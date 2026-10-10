@@ -1,0 +1,14 @@
+baseURL = "https://example.org/"
+title = "Permalinks"
+languageCode = "en"
+timeZone = "UTC"
+
+[permalinks]
+  posts = "/:year/:month/:day/:slug/"
+  notes = "/:sections/:filename/"
+  blog = "/:section/:contentbasename/"
+  essays = "/:year/:title/"
+  [permalinks.page]
+    docs = "/manual/:sections[1:]/:filename/"
+  [permalinks.section]
+    docs = "/manual/:sections[1:]/"

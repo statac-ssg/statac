@@ -1,0 +1,4 @@
+BaseURL = "https://example.org/"
+Title = "Settings in config.toml"
+LanguageCode = "en"
+TimeZone = "UTC"

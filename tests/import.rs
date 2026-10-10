@@ -1,0 +1,2354 @@
+//! `statac import` reads each made site in `tests/import/*/old` and
+//! writes the new site kept beside it in `new/`, file for file and byte
+//! for byte. Files written exactly as `starter/` holds them aren't kept
+//! again: each is compared with the starter's own. The old site is the
+//! same after as before, and the new one passes `statac check` with no
+//! error.
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use statac::build::{self, Mode, Options};
+use statac::date::Date;
+use statac::import::{self, Tool};
+use statac::problem::Severity;
+
+const KEY: &str = "0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20";
+
+fn today() -> Date {
+    Date::day_only(2026, 10, 6)
+}
+
+fn scratch(label: &str) -> PathBuf {
+    let tests = std::env::temp_dir().join(format!("statac-import-{}", std::process::id()));
+    let path = tests.join(label);
+    let _ = fs::remove_dir_all(&path);
+    fs::create_dir_all(&tests).unwrap();
+    path
+}
+
+/// Every file under `folder`, by its path in it, with its bytes.
+fn files(folder: &Path) -> BTreeMap<String, Vec<u8>> {
+    let mut found = BTreeMap::new();
+    let mut waiting = vec![folder.to_path_buf()];
+    while let Some(at) = waiting.pop() {
+        for entry in fs::read_dir(&at).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                waiting.push(path);
+            } else {
+                let rel = path.strip_prefix(folder).unwrap();
+                let rel = rel.to_string_lossy().replace('\\', "/");
+                found.insert(rel, fs::read(&path).unwrap());
+            }
+        }
+    }
+    found
+}
+
+/// Imports `old` into `new` with the day fixed, giving the exit code and
+/// what was said.
+fn import(old: &Path, new: &Path, from: Option<Tool>) -> (u8, String) {
+    let mut said = Vec::new();
+    let options = import::Options {
+        old: old.to_path_buf(),
+        new: Some(new.to_path_buf()),
+        from,
+        today: Some(today()),
+    };
+    let code = import::run(&options, None, &mut said, false);
+    (code, String::from_utf8(said).unwrap())
+}
+
+/// Imports `old` into `new` as [`import`] does, with `typed` there to
+/// read, by a person at a terminal where `terminal` says.
+fn import_answering(old: &Path, new: &Path, typed: &str, terminal: bool) -> (u8, String) {
+    let mut said = Vec::new();
+    let options = import::Options {
+        old: old.to_path_buf(),
+        new: Some(new.to_path_buf()),
+        from: None,
+        today: Some(today()),
+    };
+    let mut reader = typed.as_bytes();
+    let input = statac::new::Input {
+        reader: &mut reader,
+        terminal,
+    };
+    let code = import::run(&options, Some(input), &mut said, false);
+    (code, String::from_utf8(said).unwrap())
+}
+
+/// The starter's own file at `path`, where it has one.
+fn starter(path: &str) -> Option<Vec<u8>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("starter/site");
+    fs::read(root.join(path)).ok()
+}
+
+/// The name of each warning and note `statac check` finds in `site`, in
+/// order, having found no error.
+fn checked(site: &Path) -> Vec<String> {
+    let outcome = build::run(&Options {
+        mode: Mode::Check,
+        site: site.to_path_buf(),
+        out: None,
+        today: Some(today()),
+        drafts: false,
+        url: None,
+    });
+    let report = statac::report::Report::new(outcome.sources(), site, false);
+    let errors: Vec<_> = (outcome.problems.iter())
+        .filter(|problem| problem.kind.severity() == Severity::Error)
+        .cloned()
+        .collect();
+    assert!(errors.is_empty(), "{}", report.problems(&errors));
+    let mut names: Vec<String> = (outcome.problems.iter())
+        .map(|problem| problem.kind.name().to_owned())
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// Imports the fixture `name`, compares what it wrote with what is kept,
+/// and gives the names of what `check` finds in it.
+fn fixture(name: &str) -> Vec<String> {
+    let old = PathBuf::from(format!("tests/import/{name}/old"));
+    let wanted = Path::new("tests/import").join(name).join("new");
+    let before = files(&old);
+    let new = scratch(name);
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(files(&old), before, "{name}: the old site changed");
+    let mut made = files(&new);
+    let settings = made.get_mut("statac.yaml").unwrap();
+    let text = String::from_utf8(settings.clone()).unwrap();
+    let fixed: Vec<String> = text
+        .lines()
+        .map(|line| match line.starts_with("feed_key: ") {
+            true => format!("feed_key: {KEY}"),
+            false => line.to_owned(),
+        })
+        .collect();
+    *settings = (fixed.join("\n") + "\n").into_bytes();
+    let kept = files(&wanted);
+    for (path, bytes) in &made {
+        let held = kept.get(path).cloned().or_else(|| starter(path));
+        let shown = String::from_utf8_lossy(bytes);
+        assert!(
+            held.as_ref() == Some(bytes),
+            "{name}: `{path}` is now:\n{shown}"
+        );
+    }
+    for path in kept.keys() {
+        assert!(made.contains_key(path), "{name}: `{path}` wasn't written");
+    }
+    let samples = [
+        "content/notes/",
+        "content/photos/",
+        "content/posts/first-post/",
+        "content/posts/what-a-post-can-hold/",
+    ];
+    let sample = (made.keys())
+        .filter(|path| !kept.contains_key(*path))
+        .find(|path| samples.iter().any(|folder| path.starts_with(folder)));
+    assert_eq!(sample, None, "{name}: a sample page's file was written");
+    let card = made.keys().find(|path| path.starts_with("templates/og"));
+    assert_eq!(card, None, "{name}: a sharing card's file was written");
+    checked(&new)
+}
+
+const NO_ADDRESS: &str = "no-site-address";
+const NO_ZONE: &str = "no-time-zone";
+const DRAFT: &str = "draft-left-out";
+const AS_TEXT: &str = "published-as-text";
+
+#[test]
+fn each_permalink_style_keeps_every_address() {
+    for (name, found) in [
+        ("permalink-date", &[][..]),
+        ("permalink-pretty", &[NO_ADDRESS, NO_ZONE]),
+        ("permalink-ordinal", &[NO_ADDRESS, NO_ZONE]),
+        ("permalink-weekdate", &[NO_ADDRESS, NO_ZONE]),
+        ("permalink-none", &[NO_ADDRESS, NO_ZONE]),
+        ("permalink-pattern", &[NO_ADDRESS, NO_ZONE]),
+    ] {
+        assert_eq!(fixture(name), found, "{name}");
+    }
+}
+
+#[test]
+fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts() {
+    assert_eq!(fixture("home-pages"), &[] as &[&str]);
+    let out = scratch("home-pages-built");
+    let new = out.with_file_name("home-pages");
+    let outcome = build::run(&Options {
+        mode: Mode::Build,
+        site: new.clone(),
+        out: Some(out.clone()),
+        today: Some(today()),
+        drafts: false,
+        url: None,
+    });
+    let stopped = |problem: &&statac::problem::Problem| problem.kind.severity() == Severity::Error;
+    assert_eq!(outcome.problems.iter().filter(stopped).count(), 0);
+    let read = |path: &str| fs::read_to_string(out.join(path)).unwrap();
+    // The old third page held the oldest post, as the list's third does.
+    assert!(read("page3/index.html").contains("url=https://example.org/posts/page/3/"));
+    assert!(read("posts/page/3/index.html").contains("Post 1"));
+    // The old second page held the later post of one day and the list's
+    // second holds the earlier, so it is sent on to the page of its number.
+    assert!(read("page2/index.html").contains("url=https://example.org/posts/page/2/"));
+    assert!(!out.join("page").exists());
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(report.contains(
+        "sends readers on from `/page2/`, an old later page of the home page, to the page of \
+         `content/posts/` with the same number, which doesn't hold exactly the same posts"
+    ));
+    assert!(!report.contains("Nothing in the new site answers these old addresses"));
+}
+
+#[test]
+fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
+    for (name, found, posts_page) in [
+        ("hugo-home-pages", &[][..], true),
+        ("zola-home-pages", &[][..], false),
+        ("eleventy-home-pages", &[NO_ADDRESS][..], true),
+    ] {
+        assert_eq!(fixture(name), found, "{name}");
+        let out = scratch(&format!("{name}-built"));
+        let new = out.with_file_name(name);
+        let outcome = build::run(&Options {
+            mode: Mode::Build,
+            site: new.clone(),
+            out: Some(out.clone()),
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        assert!(outcome.published.is_some(), "{name}");
+        let home = fs::read_to_string(new.join("content/index.md")).unwrap();
+        assert!(home.contains("\nposts_per_page: 0\n"), "{name}: {home}");
+        assert!(!out.join("page").exists(), "{name}");
+        assert_eq!(out.join("posts/page/2").exists(), posts_page, "{name}");
+    }
+    let report = |name: &str| {
+        fs::read_to_string(Path::new("tests/import").join(name).join("new/IMPORT.md")).unwrap()
+    };
+    assert!(report("hugo-home-pages").contains(
+        "Where the old home page had later pages, nothing answers them: Statac's home page \
+         shows the newest of each folder itself"
+    ));
+    let zola = report("zola-home-pages");
+    assert!(zola.contains("nothing answers the old home page's later pages: they are listed"));
+    assert!(zola.contains("\n- `/page/2/`\n"));
+    assert!(!report("eleventy-home-pages").contains("later pages"));
+}
+
+#[test]
+fn a_site_under_a_path_keeps_its_addresses_and_links() {
+    assert_eq!(fixture("baseurl"), [NO_ZONE, "robots-beneath-path"]);
+}
+
+#[test]
+fn a_404_page_of_the_old_sites_own_is_kept_out_of_search_with_its_own_words() {
+    let new = scratch("baseurl-built");
+    let (code, said) = import(Path::new("tests/import/baseurl/old"), &new, None);
+    assert_eq!(code, 0, "{said}");
+    let outcome = build::run(&Options {
+        mode: Mode::Build,
+        site: new.clone(),
+        out: None,
+        today: Some(today()),
+        drafts: false,
+        url: None,
+    });
+    assert!(outcome.published.is_some());
+    let page = fs::read_to_string(new.join("_site/404.html")).unwrap();
+    assert!(
+        page.contains("<meta name=\"robots\" content=\"noindex\">\n</head>"),
+        "{page}"
+    );
+    assert!(!page.contains("og:"), "{page}");
+    assert!(
+        page.contains(">Not found</h1>")
+            && page.contains("for an address where nothing is published.</p>"),
+        "{page}"
+    );
+    // A page anywhere else is shared as it was.
+    let about = fs::read_to_string(new.join("_site/about.html")).unwrap();
+    assert!(about.contains("og:title") && !about.contains("noindex"));
+}
+
+#[test]
+fn dates_come_across_from_names_and_front_matter() {
+    assert_eq!(fixture("dates"), [DRAFT, NO_ADDRESS]);
+}
+
+#[test]
+fn front_matter_comes_across_in_statacs_words() {
+    assert_eq!(fixture("front-matter"), [DRAFT, NO_ADDRESS, NO_ZONE]);
+}
+
+#[test]
+fn tags_in_the_writing_convert_or_stay_as_written() {
+    assert_eq!(fixture("tags-in-writing"), [NO_ZONE, AS_TEXT]);
+}
+
+#[test]
+fn markdown_that_reads_differently_is_counted_not_rewritten() {
+    assert_eq!(fixture("markdown-forms"), [NO_ADDRESS, NO_ZONE, AS_TEXT]);
+}
+
+#[test]
+fn words_statac_would_read_as_a_snippet_call_are_escaped() {
+    assert_eq!(fixture("calls-in-writing"), [NO_ADDRESS, NO_ZONE]);
+}
+
+#[test]
+fn code_inside_html_is_given_a_blank_line_and_stays_code() {
+    assert_eq!(fixture("html-writing"), [NO_ADDRESS, NO_ZONE]);
+}
+
+#[test]
+fn markers_statac_refuses_and_dollars_it_reads_as_maths_are_settled() {
+    assert_eq!(fixture("markers-and-dollars"), [NO_ADDRESS, NO_ZONE]);
+}
+
+#[test]
+fn maths_the_old_site_set_between_dollar_signs_stays_maths() {
+    assert_eq!(fixture("hugo-maths"), [] as [&str; 0]);
+    assert_eq!(fixture("eleventy-maths"), [NO_ADDRESS]);
+}
+
+#[test]
+fn files_data_and_folders_of_pages_come_across() {
+    assert_eq!(fixture("files-and-data"), [DRAFT, NO_ADDRESS, NO_ZONE]);
+}
+
+#[test]
+fn settings_in_toml_are_read_as_settings_in_yaml() {
+    assert_eq!(fixture("settings-toml"), [] as [&str; 0]);
+}
+
+#[test]
+fn a_site_is_read_from_the_folder_its_settings_name() {
+    assert_eq!(fixture("source-folder"), [NO_ADDRESS, NO_ZONE]);
+}
+
+#[test]
+fn pages_and_feeds_of_the_old_built_output_that_nothing_answers_are_listed() {
+    assert_eq!(fixture("built-output"), [NO_ZONE]);
+}
+
+#[test]
+fn what_is_said_counts_the_old_built_pages_nothing_answers() {
+    let old = Path::new("tests/import/built-output/old");
+    let new = scratch("said-built");
+    let (code, said) = import(old, &new, None);
+    assert_eq!(code, 0);
+    assert!(
+        said.contains("\nAddresses: 5 kept, 8 that nothing answers now.\n"),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_file_whose_name_cant_be_published_is_given_one_that_can() {
+    assert_eq!(fixture("hugo-file-names"), [] as [&str; 0]);
+}
+
+#[test]
+fn an_old_address_the_new_site_cant_keep_is_left_out_and_listed() {
+    assert_eq!(fixture("hugo-aliases-kept"), [] as [&str; 0]);
+    let old = Path::new("tests/import/hugo-aliases-kept/old");
+    let (code, said) = import(old, &scratch("said-aliases"), None);
+    assert_eq!(code, 0);
+    assert!(
+        said.contains("\nAddresses: 8 kept, 1 that nothing answers now, 5 that can't be kept.\n"),
+        "{said}"
+    );
+}
+
+#[test]
+fn the_starters_posts_folder_is_left_out_where_nothing_lands_in_it() {
+    assert_eq!(fixture("hugo-no-posts"), [] as [&str; 0]);
+    let new = scratch("no-posts");
+    let (code, said) = import(Path::new("tests/import/hugo-no-posts/old"), &new, None);
+    assert_eq!(code, 0, "{said}");
+    assert!(!new.join("content/posts").exists());
+}
+
+#[test]
+fn a_pattern_goes_in_the_highest_folders_own_page_and_no_page_is_made_for_it() {
+    assert_eq!(fixture("hugo-nested-folders"), [] as [&str; 0]);
+    let new = scratch("nested");
+    let old = Path::new("tests/import/hugo-nested-folders/old");
+    let (code, said) = import(old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    let indexes: Vec<&String> = (made.keys())
+        .filter(|path| path.starts_with("content/post/") && path.ends_with("index.md"))
+        .collect();
+    assert_eq!(indexes, ["content/post/index.md"]);
+}
+
+#[test]
+fn what_is_said_counts_what_came_across() {
+    let old = Path::new("tests/import/front-matter/old");
+    let new = scratch("said");
+    let (code, said) = import(old, &new, None);
+    assert_eq!(code, 0);
+    let shown = new.to_string_lossy();
+    assert_eq!(
+        said,
+        format!(
+            "Imported the Jekyll site `tests/import/front-matter/old` into `{shown}`. This is a \
+             best effort: read `{shown}/IMPORT.md` before you publish.\n\
+             \n\
+             Converted: 2 posts, 1 draft, 2 pages.\n\
+             Addresses: 6 kept.\n\
+             Left for you: 6 things of 3 kinds.\n\
+             \n\
+             Next: `cd {shown}`, then `statac check`.\n"
+        )
+    );
+}
+
+#[test]
+fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
+    let top = scratch("errors");
+    let old = top.join("old");
+    fs::create_dir_all(old.join("_posts")).unwrap();
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    fs::write(
+        old.join("_posts/2026-01-01-post-1.md"),
+        "---\ntitle: Post 1\ndate: 04/10/2026\n---\nA post with a date of two readings.\n",
+    )
+    .unwrap();
+    fs::write(
+        old.join("_posts/2026-01-02-post-2.md"),
+        "---\ntitle: Post 2\n---\nA post whose maths has a brace never closed.\n\n\
+         Half is $$\\frac{1}{2$$.\n",
+    )
+    .unwrap();
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let shown = new.to_string_lossy();
+    assert!(
+        said.ends_with(&format!(
+            "Left for you: 4 things of 3 kinds.\n\
+             The new site doesn't build yet: 2 errors, listed in `{shown}/IMPORT.md`.\n\
+             \n\
+             Next: `cd {shown}`, then `statac check`.\n"
+        )),
+        "{said}"
+    );
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(
+        report.contains(
+            "### Errors in the new site\n\
+             \n\
+             Statac found these when it read the new site, and each stops it building: `statac \
+             check` shows each one with what to do.\n\
+             \n\
+             - `content/posts/post-1.md`, line 3: ``Unclear date: `04/10/2026` could be 4 October \
+             or 10 April``\n\
+             - `content/posts/post-2.md`, line 8: ``Malformed maths: `{` is never closed``\n\
+             \n"
+        ),
+        "{report}"
+    );
+    let outcome = build::run(&Options {
+        mode: Mode::Check,
+        site: new.clone(),
+        out: None,
+        today: Some(today()),
+        drafts: false,
+        url: None,
+    });
+    let errors = (outcome.problems.iter())
+        .filter(|problem| problem.kind.severity() == Severity::Error)
+        .count();
+    assert_eq!(errors, 2);
+}
+
+/// What importing `old` says, having written nothing.
+fn refused(old: &Path, new: &Path, from: Option<Tool>) -> String {
+    let (code, said) = import(old, new, from);
+    assert_eq!(code, 1, "{said}");
+    said.lines().next().unwrap_or_default().to_owned()
+}
+
+#[test]
+fn a_site_that_cant_be_imported_is_refused_and_nothing_is_written() {
+    let top = scratch("refused");
+    let old = top.join("old");
+    fs::create_dir_all(old.join("_posts")).unwrap();
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    let before = files(&old);
+
+    let missing = top.join("missing");
+    assert_eq!(
+        refused(&missing, &top.join("new-1"), None),
+        format!(
+            "error  Can't read `{}`: it doesn't exist",
+            missing.display()
+        )
+    );
+
+    let full = top.join("full");
+    fs::create_dir_all(&full).unwrap();
+    fs::write(full.join("a.txt"), "a\n").unwrap();
+    let (_, said) = import(&old, &full, None);
+    assert_eq!(
+        said,
+        format!(
+            "error  Folder not empty: `{}` holds `a.txt`\n\
+             \x20 Give `statac import` an empty folder, or the name of a new one.\n\
+             \x20 More: https://statac.dev/e/folder-not-empty/\n",
+            full.display()
+        )
+    );
+
+    let site = top.join("site");
+    fs::create_dir_all(&site).unwrap();
+    fs::write(site.join("statac.yaml"), "title: Site 2\n").unwrap();
+    let (_, said) = import(&old, &site, None);
+    assert_eq!(
+        said,
+        format!(
+            "error  Already a site: `{}` has a `statac.yaml`\n\
+             \x20 More: https://statac.dev/e/already-a-site/\n",
+            site.display()
+        )
+    );
+
+    let inside = old.join("new");
+    assert_eq!(
+        refused(&old, &inside, None),
+        format!(
+            "error  Can't write `{}`: it is inside the site being imported, `{}`",
+            inside.display(),
+            old.display()
+        )
+    );
+    assert!(!inside.exists());
+    assert_eq!(
+        refused(&old, &top, None),
+        format!(
+            "error  Can't write `{}`: the site being imported, `{}`, is inside it",
+            top.display(),
+            old.display()
+        )
+    );
+
+    let nothing = top.join("nothing");
+    fs::create_dir_all(&nothing).unwrap();
+    fs::write(nothing.join("index.md"), "Home.\n").unwrap();
+    let said = {
+        let (code, said) = import(&nothing, &top.join("new-2"), None);
+        assert_eq!(code, 1);
+        said
+    };
+    assert!(
+        said.starts_with(&format!(
+            "error  Can't tell what made the site: `{}` has no settings file Statac knows\n  \
+             Say what made it with `--from=jekyll`, `--from=hugo`, `--from=zola` or `--from=eleventy`.\n",
+            nothing.display()
+        )),
+        "{said}"
+    );
+
+    let toml = top.join("toml");
+    fs::create_dir_all(&toml).unwrap();
+    fs::write(toml.join("_config.toml"), "title = \"Site 1\"\nurl = \n").unwrap();
+    assert_eq!(
+        refused(&toml, &top.join("new-3"), None),
+        format!(
+            "error  Can't read `{}`: this line doesn't read as TOML",
+            toml.join("_config.toml").display()
+        )
+    );
+
+    for name in ["new-1", "new-2", "new-3"] {
+        assert!(!top.join(name).exists(), "{name}");
+    }
+    assert_eq!(files(&old), before);
+}
+
+#[test]
+fn a_site_whose_tool_isnt_told_is_read_as_the_tool_named() {
+    let top = scratch("named");
+    let old = top.join("old");
+    fs::create_dir_all(old.join("_posts")).unwrap();
+    fs::write(
+        old.join("_posts/2026-01-01-post-1.md"),
+        "---\ntitle: Post 1\n---\nA post in a site with no settings file, read as Jekyll's.\n",
+    )
+    .unwrap();
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, Some(Tool::Jekyll));
+    assert_eq!(code, 0, "{said}");
+    let post = fs::read_to_string(new.join("content/posts/post-1.md")).unwrap();
+    assert!(
+        post.starts_with("---\ntitle: Post 1\ndate: 2026-01-01\n"),
+        "{post}"
+    );
+}
+
+#[test]
+fn the_command_line_asks_for_a_folder_and_a_tool_statac_knows() {
+    let run = |args: &[&str]| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_statac"))
+            .args(args)
+            .env("NO_COLOR", "1")
+            .output()
+            .unwrap()
+    };
+    let output = run(&["import"]);
+    assert_eq!(output.status.code(), Some(2));
+    let said = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        said.starts_with(
+            "error  Missing folder: `statac import` needs the folder of the site to import\n"
+        ),
+        "{said}"
+    );
+    let output = run(&["import", "old", "--from=tool-1"]);
+    assert_eq!(output.status.code(), Some(2));
+    let said = String::from_utf8(output.stderr).unwrap();
+    assert!(said.contains("`--from`"), "{said}");
+    assert!(said.contains("`jekyll`"), "{said}");
+    assert!(said.contains("`hugo`"), "{said}");
+}
+
+const PICTURE: &str = "undescribed-picture";
+
+#[test]
+fn hugo_settings_are_read_in_each_format_and_split_over_a_folder() {
+    for name in [
+        "hugo-settings-yaml",
+        "hugo-settings-json",
+        "hugo-settings-split",
+        "hugo-config-toml",
+    ] {
+        assert_eq!(fixture(name), [] as [&str; 0], "{name}");
+    }
+}
+
+#[test]
+fn hugo_front_matter_comes_across_in_statacs_words() {
+    assert_eq!(fixture("hugo-front-matter"), [DRAFT]);
+}
+
+#[test]
+fn hugo_pages_kept_as_folders_come_across_whole() {
+    assert_eq!(fixture("hugo-bundles"), [] as [&str; 0]);
+}
+
+#[test]
+fn hugo_addresses_are_kept_by_each_placeholder_and_as_files() {
+    assert_eq!(fixture("hugo-permalinks"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-ugly"), [] as [&str; 0]);
+}
+
+#[test]
+fn hugo_site_under_a_path_keeps_its_addresses_and_links() {
+    assert_eq!(fixture("hugo-under-path"), [AS_TEXT]);
+}
+
+#[test]
+fn hugo_tags_keep_the_addresses_hugo_gave_them() {
+    assert_eq!(fixture("hugo-tags"), [] as [&str; 0]);
+}
+
+#[test]
+fn hugo_languages_come_across_by_folder_and_by_name() {
+    assert_eq!(fixture("hugo-languages-folders"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-languages-names"), [] as [&str; 0]);
+}
+
+#[test]
+fn hugo_dates_come_across_from_names_and_front_matter() {
+    assert_eq!(fixture("hugo-dates"), [] as [&str; 0]);
+}
+
+#[test]
+fn hugo_tags_in_the_writing_convert_or_stay_as_written() {
+    assert_eq!(
+        fixture("hugo-tags-in-writing"),
+        [
+            "broken-link",
+            "missing-definition",
+            "no-still",
+            AS_TEXT,
+            PICTURE
+        ]
+    );
+}
+
+#[test]
+fn hugo_markdown_that_reads_differently_is_counted_not_rewritten() {
+    assert_eq!(fixture("hugo-markdown-forms"), [] as [&str; 0]);
+}
+
+#[test]
+fn hugo_files_data_and_folders_left_come_across_or_are_listed() {
+    assert_eq!(fixture("hugo-files-and-data"), [] as [&str; 0]);
+}
+
+#[test]
+fn a_hugo_site_is_told_by_its_settings() {
+    let top = scratch("told");
+    let site = |name: &str, files: &[(&str, &str)]| {
+        let folder = top.join(name);
+        for (path, text) in files {
+            let path = folder.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        folder
+    };
+    for (name, files) in [
+        ("hugo-toml", &[("hugo.toml", "title = \"Site 1\"\n")][..]),
+        ("hugo-yaml", &[("hugo.yaml", "title: Site 1\n")]),
+        ("hugo-yml", &[("hugo.yml", "title: Site 1\n")]),
+        ("hugo-json", &[("hugo.json", "{\"title\": \"Site 1\"}\n")]),
+        (
+            "config-toml",
+            &[("config.toml", "BaseURL = \"https://example.org/\"\n")],
+        ),
+        (
+            "config-yaml",
+            &[("config.yaml", "baseurl: https://example.org/\n")],
+        ),
+        ("config-json", &[("config.json", "{\"baseURL\": \"/\"}\n")]),
+        ("split", &[("config/_default/params.toml", "a = 1\n")]),
+    ] {
+        let folder = site(name, files);
+        assert!(Tool::Hugo.owns(&folder), "{name}");
+        assert!(!Tool::Jekyll.owns(&folder), "{name}");
+        assert!(!Tool::Zola.owns(&folder), "{name}");
+    }
+    let other = site(
+        "other-tool",
+        &[("config.toml", "base_url = \"https://example.org/\"\n")],
+    );
+    assert!(!Tool::Hugo.owns(&other));
+    assert!(Tool::Zola.owns(&other));
+
+    let both = site(
+        "both",
+        &[
+            ("hugo.toml", "title = \"Site 1\"\n"),
+            ("_config.yml", "title: Site 1\n"),
+        ],
+    );
+    assert_eq!(
+        refused(&both, &top.join("new-2"), None),
+        format!(
+            "error  Can't tell what made the site: `{}` has the settings files of more than one tool",
+            both.display()
+        )
+    );
+    let new = top.join("new-3");
+    let (code, said) = import(&both, &new, Some(Tool::Hugo));
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("Imported the Hugo site"), "{said}");
+
+    let broken = site(
+        "broken",
+        &[("hugo.toml", "title = \"Site 1\"\nbaseURL = \n")],
+    );
+    assert_eq!(
+        refused(&broken, &top.join("new-4"), None),
+        format!(
+            "error  Can't read `{}`: this line doesn't read as TOML",
+            broken.join("hugo.toml").display()
+        )
+    );
+    assert!(!top.join("new-4").exists());
+}
+
+const OUTSIDE: &str = "kept outside the old site";
+
+/// An old site at `outside/old` under a new folder for `label`, with one
+/// post, and files in `outside/` and `outside/inner/` that are no part of
+/// it. Gives the old site's folder and `outside/`.
+fn beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
+    let outside = scratch(label).join("outside");
+    let old = outside.join("old");
+    fs::create_dir_all(old.join("_posts")).unwrap();
+    fs::write(
+        old.join("_posts/2026-01-01-post-1.md"),
+        "---\ntitle: Post 1\n---\nA post of the old site's own.\n",
+    )
+    .unwrap();
+    for folder in [outside.clone(), outside.join("inner")] {
+        fs::create_dir_all(folder.join("_posts")).unwrap();
+        fs::write(folder.join("file-9.txt"), OUTSIDE).unwrap();
+        fs::write(folder.join("data-9.yml"), format!("a: {OUTSIDE}\n")).unwrap();
+        fs::write(folder.join("page-9.html"), format!("<p>{OUTSIDE}</p>\n")).unwrap();
+        fs::write(
+            folder.join("post-9.md"),
+            format!("---\ntitle: Post 9\ndate: 2026-02-02\n---\n{OUTSIDE}\n"),
+        )
+        .unwrap();
+        fs::write(
+            folder.join("_posts/2026-02-02-post-9.md"),
+            format!("---\ntitle: Post 9\n---\n{OUTSIDE}\n"),
+        )
+        .unwrap();
+    }
+    (old, outside)
+}
+
+/// Imports `old`, whose settings are `settings`, and gives the report,
+/// having seen that the old site's own post came across and nothing from
+/// outside it did, by name or by what it holds.
+fn nothing_from_outside(old: &Path, settings: &str) -> String {
+    nothing_from_outside_of(old, "_config.yml", settings)
+}
+
+/// [`nothing_from_outside`], the settings being in the file `named`.
+fn nothing_from_outside_of(old: &Path, named: &str, settings: &str) -> String {
+    fs::write(old.join(named), settings).unwrap();
+    let new = old.parent().unwrap().parent().unwrap().join("new");
+    let (code, said) = import(old, &new, None);
+    assert_eq!(code, 0, "{settings}: {said}");
+    let made = files(&new);
+    assert!(made.contains_key("content/posts/post-1.md"), "{settings}");
+    for (path, bytes) in &made {
+        let text = String::from_utf8_lossy(bytes);
+        assert!(!path.contains("-9"), "{settings}: `{path}` was written");
+        assert!(!text.contains(OUTSIDE), "{settings}: `{path}`:\n{text}");
+        assert!(
+            !text.contains("post-9") && !text.contains("file-9"),
+            "{settings}: `{path}`:\n{text}"
+        );
+    }
+    let report = String::from_utf8(made["IMPORT.md"].clone()).unwrap();
+    fs::remove_dir_all(&new).unwrap();
+    report
+}
+
+#[cfg(unix)]
+const LEADS_OUTSIDE: &str = "a link that leads outside the old site, which Statac doesn't follow";
+#[cfg(unix)]
+const LEADS_BACK: &str =
+    "a link that leads back to a folder it is inside, which Statac doesn't follow";
+
+/// A page of the old site's own at `path`.
+#[cfg(unix)]
+fn page_at(old: &Path, path: &str, title: &str) {
+    fs::create_dir_all(old.join(path).parent().unwrap()).unwrap();
+    let text = format!("---\ntitle: {title}\n---\nA page of the old site's own.\n");
+    fs::write(old.join(path), text).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_that_leads_inside_the_old_site_is_followed_where_it_stands() {
+    use std::os::unix::fs::symlink;
+    let (old, _) = beside_files_of_others("links-inside");
+    page_at(&old, "store/page-2.md", "Page 2");
+    symlink("store", old.join("linked")).unwrap();
+    symlink("store/page-2.md", old.join("page-3.md")).unwrap();
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    let new = old.parent().unwrap().parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    for path in [
+        "content/store/page-2.md",
+        "content/linked/page-2.md",
+        "content/page-3.md",
+    ] {
+        let text = String::from_utf8_lossy(&made[path]);
+        assert!(text.contains("title: Page 2"), "{path}: {text}");
+    }
+    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
+    assert!(
+        report.contains(
+            "Statac followed 2 links, such as `linked`, which lead to somewhere inside the old \
+             site, and read what each leads to as standing where the link is.\n"
+        ),
+        "{report}"
+    );
+    assert!(!report.contains("Links Statac didn't follow"), "{report}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_that_leads_outside_back_or_nowhere_is_never_followed() {
+    use std::os::unix::fs::symlink;
+    let (old, outside) = beside_files_of_others("links-refused");
+    // A folder beside the old one whose name begins with its name.
+    let beside = outside.join("old-2");
+    fs::create_dir_all(&beside).unwrap();
+    fs::write(
+        beside.join("page-8.md"),
+        format!("---\ntitle: Page 8\n---\n{OUTSIDE}\n"),
+    )
+    .unwrap();
+    page_at(&old, "store/page-2.md", "Page 2");
+    page_at(&old, "a/page-4.md", "Page 4");
+    page_at(&old, "b/page-5.md", "Page 5");
+    symlink("store", old.join("linked")).unwrap();
+    // Inside a folder a link leads to, one that leads outside.
+    symlink(&outside, old.join("store/out")).unwrap();
+    symlink("../old-2", old.join("beside")).unwrap();
+    symlink("..", old.join("store/up")).unwrap();
+    symlink("../b", old.join("a/x")).unwrap();
+    symlink("../a", old.join("b/y")).unwrap();
+    symlink("nowhere", old.join("gone")).unwrap();
+    let report = nothing_from_outside(&old, "title: Site 1\n");
+    assert!(!report.contains("Page 8"), "{report}");
+    for (link, why) in [
+        ("store/out", LEADS_OUTSIDE),
+        ("linked/out", LEADS_OUTSIDE),
+        ("beside", LEADS_OUTSIDE),
+        ("store/up", LEADS_BACK),
+        ("linked/up", LEADS_BACK),
+        ("a/x/y", LEADS_BACK),
+        ("b/y/x", LEADS_BACK),
+        ("gone", "a link to something that isn't there"),
+    ] {
+        let line = format!("- `{link}`: {why}\n");
+        let listed = report.split("### Links Statac didn't follow").nth(1);
+        assert!(
+            listed.is_some_and(|listed| listed.contains(&line)),
+            "{line}{report}"
+        );
+    }
+    assert!(
+        report.contains("Statac followed 3 links, such as `a/x`,"),
+        "{report}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_folder_the_settings_name_is_read_through_a_link_that_leads_inside() {
+    use std::os::unix::fs::symlink;
+    let (old, _) = beside_files_of_others("links-setting");
+    fs::create_dir_all(old.join("kept")).unwrap();
+    fs::rename(old.join("_posts"), old.join("kept/_posts")).unwrap();
+    symlink("kept", old.join("linked")).unwrap();
+    let report = nothing_from_outside(&old, "title: Site 1\nsource: linked\n");
+    assert!(!report.contains("Settings naming a folder"), "{report}");
+    assert!(
+        report.contains("Statac followed 1 link, `linked`, which leads"),
+        "{report}"
+    );
+}
+
+#[cfg(unix)]
+const UNPUBLISHED: &str =
+    "a link that leads to a place the old site didn't publish, which Statac doesn't follow";
+
+/// Makes an old site of `files`, with a file and a page holding the
+/// marker in each of `kept_back`, places the tool reads without
+/// publishing or doesn't read, and imports it. Then puts a link to each,
+/// and to a hidden file, in the folder `links_in`, where the tool
+/// publishes what it finds, imports it again, and sees that the links
+/// brought nothing into the new site, and that each is listed as leading
+/// to what wasn't published. One more link, there both times, leads to
+/// `published`, a folder the tool does publish, which holds a hidden
+/// file with the marker: the folder comes across at the link, as
+/// `comes_across` in the new site, and the hidden file doesn't.
+#[cfg(unix)]
+fn nothing_kept_back_is_published_through_a_link(
+    label: &str,
+    files: &[(&str, &str)],
+    kept_back: &[&str],
+    links_in: &str,
+    published: &str,
+    comes_across: &str,
+) {
+    use std::os::unix::fs::symlink;
+    let top = scratch(label);
+    let old = top.join("old");
+    let write = |path: &str, text: &str| {
+        fs::create_dir_all(old.join(path).parent().unwrap()).unwrap();
+        fs::write(old.join(path), text).unwrap();
+    };
+    for (path, text) in files {
+        write(path, text);
+    }
+    let page = format!("---\ntitle: Page 7\ndate: 2026-03-03\n---\n{OUTSIDE}\n");
+    write(".env", OUTSIDE);
+    write(&format!("{published}/.hidden-7.txt"), OUTSIDE);
+    for place in kept_back {
+        write(&format!("{place}/file-7.txt"), OUTSIDE);
+        write(&format!("{place}/page-7.md"), &page);
+        write(&format!("{place}/inner/page-7.html"), &page);
+    }
+    fs::create_dir_all(old.join(links_in)).unwrap();
+    let up = "../".repeat(links_in.split('/').count());
+    let link = |to: &str, name: &str| {
+        symlink(format!("{up}{to}"), old.join(links_in).join(name)).unwrap();
+    };
+    link(published, "linked");
+    let (code, said) = import(&old, &top.join("new-1"), None);
+    assert_eq!(code, 0, "{said}");
+    let without = files_of(&top.join("new-1"));
+    link(".env", "env.txt");
+    for (n, place) in kept_back.iter().enumerate() {
+        link(place, &format!("link-{n}"));
+    }
+    let (code, said) = import(&old, &top.join("new-2"), None);
+    assert_eq!(code, 0, "{said}");
+    let made = files_of(&top.join("new-2"));
+    // The report differs, and the key made fresh for the feed's ids.
+    let but_those = |made: &BTreeMap<String, Vec<u8>>| -> Vec<(String, usize)> {
+        (made.iter())
+            .filter(|(path, _)| !matches!(path.as_str(), "IMPORT.md" | "statac.yaml"))
+            .map(|(path, bytes)| (path.clone(), bytes.len()))
+            .collect()
+    };
+    assert_eq!(but_those(&made), but_those(&without), "{label}");
+    for (path, bytes) in &made {
+        let through =
+            path.contains("link-") || path.contains("env.txt") || path.contains("/linked/.");
+        assert!(!through, "{label}: `{path}` was written");
+        let text = String::from_utf8_lossy(bytes);
+        let own = path != "IMPORT.md" && without.get(path) == Some(bytes);
+        assert!(own || !text.contains(OUTSIDE), "{label}: `{path}`:\n{text}");
+    }
+    assert!(
+        made.contains_key(comes_across),
+        "{label}: {:?}",
+        made.keys()
+    );
+    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
+    let listed = report.split("### Links Statac didn't follow").nth(1);
+    for name in (0..kept_back.len())
+        .map(|n| format!("link-{n}"))
+        .chain(["env.txt".to_owned()])
+    {
+        let line = format!("- `{links_in}/{name}`: {UNPUBLISHED}\n");
+        assert!(
+            listed.is_some_and(|listed| listed.contains(&line)),
+            "{label}: {line}{report}"
+        );
+    }
+}
+
+#[cfg(unix)]
+fn files_of(folder: &Path) -> BTreeMap<String, Vec<u8>> {
+    files(folder)
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_never_publishes_what_jekyll_kept_back() {
+    nothing_kept_back_is_published_through_a_link(
+        "kept-back-jekyll",
+        &[
+            ("_config.yml", "title: Site 1\nexclude: [private]\n"),
+            (
+                "_posts/2026-01-01-post-1.md",
+                "---\ntitle: Post 1\n---\nA post.\n",
+            ),
+            ("kept/page-2.md", "---\ntitle: Page 2\n---\nA page.\n"),
+        ],
+        &[
+            ".git",
+            "node_modules/package-1",
+            "_drafts",
+            "_data",
+            "_includes",
+            "_layouts",
+            "private",
+            "_site",
+        ],
+        "assets",
+        "kept",
+        "content/assets/linked/page-2.md",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_never_publishes_what_hugo_kept_back() {
+    nothing_kept_back_is_published_through_a_link(
+        "kept-back-hugo",
+        &[
+            (
+                "hugo.toml",
+                "baseURL = \"https://example.org/\"\ntitle = \"Site 1\"\n",
+            ),
+            (
+                "content/posts/post-1.md",
+                "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n",
+            ),
+            ("static/kept/file-2.txt", "A file.\n"),
+        ],
+        &[
+            ".git",
+            "node_modules/package-1",
+            "data",
+            "layouts",
+            "archetypes",
+            "themes/theme-1",
+            "public",
+        ],
+        "static/files",
+        "static/kept",
+        "static/files/linked/file-2.txt",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_never_publishes_what_zola_kept_back() {
+    nothing_kept_back_is_published_through_a_link(
+        "kept-back-zola",
+        &[
+            (
+                "config.toml",
+                "base_url = \"https://example.org\"\ntitle = \"Site 1\"\nignored_content = [\"private/*\"]\n",
+            ),
+            (
+                "content/post-1.md",
+                "+++\ntitle = \"Post 1\"\ndate = 2026-01-01\n+++\nA post.\n",
+            ),
+            ("static/kept/file-2.txt", "A file.\n"),
+        ],
+        &[
+            ".git",
+            "node_modules/package-1",
+            "templates",
+            "sass",
+            "themes/theme-1",
+            "content/private",
+            "public",
+        ],
+        "static/files",
+        "static/kept",
+        "static/files/linked/file-2.txt",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_never_publishes_what_eleventy_kept_back() {
+    nothing_kept_back_is_published_through_a_link(
+        "kept-back-eleventy",
+        &[
+            (
+                ".eleventy.js",
+                "module.exports = function (eleventyConfig) {\n  eleventyConfig.addPassthroughCopy(\"files\");\n};\n",
+            ),
+            (".eleventyignore", "private/\n"),
+            (
+                "posts/post-1.md",
+                "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n",
+            ),
+            ("kept/page-2.md", "---\ntitle: Page 2\n---\nA page.\n"),
+        ],
+        &[
+            ".git",
+            "node_modules/package-1",
+            "_data",
+            "_includes",
+            "private",
+            "_site",
+        ],
+        "files",
+        "kept",
+        "static/files/linked/page-2.md",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn an_eleventy_folder_outside_the_input_folder_is_read_through_a_link_into_it() {
+    use std::os::unix::fs::symlink;
+    let top = scratch("links-beyond");
+    let old = top.join("old");
+    let write = |path: &str, text: &str| {
+        fs::create_dir_all(old.join(path).parent().unwrap()).unwrap();
+        fs::write(old.join(path), text).unwrap();
+    };
+    let settings = "module.exports = function () {\n  return { dir: { input: \"src\" } };\n};\n";
+    write(".eleventy.js", settings);
+    write(".eleventyignore", "notes/private/\n");
+    write("src/index.md", "---\ntitle: Home\n---\nThe home page.\n");
+    write(
+        "notes/note-1.md",
+        "---\ntitle: Note 1\n---\nA note kept beside the input folder.\n",
+    );
+    let kept_back = format!("---\ntitle: Page 7\n---\n{OUTSIDE}\n");
+    write("notes/private/page-7.md", &kept_back);
+    write("notes/.hidden/page-7.md", &kept_back);
+    write("notes/node_modules/package-1/page-7.md", &kept_back);
+    symlink("../notes", old.join("src/notes")).unwrap();
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    assert!(
+        made.contains_key("content/notes/note-1.md"),
+        "{:?}",
+        made.keys()
+    );
+    for (path, bytes) in &made {
+        let text = String::from_utf8_lossy(bytes);
+        assert!(
+            !text.contains(OUTSIDE) && !text.contains("Page 7"),
+            "`{path}`:\n{text}"
+        );
+    }
+    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
+    assert!(
+        report.contains("Statac followed 1 link, `src/notes`,"),
+        "{report}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn only_so_many_links_are_followed_in_one_import() {
+    use std::os::unix::fs::symlink;
+    let (old, _) = beside_files_of_others("links-many");
+    page_at(&old, "store/page-2.md", "Page 2");
+    for n in 0..70 {
+        symlink("store", old.join(format!("linked-{n:02}"))).unwrap();
+    }
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    let new = old.parent().unwrap().parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
+    assert!(report.contains("Statac followed 64 links,"), "{report}");
+    let past = ": a link past the number Statac follows in one site\n";
+    assert_eq!(report.matches(past).count(), 6, "{report}");
+    assert!(made.contains_key("content/linked-63/page-2.md"));
+    assert!(!made.contains_key("content/linked-64/page-2.md"));
+}
+
+#[cfg(unix)]
+#[test]
+fn an_old_site_given_as_a_link_is_read() {
+    use std::os::unix::fs::symlink;
+    let (old, outside) = beside_files_of_others("links-old");
+    let linked = outside.parent().unwrap().join("old-linked");
+    symlink(&old, &linked).unwrap();
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    let new = outside.parent().unwrap().join("new");
+    let (code, said) = import(&linked, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    assert!(made.contains_key("content/posts/post-1.md"), "{said}");
+    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
+    assert!(!report.contains("Statac followed"), "{report}");
+}
+
+const FOLDER_UNREAD: &str = "### Settings naming a folder Statac doesn't read\n\
+     \n\
+     Each of these settings names a folder outside the old site's own folder, or one reached \
+     through a link that leads outside it. Statac reads nothing outside the old site, so each was \
+     read as if it weren't set: bring across by hand what the folder holds, if it is wanted.\n\
+     \n";
+
+const FOLDER_SETTINGS: [&str; 7] = [
+    "source",
+    "destination",
+    "collections_dir",
+    "data_dir",
+    "layouts_dir",
+    "includes_dir",
+    "plugins_dir",
+];
+
+#[test]
+fn a_folder_the_settings_name_outside_the_old_site_is_never_read() {
+    let (old, outside) = beside_files_of_others("outside");
+    fs::create_dir_all(old.join("a")).unwrap();
+    let absolute = outside.to_string_lossy().replace('\\', "/");
+    for setting in FOLDER_SETTINGS {
+        for folder in ["..", "../inner", "a/../..", "a/../../inner", &absolute, "/"] {
+            let line = format!("{setting}: {folder}");
+            let report = nothing_from_outside(&old, &format!("title: Site 1\n{line}\n"));
+            let listed = format!("{FOLDER_UNREAD}- `_config.yml`, line 2: `{line}`\n");
+            assert!(report.contains(&listed), "{line}: {report}");
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_folder_the_settings_name_through_a_link_is_never_read() {
+    use std::os::unix::fs::symlink;
+    let (old, outside) = beside_files_of_others("linked");
+    symlink(&outside, old.join("linked")).unwrap();
+    for setting in FOLDER_SETTINGS {
+        for folder in ["linked", "linked/inner", "./linked/"] {
+            let line = format!("{setting}: {folder}");
+            let report = nothing_from_outside(&old, &format!("title: Site 1\n{line}\n"));
+            let listed = format!("{FOLDER_UNREAD}- `_config.yml`, line 2: `{line}`\n");
+            assert!(report.contains(&listed), "{line}: {report}");
+        }
+    }
+    fs::remove_file(old.join("linked")).unwrap();
+    symlink(&outside, old.join("_site")).unwrap();
+    let report = nothing_from_outside(&old, "title: Site 1\n");
+    assert!(!report.contains("built output, `_site/`"), "{report}");
+    assert!(
+        report.contains(
+            "- `_site`: a link that leads outside the old site, which Statac doesn't follow.\n"
+        ),
+        "{report}"
+    );
+    assert!(
+        report.contains(
+            "### Links Statac didn't follow\n\
+             \n\
+             Statac follows a link in the old site only to something inside it that the old \
+             site published. Each of these it didn't follow, for the reason beside it, so what \
+             the old site read through it didn't come across: put the folder or file itself \
+             where the link is, in a copy of the old site, and import again.\n\
+             \n\
+             - `_site`: a link that leads outside the old site, which Statac doesn't follow\n"
+        ),
+        "{report}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_settings_file_that_is_a_link_isnt_read() {
+    use std::os::unix::fs::symlink;
+    let (old, outside) = beside_files_of_others("linked-settings");
+    fs::write(
+        outside.join("settings-9.yml"),
+        format!("title: {OUTSIDE}\n"),
+    )
+    .unwrap();
+    symlink(outside.join("settings-9.yml"), old.join("_config.yml")).unwrap();
+    assert!(!Tool::Jekyll.owns(&old));
+    let new = outside.parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, Some(Tool::Jekyll));
+    assert_eq!(code, 0, "{said}");
+    for (path, bytes) in files(&new) {
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(!text.contains(OUTSIDE), "`{path}`:\n{text}");
+    }
+}
+
+#[test]
+fn an_include_or_a_link_named_outside_the_old_site_is_never_read() {
+    let (old, outside) = beside_files_of_others("include");
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    fs::write(
+        old.join("_posts/2026-01-02-post-2.md"),
+        "---\ntitle: Post 2\n---\n{% include ../../file-9.txt %}\n\n\
+         {% include ../page-9.html a=\"1\" %}\n\n\
+         [A file]({% link ../file-9.txt %}), [a post]({% post_url ../_posts/2026-02-02-post-9 %}).\n",
+    )
+    .unwrap();
+    let before = files(&outside);
+    let new = outside.parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    for (path, bytes) in &made {
+        let text = String::from_utf8_lossy(bytes);
+        assert!(!text.contains(OUTSIDE), "`{path}`:\n{text}");
+    }
+    let snippets: Vec<&str> = (made.keys())
+        .filter(|path| path.starts_with("snippets/") && path.contains("_9"))
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        snippets,
+        [
+            "snippets/include_______file_9.html",
+            "snippets/include____page_9.html"
+        ]
+    );
+    assert_eq!(files(&outside), before);
+    let beside = fs::read_dir(outside.parent().unwrap()).unwrap().count();
+    assert_eq!(beside, 2);
+}
+
+#[test]
+fn every_place_of_a_kind_is_listed_however_many() {
+    let top = scratch("every-place");
+    let old = top.join("old");
+    fs::create_dir_all(old.join("_posts")).unwrap();
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    let lines: String = (1..=60)
+        .map(|n| format!("Line {n}.\n{{: .class-{n}}}\n\n"))
+        .collect();
+    fs::write(
+        old.join("_posts/2026-01-01-post-1.md"),
+        format!("---\ntitle: Post 1\n---\n{lines}"),
+    )
+    .unwrap();
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    for n in 1..=60 {
+        let line = 3 + 3 * n - 1;
+        let listed = format!("- `_posts/2026-01-01-post-1.md`, line {line}: `{{: .class-{n}}}`\n");
+        assert!(report.contains(&listed), "{listed}{report}");
+    }
+    assert!(!report.contains(" more.\n"), "{report}");
+}
+
+const HUGO_FOLDER_SETTINGS: [&str; 10] = [
+    "contentDir",
+    "staticDir",
+    "publishDir",
+    "dataDir",
+    "layoutDir",
+    "assetDir",
+    "i18nDir",
+    "archetypeDir",
+    "themesDir",
+    "resourceDir",
+];
+
+/// A Hugo site with one post, beside files that are no part of it, as
+/// [`beside_files_of_others`] makes them.
+fn hugo_beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
+    let (old, outside) = beside_files_of_others(label);
+    fs::remove_dir_all(old.join("_posts")).unwrap();
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    fs::write(
+        old.join("content/posts/post-1.md"),
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post of the old site's own.\n",
+    )
+    .unwrap();
+    (old, outside)
+}
+
+#[test]
+fn hugo_folders_the_settings_name_outside_the_old_site_are_never_read() {
+    let (old, outside) = hugo_beside_files_of_others("hugo-outside");
+    fs::create_dir_all(old.join("a")).unwrap();
+    let absolute = outside.to_string_lossy().replace('\\', "/");
+    let base = "baseURL: https://example.org/\n";
+    for setting in HUGO_FOLDER_SETTINGS {
+        for folder in ["..", "../inner", "a/../..", &absolute, "/"] {
+            let line = format!("{setting}: {folder}");
+            let report = nothing_from_outside_of(&old, "hugo.yaml", &format!("{base}{line}\n"));
+            let listed = format!("{FOLDER_UNREAD}- `hugo.yaml`, line 2: `{line}`\n");
+            assert!(report.contains(&listed), "{line}: {report}");
+        }
+    }
+    let settings = format!("{base}languages:\n  en:\n    contentDir: ..\n");
+    let report = nothing_from_outside_of(&old, "hugo.yaml", &settings);
+    let listed = format!("{FOLDER_UNREAD}- `hugo.yaml`, line 2: `languages.en.contentDir: ..`\n");
+    assert!(report.contains(&listed), "{report}");
+}
+
+#[cfg(unix)]
+#[test]
+fn hugo_folders_the_settings_name_through_a_link_are_never_read() {
+    use std::os::unix::fs::symlink;
+    let (old, outside) = hugo_beside_files_of_others("hugo-linked");
+    symlink(&outside, old.join("linked")).unwrap();
+    let base = "baseURL: https://example.org/\n";
+    for setting in HUGO_FOLDER_SETTINGS {
+        for folder in ["linked", "linked/inner"] {
+            let line = format!("{setting}: {folder}");
+            let report = nothing_from_outside_of(&old, "hugo.yaml", &format!("{base}{line}\n"));
+            let listed = format!("{FOLDER_UNREAD}- `hugo.yaml`, line 2: `{line}`\n");
+            assert!(report.contains(&listed), "{line}: {report}");
+        }
+    }
+    fs::remove_file(old.join("linked")).unwrap();
+    // The folders Hugo reads by their own names, and its folder of
+    // settings, each a link.
+    fs::create_dir_all(outside.join("config/_default")).unwrap();
+    fs::write(
+        outside.join("config/_default/params.yaml"),
+        format!("author: {OUTSIDE}\n"),
+    )
+    .unwrap();
+    for name in ["static", "data", "public", "layouts", "themes", "config"] {
+        let to = match name {
+            "config" => outside.join("config"),
+            _ => outside.clone(),
+        };
+        symlink(to, old.join(name)).unwrap();
+        let report = nothing_from_outside_of(&old, "hugo.yaml", base);
+        let listed = format!(
+            "- `{name}`: a link that leads outside the old site, which Statac doesn't follow.\n"
+        );
+        assert!(report.contains(&listed), "{name}: {report}");
+        fs::remove_file(old.join(name)).unwrap();
+    }
+    fs::rename(old.join("content"), old.join("kept")).unwrap();
+    symlink(&outside, old.join("content")).unwrap();
+    fs::write(old.join("hugo.yaml"), base).unwrap();
+    let new = outside.parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    for (path, bytes) in files(&new) {
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(!path.contains("-9"), "`{path}` was written");
+        assert!(!text.contains(OUTSIDE), "`{path}`:\n{text}");
+    }
+}
+
+#[test]
+fn a_hugo_figure_is_a_call_where_its_file_holds_a_photograph_whatever_its_ending() {
+    let old = scratch("hugo-figure-kinds");
+    let post = old.join("content/posts/post-1");
+    fs::create_dir_all(&post).unwrap();
+    fs::write(old.join("hugo.yaml"), "baseURL: https://example.org/\n").unwrap();
+    let jpeg = fs::read("tests/import/hugo-tags-in-writing/old/static/images/photo-2.jpg").unwrap();
+    let gif = b"GIF89a\x28\x00\x1e\x00\x00\x00\x00\x3b";
+    fs::write(post.join("photo-1.gif"), &jpeg).unwrap();
+    fs::write(post.join("picture-1.jpg"), gif).unwrap();
+    fs::write(post.join("photo-2.jfif"), &jpeg).unwrap();
+    fs::write(
+        post.join("index.md"),
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n{{< figure src=\"photo-1.gif\" >}}\n\n\
+         {{< figure src=\"picture-1.jpg\" >}}\n\n{{< figure src=\"photo-2.jfif\" >}}\n",
+    )
+    .unwrap();
+    let new = scratch("hugo-figure-kinds-new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let post = fs::read_to_string(new.join("content/posts/post-1/index.md")).unwrap();
+    // A JPEG is a photograph under a GIF's name, and a GIF is none under
+    // a JPEG's.
+    assert!(post.contains("@figure('photo-1.gif')"), "{post}");
+    assert!(post.contains("<img src=\"picture-1.jpg\""), "{post}");
+    // Statac reads no file as a picture under this name.
+    assert!(post.contains("<img src=\"photo-2.jfif\""), "{post}");
+    // The new site builds: the call's picture is one Statac shows.
+    assert_eq!(checked(&new), [NO_ZONE, "undescribed-picture"]);
+}
+
+#[test]
+fn a_picture_a_hugo_tag_names_outside_the_old_site_is_never_looked_for() {
+    let (old, outside) = hugo_beside_files_of_others("hugo-figure");
+    fs::write(outside.join("photo-9.jpg"), OUTSIDE).unwrap();
+    fs::write(old.join("hugo.yaml"), "baseURL: https://example.org/\n").unwrap();
+    fs::write(
+        old.join("content/posts/post-1.md"),
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n\
+         {{< figure src=\"/../../photo-9.jpg\" >}}\n\n{{< figure src=\"/../photo-1.jpg\" >}}\n",
+    )
+    .unwrap();
+    let new = outside.parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    // One there and one not are told of alike: neither was looked for.
+    let post = fs::read_to_string(new.join("content/posts/post-1.md")).unwrap();
+    assert!(!post.contains("@figure("), "{post}");
+    for (path, bytes) in files(&new) {
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(!text.contains(OUTSIDE), "`{path}`:\n{text}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn an_old_address_that_cant_be_kept_is_told_of_once_though_the_built_output_holds_it() {
+    let top = scratch("unkept-built");
+    let old = top.join("old");
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    fs::create_dir_all(old.join("public/old/post-1-??")).unwrap();
+    fs::create_dir_all(old.join("public/posts/post-1")).unwrap();
+    fs::write(old.join("hugo.yaml"), "baseURL: https://example.org/\n").unwrap();
+    fs::write(
+        old.join("content/posts/post-1.md"),
+        "---\ntitle: Post 1\ndate: 2026-01-01\naliases:\n  - /old/post-1-??/\n---\nA post.\n",
+    )
+    .unwrap();
+    fs::write(old.join("public/old/post-1-??/index.html"), "<p>Old.</p>\n").unwrap();
+    fs::write(
+        old.join("public/posts/post-1/index.html"),
+        "<p>A post.</p>\n",
+    )
+    .unwrap();
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert_eq!(report.matches("`/old/post-1-??/`").count(), 1, "{report}");
+    assert!(
+        report.contains(
+            "This old address can't be kept: the new site can't send readers on from it, so it \
+             was left out of its page's `redirect_from`.\n\
+             \n\
+             - `/old/post-1-??/`, for `content/posts/post-1.md`: `?` can't be in a name\n"
+        ),
+        "{report}"
+    );
+}
+
+#[test]
+fn zola_settings_are_read_from_zola_toml_or_config_toml() {
+    assert_eq!(fixture("zola-settings"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-config-toml"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_front_matter_comes_across_in_statacs_words() {
+    assert_eq!(fixture("zola-front-matter"), [DRAFT, "untitled-page"]);
+}
+
+#[test]
+fn zola_lists_keep_their_order_pages_and_redirects() {
+    assert_eq!(fixture("zola-lists"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_pages_keep_their_names_dates_and_addresses() {
+    assert_eq!(fixture("zola-pages"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_names_are_made_ready_by_each_slugify_setting() {
+    assert_eq!(fixture("zola-slugify-on"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-slugify-safe"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-slugify-off"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_tags_keep_the_addresses_zola_gave_them() {
+    assert_eq!(fixture("zola-tags"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_languages_come_across_by_place() {
+    assert_eq!(fixture("zola-languages"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_tags_in_the_writing_convert_or_stay_as_written() {
+    assert_eq!(
+        fixture("zola-tags-in-writing"),
+        ["broken-link", DRAFT, "no-still", AS_TEXT]
+    );
+}
+
+#[test]
+fn zola_site_under_a_path_keeps_its_addresses_and_links() {
+    assert_eq!(fixture("zola-under-path"), ["robots-beneath-path"]);
+}
+
+#[test]
+fn zola_feeds_stay_at_their_old_addresses() {
+    assert_eq!(fixture("zola-feeds"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_built_output_is_looked_in_for_every_address() {
+    assert_eq!(fixture("zola-built-agrees"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-built-missing"), [] as [&str; 0]);
+}
+
+#[test]
+fn a_zola_site_is_told_by_its_settings() {
+    let top = scratch("zola-told");
+    let site = |name: &str, files: &[(&str, &str)]| {
+        let folder = top.join(name);
+        for (path, text) in files {
+            let path = folder.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        folder
+    };
+    for (name, file, text) in [
+        ("zola-toml", "zola.toml", "title = \"Site 1\"\n"),
+        (
+            "config-toml",
+            "config.toml",
+            "base_url = \"https://example.org\"\n",
+        ),
+    ] {
+        let folder = site(name, &[(file, text)]);
+        assert!(Tool::Zola.owns(&folder), "{name}");
+        assert!(!Tool::Hugo.owns(&folder), "{name}");
+        assert!(!Tool::Jekyll.owns(&folder), "{name}");
+    }
+    let other = site(
+        "other-tool",
+        &[("config.toml", "baseURL = \"https://example.org/\"\n")],
+    );
+    assert!(!Tool::Zola.owns(&other));
+    let (code, said) = import(&other, &top.join("new-1"), None);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("Imported the Hugo site"), "{said}");
+    let neither = site("neither", &[("config.toml", "title = \"Site 1\"\n")]);
+    assert!(!Tool::Zola.owns(&neither));
+    assert!(!Tool::Hugo.owns(&neither));
+    let new = top.join("new-2");
+    let (code, said) = import(&neither, &new, Some(Tool::Zola));
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("Imported the Zola site"), "{said}");
+}
+
+/// A Zola site in `top/old` naming `setting` in its settings, with a
+/// post calling `youtube` and a file outside it, at `top/outside`, holding
+/// what the setting would read there: built output, or a theme's tag of
+/// the same name. Gives the report the import writes and the new site's
+/// every file.
+fn zola_outside(top: &Path, setting: &str) -> (String, BTreeMap<String, Vec<u8>>) {
+    let old = top.join("old");
+    let outside = top.join("outside");
+    for (path, text) in [
+        (
+            old.join("config.toml"),
+            format!("base_url = \"https://example.org\"\n{setting}\n"),
+        ),
+        (
+            old.join("content/posts/post-1.md"),
+            "+++\ntitle = \"Post 1\"\ndate = 2026-01-01\n+++\nA post calling a tag a theme \
+             outside the site has.\n\n{{ youtube(id=\"abcdefghijk\") }}\n"
+                .to_owned(),
+        ),
+        (
+            outside.join("templates/shortcodes/youtube.html"),
+            "outside-1\n".to_owned(),
+        ),
+        (outside.join("index.html"), "outside-1\n".to_owned()),
+    ] {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, Some(Tool::Zola));
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    let report = String::from_utf8(made["IMPORT.md"].clone()).unwrap();
+    for (path, bytes) in &made {
+        assert!(
+            !String::from_utf8_lossy(bytes).contains("outside-1"),
+            "{path} holds what is outside the site"
+        );
+    }
+    let post = String::from_utf8(made["content/posts/post-1.md"].clone()).unwrap();
+    assert!(post.contains("@youtube('abcdefghijk')"), "{post}");
+    (report, made)
+}
+
+#[test]
+fn a_zola_folder_named_outside_the_site_is_never_read() {
+    let top = scratch("zola-outside");
+    let outside = std::path::absolute(top.join("absolute").join("outside")).unwrap();
+    let absolute = outside.to_string_lossy().replace('\\', "/");
+    for (label, setting, shown) in [
+        (
+            "up",
+            "output_dir = \"../outside\"",
+            "output_dir: ../outside",
+        ),
+        (
+            "absolute",
+            &format!("output_dir = \"{absolute}\""),
+            &format!("output_dir: {absolute}"),
+        ),
+        (
+            "theme-up",
+            "theme = \"../../outside\"",
+            "theme: ../../outside`",
+        ),
+        (
+            "theme-absolute",
+            &format!("theme = \"{absolute}\""),
+            &format!("theme: {absolute}`"),
+        ),
+    ] {
+        let (report, _) = zola_outside(&top.join(label), setting);
+        assert!(
+            report.contains("### Settings naming a folder Statac doesn't read"),
+            "{label}: {report}"
+        );
+        assert!(report.contains(shown), "{label}: {report}");
+        assert!(!report.contains("built output, `"), "{label}: {report}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_zola_folder_reached_through_a_link_is_never_read() {
+    let top = scratch("zola-linked");
+    for (label, setting, link) in [
+        ("output", "output_dir = \"built\"", "built"),
+        ("theme", "theme = \"theme-1\"", "themes/theme-1"),
+    ] {
+        let at = top.join(label);
+        let old = at.join("old");
+        fs::create_dir_all(old.join("themes")).unwrap();
+        std::os::unix::fs::symlink(at.join("outside"), old.join(link)).unwrap();
+        let (report, _) = zola_outside(&at, setting);
+        assert!(
+            report.contains("### Settings naming a folder Statac doesn't read"),
+            "{label}: {report}"
+        );
+        assert!(!report.contains("built output, `"), "{label}: {report}");
+    }
+    let at = top.join("content");
+    let old = at.join("old");
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    fs::create_dir_all(old.join("static")).unwrap();
+    fs::create_dir_all(at.join("outside")).unwrap();
+    fs::write(at.join("outside/post-2.md"), "outside-1\n").unwrap();
+    std::os::unix::fs::symlink(
+        at.join("outside/post-2.md"),
+        old.join("content/posts/post-2.md"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(at.join("outside/post-2.md"), old.join("static/file-1.txt"))
+        .unwrap();
+    let (report, made) = zola_outside(&at, "");
+    assert!(!made.contains_key("content/posts/post-2.md"));
+    assert!(!made.contains_key("static/file-1.txt"));
+    assert!(
+        report.contains("- `content/posts/post-2.md`: a link that leads outside the old site, which Statac doesn't follow."),
+        "{report}"
+    );
+}
+
+#[test]
+fn a_zola_feed_named_with_a_path_is_not_taken_for_a_feeds_name() {
+    let top = scratch("zola-feed-path");
+    let setting = "generate_feeds = true\nfeed_filenames = [\"../../outside/feed-9.xml\"]";
+    let (report, made) = zola_outside(&top, setting);
+    for (path, bytes) in &made {
+        let text = String::from_utf8_lossy(bytes);
+        assert!(!text.contains("feed-9"), "`{path}`:\n{text}");
+    }
+    assert!(!report.contains("Errors in the new site"), "{report}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_zola_settings_file_that_is_a_link_isnt_read() {
+    let top = scratch("zola-linked-settings");
+    let old = top.join("old");
+    fs::create_dir_all(old.join("content")).unwrap();
+    fs::write(
+        top.join("settings-9.toml"),
+        "base_url = \"https://example.org\"\ntitle = \"outside-1\"\n",
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(top.join("settings-9.toml"), old.join("config.toml")).unwrap();
+    assert!(!Tool::Zola.owns(&old));
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, Some(Tool::Zola));
+    assert_eq!(code, 1, "{said}");
+    assert!(said.contains("it is a link"), "{said}");
+    assert!(!new.exists());
+}
+
+#[test]
+fn eleventy_settings_are_read_in_either_quotes_and_assumed_where_absent() {
+    for name in [
+        "eleventy-settings-double",
+        "eleventy-settings-single",
+        "eleventy-settings-absent",
+        "eleventy-settings-program",
+        "eleventy-package-json",
+    ] {
+        assert_eq!(fixture(name), [NO_ADDRESS], "{name}");
+    }
+}
+
+#[test]
+fn eleventy_front_matter_comes_across_in_statacs_words() {
+    assert_eq!(
+        fixture("eleventy-front-matter"),
+        [NO_ADDRESS, "untitled-page"]
+    );
+}
+
+#[test]
+fn eleventy_permalinks_are_kept_in_each_form() {
+    assert_eq!(fixture("eleventy-permalinks"), [DRAFT, NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_data_is_handed_down_as_statac_hands_it() {
+    assert_eq!(fixture("eleventy-data"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_folders_of_unpublished_files_with_no_title_are_left_behind() {
+    assert_eq!(fixture("eleventy-parts"), [DRAFT, NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_permalinks_written_on_every_page_become_one_pattern() {
+    assert_eq!(fixture("eleventy-pattern"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_addresses_through_the_url_filter_carry_the_path_the_settings_give() {
+    assert_eq!(fixture("eleventy-under-path"), ["broken-link", NO_ADDRESS]);
+}
+
+const ADD_URL: &str = "Add the whole address as `url` in `statac.yaml`";
+
+#[test]
+fn an_address_given_for_a_site_whose_settings_give_none_is_its_url() {
+    let old = Path::new("tests/import/eleventy-under-path/old");
+    let new = scratch("address-given");
+    let (code, said) = import_answering(old, &new, "https://example.org\n", false);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("Imported the Eleventy site"), "{said}");
+    let read = |path: &str| fs::read_to_string(new.join(path)).unwrap();
+    assert!(read("statac.yaml").contains("\nurl: https://example.org/blog\n"));
+    let report = read("IMPORT.md");
+    assert!(
+        report.contains("its `url` is the address you gave"),
+        "{report}"
+    );
+    assert!(!report.contains(ADD_URL), "{report}");
+    assert!(report.contains("The site is under a path, `/blog`, as its `url` says"));
+    assert_eq!(
+        checked(&new),
+        ["broken-link", "missing-anchor", "robots-beneath-path"]
+    );
+
+    let new = scratch("address-given-whole");
+    let (code, said) = import_answering(old, &new, "https://example.org/blog/\n", false);
+    assert_eq!(code, 0, "{said}");
+    let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
+    assert!(settings.contains("\nurl: https://example.org/blog\n"));
+}
+
+#[test]
+fn a_site_whose_settings_give_no_address_has_no_url_where_none_is_given() {
+    let old = Path::new("tests/import/eleventy-under-path/old");
+    for (label, typed) in [("address-enter", "\n"), ("address-nothing", "")] {
+        let new = scratch(label);
+        let (code, said) = import_answering(old, &new, typed, false);
+        assert_eq!(code, 0, "{said}");
+        assert!(said.starts_with("Imported the Eleventy site"), "{said}");
+        let made = files(&new);
+        let kept = files(Path::new("tests/import/eleventy-under-path/new"));
+        assert_eq!(made["IMPORT.md"], kept["IMPORT.md"], "{label}");
+        let settings = String::from_utf8(made["statac.yaml"].clone()).unwrap();
+        assert!(!settings.contains("url:"), "{settings}");
+        assert!(String::from_utf8_lossy(&made["IMPORT.md"]).contains(ADD_URL));
+    }
+}
+
+#[test]
+fn the_sites_address_is_asked_for_at_a_terminal_until_it_is_one_or_enter() {
+    let old = Path::new("tests/import/eleventy-under-path/old");
+    let question = "What is the site's address?\n\x20 The old site's settings don't say.\n\
+                    \x20 Enter for none yet.\n";
+    let new = scratch("address-asked");
+    let typed = "example\nhttps://example.org/blog\n";
+    let (code, said) = import_answering(old, &new, typed, true);
+    assert_eq!(code, 0, "{said}");
+    let asked = format!(
+        "{question}\x20 > \x20 `example` isn't a web address. Write it whole, as \
+         `https://example.org`.\n\x20 > \nImported the Eleventy site"
+    );
+    assert!(said.starts_with(&asked), "{said}");
+    let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
+    assert!(settings.contains("\nurl: https://example.org/blog\n"));
+
+    let new = scratch("address-asked-enter");
+    let (code, said) = import_answering(old, &new, "\n", true);
+    assert_eq!(code, 0, "{said}");
+    assert!(
+        said.starts_with(&format!("{question}\x20 > \nImported")),
+        "{said}"
+    );
+    assert!(
+        !fs::read_to_string(new.join("statac.yaml"))
+            .unwrap()
+            .contains("url:")
+    );
+}
+
+#[test]
+fn an_unusable_address_read_with_no_terminal_stops_the_import() {
+    let old = Path::new("tests/import/eleventy-under-path/old");
+    let new = scratch("address-unusable");
+    let (code, said) = import_answering(old, &new, "example\n", false);
+    assert_eq!(code, 1);
+    assert_eq!(
+        said,
+        "`example` isn't a web address. Write it whole, as `https://example.org`.\n"
+    );
+    assert!(!new.exists());
+}
+
+#[test]
+fn the_sites_address_is_asked_for_of_any_tool_and_only_where_the_settings_give_none() {
+    let hugo = scratch("address-hugo-old");
+    fs::create_dir_all(hugo.join("content/posts")).unwrap();
+    fs::write(hugo.join("hugo.toml"), "title = \"Site 1\"\n").unwrap();
+    let post = "+++\ntitle = \"Post 1\"\ndate = 2026-01-01\n+++\nA post.\n";
+    fs::write(hugo.join("content/posts/post-1.md"), post).unwrap();
+    let zola = scratch("address-zola-old");
+    fs::create_dir_all(zola.join("content")).unwrap();
+    fs::write(
+        zola.join("config.toml"),
+        "base_url = \"/\"\ntitle = \"Site 1\"\n",
+    )
+    .unwrap();
+    fs::write(zola.join("content/post-1.md"), post).unwrap();
+    let jekyll = PathBuf::from("tests/import/permalink-pretty/old");
+    for (label, old) in [("hugo", hugo), ("zola", zola), ("jekyll", jekyll)] {
+        let new = scratch(&format!("address-{label}"));
+        let (code, said) = import_answering(&old, &new, "https://example.org/\n", true);
+        assert_eq!(code, 0, "{said}");
+        assert!(said.starts_with("What is the site's address?\n"), "{said}");
+        let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        assert!(settings.contains("\nurl: https://example.org\n"), "{label}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(!report.contains("no `url`"), "{label}: {report}");
+        assert!(!checked(&new).contains(&NO_ADDRESS.to_owned()), "{label}");
+    }
+    let old = Path::new("tests/import/hugo-home-pages/old");
+    let new = scratch("address-known");
+    let (code, said) = import_answering(old, &new, "https://example.com\n", true);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("Imported the Hugo site"), "{said}");
+    let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
+    assert!(
+        settings.contains("\nurl: https://example.org\n"),
+        "{settings}"
+    );
+}
+
+#[test]
+fn eleventy_folders_given_by_a_name_said_once_are_read() {
+    assert_eq!(fixture("eleventy-settings-named"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_markdown_options_are_read_in_a_file_the_settings_fetch() {
+    assert_eq!(fixture("eleventy-settings-fetched"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_categories_become_tags_and_their_old_pages_send_readers_on() {
+    assert_eq!(fixture("eleventy-categories"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_pages_are_dated_and_named_by_their_files() {
+    assert_eq!(fixture("eleventy-dates"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_redirects_become_the_pages_old_addresses() {
+    assert_eq!(fixture("eleventy-redirects"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_tags_in_the_writing_convert_or_stay_as_written() {
+    assert_eq!(
+        fixture("eleventy-tags-in-writing"),
+        ["broken-link", NO_ADDRESS, AS_TEXT]
+    );
+}
+
+#[test]
+fn eleventy_line_ends_are_line_breaks_where_the_settings_said() {
+    assert_eq!(fixture("eleventy-breaks"), [NO_ADDRESS]);
+}
+
+#[test]
+fn eleventy_templates_ignored_files_and_files_beside_pages() {
+    assert_eq!(
+        fixture("eleventy-templates"),
+        [NO_ADDRESS, AS_TEXT, "untitled-page"]
+    );
+}
+
+#[test]
+fn eleventy_built_output_is_looked_in_for_every_address() {
+    assert_eq!(fixture("eleventy-built-agrees"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-built-missing"), [NO_ADDRESS]);
+}
+
+/// A folder under `top` holding `files`.
+fn made_site(top: &Path, name: &str, files: &[(&str, &str)]) -> PathBuf {
+    let folder = top.join(name);
+    for (path, text) in files {
+        let path = folder.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    folder
+}
+
+#[test]
+fn an_eleventy_site_is_told_by_its_settings_or_its_package() {
+    let top = scratch("eleventy-told");
+    for (name, files) in [
+        (
+            "dot-js",
+            &[(".eleventy.js", "module.exports = function () {};\n")][..],
+        ),
+        (
+            "config-js",
+            &[("eleventy.config.js", "export default {};\n")],
+        ),
+        (
+            "config-mjs",
+            &[("eleventy.config.mjs", "export default {};\n")],
+        ),
+        (
+            "config-cjs",
+            &[("eleventy.config.cjs", "module.exports = {};\n")],
+        ),
+        (
+            "package",
+            &[(
+                "package.json",
+                "{\"dependencies\": {\"@11ty/eleventy\": \"^3.0.0\"}}\n",
+            )],
+        ),
+    ] {
+        let folder = made_site(&top, name, files);
+        assert!(Tool::Eleventy.owns(&folder), "{name}");
+        for other in [Tool::Jekyll, Tool::Hugo, Tool::Zola] {
+            assert!(!other.owns(&folder), "{name}");
+        }
+    }
+    for (name, text) in [
+        (
+            "other-package",
+            "{\"dependencies\": {\"other-tool\": \"1\"}}\n",
+        ),
+        ("broken-package", "{\"dependencies\": \n"),
+    ] {
+        let folder = made_site(&top, name, &[("package.json", text)]);
+        assert!(!Tool::Eleventy.owns(&folder), "{name}");
+    }
+    let neither = made_site(
+        &top,
+        "neither",
+        &[(
+            "posts/post-1.md",
+            "---\ntitle: Post 1\n---\nA post read as Eleventy's.\n",
+        )],
+    );
+    let (code, said) = import(&neither, &top.join("new-1"), Some(Tool::Eleventy));
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("Imported the Eleventy site"), "{said}");
+    let report = fs::read_to_string(top.join("new-1/IMPORT.md")).unwrap();
+    assert!(
+        report.starts_with("This site was imported from an Eleventy site"),
+        "{report}"
+    );
+}
+
+/// An Eleventy site with one post beside files that are no part of it, as
+/// [`beside_files_of_others`] makes them.
+fn eleventy_beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
+    let (old, outside) = beside_files_of_others(label);
+    fs::remove_dir_all(old.join("_posts")).unwrap();
+    fs::create_dir_all(old.join("posts")).unwrap();
+    fs::write(
+        old.join("posts/post-1.md"),
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post of the old site's own.\n",
+    )
+    .unwrap();
+    (old, outside)
+}
+
+const COPY_UNREAD: &str = "### Copies Statac doesn't make\n";
+
+/// Imports `old` with `settings` as its `.eleventy.js`, and gives the
+/// report, having seen that the old site's own post came across and that
+/// nothing from outside it did. The report may name what it didn't read.
+fn eleventy_nothing_from_outside(old: &Path, settings: &str) -> String {
+    fs::write(old.join(".eleventy.js"), settings).unwrap();
+    let new = old.parent().unwrap().parent().unwrap().join("new");
+    let (code, said) = import(old, &new, None);
+    assert_eq!(code, 0, "{settings}: {said}");
+    let made = files(&new);
+    assert!(made.contains_key("content/posts/post-1.md"), "{settings}");
+    for (path, bytes) in &made {
+        let text = String::from_utf8_lossy(bytes);
+        // A copy named by a whole path lands under that path, which holds
+        // the scratch folder's own name, so only the file's name is asked.
+        let name = path.rsplit('/').next().unwrap_or_default();
+        assert!(!name.contains("-9"), "{settings}: `{path}` was written");
+        assert!(!text.contains(OUTSIDE), "{settings}: `{path}`:\n{text}");
+    }
+    let report = String::from_utf8(made["IMPORT.md"].clone()).unwrap();
+    fs::remove_dir_all(&new).unwrap();
+    report
+}
+
+/// Settings whose second line is `line`.
+fn eleventy_settings(line: &str) -> String {
+    format!("module.exports = function (eleventyConfig) {{\n  {line}\n}};\n")
+}
+
+#[test]
+fn an_eleventy_folder_or_copy_named_outside_the_old_site_is_never_read() {
+    let (old, outside) = eleventy_beside_files_of_others("eleventy-outside");
+    fs::create_dir_all(old.join("a")).unwrap();
+    let absolute = outside.to_string_lossy().replace('\\', "/");
+    for setting in ["input", "output", "includes", "data", "layouts"] {
+        for folder in ["..", "../inner", "a/../..", &absolute, "/"] {
+            let line = format!("return {{ dir: {{ {setting}: \"{folder}\" }} }};");
+            let report = nothing_from_outside_of(&old, ".eleventy.js", &eleventy_settings(&line));
+            let listed =
+                format!("{FOLDER_UNREAD}- `.eleventy.js`, line 2: `{setting}: {folder}`\n");
+            assert!(report.contains(&listed), "{line}: {report}");
+        }
+    }
+    for copy in [
+        "\"..\"".to_owned(),
+        "\"../inner\"".to_owned(),
+        "\"../file-9.txt\"".to_owned(),
+        "'a/../../file-9.txt'".to_owned(),
+        format!("\"{absolute}/file-9.txt\""),
+        "\"../*.txt\"".to_owned(),
+        "{ \"..\": \"copied\" }".to_owned(),
+        "{ \"a\": \"../../escaped\" }".to_owned(),
+    ] {
+        let line = format!("eleventyConfig.addPassthroughCopy({copy});");
+        let report = eleventy_nothing_from_outside(&old, &eleventy_settings(&line));
+        let listed = format!("- `.eleventy.js`, line 2: `addPassthroughCopy({copy})`\n");
+        assert!(report.contains(COPY_UNREAD), "{line}: {report}");
+        assert!(report.contains(&listed), "{line}: {report}");
+        assert!(!outside.parent().unwrap().join("escaped").exists());
+    }
+    // Eleventy writes a copy into its output folder, however its place
+    // there is written, and Statac into `static/`. A place that names a
+    // drive is no place in a site, and is told.
+    fs::write(old.join("a/file-1.txt"), "file-1\n").unwrap();
+    let line = format!("eleventyConfig.addPassthroughCopy({{ \"a\": \"{absolute}/copied\" }});");
+    let report = eleventy_nothing_from_outside(&old, &eleventy_settings(&line));
+    assert_eq!(report.contains(COPY_UNREAD), cfg!(windows), "{report}");
+    assert!(!outside.join("copied").exists());
+    fs::remove_file(old.join("a/file-1.txt")).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn an_eleventy_folder_or_copy_reached_through_a_link_is_never_read() {
+    use std::os::unix::fs::symlink;
+    let (old, outside) = eleventy_beside_files_of_others("eleventy-linked");
+    symlink(&outside, old.join("linked")).unwrap();
+    for setting in ["input", "output", "includes", "data", "layouts"] {
+        for folder in ["linked", "linked/inner", "./linked/"] {
+            let line = format!("return {{ dir: {{ {setting}: \"{folder}\" }} }};");
+            let report = nothing_from_outside_of(&old, ".eleventy.js", &eleventy_settings(&line));
+            let listed =
+                format!("{FOLDER_UNREAD}- `.eleventy.js`, line 2: `{setting}: {folder}`\n");
+            assert!(report.contains(&listed), "{line}: {report}");
+        }
+    }
+    for copy in [
+        "\"linked\"",
+        "\"linked/file-9.txt\"",
+        "{ \"linked\": \"copied\" }",
+    ] {
+        let line = format!("eleventyConfig.addPassthroughCopy({copy});");
+        let report = eleventy_nothing_from_outside(&old, &eleventy_settings(&line));
+        assert!(report.contains(COPY_UNREAD), "{line}: {report}");
+    }
+    // A pattern finds nothing through the link, and the walk tells of it.
+    let line = "eleventyConfig.addPassthroughCopy(\"**/*.txt\");";
+    let report = eleventy_nothing_from_outside(&old, &eleventy_settings(line));
+    assert!(
+        report.contains(
+            "- `linked`: a link that leads outside the old site, which Statac doesn't follow.\n"
+        ),
+        "{report}"
+    );
+    fs::remove_file(old.join("linked")).unwrap();
+    // The files read by their own names, each a link.
+    fs::write(outside.join("_redirects"), "/post-9/ /posts/post-1/\n").unwrap();
+    fs::write(outside.join("ignore-9"), "posts/\n").unwrap();
+    for (name, to) in [
+        ("_redirects", outside.join("_redirects")),
+        (".eleventyignore", outside.join("ignore-9")),
+        ("_data", outside.clone()),
+        ("_includes", outside.clone()),
+        ("_site", outside.clone()),
+        ("img", outside.clone()),
+    ] {
+        symlink(&to, old.join(name)).unwrap();
+        let settings = eleventy_settings("eleventyConfig.addPassthroughCopy(\"img\");");
+        let report = eleventy_nothing_from_outside(&old, &settings);
+        assert!(!report.contains("post-9"), "{name}: {report}");
+        fs::remove_file(old.join(name)).unwrap();
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn an_eleventy_settings_file_that_is_a_link_isnt_read() {
+    use std::os::unix::fs::symlink;
+    let (old, outside) = eleventy_beside_files_of_others("eleventy-linked-settings");
+    fs::write(
+        outside.join("settings-9.js"),
+        format!("module.exports = () => ({{ dir: {{ input: \"..\" }} }}); // {OUTSIDE}\n"),
+    )
+    .unwrap();
+    symlink(outside.join("settings-9.js"), old.join(".eleventy.js")).unwrap();
+    assert!(!Tool::Eleventy.owns(&old));
+    let new = outside.parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, Some(Tool::Eleventy));
+    assert_eq!(code, 0, "{said}");
+    for (path, bytes) in files(&new) {
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(!text.contains(OUTSIDE), "`{path}`:\n{text}");
+        assert!(!text.contains("settings-9"), "`{path}`:\n{text}");
+    }
+}
+
+#[test]
+fn eleventy_reads_gitignore_unless_the_settings_turn_it_off() {
+    let top = scratch("eleventy-gitignore");
+    let files = [
+        (".gitignore", "drafts/\n"),
+        (
+            "posts/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n",
+        ),
+        (
+            "drafts/post-2.md",
+            "---\ntitle: Post 2\ndate: 2026-01-02\n---\nA post `.gitignore` leaves out.\n",
+        ),
+    ];
+    for (name, settings, kept) in [
+        ("on", "module.exports = function () {};\n", false),
+        (
+            "off",
+            "module.exports = function (c) { c.setUseGitIgnore(false); };\n",
+            true,
+        ),
+    ] {
+        let mut all = files.to_vec();
+        all.push((".eleventy.js", settings));
+        let old = made_site(&top, name, &all);
+        let new = top.join(format!("{name}-new"));
+        let (code, said) = import(&old, &new, None);
+        assert_eq!(code, 0, "{said}");
+        assert_eq!(
+            new.join("content/drafts/post-2.md").exists(),
+            kept,
+            "{name}"
+        );
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert_eq!(
+            report.contains("- `drafts/`: a folder `.gitignore` leaves out"),
+            !kept,
+            "{report}"
+        );
+    }
+}

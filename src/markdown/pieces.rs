@@ -1,0 +1,162 @@
+//! The pieces of the writing a site may write itself, each through a file
+//! of its name in `snippets/markdown/`, and what each is handed.
+
+use crate::highlight::{self, FirstWord, Language};
+
+/// A kind of element in the writing whose HTML a site may write itself.
+/// Nothing calls a piece's file by name: Statac writes every such element
+/// through it.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+pub enum Piece {
+    Heading,
+    Link,
+    Image,
+    /// A code block.
+    Code,
+    /// Code among the words.
+    InlineCode,
+    /// Where the writing points at a footnote.
+    Footnote,
+    /// The footnotes gathered at the foot of the page.
+    Footnotes,
+    Callout,
+}
+
+impl Piece {
+    pub const ALL: [Piece; 8] = [
+        Piece::Heading,
+        Piece::Link,
+        Piece::Image,
+        Piece::Code,
+        Piece::InlineCode,
+        Piece::Footnote,
+        Piece::Footnotes,
+        Piece::Callout,
+    ];
+
+    /// Its file's name in `snippets/markdown/`, without `.html`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Piece::Heading => "heading",
+            Piece::Link => "link",
+            Piece::Image => "image",
+            Piece::Code => "code",
+            Piece::InlineCode => "inline_code",
+            Piece::Footnote => "footnote",
+            Piece::Footnotes => "footnotes",
+            Piece::Callout => "callout",
+        }
+    }
+
+    pub fn of_name(name: &str) -> Option<Piece> {
+        Piece::ALL.into_iter().find(|piece| piece.name() == name)
+    }
+
+    /// Every name its file is handed besides `page` and `site`. The writing
+    /// hands all but a link's `outside`, a callout's `title` and a
+    /// picture's `photo`, which are the site's to say.
+    pub fn handed(self) -> &'static [&'static str] {
+        match self {
+            Piece::Heading => &["level", "id", "classes", "body"],
+            Piece::Link => &["address", "title", "body", "outside"],
+            Piece::Image => &["address", "alt", "title", "width", "height", "photo"],
+            Piece::Code => &["code", "body", "language", "caption"],
+            Piece::InlineCode => &["code"],
+            Piece::Footnote => &["number", "shown", "id", "note"],
+            Piece::Footnotes => &["notes", "label"],
+            Piece::Callout => &["kind", "title", "body"],
+        }
+    }
+
+    /// The piece a file that isn't one was most likely meant as: near it
+    /// in spelling, or opening with its name, as `codeblock` does `code`.
+    /// Where it opens with two, as `footnotes-old` does, the longer.
+    pub fn meant_by(name: &str) -> Option<Piece> {
+        if let Some(near) = crate::suggest::nearest(name, Piece::ALL.map(Piece::name)) {
+            return Piece::of_name(near);
+        }
+        let lowered = name.to_lowercase();
+        Piece::ALL
+            .into_iter()
+            .filter(|piece| lowered.starts_with(piece.name()))
+            .max_by_key(|piece| piece.name().len())
+    }
+}
+
+/// A value a piece's file is handed.
+#[derive(Clone, PartialEq, Debug)]
+pub enum PieceValue {
+    /// Words, printed escaped. Nothing to give is empty words, which print
+    /// nothing and are false in an `{% if %}`.
+    Text(String),
+    Number(u64),
+    Truth(bool),
+    /// HTML Statac wrote, printed as it is.
+    Html(String),
+    List(Vec<PieceValue>),
+    /// Values by name, as each footnote is handed.
+    Record(Vec<(&'static str, PieceValue)>),
+}
+
+/// A code block's language and caption, as a piece is handed them, from
+/// the line opening its fence: the first word is the language, unless the
+/// line opens with a quote, and the rest is the caption, without the quotes
+/// round it where it is quoted whole. A first word that is a file's name
+/// opens the caption, and the language is the one its name gives.
+pub(super) fn fence(info: &str) -> (&str, &str) {
+    let info = info.trim();
+    let (language, rest) = match info.starts_with(['"', '\'']) {
+        true => ("", info),
+        false => info.split_once(char::is_whitespace).unwrap_or((info, "")),
+    };
+    let (language, rest) = match highlight::first_word(language) {
+        FirstWord::File(Language::Known(name)) => (name, info),
+        FirstWord::File(_) => ("", info),
+        FirstWord::Language(_) => (language, rest),
+    };
+    let rest = rest.trim();
+    let caption = ['"', '\'']
+        .into_iter()
+        .find_map(|quote| {
+            rest.strip_prefix(quote)?
+                .strip_suffix(quote)
+                .filter(|inner| !inner.contains(quote))
+        })
+        .unwrap_or(rest);
+    (language, caption)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_fence_gives_its_language_and_caption() {
+        assert_eq!(fence("rust"), ("rust", ""));
+        assert_eq!(fence("rust example.rs"), ("rust", "example.rs"));
+        assert_eq!(fence("rust \"The example\""), ("rust", "The example"));
+        assert_eq!(fence("\"mermaid\""), ("", "mermaid"));
+        assert_eq!(fence(""), ("", ""));
+    }
+
+    #[test]
+    fn a_fence_opening_with_a_files_name_is_captioned_with_it() {
+        assert_eq!(fence("example.rs"), ("rs", "example.rs"));
+        assert_eq!(
+            fence("Gemfile for the site"),
+            ("ruby", "Gemfile for the site")
+        );
+        assert_eq!(fence("notes-1.txt"), ("", "notes-1.txt"));
+        assert_eq!(fence(".gitignore"), (".gitignore", ""));
+        assert_eq!(fence("Makefile"), ("Makefile", ""));
+    }
+
+    #[test]
+    fn a_file_that_is_no_piece_is_offered_the_one_it_was_meant_as() {
+        assert_eq!(Piece::meant_by("headings"), Some(Piece::Heading));
+        assert_eq!(Piece::meant_by("codeblock"), Some(Piece::Code));
+        assert_eq!(Piece::meant_by("footnotes-old"), Some(Piece::Footnotes));
+        assert_eq!(Piece::meant_by("inlinecode"), Some(Piece::InlineCode));
+        assert_eq!(Piece::meant_by("blockquote"), None);
+    }
+}

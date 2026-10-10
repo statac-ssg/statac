@@ -1,0 +1,11 @@
+# German. Every line is from the Unicode CLDR, release 48.2.3: see
+# LICENSE-CLDR.txt.
+months: [Januar, Februar, März, April, Mai, Juni, Juli, August,
+  September, Oktober, November, Dezember]
+months_short: [Jan., Feb., März, Apr., Mai, Juni, Juli, Aug., Sept.,
+  Okt., Nov., Dez.]
+months_short_alone: [Jan, Feb, Mär, Apr, Mai, Jun, Jul, Aug, Sep, Okt, Nov, Dez]
+weekdays: [Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag]
+weekdays_short: [Mo., Di., Mi., Do., Fr., Sa., So.]
+am_pm: [AM, PM]
+quotes: „ “ ‚ ‘

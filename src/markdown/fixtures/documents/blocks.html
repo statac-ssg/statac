@@ -1,0 +1,49 @@
+<p>Before the call.</p>
+<call box=alone>
+<p>Inside the call, <em>read as Markdown</em>.</p>
+<ul>
+  <li>One</li>
+  <li>Two</li>
+</ul>
+</call>
+<p>Words before.</p>
+<call box=alone>
+<p>Close against the words.</p>
+</call>
+<p>Words after.</p>
+<blockquote>
+  <p>A quotation.</p>
+  <call box=alone>
+  <p>Inside the quotation.</p>
+  <p>More inside.</p>
+  </call>
+</blockquote>
+<ul>
+  <li>
+    <p>An item.</p>
+    <call box=alone>
+    <p>Inside the item.</p>
+    <pre class="code"><code>code inside</code></pre>
+    </call>
+  </li>
+  <li>
+    <p>A tight item.</p>
+    <call box=alone>
+    <p>Inside the tight item.</p>
+    </call>
+  </li>
+</ul>
+<call box=alone>
+<p>Outer.</p>
+<call box=alone>
+<h2>Inner heading</h2>
+</call>
+</call>
+<pre class="code"><code class="language-text">@box()
+Shown as code.
+@end</code></pre>
+<div>
+<call box=html>
+<p>Inside <em>HTML</em>.</p>
+</call>
+</div>

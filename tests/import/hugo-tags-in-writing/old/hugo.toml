@@ -1,0 +1,7 @@
+baseURL = "https://example.org/"
+title = "Tags in the writing"
+languageCode = "en"
+timeZone = "UTC"
+
+[params]
+  author = "Name"

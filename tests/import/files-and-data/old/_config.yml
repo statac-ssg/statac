@@ -1,0 +1,8 @@
+title: Files and data
+exclude:
+  - notes.txt
+collections:
+  recipes:
+    output: true
+  drafts-kept:
+    output: false

@@ -1,0 +1,248 @@
+# Grammars and themes Statac carries
+
+Written by `cargo run --example grammars` from npm's tm-grammars 1.32.22,
+https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz, and
+the themes in `src/highlight/themes/`.
+
+## Grammars
+
+- ActionScript (`actionscript-3`): Apache-2.0. https://github.com/BowlerHatLLC/vscode-as3mxml/blob/11ccf88dc1ec08a55c262a96676d507b354f19b5/distribution/src/assembly/syntaxes/AS3.tmLanguage
+- AutoHotkey (`ahk`): MIT. https://github.com/mark-wiemer/ahkpp/blob/63c1fd4d675e9ea98f60083786afe94505bdd57b/language/ahk.tmLanguage.yaml
+- Angular HTML (`angular-html`): MIT. https://github.com/onivim/vscode-exthost/blob/cfc2a2212de9ea10943af58ebd1817a5ad196463/extensions/html/syntaxes/html-derivative.tmLanguage.json
+- Angular TypeScript (`angular-ts`): MIT. https://github.com/microsoft/vscode/blob/210541906e5a96ab39f9c753f921b1bd35f4138b/extensions/typescript-basics/syntaxes/TypeScript.tmLanguage.json
+- AppleScript (`applescript`): TextMate bundle licence: "Permission to copy, use, modify, sell and distribute this software is granted.". https://github.com/textmate/applescript.tmbundle/blob/4947cad7494eba084c21cfe04689b4efce96700f/Syntaxes/AppleScript.tmLanguage
+- Ara (`ara`): Apache-2.0. https://github.com/ara-lang/highlighting/blob/ed1dbedcf03d0b67207e41fe2e11218cc925dc0d/syntaxes/ara.json
+- Assembly (`asm`): MIT. https://github.com/13xforever/x86_64-assembly-vscode/blob/5c1958f4283d260f5dc88fa4f5f31c620e061a5a/syntaxes/language-x86_64-assembly.tmLanguage
+- Astro (`astro`): MIT. https://github.com/withastro/language-tools/blob/8e55c37cbcf134dedf0068781245da5a9d46d081/packages/vscode/syntaxes/astro.tmLanguage.src.yaml
+- AWK (`awk`): MIT. https://github.com/luggage66/vscode-awk/blob/eff8c0f160ae16592c8d9963fd77046137fd2612/syntaxes/awk.tmLanguage
+- Ballerina (`ballerina`): Apache-2.0. https://github.com/ballerina-platform/ballerina-grammar/blob/4bf70d328ae9e5a93219e44c031ab3776c76727a/syntaxes/ballerina.tmLanguage
+- Batch File (`bat`): MIT. https://github.com/microsoft/vscode/blob/df15c8e832a341633acd2e9bb26e1b275d09cfe0/extensions/bat/syntaxes/batchfile.tmLanguage.json
+- Beancount (`beancount`): MIT. https://github.com/Lencerf/vscode-beancount/blob/60dcdbd3af273aca0ff628220f2828483101ca47/syntaxes/beancount.tmLanguage
+- Berry (`berry`): MIT. https://github.com/berry-lang/berry/blob/74611286b8d2d2c2ee16ea187029f2a9c4257f5f/tools/plugins/vscode/skiars.berry-1.2.0/syntaxes/berry.json
+- BibTeX (`bibtex`): MIT. https://github.com/microsoft/vscode/blob/9a2c94d213696a4453b6d9988b003d98e7646e75/extensions/latex/syntaxes/Bibtex.tmLanguage.json
+- Bicep (`bicep`): MIT. https://github.com/Azure/bicep/blob/6252abb94141fc6e774a53652404be30f1cb9000/src/textmate/bicep.tmlanguage
+- Blade (`blade`): MIT. https://github.com/laravel/vs-code-extension/blob/80726f64975dc935d6b925d8230cdc1ea075802a/syntaxes/blade.tmLanguage.json
+- 1C (Enterprise) (`bsl`): MIT. https://github.com/1c-syntax/vsc-language-1c-bsl/blob/c93f87c76d8a536a494039e9dc78a684b14b4e4c/syntaxes/1c.tmLanguage.json
+- C (`c`): MIT. https://github.com/microsoft/vscode/blob/bd1abe08c38bb5deccf65610f8f3c03d2338d20d/extensions/cpp/syntaxes/c.tmLanguage.json
+- C3 (`c3`): MIT. https://github.com/c3lang/vscode-c3/blob/38dcc9ae665da32dea3e391f342478668d44e16f/syntaxes/c3.tmLanguage.json
+- Cadence (`cadence`): Apache-2.0. https://github.com/onflow/vscode-cadence/blob/bc7e5d3bb613e01789584283d7911cfd6b616dc4/extension/language/syntaxes/cadence.tmGrammar.json
+- Cairo (`cairo`): Apache-2.0. https://github.com/starkware-libs/cairo-lang/blob/4ea4fe8e167845a3402ae2ea0a8b6004aad18dd5/src/starkware/cairo/lang/ide/vscode-cairo/syntaxes/cairo.tmLanguage.json
+- Chapel (`chapel`): Apache-2.0. https://github.com/chapel-lang/chapel-vscode/blob/c933a6c379df844d564644ee6c6df4e6055ceb33/syntaxes/chapel.tmLanguage.json
+- Clarity (`clarity`): MIT. https://github.com/hirosystems/clarity.tmbundle/blob/623ab02ac06f3fc27172503f64726bf0b107e5ee/Syntaxes/clarity.JSON-tmLanguage
+- Clojure (`clojure`): MIT. https://github.com/microsoft/vscode/blob/a1a4c0a63b1ad59e84f54b874744fe35dea9abe1/extensions/clojure/syntaxes/clojure.tmLanguage.json
+- CMake (`cmake`): MIT. https://github.com/twxs/vs.language.cmake/blob/19b1b8fe2d68d72cf294d0c3c22f0a3fc54f8f6f/syntaxes/CMake.tmLanguage
+- COBOL (`cobol`): MIT. https://github.com/spgennard/vscode_cobol/blob/7020540cc77e04fb2edc8503f906d51fa840bbe5/syntaxes/COBOL.tmLanguage.json
+- CODEOWNERS (`codeowners`): MIT. https://github.com/jasonnutter/vscode-codeowners/blob/219dee0ab25c1bfad0b9de84180117e71221a653/syntaxes/codeowners.tmLanguage.json
+- CodeQL (`codeql`): MIT. https://github.com/github/vscode-codeql/blob/a6266bbcc88702619ceb580253a65e8f83333c1b/syntaxes/ql.tmLanguage.json
+- CoffeeScript (`coffee`): MIT. https://github.com/microsoft/vscode/blob/ff58f5083f57b50e6a100ab60454dfb72fe21e80/extensions/coffeescript/syntaxes/coffeescript.tmLanguage.json
+- Common Lisp (`common-lisp`): MIT. https://github.com/qingpeng9802/vscode-common-lisp/blob/79d04dc9ca80d98e65c4f28b3d67a24a7829b18f/syntaxes/commonlisp.tmLanguage.json
+- Rocq (`coq`): MIT. https://github.com/rocq-prover/vsrocq/blob/76f6daf4589f6617019e7500d5c2acb327578b44/client/syntax/rocq.tmLanguage.json
+- C++ (`cpp`): MIT. https://github.com/microsoft/vscode/blob/8623a79836fba2e7e058e3493345ee068d28ce4f/extensions/cpp/syntaxes/cpp.tmLanguage.json
+- Crystal (`crystal`): MIT. https://github.com/crystal-lang-tools/vscode-crystal-lang/blob/c920b0931ec5f05b78447dbff31b172c64f1d734/syntaxes/crystal.json
+- C# (`csharp`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/csharp/syntaxes/csharp.tmLanguage.json
+- CSS (`css`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/css/syntaxes/css.tmLanguage.json
+- CSV (`csv`): MIT. https://github.com/mechatroner/vscode_rainbow_csv/blob/3bdafafa12940a75166089b64bdd80b1d3b071db/syntaxes/csv.tmLanguage.json
+- Cypher (`cypher`): MIT. https://github.com/adam-cowley/neo4j-vscode/blob/ad90d275ac76c740018e78f78722343f730270e0/cypher/cypher.tmLanguage
+- D (`d`): MIT. https://github.com/Pure-D/code-d/blob/71992a1a52a3025f3333e4025eee0f255a8cda03/syntaxes/d.json
+- Dart (`dart`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/dart/syntaxes/dart.tmLanguage.json
+- Desktop (`desktop`): MIT. https://github.com/nico-castell/desktop-file-support/blob/63720f5f05313de22b68ecbd0ca3d3ed8ba57e7e/syntaxes/desktop.tmLanguage.json
+- Diff (`diff`): MIT. https://github.com/microsoft/vscode/blob/4549bd26c7b799284e0ebd8dc1e0310e6a8707a1/extensions/diff/syntaxes/diff.tmLanguage.json
+- Dockerfile (`docker`): MIT. https://github.com/microsoft/vscode/blob/8270a86019db7551da42b71d15c6080a414d8c81/extensions/docker/syntaxes/docker.tmLanguage.json
+- dotEnv (`dotenv`): MIT. https://github.com/dotenv-org/dotenv-vscode/blob/3b4caf3398b3958b5fef8ef723c332eb1f30dfbb/syntaxes/dotenv.tmLanguage.json
+- Edge (`edge`): MIT. https://github.com/edge-js/edge-vscode/blob/04352c41981ca664598674556afa63bd393a10f3/syntaxes/edge.tmLanguage.json
+- Elm (`elm`): MIT. https://github.com/elm-tooling/elm-language-client-vscode/blob/c70351314682c2e0fae8a402ebb301da79821c37/syntaxes/elm-syntax.json
+- Emacs Lisp (`emacs-lisp`): ISC. https://github.com/Alhadis/language-emacs-lisp/blob/b38b69f684e7750b35f370fe567e7d9431f5fbc8/grammars/emacs-lisp.cson
+- ERB (`erb`): TextMate bundle licence: "Permission to copy, use, modify, sell and distribute this software is granted.". https://github.com/textmate/ruby.tmbundle/blob/ecf0f1df23984bcff9b51552e35d9696cb0d9539/Syntaxes/HTML%20(Ruby%20-%20ERB).tmLanguage
+- Erlang (`erlang`): Apache-2.0. https://github.com/erlang-ls/grammar/blob/fe898becd3004bcb4947ab50d6b6b830fbfb9228/Erlang.plist
+- Fennel (`fennel`): MIT. https://github.com/kongeor/vsc-fennel/blob/664148923d7bd72531120d0cba712c6dba6f698d/syntaxes/fennel.tmLanguage.json
+- Fish (`fish`): MIT. https://github.com/bmalehorn/vscode-fish/blob/8288b88c46ebe1ef2876fd4275450fc80c5a176a/syntaxes/fish.tmLanguage.json
+- Fluent (`fluent`): MIT. https://github.com/macabeus/vscode-fluent/blob/8544ea296a7769a359f43ddff4dc4b6c61f5cf59/syntaxes/fluent.tmLanguage.json
+- Fortran (Fixed Form) (`fortran-fixed-form`): MIT. https://github.com/fortran-lang/vscode-fortran-support/blob/002eaa90668fd7d63cd073e8ca21b1388357ed62/syntaxes/fortran_fixed-form.tmLanguage.json
+- Fortran (Free Form) (`fortran-free-form`): MIT. https://github.com/fortran-lang/vscode-fortran-support/blob/f5fbf935d709e165922b307885a6106e32624018/syntaxes/fortran_free-form.tmLanguage.json
+- F# (`fsharp`): MIT. https://github.com/microsoft/vscode/blob/e6cffb21362b6d7addb977ff7db14f0681228780/extensions/fsharp/syntaxes/fsharp.tmLanguage.json
+- GDResource (`gdresource`): MIT. https://github.com/godotengine/godot-vscode-plugin/blob/e7e2d0439dea0fb3a568378554c81e0a17348a84/syntaxes/GDResource.tmLanguage.json
+- GDScript (`gdscript`): MIT. https://github.com/godotengine/godot-vscode-plugin/blob/3f2860fd76c591a6010f0d35220490933e41d01d/syntaxes/GDScript.tmLanguage.json
+- GDShader (`gdshader`): MIT. https://github.com/godotengine/godot-vscode-plugin/blob/e7e2d0439dea0fb3a568378554c81e0a17348a84/syntaxes/GDShader.tmLanguage.json
+- Genie (`genie`): MIT. https://github.com/vala-lang/vala-vscode/blob/8f825e95648326df2572d0522632251cdff4a43b/syntaxes/genie.YAML-tmLanguage
+- Gherkin (`gherkin`): MIT. https://github.com/alexkrechik/VSCucumberAutoComplete/blob/fbb554addf81e8961b58b1577924af10fecf9694/syntaxes/feature.tmLanguage.json
+- Git Commit Message (`git-commit`): MIT. https://github.com/microsoft/vscode/blob/f8c3f89468fea14103d8790d59ea8594d6e644eb/extensions/git-base/syntaxes/git-commit.tmLanguage.json
+- Git Rebase Message (`git-rebase`): MIT. https://github.com/microsoft/vscode/blob/e95c74c4c7af876e79ec58df262464467c06df28/extensions/git-base/syntaxes/git-rebase.tmLanguage.json
+- Gleam (`gleam`): Apache-2.0. https://github.com/gleam-lang/vscode-gleam/blob/aa487ed82aeaec8dbac62e796689daf55abf1aa9/syntaxes/gleam.tmLanguage.json
+- Glimmer JS (`glimmer-js`): MIT. https://github.com/lifeart/vsc-ember-syntax/blob/76fce7b360ce09a78789e7d5217b8955d1a5d95f/syntaxes/source.gjs.json
+- Glimmer TS (`glimmer-ts`): MIT. https://github.com/lifeart/vsc-ember-syntax/blob/76fce7b360ce09a78789e7d5217b8955d1a5d95f/syntaxes/source.gts.json
+- GN (`gn`): Apache-2.0. https://github.com/google/gn-language-server/blob/a77b96900dd5ad6395294e34c2c5833cc89d5af0/vscode-gn/syntaxes/gn.tmLanguage.json
+- Go (`go`): MIT. https://github.com/microsoft/vscode/blob/091ef378baaa141c8bc4bbe9775d4cb3bd655a80/extensions/go/syntaxes/go.tmLanguage.json
+- GraphQL (`graphql`): MIT. https://github.com/prisma-labs/vscode-graphql/blob/4569aef2364b42b6acd8188e4a6ca9b0ba3c6a1d/grammars/graphql.json
+- Groovy (`groovy`): MIT. https://github.com/microsoft/vscode/blob/8fdf170a0850c1cc027382f31650aaf300d3ae2a/extensions/groovy/syntaxes/groovy.tmLanguage.json
+- Hack (`hack`): MIT. https://github.com/slackhq/vscode-hack/blob/f92d6a49ce03a4ed16d342e6bd9e8be65af0b623/syntaxes/hack.json
+- Ruby Haml (`haml`): MIT. https://github.com/karuna/haml-vscode/blob/aa45415aefd691af0a501ea4f98e434490623e0d/syntaxes/haml.json
+- Handlebars (`handlebars`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/handlebars/syntaxes/Handlebars.tmLanguage.json
+- Haskell (`haskell`): BSD-3-Clause. https://github.com/octref/language-haskell/blob/ae87982aac2bf5cf6334c067e49c5ec8fc08b871/syntaxes/haskell.json
+- Haxe (`haxe`): MIT. https://github.com/vshaxe/haxe-TmLanguage/blob/7f2e6feda8aa74ae5edebb04607f63f762bfc365/haxe.YAML-tmLanguage
+- Hjson (`hjson`): MIT. https://github.com/hjson/textmate-hjson/blob/196075169c9a9f9ab04c8e7423b67ea72c976237/Syntaxes/Hjson.tmLanguage
+- HLSL (`hlsl`): MIT. https://github.com/microsoft/vscode/blob/efa12b2f49ec6ee84ed1e7bbd948808efec452f6/extensions/hlsl/syntaxes/hlsl.tmLanguage.json
+- HTML (`html`): MIT. https://github.com/microsoft/vscode/blob/45324363153075dab0482312ae24d8c068d81e4f/extensions/html/syntaxes/html.tmLanguage.json
+- HTML (Derivative) (`html-derivative`): MIT. https://github.com/microsoft/vscode/blob/4064f172528461afc6944383d07521f6a30da89c/extensions/html/syntaxes/html-derivative.tmLanguage.json
+- HTTP (`http`): MIT. https://github.com/Huachao/vscode-restclient/blob/6649589e4d3f97d9c0d68a4f7ffe03fa2919c4df/syntaxes/http.tmLanguage.json
+- HXML (`hxml`): MIT. https://github.com/vshaxe/haxe-TmLanguage/blob/365040ca52f480c5a9d7bfe87aaaead06fc08fed/hxml.YAML-tmLanguage
+- Hy (`hy`): MIT. https://github.com/hylang/vscode-hy/blob/8f99630793b7483cf4cac10a655da6fed08a4f9f/syntaxes/hy.tmLanguage.json
+- Imba (`imba`): MIT. https://github.com/imba/imba/blob/183643518e567f0e125046b47b6d81f1aa7bdbb1/packages/vscode-imba/syntaxes/imba.tmLanguage.json
+- INI (`ini`): MIT. https://github.com/microsoft/vscode/blob/8fdf170a0850c1cc027382f31650aaf300d3ae2a/extensions/ini/syntaxes/ini.tmLanguage.json
+- Java (`java`): MIT. https://github.com/microsoft/vscode/blob/3c86ede5f554f6e196c832394e126b291a1de606/extensions/java/syntaxes/java.tmLanguage.json
+- JavaScript (`javascript`): MIT. https://github.com/microsoft/vscode/blob/210541906e5a96ab39f9c753f921b1bd35f4138b/extensions/javascript/syntaxes/JavaScript.tmLanguage.json
+- Jinja (`jinja`): MIT. https://github.com/samuelcolvin/jinjahtml-vscode/blob/be729c88f723602e7b5df2e9dc5e8c016c31c38f/syntaxes/jinja.tmLanguage.json
+- Jison (`jison`): MIT. https://github.com/cdibbs/language-jison/blob/9d4cb4b044832320a51fabb6e533fc299425f552/grammars/jison.cson
+- JSON (`json`): MIT. https://github.com/microsoft/vscode/blob/d6af4893ed9a3545163a4cb748fa5548bd1e51a5/extensions/json/syntaxes/JSON.tmLanguage.json
+- JSON5 (`json5`): MIT. https://github.com/mrmlnc/vscode-json5/blob/e884b89929103ff009322c393080ff45a4544e88/syntaxes/json5.json
+- JSON with Comments (`jsonc`): MIT. https://github.com/microsoft/vscode/blob/0adddd82816db666c52038e8277312dc55da2756/extensions/json/syntaxes/JSONC.tmLanguage.json
+- JSON Lines (`jsonl`): MIT. https://github.com/microsoft/vscode/blob/0adddd82816db666c52038e8277312dc55da2756/extensions/json/syntaxes/JSONL.tmLanguage.json
+- Jsonnet (`jsonnet`): Apache-2.0. https://github.com/heptio/vscode-jsonnet/blob/39088f9cde9f483c8e0efeb67a3fd561cd873aad/syntaxes/jsonnet.tmLanguage.json
+- JSSM (`jssm`): MIT. https://github.com/StoneCypher/sublime-jssm/blob/2be02a59d284229bbbfb3dc6c2bdcec9b2c263ef/jssm.tmLanguage
+- JSX (`jsx`): MIT. https://github.com/microsoft/vscode/blob/210541906e5a96ab39f9c753f921b1bd35f4138b/extensions/javascript/syntaxes/JavaScriptReact.tmLanguage.json
+- Julia (`julia`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/julia/syntaxes/julia.tmLanguage.json
+- Just (`just`): MIT. https://github.com/nefrob/vscode-just/blob/2253973135a5cdc34e44df876fecd30aff605150/syntaxes/just.tmLanguage.json
+- KDL (`kdl`): Apache-2.0. https://github.com/kdl-org/vscode-kdl/blob/b986286d526d3dba7f5121956a52ce300c3418f0/syntaxes/kdl.tmLanguage.json
+- Kotlin (`kotlin`): MIT. https://github.com/fwcd/vscode-kotlin/blob/626e20d5c51a4379c4c0ee293aa89e58b5232aec/syntaxes/kotlin.tmLanguage.json
+- LaTeX (`latex`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/latex/syntaxes/LaTeX.tmLanguage.json
+- Lean 4 (`lean`): Apache-2.0. https://github.com/leanprover/vscode-lean4/blob/2ca585c47d447682452bd72f528feffd03ef4971/vscode-lean4/syntaxes/lean4.json
+- Less (`less`): MIT. https://github.com/microsoft/vscode/blob/03dc55030b3b2b5c4779d4ac1e2e46cd1f5a6b7c/extensions/less/syntaxes/less.tmLanguage.json
+- Liquid (`liquid`): MIT. https://github.com/Shopify/liquid-tm-grammar/blob/099adcf0d4beacd078a22432eaeab08d6f1e6da5/grammars/liquid.tmLanguage.json
+- Log file (`log`): MIT. https://github.com/emilast/vscode-logfile-highlighter/blob/396c8552ff99d0e07142fdd940d75dae212dd28c/syntaxes/log.tmLanguage
+- Logo (`logo`): TextMate bundle licence: "Permission to copy, use, modify, sell and distribute this software is granted.". https://github.com/textmate/logo.tmbundle/blob/3205e987ed2a2aa11accdd55a7d094832441f89c/Syntaxes/Logo.tmLanguage
+- Lua (`lua`): MIT. https://github.com/microsoft/vscode/blob/c8fdd1650c06321d687ddfd1eff06aae4b616256/extensions/lua/syntaxes/lua.tmLanguage.json
+- Makefile (`make`): MIT. https://github.com/microsoft/vscode/blob/91db8ea85fee30ebb3c7a5e7939aa2a8d79811c5/extensions/make/syntaxes/make.tmLanguage.json
+- Markdown (`markdown`): MIT. https://github.com/microsoft/vscode/blob/6d8ab9737d58fc5eaf07e2ae6553b38183a5de47/extensions/markdown-basics/syntaxes/markdown.tmLanguage.json
+- Marko (`marko`): MIT. https://github.com/marko-js/language-server/blob/9b627df21b63f9aeecd04780b9336ac3b734fa17/packages/vscode/syntaxes/marko.tmLanguage.json
+- MATLAB (`matlab`): BSD-2-Clause. https://github.com/mathworks/MATLAB-Language-grammar/blob/69dbf20c1eb19efd629c0438a2a493e60617e8de/Matlab.tmbundle/Syntaxes/MATLAB.tmLanguage
+- MDC (`mdc`): MIT. https://github.com/nuxt-content/vscode-mdc/blob/97c4924c847eea22e50188a5127d893262a66019/syntaxes/mdc.standalone.tmLanguage.json
+- MDX (`mdx`): MIT. https://github.com/wooorm/markdown-tm-language/blob/c78b1e5df644d24fa76716bbe26f4b48a6fc1610/source.mdx.tmLanguage
+- Mermaid (`mermaid`): MIT. https://github.com/bpruitt-goddard/vscode-mermaid-syntax-highlight/blob/8b62f487cb7a89afcd152febfbf47f5d4787657f/syntaxes/mermaid.tmLanguage.yaml
+- MIPS Assembly (`mipsasm`): TextMate bundle licence: "Permission to copy, use, modify, sell and distribute this software is granted.". https://github.com/textmate/mips.tmbundle/blob/eb7601016a109bf912a48a1c21988f3c4a59fb3a/Syntaxes/MIPS.tmLanguage
+- Mojo (`mojo`): Apache-2.0. https://github.com/modular/vscode-mojo/blob/7661e4e6157718ab1ecc700441138738f4fcbc9b/syntaxes/mojo.syntax.json
+- MoonBit (`moonbit`): Apache-2.0. https://github.com/moonbitlang/moonbit-tmLanguage/blob/5be3967f9f5093fd0210afc385bd3495b243d465/grammars/moonbit.tmLanguage.json
+- Move (`move`): MIT. https://github.com/damirka/move-syntax/blob/01aeb9284635195a4861cfa7d46759320bb6609c/syntaxes/move.tmLanguage.json
+- Narrat Language (`narrat`): MIT. https://github.com/liana-p/narrat-syntax-highlighting-vscode/blob/00d4b410338fc50ca0ce77a1f7e873c1fb66d376/syntaxes/narrat.tmLanguage.yaml
+- Nextflow (`nextflow`): MIT. https://github.com/nextflow-io/vscode-language-nextflow/blob/928fc02dd8d082d489a5cec0c019268894719339/syntaxes/nextflow.tmLanguage.json
+- Nextflow Groovy (`nextflow-groovy`): MIT. https://github.com/nextflow-io/vscode-language-nextflow/blob/928fc02dd8d082d489a5cec0c019268894719339/syntaxes/groovy.tmLanguage.json
+- Nix (`nix`): MIT. https://github.com/nix-community/vscode-nix-ide/blob/effbf3494a43250a537834805b305793994b9ca8/dist/nix.tmLanguage.json
+- nushell (`nushell`): MIT. https://github.com/nushell/vscode-nushell-lang/blob/dd6145171b0e51963f1e3b0f92ade7e9ddfd1628/syntaxes/nushell.tmLanguage.json
+- Objective-C (`objective-c`): MIT. https://github.com/microsoft/vscode/blob/bd1abe08c38bb5deccf65610f8f3c03d2338d20d/extensions/objective-c/syntaxes/objective-c.tmLanguage.json
+- Objective-C++ (`objective-cpp`): MIT. https://github.com/microsoft/vscode/blob/bd1abe08c38bb5deccf65610f8f3c03d2338d20d/extensions/objective-c/syntaxes/objective-c++.tmLanguage.json
+- OCaml (`ocaml`): Apache-2.0. https://github.com/reasonml-editor/vscode-reasonml/blob/14af625ec50ed9968b957b4d6336c5338d81af45/syntaxes/ocaml.json
+- Odin (`odin`): MIT. https://github.com/DanielGavin/ols/blob/d26a19b38c581e28f67609cbb2d5ac933a9373d1/editors/vscode/syntaxes/odin.tmLanguage.json
+- OpenSCAD (`openscad`): MIT. https://github.com/tbuser/openscad.tmbundle/blob/5962175ed355c2d58dc1991801c229809363e999/Syntaxes/OpenSCAD.tmLanguage
+- Pascal (`pascal`): MIT. https://github.com/alefragnani/vscode-language-pascal/blob/f2d6345bd9fe83932f4d04fcacf98ce7d74b8034/syntaxes/pascal.tmLanguage
+- Perl (`perl`): MIT. https://github.com/microsoft/vscode/blob/e637ff1bf7f481134849625e982ec80df9b35bc8/extensions/perl/syntaxes/perl.tmLanguage.json
+- PHP (`php`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/php/syntaxes/php.tmLanguage.json
+- Pkl (`pkl`): Apache-2.0. https://github.com/apple/pkl.tmbundle/blob/4ed6ca67ec7579b7a3a86b96ee89874ae825f15f/Syntaxes/pkl.tmLanguage
+- PL/SQL (`plsql`): MIT. https://github.com/zabel-xyz/plsql-language/blob/256a6b8f04f2bdc5e60ce921646a5068957078d7/syntaxes/plsql.tmLanguage
+- Gettext PO (`po`): TextMate bundle licence: "Permission to copy, use, modify, sell and distribute this software is granted.". https://github.com/textmate/gettext.tmbundle/blob/08bb69558d82ada8d4f36b8869f871ce69014749/Syntaxes/Gettext.tmLanguage
+- Polar (`polar`): Apache-2.0. https://github.com/osohq/polar-grammar/blob/1a87b3a7f2b47aea681a0f627b2297f77171d1c3/syntaxes/polar.tmLanguage.json
+- PostCSS (`postcss`): MIT. https://github.com/vuejs/vetur/blob/8ccae3ba50b65837d4cd4acc71a3b84cd3bee27c/syntaxes/vue-postcss.json
+- PowerQuery (`powerquery`): MIT. https://github.com/microsoft/powerquery-language/blob/eed9810b5f78dfb63319bdbce80bca50419dfa50/PowerQuery.tmLanguage.json
+- PowerShell (`powershell`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/powershell/syntaxes/powershell.tmLanguage.json
+- Prisma (`prisma`): Apache-2.0. https://github.com/prisma/language-tools/blob/eca96bfdfa03bde79465e831e502481d386934be/packages/vscode/syntaxes/prisma.tmLanguage.json
+- Prolog (`prolog`): MIT. https://github.com/arthwang/vsc-prolog/blob/5e15f731d5ef8e0f3974589b84ddefe6a2bf78c7/syntaxes/prolog.swi.tmLanguage.json
+- Protocol Buffer 3 (`proto`): MIT. https://github.com/zxh0/vscode-proto3/blob/274be763ecae7055505354b44f4892a2669e1da8/syntaxes/proto3.tmLanguage.json
+- Pug (`pug`): MIT. https://github.com/microsoft/vscode/blob/6ac83c7c7dda9f27ca1fe9d98675253e010b75d1/extensions/pug/syntaxes/pug.tmLanguage.json
+- Puppet (`puppet`): Apache-2.0. https://github.com/octref/puppet-vscode/blob/42e02ef6c02aefb0dcf03f8367fdc106d7213a6c/syntaxes/puppet.tmLanguage
+- Python (`python`): MIT. https://github.com/microsoft/vscode/blob/cf4c9e469d521fa5f33353737e8157eb0789ad02/extensions/python/syntaxes/MagicPython.tmLanguage.json
+- QML (`qml`): MIT. https://github.com/seanwu1105/vscode-qt-for-python/blob/51408001e908800c00ce9f68f66e511545ea29fe/syntaxes/qml.tmLanguage.json
+- QML Directory (`qmldir`): MIT. https://github.com/seanwu1105/vscode-qt-for-python/blob/b301e7b18493ba59c4f52e49c3f73b6cd23d4c4b/syntaxes/qmldir.tmLanguage.json
+- Qt Style Sheets (`qss`): MIT. https://github.com/seanwu1105/vscode-qt-for-python/blob/f0a56a97d10f58ab7b4b6e2ab6ce34ca4c9d521d/syntaxes/qss.tmLanguage.json
+- R (`r`): MIT. https://github.com/posit-dev/positron/blob/c4d6bab60dd914427a2d47a4b64e75e025d94059/extensions/positron-r/syntaxes/r.tmGrammar.gen.json
+- Raku (`raku`): MIT. https://github.com/microsoft/vscode/blob/8fdf170a0850c1cc027382f31650aaf300d3ae2a/extensions/perl/syntaxes/perl6.tmLanguage.json
+- ASP.NET Razor (`razor`): MIT. https://github.com/dotnet/razor/blob/743f32a68c61809b22fd84e8748c3686ef1bb8b8/src/Razor/src/Microsoft.VisualStudio.RazorExtension/EmbeddedGrammars/aspnetcorerazor.tmLanguage.json
+- RBS (`rbs`): MIT. https://github.com/soutaro/vscode-rbs-syntax/blob/d945dc76ec7eee172c51eb8bea1f206aa2e52925/syntaxes/rbs.tmLanguage.json
+- Windows Registry Script (`reg`): MIT. https://github.com/mihai-vlc/reg-vscode/blob/896096fc6756329d82c71a913663a1c0ac678f74/syntaxes/reg.tmLanguage
+- RegExp (`regexp`): MIT. https://github.com/MagicStack/MagicPython/blob/c9b3409deb69acec31bbf7913830e93a046b30cc/grammars/MagicRegExp.tmLanguage
+- RISC-V (`riscv`): MIT. https://github.com/zhuanhao-wu/vscode-riscv-support/blob/2736b60e45ff2ef738d784055e136cf38d6290cd/syntaxes/riscv.tmLanguage
+- RON (`ron`): MIT. https://github.com/a5huynh/vscode-ron/blob/3acb0d97348c972b3b6f04b4e92901a541b22022/syntaxes/ron.tmGrammar.json
+- ROS Interface (`rosmsg`): MIT. https://github.com/jtbandes/ros-tmlanguage/blob/d8ae27bc0d04498c01cb8dc77bfe2884474d9aba/ROS%20Interface.tmLanguage.yaml
+- reStructuredText (`rst`): MIT. https://github.com/microsoft/vscode/blob/48e93f756b764991ede33ad09781a863aca6907a/extensions/restructuredtext/syntaxes/rst.tmLanguage.json
+- Ruby (`ruby`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/ruby/syntaxes/ruby.tmLanguage.json
+- Rust (`rust`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/rust/syntaxes/rust.tmLanguage.json
+- SAS (`sas`): MIT. https://github.com/rpardee/sas/blob/49f6e733c6c0b918a2a825ca2f63dba704f3e8c0/syntaxes/sas.tmLanguage
+- Scala (`scala`): MIT. https://github.com/scala/vscode-scala-syntax/blob/672fa16c64e12b2cc8b98da011411463968de727/syntaxes/Scala.tmLanguage.json
+- Scheme (`scheme`): MIT. https://github.com/sjhuangx/vscode-scheme/blob/4e21683666e1e2edfa21d040ecd427f628e7b5ff/syntaxes/scheme.tmLanguage
+- SCSS (`scss`): MIT. https://github.com/microsoft/vscode/blob/cf8d61ebd2f022f4ce8280171f0360d1fe0a206d/extensions/scss/syntaxes/scss.tmLanguage.json
+- 1C (Query) (`sdbl`): MIT. https://github.com/1c-syntax/vsc-language-1c-bsl/blob/c60d42089e5139942ff5b1db3a0a3ca8dd094ce6/syntaxes/1c-query.tmLanguage.json
+- ShaderLab (`shaderlab`): MIT. https://github.com/microsoft/vscode/blob/8fdf170a0850c1cc027382f31650aaf300d3ae2a/extensions/shaderlab/syntaxes/shaderlab.tmLanguage.json
+- Shell (`shellscript`): MIT. https://github.com/microsoft/vscode/blob/9473445f7d3dcb5c579f42ece8b6c18c43c63ed3/extensions/shellscript/syntaxes/shell-unix-bash.tmLanguage.json
+- Shell Session (`shellsession`): MIT. https://github.com/hronro/sublime-linguist-syntax/blob/9c84f1d69dbe89bc23292f129cf2d408a9c7afe1/syntaxes/ShellSession.tmLanguage
+- GNU Smalltalk (`smalltalk`): MIT. https://github.com/leocamello/vscode-smalltalk/blob/241ae15a15643a7728ddf6c5c1771e340e731041/syntaxes/gnu-smalltalk.YAML-tmLanguage
+- Smithy (`smithy`): Apache-2.0. https://github.com/smithy-lang/smithy-vscode/blob/207935eefd01821565e86f115b928fa44992830f/syntaxes/smithy.tmLanguage.json
+- Solidity (`solidity`): MIT. https://github.com/juanfranblanco/vscode-solidity/blob/54ae302551a095e3f34371bb15f654f574e10fac/syntaxes/solidity.json
+- Closure Templates (`soy`): MIT. https://github.com/mthadley/language-closure-templates/blob/7caf3a1fad0245c4196d3766ba0f481762fbc92e/grammars/closure-templates.json
+- Splunk Query Language (`splunk`): MIT. https://github.com/arcsector/vscode-splunk-search-syntax/blob/b1f68ff035950e6a98e0db4af1a338cb1c3c1858/syntaxes/splunk_search.tmLanguage
+- SQL (`sql`): MIT. https://github.com/microsoft/vscode/blob/af600487b1e94374d9f48f57cbf2cad24656b07f/extensions/sql/syntaxes/sql.tmLanguage.json
+- SSH Config (`ssh-config`): TextMate bundle licence: "Permission to copy, use, modify, sell and distribute this software is granted.". https://github.com/textmate/ssh-config.tmbundle/blob/212a0000c50e0c877303b2c4fcead539d2af2670/Syntaxes/SSH-Config.tmLanguage
+- Stata (`stata`): MIT. https://github.com/kylebarron/language-stata/blob/dd98de502bc1bf2a205f3f023afb98c7aa5b42ee/grammars/stata.json
+- Stylus (`stylus`): MIT. https://github.com/d4rkr00t/language-stylus/blob/198a851f385aee857332f3ce5dd981ff67720ead/syntaxes/stylus.json
+- SurrealQL (`surrealql`): Apache-2.0. https://github.com/surrealdb/surrealql-grammar/blob/d7594cbe432daaa51d30723a63fb63888d5073a0/syntaxes/surrealql.tmLanguage.json
+- Svelte (`svelte`): MIT. https://github.com/sveltejs/language-tools/blob/2cfcc15b4c44dfc1128432e20ca663fe20bdd12e/packages/svelte-vscode/syntaxes/svelte.tmLanguage.src.yaml
+- Swift (`swift`): MIT. https://github.com/jtbandes/swift-tmlanguage/blob/2be007b6bc88e54a0edfd3c313ff31276edc923d/Swift.tmLanguage.yaml
+- SystemVerilog (`system-verilog`): MIT. https://github.com/mshr-h/vscode-verilog-hdl-support/blob/e6a5a2b76055dd7acbdc7420060e0314cb86e8dd/syntaxes/systemverilog.tmLanguage.json
+- Systemd Units (`systemd`): MIT. https://github.com/hangxingliu/vscode-systemd/blob/62ace1156b5afa0ec9932e3a55cfc00c0123c457/src/syntax/systemd.tmLanguage
+- TalonScript (`talonscript`): MIT. https://github.com/mrob95/vscode-TalonScript/blob/91f3a6faaf926c02582f36ee155f2c4a02b9cc48/syntaxes/talon.tmLanguage.json
+- Tasl (`tasl`): MIT. https://github.com/underlay/vscode-tasl/blob/dde4b7c0b762c2e667584095362dd49ebfacece7/syntaxes/tasl.tmLanguage.json
+- Templ (`templ`): MIT. https://github.com/templ-go/templ-vscode/blob/d0af70c97ed384e93892c46b93d622ffaba5d93c/syntaxes/templ.tmLanguage.json
+- TeX (`tex`): MIT. https://github.com/microsoft/vscode/blob/609f17a76734f092792a33c891af40bbcaea0c64/extensions/latex/syntaxes/TeX.tmLanguage.json
+- TOML (`toml`): TextMate bundle licence: "Permission to copy, use, modify, sell and distribute this software is granted.". https://github.com/textmate/toml.tmbundle/blob/e82b64c1e86396220786846201e9aa3f0a2d9ca2/Syntaxes/TOML.tmLanguage
+- TSV (`tsv`): MIT. https://github.com/mechatroner/vscode_rainbow_csv/blob/00d4c947f1bbe6a4a73599bd97fb31bdfbe262f3/syntaxes/tsv.tmLanguage.json
+- TSX (`tsx`): MIT. https://github.com/microsoft/vscode/blob/210541906e5a96ab39f9c753f921b1bd35f4138b/extensions/typescript-basics/syntaxes/TypeScriptReact.tmLanguage.json
+- Twig (`twig`): MIT. https://github.com/mblode/vscode-twig-language-2/blob/73f4e2729ce5f490e294dd158c82c22a35cf96de/src/syntaxes/twig.tmLanguage
+- TypeScript (`typescript`): MIT. https://github.com/microsoft/vscode/blob/210541906e5a96ab39f9c753f921b1bd35f4138b/extensions/typescript-basics/syntaxes/TypeScript.tmLanguage.json
+- TypeSpec (`typespec`): MIT. https://github.com/microsoft/typespec/blob/8e16f8cfffd431f2a04647f8f98bbc98e8f6fcd0/grammars/typespec.json
+- Typst (`typst`): Apache-2.0. https://github.com/Myriad-Dreamin/tinymist/blob/b4e837d01ddb66d676637a1af80b6754ff874395/editors/vscode/package.json
+- V (`v`): MIT. https://github.com/vlang/vscode-vlang/blob/cc6dee79af1fc1332084a263b952489aaed7e884/syntaxes/v.tmLanguage.json
+- Vala (`vala`): MIT. https://github.com/vala-lang/vala-vscode/blob/8f825e95648326df2572d0522632251cdff4a43b/syntaxes/vala.YAML-tmLanguage
+- Visual Basic (`vb`): MIT. https://github.com/microsoft/vscode/blob/35d97bc7e439fce0f50f42074041ab2d8571b20a/extensions/vb/syntaxes/asp-vb-net.tmLanguage.json
+- Verilog (`verilog`): MIT. https://github.com/mshr-h/vscode-verilog-hdl-support/blob/67065883604b1b68a97ca33db22b1eb0c05553de/syntaxes/verilog.tmLanguage.json
+- VHDL (`vhdl`): MIT. https://github.com/jonasjj/awesome-vhdl/blob/b787559a47d64c7baf2a9ac0f4cac8e2e721cddc/syntaxes/vhdl.tmLanguage
+- Vim Script (`viml`): MIT. https://github.com/dunstontc/viml/blob/8762570fc7d6f1009a3c93efd2a337330d88b88e/syntaxes/viml.tmLanguage.json
+- Vue (`vue`): MIT. https://github.com/vuejs/language-tools/blob/cd7a6e53d58111640f116d1e19f1c1cf06c7157d/extensions/vscode/syntaxes/vue.tmLanguage.json
+- Vue HTML (`vue-html`): MIT. https://github.com/vuejs/vetur/blob/53ee52746b1f26f44391c3764bc7bd06d4ddaa46/syntaxes/vue-html.tmLanguage.json
+- Vue Vine (`vue-vine`): MIT. https://github.com/vue-vine/assets/blob/2921493f703bfcf64aed5644f275e7e65f2e0a48/grammars/vue-vine.tmLanguage.json
+- Vyper (`vyper`): MIT. https://github.com/tintinweb/vscode-vyper/blob/3df08ea46fc7df1a5e7f35365e615624849d1c1b/syntaxes/vyper.tmLanguage.json
+- WebAssembly (`wasm`): MIT. https://github.com/wasmerio/vscode-wasm/blob/9d0ace1ff113f4a3e95797675039cd94ec257078/syntaxes/wat.json
+- Wenyan (`wenyan`): MIT. https://github.com/wenyan-lang/highlight/blob/5100e8a803978b4f5b009adac035d1f27f591760/wenyan.tmLanguage.json
+- WGSL (`wgsl`): MIT. https://github.com/PolyMeilex/vscode-wgsl/blob/04222c48533ca541d6dc97043ea096471517e079/syntaxes/wgsl.tmLanguage.json
+- Wikitext (`wikitext`): MIT. https://github.com/Frederisk/Wikitext-VSCode-Extension/blob/40e726bfe904a1e3b9a3141b4920f5061ce60e52/syntaxes/wikitext.tmLanguage.yaml
+- WebAssembly Interface Types (`wit`): MIT. https://github.com/wasmerio/vscode-wasm/blob/5a67ac3f5ade246b44308768b034204612f3a0c9/syntaxes/wit.json
+- XML (`xml`): MIT. https://github.com/microsoft/vscode/blob/10a1d2a50a2882f5ae85bdb51eb04d3064fb9de9/extensions/xml/syntaxes/xml.tmLanguage.json
+- XSL (`xsl`): MIT. https://github.com/microsoft/vscode/blob/8fdf170a0850c1cc027382f31650aaf300d3ae2a/extensions/xml/syntaxes/xsl.tmLanguage.json
+- YAML (`yaml`): MIT. https://github.com/textmate/yaml.tmbundle/blob/e54ceae3b719506dba7e481a77cea4a8b576ae46/Syntaxes/YAML.tmLanguage
+- ZenScript (`zenscript`): MIT. https://github.com/CraftTweaker/ZenScript-tmLanguage/blob/5a7bcb775a6fb37470e56f904e70d8b8b9e6b047/zenscript.tmLanguage.json
+- Zig (`zig`): MIT. https://github.com/ziglang/vscode-zig/blob/9c7bb7631f3af99331475b633aaf5b70345c6713/syntaxes/zig.tmLanguage.json
+-  (`angular-expression`): MIT. https://github.com/angular/vscode-ng-language-service/blob/39057fc2dbb37125778fb2c5c517c661f9399996/syntaxes/expression.json
+-  (`angular-inline-style`): MIT. https://github.com/angular/vscode-ng-language-service/blob/f0422f5f571f79a904510944452f06fb36beff22/syntaxes/inline-styles.json
+-  (`angular-inline-template`): MIT. https://github.com/angular/vscode-ng-language-service/blob/a18c61752e65ddcbeb31217f47f29fa38fe26c42/syntaxes/inline-template.json
+-  (`angular-let-declaration`): MIT. https://github.com/angular/vscode-ng-language-service/blob/0aa2aa572dedcad4c5fc3c6825227396f4e99f21/syntaxes/let-declaration.json
+-  (`angular-template`): MIT. https://github.com/angular/vscode-ng-language-service/blob/28739e438742bee69faceda5fd15445682451397/syntaxes/template.json
+-  (`angular-template-blocks`): MIT. https://github.com/angular/vscode-ng-language-service/blob/8c84410f61ed87e261a83458af10af18cbf669a9/syntaxes/template-blocks.json
+- C++ (`cpp-macro`): MIT. https://github.com/microsoft/vscode/blob/8623a79836fba2e7e058e3493345ee068d28ce4f/extensions/cpp/syntaxes/cpp.embedded.macro.tmLanguage.json
+-  (`es-tag-css`): MIT. https://github.com/0x00000001A/es6-string-html/blob/b8f51210b53ce64e789949d4be33b7ecb42cf177/syntaxes/es6-inline-css.json
+-  (`es-tag-glsl`): MIT. https://github.com/0x00000001A/es6-string-html/blob/b8f51210b53ce64e789949d4be33b7ecb42cf177/syntaxes/es6-inline-glsl.json
+-  (`es-tag-html`): MIT. https://github.com/0x00000001A/es6-string-html/blob/b8f51210b53ce64e789949d4be33b7ecb42cf177/syntaxes/es6-inline-html.json
+-  (`es-tag-sql`): MIT. https://github.com/frigus02/vscode-sql-tagged-template-literals/blob/80e8ddcb034a3bc66382789d2ca251d0266a9f56/extension-syntax-only/syntaxes/grammar.json
+-  (`es-tag-xml`): MIT. https://github.com/0x00000001A/es6-string-html/blob/b8f51210b53ce64e789949d4be33b7ecb42cf177/syntaxes/es6-inline-xml.json
+- jinja-html (`jinja-html`): MIT. https://github.com/samuelcolvin/jinjahtml-vscode/blob/64ad369cd167bba2e614944db6d925b7dc6483b4/syntaxes/jinja-html.tmLanguage.json
+-  (`markdown-nix`): MIT. https://github.com/nix-community/vscode-nix-ide/blob/e2aff510787a01beb97c6227adbb96e38a60fac4/dist/injection.json
+-  (`markdown-vue`): MIT. https://github.com/vuejs/language-tools/blob/784dd56026e07f1dadb9ef2498418eccbb3dee29/extensions/vscode/syntaxes/markdown-vue.json
+-  (`vue-directives`): MIT. https://github.com/vuejs/language-tools/blob/784dd56026e07f1dadb9ef2498418eccbb3dee29/extensions/vscode/syntaxes/vue-directives.json
+-  (`vue-interpolations`): MIT. https://github.com/vuejs/language-tools/blob/784dd56026e07f1dadb9ef2498418eccbb3dee29/extensions/vscode/syntaxes/vue-interpolations.json
+-  (`vue-sfc-style-variable-injection`): MIT. https://github.com/vuejs/language-tools/blob/e85556a2e4bf0d6c981bdbd95c8a0b1e85e7ae8a/extensions/vscode/syntaxes/vue-sfc-style-variable-injection.json
+
+## Themes
+
+- `base16-ocean-light`: MIT. https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-light.json
+- `base16-ocean-dark`: MIT. https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-dark.json
+- `gruvbox-light-medium`: MIT. tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts
+- `gruvbox-dark-medium`: MIT. tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts
+- `solarized-light`: MIT. tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/0132168df99ab8830a1eb158b1a5e8242f3e94ff/extensions/theme-solarized-light/themes/solarized-light-color-theme.json
+- `solarized-dark`: MIT. tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/e886f3e07de31233c89ecdba812b05bfd07616d7/extensions/theme-solarized-dark/themes/solarized-dark-color-theme.json
+- `catppuccin-latte`: MIT. tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json
+- `catppuccin-mocha`: MIT. tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json
+- `one-half-light`: MIT. https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfLight.tmTheme, written as JSON
+- `one-half-dark`: MIT. https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfDark.tmTheme, written as JSON

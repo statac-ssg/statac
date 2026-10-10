@@ -1,0 +1,3 @@
+---
+---
+<rss version="2.0">{% for post in site.posts %}{% endfor %}</rss>

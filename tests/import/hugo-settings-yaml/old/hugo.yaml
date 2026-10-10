@@ -1,0 +1,12 @@
+baseURL: https://example.org/
+title: Settings in YAML
+languageCode: en-GB
+timeZone: Europe/London
+theme: theme-1
+pagination:
+  pagerSize: 5
+  path: pages
+params:
+  author: Name
+  book:
+    isbn: 0-000-00000-0

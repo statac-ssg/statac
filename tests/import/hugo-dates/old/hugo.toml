@@ -1,0 +1,9 @@
+baseURL = "https://example.org/"
+title = "Dates from names"
+languageCode = "en"
+timeZone = "Europe/London"
+enableGitInfo = true
+
+[frontmatter]
+  date = [":filename", ":default", ":git"]
+  lastmod = [":fileModTime", "lastmod"]

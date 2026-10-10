@@ -1,0 +1,4 @@
+baseURL = "https://example.org/"
+title = "File names"
+languageCode = "en"
+timeZone = "UTC"

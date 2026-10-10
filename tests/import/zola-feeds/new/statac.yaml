@@ -1,0 +1,12 @@
+title: Feeds
+url: https://example.org
+language: en
+timezone: UTC
+date_format: 31 December 2025
+date_short: 31 Dec 2025
+date_day: 31 Dec
+date_stamp: 31 Dec 2025, 15:04
+# What each post's id in a feed is made from: never change it once a feed is published.
+feed_key: 0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20
+posts_per_page: 0
+feed_ids_before: 2026-10-06

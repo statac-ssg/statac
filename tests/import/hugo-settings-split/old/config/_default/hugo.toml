@@ -1,0 +1,4 @@
+baseURL = "https://example.org/"
+title = "Settings split over a folder"
+languageCode = "en"
+timeZone = "UTC"

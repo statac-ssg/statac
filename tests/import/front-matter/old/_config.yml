@@ -1,0 +1,11 @@
+title: Front matter
+author: Name
+tags: [one]
+markdown: kramdown
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+      byline: Name

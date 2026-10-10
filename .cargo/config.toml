@@ -1,0 +1,4 @@
+[env]
+# The C code is otherwise compiled for the building Mac's own version, newer
+# than the one Rust targets.
+MACOSX_DEPLOYMENT_TARGET = "11.0"

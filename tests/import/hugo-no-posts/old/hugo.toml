@@ -1,0 +1,4 @@
+baseURL = "https://example.org/"
+title = "No posts folder"
+languageCode = "en"
+timeZone = "UTC"

@@ -1,0 +1,3 @@
+# Fixtures and expected output are compared byte for byte, so no file's
+# line endings are changed on any system.
+* -text

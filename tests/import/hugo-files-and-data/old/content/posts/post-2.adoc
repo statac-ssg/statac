@@ -1,0 +1,3 @@
+= Post 2
+
+A page in AsciiDoc.

@@ -1,0 +1,40 @@
+name: Windows
+run-name: ${{ inputs.reason }}
+
+# By hand only: Windows minutes are rationed.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this run is worth its minutes
+        required: true
+        type: string
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@70dec6087f2cb6bab9fbac4da23160afbe848e91 # 1.99.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # libaom needs NASM on x86-64 and the image has none. Chocolatey
+      # installs it without putting it on PATH.
+      - run: |
+          choco install nasm --no-progress -y
+          Add-Content $env:GITHUB_PATH "C:\Program Files\NASM"
+      - run: |
+          rustc -V; cmake --version; nasm -v
+      - run: cargo build --release
+      - run: (Get-Item .\target\release\statac.exe).Length
+      # --release reuses the C libraries the build above compiled.
+      - run: cargo test --release --no-fail-fast
+      # The encoder's time and the flags its C was compiled with, then the
+      # same machine's time for work done in Rust alone, to judge the first by.
+      - run: cargo run --release -p avif-aom-sys --example encode_timing
+        if: ${{ !cancelled() }}
+      - run: cargo run --release --example picture_timing
+        if: ${{ !cancelled() }}

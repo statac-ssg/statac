@@ -1,0 +1,8 @@
+{# takes photo #}
+{% set described = alt if alt is defined else photo.alt %}
+{% set loading = loading if loading is defined else "lazy" %}
+{% if photo.avif %}
+<picture><source type="image/avif" srcset="{{ photo.avif }}" sizes="{{ photo.sizes }}"><img src="{{ photo.src }}" srcset="{{ photo.fallback }}" sizes="{{ photo.sizes }}" width="{{ photo.width }}" height="{{ photo.height }}" alt="{{ described }}" loading="{{ loading }}" decoding="async"></picture>
+{%- else %}
+<img src="{{ photo.src }}"{% if photo.width %} width="{{ photo.width }}" height="{{ photo.height }}"{% endif %} alt="{{ described }}" loading="{{ loading }}" decoding="async">
+{%- endif %}

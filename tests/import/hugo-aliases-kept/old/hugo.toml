@@ -1,0 +1,4 @@
+baseURL = "https://example.org/"
+title = "Aliases"
+languageCode = "en"
+timeZone = "UTC"

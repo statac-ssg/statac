@@ -1,0 +1,1840 @@
+//! Building a page: its writing to HTML, its snippet calls through the
+//! site's snippets, then its layout and the templates that layout extends.
+
+use std::cell::{Cell, RefCell};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
+
+use minijinja::value::{Rest, Value};
+use minijinja::{Environment, Error, State};
+
+use super::card::Gathered;
+use super::files::{Snippet, Unnamed, unnamed_fills};
+use super::frame::{self, Frame, Handed};
+use super::layout::{self, Chosen};
+use super::values::{ListValue, PageValue, SiteValue};
+use super::{Templates, explain};
+use crate::assets::Assets;
+use crate::config::Settings;
+use crate::content::words::PageWord;
+use crate::dates::Dates;
+use crate::highlight::{self, Highlighter, Language};
+use crate::markdown::{self, Piece, PieceValue, Placement, Within};
+use crate::problem::{
+    ArgumentFault, Chooser, Kind, Named, NamedFeed, Problem, Relation, ShownBy, ShownWords,
+    Stopped, Word,
+};
+use crate::reads::{Key, Reads};
+use crate::site::{
+    Id, LanguageId, ListId, NameId, Names, PageId, PictureId, Redirect, SentTo, Site, TemplateId,
+};
+use crate::source::{Place, SourceId, Sources};
+
+/// Everything a page is built from, shared by every page built.
+pub(super) struct Shared {
+    pub sources: Sources,
+    pub settings: Settings,
+    pub site: Site,
+    pub assets: Assets,
+    pub templates: Templates,
+    pub dates: Dates,
+    /// The path the site is published under, such as `/blog`; empty at the
+    /// top of its domain.
+    pub base: String,
+    outlines: Mutex<HashMap<PageId, Arc<Vec<Section>>>>,
+    /// The names known before any page is built, read by every thread
+    /// without waiting on another.
+    known: Names,
+    /// Names first met while building, numbered on from `known`.
+    later: RwLock<Names>,
+    /// Each page's writing once built, by page.
+    bodies: Vec<OnceLock<Arc<Body>>>,
+    /// Each data file's value once a template has reached it, by file,
+    /// with where each text in it is written, by the text's address.
+    pub data_values: Vec<OnceLock<(Value, frame::Origins)>>,
+    /// Every feed the site publishes.
+    feeds: Vec<crate::feeds::Feed>,
+    /// Each list's feed among `feeds`, by list.
+    feed_of: Vec<Option<usize>>,
+    /// The page published at each address, by the address's key, a list's
+    /// later pages under their first page; made when first asked.
+    standing: OnceLock<HashMap<String, PageId>>,
+    /// What colours the code in the writing, in the site's `code_style`.
+    pub highlighter: Option<Highlighter>,
+    /// What the site's cards come to, each worked out once.
+    pub cards: super::card::Room,
+}
+
+impl std::fmt::Debug for Shared {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Shared")
+    }
+}
+
+impl Shared {
+    /// The id a field or setting is recorded by.
+    pub fn name_id(&self, name: &str) -> NameId {
+        if let Some(id) = self.known.get(name) {
+            return id;
+        }
+        let after_known = |id: NameId| NameId::from_index(self.known.len() + id.index());
+        if let Some(id) = self.later.read().expect("never poisoned").get(name) {
+            return after_known(id);
+        }
+        after_known(self.later.write().expect("never poisoned").intern(name))
+    }
+
+    /// The feed `list` publishes, where it publishes one.
+    pub fn feed(&self, list: ListId) -> Option<&crate::feeds::Feed> {
+        self.feed_of[list.index()].map(|at| &self.feeds[at])
+    }
+
+    /// The page published at `address`, or the page whose list's later
+    /// page is published there. Which page stands where is known from the
+    /// site's pages, which is recorded as read.
+    pub fn standing_at(&self, address: &crate::content::address::Address) -> Option<PageId> {
+        frame::read(Key::Lists);
+        let standing = self.standing.get_or_init(|| {
+            let mut standing = HashMap::new();
+            for (id, page) in self.site.pages.iter().filter(|(_, page)| page.lands()) {
+                standing.insert(page.address.key(), id);
+                if let Some(list) = page.speaks_for {
+                    for later in &self.site.lists.get(list).later {
+                        standing.insert(later.key(), id);
+                    }
+                }
+            }
+            standing
+        });
+        standing.get(&address.key()).copied()
+    }
+
+    /// The name a field or setting is recorded under as `id`.
+    pub fn name_of(&self, id: NameId) -> String {
+        match id.index().checked_sub(self.known.len()) {
+            None => self.known.name(id).to_owned(),
+            Some(later) => {
+                let names = self.later.read().expect("never poisoned");
+                names.name(NameId::from_index(later)).to_owned()
+            }
+        }
+    }
+
+    /// The page's address, the site's own path included.
+    pub fn address_of(&self, page: PageId) -> String {
+        format!(
+            "{}{}",
+            self.base,
+            self.site.pages.get(page).address.as_str()
+        )
+    }
+}
+
+/// A page's writing as built.
+#[derive(Debug)]
+pub(super) struct Body {
+    written: markdown::Written,
+    reads: Reads,
+    problems: Vec<Problem>,
+    /// The pictures the writing was told to show with no description.
+    undescribed: Vec<String>,
+    /// The photographs whose copies the writing names.
+    developed: Vec<crate::album::Shown>,
+    /// Where the first block of code coloured in the writing names its
+    /// language, and the same for each page whose writing it shows whole.
+    coloured: Vec<Place>,
+    /// What the writing links to, for checking once the site is built.
+    writing: crate::links::Writing,
+    /// The steps the engine took building it, and whether they ran out.
+    steps: u64,
+    spent: bool,
+    /// How many search boxes the writing asks for.
+    search_boxes: usize,
+    /// The writing as its own page shows it whole after search boxes of
+    /// the layout's, by how many, its own numbered after them.
+    after_boxes: Mutex<Vec<(usize, String)>>,
+    /// The writing as shown on other pages, made when first shown there.
+    elsewhere: OnceLock<Elsewhere>,
+}
+
+/// A page's writing as shown on other pages: its HTML and its excerpt, each
+/// with the addresses read from the page spelled from the top of the site;
+/// none where that changes nothing.
+#[derive(Debug)]
+struct Elsewhere {
+    html: Option<String>,
+    excerpt: Option<String>,
+}
+
+/// One page built: its HTML, what it read, its problems, and what it asks
+/// the build to make beside it. No HTML where a problem stopped it.
+#[derive(Debug)]
+pub struct Rendered {
+    pub html: Option<String>,
+    pub reads: Reads,
+    pub problems: Vec<Problem>,
+    /// The photographs whose copies it names, as each was named.
+    pub developed: Vec<crate::album::Shown>,
+    /// The sharing cards it asked for, each page's once.
+    pub cards: Vec<super::card::Asked>,
+    /// Where the first block of code coloured names its language, in each
+    /// page's writing it shows whole.
+    pub coloured: Vec<Place>,
+}
+
+impl Rendered {
+    fn of(html: Option<String>, frame: Frame, mut problems: Vec<Problem>) -> Rendered {
+        let shared = &frame.shared;
+        if html.is_some()
+            && !frame.shows_writing
+            && let Some(page) = frame.home()
+            && has_writing(shared, page)
+            && let Some(layout) = frame.layout
+        {
+            let source = shared.templates.files[layout].source;
+            let path = shared.sources.path(source).to_string_lossy();
+            let kind = Kind::WritingNeverShown {
+                layout: path.replace('\\', "/"),
+                pages: 1,
+            };
+            let head = crate::content::words::head(&shared.sources, source);
+            problems.push(met_building(Problem::at(kind, head), &frame));
+        }
+        let mut pages: Vec<PageId> = frame.reads.cards().collect();
+        pages.sort_unstable();
+        pages.dedup();
+        let cards = pages.into_iter();
+        Rendered {
+            html,
+            cards: cards
+                .map(|page| super::card::asked(&frame.shared, page))
+                .collect(),
+            reads: frame.reads,
+            problems,
+            developed: frame.developed,
+            coloured: frame.coloured,
+        }
+    }
+}
+
+/// The photographs `shown` on any output, each once in the order of their
+/// ids: with the first place in the writing naming it, and whether its
+/// copy at its own width is named anywhere.
+pub fn developed(shown: impl IntoIterator<Item = crate::album::Shown>) -> Vec<crate::album::Shown> {
+    let mut developed: BTreeMap<PictureId, (Option<Place>, bool)> = BTreeMap::new();
+    for shown in shown {
+        let (first, fuller) = developed
+            .entry(shown.id)
+            .or_insert((shown.place, shown.full));
+        *fuller |= shown.full;
+        let earlier = |a: Place, b: Place| (a.source, a.span.start) < (b.source, b.span.start);
+        *first = match (*first, shown.place) {
+            (Some(first), Some(at)) if earlier(at, first) => Some(at),
+            (None, at) => at,
+            (first, _) => first,
+        };
+    }
+    developed
+        .into_iter()
+        .map(|(id, (place, full))| crate::album::Shown { id, place, full })
+        .collect()
+}
+
+/// Builds the pages of one site.
+#[derive(Clone)]
+pub struct Renderer {
+    pub(super) shared: Arc<Shared>,
+}
+
+impl Renderer {
+    pub fn new(
+        sources: Sources,
+        settings: Settings,
+        site: Site,
+        assets: Assets,
+        templates: Templates,
+        dates: Dates,
+        feeds: Vec<crate::feeds::Feed>,
+    ) -> Renderer {
+        let base = settings.base();
+        let mut feed_of = vec![None; site.lists.len()];
+        for (at, feed) in feeds.iter().enumerate() {
+            feed_of[feed.list.index()] = Some(at);
+        }
+        let known = known_names(&settings, &site);
+        let highlighter = settings
+            .text("code_style")
+            .and_then(|style| Highlighter::new(style.value));
+        let bodies = std::iter::repeat_with(OnceLock::new)
+            .take(site.pages.len())
+            .collect();
+        let data_values = std::iter::repeat_with(OnceLock::new)
+            .take(site.data.files.len())
+            .collect();
+        let cards = super::card::Room::new(&templates.cards, site.pages.len());
+        Renderer {
+            shared: Arc::new(Shared {
+                sources,
+                settings,
+                site,
+                assets,
+                templates,
+                dates,
+                base,
+                outlines: Mutex::new(HashMap::new()),
+                known,
+                later: RwLock::new(Names::default()),
+                bodies,
+                data_values,
+                feeds,
+                feed_of,
+                standing: OnceLock::new(),
+                highlighter,
+                cards,
+            }),
+        }
+    }
+
+    pub fn sources(&self) -> &Sources {
+        &self.shared.sources
+    }
+
+    pub fn site(&self) -> &Site {
+        &self.shared.site
+    }
+
+    pub fn settings(&self) -> &Settings {
+        &self.shared.settings
+    }
+
+    pub fn assets(&self) -> &Assets {
+        &self.shared.assets
+    }
+
+    pub(crate) fn dates(&self) -> &Dates {
+        &self.shared.dates
+    }
+
+    /// The same site, held twice.
+    pub(crate) fn share(&self) -> Renderer {
+        Renderer {
+            shared: Arc::clone(&self.shared),
+        }
+    }
+
+    /// Everything to say of the site's cards, once its outputs are built
+    /// and have `asked` what they did of them: what stopped one, the pages
+    /// left without, and what no page uses.
+    pub fn cards_told(&self, asked: &Gathered) -> Vec<Problem> {
+        super::card::told(&self.shared, asked)
+    }
+
+    /// The cards the outputs built `asked` for, to draw.
+    pub fn cards_wanted<'a>(&'a self, asked: &'a Gathered) -> Vec<crate::cards::keep::Wanted<'a>> {
+        super::card::wanted(&self.shared, asked)
+    }
+
+    /// The names those cards are kept under between builds.
+    pub fn cards_kept(&self, asked: &Gathered) -> std::collections::HashSet<String> {
+        super::card::kept(&self.shared, asked)
+    }
+
+    /// The card of `page`, as an output that read it asked for it.
+    pub(crate) fn card_asked(&self, page: PageId) -> super::card::Asked {
+        super::card::asked(&self.shared, page)
+    }
+
+    /// The pictures that pages are shared with as `og_image` names them,
+    /// each with how many pages asked for it.
+    pub fn own_cards(&self, asked: &Gathered) -> BTreeMap<PictureId, usize> {
+        super::card::own(asked)
+    }
+
+    /// The name a field or setting's reads are recorded under as `id`.
+    pub(crate) fn name_of(&self, id: NameId) -> String {
+        self.shared.name_of(id)
+    }
+
+    /// How many names reads have been recorded under so far.
+    pub(crate) fn names(&self) -> usize {
+        self.shared.known.len() + self.shared.later.read().expect("never poisoned").len()
+    }
+
+    /// Every template, snippet and text of a card the site has, in the
+    /// order of their ids: what it is held as, the file it is read from,
+    /// and whether it builds anything.
+    pub(crate) fn templates(&self) -> impl Iterator<Item = (String, SourceId, bool)> + '_ {
+        let templates = &self.shared.templates;
+        templates.files.iter().enumerate().map(|(at, file)| {
+            let held = format!("{:?} {}", file.role, file.name);
+            (held, file.source, !templates.unusable.contains(&at))
+        })
+    }
+
+    /// The files the site's cards are drawn with, each by its path in the
+    /// site.
+    pub(crate) fn card_files(&self) -> Vec<String> {
+        super::card::files(&self.shared.templates.cards)
+    }
+
+    /// The build's date.
+    pub(crate) fn today(&self) -> crate::date::Date {
+        crate::dates::ShowDates::today(&self.shared.dates)
+    }
+
+    /// The feed `list` publishes, where it publishes one.
+    pub(crate) fn feed_of(&self, list: ListId) -> Option<&crate::feeds::Feed> {
+        self.shared.feed(list)
+    }
+
+    /// What a page's file alone puts on a page as HTML: its writing as
+    /// Markdown makes it, so that what it shows as code or escapes is no
+    /// markup, between its fields as written. A call is left as the file
+    /// spells it, whatever it is handed with it: what its snippet writes
+    /// is the snippet's. None for a page whose file isn't Markdown.
+    pub(crate) fn written_by_its_file(&self, page: PageId) -> Option<String> {
+        let shared = &*self.shared;
+        let source = written_as_markdown(shared, page)?;
+        let text = shared.sources.text(source);
+        let body = shared.site.pages.get(page).body;
+        let wraps = |name: &str| wraps(shared, name);
+        let document = markdown::read(&shared.sources, source, body, &wraps, &shared.base);
+        let options = markdown::Options {
+            snippets: &AsSpelled(text),
+            back_to_the_text: None,
+            digits: None,
+            right_to_left: false,
+            highlighter: None,
+        };
+        let range = body.range();
+        let mut out = text[..range.start].to_owned();
+        out.push_str(&markdown::to_html(&document, &options));
+        out.push_str(&text[range.end..]);
+        Some(out)
+    }
+
+    /// The file a template or snippet is read from.
+    pub fn template_source(&self, id: TemplateId) -> SourceId {
+        self.shared.templates.files[id.index()].source
+    }
+
+    /// Whether the file is a snippet, built only where the writing or a
+    /// template calls it by its name.
+    pub fn called_by_name(&self, id: TemplateId) -> bool {
+        matches!(
+            self.shared.templates.files[id.index()].role,
+            super::files::Role::Snippet(_)
+        )
+    }
+
+    /// The id a field or setting's reads are recorded by.
+    pub fn name_id(&self, name: &str) -> NameId {
+        self.shared.name_id(name)
+    }
+
+    /// What `page`'s writing links to and hands its snippet calls, once
+    /// its writing has been built.
+    pub fn writing(&self, page: PageId) -> Option<&crate::links::Writing> {
+        let body = self.shared.bodies[page.index()].get()?;
+        Some(&body.writing)
+    }
+
+    /// How a problem met building `page`, or its list's page `number`
+    /// counted from 1, names the page, and where.
+    pub fn building(&self, page: PageId, number: usize) -> Option<(Relation, Option<Place>)> {
+        let frame = Frame {
+            number,
+            ..Frame::new(Arc::clone(&self.shared), Some(page))
+        };
+        building(&frame)
+    }
+
+    /// The template `page` is built with.
+    pub fn layout_of(&self, page: PageId) -> Result<Chosen, Problem> {
+        let shared = &self.shared;
+        layout::choose(
+            &shared.templates,
+            &shared.sources,
+            &shared.site,
+            shared.site.pages.get(page),
+        )
+    }
+
+    /// Builds `page`: its writing, then its layout.
+    pub fn render(&self, page: PageId) -> Rendered {
+        self.render_numbered(page, 1)
+    }
+
+    /// Builds the page `number`, counted from 2, of the list `page` speaks
+    /// for: `page`'s layout, handed the page as it stands there, which
+    /// carries none of its writing.
+    pub fn render_later(&self, page: PageId, number: usize) -> Rendered {
+        self.render_numbered(page, number)
+    }
+
+    fn render_numbered(&self, page: PageId, number: usize) -> Rendered {
+        let shared = &self.shared;
+        frame::push(Frame {
+            number,
+            ..Frame::new(Arc::clone(shared), Some(page))
+        });
+        let mut problems = match number {
+            1 => match &body(shared, page) {
+                Ok(body) => {
+                    frame::with(|frame| {
+                        frame.steps = body.steps;
+                        frame.spent = body.spent;
+                        // A picture the writing told isn't told again by the layout.
+                        frame.undescribed.clone_from(&body.undescribed);
+                    });
+                    body.problems.clone()
+                }
+                Err(_) => Vec::new(),
+            },
+            _ => Vec::new(),
+        };
+        frame::read(Key::Field(page, shared.name_id("layout")));
+        frame::read(Key::Field(page, shared.name_id("type")));
+        let chosen = match self.layout_of(page) {
+            Ok(chosen) => chosen,
+            Err(problem) => {
+                let frame = frame::pop();
+                // Placed in a file, it is one problem for every page built so.
+                problems.push(match problem.place {
+                    Some(_) => problem,
+                    None => met_building(problem, &frame),
+                });
+                return Rendered::of(None, frame, problems);
+            }
+        };
+        let context = minijinja::context! {
+            page => PageValue::numbered(shared, page, number),
+            site => SiteValue::value(shared, frame::language()),
+        };
+        self.finish(&chosen.name, context, problems)
+    }
+
+    /// The problem with a site that sends readers on from old addresses
+    /// and has no template to build the pages left at them: one for the
+    /// site, placed at the first old address.
+    pub fn without_redirect_template(&self) -> Option<Problem> {
+        let first = self.shared.site.redirects.first()?;
+        if self.shared.templates.is_layout(REDIRECT) {
+            return None;
+        }
+        Some(Problem::at(
+            Kind::MissingTemplate {
+                path: super::files::template_path(REDIRECT),
+                chosen: Chooser::Written,
+                nearest: None,
+            },
+            first.place,
+        ))
+    }
+
+    /// Builds the page left at an address that sends a reader on, with the
+    /// template `redirect`. It is handed `to`, where the reader is sent,
+    /// whole where it is on the site and the site has a `url`; `title`,
+    /// what the tab says meanwhile: the `title` of the page writing the
+    /// redirect, or else what `headline` calls the page the reader is sent
+    /// to, where one on the site is, or else `to`; and the page writing
+    /// the redirect as `page`.
+    pub fn render_redirect(&self, redirect: &Redirect) -> Rendered {
+        let shared = &self.shared;
+        let page = redirect.page;
+        frame::push(Frame {
+            redirect: true,
+            ..Frame::new(Arc::clone(shared), Some(page))
+        });
+        frame::read(Key::Setting(shared.name_id("url")));
+        frame::read(Key::Field(page, shared.name_id("url")));
+        frame::read(Key::Field(page, shared.name_id("title")));
+        let on_site = |address: String| match shared.settings.text("url") {
+            Some(url) => crate::content::address::whole(&address, super::own::origin_of(url.value)),
+            None => address,
+        };
+        let (to, sent_to) = match &redirect.to {
+            SentTo::Page => (on_site(shared.address_of(page)), Some(page)),
+            SentTo::Site {
+                address, fragment, ..
+            } => (
+                on_site(format!("{}{}{fragment}", shared.base, address.as_str())),
+                shared.standing_at(address),
+            ),
+            SentTo::Elsewhere(written) => (written.clone(), None),
+        };
+        let p = shared.site.pages.get(page);
+        let title = match (&p.title, sent_to) {
+            (Some(title), _) if p.words.get(PageWord::Title).is_some() => title.value.clone(),
+            // Only writing asking for its own opening words is refused, and
+            // none is being built here.
+            (_, Some(sent_to)) => {
+                super::own::headline(shared, sent_to).unwrap_or_else(|_| to.clone())
+            }
+            _ => to.clone(),
+        };
+        let context = minijinja::context! {
+            to,
+            title,
+            page => PageValue::value(shared, page),
+            site => SiteValue::value(shared, frame::language()),
+        };
+        self.finish(REDIRECT, context, Vec::new())
+    }
+
+    /// Every feed the site publishes.
+    pub fn feeds(&self) -> &[crate::feeds::Feed] {
+        &self.shared.feeds
+    }
+
+    /// Builds a list's feed with its template, handed `list`, its dated
+    /// `posts` newest first, and `page`, the page speaking for the list,
+    /// where one does.
+    pub fn render_feed(&self, feed: &crate::feeds::Feed) -> Rendered {
+        let shared = &self.shared;
+        let page = shared.site.lists.get(feed.list).page;
+        frame::push(Frame {
+            feed: Some(feed.clone()),
+            language: shared.site.lists.get(feed.list).language,
+            ..Frame::new(Arc::clone(shared), page)
+        });
+        frame::read(Key::ListHead(feed.list));
+        let posts: Vec<Value> = crate::feeds::entries(&shared.site, &shared.dates, feed.list)
+            .into_iter()
+            .map(|post| PageValue::value(shared, post))
+            .collect();
+        let mut context: BTreeMap<&str, Value> = BTreeMap::new();
+        context.insert("list", ListValue::value(shared, feed.list));
+        context.insert("posts", Value::from(posts));
+        context.insert("site", SiteValue::value(shared, frame::language()));
+        if let Some(page) = page {
+            context.insert("page", PageValue::value(shared, page));
+        }
+        self.finish(&feed.template, Value::from(context), Vec::new())
+    }
+
+    /// Builds the template `name` with `context`, on the frame pushed for
+    /// the output, and pops it.
+    fn finish(&self, name: &str, context: Value, mut problems: Vec<Problem>) -> Rendered {
+        let shared = &self.shared;
+        let chain = shared.templates.chain(name);
+        for &at in &chain {
+            frame::read(Key::Template(Templates::id(at)));
+        }
+        if chain
+            .iter()
+            .any(|at| shared.templates.unusable.contains(at))
+        {
+            let frame = frame::pop();
+            return Rendered::of(None, frame, problems);
+        }
+        let layout = shared.templates.by_name.get(name).copied();
+        frame::with(|frame| frame.layout = layout);
+        let result = shared
+            .templates
+            .env
+            .get_template(name)
+            .and_then(|template| {
+                let at = layout.expect("a template the engine holds");
+                frame::begin(at, None)?;
+                frame::end(at, super::indent::render(&template, context))?
+            });
+        let mut frame = frame::pop();
+        problems.append(&mut frame.problems);
+        let html = match result {
+            Ok(html) => Some(html),
+            Err(error) => {
+                problems.extend(explain::explain(&error, &mut frame, &[]));
+                None
+            }
+        };
+        let html = html.filter(|_| {
+            !problems
+                .iter()
+                .any(|p| p.kind.severity() == crate::problem::Severity::Error)
+        });
+        Rendered::of(html, frame, problems)
+    }
+}
+
+/// The template that builds the page left at an old address.
+pub const REDIRECT: &str = "redirect";
+
+/// Every name a build can be told before it starts that a page or the site
+/// may be asked for: Statac's own words and settings, and every field the
+/// pages and settings write.
+fn known_names(settings: &Settings, site: &Site) -> Names {
+    use crate::content::words::PageWord;
+    let mut names = Names::default();
+    for word in PageWord::all() {
+        names.intern(word.name());
+    }
+    for name in crate::config::setting_names() {
+        names.intern(name);
+    }
+    for own in &settings.own {
+        names.intern(&own.name);
+    }
+    for name in super::values::PAGE_ANSWERS {
+        names.intern(name);
+    }
+    for (_, page) in site.pages.iter() {
+        for field in &page.words.fields {
+            names.intern(&field.name);
+        }
+    }
+    names
+}
+
+thread_local! {
+    /// The pages whose writing this thread is building, outermost first.
+    static WRITING: RefCell<Vec<PageId>> = const { RefCell::new(Vec::new()) };
+}
+
+/// A page's writing, built once and kept. What building it read is
+/// recorded on the output asking for it.
+fn body(shared: &Arc<Shared>, page: PageId) -> Result<Arc<Body>, Error> {
+    frame::read(Key::Body(page));
+    let slot = &shared.bodies[page.index()];
+    let body = match slot.get() {
+        Some(body) => Arc::clone(body),
+        None => {
+            if WRITING.with_borrow(|writing| writing.contains(&page)) {
+                return Err(frame::raise(Kind::TemplateStopped {
+                    reason: Stopped::ContentInItself,
+                }));
+            }
+            WRITING.with_borrow_mut(|writing| writing.push(page));
+            let built = Arc::new(build_body(shared, page, 0));
+            WRITING.with_borrow_mut(Vec::pop);
+            // Another thread may have built it meanwhile; the first kept wins.
+            let _ = slot.set(built);
+            Arc::clone(slot.get().expect("set just now"))
+        }
+    };
+    frame::with(|frame| {
+        for &key in body.reads.keys() {
+            frame.reads.read(key);
+        }
+        frame.developed.extend(body.developed.iter().copied());
+    });
+    Ok(body)
+}
+
+/// Whether a page's file holds writing: anything below its front matter
+/// but space and HTML comments.
+fn has_writing(shared: &Shared, page: PageId) -> bool {
+    let p = shared.site.pages.get(page);
+    let Some(source) = p.source else {
+        return false;
+    };
+    let mut rest = &shared.sources.text(source)[p.body.range()];
+    loop {
+        rest = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
+        match rest.strip_prefix("<!--") {
+            // A comment left open runs to the end, as Markdown reads it.
+            Some(comment) => rest = comment.split_once("-->").map_or("", |(_, after)| after),
+            None => return !rest.is_empty(),
+        }
+    }
+}
+
+/// Whether the site's snippet `name` wraps the writing below a call to it,
+/// which it does where it shows the writing; none where the site has no
+/// such snippet.
+fn wraps(shared: &Shared, name: &str) -> Option<bool> {
+    let snippet = shared.templates.snippets.get(name)?;
+    Some(!snippet.wrapped.is_empty())
+}
+
+/// The file a page's writing is read from as Markdown; none for a page
+/// written in HTML, or one Statac made with none.
+fn written_as_markdown(shared: &Shared, page: PageId) -> Option<SourceId> {
+    let p = shared.site.pages.get(page);
+    let source = p.source?;
+    (!(p.path.ends_with(".html") || p.path.ends_with(".htm"))).then_some(source)
+}
+
+/// Writes each call as the file spells it, before the writing it wraps.
+struct AsSpelled<'a>(&'a str);
+
+impl markdown::Snippets for AsSpelled<'_> {
+    fn html(&self, _: &markdown::Call, place: Place, _: Placement, body: Option<&str>) -> String {
+        let mut out = self.0[place.span.range()].to_owned();
+        out.push_str(body.unwrap_or_default());
+        out
+    }
+}
+
+/// A page's writing read as Markdown, its headings given their ids; none
+/// for a page written in HTML, or one Statac made with none.
+fn writing(shared: &Shared, page: PageId) -> Option<markdown::Document> {
+    let p = shared.site.pages.get(page);
+    let source = written_as_markdown(shared, page)?;
+    let wraps = |name: &str| wraps(shared, name);
+    let mut document = markdown::read(&shared.sources, source, p.body, &wraps, &shared.base);
+    // An address inside the site moves with the site.
+    if !document.in_site.is_empty() {
+        frame::read(Key::Setting(shared.name_id("url")));
+    }
+    let path = shared.sources.path(source).to_string_lossy();
+    markdown::give_heading_ids(&mut document, &path, shared.sources.text(source));
+    if let Some(words) = typography_of(shared, page) {
+        let typography = markdown::Typography::of(words);
+        markdown::set_typography(&mut document, &shared.sources, &typography);
+    }
+    Some(document)
+}
+
+/// The words of the language a page's writing is set in, where the site
+/// sets its writing's punctuation at all.
+pub(super) fn typography_of(shared: &Shared, page: PageId) -> Option<&crate::language::Words> {
+    frame::read(Key::Setting(shared.name_id("typography")));
+    if shared.settings.truth("typography") == Some(false) {
+        return None;
+    }
+    Some(words_of(shared, shared.site.pages.get(page).language))
+}
+
+/// The words of `language`, recorded as read.
+pub(super) fn words_of(shared: &Shared, language: LanguageId) -> &crate::language::Words {
+    frame::read(Key::Language(language));
+    &shared.dates.language(language).words
+}
+
+/// The headings of a page's writing, as its table of contents lists them.
+#[derive(Debug)]
+pub(super) struct Section {
+    pub level: u8,
+    pub id: String,
+    pub text: String,
+}
+
+fn sections(document: &markdown::Document) -> Vec<Section> {
+    markdown::headings(document)
+        .into_iter()
+        .map(|heading| Section {
+            level: heading.level,
+            id: heading.id.unwrap_or_default().to_owned(),
+            text: heading.text,
+        })
+        .collect()
+}
+
+/// `page.toc`'s headings, read once and kept. The writing's own calls may
+/// ask for them while it is being built.
+pub(super) fn outline(shared: &Shared, page: PageId) -> Arc<Vec<Section>> {
+    frame::read(Key::Body(page));
+    if let Some(kept) = shared.outlines.lock().expect("never poisoned").get(&page) {
+        return Arc::clone(kept);
+    }
+    let found = Arc::new(writing(shared, page).map_or_else(Vec::new, |d| sections(&d)));
+    let mut outlines = shared.outlines.lock().expect("never poisoned");
+    Arc::clone(outlines.entry(page).or_insert(found))
+}
+
+/// Builds a page's writing, its search boxes numbered after
+/// `boxes_before` others.
+fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
+    let p = shared.site.pages.get(page);
+    frame::push(Frame {
+        making: frame::Making::Writing,
+        search_boxes: boxes_before,
+        ..Frame::new(Arc::clone(shared), Some(page))
+    });
+    let mut problems = Vec::new();
+    let mut wordless = Vec::new();
+    let mut links = crate::links::Writing::default();
+    let written = match writing(shared, page) {
+        None => match p.source {
+            Some(source) => {
+                undescribed_in_html(shared, page, source, p.body);
+                links.written = crate::links::written_in_html(&shared.sources, source, p.body);
+                markdown::as_written(&shared.sources.text(source)[p.body.range()])
+            }
+            None => markdown::Written::default(),
+        },
+        Some(document) => {
+            links.written = crate::links::written(&document, &shared.sources);
+            links.handed = crate::links::handed(&document);
+            problems.extend(document.problems.iter().cloned());
+            if let Some(place) = code_languages(shared, &document, &mut problems) {
+                frame::with(|frame| frame.coloured.push(place));
+            }
+            for top in std::iter::once(&document.root).chain(&document.notes) {
+                undescribed_in_node(shared, page, top);
+            }
+            shared
+                .outlines
+                .lock()
+                .expect("never poisoned")
+                .entry(page)
+                .or_insert_with(|| Arc::new(sections(&document)));
+            let prose = Prose {
+                shared,
+                page,
+                document: &document,
+                failed: RefCell::new(BTreeSet::new()),
+                in_html_said: Cell::new(false),
+                unreadable_said: RefCell::new(Vec::new()),
+                moved: RefCell::new(Vec::new()),
+                pieced: RefCell::new(Vec::new()),
+            };
+            let words = words_of(shared, p.language);
+            let written = markdown::write(
+                &document,
+                &markdown::Options {
+                    snippets: &prose,
+                    back_to_the_text: words.back_to_the_text.as_deref(),
+                    digits: words.digits.as_ref(),
+                    right_to_left: words.direction == crate::language::Direction::RightToLeft,
+                    highlighter: shared.highlighter.as_ref(),
+                },
+            );
+            wordless = missing_words(shared, p.language, &document);
+            // A picture's tag leads where it was written to, not where
+            // the writing spells it.
+            for (place, address) in prose.moved.into_inner() {
+                for linked in &mut links.written {
+                    if linked.place == place {
+                        linked.address.clone_from(&address);
+                    }
+                }
+            }
+            // An address the site's own file was handed is followed only
+            // where that file wrote it on the page.
+            let pieced = prose.pieced.into_inner();
+            let (handed, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut links.written)
+                .into_iter()
+                .partition(|linked| pieced.contains(&linked.place));
+            links.written = kept;
+            links.handed.extend(handed);
+            written
+        }
+    };
+    let mut frame = frame::pop();
+    problems.append(&mut frame.problems);
+    let wordless = wordless.into_iter().map(Problem::nowhere);
+    problems.extend(wordless.map(|problem| met_building(problem, &frame)));
+    Body {
+        written,
+        undescribed: frame.undescribed,
+        reads: frame.reads,
+        problems,
+        developed: frame.developed,
+        coloured: frame.coloured,
+        writing: links,
+        elsewhere: OnceLock::new(),
+        steps: frame.steps,
+        spent: frame.spent,
+        search_boxes: frame.search_boxes - boxes_before,
+        after_boxes: Mutex::new(Vec::new()),
+    }
+}
+
+/// A page's writing whole as the page's own output shows it, where the
+/// writing asks for search boxes: its boxes counted with the output's, so
+/// the page has one first box and no two with one id. Shown after boxes
+/// the layout asked for, the writing is built again with its own numbered
+/// after them, since the writing kept numbers its own from the first.
+fn among_the_pages_boxes(shared: &Arc<Shared>, page: PageId, body: &Body) -> String {
+    let before = frame::with(|frame| {
+        *frame.boxes_before_writing.get_or_insert_with(|| {
+            let before = frame.search_boxes;
+            frame.search_boxes += body.search_boxes;
+            before
+        })
+    });
+    let before = before.unwrap_or_default();
+    if before == 0 {
+        return body.written.html.clone();
+    }
+    let kept = |body: &Body| {
+        let kept = body.after_boxes.lock().expect("never poisoned");
+        let found = kept.iter().find(|(after, _)| *after == before);
+        found.map(|(_, html)| html.clone())
+    };
+    if let Some(html) = kept(body) {
+        return html;
+    }
+    // What building it again tells and reads, the first building did.
+    WRITING.with_borrow_mut(|writing| writing.push(page));
+    let again = build_body(shared, page, before);
+    WRITING.with_borrow_mut(Vec::pop);
+    let mut kept = body.after_boxes.lock().expect("never poisoned");
+    kept.push((before, again.written.html.clone()));
+    again.written.html
+}
+
+/// The words `document` is shown with that its page's language has none
+/// of: what a screen reader says for a footnote's way back, and the names
+/// of the callouts. Nothing where the language has no words at all, which
+/// is told of the language, or where nothing shows the words: the site's
+/// own file for the footnotes or a callout never reads them, or the site
+/// has no file for a callout.
+fn missing_words(
+    shared: &Shared,
+    language: LanguageId,
+    document: &markdown::Document,
+) -> Vec<Kind> {
+    use crate::language::{FOLDER, Whence};
+    let spoken = shared.dates.language(language);
+    let (Some(tag), false) = (&spoken.tag, spoken.whence == Whence::Nothing) else {
+        return Vec::new();
+    };
+    let file = match &spoken.whence {
+        Whence::Site(path) => path.clone(),
+        _ => format!("{FOLDER}/{tag}.yaml"),
+    };
+    let words = words_of(shared, language);
+    let templates = &shared.templates;
+    let footnotes = words.back_to_the_text.is_none()
+        && !document.notes.is_empty()
+        && templates.piece_shows(Piece::Footnotes, "label");
+    let callouts = words.callouts.is_none()
+        && markdown::has_callout(document)
+        && templates.piece_shows(Piece::Callout, "title");
+    [
+        (footnotes, ShownWords::BackToTheText),
+        (callouts, ShownWords::Callouts),
+    ]
+    .into_iter()
+    .filter(|(missing, _)| *missing)
+    .map(|(_, words)| Kind::MissingWords {
+        tag: tag.clone(),
+        file: file.clone(),
+        words,
+        pages: 1,
+    })
+    .collect()
+}
+
+/// Tells each `<img>` in the HTML at `span` of `page`'s writing that has
+/// no `alt` at all, at the address it shows. One with an empty `alt` is
+/// marked as decoration, as HTML marks one.
+fn undescribed_in_html(shared: &Shared, page: PageId, source: SourceId, span: crate::source::Span) {
+    let text = &shared.sources.text(source)[span.range()];
+    crate::html::start_tags(text, |tag| {
+        if tag.name != "img" || tag.get("alt").is_some() {
+            return;
+        }
+        let shown = ["src", "srcset"].into_iter().find_map(|name| {
+            let attribute = tag.attributes.iter().find(|a| a.name == name)?;
+            let found =
+                crate::html::addresses(&attribute.value, name == "srcset", attribute.at.start);
+            found.first().copied()
+        });
+        let Some((written, at)) = shown else {
+            return;
+        };
+        let start = span.start as usize + at;
+        let at = Place {
+            source,
+            span: crate::source::Span::new(start, start + written.len()),
+        };
+        let picture = crate::html::decoded(written, false);
+        let kind = Kind::UndescribedPicture {
+            picture: picture.clone(),
+            shown: ShownBy::Html,
+        };
+        let found =
+            super::media::found(shared, page, &picture).map(|id| shared.site.pictures.get(id));
+        if found.is_some_and(crate::album::Picture::decorative) {
+            return;
+        }
+        let key = found.map_or(picture, crate::album::Picture::shown);
+        super::media::undescribed(key, |_| Problem::at(kind, at));
+    });
+}
+
+/// Tells the undescribed pictures in the HTML among `node`'s writing.
+fn undescribed_in_node(shared: &Shared, page: PageId, node: &markdown::Node) {
+    // A block of HTML is read whole, as a tag may run over its lines.
+    if matches!(
+        node.kind,
+        markdown::Kind::HtmlBlock | markdown::Kind::Html(_)
+    ) {
+        undescribed_in_html(shared, page, node.place.source, node.place.span);
+        return;
+    }
+    for child in &node.children {
+        undescribed_in_node(shared, page, child);
+    }
+}
+
+/// A page's opening words as built, or the refusal that stops the
+/// template asking where building them stopped.
+pub(super) fn opening(shared: &Arc<Shared>, page: PageId) -> Result<Option<String>, Error> {
+    body(shared, page).map(|body| body.written.opening.clone())
+}
+
+/// Tells each block of code whose language Statac has no colours for, and
+/// each left uncoloured for a line too long, at the word naming its
+/// language, and records the style read where any is coloured. Gives
+/// where the first block coloured names its language.
+fn code_languages(
+    shared: &Shared,
+    document: &markdown::Document,
+    problems: &mut Vec<Problem>,
+) -> Option<Place> {
+    let mut coloured = None;
+    let mut visit = |node: &markdown::Node| {
+        let markdown::Kind::CodeBlock { info, text, .. } = &node.kind else {
+            return;
+        };
+        let Some(word) = info.split_whitespace().next() else {
+            return;
+        };
+        match highlight::first_word(word).language() {
+            Language::Plain => {}
+            Language::Known(_) => {
+                let place = fence_word(&shared.sources, node.place).unwrap_or(node.place);
+                match highlight::too_long(text) {
+                    None => coloured = coloured.or(Some(place)),
+                    Some(characters) => {
+                        problems.push(Problem::at(
+                            Kind::CodeNotColoured {
+                                characters,
+                                block: true,
+                            },
+                            place,
+                        ));
+                    }
+                }
+            }
+            Language::Unknown { nearest } => {
+                let place = fence_word(&shared.sources, node.place);
+                problems.push(Problem::at(
+                    Kind::UnknownCodeLanguage {
+                        written: place
+                            .map_or(word, |place| shared.sources.spelling(place))
+                            .to_owned(),
+                        nearest: nearest.map(str::to_owned),
+                    },
+                    place.unwrap_or(node.place),
+                ));
+            }
+        }
+    };
+    document.root.walk(&mut visit);
+    for note in &document.notes {
+        note.walk(&mut visit);
+    }
+    if coloured.is_some() {
+        frame::read(Key::Setting(shared.name_id("code_style")));
+    }
+    coloured
+}
+
+/// The inside of a `<code>` holding `text`, which a template shows:
+/// coloured as `language` where that names a grammar and no line is too
+/// long, and as it is otherwise. A line too long is told at `at`, where
+/// coloured code is recorded as shown.
+pub(super) fn code_html(
+    shared: &Shared,
+    text: &str,
+    language: Language,
+    at: impl FnOnce() -> Option<Place>,
+) -> String {
+    let Language::Known(name) = language else {
+        return highlight::plain(text);
+    };
+    if let Some(characters) = highlight::too_long(text) {
+        let kind = Kind::CodeNotColoured {
+            characters,
+            block: false,
+        };
+        super::media::told_at(at(), kind);
+        return highlight::plain(text);
+    }
+    frame::read(Key::Setting(shared.name_id("code_style")));
+    let at = at();
+    frame::with(|frame| frame.coloured.extend(at));
+    match &shared.highlighter {
+        Some(highlighter) => highlighter.html(name, text).as_ref().to_owned(),
+        None => highlight::plain(text),
+    }
+}
+
+/// Where the first word after a code block's opening fence is written.
+fn fence_word(sources: &Sources, block: Place) -> Option<Place> {
+    let text = sources.text(block.source);
+    let start = block.span.start as usize;
+    let line = &text[start..];
+    let line = &line[..line.find('\n').unwrap_or(line.len())];
+    let fence = line.trim_start();
+    let marker = fence.chars().next().filter(|c| matches!(c, '`' | '~'))?;
+    let after = fence.trim_start_matches(marker);
+    let word_start = line.len() - after.trim_start().len();
+    let word = after.split_whitespace().next()?;
+    let begin = start + word_start;
+    Some(Place {
+        source: block.source,
+        span: crate::source::Span::new(begin, begin + word.len()),
+    })
+}
+
+/// What a page's writing answers as built: `page.words`, `page.maths` and
+/// the like. Where building it stopped, the refusal that stops the
+/// template asking.
+pub(super) fn of_body(
+    shared: &Arc<Shared>,
+    page: PageId,
+    answer: impl FnOnce(&markdown::Written) -> Option<Value>,
+) -> Option<Value> {
+    match body(shared, page) {
+        Ok(body) => answer(&body.written),
+        Err(error) => Some(Value::from(error)),
+    }
+}
+
+/// A part of a page's writing that is HTML.
+#[derive(Copy, Clone)]
+pub(super) enum Part {
+    Content,
+    Excerpt,
+}
+
+/// `page.content` or `page.excerpt`: as built on the page's own page, and
+/// elsewhere with each address read from the page spelled from the top of
+/// the site, so it leads where it leads there. That depends on where the
+/// page is published, which is recorded as read. Where building it
+/// stopped, the refusal that stops the template asking.
+pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<Value> {
+    frame::with(|frame| frame.shows_writing |= frame.home() == Some(page));
+    let body = match body(shared, page) {
+        Ok(body) => body,
+        Err(error) => return Some(Value::from(error)),
+    };
+    let own = match part {
+        Part::Content => {
+            frame::with(|frame| frame.coloured.extend(&body.coloured));
+            &body.written.html
+        }
+        Part::Excerpt => body.written.excerpt.as_ref()?,
+    };
+    let (home, making) = frame::with(|frame| (frame.home(), frame.making)).unzip();
+    if home.flatten() == Some(page) {
+        let counted = matches!(part, Part::Content)
+            && body.search_boxes > 0
+            && making == Some(frame::Making::Output);
+        return Some(Value::from_safe_string(match counted {
+            true => among_the_pages_boxes(shared, page, &body),
+            false => own.clone(),
+        }));
+    }
+    frame::read(Key::Field(page, shared.name_id("url")));
+    let elsewhere = body.elsewhere.get_or_init(|| {
+        let address = shared.address_of(page);
+        let written = &body.written;
+        Elsewhere {
+            html: crate::elsewhere::html(&written.html, &address),
+            excerpt: written
+                .excerpt
+                .as_deref()
+                .and_then(|excerpt| crate::elsewhere::html(excerpt, &address)),
+        }
+    });
+    let moved = match part {
+        Part::Content => &elsewhere.html,
+        Part::Excerpt => &elsewhere.excerpt,
+    };
+    Some(Value::from_safe_string(
+        moved.as_ref().unwrap_or(own).clone(),
+    ))
+}
+
+/// Builds the snippet calls in a page's writing, and the pieces of it the
+/// site writes itself.
+struct Prose<'a> {
+    shared: &'a Arc<Shared>,
+    page: PageId,
+    document: &'a markdown::Document,
+    /// Pieces whose file stopped once on this page, which are written as
+    /// Statac writes them for the rest of it, so the one mistake is told
+    /// once.
+    failed: RefCell<BTreeSet<Piece>>,
+    /// Whether a call inside HTML has been built on this page, which is
+    /// said of the first.
+    in_html_said: Cell<bool>,
+    /// Where a picture that can't be read has been told of, a piece that
+    /// stopped being written a second time as Statac writes it.
+    unreadable_said: RefCell<Vec<Place>>,
+    /// Each picture's address written other than the writing spells it,
+    /// so it reaches the file, by where it is written.
+    moved: RefCell<Vec<(Place, String)>>,
+    /// Where each picture the site's own file wrote has its address
+    /// written: the page carries what that file made of it.
+    pieced: RefCell<Vec<Place>>,
+}
+
+impl Prose<'_> {
+    /// Where `address` is written within the picture at `place`.
+    fn address_place(&self, address: &str, place: Place) -> Place {
+        if let Some(stands) = self.document.in_site_at(address, place) {
+            return stands;
+        }
+        let spelling = self.shared.sources.spelling(place);
+        match spelling.rfind(address).filter(|_| !address.is_empty()) {
+            Some(at) => {
+                let start = place.span.start as usize + at;
+                Place {
+                    source: place.source,
+                    span: crate::source::Span::new(start, start + address.len()),
+                }
+            }
+            None => place,
+        }
+    }
+}
+
+impl markdown::Snippets for Prose<'_> {
+    fn writes(&self, piece: Piece) -> bool {
+        self.shared.templates.pieces.contains_key(&piece) && !self.failed.borrow().contains(&piece)
+    }
+
+    fn piece(
+        &self,
+        piece: Piece,
+        values: Vec<(&'static str, PieceValue)>,
+        place: Place,
+    ) -> Option<String> {
+        // A picture is told where its address is written, as a picture
+        // Statac writes is.
+        let calling = match (piece, values.first()) {
+            (Piece::Image, Some(("address", PieceValue::Text(address)))) => {
+                self.address_place(address, place)
+            }
+            _ => place,
+        };
+        let before = frame::with(|frame| frame.calling.replace(calling)).flatten();
+        let built = super::pieces::build(self.shared, self.page, piece, values);
+        frame::with(|frame| frame.calling = before);
+        match built? {
+            Ok(html) => {
+                if piece == Piece::Image {
+                    self.pieced.borrow_mut().push(calling);
+                }
+                Some(html)
+            }
+            Err(error) => {
+                self.failed.borrow_mut().insert(piece);
+                let problems = frame::with(|frame| explain::explain(&error, frame, &[place]))
+                    .unwrap_or_default();
+                frame::with(|frame| frame.problems.extend(problems));
+                None
+            }
+        }
+    }
+
+    fn picture(&self, address: &str, place: Place, tagged: bool) -> Option<markdown::Picture> {
+        let shared = self.shared;
+        let page = shared.site.pages.get(self.page);
+        // A page made from data is written in no folder of `content/`.
+        let folder = page
+            .made
+            .is_none()
+            .then(|| page.path.rfind('/').map_or("", |at| &page.path[..=at]));
+        let published = shared.address_of(self.page);
+        let from = crate::album::From {
+            folder,
+            page: &published,
+            base: &shared.base,
+        };
+        let pictures = &shared.site.pictures;
+        let Some(found) = pictures.find(address, &from) else {
+            frame::read(Key::Pictures);
+            return None;
+        };
+        // How its tag reaches it depends on where the page is published.
+        frame::read(Key::Field(self.page, shared.name_id("url")));
+        frame::read(Key::Picture(found.id));
+        let picture = pictures.get(found.id);
+        let at = self.address_place(address, place);
+        let left_alone =
+            picture.left_alone() || shared.settings.truth("optimise_images") == Some(false);
+        frame::read(Key::Setting(shared.name_id("optimise_images")));
+        let told = match &picture.seen {
+            crate::album::Seen::Unreadable(fault) if !left_alone => Some(Kind::UnreadablePicture {
+                path: picture.shown(),
+                fault: fault.clone(),
+            }),
+            crate::album::Seen::Plain {
+                kind: crate::pictures::Kind::Heic | crate::pictures::Kind::Heif,
+                ..
+            } => Some(Kind::HeicPicture {
+                path: picture.shown(),
+            }),
+            _ => None,
+        };
+        if let Some(kind) = told
+            && !self.unreadable_said.borrow().contains(&at)
+        {
+            self.unreadable_said.borrow_mut().push(at);
+            let problem = Problem::at(kind, at);
+            frame::with(|frame| {
+                if !frame.problems.contains(&problem) {
+                    frame.problems.push(problem);
+                }
+            });
+        }
+        if tagged && found.address != address {
+            self.moved.borrow_mut().push((at, found.address.clone()));
+        }
+        let size = picture.size().map(|size| (size.width, size.height));
+        let alt = picture.sidecar.as_ref().and_then(|said| said.alt.as_ref());
+        let mut shown = markdown::Picture {
+            address: found.address,
+            size,
+            copies: None,
+            alt: alt.map(|alt| alt.value.clone()).unwrap_or_default(),
+            decorative: picture.decorative(),
+            file: Some(picture.shown()),
+            described_beside: picture.root == crate::album::Root::Content,
+        };
+        if !tagged || picture.copies.is_empty() {
+            return Some(shown);
+        }
+        frame::read(Key::Setting(shared.name_id("max_width")));
+        frame::read(Key::Setting(shared.name_id("image_sizes")));
+        let end = shown
+            .address
+            .find(['?', '#'])
+            .unwrap_or(shown.address.len());
+        let beside = &shown.address[..shown.address[..end].rfind('/').map_or(0, |at| at + 1)];
+        let srcset = |format: crate::pictures::Format| {
+            let mut srcset = String::new();
+            for copy in picture.copies.iter().filter(|copy| copy.format == format) {
+                if !srcset.is_empty() {
+                    srcset.push_str(", ");
+                }
+                let mut address = String::new();
+                markdown::escape_href(&format!("{beside}{}", copy.name), &mut address);
+                // A comma parts the addresses of a `srcset`.
+                srcset.push_str(&address.replace(',', "%2C"));
+                srcset.push_str(&format!(" {}w", copy.width));
+            }
+            srcset
+        };
+        let widths: Vec<u32> = picture.copies.iter().map(|copy| copy.width).collect();
+        let fallback = picture.copies.last()?.format;
+        let src_width = crate::pictures::src_width(&widths)?;
+        let mut src = String::new();
+        let named = picture
+            .copies
+            .iter()
+            .find(|copy| copy.format == fallback && copy.width == src_width)?;
+        markdown::escape_href(&format!("{beside}{}", named.name), &mut src);
+        shown.copies = Some(markdown::Copies {
+            avif: srcset(crate::pictures::Format::Avif),
+            fallback: srcset(fallback),
+            src,
+            sizes: shared
+                .settings
+                .text("image_sizes")
+                .map(|sizes| sizes.value.to_owned())
+                .unwrap_or_default(),
+        });
+        frame::develops(found.id, Some(at), false);
+        Some(shown)
+    }
+
+    fn undescribed(&self, picture: &str, found: Option<&markdown::Picture>, place: Place) {
+        let at = self.address_place(picture, place);
+        let kind = Kind::UndescribedPicture {
+            picture: picture.to_owned(),
+            shown: ShownBy::Markdown {
+                described_beside: found.is_some_and(|found| found.described_beside),
+            },
+        };
+        let file = found.and_then(|found| found.file.clone());
+        let key = file.unwrap_or_else(|| picture.to_owned());
+        super::media::undescribed(key, |_| Problem::at(kind, at));
+    }
+
+    fn html(
+        &self,
+        call: &markdown::Call,
+        place: Place,
+        placement: Placement,
+        body: Option<&str>,
+    ) -> String {
+        let shared = self.shared;
+        let name = &call.name.value;
+        let Some(snippet) = shared.templates.snippets.get(name) else {
+            // In HTML, only a name the site has is a call.
+            if call.within != Within::Prose {
+                return escape(shared.sources.spelling(place));
+            }
+            let nearest =
+                crate::suggest::nearest(name, shared.templates.snippets.keys().map(String::as_str))
+                    .map(str::to_owned);
+            let at = call.name.origin.place.unwrap_or(place);
+            frame::with(|frame| {
+                frame.problems.push(Problem::at(
+                    Kind::UnknownWord {
+                        word: Word::Snippet,
+                        written: name.clone(),
+                        nearest,
+                    },
+                    at,
+                ))
+            });
+            return String::new();
+        };
+        if call.within != Within::Prose && !self.in_html_said.replace(true) {
+            frame::with(|frame| {
+                frame
+                    .problems
+                    .push(Problem::at(Kind::CallInHtml { name: name.clone() }, place))
+            });
+        }
+        if !snippet.wrapped.is_empty() && !call.wraps() {
+            frame::with(|frame| {
+                frame.problems.push(Problem::at(
+                    Kind::MalformedCall {
+                        found: markdown::Malformed::WrapsNothing(name.clone()),
+                    },
+                    place,
+                ))
+            });
+            return String::new();
+        }
+        let wrong = |fault, at: Place| {
+            frame::with(|frame| {
+                frame.problems.push(Problem::at(
+                    Kind::WrongArgument {
+                        snippet: name.clone(),
+                        fault,
+                    },
+                    at,
+                ))
+            });
+            String::new()
+        };
+        let mut handed: Vec<(String, Value)> = Vec::new();
+        let mut unnamed = Vec::new();
+        let words = typography_of(shared, self.page);
+        let typography = words.map(markdown::Typography::of);
+        for argument in &call.arguments {
+            let value = prose_value(&argument.value.value, typography.as_ref());
+            let at = argument.value.origin.place.unwrap_or(place);
+            match &argument.name {
+                Some(given) => {
+                    let given_at = given.origin.place.unwrap_or(at);
+                    let given_name = given.value.as_str();
+                    if super::files::SUPPLIED.contains(&given_name)
+                        || super::files::WRAPPED.contains(&given_name)
+                    {
+                        return wrong(ArgumentFault::Supplied(given.value.clone()), given_at);
+                    }
+                    if !snippet.params.contains(&given.value) {
+                        let nearest = crate::suggest::nearest(
+                            &given.value,
+                            snippet.params.iter().map(String::as_str),
+                        )
+                        .map(str::to_owned);
+                        return wrong(
+                            ArgumentFault::NoSuchName {
+                                given: given.value.clone(),
+                                nearest,
+                            },
+                            given_at,
+                        );
+                    }
+                    handed.push((given.value.clone(), value));
+                }
+                None => unnamed.push((value, at)),
+            }
+        }
+        let first = unnamed.first().map_or(place, |(_, at)| *at);
+        match unnamed_fills(
+            snippet.takes.as_ref(),
+            &snippet.params,
+            unnamed.len(),
+            |p| handed.iter().any(|(h, _)| h == p),
+        ) {
+            Unnamed::Nothing => {}
+            Unnamed::Fills(names) => {
+                for (name, (value, _)) in names.into_iter().zip(unnamed) {
+                    handed.push((name, value));
+                }
+            }
+            Unnamed::Gathers(name) => {
+                let values: Vec<Value> = unnamed.into_iter().map(|(v, _)| v).collect();
+                handed.push((name, Value::from(values)));
+            }
+            Unnamed::NeedsNames => {
+                return wrong(
+                    ArgumentFault::NeedsNames {
+                        wanted: snippet.params.clone(),
+                    },
+                    first,
+                );
+            }
+            Unnamed::TooMany { takes, past } => {
+                let at = unnamed.get(past).map_or(first, |(_, at)| *at);
+                let others = snippet
+                    .params
+                    .iter()
+                    .filter(|p| !takes.contains(p))
+                    .cloned()
+                    .collect();
+                return wrong(ArgumentFault::TooMany { takes, others }, at);
+            }
+            Unnamed::Twice { name: twice, at } => {
+                let at = unnamed.get(at).map_or(first, |(_, at)| *at);
+                return wrong(ArgumentFault::Twice(twice), at);
+            }
+        }
+        if let Some(body) = body
+            && snippet.wrapped.iter().any(|name| name == "body")
+        {
+            handed.push(("body".into(), Value::from_safe_string(body.to_owned())));
+        }
+        handed.push((
+            "standalone".into(),
+            Value::from(placement == Placement::Standalone),
+        ));
+        let page = PageValue::value(shared, self.page);
+        let site = SiteValue::value(shared, frame::language());
+        // Each call is told on its own; what an earlier call handed is no
+        // part of this one.
+        let before = frame::with(|frame| {
+            frame.handed = None;
+            frame.refusal = None;
+            frame.raised = None;
+            frame.calling.replace(place)
+        })
+        .flatten();
+        let built = build_snippet(shared, snippet, handed, page, site, None);
+        frame::with(|frame| frame.calling = before);
+        match built {
+            Ok(html) => html,
+            Err(error) => {
+                let problems = frame::with(|frame| explain::explain(&error, frame, &[place]))
+                    .unwrap_or_default();
+                frame::with(|frame| frame.problems.extend(problems));
+                String::new()
+            }
+        }
+    }
+}
+
+/// A value a call in the writing hands its snippet. The author's own words
+/// are set as the writing around the call is, so a caption's dash is the
+/// prose's; a value naming something reaches the snippet as typed.
+fn prose_value(value: &markdown::Value, typography: Option<&markdown::Typography<'_>>) -> Value {
+    match value {
+        markdown::Value::Text(text) => match typography {
+            Some(typography) if !names_something(text) => {
+                Value::from(markdown::set_words(text, typography))
+            }
+            _ => Value::from(text.as_str()),
+        },
+        markdown::Value::Number(n) if n.fract() == 0.0 && n.abs() < 1e15 => Value::from(*n as i64),
+        markdown::Value::Number(n) => Value::from(*n),
+        markdown::Value::Bool(b) => Value::from(*b),
+    }
+}
+
+/// Whether a value handed to a call names something rather than saying it:
+/// a file, an address, the id of a video. A curled apostrophe or a dash in
+/// a name is a file nothing finds. A snippet never says which of its
+/// parameters are names, so this is asked of the value's shape: empty, an
+/// address, a path, a last word with a file's extension, or a single word
+/// with no apostrophe or ellipsis in it.
+fn names_something(value: &str) -> bool {
+    let value = value.trim();
+    let one_word_of_writing =
+        |word: &str| !word.contains('/') && (word.contains('\'') || word.contains("..."));
+    value.is_empty()
+        || value.contains("://")
+        || value.starts_with('/')
+        || ends_in_an_extension(value)
+        || (!value.contains(char::is_whitespace) && !one_word_of_writing(value))
+}
+
+/// A last word with a short extension on it: `photo 1.jpg` names a file,
+/// while a sentence ending in a full stop has nothing after the dot.
+fn ends_in_an_extension(value: &str) -> bool {
+    let last = value.rsplit(char::is_whitespace).next().unwrap_or(value);
+    last.rsplit_once('.').is_some_and(|(before, extension)| {
+        !before.is_empty()
+            && (1..=5).contains(&extension.chars().count())
+            && extension.chars().all(|c| c.is_ascii_alphanumeric())
+    })
+}
+
+fn escape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Builds a snippet with what a call handed it, and `page` and `site`,
+/// called by the run `calling` where a template calls it.
+fn build_snippet(
+    shared: &Arc<Shared>,
+    snippet: &Snippet,
+    handed: Vec<(String, Value)>,
+    page: Value,
+    site: Value,
+    calling: Option<&State>,
+) -> Result<String, Error> {
+    let templates = &shared.templates;
+    frame::read(Key::Template(Templates::id(snippet.file)));
+    if templates.unusable.contains(&snippet.file) {
+        return Err(frame::told());
+    }
+    let calls_itself = frame::with(|frame| frame.snippets.contains(&snippet.name)).unwrap_or(false);
+    if calls_itself {
+        return Err(frame::raise(Kind::TemplateStopped {
+            reason: Stopped::CallsItself(snippet.name.clone()),
+        }));
+    }
+    let mut context: BTreeMap<String, Value> = handed.iter().cloned().collect();
+    context.insert("page".into(), page);
+    context.insert("site".into(), site);
+    let name = &templates.files[snippet.file].name;
+    frame::begin(snippet.file, calling)?;
+    frame::with(|frame| frame.snippets.push(snippet.name.clone()));
+    let built = templates
+        .env
+        .get_template(name)
+        .and_then(|template| super::indent::render(&template, context));
+    frame::with(|frame| frame.snippets.pop());
+    let built = frame::end(snippet.file, built)?;
+    built.map_err(|inner| {
+        frame::with(|frame| {
+            frame.handed.get_or_insert(Handed {
+                snippet: snippet.name.clone(),
+                values: handed,
+            });
+        });
+        Error::new(inner.kind(), explain::IN_SNIPPET).with_source(inner)
+    })
+}
+
+/// Registers a snippet as a function templates call by its name. A
+/// missing value handed to it is refused at the call, and a failure inside
+/// it carries the call's place.
+pub(super) fn register_snippet(env: &mut Environment<'static>, snippet: &Snippet) {
+    let snippet = snippet.clone();
+    let name = snippet.name.clone();
+    env.add_function(name, move |state: &State, args: Rest<Value>| {
+        super::guard::check_args(
+            &snippet.name,
+            super::guard::Callee::Snippet,
+            &args,
+            super::guard::Input::Whole,
+        )?;
+        let Some(shared) = frame::shared() else {
+            return Err(frame::told());
+        };
+        let raise = |fault| {
+            frame::raise(Kind::WrongArgument {
+                snippet: snippet.name.clone(),
+                fault,
+            })
+        };
+        let mut handed: Vec<(String, Value)> = Vec::new();
+        let mut unnamed = Vec::new();
+        for arg in args.iter() {
+            if !arg.is_kwargs() {
+                unnamed.push(arg.clone());
+                continue;
+            }
+            for key in arg.try_iter()? {
+                let given = key.as_str().unwrap_or_default().to_owned();
+                if super::files::SUPPLIED.contains(&given.as_str()) {
+                    return Err(raise(ArgumentFault::Supplied(given)));
+                }
+                if !snippet.params.contains(&given) && !snippet.wrapped.contains(&given) {
+                    let nearest =
+                        crate::suggest::nearest(&given, snippet.params.iter().map(String::as_str))
+                            .map(str::to_owned);
+                    return Err(raise(ArgumentFault::NoSuchName { given, nearest }));
+                }
+                let value = arg.get_item(&key)?;
+                handed.push((given, value));
+            }
+        }
+        match unnamed_fills(
+            snippet.takes.as_ref(),
+            &snippet.params,
+            unnamed.len(),
+            |p| handed.iter().any(|(h, _)| h == p),
+        ) {
+            Unnamed::Nothing => {}
+            Unnamed::Fills(names) => handed.extend(names.into_iter().zip(unnamed)),
+            Unnamed::Gathers(name) => handed.push((name, Value::from(unnamed))),
+            Unnamed::NeedsNames => {
+                return Err(raise(ArgumentFault::NeedsNames {
+                    wanted: snippet.params.clone(),
+                }));
+            }
+            Unnamed::TooMany { takes, .. } => {
+                let others = snippet
+                    .params
+                    .iter()
+                    .filter(|p| !takes.contains(p))
+                    .cloned()
+                    .collect();
+                return Err(raise(ArgumentFault::TooMany { takes, others }));
+            }
+            Unnamed::Twice { name, .. } => return Err(raise(ArgumentFault::Twice(name))),
+        }
+        let page = state.lookup("page").unwrap_or_default();
+        let site = state.lookup("site").unwrap_or_default();
+        build_snippet(&shared, &snippet, handed, page, site, Some(state))
+            .map(Value::from_safe_string)
+    });
+}
+
+/// How a problem met building the frame's page names it: a page of the
+/// author's by its first line, or the item it was made from; a list's page
+/// Statac made, one after its first, or a feed, by name, with the setting
+/// placing it or the file of its list's page where there is one.
+pub(super) fn building(frame: &Frame) -> Option<(Relation, Option<Place>)> {
+    let shared = &frame.shared;
+    if let Some(feed) = &frame.feed {
+        let (word, name) = crate::feeds::described(&shared.site, &shared.sources, feed.list);
+        let named = Named::Feed(Box::new(NamedFeed {
+            word,
+            name,
+            address: format!("{}{}", shared.base, feed.address.as_str()),
+        }));
+        return Some((Relation::Building(Some(named)), feed.placed));
+    }
+    let page = frame.page?;
+    let head = shared.site.head(page, &shared.sources);
+    let named = match frame.number {
+        1 if shared.site.pages.get(page).source.is_some() => None,
+        1 => Some(shared.site.named(page, &shared.sources)),
+        number => Some(Named::later(number, shared.address_of(page))),
+    };
+    Some((Relation::Building(named), head))
+}
+
+/// Marks a problem as met building the frame's page, where a page is
+/// being built and the problem isn't in its own file.
+pub(super) fn met_building(problem: Problem, frame: &Frame) -> Problem {
+    let Some((relation, head)) = building(frame) else {
+        return problem;
+    };
+    if relation == Relation::Building(None)
+        && let (Some(at), Some(head)) = (problem.place, head)
+        && at.source == head.source
+    {
+        return problem;
+    }
+    problem.met(relation, head)
+}

@@ -1,0 +1,47 @@
+{# A folder's page, and the pages Statac makes for a tag and a series: see /lists/ -#}
+{% extends "base" %}
+{% block main %}
+    {% set words = site.data.words[page.language] %}
+    <header class="top column">
+      {% if page.list.word == "tag" %}
+      <h1>{{ words.tagged }} {{ page.list.name }}</h1>
+      {% elif page.list.word == "series" %}
+      <h1>{{ words.in_series }} {{ page.list.name }}</h1>
+      {% else %}
+      <h1>{{ headline(page) }}</h1>
+      {% endif %}
+      {% if page.summary %}
+      <p class="summary">{{ page.summary }}</p>
+      {% endif %}
+    </header>
+    {% if page.content %}
+    <div class="writing column">
+      {{ page.content }}
+    </div>
+    {% endif %}
+    <div class="listing column">
+      {# The posts under a heading for each year, a new one opening where the year changes. #}
+      {% set seen = namespace(year="") %}
+      {% for post in page.posts %}
+      {% set year = post.date | date("2025") if post.date else "" %}
+      {% if loop.first or year != seen.year %}
+      {% if not loop.first %}
+        </ol>
+      </section>
+      {% endif %}
+      <section class="year">
+        {% if year %}
+        <h2>{{ year }}</h2>
+        {% endif %}
+        <ol class="posts">
+          {% set seen.year = year %}
+          {% endif %}
+          {{ entry(post, pictured=true) }}
+          {% if loop.last %}
+        </ol>
+      </section>
+      {% endif %}
+      {% endfor %}
+      {{ pager() }}
+    </div>
+{% endblock %}

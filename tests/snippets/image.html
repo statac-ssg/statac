@@ -1,0 +1,9 @@
+{# takes photo, alt #}
+{% set shown = page.photo(photo, decorative=decorative | default(false)) %}
+{% set captioned = caption if caption is defined else shown.caption %}
+<figure{% if wide is defined and wide %} class="wide"{% endif %}>
+{% if alt is defined %}{{ picture(shown, alt=alt) }}{% else %}{{ picture(shown) }}{% endif %}
+{% if captioned %}
+<figcaption>{{ captioned | markdown }}</figcaption>
+{% endif %}
+</figure>

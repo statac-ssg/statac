@@ -1,0 +1,369 @@
+//! Making a photograph's copies, keeping them between builds, and
+//! publishing them.
+//!
+//! A copy is kept in `.statac/pictures/` under its key, so the same
+//! photograph at the same settings is never made twice. It is written
+//! under another name and renamed, so a file there is always whole.
+
+use std::collections::{BTreeMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use rayon::prelude::*;
+
+use super::progress::{Counted, Making};
+use super::{KEPT, Picture, Pictures, Progress, is_file_itself, keep_file, kept_in, quietly};
+use crate::pictures::{self, Error, Rendition, Unreadable};
+use crate::problem::{Kind, PictureFault, Problem, system_reason};
+use crate::publish::Staging;
+use crate::site::PictureId;
+use crate::source::Place;
+
+/// What making and publishing the copies came to.
+#[derive(Default, Debug)]
+pub struct Developed {
+    /// The copies made, the rest being kept from an earlier build.
+    pub made: usize,
+    /// The photographs those were made from.
+    pub from: usize,
+    /// The copies written into the built site.
+    pub published: usize,
+    pub problems: Vec<Problem>,
+}
+
+/// A photograph some page shows.
+#[derive(Copy, Clone, Debug)]
+pub struct Shown {
+    pub id: PictureId,
+    /// Where the writing first shows it; none where only a template does.
+    pub place: Option<Place>,
+    /// Whether its copy at its own width is asked for.
+    pub full: bool,
+}
+
+/// The folder of `.statac` copies are kept in.
+const PICTURES: &str = "pictures";
+
+/// The name a copy is kept under.
+fn kept_as(copy: &Rendition) -> String {
+    format!("{}.{}", &copy.key.hex()[..32], copy.format.extension())
+}
+
+/// Where copies are kept, and what became of keeping them.
+pub(crate) struct Kept {
+    /// The folder's name in `.statac`.
+    sub: &'static str,
+    /// None where nothing may be kept or taken from what is kept.
+    folder: Option<PathBuf>,
+    /// Why nothing may be, where the folder is refused.
+    refused: Option<std::io::Error>,
+    /// Why nothing more is kept, once a copy couldn't be.
+    unwritten: Mutex<Option<Problem>>,
+    /// The copies written straight into the built site instead, each by
+    /// its file there.
+    direct: Mutex<HashSet<String>>,
+    /// Counted into the name a copy is first written under, so two of the
+    /// same file made at once, from two photographs alike, never share one.
+    fresh: AtomicUsize,
+}
+
+impl Kept {
+    /// What the site at `site` keeps in the folder `sub` of `.statac`.
+    pub(crate) fn new(site: &Path, sub: &'static str) -> Kept {
+        let (folder, refused) = match kept_in(site, sub) {
+            Ok(folder) => (Some(folder), None),
+            Err(error) => (None, Some(error)),
+        };
+        Kept {
+            sub,
+            folder,
+            refused,
+            unwritten: Mutex::new(None),
+            direct: Mutex::new(HashSet::new()),
+            fresh: AtomicUsize::new(0),
+        }
+    }
+
+    /// Whether `name` is kept. Only a file itself is: a link standing in
+    /// for one is never read, and what it stood for is made again.
+    pub(crate) fn has(&self, name: &str) -> bool {
+        self.folder
+            .as_ref()
+            .is_some_and(|folder| is_file_itself(&folder.join(name)))
+    }
+
+    /// Makes the folder ready to keep something new in.
+    pub(crate) fn make_ready(&self, site: &Path) {
+        // Asked again once made: either may have been put there as a link.
+        let made = match (&self.folder, &self.refused) {
+            (Some(folder), _) => {
+                fs::create_dir_all(folder).and_then(|()| kept_in(site, self.sub).map(drop))
+            }
+            (None, Some(error)) => Err(std::io::Error::new(error.kind(), error.to_string())),
+            (None, None) => Ok(()),
+        };
+        if let Err(error) = made {
+            self.gave_up(&error);
+        }
+    }
+
+    fn gave_up(&self, error: &std::io::Error) {
+        let mut unwritten = self.unwritten.lock().expect("never poisoned");
+        unwritten.get_or_insert_with(|| {
+            Problem::nowhere(Kind::CacheNotWritten {
+                path: PathBuf::from(KEPT).join(self.sub),
+                reason: system_reason(error),
+            })
+        });
+    }
+
+    /// Keeps as `name` what was just made, or where it can't be kept,
+    /// writes it into the built site at `file`.
+    pub(crate) fn keep(
+        &self,
+        name: &str,
+        bytes: &[u8],
+        file: &str,
+        staging: &Staging,
+    ) -> Result<(), Problem> {
+        let usable = self.unwritten.lock().expect("never poisoned").is_none();
+        if let Some(folder) = self.folder.as_ref().filter(|_| usable) {
+            let nth = self.fresh.fetch_add(1, Ordering::Relaxed);
+            let fresh = format!("{name}.{}-{nth}", std::process::id());
+            match keep_file(folder, name, &fresh, bytes) {
+                Ok(()) => return Ok(()),
+                Err(error) => self.gave_up(&error),
+            }
+        }
+        staging.write(file, bytes)?;
+        self.direct
+            .lock()
+            .expect("never poisoned")
+            .insert(file.to_owned());
+        Ok(())
+    }
+
+    /// Publishes at each file what is kept under the name beside it, but
+    /// for those written there already, and says how many files the built
+    /// site has of them and what went wrong.
+    pub(crate) fn publish(
+        self,
+        wanted: Vec<(String, String)>,
+        staging: &Staging,
+    ) -> (usize, Vec<Problem>) {
+        let direct = self.direct.into_inner().expect("never poisoned");
+        let copied: Vec<Result<(), Problem>> = wanted
+            .par_iter()
+            .filter(|(_, file)| !direct.contains(file))
+            .map(|(name, file)| {
+                let shown = format!("{KEPT}/{}/{name}", self.sub);
+                let from = self.folder.as_ref().map(|folder| folder.join(name));
+                staging.copy_whole(&from.unwrap_or_default(), &shown, file)
+            })
+            .collect();
+        let mut published = direct.len();
+        let mut problems = Vec::new();
+        for copied in copied {
+            match copied {
+                Ok(()) => published += 1,
+                Err(problem) => problems.push(problem),
+            }
+        }
+        problems.extend(self.unwritten.into_inner().expect("never poisoned"));
+        (published, problems)
+    }
+
+    /// Removes every file kept under a name not among `wanted` that ends
+    /// as one of `endings`, and says how many. Only files themselves,
+    /// directly in the folder, are removed: a link or a folder found
+    /// there is left alone, and nothing is removed where the folder is
+    /// not a folder of the site's own.
+    pub(crate) fn sweep(&self, wanted: &HashSet<String>, endings: &[&str]) -> usize {
+        let Some(folder) = &self.folder else {
+            return 0;
+        };
+        let Ok(entries) = fs::read_dir(folder) else {
+            return 0;
+        };
+        let mut removed = 0;
+        for entry in entries.flatten() {
+            let Ok(name) = entry.file_name().into_string() else {
+                continue;
+            };
+            // A directory entry's own kind, which follows no link.
+            let file = entry.file_type().is_ok_and(|kind| kind.is_file());
+            if !file || name == "index" || wanted.contains(&name) {
+                continue;
+            }
+            let ours = endings
+                .iter()
+                .any(|ending| name.rsplit_once('.').is_some_and(|(_, e)| e == *ending));
+            if fs::remove_file(folder.join(&name)).is_ok() && ours {
+                removed += 1;
+            }
+        }
+        removed
+    }
+}
+
+pub(crate) fn fault(error: Error) -> PictureFault {
+    match error {
+        Error::Unreadable(Unreadable::Unsupported(what)) => PictureFault::Unsupported(what.into()),
+        Error::Unreadable(_) => PictureFault::CutShort,
+        Error::NotAPhotograph(_) => {
+            PictureFault::Unsupported("picture of another kind than when the site was read".into())
+        }
+        Error::TooLarge(size) => PictureFault::TooLarge {
+            width: size.width,
+            height: size.height,
+        },
+        Error::NotOffered { width, format } => PictureFault::CantMake(format!(
+            "it has no {} copy {width} wide",
+            format.extension()
+        )),
+        Error::Encode { message, .. } => PictureFault::CantMake(message),
+    }
+}
+
+/// Makes the copies of `shown`, each a photograph with where the writing
+/// first shows it, that no earlier build kept, and publishes every copy of
+/// each beside where the photograph is published.
+pub fn develop(
+    site: &Path,
+    all: &Pictures,
+    shown: &[Shown],
+    staging: &Staging,
+    progress: Progress,
+) -> Developed {
+    let kept = Kept::new(site, PICTURES);
+    let jobs: Vec<(&Picture, &Shown, Vec<&Rendition>)> = shown
+        .par_iter()
+        .map(|shown| {
+            let picture = all.get(shown.id);
+            let missing = picture
+                .wanted(shown.full)
+                .filter(|copy| !kept.has(&kept_as(copy)))
+                .collect();
+            (picture, shown, missing)
+        })
+        .collect();
+    let to_make: usize = jobs.iter().map(|(_, _, missing)| missing.len()).sum();
+    if to_make > 0 {
+        kept.make_ready(site);
+    }
+    let counted = Counted::new(progress, Making::Copies, to_make);
+    let settings = pictures::Settings::default();
+    let made: Vec<(usize, Vec<Problem>)> = jobs
+        .par_iter()
+        .filter(|(_, _, missing)| !missing.is_empty())
+        .map(|(picture, shown, missing)| {
+            let unreadable = |fault| {
+                let kind = Kind::UnreadablePicture {
+                    path: picture.shown(),
+                    fault,
+                };
+                Problem::placed(kind, shown.place)
+            };
+            let bytes = match fs::read(&picture.file) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    let kind = Kind::CantRead {
+                        path: picture.shown().into(),
+                        reason: system_reason(&error),
+                    };
+                    return (0, vec![Problem::nowhere(kind)]);
+                }
+            };
+            let opened = match quietly(|| pictures::open(&bytes)) {
+                Ok(opened) => opened,
+                Err(error) => return (0, vec![unreadable(fault(error))]),
+            };
+            drop(bytes);
+            let mut widths: BTreeMap<u32, Vec<&Rendition>> = BTreeMap::new();
+            for copy in missing {
+                widths.entry(copy.width).or_default().push(copy);
+            }
+            let problems: Vec<Problem> = widths
+                .par_iter()
+                .flat_map_iter(|(&width, copies)| {
+                    let resized = opened.resize(width, &settings);
+                    let mut problems = Vec::new();
+                    for copy in copies {
+                        let encoded = match &resized {
+                            Ok(resized) => resized.encode(copy.format, &settings),
+                            Err(error) => Err(error.clone()),
+                        };
+                        let file = picture.copy_file(&copy.name).unwrap_or_default();
+                        match encoded {
+                            Ok(bytes) => {
+                                let name = kept_as(copy);
+                                problems.extend(kept.keep(&name, &bytes, &file, staging).err())
+                            }
+                            Err(error) => problems.push(unreadable(fault(error))),
+                        }
+                        counted.one_done();
+                    }
+                    problems
+                })
+                .collect();
+            (missing.len(), problems)
+        })
+        .collect();
+    counted.finish();
+
+    let mut developed = Developed::default();
+    // One photograph is told once, however many of its copies went wrong.
+    let mut told: HashSet<String> = HashSet::new();
+    for (copies, problems) in made {
+        if problems.is_empty() {
+            developed.made += copies;
+            developed.from += 1;
+        }
+        for problem in problems {
+            let once = match &problem.kind {
+                Kind::UnreadablePicture { path, .. } => told.insert(path.clone()),
+                _ => true,
+            };
+            if once {
+                developed.problems.push(problem);
+            }
+        }
+    }
+    if !developed.problems.is_empty() {
+        return developed;
+    }
+
+    let wanted = jobs
+        .iter()
+        .flat_map(|(picture, shown, _)| {
+            let copies = picture.wanted(shown.full);
+            copies.map(|copy| {
+                let file = picture.copy_file(&copy.name).unwrap_or_default();
+                (kept_as(copy), file)
+            })
+        })
+        .collect();
+    let (published, problems) = kept.publish(wanted, staging);
+    developed.published = published;
+    developed.problems.extend(problems);
+    developed
+}
+
+/// Removes every copy kept that is of none of `asked`, each a photograph
+/// and whether its copy at its own width is wanted too, and says how many.
+/// Only files themselves, directly in the folder of copies, are removed: a
+/// link or a folder found there is left alone, and nothing is removed
+/// where the folder of copies is not a folder of the site's own.
+pub fn sweep(
+    site: &Path,
+    all: &Pictures,
+    asked: impl IntoIterator<Item = (PictureId, bool)>,
+) -> usize {
+    let wanted: HashSet<String> = asked
+        .into_iter()
+        .flat_map(|(id, full)| all.get(id).wanted(full).map(kept_as))
+        .collect();
+    Kept::new(site, PICTURES).sweep(&wanted, &["avif", "jpg", "png"])
+}

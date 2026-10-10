@@ -1,0 +1,7 @@
+# Old addresses.
+/old/post-1/  /posts/post-1/  301
+/old/post-2.html /posts/post-2/
+/old/*  /posts/:splat  301
+/elsewhere/  https://example.org/  302
+/posts/missing/  /posts/post-9/
+/search  /search.html  200

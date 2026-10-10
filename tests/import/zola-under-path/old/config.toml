@@ -1,0 +1,5 @@
+base_url = "https://example.org/blog/"
+title = "Under a path"
+
+[markdown]
+smart_punctuation = true

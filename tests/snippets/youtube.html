@@ -1,0 +1,6 @@
+{# takes address #}
+{% set video = page.youtube(address) %}
+{% set still = page.photo(poster) if poster is defined else video.still %}
+<a href="{{ video.embed }}">
+  {% if still %}<img src="{{ still.src }}" alt="Play the video">{% else %}Play the video{% endif %}
+</a>

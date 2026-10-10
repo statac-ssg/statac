@@ -1,0 +1,26 @@
+{# The Atom feed of a list's newest posts: see /feeds/ -#}
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="{{ page.language }}">
+  <title>{{ site.title if list.word == "site" else list.title ~ " - " ~ site.title }}</title>
+  {% if site.tagline is defined %}
+  <subtitle>{{ site.tagline }}</subtitle>
+  {% endif %}
+  <link rel="self" href="{{ list.feed | absolute }}"/>
+  <link rel="alternate" href="{{ list.url | absolute }}"/>
+  <id>{{ feed_id(page) }}</id>
+  <updated>{{ posts | newest_date | moment }}</updated>
+  <author><name>{{ site.author if site.author is defined else site.title }}</name></author>
+  {% for post in posts[:20] %}
+  <entry>
+    <title>{{ called(post) }}</title>
+    <link rel="alternate" href="{{ post.url | absolute }}"/>
+    <id>{{ feed_id(post) }}</id>
+    <published>{{ post.date | moment }}</published>
+    <updated>{{ post.updated | default(post.date) | moment }}</updated>
+    {% for tag in post.tags %}
+    <category term="{{ tag.name }}"/>
+    {% endfor %}
+    <content type="html">{{ post.content | absolute }}</content>
+  </entry>
+  {% endfor %}
+</feed>

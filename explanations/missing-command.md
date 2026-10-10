@@ -1,0 +1,35 @@
+# Missing command
+
+The command line gives options, but no command to apply them to.
+
+## What you'll see {#what-youll-see}
+
+```text
+error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, `import` or `explain`
+  Run `statac --help` to see the commands.
+  More: https://statac.dev/e/missing-command/
+```
+
+## Why Statac stops
+
+Options say how to do something, not what to do. Statac doesn't guess
+which command you meant.
+
+## How to fix it
+
+Add `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`,
+`import` or `explain` after `statac`. `statac --help` lists the commands and what
+each does, and `statac check --help` shows only the options `check`
+takes.
+
+## Example
+
+```text
+statac --site=docs
+```
+
+To check the site in `docs`:
+
+```text
+statac check --site=docs
+```

@@ -1,0 +1,12 @@
+baseURL = "https://example.org/"
+title = "Languages by folder"
+defaultContentLanguage = "en"
+timeZone = "UTC"
+
+[languages.en]
+  contentDir = "content/en"
+  weight = 1
+[languages.fr]
+  contentDir = "content/fr"
+  weight = 2
+  title = "Langues par dossier"

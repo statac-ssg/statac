@@ -1,0 +1,4 @@
+base_url = "https://example.org"
+title = "Config"
+generate_feed = true
+feed_filename = "rss.xml"

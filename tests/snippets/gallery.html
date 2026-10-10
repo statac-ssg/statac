@@ -1,0 +1,15 @@
+{# takes photos... #}
+<div class="gallery">
+{% for picture in page.photos(photos if photos is defined else none, sizes="(max-width: 30rem) 100vw, 15rem", full=true) %}
+  <a href="{{ picture.full }}"{% if not picture.alt %} aria-label="{{ picture.name }}"{% endif %}>
+{% if picture.avif %}
+    <picture>
+      <source type="image/avif" srcset="{{ picture.avif }}" sizes="{{ picture.sizes }}">
+      <img src="{{ picture.src }}" srcset="{{ picture.fallback }}" sizes="{{ picture.sizes }}" width="{{ picture.width }}" height="{{ picture.height }}" alt="{{ picture.alt }}" loading="lazy" decoding="async">
+    </picture>
+{% else %}
+    <img src="{{ picture.src }}"{% if picture.width %} width="{{ picture.width }}" height="{{ picture.height }}"{% endif %} alt="{{ picture.alt }}" loading="lazy" decoding="async">
+{% endif %}
+  </a>
+{% endfor %}
+</div>

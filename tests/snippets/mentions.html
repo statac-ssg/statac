@@ -1,0 +1,22 @@
+{% set mentions = page.webmentions %}
+{% if page.mentions and (mentions.said or mentions.faces) %}
+<section class="mentions">
+  {% if mentions.faces %}
+  <p>
+    {% for mention in mentions.faces %}
+    <a href="{{ mention.url }}" rel="nofollow ugc">{% if mention.face %}<img src="{{ mention.face.src }}" width="{{ mention.face.width }}" height="{{ mention.face.height }}" alt="">{% endif %}{% if mention.author %}{{ mention.author }}{% endif %} {{ mention.kind }}</a>
+    {% endfor %}
+  </p>
+  {% endif %}
+  {% for mention in mentions.said %}
+  <article>
+    <p>
+      {% if mention.face %}<img src="{{ mention.face.src }}" width="{{ mention.face.width }}" height="{{ mention.face.height }}" alt="">{% endif %}
+      {% if mention.author_url and mention.author %}<a href="{{ mention.author_url }}" rel="nofollow ugc">{{ mention.author }}</a>{% elif mention.author %}{{ mention.author }}{% endif %}
+      <a href="{{ mention.url }}" rel="nofollow ugc">{{ mention.kind }}</a>{% if mention.published %} on {{ mention.published }}{% endif %}
+    </p>
+    {% if mention.words %}<p>{{ mention.words }}</p>{% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% endif %}

@@ -1,0 +1,1343 @@
+/* The site's one stylesheet, linked from templates/base.html: see /assets/
+
+   1. Colours, type and space: most changes start here
+   2. Reset
+   3. Base elements
+   4. Layout
+   5. The site's header and footer
+   6. A page's title
+   7. The writing
+   8. After a post
+   9. Lists of posts
+   10. Search
+   11. Motion and print */
+
+
+/* 1. Colours, type and space
+
+   Each colour is written twice, for a light page and a dark one, and the
+   reader's own setting chooses. The accent is a highlighter: it fills
+   and underlines, and never colours text, so one accent serves both. */
+
+:root {
+  color-scheme: light dark;
+
+  --paper: light-dark(oklch(98.6% 0.005 85), oklch(18% 0.008 70));
+  --surface: light-dark(oklch(95.8% 0.009 80), oklch(22% 0.01 70));
+  --ink: light-dark(oklch(23% 0.012 70), oklch(92% 0.008 85));
+  --quiet: light-dark(oklch(45% 0.015 70), oklch(74% 0.012 80));
+  --rule: light-dark(oklch(88% 0.012 80), oklch(34% 0.012 75));
+
+  --accent: oklch(90% 0.17 98);
+  --accent-strong: oklch(66% 0.135 78);
+  --on-accent: oklch(22% 0.02 80);
+
+  /* Fonts the reader's computer has already. To use one of your own, put
+     its files in assets/ and name it first on one of these lines. */
+  --display: "Iowan Old Style", "Sitka Text", Charter, Georgia, serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Sizes grow a little with the window. --small is the smallest text on
+     the site, about 15px on a phone and 17px on a wide screen. */
+  --small: clamp(0.95rem, 0.92rem + 0.15vw, 1.04rem);
+  --text: clamp(1.06rem, 1rem + 0.3vw, 1.19rem);
+  --large: clamp(1.25rem, 1.15rem + 0.45vw, 1.45rem);
+  --larger: clamp(1.45rem, 1.3rem + 0.75vw, 1.8rem);
+  --heading: clamp(1.75rem, 1.5rem + 1.2vw, 2.4rem);
+  --title: clamp(2.2rem, 1.7rem + 2.6vw, 3.6rem);
+
+  --gutter: clamp(1rem, 4vw, 2rem);
+  --column: 40rem;
+  --wide: 58rem;
+  --corner: 0.375rem;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --quiet: var(--ink);
+    --rule: color-mix(in oklch, var(--ink) 60%, var(--paper));
+  }
+}
+
+
+/* 2. Reset */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+img,
+video,
+picture,
+iframe {
+  display: block;
+  max-inline-size: 100%;
+}
+
+img,
+video {
+  block-size: auto;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+
+/* 3. Base elements */
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--text);
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+
+main {
+  flex: 1;
+  padding-block-end: 6rem;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+/* Links are the colour of the text and always underlined, so none is
+   told by colour alone. Under the pointer the underline thickens into a
+   stroke of highlighter. */
+a {
+  color: var(--ink);
+  text-decoration-line: underline;
+  text-decoration-color: var(--accent-strong);
+  text-decoration-thickness: max(1.5px, 0.1em);
+  text-underline-offset: 0.22em;
+  transition:
+    text-decoration-color 0.15s ease,
+    text-decoration-thickness 0.15s ease;
+}
+
+a:hover {
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.3em;
+}
+
+/* Keyboard focus: a link is filled with the accent over a dark bar, so
+   one of the two shows on either page. Anything else gets an outline. */
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+a:focus-visible {
+  outline: 3px solid transparent;
+  outline-offset: 0;
+  background: var(--accent);
+  box-shadow:
+    0 -2px var(--accent),
+    0 4px var(--on-accent);
+  text-decoration: none;
+}
+
+a:focus-visible,
+a:focus-visible * {
+  color: var(--on-accent);
+}
+
+/* A highlight wouldn't show behind a picture. */
+a:has(img):focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  background: none;
+  box-shadow: none;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:target {
+  scroll-margin-block-start: 2rem;
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--mono);
+}
+
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A small heading in capitals, for the name of a group of things. */
+.label {
+  font-family: var(--body);
+  font-size: var(--small);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
+
+
+/* 4. Layout
+
+   .wide centres a block at the wide measure. .column is a grid whose
+   children sit in the reading column; a gallery, or a child with the
+   class wide, takes the wider track around it.
+
+     | gutter | wide | column | wide | gutter |                          */
+
+.wide {
+  inline-size: min(100% - 2 * var(--gutter), var(--wide));
+  margin-inline: auto;
+}
+
+.column {
+  --edge: calc((var(--wide) - var(--column)) / 2);
+
+  display: grid;
+  grid-template-columns:
+    minmax(var(--gutter), 1fr)
+    [wide-start] minmax(0, var(--edge))
+    [column-start] min(100% - 2 * var(--gutter), var(--column))
+    [column-end] minmax(0, var(--edge))
+    [wide-end] minmax(var(--gutter), 1fr);
+}
+
+.column > * {
+  grid-column: column;
+  min-inline-size: 0;
+}
+
+.column > :is(.wide, .gallery) {
+  grid-column: wide;
+  inline-size: auto;
+  margin-inline: 0;
+}
+
+.skip {
+  position: absolute;
+  inset-block-start: 1rem;
+  inset-inline-start: 1rem;
+  z-index: 1;
+  padding: 0.5rem 1rem;
+  translate: 0 -300%;
+}
+
+.skip:focus-visible {
+  translate: none;
+}
+
+
+/* 5. The site's header and footer */
+
+body > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 2rem;
+  padding-block: 1.5rem;
+}
+
+.name {
+  margin-inline-end: auto;
+  font-family: var(--display);
+  font-size: var(--large);
+  font-weight: 600;
+}
+
+.name a {
+  text-decoration: none;
+}
+
+body > header ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+body > header nav a {
+  display: inline-block;
+  padding-block: 0.25rem;
+  color: var(--quiet);
+  text-decoration-color: transparent;
+}
+
+body > header nav a:hover {
+  color: var(--ink);
+  text-decoration-color: var(--accent);
+}
+
+/* The page a reader is on, or the part of the site it is in. */
+body > header nav a[aria-current] {
+  color: var(--ink);
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.3em;
+}
+
+.languages {
+  font-size: var(--small);
+  text-transform: uppercase;
+}
+
+body > footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding-block: 1.5rem;
+  border-block-start: 1px solid var(--rule);
+  font-size: var(--small);
+  color: var(--quiet);
+}
+
+.rights {
+  margin-inline-start: auto;
+}
+
+/* 6. A page's title: its name, a line about it, and its details */
+
+.top {
+  row-gap: 1rem;
+  padding-block: 4rem 3rem;
+}
+
+.top h1 {
+  font-family: var(--display);
+  font-size: var(--title);
+  font-weight: 650;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+}
+
+.summary {
+  font-size: var(--large);
+  line-height: 1.45;
+  color: var(--quiet);
+}
+
+/* A post's date and reading time, parted by dots. */
+.about {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-size: var(--small);
+  color: var(--quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.about li + li::before {
+  content: "·";
+  content: "·" / "";
+  margin-inline-end: 0.5rem;
+}
+
+
+/* 7. The writing
+
+   Everything a page's writing can hold. Each piece keeps a space above
+   it, and headings, pictures and code ask for more. */
+
+.writing > * + * {
+  margin-block-start: var(--space, 1.25em);
+}
+
+.writing > :is(h2, h3, h4) {
+  --space: 3rem;
+}
+
+.writing > h2 {
+  --space: 4rem;
+}
+
+.writing > :is(h2, h3, h4) + * {
+  --space: 0.75rem;
+}
+
+/* :where() keeps these weak, so the space under a heading still wins. */
+.writing > :where(figure, pre, .scroll, .callout, .note, .contents, .gallery, details, hr),
+.writing > :where(figure, pre, .scroll, .callout, .note, .contents, .gallery, details, hr) + * {
+  --space: 2rem;
+}
+
+/* Writing inside writing: a paragraph in a list, a quotation or a note. */
+:is(.writing, .posts) :is(li, dd, blockquote, aside, details, td) > * + * {
+  margin-block-start: 0.5rem;
+}
+
+.writing a:visited:not(:hover) {
+  text-decoration-color: var(--quiet);
+}
+
+.writing h2 {
+  font-family: var(--display);
+  font-size: var(--heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.writing h3 {
+  font-size: var(--large);
+  line-height: 1.3;
+}
+
+.writing h4 {
+  font-size: var(--text);
+}
+
+:not(pre) > code {
+  padding: 0.1em 0.3em;
+  border-radius: 0.25em;
+  background: var(--surface);
+  font-size: 0.92em;
+}
+
+kbd {
+  padding: 0.05em 0.4em;
+  border: 1px solid var(--rule);
+  border-block-end-width: 2px;
+  border-radius: 0.25em;
+  background: var(--surface);
+  font-size: 0.92em;
+}
+
+abbr[title] {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+mark {
+  padding-inline: 0.15em;
+  border-radius: 0.15em;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+sub,
+sup {
+  line-height: 0;
+}
+
+/* Lists. A list with a class, such as a gallery, lays itself out. */
+
+.writing :is(ul, ol):not([class]) {
+  padding-inline-start: 1.3em;
+}
+
+/* A list in a note sits inside the notes' own list, where a browser
+   would give it the hollow mark of a list within a list. */
+.writing > ul:not([class]) {
+  list-style-type: disc;
+}
+
+.writing li + li {
+  margin-block-start: 0.5rem;
+}
+
+.writing li::marker {
+  color: var(--quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A list of boxes to tick, written - [ ] and - [x]. */
+.writing li:has(> input[type="checkbox"]) {
+  margin-inline-start: -1.3em;
+  list-style: none;
+}
+
+/* The box is drawn here, in the page's own colours, where a browser
+   would draw its own in grey or blue. */
+.writing li > input[type="checkbox"] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  inline-size: 1em;
+  block-size: 1em;
+  margin-inline-end: 0.3em;
+  border: 1.5px solid var(--quiet);
+  border-radius: 0.2em;
+  background: var(--paper);
+  vertical-align: -0.12em;
+}
+
+.writing li > input[type="checkbox"]:checked {
+  border-color: var(--accent-strong);
+  background: var(--accent);
+}
+
+.writing li > input[type="checkbox"]:checked::before {
+  content: "";
+  inline-size: 0.6em;
+  block-size: 0.6em;
+  background: var(--on-accent);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+}
+
+/* A term and its meaning side by side where there is room. */
+.writing dl {
+  display: grid;
+  gap: 0.5rem 1.5rem;
+}
+
+.writing dt {
+  font-weight: 700;
+}
+
+@media (min-width: 36rem) {
+  .writing dl {
+    grid-template-columns: max-content 1fr;
+  }
+
+  .writing dt {
+    grid-column: 1;
+  }
+
+  .writing dd {
+    grid-column: 2;
+  }
+}
+
+/* Quotations. @quote puts who said it beneath. */
+
+blockquote {
+  padding-inline-start: 1.5rem;
+  border-inline-start: 4px solid var(--accent);
+  font-family: var(--display);
+  font-size: var(--large);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.quote figcaption {
+  margin-block-start: 0.75rem;
+  padding-inline-start: calc(1.5rem + 4px);
+  font-size: var(--text);
+  color: var(--ink);
+}
+
+/* Code. A block with a caption is one box, the caption heading the
+   code. */
+
+pre {
+  padding: 1rem 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--corner);
+  background: var(--surface);
+  font-size: var(--small);
+  line-height: 1.6;
+  tab-size: 2;
+  overflow-x: auto;
+}
+
+figure.code {
+  border: 1px solid var(--rule);
+  border-radius: var(--corner);
+  overflow: clip;
+}
+
+/* The code stylesheet brings a background of its own with its colours.
+   The page's is kept in its place, so code sits on the same surface as
+   a callout whatever code_style is chosen. On it the solarized and
+   one-half styles fall a little under a contrast of 4.5 to 1 in the
+   light look, 4.31 and 4.16; without these three lines each style has
+   its own background back: see /assets/ */
+pre.code,
+figure.code {
+  background: var(--surface);
+}
+
+.code figcaption {
+  padding: 0.5rem 1.5rem;
+  border-block-end: 1px solid var(--rule);
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.code figcaption a {
+  color: inherit;
+}
+
+.code pre {
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+/* Pictures, videos and recordings */
+
+.writing :is(img, video) {
+  margin-inline: auto;
+  border-radius: var(--corner);
+}
+
+.writing :is(figure.wide, .gallery) img {
+  inline-size: 100%;
+}
+
+figcaption {
+  font-size: var(--small);
+  line-height: 1.5;
+  color: var(--quiet);
+}
+
+figure > :is(picture, img, video, audio, a, button, iframe) + figcaption {
+  margin-block-start: 0.5rem;
+}
+
+audio {
+  inline-size: 100%;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(13rem, 45%), 1fr));
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.writing .gallery li {
+  margin: 0;
+}
+
+.gallery a {
+  display: block;
+  border-radius: var(--corner);
+  overflow: hidden;
+}
+
+.gallery img {
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  background: var(--surface);
+  transition: scale 0.3s ease;
+}
+
+.gallery a:hover img {
+  scale: 1.03;
+}
+
+/* A video kept on another site: its still, with a button to play it,
+   and then its player. */
+
+.video :is(img, iframe) {
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.video img {
+  object-fit: cover;
+}
+
+.video iframe {
+  border: 0;
+  border-radius: var(--corner);
+}
+
+.video :is(a, button):has(img) {
+  display: block;
+  position: relative;
+  inline-size: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--corner);
+  background: none;
+  cursor: pointer;
+}
+
+.video :is(a, button):has(img)::before,
+.video :is(a, button):has(img)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.video :is(a, button):has(img)::before {
+  inline-size: 4.5rem;
+  block-size: 4.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.video :is(a, button):has(img)::after {
+  inline-size: 1.5rem;
+  block-size: 1.75rem;
+  translate: 0.15rem;
+  background: var(--on-accent);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* Tables. A wide one scrolls inside its own box. */
+
+.scroll {
+  overflow-x: auto;
+}
+
+table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 0.5rem 1rem;
+  border-block-end: 1px solid var(--rule);
+  text-align: start;
+  vertical-align: top;
+}
+
+:is(th, td):first-child {
+  padding-inline-start: 0;
+}
+
+:is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+thead th {
+  border-block-end: 2px solid var(--ink);
+}
+
+/* Callouts, notes and the table of contents: a box set beside the
+   main point. */
+
+.callout,
+.note,
+.contents {
+  padding: 1rem 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--corner);
+  background: var(--surface);
+}
+
+.callout-title {
+  inline-size: fit-content;
+  padding: 0.05em 0.5em;
+  border-radius: 0.2em;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--small);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.contents ul {
+  padding-inline-start: 1.3em;
+}
+
+.contents > ul {
+  margin-block-start: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+details {
+  padding-block: 0.75rem;
+  border-block: 1px solid var(--rule);
+}
+
+summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+hr {
+  border: 0;
+  color: var(--quiet);
+  text-align: center;
+}
+
+hr::after {
+  content: "· · ·";
+  letter-spacing: 0.5em;
+}
+
+math[display="block"] {
+  overflow-x: auto;
+}
+
+/* Footnotes, gathered at the end of the writing. */
+
+.footnote a {
+  padding-inline: 0.1em;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.writing > .footnotes {
+  --space: 4rem;
+
+  padding-block-start: 1.5rem;
+  border-block-start: 1px solid var(--rule);
+  font-size: var(--small);
+  color: var(--quiet);
+}
+
+/* The footnote a reader has gone to. */
+.footnotes li:target,
+.footnotes li:target a {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.back {
+  text-decoration: none;
+}
+
+
+/* 8. After a post: its tags and series, the posts either side, related
+   posts, and what other sites said */
+
+.filed > * {
+  display: grid;
+  gap: 0.5rem;
+  margin-block-start: 3rem;
+  padding-block-start: 1.5rem;
+  border-block-start: 1px solid var(--rule);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.tags a::before {
+  content: "#";
+  content: "#" / "";
+  color: var(--quiet);
+}
+
+.more {
+  margin-block-start: 3rem;
+}
+
+.more ul {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.more a {
+  display: grid;
+  gap: 0.25rem;
+  block-size: 100%;
+  padding: 1rem 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--corner);
+  text-decoration: none;
+}
+
+.more a:hover {
+  border-color: var(--accent-strong);
+}
+
+.more strong {
+  font-family: var(--display);
+  font-size: var(--large);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Side by side where there is room, each keeping its own half when the
+   other isn't there. */
+@media (min-width: 36rem) {
+  .more ul {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .more li:has([rel="next"]) {
+    grid-column: 2;
+    text-align: end;
+  }
+}
+
+.related,
+.mentions {
+  margin-block-start: 4rem;
+}
+
+.related ul {
+  margin-block-start: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.related li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding-block: 0.75rem;
+  border-block-start: 1px solid var(--rule);
+}
+
+.related li:last-child {
+  border-block-end: 1px solid var(--rule);
+}
+
+.related time,
+.mentions time {
+  font-size: var(--small);
+  color: var(--quiet);
+}
+
+.mentions > div {
+  display: grid;
+  gap: 1rem;
+}
+
+.mentions article {
+  display: grid;
+  gap: 0.25rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--rule);
+}
+
+.faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0;
+  list-style: none;
+  font-size: var(--small);
+}
+
+.mentions img {
+  display: inline-block;
+  inline-size: 2rem;
+  block-size: 2rem;
+  margin-inline-end: 0.35rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+
+/* 9. Lists of posts: the date beside the title, and above it where
+   there is no room */
+
+.listing {
+  row-gap: 1rem;
+}
+
+.writing + .listing {
+  margin-block-start: 4rem;
+}
+
+.writing:empty + .listing {
+  margin-block-start: 0;
+}
+
+.listing + .listing {
+  margin-block-start: 4rem;
+}
+
+/* A list's name, with a link to the whole of it. */
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding-block-end: 0.5rem;
+  border-block-end: 1px solid var(--rule);
+}
+
+.heading h2 {
+  font-family: var(--display);
+  font-size: var(--larger);
+  font-weight: 600;
+}
+
+/* A year's posts. On a wide screen the year stands to the side of them
+   and stays in view while they pass. */
+
+.listing:has(.year) {
+  row-gap: 3rem;
+}
+
+.year {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.year > h2 {
+  font-family: var(--display);
+  font-size: var(--heading);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.year > ol {
+  grid-column: -2 / -1;
+}
+
+/* Under a year the day is set against the title, so the two read as a
+   pair. */
+.year .posts {
+  grid-template-columns: minmax(3.5rem, max-content) minmax(0, 1fr);
+  column-gap: 1rem;
+}
+
+.year .posts > li > time {
+  text-align: end;
+}
+
+@media (min-width: 62rem) {
+  .column > .year {
+    grid-column: wide-start / column-end;
+    grid-template-columns: minmax(0, 1fr) var(--column);
+  }
+
+  .year > h2 {
+    position: sticky;
+    inset-block-start: 1.5rem;
+    align-self: start;
+    padding-block-start: 1rem;
+  }
+}
+
+.posts {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, max-content) minmax(0, 1fr);
+  column-gap: 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.posts > li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  row-gap: 0.25rem;
+  padding-block: 1.25rem 1.75rem;
+}
+
+.posts > li + li {
+  border-block-start: 1px solid var(--rule);
+}
+
+.posts > li > time {
+  font-size: var(--small);
+  color: var(--quiet);
+}
+
+.posts > li > div {
+  grid-column: 2;
+  min-inline-size: 0;
+}
+
+.posts h3 {
+  font-family: var(--display);
+  font-size: var(--large);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.posts p {
+  color: var(--quiet);
+}
+
+/* What follows a post's title: a line about it, or its picture and
+   its opening. */
+.posts > li > div > * + * {
+  margin-block-start: 0.5rem;
+}
+
+.posts > li > div > picture + * {
+  margin-block-start: 0.75rem;
+}
+
+.posts img {
+  border-radius: var(--corner);
+}
+
+@media (max-width: 36rem) {
+  .posts,
+  .year .posts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .posts > li > div {
+    grid-column: 1;
+  }
+
+  .year .posts > li > time {
+    text-align: start;
+  }
+}
+
+/* Notes: each shown whole, with its date and tags beneath. */
+
+.notes {
+  display: grid;
+  padding: 0;
+  list-style: none;
+}
+
+.notes > li {
+  padding-block: 2rem;
+  border-block-start: 1px solid var(--rule);
+}
+
+.notes > li:first-child {
+  padding-block-start: 1rem;
+  border-block-start: 0;
+}
+
+.notes article {
+  display: grid;
+  gap: 1rem;
+}
+
+.notes :is(h2, h3) {
+  font-family: var(--display);
+  font-size: var(--large);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.notes footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1.5rem;
+  font-size: var(--small);
+  color: var(--quiet);
+}
+
+/* A note with no title is called by its date. */
+.top .stamp {
+  font-size: var(--heading);
+}
+
+/* Photographs: square pictures, three to a row, with no gaps in the
+   rows. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.grid a {
+  display: block;
+  border-radius: var(--corner);
+  overflow: hidden;
+}
+
+.grid img {
+  inline-size: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--surface);
+  transition: scale 0.3s ease;
+}
+
+.grid a:hover img {
+  scale: 1.03;
+}
+
+/* Six in a row on the home page, where there is room. */
+@media (min-width: 40rem) {
+  .strip {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+/* One photograph: the picture, then its name beneath it. */
+.shot {
+  padding-block-start: 2rem;
+}
+
+.shot img {
+  inline-size: 100%;
+  border-radius: var(--corner);
+}
+
+.top.under {
+  padding-block: 2rem 1.5rem;
+}
+
+.top.under h1 {
+  font-size: var(--heading);
+}
+
+/* The way to a list's newer and older pages. */
+.pager ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 1.5rem 0 0;
+  border-block-start: 1px solid var(--rule);
+  list-style: none;
+}
+
+.pager li:has([rel="next"]) {
+  margin-inline-start: auto;
+}
+
+/* Arrows on the links between pages, turned where lines run from the
+   right. */
+.pager [rel="prev"]::before,
+.more [rel="prev"] .label::before {
+  content: "← ";
+  content: "← " / "";
+}
+
+.pager [rel="next"]::after,
+.heading a::after,
+.more [rel="next"] .label::after {
+  content: " →";
+  content: " →" / "";
+}
+
+:dir(rtl) :is(.pager [rel="prev"], .more [rel="prev"] .label)::before {
+  content: "→ ";
+  content: "→ " / "";
+}
+
+:dir(rtl) :is(.pager [rel="next"], .heading a, .more [rel="next"] .label)::after {
+  content: " ←";
+  content: " ←" / "";
+}
+
+
+/* 10. Search
+
+   Nothing here shows until the site has a search box: see /hooks/ */
+
+search {
+  display: grid;
+  gap: 0.5rem;
+}
+
+search label {
+  font-weight: 700;
+}
+
+input[type="search"] {
+  inline-size: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--corner);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+input[type="search"]:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 0;
+}
+
+search [role="status"] {
+  font-size: var(--small);
+  color: var(--quiet);
+}
+
+search [role="status"]:empty {
+  display: none;
+}
+
+search ul {
+  padding: 0;
+  list-style: none;
+}
+
+.writing search li {
+  margin: 0;
+  padding-block: 0.75rem;
+  border-block-start: 1px solid var(--rule);
+}
+
+search li a {
+  font-family: var(--display);
+  font-size: var(--large);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+
+/* 11. Motion and print */
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* On paper: the writing alone, black on white, with each link's
+   address written out. */
+@media print {
+  .skip,
+  body > header nav,
+  body > footer,
+  .more,
+  .pager,
+  .related {
+    display: none;
+  }
+
+  :root {
+    color-scheme: light;
+    --paper: white;
+    --surface: white;
+    --ink: black;
+    --quiet: #444;
+    --accent-strong: black;
+  }
+
+  .writing a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    overflow-wrap: anywhere;
+  }
+}

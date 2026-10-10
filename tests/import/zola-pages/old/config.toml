@@ -1,0 +1,6 @@
+base_url = "https://example.org"
+title = "Pages"
+ignored_content = ["*.xlsx"]
+
+[markdown]
+smart_punctuation = true

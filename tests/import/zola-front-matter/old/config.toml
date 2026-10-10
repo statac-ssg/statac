@@ -1,0 +1,10 @@
+base_url = "https://example.org"
+title = "Front matter"
+smart_punctuation = true
+taxonomies = [
+  { name = "tags" },
+  { name = "categories" },
+]
+
+[markdown]
+smart_punctuation = true

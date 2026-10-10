@@ -1,0 +1,13 @@
+base_url = "https://example.org"
+title = "Languages"
+default_language = "en"
+generate_feeds = true
+taxonomies = [{ name = "tags" }]
+
+[markdown]
+smart_punctuation = true
+
+[languages.fr]
+title = "Langues"
+generate_feeds = true
+taxonomies = [{ name = "tags" }]

@@ -1,0 +1,13 @@
+base_url = "https://example.org"
+title = "Tags"
+taxonomies = [
+  { name = "Tags", feed = true, paginate_by = 5 },
+  { name = "categories" },
+  { name = "authors" },
+]
+
+[markdown]
+smart_punctuation = true
+
+[slugify]
+taxonomies = "safe"

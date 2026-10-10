@@ -1,0 +1,17 @@
+base_url = "https://example.org/"
+title = "Settings"
+description = "A site whose settings come across."
+default_language = "en"
+compile_sass = true
+build_search_index = true
+author = "Name"
+
+[markdown]
+smart_punctuation = true
+highlight_code = true
+external_links_target_blank = true
+external_links_no_follow = true
+
+[extra]
+github = "name"
+menu = [{ name = "Posts", url = "/posts/" }]

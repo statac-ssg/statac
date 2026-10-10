@@ -1,0 +1,6 @@
+title: Source
+source: site
+destination: built
+collections:
+  notes:
+    output: true

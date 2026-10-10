@@ -1,0 +1,18 @@
+The files in this folder are from the Unicode CLDR's JSON distribution,
+release 48.2.3, each unchanged and at the path the release gives it:
+
+https://github.com/unicode-org/cldr-json/tree/48.2.3/cldr-json
+
+They are under the Unicode License V3, the text of which is in
+src/language/bundled/LICENSE-CLDR.txt. The words Statac has for each language
+but English are held to these files by a test in src/language/tests.rs.
+
+The files for sw are there for the example in
+explanations/unknown-language.md alone, which the same tests hold to them:
+Statac has no words for Swahili. The usual form of a date in each language
+is held to these files by a test in src/dates/tests.rs.
+
+To move to a later release, fetch the same files at its tag in place of
+these and run the tests. Then bring the files in src/language/bundled/ and
+the example to what the tests say, and name the new release wherever this
+one is named.

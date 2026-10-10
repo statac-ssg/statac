@@ -1,0 +1,13 @@
+---
+title: Post 1
+date: 2026-01-01
+---
+<blockquote>
+A summary inside HTML that is closed before the marker.
+</blockquote>
+
+<!--more-->
+
+The rest of the post, which was part of the HTML and is a paragraph now.
+
+More of it.

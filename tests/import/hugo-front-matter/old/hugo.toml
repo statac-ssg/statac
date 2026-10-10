@@ -1,0 +1,4 @@
+baseURL = "https://example.org/"
+title = "Front matter"
+languageCode = "en-GB"
+timeZone = "Europe/London"

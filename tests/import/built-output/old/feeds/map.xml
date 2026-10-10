@@ -1,0 +1,3 @@
+---
+---
+<urlset>{% for post in site.posts %}{% endfor %}</urlset>

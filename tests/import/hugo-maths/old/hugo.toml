@@ -1,0 +1,11 @@
+baseURL = "https://example.org/"
+title = "Maths the settings pass through"
+languageCode = "en"
+timeZone = "UTC"
+
+[markup.goldmark.extensions.passthrough]
+enable = true
+
+[markup.goldmark.extensions.passthrough.delimiters]
+block = [["$$", "$$"]]
+inline = [["$", "$"]]

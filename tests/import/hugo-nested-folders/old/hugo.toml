@@ -1,0 +1,7 @@
+baseURL = "https://example.org/"
+title = "Nested folders"
+languageCode = "en"
+timeZone = "UTC"
+
+[permalinks]
+  post = "/:year/:month/:day/:slug/"

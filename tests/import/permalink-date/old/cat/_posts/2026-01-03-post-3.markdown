@@ -1,0 +1,4 @@
+---
+title: Post 3
+---
+A post ending `.markdown`, in the `_posts` of a folder, which is its category.

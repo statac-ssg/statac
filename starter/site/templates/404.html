@@ -1,0 +1,17 @@
+{# The page a reader is shown where nothing is published, kept out of search engines: see /feeds/ -#}
+{% extends "base" %}
+{% block title %}{% set words = site.data.words[page.language] %}{{ words.not_found }} - {{ site.title }}{% endblock %}
+{% block sharing %}
+  <meta name="robots" content="noindex">
+{% endblock %}
+{% block main %}
+    {% set words = site.data.words[page.language] %}
+    <header class="top column">
+      <h1>{{ words.not_found }}</h1>
+      <p class="summary">{{ words.nothing_here }}</p>
+    </header>
+    <div class="writing column">
+      <p><a href="{{ site.languages[page.language].url }}">{{ words.go_home }}</a></p>
+      {{ page.content }}
+    </div>
+{% endblock %}

@@ -1,0 +1,10 @@
+# French. Every line is from the Unicode CLDR, release 48.2.3: see
+# LICENSE-CLDR.txt.
+months: [janvier, février, mars, avril, mai, juin, juillet, août,
+  septembre, octobre, novembre, décembre]
+months_short: [janv., févr., mars, avr., mai, juin, juil., août, sept.,
+  oct., nov., déc.]
+weekdays: [lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche]
+weekdays_short: [lun., mar., mer., jeu., ven., sam., dim.]
+am_pm: [AM, PM]
+quotes: « » « »

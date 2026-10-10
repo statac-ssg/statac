@@ -1,0 +1,197 @@
+name: Release packages
+run-name: ${{ inputs.reason }}
+
+# By hand only. It builds and tests each platform's binary and leaves the
+# packages as artefacts of the run: it makes no tag and no release, which
+# are a person's to make.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this run is worth its minutes
+        required: true
+        type: string
+      version:
+        description: The version in Cargo.toml, as 0.9.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.manifest.outputs.version }}
+      rust: ${{ steps.manifest.outputs.rust }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: manifest
+        env:
+          ASKED: ${{ inputs.version }}
+        run: |
+          field() {
+            awk -F'"' -v name="$1" '
+              /^\[/ { package = ($0 == "[package]") }
+              package && $1 ~ "^" name " *= *$" { print $2 }
+            ' Cargo.toml
+          }
+          version=$(field version)
+          rust=$(field rust-version)
+          if [ -z "$version" ] || [ -z "$rust" ]; then
+            echo "::error::Cargo.toml names no version or no rust-version"
+            exit 1
+          fi
+          if [ "$ASKED" != "$version" ]; then
+            echo "::error::Cargo.toml is at $version, and this run was asked for $ASKED"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "rust=$rust" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-15
+          - target: x86_64-apple-darwin
+            runner: macos-15-intel
+          # The oldest image there is, since a binary needs at least the
+          # glibc it was built against.
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-22.04-arm
+          # The C runtime is linked in, so the binary asks for no
+          # redistributable to be installed first.
+          - target: x86_64-pc-windows-msvc
+            runner: windows-2025
+            rustflags: -C target-feature=+crt-static
+    env:
+      RUSTFLAGS: ${{ matrix.rustflags }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
+        with:
+          toolchain: ${{ needs.version.outputs.rust }}
+          targets: ${{ matrix.target }}
+      # libaom needs NASM on x86-64 and no image has it.
+      - if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends nasm
+      - if: matrix.target == 'x86_64-apple-darwin'
+        run: brew install nasm
+      # Chocolatey installs it without putting it on PATH.
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nasm --no-progress -y
+          Add-Content $env:GITHUB_PATH "C:\Program Files\NASM"
+      - shell: bash
+        run: |
+          rustc -vV
+          cmake --version
+          case "${{ matrix.target }}" in x86_64-*) nasm -v ;; esac
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      # --release reuses the C libraries the build above compiled.
+      - run: cargo test --release --locked --no-fail-fast --target ${{ matrix.target }}
+      # What the binary asks of the system it runs on.
+      - if: runner.os == 'macOS'
+        run: |
+          otool -L target/${{ matrix.target }}/release/statac
+          vtool -show-build target/${{ matrix.target }}/release/statac
+      - if: runner.os == 'Linux'
+        run: |
+          ldd target/${{ matrix.target }}/release/statac
+          echo "The newest glibc symbol it needs:"
+          objdump -T target/${{ matrix.target }}/release/statac |
+            grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -n 1
+      - shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: sh tools/package.sh "$VERSION" ${{ matrix.target }} packages
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: statac-${{ needs.version.outputs.version }}-${{ matrix.target }}
+          path: packages/
+          if-no-files-found: error
+          compression-level: 0
+
+  # A Linux binary that asks nothing of the system's C library, built where
+  # musl is the system's own.
+  build-static:
+    needs: version
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Not a container job: the actions don't run in Alpine on ARM.
+      - env:
+          VERSION: ${{ needs.version.outputs.version }}
+          RUST: ${{ needs.version.outputs.rust }}
+          # Alpine 3.24.2
+          IMAGE: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+        run: |
+          docker run --rm --volume "$PWD:/statac" --workdir /statac "$IMAGE" \
+            sh tools/build-static.sh "$VERSION" "$RUST" ${{ matrix.target }} "$(id -u)" packages
+      # Outside Alpine, on a system with no musl of its own.
+      - env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          said=$(target/${{ matrix.target }}/release/statac --version)
+          echo "$said"
+          test "$said" = "Statac $VERSION"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: statac-${{ needs.version.outputs.version }}-${{ matrix.target }}
+          path: packages/
+          if-no-files-found: error
+          compression-level: 0
+
+  gather:
+    needs: [version, build, build-static]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: statac-*
+          path: packages
+          merge-multiple: true
+      - working-directory: packages
+        run: |
+          cat *.sha256 > SHA256SUMS
+          rm *.sha256
+          sha256sum --check SHA256SUMS
+          ls -l
+          cat SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ needs.version.outputs.version }}
+          path: packages/
+          if-no-files-found: error
+          compression-level: 0

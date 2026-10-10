@@ -1,0 +1,24 @@
+{# One photograph: the picture first and wide, then what is written about it: see /templates/ -#}
+{% extends "base" %}
+{% block main %}
+    <article>
+      {% if page.cover %}
+      <div class="column">
+        <figure class="shot wide">{{ picture(page.photo(page.cover), loading="eager") }}</figure>
+      </div>
+      {% endif %}
+      <header class="top under column">
+        <h1>{{ headline(page) }}</h1>
+        {% if page.date %}
+        <ul class="about">
+          <li><time datetime="{{ page.date | moment }}">{{ page.date }}</time></li>
+        </ul>
+        {% endif %}
+      </header>
+      <div class="writing column">
+        {{ page.content }}
+      </div>
+      {{ filed() }}
+    </article>
+    {{ beside() }}
+{% endblock %}

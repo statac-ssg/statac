@@ -1,0 +1,8 @@
+base_url = "https://example.org"
+title = "Slugify off"
+
+[markdown]
+smart_punctuation = true
+
+[slugify]
+paths = "off"

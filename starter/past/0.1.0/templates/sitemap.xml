@@ -1,0 +1,10 @@
+{# The sitemap search engines read, every page with its translations: see /feeds/ -#}
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+{% for entry in site.pages if entry.url is endingwith("/") or (entry.url is endingwith(".html") and entry.url is not endingwith("/404.html")) %}  <url>
+    <loc>{{ entry.url | absolute }}</loc>
+{% if entry.translations %}    <xhtml:link rel="alternate" hreflang="{{ entry.language }}" href="{{ entry.url | absolute }}"/>
+{% for other in entry.translations %}    <xhtml:link rel="alternate" hreflang="{{ other.language }}" href="{{ other.url | absolute }}"/>
+{% endfor %}{% endif %}  </url>
+{% endfor %}</urlset>

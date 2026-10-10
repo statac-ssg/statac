@@ -1,0 +1,7 @@
+base_url = "https://example.org"
+title = "Feeds"
+generate_feeds = true
+feed_filenames = ["atom.xml", "rss.xml"]
+
+[markdown]
+smart_punctuation = true

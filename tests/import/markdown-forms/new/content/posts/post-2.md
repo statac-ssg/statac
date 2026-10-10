@@ -1,0 +1,36 @@
+---
+title: Post 2
+date: 2026-01-02
+---
+A second post with an attribute list.
+{: .class-3}
+
+<div markdown="1">
+*Markdown* inside HTML that asks for it to be read.
+</div>
+
+<figure class="a" markdown='block'>
+*More* of the same.
+</figure>
+
+A <span markdown=span>*span*</span> inside a line.
+
+<div markdown="0">
+HTML that asks for none is left out.
+</div>
+
+So is `<div markdown="1">` in code.
+
+A footnote[^1] and two links, [one][] and [two][], defined straight after it.
+
+[^1]: A footnote.
+
+[one]: https://example.org/one/
+[two]: https://example.org/two/
+
+Another[^2], whose second line is its own, and [three][] after a blank line.
+
+[^2]: A footnote
+of two lines.
+
+[three]: https://example.org/three/

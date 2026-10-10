@@ -1,0 +1,9 @@
+title = "Settings in TOML"
+url = "https://example.org"
+timezone = "Europe/London"
+permalink = "/:year/:title/"
+markdown = "kramdown"
+author = "Name"
+
+[book]
+isbn = "0-000-00000-0"

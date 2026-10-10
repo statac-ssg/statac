@@ -1,0 +1,68 @@
+{# The home page: what the site is, then the newest of each kind of page: see /templates/ -#}
+{% extends "base" %}
+{% block title %}{{ site.title }}{% endblock %}
+{% block main %}
+    {% set words = site.data.words[page.language] %}
+    <header class="top column">
+      <h1>{{ page.greeting | default(headline(page)) }}</h1>
+    </header>
+    {% if page.content %}
+    <div class="writing column">
+      {{ page.content }}
+    </div>
+    {% endif %}
+    {# A part for each folder in content/ that has posts: a folder called notes shows its notes whole, one called photos its pictures, and any other its posts as lines. Delete a folder and its part goes with it. #}
+    {% for folder in site.folders if folder.posts and folder.name not in ["notes", "photos"] %}
+    <section class="listing column" aria-labelledby="home-{{ folder.name }}">
+      <div class="heading">
+        <h2 id="home-{{ folder.name }}">{{ folder.title }}</h2>
+        <a href="{{ folder.url }}">{{ words.all }}</a>
+      </div>
+      <ol class="posts">
+        {% for post in folder.posts[:5] %}
+        {{ line(post) }}
+        {% endfor %}
+      </ol>
+    </section>
+    {% endfor %}
+    {% for folder in site.folders if folder.posts and folder.name == "notes" %}
+    <section class="listing column" aria-labelledby="home-notes">
+      <div class="heading">
+        <h2 id="home-notes">{{ folder.title }}</h2>
+        <a href="{{ folder.url }}">{{ words.all }}</a>
+      </div>
+      <ol class="notes">
+        {% for post in folder.posts[:2] %}
+        {{ short(post, nested=true) }}
+        {% endfor %}
+      </ol>
+    </section>
+    {% endfor %}
+    {% for folder in site.folders if folder.posts and folder.name == "photos" %}
+    <section class="listing column" aria-labelledby="home-photos">
+      <div class="heading wide">
+        <h2 id="home-photos">{{ folder.title }}</h2>
+        <a href="{{ folder.url }}">{{ words.all }}</a>
+      </div>
+      <ul class="grid strip wide">
+        {% for post in folder.posts[:6] %}
+        {{ thumb(post) }}
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+    {# A site that keeps its posts in no folder lists them here. #}
+    {% if not site.folders and page.posts %}
+    <section class="listing column" aria-labelledby="home-posts">
+      <div class="heading">
+        <h2 id="home-posts">{{ words.latest }}</h2>
+      </div>
+      <ol class="posts">
+        {% for post in page.posts %}
+        {{ line(post) }}
+        {% endfor %}
+      </ol>
+      {{ pager() }}
+    </section>
+    {% endif %}
+{% endblock %}

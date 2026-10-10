@@ -1,0 +1,5 @@
+---
+title: Post 9
+date: 2026-07-12T23:30:00
+---
+A post dated with a time and no offset in quotes, which Jekyll read in the site's zone.

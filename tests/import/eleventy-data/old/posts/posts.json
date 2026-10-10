@@ -1,0 +1,7 @@
+{
+  "layout": "post.njk",
+  "tags": "posts",
+  "author": "Name",
+  "description": "One of the posts.",
+  "permalink": "/blog/{{ page.fileSlug }}/"
+}

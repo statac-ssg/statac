@@ -1,0 +1,1125 @@
+//! The command line: what the author asked for, and the answer.
+//!
+//! Options are written `--name=value`, and may come before or after the command.
+
+use std::ffi::OsString;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
+
+use crate::album::Progress;
+use crate::build::{self, Mode, Options, Outcome};
+use crate::date::{self, Date, Fault};
+use crate::import;
+use crate::new;
+use crate::problem::{Code, Expected, Found, Kind, Missing, OptionHint, Problem};
+use crate::refresh;
+use crate::refuse;
+use crate::report::{Quiet, Report};
+use crate::serve;
+use crate::serve::watch::{self, How};
+use crate::source::Sources;
+use crate::stamp;
+use crate::suggest;
+use crate::wording;
+
+/// What the command line asks for.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Request {
+    Build(Options),
+    Check(Options),
+    Serve {
+        options: serve::Options,
+        /// Whether nothing is to be fetched.
+        offline: bool,
+    },
+    Stamp(stamp::Options),
+    Refresh(refresh::Options),
+    Refuse(refuse::Options),
+    New(new::Options),
+    Import(import::Options),
+    Explain(Code),
+    /// The usage screen, for the command named before `--help`, or whole.
+    Help(Option<&'static str>),
+    Version,
+}
+
+const COMMANDS: [&str; 9] = [
+    "build", "check", "serve", "stamp", "refresh", "refuse", "new", "import", "explain",
+];
+
+/// The options that take a value, and the commands that take each.
+const OPTIONS: [(&str, &[&str]); 7] = [
+    (
+        "--site",
+        &["build", "check", "serve", "stamp", "refresh", "refuse"],
+    ),
+    ("--out", &["build"]),
+    ("--url", &["build", "check"]),
+    (
+        "--today",
+        &[
+            "build", "check", "serve", "stamp", "refresh", "refuse", "import",
+        ],
+    ),
+    ("--port", &["serve"]),
+    ("--watch", &["serve"]),
+    ("--from", &["import"]),
+];
+
+/// The ways `--watch` names of watching the site's folder.
+const WAYS: [&str; 3] = ["auto", "native", "poll"];
+
+/// Options that take no value, and the commands that take each.
+const FLAGS: [(&str, &[&str]); 7] = [
+    ("--drafts", &["build", "check"]),
+    ("--no-drafts", &["serve"]),
+    ("--offline", &["serve"]),
+    ("--yes", &["new"]),
+    ("--cards", &["new"]),
+    ("--update", &["new"]),
+    ("--missing", &["new"]),
+];
+
+/// Options any command takes, which take no value.
+const QUESTIONS: [&str; 2] = ["--help", "--version"];
+
+/// Spellings other tools use for what Statac spells one way.
+const OTHER_SPELLINGS: [(&str, &str); 7] = [
+    ("help", "--help"),
+    ("-h", "--help"),
+    ("-help", "--help"),
+    ("version", "--version"),
+    ("-v", "--version"),
+    ("-V", "--version"),
+    ("-version", "--version"),
+];
+
+/// The first line of the usage screen.
+const INTRO: &str = "Statac builds a website from a folder of writing.\n";
+
+/// Each command's entry on the usage screen, as the screen sets it.
+const USAGE: [(&str, &str); 11] = [
+    (
+        "build",
+        "  statac build [folder]  Read the site and write it out, ready to publish.\n",
+    ),
+    (
+        "check",
+        "  statac check [folder]  Read the site and show every problem with it.\n",
+    ),
+    (
+        "serve",
+        "  statac serve [folder]  Build the site and serve it on this computer,
+                         building it again each time you save.
+",
+    ),
+    (
+        "stamp",
+        "  statac stamp [folder]  Write the date over every stamp, such as =today, in
+                         the front matter of the site's pages.
+",
+    ),
+    (
+        "refresh",
+        "  statac refresh [folder]
+                         Fetch what the site keeps from other sites, such
+                         as the still of a video or a webmention, into
+                         fetched/. Webmentions are asked for with the
+                         token in STATAC_WEBMENTION_TOKEN, or else in
+                         the site's .statac/token.
+",
+    ),
+    (
+        "refuse",
+        "  statac refuse <address> [folder]
+                         Remove the webmention sent from the address, or
+                         every one from a sender at or under it, and never
+                         keep it again.
+",
+    ),
+    (
+        "new",
+        "  statac new [folder]    Ask four questions and write a new site from the
+                         answers into the folder, which must be empty or
+                         not there yet.
+",
+    ),
+    (
+        "new",
+        "  statac new --cards [folder]
+                         Write the sharing card's settings, background
+                         and fonts into the site, so a card is drawn
+                         for each page.
+",
+    ),
+    (
+        "new",
+        "  statac new --update [folder]
+                         Put the newest version in place of each file
+                         statac new wrote that was never changed, and
+                         show what is new in the others.
+",
+    ),
+    (
+        "import",
+        "  statac import <folder> [new folder]
+                         Write a new site from a site another tool made,
+                         into the new folder, which must be empty or not
+                         there yet; without one, beside the old site, its
+                         name ending -statac. The old site is only read.
+",
+    ),
+    (
+        "explain",
+        "  statac explain <name>  Explain a kind of problem. Its name is the last part
+                         of the problem's More: link.
+",
+    ),
+];
+
+/// Each option's entry on the usage screen, as the screen sets it.
+const OPTION_LINES: [(&str, &str); 14] = [
+    (
+        "--site",
+        "  --site=<folder>        The site's folder, as the folder after the command
+                         gives it. Without either, the site the current
+                         folder is in.
+",
+    ),
+    (
+        "--out",
+        "  --out=<folder>         Where statac build writes the built site. Without
+                         it, _site in the site's folder.
+",
+    ),
+    (
+        "--url",
+        "  --url=<address>        The site's address for this run, in place of url in
+                         statac.yaml, as a preview of the site needs.
+",
+    ),
+    (
+        "--today",
+        "  --today=<date>         The day the site is built on, as 2026-10-04, for
+                         site.today, the day stamps are counted from, and
+                         the day statac refresh and statac refuse record.
+                         Without it, today in the site's zone, or for
+                         statac refuse, on this computer's clock.
+",
+    ),
+    (
+        "--drafts",
+        "  --drafts               Build drafts and posts dated after today as if
+                         they were published.
+",
+    ),
+    (
+        "--no-drafts",
+        "  --no-drafts            Leave drafts and posts dated after today out of
+                         what statac serve shows, as statac build does.
+",
+    ),
+    (
+        "--offline",
+        "  --offline              Fetch nothing as statac serve starts. Without it,
+                         statac serve fetches what is new once, as statac
+                         refresh does, after the first build with no
+                         errors.
+",
+    ),
+    (
+        "--yes",
+        "  --yes                  Take every answer statac new offers without asking.\n",
+    ),
+    (
+        "--missing",
+        "  --missing              For statac new --update, write the files statac
+                         new writes that the site doesn't have.
+",
+    ),
+    (
+        "--from",
+        "  --from=<tool>          The tool that made the site statac import reads:
+                         jekyll, hugo, zola or eleventy. Without it, told
+                         from the site's files.
+",
+    ),
+    (
+        "--port",
+        "  --port=<number>        The port statac serve answers on. Without it,
+                         3000, or the next port that is free.
+",
+    ),
+    (
+        "--watch",
+        "  --watch=<way>          How statac serve learns of a save: native, by
+                         the system's own reports; poll, by looking at
+                         every file twice a second; or auto, which
+                         polls only where reports can't be relied on.
+                         Without it, auto.
+",
+    ),
+    ("--help", "  --help                 Show this.\n"),
+    (
+        "--version",
+        "  --version              Show which version of Statac this is.\n",
+    ),
+];
+
+/// The usage screen: whole, or for one command, its entries and the
+/// options it takes.
+fn help(command: Option<&str>) -> String {
+    let takes = |option: &str| {
+        command.is_none_or(|command| {
+            QUESTIONS.contains(&option)
+                || OPTIONS
+                    .iter()
+                    .chain(&FLAGS)
+                    .any(|(taken, takers)| *taken == option && takers.contains(&command))
+        })
+    };
+    let mut screen = format!("{INTRO}\nUsage:\n");
+    for (of, entry) in USAGE {
+        if command.is_none_or(|command| command == of) {
+            screen.push_str(entry);
+        }
+    }
+    screen.push_str("\nOptions:\n");
+    for (option, entry) in OPTION_LINES {
+        if takes(option) {
+            screen.push_str(entry);
+        }
+    }
+    screen
+}
+
+/// Where a run writes, and whether each stream takes colour.
+pub struct Terminal<'a> {
+    pub out: &'a mut dyn Write,
+    pub err: &'a mut dyn Write,
+    pub colour_out: bool,
+    pub colour_err: bool,
+    /// How a long build says how far it has got.
+    pub progress: Progress,
+}
+
+/// The stack of each thread that builds pages. The deepest writing read,
+/// in a build without optimisation, uses under a fifth of it.
+pub const STACK_SIZE: usize = 8 << 20;
+
+/// Does what `args` (the program's name left off) ask, and gives the exit
+/// code: 0 for a clean run or warnings only, 1 for errors, 2 for a mistake
+/// on the command line, and 101 for a fault of Statac's own.
+pub fn run(args: impl IntoIterator<Item = OsString>, terminal: &mut Terminal) -> u8 {
+    // Fails only where a pool already exists, which then is the one used.
+    let _ = rayon::ThreadPoolBuilder::new()
+        .stack_size(STACK_SIZE)
+        .build_global();
+    let args: Vec<OsString> = args.into_iter().collect();
+    let unreadable: Vec<bool> = args.iter().map(|arg| arg.to_str().is_none()).collect();
+    let args: Vec<String> = args
+        .iter()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
+    let request = match parse_with(&args, &unreadable) {
+        Ok(request) => request,
+        Err(problems) => {
+            let sources = Sources::default();
+            let report = Report::new(&sources, Path::new(""), terminal.colour_err);
+            say(terminal.err, &report.problems(&problems));
+            return 2;
+        }
+    };
+    let command = match &request {
+        Request::Help(_) | Request::Version | Request::Explain(_) => None,
+        Request::Build(_) => Some("build"),
+        Request::Check(_) => Some("check"),
+        Request::Stamp(_) => Some("stamp"),
+        Request::Refresh(_) => Some("refresh"),
+        Request::Refuse(_) => Some("refuse"),
+        Request::Import(_) => Some("import"),
+        Request::New(_) => Some("new"),
+        Request::Serve { .. } => Some("serve"),
+    };
+    guarded(command, terminal, |terminal| {
+        act(request, command, terminal)
+    })
+}
+
+/// Runs `command`, and after Rust's own report of a panic in it, which is
+/// what a report of the fault needs, says on the same stream that the
+/// fault is Statac's own. A panic ends the run with the code Rust gives it.
+fn guarded(
+    command: Option<&str>,
+    terminal: &mut Terminal,
+    command_runs: impl FnOnce(&mut Terminal) -> u8,
+) -> u8 {
+    crate::publish::nothing_in_place();
+    let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| command_runs(terminal)));
+    ran.unwrap_or_else(|_| {
+        let lines: &[&str] = match command {
+            Some("build") if crate::publish::in_place() => &[wording::BUILD_STOPPED],
+            Some("build") => &[wording::BUILD_STOPPED, wording::WROTE_NOTHING],
+            Some("check") => &[wording::CHECK_STOPPED],
+            _ => &[],
+        };
+        for line in lines.iter().chain(&[wording::REPORT_FAULT]) {
+            say(terminal.err, &format!("{line}\n"));
+        }
+        101
+    })
+}
+
+/// Does what `request` asks.
+fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> u8 {
+    if let Some(command) = command {
+        let badge = crate::report::badge(terminal.colour_out, command);
+        say(terminal.out, &badge);
+    }
+    if let Some(site) = site_of(&mut request)
+        && let Err(problem) = find_site(site)
+    {
+        let sources = Sources::default();
+        let report = Report::new(&sources, Path::new(""), terminal.colour_out);
+        // Said as each command says it can't read the folder it was given.
+        let said = match request {
+            Request::Build(_) | Request::Serve { .. } => {
+                let outcome = Outcome::unread(problem);
+                said_of_build(&report, &outcome, Path::new(""), Duration::ZERO)
+            }
+            Request::Stamp(_) => report.problems(&[problem]),
+            _ => report.check(&[problem], &Quiet::default()),
+        };
+        say(terminal.out, &said);
+        return 1;
+    }
+    match request {
+        Request::Help(command) => say(terminal.out, &help(command)),
+        Request::Version => say(
+            terminal.out,
+            &format!("Statac {}\n", env!("CARGO_PKG_VERSION")),
+        ),
+        Request::Explain(code) => say(terminal.out, &code.explained()),
+        Request::Build(options) | Request::Check(options) => {
+            let started = Instant::now();
+            let outcome = build::run_saying(&options, terminal.progress);
+            let problems = &outcome.problems;
+            let report = Report::new(outcome.sources(), &options.site, terminal.colour_out);
+            let said = match options.mode {
+                Mode::Build => said_of_build(&report, &outcome, &options.out(), started.elapsed()),
+                Mode::Check => {
+                    // A stopped run leaves pages out, so what it carries is unknown.
+                    let javascript = match outcome.stopped() {
+                        true => &[],
+                        false => outcome.javascript.as_slice(),
+                    };
+                    report.check_with(problems, &outcome.quiet, javascript)
+                }
+            };
+            say(terminal.out, &report.included(outcome.included));
+            say(terminal.out, &said);
+            if outcome.stopped() {
+                return 1;
+            }
+        }
+        Request::Stamp(options) => {
+            let outcome = stamp::run(&options);
+            let nowhere = Sources::default();
+            let sources = outcome.sources().unwrap_or(&nowhere);
+            let report = Report::new(sources, &options.site, terminal.colour_out);
+            // The problems come between what was stamped and that nothing
+            // was, which is the only thing said after an error.
+            let stamps = report.stamps(&outcome.pass);
+            let problems = report.problems(&outcome.problems);
+            let gap = if stamps.is_empty() || problems.is_empty() {
+                ""
+            } else {
+                "\n"
+            };
+            let said = match (
+                outcome.pass.unsettled,
+                stamps.is_empty() && problems.is_empty(),
+            ) {
+                (true, _) => format!("{problems}{gap}{stamps}"),
+                (false, true) if outcome.pass.unrecorded => String::new(),
+                (false, true) => format!("{}\n", wording::NOTHING_TO_STAMP),
+                (false, false) => format!("{stamps}{gap}{problems}"),
+            };
+            say(terminal.out, &said);
+            let said = match outcome.pass.unrecorded {
+                true => format!("{}\n", wording::IDS_NOT_WRITTEN),
+                false => String::new(),
+            };
+            say(terminal.out, &said);
+            if !outcome.problems.is_empty() || outcome.pass.unsettled {
+                return 1;
+            }
+        }
+        Request::Refresh(options) => {
+            let token = token(&options.site, terminal.out);
+            let options = refresh::Options { token, ..options };
+            return refresh::run(
+                &options,
+                &crate::fetch::fetch,
+                terminal.out,
+                terminal.colour_out,
+            );
+        }
+        Request::Refuse(options) => {
+            return refuse::run(&options, terminal.out, terminal.colour_out);
+        }
+        Request::Import(options) => {
+            let stdin = std::io::stdin();
+            let answering = std::io::IsTerminal::is_terminal(&stdin);
+            let mut reader = stdin.lock();
+            let input = new::Input {
+                reader: &mut reader,
+                terminal: answering,
+            };
+            return import::run(&options, Some(input), terminal.out, terminal.colour_out);
+        }
+        Request::New(mut options) => {
+            // A site to write the card's files into is found as the site of
+            // any other command is; where there is none, a new one is made.
+            if options.cards && options.folder.is_none() {
+                let mut site = PathBuf::new();
+                if find_site(&mut site).is_ok() {
+                    options.folder = Some(site);
+                }
+            }
+            let stdin = std::io::stdin();
+            let answering = std::io::IsTerminal::is_terminal(&stdin);
+            let mut reader = stdin.lock();
+            let machine = new::Machine {
+                input: Some(new::Input {
+                    reader: &mut reader,
+                    terminal: answering,
+                }),
+                locale: new::Locale::of_this_machine(),
+                timezone: new::zone_of_this_machine(),
+                today: new::today_on_this_machine(),
+            };
+            return new::run(&options, machine, terminal.out, terminal.colour_out);
+        }
+        Request::Serve { options, offline } => {
+            let token = token(&options.site, terminal.out);
+            let options = serve::Options {
+                fetcher: (!offline).then(|| serve::Fetcher::new(crate::fetch::fetch)),
+                token,
+                ..options
+            };
+            let Some(mut serving) = serve::start(&options, terminal.out, terminal.colour_out)
+            else {
+                return 1;
+            };
+            // Serving ends when the author ends the program.
+            while serving.round(terminal.out) {}
+            return 1;
+        }
+    }
+    0
+}
+
+/// The site's folder of a request that works on a site.
+fn site_of(request: &mut Request) -> Option<&mut PathBuf> {
+    match request {
+        Request::Build(options) | Request::Check(options) => Some(&mut options.site),
+        Request::Serve { options, .. } => Some(&mut options.site),
+        Request::Stamp(options) => Some(&mut options.site),
+        Request::Refresh(options) => Some(&mut options.site),
+        Request::Refuse(options) => Some(&mut options.site),
+        Request::New(_)
+        | Request::Import(_)
+        | Request::Explain(_)
+        | Request::Help(_)
+        | Request::Version => None,
+    }
+}
+
+/// Settles `site`, as the command line left it, on the folder of the site
+/// to work on. A folder named is taken as named, and refused where it is
+/// there and isn't a site; one that isn't there is left for the command
+/// to tell. Where none is named, the site is the nearest folder that is
+/// one, from the current folder up, named from the current folder.
+fn find_site(site: &mut PathBuf) -> Result<(), Problem> {
+    let no_site = |folder: String| Problem::nowhere(Kind::NoSiteHere { folder });
+    if !site.as_os_str().is_empty() {
+        let there = std::fs::metadata(&*site).is_ok_and(|found| found.is_dir());
+        return match there && matches!(new::site_mark(site), Ok(None)) {
+            true => Err(no_site(site.display().to_string())),
+            false => Ok(()),
+        };
+    }
+    let cant_read = |path: PathBuf, error: &std::io::Error| {
+        Problem::nowhere(Kind::CantRead {
+            path,
+            reason: crate::problem::system_reason(error),
+        })
+    };
+    let here = std::env::current_dir().map_err(|error| cant_read(PathBuf::from("."), &error))?;
+    for (up, folder) in here.ancestors().enumerate() {
+        let named = match up {
+            0 => PathBuf::from("."),
+            _ => std::iter::repeat_n("..", up).collect(),
+        };
+        match new::site_mark(folder) {
+            Ok(Some(_)) => {
+                *site = named;
+                return Ok(());
+            }
+            Ok(None) => {}
+            Err(error) => return Err(cant_read(named, &error)),
+        }
+    }
+    Err(no_site(".".into()))
+}
+
+/// What `build` says of a build into `out` that took `took`: its errors
+/// in full, the rest counted, and what it wrote.
+pub(crate) fn said_of_build(
+    report: &Report,
+    outcome: &Outcome,
+    out: &Path,
+    took: Duration,
+) -> String {
+    let problems = &outcome.problems;
+    let mut said = report.build(problems, &outcome.quiet);
+    let wrote = report.wrote(problems, outcome.published, out, took);
+    let part = format!(
+        "{}{}{}{}{wrote}",
+        report.copies(outcome.copies),
+        report.cards(outcome.cards),
+        report.hooks(outcome.hooks),
+        report.fetched(outcome.fetched)
+    );
+    if !said.is_empty() && !part.is_empty() {
+        said.push('\n');
+    }
+    said.push_str(&part);
+    said
+}
+
+/// The relay's token for the site at `site`, from the environment or the
+/// site's own file, saying on `out` why a file that is there isn't used.
+fn token(site: &Path, out: &mut dyn Write) -> Option<refresh::Token> {
+    let variable = std::env::var(refresh::TOKEN_VARIABLE).ok();
+    let (token, unused) = refresh::token(site, variable);
+    if let Some(line) = unused {
+        say(out, &format!("{}\n", crate::report::shown(&line)));
+    }
+    token
+}
+
+/// A stream that can't be written to is let go: a reader that stops
+/// reading, as `head` does, is no mistake of the author's.
+fn say(stream: &mut dyn Write, text: &str) {
+    let _ = stream.write_all(text.as_bytes());
+    let _ = stream.flush();
+}
+
+/// Reads the command line, or gives every mistake in it, in order.
+pub fn parse(args: &[String]) -> Result<Request, Vec<Problem>> {
+    parse_with(args, &[])
+}
+
+/// A folder or path given on the command line that Statac can't use: one
+/// holding bytes that aren't UTF-8 (`unreadable`, its lossy reading
+/// being `written`), or a control character.
+fn unusable_name(written: &str, unreadable: bool) -> Option<Kind> {
+    let written = written.to_owned();
+    if unreadable {
+        Some(Kind::UnreadableName { written })
+    } else if written.chars().any(char::is_control) {
+        Some(Kind::UnusableName { written })
+    } else {
+        None
+    }
+}
+
+/// [`parse`], given for each of `args` whether the system's own reading
+/// of it held bytes that aren't UTF-8, which `args` then has replaced.
+fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Problem>> {
+    let unreadable = |at: usize| unreadable.get(at).copied().unwrap_or(false);
+    if args.is_empty() {
+        return Ok(Request::Help(None));
+    }
+    if let Some(asked) = args.iter().position(|arg| arg == "--help") {
+        let command = command_at(args)
+            .filter(|&at| at < asked)
+            .and_then(|at| COMMANDS.into_iter().find(|&command| command == args[at]));
+        return Ok(Request::Help(command));
+    }
+    if args.iter().any(|arg| arg == "--version") {
+        return Ok(Request::Version);
+    }
+    let at = command_at(args);
+    let command = at.map(|i| args[i].as_str());
+    let known = command.filter(|command| COMMANDS.contains(command));
+    let mut problems = Vec::new();
+    let mut mistake = |kind| problems.push(Problem::nowhere(kind));
+    let mut site = None;
+    // Whether the site's folder came as the word after the command.
+    let mut site_bare = false;
+    let mut out = None;
+    let mut url = None;
+    let mut today = None;
+    let mut drafts = false;
+    let mut no_drafts = false;
+    let mut offline = false;
+    let mut yes = false;
+    let mut update = false;
+    let mut cards = false;
+    let mut missing = false;
+    let mut port = None;
+    let mut watch = None;
+    let wrong = |option: &str, expected, written: &str| Kind::WrongKind {
+        field: option.into(),
+        expected,
+        found: Found::Written(written.into()),
+        respelt: None,
+    };
+    let mut name = None;
+    let mut address = None;
+    // The folder `new` makes the site in.
+    let mut folder = None;
+    // The folders `import` reads from and writes into.
+    let mut old = None;
+    // Whether a folder to read from was written, usable or not.
+    let mut old_named = false;
+    let mut new_folder = None;
+    let mut from = None;
+    let mut i = 0;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        i += 1;
+        if !is_option(arg) {
+            if Some(i - 1) == at {
+                if known.is_none() {
+                    mistake(Kind::UnknownCommand {
+                        written: arg.into(),
+                        suggestion: suggest::nearest(arg, COMMANDS)
+                            .or_else(|| other_spelling(arg))
+                            .map(str::to_owned),
+                    });
+                }
+            } else if known == Some("explain") && name.is_none() {
+                name = Some(arg);
+                if Code::from_name(arg).is_none() {
+                    mistake(Kind::UnknownProblemName {
+                        written: arg.into(),
+                        suggestion: suggest::nearest(arg, Code::ALL.iter().map(|c| c.name()))
+                            .map(str::to_owned),
+                    });
+                }
+            } else if known == Some("refuse") && address.is_none() {
+                address = Some(arg);
+                if !crate::fetched::mentions::web_address(arg) {
+                    let https = format!("https://{arg}");
+                    let respelt = (!arg.contains("://")
+                        && crate::fetched::mentions::web_address(&https))
+                    .then_some(https);
+                    mistake(Kind::NotAWebAddress {
+                        written: arg.into(),
+                        respelt,
+                    });
+                }
+            } else if known == Some("new") && folder.is_none() {
+                match unusable_name(arg, unreadable(i - 1)) {
+                    Some(kind) => mistake(kind),
+                    None => folder = Some(PathBuf::from(arg)),
+                }
+            } else if known == Some("import") && old.is_none() {
+                old_named = true;
+                match unusable_name(arg, unreadable(i - 1)) {
+                    Some(kind) => mistake(kind),
+                    None => old = Some(PathBuf::from(arg)),
+                }
+            } else if known == Some("import") && new_folder.is_none() {
+                match unusable_name(arg, unreadable(i - 1)) {
+                    Some(kind) => mistake(kind),
+                    None => new_folder = Some(PathBuf::from(arg)),
+                }
+            } else if matches!(
+                known,
+                Some("build" | "check" | "serve" | "stamp" | "refresh" | "refuse")
+            ) && !site_bare
+            {
+                site_bare = true;
+                match (&site, unusable_name(arg, unreadable(i - 1))) {
+                    (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                        option: "--site".into(),
+                    }),
+                    (None, Some(kind)) => mistake(kind),
+                    (None, None) => site = Some(PathBuf::from(arg)),
+                }
+            } else {
+                mistake(Kind::UnexpectedArgument {
+                    written: arg.into(),
+                    suggestion: None,
+                });
+            }
+            continue;
+        }
+
+        let (written_name, value) = match arg.split_once('=') {
+            Some((written_name, value)) => (written_name, Some(value)),
+            None => (arg, None),
+        };
+        if let Some(&(flag, takers)) = FLAGS.iter().find(|(f, _)| *f == written_name) {
+            if value.is_some() {
+                mistake(Kind::UnknownOption {
+                    written: arg.into(),
+                    hint: OptionHint::Similar(flag.into()),
+                });
+            } else if let Some(command) = known
+                && !takers.contains(&command)
+            {
+                let hint = match (command, flag) {
+                    ("serve", "--drafts") => OptionHint::ShownAlready,
+                    _ => OptionHint::ForOther {
+                        command: command.into(),
+                        option: flag.into(),
+                        takers: takers.into(),
+                    },
+                };
+                mistake(Kind::UnknownOption {
+                    written: arg.into(),
+                    hint,
+                });
+            } else {
+                let given = match flag {
+                    "--drafts" => &mut drafts,
+                    "--no-drafts" => &mut no_drafts,
+                    "--yes" => &mut yes,
+                    "--update" => &mut update,
+                    "--cards" => &mut cards,
+                    "--missing" => &mut missing,
+                    _ => &mut offline,
+                };
+                if std::mem::replace(given, true) {
+                    mistake(Kind::OptionGivenTwice {
+                        option: flag.into(),
+                    });
+                }
+            }
+            continue;
+        }
+        let Some(&(option, takers)) = OPTIONS.iter().find(|(o, _)| *o == written_name) else {
+            mistake(Kind::UnknownOption {
+                written: arg.into(),
+                hint: hint(written_name, value, known),
+            });
+            continue;
+        };
+        // `--site docs` is the value given apart, and taken with its option.
+        let apart = match value {
+            None if takes_apart(args, i, at) => {
+                i += 1;
+                Some(args[i - 1].clone())
+            }
+            _ => None,
+        };
+        if let Some(command) = known
+            && !takers.contains(&command)
+        {
+            mistake(Kind::UnknownOption {
+                written: arg.into(),
+                hint: OptionHint::ForOther {
+                    command: command.into(),
+                    option: option.into(),
+                    takers: takers.into(),
+                },
+            });
+            continue;
+        }
+        let value = match value {
+            Some(value) if !value.is_empty() => value,
+            _ => {
+                mistake(Kind::MissingValue {
+                    written: arg.into(),
+                    option: option.into(),
+                    value: apart,
+                });
+                continue;
+            }
+        };
+        if option == "--today" {
+            match (today, day(option, value)) {
+                (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                    option: option.into(),
+                }),
+                (None, Ok(date)) => today = Some(date),
+                (None, Err(kind)) => mistake(kind),
+            }
+            continue;
+        }
+        if option == "--url" {
+            match (&url, crate::config::site_address(value)) {
+                (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                    option: option.into(),
+                }),
+                (None, true) => url = Some(value.to_owned()),
+                (None, false) => {
+                    let https = format!("https://{value}");
+                    let respelt = (!value.contains("://") && crate::config::site_address(&https))
+                        .then(|| https.into_boxed_str());
+                    mistake(Kind::WrongKind {
+                        field: option.into(),
+                        expected: Expected::SiteAddress,
+                        found: Found::Written(value.into()),
+                        respelt,
+                    });
+                }
+            }
+            continue;
+        }
+        if option == "--port" {
+            match (port, value.parse::<u16>()) {
+                (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                    option: option.into(),
+                }),
+                (None, Ok(number)) if number > 0 => port = Some(number),
+                (None, _) => mistake(wrong(
+                    option,
+                    Expected::Between { from: 1, to: 65535 },
+                    value,
+                )),
+            }
+            continue;
+        }
+        if option == "--from" {
+            match (from, import::Tool::from_word(value)) {
+                (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                    option: option.into(),
+                }),
+                (None, Some(tool)) => from = Some(tool),
+                (None, None) => {
+                    let tools = import::Tool::ALL
+                        .iter()
+                        .map(|t| t.word().to_owned())
+                        .collect();
+                    mistake(wrong(option, Expected::OneOf(tools), value));
+                }
+            }
+            continue;
+        }
+        if option == "--watch" {
+            let how = match value {
+                "auto" => Some(How::Auto),
+                "native" => Some(How::Native),
+                "poll" => Some(How::Poll { every: watch::POLL }),
+                _ => None,
+            };
+            match (watch, how) {
+                (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                    option: option.into(),
+                }),
+                (None, Some(how)) => watch = Some(how),
+                (None, None) => {
+                    let ways = WAYS.iter().map(|way| way.to_string()).collect();
+                    mistake(wrong(option, Expected::OneOf(ways), value));
+                }
+            }
+            continue;
+        }
+        let slot = if option == "--site" {
+            &mut site
+        } else {
+            &mut out
+        };
+        match (&slot, unusable_name(value, unreadable(i - 1))) {
+            (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                option: option.into(),
+            }),
+            (None, Some(kind)) => mistake(kind),
+            (None, None) => *slot = Some(PathBuf::from(value)),
+        }
+    }
+    if command.is_none() {
+        problems.insert(0, Problem::nowhere(Kind::MissingCommand));
+    }
+    if known == Some("explain") && name.is_none() {
+        problems.push(Problem::nowhere(Kind::MissingName));
+    }
+    if known == Some("refuse") && address.is_none() {
+        problems.push(Problem::nowhere(Kind::MissingAddress));
+    }
+    if missing && !update {
+        problems.push(Problem::nowhere(Kind::UnknownOption {
+            written: "--missing".into(),
+            hint: OptionHint::OnlyWithUpdate,
+        }));
+    }
+    if update && yes {
+        problems.push(Problem::nowhere(Kind::UnknownOption {
+            written: "--yes".into(),
+            hint: OptionHint::NotWithUpdate,
+        }));
+    }
+    if update && cards {
+        problems.push(Problem::nowhere(Kind::UnknownOption {
+            written: "--cards".into(),
+            hint: OptionHint::CardsWithUpdate,
+        }));
+    }
+    if known == Some("import") && !old_named {
+        problems.push(Problem::nowhere(Kind::MissingFolder));
+    }
+    if !problems.is_empty() {
+        return Err(problems);
+    }
+    // A site named by neither is left empty, to be found as the command runs.
+    let options = |mode| Options {
+        mode,
+        site: site.clone().unwrap_or_default(),
+        out: out.clone(),
+        today,
+        drafts,
+        url: url.clone(),
+    };
+    Ok(match known {
+        Some("build") => Request::Build(options(Mode::Build)),
+        Some("check") => Request::Check(options(Mode::Check)),
+        Some("serve") => Request::Serve {
+            options: serve::Options {
+                site: site.unwrap_or_default(),
+                port: port.unwrap_or(serve::PORT),
+                watch: watch.unwrap_or(How::Auto),
+                settle: watch::Settle::default(),
+                today,
+                drafts: !no_drafts,
+                fetcher: None,
+                token: None,
+            },
+            offline,
+        },
+        Some("stamp") => Request::Stamp(stamp::Options {
+            site: site.unwrap_or_default(),
+            today,
+        }),
+        Some("refresh") => Request::Refresh(refresh::Options {
+            site: site.unwrap_or_default(),
+            today,
+            token: None,
+        }),
+        Some("new") => Request::New(new::Options {
+            folder,
+            yes,
+            update: update.then_some(new::update::Update { missing }),
+            cards,
+        }),
+        Some("import") => Request::Import(import::Options {
+            old: old.expect("checked above"),
+            new: new_folder,
+            from,
+            today,
+        }),
+        Some("refuse") => Request::Refuse(refuse::Options {
+            site: site.unwrap_or_default(),
+            address: address.expect("checked above").to_owned(),
+            today,
+        }),
+        _ => Request::Explain(name.and_then(Code::from_name).expect("checked above")),
+    })
+}
+
+/// A day written as ISO 8601, `2026-10-04`, given to `option`.
+fn day(option: &str, written: &str) -> Result<Date, Kind> {
+    let wrong = |respelt: Option<String>| Kind::WrongKind {
+        field: option.into(),
+        expected: Expected::Date,
+        found: Found::Written(written.into()),
+        respelt: respelt.map(String::into_boxed_str),
+    };
+    let missing = |missing| Kind::NoSuchDate {
+        written: written.into(),
+        missing,
+    };
+    match date::read(written) {
+        // The build has one day, so a time or an offset would be dropped unsaid.
+        Ok(date) if date.time.is_some() || date.offset.is_some() => {
+            Err(wrong(Some(date.iso_day())))
+        }
+        Ok(date) => Ok(date),
+        Err(Fault::NotIso { iso }) => Err(wrong(iso)),
+        Err(Fault::Unclear { readings }) => Err(Kind::UnclearDate {
+            written: written.into(),
+            readings: Box::new(readings),
+        }),
+        Err(Fault::NoSuchDay { day, month, year }) => {
+            Err(missing(Missing::Day { day, month, year }))
+        }
+        Err(Fault::NoSuchMonth(month)) => Err(missing(Missing::Month(month))),
+        Err(Fault::NoSuchTime(time)) => Err(missing(Missing::Time(time))),
+        Err(Fault::NoSuchOffset(offset)) => Err(missing(Missing::Offset(offset))),
+    }
+}
+
+fn is_option(arg: &str) -> bool {
+    arg.starts_with('-') && arg != "-"
+}
+
+/// The command is the first argument that is neither an option nor an
+/// option's value given apart.
+fn command_at(args: &[String]) -> Option<usize> {
+    let mut i = 0;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        i += 1;
+        if !is_option(arg) {
+            return Some(i - 1);
+        }
+        if OPTIONS.iter().any(|(o, _)| *o == arg) && takes_apart(args, i, None) {
+            i += 1;
+        }
+    }
+    None
+}
+
+/// Whether the argument at `i` reads as the value of the option before it.
+fn takes_apart(args: &[String], i: usize, command: Option<usize>) -> bool {
+    args.get(i).is_some_and(|next| !is_option(next)) && command != Some(i)
+}
+
+fn other_spelling(written: &str) -> Option<&'static str> {
+    OTHER_SPELLINGS
+        .iter()
+        .find(|(other, _)| *other == written)
+        .map(|&(_, ours)| ours)
+}
+
+/// What can be said about an option Statac doesn't have, given the command
+/// it was meant for.
+fn hint(written: &str, value: Option<&str>, command: Option<&str>) -> OptionHint {
+    if let Some(ours) = other_spelling(written) {
+        return OptionHint::Similar(ours.into());
+    }
+    let taken: Vec<&'static str> = OPTIONS
+        .iter()
+        .chain(&FLAGS)
+        .filter(|(_, takers)| command.is_none_or(|command| takers.contains(&command)))
+        .map(|&(option, _)| option)
+        .collect();
+    let candidates = taken.iter().copied().chain(QUESTIONS);
+    if let Some(near) = suggest::nearest(written, candidates) {
+        return OptionHint::Similar(match value {
+            Some(value)
+                if !QUESTIONS.contains(&near) && !FLAGS.iter().any(|(flag, _)| *flag == near) =>
+            {
+                format!("{near}={value}")
+            }
+            _ => near.into(),
+        });
+    }
+    match command {
+        Some(command) => OptionHint::Takes {
+            command: command.into(),
+            options: taken.into(),
+        },
+        None => OptionHint::None,
+    }
+}
+
+#[cfg(test)]
+mod tests;

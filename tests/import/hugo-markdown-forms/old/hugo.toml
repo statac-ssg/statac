@@ -1,0 +1,11 @@
+baseURL = "https://example.org/"
+title = "Markdown forms"
+languageCode = "en"
+timeZone = "UTC"
+enableEmoji = true
+summaryLength = 20
+
+[markup.goldmark.parser.attribute]
+  block = true
+[markup.highlight]
+  style = "monokai"

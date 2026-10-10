@@ -1,0 +1,7 @@
+baseURL = "https://example.org/"
+title = "Home pages"
+languageCode = "en"
+timeZone = "Europe/London"
+
+[pagination]
+pagerSize = 2

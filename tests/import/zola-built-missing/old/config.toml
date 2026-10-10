@@ -1,0 +1,6 @@
+base_url = "https://example.org"
+title = "Built"
+generate_feeds = true
+
+[markdown]
+smart_punctuation = true

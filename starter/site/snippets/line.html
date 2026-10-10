@@ -1,0 +1,14 @@
+{# takes post #}
+{# A post as one line of a list: its date, its title and a line about it: see /lists/ -#}
+{% set about = post.summary | default(post.opening) | default("") %}
+<li>
+  {% if post.date %}
+  <time datetime="{{ post.date | moment }}">{{ post.date | date(site.date_short) }}</time>
+  {% endif %}
+  <div>
+    <h3><a href="{{ post.url }}">{{ called(post) }}</a></h3>
+    {% if about %}
+    <p>{{ about | truncate(160, "…") }}</p>
+    {% endif %}
+  </div>
+</li>

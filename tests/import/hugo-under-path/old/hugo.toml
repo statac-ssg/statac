@@ -1,0 +1,4 @@
+baseURL = "https://example.org/blog/"
+title = "Under a path"
+languageCode = "en"
+timeZone = "UTC"

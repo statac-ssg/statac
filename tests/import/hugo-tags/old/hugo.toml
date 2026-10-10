@@ -1,0 +1,14 @@
+baseURL = "https://example.org/"
+title = "Tags"
+languageCode = "en"
+timeZone = "UTC"
+
+[taxonomies]
+  tag = "tags"
+  category = "categories"
+  series = "series"
+  author = "authors"
+
+[permalinks]
+  [permalinks.term]
+    tags = "/topics/:slug/"

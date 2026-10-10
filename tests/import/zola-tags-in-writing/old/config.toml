@@ -1,0 +1,6 @@
+base_url = "https://example.org"
+title = "Tags in the writing"
+
+[markdown]
+smart_punctuation = true
+render_emoji = true

@@ -1,0 +1,13 @@
+{# A page that isn't a post, a note, a photograph or a list: see /templates/ -#}
+{% extends "base" %}
+{% block main %}
+    <header class="top column">
+      <h1>{{ headline(page) }}</h1>
+      {% if page.summary %}
+      <p class="summary">{{ page.summary }}</p>
+      {% endif %}
+    </header>
+    <div class="writing column">
+      {{ page.content }}
+    </div>
+{% endblock %}

@@ -1,0 +1,4 @@
+:root {
+  --accent: oklch(88% 0.11 150);
+  --accent-strong: oklch(63% 0.14 150);
+}

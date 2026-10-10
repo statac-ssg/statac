@@ -1,0 +1,20 @@
+{# takes post #}
+{# A post in a list: its day, its title, its picture where asked, and its opening: see /lists/ -#}
+{% set words = site.data.words[post.language] %}
+<li class="entry">
+  {% if post.date %}
+  <time datetime="{{ post.date | moment }}">{{ post.date | date(site.date_day) }}</time>
+  {% endif %}
+  <div>
+    <h3><a href="{{ post.url }}">{{ called(post) }}</a></h3>
+    {% if pictured is defined and post.cover %}
+    {{ picture(post.photo(post.cover, decorative=true), alt="") }}
+    {% endif %}
+    {% if post.excerpt %}
+    {{ post.excerpt }}
+    {% if post.excerpt_marked %}
+    <p><a href="{{ post.url }}">{{ words.read_more }}</a></p>
+    {% endif %}
+    {% endif %}
+  </div>
+</li>
