@@ -14,15 +14,21 @@ install beside it.
 
 ## Installing
 
-On a Mac, or on Linux with [Homebrew](https://brew.sh):
+On a Mac, with [Homebrew](https://brew.sh):
 
 ```sh
 brew install statac-ssg/statac/statac
 ```
 
-For Windows, or without Homebrew, each
+On Linux:
+
+```sh
+curl -fsSL https://get.statac.dev | sh
+```
+
+For Windows, or another way to install, each
 [release](https://github.com/statac-ssg/statac/releases) has a package
-for each kind of machine. [Getting started](https://statac.dev/getting-started/)
+for each kind of machine. [Installing](https://statac.dev/install/)
 says which to take and how to check it.
 
 ## A first site

@@ -177,6 +177,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: statac-*
@@ -189,6 +192,15 @@ jobs:
           sha256sum --check SHA256SUMS
           ls -l
           cat SHA256SUMS
+      # The install script, given these packages laid out as a release's.
+      - env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          mkdir -p releases/latest/download "releases/download/v$VERSION"
+          cp packages/SHA256SUMS releases/latest/download/
+          cp packages/* "releases/download/v$VERSION/"
+          STATAC_RELEASES="file://$PWD/releases" sh tools/install.sh --to "$PWD/installed"
+          test "$(installed/statac --version)" = "Statac $VERSION"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ needs.version.outputs.version }}
