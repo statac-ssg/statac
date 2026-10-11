@@ -653,7 +653,7 @@ fn calls_are_found_only_where_they_are_calls() {
         &'static [(&'static str, Within)],
         &'static str,
     );
-    let cases: [Case; 22] = [
+    let cases: [Case; 24] = [
         (
             "A @x(1) b.\n",
             &[("@x(1)", Within::Prose)],
@@ -707,6 +707,12 @@ fn calls_are_found_only_where_they_are_calls() {
             "<script>let a = \"@x(1)\";</script>",
         ),
         ("<pre>\n@x(1)\n</pre>\n", &[], "<pre>\n@x(1)\n</pre>"),
+        ("<pre\n>\n@x(1)\n</pre>\n", &[], "<pre\n>\n@x(1)\n</pre>"),
+        (
+            "<div\n>\n@x(1)\n</div>\n",
+            &[("@x(1)", Within::Html)],
+            "<div\n>\n<call x=html>\n</div>",
+        ),
         (
             "<div>\n<code>@x(1)</code>\n</div>\n",
             &[],

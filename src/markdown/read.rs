@@ -1318,6 +1318,9 @@ struct Html {
     /// The tag being read, and whether it closes an element.
     in_tag: Option<(Option<&'static str>, bool)>,
     quote: Option<char>,
+    /// Whether the last character read is `/`: a tag may end in a later
+    /// piece than its `/`.
+    slash: bool,
 }
 
 /// Where a placeholder sits in raw HTML, what surrounds it, and whether it
@@ -1338,7 +1341,6 @@ impl Html {
         let mut found = Vec::new();
         let mut stretches = Vec::new();
         let mut stretch = self.literal().then_some(0);
-        let b = html.as_bytes();
         let mut i = 0;
         while i < html.len() {
             match (stretch, self.literal()) {
@@ -1374,7 +1376,7 @@ impl Html {
                                 if let Some(p) = self.excluded.iter().rposition(|n| *n == name) {
                                     self.excluded.truncate(p);
                                 }
-                            } else if b[i - 1] != b'/' {
+                            } else if !self.slash {
                                 self.excluded.push(name);
                             }
                         }
@@ -1400,10 +1402,12 @@ impl Html {
                         .copied()
                         .find(|e| e.eq_ignore_ascii_case(name));
                     self.in_tag = Some((excluded, closing));
+                    self.slash = false;
                     i = from + len;
                     continue;
                 }
             }
+            self.slash = c == '/';
             i += c.len_utf8();
         }
         if let Some(start) = stretch {
