@@ -1161,7 +1161,13 @@ impl Reader<'_> {
             {
                 let mut kept = Vec::new();
                 for (name, value) in raised {
-                    match fields.iter().any(|f| f.name == *name) {
+                    // Hugo reads none of its own words beneath `params` but
+                    // the lists of terms, so `url` there is the author's.
+                    let lower = name.to_lowercase();
+                    let hugos = (HUGOS_WORDS.contains(&lower.as_str())
+                        || DATE_NAMES.contains(&lower.as_str()))
+                        && !plurals.contains(&lower);
+                    match hugos || fields.iter().any(|f| f.name == *name) {
                         true => kept.push((name.clone(), value.clone())),
                         false => fields.push(Field::new(name, value.clone(), field.line)),
                     }

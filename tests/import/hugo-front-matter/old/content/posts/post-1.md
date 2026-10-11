@@ -13,7 +13,11 @@ Aliases: [/old/post-1/, old-name]
 params:
   author: Name
   subtitle: A subtitle
+  url: https://example.org/
+  slug: named-in-params
+  date: 2001-01-01
+  weight: 9
 book:
   isbn: 0-000-00000-0
 ---
-A post in YAML, with capitals, nested params, a weight and old addresses.
+A post in YAML, with capitals, nested params that hold names Hugo reads only above them, a weight and old addresses.
