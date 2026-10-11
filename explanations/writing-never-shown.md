@@ -1,8 +1,8 @@
 # Writing never shown
 
-A layout builds pages that have writing and never asks for it, so each of
-those pages is published without its writing. The message names the
-layout, says how many pages it builds that way, and lists them.
+A layout builds pages that have writing, but never puts the writing on the
+page, so each of those pages is published without it. The message shows
+the layout and how many pages it builds this way, and lists those pages.
 
 A page's writing is everything below its front matter. A layout puts it on
 the page with `{{ page.content }}`.
@@ -17,25 +17,25 @@ warning  Writing never shown: 3 pages built by `templates/hollow.html` have writ
 
 ## Why Statac warns
 
-The pages are built as the layout says, and a layout that leaves the
-writing out may be what you meant: a page of links, say, or a home page
-that only lists posts. Statac can't tell that from a layout whose
-`{{ page.content }}` was forgotten, and what you wrote would be missing
-from the site without a word, so it says so once for each layout.
+Statac builds the pages as the layout says, and a layout that leaves out
+the writing may be what you meant, for a page of links or a home page that
+only lists posts. Statac can't tell that apart from a layout where you
+forgot `{{ page.content }}`. In that case, what you wrote would be missing
+from the site with no message, so Statac warns once for each layout.
 
-A layout shows the writing where it asks for `page.content` or
-`page.excerpt`, itself or in a template it extends or a snippet it calls.
-What only describes the writing, such as `page.opening`, `page.words` or
-`page.toc`, puts none of it on the page and doesn't count. A page with
-front matter and nothing below it, or only HTML comments, has no writing
-to show and is never counted.
+A layout counts as showing the writing if it uses `page.content` or
+`page.excerpt`, either directly or in a template it extends or a snippet it
+calls. Values that only describe the writing, such as `page.opening`,
+`page.words` or `page.toc`, don't put any of it on the page, so they don't
+count. A page with front matter and nothing below it, or only HTML
+comments, has no writing to show, so it is never counted.
 
 ## How to fix it
 
-Where the writing belongs on the page, add `{{ page.content }}` to the
+If the writing belongs on the page, add `{{ page.content }}` to the
 layout.
 
-Where it doesn't, take the writing out of the pages the message lists, or
+If it doesn't, take the writing out of the pages the message lists, or
 keep it and quieten the warning with `quiet: [writing-never-shown]` in
 `statac.yaml`.
 
@@ -47,7 +47,7 @@ keep it and quieten the warning with `quiet: [writing-never-shown]` in
 <h1>{{ page.title }}</h1>
 ```
 
-`content/post-1.md` is built by it:
+`content/post-1.md` is built with it:
 
 ```markdown
 ---
@@ -57,8 +57,8 @@ layout: hollow
 Post 1 says this.
 ```
 
-The page is published with its title and without `Post 1 says this.` To
-show it:
+The page is published with its title but without `Post 1 says this.` To
+show the writing:
 
 ```html
 <h1>{{ page.title }}</h1>

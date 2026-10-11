@@ -1,9 +1,9 @@
 # No value
 
-A template shows or uses a value that isn't there: a field the page
-doesn't set, a setting `statac.yaml` doesn't have, a file or a value
-`data/` doesn't have, or a value written empty. The message says which,
-and on which page or in which file.
+A template shows or uses a value that doesn't exist. It may be a field
+the page doesn't set, a setting that isn't in `statac.yaml`, a file or
+value that isn't in `data/`, or a value that was written empty. The
+message says which, and names the page or file.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,42 +15,44 @@ error  No value: `page.summary` isn't set on `content/post-1.md`
 
 ## Why Statac stops
 
-Published, a missing value comes out as nothing, or as a word such as
-`none`, and the page looks finished when it isn't. Statac stops instead, so
-you decide what a page without the value shows.
+On a published page, a missing value comes out as nothing, or as a word
+such as `none`, and the page looks finished when it isn't. Statac stops
+instead, so that you decide what a page without the value shows.
 
-The same goes for a value that may be missing inside a list or map the
-template writes itself, such as `[page.summary, page.title]`: nothing would
-say so when it is, so Statac asks for a default when it reads the template.
+The same applies to a value that may be missing inside a list or map that
+the template writes itself, such as `[page.summary, page.title]`. Nothing
+would show that the value was missing, so Statac asks for a default as
+soon as it reads the template.
 
 ## How to fix it
 
-Where every page should have the value, add it to the page the message
-names. Where some pages don't, say what they show instead:
+If every page should have the value, add it to the page the message
+names. If some pages don't have it, say what they show instead:
 
 - `{{ page.summary | default("") }}` shows nothing.
-- `{% if page.summary %}...{% endif %}` leaves out what's around it too.
+- `{% if page.summary %}...{% endif %}` leaves out the text around it as well.
 - `{{ page.description | default(page.summary) | default("") }}` shows the
-  description, else the summary, else nothing. Where the last `default`
-  is left out, the message names `page.summary`, the value that was
-  missing at the end.
+  description, or else the summary, or else nothing. If you leave out the
+  last `default`, the message names `page.summary`, the last value in the
+  chain, which was missing.
 
-A filter that groups or gathers pages by a field, such as
+A filter that groups or collects pages by a field, such as
 `groupby("rank")`, `unique(attribute="rank")` or `map(attribute="rank")`,
-needs it on every page it is handed: where to put a page without it would
-be a guess. The message names the page that lacks it. Leave out the pages
-without it first, as in
+needs that field on every page it is given, because where to put a page
+without it would be a guess. The message names the page that doesn't have
+the field. Leave out the pages without it first, as in
 `site.pages | selectattr("rank", "defined") | groupby("rank")`, or give
 `map` a `default=`. A filter that only tests a field, such as
-`selectattr("rank", "eq", 1)`, passes over a page without it, as `if` does.
-`sort(attribute="rank")` puts pages without it last and warns.
+`selectattr("rank", "eq", 1)`, skips a page without it, as `if` does.
+`sort(attribute="rank")` puts pages without the field last, and warns.
 
-A page Statac makes for a list, such as a tag's page, has no `title`.
-`{{ headline(page) }}` names it by its list's name, and any other page by
-its `title` where it has one.
+A page that Statac makes for a list, such as a tag's page, has no
+`title`. For such a page, `{{ headline(page) }}` shows the list's name.
+For any other page, it shows the page's `title` if it has one.
 
-In a snippet, `page` is the page being built, not a page the call handed
-it. A snippet handed a post as `post` reads its fields as `post.summary`.
+In a snippet, `page` is the page being built, not a page that the call
+passed to the snippet. If a call passes a post to a snippet as `post`, the
+snippet reads the post's fields as `post.summary` and so on.
 
 ## Example
 

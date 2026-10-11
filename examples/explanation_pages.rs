@@ -73,7 +73,7 @@ fn page(code: Code) -> String {
     let shown = body.find(seen).expect("each explanation shows its message") + seen.len();
     let after = shown + body[shown..].find("```\n").expect("the message closes") + 4;
     let body = format!(
-        "{}\nIn the terminal the message also names the file and line where there is one, \
+        "{}\nIn the terminal, the message also shows the file and line, if there is one, \
          and marks the exact text.\n{}",
         &body[..after],
         &body[after..]
@@ -120,9 +120,9 @@ fn index() -> String {
         "explanations/",
     );
     out.push_str(
-        "\nEvery kind of problem Statac tells you about has a page here. Its \
-         name is the last part of the problem's `More:` link, and `statac \
-         explain` with that name shows the same page in the terminal.\n",
+        "\nEvery kind of problem Statac reports has a page here. The page's \
+         name is the last part of the problem's `More:` link, and running \
+         `statac explain` with that name shows the same page in the terminal.\n",
     );
     let groups = [
         (
@@ -138,7 +138,7 @@ fn index() -> String {
         (
             Severity::Note,
             "Notes",
-            "A note is about the published page, not a mistake.",
+            "A note tells you something about the published page. It doesn't mean anything is wrong.",
         ),
     ];
     for (severity, heading, about) in groups {

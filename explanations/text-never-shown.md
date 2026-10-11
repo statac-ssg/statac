@@ -1,11 +1,12 @@
 # Text never shown
 
-A template that extends another fills a block the other doesn't have, so
-what the block holds appears on no page.
+A template that extends another template fills a block that the other
+one doesn't have, so the block's contents don't appear on any page.
 
 A template that starts `{% extends "base" %}` is built as `base`, with each
-of its blocks put in place of the block of the same name in `base`. A block
-`base` doesn't have, nor any template `base` extends, has nowhere to go.
+of its blocks replacing the block of the same name in `base`. If neither
+`base` nor any template `base` extends has a block of that name, the block
+has nowhere to go.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,15 +18,15 @@ error  Text never shown: `templates/base.html` has no block called `content`
 
 ## Why Statac stops
 
-The block's text would be left out of every page without a word, and Statac
-can't tell whether the block's name is a slip or the other template is
+The block's text would be left out of every page without a word. Statac
+can't tell whether the block's name is a mistake or the other template is
 missing a block.
 
 ## How to fix it
 
-Name the block as the template it extends does. When a block with a similar
-name is there, Statac offers it. If the other template should show it, add
-the block there.
+Give the block the name it has in the template it extends. If that
+template has a block with a similar name, the message suggests it. If the
+other template should show the block, add the block to that template.
 
 ## Example
 

@@ -1,8 +1,8 @@
 # Robots beneath a path
 
-The site lives beneath a path of its host, such as
-`https://example.org/blog/`, and publishes a `robots.txt`, which lands
-beneath that path too, at `https://example.org/blog/robots.txt`.
+The site is published beneath a path on its host, such as
+`https://example.org/blog/`, and it publishes a `robots.txt`. That file
+ends up beneath the same path, at `https://example.org/blog/robots.txt`.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,21 +14,23 @@ note  Robots beneath a path: crawlers read only `https://example.org/robots.txt`
 
 ## Why Statac notes it
 
-Crawlers read `robots.txt` at the top of a host and nowhere else, so what
-this one says is never read. Statac publishes it all the same, since it
-is yours, and tells you once.
+Crawlers read `robots.txt` only at the top of a host, so they never read
+this one. Statac publishes it anyway, since it is your file, and tells
+you once.
 
 ## How to fix it
 
-Copy the lines you want read into the `robots.txt` at the top of the
-host, wherever that is kept. A line naming the sitemap works from there:
+Copy the lines you want crawlers to read into the `robots.txt` at the
+top of the host, wherever that file is kept. A line giving the sitemap's
+address works from there:
 
 ```
 Sitemap: https://example.org/blog/sitemap.xml
 ```
 
-If the page is there only for crawlers, you can take it out of the site.
-Once you have understood the note, `quiet:` stops it being shown.
+If the page exists only for crawlers, you can remove it from the site.
+Once you have understood the note, you can stop it being shown with
+`quiet:`.
 
 ## Example
 

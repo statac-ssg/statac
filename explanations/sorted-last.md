@@ -15,22 +15,22 @@ warning  Sorted last: `content/post-2.md` has no `rank`
 
 ## Why Statac warns
 
-Pages without the field have no place in the order, and the end is the
-place that keeps every page and the order of the rest as written. Statac
-tells you, because a page left out of the order may be a field you meant
-to set.
+Pages without the field have no place in the order. Putting them at the
+end keeps every page in the list, and keeps the rest sorted as the
+template asks. Statac warns you, because a page missing from the order may be
+missing a field you meant to set.
 
 ## How to fix it
 
-Where every page should have the field, add it to the pages the message
-names. Where pages without it don't belong in the list, leave them out
+If every page should have the field, add it to the pages the message
+names. If pages without it don't belong in the list, leave them out
 before sorting:
 
 ```html
 {% for post in site.pages | selectattr("rank", "defined") | sort(attribute="rank") %}
 ```
 
-Where they belong at the end, say so in the template, which gives the same
+If they belong at the end, say so in the template. This gives the same
 order without the warning:
 
 ```html
@@ -48,4 +48,5 @@ In `templates/page.html`:
 {% endfor %}
 ```
 
-With `content/post-2.md` given `rank: 3`, every page has its place.
+Once `content/post-2.md` has `rank: 3`, every page has a place in the
+order.

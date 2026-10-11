@@ -1,7 +1,8 @@
 # More written twice
 
 A page's writing has `<!--more-->` on a line of its own more than once.
-The first one ends the excerpt a list shows; the later ones end nothing.
+The first one marks the end of the excerpt that a list shows. The later
+ones have no effect.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,10 +14,10 @@ warning  More written twice: the excerpt ends at the first `<!--more-->`
 
 ## Why Statac warns
 
-Statac is sure what it does here: the excerpt ends at the first
-`<!--more-->`, as it does wherever excerpts are written this way, and the
-page is published. It tells you, because a later marker may be where you
-meant the excerpt to end.
+There is no doubt about what happens here. The excerpt ends at the first
+`<!--more-->`, which is the usual rule wherever excerpts are marked this
+way, and the page is published. Statac warns you because you may have
+meant the excerpt to end at a later marker.
 
 ## How to fix it
 
@@ -39,7 +40,7 @@ More of the post.
 The rest.
 ```
 
-The excerpt ends at the first. Keep one:
+The excerpt ends at the first marker. Keep only one:
 
 ```markdown
 The part a list shows.

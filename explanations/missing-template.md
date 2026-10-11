@@ -1,19 +1,19 @@
 # Missing template
 
-A page needs a template that `templates/` doesn't have. The message names
-the file Statac looked for.
+A page needs a template that isn't in `templates/`. The message gives the
+name of the file Statac looked for.
 
-A page is built with the first of these:
+Statac builds a page with the first of these that applies:
 
-1. the template its own `layout:` names, as `layout: post`;
-2. the template its `type:` names, where `templates/` has one;
-3. a `layout:` handed down from its folder or `statac.yaml`, as
+1. the template named by the page's own `layout:`, such as `layout: post`;
+2. the template named by its `type:`, if `templates/` has one;
+3. a `layout:` handed down from its folder or `statac.yaml`, such as
    `pages.layout: post`, unless the page speaks for a list;
 4. `home` for the home page, `folder` for any other page that speaks for
    a list, and `page` for the rest.
 
-A template's `{% extends "base" %}` names another the same way. Each name
-is the file's name in `templates/` without `.html`.
+A template's `{% extends "base" %}` refers to another template in the same
+way. Each name is the file's name in `templates/` without `.html`.
 
 ## What you'll see {#what-youll-see}
 
@@ -29,10 +29,10 @@ With no template, there is nothing to build the page with.
 
 ## How to fix it
 
-Add the template to `templates/`, or correct the name. When a template with
-a similar name is there, Statac offers it. To build a page with another
-template, write `layout:` on the page, or `pages.layout:` on its folder's
-`index.md`.
+Add the template to `templates/`, or correct the name. If there is a
+template with a similar name, Statac suggests it. To build a page with a
+different template, set `layout:` on the page, or `pages.layout:` in its
+folder's `index.md`.
 
 ## Example
 

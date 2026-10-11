@@ -1,8 +1,9 @@
 # Colour converted
 
-A photograph carries a colour profile that isn't sRGB, such as Display P3
-or Adobe RGB, as cameras and phones often write. Statac converted its
-colours to sRGB when it made the copies it publishes.
+A photograph has a colour profile other than sRGB, such as Display P3 or
+Adobe RGB. Cameras and phones often write these profiles. When Statac made
+the copies of the photograph that it publishes, it converted their colours
+to sRGB.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,28 +14,30 @@ note  Colour converted: the copies of `content/photo-1.jpg` are in sRGB, convert
 
 ## Why Statac says so
 
-The copies carry no colour profile, and a browser shows a picture without
-one as sRGB. Left unconverted, the photograph's colours would come out
-duller or shifted, so Statac converts them and the copies look as the
-photograph does.
+The copies have no colour profile, and a browser shows a picture without
+one as sRGB. Without the conversion, the colours would look duller or
+shifted. Converting them makes the copies look the same as the photograph.
 
-Colours the wider space holds and sRGB doesn't are brought to the nearest
-sRGB has. On most photographs the difference can't be seen; on one with
-very strong colours it sometimes can. Statac says so, once for each such
-photograph a page shows, so the change is never a surprise. Your own file
-is never altered.
+Some colours in the wider colour space don't exist in sRGB, so Statac
+replaces each of them with the nearest sRGB colour. On most photographs you
+can't see the difference, but on one with very strong colours you sometimes
+can. Statac shows this note once for each such photograph that a page
+shows, so the change never comes as a surprise. Your own file is never
+changed.
 
 ## How to fix it
 
-Nothing is wrong. Once you have understood it, quieten it by name.
+Nothing is wrong. Once you have understood the note, you can quieten it by
+name.
 
-To publish a photograph as the file it is, its profile kept, write
-`optimise: false` in a file beside it named after it, such as
-`photo-1.jpg.yaml` for `photo-1.jpg`. Statac then makes no copies of it.
+To publish the photograph's own file, with its profile, put a file next to
+it that is named after it, such as `photo-1.jpg.yaml` for `photo-1.jpg`, and
+write `optimise: false` in that file. Statac then makes no copies of the
+photograph.
 
 ## Example
 
-In `statac.yaml`, to stop it being shown:
+To stop showing the note, add this to `statac.yaml`:
 
 ```yaml
 quiet: [colour-converted]

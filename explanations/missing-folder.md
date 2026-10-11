@@ -12,14 +12,15 @@ error  Missing folder: `statac import` needs the folder of the site to import
 
 ## Why Statac stops
 
-Importing reads a site another tool made and writes a new one beside it,
-so it needs to know which site. Statac doesn't take the folder it is run
-in, since the new site is written beside the old, outside that folder.
+Importing reads a site made by another tool and writes a new site beside
+it, so Statac needs to know which site to read. It doesn't assume the
+folder it is run in, because the new site is written beside the old one,
+outside that folder.
 
 ## How to fix it
 
-Name the old site's folder after the command, and, if you like, the
-folder to write the new site into after that.
+Name the old site's folder after the command. If you like, you can also
+name the folder to write the new site into after that.
 
 ## Example
 

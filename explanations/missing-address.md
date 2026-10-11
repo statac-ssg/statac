@@ -1,7 +1,8 @@
 # Missing address
 
-`statac refuse` was given no address. It turns away the webmention at an
-address, or everything from a sender, so it needs to know which.
+`statac refuse` was given no address. It turns away either the
+webmention from one address or everything from one sender, so it needs
+an address to know which.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,9 +18,9 @@ Without an address, there is nothing to refuse.
 
 ## How to fix it
 
-Give the address after `statac refuse`: the address of the page that
-sent the webmention, as its file in `fetched/mentions/` gives it in
-`url`, or the address of the sender's site.
+Give the address after `statac refuse`. This is either the address of
+the page that sent the webmention, as given in `url` in its file in
+`fetched/mentions/`, or the address of the sender's site.
 
 ## Example
 

@@ -1,8 +1,8 @@
 # No names to check
 
-A field is declared in `statac.yaml` as `one of data.` and a table, and
-the table is written as a list. The items of a list have no names, so
-there is nothing for a value of the field to be one of.
+A field is declared in `statac.yaml` as `one of data.` followed by a
+table, but the table is written as a list. Items in a list have no names,
+so there are no names for the field's values to be one of.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,9 +14,10 @@ error  No names to check: `data/people.yaml` is a list, so `fields.author` can't
 
 ## Why Statac stops
 
-The declaration says every value of the field is one of the table's names.
-Statac won't choose a field of the items to stand for their names, and
-passing every value would drop the check you asked for without saying so.
+The declaration says that every value of the field is one of the
+table's names. Statac won't pick one of the items' fields to use as their
+names. Accepting every value would drop the check you asked for without
+telling you.
 
 ## How to fix it
 
@@ -38,7 +39,7 @@ In `data/people.yaml`:
 - name: Person 2
 ```
 
-Written with a name for each item:
+Rewritten with a name for each item:
 
 ```yaml
 person-1:

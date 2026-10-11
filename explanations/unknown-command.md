@@ -14,13 +14,13 @@ error  Unknown command: `biuld`
 ## Why Statac stops
 
 Statac can't tell what you meant to do, and doing the wrong thing could
-write files you didn't ask for. When a command is close to what you wrote,
-Statac offers it.
+write files you didn't ask for. If a command is close to what you wrote,
+Statac suggests it.
 
 ## How to fix it
 
-Write one of Statac's commands. Statac spells each of its words one way,
-so `statac help` is written `statac --help`.
+Use one of Statac's commands. Statac accepts only one spelling for each of
+its words, so `statac help` must be written as `statac --help`.
 
 ## Example
 

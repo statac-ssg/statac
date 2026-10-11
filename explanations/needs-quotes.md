@@ -1,9 +1,9 @@
 # Needs quotes
 
-A field that holds text is given a value YAML reads as something else, and
-reading it that way would change what you wrote. `3.10` is the number 3.1
-to YAML, `0x10` is 16, and `1e3` is 1000. A colour such as `#F2E9D3`
-written bare is a comment to YAML, which leaves the line with no value.
+A text field has a value that YAML reads as something else, and reading it
+that way would change what you wrote. To YAML, `3.10` is the number 3.1,
+`0x10` is 16, and `1e3` is 1000. A colour such as `#F2E9D3` written
+without quotes is a comment to YAML, so the line is left with no value.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,11 +15,12 @@ error  Needs quotes: YAML reads `3.10` as 3.1
 
 ## Why Statac stops
 
-Statac takes a bare value as typed where YAML's reading keeps every
-character, so `title: 1984` is the text `1984`. Where the reading would
-change the characters, keeping them would mean reading YAML differently
-from every other tool, and taking YAML's reading would change your words.
-Quotes make it text in every reader.
+If YAML's reading of a value without quotes keeps every character, Statac
+uses the value as you typed it, so `title: 1984` is the text `1984`. If
+YAML's reading would change the characters, Statac can't keep them without
+reading YAML differently from every other tool, and can't use YAML's
+reading without changing your words. With quotes, every YAML reader treats
+the value as text.
 
 ## How to fix it
 

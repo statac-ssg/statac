@@ -1,9 +1,9 @@
 # Page in snippet
 
-A snippet is handed a page, and shows a field of `page` too. In a snippet,
-`page` is the page being built, so on a page listing posts, `page.title`
-is the list's title every time, not the title of the post the call handed
-it.
+A snippet is handed a page, but it also shows a field of `page`. In a
+snippet, `page` is the page being built. So on a page that lists posts,
+`page.title` is the list page's title every time, not the title of the
+post that the call handed to the snippet.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,13 +15,14 @@ warning  Page in snippet: `card` shows `page.title`, the page being built
 
 ## Why Statac warns
 
-Sometimes a snippet means the page being built, such as marking the post
-that is being read. Statac can't tell which you meant, so it builds the page
-as written and says so.
+Sometimes a snippet does mean the page being built, for example to mark
+the post that is being read. Statac can't tell which you meant, so it
+builds the page as written and warns you.
 
 ## How to fix it
 
-Read the field from the name the call hands the page by, as Statac offers.
+Read the field from the name the page is handed under, as Statac
+suggests.
 If the page being built is what you meant, quieten this warning with
 `quiet: [page-in-snippet]` in `statac.yaml`.
 

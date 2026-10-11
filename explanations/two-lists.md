@@ -1,9 +1,9 @@
 # Two lists
 
-A page has both `each:` and `posts:`. Each line chooses the list the page
-speaks for: `posts:` the posts it lists, `each:` the pages it makes. A
-page speaks for one list. The message points at the second line, and
-shows where the first was written.
+A page has both `each:` and `posts:`. Each line chooses a list for the
+page: `posts:` chooses the posts it lists, and `each:` chooses the pages
+it makes. A page can have only one list. The message points to the second
+line, and shows where the first one is.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,13 +15,13 @@ error  Two lists: this page has both `posts:` and `each:`
 
 ## Why Statac stops
 
-Statac can't tell which of the two lists you meant the page to speak for,
-and choosing one would leave the other out without a word.
+Statac can't tell which of the two lists you meant the page to have, and
+choosing one would leave the other out without telling you.
 
 ## How to fix it
 
-Move one of the lines to a page of its own, with what goes with it: a
-`permalink:` and a `layout:` go with `each:`.
+Move one of the lines to a page of its own, along with the lines that
+belong with it. A `permalink:` and a `layout:` belong with `each:`.
 
 ## Example
 
@@ -36,7 +36,7 @@ permalink: /cards/{name}/
 ---
 ```
 
-Keep the list here, and make the pages from another page,
+Keep the `posts:` list here, and make the pages from a separate page,
 `content/cards.md`:
 
 ```yaml

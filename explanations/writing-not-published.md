@@ -1,8 +1,8 @@
 # Writing not published
 
 A page with `redirect_to` has writing after its front matter. A page
-sending readers on publishes only its redirect, so the writing appears
-nowhere.
+that sends readers on publishes only the redirect, so the writing doesn't
+appear anywhere.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,15 +14,15 @@ warning  Writing not published: `content/post-1.md` sends readers on
 
 ## Why Statac warns
 
-Statac is sure the redirect is meant: `redirect_to` says so. It publishes
-the redirect and tells you, because writing that is never published may
-be writing you want kept.
+Statac is sure the redirect is intended, because `redirect_to` says so.
+It publishes the redirect and tells you, because writing that is never
+published may be writing you want to keep.
 
 ## How to fix it
 
-Move the writing to the page readers are sent to, and leave the page
-sending them on with front matter alone. If the page should be published
-here after all, take `redirect_to` out.
+Move the writing to the page readers are sent to, and leave only front
+matter on the page that sends them on. If the page should be published
+here after all, remove `redirect_to`.
 
 ## Example
 

@@ -1,7 +1,7 @@
 # Missing name
 
-`statac explain` was given no name. It explains one kind of problem at a
-time, by its name.
+`statac explain` was run without a problem's name. It explains one kind of
+problem at a time, so it needs that problem's name.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,8 +17,8 @@ Without a name, there is nothing to explain.
 
 ## How to fix it
 
-Give the problem's name after `statac explain`. Every problem's name is the
-last part of its `More:` link.
+Write the problem's name after `statac explain`. Every problem's name is
+the last part of its `More:` link.
 
 ## Example
 
@@ -26,7 +26,7 @@ last part of its `More:` link.
 statac explain
 ```
 
-For a problem whose link ends `/e/broken-link`:
+For a problem whose link ends in `/e/broken-link`:
 
 ```text
 statac explain broken-link

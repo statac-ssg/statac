@@ -1,8 +1,9 @@
 # Missing file
 
-A template asks for a file in `assets/` that isn't there, through `css()`,
-`js()` or `asset()`, or a card's settings name a background or a font
-that isn't in `templates/og/`. The message names the file it looked for.
+A template uses `css()`, `js()` or `asset()` to ask for a file in
+`assets/` that isn't there, or a card's settings refer to a background or
+font that isn't in `templates/og/`. The message gives the name of the
+file Statac looked for.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,14 +18,14 @@ error  Missing file: there is no `assets/sit.css`
 Statac publishes each file in `assets/` under a new name made from its
 contents, and those functions write that name into the page. With no file,
 there is no name to write, and the page would link to nothing. A card
-with no background or font to draw with can't be drawn.
+can't be drawn without its background or font.
 
 ## How to fix it
 
-Correct the name, or add the file to `assets/`, or for a card to
-`templates/og/`. When a file with a similar
-name is there, Statac offers it. A file in `static/` keeps its own name, so
-link to it directly instead: Statac gives the address to use.
+Correct the name, or add the file to `assets/` (or, for a card, to
+`templates/og/`). If there is a file with a similar name, Statac
+suggests it. A file in `static/` keeps its own name, so link to it
+directly instead. Statac tells you the address to use.
 
 ## Example
 

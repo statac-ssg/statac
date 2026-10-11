@@ -1,8 +1,9 @@
 # Location published
 
-A JPEG, PNG or WebP beside your writing holds where it was taken, as a
-phone or a camera with GPS writes into its photographs. Statac publishes
-the file exactly as it is, so the position is published with it.
+A JPEG, PNG or WebP file next to your writing records where it was
+taken. A phone or a camera with GPS writes this into its photographs.
+Statac publishes the file exactly as it is, so the location is published
+with it.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,42 +15,44 @@ note  Location published: `content/photo-1.jpg` holds where it was taken in its 
 
 ## Why Statac says so
 
-A file you put in `content/` is published byte for byte, whatever it
-holds: Statac never changes it. Anyone who has the picture can read the
-latitude and longitude in it. That is often what you mean, and often not,
-and Statac can't tell which. So `statac check` says so, once for each such
-file, and the choice stays with you.
+Statac publishes a file you put in `content/` byte for byte, whatever it
+contains, and never changes it. Anyone who has the picture can read the
+latitude and longitude in it. Sometimes you mean that to happen and
+sometimes you don't, and Statac can't tell which. So `statac check` tells
+you, once for each such file, and leaves the choice to you.
 
-The file itself is all that holds the position. The resized copies Statac
-makes of a photograph a page shows hold the picture and nothing else. A
-photograph a page shows and nothing links is published as its copies
-alone, and nothing is said of it. One a page links, one no page shows and
-one left alone by `optimise: false` are published as the files they are.
+Only the file itself contains the location. The resized copies Statac
+makes of a photograph that a page shows contain the picture and nothing
+else. A photograph that a page shows but nothing links to is published
+only as its copies, and no note is shown for it. A photograph that a page
+links to, one that no page shows, and one that `optimise: false` leaves
+as it is are all published as the original files.
 
-Statac looks for the position a camera writes, a latitude and a
-longitude, in a JPEG, PNG or WebP. It looks at no other kind of file, and
-for nothing else a file may say of a place. A file in `static/` is never
-looked at, and nothing is said of it.
+Statac looks for the location a camera writes, a latitude and a
+longitude, in JPEG, PNG and WebP files. It doesn't look in any other kind
+of file, or for any other information a file may hold about a place. A
+file in `static/` is never checked, and no note is shown for it.
 
-`statac build` and `statac serve` say nothing of this and don't count it.
+`statac build` and `statac serve` don't show this note or count it.
 
 ## How to fix it
 
-Nothing is wrong where you mean the position to be published. Quieten the
+If you mean the location to be published, nothing is wrong. Quieten the
 note by name and it is no longer shown.
 
-To publish the picture without it, make a copy without the location and
-put it in the file's place. Most programs that export photographs can
-leave the location out, and so can a phone when it shares one. The copy
-is yours to make: Statac publishes the file you give it.
+To publish the picture without the location, make a copy without it and
+put the copy in place of the file. Most programs that export photographs
+can leave the location out, and so can a phone when it shares a
+photograph. You have to make the copy yourself, because Statac publishes
+the file you give it.
 
 ## Example
 
-`content/photo-1.jpg` stands beside a post that links it, and holds a
-position. `statac check` says so. Once a copy exported without the
-location stands in its place, nothing is said.
+`content/photo-1.jpg` is next to a post that links to it, and contains a
+location. `statac check` shows the note. Once you replace the file with a
+copy exported without the location, the note is no longer shown.
 
-In `statac.yaml`, to stop it being shown:
+To stop the note being shown, add this to `statac.yaml`:
 
 ```yaml
 quiet: [location-published]

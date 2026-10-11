@@ -2,7 +2,7 @@
 
 One of Statac's settings is written nested under its first part, such as
 `layout:` indented under `pages:`, or a text on a card is written as
-`title:` with `text:` beneath it. Statac's own settings have one
+`title:` with `text:` beneath it. Statac's own settings have only one
 spelling, written flat on one line: `pages.layout: post`, `title.text:`.
 
 ## What you'll see {#what-youll-see}
@@ -15,9 +15,10 @@ error  Nested setting: `layout` under `pages`
 
 ## Why Statac stops
 
-Your own fields may nest, and reach templates the same way. Statac's
-settings keep the one flat spelling, so every site writes them alike and
-anyone reading a site's files learns them once.
+Your own fields can be nested, and templates reach them through that
+nesting. Statac's settings keep their one flat
+spelling, so every site writes them the same way, and anyone reading a
+site's files only has to learn them once.
 
 ## How to fix it
 

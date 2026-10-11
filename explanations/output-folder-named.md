@@ -1,8 +1,9 @@
 # Output folder named
 
-The site's `after_build` command names the folder the built site is
-published in, `_site` unless the build was asked for another. While the
-command runs, that folder still holds the site built last time.
+The site's `after_build` command contains the name of the folder the
+built site is published in. That folder is `_site` unless the build was
+told to use another. While the command runs, the folder still holds the
+site built last time.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,23 +15,24 @@ warning  Output folder named: `_site` holds the site built last time while `afte
 
 ## Why Statac warns
 
-Statac builds into a folder of its own and puts it in the published
-site's place only once the whole build, `after_build` included, has ended
-well. A command that names `_site` therefore acts on the last build: an
-index is made of the old pages, old files are compressed or sent to the
-server, and whatever the command writes there is replaced a moment later
-by the new site. On a first build there is no such folder at all.
+Statac builds into a separate folder, and puts it in place of the
+published site only after the whole build, including `after_build`, has
+succeeded. So a command that names `_site` works on the previous build. It
+makes an index of the old pages, or compresses old files or sends them
+to the server, and anything it writes there is replaced a moment later by
+the new site. On a first build, the folder doesn't exist at all.
 
-Nothing in what the command prints need show it, so Statac says so.
+The command's output may show no sign of this, so Statac warns you.
 
 ## How to fix it
 
-Name the folder Statac hands the command, `STATAC_OUT`, where the line
-names the output folder. `sh` writes it `"$STATAC_OUT"` and `cmd`
-writes it `"%STATAC_OUT%"`. The message shows the line written that way.
+In the command, replace the output folder's name with
+`STATAC_OUT`, the folder Statac hands the command. In `sh` you write it as
+`"$STATAC_OUT"`, and in `cmd` as `"%STATAC_OUT%"`. The message shows the
+line rewritten this way.
 
-Where the command really does mean the site built last time,
-`quiet: [output-folder-named]` stops the warning being shown.
+If the command really is meant to use the site built last time,
+`quiet: [output-folder-named]` stops the warning from being shown.
 
 ## Example
 
@@ -41,7 +43,7 @@ after_build: ./index.sh _site
 ```
 
 While the command runs, `_site` still holds the site built last time.
-Written to act on the new build, in `$STATAC_OUT`:
+To act on the new build in `$STATAC_OUT`, write:
 
 ```yaml
 after_build: ./index.sh "$STATAC_OUT"

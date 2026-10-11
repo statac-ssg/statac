@@ -1,10 +1,10 @@
 # Template stopped
 
-A template stopped while Statac built a page with it, for a reason other
-than a missing value. The message says why, such as adding a number to
-text, a filter handed something it can't work on, a snippet that calls
-itself, or a `!!binary` value whose bytes aren't text shown on the page,
-and names the page being built.
+A template failed while Statac was building a page with it, for a reason
+other than a missing value. The message gives the reason and the page
+being built. Reasons include adding a number to text, giving a filter
+something it can't work on, a snippet that calls itself, and showing a
+`!!binary` value on the page when its bytes aren't text.
 
 ## What you'll see {#what-youll-see}
 
@@ -21,20 +21,20 @@ broken page in the site.
 
 ## How to fix it
 
-Look at the place the caret points to, on the page the message names.
+Look at the place the caret points to, on the page the message gives.
 Common causes:
 
-- `absolute` on a site whose `statac.yaml` doesn't give the site's own
-  address, which it needs to make a full one.
-- `date` or `moment` handed something that isn't a date.
-- `headline` handed something that isn't a page, such as a title.
-- `url` handed something that isn't an address from the top of the site,
-  starting with one `/`.
-- A snippet that calls a snippet that calls it back. Take the call out of
-  one of them.
+- `absolute` used on a site whose `statac.yaml` doesn't give the site's
+  own address. `absolute` needs it to make a full address.
+- `date` or `moment` given something that isn't a date.
+- `headline` given something that isn't a page, such as a title.
+- `url` given something that isn't an address from the top of the site,
+  starting with a single `/`.
+- A snippet that calls another snippet, which calls the first one back.
+  Remove the call from one of them.
 - A loop that never ends, or a loop inside a loop over long lists, which
-  took all the steps Statac lets one page take. The message names the
-  layout the page is built with; the caret points to where the steps ran
+  used up all the steps Statac allows for one page. The message gives the
+  layout the page is built with. The caret points to where the steps ran
   out, which may be in a snippet the layout calls.
 
 ## Example

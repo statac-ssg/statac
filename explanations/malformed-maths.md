@@ -1,7 +1,7 @@
 # Malformed maths
 
-Statac found maths in your writing, between dollar signs, but couldn't
-make it into maths for the page. The message says what it found and points
+Statac found maths between dollar signs in your writing, but couldn't
+turn it into maths on the page. The message says what it found and points
 at the place to fix, such as a brace that is never closed or a command
 Statac doesn't know.
 
@@ -14,29 +14,30 @@ error  Malformed maths: Statac doesn't know `\fracc`
 
 ## Why Statac stops
 
-Statac can't tell what maths it can't read was meant to say: a command
-spelt wrong, a brace left out, or dollar signs that were never maths at
-all. Publishing what you typed would put the maths' source in front of
-readers instead, so Statac stops rather than guess.
+If Statac can't read some maths, it can't tell what the maths was meant
+to say. A command may be spelt wrong, a brace may be missing, or the
+dollar signs may never have been maths at all. Publishing what you typed
+would show readers the maths' source instead, so Statac stops rather
+than guess.
 
 ## How to fix it
 
 Look at the place the caret points to. Common causes:
 
-- A command Statac doesn't know, often one spelt wrong: `\fracc` for
-  `\frac`. [Writing](/writing/#maths) lists what Statac's maths covers.
+- A command Statac doesn't know, often a misspelt one: `\fracc` for
+  `\frac`. [Writing](/writing/#maths) lists the maths Statac supports.
 - A `{` with no `}` to close it, or a `\begin{cases}` with no
   `\end{cases}`.
-- An `\end{...}` naming another environment than the `\begin{...}` it
-  closes.
-- A command with less after it than it takes, such as `\frac{1}` with no
-  second part.
-- Two `^` or two `_` on one thing, `x^a^b`. Put braces round what goes
-  together: `x^{a^b}`.
-- An `\eqref` to a label no equation on the page has.
+- An `\end{...}` that names a different environment from the
+  `\begin{...}` it closes.
+- A command followed by fewer parts than it needs, such as `\frac{1}`
+  with no second part.
+- Two `^` or two `_` on the same thing, as in `x^a^b`. Put braces round
+  the parts that belong together: `x^{a^b}`.
+- An `\eqref` to a label that no equation on the page has.
 
-Where the dollar signs were never maths, write a backslash before one:
-`\$5`.
+If the dollar signs were never meant as maths, put a backslash before
+one: `\$5`.
 
 ## Example
 

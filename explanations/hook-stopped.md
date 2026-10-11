@@ -1,12 +1,13 @@
 # Hook stopped
 
 One of the site's own commands, `before_build` or `after_build` in
-`statac.yaml`, didn't end well. The message says which, how it ended, and
-shows what the command printed, the last 40 lines where it printed more.
+`statac.yaml`, failed. The message says which command it was and how it
+ended. It also shows what the command printed (the last 40 lines, if it
+printed more).
 
-A command ends well when it ends with exit code 0. Any other code, the
-command being ended by something else before it finished, or the system's
-shell not starting at all, stops the build.
+A command succeeds if it ends with exit code 0. The build stops if the
+command ends with any other code, if something else ends the command
+before it finishes, or if the system's shell doesn't start at all.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,27 +18,34 @@ error  Hook stopped: `after_build` ended with exit code 3
 
 ## Why Statac stops
 
-A `before_build` command makes something the site is built from, such as
-a stylesheet, and an `after_build` command finishes the built site, such
-as by making its search index. Statac can't tell how far a command that
-ended badly got, so it publishes nothing: the site built last time stays
-as it was.
+A `before_build` command makes something the site is built from, such
+as a stylesheet. An `after_build` command finishes off the built site,
+for example by making its search index. Statac can't tell how far a
+failed command got, so it publishes nothing, and the site from the last
+build stays as it was.
 
 ## How to fix it
 
-Read what the command printed, which is where it says what went wrong.
-Running the same line yourself, in the site's folder, shows the same.
+Read what the command printed. That is where it says what went wrong.
+If you run the same line yourself in the site's folder, you see the same
+output.
 
-An exit code of 127 is how the shell says it couldn't find a command (on
-Windows, 9009). Check the command is installed and that the shell can
-find it from where Statac was run.
+Exit code 127 (9009 on Windows) means the shell couldn't find a command.
+Check that the command is installed and on the `PATH` Statac was started
+with. The command runs in the site's folder, so a path such as
+`./tools/make.sh` is read from there.
 
-A command is handed five values: `STATAC_SITE`, the site's folder;
-`STATAC_OUT`, the folder to act on; `STATAC_DRAFTS`, `yes` or `no`;
-`STATAC_SERVE`, `yes` where `statac serve` runs it and `no` otherwise;
-and `STATAC_HOOK`, the setting it is written in. An `after_build` command
-runs before the built site is put in its place, so it must act on
-`STATAC_OUT`, not on `_site`, which still holds the site built last time.
+A command is handed five values:
+
+- `STATAC_SITE`: the site's folder.
+- `STATAC_OUT`: the folder to work on.
+- `STATAC_DRAFTS`: `yes` or `no`.
+- `STATAC_SERVE`: `yes` if `statac serve` is running the command, and `no` otherwise.
+- `STATAC_HOOK`: the setting the command is written in.
+
+An `after_build` command runs before the built site is moved into place,
+so it must work on `STATAC_OUT`, not on `_site`. At that point `_site`
+still holds the site from the last build.
 
 ## Example
 
@@ -54,4 +62,5 @@ error  Hook stopped: `after_build` ended with exit code 1
     gzip: can't stat: missing.html: No such file or directory
 ```
 
-Name a file the built site has, and build again.
+Change the command to name a file that the built site has, then build
+again.

@@ -1,10 +1,11 @@
 # Reserved name
 
-One of your own values takes a name Statac already gives a meaning to. In
-`statac.yaml`, names such as `posts`, `tags` and `today` are Statac's on
-`site`. In a field declaration, names such as `title` and `date` are
-Statac's on `page`. In `snippets/`, `url.html` takes the name of
-`@url(...)`, which is Statac's own in the writing.
+One of your own values uses a name that already has a meaning in Statac.
+In `statac.yaml`, names such as `posts`, `tags` and `today` are reserved,
+because Statac uses them on `site`. In a field declaration, names such as
+`title` and `date` are reserved because Statac uses them on `page`. In
+`snippets/`, a file named `url.html` would have the same name as
+`@url(...)`, which Statac provides for use in a page's writing.
 
 ## What you'll see {#what-youll-see}
 
@@ -16,12 +17,12 @@ error  Reserved name: `site.posts` is Statac's own
 
 ## Why Statac stops
 
-Templates read Statac's value and yours under the same name, so one of the
-two would be lost. Statac can't know which you wanted.
+Templates would find Statac's value and yours under the same name, so one
+of them would be lost. Statac can't know which one you wanted.
 
 ## How to fix it
 
-Give your value a name of your own. Statac offers one.
+Give your value a different name. The message suggests one.
 
 ## Example
 
@@ -32,7 +33,7 @@ title: Site 1
 posts: 12
 ```
 
-`site.posts` is Statac's list of posts. Name yours another way:
+`site.posts` is Statac's list of posts. Give yours a different name:
 
 ```yaml
 title: Site 1

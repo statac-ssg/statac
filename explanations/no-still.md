@@ -1,9 +1,9 @@
 # No still
 
-A page shows a video kept on YouTube or Vimeo, and reads the video's
-`still`, the picture shown in its place until a reader presses play. No
-still for the video is in the site's `fetched/stills/` folder, so the
-page has none: `still` is empty.
+A page shows a video hosted on YouTube or Vimeo, and uses the video's
+`still`: the picture shown in place of the video until a reader presses
+play. The site's `fetched/stills/` folder has no still for this video, so
+`still` is empty.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,31 +15,32 @@ warning  No still: no picture has been fetched for this video yet
 
 ## Why Statac warns
 
-A page that loads a video site's player as it opens tells that site of
-every reader who visits, whether or not they watch. Showing a still
-instead, and loading the player only when the reader presses play, tells
-it of no one until then. The still is fetched from the video site once,
-by `statac refresh`, and kept in the site, since `statac build` never
-uses the network: a build of the same files is the same every time, and
+If a page loads a video site's player as soon as it opens, the video site
+learns about every reader who visits, whether or not they watch. If the
+page shows a still instead, and loads the player only when the reader
+presses play, the video site learns about no one until then.
+`statac refresh` fetches the still from the video site once, and the
+still is kept in the site, because `statac build` never uses the network.
+That way, building the same files gives the same result every time, and
 works with no connection at all.
 
-Statac says so once for each video, however many pages show it: at the
-call in the writing where the writing shows the video, and otherwise in
-the template. Where the video site answered that it has no picture for
-the video, `fetched/record` says `absent` against it, `statac refresh`
-doesn't ask again, and the warning says so.
+Statac warns once for each video, however many pages show it. If your
+writing shows the video, the warning points at the call in the writing.
+Otherwise it points at the template. If the video site replied that it has
+no picture for the video, `fetched/record` marks the video `absent`.
+`statac refresh` then doesn't ask again, and the warning says so.
 
 ## How to fix it
 
-Run `statac refresh` in the site's folder. It fetches the still of every
-video a page reads one for, into `fetched/stills/`, and says what it
-fetched. Commit `fetched/` with the rest of the site.
+Run `statac refresh` in the site's folder. It fetches a still into
+`fetched/stills/` for every video whose still a page uses, and lists what
+it fetched. Commit `fetched/` with the rest of the site.
 
-Where the video site has no picture, show one of your own: a snippet can
-take your picture as an argument of its own, such as `poster`, and show
-it with `page.photo` in place of the still.
+If the video site has no picture, show one of your own. A snippet can take
+your picture as an argument you define, such as `poster`, and show it with
+`page.photo` instead of the still.
 
-Once you have understood it, the warning can be quietened by name.
+Once you have understood the warning, you can quieten it by name.
 
 ## Example
 

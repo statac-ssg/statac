@@ -1,20 +1,21 @@
 # Card not drawn
 
-A page's sharing card couldn't be drawn from what the page says, so the
-page has no card: `page.card` has no value on it, and a layout testing
-for one writes no picture for it. The message says why:
+Statac couldn't draw a page's sharing card from what the page says, so
+the page has no card. `page.card` has no value on that page, and a layout
+that tests for one writes no picture for it. The message gives one of
+these reasons:
 
-- a text in the middle of the card doesn't fit the room it has, even at
+- a text in the middle of the card doesn't fit the space it has, even at
   the smallest size Statac tries;
-- the texts at the top and the bottom leave no room between them;
-- the page's texts hold a character none of the card's fonts has.
+- the texts at the top and the bottom leave no space between them;
+- the page's texts contain a character that none of the card's fonts has.
 
-Pages left without a card for the same reason are told together, with
-how many there are and the first of them. Pages needing some of the same
-characters are told together too, with the characters the most of them
-need named first. Pages with nothing missing in common, such as one
-needing an arrow and one needing letters of another script, are told
-apart.
+Pages left without a card for the same reason are reported together,
+with the number of pages and the first of them. Pages that need some of
+the same characters are reported together too, and the characters the
+most pages need are listed first. Pages whose missing
+characters have nothing in common, such as one that needs an arrow and
+one that needs letters from another script, are reported separately.
 
 ## What you'll see {#what-youll-see}
 
@@ -26,27 +27,28 @@ warning  Card not drawn: the `title` of `content/post-1.md` doesn't fit, even at
 
 ## Why Statac warns
 
-Statac never cuts a text short, lets one run off the card, or draws a
-box where a character should be. A card it can't draw whole it doesn't
-draw at all. The page is still built and published, so the build goes
-on, and Statac tells you which pages are shared without a picture.
+Statac never cuts a text short, lets a text run off the card, or draws
+a box in place of a character. If it can't draw the whole card, it
+doesn't draw the card at all. The page is still built and published, so
+the build carries on, and Statac tells you which pages will be shared
+without a picture.
 
 ## How to fix it
 
-For a text that doesn't fit, give those pages fewer words there: a
-shorter `og_title` shortens a title on the card and nowhere else. Or give
-the middle of the card more room, with a smaller `padding` or smaller
-texts at the top and bottom.
+If a text doesn't fit, give those pages fewer words there. A shorter
+`og_title` shortens the title on the card and nowhere else. Or give the
+middle of the card more space, with a smaller `padding` or smaller texts
+at the top and bottom.
 
-For a character no font has, add a font that has it to the card's `font`.
-Fonts are tried in the order written. `statac new --cards` writes two, Noto
-Sans for text and Noto Emoji for emoji. Where one of them has the character
-but isn't in `templates/og/`, the message says so:
-`statac new --update --missing` writes it again, and then you name it in
+If no font has a character, add a font that has it to the card's `font`.
+Fonts are tried in the order they are written. `statac new --cards`
+writes two: Noto Sans for text and Noto Emoji for emoji. If one of these
+has the character but isn't in `templates/og/`, the message says so. Run
+`statac new --update --missing` to write the font again, then add it to
 the card's `font`.
 
-To share a page with a picture of your own instead, name it with
-`og_image`.
+To share a page with a picture of your own instead, give that picture in
+the page's `og_image`.
 
 ## Example
 
@@ -56,7 +58,7 @@ In `templates/og.yaml`:
 title.size: up to 75
 ```
 
-In `content/post-1.md`, a title for the card alone:
+In `content/post-1.md`, a title used only on the card:
 
 ```yaml
 og_title: A shorter title

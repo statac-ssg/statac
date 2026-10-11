@@ -1,7 +1,8 @@
 # Not Statac's folder
 
-The folder the built site should go in already holds files Statac didn't
-put there, or a file or link stands where the folder should be.
+The folder the built site should go in already contains files that
+Statac didn't put there, or there is a file or link where the folder
+should be.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,14 +15,16 @@ error  Not Statac's folder: `docs` already holds 2 files and 1 folder
 ## Why Statac stops
 
 Each build replaces the whole output folder, so nothing from an earlier
-build lingers. Statac leaves a `.statac-built` file in every folder it
-builds, and replaces only a folder that has one, or an empty one. Anything
-else could be your own files, sent there by a mistyped folder name.
+build is left behind. Statac leaves a `.statac-built` file in every
+folder it builds, and only replaces a folder that has this file, or an
+empty folder. Any other folder could hold your own files, with the build
+pointed at it by a mistyped folder name.
 
 ## How to fix it
 
 Build into a new or empty folder. If the folder really is an old built
-site, from before Statac marked it, empty it yourself and build again.
+site from before Statac marked its folders, empty it yourself and build
+again.
 
 ## Example
 

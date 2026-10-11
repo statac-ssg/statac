@@ -1,11 +1,11 @@
 # Names nothing
 
 A field that `statac.yaml` declares as `one of data.` and a table, or
-`one of folder.` and a folder, holds a value that is none of the names
+`one of folder.` and a folder, has a value that matches none of the names
 there. A table's names are the names its items are written under. A
-folder's names are its pages' names as they stand in their addresses:
-`book-1` for `book-1.md`, and `day-one` for `03-day-one.md` in a numbered
-folder.
+folder's names are the names of its pages as they appear in their
+addresses: `book-1` for `book-1.md`, and `day-one` for `03-day-one.md` in
+a numbered folder.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,15 +17,16 @@ error  Names nothing: `data/people.yaml` has no `persn-1`
 
 ## Why Statac stops
 
-The rule is yours: you said the field names one of these. A name that
-matches none is most often a slip, and Statac can't tell which record or
-page you meant. When a name is close, Statac offers it.
+You made the rule: you said the field refers to one of these. A value
+that matches none of them is most often a typing mistake, and Statac
+can't tell which record or page you meant. If a name is close, Statac
+suggests it.
 
 ## How to fix it
 
-Write one of the names the table or the folder has, or add the record or
-the page the value names. A draft, and a post waiting for its day, can be
-named.
+Write one of the names that the table or the folder has, or add the
+record or page that the value refers to. The value can refer to a draft,
+or to a post waiting for its day.
 
 ## Example
 
@@ -53,7 +54,7 @@ author: persn-1
 ---
 ```
 
-The table's name is `person-1`:
+The name in the table is `person-1`:
 
 ```yaml
 ---

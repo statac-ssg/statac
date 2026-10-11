@@ -1,8 +1,8 @@
 # Not linked by place
 
-A page with no `translation_key` stands where a page in another language
-with one stands, such as `content/en/about.md` beside a
-`content/about.md` that has `translation_key: about`. The two aren't
+A page with no `translation_key` is in the same place as a page in
+another language that has one. For example, `content/en/about.md` has no
+key, and `content/about.md` has `translation_key: about`. The two aren't
 linked as translations.
 
 ## What you'll see {#what-youll-see}
@@ -16,11 +16,11 @@ warning  Not linked by place: `content/about.md` has `translation_key: about`
 ## Why Statac warns
 
 Pages in different languages at the same path under their languages'
-folders are translations of each other. A page with a
-`translation_key` is linked by its key alone, though, so the page
-standing in its place is left out. Statac builds both pages as they
-are; it tells you because two pages standing in one place are usually
-meant to be one page's translations.
+folders are translations of each other. But a page with a
+`translation_key` is linked by its key alone, so the page in the same
+place is left out. Statac builds both pages as they are. It warns you
+because two pages in the same place are usually meant to be translations
+of one page.
 
 ## How to fix it
 

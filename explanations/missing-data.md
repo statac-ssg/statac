@@ -1,8 +1,9 @@
 # Missing data
 
-A field is declared in `statac.yaml` as `one of data.` and a name, and
-nothing in `data/` has that name. `data.people` is `data/people.yaml`, and
-`data.people.staff` is `data/people/staff.yaml`.
+A field is declared in `statac.yaml` as `one of data.` followed by a
+name, but nothing in `data/` has that name. `data.people` means
+`data/people.yaml`, and `data.people.staff` means
+`data/people/staff.yaml`.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,13 +16,14 @@ error  Missing data: there is no `data.poeple` for `fields.author` to name
 ## Why Statac stops
 
 The declaration says every value of the field is one of the table's names.
-With no table there are no names to hold a value to, and passing every
-value would drop the check you asked for without saying so. When a name in
-`data/` is close, Statac offers it.
+Without the table there are no names to check a value against, and
+letting every value pass would quietly drop the check you asked for. If
+a name in `data/` is close, Statac suggests it.
 
 ## How to fix it
 
-Write the table's name as its file is named, or add the file to `data/`.
+Write the table's name to match its file's name, or add the file to
+`data/`.
 
 ## Example
 
@@ -31,13 +33,13 @@ In `statac.yaml`:
 fields.author: one of data.poeple
 ```
 
-`data/` holds:
+`data/` contains:
 
 ```text
 data/people.yaml
 ```
 
-The table is `data.people`:
+The table is called `data.people`:
 
 ```yaml
 fields.author: one of data.people

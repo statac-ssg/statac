@@ -1,8 +1,8 @@
 # Token in settings
 
 `statac.yaml` has a `webmention_token:` line. The token is the key the
-webmention relay gave you to read your site's mentions, and it doesn't
-belong in a file kept with the site.
+webmention relay gave you to read your site's mentions. It doesn't belong
+in a file that is kept with the site.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,24 +14,24 @@ error  Token in settings: `webmention_token` doesn't belong in a file kept with 
 
 ## Why Statac stops
 
-The site's folder is committed, shared and often published, and whoever
-holds the token can read every mention the relay keeps for you. So Statac
-reads the token from two places only, when `statac refresh` asks the relay:
-the variable `STATAC_WEBMENTION_TOKEN`, or else the one line of the file
-`.statac/token`, in a folder a new site's `.gitignore` keeps out of what is
-committed. Where both hold one, the variable's is used. A line holding it in
-`statac.yaml` stops the build, so the token goes no further than it has, and
-its value is never shown: wherever Statac draws the line, it draws dots in
-its place.
+The site's folder is committed, shared and often published, and anyone
+who has the token can read every mention the relay stores for you. So
+when `statac refresh` asks the relay for mentions, Statac reads the token
+from only two places: the variable `STATAC_WEBMENTION_TOKEN`, or else the
+single line of the file `.statac/token`. A new site's `.gitignore` keeps
+that folder out of commits. If both have a token, the variable's is used.
+A token line in `statac.yaml` stops the build, so the token goes no
+further than it already has. Its value is never shown: wherever Statac
+prints the line, it prints dots in place of the token.
 
 `statac build` and `statac check` never need the token at all.
 
 ## How to fix it
 
-Remove the line from `statac.yaml`, and make sure the token is in none of
+Remove the line from `statac.yaml`, and make sure the token isn't in any of
 the files you commit. If it has been committed, ask the relay for a new
-one, since the old one is in the history of the folder. Then say the site
-uses webmentions with `webmentions: true`, and give the token to
+token, since the old one is in the folder's history. Then say that the
+site uses webmentions by adding `webmentions: true`, and give the token to
 `statac refresh` in the variable `STATAC_WEBMENTION_TOKEN`:
 
 ```sh
@@ -39,8 +39,8 @@ STATAC_WEBMENTION_TOKEN=your-token statac refresh
 ```
 
 Or keep it on this computer, as the one line of the file `.statac/token`
-in the site's folder, and run `statac refresh` with no variable. Check
-that `.gitignore` lists `.statac/` first, so the file is never committed.
+in the site's folder, and run `statac refresh` without the variable. First
+check that `.gitignore` lists `.statac/`, so the file is never committed.
 
 ## Example
 

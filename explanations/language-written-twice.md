@@ -1,8 +1,8 @@
 # Language written twice
 
-`language` in `statac.yaml` lists the same language twice. Capitals don't
-make a different language, so `en` and `EN` are one. The message points at
-the second, and shows where the first was written.
+`language` in `statac.yaml` lists the same language twice. Capital letters
+don't make it a different language, so `en` and `EN` are the same. The
+message points at the second one, and shows where the first is written.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,13 +14,14 @@ error  Language written twice: `en`
 ## Why Statac stops
 
 The first language in the list is the site's main language, and each
-language's pages live in a folder named after it. With one language
-written twice, Statac can't know which spelling names its folder, or
-whether the second was meant to be another language altogether.
+language's pages are in a folder named after that language. If a language
+is written twice, Statac can't tell which spelling is the folder's name, or
+whether you meant the second to be a different language.
 
 ## How to fix it
 
-Keep the language once, spelled as its folder is, and remove the other.
+Keep one of them, spelled the same way as the language's folder, and
+remove the other.
 
 ## Example
 
@@ -30,7 +31,7 @@ In `statac.yaml`:
 language: [en, ar, EN]
 ```
 
-Each language once:
+With each language listed once:
 
 ```yaml
 language: [en, ar]

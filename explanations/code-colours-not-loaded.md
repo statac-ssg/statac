@@ -1,12 +1,12 @@
 # Code colours not loaded
 
-A page shows a block of code Statac coloured, and nothing the site builds
-asks for `code.css`, the stylesheet that holds the colours. The code is
-published marked for colour with no colours to show it in, so readers see
-it in one colour.
+A page shows a block of code that Statac coloured, but nothing the site
+builds asks for `code.css`, the stylesheet that contains the colours. The
+code is published marked up for colour, but with no colours defined, so
+readers see it all in one colour.
 
-Statac tells this once for the site, at the first coloured block of the
-first page that shows one.
+Statac reports this once for the whole site, at the first coloured block
+on the first page that has one.
 
 ## What you'll see {#what-youll-see}
 
@@ -19,26 +19,27 @@ warning  Code colours not loaded: no template asks for `code.css`
 ## Why Statac warns
 
 Statac colours code by giving each piece of it a class, such as `hl-4k`,
-and writes what each class looks like into `code.css`. A page shows the
-colours only where it loads that stylesheet, which a template does with
-`css("code.css")`. Where no template does, the stylesheet is published
-and no page uses it. Nothing on the page looks broken, so it is easy to
+and writes the style for each class into `code.css`. A page shows the
+colours only if it loads that stylesheet, which a template does with
+`css("code.css")`. If no template does, the stylesheet is published but
+no page uses it. Nothing on the page looks broken, so this is easy to
 miss.
 
-Statac goes by what the build read. Where anything it built asked for
-`code.css`, with `css` or with `asset`, on any page, it says nothing. An
-`assets/code.css` of your own is held to the same.
+Statac decides from what the build actually read. If anything it built
+asked for `code.css`, with `css` or with `asset`, on any page, it says
+nothing. The same check applies if you have an `assets/code.css` of your
+own.
 
 ## How to fix it
 
-Ask for the stylesheet inside the `<head>` of your layout, the template
-your other templates extend, so every page loads it.
+Ask for the stylesheet inside the `<head>` of your layout (the template
+your other templates extend), so that every page loads it.
 
-Where the colours reach your pages some way Statac can't see, such as
-rules copied into another stylesheet, or you want code in one colour,
+If the colours reach your pages in a way Statac can't see, such as rules
+copied into another stylesheet, or if you want code in one colour,
 quieten this warning with `quiet: [code-colours-not-loaded]` in
-`statac.yaml`. To show one block without colour, write `text` as its
-language, or none.
+`statac.yaml`. To show a single block without colour, give `text` as its
+language, or give no language.
 
 ## Example
 

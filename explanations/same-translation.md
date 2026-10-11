@@ -1,11 +1,11 @@
 # Same translation
 
-Two pages in one language would both be the translation of the same
+Two pages in the same language would both be the translation of the same
 pages in the site's other languages. Either both have the same
-`translation_key`, or both stand where a page in another language
-stands, such as `content/en/about.md` and `content/en/about.html` beside
-`content/about.md`. The message points at the second, and shows the
-first.
+`translation_key`, or both are in the same place as a page in another
+language. For example, `content/en/about.md` and `content/en/about.html`
+are both in the same place as `content/about.md`. The message points to
+the second page, and shows the first.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,16 +17,17 @@ error  Same translation: two pages in `en` have `translation_key: about`
 
 ## Why Statac stops
 
-A page has one translation in each language. With two candidates in
-one language, Statac can't know which one a reader switching language
-should reach, and a guess would send them to the wrong page.
+A page has one translation in each language. If there are two candidates
+in one language, Statac can't know which one to send a reader to when
+they switch language, and a guess would send them to the wrong page.
 
 ## How to fix it
 
-Where both have one key, give each page its own key, or move the one in
-the wrong language to its own language's folder. Where both stand in one
+If both have the same key, give each page its own key, or move the one in
+the wrong language to its own language's folder. If both are in the same
 place, rename one of them, or give the one that isn't the translation a
-`translation_key` of its own, which links it by its key alone.
+`translation_key` of its own. It is then linked to other pages by its key
+only.
 
 ## Example
 

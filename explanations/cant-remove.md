@@ -1,13 +1,16 @@
 # Can't remove
 
-Statac couldn't remove a folder it made, or a file in `fetched/`. It
-builds each site in a folder of its own and puts that in the output's
-place only when the build succeeds. Where it has no spare to build into,
-or can't change the two over in one step, it makes folders beside the
-output for the purpose, named with `.statac-new` or `.statac-old` at the
-end; those are the folders it couldn't remove. `statac refuse` removes a
-webmention's file from `fetched/mentions/`, and its sender's face from
-`fetched/faces/`, but never where it is a link, or anything but a file.
+Statac couldn't remove a folder it made, or a file in `fetched/`.
+
+Statac builds each site in a separate folder, and puts that folder in
+place of the output folder only if the build succeeds. If it has no spare
+to build into, or can't swap the two folders in one step, it makes
+folders for this beside the output folder, with names ending
+`.statac-new` or `.statac-old`. Those are the folders it couldn't remove.
+
+`statac refuse` removes a webmention's file from `fetched/mentions/`, and
+the sender's face from `fetched/faces/`. It never removes either one if
+it is a link, and never removes anything that isn't a file.
 
 ## What you'll see {#what-youll-see}
 
@@ -18,18 +21,20 @@ error  Can't remove `._site.statac-old`: permission denied
 
 ## Why Statac stops
 
-A folder Statac can't remove is one it can't use for the next build
-either. When this comes after a successful build, the new site is already
-in place; only the old copy beside it is left. A webmention `statac
-refuse` couldn't remove is still shown.
+Statac can't use a folder it can't remove for the next build either.
+If this error follows a successful build, the new site is already in
+place, and only the old copy beside it is left behind. If `statac refuse`
+couldn't remove a webmention, the webmention is still shown.
 
 ## How to fix it
 
-Deal with the reason the message gives, such as a program holding a file
-in the folder open, then build again. Statac removes the folder itself
-next time, or you can remove it. For a file in `fetched/`, put the file
-itself in place of a link, then run `statac refuse` again.
+Deal with the reason the message gives, such as a program that has a
+file in the folder open, then build again. Statac removes the folder on
+the next build, or you can remove it yourself. For a file in `fetched/`
+that is a link, replace the link with the file itself, then run
+`statac refuse` again.
 
 ## Example
 
-Close whatever has a file from the old site open, and build again.
+Close any program that has a file from the old site open, then build
+again.

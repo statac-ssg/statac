@@ -14,23 +14,24 @@ error  Malformed JSON: a comma with nothing after it
 
 ## Why Statac stops
 
-Past the mistake, Statac can't tell which values you meant, and templates
-reaching the file would get the wrong ones, or none, without anyone
-noticing.
+After the mistake, Statac can't tell which values you meant. Templates
+that use the file would get the wrong values, or none, and nobody would
+notice.
 
 ## How to fix it
 
-Look at the place the caret points to. JSON is strict, and common causes
+Look at the place the caret points to. JSON is strict. Common causes
 are:
 
 - A quote or bracket opened and never closed.
-- A comma after the last value in a list or an object. JSON allows none.
-- A name or text in single quotes, or none. JSON writes both in double
-  quotes.
-- A backslash JSON doesn't know, such as `\q`. Write `\\` for a backslash.
-- A line break or a tab written as itself inside quotes. Write `\n` or
-  `\t` instead.
-- A number written another way, such as `01`, `.5` or `+1`. Write `1`,
+- A comma after the last value in a list or an object. JSON doesn't allow one.
+- A name or text in single quotes, or with no quotes. JSON needs double
+  quotes around both.
+- A backslash sequence JSON doesn't recognise, such as `\q`. Write `\\`
+  for a backslash.
+- A line break or a tab typed directly inside quotes. Write `\n` or `\t`
+  instead.
+- A number written in a form JSON doesn't accept, such as `01`, `.5` or `+1`. Write `1`,
   `0.5` and `1`.
 
 ## Example

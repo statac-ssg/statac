@@ -1,8 +1,8 @@
 # Option given twice
 
-The command line gives the same option twice. The folder written after
-`statac build` or `statac check` is the site's folder, as `--site` gives it,
-so giving both counts as `--site` twice.
+The same option is given twice on the command line. A folder written after
+`statac build` or `statac check` sets the site's folder, the same as
+`--site` does, so writing both counts as giving `--site` twice.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,8 +14,8 @@ error  Option given twice: `--site`
 
 ## Why Statac stops
 
-Statac can't tell which of the two values you meant, and taking either
-would quietly ignore the other.
+Statac can't tell which of the two values you meant, and using either one
+would silently ignore the other.
 
 ## How to fix it
 

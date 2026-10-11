@@ -1,7 +1,7 @@
 # Dates disagree
 
-A page's file name opens with a date, such as `2026-10-04-post-1.md`, and
-its `date:` line gives another day.
+A page's file name starts with a date, such as `2026-10-04-post-1.md`, but
+its `date:` line has a different day.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,15 +13,15 @@ warning  Dates disagree: `date` is `2026-10-05`, the file name `2026-10-04`
 
 ## Why Statac warns
 
-The `date:` line is written on the page itself, so Statac uses it, and the
-build goes on. It tells you, because one of the two is probably a mistake,
-and the address of a post often holds its date.
+The `date:` line is written in the page itself, so Statac uses it, and the
+build goes on. Statac warns you because one of the two is probably a
+mistake, and a post's address often includes its date.
 
 ## How to fix it
 
-Change the file name or the `date:` line so they give the same day. If the
-file name's date is right, you can remove the `date:` line: a date at the
-start of the name dates the page.
+Change the file name or the `date:` line so they show the same day. If the
+file name's date is right, you can remove the `date:` line. A date at the
+start of the file name sets the page's date.
 
 ## Example
 

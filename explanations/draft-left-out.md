@@ -1,7 +1,8 @@
 # Draft left out
 
-A page says `draft: true`, written on the page or handed down from its
-folder's `index.md` as `pages.draft: true`, so it isn't built.
+A page has `draft: true`, so it isn't built. The field is either written
+on the page itself, or handed down from its folder's `index.md` as
+`pages.draft: true`.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,19 +15,19 @@ note  Draft left out: `content/post-1.md`
 ## Why Statac says so
 
 A draft is left out of everything: it has no page of its own, and no
-folder, tag, series or feed lists it. Statac names every page it leaves
-out, so a page marked as a draft and forgotten never goes missing without
-a word. `statac check` shows each draft, and `statac build` counts them.
+folder, tag, series or feed lists it. Statac reports every page it leaves
+out, so a page you marked as a draft and then forgot about never
+disappears without a word. `statac check` shows each draft, and `statac build` counts them.
 This can't be quietened, because it leaves a page out.
 
 ## How to fix it
 
-Nothing is wrong: this is what `draft: true` asks for. When the page is
-ready, take the line out, or write `draft: false`.
+Nothing is wrong. This is what `draft: true` is for. When the page is
+ready, remove the line, or write `draft: false`.
 
-To see drafts while you write them, run `statac serve`, which shows them
-and marks each one. `statac build --drafts` builds them as if published,
-and says how many it included.
+To see drafts while you write them, run `statac serve`. It includes them
+and marks each one. `statac build --drafts` builds drafts as if they were
+published, and says how many it included.
 
 ## Example
 
@@ -39,7 +40,7 @@ draft: true
 ---
 ```
 
-Published, with the line taken out:
+To publish it, remove the line:
 
 ```yaml
 ---

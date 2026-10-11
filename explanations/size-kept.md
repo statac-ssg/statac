@@ -1,9 +1,9 @@
 # Size kept
 
 A text on a card is placed at the top or the bottom, and its size is
-written `up to`, as `up to 75`. Statac fits only the texts in the middle
-row, at `left`, `centre` or `right`, to the room there; a text at the top
-or the bottom is drawn at the size written.
+written with `up to`, as in `up to 75`. Statac fits only the texts in
+the middle row (at `left`, `centre` or `right`) to the space there. A
+text at the top or the bottom is drawn at the size written.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,15 +15,15 @@ warning  Size kept: at `bottom`, `up to 36` is drawn at 36
 
 ## Why Statac warns
 
-Statac is sure what you meant: the size is the largest you would have
-it, and it draws it at that size, so the build goes on. It tells you,
-because `up to` says you expect it to shrink when a long title needs the
-room, and here it never does.
+Statac is sure what you meant: the size is the largest you want the
+text to be. It draws the text at that size, and the build goes on. It
+warns you because `up to` says you expect the text to shrink when a long
+title needs the room, and here it never does.
 
 ## How to fix it
 
 Write the size without `up to`, or place the text at `left`, `centre` or
-`right` to have it fitted.
+`right` so that it is fitted.
 
 ## Example
 
@@ -36,7 +36,7 @@ footer.size: up to 36
 footer.colour: "#B9A88F"
 ```
 
-Drawn at 36 either way, written as it is drawn:
+The text is drawn at 36 either way, so write the size as it is drawn:
 
 ```yaml
 footer.size: 36

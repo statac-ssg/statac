@@ -2,7 +2,7 @@
 
 Two pages have the same `id:`. A page's id is its permanent identity: it
 stays the same when the page's title or address changes. The message
-points at the second, and shows where the first was written.
+points at the second page, and shows where the first was written.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,14 +14,14 @@ error  Same id: two pages have the id `k3m9x2`
 
 ## Why Statac stops
 
-An id names one page. With two pages giving the same one, anything that
-follows a page by its id, such as a feed reader, would take one page for
-the other.
+An id identifies one page. If two pages have the same id, anything that
+tracks a page by its id, such as a feed reader, would mistake one page
+for the other.
 
 ## How to fix it
 
-Give each page its own id. A page made from an item in `data/` takes the
-item's `id:`, so look there too.
+Give each page its own id. A page made from an item in `data/` gets its id
+from the item's `id:`, so check there too.
 
 ## Example
 
@@ -34,7 +34,7 @@ item's `id:`, so look there too.
   id: k3m9x2
 ```
 
-Give the second its own:
+Give the second person its own id:
 
 ```yaml
 - name: Person 1

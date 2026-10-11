@@ -1,12 +1,12 @@
 # Sharing image may not show
 
-A page names the picture it is shared with, with `og_image`, and the file
-is of a kind that some link previews don't show: a WebP or an SVG, say.
-Statac uses the picture all the same. It is published as it is, and
-`page.card` answers with its address, exactly as for any other picture.
+A page uses `og_image` to choose the picture it is shared with, and the
+file is of a kind that some link previews don't show, such as a WebP or an
+SVG. Statac still uses the picture. It is published unchanged, and
+`page.card` has its address, the same as for any other picture.
 
-A picture several pages name is told once, with how many pages there are,
-where the first of them names it.
+If several pages use the same picture, Statac reports it once, at the
+first page that uses it, and says how many pages there are.
 
 ## What you'll see {#what-youll-see}
 
@@ -18,28 +18,27 @@ warning  Sharing image may not show: `content/cover.webp` is a WebP
 
 ## Why Statac warns
 
-A link preview is made by the site or the program a link is pasted into,
-each with a reader of its own for the picture. Some kinds of picture are
-read by some of them and not by others, and which those are changes from
-year to year. A PNG is the kind most widely shown. Where a preview
-can't read the picture, the page is shared with no picture at all, and
-nothing on your own site shows that it happened.
+A link preview is made by the site or program that the link is pasted
+into, and each one has its own code for reading the picture. Some of them
+can read a given kind of picture and others can't, and which ones can
+changes from year to year. PNG is the kind most widely shown. If a
+preview can't read the picture, the page is shared with no picture at
+all, and nothing on your own site shows that this happened.
 
-Statac goes by what the file holds, not by its name, so a WebP saved as
-`cover.png` is told as a WebP.
+Statac checks what the file contains, not its name, so a WebP saved as
+`cover.png` is reported as a WebP.
 
-The picture is yours to choose, so Statac uses the one you name, never
-sets it aside for the kind of file it is, and never draws a card in its
+The picture is your choice, so Statac uses the one you name. It never
+sets it aside because of its kind of file, and never draws a card in its
 place.
 
 ## How to fix it
 
-For a picture more previews show, save it as a PNG and name that with
-`og_image`.
+To have the picture shown in more previews, save it as a PNG and set
+`og_image` to that file.
 
-Where the previews that matter to you show the picture as it is, nothing
-needs changing. Once you have understood it, quieten the warning by
-name.
+If the previews that matter to you show the picture as it is, nothing
+needs changing. Once you have understood the warning, quieten it by name.
 
 ## Example
 
@@ -49,8 +48,8 @@ In `content/post-1/index.md`:
 og_image: cover.webp
 ```
 
-With `cover.png` beside the post and `og_image: cover.png` in it, the
-warning goes.
+With `cover.png` beside the post and `og_image: cover.png` in the post,
+the warning goes away.
 
 In `statac.yaml`, to stop it being shown:
 

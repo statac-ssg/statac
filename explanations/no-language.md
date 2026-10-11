@@ -1,7 +1,7 @@
 # No language set
 
-`statac.yaml` has no `language`, so Statac reads the site as written in
-English.
+`statac.yaml` has no `language` setting, so Statac treats the site as
+written in English.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,24 +13,25 @@ note  No language set: the site is read as English
 
 ## Why Statac says so
 
-A page says what language it is in, as `lang` on its `<html>`, and a
-screen reader chooses the voice it reads the page aloud in by that. With
-no `language`, templates have `en` for it, so a site written in another
-language is read aloud in an English voice. A browser offers to
-translate a page, and breaks its words at the ends of lines, by the same
-value.
+Each page states its language with `lang` on its `<html>` element, and a
+screen reader uses that to choose the voice it reads the page aloud in.
+With no `language`, templates get `en` for it, so a site written in
+another language is read aloud in an English voice. A browser also uses
+the same value to decide whether to offer a translation, and how to break
+words at the ends of lines.
 
-The language also decides the words Statac writes: the months and
-weekdays of dates, the quotation marks, and words such as `back to the
-text` beside a footnote. With no `language`, these are English too.
+The language also decides the words Statac writes: the names of months
+and weekdays in dates, the quotation marks, and words such as `back to the
+text` beside a footnote. With no `language`, these are in English too.
 
-Statac says so once for the site, since a site in English looks right
-either way and nothing else would show the line missing.
+Statac shows this note once for the whole site. A site in English looks
+correct either way, so nothing else would show that the line is missing.
 
 ## How to fix it
 
-Add the language the site is written in to `statac.yaml`, by its code.
-A site written in more than one lists them all, the main one first.
+Add the site's language to `statac.yaml`, using its code. If the site is
+written in more than one language, list them all, with the main one
+first.
 
 ## Example
 
@@ -40,7 +41,8 @@ A `statac.yaml` with no `language` line:
 title: Site 1
 ```
 
-With the line, the note is gone, and every page says it is in English:
+With the line added, the note goes away, and every page says it is in
+English:
 
 ```yaml
 title: Site 1

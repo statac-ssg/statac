@@ -1,8 +1,9 @@
 # Unknown language
 
-The site's `language` names a language Statac has no words for, and the
-site's `languages/` folder has no file for it either. Statac knows the
-words of a few languages; for any other, the site writes its own.
+The site's `language` is set to a language Statac has no words for, and
+the site's `languages/` folder has no file for it either. Statac comes
+with the words for a few languages. For any other, the site provides its
+own.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,16 +15,16 @@ warning  Unknown language: Statac has no words for `sw`
 
 ## Why Statac warns
 
-Statac is sure which language you mean, and the build goes on. Without
-words, dates are written in figures, such as `2025-12-31`, and quotation
+Statac is sure which language you mean, so the build continues. Without
+the words, dates are written in figures, such as `2025-12-31`, and quotation
 marks stay as they were typed. A `date_format` that writes a month or a
 weekday in words stops the build, since there are no words to write it
 with.
 
 ## How to fix it
 
-Add a file named after the language's code to `languages/`, with the
-words and marks it is written with. Every line is optional.
+Add a file to `languages/` named after the language's code, containing
+the language's words and quotation marks. Every line in it is optional.
 
 ## Example
 
@@ -33,7 +34,7 @@ In `statac.yaml`:
 language: sw
 ```
 
-A file `languages/sw.yaml` giving Swahili's words:
+A file `languages/sw.yaml` with the words for Swahili:
 
 ```yaml
 months: [Januari, Februari, Machi, Aprili, Mei, Juni,

@@ -1,9 +1,9 @@
 # Definition written twice
 
-A page has two footnotes' notes with one label, such as two lines opening
-`[^1]:`. Labels match whatever their case, so `[^note]:` and `[^Note]:`
-are one label too. Every marker with that label points at the later note,
-so the first is shown nowhere.
+A page has two footnote notes with the same label, such as two lines that
+start with `[^1]:`. Labels match whatever their case, so `[^note]:` and
+`[^Note]:` also count as the same label. Every marker with that label
+points to the later note, so the first note is never shown.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,16 +15,16 @@ warning  Definition written twice: the first `[^n]:` line isn't shown
 
 ## Why Statac warns
 
-Statac shows the later note and publishes the page. It
-tells you, because the first note is writing you wrote that readers never
-see, and it is often the one you meant: a note copied from another page,
-or a label given to two notes by mistake.
+Statac shows the later note and publishes the page. It warns you because
+readers never see the first note, which you wrote, and it is often the
+note you meant. This happens when a note is copied from another page, or
+when two notes are given the same label by mistake.
 
 ## How to fix it
 
-Give one of the notes another label, and point a marker at it where it
-belongs, or take one of them out. The message points at the first note,
-and at the later one that is shown instead.
+Give one of the notes another label, and change the marker where that
+note belongs to use the new label. Or delete one of the notes. The message
+points to the first note, and to the later one that is shown instead.
 
 ## Example
 

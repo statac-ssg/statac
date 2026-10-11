@@ -1,8 +1,9 @@
 # Can't quieten
 
-`quiet:` in `statac.yaml` names a problem that can't be quietened. You can
-quieten a warning or a note you have understood. You can't quieten one that
-stops the build, or one that leaves a page out of the published site.
+`quiet:` in `statac.yaml` lists a problem that can't be quietened. You can
+quieten a warning or a note once you have understood it. You can't quieten a
+problem that stops the build, or one that leaves a page out of the published
+site.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,13 +15,14 @@ error  Can't quieten: `duplicate-key` stops the build
 
 ## Why Statac stops
 
-Quietening a problem that stops the build, or leaves a page out, would hide
-a site that isn't the one you wrote. Statac always says so.
+If you could quieten a problem that stops the build or leaves a page out,
+the published site would no longer be the one you wrote, and nothing would
+tell you. Statac always reports these problems.
 
 ## How to fix it
 
-Take the name out of `quiet:`, and fix the problem itself. `statac explain`
-with its name says how.
+Take the name out of `quiet:`, and fix the problem itself. Run
+`statac explain` with the problem's name to see how.
 
 ## Example
 
@@ -30,7 +32,8 @@ In `statac.yaml`:
 quiet: [broken-link, duplicate-key]
 ```
 
-A duplicate key stops the build, so it can't be quietened:
+A duplicate key stops the build, so it can't be quietened. Take it out of
+the list:
 
 ```yaml
 quiet: [broken-link]

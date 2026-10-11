@@ -1,9 +1,9 @@
 # Unwritable name
 
-A file in `assets/` or `static/` has a name some common disk can't hold.
-Windows keeps names such as `CON`, `NUL`, `COM1` and `LPT1` for devices,
-with or without an extension; refuses the characters `< > : " | ? * \`;
-and drops a dot or a space at the end of a name.
+A file in `assets/` or `static/` has a name that some common disks can't
+store. Windows reserves names such as `CON`, `NUL`, `COM1` and `LPT1` for
+devices, with or without an extension. It also refuses the characters
+`< > : " | ? * \`, and drops a dot or a space at the end of a name.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,9 +14,9 @@ error  Unwritable name: `static/con.txt` uses `con`, a device name on Windows
 
 ## Why Statac stops
 
-Statac holds every site to the rules of the strictest disk, so a site that
-builds on one computer builds on all of them, and a copy of the built site
-can be put anywhere.
+Statac applies the rules of the strictest disk to every site. That way, a
+site that builds on one computer builds on all of them, and you can copy
+the built site anywhere.
 
 ## How to fix it
 

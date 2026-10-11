@@ -13,15 +13,16 @@ error  Merge key: Statac doesn't copy fields in with `<<`
 
 ## Why Statac stops
 
-Statac reads a data file exactly as it stands, so what you see in the file
-is what templates get. The merge key isn't part of YAML's current version,
-and readers disagree about it: some copy the fields in, others read `<<` as
-a field of its own. Statac won't guess which you meant.
+Statac reads a data file exactly as it is written, so templates get what
+you see in the file. The merge key isn't part of the current version of
+YAML, and programs that read YAML disagree about it. Some copy the fields
+in, and others read `<<` as an ordinary field. Statac doesn't guess which
+you meant.
 
 ## How to fix it
 
-Write the fields out in full in each item that has them. To keep a field
-called `<<`, put it in quotes: `"<<":`.
+Write the fields out in full in each item that needs them. If you want a
+field called `<<`, put its name in quotes: `"<<":`.
 
 ## Example
 

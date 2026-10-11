@@ -14,9 +14,9 @@ error  Unknown problem name: `brokn-link`
 
 ## Why Statac stops
 
-A misspelt name in `quiet:` would quieten nothing, and you would go on
-seeing the problem you meant to quieten without knowing why. When a known
-name is close, Statac offers it.
+A misspelt name in `quiet:` would quieten nothing, and you would keep
+seeing the problem you meant to quieten without knowing why. If a known
+name is close, Statac suggests it.
 
 ## How to fix it
 

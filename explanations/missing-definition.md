@@ -1,8 +1,8 @@
 # Missing definition
 
-The writing points at a footnote, `[^label]`, or names a link by a label,
-`[text][label]` or `[label][]`, and no line on the page defines that label.
-Statac publishes what you wrote as words, brackets and all.
+Your writing refers to a footnote, `[^label]`, or to a link by its label,
+`[text][label]` or `[label][]`, but no line on the page defines that
+label. Statac publishes what you wrote as plain text, brackets and all.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,19 +14,19 @@ warning  Missing definition: there is no `[^2]:` line
 
 ## Why Statac warns
 
-Markdown shows a reference with no definition as the words you typed, so
-the page is still readable, but the note or the link you meant isn't on it.
-A footnote's note and a link's address can be written anywhere on the
-page, even inside a snippet call that wraps writing, so a label spelled
-two ways is the usual cause. Brackets that aren't a reference, such as
-`[draft]` alone or `x[i][j]`, are left alone.
+Markdown shows a reference with no definition as the text you typed. The
+page is still readable, but the note or link you meant is missing. A
+footnote's note and a link's address can be written anywhere on the page,
+even inside a snippet call that wraps writing. So the usual cause is a
+label spelled differently in the two places. Statac ignores brackets that
+aren't a reference, such as `[draft]` on its own or `x[i][j]`.
 
 ## How to fix it
 
-Add the line the reference needs, or correct the label to one the page
-defines. When a defined label is close to the one you wrote, Statac offers
-it. Labels match whatever their case. To show the brackets as words, write
-a backslash before the first: `\[^label]`.
+Add the line the reference needs, or change the label to one the page
+defines. If a defined label is close to the one you wrote, Statac suggests
+it. Labels match regardless of case. To show the brackets as text, put a
+backslash before the first one: `\[^label]`.
 
 ## Example
 

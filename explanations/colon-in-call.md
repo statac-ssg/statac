@@ -1,7 +1,8 @@
 # Colon in call
 
-An argument in a snippet call was named with a colon, `caption: 'Post 1'`,
-where a call names its arguments with `=`, `caption='Post 1'`.
+An argument in a snippet call was named with a colon, as in
+`caption: 'Post 1'`. A call names its arguments with `=`, as in
+`caption='Post 1'`.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,8 +15,8 @@ warning  Colon in call: `caption:` was read as `caption=`
 ## Why Statac warns
 
 The meaning is clear, so Statac uses the value as though you had written
-`=` and tells you. A call is written the same way in your writing and in a
-template, and a template names arguments with `=`.
+`=`, and warns you. A call is written the same way in your writing as in a
+template, and templates name arguments with `=`.
 
 ## How to fix it
 

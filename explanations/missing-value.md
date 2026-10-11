@@ -13,9 +13,9 @@ error  Missing value: `--site` needs a folder
 
 ## Why Statac stops
 
-Without its value the option means nothing, and Statac doesn't guess one.
-When the value was written apart from the option, Statac offers the two
-joined.
+Without a value, the option means nothing, and Statac doesn't guess one.
+If you wrote the value separately from the option, the message suggests
+the two joined together.
 
 ## How to fix it
 

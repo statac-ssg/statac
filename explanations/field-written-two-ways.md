@@ -1,8 +1,8 @@
 # Field written two ways
 
-One of your own fields is written with a dot in its name on one page, such
-as `book.author:`, and nested on another, as `book:` with `author:` beneath
-it. To YAML these are two different fields.
+On one page, one of your own fields is written with a dot in its name, such
+as `book.author:`. On another page it is nested, as `book:` with `author:`
+beneath it. YAML reads these as two different fields.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,13 +14,14 @@ warning  Field written two ways: `book.author` is also nested under `book`
 
 ## Why Statac warns
 
-A template asking for `page.book.author` finds the nested one and misses
-the other, so some pages would show nothing there. Statac keeps both as you
-wrote them and tells you, showing where the nested one is.
+A template that uses `page.book.author` finds the nested field and misses
+the dotted one, so on some pages it would show nothing. Statac keeps both
+fields as you wrote them, and the warning shows where the nested one is.
 
 ## How to fix it
 
-Nest the field everywhere, so templates read it one way.
+Nest the field on every page, so templates read it the same way
+everywhere.
 
 ## Example
 

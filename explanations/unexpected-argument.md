@@ -1,8 +1,8 @@
 # Unexpected argument
 
-The command line has a word the command has no use for. `statac build` and
-`statac check` take one word, the site's folder, and `statac explain` takes
-one name.
+The command line includes a word that the command doesn't use.
+`statac build` and `statac check` take one word, the site's folder, and
+`statac explain` takes one name.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,12 +14,12 @@ error  Unexpected argument: `docs`
 
 ## Why Statac stops
 
-Statac can't tell what the word was meant to do, and leaving it out could
+Statac can't tell what the word was meant to do, and ignoring it could
 build a different site from the one you meant.
 
 ## How to fix it
 
-Remove the word, or give it as an option.
+Remove the word, or pass it as an option.
 
 ## Example
 

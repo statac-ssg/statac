@@ -1,6 +1,6 @@
 # Unknown option
 
-The command line gives an option the command doesn't take. Either Statac
+The command line includes an option that the command doesn't take. Either Statac
 has no option by that name, or it belongs to another command.
 
 ## What you'll see {#what-youll-see}
@@ -13,14 +13,15 @@ error  Unknown option: `--sight=docs`
 
 ## Why Statac stops
 
-Leaving the option out would do something other than what you asked. When
-an option is close to what you wrote, Statac offers it.
+Ignoring the option would do something other than what you asked. If an
+option is close to what you wrote, the message suggests it.
 
 ## How to fix it
 
 Use an option the command takes, written with two hyphens and its value
-after an `=`. `--help` after the command, as `statac check --help`, lists
-the options that command takes; `statac --help` lists every option.
+after an `=`. To list the options a command takes, put
+`--help` after it, as in `statac check --help`. `statac --help` lists
+every option.
 
 ## Example
 
@@ -28,13 +29,13 @@ the options that command takes; `statac --help` lists every option.
 statac check --out=public
 ```
 
-`--out` says where `statac build` writes the site, and `check` writes
+`--out` sets where `statac build` writes the site, but `check` writes
 nothing. To write the site to `public`:
 
 ```text
 statac build --out=public
 ```
 
-`statac serve` shows drafts and posts waiting for their day without being
-asked, so it has no `--drafts`; `statac serve --no-drafts` leaves them
-out.
+`statac serve` shows drafts and posts waiting for their day by default,
+so it has no `--drafts` option. To leave them out, use
+`statac serve --no-drafts`.

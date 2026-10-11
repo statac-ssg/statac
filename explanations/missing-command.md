@@ -1,6 +1,6 @@
 # Missing command
 
-The command line gives options, but no command to apply them to.
+The command line has options, but no command for them to apply to.
 
 ## What you'll see {#what-youll-see}
 
@@ -18,8 +18,8 @@ which command you meant.
 ## How to fix it
 
 Add `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`,
-`import` or `explain` after `statac`. `statac --help` lists the commands and what
-each does, and `statac check --help` shows only the options `check`
+`import` or `explain` after `statac`. `statac --help` lists the commands
+and what each does, and `statac check --help` shows only the options `check`
 takes.
 
 ## Example

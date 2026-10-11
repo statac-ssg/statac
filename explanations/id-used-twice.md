@@ -1,11 +1,11 @@
 # Id used twice
 
-A heading is given an id in braces, `## Title {#id}`, that something
-earlier on the page already has: another heading given the same id, or a
-footnote. Statac writes footnotes' ids itself: `note-1`, `note-2` and so
-on for the notes, and `back-1` and the like for the markers pointing at
-them. The message points at the second, and shows the first heading
-where there is one.
+A heading has an id in braces, such as `## Title {#id}`, but something
+earlier on the page already has that id. It may be another heading with
+the same id, or a footnote. Statac gives footnotes their ids itself:
+`note-1`, `note-2` and so on for the notes, and `back-1` and so on for the
+markers that link to them. The message points at the second use of the
+id, and also shows the first if it is a heading.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,15 +17,16 @@ warning  Id used twice: a heading above has the id `rust`
 
 ## Why Statac warns
 
-An id names one place on a page. A link to it lands on the first thing
-that has it, so the second heading can't be linked to. Statac keeps the id
-as you wrote it, since it is yours, and tells you. An id Statac makes from
-a heading's words never takes one you wrote: it gets a number instead.
+An id marks one place on a page. A link to it goes to the first thing
+with that id, so nothing can link to the second heading. Statac keeps the
+id as you wrote it, because you chose it, and warns you. An id that Statac
+makes from a heading's words never reuses one you wrote. Statac adds a
+number to its own id instead.
 
 ## How to fix it
 
-Give the heading an id of its own, or leave the braces off and let Statac
-make one from its words. Ids starting `note-` or `back-` belong to the
+Give the heading its own id, or remove the braces and let Statac make one
+from the heading's words. Ids starting with `note-` or `back-` are used by
 footnotes.
 
 ## Example

@@ -1,7 +1,7 @@
 # Malformed list
 
-A page's `posts:` line, which chooses the posts the page lists, can't be
-read.
+Statac can't read a page's `posts:` line, which chooses the posts the
+page lists.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,22 +13,24 @@ error  Malformed list: a list starts from `site.posts`, not `site.pages`
 
 ## Why Statac stops
 
-A `posts:` line starts from every post on the site, `site.posts`, and
-keeps some of them with filters, each after a `|`:
+A `posts:` line starts from `site.posts`, which is every post on the
+site, and narrows it down with filters, each written after a `|`:
 
 - `tagged("Rust")` keeps the posts with that tag.
-- `in("blog")` keeps the posts in that folder, however deeply filed.
-- `where("field", "value")` keeps the posts whose field holds that value.
+- `in("blog")` keeps the posts in that folder, including those in folders inside it.
+- `where("field", "value")` keeps the posts whose field has that value.
 
-These are the same filters templates use. A line that starts elsewhere,
-uses another filter, or leaves a bracket or a quote open can't say which
-posts it means, so the build stops at the place in the line.
+Templates use the same filters. If a line starts from anything else,
+uses another filter, or leaves a bracket or a quote open, Statac can't
+tell which posts it means. The build stops, and the message points to the
+place in the line.
 
 ## How to fix it
 
 Start the line with `site.posts`, and write each filter with its values in
-brackets, each value in quotes. The order the posts are listed in is the
-page's `order:`, newest first unless it says `oldest first`.
+brackets and each value in quotes. The page's `order:` sets the order the
+posts are listed in. It is newest first by default, or `oldest first` if
+the page says so.
 
 ## Example
 

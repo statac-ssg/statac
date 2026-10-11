@@ -1,8 +1,9 @@
 # Newer starter files
 
-Some of the files `statac new` wrote as the site was made have a newer
-version in this Statac. Each is a file you never changed, or a file of
-yours made from a version of the starter that has changed since.
+Some of the files that `statac new` wrote when the site was made have a
+newer version in this version of Statac. Each is either a file you never
+changed, or a file you changed, starting from a version of the starter
+that has changed since.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,26 +16,27 @@ note  Newer starter files: 1 of the files `statac new` wrote has a newer version
 ## Why Statac says so
 
 Once `statac new` has written a site's templates, snippets and
-stylesheet, they are yours, and a better version in a later Statac never
-reaches them unasked. Statac knows every version each starter file has
-had, so it tells a file you never changed by its bytes, and nothing is
-kept in the site to tell it. A file you changed is held to the version
-nearest to it, by the fewest lines differing; where that is the newest,
-there is nothing new, and it isn't counted. Statac says this once, on
-`statac check` and in the count after `statac build`.
+stylesheet, they are yours. A later version of Statac never changes them
+unless you ask. Statac knows every version each starter file has had, so
+it can recognise a file you never changed from its exact bytes, and
+nothing extra is kept in the site to record it. A file you changed is
+compared with the starter version nearest to it, the one with the fewest
+lines different. If that is the newest version, there is nothing new, and
+the file isn't counted. Statac shows this note once, in `statac check`
+and in the count after `statac build`.
 
 ## How to fix it
 
-Run `statac new --update` in the site's folder. It puts the newest
-version in place of each file you never changed, and shows what is new
-in each of yours, which it never writes to. Then copy into your own
-files whatever of it you want.
+Run `statac new --update` in the site's folder. It replaces each file you
+never changed with the newest version. For each file you changed, it
+shows what is new, but never writes to the file. Then copy whatever you
+want from that into your own files.
 
-If you mean to keep the files as they are, quieten it.
+If you want to keep the files as they are, quieten the note.
 
 ## Example
 
-`statac new --update` says what it did:
+`statac new --update` reports what it did:
 
 ```text
 Updated `templates/base.html`.

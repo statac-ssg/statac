@@ -1,7 +1,7 @@
 # Missing anchor
 
-A link points at a place on a page, the part after `#`, and the page is
-there but nothing on it has that id. A reader who follows the link lands
+A link points at a place on a page (the part after `#`). The page
+exists, but nothing on it has that id. A reader who follows the link lands
 at the top of the page instead of the part you meant.
 
 ## What you'll see {#what-youll-see}
@@ -17,15 +17,16 @@ warning  Missing anchor: nothing on `/posts/post-1/` has the id `rust`
 Once every page is built, Statac knows each id on each page: every
 heading's, every footnote's, and every `id` in HTML you or a template
 wrote. It publishes the page with the link as written and tells you,
-because the page is still worth reading. A heading's id comes from its
-words, so changing the words changes the id, and links to it from other
-pages then miss.
+because the page is still worth reading. A heading's id is made from its
+words. If you change the words, the id changes, and links to the heading
+from other pages no longer find it.
 
 ## How to fix it
 
-Point the link at an id the page has. When one is close, Statac offers it.
-Two ids that look the same can differ in how their letters were typed, as
-with accents or marks typed in another order; Statac offers the one on the
+Point the link at an id that the page has. If one is close, the message
+suggests it. Two ids that look the same can still differ in how their
+letters were typed, for example when accents or marks were typed in a
+different order. In that case, Statac suggests the id that is on the
 page. To keep an id when you change a heading, give the heading its id in
 braces: `## New words {#old-words}`.
 

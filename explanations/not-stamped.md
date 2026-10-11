@@ -1,8 +1,8 @@
 # Not stamped
 
 A value in a page's front matter is a stamp, such as `=today` or
-`=monday 09:00`: one of Statac's words standing for a date, waiting for
-the date to be written in its place.
+`=monday 09:00`. A stamp is one of Statac's words that stands for a date,
+and is there until the real date is written in its place.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,20 +14,21 @@ error  Not stamped: `date` is still `=monday 09:00`
 
 ## Why Statac stops
 
-A stamp names a different day each day it is read, and a build of the same
-files is the same every time, so `statac build` and `statac check` never
-choose the date. Nor can a page be published dated `=monday`. The date is
-written into the file once, by `statac stamp` or by `statac serve`, and
-from then on the file says the day itself.
+A stamp means a different day depending on when it is read, but a build
+of the same files is always the same. So `statac build` and
+`statac check` never choose the date. A page can't be published with the
+date `=monday` either. Instead, `statac stamp` or `statac serve` writes
+the date into the file once, and from then on the file itself says which
+day it is.
 
 ## How to fix it
 
-Run `statac stamp` in the site's folder. It writes the date over every
-stamp in the site and says what it wrote. `statac serve` does the same as
-it starts and on every save, so a site being served never holds a stamp
-for long.
+Run `statac stamp` in the site's folder. It replaces every
+stamp in the site with its date, and tells you what it wrote.
+`statac serve` does the same when it starts and on every save, so a stamp
+never stays in a site being served for long.
 
-To publish the words themselves, write the value as a block, which is
+To publish a stamp's word itself, write the value as a block. A block is
 always read as text:
 
 ```yaml
@@ -46,7 +47,7 @@ date: =monday 09:00
 ---
 ```
 
-After `statac stamp`, run on Tuesday 6 October 2026:
+After running `statac stamp` on Tuesday 6 October 2026:
 
 ```yaml
 ---

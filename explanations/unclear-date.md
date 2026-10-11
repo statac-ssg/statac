@@ -1,6 +1,6 @@
 # Unclear date
 
-A date is written with slashes or dots, and could be read two ways:
+A date is written with slashes or dots, so it could be read two ways:
 `3/4/2026` is 3 April in some places and 4 March in others.
 
 ## What you'll see {#what-youll-see}

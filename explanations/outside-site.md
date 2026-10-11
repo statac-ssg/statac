@@ -1,10 +1,10 @@
 # Outside the site
 
-Something in the site reaches for a file outside where it may: a Sass
-`@use`, `@forward` or `@import` that leads out of `assets/`, a card's
-background or font named outside `templates/og/`, or a link in a folder
-such as `content/`, `assets/` or `static/` whose target is outside that
-folder. Statac doesn't read the file.
+Something in the site refers to a file outside the folder it is allowed
+to read from: a Sass `@use`, `@forward` or `@import` that leads out of
+`assets/`, a card's background or font outside `templates/og/`, or a link
+in a folder such as `content/`, `assets/` or `static/` that points outside
+that folder. Statac doesn't read the file.
 
 ## What you'll see {#what-youll-see}
 
@@ -16,18 +16,18 @@ error  Outside the site: `../../outside` isn't in `assets/`
 
 ## Why Statac stops
 
-Everything Statac publishes comes from the folder it is published from, so
-building a site can never copy a file from elsewhere into the published
-site, whoever wrote the site. A link in `static/` to the site's
-`statac.yaml` would publish its settings, secrets included.
+Statac publishes each file only from the folder it belongs in. This means
+building a site can never copy a file from anywhere else into the
+published site, whoever wrote the site. Otherwise, a link in `static/` to
+the site's `statac.yaml` would publish its settings, secrets included.
 
 ## How to fix it
 
-Copy the file into the folder in place of the link: a stylesheet into
-`assets/`, loaded from there; a card's background or font into
-`templates/og/`, named from there; anything else into `assets/`,
-`static/` or `content/`. A link to somewhere inside the same folder is
-fine.
+Copy the file into the right folder instead of linking to it. Copy a
+stylesheet into `assets/` and load it from there. Copy a card's background
+or font into `templates/og/` and refer to it from there. Copy anything
+else into `assets/`, `static/` or `content/`. A link to somewhere inside
+the same folder is fine.
 
 ## Example
 

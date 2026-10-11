@@ -1,6 +1,6 @@
 # No such date
 
-A date is written in the right form, but the calendar has no such day: 30
+A date is written in the right form, but no such date or time exists: 30
 February, month 13, a time such as `25:70`, or an offset more than 14 hours
 from UTC.
 
@@ -18,7 +18,7 @@ could put a post on the wrong day.
 
 ## How to fix it
 
-Correct the date. The message names the part that doesn't exist.
+Correct the date. The message shows which part doesn't exist.
 
 ## Example
 

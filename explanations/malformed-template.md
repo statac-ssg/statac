@@ -1,9 +1,9 @@
 # Malformed template
 
 Statac couldn't read a template or a snippet. The message says what it
-found, in the template's own words, and points at the place to fix: a tag
-that is never closed, an `{% endif %}` with no `{% if %}`, or a `takes`
-line it can't follow.
+found, in the template language's own terms, and points to the place to
+fix. Typical causes are a tag that is never closed, an `{% endif %}` with
+no `{% if %}`, or a `takes` line that Statac can't follow.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,8 +14,9 @@ error  Malformed template: unexpected end of input, expected end of block
 
 ## Why Statac stops
 
-A template it can't read can't build any page that uses it, and guessing
-at what it meant would publish something you didn't write.
+Statac can't build any page that uses a template it can't read, and
+guessing what the template meant would publish something you didn't
+write.
 
 ## How to fix it
 
@@ -24,9 +25,10 @@ Look at the place the caret points to. Common causes:
 - A `{{` or `{%` with no `}}` or `%}` after it.
 - A block opened and never closed, such as `{% if %}` with no
   `{% endif %}`, or closed twice.
-- A snippet's first line, `{# takes photo, alt #}`, naming something the
-  snippet never reads, or more than two names. The line says which values
-  a call may give without a name, in order; any others are given by name.
+- A snippet's first line, `{# takes photo, alt #}`, listing something the
+  snippet never uses, or listing more than two names. This line lists, in
+  order, the values a call may pass without a name. A call passes any
+  others by name.
 
 ## Example
 

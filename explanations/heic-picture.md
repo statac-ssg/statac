@@ -1,7 +1,7 @@
 # HEIC picture
 
-A page shows a picture saved as HEIC or HEIF, as many phones save their
-photographs. Statac published the file as it is and made no copies of it.
+A page shows a picture saved as HEIC or HEIF, the format many phones
+save photographs in. Statac published the file as it is and made no copies of it.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,17 +13,18 @@ warning  HEIC picture: `content/photo-1.heic` is published as it is, with no cop
 
 ## Why Statac warns
 
-Statac doesn't read HEIC, so it can't make the smaller AVIF and JPEG
-copies it makes of a photograph, nor write the picture's width and height
-into the page. Few browsers show a HEIC picture at all: most readers
-would see a broken picture where it should be. The file is published all
-the same, since that is what the page asks for, and Statac says so.
+Statac can't read HEIC, so it can't make the smaller AVIF and JPEG
+copies it usually makes of a photograph, or write the picture's width and
+height into the page. Few browsers can show a HEIC picture at all, so
+most readers would see a broken picture in its place. Statac publishes
+the file anyway, because the page asks for it, and warns you.
 
 ## How to fix it
 
-Export the photograph as a JPEG from the program that holds it, keep the
-JPEG beside the writing in place of the HEIC file, and name that where
-the picture is shown. Statac then publishes it as it does any photograph.
+Export the photograph as a JPEG from the program you keep it in. Put the
+JPEG beside the page's file in place of the HEIC file, and use the JPEG's
+name where the picture is shown. Statac then publishes it as it does any
+other photograph.
 
 ## Example
 
@@ -33,5 +34,6 @@ In `content/post-1.md`:
 ![A gradient from blue to orange](photo-1.heic)
 ```
 
-With `photo-1.jpg` beside the post and
-`![A gradient from blue to orange](photo-1.jpg)` in it, the photograph is published as copies every browser shows.
+If you put `photo-1.jpg` beside the post and write
+`![A gradient from blue to orange](photo-1.jpg)` in it instead, Statac
+publishes copies of the photograph that every browser can show.

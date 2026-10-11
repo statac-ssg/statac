@@ -1,7 +1,8 @@
 # Can't read
 
-Statac couldn't read a file or folder of the site. The message names it
-and gives the system's reason, such as no permission to read it.
+Statac couldn't read a file or folder in the site. The message says which
+one, and gives the reason the system reported, such as not having
+permission to read it.
 
 ## What you'll see {#what-youll-see}
 
@@ -12,13 +13,13 @@ error  Can't read `assets/site.css`: permission denied
 
 ## Why Statac stops
 
-A site with a file left out isn't the site you wrote, so the build stops
-rather than publish it without.
+A site with a file missing isn't the site you wrote, so the build stops
+rather than publish it without that file.
 
 ## How to fix it
 
-Deal with the reason the message gives, such as giving yourself permission
-to read the file, then build again.
+Deal with the reason the message gives, for example by giving yourself
+permission to read the file. Then build again.
 
 ## Example
 

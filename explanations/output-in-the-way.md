@@ -1,7 +1,7 @@
 # Output folder in the way
 
-`statac build` was given an output folder, with `--out`, that is one of
-the folders the site is read from, or inside one: `content/`,
+The output folder given to `statac build` with `--out` is one of the
+folders Statac reads the site from, or is inside one: `content/`,
 `templates/`, `snippets/`, `assets/`, `static/`, `data/`, `languages/`
 or `fetched/`.
 
@@ -22,8 +22,8 @@ it again, one folder deeper each time. Statac stops before it runs
 ## How to fix it
 
 Build into a folder Statac doesn't read. Without `--out`, Statac builds
-into `_site` in the site's folder; any other folder outside those eight,
-such as `public`, will do as well.
+into `_site` in the site's folder. Any other folder outside those eight,
+such as `public`, works as well.
 
 ## Example
 

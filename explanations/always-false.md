@@ -1,10 +1,10 @@
 # Always false
 
-A template tests whether a page has a field with `is defined` or
-`is not defined`, and no page has a field by that name. A field one slip
-away is one a page can have, so the name is likely misspelt, and the test
-gives the same answer on every page: what it guards is never shown, or
-always shown.
+A template uses `is defined` or `is not defined` to test whether a page
+has a field, but no page has a field with that name. A page can have a
+field whose name is one slip away (a character added, left out or
+changed, or two neighbours swapped), so the name is probably misspelt. The test then gives the same result on every page, so whatever
+it wraps is either never shown or always shown.
 
 ## What you'll see {#what-youll-see}
 
@@ -16,20 +16,20 @@ warning  Always false: no page has `subtitel`
 
 ## Why Statac warns
 
-A field no page has yet is often one that later pages will have, so Statac
-builds the page as written. When the name is one character away from a
-field pages do have, the test is more likely a slip than a plan, and
-nothing on the page would show it.
+A field that no page has yet is often one that later pages will have,
+so Statac builds the page as written. But if the name is one slip
+away from a field that pages do have, the test is more likely a mistake
+than a plan, and nothing on the built page would show the mistake.
 
 ## How to fix it
 
-Write the field Statac offers. If the name is right and no page has the
+Use the field Statac suggests. If the name is right and no page has the
 field yet, add it to a page, or quieten this warning with
 `quiet: [always-false]` in `statac.yaml`.
 
 ## Example
 
-In `templates/post.html`, where posts have a `subtitle`:
+In `templates/post.html`, on a site whose posts have a `subtitle`:
 
 ```html
 {% if page.subtitel is defined %}
@@ -37,7 +37,7 @@ In `templates/post.html`, where posts have a `subtitle`:
 {% endif %}
 ```
 
-The field is `subtitle`:
+The field is called `subtitle`:
 
 ```html
 {% if page.subtitle is defined %}

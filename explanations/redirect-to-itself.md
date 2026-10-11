@@ -1,14 +1,15 @@
 # Redirect to itself
 
-A page's `redirect_to` names the page's own address, or an address whose
-redirects, followed, come back to the page. A page with `redirect_to`
-publishes a redirect at its address and nothing else, so a reader
-arriving there would be sent back to the same redirect, again and again.
+A page's `redirect_to` is set to the page's own address, or to an address
+whose redirects lead back to the page. A page with `redirect_to` publishes
+only a redirect at its address, so a reader arriving there would be sent
+back to the same redirect, again and again.
 
-Statac follows a `redirect_to` naming another redirect on the site, an
-old address in a page's `redirect_from` or a page with its own
-`redirect_to`, to where readers would end up. Where that comes back to
-the page, every page in the ring is told, each at its own `redirect_to`.
+If a `redirect_to` points at another redirect on the site (an old address
+in a page's `redirect_from`, or a page with its own `redirect_to`), Statac
+follows it to where readers would end up. If that leads back to the page,
+Statac reports the error on every page in the loop, each at its own
+`redirect_to`.
 
 ## What you'll see {#what-youll-see}
 
@@ -25,9 +26,10 @@ redirect would leave its address unusable.
 
 ## How to fix it
 
-Point `redirect_to` at the address the writing is at now. If the page
-should be published here after all, take `redirect_to` out. In a ring,
-send readers from one page at least to somewhere that isn't a redirect.
+Point `redirect_to` at the address where the writing is now. If the page
+should be published at its own address after all, remove `redirect_to`.
+In a loop, send readers from at least one page to an address that isn't
+a redirect.
 
 ## Example
 
@@ -47,7 +49,7 @@ redirect_to: /posts/post-1/
 ---
 ```
 
-Two pages sending readers to each other, `content/post-1.md`:
+Two pages that send readers to each other. In `content/post-1.md`:
 
 ```yaml
 ---
@@ -55,7 +57,7 @@ redirect_to: /post-2/
 ---
 ```
 
-and `content/post-2.md`:
+And in `content/post-2.md`:
 
 ```yaml
 ---

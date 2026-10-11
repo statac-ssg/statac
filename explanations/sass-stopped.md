@@ -1,8 +1,8 @@
 # Sass stopped
 
 A Sass file in `assets/` couldn't be compiled to CSS. The message gives
-Sass's reason, and points at the file and line where it stopped, which may
-be a file the stylesheet uses.
+Sass's reason, and points at the file and line where Sass stopped. This
+may be another file that the stylesheet uses.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,14 +13,14 @@ error  Sass stopped: undefined variable
 
 ## Why Statac stops
 
-Without the compiled stylesheet, the pages using it would be published
-without their styles.
+Without the compiled stylesheet, the pages that use it would be
+published without their styles.
 
 ## How to fix it
 
 Correct the line the message points at, then build again. A Sass file
-whose name starts with `_` is only part of others: it is never published
-on its own, only as part of the stylesheets that use it.
+whose name starts with `_` is only ever part of other stylesheets. It is
+never published on its own, only as part of the stylesheets that use it.
 
 ## Example
 
@@ -32,7 +32,7 @@ a {
 }
 ```
 
-If no `$link` is defined, define it before it is used:
+If `$link` isn't defined anywhere, define it before it is used:
 
 ```scss
 $link: #0645ad;

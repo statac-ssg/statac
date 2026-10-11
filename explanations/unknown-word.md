@@ -1,14 +1,15 @@
 # Unknown word
 
-A word appears where Statac knows every word that can be written, and this
-isn't one of them: a setting under `tags.` or `series.`, a kind in a field
-declaration, a setting in a language file, a time zone, a table in `data/`
-that `each:` names, a place on a card, a stamp in front matter such as
-`=tomorrow`, or a name in a template.
+Statac found a word it doesn't know in a place where it knows every word
+that can be written. That place is one of these: a setting under `tags.`
+or `series.`, a kind in a field declaration, a setting in a language file,
+a time zone, a table in `data/` that `each:` refers to, a place on a card,
+a stamp in front matter such as `=tomorrow`, or a name in a template.
 
-In a template, Statac knows every name: `page` and `site`, the fields pages
-and settings have, the names the template sets itself, its filters and
-tests, the snippets in `snippets/`, and the tags and folders the site has.
+In a template, Statac knows every name that can be used: `page` and
+`site`, the fields of pages and settings, the names the template sets
+itself, the filters and tests, the snippets in `snippets/`, and the site's
+tags and folders.
 
 ## What you'll see {#what-youll-see}
 
@@ -20,20 +21,21 @@ error  Unknown setting: `tags.permalnk`
 
 ## Why Statac stops
 
-These words are Statac's own, the site's, or the names of the world's time
-zones, so one it doesn't know is a slip, and it can't tell what you meant.
-When a known word is close, Statac offers it.
+These words are Statac's own, the site's own, or the names of the world's
+time zones. So a word Statac doesn't know is a mistake, and it can't tell
+what you meant. If a known word is close, Statac suggests it.
 
 ## How to fix it
 
-Write the word Statac offers, or one from the list on its page in the
-documentation. A time zone is named for a place, as `Europe/London` or
-`America/Chicago` is. In a template, check the spelling against the field in
+Write the word Statac suggests, or one from the list on the relevant page
+of the documentation. A time zone is named after a place, such as
+`Europe/London` or `America/Chicago`. In a template, check the spelling against the field in
 the front matter, the setting in `statac.yaml`, or the file in `snippets/`.
 
 A stamp is `=today`, `=now`, `=tomorrow`, `=yesterday` or a weekday from
-`=monday` to `=sunday`. A time after it is written with two figures for
-the hour, a colon and two for the minute, as `=monday 09:00` is.
+`=monday` to `=sunday`. To add a time after it, write two
+digits for the hour, a colon, and two digits for the minute, as in
+`=monday 09:00`.
 
 ## Example
 
@@ -45,7 +47,7 @@ fields.isbn: txt
 timezone: Europe/Londn
 ```
 
-Statac's words are `tags.permalink` and `text`, and the zone is
+The correct words are `tags.permalink` and `text`, and the time zone is
 `Europe/London`:
 
 ```yaml

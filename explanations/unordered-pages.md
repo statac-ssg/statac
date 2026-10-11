@@ -1,7 +1,7 @@
 # Unordered pages
 
-A list's page gives its order as a list of names, `order: [day-one,
-day-two]`, and the list has pages that aren't named there.
+A list's page sets its order as a list of names, `order: [day-one,
+day-two]`, but the list has pages that aren't named there.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,21 +13,21 @@ warning  Unordered pages: `order` leaves out `day-four` and `day-five`
 
 ## Why Statac warns
 
-The pages it names come first, in the order written. The pages it leaves
-out follow them, in the order they would have had: newest first for posts,
-and A to Z by name for pages without a date. Statac goes on, and tells you,
-because a page left out of the order was probably added after it was
-written.
+The pages named in `order` come first, in the order written. The pages
+left out follow them, in the order they would otherwise have had: newest
+first for posts, and A to Z by name for pages without a date. Statac
+carries on, but warns you, because a page left out of the order was
+probably added after the order was written.
 
 ## How to fix it
 
-Add each page the warning names to the `order:` list, where it belongs. A
-page is named by the last part of its address, so `content/days/day-four.md`
-is `day-four`.
+Add each page the warning lists to the `order:` list, in the place where
+it belongs. A page is named by the last part of its address, so
+`content/days/day-four.md` is `day-four`.
 
 ## Example
 
-`content/days/index.md`:
+In `content/days/index.md`:
 
 ```yaml
 ---
@@ -36,7 +36,7 @@ order: [day-one, day-two]
 ---
 ```
 
-with `day-three.md` in the folder too. Name it:
+The folder also has `day-three.md`. Add it to the list:
 
 ```yaml
 order: [day-one, day-two, day-three]
