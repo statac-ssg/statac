@@ -1510,6 +1510,33 @@ fn the_site_answers_with_the_host_its_address_names() {
     assert_eq!(built.html("post-1.md"), "none");
 }
 
+#[test]
+fn the_site_says_whether_it_takes_webmentions() {
+    const ASKS: &str = "{% if site.webmentions %}on{% else %}off{% endif %}";
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\nurl: https://example.org/\n\
+             webmentions: true\n",
+        ),
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        ("templates/page.html", ASKS),
+    ]);
+    assert_eq!(built.html("post-1.md"), "on");
+    let rendered = built.render("post-1.md");
+    assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
+    let webmentions = Key::Setting(built.renderer.name_id("webmentions"));
+    assert!(rendered.reads.keys().contains(&webmentions));
+
+    let built = site(&[
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        ("templates/page.html", ASKS),
+    ]);
+    assert_eq!(built.html("post-1.md"), "off");
+    let rendered = built.render("post-1.md");
+    assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
+}
+
 /// A page's layout and its writing each asking for search boxes: the page
 /// has one first box and no two with one id, wherever the layout shows the
 /// writing; another page showing the writing shows it numbered from the

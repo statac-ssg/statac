@@ -624,6 +624,10 @@ impl SiteValue {
                 lists.sort_by_key(|&id| address(id));
                 Some(Lists::value(shared, lists))
             }
+            "webmentions" => {
+                frame::read(setting_key(shared, key));
+                Some(Value::from(shared.settings.truth(key) == Some(true)))
+            }
             "today" => {
                 frame::read(Key::Today);
                 Some(DateValue::value(shared, shared.dates.today()))
@@ -679,7 +683,7 @@ impl Object for SiteValue {
                     _ => settings.text(name).is_some(),
                 }),
         )
-        .chain(["languages"])
+        .chain(["languages", "webmentions"])
         .map(Value::from)
         .collect();
         names.extend(settings.own.iter().map(|f| Value::from(f.name.as_str())));

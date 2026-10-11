@@ -564,6 +564,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("feed", Ty::Text),
         ("data", Ty::Any),
         ("languages", Ty::Any),
+        ("webmentions", Ty::Bool),
     ] {
         site_fields.insert(name.to_owned(), Field { ty, always: true });
     }
