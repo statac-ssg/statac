@@ -40,8 +40,6 @@ Statac worked out where the old site published each page, read the new site, and
 
 - Every page lands where the old site published it, with nothing added.
 
-The old site published a page listing every one of its `tags` at `/tags/`, and the starter has none.
-
 ## Left for you
 
 ### Feeds made by templates

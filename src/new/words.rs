@@ -12,6 +12,7 @@ pub(super) const WORDS: &[(&str, &str)] = &[
     ("tags", "Tags"),
     ("series", "Series:"),
     ("tagged", "Posts tagged"),
+    ("all_tags", "All tags"),
     ("in_series", "Posts in the series"),
     ("contents", "Contents"),
     ("more_posts", "More posts"),

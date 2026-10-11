@@ -60,6 +60,7 @@ starter! {
     "content/posts/what-a-post-can-hold/video-1.mp4",
     "content/robots.md",
     "content/sitemap.md",
+    "content/tags.md",
     "snippets/audio.html",
     "snippets/beside.html",
     "snippets/called.html",
@@ -96,6 +97,7 @@ starter! {
     "templates/redirect.html",
     "templates/robots.txt",
     "templates/sitemap.xml",
+    "templates/tags.html",
 }
 
 /// Whether the starter has a snippet a page calls by `name`.
@@ -114,6 +116,17 @@ const SAMPLES: &[&str] = &[
     "content/posts/",
     "static/favicon.ico",
 ];
+
+/// The page listing every tag, which each language of a site has.
+pub(super) const TAGS_PAGE: &str = "content/tags.md";
+
+/// The bytes of the starter's file at `path`.
+pub(super) fn file(path: &str) -> Option<&'static [u8]> {
+    FILES
+        .iter()
+        .find(|file| file.path == path)
+        .map(|file| file.bytes)
+}
 
 /// The posts' own page, which a site made by an import is given for the
 /// old site's posts.

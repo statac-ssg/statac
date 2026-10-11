@@ -44,10 +44,6 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
 
-The old site published a page listing every one of its `tags` at `/fr/tags/`, and the starter has none.
-
-The old site published a page listing every one of its `tags` at `/tags/`, and the starter has none.
-
 ## Left for you
 
 Nothing: everything Statac read came across.

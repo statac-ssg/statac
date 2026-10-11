@@ -371,7 +371,7 @@ fn an_old_address_the_new_site_cant_keep_is_left_out_and_listed() {
     let (code, said) = import(old, &scratch("said-aliases"), None);
     assert_eq!(code, 0);
     assert!(
-        said.contains("\nAddresses: 8 kept, 1 that nothing answers now, 5 that can't be kept.\n"),
+        said.contains("\nAddresses: 8 kept, 5 that can't be kept.\n"),
         "{said}"
     );
 }

@@ -43,6 +43,7 @@ const STARTER_PAGES: &[(&str, &str)] = &[
     ("404.md", "/404.html"),
     ("sitemap.md", "/sitemap.xml"),
     ("robots.md", "/robots.txt"),
+    ("tags.md", "/tags/"),
 ];
 
 pub static FIELD_RENAMED: FindingKind = FindingKind {
@@ -738,6 +739,37 @@ pub fn write<'a>(
         summary.kept.later = addresses::send_on_to_later_pages(&mut out, today, &placed, home)?;
     }
     summary.terms = terms;
+    // The starter's page listing every tag stands where the old site's did.
+    for (address, name) in &term_lists {
+        if !name.eq_ignore_ascii_case("tags") {
+            continue;
+        }
+        let language =
+            (other_languages.iter()).find(|language| address.starts_with(&format!("/{language}/")));
+        let (path, at, rest) = match language {
+            Some(language) => (
+                format!("content/{language}/tags.md"),
+                format!("/{language}/tags/"),
+                &address[language.len() + 1..],
+            ),
+            None => (
+                "content/tags.md".to_owned(),
+                "/tags/".to_owned(),
+                address.as_str(),
+            ),
+        };
+        if *address == at {
+            continue;
+        }
+        if let Some((front, _)) = out
+            .text(&path)
+            .as_deref()
+            .and_then(|t| t.rsplit_once("---\n"))
+        {
+            let line = yaml::fields([("permalink", &Value::Text(rest.to_owned()))]);
+            out.put(&path, format!("{front}{line}---\n").as_bytes())?;
+        }
+    }
     let checked = addresses::check(
         folder,
         today,

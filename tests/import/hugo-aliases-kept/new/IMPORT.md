@@ -43,8 +43,6 @@ These old addresses can't be kept: the new site can't send readers on from them,
 - `/posts/post-2/`, for `content/posts/post-1.md`: `content/posts/post-2.md` is published there
 - `/old/post-1/`, for `content/posts/post-2.md`: `content/posts/post-1.md` sends readers on from there already
 
-The old site published a page listing every one of its `tags` at `/tags/`, and the starter has none.
-
 ## Left for you
 
 ### Feeds made by templates

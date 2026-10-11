@@ -1,13 +1,34 @@
-//! The sample pages of a new site, which carry dates: two posts, three
-//! notes and six photographs, each dated today or some days before, so
-//! that a new site's lists have an order. Each is written as it is here
-//! with its day in place of `{day}`.
+//! The sample pages of a new site: two posts, three notes and six
+//! photographs, each dated today or some days before, so that a new
+//! site's lists have an order, and a page with no date. Each is written
+//! as it is here with its day in place of `{day}`.
 
 use crate::date::Date;
 
 /// A sample page: its path in a site, how many days before today it is
 /// dated, and its text.
 const PAGES: &[(&str, i32, &str)] = &[
+    (
+        "content/about.md",
+        0,
+        r#"---
+title: About
+menu: true
+---
+This is a page that isn't a post, the file `content/about.md`. It has no date and is listed with no posts. Write here what the site is about and who writes it, in place of these words.
+
+The `menu: true` line in the file puts the page in the site's menu, after the folders. To make another page, add a file beside this one in `content/`, such as `contact.md`, opening with its title:
+
+```yaml
+---
+title: Contact
+menu: true
+---
+```
+
+Then write the page below that, in Markdown. It is published at `/contact/`. Without the `menu: true` line it is published all the same, and is reached by the links you write to it.
+"#,
+    ),
     (
         "content/posts/first-post/index.md",
         0,

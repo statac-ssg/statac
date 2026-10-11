@@ -46,8 +46,6 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 4 pages at the top of `content/`, such as `content/categories-Notes.md`, send readers on from the old page of a tag or a category to the tag's page, each with `permalink` and `redirect_to`.
 
-The old site published a page listing every one of its `Tags` at `/Tags/`, and the starter has none.
-
 The old site published a page listing every one of its `categories` at `/categories/`, and the starter has none.
 
 The old site published a page listing every one of its `authors` at `/authors/`, and the starter has none.

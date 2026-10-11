@@ -225,6 +225,58 @@ fn a_folder_of_sample_pages_deleted_leaves_a_site_with_no_problem() {
     }
 }
 
+/// Each language has a page listing its tags, which each tag's page
+/// links to; a page with `menu: true` is in the menu of its language.
+/// Deleting any of them leaves a site with no problem and no link to it.
+#[test]
+fn every_tag_is_listed_on_a_page_and_a_page_asks_into_the_menu() {
+    let folder = scratch("tags-and-menu");
+    made(&folder, "Site 1\nhttps://example.org\nen, fr\n\n");
+    fs::create_dir_all(folder.join("content/fr/posts")).unwrap();
+    fs::write(
+        folder.join("content/fr/posts/post-1.md"),
+        "---\ntitle: Post 1\ndate: 2026-10-01\ntags: [Tag 1]\n---\nText.\n",
+    )
+    .unwrap();
+    let (found, published) = built(&folder, Mode::Build);
+    assert!(found.is_empty() && published, "{found:?}");
+    let tag = "<li><a href=\"/tags/examples/\" rel=\"tag\">Examples</a></li>";
+    let all = read_built(&folder, "tags/index.html");
+    assert!(
+        all.contains(tag) && !all.contains("/fr/tags/tag-1/"),
+        "{all}"
+    );
+    let french = read_built(&folder, "fr/tags/index.html");
+    let tag = "<li><a href=\"/fr/tags/tag-1/\" rel=\"tag\">Tag 1</a></li>";
+    assert!(
+        french.contains(tag) && !french.contains("/tags/examples/"),
+        "{french}"
+    );
+    let link = "<p><a href=\"/tags/\">All tags</a></p>";
+    assert!(read_built(&folder, "tags/examples/index.html").contains(link));
+    let link = "<p><a href=\"/fr/tags/\">All tags</a></p>";
+    assert!(read_built(&folder, "fr/tags/tag-1/index.html").contains(link));
+    let about = "<li><a href=\"/about/\">About</a></li>";
+    assert!(read_built(&folder, "index.html").contains(about));
+    assert!(!read_built(&folder, "fr/index.html").contains("/about/"));
+    let here = "<li><a href=\"/about/\" aria-current=\"page\">About</a></li>";
+    assert!(read_built(&folder, "about/index.html").contains(here));
+
+    for page in ["content/tags.md", "content/fr/tags.md", "content/about.md"] {
+        fs::remove_file(folder.join(page)).unwrap();
+    }
+    fs::remove_dir_all(folder.with_extension("built")).unwrap();
+    let (found, published) = built(&folder, Mode::Build);
+    assert!(found.is_empty() && published, "{found:?}");
+    for page in ["tags/examples/index.html", "fr/tags/tag-1/index.html"] {
+        let page = read_built(&folder, page);
+        assert!(
+            !page.contains("All tags") && !page.contains("/about/"),
+            "{page}"
+        );
+    }
+}
+
 #[test]
 fn a_site_naming_no_language_is_in_english() {
     let folder = scratch("no-language");
@@ -750,7 +802,7 @@ fn a_site_draws_cards_from_when_it_asks_until_their_description_is_removed() {
     // A card for every page but the one nothing is published at. The home
     // page's own list has one page, so no second is published or carded.
     let on = cards_of(&folder);
-    assert_eq!(on, (6, 16, 16));
+    assert_eq!(on, (6, 18, 18));
     assert!(!folder.with_extension("built").join("page").exists());
     let yours = "`templates/og.yaml` is yours and wasn't touched.\n";
     assert_eq!(ran(&folder, true, None), yours);
@@ -877,7 +929,8 @@ fn the_menu_ends_with_notes_and_photographs_and_a_note_is_called_by_its_date_and
     let (found, published) = built(&folder, Mode::Build);
     assert!(found.is_empty() && published, "{found:?}");
 
-    // Home, each other folder by its name, then notes and photographs.
+    // Home, each other folder by its name, then notes and photographs,
+    // then the pages that ask to be in it.
     let home = read_built(&folder, "index.html");
     let at = home.find("<nav aria-label=\"Site\">").unwrap();
     let menu = &home[at..home[at..].find("</nav>").unwrap() + at];
@@ -888,7 +941,9 @@ fn the_menu_ends_with_notes_and_photographs_and_a_note_is_called_by_its_date_and
         .collect();
     assert_eq!(
         names,
-        ["Home", "Links", "Posts", "Writing", "Notes", "Photos"]
+        [
+            "Home", "Links", "Posts", "Writing", "Notes", "Photos", "About"
+        ]
     );
     fs::remove_dir_all(folder.join("content/links")).unwrap();
     fs::remove_dir_all(folder.join("content/writing")).unwrap();
@@ -942,6 +997,7 @@ const HOME: &str = r##"<!doctype html>
         <li><a href="/posts/">Posts</a></li>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>
@@ -1060,6 +1116,7 @@ const POST: &str = r##"<!doctype html>
         <li><a href="/posts/" aria-current="true">Posts</a></li>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>
@@ -1131,6 +1188,7 @@ const NOTES: &str = r##"<!doctype html>
         <li><a href="/posts/">Posts</a></li>
         <li><a href="/notes/" aria-current="page">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>
@@ -1217,6 +1275,7 @@ const NOTE: &str = r##"<!doctype html>
         <li><a href="/posts/">Posts</a></li>
         <li><a href="/notes/" aria-current="true">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>
@@ -1276,6 +1335,7 @@ const PHOTOS: &str = r##"<!doctype html>
         <li><a href="/posts/">Posts</a></li>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/" aria-current="page">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>
@@ -1329,6 +1389,7 @@ const PHOTO: &str = r##"<!doctype html>
         <li><a href="/posts/">Posts</a></li>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/" aria-current="true">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>
@@ -1385,12 +1446,14 @@ const TAG: &str = r##"<!doctype html>
         <li><a href="/posts/">Posts</a></li>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>
   <main id="content">
     <header class="top column">
       <h1>Posts tagged Tag 1</h1>
+      <p><a href="/tags/">All tags</a></p>
     </header>
     <div class="listing column">
       <section class="year">
@@ -1463,6 +1526,9 @@ const SITEMAP: &str = r##"<?xml version="1.0" encoding="UTF-8"?>
     <loc>https://example.org/</loc>
   </url>
   <url>
+    <loc>https://example.org/about/</loc>
+  </url>
+  <url>
     <loc>https://example.org/notes/</loc>
   </url>
   <url>
@@ -1505,6 +1571,9 @@ const SITEMAP: &str = r##"<?xml version="1.0" encoding="UTF-8"?>
     <loc>https://example.org/posts/what-a-post-can-hold/</loc>
   </url>
   <url>
+    <loc>https://example.org/tags/</loc>
+  </url>
+  <url>
     <loc>https://example.org/tags/examples/</loc>
   </url>
   <url>
@@ -1533,6 +1602,7 @@ const NOT_FOUND: &str = r##"<!doctype html>
         <li><a href="/posts/">Posts</a></li>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
+        <li><a href="/about/">About</a></li>
       </ul>
     </nav>
   </header>

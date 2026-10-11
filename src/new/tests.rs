@@ -182,7 +182,7 @@ fn every_default_is_taken_by_enter() {
              \x20 3  2025-12-31\n\
              \x20 Or type an example of your own.\n\
              \x20 [1] > \n\
-             Made a new site in `{shown}`: 83 files.\n\
+             Made a new site in `{shown}`: 86 files.\n\
              Times are in Europe/London, as this machine is set.\n\
              \n\
              statac.yaml:\n\
@@ -583,7 +583,7 @@ fn a_machine_with_no_time_zone_is_told_to_name_one() {
     assert_eq!(code, 0, "{said}");
     assert!(
         said.contains(
-            ": 83 files.\nThis machine doesn't say where it is: add `timezone: \
+            ": 86 files.\nThis machine doesn't say where it is: add `timezone: \
              Europe/London`, with your own, to `statac.yaml`.\n\nstatac.yaml:\n"
         ),
         "{said}"
@@ -779,7 +779,7 @@ fn a_folder_that_isnt_there_is_made_with_the_folders_above_it() {
     let folder = outer.join("sites").join("site-1");
     let answers = answers(&["en"], None);
     let made = make(Maker::New, &folder, &answers, None, day(), false).unwrap();
-    assert_eq!(made.files, 83);
+    assert_eq!(made.files, 86);
     assert!(folder.join("statac.yaml").is_file());
 }
 
@@ -1087,7 +1087,7 @@ fn cards_with_a_folder_empty_or_not_there_makes_the_site_with_its_card() {
         let (said, code) = cards(&folder);
         assert_eq!(code, 0, "{said}");
         assert!(said.starts_with("Made a new site in `"), "{said}");
-        assert!(said.contains("`: 89 files.\n"), "{said}");
+        assert!(said.contains("`: 92 files.\n"), "{said}");
         for path in CARD_FILES {
             assert!(platform::join(&folder, path).is_file(), "{path}");
         }
