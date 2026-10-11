@@ -634,6 +634,35 @@ fn a_quotation_says_who_said_it_and_where() {
     );
 }
 
+#[test]
+fn a_snippet_handed_false_does_as_it_does_when_handed_nothing() {
+    let folder = scratch("false");
+    made(&folder, "Site 1\nhttps://example.org\nen-GB\n\n");
+    fs::write(
+        folder.join("content/page-1.md"),
+        "---\ntitle: Page 1\nlayout: page-1\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        folder.join("templates/page-1.html"),
+        "{% set post = (site.posts | selectattr(\"cover\") | list)[0] %}\
+         {{ entry(post) }}<hr>{{ entry(post, pictured=false) }}<hr>\
+         {{ short(post) }}<hr>{{ short(post, nested=false) }}\n",
+    )
+    .unwrap();
+    let (found, published) = built(&folder, Mode::Build);
+    assert!(found.is_empty() && published, "{found:?}");
+    let page = read_built(&folder, "page-1/index.html");
+    let shown: Vec<&str> = page.split("<hr>").collect();
+    let [entry, entry_false, short, short_false] = shown[..] else {
+        panic!("{page}");
+    };
+    assert!(!entry.contains("<img"), "{entry}");
+    assert_eq!(entry_false, entry);
+    assert!(short.contains("<h2>"), "{short}");
+    assert_eq!(short_false, short);
+}
+
 /// Runs `statac new` on the site in `folder` with `cards` and `update` as
 /// given, and gives what it said.
 fn ran(folder: &Path, cards: bool, update: Option<new::update::Update>) -> String {
