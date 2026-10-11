@@ -22,8 +22,10 @@ it can recognise a file you never changed from its exact bytes, and
 nothing extra is kept in the site to record it. A file you changed is
 compared with the starter version nearest to it, the one with the fewest
 lines different. If that is the newest version, there is nothing new, and
-the file isn't counted. Statac shows this note once, in `statac check`
-and in the count after `statac build`.
+the file isn't counted. Nor is a file with less than half of its lines,
+and less than half of that version's, in common with it: it is your own
+file, not a starter file changed. Statac shows this note once, in
+`statac check` and in the count after `statac build`.
 
 ## How to fix it
 

@@ -855,6 +855,34 @@ fn the_note_counts_older_files_and_the_authors_with_something_new() {
     assert_eq!(newer_starter(&folder, &Starter::OWN), None);
 }
 
+/// A file with little or nothing of any version in it is the author's
+/// own, never a version changed, whichever version is the shorter.
+#[test]
+fn a_file_unlike_every_version_is_the_authors_own_with_nothing_new() {
+    let is = |home: &[u8]| {
+        let folder = made_site("unlike", &[("templates/home.html", home)]);
+        let found = survey(&folder.canonicalize().unwrap(), &STARTER);
+        let home = found
+            .into_iter()
+            .find(|found| found.path == "templates/home.html");
+        let told = newer_starter(&folder, &STARTER).is_some();
+        (home.unwrap().is, told)
+    };
+    let new = Is::Yours {
+        new: Some((HOME_W1, HOME_W2)),
+    };
+    let own = Is::Yours { new: None };
+    // Nothing of either version, and one line of four.
+    assert_eq!(is(b"<p>Mine.</p>\n"), (own.clone(), false));
+    let one_shared = b"{% extends \"base.html\" %}\n<p>One.</p>\n<p>Two.</p>\n<p>Three.</p>\n";
+    assert_eq!(is(one_shared), (own, false));
+    // Half of the file's lines, and half of the version's.
+    let half_its_own = b"{% extends \"base.html\" %}\n<p>Mine.</p>\n";
+    assert_eq!(is(half_its_own), (new.clone(), true));
+    let half_the_versions = concat(HOME_W1, b"<p>1</p>\n<p>2</p>\n<p>3</p>\n<p>4</p>\n");
+    assert_eq!(is(&half_the_versions), (new, true));
+}
+
 const CSS_1: &[u8] = b"body { margin: 0; }\n";
 const CSS_2: &[u8] = b"body { margin: 0 auto; }\n";
 

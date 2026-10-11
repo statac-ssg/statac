@@ -99,7 +99,8 @@ pub(super) enum Is {
         current: &'static [u8],
     },
     /// Bytes of the author's own, and what is new since the version
-    /// nearest them: that version and the current one, where they differ.
+    /// nearest them: that version and the current one, where they differ
+    /// and the bytes are a copy of that version changed.
     Yours {
         new: Option<(&'static [u8], &'static [u8])>,
     },
@@ -181,21 +182,35 @@ fn told(bytes: Vec<u8>, versions: &Versions) -> Is {
         return Is::NotText { changed };
     };
     let read = differ::lines(text);
-    // The nearest version, the newer of two as near.
-    let mut nearest: Option<(usize, &'static [u8])> = None;
+    // The nearest version, the newer of two as near, and whether the file
+    // is a copy of it changed.
+    let mut nearest: Option<(usize, &'static [u8], bool)> = None;
     for version in versions.all() {
         let Some(version_text) = self::text(version) else {
             continue;
         };
-        let distance = differ::distance(&read, &differ::lines(version_text));
-        if nearest.is_none_or(|(least, _)| distance <= least) {
-            nearest = Some((distance, version));
+        let lines = differ::lines(version_text);
+        let distance = differ::distance(&read, &lines);
+        if nearest.is_none_or(|(least, ..)| distance <= least) {
+            let shared = (read.len() + lines.len() - distance) / 2;
+            nearest = Some((
+                distance,
+                version,
+                is_a_copy(shared, read.len(), lines.len()),
+            ));
         }
     }
     let new = nearest
-        .filter(|(_, version)| *version != current)
-        .map(|(_, version)| (version, current));
+        .filter(|(_, version, copy)| *copy && *version != current)
+        .map(|(_, version, _)| (version, current));
     Is::Yours { new }
+}
+
+/// Whether a file of `own` lines is a version of `theirs` lines changed,
+/// sharing `shared` of them: half of either's at least. A file less like
+/// every version is the author's own, which the starter's news isn't for.
+fn is_a_copy(shared: usize, own: usize, theirs: usize) -> bool {
+    shared > 0 && (shared * 2 >= own || shared * 2 >= theirs)
 }
 
 /// `bytes` as text, where they are.
