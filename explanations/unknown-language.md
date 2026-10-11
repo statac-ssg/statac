@@ -19,7 +19,8 @@ Statac is sure which language you mean, so the build continues. Without
 the words, dates are written in figures, such as `2025-12-31`, and quotation
 marks stay as they were typed. A `date_format` that writes a month or a
 weekday in words stops the build, since there are no words to write it
-with.
+with. The direction of the writing needs no words: a page in Hebrew or
+Urdu is still written right to left.
 
 ## How to fix it
 

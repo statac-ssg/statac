@@ -5,7 +5,9 @@ https://github.com/unicode-org/cldr-json/tree/48.2.3/cldr-json
 
 They are under the Unicode License V3, the text of which is in
 src/language/bundled/LICENSE-CLDR.txt. The words Statac has for each language
-but English are held to these files by a test in src/language/tests.rs.
+but English are held to these files by a test in src/language/tests.rs, and
+so is the direction every language is written in, in
+src/language/direction.rs.
 
 The files for sw are there for the example in
 explanations/unknown-language.md alone, which the same tests hold to them:

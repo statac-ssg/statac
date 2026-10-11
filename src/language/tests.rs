@@ -575,3 +575,88 @@ fn a_regional_tag_reads_its_languages_words_and_says_nothing() {
     assert_eq!(language.whence, Whence::Statac("en"));
     assert!(problems.is_empty(), "{problems:?}");
 }
+
+/// The script of each tag the CLDR gives a likely script for, and
+/// whether the CLDR has that script written right to left.
+fn the_cldrs_directions() -> (Vec<(String, bool)>, Vec<String>) {
+    let scripts = cldr("cldr-core/scriptMetadata.json");
+    let Yaml::Mapping(scripts) = &under(&scripts, &["scriptMetadata"]).value else {
+        panic!("scripts");
+    };
+    let right_to_left: Vec<String> = scripts
+        .iter()
+        .filter(|entry| texts(&entry.value, ["rtl"]) == ["YES"])
+        .map(|entry| crate::content::words::key_name(&entry.key))
+        .collect();
+    let likely = cldr("cldr-core/supplemental/likelySubtags.json");
+    let Yaml::Mapping(likely) = &under(&likely, &["supplemental", "likelySubtags"]).value else {
+        panic!("likely subtags");
+    };
+    let tags = likely
+        .iter()
+        .map(|entry| {
+            let Yaml::Scalar(full) = &entry.value.value else {
+                panic!("{entry:?}");
+            };
+            let script = full.split('-').nth(1).expect("a script");
+            let tag = crate::content::words::key_name(&entry.key);
+            (tag, right_to_left.iter().any(|known| known == script))
+        })
+        // `und` is no language: the CLDR's guess from a script or a region alone.
+        .filter(|(tag, _)| tag.split('-').next() != Some("und"))
+        .collect();
+    (tags, right_to_left)
+}
+
+/// Which way a language is written is the Unicode CLDR's and nothing
+/// else: every tag it gives a script for runs the way that script does,
+/// and no script, language or region is listed that it doesn't give.
+#[test]
+fn the_direction_of_every_language_is_the_cldrs() {
+    let (tags, scripts) = the_cldrs_directions();
+    assert!(tags.len() > 7000, "{}", tags.len());
+    for (tag, right_to_left) in &tags {
+        let direction = Direction::of(tag);
+        assert_eq!(direction == Direction::RightToLeft, *right_to_left, "{tag}");
+    }
+    assert_eq!(direction::SCRIPTS, scripts);
+    let listed = |tag: &&str| tags.iter().any(|(known, right)| known == tag && *right);
+    assert!(direction::LANGUAGES.iter().all(listed));
+    let known = |tag: &&str| tags.iter().any(|(known, _)| known == tag);
+    assert!(direction::REGIONS.iter().all(known));
+}
+
+#[test]
+fn a_tag_is_read_by_its_script_then_its_region_then_its_language() {
+    let cases = [
+        ("he", Direction::RightToLeft),
+        ("HE-il", Direction::RightToLeft),
+        ("ur-PK", Direction::RightToLeft),
+        ("pa", Direction::LeftToRight),
+        ("pa-PK", Direction::RightToLeft),
+        ("pa-Arab", Direction::RightToLeft),
+        ("pa-Guru-PK", Direction::LeftToRight),
+        ("ug-KZ", Direction::LeftToRight),
+        ("ar-Latn", Direction::LeftToRight),
+        ("sw", Direction::LeftToRight),
+        ("", Direction::LeftToRight),
+    ];
+    for (tag, direction) in cases {
+        assert_eq!(Direction::of(tag), direction, "{tag}");
+    }
+}
+
+#[test]
+fn a_language_statac_has_no_words_for_runs_the_way_its_script_does() {
+    let (hebrew, problems) = language("he", &[]);
+    assert_eq!(problems, [("unknown-language", "he".to_owned())]);
+    assert_eq!(*hebrew.words, Words::wordless("he"));
+    assert_eq!(hebrew.words.direction, Direction::RightToLeft);
+
+    // Its own file keeps the direction, and says another where it writes one.
+    let (own, problems) = language("he-IL", &[("languages/he.yaml", "quotes: ” ” ’ ’\n")]);
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(own.words.direction, Direction::RightToLeft);
+    let (turned, _) = language("he", &[("languages/he.yaml", "direction: ltr\n")]);
+    assert_eq!(turned.words.direction, Direction::LeftToRight);
+}

@@ -5,10 +5,12 @@
 //! Statac's own words for a language are kept in the binary. A site's own
 //! `languages/<tag>.yaml` adds to them key by key: a key it writes takes
 //! the place of Statac's, and a key it leaves out keeps Statac's. For a
-//! language Statac has no words for, the file is the language whole. A tag
-//! neither has is looked for again without its last part, `en-US` as `en`,
-//! as the Unicode CLDR's own data inherits.
+//! language Statac has no words for, the file is the language whole, on
+//! lines running the way its script does. A tag neither has is looked for
+//! again without its last part, `en-US` as `en`, as the Unicode CLDR's own
+//! data inherits.
 
+mod direction;
 mod read;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -89,6 +91,14 @@ pub struct Words {
 pub const CALLOUTS: [&str; 5] = ["note", "tip", "important", "warning", "caution"];
 
 impl Words {
+    /// No words, on lines running the way the language `tag` is written.
+    pub fn wordless(tag: &str) -> Words {
+        Words {
+            direction: Direction::of(tag),
+            ..Words::default()
+        }
+    }
+
     /// Months with no day beside them: `months_alone`, or `months` where
     /// the language writes the two alike.
     pub fn months_with_no_day(&self) -> Option<&[String; 12]> {
@@ -222,7 +232,7 @@ impl Languages {
                             let statacs = broader(wanted)
                                 .find_map(bundled)
                                 .map(|(_, words)| (*words).clone())
-                                .unwrap_or_default();
+                                .unwrap_or_else(|| Words::wordless(tag.value));
                             let (words, found) = read_onto(sources, id, statacs);
                             problems.extend(found);
                             Some((Arc::new(words), Whence::Site(shown)))
@@ -232,7 +242,7 @@ impl Languages {
                                 path: shown.clone().into(),
                                 reason: crate::problem::system_reason(&error),
                             }));
-                            Some((Arc::new(Words::default()), Whence::Site(shown)))
+                            Some((Arc::new(Words::wordless(tag.value)), Whence::Site(shown)))
                         }
                     }
                 }
@@ -255,7 +265,7 @@ impl Languages {
         });
         Language {
             tag: Some(tag.value.to_owned()),
-            words: Arc::new(Words::default()),
+            words: Arc::new(Words::wordless(tag.value)),
             whence: Whence::Nothing,
         }
     }

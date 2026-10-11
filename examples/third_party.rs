@@ -439,8 +439,10 @@ fn list() -> String {
          months and the weekdays, the words for am and pm, the quotation \
          marks, the direction of writing and the digits. So is the usual \
          form of a date in each of those languages, in \
-         `src/dates/format.rs`, and so are English's months, weekdays and \
-         quotation marks: Unicode License V3. [{cldr}]"
+         `src/dates/format.rs`, so are English's months, weekdays and \
+         quotation marks, and so is the direction of a language Statac has no \
+         words for, in `src/language/direction.rs`: Unicode License V3. \
+         [{cldr}]"
     )
     .unwrap();
 
