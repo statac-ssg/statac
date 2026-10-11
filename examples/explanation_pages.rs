@@ -178,7 +178,7 @@ fn said_here(path: &str) -> Option<&'static str> {
         ("content/index.md", ..) => "The home page, where you describe the site: see /new/",
         ("content/about.md", ..) => {
             "A sample page that isn't a post, which explains how to write the next one and how \
-             a page joins the menu"
+             a page joins the menu: see /new/"
         }
         ("content/posts/first-post/index.md", ..) => {
             "The site's first post, which explains how to write the next one"
