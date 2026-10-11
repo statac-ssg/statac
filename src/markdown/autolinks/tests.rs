@@ -1,4 +1,4 @@
-use super::written_at;
+use super::{Written, written_at};
 use crate::language::bundled;
 use crate::markdown::typography::{bare_addresses, blocks};
 use crate::markdown::{
@@ -463,4 +463,74 @@ fn a_character_is_found_where_it_was_typed() {
     assert_eq!(written_at("&amp; www", "&amp;amp; www", 6), Some(10));
     assert_eq!(written_at("ab www", "a\u{b}b www", 3), Some(4));
     assert_eq!(written_at("ab", "xy", 1), None);
+}
+
+/// A place asked for after another is read on from it, and is where it
+/// would be found asked alone, whatever the order of asking.
+#[test]
+fn a_character_is_found_the_same_asked_in_any_order() {
+    let cases = [
+        ("a*b www.c.d * e", "a\\*b www.c.d \\* e"),
+        ("a & www.b.c & d", "a &amp; www.b.c &#38; d"),
+        ("é www.b.c é", "&eacute; www.b.c &#233;"),
+        ("&x; é", "&x; &eacute;"),
+        ("ab www cd", "a\u{b}b www c\u{b}d"),
+        ("ab", "xy"),
+    ];
+    for (text, spelling) in cases {
+        let places: Vec<usize> = text
+            .char_indices()
+            .map(|(at, _)| at)
+            .chain([text.len()])
+            .collect();
+        let alone: Vec<_> = places
+            .iter()
+            .map(|at| written_at(text, spelling, *at))
+            .collect();
+        let written = Written::new(text, spelling);
+        let onwards: Vec<_> = places.iter().map(|at| written.at(*at)).collect();
+        assert_eq!(onwards, alone, "{text}");
+        let back: Vec<_> = places.iter().rev().map(|at| written.at(*at)).collect();
+        assert_eq!(
+            back,
+            alone.iter().rev().copied().collect::<Vec<_>>(),
+            "{text}"
+        );
+        let twice: Vec<_> = places
+            .iter()
+            .map(|at| (written.at(*at), written.at(*at)))
+            .collect();
+        assert!(
+            twice
+                .iter()
+                .zip(&alone)
+                .all(|((a, b), alone)| a == alone && b == alone)
+        );
+    }
+}
+
+#[test]
+fn every_address_of_one_line_is_placed_at_itself() {
+    let text = "É \\* www.a.org &amp; é x@b.example.org, \\[ www.c.org ö &#233; d@e.example.org www.f.org.\n";
+    let (sources, document) = read_text(text);
+    let placed: Vec<_> = links(&document)
+        .into_iter()
+        .map(|link| {
+            let words: String = link
+                .children
+                .iter()
+                .map(|child| sources.spelling(child.place))
+                .collect();
+            (sources.spelling(link.place), words)
+        })
+        .collect();
+    let addresses = [
+        "www.a.org",
+        "x@b.example.org",
+        "www.c.org",
+        "d@e.example.org",
+        "www.f.org",
+    ];
+    let expected: Vec<_> = addresses.iter().map(|a| (*a, (*a).to_owned())).collect();
+    assert_eq!(placed, expected);
 }

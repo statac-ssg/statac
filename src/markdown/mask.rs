@@ -173,12 +173,14 @@ pub(super) fn mask(
     // one told of as wrapping nothing, and one to a name the site has no
     // snippet for, which is told of as that.
     let mut ended: Vec<usize> = Vec::new();
+    let mut unclosed = 0;
     let mut i = start;
     while let Some(at) = next_special(b, i) {
         i = at + 1;
         match b[at] {
             b'$' => {
-                if let Some((to, display)) = maths(text, at, masker.line.of(b, at).0) {
+                let line = masker.line.of(b, at).0;
+                if let Some((to, display)) = maths(text, at, line, &mut unclosed) {
                     let inner = if display {
                         at + 2..to - 2
                     } else {
@@ -587,7 +589,10 @@ fn glued(text: &str, at: usize) -> bool {
 /// scan can't see. Maths over several lines
 /// must be a block, `$$` opening its line and closing the last, and never
 /// crosses a blank line.
-fn maths(text: &str, at: usize, line: usize) -> Option<(usize, bool)> {
+///
+/// `unclosed` is how far an earlier `$` was read on with no `$` to close
+/// it: one before there has none either, so a line of them is read once.
+fn maths(text: &str, at: usize, line: usize, unclosed: &mut usize) -> Option<(usize, bool)> {
     let b = text.as_bytes();
     if at > 0 && b[at - 1] == b'\\' {
         return None;
@@ -625,14 +630,14 @@ fn maths(text: &str, at: usize, line: usize) -> Option<(usize, bool)> {
     if b.get(at + 1).is_none_or(u8::is_ascii_whitespace) {
         return None;
     }
-    if glued(text, at) {
+    if glued(text, at) || at < *unclosed {
         return None;
     }
     let mut k = at + 1;
     while k < b.len() {
         match b[k] {
-            b'`' | b'\n' => return None,
-            b']' if b.get(k + 1) == Some(&b'(') => return None,
+            b'`' | b'\n' => break,
+            b']' if b.get(k + 1) == Some(&b'(') => break,
             b'\\' if b.get(k + 1) != Some(&b'\n') => {
                 k += 2;
                 continue;
@@ -646,6 +651,7 @@ fn maths(text: &str, at: usize, line: usize) -> Option<(usize, bool)> {
         }
         k += 1;
     }
+    *unclosed = k;
     None
 }
 
@@ -689,4 +695,42 @@ fn fence_tabs(text: &str, from: usize) -> Cow<'_, str> {
         }
     }
     Cow::Owned(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every text of up to `length` of `letters`.
+    fn every(letters: &[char], length: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut last = all.clone();
+        for _ in 0..length {
+            last = last
+                .iter()
+                .flat_map(|text| letters.iter().map(move |c| format!("{text}{c}")))
+                .collect();
+            all.extend(last.iter().cloned());
+        }
+        all
+    }
+
+    /// Remembering how far an unclosed `$` was read on changes nothing:
+    /// each `$` of a line, asked in turn, is the maths it is asked alone.
+    #[test]
+    fn a_dollar_is_the_same_maths_after_one_that_never_closed() {
+        let letters = ['$', 'a', ' ', '1', '\\', '`', ']', '(', '<', '>', '\n'];
+        for text in every(&letters, 6) {
+            let b = text.as_bytes();
+            let mut unclosed = 0;
+            for at in (0..b.len()).filter(|at| b[*at] == b'$') {
+                let line = line_start(b, at);
+                assert_eq!(
+                    maths(&text, at, line, &mut unclosed),
+                    maths(&text, at, line, &mut 0),
+                    "{text:?} at {at}"
+                );
+            }
+        }
+    }
 }

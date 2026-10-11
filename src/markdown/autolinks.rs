@@ -8,6 +8,8 @@
 //! typed in raw HTML, or a `www.` or scheme address inside a `[` not yet
 //! closed. Code, maths and a call's arguments are no part of the words.
 
+use std::cell::Cell;
+
 use super::Document;
 use super::controls;
 use super::node::{Kind, Node};
@@ -181,13 +183,24 @@ impl Cutting<'_> {
             return;
         }
         let spelling = &self.source[node.place.span.range()];
+        // The addresses of one node are asked for in their order, so each
+        // is counted on from the last: a node may hold thousands.
+        let counted = Cell::new((0, 0));
         let byte = |chars: usize| {
-            text.char_indices()
-                .nth(chars)
-                .map_or(text.len(), |(at, _)| at)
+            let (passed, from) = match counted.get() {
+                (passed, from) if passed <= chars => (passed, from),
+                _ => (0, 0),
+            };
+            let at = text[from..]
+                .char_indices()
+                .nth(chars - passed)
+                .map_or(text.len(), |(at, _)| from + at);
+            counted.set((chars, at));
+            at
         };
+        let typed = Written::new(text, spelling);
         let written = |at: usize| {
-            let typed = written_at(text, spelling, at).unwrap_or(match at {
+            let typed = typed.at(at).unwrap_or(match at {
                 0 => 0,
                 _ => spelling.len(),
             });
@@ -197,7 +210,8 @@ impl Cutting<'_> {
             let mut piece = node.clone();
             if from > 0 || to < text.len() {
                 piece.kind = Kind::Text(text[from..to].to_owned());
-                piece.place.span = Span::new(written(from), written(to).max(written(from)));
+                let start = written(from);
+                piece.place.span = Span::new(start, written(to).max(start));
             }
             piece
         };
@@ -254,49 +268,80 @@ impl Cutting<'_> {
 /// are characters read from several typed, and a control character typed
 /// there was left out. None where the two can't be matched.
 fn written_at(text: &str, spelling: &str, at: usize) -> Option<usize> {
-    if text == spelling {
-        return Some(at);
+    Written::new(text, spelling).at(at)
+}
+
+/// `written_at` asked of one text again and again: a place at or after
+/// the last one asked for is read on from it.
+struct Written<'a> {
+    text: &'a str,
+    spelling: &'a str,
+    same: bool,
+    /// The last place asked for, and how far into the text and into the
+    /// spelling reading to it came.
+    read: Cell<(usize, usize, usize)>,
+}
+
+impl<'a> Written<'a> {
+    fn new(text: &'a str, spelling: &'a str) -> Written<'a> {
+        Written {
+            text,
+            spelling,
+            same: text == spelling,
+            read: Cell::new((0, 0, 0)),
+        }
     }
-    let (mut t, mut s) = (0, 0);
-    while t < at {
-        let c = text[t..].chars().next()?;
-        let rest = &spelling[s..];
-        let mut typed = rest.chars();
-        let first = typed.next()?;
-        if first == '\\' && typed.next() == Some(c) && c.is_ascii_punctuation() {
-            s += 2;
-            t += 1;
-            continue;
+
+    fn at(&self, at: usize) -> Option<usize> {
+        if self.same {
+            return Some(at);
         }
-        if first == '&'
-            && let Some((length, decoded)) = entity(rest)
-            && (decoded || c != '&')
-        {
-            // A few named entities stand for two characters.
-            let mut read = text[t..].chars();
-            let after = spelling[s + length..].chars().next();
-            let two =
-                read.nth(1).is_some_and(|second| Some(second) != after) && read.next() == after;
-            t += text[t..]
-                .chars()
-                .take(if two { 2 } else { 1 })
-                .map(char::len_utf8)
-                .sum::<usize>();
-            s += length;
-            continue;
+        let (text, spelling) = (self.text, self.spelling);
+        let (mut t, mut s) = match self.read.get() {
+            (asked, t, s) if asked <= at => (t, s),
+            _ => (0, 0),
+        };
+        while t < at {
+            let c = text[t..].chars().next()?;
+            let rest = &spelling[s..];
+            let mut typed = rest.chars();
+            let first = typed.next()?;
+            if first == '\\' && typed.next() == Some(c) && c.is_ascii_punctuation() {
+                s += 2;
+                t += 1;
+                continue;
+            }
+            if first == '&'
+                && let Some((length, decoded)) = entity(rest)
+                && (decoded || c != '&')
+            {
+                // A few named entities stand for two characters.
+                let mut read = text[t..].chars();
+                let after = spelling[s + length..].chars().next();
+                let two =
+                    read.nth(1).is_some_and(|second| Some(second) != after) && read.next() == after;
+                t += text[t..]
+                    .chars()
+                    .take(if two { 2 } else { 1 })
+                    .map(char::len_utf8)
+                    .sum::<usize>();
+                s += length;
+                continue;
+            }
+            if first == c {
+                s += c.len_utf8();
+                t += c.len_utf8();
+                continue;
+            }
+            if controls::left_out(first) {
+                s += first.len_utf8();
+                continue;
+            }
+            return None;
         }
-        if first == c {
-            s += c.len_utf8();
-            t += c.len_utf8();
-            continue;
-        }
-        if controls::left_out(first) {
-            s += first.len_utf8();
-            continue;
-        }
-        return None;
+        self.read.set((at, t, s));
+        Some(s)
     }
-    Some(s)
 }
 
 /// How long the entity `rest` opens with is, if it looks like one, and
