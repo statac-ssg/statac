@@ -2077,10 +2077,16 @@ impl Reader<'_> {
 
     /// The feed and layout each list's own page keeps.
     fn lists_and_feeds(&mut self) {
-        let feeds = self.s.feeds;
+        let (home, lists, tags) = match self.s.feeds {
+            true => self.s.feeds_for,
+            false => (false, false, false),
+        };
+        let name = self.s.feed_name.clone();
+        let off = || Field::new("feed", Value::Truth(false), None);
         let mut laid_out = Vec::new();
         let mut homes: Vec<String> = Vec::new();
         let mut feed_addresses = Vec::new();
+        let mut unfed = false;
         for at in 0..self.docs.len() {
             let doc = &self.docs[at];
             if !matches!(doc.shape, Shape::List | Shape::Made) || doc.draft {
@@ -2111,49 +2117,93 @@ impl Reader<'_> {
             if doc.dir.is_empty() {
                 homes.push(doc.language.clone());
             }
-            if feeds && dated {
-                words.push(Field::new("feed", Value::Text("index.xml".into()), None));
+            let fed = match doc.dir.is_empty() {
+                true => home,
+                false => lists,
+            };
+            if fed && dated {
+                words.push(Field::new("feed", Value::Text(name.clone()), None));
                 let prefix = self.prefix(&doc.language);
-                feed_addresses
-                    .push(format!("/{prefix}{}", slug::tidied_path(&doc.dir)) + "index.xml");
+                feed_addresses.push(format!("/{prefix}{}", slug::tidied_path(&doc.dir)) + &name);
+            } else if dated && !doc.dir.contains('/') {
+                words.push(off());
+                unfed = true;
             }
             self.docs[at].words.extend(words);
         }
-        if feeds {
-            let languages: Vec<String> = match self.several() {
-                true => self.languages.clone(),
-                false => vec![self.main.clone()],
-            };
-            for language in languages {
-                let dated = self.docs.iter().any(|d| {
-                    d.date.is_some()
-                        && !d.draft
-                        && d.language == language
-                        && matches!(d.shape, Shape::Single | Shape::Bundle)
-                });
-                if homes.contains(&language) || !dated {
-                    continue;
-                }
-                let prefix = self.prefix(&language);
-                self.import.words.push((
-                    format!("{prefix}index.md"),
-                    Field::new("feed", Value::Text("index.xml".into()), None),
-                ));
-                feed_addresses.push(format!("/{prefix}index.xml"));
+        let languages: Vec<String> = match self.several() {
+            true => self.languages.clone(),
+            false => vec![self.main.clone()],
+        };
+        for language in languages {
+            let dated = self.docs.iter().any(|d| {
+                d.date.is_some()
+                    && !d.draft
+                    && d.language == language
+                    && matches!(d.shape, Shape::Single | Shape::Bundle)
+            });
+            if homes.contains(&language) || !dated {
+                continue;
             }
+            let prefix = self.prefix(&language);
+            let word = match home {
+                true => Field::new("feed", Value::Text(name.clone()), None),
+                false => off(),
+            };
+            self.import.words.push((format!("{prefix}index.md"), word));
+            match home {
+                true => feed_addresses.push(format!("/{prefix}{name}")),
+                false => unfed = true,
+            }
+        }
+        let fed = !feed_addresses.is_empty();
+        if fed {
             self.import.addresses.extend(feed_addresses);
             self.import
                 .settings
                 .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
-            self.note(
-                "Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own \
-                 page. Each is now an Atom feed at the same address, written by \
-                 `templates/feed.xml`, as `feed: index.xml` on each list's page says, and \
-                 `feed_ids_before` keeps each post's id the address Hugo gave it, so feed \
-                 readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed \
-                 Hugo made for each tag has no equal."
-                    .to_owned(),
-            );
+        }
+        let kept = format!(
+            "at the same address, written by `templates/feed.xml`, as `feed: {name}` on {} says, \
+             and `feed_ids_before` keeps each post's id the address Hugo gave it, so feed \
+             readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
+            match (home, lists) {
+                (true, false) => "the home page",
+                _ => "each list's page",
+            }
+        );
+        let mut said = match (fed, home, lists) {
+            (false, ..) => String::new(),
+            (true, true, true) => format!(
+                "Hugo's feeds were RSS, at `{name}` beside the home page and each list's own \
+                 page. Each is now an Atom feed {kept}"
+            ),
+            (true, true, false) => format!(
+                "Hugo's feed was RSS, at `{name}` beside the home page. It is now an Atom feed \
+                 {kept}"
+            ),
+            (true, false, _) => format!(
+                "Hugo's feeds were RSS, at `{name}` beside each list's own page. Each is now an \
+                 Atom feed {kept}"
+            ),
+        };
+        if unfed {
+            said += match fed {
+                true => {
+                    " Hugo made no feed for the other lists, so the page of each says \
+                     `feed: false`."
+                }
+                false => {
+                    "Hugo made no feeds, so the page of each list says `feed: false`: see \
+                     https://statac.dev/feeds/."
+                }
+            };
+        }
+        if fed && tags && self.s.terms {
+            said += " The feed Hugo made for each tag has no equal.";
+        }
+        if !said.is_empty() {
+            self.note(said);
         }
         if !laid_out.is_empty() {
             let folders: Vec<String> = laid_out
@@ -2260,15 +2310,18 @@ impl Reader<'_> {
         }
         // Hugo wrote a feed beside the page of each tag and of each list
         // of that kind; Statac gives one only where a page asks.
-        if self.s.feeds && self.s.terms {
+        if self.s.feeds && self.s.feeds_for.2 && self.s.terms {
             let mut feeds: Vec<String> = Vec::new();
             for doc in self.docs.iter().filter(|d| !d.draft) {
                 let prefix = format!("/{}", self.prefix(&doc.language));
                 let prefix = prefix.trim_end_matches('/');
                 for (plural, terms) in &doc.terms {
                     for term in terms {
-                        let feed =
-                            format!("{prefix}/{plural}/{}/index.xml", self.making.made(term));
+                        let feed = format!(
+                            "{prefix}/{plural}/{}/{}",
+                            self.making.made(term),
+                            self.s.feed_name
+                        );
                         if !feeds.contains(&feed) {
                             feeds.push(feed);
                         }

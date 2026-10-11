@@ -399,6 +399,11 @@ pub struct Settings {
     pub maths: (bool, bool),
     pub block_attributes: bool,
     pub feeds: bool,
+    /// Whether `outputs` gives a feed to the home page, to each list, and
+    /// to each tag.
+    pub feeds_for: (bool, bool, bool),
+    /// The name of a feed's file, which `outputFormats` can change.
+    pub feed_name: String,
     pub terms: bool,
     pub git: bool,
     /// Settings Statac has no equal for, each with its file, line and text.
@@ -505,6 +510,8 @@ pub fn settle(folder: &Path, entries: &[Entry]) -> Settings {
         maths: (false, false),
         block_attributes: false,
         feeds: true,
+        feeds_for: (true, true, true),
+        feed_name: "index.xml".into(),
         terms: true,
         git: false,
         left: Vec::new(),
@@ -681,6 +688,55 @@ pub fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                     field.name,
                     super::super::write::shown_value(value)
                 ));
+            }
+            "outputs" => {
+                let mut rest = Vec::new();
+                for (kind, formats) in fields(value) {
+                    let formats = texts_of(formats);
+                    let feed = formats.iter().any(|f| f.eq_ignore_ascii_case("rss"));
+                    match kind.to_ascii_lowercase().as_str() {
+                        "home" => s.feeds_for.0 = feed,
+                        "section" => s.feeds_for.1 = feed,
+                        "term" => s.feeds_for.2 = feed,
+                        _ => {}
+                    }
+                    let others: Vec<Value> = (formats.iter())
+                        .filter(|f| !["html", "rss"].contains(&f.to_lowercase().as_str()))
+                        .map(|f| Value::Text(f.clone()))
+                        .collect();
+                    if !others.is_empty() {
+                        rest.push((kind.clone(), Value::List(others)));
+                    }
+                }
+                if !rest.is_empty() {
+                    leave(format!(
+                        "{}: {}",
+                        field.name,
+                        super::super::write::shown_value(&Value::Fields(rest))
+                    ));
+                }
+            }
+            "outputformats" => {
+                let mut rest = value.clone();
+                let rss = get(fields(value), "rss").map(fields).unwrap_or_default();
+                // Only a plain name is kept: it is written into the new
+                // site as part of an address.
+                let plain = |name: &String| {
+                    !name.is_empty()
+                        && !name.starts_with('.')
+                        && (name.chars()).all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+                };
+                if let Some(name) = get(rss, "basename").and_then(text_of).filter(plain) {
+                    s.feed_name = format!("{name}.xml");
+                    take(&mut rest, &["rss", "basename"]);
+                }
+                if rest != Value::Fields(Vec::new()) {
+                    leave(format!(
+                        "{}: {}",
+                        field.name,
+                        super::super::write::shown_value(&rest)
+                    ));
+                }
             }
             "markup" => {
                 let mut rest = value.clone();

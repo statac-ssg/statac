@@ -666,6 +666,160 @@ fn hugo_site_under_a_path_keeps_its_addresses_and_links() {
 }
 
 #[test]
+fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
+    let both =
+        "Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own page";
+    let home = "Hugo's feed was RSS, at `feed.xml` beside the home page. It is now an Atom feed \
+                at the same address, written by `templates/feed.xml`, as `feed: feed.xml` on the \
+                home page says";
+    let lists = "Hugo's feeds were RSS, at `index.xml` beside each list's own page";
+    let others = "Hugo made no feed for the other lists, so the page of each says `feed: false`.";
+    let none = "Hugo made no feeds, so the page of each list says `feed: false`";
+    // The settings, whether the old site has a home page of its own, the
+    // `feed` of the new home page and of the posts' page, and what is said.
+    let cases = [
+        ("", true, "index.xml", "index.xml", &[both][..]),
+        ("", false, "index.xml", "index.xml", &[both][..]),
+        (
+            "[outputs]\nhome = ['html', 'rss']\nsection = ['html']\n\
+             [outputFormats.RSS]\nbaseName = 'feed'\n",
+            true,
+            "feed.xml",
+            "false",
+            &[home, others][..],
+        ),
+        (
+            "[outputs]\nhome = ['HTML', 'RSS']\nsection = ['HTML']\n\
+             [outputformats.rss]\nbasename = 'feed'\n",
+            false,
+            "feed.xml",
+            "false",
+            &[home, others][..],
+        ),
+        (
+            "[outputs]\nhome = ['html']\n",
+            true,
+            "false",
+            "index.xml",
+            &[lists, others][..],
+        ),
+        (
+            "disableKinds = ['rss']\n",
+            true,
+            "false",
+            "false",
+            &[none][..],
+        ),
+        (
+            "[outputs]\nhome = ['html']\nsection = ['html']\n",
+            false,
+            "false",
+            "false",
+            &[none][..],
+        ),
+    ];
+    for (at, (settings, has_home, home_feed, posts_feed, said)) in cases.into_iter().enumerate() {
+        let old = scratch(&format!("hugo-feeds-old-{at}"));
+        let new = scratch(&format!("hugo-feeds-new-{at}"));
+        fs::create_dir_all(old.join("content/posts")).unwrap();
+        let top = "baseURL = 'https://example.org/'\ntitle = 'Feeds'\ntimeZone = 'Europe/London'\n";
+        fs::write(old.join("hugo.toml"), format!("{top}{settings}")).unwrap();
+        let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n";
+        fs::write(old.join("content/posts/post-1.md"), post).unwrap();
+        if has_home {
+            fs::write(old.join("content/_index.md"), "---\ntitle: Home\n---\n").unwrap();
+        }
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{settings}: {told}");
+        let read = |path: &str| fs::read_to_string(new.join(path)).unwrap();
+        let word = |path: &str, feed: &str| {
+            let page = read(path);
+            assert!(
+                page.contains(&format!("\nfeed: {feed}\n")),
+                "{settings}: {path}: {page}"
+            );
+        };
+        word("content/index.md", home_feed);
+        word("content/posts/index.md", posts_feed);
+        let report = read("IMPORT.md");
+        for sentence in said {
+            assert!(report.contains(sentence), "{settings}: {report}");
+        }
+        assert!(!report.contains("`outputs"), "{settings}: {report}");
+        assert!(!report.contains("`outputFormats"), "{settings}: {report}");
+
+        let out = scratch(&format!("hugo-feeds-built-{at}"));
+        let outcome = build::run(&Options {
+            mode: Mode::Build,
+            site: new.clone(),
+            out: Some(out.clone()),
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        assert!(outcome.published.is_some(), "{settings}");
+        let mut feeds: Vec<String> = (files(&out).into_keys())
+            .filter(|path| path.ends_with(".xml") && path != "sitemap.xml")
+            .collect();
+        feeds.sort();
+        let mut wanted = Vec::new();
+        if home_feed != "false" {
+            wanted.push(home_feed.to_owned());
+        }
+        if posts_feed != "false" {
+            wanted.push(format!("posts/{posts_feed}"));
+        }
+        assert_eq!(feeds, wanted, "{settings}");
+    }
+}
+
+#[test]
+fn hugo_settings_for_formats_statac_has_no_equal_for_are_listed() {
+    let old = scratch("hugo-feeds-left-old");
+    let new = scratch("hugo-feeds-left-new");
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    let settings = "baseURL = 'https://example.org/'\ntitle = 'Feeds'\n\
+                    [outputs]\nhome = ['html', 'json', 'rss']\npage = ['html']\n\
+                    [outputFormats.rss]\nbaseName = 'feed'\nmediaType = 'application/rss'\n";
+    fs::write(old.join("hugo.toml"), settings).unwrap();
+    let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n";
+    fs::write(old.join("content/posts/post-1.md"), post).unwrap();
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(report.contains("`outputs: {home: [json]}`"), "{report}");
+    assert!(
+        report.contains("`outputFormats: {rss: {mediaType: application/rss}}`"),
+        "{report}"
+    );
+}
+
+#[test]
+fn a_hugo_feeds_name_that_isnt_a_plain_one_is_left_and_listed() {
+    for name in ["../feed", "a/b", ".hidden", "fe`ed", "two words", ""] {
+        let old = scratch("hugo-feeds-name-old");
+        let new = scratch("hugo-feeds-name-new");
+        fs::create_dir_all(old.join("content/posts")).unwrap();
+        let settings = format!(
+            "baseURL = 'https://example.org/'\ntitle = 'Feeds'\n\
+             [outputFormats.rss]\nbaseName = '{name}'\n"
+        );
+        fs::write(old.join("hugo.toml"), settings).unwrap();
+        let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n";
+        fs::write(old.join("content/posts/post-1.md"), post).unwrap();
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{name}: {told}");
+        let page = fs::read_to_string(new.join("content/posts/index.md")).unwrap();
+        assert!(page.contains("\nfeed: index.xml\n"), "{name}: {page}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(
+            report.contains("`outputFormats: {rss: {baseName: "),
+            "{name}: {report}"
+        );
+    }
+}
+
+#[test]
 fn hugo_tags_keep_the_addresses_hugo_gave_them() {
     assert_eq!(fixture("hugo-tags"), [] as [&str; 0]);
 }
