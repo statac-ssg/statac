@@ -1729,6 +1729,10 @@ impl Reader<'_> {
         let mut cut = 0;
         let mut emoji: Vec<(String, usize)> = Vec::new();
         let mut written = Vec::new();
+        let posts = self.docs.iter().filter(|d| {
+            d.date.is_some() && !d.draft && matches!(d.shape, Shape::Single | Shape::Bundle)
+        });
+        let posts = posts.count() as u64;
         let docs = std::mem::take(&mut self.docs);
         let whole = self.import.address.clone();
         let base = whole
@@ -1916,7 +1920,7 @@ impl Reader<'_> {
                 }
             ));
         }
-        self.paging();
+        self.paging(posts);
     }
 }
 
@@ -2419,8 +2423,8 @@ impl Reader<'_> {
         }
     }
 
-    /// The settings for a list's later pages.
-    fn paging(&mut self) {
+    /// The settings for a list's later pages, in a site of so many posts.
+    fn paging(&mut self, posts: u64) {
         if let Some(size) = self.s.pager_size
             && size != 10
         {
@@ -2437,7 +2441,10 @@ impl Reader<'_> {
                 ));
             }
         }
-        if self.s.pager_size.is_some() || self.s.pager_path.is_some() {
+        // Later pages are the layouts' doing, which nothing here reads: a
+        // site with more posts than a page shows may have had them.
+        let more = posts > self.s.pager_size.unwrap_or(10);
+        if self.s.pager_size.is_some() || self.s.pager_path.is_some() || more {
             self.note(
                 "Hugo made later pages only for the lists whose templates asked for them, which \
                  Statac can't tell from the writing; Statac makes them for every list with more \
@@ -2445,7 +2452,7 @@ impl Reader<'_> {
                     .to_owned(),
             );
         }
-        if self.s.pager_size.is_some() {
+        if self.s.pager_size.is_some() || more {
             self.note(
                 "Where the old home page had later pages, nothing answers them: Statac's home \
                  page shows the newest of each folder itself, so `content/index.md` keeps its \

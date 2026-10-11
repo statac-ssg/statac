@@ -666,6 +666,34 @@ fn hugo_site_under_a_path_keeps_its_addresses_and_links() {
 }
 
 #[test]
+fn hugo_later_pages_are_spoken_of_wherever_the_old_site_could_have_had_them() {
+    let lists = "Hugo made later pages only for the lists whose templates asked for them";
+    let home = "Where the old home page had later pages, nothing answers them";
+    // How many posts, the settings, and whether later pages are spoken of.
+    for (posts, settings, said) in [
+        (10, "", false),
+        (11, "", true),
+        (2, "[pagination]\npagerSize = 5\n", true),
+        (6, "[pagination]\npagerSize = 5\n", true),
+    ] {
+        let old = scratch(&format!("hugo-later-old-{posts}"));
+        let new = scratch(&format!("hugo-later-new-{posts}"));
+        fs::create_dir_all(old.join("content/posts")).unwrap();
+        let top = "baseURL = 'https://example.org/'\ntitle = 'Later pages'\n";
+        fs::write(old.join("hugo.toml"), format!("{top}{settings}")).unwrap();
+        for n in 1..=posts {
+            let post = format!("---\ntitle: Post {n}\ndate: 2026-01-{n:02}\n---\nA post.\n");
+            fs::write(old.join(format!("content/posts/post-{n}.md")), post).unwrap();
+        }
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{posts}: {told}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert_eq!(report.contains(lists), said, "{posts}: {report}");
+        assert_eq!(report.contains(home), said, "{posts}: {report}");
+    }
+}
+
+#[test]
 fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
     let both =
         "Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own page";
