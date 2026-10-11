@@ -447,6 +447,8 @@ pub struct Site {
     pub mentions: crate::fetched::mentions::Mentions,
     /// Where each page left out as a draft or until its day would stand.
     pub held_back: Vec<HeldBack>,
+    /// The `layout:` of each page left out until the site has an address.
+    pub layouts_needing_url: Vec<String>,
     /// Each page's previous and next page, by page, in the run it walks.
     pub neighbours: Vec<[Option<PageId>; 2]>,
     /// Each post's place in its language's own list, by page.

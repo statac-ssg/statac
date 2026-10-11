@@ -184,6 +184,7 @@ pub fn read(root: &Path, run: &Run) -> Read {
         sidecars: Vec::new(),
         files_left_out: Vec::new(),
         held_back: Vec::new(),
+        layouts_needing_url: Vec::new(),
     };
     reader.read_docs(&content, &mut sources);
     reader.build(&sources, &mut site);
@@ -204,6 +205,7 @@ pub fn read(root: &Path, run: &Run) -> Read {
     );
     let keys_left_out = reader.keys_left_out;
     site.held_back = reader.held_back;
+    site.layouts_needing_url = reader.layouts_needing_url;
     let (sidecars, left_out) = (reader.sidecars, reader.files_left_out);
     problems.extend(crate::lists::build(&mut site, &settings, &dates, &sources));
     made::make_for_posts(&sources, &mut site, for_posts, &mut problems);
@@ -469,6 +471,7 @@ struct Reader<'a> {
     files_left_out: Vec<String>,
     /// Where the pages left out as drafts or until their day would stand.
     held_back: Vec<crate::site::HeldBack>,
+    layouts_needing_url: Vec<String>,
 }
 
 impl Reader<'_> {
@@ -847,6 +850,9 @@ impl Reader<'_> {
                 waiting: crate::problem::Waiting::Page(path.clone()),
             };
             problems.push(Problem::at(kind, needs.origin.place.unwrap_or(head)));
+            if let Some(layout) = words.text(PageWord::Layout) {
+                self.layouts_needing_url.push(layout.value.to_owned());
+            }
             return None;
         }
         let name = match place {

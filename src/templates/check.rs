@@ -214,8 +214,12 @@ pub(super) struct Checked<'a> {
 
 /// Checks every template and snippet of a site, and gives the problems
 /// with the index of the file each is in.
+///
+/// Each template named in `with_url` is checked against the schema beside
+/// it, in place of `schema`.
 pub(super) fn check_site(
     schema: &Schema,
+    with_url: Option<(&Schema, &BTreeSet<String>)>,
     files: &[Checked],
     sources: &Sources,
 ) -> Vec<(usize, Problem)> {
@@ -226,6 +230,10 @@ pub(super) fn check_site(
         if matches!(file.role, Role::Snippet(_)) {
             continue;
         }
+        let schema = match with_url {
+            Some((with_url, names)) if names.contains(file.name) => with_url,
+            _ => schema,
+        };
         let mut checker = Checker::new(schema, file, sources, None);
         checker.run();
         problems.extend(checker.problems.into_iter().map(|p| (at, p)));

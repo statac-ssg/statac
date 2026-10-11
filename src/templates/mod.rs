@@ -212,7 +212,24 @@ pub fn read(
             role: &f.role,
         })
         .collect();
-    told.extend(check::check_site(&schema, &checked, sources));
+    // A template only pages left out until the site has an address are
+    // built with is never built without one, and is checked as with one.
+    let waiting = layouts_only_needing_url(site);
+    let with_url = (!waiting.is_empty()).then(|| {
+        let mut with_url = self::schema(site, settings);
+        with_url.snippets = snippets.clone();
+        with_url.templates.clone_from(&schema.templates);
+        for name in ["url", "host"] {
+            let always = Field {
+                ty: Ty::Text,
+                always: true,
+            };
+            with_url.site.insert(name.to_owned(), always);
+        }
+        (with_url, waiting)
+    });
+    let with_url = with_url.as_ref().map(|(schema, waiting)| (schema, waiting));
+    told.extend(check::check_site(&schema, with_url, &checked, sources));
 
     let mut unusable = BTreeSet::new();
     for (at, problem) in told {
@@ -395,6 +412,28 @@ fn never_shown(
 }
 
 /// Every name a template may read on a page and on the site.
+/// The templates named as the layout of a page left out until the site
+/// has an address, and of no page that is built. The templates a page
+/// naming none is built with are left out, being any page's.
+fn layouts_only_needing_url(site: &Site) -> BTreeSet<String> {
+    use crate::content::words::PageWord;
+    let name = |layout: &str| layout.strip_suffix(".html").unwrap_or(layout).to_owned();
+    let mut waiting: BTreeSet<String> = site
+        .layouts_needing_url
+        .iter()
+        .map(|layout| name(layout))
+        .filter(|layout| !matches!(layout.as_str(), "home" | "folder" | "page"))
+        .collect();
+    for (_, page) in site.pages.iter() {
+        for word in [PageWord::Layout, PageWord::Type] {
+            if let Some(named) = page.words.text(word) {
+                waiting.remove(&name(named.value));
+            }
+        }
+    }
+    waiting
+}
+
 fn schema(site: &Site, settings: &Settings) -> Schema {
     use crate::content::words::PageWord;
     let mut schema = Schema::new();

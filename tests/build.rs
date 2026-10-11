@@ -619,6 +619,53 @@ const WHOLE_ADDRESSES: &[(&str, &str)] = &[
     ("robots.txt", "Sitemap: {at}/sitemap.xml"),
 ];
 
+/// A template that only a page left out until the site has an address is
+/// built with reads the address freely: it is never built without one.
+#[test]
+fn a_template_only_a_page_needing_the_address_uses_is_checked_as_with_one() {
+    let site = Site::new("needs-url-template");
+    site.write(
+        "content/robots.md",
+        "---\npermalink: /robots.txt\nlayout: robots.txt\nneeds: url\n---\n",
+    );
+    let robots = "Sitemap: {{ site.url }}/sitemap.xml on {{ site.host }}\n";
+    site.write("templates/robots.txt", robots);
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.contains("`content/robots.md` is left out"), "{said}");
+    assert!(!said.contains("site.url"), "{said}");
+
+    let (said, code) = site.run(&["build", "--url=https://example.org"]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        fs::read_to_string(site.root.join("_site/robots.txt")).unwrap(),
+        "Sitemap: https://example.org/sitemap.xml on example.org\n"
+    );
+
+    // Anything else in it is checked as in any template.
+    site.write(
+        "templates/robots.txt",
+        &format!("{robots}{{{{ site.titel }}}}\n"),
+    );
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(code, 1, "{said}");
+    assert!(said.contains("Unknown field: `site.titel`"), "{said}");
+    assert!(!said.contains("site.url"), "{said}");
+
+    // A page that is built with it has no address to show.
+    site.write("templates/robots.txt", robots);
+    site.write(
+        "content/other.md",
+        "---\ntitle: Other\npermalink: /other.txt\nlayout: robots.txt\n---\n",
+    );
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(code, 1, "{said}");
+    assert!(
+        said.contains("No value: nothing is set for `site.url`"),
+        "{said}"
+    );
+}
+
 #[test]
 fn every_whole_address_follows_the_address_given_for_the_run() {
     let with_url = "title: Site\nurl: https://example.org\nlanguage: en\ntimezone: UTC\n\
