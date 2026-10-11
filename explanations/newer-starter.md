@@ -40,7 +40,7 @@ If you want to keep the files as they are, quieten the note.
 
 ```text
 Updated `templates/base.html`.
-`templates/post.html` is yours and wasn't touched. Since the starter file nearest to it, the starter's has changed:
+`templates/post.html` is yours and wasn't touched. The starter's file has changed since the version nearest to yours:
   @@ line 12
    <h1>{{ headline(page) }}</h1>
   -<p>{{ page.date }}</p>

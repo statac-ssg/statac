@@ -3456,8 +3456,8 @@ pub(crate) fn updated_file(path: &str) -> String {
 
 pub(crate) fn yours_with_new(path: &str) -> String {
     format!(
-        "`{path}` is yours and wasn't touched. Since the starter file nearest to it, the \
-         starter's has changed:"
+        "`{path}` is yours and wasn't touched. The starter's file has \
+         changed since the version nearest to yours:"
     )
 }
 

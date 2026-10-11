@@ -280,15 +280,15 @@ fn what_is_new_since_the_version_nearest_a_file_of_the_authors_is_shown() {
     assert_eq!(code, 0, "{said}");
     assert_eq!(
         said,
-        "`snippets/note.html` is yours and wasn't touched. Since the starter file nearest to \
-         it, the starter's has changed:\n\
+        "`snippets/note.html` is yours and wasn't touched. The starter's file has \
+         changed since the version nearest to yours:\n\
          \x20 @@ line 1\n\
          \x20 -<aside>\n\
          \x20 +<aside class=\"note\">\n\
          \x20  {{ body }}\n\
          \x20  </aside>\n\
-         `templates/base.html` is yours and wasn't touched. Since the starter file nearest to \
-         it, the starter's has changed:\n\
+         `templates/base.html` is yours and wasn't touched. The starter's file has \
+         changed since the version nearest to yours:\n\
          \x20 @@ line 1\n\
          \x20  <!doctype html>\n\
          \x20  <meta charset=\"utf-8\">\n\
