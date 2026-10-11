@@ -5,8 +5,10 @@ A template or a page uses something Statac doesn't support.
 `include`, `import` and `from` are other ways to place one template inside
 another. In Statac, a piece of a page is a snippet, which is a file in
 `snippets/`. A template places a snippet by calling it by its file name:
-`{{ card(post) }}` places `snippets/card.html` and hands it `post`. The
-message suggests the call to write instead of the line.
+`{{ card(post) }}` places `snippets/card.html` and hands it `post`. For
+`include`, the message suggests the call to write in place of the line.
+For `import` and `from`, it suggests the call to write in place of each
+later use of what the line brought in.
 
 Some of Statac's own names, such as the one for the pictures beside a
 page, aren't available in this version yet. The message says which one
@@ -28,7 +30,9 @@ isn't available yet would otherwise publish nothing in its place.
 
 ## How to fix it
 
-Replace the `include`, `import` or `from` line with a call to the snippet.
+Replace an `include` line with a call to the snippet. For `import` and
+`from`, take the line out, and replace each later use with a call to the
+snippet.
 If you used a name that isn't available yet, remove it from the template
 for now.
 
