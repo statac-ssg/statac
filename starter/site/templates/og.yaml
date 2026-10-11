@@ -1,4 +1,4 @@
-# The sharing card drawn for each page: see /sharing-cards/
+# The settings for the sharing card drawn for each page: see /sharing-cards/
 background: background.png
 font: [NotoSans-Regular.ttf, NotoEmoji.ttf]
 padding: 80

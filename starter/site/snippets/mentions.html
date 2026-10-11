@@ -1,4 +1,4 @@
-{# What other sites said of the page, fetched by statac refresh, each marked up as microformats: see /webmentions/ -#}
+{# What other sites said about the page, fetched by statac refresh. Each one is marked up as microformats: see /webmentions/ -#}
 {% set words = site.data.words[page.language] %}
 {% set mentions = page.webmentions %}
 {% set kinds = {"replied": words.replied, "liked": words.liked, "reposted": words.reposted, "bookmarked": words.bookmarked, "mentioned": words.mentioned} %}

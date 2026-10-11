@@ -149,8 +149,8 @@ fn a_site_in_a_language_lacking_the_words_statac_shows_is_given_them_in_english(
         let file = folder.join(format!("languages/{tag}.yaml"));
         assert_eq!(
             fs::read_to_string(&file).unwrap(),
-            "# The words Statac shows beside the writing, in English for you to translate: see \
-             /dates-and-languages/\n\
+            "# The words Statac itself shows alongside your writing, in English for you to translate: \
+             see /dates-and-languages/\n\
              back_to_the_text: back to the text\n\
              callouts: [Note, Tip, Important, Warning, Caution]\n",
             "{tag}"

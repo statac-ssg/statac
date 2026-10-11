@@ -1,5 +1,5 @@
 {# takes address #}
-{# A video kept on Vimeo, shown as its still until a reader presses play, with its caption where it has one, called as @vimeo("123456789"): see /videos/ -#}
+{# A video kept on Vimeo, with its caption if it has one. It shows as its still until a reader presses play, called as @vimeo("123456789"): see /videos/ -#}
 {% set words = site.data.words[page.language] %}
 {% set video = page.vimeo(address) %}
 {% set still = page.photo(poster) if poster is defined else video.still %}

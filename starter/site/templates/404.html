@@ -1,4 +1,4 @@
-{# The page a reader is shown where nothing is published, kept out of search engines: see /feeds/ -#}
+{# The page a reader sees at an address where nothing is published. It is kept out of search engines: see /feeds/ -#}
 {% extends "base" %}
 {% block title %}{% set words = site.data.words[page.language] %}{{ words.not_found }} - {{ site.title }}{% endblock %}
 {% block sharing %}

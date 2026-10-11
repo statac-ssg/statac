@@ -1019,7 +1019,7 @@ pub fn words() -> &'static [(&'static str, &'static str)] {
 /// of the site's languages.
 fn words_file(languages: &[String]) -> String {
     let mut text = String::from(
-        "# The words the templates and snippets show readers, for each language: see /new/\n",
+        "# The words the templates and snippets show readers, in each language: see /new/\n",
     );
     for tag in languages {
         text.push_str(&format!("{}:\n", quoted(tag)));
@@ -1049,8 +1049,8 @@ fn language_path(tag: &str) -> String {
 fn language_file() -> String {
     let english = crate::language::english();
     let mut text = String::from(
-        "# The words Statac shows beside the writing, in English for you to translate: see \
-         /dates-and-languages/\n",
+        "# The words Statac itself shows alongside your writing, in English for you to translate: \
+         see /dates-and-languages/\n",
     );
     if let Some(label) = &english.back_to_the_text {
         text.push_str(&format!("back_to_the_text: {}\n", quoted(label)));

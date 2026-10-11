@@ -171,33 +171,33 @@ fn said_here(path: &str) -> Option<&'static str> {
     let ending = name.rsplit('.').next().unwrap_or_default();
     Some(match (path, name, ending) {
         (".gitignore", ..) => {
-            "The folders git leaves out of the site's history: the built site, and what \
+            "The folders git leaves out of the site's history: the built site, and the files \
              Statac keeps between builds"
         }
         ("statac.yaml", ..) => "The site's settings, written from your answers: see /settings/",
-        ("content/index.md", ..) => "The home page, where you say what the site is: see /new/",
+        ("content/index.md", ..) => "The home page, where you describe the site: see /new/",
         ("content/posts/first-post/index.md", ..) => {
-            "The site's first post, which says how to write the next"
+            "The site's first post, which explains how to write the next one"
         }
         ("content/posts/what-a-post-can-hold/index.md", ..) => {
-            "A sample post showing each thing a page's writing can hold, with the way it is \
-             written: see /writing/"
+            "A sample post showing everything a page's writing can contain, and how to write \
+             each one: see /writing/"
         }
         (_, "example.css", _) => "A file the sample post shows as code",
         ("static/favicon.ico", ..) => {
-            "A sample icon, which browsers show in the site's tab: put your own in its \
-             place: see /assets/"
+            "A sample icon, which browsers show in the site's tab. Replace it with your own: \
+             see /assets/"
         }
         (_, "background.png", _) => "The picture every card is drawn on",
-        (_, "NotoSans-Regular.ttf", _) => "The font the card's words are drawn in",
-        (_, "NotoEmoji.ttf", _) => "The font the card's emoji are drawn in",
-        (_, "OFL.txt", _) => "The licence Noto Sans is given under",
-        (_, "NotoEmoji-OFL.txt", _) => "The licence Noto Emoji is given under",
+        (_, "NotoSans-Regular.ttf", _) => "The font used for the card's text",
+        (_, "NotoEmoji.ttf", _) => "The font used for the card's emoji",
+        (_, "OFL.txt", _) => "The licence Noto Sans is released under",
+        (_, "NotoEmoji-OFL.txt", _) => "The licence Noto Emoji is released under",
         (_, "index.md", _) if path.starts_with("content/photos/") => "A sample photograph's page",
         (_, _, "md") if path.starts_with("content/notes/") => "A sample note",
         (_, _, "jpg") => "A sample picture",
         (_, _, "yaml") if name.ends_with(".jpg.yaml") => {
-            "What a reader who can't see the picture is told in its place: see /pictures/"
+            "The description a reader who can't see the picture is given instead: see /pictures/"
         }
         (_, _, "m4a") => "A sample recording, two seconds long",
         (_, _, "mp4") => "A sample video, two seconds long",
@@ -391,9 +391,11 @@ pub fn starter_page() -> String {
     let mut out = String::from(
         "---\n# Written from the starter's files by `cargo run --example explanation_pages`.\n\
          title: The starter\n\
-         summary: Each file a new site holds, what it is, and the words readers see.\n---\n\
-         `statac new` writes these files into a new site, and every one is yours to change. \
-         What is said of each is what its own opening line says, where it has one.\n",
+         summary: Each file a new site starts with, what it is for, and the words readers see.\n\
+         ---\n\
+         `statac new` writes these files into a new site, and you can change any of them. \
+         If a file has an opening line that describes it, the description below is taken \
+         from that line.\n",
     );
     let files = starter_files(false);
     let mut folders: Vec<&str> = vec![""];
@@ -415,8 +417,8 @@ pub fn starter_page() -> String {
     }
     out.push_str(
         "\n## What `statac new --cards` adds {#cards}\n\n\
-         With `--cards`, a new site or one already made is given the files its sharing \
-         cards are drawn from.\n\n",
+         With `--cards`, `statac new` adds the files that sharing cards are drawn from. \
+         This works on a new site or an existing one.\n\n",
     );
     let with_cards = starter_files(true);
     let cards: Vec<_> = with_cards
@@ -426,8 +428,8 @@ pub fn starter_page() -> String {
     table(&mut out, "", &cards);
     out.push_str(
         "\n## What another language adds {#languages}\n\n\
-         For each of its languages but English, a new site is given a file named by the \
-         language's code.\n\n",
+         For each of the site's languages other than English, `statac new` writes a file \
+         named after the language's code.\n\n",
     );
     let (path, text) = statac::new::language_file_of_a_new_site("<code>");
     let (_, said) = opening(&text);
@@ -435,9 +437,9 @@ pub fn starter_page() -> String {
     table(&mut out, "", &[&(path, None, said.to_owned())]);
     out.push_str(
         "\n## The words {#words}\n\n\
-         `data/words.yaml` holds every word the templates and snippets show readers, under \
-         each of the site's languages, in English until you translate them. A template \
-         reads one by its name, as `words.older_posts`.\n\n\
+         `data/words.yaml` contains every word the templates and snippets show readers, under \
+         each of the site's languages. The words are in English until you translate them. \
+         A template uses a word by its name, as in `words.older_posts`.\n\n\
          | Name | In English |\n|---|---|\n",
     );
     for (name, english) in statac::new::words() {
