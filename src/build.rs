@@ -1668,7 +1668,9 @@ impl Reader {
     /// not told, but only what the snippet's own file can be shown to have
     /// written: a piece on the page that the file holds whole, to the
     /// letter, and that no other file the page read holds. Every other
-    /// piece is told of some file, as it would be were no snippet called.
+    /// piece is told of some file, as it would be were no snippet called:
+    /// of each file that writes some, or where the files hold every piece
+    /// on the page to the letter, of those holding one.
     fn wrote(
         &self,
         runs: usize,
@@ -1714,6 +1716,25 @@ impl Reader {
                     .copied()
                     .filter(|&source| !cleared.contains(&source) && texts.writes(source, true)),
             );
+            // Where every piece on the page is one some file holds to the
+            // letter, a file holding none of them wrote none of them: its
+            // own went unshown, or was shown as text.
+            let holds = |texts: &mut Texts, source: SourceId, piece: &scripts::Print| {
+                texts.pieces(source).iter().any(|held| held.print == *piece)
+            };
+            let all_held = pieces
+                .iter()
+                .all(|piece| self.read.iter().any(|&source| holds(texts, source, piece)));
+            if all_held {
+                let wrote: Vec<SourceId> = from
+                    .iter()
+                    .copied()
+                    .filter(|&source| pieces.iter().any(|piece| holds(texts, source, piece)))
+                    .collect();
+                if !wrote.is_empty() {
+                    from = wrote;
+                }
+            }
         }
         if from.is_empty() {
             // A cleared snippet's own pieces are run wherever it is called,

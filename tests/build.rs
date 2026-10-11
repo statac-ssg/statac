@@ -1626,6 +1626,65 @@ fn javascript_a_snippet_called_by_name_writes_is_not_listed_and_the_rest_is() {
             &["Written in `templates/page.html`, on 1 page"],
         ),
         (
+            "a field shown as text, beside a layout's own script",
+            &[
+                (
+                    "content/post-2.md",
+                    "---\ntitle: Post 2\nsummary: \"<script>shown()</script>\"\n---\nText.\n",
+                ),
+                (
+                    "templates/page.html",
+                    "{{ page.summary | default(\"\") }}{{ page.content }}<script>run()</script>\n",
+                ),
+            ],
+            &["Written in `templates/page.html`, on 2 pages"],
+        ),
+        (
+            "a field shown as markup, beside a layout's own script",
+            &[
+                (
+                    "content/post-2.md",
+                    "---\ntitle: Post 2\nsummary: \"<script>shown()</script>\"\n---\nText.\n",
+                ),
+                (
+                    "templates/page.html",
+                    "{{ page.summary | default(\"\") | safe }}{{ page.content }}<script>run()</script>\n",
+                ),
+            ],
+            &[
+                "Written in `content/post-2.md`, on 1 page",
+                "Written in `templates/page.html`, on 2 pages",
+            ],
+        ),
+        (
+            "a field shown as markup that YAML spells another way, beside a layout's own script",
+            &[
+                (
+                    "content/post-2.md",
+                    "---\ntitle: Post 2\nsummary: \"<script>shown(\\\"1\\\")</script>\"\n---\nText.\n",
+                ),
+                (
+                    "templates/page.html",
+                    "{{ page.summary | default(\"\") | safe }}{{ page.content }}<script>run()</script>\n",
+                ),
+            ],
+            &[
+                "Written in `content/post-2.md`, on 1 page",
+                "Written in `templates/page.html`, on 2 pages",
+            ],
+        ),
+        (
+            "a layout's script in a branch not taken, beside the writing's own",
+            &[
+                ("content/post-1.md", "<script>run()</script>\n"),
+                (
+                    "templates/page.html",
+                    "{{ page.content }}{% if page.draft %}<script>draft()</script>{% endif %}\n",
+                ),
+            ],
+            &["Written in `content/post-1.md`, on 1 page"],
+        ),
+        (
             "a called snippet writing a script, and the page loading one",
             &[
                 ("snippets/play.html", PLAY),
