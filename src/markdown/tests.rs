@@ -1492,6 +1492,7 @@ fn footnotes_are_numbered_by_first_use_and_gathered_at_the_foot() {
             in_site: Vec::new(),
             problems: Vec::new(),
             held_in_paragraph: Vec::new(),
+            held_open: Vec::new(),
         })
         .iter()
         .any(|node| matches!(node.kind, Kind::FootnoteDefinition { .. }))
@@ -2074,6 +2075,8 @@ fn the_excerpt_ends_at_a_more_marker_on_its_own() {
         "One.\n\nTwo <!--more--> three.\n",
         "One.\n\n<!-- More -->\n\nThree.\n",
         "One.\n\n<!--more--> Two.\n\nThree.\n",
+        "<div class=\"box\">\n\nOne.\n\n<!--more-->\n\nTwo.\n\n</div>\n",
+        "<div class=\"box\">\n\nOne.\n\n<div>\n<!--more-->\n\nTwo.\n\n</div></div>\n",
     ] {
         let written = written(not_a_marker);
         assert_eq!(
@@ -2087,6 +2090,30 @@ fn the_excerpt_ends_at_a_more_marker_on_its_own() {
     assert_eq!(at_the_top.excerpt, None);
     assert!(at_the_top.excerpt_marked);
     assert!(written("One.\n\n<!--more-->\n\nTwo.\n").excerpt_marked);
+    // Outside every element the author's HTML holds open, a marker ends
+    // the excerpt as anywhere else.
+    for (text, excerpt) in [
+        (
+            "<div class=\"box\">One.</div>\n\n<!--more-->\n\nTwo.\n",
+            "<div class=\"box\">One.</div>",
+        ),
+        (
+            "<div class=\"box\">\n\nOne.\n\n</div>\n\n<!--more-->\n\nTwo.\n",
+            "<div class=\"box\">\n<p>One.</p>\n</div>",
+        ),
+        (
+            "One <span class=\"box\"> two.\n\n<!--more-->\n\nThree.\n",
+            "<p>One <span class=\"box\"> two.</p>",
+        ),
+        ("<p>One.\n\n<!--more-->\n\nTwo.\n", "<p>One."),
+    ] {
+        let written = written(text);
+        assert_eq!(written.excerpt.as_deref(), Some(excerpt), "{text:?}");
+        assert!(written.excerpt_marked, "{text:?}");
+    }
+    let in_code = written("<div class=\"box\">\n\nOne.\n\n```\n<!--more-->\n```\n\n</div>\n");
+    assert_eq!(in_code.excerpt.as_deref(), Some("<p>One.</p>"));
+    assert!(!in_code.excerpt_marked);
 }
 
 /// A more marker Statac can't act on stops, at the marker: spelled in
@@ -2145,6 +2172,21 @@ fn a_more_marker_statac_cant_act_on_is_told_at_the_marker() {
             "<!--more-->",
         ),
         (
+            "<div class=\"box\">\n\nOne.\n\n<!--more-->\n\nTwo.\n\n</div>\n",
+            "Wrong place: `<!--more-->` can't end an excerpt inside `<div>`",
+            "<!--more-->",
+        ),
+        (
+            "<DIV>\n\nOne.\n\n<!--more-->\n\nTwo.\n\n</DIV>\n",
+            "Wrong place: `<!--more-->` can't end an excerpt inside `<DIV>`",
+            "<!--more-->",
+        ),
+        (
+            "<section>\n<div>\nOne.\n<!--more-->\n\nTwo.\n\n</div>\n</section>\n",
+            "Wrong place: `<!--more-->` can't end an excerpt inside `<div>`",
+            "<!--more-->",
+        ),
+        (
             "One <!-- more --> two.\n",
             "Wrong place: `<!-- more -->` ends an excerpt only on a line of its own",
             "<!-- more -->",
@@ -2182,6 +2224,11 @@ fn a_more_marker_statac_cant_act_on_is_told_at_the_marker() {
         "`<!--MORE-->`\n\n```\n<!--more-->\n<!--more-->\n```\n",
         "<!--break-->\n\nOne <!--break--> two.\n",
         "<div>\nOne.\n</div>\n<!--more-->\n\nTwo.\n",
+        "<div class=\"box\">One.</div>\n\n<!--more-->\n\nTwo.\n",
+        "<div class=\"box\">\n\nOne.\n\n</div>\n\n<!--more-->\n\nTwo.\n",
+        "One <span class=\"box\"> two.\n\n<!--more-->\n\nThree.\n",
+        "<p>One.\n\n<!--more-->\n\nTwo.\n",
+        "<div class=\"box\">\n\nOne.\n\n```\n<!--more-->\n```\n\n</div>\n",
     ] {
         assert_eq!(told(quiet), [], "{quiet:?}");
     }

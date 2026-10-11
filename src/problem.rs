@@ -1920,6 +1920,9 @@ pub enum MoreAt {
     Footnote,
     /// On a line of its own inside a block of the author's HTML.
     Html,
+    /// Inside an element the author's HTML opened before it and holds
+    /// open, by its name as written.
+    Element(String),
     /// On a line with other writing.
     Words,
 }

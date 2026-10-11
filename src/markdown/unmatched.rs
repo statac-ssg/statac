@@ -416,6 +416,18 @@ impl Elements {
         }
     }
 
+    /// The innermost element the raw HTML holds open, by its name as
+    /// written, other than one a browser closes by itself; none inside a
+    /// comment or a text element, which takes in what follows.
+    pub fn holding(&self) -> Option<&str> {
+        if self.stack.last().is_some_and(Opened::swallows) {
+            return None;
+        }
+        (self.stack.iter().rev())
+            .find(|opened| opened.holds == Holds::Markup && !opened.is(CLOSED_BY_ITSELF))
+            .map(|opened| opened.written.as_str())
+    }
+
     /// Every tag told, at its place in the masked text; and what a
     /// paragraph at the top of the writing left open and closed for it,
     /// which reaches past a value shown as that paragraph's words alone.

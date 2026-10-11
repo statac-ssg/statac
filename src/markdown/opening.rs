@@ -31,12 +31,27 @@ pub struct Written {
 /// Which of the writing's blocks holds the more marker that ends the
 /// excerpt, and whether it ends after that block: the first `<!--more-->`
 /// standing on a line of its own at the top of the writing, as a block of
-/// its own or as the last line of a block of HTML.
-pub(super) fn more_marker(root: &Node) -> Option<(usize, bool)> {
+/// its own or as the last line of a block of HTML, outside every element
+/// the author's HTML holds open.
+pub(super) fn more_marker(document: &Document) -> Option<(usize, bool)> {
+    let root = &document.root;
     root.children.iter().enumerate().find_map(|(at, block)| {
         let (written, after, _) = ending_marker(block)?;
-        is_more(&written).then_some((at, after))
+        let held = held_open(document, block, after);
+        (is_more(&written) && held.is_none()).then_some((at, after))
     })
+}
+
+/// The innermost element the author's HTML holds open round the marker
+/// `ending_marker` finds in `block`, by its name as written.
+fn held_open<'a>(document: &'a Document, block: &Node, after: bool) -> Option<&'a str> {
+    let line = match after {
+        true => block.children.last(),
+        false => block.children.first(),
+    }?;
+    (document.held_open.iter())
+        .find(|(at, _)| *at == line.place.span.start)
+        .map(|(_, name)| name.as_str())
 }
 
 /// A marker in any case at the top of the writing, as written, where it
@@ -103,7 +118,9 @@ pub(super) fn misplaced_markers(document: &Document, text: &str) -> Vec<Problem>
                     }
                 }
                 let place = markers.narrowed(place, &written);
-                markers.marker(&written, place, None);
+                let held = held_open(document, block, after);
+                let within = held.map(|name| MoreAt::Element(name.to_owned()));
+                markers.marker(&written, place, within);
             }
             None => markers.visit(block, None),
         }

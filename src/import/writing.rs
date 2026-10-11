@@ -113,8 +113,11 @@ pub fn settle(
     }
     // A marker Statac refuses stops the build. Each on a line of its own
     // inside HTML is given a blank line each side, and one Statac refuses
-    // still, or refuses anywhere else, is taken out.
+    // still, or refuses anywhere else, is taken out, with any blank line
+    // it was given.
     let mut apart: Vec<usize> = Vec::new();
+    // Whether each marker in `apart` was given a line before it and after.
+    let mut added: Vec<(bool, bool)> = Vec::new();
     for _ in 0..PASSES {
         let refused = refused_markers(&document);
         if refused.is_empty() {
@@ -129,30 +132,33 @@ pub fn settle(
                 .map_or(writing.len(), |i| marker.end + i);
             let alone = writing[line..marker.start].trim().is_empty()
                 && writing[marker.end..line_end].trim().is_empty();
-            let tried = apart.binary_search(&marker.start).is_ok();
-            if at == MoreAt::Html && alone && !tried {
-                if line_end < writing.len() && !writing[line_end + 1..].starts_with(['\n', '\r']) {
+            let tried = apart.binary_search(&marker.start).ok();
+            if at == MoreAt::Html && alone && tried.is_none() {
+                let after =
+                    line_end < writing.len() && !writing[line_end + 1..].starts_with(['\n', '\r']);
+                if after {
                     edits.push((line_end + 1..line_end + 1, "\n"));
                 }
                 if line > 0 {
                     edits.push((line..line, "\n"));
                 }
-                set_apart_now.push(marker.start);
+                set_apart_now.push((marker.start, (line > 0, after)));
                 settled.markers_moved += 1;
                 continue;
             }
-            if tried {
+            let (before, after) = tried.map_or((false, false), |at| added[at]);
+            if tried.is_some() {
                 settled.markers_moved -= 1;
             }
             let next = (line_end + 1).min(writing.len());
             edits.push(match alone {
-                true => (line..next, ""),
+                true => (line - usize::from(before)..next + usize::from(after), ""),
                 false => (marker, ""),
             });
             settled.markers_out += 1;
         }
         set_apart_now.sort_unstable();
-        apart = set_apart_now;
+        (apart, added) = set_apart_now.into_iter().unzip();
         edit(writing, edits, &mut [&mut *fences, &mut *calls, &mut apart]);
         document = read(writing);
     }

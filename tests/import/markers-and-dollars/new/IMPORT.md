@@ -12,7 +12,7 @@ The settings name no language, so the site is in English, `en`: change `language
 
 The settings name no time zone, so none is written, and Statac reads a date written without an offset as UTC, and says so: add `timezone` to `statac.yaml`, as `Europe/London`.
 
-Statac gave 2 `<!--more-->` markers a blank line each side, where each stood on a line of its own inside HTML: Statac ends a summary only at one between two blocks of the writing. The summary ends where it did, and the lines after the marker, up to the next blank line, are read as Markdown now, where they were part of the HTML.
+Statac gave 1 `<!--more-->` marker a blank line each side, where it stood on a line of its own inside HTML: Statac ends a summary only at one between two blocks of the writing. The summary ends where it did, and the lines after the marker, up to the next blank line, are read as Markdown now, where they were part of the HTML.
 
 Statac put a backslash before 2 dollar signs it would have read as opening maths, as `\$`, which the old site didn't set as maths, so each shows as written: see https://statac.dev/writing/#maths.
 
@@ -39,8 +39,9 @@ Statac worked out where the old site published each page, read the new site, and
 
 ### Summary markers taken out
 
-Statac ends a summary only at `<!--more-->` on a line of its own between two blocks of the writing, and one anywhere else stops the build. Each of these stood inside a line, a list or a quotation, so it was taken out, and the page's summary is its first paragraph: put `<!--more-->` on a line of its own where the summary should end.
+Statac ends a summary only at `<!--more-->` on a line of its own between two blocks of the writing, and one anywhere else stops the build. Each of these stood inside a line, a list, a quotation or an HTML element, so it was taken out, and the page's summary is its first paragraph: put `<!--more-->` on a line of its own where the summary should end.
 
+- `_posts/2026-01-02-post-2.md`: `<!--more-->`
 - `_posts/2026-01-03-post-3.md`: `<!--more-->`
 - `_posts/2026-01-03-post-3.md`: `<!--more-->`
 

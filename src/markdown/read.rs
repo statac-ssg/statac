@@ -183,6 +183,7 @@ pub(super) fn build(
         elements: Elements::default(),
         around: Vec::new(),
         unmatched: Vec::new(),
+        held_open: Vec::new(),
         image: 0,
         open: None,
         literal: Vec::new(),
@@ -325,6 +326,7 @@ pub(super) fn build(
         in_site,
         problems,
         held_in_paragraph,
+        held_open: builder.held_open,
     }
 }
 
@@ -379,6 +381,9 @@ struct Builder<'a> {
     around: Vec<Elements>,
     /// What the raw HTML of each note read leaves unmatched.
     unmatched: Vec<Told>,
+    /// Each piece of raw HTML opening with a comment while the raw HTML
+    /// holds an element open: where it starts, and the element's name.
+    held_open: Vec<(u32, String)>,
     /// How many images' descriptions the words are inside.
     image: usize,
     /// A token over several lines that has become a node, whose later
@@ -1085,6 +1090,13 @@ impl<'a> Builder<'a> {
         }
         // A picture's description shows no markup.
         if self.image == 0 {
+            // A more marker can't end an excerpt inside an element left
+            // open before it, so what is open at each comment is kept.
+            if html.trim_start().starts_with("<!--")
+                && let Some(name) = self.elements.holding()
+            {
+                self.held_open.push((span.start, name.to_owned()));
+            }
             self.elements.read(html, masked_start);
         }
         let (found, literal) = self.html.read(html);

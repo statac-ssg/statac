@@ -390,6 +390,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
                     format!("Wrong place: `{key}` can't end an excerpt inside a footnote")
                 }
                 MoreAt::Html => format!("Wrong place: `{key}` can't end an excerpt inside HTML"),
+                MoreAt::Element(name) => {
+                    format!("Wrong place: `{key}` can't end an excerpt inside `<{name}>`")
+                }
                 MoreAt::Words => {
                     format!("Wrong place: `{key}` ends an excerpt only on a line of its own")
                 }
@@ -2021,6 +2024,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             WrongPlace::Item => Some("Write it on a page in `content/` instead.".into()),
             WrongPlace::NoCommand(command) => {
                 Some(format!("Add the `{command}:` line it describes, or take it out."))
+            }
+            WrongPlace::More(MoreAt::Element(name)) => {
+                Some(format!("Move it outside the `<{name}>`."))
             }
             WrongPlace::More(_) => {
                 Some("Move it to a line of its own between two paragraphs.".into())
@@ -4651,6 +4657,14 @@ mod tests {
                 },
                 "Wrong place: `<!--more-->` can't end an excerpt inside `@box`",
                 Some("Move it to a line of its own between two paragraphs."),
+            ),
+            (
+                Kind::WrongPlace {
+                    key: "<!--more-->".into(),
+                    why: WrongPlace::More(MoreAt::Element("div".into())),
+                },
+                "Wrong place: `<!--more-->` can't end an excerpt inside `<div>`",
+                Some("Move it outside the `<div>`."),
             ),
             (
                 Kind::WrongPlace {

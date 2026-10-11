@@ -13,7 +13,8 @@ with `each:`.
 The same applies to `<!--more-->` in a page's writing. It ends the excerpt
 only when it is on a line of its own between two paragraphs, or is the
 last line of a block of HTML. It doesn't work inside a list, a quotation,
-a footnote, a call or a block of HTML, or on a line with other writing.
+a footnote, a call, a block of HTML or an element your HTML opens before
+it and closes after it, or on a line with other writing.
 
 A setting that describes one of the site's own commands needs that command
 to be set. `after_build_makes` says what `after_build` makes, and

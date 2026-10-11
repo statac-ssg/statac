@@ -123,6 +123,10 @@ pub struct Document {
     /// writing, which the paragraph's end closes: told of a value shown as
     /// that paragraph's words alone, without its `<p>`.
     pub held_in_paragraph: Vec<Problem>,
+    /// Each piece of raw HTML opening with a comment inside an element the
+    /// raw HTML opened before it and left open: where the piece starts,
+    /// and the innermost such element's name as written.
+    pub held_open: Vec<(u32, String)>,
 }
 
 impl Document {

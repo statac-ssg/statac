@@ -121,7 +121,7 @@ pub fn to_html(document: &Document, options: &Options<'_>) -> String {
 pub fn write(document: &Document, options: &Options<'_>) -> Written {
     let mut writer = Writer::new(options, Vec::new());
     writer.main = true;
-    let more = opening::more_marker(&document.root);
+    let more = opening::more_marker(document);
     let mut more_at = None;
     for (at, child) in document.root.children.iter().enumerate() {
         if more == Some((at, false)) {

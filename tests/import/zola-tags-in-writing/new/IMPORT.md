@@ -94,7 +94,7 @@ Each of these tags is now a call to a snippet of its name, and the snippet holds
 
 ### Summary markers taken out
 
-Statac ends a summary only at `<!--more-->` on a line of its own between two blocks of the writing, and one anywhere else stops the build. Each of these stood inside a line, a list or a quotation, so it was taken out, and the page's summary is its first paragraph: put `<!--more-->` on a line of its own where the summary should end.
+Statac ends a summary only at `<!--more-->` on a line of its own between two blocks of the writing, and one anywhere else stops the build. Each of these stood inside a line, a list, a quotation or an HTML element, so it was taken out, and the page's summary is its first paragraph: put `<!--more-->` on a line of its own where the summary should end.
 
 - `content/posts/post-1.md`: `<!--more-->`
 

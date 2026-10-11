@@ -79,9 +79,9 @@ pub static MORE_OUT: FindingKind = FindingKind {
     heading: "Summary markers taken out",
     sentence: "Statac ends a summary only at `<!--more-->` on a line of its own between two \
                blocks of the writing, and one anywhere else stops the build. Each of these stood \
-               inside a line, a list or a quotation, so it was taken out, and the page's \
-               summary is its first paragraph: put `<!--more-->` on a line of its own where the \
-               summary should end.",
+               inside a line, a list, a quotation or an HTML element, so it was taken out, and \
+               the page's summary is its first paragraph: put `<!--more-->` on a line of its \
+               own where the summary should end.",
 };
 
 pub static LINKS: FindingKind = FindingKind {

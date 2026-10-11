@@ -982,6 +982,36 @@ warning  Unmatched tag: `</section>` closes nothing opened before it
     );
 }
 
+/// A more marker inside an element the writing's HTML holds open over
+/// several blocks would cut the excerpt inside it, so it stops.
+#[test]
+fn a_more_marker_inside_an_element_left_open_stops_at_the_marker() {
+    let site = Site::new("more-inside");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n\
+         <div class=\"box\">\n\nOne.\n\n<!--more-->\n\nTwo.\n\n</div>\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 1, "{said}");
+    assert_eq!(
+        said,
+        "\
+error  Wrong place: `<!--more-->` can't end an excerpt inside `<div>`
+  content/post-1.md, line 9
+   9 │ <!--more-->
+     │ ^^^^^^^^^^^
+  Move it outside the `<div>`.
+  More: https://statac.dev/e/wrong-place/
+
+1 error: 1 wrong-place.
+"
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 1, "{said}");
+    assert!(!site.out().exists());
+}
+
 #[test]
 fn a_layout_that_never_shows_its_pages_writing_is_told_once_counting_them() {
     let site = Site::new("hollow");
