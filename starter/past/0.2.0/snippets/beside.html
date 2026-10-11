@@ -1,0 +1,14 @@
+{# Links to the pages either side of this one, each labelled with what that page is called: see /lists/ -#}
+{% set words = site.data.words[page.language] %}
+{% if page.previous or page.next %}
+<nav class="more wide" aria-label="{{ words.more_posts }}">
+  <ul>
+    {% if page.previous %}
+    <li><a href="{{ page.previous.url }}" rel="prev"><span class="label">{{ words.previous }}</span> <strong>{{ called(page.previous) }}</strong></a></li>
+    {% endif %}
+    {% if page.next %}
+    <li><a href="{{ page.next.url }}" rel="next"><span class="label">{{ words.next }}</span> <strong>{{ called(page.next) }}</strong></a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}

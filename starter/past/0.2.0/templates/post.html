@@ -1,0 +1,54 @@
+{# A post: its title, summary and dates, then the writing, what it is filed under, the posts either side of it, and related posts: see /templates/ and /lists/ -#}
+{% extends "base" %}
+{% block main %}
+    {% set words = site.data.words[page.language] %}
+    <article>
+      <header class="top column">
+        <h1>{{ headline(page) }}</h1>
+        {% if page.summary %}
+        <p class="summary">{{ page.summary }}</p>
+        {% endif %}
+        <ul class="about">
+          {% if page.date %}
+          <li><time datetime="{{ page.date | moment }}">{{ page.date }}</time></li>
+          {% endif %}
+          {% if page.updated %}
+          <li>{{ words.updated }} <time datetime="{{ page.updated | moment }}">{{ page.updated }}</time></li>
+          {% endif %}
+          <li>{{ [1, page.words // 200] | max | digits }} {{ words.minutes }}</li>
+        </ul>
+      </header>
+      <div class="writing column">
+        {% if page.cover %}
+        <figure class="wide">{{ picture(page.photo(page.cover), loading="eager") }}</figure>
+        {% endif %}
+        {% if page.contents and page.toc %}
+        <nav class="contents" aria-labelledby="contents">
+          <p class="label" id="contents">{{ words.contents }}</p>
+          <ul>
+            {% for heading in page.toc recursive %}
+            <li><a href="{{ heading.url }}">{{ heading.title }}</a>{% if heading.headings %}<ul>{{ loop(heading.headings) | trim }}</ul>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        </nav>
+        {% endif %}
+        {{ page.content }}
+      </div>
+      {{ filed() }}
+    </article>
+    {% if page.mentions %}
+    {{ mentions() }}
+    {% endif %}
+    {{ beside() }}
+    {% set related = related(page)[:3] %}
+    {% if related %}
+    <section class="related wide" aria-labelledby="related">
+      <h2 class="label" id="related">{{ words.related }}</h2>
+      <ul>
+        {% for post in related %}
+        <li><a href="{{ post.url }}">{{ called(post) }}</a>{% if post.date %} <time datetime="{{ post.date | moment }}">{{ post.date | date(site.date_short) }}</time>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+{% endblock %}

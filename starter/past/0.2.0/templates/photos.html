@@ -1,0 +1,23 @@
+{# The photographs' page: a grid of them, newest first: see /lists/ -#}
+{% extends "base" %}
+{% block main %}
+    <header class="top column">
+      <h1>{{ headline(page) }}</h1>
+      {% if page.summary %}
+      <p class="summary">{{ page.summary }}</p>
+      {% endif %}
+    </header>
+    {% if page.content %}
+    <div class="writing column">
+      {{ page.content }}
+    </div>
+    {% endif %}
+    <div class="listing column">
+      <ul class="grid wide">
+        {% for post in page.posts %}
+        {{ thumb(post) }}
+        {% endfor %}
+      </ul>
+      {{ pager() }}
+    </div>
+{% endblock %}

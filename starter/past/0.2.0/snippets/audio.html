@@ -1,0 +1,13 @@
+{# takes clip #}
+{# A recording kept in the site, with its caption if it has one, called as @audio("recording-1.m4a"): see /videos/ -#}
+{% set words = site.data.words[page.language] %}
+{% set recording = page.audio(clip) %}
+<figure>
+  <audio controls preload="metadata"{% if caption is defined %} aria-label="{{ caption | markdown | plain }}"{% endif %}>
+    <source src="{{ recording.src }}" type="{{ recording.type }}">
+    <a href="{{ recording.src }}">{{ words.download_recording }}</a>
+  </audio>
+  {% if caption is defined %}
+  <figcaption>{{ caption | markdown }}</figcaption>
+  {% endif %}
+</figure>

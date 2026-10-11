@@ -1,0 +1,23 @@
+{# The notes' page, which shows each note in full: see /lists/ -#}
+{% extends "base" %}
+{% block main %}
+    <header class="top column">
+      <h1>{{ headline(page) }}</h1>
+      {% if page.summary %}
+      <p class="summary">{{ page.summary }}</p>
+      {% endif %}
+    </header>
+    {% if page.content %}
+    <div class="writing column">
+      {{ page.content }}
+    </div>
+    {% endif %}
+    <div class="listing column">
+      <ol class="notes">
+        {% for post in page.posts %}
+        {{ short(post) }}
+        {% endfor %}
+      </ol>
+      {{ pager() }}
+    </div>
+{% endblock %}

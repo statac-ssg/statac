@@ -1,0 +1,15 @@
+{# Links to the pages of a list before and after this one: see /lists/ -#}
+{% set words = site.data.words[page.language] %}
+{% if page.previous or page.next %}
+{% set order = page.list.order %}
+<nav class="pager" aria-label="{{ words.pages }}">
+  <ul>
+    {% if page.previous %}
+    <li><a href="{{ page.previous.url }}" rel="prev">{{ words.newer_posts if order == "newest first" else words.older_posts if order == "oldest first" else words.previous_page }}</a></li>
+    {% endif %}
+    {% if page.next %}
+    <li><a href="{{ page.next.url }}" rel="next">{{ words.older_posts if order == "newest first" else words.newer_posts if order == "oldest first" else words.next_page }}</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}

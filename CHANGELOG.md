@@ -2,6 +2,48 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.2.0 - 2026-10-11
+
+### New
+
+- A new site has a page listing every tag, at `/tags/`, with an "All
+  tags" link from each tag's page, and an About page to adopt or copy.
+- A page joins the starter's menu with `menu: true` in its front matter.
+- HTML in the writing that is left open, or closes what it never opened,
+  is warned of at its tag and published as written.
+- `site.webmentions` tells a template whether the site takes webmentions.
+- An install script for Linux and macOS:
+  `curl -fsSL https://get.statac.dev | sh`.
+
+### Fixed
+
+- `statac new --update` and `check` take a file that no longer resembles
+  any version of the starter's as the author's own, and say nothing of a
+  newer one.
+- `check` no longer stops a template that only pages with `needs: url`
+  use from reading the site's address.
+- `check` no longer lists a file as writing JavaScript where the page's
+  scripts all come from another file.
+- A site in a right-to-left language Statac has no words for is built
+  right to left.
+- A tag whose `>` starts the next line of HTML is read without a fault.
+- A more marker inside an element the writing's HTML holds open is
+  refused.
+- The starter's snippets treat `pictured=false` and `nested=false` as
+  not given.
+- A line of many unclosed `$` or bare addresses no longer slows a build.
+- Importing a Hugo site keeps its feeds where `outputs` and
+  `outputFormats` put them, leaves a page's own fields beneath `params`
+  where they bear one of Hugo's names, and speaks of the later pages
+  wherever the site has more posts than a page shows.
+- Importing a Zola site answers a list's `/page/1/` from the list's own
+  page.
+
+### Changed
+
+- What `statac new --update` shows of a changed file, the explanations
+  of problems and the opening lines of each starter file are reworded.
+
 ## 0.1.0 - 2026-10-10
 
 The first release.

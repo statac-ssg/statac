@@ -1,0 +1,18 @@
+{# The page listing every tag, each leading to its posts: see /lists/ -#}
+{% extends "base" %}
+{% block main %}
+    <header class="top column">
+      <h1>{{ headline(page) }}</h1>
+      {% if page.summary %}
+      <p class="summary">{{ page.summary }}</p>
+      {% endif %}
+    </header>
+    <div class="writing column">
+      {{ page.content }}
+      <ul class="tags">
+        {% for tag in site.tags %}
+        <li><a href="{{ tag.url }}" rel="tag">{{ tag }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+{% endblock %}

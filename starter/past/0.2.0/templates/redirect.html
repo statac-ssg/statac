@@ -1,0 +1,11 @@
+{# The page that sends readers on from an old address. It is kept out of search engines: see /addresses/ -#}
+{% set words = site.data.words[page.language] -%}
+<!doctype html>
+<html lang="{{ page.language }}" dir="{{ page.direction }}">
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url={{ to }}">
+<link rel="canonical" href="{{ to }}">
+<p>{{ words.moved }} <a href="{{ to }}">{{ to }}</a></p>
+</html>

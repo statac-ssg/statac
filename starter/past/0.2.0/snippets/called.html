@@ -1,0 +1,3 @@
+{# takes post #}
+{# What a page is called: its name or, if it has no title (a note may have none), its date and time: see /lists/ -#}
+{% if post.untitled and post.title is not defined and post.date %}{{ post.date | date(site.date_stamp) }}{% else %}{{ headline(post) }}{% endif %}

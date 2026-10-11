@@ -1,0 +1,2 @@
+{# A picture written in Markdown. A photograph is shown as its copies: see /snippets/ -#}
+{% if photo %}{{ picture(photo, alt=alt) }}{% else %}<img src="{{ address }}" alt="{{ alt }}"{% if title %} title="{{ title }}"{% endif %} loading="lazy" decoding="async">{% endif %}
