@@ -15,6 +15,7 @@ use super::html::{escape, escape_href};
 use super::mask::{Masked, OPEN, Piece, TokenKind, Wrapping};
 use super::node::{Alignment, CalloutKind, Kind, Node};
 use super::typography::SETS;
+use super::unmatched::{Block, Elements, Told};
 use super::{Definition, Document, InSite, controls};
 use crate::problem::{Kind as ProblemKind, Problem};
 use crate::source::{Place, SourceId, Span};
@@ -179,6 +180,9 @@ pub(super) fn build(
         depth: 0,
         skipping: 0,
         html: Html::default(),
+        elements: Elements::default(),
+        around: Vec::new(),
+        unmatched: Vec::new(),
         image: 0,
         open: None,
         literal: Vec::new(),
@@ -226,6 +230,17 @@ pub(super) fn build(
         builder.close();
     }
     let root = builder.stack.pop().expect("the root");
+    let mut unmatched = std::mem::take(&mut builder.unmatched);
+    let (told, contained) = std::mem::take(&mut builder.elements).finish();
+    unmatched.extend(told);
+    let unmatched_tag = |(unmatched, range): Told| {
+        let span = masked.map.span(range);
+        Problem::at(
+            ProblemKind::UnmatchedTag { unmatched },
+            Place { source, span },
+        )
+    };
+    let held_in_paragraph = contained.into_iter().map(unmatched_tag).collect();
     in_site.append(&mut builder.in_site);
     in_site.sort_by_key(|stands| stands.place.span.start);
     let mut problems = builder.problems;
@@ -295,6 +310,7 @@ pub(super) fn build(
             ));
         }
     }
+    problems.extend(unmatched.into_iter().map(unmatched_tag));
     for &(span, character) in &masked.left_out {
         problems.push(Problem::at(
             ProblemKind::ControlCharacter { character },
@@ -308,6 +324,24 @@ pub(super) fn build(
         definitions,
         in_site,
         problems,
+        held_in_paragraph,
+    }
+}
+
+/// The block a node is written as that closes the elements raw HTML
+/// opens inside it, as `</li>` does; `top` where it stands at the top of
+/// the writing.
+fn block(kind: &Kind, top: bool) -> Option<Block> {
+    match kind {
+        Kind::Paragraph { tight: false } => Some(Block::Paragraph { top }),
+        Kind::Item => Some(Block::Item),
+        Kind::TableCell => Some(Block::Cell),
+        Kind::Heading { .. }
+        | Kind::Quotation
+        | Kind::Callout(_)
+        | Kind::Term
+        | Kind::Definition => Some(Block::Other),
+        _ => None,
     }
 }
 
@@ -338,6 +372,13 @@ struct Builder<'a> {
     /// read past: how many nodes are open inside it, itself included.
     skipping: usize,
     html: Html,
+    /// The elements the raw HTML read so far holds open. A footnote's note
+    /// is shown apart from the writing, so holds its own.
+    elements: Elements,
+    /// The elements held open around each note being read.
+    around: Vec<Elements>,
+    /// What the raw HTML of each note read leaves unmatched.
+    unmatched: Vec<Told>,
     /// How many images' descriptions the words are inside.
     image: usize,
     /// A token over several lines that has become a node, whose later
@@ -618,11 +659,17 @@ impl<'a> Builder<'a> {
         ) {
             self.html = Html::default();
         }
+        if let Kind::FootnoteDefinition { .. } = kind {
+            self.around.push(std::mem::take(&mut self.elements));
+        }
         let node = Node::new(kind, self.place(span));
         if node.is_inline() {
             self.open_tight();
         } else {
             self.close_tight();
+        }
+        if let Some(block) = block(&node.kind, self.stack.len() == 1) {
+            self.elements.enclose(block, self.stack.len());
         }
         self.depth += usize::from(is_level(&node));
         self.stack.push(node);
@@ -632,6 +679,19 @@ impl<'a> Builder<'a> {
         self.close_tight();
         if matches!(tag, TagEnd::Image) {
             self.image -= 1;
+        }
+        // A tag left unended at the end of a block of HTML ends there.
+        if matches!(tag, TagEnd::HtmlBlock) {
+            self.elements.settle();
+        }
+        if matches!(tag, TagEnd::FootnoteDefinition) {
+            let around = self.around.pop().unwrap_or_default();
+            let note = std::mem::replace(&mut self.elements, around);
+            self.unmatched.extend(note.finish().0);
+        }
+        let top = self.stack.last().expect("an open node");
+        if block(&top.kind, false).is_some() {
+            self.elements.unenclose(self.stack.len() - 1);
         }
         self.close();
     }
@@ -1022,6 +1082,10 @@ impl<'a> Builder<'a> {
         // apart is the call's.
         if self.open.is_some() && html.trim().is_empty() {
             return;
+        }
+        // A picture's description shows no markup.
+        if self.image == 0 {
+            self.elements.read(html, masked_start);
         }
         let (found, literal) = self.html.read(html);
         for stretch in literal {

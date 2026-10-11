@@ -167,18 +167,24 @@ pub(crate) fn comment_end(b: &[u8], at: usize) -> usize {
     if rest.starts_with(b"->") {
         return at + 2;
     }
+    comment_close(b, at).unwrap_or(b.len())
+}
+
+/// Where a comment's text from `at` ends: past the first `-->` or `--!>`.
+/// None where neither follows.
+pub(crate) fn comment_close(b: &[u8], at: usize) -> Option<usize> {
     let mut i = at;
     while let Some(dash) = next(b, b'-', i) {
         let after = &b[dash..];
         if after.starts_with(b"-->") {
-            return dash + 3;
+            return Some(dash + 3);
         }
         if after.starts_with(b"--!>") {
-            return dash + 4;
+            return Some(dash + 4);
         }
         i = dash + 1;
     }
-    b.len()
+    None
 }
 
 /// Where the end tag of the element `name` starts, from `at`: `</` and

@@ -802,10 +802,16 @@ fn markdown(state: &State, value: &Value) -> Value {
             highlighter: None,
         },
     );
+    let trimmed = html.trim_end();
+    let bare = trimmed
+        .strip_prefix("<p>")
+        .and_then(|rest| rest.strip_suffix("</p>"))
+        .filter(|inside| !inside.contains("<p>"));
     if let Some(shared) = &shared {
-        let told: Vec<Problem> = document
-            .problems
-            .into_iter()
+        // Without its `<p>`, the paragraph closes nothing for the value.
+        let held = bare.map(|_| document.held_in_paragraph).unwrap_or_default();
+        let told: Vec<Problem> = (document.problems.into_iter())
+            .chain(held)
             .filter(|problem| crate::markdown::told_of_a_value(&problem.kind))
             .collect();
         if !told.is_empty() {
@@ -847,11 +853,6 @@ fn markdown(state: &State, value: &Value) -> Value {
             });
         }
     }
-    let trimmed = html.trim_end();
-    let bare = trimmed
-        .strip_prefix("<p>")
-        .and_then(|rest| rest.strip_suffix("</p>"))
-        .filter(|inside| !inside.contains("<p>"));
     Value::from_safe_string(bare.map_or_else(|| html.clone(), str::to_owned))
 }
 

@@ -1,6 +1,6 @@
 use super::*;
 use crate::origin::Style;
-use crate::problem::Kind as ProblemKind;
+use crate::problem::{Kind as ProblemKind, Unmatched};
 use crate::source::{LineColumn, Place};
 
 /// Writes every call as an empty element naming it and saying where it sits.
@@ -1485,6 +1485,7 @@ fn footnotes_are_numbered_by_first_use_and_gathered_at_the_foot() {
             definitions: Vec::new(),
             in_site: Vec::new(),
             problems: Vec::new(),
+            held_in_paragraph: Vec::new(),
         })
         .iter()
         .any(|node| matches!(node.kind, Kind::FootnoteDefinition { .. }))
@@ -2672,4 +2673,162 @@ fn a_call_wrapping_writing_is_a_level_of_nesting() {
         sources.line_number(place.source, place.span.start as usize),
         1
     );
+}
+
+/// Each tag of raw HTML told left unmatched: what it leaves so, the tag
+/// as written where it is placed, and its line.
+fn unmatched_at(text: &str) -> Vec<(Unmatched, String, usize)> {
+    let (sources, document) = read_text(text);
+    (document.problems.into_iter())
+        .filter_map(|problem| {
+            let ProblemKind::UnmatchedTag { unmatched } = problem.kind else {
+                return None;
+            };
+            let place = problem.place.unwrap();
+            let line = sources.line_number(place.source, place.span.start as usize);
+            Some((unmatched, sources.spelling(place).to_owned(), line))
+        })
+        .collect()
+}
+
+/// Raw HTML is followed through the elements it opens and closes, as a
+/// browser builds the page round it, and a tag that reaches past the
+/// writing is told at the tag, on its first line: an element or a comment
+/// left open, or an end tag closing nothing the writing opened. What a
+/// browser closes without harm is never told, nor is what is no markup.
+#[test]
+fn html_that_reaches_past_the_writing_is_told_at_its_tag() {
+    let open =
+        |name: &str, at: &str, line| (Unmatched::NeverClosed(name.into()), at.to_owned(), line);
+    let stray = |name: &str, line| {
+        let at = format!("</{name}>");
+        (Unmatched::ClosesNothing(name.into()), at, line)
+    };
+    let comment = |line| (Unmatched::CommentNeverClosed, "<!--".to_owned(), line);
+    let cases = [
+        // An element left open, a stray end tag, and an element left open
+        // that a browser closes as its container closes.
+        (
+            "A paragraph.\n\n<div class=\"footnotes\"><h4>Notes</h4>\n\n1. A note.\n",
+            vec![open("div", "<div class=\"footnotes\">", 3)],
+        ),
+        ("One.\n\nTwo.\n\n</div>\n\nThree.\n", vec![stray("div", 5)]),
+        (
+            "<TABLE CLASS=\"box\">\n<TR><TD>1</TD><TD>2</TD></TR>\n\
+             <TR><TD>3</TD><TD>4</TD></TR>\n\nAfter.\n",
+            vec![open("TABLE", "<TABLE CLASS=\"box\">", 1)],
+        ),
+        (
+            "<figure>\n<div class=\"table-wrapper\">\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n\
+             <figcaption>A table.</figcaption>\n</figure>\n",
+            vec![],
+        ),
+        // Names in any case.
+        ("<DIV>\nOne.\n</div>\n", vec![]),
+        ("<Section>\nOne.\n", vec![open("Section", "<Section>", 1)]),
+        // Elements that hold nothing, and those a browser closes by itself.
+        (
+            "A picture: <img src=\"photo-1.jpg\"><br>\n\n<hr>\n<input type=\"checkbox\">\n",
+            vec![],
+        ),
+        (
+            "<ul>\n<li>One\n<li>Two\n</ul>\n\n<table>\n<tr><td>1\n<tr><td>2\n</table>\n\n\
+             <dl><dt>Term<dd>Definition</dl>\n\n<p>Words.\n",
+            vec![],
+        ),
+        ("One.</li> Two.</td> Three.</tr> Four.</dd>\n", vec![]),
+        ("One.</p>\n\nTwo.</br> Three.</img>\n", vec![]),
+        // An end tag closes what is opened inside its element.
+        (
+            "<section>\n<div>\n<span>A note in a box.\n</section>\n",
+            vec![],
+        ),
+        ("<pre>\n<span>One\n</pre>\n", vec![]),
+        // But not past a table open inside it.
+        (
+            "<div><table><tr><td>1</div>\n",
+            vec![open("div", "<div>", 1), open("table", "<table>", 1)],
+        ),
+        // A formatting element closed so is opened again round what follows
+        // until its own end tag; a later link closes a link.
+        ("<div><b>Bold\n</div>\n", vec![open("b", "<b>", 1)]),
+        ("<div><b>Bold\n</div>\n\nMore.</b>\n", vec![]),
+        (
+            "<p><a href=\"/one/\">One</p>\n<p><a href=\"/two/\">Two</a></p>\n",
+            vec![],
+        ),
+        ("<table><tr><td><b>Bold</td></tr></table>\n", vec![]),
+        (
+            "<em>A caption.\n\nThe next paragraph.\n",
+            vec![open("em", "<em>", 1)],
+        ),
+        // Markdown's blocks close what is opened inside them, and an end tag
+        // after still matches; a block element in a paragraph closes it.
+        (
+            "A sentence <span>with words.\n\n- An item <span>in a list.\n- Another.\n\n\
+             > A quotation <span>quoted.\n\n| A |\n|---|\n| <span>1 |\n\n## A <span>heading\n",
+            vec![],
+        ),
+        ("<intro>The opening.\n\nMore.\n\n</intro>\n", vec![]),
+        ("Words <div>in a box.\n", vec![open("div", "<div>", 1)]),
+        // A comment left open, comments holding tags, and one that closes
+        // as it opens.
+        ("One.\n\n<!-- To come.\n\nTwo.\n", vec![comment(3)]),
+        ("<!-- <div> </span> -->\n\nOne.\n", vec![]),
+        ("<!-->\n\n<div>One.</div>\n", vec![]),
+        // A comment or text element left open takes in the end tags after
+        // it, so is told alone.
+        ("<div>\n<!-- </div>\n", vec![comment(2)]),
+        (
+            "<div>\n<script>\nlet a = 1;\n",
+            vec![open("script", "<script>", 2)],
+        ),
+        (
+            "A <title> in the words.\n",
+            vec![open("title", "<title>", 1)],
+        ),
+        // What a text element holds is no markup.
+        (
+            "<script>if (a<b) { f('</div>'); }</script>\n\n<style>p > a { }</style>\n\n\
+             <textarea><div></textarea>\n",
+            vec![],
+        ),
+        // A tag over several lines, told on its first.
+        (
+            "<div\n  class=\"box\">\nOne.\n",
+            vec![open("div", "<div", 1)],
+        ),
+        ("<div>\nOne.\n</div\n>\n", vec![]),
+        // `/>` closes what it opens in SVG, and nowhere else.
+        (
+            "<svg viewBox=\"0 0 1 1\"><path d=\"M0 0\"/><circle r=\"1\"/></svg>\n",
+            vec![],
+        ),
+        ("<div/>\nOne.\n", vec![open("div", "<div/>", 1)]),
+        // Code is no markup, nor is a picture's description.
+        (
+            "`<div>` and `</span>`\n\n```html\n<div>\n```\n\n    <section>\n",
+            vec![],
+        ),
+        ("![A <span>picture](photo-1.jpg)\n", vec![]),
+        // The writing a call wraps, and a footnote's note, are each matched
+        // on their own.
+        ("@box()\n<div>\n@end\n", vec![open("div", "<div>", 2)]),
+        ("<div>\n\n@box()\nWords.\n@end\n\n</div>\n", vec![]),
+        (
+            "<div>\n\n@box()\n</div>\n@end\n",
+            vec![open("div", "<div>", 1), stray("div", 4)],
+        ),
+        (
+            "Words.[^1]\n\n[^1]: <div>A note.\n\n</div>\n",
+            vec![open("div", "<div>", 3), stray("div", 5)],
+        ),
+    ];
+    for (text, told) in cases {
+        let mut wanted = told.clone();
+        wanted.sort_by_key(|(_, _, line)| *line);
+        assert_eq!(unmatched_at(text), wanted, "{text:?}");
+        let crlf = text.replace('\n', "\r\n");
+        assert_eq!(unmatched_at(&crlf), wanted, "{crlf:?}");
+    }
 }

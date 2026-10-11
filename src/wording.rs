@@ -14,8 +14,8 @@ use crate::problem::{
     FormatFault, Found, Held, Hint, Instead, Kind, Lack, ListFault, Maker, Missing, MoreAt, Named,
     NamedIn, Needed, NotDrawn, OptionHint, Own, PictureFault, Piece, PublishedAsText, Reach,
     RecordFault, Relation, Requirer, Root, SetAside, Severity, ShownBy, ShownWords, SiteMark, Sort,
-    Stopped, Taken, TakesFault, TemplateFault, Translated, Unheard, Unquietenable, Unsupported,
-    Unwritten, Waiting, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
+    Stopped, Taken, TakesFault, TemplateFault, Translated, Unheard, Unmatched, Unquietenable,
+    Unsupported, Unwritten, Waiting, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 use crate::publish::Occupant;
 use crate::serve::live::Told;
@@ -758,6 +758,13 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::IdUsedTwice { id, taken } => match taken {
             Taken::Heading(_) => format!("Id used twice: a heading above has the id `{id}`"),
             Taken::Footnote => format!("Id used twice: a footnote has the id `{id}`"),
+        },
+        Kind::UnmatchedTag { unmatched } => match unmatched {
+            Unmatched::NeverClosed(name) => format!("Unmatched tag: `<{name}>` is never closed"),
+            Unmatched::CommentNeverClosed => "Unmatched tag: `<!--` is never closed".into(),
+            Unmatched::ClosesNothing(name) => {
+                format!("Unmatched tag: `</{name}>` closes nothing opened before it")
+            }
         },
         Kind::SizeKept {
             written, at, size, ..
@@ -2343,6 +2350,11 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             .into(),
         ),
         Kind::IdUsedTwice { .. } => Some("Give this heading an id of its own.".into()),
+        Kind::UnmatchedTag { unmatched } => Some(match unmatched {
+            Unmatched::NeverClosed(name) => format!("Close it with `</{name}>` where it should end."),
+            Unmatched::CommentNeverClosed => "Close it with `-->`.".into(),
+            Unmatched::ClosesNothing(_) => "Take it out, or open the element above it.".into(),
+        }),
         Kind::SizeKept { field, size, .. } => Some(format!(
             "Write `{field}: {size}`; only a text at `left`, `centre` or `right` is fitted."
         )),
@@ -4294,6 +4306,34 @@ mod tests {
                 },
                 "Id used twice: a footnote has the id `note-1`",
                 Some("Give this heading an id of its own."),
+            ),
+            (
+                Kind::UnmatchedTag {
+                    unmatched: Unmatched::NeverClosed("div".into()),
+                },
+                "Unmatched tag: `<div>` is never closed",
+                Some("Close it with `</div>` where it should end."),
+            ),
+            (
+                Kind::UnmatchedTag {
+                    unmatched: Unmatched::NeverClosed("TABLE".into()),
+                },
+                "Unmatched tag: `<TABLE>` is never closed",
+                Some("Close it with `</TABLE>` where it should end."),
+            ),
+            (
+                Kind::UnmatchedTag {
+                    unmatched: Unmatched::CommentNeverClosed,
+                },
+                "Unmatched tag: `<!--` is never closed",
+                Some("Close it with `-->`."),
+            ),
+            (
+                Kind::UnmatchedTag {
+                    unmatched: Unmatched::ClosesNothing("div".into()),
+                },
+                "Unmatched tag: `</div>` closes nothing opened before it",
+                Some("Take it out, or open the element above it."),
             ),
             (
                 Kind::BrokenLink {

@@ -915,6 +915,73 @@ error  Malformed maths: Statac doesn't know `\\fracc`
     );
 }
 
+/// HTML left open, or closing what it never opened, is published exactly
+/// as written and told at its tag; a value shown on many pages is told at
+/// its place once.
+#[test]
+fn html_left_unmatched_is_published_as_written_and_told_at_its_tag() {
+    let site = Site::new("unmatched-tag");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\nsummary: A summary <span>in words\n---\n\
+         <div class=\"box\">\n\nA note in a box.\n\n</section>\n",
+    );
+    let summaries = "{{ page.content }}\
+                     {% for post in site.posts %}{{ post.summary | markdown }}{% endfor %}\n";
+    site.write("templates/home.html", summaries);
+    site.write("templates/folder.html", summaries);
+    site.write(
+        "templates/page.html",
+        "{{ page.summary | markdown }}\n{{ page.content }}\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Unmatched tag: `<span>` is never closed
+  content/post-1.md, line 4
+   4 │ summary: A summary <span>in words
+     │                    ^^^^^^
+  Read as Markdown here: templates/home.html, line 1
+   1 │ {{ page.content }}{% for post in site.posts %}{{ post.summary | markdown }}{% endfor %}
+     │                                                  ^^^^^^^^^^^^^^^^^^^^^^^
+  While building: content/index.md
+  Close it with `</span>` where it should end.
+  More: https://statac.dev/e/unmatched-tag/
+
+warning  Unmatched tag: `<div>` is never closed
+  content/post-1.md, line 6
+   6 │ <div class=\"box\">
+     │ ^^^^^^^^^^^^^^^^^
+  Close it with `</div>` where it should end.
+  More: https://statac.dev/e/unmatched-tag/
+
+warning  Unmatched tag: `</section>` closes nothing opened before it
+  content/post-1.md, line 10
+  10 │ </section>
+     │ ^^^^^^^^^^
+  Take it out, or open the element above it.
+  More: https://statac.dev/e/unmatched-tag/
+
+3 warnings: 3 unmatched-tag.
+"
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.contains("3 warnings: 3 unmatched-tag."), "{said}");
+    let page = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    assert_eq!(
+        page,
+        "A summary <span>in words\n<div class=\"box\">\n<p>A note in a box.</p>\n</section>\n"
+    );
+    let home = fs::read_to_string(site.out().join("index.html")).unwrap();
+    assert!(
+        home.contains("<p>The home page.</p>A summary <span>in words"),
+        "{home}"
+    );
+}
+
 #[test]
 fn a_layout_that_never_shows_its_pages_writing_is_told_once_counting_them() {
     let site = Site::new("hollow");

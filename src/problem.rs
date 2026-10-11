@@ -168,6 +168,7 @@ codes! {
     DefinitionWrittenTwice "definition-written-twice",
     CellNeverShown "cell-never-shown",
     IdUsedTwice "id-used-twice",
+    UnmatchedTag "unmatched-tag",
     SizeKept "size-kept",
     UnreadablePicture "unreadable-picture",
     ColourConverted "colour-converted",
@@ -269,6 +270,7 @@ impl Code {
             | Code::DefinitionWrittenTwice
             | Code::CellNeverShown
             | Code::IdUsedTwice
+            | Code::UnmatchedTag
             | Code::SizeKept
             | Code::DescribesNoPicture
             | Code::CacheNotWritten
@@ -424,6 +426,7 @@ impl Code {
             | Code::DefinitionWrittenTwice
             | Code::CellNeverShown
             | Code::IdUsedTwice
+            | Code::UnmatchedTag
             | Code::SizeKept
             | Code::ColourConverted
             | Code::DescribesNoPicture
@@ -1213,6 +1216,11 @@ pub enum Kind {
         id: String,
         taken: Taken,
     },
+    /// Raw HTML in the writing, or in a value read as Markdown, that
+    /// reaches past it into the page around it.
+    UnmatchedTag {
+        unmatched: Unmatched,
+    },
     /// A size written `up to` where nothing is fitted, so drawn at the
     /// size given: the size field, its value and the place, each as
     /// written, and the size drawn.
@@ -1854,6 +1862,18 @@ pub enum PublishedAsText {
     FrontMatter,
 }
 
+/// What a tag in raw HTML leaves unmatched.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Unmatched {
+    /// An element opened and never closed, by its name as written.
+    NeverClosed(String),
+    /// A comment opened and never closed.
+    CommentNeverClosed,
+    /// An end tag with nothing open for it to close, by its name as
+    /// written.
+    ClosesNothing(String),
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum WrongPlace {
     /// Handed down, though each page has its own.
@@ -2458,6 +2478,7 @@ impl Kind {
             Kind::DefinitionWrittenTwice { .. } => Code::DefinitionWrittenTwice,
             Kind::CellNeverShown { .. } => Code::CellNeverShown,
             Kind::IdUsedTwice { .. } => Code::IdUsedTwice,
+            Kind::UnmatchedTag { .. } => Code::UnmatchedTag,
             Kind::SizeKept { .. } => Code::SizeKept,
             Kind::UnreadablePicture { .. } => Code::UnreadablePicture,
             Kind::ColourConverted { .. } => Code::ColourConverted,

@@ -1436,17 +1436,24 @@ fn a_layout_whose_templates_read_none_of_the_writing_is_the_one_told() {
 
 #[test]
 fn a_page_with_no_writing_is_never_told_of_a_layout_that_shows_none() {
-    for page in [
-        "---\ntitle: Post 1\n---\n",
-        "---\ntitle: Post 1\n---\n\n  \n",
-        "---\ntitle: Post 1\n---\n<!-- To come. -->\n\n<!--\nAnd more.\n-->\n",
-        "---\ntitle: Post 1\n---\n<!-- Never closed.\n",
+    // The comment left open is told of itself.
+    let open = Kind::UnmatchedTag {
+        unmatched: crate::problem::Unmatched::CommentNeverClosed,
+    };
+    for (page, told) in [
+        ("---\ntitle: Post 1\n---\n", None),
+        ("---\ntitle: Post 1\n---\n\n  \n", None),
+        (
+            "---\ntitle: Post 1\n---\n<!-- To come. -->\n\n<!--\nAnd more.\n-->\n",
+            None,
+        ),
+        ("---\ntitle: Post 1\n---\n<!-- Never closed.\n", Some(open)),
     ] {
         let kinds = kinds_building_post_1(&[
             ("content/post-1.md", page),
             ("templates/page.html", "{{ page.title }}"),
         ]);
-        assert_eq!(kinds, [], "{page}");
+        assert_eq!(kinds, Vec::from_iter(told), "{page}");
     }
 }
 
@@ -2212,6 +2219,76 @@ fn a_value_read_as_markdown_is_told_only_what_a_value_is_told() {
     assert_eq!(sources.spelling(shown), "[^n]");
     assert_eq!(sources.path(shown.source), sources.path(first.source));
     assert!(first.span.start < shown.span.start);
+}
+
+/// HTML a value read as Markdown leaves unmatched is told at the tag in
+/// the value's file, placed whether the value stands there as it is or
+/// is read alone. A value of one paragraph is shown without its `<p>`, so
+/// what the paragraph would close is told; in a value of more, the
+/// paragraph closes it.
+#[test]
+fn html_a_value_read_as_markdown_leaves_unmatched_is_told_at_the_tag() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        NO_HOME,
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\nsummary: A summary <span>in words\n---\n",
+        ),
+        (
+            "data/notes.yaml",
+            "box: |\n  <div class=\"box\">\n\n  A note in a box.\n\
+             two: |\n  One <span>word.\n\n  Two.\n\
+             stray: \"One.</section>\"\n\
+             closed: \"<em>One</em>.\"\n",
+        ),
+        (
+            "templates/page.html",
+            "<p>{{ page.summary | markdown }}</p>{{ site.data.notes.box | markdown }}\
+             {{ site.data.notes.two | markdown }}{{ site.data.notes.stray | markdown }}\
+             {{ site.data.notes.closed | markdown }}",
+        ),
+    ]);
+    let rendered = built.render("post-1.md");
+    assert_eq!(
+        built.told(&rendered.problems),
+        [
+            (
+                "unmatched-tag",
+                "content/post-1.md".to_owned(),
+                "<span>".to_owned()
+            ),
+            (
+                "unmatched-tag",
+                "data/notes.yaml".to_owned(),
+                "<div class=\"box\">".to_owned()
+            ),
+            (
+                "unmatched-tag",
+                "data/notes.yaml".to_owned(),
+                "</section>".to_owned()
+            ),
+        ]
+    );
+    let headlines: Vec<String> = rendered.problems.iter().map(Problem::headline).collect();
+    assert_eq!(
+        headlines,
+        [
+            "Unmatched tag: `<span>` is never closed",
+            "Unmatched tag: `<div>` is never closed",
+            "Unmatched tag: `</section>` closes nothing opened before it",
+        ]
+    );
+    assert!(
+        (rendered.html.as_deref().unwrap()).starts_with(
+            "<p>A summary <span>in words</p><div class=\"box\">\n<p>A note in a box.</p>"
+        ),
+        "{:?}",
+        rendered.html
+    );
 }
 
 /// A page whose more marker Statac can't act on is told at the marker in

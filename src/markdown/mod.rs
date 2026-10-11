@@ -8,10 +8,12 @@
 //! its children. An `@url(...)` is no snippet's: it is read as the address
 //! it stands for inside the site, in a link's address as anywhere a call
 //! is read. A control character is left out before the parser reads
-//! the text (see `controls`). Passes over the finished tree change it in
-//! place, and reading ends with the one that links each address written
-//! bare (see `autolinks`); questions about the writing (its words, links
-//! and headings) are functions over it.
+//! the text (see `controls`). The author's raw HTML is followed through
+//! the elements it opens and closes as it is read, to tell a tag that
+//! reaches past the writing (see `unmatched`). Passes over the finished
+//! tree change it in place, and reading ends with the one that links each
+//! address written bare (see `autolinks`); questions about the writing
+//! (its words, links and headings) are functions over it.
 
 mod autolinks;
 mod block;
@@ -30,6 +32,7 @@ mod read;
 #[cfg(test)]
 mod tests;
 mod typography;
+mod unmatched;
 
 pub use call::{Argument, Call, IN_SITE, Value, Within, from_the_top};
 pub(crate) use html::escape_href;
@@ -116,6 +119,10 @@ pub struct Document {
     /// written.
     pub in_site: Vec<InSite>,
     pub problems: Vec<Problem>,
+    /// What raw HTML leaves open inside a paragraph at the top of the
+    /// writing, which the paragraph's end closes: told of a value shown as
+    /// that paragraph's words alone, without its `<p>`.
+    pub held_in_paragraph: Vec<Problem>,
 }
 
 impl Document {
@@ -164,6 +171,7 @@ const TOLD_OF_A_VALUE: &[crate::problem::Code] = &[
     crate::problem::Code::MissingDefinition,
     crate::problem::Code::FootnoteNeverShown,
     crate::problem::Code::DefinitionWrittenTwice,
+    crate::problem::Code::UnmatchedTag,
 ];
 
 /// Whether a problem met reading writing is told of a value a template
