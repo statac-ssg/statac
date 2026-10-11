@@ -1,0 +1,46 @@
+# The words the templates and snippets show readers, in each language: see /new/
+en:
+  skip: Skip to the content
+  navigation: Site
+  home: Home
+  latest: Latest posts
+  feed: RSS feed
+  languages: Languages
+  tags: Tags
+  series: "Series:"
+  tagged: Posts tagged
+  in_series: Posts in the series
+  contents: Contents
+  more_posts: More posts
+  previous: Previous
+  next: Next
+  related: Related posts
+  read_more: Read more
+  pages: More pages
+  newer_posts: Newer posts
+  older_posts: Older posts
+  previous_page: Previous page
+  next_page: Next page
+  mentions: From other sites
+  replied: replied
+  liked: liked
+  reposted: reposted
+  bookmarked: bookmarked
+  mentioned: mentioned
+  play_video: Play the video
+  play: Play
+  video_player: Video player
+  download_video: Download the video
+  download_recording: Download the recording
+  note: Note
+  tip: Tip
+  important: Important
+  warning: Warning
+  caution: Caution
+  moved: This page has moved to
+  not_found: Page not found
+  nothing_here: Nothing is published at this address.
+  go_home: Go to the home page
+  updated: Updated
+  minutes: min read
+  all: See all

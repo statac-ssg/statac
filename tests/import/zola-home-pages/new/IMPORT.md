@@ -37,13 +37,12 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## Addresses
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old addresses there: 4 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old addresses there: 5 are published there, or sent on from there.
 
-- Every page lands where the old site published it, with nothing added.
+- 1 page carries `redirect_from`, for the other addresses that led to it.
 
 Nothing in the new site answers these old addresses. Give the page that should answer each a `redirect_from` naming it, or a `permalink`:
 
-- `/page/1/`
 - `/page/2/`
 
 ## Left for you

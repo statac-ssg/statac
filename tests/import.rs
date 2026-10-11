@@ -230,8 +230,13 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
         assert!(outcome.published.is_some(), "{name}");
         let home = fs::read_to_string(new.join("content/index.md")).unwrap();
         assert!(home.contains("\nposts_per_page: 0\n"), "{name}: {home}");
-        assert!(!out.join("page").exists(), "{name}");
+        assert!(!out.join("page/2").exists(), "{name}");
         assert_eq!(out.join("posts/page/2").exists(), posts_page, "{name}");
+        // Zola sent `/page/1/` on to the home page, and so does the new
+        // site.
+        let first = fs::read_to_string(out.join("page/1/index.html")).ok();
+        let sent_home = first.is_some_and(|page| page.contains("url=https://example.org/\""));
+        assert_eq!(sent_home, name == "zola-home-pages", "{name}");
     }
     let report = |name: &str| {
         fs::read_to_string(Path::new("tests/import").join(name).join("new/IMPORT.md")).unwrap()
@@ -1605,6 +1610,11 @@ fn zola_front_matter_comes_across_in_statacs_words() {
 #[test]
 fn zola_lists_keep_their_order_pages_and_redirects() {
     assert_eq!(fixture("zola-lists"), [] as [&str; 0]);
+}
+
+#[test]
+fn zola_lists_answer_the_first_page_zola_sent_on_to_them() {
+    assert_eq!(fixture("zola-first-pages"), [] as [&str; 0]);
 }
 
 #[test]

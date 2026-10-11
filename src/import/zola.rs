@@ -1381,9 +1381,9 @@ impl Reader<'_> {
             if doc.shape != Shape::List || doc.draft {
                 continue;
             }
-            // A home page left to the starter's has no page of its own to
-            // carry a `redirect_from`.
-            any |= !doc.words_only;
+            // Only a list below the home page says `posts_per_page`: the
+            // home page keeps its own list to one page.
+            any |= !doc.dir.is_empty();
             let path = doc
                 .list
                 .paginate_path
@@ -1426,7 +1426,11 @@ impl Reader<'_> {
             };
             let first = at(1);
             match self.docs[list].words_only {
-                true => self.import.addresses.push(first),
+                true => {
+                    self.import.addresses.push(first.clone());
+                    let from = Value::List(vec![Value::Text(first)]);
+                    (self.docs[list].words).push(Field::new("redirect_from", from, None));
+                }
                 false => self.docs[list].others.push(first),
             }
             for n in 2..=pages {

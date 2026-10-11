@@ -688,6 +688,12 @@ pub fn write<'a>(
     }
 
     summary.kept = addresses::keep(&mut out, &mut placed, today, &other_languages)?;
+    // `keep` counts only the pages that came across; a starter's page
+    // carries the `redirect_from` its words give it.
+    summary.kept.redirected += (words.iter())
+        .filter(|(path, field)| field.name == "redirect_from" && !came.contains(path))
+        .filter(|(path, _)| out.text(&format!("content/{path}")).is_some())
+        .count();
     let mut worked_out: Vec<(String, String)> = Vec::new();
     for page in &placed {
         let addresses = page.address.iter().chain(&page.other_addresses);
