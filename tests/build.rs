@@ -2667,3 +2667,95 @@ fn every_page_as_a_list_and_chosen_by_a_field_is_as_any_list_is() {
     );
     assert!(built.contains("\n/post-4/=/post-4/\n"), "{built}");
 }
+
+#[test]
+fn every_list_of_pages_a_template_is_handed_is_as_any_list_is() {
+    let site = Site::new("lists-of-pages");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nposts_per_page: 2\n",
+    );
+    site.write("content/index.md", "---\ntitle: Home\n---\n");
+    site.write(
+        "content/blog/index.md",
+        "---\ntitle: Blog\nlayout: lists\n---\n",
+    );
+    site.write("content/blog/undated.md", "---\ntitle: Undated\n---\n");
+    for n in 1..=5 {
+        let text = format!(
+            "---\ntitle: Post {n}\ndate: 2026-09-0{n}\ntags: [one{}]\n---\nWords.\n",
+            if n % 2 == 0 { ", two" } else { "" }
+        );
+        site.write(&format!("content/blog/post-{n}.md"), &text);
+    }
+    site.write("templates/page.html", "{{ page.title }}\n");
+    site.write("templates/post.html", "{{ page.title }}\n");
+    site.write("templates/folder.html", "{{ page.list.name }}\n");
+    // Each list as it is handed, and the same pages as a list made in the
+    // template.
+    let lists = [
+        "site.posts",
+        "page.posts",
+        "page.list.posts",
+        "page.list.pages",
+        "page.list.pager",
+        "related(page.posts[0])",
+        "site.tags[0].posts",
+    ];
+    let asked = [
+        "{{ L | length }}",
+        "{{ 'some' if L else 'none' }}",
+        "{{ L[0].url }} {{ L[-1].url }} {{ L[1:2] | map(attribute='title') | join }}",
+        "{{ L[:2] | join(' ') }}|{{ L[1:] | join(' ') }}|{{ L[-2:] | join(' ') }}",
+        "{{ L[::-1] | join(' ') }}",
+        "{{ L | first }} {{ L | last }}",
+        "{{ L | reverse | join(' ') }}",
+        "{{ (L + L) | length }} {{ ([page] + L) | join(' ') }}",
+        "{{ L[0] in L }} {{ page in L }}",
+        "{% for p in L %}{{ loop.index }}/{{ loop.length }}:{{ p.url }}{% if not loop.last %},{% endif %}{% endfor %}",
+        "{% for p in L if p.title is endingwith('2') %}{{ p.url }}{% endfor %}",
+        "{{ L | sort(attribute='title', reverse=true) | join(' ') }}",
+        "{{ L | map(attribute='title') | join(',') }}",
+        "{{ L | selectattr('title', 'eq', 'Post 2') | join(' ') }}",
+        "{{ L | batch(2) | map('length') | join(',') }}",
+        "{{ L | newest_first | join(' ') }}",
+        "{{ L | tagged('two') | join(' ') }}",
+        "{{ L }}",
+        "{{ L | json }}",
+    ];
+    let mut folder = String::new();
+    for list in lists {
+        for asking in asked {
+            let made = format!("({list} | list)");
+            folder.push_str(&asking.replace('L', list));
+            folder.push('=');
+            folder.push_str(&asking.replace('L', &made));
+            folder.push_str(";\n");
+        }
+    }
+    site.write("templates/lists.html", &folder);
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    for built in ["blog/index.html", "blog/page/2/index.html"] {
+        let built = fs::read_to_string(site.out().join(built)).unwrap();
+        let mut lines = built.lines();
+        for list in lists {
+            for asking in asked {
+                let line = lines.next().unwrap().strip_suffix(';').unwrap();
+                let (handed, made) = line.split_at(line.len() / 2);
+                assert_eq!(Some(handed), made.strip_prefix('='), "{list}: {asking}");
+            }
+        }
+        assert_eq!(lines.next(), None);
+    }
+    let first = fs::read_to_string(site.out().join("blog/index.html")).unwrap();
+    for line in [
+        "5=5",
+        "/blog/post-5/ /blog/post-4/=/blog/post-5/ /blog/post-4/",
+        "6=6",
+        "3=3",
+        "/blog/ /blog/page/2/ /blog/page/3/=/blog/ /blog/page/2/ /blog/page/3/",
+    ] {
+        assert!(first.contains(&format!("\n{line};\n")), "{line}\n{first}");
+    }
+}

@@ -33,6 +33,8 @@ pub enum Key {
     ListPage(ListId, u32),
     /// The newest members of a list, as its feed carries them.
     ListHead(ListId),
+    /// Every member of a list, dated or not.
+    Members(ListId),
     /// Which lists exist, and their sizes.
     Lists,
     /// Which of one language's lists exist, and their sizes.
@@ -134,6 +136,7 @@ impl Translation {
             Key::Mentions(page) => Key::Mentions(self.page(page)?),
             Key::ListPage(list, number) => Key::ListPage(self.list(list)?, number),
             Key::ListHead(list) => Key::ListHead(self.list(list)?),
+            Key::Members(list) => Key::Members(self.list(list)?),
             Key::FieldOfEvery(name) => Key::FieldOfEvery(*self.names.get(name.index())?),
             Key::Setting(name) => Key::Setting(*self.names.get(name.index())?),
             Key::Template(id) => Key::Template(self.template(id)?),

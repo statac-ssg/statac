@@ -490,7 +490,8 @@ fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value
             ValueKind::None | ValueKind::Bool | ValueKind::Number | ValueKind::String
         )
     };
-    if let Some(pages) = input.downcast_object_ref::<super::values::EveryPage>()
+    if let Some(pages) = input.downcast_object_ref::<super::values::Pages>()
+        && matches!(pages.which, super::values::Which::Every)
         && let Some(path) = &attribute
         && let Some(field) = path.split('.').next()
         && super::values::as_written(field)

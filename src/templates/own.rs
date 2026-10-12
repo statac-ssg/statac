@@ -13,7 +13,7 @@ use minijinja::{Environment, Error, State};
 use super::frame;
 use super::guard::{self, Callee, Input};
 use super::render::Shared;
-use super::values::{DateValue, ListValue, Lists, PageValue};
+use super::values::{DateValue, ListValue, Lists, PageValue, Pages, Which};
 use crate::content::words::PageWord;
 use crate::date::Date;
 use crate::dates::ShowDates;
@@ -444,7 +444,7 @@ fn pages_of(posts: &Value, filter: &str) -> Result<Vec<(Value, PageId)>, Error> 
 fn filtered(shared: &Shared, posts: &Value, name: &str, filter: &Filter) -> Result<Value, Error> {
     let pages = pages_of(posts, name)?;
     if let Filter::In(list, _) = filter {
-        super::values::read_whole(shared, *list);
+        super::values::read_whole(*list);
     }
     let field = filter.reads().map(|field| shared.name_id(field));
     Ok(Value::from(
@@ -466,9 +466,12 @@ fn filtered(shared: &Shared, posts: &Value, name: &str, filter: &Filter) -> Resu
 fn related(shared: &Arc<Shared>, page: PageId) -> Value {
     frame::read(Key::Field(page, shared.name_id("tags")));
     for tag in crate::lists::tags_of(&shared.site, page) {
-        super::values::read_whole(shared, tag);
+        super::values::read_whole(tag);
     }
-    super::values::pages_value(shared, &crate::lists::related(&shared.site, page))
+    Pages::value(
+        shared,
+        Which::These(crate::lists::related(&shared.site, page)),
+    )
 }
 
 /// A page's date, recorded as read.

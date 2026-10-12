@@ -3400,7 +3400,7 @@ fn reading_a_list_is_recorded_by_the_list() {
     let reads = built.render("blog/post-1.md").reads;
     let tags = built.renderer.name_id("tags");
     assert!(reads.keys().contains(&Key::Field(post, tags)));
-    assert!(reads.keys().contains(&Key::ListPage(rust, 1)));
+    assert!(reads.keys().contains(&Key::Members(rust)));
 }
 
 #[test]
@@ -3987,7 +3987,7 @@ fn related_gives_the_posts_sharing_most_tags_first() {
         )
         .unwrap();
     let reads = built.render("blog/post-4.md").reads;
-    assert!(reads.keys().contains(&Key::ListPage(c, 1)));
+    assert!(reads.keys().contains(&Key::Members(c)));
 
     let built = paged(&[(
         "templates/page.html",

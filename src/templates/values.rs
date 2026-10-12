@@ -109,7 +109,7 @@ pub(super) fn as_written(key: &str) -> bool {
 pub(super) fn opaque(value: &Value) -> bool {
     value.downcast_object_ref::<PageValue>().is_some()
         || value.downcast_object_ref::<SiteValue>().is_some()
-        || value.downcast_object_ref::<EveryPage>().is_some()
+        || value.downcast_object_ref::<Pages>().is_some()
         || value.downcast_object_ref::<ListValue>().is_some()
         || value.downcast_object_ref::<Lists>().is_some()
         || value.downcast_object_ref::<Languages>().is_some()
@@ -355,8 +355,7 @@ impl PageValue {
                 match page.speaks_for {
                     Some(list) => {
                         frame::read(Key::ListPage(list, stretch_key(self.number)));
-                        let stretch = shared.site.lists.get(list).stretch(self.number);
-                        Some(pages_value(shared, stretch))
+                        Some(Pages::value(shared, Which::Stretch(list, self.number)))
                     }
                     // A page making a page per item lists nothing of its own.
                     None if page.speaks_for_a_list() => {
@@ -629,8 +628,8 @@ impl SiteValue {
                     frame::read(Key::ListsIn(self.language));
                     return None;
                 };
-                read_whole(shared, list);
-                Some(pages_value(shared, &shared.site.lists.get(list).members))
+                read_whole(list);
+                Some(Pages::value(shared, Which::Posts(list)))
             }
             "tags" | "series" => {
                 frame::read(Key::ListsIn(self.language));
@@ -760,49 +759,96 @@ fn stretch_key(number: usize) -> u32 {
     u32::try_from(number).unwrap_or(u32::MAX)
 }
 
-/// Records reading every stretch of a list.
-pub(super) fn read_whole(shared: &Shared, list: ListId) {
-    for number in 1..=shared.site.lists.get(list).stretches() {
-        frame::read(Key::ListPage(list, stretch_key(number)));
+/// Records reading every member of a list.
+pub(super) fn read_whole(list: ListId) {
+    frame::read(Key::Members(list));
+}
+
+/// Pages in an order, as a list that makes each page's value as it is
+/// reached: most templates that ask for one want a few of them, or how
+/// many there are.
+#[derive(Debug)]
+pub(super) struct Pages {
+    pub shared: Arc<Shared>,
+    pub which: Which,
+}
+
+/// Which pages a list of them holds.
+#[derive(Debug)]
+pub(super) enum Which {
+    /// Every page the site publishes, a list's later pages among them, in
+    /// the order of their addresses.
+    Every,
+    /// A list's posts.
+    Posts(ListId),
+    /// A list's posts, then its pages without a date.
+    All(ListId),
+    /// The posts on one of a list's pages, counted from 1.
+    Stretch(ListId, usize),
+    /// A list's page and each of its later pages, this many in all.
+    Pager(PageId, usize),
+    These(Vec<PageId>),
+}
+
+impl Pages {
+    pub fn value(shared: &Arc<Shared>, which: Which) -> Value {
+        Value::from_object(Pages {
+            shared: Arc::clone(shared),
+            which,
+        })
+    }
+
+    fn len(&self) -> usize {
+        let lists = &self.shared.site.lists;
+        match &self.which {
+            Which::Every => self.shared.every_page().len(),
+            Which::Posts(list) => lists.get(*list).members.len(),
+            Which::All(list) => {
+                let list = lists.get(*list);
+                list.members.len() + list.undated.len()
+            }
+            Which::Stretch(list, number) => lists.get(*list).stretch(*number).len(),
+            Which::Pager(_, pages) => *pages,
+            Which::These(pages) => pages.len(),
+        }
+    }
+
+    /// The page at `at`, and which of its list's pages it is.
+    fn at(&self, at: usize) -> Option<(PageId, usize)> {
+        let lists = &self.shared.site.lists;
+        let first = |id: &PageId| (*id, 1);
+        match &self.which {
+            Which::Every => self.shared.every_page().get(at).copied(),
+            Which::Posts(list) => lists.get(*list).members.get(at).map(first),
+            Which::All(list) => {
+                let list = lists.get(*list);
+                let undated = || list.undated.get(at - list.members.len());
+                list.members.get(at).or_else(undated).map(first)
+            }
+            Which::Stretch(list, number) => lists.get(*list).stretch(*number).get(at).map(first),
+            Which::Pager(page, pages) => (at < *pages).then_some((*page, at + 1)),
+            Which::These(pages) => pages.get(at).map(first),
+        }
     }
 }
 
-pub(super) fn pages_value(shared: &Arc<Shared>, pages: &[PageId]) -> Value {
-    Value::from(
-        pages
-            .iter()
-            .map(|&id| PageValue::value(shared, id))
-            .collect::<Vec<_>>(),
-    )
-}
-
-/// Every page the site publishes, a list's later pages among them, in the
-/// order of their addresses: a list that makes each page's value as it is
-/// reached, since most templates that ask for it want a few of them.
-#[derive(Debug)]
-pub(super) struct EveryPage {
-    pub shared: Arc<Shared>,
-}
-
-impl Object for EveryPage {
+impl Object for Pages {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
         ObjectRepr::Seq
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        let &(id, number) = self.shared.every_page().get(key.as_usize()?)?;
+        let (id, number) = self.at(key.as_usize()?)?;
         Some(PageValue::numbered(&self.shared, id, number))
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Seq(self.shared.every_page().len())
+        Enumerator::Seq(self.len())
     }
 }
 
 fn all_pages(shared: &Arc<Shared>) -> Value {
-    Value::from_object(EveryPage {
-        shared: Arc::clone(shared),
-    })
+    Pages::value(shared, Which::Every)
 }
 
 /// A page's headings as its table of contents: each with its words, its
@@ -953,24 +999,21 @@ impl ListValue {
                 }
             }
             "posts" => {
-                read_whole(shared, self.id);
-                Some(pages_value(shared, &list.members))
+                read_whole(self.id);
+                Some(Pages::value(shared, Which::Posts(self.id)))
             }
             "pages" => {
-                read_whole(shared, self.id);
-                let pages: Vec<PageId> =
-                    list.members.iter().chain(&list.undated).copied().collect();
-                Some(pages_value(shared, &pages))
+                read_whole(self.id);
+                Some(Pages::value(shared, Which::All(self.id)))
             }
             "pager" => {
-                read_whole(shared, self.id);
-                let pager = match list.page {
-                    Some(page) if shared.site.pages.get(page).lands() => (1..=1 + list.later.len())
-                        .map(|number| PageValue::numbered(shared, page, number))
-                        .collect(),
-                    _ => Vec::new(),
-                };
-                Some(Value::from(pager))
+                read_whole(self.id);
+                Some(match list.page {
+                    Some(page) if shared.site.pages.get(page).lands() => {
+                        Pages::value(shared, Which::Pager(page, 1 + list.later.len()))
+                    }
+                    _ => Value::from(Vec::<Value>::new()),
+                })
             }
             "feed" => Some(feed_value(shared, self.id)),
             "word" => Some(Value::from(match shared.site.is_home(self.id) {
@@ -978,7 +1021,7 @@ impl ListValue {
                 false => list.key.word(),
             })),
             "order" => {
-                read_whole(shared, self.id);
+                read_whole(self.id);
                 Some(Value::from(list.order.map_or("", Order::word)))
             }
             _ => None,

@@ -34,8 +34,8 @@ fn site_posts_holds_the_posts_of_the_pages_own_language() {
     let (ar, en) = (LanguageId::from_index(0), LanguageId::from_index(1));
     let (main, english) = (site.own_list(ar).unwrap(), site.own_list(en).unwrap());
     let keys = built.render("en/post-1.md").reads.keys().to_vec();
-    assert!(keys.contains(&Key::ListPage(english, 1)));
-    assert!(!keys.contains(&Key::ListPage(main, 1)));
+    assert!(keys.contains(&Key::Members(english)));
+    assert!(!keys.contains(&Key::Members(main)));
     assert!(keys.contains(&Key::ListsIn(en)));
     assert!(!keys.contains(&Key::ListsIn(ar)) && !keys.contains(&Key::Lists));
 }

@@ -423,13 +423,15 @@ impl Taken<'_> {
                 let at = (number as usize).clamp(1, stretches.len()) - 1;
                 stretches[at]
             }
-            Key::ListHead(list) => *prints.heads[list.index()].get_or_init(|| {
-                let held = site.lists.get(list);
-                let (members, undated) = (self.named(&held.members), self.named(&held.undated));
-                Print::default()
-                    .with((self.list(list), members, undated))
-                    .done()
-            }),
+            Key::ListHead(list) | Key::Members(list) => {
+                *prints.heads[list.index()].get_or_init(|| {
+                    let held = site.lists.get(list);
+                    let (members, undated) = (self.named(&held.members), self.named(&held.undated));
+                    Print::default()
+                        .with((self.list(list), members, undated))
+                        .done()
+                })
+            }
             // Wider than the one name: what any page says of itself.
             Key::FieldOfEvery(_) => self.every_front(),
             Key::Lists | Key::ListsIn(_) => self.every_list(),
