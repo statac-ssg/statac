@@ -43,6 +43,17 @@ fn mark_of(published: &str) -> &str {
 }
 
 #[test]
+fn no_code_stylesheet_is_published_where_code_style_is_none() {
+    let site = Site::new(
+        "code-css-off",
+        &[("assets/site.css", "body { margin: 0; }\n")],
+    );
+    let (assets, problems) = gather(&site.0, "", Some("none"), &mut Sources::default());
+    assert_eq!(problems, []);
+    assert!(assets.get("code.css").is_none());
+}
+
+#[test]
 fn the_code_stylesheet_is_written_from_the_style_and_published_like_any_other() {
     let site = Site::new("code-css", &[("assets/site.css", "body { margin: 0; }\n")]);
     let gathered = || gather(&site.0, "", Some("one-half"), &mut Sources::default());

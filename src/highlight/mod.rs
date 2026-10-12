@@ -32,6 +32,19 @@ pub const STYLESHEET: &str = "code.css";
 /// The styles `code_style` takes.
 pub const NAMES: &[&str] = &["ocean", "gruvbox", "solarized", "catppuccin", "one-half"];
 
+/// What `code_style` is where the site wants no code coloured.
+pub const OFF: &str = "none";
+
+/// Every word `code_style` takes: the styles, then `OFF`.
+pub const SETTING: &[&str] = &[
+    "ocean",
+    "gruvbox",
+    "solarized",
+    "catppuccin",
+    "one-half",
+    OFF,
+];
+
 const CLASS_PREFIX: &str = "hl-";
 
 /// The kinds of thing code is marked as, each the name of its class after
@@ -602,8 +615,8 @@ pub struct Highlighter {
 }
 
 impl Highlighter {
-    /// None for a name `code_style` doesn't take, which the setting has
-    /// already refused.
+    /// None for `none`, and for a name `code_style` doesn't take, which
+    /// the setting has already refused.
     pub fn new(code_style: &str) -> Option<Highlighter> {
         NAMES.contains(&code_style).then(|| Highlighter {
             done: Mutex::new(HashMap::new()),

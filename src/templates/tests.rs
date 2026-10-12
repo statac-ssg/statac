@@ -1775,6 +1775,32 @@ fn code_is_coloured_in_the_sites_style_and_a_language_it_lacks_is_told_at_its_wo
 }
 
 #[test]
+fn code_style_none_colours_nothing_tells_of_no_language_and_asks_for_no_stylesheet() {
+    let built = site(&[
+        ("statac.yaml", "title: Site\ncode_style: none\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\n\n```rust\nfn main() {}\n```\n\n~~~ cosole\n$ ls\n~~~\n",
+        ),
+        (
+            "templates/base.html",
+            "<head>{{ css(\"code.css\") }}</head>{% block main %}{% endblock %}\
+             <i>{{ \"let a\" | highlight(\"rust\") }}{{ \"b\" | highlight(\"cosole\") }}</i>",
+        ),
+        PAGE,
+    ]);
+    let rendered = built.render("post-1.md");
+    assert_eq!(built.told(&rendered.problems), []);
+    let html = rendered.html.unwrap();
+    assert!(html.contains("<head></head>"), "{html}");
+    assert!(html.contains("<code class=\"language-rust\">fn main() {}</code>"));
+    assert!(html.contains("<code class=\"language-cosole\">$ ls</code>"));
+    assert!(html.contains("<i>let ab</i>"), "{html}");
+    let style = built.renderer.name_id("code_style");
+    assert!(rendered.reads.keys().contains(&Key::Setting(style)));
+}
+
+#[test]
 fn a_fence_opening_with_a_files_name_is_coloured_by_it_where_its_ending_names_a_language() {
     let built = site(&[
         (

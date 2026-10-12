@@ -119,7 +119,7 @@ const SETTINGS: &[Setting] = &[
     setting("date_zeros", Shape::Truth, Some(Preset::Truth(true))),
     setting(
         "code_style",
-        Shape::OneOf(crate::highlight::NAMES),
+        Shape::OneOf(crate::highlight::SETTING),
         Some(Preset::Text("ocean")),
     ),
     setting("typography", Shape::Truth, Some(Preset::Truth(true))),

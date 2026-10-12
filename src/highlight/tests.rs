@@ -278,6 +278,9 @@ fn a_line_is_too_long_past_the_longest_counted_in_characters() {
 fn each_style_is_written_as_a_rule_to_a_kind_whose_colour_a_property_can_set() {
     let styles: Vec<&str> = styles::STYLES.iter().map(|style| style.name).collect();
     assert_eq!(styles, NAMES);
+    assert_eq!(SETTING, [NAMES, &[OFF]].concat());
+    assert!(Highlighter::new(OFF).is_none());
+    assert_eq!(stylesheet(OFF), None);
     for &name in NAMES {
         let css = stylesheet(name).unwrap_or_else(|| panic!("{name}"));
         assert!(css.contains(&format!("Code colours: {name},")), "{name}");

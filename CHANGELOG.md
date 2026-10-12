@@ -4,6 +4,14 @@ What changed in each release of Statac, the newest first.
 
 ## Unreleased
 
+### New
+
+- `code_style: none` turns the colouring of code off: code is published
+  as written with its language's class, no `code.css` is published,
+  `css("code.css")` writes nothing, and a language Statac has no colours
+  for is not warned of. For a site that colours code in the browser, or
+  wants it plain.
+
 ### Changed
 
 - Coloured code is marked with the kind of each piece, such as

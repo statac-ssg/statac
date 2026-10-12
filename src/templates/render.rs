@@ -1077,6 +1077,10 @@ fn code_languages(
     document: &markdown::Document,
     problems: &mut Vec<Problem>,
 ) -> Option<Place> {
+    if shared.highlighter.is_none() {
+        frame::read(Key::Setting(shared.name_id("code_style")));
+        return None;
+    }
     let mut coloured = None;
     let mut visit = |node: &markdown::Node| {
         let markdown::Kind::CodeBlock { info, text, .. } = &node.kind else {
@@ -1139,6 +1143,10 @@ pub(super) fn code_html(
     let Language::Known(name) = language else {
         return highlight::plain(text);
     };
+    if shared.highlighter.is_none() {
+        frame::read(Key::Setting(shared.name_id("code_style")));
+        return highlight::plain(text);
+    }
     if let Some(characters) = highlight::too_long(text) {
         let kind = Kind::CodeNotColoured {
             characters,
@@ -1154,6 +1162,12 @@ pub(super) fn code_html(
         Some(highlighter) => highlighter.html(name, text).as_ref().to_owned(),
         None => highlight::plain(text),
     }
+}
+
+/// Whether the site has `code_style: none`, recorded as read.
+pub(super) fn colouring_off(shared: &Shared) -> bool {
+    frame::read(Key::Setting(shared.name_id("code_style")));
+    shared.highlighter.is_none()
 }
 
 /// Where the first word after a code block's opening fence is written.

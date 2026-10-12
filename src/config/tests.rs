@@ -352,9 +352,16 @@ fn settings_of_the_wrong_kind_are_refused_at_the_value() {
         };
     let styles = || {
         Expected::OneOf(
-            ["ocean", "gruvbox", "solarized", "catppuccin", "one-half"]
-                .map(String::from)
-                .to_vec(),
+            [
+                "ocean",
+                "gruvbox",
+                "solarized",
+                "catppuccin",
+                "one-half",
+                "none",
+            ]
+            .map(String::from)
+            .to_vec(),
         )
     };
     let cases = [

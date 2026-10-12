@@ -73,6 +73,9 @@ fn highlighted(state: &State, value: &Value, word: &str) -> Value {
         super::explain::filter(&shared, state, "highlight", &text, Some(word))
             .or_else(|| frame::with(|frame| frame.calling).flatten())
     };
+    if super::render::colouring_off(&shared) {
+        return Value::from_safe_string(highlight::plain(&text));
+    }
     let language = match highlight::first_word(word).language() {
         Language::Unknown { nearest } => {
             let kind = Kind::UnknownCodeLanguage {
@@ -242,6 +245,13 @@ pub(super) fn install(env: &mut Environment<'_>) {
         check_function("css", &name)?;
         let shared = shared()?;
         let name = name.to_string();
+        // With no code coloured there is no stylesheet of colours to ask for.
+        if name == highlight::STYLESHEET
+            && shared.assets.id(&name).is_none()
+            && super::render::colouring_off(&shared)
+        {
+            return Ok(Value::from_safe_string(String::new()));
+        }
         let tag = frame::with(|f| shared.assets.css(&name, &mut f.reads))
             .unwrap_or_else(|| shared.assets.css(&name, &mut Default::default()));
         tag.map(Value::from_safe_string).map_err(frame::raise)
