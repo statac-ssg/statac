@@ -779,6 +779,7 @@ fn carry(last: &Last, now: Taken<'_>, plan: &Plan, own: &[u64]) -> Vec<Option<Bu
             cards: cards.collect::<Option<_>>()?,
             sized: old.sized,
             coloured: coloured.collect::<Option<_>>()?,
+            walked: old.walked,
             written: true,
         })
     };

@@ -85,6 +85,8 @@ pub(super) struct Frame {
     /// Whether what is built asked the page published where it is for its
     /// writing, whole or as its excerpt.
     pub shows_writing: bool,
+    /// How many pages of lists of the whole site what is built reached.
+    pub walked: u64,
 }
 
 /// What a frame is the build of.
@@ -159,6 +161,7 @@ impl Frame {
             running: Vec::new(),
             spent: false,
             shows_writing: false,
+            walked: 0,
         }
     }
 
@@ -215,6 +218,14 @@ pub(super) fn unrecorded<R>(f: impl FnOnce() -> R) -> R {
 pub(super) fn read(key: Key) {
     if !UNRECORDED.get() {
         with(|frame| frame.reads.read(key));
+    }
+}
+
+/// Notes that the output being built reached one more page of a list of
+/// the whole site, where it is the output's own doing.
+pub(super) fn walked() {
+    if !UNRECORDED.get() {
+        with(|frame| frame.walked += 1);
     }
 }
 

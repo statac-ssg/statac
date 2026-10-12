@@ -25,6 +25,7 @@ mod shows;
 #[cfg(test)]
 mod tests;
 mod values;
+mod walks;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
@@ -61,6 +62,9 @@ pub struct Templates {
     cards: card::Cards,
     /// How many of the engine's steps building one output may take.
     steps: u64,
+    /// How many pages of lists of the whole site the outputs running one
+    /// loop reach before it is noted.
+    many_walked: u64,
 }
 
 impl Templates {
@@ -269,6 +273,7 @@ pub fn read(
         extends,
         cards,
         steps,
+        many_walked: lowered_walked(root).unwrap_or(walks::MANY),
     };
     (templates, problems)
 }
@@ -286,6 +291,15 @@ fn lowered(_: &Path) -> Option<u64> {
 
 #[cfg(test)]
 use tests::lowered;
+
+/// What a test lowers [`walks::MANY`] to for the site at a root.
+#[cfg(not(test))]
+fn lowered_walked(_: &Path) -> Option<u64> {
+    None
+}
+
+#[cfg(test)]
+use tests::lowered_walked;
 
 /// How what a template prints is escaped, by the kind of file it writes:
 /// not at all for plain text, as JSON values for JSON, and as markup for

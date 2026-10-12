@@ -935,6 +935,12 @@ impl Object for Pages {
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let (id, number) = self.at(key.as_usize()?)?;
+        if !matches!(
+            self.which,
+            Which::Stretch(..) | Which::Pager(..) | Which::Groups(_)
+        ) {
+            frame::walked();
+        }
         Some(PageValue::numbered(&self.shared, id, number))
     }
 

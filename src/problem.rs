@@ -159,6 +159,7 @@ codes! {
     RedirectToItself "redirect-to-itself",
     WritingNotPublished "writing-not-published",
     SortedLast "sorted-last",
+    LoopOverEveryPage "loop-over-every-page",
     CallInHtml "call-in-html",
     MoreWrittenTwice "more-written-twice",
     UntitledPage "untitled-page",
@@ -295,6 +296,7 @@ impl Code {
             | Code::MissingWords
             | Code::LocationPublished
             | Code::RobotsBeneathPath
+            | Code::LoopOverEveryPage
             | Code::NewerStarter => Severity::Note,
             Code::OtherSpelling
             | Code::CantWrite
@@ -441,6 +443,7 @@ impl Code {
             | Code::NoStill
             | Code::WebmentionsOff
             | Code::MentionOfNoPage
+            | Code::LoopOverEveryPage
             | Code::NewerStarter => false,
             Code::OtherSpelling
             | Code::CantWrite
@@ -1160,6 +1163,18 @@ pub enum Kind {
         first: Named,
         /// The sort written to leave them out, where the template's text
         /// gives it.
+        instead: Option<String>,
+    },
+    /// A loop over a list of the whole site's pages that so many pages
+    /// run that the build went through pages past counting.
+    LoopOverEveryPage {
+        /// The list as the loop names it, where a template's text gives
+        /// the loop.
+        written: Option<String>,
+        /// How many pages were built running it.
+        pages: usize,
+        /// The list written to choose the pages the loop keeps, where the
+        /// loop says which in a way a filter can.
         instead: Option<String>,
     },
     /// The first snippet call built inside a page's HTML, by the snippet's
@@ -2473,6 +2488,7 @@ impl Kind {
             Kind::RedirectToItself { .. } | Kind::RedirectedBack { .. } => Code::RedirectToItself,
             Kind::WritingNotPublished { .. } => Code::WritingNotPublished,
             Kind::SortedLast { .. } => Code::SortedLast,
+            Kind::LoopOverEveryPage { .. } => Code::LoopOverEveryPage,
             Kind::CallInHtml { .. } => Code::CallInHtml,
             Kind::UntitledPage { .. } => Code::UntitledPage,
             Kind::MissingDefinition { .. } => Code::MissingDefinition,

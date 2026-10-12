@@ -706,6 +706,20 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::WritingNotPublished { path } => {
             format!("Writing not published: `{path}` sends readers on")
         }
+        Kind::LoopOverEveryPage { written, pages, .. } => {
+            let pages = match pages {
+                1 => "1 page".to_owned(),
+                pages => format!("{} pages", grouped(pages)),
+            };
+            match written {
+                Some(written) => {
+                    format!("Loop over every page: `{written}` is gone through on {pages}")
+                }
+                None => format!(
+                    "Loop over every page: {pages} each go through a list of the whole site"
+                ),
+            }
+        }
         Kind::SortedLast {
             field,
             count,
@@ -2337,6 +2351,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::SortedLast { instead, .. } => instead
             .as_ref()
             .map(|written| format!("Write `{written}` to leave out the items without it.")),
+        Kind::LoopOverEveryPage { instead, .. } => instead
+            .as_ref()
+            .map(|written| format!("Write `{written}` to choose the pages once for the site.")),
         Kind::CallInHtml { name } => Some(format!("To show it as text, write `\\@{name}`.")),
         Kind::UntitledPage { page, .. } => Some(match page {
             Named::ListPage(..) => "Add `title:` to `statac.yaml`; the home page is called by it.",
@@ -4818,6 +4835,27 @@ mod tests {
                     instead: None,
                 },
                 "Sorted last: 3 items have no `rank`, starting with item 2",
+                None,
+            ),
+            (
+                Kind::LoopOverEveryPage {
+                    written: Some("site.pages".into()),
+                    pages: 11243,
+                    instead: Some("site.pages | selectattr(\"menu\")".into()),
+                },
+                "Loop over every page: `site.pages` is gone through on 11,243 pages",
+                Some(
+                    "Write `site.pages | selectattr(\"menu\")` to choose the pages once for \
+                     the site.",
+                ),
+            ),
+            (
+                Kind::LoopOverEveryPage {
+                    written: None,
+                    pages: 4000,
+                    instead: None,
+                },
+                "Loop over every page: 4,000 pages each go through a list of the whole site",
                 None,
             ),
             (

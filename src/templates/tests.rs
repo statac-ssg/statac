@@ -73,6 +73,18 @@ pub(super) fn lowered(root: &Path) -> Option<u64> {
         .map(|&(_, steps)| steps)
 }
 
+/// The sites whose loops over every page are noted sooner than
+/// [`super::walks::MANY`], by their folders.
+static LOWERED_WALKED: Mutex<Vec<(PathBuf, u64)>> = Mutex::new(Vec::new());
+
+pub(super) fn lowered_walked(root: &Path) -> Option<u64> {
+    let lowered = LOWERED_WALKED.lock().unwrap();
+    lowered
+        .iter()
+        .find(|(at, _)| at == root)
+        .map(|&(_, many)| many)
+}
+
 /// A site written to a fresh folder, each of its outputs allowed `steps`.
 fn site_of_steps(steps: u64, files: &[(&str, &str)]) -> TempSite {
     let temp = TempSite::new(files);
@@ -4041,6 +4053,7 @@ mod lists;
 mod pieces;
 mod shows;
 mod translations;
+mod walks;
 
 /// `@url(...)` in a page's writing and in a value read as Markdown, and
 /// `url(...)` in a template, are each the address under the site's path,

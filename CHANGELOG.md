@@ -11,6 +11,11 @@ What changed in each release of Statac, the newest first.
   `css("code.css")` writes nothing, and a language Statac has no colours
   for is not warned of. For a site that colours code in the browser, or
   wants it plain.
+- A note, `loop-over-every-page`, where a template loops over a list of
+  the whole site's pages on so many pages that the build's work grows
+  with the square of the site. `check` shows the loop and, where the loop
+  keeps pages by a field, the filter to write in its place, which Statac
+  works out once for the site.
 
 ### Fixed
 

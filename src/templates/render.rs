@@ -292,6 +292,8 @@ pub struct Rendered {
     /// Where the first block of code coloured names its language, in each
     /// page's writing it shows whole.
     pub coloured: Vec<Place>,
+    /// How many pages of lists of the whole site it reached.
+    pub walked: u64,
 }
 
 impl Rendered {
@@ -325,6 +327,7 @@ impl Rendered {
             problems,
             developed: frame.developed,
             coloured: frame.coloured,
+            walked: frame.walked,
         }
     }
 }

@@ -438,6 +438,8 @@ pub(crate) struct Built {
     /// Where the first block of code coloured names its language, in each
     /// page's writing it shows whole.
     pub coloured: Vec<Place>,
+    /// How many pages of lists of the whole site it reached.
+    pub walked: u64,
     /// Whether the built site holds it.
     pub written: bool,
 }
@@ -884,6 +886,9 @@ pub(crate) fn conclude(
         problems.extend(renderer.assets().narrowed().cloned());
     }
     problems.extend(colours_not_loaded(renderer, built));
+    problems.extend(
+        renderer.loops_over_every_page(built.iter().map(|built| (built.walked, &built.reads))),
+    );
     // What a card's texts met may be what its page's layout met too.
     let of_cards: Vec<Problem> = renderer
         .cards_told(&cards)
@@ -1309,6 +1314,7 @@ pub(crate) fn build_output(
         cards: rendered.cards,
         sized,
         coloured: rendered.coloured,
+        walked: rendered.walked,
         written,
     }
 }
