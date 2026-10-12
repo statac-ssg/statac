@@ -23,6 +23,10 @@ Look at the place the caret points to. Common causes:
 
 - A quote or bracket that is opened and never closed. Close it within the
   same value.
+- A text in quotes that runs onto another line, where the later line
+  starts no deeper than the field the text belongs to. Start each later
+  line with at least the number of spaces the message gives, or put the
+  whole text on one line.
 - A tab used for indentation. YAML indents with spaces only.
 - Text after a closing quote. Put the whole value inside the quotes.
 - A backslash escape in double quotes that YAML doesn't recognise, such

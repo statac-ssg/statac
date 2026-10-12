@@ -248,12 +248,27 @@ impl<'a> Events<'a> {
                 .map_or(at, |c| at + c.len_utf8())
         };
         let (found, range) = match error.kind() {
-            ErrorKind::UnclosedQuotedScalar
-            | ErrorKind::InvalidQuotedScalarIndent
-            | ErrorKind::DocumentIndicatorInQuotedScalar => match self.opening_quote(at) {
-                Some((quote, start)) => (Malformed::UnclosedQuote(quote), start..start + 1),
+            ErrorKind::InvalidQuotedScalarIndent => match self.opening_quote(at) {
+                Some((quote, start)) => match self.shallow_line(quote, start, at) {
+                    Some(spaces) => {
+                        let back = at - start;
+                        let found = Malformed::ShallowLine {
+                            quote,
+                            back,
+                            spaces,
+                        };
+                        (found, one())
+                    }
+                    None => (Malformed::UnclosedQuote(quote), start..start + 1),
+                },
                 None => (Malformed::Indentation, one()),
             },
+            ErrorKind::UnclosedQuotedScalar | ErrorKind::DocumentIndicatorInQuotedScalar => {
+                match self.opening_quote(at) {
+                    Some((quote, start)) => (Malformed::UnclosedQuote(quote), start..start + 1),
+                    None => (Malformed::Indentation, one()),
+                }
+            }
             ErrorKind::UnknownQuotedScalarEscape
             | ErrorKind::InvalidQuotedScalarHexEscape
             | ErrorKind::InvalidLowSurrogateHexEscape
@@ -355,6 +370,41 @@ impl<'a> Events<'a> {
             i += 1;
         }
         None
+    }
+
+    /// Where the parser stopped at a line, at `at`, of the text in quotes
+    /// that opens with `quote` at `opens`: the spaces before each later
+    /// line that are enough for it to be taken as more of the text. None
+    /// where the text is more likely never closed: no quote closes it
+    /// after the line, or a line no deeper than the one it opens on reads
+    /// as a field or an item.
+    fn shallow_line(&self, quote: char, opens: usize, at: usize) -> Option<usize> {
+        let closes = closing_quote(self.text, quote, opens).filter(|closes| *closes >= at)?;
+        let first = self.text[..opens].rfind('\n').map_or(0, |n| n + 1);
+        // The line's own depth, with the `- ` of each list it opens.
+        let depth = self.text.as_bytes()[first..opens]
+            .iter()
+            .take_while(|c| matches!(c, b' ' | b'-'))
+            .count();
+        for line in self.text[opens..closes].split('\n').skip(1) {
+            let written = line.trim_start_matches(' ');
+            let spaces = line.len() - written.len();
+            if written.starts_with('\t') {
+                return None;
+            }
+            let written = written.trim_end_matches('\r');
+            if !written.is_empty() && spaces <= depth && !super::reads_as_text(written, spaces) {
+                return None;
+            }
+        }
+        // YAML asks a later line to be deeper than the field the text is
+        // the value of, which stands no deeper than this, and as deep as
+        // the `-` of an item that is the text alone.
+        let before = self.text[first..opens].trim_end_matches(' ');
+        Some(match before.ends_with('-') && before.len() <= depth {
+            true => before.len() - 1,
+            false => depth + 1,
+        })
     }
 
     /// The first escape YAML doesn't define in the double-quoted scalar
@@ -462,6 +512,44 @@ impl<'a> Events<'a> {
             }
         }
     }
+}
+
+/// The quote that closes the text in quotes opening with `quote` at
+/// `opens`: in single quotes `''` is a quote written, and in double
+/// quotes a backslash takes the next character with it.
+fn closing_quote(text: &str, quote: char, opens: usize) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut at = opens + 1;
+    loop {
+        match (quote, *bytes.get(at)?) {
+            ('"', b'\\') => at += 1,
+            ('\'', b'\'') if bytes.get(at + 1) == Some(&b'\'') => at += 1,
+            (_, c) if c == quote as u8 => return Some(at),
+            _ => {}
+        }
+        at += 1;
+    }
+}
+
+/// Where each line starts that stands no deeper than the line at `line`,
+/// from it to the end of the text in quotes that opens with `quote` at
+/// `opens`, lines with nothing on them aside: the line itself first.
+pub(super) fn shallow_lines(text: &str, quote: char, opens: usize, line: usize) -> Vec<usize> {
+    let Some(closes) = closing_quote(text, quote, opens) else {
+        return Vec::new();
+    };
+    let start = text[..line].rfind('\n').map_or(0, |n| n + 1);
+    let depth = line - start;
+    let mut lines = Vec::new();
+    let mut at = start;
+    for written in text[start..=closes.max(start)].split_inclusive('\n') {
+        let spaces = written.len() - written.trim_start_matches(' ').len();
+        if !written.trim().is_empty() && spaces <= depth {
+            lines.push(at);
+        }
+        at += written.len();
+    }
+    lines
 }
 
 impl Iterator for Events<'_> {

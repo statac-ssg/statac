@@ -1594,6 +1594,9 @@ fn json_fault(found: &JsonFault) -> String {
 fn malformed(found: &Malformed) -> String {
     match found {
         Malformed::UnclosedQuote(quote) => format!("`{quote}` is never closed"),
+        Malformed::ShallowLine { .. } => {
+            "a line of a text in quotes isn't indented far enough".into()
+        }
         Malformed::UnclosedBracket(open) => format!("`{open}` is never closed"),
         Malformed::MismatchedBracket { open, close } => {
             format!("`{open}` is closed by `{close}`")
@@ -1679,6 +1682,10 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Malformed::UnclosedQuote(quote) => {
                 Some(format!("End the value with another `{quote}`."))
             }
+            Malformed::ShallowLine { spaces, .. } => Some(format!(
+                "Start each later line of the text with at least {spaces} {}.",
+                if *spaces == 1 { "space" } else { "spaces" }
+            )),
             Malformed::UnclosedBracket(open) | Malformed::MismatchedBracket { open, .. } => {
                 Some(format!("Close it with `{}`.", closing(*open)))
             }
@@ -7836,6 +7843,24 @@ mod tests {
                 malformed(Malformed::UnclosedQuote('"')),
                 "Malformed YAML: `\"` is never closed",
                 Some("End the value with another `\"`."),
+            ),
+            (
+                malformed(Malformed::ShallowLine {
+                    quote: '"',
+                    back: 12,
+                    spaces: 2,
+                }),
+                "Malformed YAML: a line of a text in quotes isn't indented far enough",
+                Some("Start each later line of the text with at least 2 spaces."),
+            ),
+            (
+                malformed(Malformed::ShallowLine {
+                    quote: '\'',
+                    back: 12,
+                    spaces: 1,
+                }),
+                "Malformed YAML: a line of a text in quotes isn't indented far enough",
+                Some("Start each later line of the text with at least 1 space."),
             ),
             (
                 malformed(Malformed::UnclosedBracket('[')),

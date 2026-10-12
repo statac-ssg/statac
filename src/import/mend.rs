@@ -101,6 +101,14 @@ fn mend(front: &str, controls: bool) -> Option<(String, usize)> {
             }
             Err(stopped) => stopped?,
         };
+        // A text in quotes is deepened from its opening quote, wherever
+        // the reader stopped in it.
+        let (found, at) = match found {
+            Malformed::ShallowLine { quote, back, .. } => {
+                (Malformed::UnclosedQuote(quote), at.checked_sub(back)?)
+            }
+            found => (found, at),
+        };
         let index = index_at(&now, at)?;
         match found {
             Malformed::UnclosedQuote(quote) if now[index].1 == quote => {
@@ -252,7 +260,7 @@ fn deepened(
         if spaces <= depth {
             let line = now[start + spaces..].iter().map(|(_, c)| *c);
             let line: String = line.take_while(|c| !matches!(c, '\n' | '\r')).collect();
-            if !reads_as_text(&line, spaces) {
+            if !yaml::reads_as_text(&line, spaces) {
                 return None;
             }
         }
@@ -277,25 +285,6 @@ fn deepened(
         out.push(*written);
     }
     Some(out)
-}
-
-/// Whether a later line of a text in quotes, `line` after its `spaces`,
-/// standing no deeper than the line the text opens on, is surely more of
-/// the text: not a line that reads as a field or an item of a list, which
-/// a quote never closed would take in, nor the mark that ends a document.
-fn reads_as_text(line: &str, spaces: usize) -> bool {
-    let word = line.split(' ').next().unwrap_or(line);
-    if word == "-" || (spaces == 0 && matches!(word, "---" | "...")) {
-        return false;
-    }
-    let name = match line.split_once(": ") {
-        Some((name, _)) => name,
-        None => match line.trim_end().strip_suffix(':') {
-            Some(name) => name,
-            None => return true,
-        },
-    };
-    name.is_empty() || (name.contains(' ') && !name.starts_with(['"', '\'']))
 }
 
 fn placeholder(n: usize) -> String {
@@ -375,8 +364,9 @@ mod tests {
 
     #[test]
     fn a_text_in_quotes_with_shallow_lines_is_read_as_yaml_reads_it() {
-        // Statac's reader stops at the second line of each as written.
-        for (front, read) in [
+        // Each as written, where Statac's reader takes a line one space
+        // deep unaided, and with its later lines no deeper than the field.
+        let cases = [
             ("summary: 'One\n two'\n", "One two"),
             ("summary: \"One\n two\"\n", "One two"),
             ("summary: 'One\n\n two\n three'\n", "One\ntwo three"),
@@ -396,7 +386,10 @@ mod tests {
                 "summary: \"One\n\ntwo and: three\"\n",
                 "One\ntwo and: three",
             ),
-        ] {
+        ];
+        let shallower = cases.map(|(front, read)| (front.replace("\n ", "\n"), read));
+        let cases = cases.map(|(front, read)| (front.to_owned(), read));
+        for (front, read) in cases.into_iter().chain(shallower) {
             let file = format!(
                 "---\ntitle: Post 1\n{front}draft: true\npermalink: false\n---\nA 'body\n left' alone.\n"
             );
@@ -440,17 +433,17 @@ mod tests {
 
     #[test]
     fn a_front_matter_too_long_or_a_mend_too_large_changes_nothing() {
-        let mendable = |filler: &str| format!("---\n{filler}summary: 'One\n two'\n---\nBody.\n");
+        let mendable = |filler: &str| format!("---\n{filler}summary: 'One\ntwo'\n---\nBody.\n");
         let under = mendable(&format!("a: {}\n", "x".repeat(LONGEST - 100)));
         assert_ne!(mended(&under, false).text, under);
         let over = mendable(&format!("a: {}\n", "x".repeat(LONGEST)));
         assert_eq!(mended(&over, false).text, over);
-        // Each later line would take 40 spaces, and there are more such
+        // Each later line would take 43 spaces, and there are more such
         // lines than a fortieth of the front matter's length.
-        let lines = " b\n".repeat(200);
-        let wide = format!("---\n{}: 'One\n{lines} two'\n---\n", "k".repeat(40));
+        let lines = "bbbb\n".repeat(200);
+        let wide = format!("---\n{}: 'One\n{lines}two'\n---\n", "k".repeat(40));
         assert_eq!(mended(&wide, false).text, wide);
-        let narrow = format!("---\nk: 'One\n{lines} two'\n---\n");
+        let narrow = format!("---\nk: 'One\n{lines}two'\n---\n");
         assert_ne!(mended(&narrow, false).text, narrow);
     }
 

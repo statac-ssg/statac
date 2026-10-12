@@ -1008,3 +1008,184 @@ fn a_control_character_yaml_allows_nowhere_is_named_at_its_place() {
         assert_eq!(spelling, c.to_string());
     }
 }
+
+/// Shapes of a text in quotes on two lines, with `@` for the spaces
+/// before its second, and the fewest YAML takes there.
+const TWO_LINES: [(&str, usize); 14] = [
+    ("title: \"One\n@two\"\n", 1),
+    ("title: 'One\n@two'\n", 1),
+    ("book:\n  name: \"One\n@two\"\n", 3),
+    ("a:\n  b:\n    c: \"One\n@two\"\n", 5),
+    ("- \"One\n@two\"\n", 0),
+    ("tags:\n  - \"One\n@two\"\n", 2),
+    ("tags:\n- \"One\n@two\"\n", 0),
+    ("books:\n  - name: \"One\n@two\"\n", 5),
+    ("books:\n  - a: 1\n    name: \"One\n@two\"\n", 5),
+    ("- - \"One\n@two\"\n", 2),
+    ("title:\n  \"One\n@two\"\n", 1),
+    ("? a\n: \"One\n@two\"\n", 1),
+    ("title: !!str \"One\n@two\"\n", 1),
+    ("title: &a \"One\n@two\"\n", 1),
+];
+
+#[test]
+fn a_later_line_of_a_text_in_quotes_is_read_from_the_depth_yaml_takes() {
+    for (shape, fewest) in TWO_LINES {
+        for spaces in 0..fewest + 3 {
+            let text = shape.replace('@', &" ".repeat(spaces));
+            let read = read_yaml(&text).1;
+            assert_eq!(read.is_ok(), spaces >= fewest, "{text:?}");
+        }
+    }
+}
+
+#[test]
+fn a_text_read_with_a_shallow_line_is_placed_as_it_is_written() {
+    let text =
+        "title: \"One\n two\n\n three\"\nbook:\n  name: 'Four\n   five'\n  isbn: \"6\ntags: [a]\n";
+    let (sources, problem) = read_yaml(text);
+    // What follows the texts is placed where it is written.
+    let problem = problem.unwrap_err();
+    let place = problem.place.unwrap();
+    assert_eq!(
+        problem.kind,
+        Kind::MalformedYaml {
+            found: Malformed::UnclosedQuote('"')
+        }
+    );
+    assert_eq!(
+        (line_column(&sources, place), sources.spelling(place)),
+        ((8, 9), "\"")
+    );
+
+    let text = text.replace("\"6\n", "\"6\"\n");
+    let (sources, node) = read_yaml(&text);
+    let node = node.unwrap();
+    let spelt = |node: &Node| sources.spelling(node.place).to_owned();
+    let title = node.get("title").unwrap();
+    assert_eq!(title.value, Value::Scalar("One two\nthree".into()));
+    assert_eq!(spelt(title), "\"One\n two\n\n three\"");
+    let book = node.get("book").unwrap();
+    let name = book.get("name").unwrap();
+    assert_eq!(name.value, Value::Scalar("Four five".into()));
+    assert_eq!(spelt(name), "'Four\n   five'");
+    assert_eq!(spelt(book.get("isbn").unwrap()), "\"6\"");
+    assert_eq!(spelt(node.get("tags").unwrap()), "[a]");
+}
+
+#[test]
+fn a_text_in_quotes_of_very_many_shallow_lines_costs_no_more_than_its_length() {
+    let started = std::time::Instant::now();
+    // One text of 200,000 lines, each a space short for the reader.
+    let long = format!("title: \"One\n{} two\"\n", " b\n".repeat(200_000));
+    assert!(read_yaml(&long).1.is_ok());
+    // The same with each line a space short for YAML too.
+    let long = format!("title: \"One\n{}two\"\n", "b\n".repeat(200_000));
+    let (kind, at, _) = problem(&long);
+    assert!(
+        matches!(
+            kind,
+            Kind::MalformedYaml {
+                found: Malformed::ShallowLine { .. }
+            }
+        ),
+        "{kind:?}"
+    );
+    assert_eq!(at, (2, 1));
+    // More texts than are read again for, each on its own line: told at
+    // the first past what is read again.
+    let many: String = (0..40_000)
+        .map(|n| format!("a{n}: \"One\n two\"\n"))
+        .collect();
+    let (kind, at, _) = problem(&many);
+    let found = Malformed::ShallowLine {
+        quote: '"',
+        back: 6,
+        spaces: 1,
+    };
+    assert_eq!(kind, Kind::MalformedYaml { found });
+    assert!(at.0 > 2 && at.0 % 2 == 0 && at.1 == 2, "{at:?}");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(20),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn a_line_of_a_text_in_quotes_shallower_than_yaml_takes_is_told_with_the_spaces_that_mend_it() {
+    // The text, where the line is told, and the spaces offered.
+    let cases = [
+        ("title: \"One\ntwo\"\n", (2, 1), 1),
+        ("title: 'One\ntwo'\n", (2, 1), 1),
+        ("title: \"One\n two\nthree\"\n", (3, 1), 1),
+        ("title: \"One\nthree\n two\"\n", (2, 1), 1),
+        ("title: \"One \\\" two\nthree\"\n", (2, 1), 1),
+        ("title: 'One '' two\nthree'\n", (2, 1), 1),
+        ("book:\n  name: \"One\n  two\"\n", (3, 3), 3),
+        ("book:\n  name: \"One\n\n two\"\n", (4, 2), 3),
+        ("books:\n  - name: \"One\n    two\"\n", (3, 5), 5),
+        ("tags:\n  - \"One\n two\"\n", (3, 2), 2),
+        ("- - \"One\n two\"\n", (2, 2), 2),
+        ("title:\n  \"One\ntwo\"\n", (3, 1), 3),
+    ];
+    for (text, at, spaces) in cases {
+        let (kind, told_at, told) = problem(text);
+        let Kind::MalformedYaml {
+            found:
+                Malformed::ShallowLine {
+                    back,
+                    spaces: offered,
+                    ..
+                },
+        } = kind
+        else {
+            panic!("{text:?}: {kind:?}");
+        };
+        assert_eq!(
+            (told_at, told.as_str(), offered),
+            (at, "t", spaces),
+            "{text:?}"
+        );
+        // The quote opens `back` bytes before the line as written.
+        let line: usize = text.lines().take(at.0 - 1).map(|line| line.len() + 1).sum();
+        assert!(
+            matches!(&text[line + at.1 - 1 - back..], t if t.starts_with(['"', '\''])),
+            "{text:?}"
+        );
+        // The spaces offered, before each later line, are enough.
+        let opens = text
+            .lines()
+            .position(|line| line.contains(['"', '\'']))
+            .unwrap();
+        let mended: String = text
+            .lines()
+            .enumerate()
+            .map(|(n, line)| match n > opens && !line.is_empty() {
+                true => format!("{}{}\n", " ".repeat(spaces), line.trim_start()),
+                false => format!("{line}\n"),
+            })
+            .collect();
+        assert!(read_yaml(&mended).1.is_ok(), "{mended:?}");
+    }
+}
+
+#[test]
+fn a_text_in_quotes_that_takes_in_a_field_or_never_closes_is_told_as_never_closed() {
+    let cases = [
+        "title: \"One\nsummary: \"Two\"\n",
+        "title: \"One\n- two\"\n",
+        "book:\n  name: \"One\n  isbn: \"1\"\n",
+        "title: \"One\n two\n",
+        "title: \"One\n---\ntwo\"\n",
+    ];
+    for text in cases {
+        let (kind, at, _) = problem(text);
+        let wanted = Kind::MalformedYaml {
+            found: Malformed::UnclosedQuote('"'),
+        };
+        assert_eq!(kind, wanted, "{text:?}");
+        let line = text.lines().position(|line| line.contains('"')).unwrap() + 1;
+        assert_eq!(at.0, line, "{text:?}");
+    }
+}

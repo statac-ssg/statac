@@ -29,6 +29,15 @@ use crate::source::{Place, SourceId, Sources, Span};
 pub enum Malformed {
     /// Placed at the opening quote, not where the parser gave up.
     UnclosedQuote(char),
+    /// A later line of a text in quotes that does close, standing too far
+    /// left for the reader to take as more of the text. Placed at the
+    /// line: the quote opens `back` bytes before it, and `spaces` before
+    /// each later line are enough.
+    ShallowLine {
+        quote: char,
+        back: usize,
+        spaces: usize,
+    },
     UnclosedBracket(char),
     MismatchedBracket {
         open: char,
@@ -51,6 +60,25 @@ pub enum Malformed {
     Unexpected(String),
     /// A value tagged `!!binary` that isn't base64.
     NotBase64,
+}
+
+/// Whether a later line of a text in quotes, `line` after its `spaces`,
+/// standing no deeper than the line the text opens on, is surely more of
+/// the text: not a line that reads as a field or an item of a list, which
+/// a quote never closed would take in, nor the mark that ends a document.
+pub(crate) fn reads_as_text(line: &str, spaces: usize) -> bool {
+    let word = line.split(' ').next().unwrap_or(line);
+    if word == "-" || (spaces == 0 && matches!(word, "---" | "...")) {
+        return false;
+    }
+    let name = match line.split_once(": ") {
+        Some((name, _)) => name,
+        None => match line.trim_end().strip_suffix(':') {
+            Some(name) => name,
+            None => return true,
+        },
+    };
+    name.is_empty() || (name.contains(' ') && !name.starts_with(['"', '\'']))
 }
 
 /// Reads the whole of a source as one YAML document.

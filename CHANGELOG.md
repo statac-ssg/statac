@@ -12,6 +12,13 @@ What changed in each release of Statac, the newest first.
   for is not warned of. For a site that colours code in the browser, or
   wants it plain.
 
+### Fixed
+
+- A text in quotes in front matter, settings or data that runs onto a
+  line one space deeper than its field is read, as YAML reads it, where
+  it was refused as a quote never closed. A later line no deeper than
+  the field is told at that line, with the spaces that mend it.
+
 ### Changed
 
 - Coloured code is marked with the kind of each piece, such as
