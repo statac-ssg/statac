@@ -978,7 +978,7 @@ const HOME: &str = r##"<!doctype html>
   <title>Site 1</title>
   <meta name="description" content="This is the home page of a new site, the file content/index.md. Write here what the site is, in place of these words.">
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Site 1">
   <meta property="og:type" content="website">
@@ -1097,7 +1097,7 @@ const POST: &str = r##"<!doctype html>
   <title>First post - Site 1</title>
   <meta name="description" content="This is the site’s first post, the file content/posts/first-post/index.md. Its picture is photo-1.jpg, kept beside it and named by its cover: line, and what a reader who can’t see the picture is told in its place is in photo-1.jpg.yaml. Change them or remove them as you like.">
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="First post">
   <meta property="og:type" content="article">
@@ -1135,8 +1135,8 @@ const POST: &str = r##"<!doctype html>
         <p>In the file, a <code>&lt;!--more--&gt;</code> line stands above this paragraph and marks where the post’s opening ends: a list of posts shows the post as far as there, with a link to the rest. A post without the line is shown as far as the end of its first paragraph.</p>
         <p>To write the next post, add a file beside this folder in <code>content/posts/</code>, such as <code>second-post.md</code>, opening with its title and its date:</p>
         <pre class="code"><code class="language-yaml">---
-<span class="hl-52">title</span>: <span class="hl-32">Second post</span>
-<span class="hl-52">date</span>: <span class="hl-32">=today</span>
+<span class="hl-property">title</span><span class="hl-punctuation">:</span> <span class="hl-string">Second post</span>
+<span class="hl-property">date</span><span class="hl-punctuation">:</span> <span class="hl-string">=today</span>
 ---</code></pre>
         <p>Then write the post below that, in Markdown. <code>statac serve</code> puts the day in place of <code>=today</code> when you save. A post with a picture is a folder like this one, its writing in <code>index.md</code> and the picture beside it. A post in <code>content/posts/</code> is listed on the home page, the newest first.</p>
       </div>
@@ -1169,7 +1169,7 @@ const NOTES: &str = r##"<!doctype html>
   <title>Notes - Site 1</title>
   <meta name="description" content="Short notes, with or without a title, newest first.">
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Notes">
   <meta property="og:type" content="website">
@@ -1256,7 +1256,7 @@ const NOTE: &str = r##"<!doctype html>
   <title>6 Oct 2026, 09:12 - Site 1</title>
   <meta name="description" content="This is a note, the file content/notes/note-1.md: a few lines with a date and no title. Its front matter holds only the date.">
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="6 Oct 2026, 09:12">
   <meta property="og:type" content="article">
@@ -1316,7 +1316,7 @@ const PHOTOS: &str = r##"<!doctype html>
   <title>Photos - Site 1</title>
   <meta name="description" content="One photograph to a page, newest first.">
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Photos">
   <meta property="og:type" content="website">
@@ -1370,7 +1370,7 @@ const PHOTO: &str = r##"<!doctype html>
   <title>Photo 1 - Site 1</title>
   <meta name="description" content="This is a photograph’s page, the file content/photos/photo-1/index.md, with the picture beside it and named by its cover: line. Write about the picture here. To do without photographs, delete the folder content/photos/.">
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Photo 1">
   <meta property="og:type" content="article">
@@ -1428,7 +1428,7 @@ const TAG: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tag 1 - Site 1</title>
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Tag 1">
   <meta property="og:type" content="website">
@@ -1588,7 +1588,7 @@ const NOT_FOUND: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Page not found - Site 1</title>
   <link rel="stylesheet" href="/site.026cdd70.css">
-  <link rel="stylesheet" href="/code.40bf4c36.css">
+  <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta name="robots" content="noindex">
 </head>

@@ -1,24 +1,30 @@
 //! Code coloured as the site is built, and `code.css`, the colours it is
 //! shown in, written from the site's `code_style`.
 //!
-//! A style is a light theme and its dark twin, and the reader's own
-//! preference chooses between them. Each piece of code is given its look in
-//! both themes; each distinct look a stylesheet rule can show is one short
-//! class, every one carrying `hl-` so a site's own stylesheet never meets
-//! one by chance. Code in the ordinary look carries none. A theme's colour
-//! too faint to read on its background is written darker or lighter.
+//! Each piece of code a grammar tells apart is marked with the kind of thing
+//! it is, a comment or a keyword, by one class carrying `hl-` so a site's own
+//! stylesheet never meets one by chance; code of no kind carries none. The
+//! marking is the same in every style. A style is a light theme and its dark
+//! twin, giving each kind a colour in both, and the reader's own preference
+//! chooses between them. A theme's colour too faint to read on its
+//! background is written darker or lighter.
 //!
-//! The grammars, themes and looks are written by `cargo run --example
-//! grammars`, which says where they come from.
+//! The grammars and styles are written by `cargo run --example grammars`,
+//! which says where they come from.
 
 mod languages;
-mod looks;
+mod styles;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::rc::Rc;
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
-use giallo::{Color, FontStyle, HighlightOptions, Registry, Style, ThemeVariant};
+use ferriki_textmate::{
+    EncodedTokenAttributes, Grammar, GrammarConfiguration, RawGrammar, RawTheme, RawThemeScope,
+    RawThemeSetting, RawThemeStyle, SyncRegistry, parse_raw_grammar,
+};
 
 /// The name a template asks for the stylesheet by.
 pub const STYLESHEET: &str = "code.css";
@@ -27,6 +33,146 @@ pub const STYLESHEET: &str = "code.css";
 pub const NAMES: &[&str] = &["ocean", "gruvbox", "solarized", "catppuccin", "one-half"];
 
 const CLASS_PREFIX: &str = "hl-";
+
+/// The kinds of thing code is marked as, each the name of its class after
+/// `hl-` and of its property in `code.css` after `--code-`.
+pub const KINDS: [&str; 19] = [
+    "comment",
+    "keyword",
+    "string",
+    "number",
+    "constant",
+    "function",
+    "type",
+    "variable",
+    "property",
+    "tag",
+    "attribute",
+    "operator",
+    "punctuation",
+    "heading",
+    "emphasis",
+    "strong",
+    "link",
+    "inserted",
+    "deleted",
+];
+
+/// The kind of what a grammar gives each scope, as a theme's selectors: the
+/// innermost scope named decides, by its longest selector. None is code of
+/// no kind, for a scope that lies within a kind's and is none of it.
+const SCOPES: &[(&str, Option<&str>)] = &[
+    ("comment", Some("comment")),
+    ("punctuation.definition.comment", Some("comment")),
+    ("keyword", Some("keyword")),
+    ("punctuation.definition.keyword", Some("keyword")),
+    ("storage", Some("keyword")),
+    ("variable.language", Some("keyword")),
+    ("keyword.operator.alignas", Some("keyword")),
+    ("keyword.operator.alignof", Some("keyword")),
+    ("keyword.operator.cast", Some("keyword")),
+    ("keyword.operator.expression", Some("keyword")),
+    ("keyword.operator.instanceof", Some("keyword")),
+    ("keyword.operator.logical.python", Some("keyword")),
+    ("keyword.operator.new", Some("keyword")),
+    ("keyword.operator.noexcept", Some("keyword")),
+    ("keyword.operator.sizeof", Some("keyword")),
+    ("keyword.operator.typeid", Some("keyword")),
+    ("keyword.operator.word", Some("keyword")),
+    ("keyword.operator.wordlike", Some("keyword")),
+    ("string", Some("string")),
+    ("punctuation.definition.string", Some("string")),
+    ("punctuation.definition.char", Some("string")),
+    ("markup.inline.raw", Some("string")),
+    ("punctuation.definition.raw", Some("string")),
+    ("variable.parameter.url", Some("string")),
+    ("constant.numeric", Some("number")),
+    ("constant.numeric keyword.operator", Some("number")),
+    ("constant.numeric punctuation", Some("number")),
+    ("constant.numeric storage", Some("number")),
+    ("keyword.other.unit", Some("number")),
+    ("constant", Some("constant")),
+    ("constant.character.entity punctuation", Some("constant")),
+    ("punctuation.definition.constant", Some("constant")),
+    ("support.constant", Some("constant")),
+    ("variable.other.enummember", Some("constant")),
+    ("entity.name.function", Some("function")),
+    ("entity.name.command", Some("function")),
+    ("meta.function-call.generic", Some("function")),
+    ("support.function", Some("function")),
+    ("variable.function", Some("function")),
+    ("entity.name.type", Some("type")),
+    ("entity.name.class", Some("type")),
+    ("entity.name.module", Some("type")),
+    ("entity.name.namespace", Some("type")),
+    ("entity.other.inherited-class", Some("type")),
+    ("support.type", Some("type")),
+    ("support.class", Some("type")),
+    ("storage.type.built-in", Some("type")),
+    ("storage.type.primitive", Some("type")),
+    ("source.go storage.type", Some("type")),
+    ("source.java storage.type", Some("type")),
+    ("storage.modifier.import", Some("type")),
+    ("storage.modifier.package", Some("type")),
+    ("variable", Some("variable")),
+    ("entity.name.variable", Some("variable")),
+    ("punctuation.definition.variable", Some("variable")),
+    ("support.variable", Some("variable")),
+    ("variable.other.property", Some("property")),
+    ("variable.other.object.property", Some("property")),
+    ("variable.object.property", Some("property")),
+    ("variable.other.member", Some("property")),
+    ("variable.other.key", Some("property")),
+    ("support.type.property-name", Some("property")),
+    ("punctuation.support.type.property-name", Some("property")),
+    ("meta.property-name", Some("property")),
+    ("meta.object-literal.key", Some("property")),
+    ("meta.attribute.python", Some("property")),
+    ("entity.name.tag.yaml", Some("property")),
+    ("keyword.other.definition.ini", Some("property")),
+    ("entity.name.tag", Some("tag")),
+    ("entity.other.attribute-name", Some("attribute")),
+    (
+        "entity.other.attribute-name punctuation.definition.entity",
+        Some("attribute"),
+    ),
+    ("meta.attribute.rust", Some("attribute")),
+    ("storage.type.annotation", Some("attribute")),
+    ("punctuation.definition.annotation", Some("attribute")),
+    ("keyword.operator", Some("operator")),
+    ("storage.type.function.arrow", Some("operator")),
+    ("punctuation", Some("punctuation")),
+    ("meta.brace", Some("punctuation")),
+    (
+        "meta.link punctuation.definition.constant",
+        Some("punctuation"),
+    ),
+    ("markup.heading", Some("heading")),
+    ("punctuation.definition.heading", Some("heading")),
+    ("entity.name.section", Some("heading")),
+    ("meta.diff.header", Some("heading")),
+    ("meta.diff.header punctuation", Some("heading")),
+    ("meta.diff.range", Some("heading")),
+    ("meta.diff.range punctuation", Some("heading")),
+    ("markup.italic", Some("emphasis")),
+    ("punctuation.definition.italic", Some("emphasis")),
+    ("markup.bold", Some("strong")),
+    ("punctuation.definition.bold", Some("strong")),
+    ("markup.underline.link", Some("link")),
+    ("string.other.link", Some("link")),
+    (
+        "string.other.link punctuation.definition.string",
+        Some("link"),
+    ),
+    ("constant.other.reference.link", Some("link")),
+    ("markup.inserted", Some("inserted")),
+    ("punctuation.definition.inserted", Some("inserted")),
+    ("markup.deleted", Some("deleted")),
+    ("punctuation.definition.deleted", Some("deleted")),
+    ("meta.embedded", None),
+    ("meta.interpolation", None),
+    ("meta.template.expression", None),
+];
 
 /// The longest line, in characters, a block may hold and be coloured: the
 /// time colouring a line takes grows with the square of its length.
@@ -80,37 +226,97 @@ const NAMED_AS_THEIR_FILES: &[&str] = &[
 /// Endings of a file's name that no language is named by.
 const ENDINGS: &[(&str, &str)] = &[("h", "c"), ("hpp", "cpp"), ("cc", "cpp"), ("htm", "html")];
 
-/// A look as `looks.rs` writes it: its text colour, its background and its
-/// font style, as a theme writes them.
-struct Look(&'static str, &'static str, &'static str);
-
-/// A style's looks, as `looks.rs` writes them.
-struct Looks {
+/// A style as `styles.rs` writes it, each colour as its light theme gives
+/// it, then its dark.
+struct Style {
     name: &'static str,
-    /// The themes, by the names the registry holds them by.
-    light: &'static str,
-    dark: &'static str,
-    /// Text in neither theme's colour.
-    ordinary: [Look; 2],
-    /// Every other pair of looks code can be given.
-    pairs: &'static [[Look; 2]],
+    /// Text of no kind.
+    text: [&'static str; 2],
+    background: [&'static str; 2],
+    /// Each kind's colour and the font style the light theme gives it, in
+    /// the order of `KINDS`.
+    kinds: [([&'static str; 2], &'static str); KINDS.len()],
 }
 
-impl Look {
-    fn style(&self) -> Style {
-        let colour =
-            |hex| Color::from_hex(hex).expect("looks.rs writes colours the highlighter reads");
-        Style {
-            foreground: colour(self.0),
-            background: colour(self.1),
-            font_style: FontStyle::from_theme_str(self.2),
-        }
+/// A grammar as `grammars.bin` holds it.
+struct Held {
+    scope: &'static str,
+    /// Its JSON, deflated.
+    deflated: &'static [u8],
+    /// The grammars that add rules of their own to it.
+    injectors: Vec<usize>,
+    /// The grammars it can't be read without: those it and they include,
+    /// and those that add to any of them.
+    needs: Vec<usize>,
+    raw: OnceLock<Option<RawGrammar>>,
+}
+
+impl Held {
+    /// The grammar read, once for every thread; none for one that can't be.
+    fn raw(&self) -> Option<&RawGrammar> {
+        let read = || {
+            let json = miniz_oxide::inflate::decompress_to_vec(self.deflated).ok()?;
+            parse_raw_grammar(std::str::from_utf8(&json).ok()?, Some("grammar.json")).ok()
+        };
+        self.raw.get_or_init(read).as_ref()
     }
 }
 
-/// Every grammar and theme, read once for the whole process.
-static REGISTRY: LazyLock<Registry> = LazyLock::new(|| {
-    Registry::load(include_bytes!("registry.zst")).expect("the registry Statac carries")
+/// Every grammar carried, and every name of one in order, with its
+/// grammar's place.
+struct Carried {
+    grammars: Vec<Held>,
+    names: Vec<(&'static str, usize)>,
+}
+
+/// What is left of `grammars.bin` to read: numbers of four bytes, the
+/// lowest first, and texts, each after its length.
+struct Unread(&'static [u8]);
+
+impl Unread {
+    fn bytes(&mut self, length: usize) -> &'static [u8] {
+        let (bytes, rest) = self.0.split_at(length);
+        self.0 = rest;
+        bytes
+    }
+
+    fn number(&mut self) -> usize {
+        let bytes = self.bytes(4).try_into().expect("four bytes");
+        u32::from_le_bytes(bytes) as usize
+    }
+
+    fn numbers(&mut self) -> Vec<usize> {
+        (0..self.number()).map(|_| self.number()).collect()
+    }
+
+    fn text(&mut self) -> &'static str {
+        let length = self.number();
+        std::str::from_utf8(self.bytes(length)).expect("a name the generator wrote")
+    }
+}
+
+static CARRIED: LazyLock<Carried> = LazyLock::new(|| {
+    let mut unread = Unread(include_bytes!("grammars.bin"));
+    let listed: Vec<_> = (0..unread.number())
+        .map(|_| {
+            let scope = unread.text();
+            (scope, unread.number(), unread.numbers(), unread.numbers())
+        })
+        .collect();
+    let names = (0..unread.number())
+        .map(|_| (unread.text(), unread.number()))
+        .collect();
+    let grammars = listed
+        .into_iter()
+        .map(|(scope, length, injectors, needs)| Held {
+            scope,
+            deflated: unread.bytes(length),
+            injectors,
+            needs,
+            raw: OnceLock::new(),
+        })
+        .collect();
+    Carried { grammars, names }
 });
 
 /// What a fence's first word names.
@@ -118,7 +324,7 @@ static REGISTRY: LazyLock<Registry> = LazyLock::new(|| {
 pub enum Language {
     /// Code shown as it is, as asked.
     Plain,
-    /// A grammar, by a name the registry knows it by.
+    /// A grammar, by a name of it Statac carries.
     Known(&'static str),
     /// A word no grammar is known by, with the nearest that is, where one
     /// is near.
@@ -245,143 +451,152 @@ pub fn too_long(code: &str) -> Option<usize> {
     (longest > LONGEST_LINE).then_some(longest)
 }
 
-/// A style's classes: each pair of looks code can be given, by the class
-/// standing for how a stylesheet shows it, or none where it is shown as
-/// ordinary text.
-struct Classes {
-    looks: &'static Looks,
-    ordinary: [Style; 2],
-    of: HashMap<[Style; 2], Option<usize>>,
-    /// Each class's declarations, in the order the classes are numbered.
-    rules: Vec<String>,
+/// The colour that stands for a kind, or for none, in the theme the
+/// grammars are read with.
+fn stand_in(kind: Option<usize>) -> String {
+    format!("#{:06x}", kind.map_or(0, |kind| kind + 1))
 }
 
-impl Classes {
-    fn new(looks: &'static Looks) -> Classes {
-        let ordinary = [looks.ordinary[0].style(), looks.ordinary[1].style()];
-        let mut of = HashMap::new();
-        let mut rules: Vec<String> = Vec::new();
-        for pair in looks.pairs {
-            let pair = [pair[0].style(), pair[1].style()];
-            let declarations = declarations(&pair, &ordinary);
-            let class = (!declarations.is_empty()).then(|| {
-                rules
-                    .iter()
-                    .position(|rule| *rule == declarations)
-                    .unwrap_or_else(|| {
-                        rules.push(declarations);
-                        rules.len() - 1
-                    })
-            });
-            of.insert(pair, class);
+/// A theme whose colours are kinds, so a token's colour is its kind, chosen
+/// among `SCOPES` as a theme's rules are.
+fn kinds_as_a_theme() -> RawTheme {
+    let rule = |scope: Option<&str>, kind: Option<usize>| {
+        let mut style = RawThemeStyle::default();
+        style.foreground = Some(stand_in(kind));
+        let mut rule = RawThemeSetting::default();
+        rule.scope = scope.map(|scope| RawThemeScope::String(scope.to_owned()));
+        rule.settings = Some(style);
+        rule
+    };
+    let rules = SCOPES.iter().map(|(scope, kind)| {
+        let kind = kind.map(|kind| {
+            let at = KINDS.iter().position(|known| *known == kind);
+            at.expect("a kind there is")
+        });
+        rule(Some(scope), kind)
+    });
+    let mut theme = RawTheme::default();
+    theme.settings = std::iter::once(rule(None, None)).chain(rules).collect();
+    theme
+}
+
+/// One language's grammar, ready to read code.
+struct Tokeniser {
+    grammar: Rc<Grammar>,
+    /// The kind each of the theme's colours stands for, by the colour's
+    /// number.
+    kinds: Vec<Option<usize>>,
+}
+
+impl Tokeniser {
+    /// None where the grammar or one it needs can't be read.
+    fn new(at: usize) -> Option<Tokeniser> {
+        let carried = &*CARRIED;
+        let held = &carried.grammars[at];
+        let mut registry = SyncRegistry::new(Some(kinds_as_a_theme()), None).ok()?;
+        for &at in std::iter::once(&at).chain(&held.needs) {
+            let grammar = &carried.grammars[at];
+            let injectors = grammar.injectors.iter();
+            let injectors = injectors.map(|&at| carried.grammars[at].scope.to_owned());
+            registry.add_grammar(grammar.raw()?.clone(), injectors.collect());
         }
-        Classes {
-            looks,
-            ordinary,
-            of,
-            rules,
-        }
+        let grammar = registry
+            // A prefilter costs more to make than it saves over one build's
+            // code.
+            .grammar_for_scope_name(
+                held.scope,
+                GrammarConfiguration::default().with_regex_prefilter(false),
+            )
+            .ok()??;
+        let kinds = grammar.color_map().into_iter().map(|colour| {
+            let kind = usize::from_str_radix(colour.strip_prefix('#')?, 16).ok()?;
+            kind.checked_sub(1).filter(|kind| *kind < KINDS.len())
+        });
+        Some(Tokeniser {
+            kinds: kinds.collect(),
+            grammar,
+        })
     }
 
-    fn class(&self, pair: [Style; 2]) -> Option<usize> {
-        if pair == self.ordinary {
-            return None;
+    /// Writes `code` with each piece of a kind in its class; none where
+    /// the grammar fails on it.
+    fn colour(&self, code: &str, out: &mut String) -> Option<()> {
+        let mut state = None;
+        for (number, line) in code.split('\n').enumerate() {
+            if number > 0 {
+                out.push('\n');
+            }
+            let read = self.grammar.tokenize_line2(line, state.take(), 0).ok()?;
+            // Each token is where it starts, counted in UTF-16 units, and
+            // what it is.
+            let (tokens, _) = read.tokens.as_chunks::<2>();
+            let ends = tokens.iter().skip(1).map(|[start, _]| *start as usize);
+            let mut rest = line;
+            let mut units = 0;
+            let mut open: Option<usize> = None;
+            for (&[_, what], end) in tokens.iter().zip(ends.chain([usize::MAX])) {
+                let mut length = 0;
+                for c in rest.chars() {
+                    if units >= end {
+                        break;
+                    }
+                    units += c.len_utf16();
+                    length += c.len_utf8();
+                }
+                let (text, after) = rest.split_at(length);
+                rest = after;
+                if text.is_empty() {
+                    continue;
+                }
+                let colour = EncodedTokenAttributes::new(what).foreground() as usize;
+                let kind = self.kinds.get(colour).copied().flatten();
+                if kind != open {
+                    if open.is_some() {
+                        out.push_str("</span>");
+                    }
+                    if let Some(kind) = kind {
+                        write!(out, "<span class=\"{CLASS_PREFIX}{}\">", KINDS[kind]).unwrap();
+                    }
+                    open = kind;
+                }
+                escape(text, out);
+            }
+            if open.is_some() {
+                out.push_str("</span>");
+            }
+            state = Some(read.rule_stack);
         }
-        let class = self.of.get(&pair);
-        debug_assert!(class.is_some(), "a pair of looks looks.rs doesn't list");
-        class.copied().flatten()
+        Some(())
     }
 }
 
-static CLASSES: LazyLock<Vec<Classes>> =
-    LazyLock::new(|| looks::LOOKS.iter().map(Classes::new).collect());
-
-fn classes(code_style: &str) -> Option<&'static Classes> {
-    CLASSES
-        .iter()
-        .find(|classes| classes.looks.name == code_style)
+thread_local! {
+    /// Each language asked for on this thread, by its grammar's place. A
+    /// tokeniser can't leave its thread, and adding a grammar to one makes
+    /// it read all it holds again, so each language has its own.
+    static TOKENISERS: RefCell<HashMap<usize, Option<Rc<Tokeniser>>>> =
+        RefCell::new(HashMap::new());
 }
 
-/// What a stylesheet says to show a pair of looks, beside the ordinary
-/// look. Bold and italic are the same in both looks, the light theme's.
-fn declarations(pair: &[Style; 2], ordinary: &[Style; 2]) -> String {
-    let mut out = String::new();
-    let [light, dark] = pair;
-    let text = |style: &Style| legible(style.foreground, style.background);
-    if text(light) != text(&ordinary[0]) || text(dark) != text(&ordinary[1]) {
-        write!(out, " color: {};", both(text(light), text(dark))).unwrap();
-    }
-    if light.background != ordinary[0].background || dark.background != ordinary[1].background {
-        write!(
-            out,
-            " background-color: {};",
-            both(light.background, dark.background)
-        )
-        .unwrap();
-    }
-    let font = light.font_style;
-    let usual = ordinary[0].font_style;
-    let differs = |bit| font.contains(bit) != usual.contains(bit);
-    if differs(FontStyle::BOLD) {
-        let weight = if font.contains(FontStyle::BOLD) {
-            "bold"
-        } else {
-            "normal"
-        };
-        write!(out, " font-weight: {weight};").unwrap();
-    }
-    if differs(FontStyle::ITALIC) {
-        let style = if font.contains(FontStyle::ITALIC) {
-            "italic"
-        } else {
-            "normal"
-        };
-        write!(out, " font-style: {style};").unwrap();
-    }
-    if differs(FontStyle::UNDERLINE) || differs(FontStyle::STRIKETHROUGH) {
-        let lines: Vec<&str> = [
-            (FontStyle::UNDERLINE, "underline"),
-            (FontStyle::STRIKETHROUGH, "line-through"),
-        ]
-        .into_iter()
-        .filter(|(bit, _)| font.contains(*bit))
-        .map(|(_, word)| word)
-        .collect();
-        let lines = if lines.is_empty() {
-            "none".to_owned()
-        } else {
-            lines.join(" ")
-        };
-        write!(out, " text-decoration: {lines};").unwrap();
-    }
-    out
-}
-
-/// A class's name: short, and the same for the same look in every build.
-fn class_name(class: usize) -> String {
-    const DIGITS: &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
-    let mut digits = Vec::new();
-    let mut rest = class;
-    loop {
-        digits.push(DIGITS[rest % 36]);
-        rest /= 36;
-        if rest == 0 {
-            break;
-        }
-    }
-    digits.reverse();
-    format!(
-        "{CLASS_PREFIX}{}",
-        String::from_utf8(digits).expect("ASCII")
-    )
+fn tokeniser(language: &str) -> Option<Rc<Tokeniser>> {
+    let names = &CARRIED.names;
+    let at = names
+        .binary_search_by_key(&language, |(name, _)| name)
+        .ok()?;
+    let at = names[at].1;
+    TOKENISERS.with_borrow_mut(|held| {
+        let tokeniser = held.entry(at);
+        tokeniser
+            .or_insert_with(|| Tokeniser::new(at).map(Rc::new))
+            .clone()
+    })
 }
 
 /// Blocks of code coloured, by their language and their code.
 type Done = HashMap<(&'static str, Box<str>), Arc<str>>;
 
-/// Colours code in one site's style.
+/// Colours code. The same code is coloured the same in every style.
 pub struct Highlighter {
-    classes: &'static Classes,
     /// Each block once coloured, so a block written twice is coloured once.
     done: Mutex<Done>,
 }
@@ -390,8 +605,7 @@ impl Highlighter {
     /// None for a name `code_style` doesn't take, which the setting has
     /// already refused.
     pub fn new(code_style: &str) -> Option<Highlighter> {
-        Some(Highlighter {
-            classes: classes(code_style)?,
+        NAMES.contains(&code_style).then(|| Highlighter {
             done: Mutex::new(HashMap::new()),
         })
     }
@@ -402,55 +616,20 @@ impl Highlighter {
         if let Some(done) = self.done.lock().expect("never poisoned").get(&key) {
             return Arc::clone(done);
         }
-        let html: Arc<str> = self.coloured(language, code).into();
+        let html: Arc<str> = coloured(language, code).into();
         let mut done = self.done.lock().expect("never poisoned");
         Arc::clone(done.entry(key).or_insert(html))
     }
+}
 
-    fn coloured(&self, language: &str, code: &str) -> String {
-        let looks = self.classes.looks;
-        let options = HighlightOptions::new(
-            language,
-            ThemeVariant::Dual {
-                light: looks.light,
-                dark: looks.dark,
-            },
-        )
-        .merge_whitespace(false);
-        let mut out = String::with_capacity(code.len() * 2);
-        let Ok(highlighted) = REGISTRY.highlight(code, &options) else {
-            escape(code, &mut out);
-            return out;
-        };
-        for (number, line) in highlighted.tokens.iter().enumerate() {
-            if number > 0 {
-                out.push('\n');
-            }
-            let mut open: Option<usize> = None;
-            for token in line {
-                let class = match token.style {
-                    ThemeVariant::Dual { light, dark } => self.classes.class([light, dark]),
-                    ThemeVariant::Single(_) => None,
-                };
-                if class != open {
-                    if open.is_some() {
-                        out.push_str("</span>");
-                    }
-                    if let Some(class) = class {
-                        out.push_str("<span class=\"");
-                        out.push_str(&class_name(class));
-                        out.push_str("\">");
-                    }
-                    open = class;
-                }
-                escape(&token.text, &mut out);
-            }
-            if open.is_some() {
-                out.push_str("</span>");
-            }
-        }
-        out
+fn coloured(language: &str, code: &str) -> String {
+    let mut out = String::with_capacity(code.len() * 2);
+    let done = tokeniser(language).and_then(|tokeniser| tokeniser.colour(code, &mut out));
+    if done.is_none() {
+        out.clear();
+        escape(code, &mut out);
     }
+    out
 }
 
 /// The inside of a `<code>` holding `code` as it is, without colour.
@@ -479,12 +658,29 @@ fn escape(text: &str, out: &mut String) {
 /// The stylesheet for the style `code_style` names; none for a name that
 /// isn't one, which the setting has already refused.
 pub fn stylesheet(code_style: &str) -> Option<String> {
-    let classes = classes(code_style)?;
-    let [light, dark] = classes.ordinary;
+    let style = styles::STYLES
+        .iter()
+        .find(|style| style.name == code_style)?;
+    let background = style.background.map(colour);
+    let text = style.text.map(colour);
+    // Some themes carry a half-transparent text colour, which a terminal
+    // ignores and a page does not: left alone it washes out every block.
+    let shown = |colours: [Colour; 2]| {
+        let [light, dark] = [0, 1].map(|side| {
+            let colour = match colours[side] == text[side] {
+                true => opaque(colours[side]),
+                false => colours[side],
+            };
+            legible(colour, background[side])
+        });
+        both(light, dark)
+    };
     let mut out = format!(
-        "/* Code colours: {}, light and dark. Statac writes this file; to change it,\n   \
-         set `code_style` in {}. */\n\n",
-        classes.looks.name,
+        "/* Code colours: {}, light and dark. Statac writes this file; to change the\n   \
+         style, set `code_style` in {}. To change one colour, set its property,\n   \
+         `--code-comment` for a comment's, in a stylesheet of your own, on `.code`\n   \
+         or on anything around it. */\n\n",
+        style.name,
         crate::config::FILE_NAME
     );
     // A custom property is inherited, so the nearest `data-theme` above the
@@ -494,28 +690,75 @@ pub fn stylesheet(code_style: &str) -> Option<String> {
         "[data-theme=\"light\"] { --statac-code-scheme: light; }\n\
          [data-theme=\"dark\"] { --statac-code-scheme: dark; }\n\n",
     );
-    // Some themes carry a half-transparent text colour, which a terminal
-    // ignores and a page does not: left alone it washes out every block.
     writeln!(
         out,
-        ".code {{\n  color-scheme: var(--statac-code-scheme, light dark);\n  color: {};\n  \
-         background-color: {};\n}}\n",
-        both(
-            legible(opaque(light.foreground), light.background),
-            legible(opaque(dark.foreground), dark.background)
-        ),
-        both(light.background, dark.background)
+        ".code {{\n  color-scheme: var(--statac-code-scheme, light dark);\n  \
+         color: var(--code-text, {});\n  \
+         background-color: var(--code-background, {});\n}}\n",
+        shown(text),
+        both(background[0], background[1])
     )
     .unwrap();
-    for (class, declarations) in classes.rules.iter().enumerate() {
-        writeln!(out, ".{} {{{declarations} }}", class_name(class)).unwrap();
+    for (kind, (colours, font)) in KINDS.iter().zip(&style.kinds) {
+        write!(
+            out,
+            ".{CLASS_PREFIX}{kind} {{ color: var(--code-{kind}, {});",
+            shown(colours.map(colour))
+        )
+        .unwrap();
+        for word in font.split_whitespace() {
+            out.push_str(match word {
+                "bold" => " font-weight: bold;",
+                "italic" => " font-style: italic;",
+                "underline" => " text-decoration: underline;",
+                _ => " text-decoration: line-through;",
+            });
+        }
+        out.push_str(" }\n");
     }
     Some(out)
 }
 
+/// A colour's red, green and blue, and how far from transparent it is.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+struct Colour([u8; 4]);
+
+impl Colour {
+    /// A colour written as `#rrggbb` or `#rrggbbaa`.
+    fn from_hex(hex: &str) -> Option<Colour> {
+        let digits = hex.strip_prefix('#')?;
+        if !matches!(digits.len(), 6 | 8) || !digits.is_ascii() {
+            return None;
+        }
+        let part = |at: usize| match digits.get(at * 2..at * 2 + 2) {
+            Some(part) => u8::from_str_radix(part, 16).ok(),
+            None => Some(255),
+        };
+        Some(Colour([part(0)?, part(1)?, part(2)?, part(3)?]))
+    }
+
+    fn hex(self) -> String {
+        let [r, g, b, a] = self.0;
+        match a {
+            255 => format!("#{r:02x}{g:02x}{b:02x}"),
+            _ => format!("#{r:02x}{g:02x}{b:02x}{a:02x}"),
+        }
+    }
+
+    /// Its red, green and blue; none where it is part transparent.
+    fn solid(self) -> Option<[u8; 3]> {
+        let [r, g, b, a] = self.0;
+        (a == 255).then_some([r, g, b])
+    }
+}
+
+fn colour(hex: &str) -> Colour {
+    Colour::from_hex(hex).expect("styles.rs writes colours")
+}
+
 /// A colour written so the reader's preference chooses it.
-fn both(light: Color, dark: Color) -> String {
-    let (light, dark) = (hex(light), hex(dark));
+fn both(light: Colour, dark: Colour) -> String {
+    let (light, dark) = (light.hex(), dark.hex());
     if light == dark {
         light
     } else {
@@ -523,25 +766,9 @@ fn both(light: Color, dark: Color) -> String {
     }
 }
 
-fn hex(colour: Color) -> String {
-    colour.as_hex().to_lowercase()
-}
-
 /// The least contrast text has with what it stands on, as WCAG asks of
 /// text of an ordinary size.
 const LEGIBLE: f64 = 4.5;
-
-/// A colour's red, green and blue; none where it is part transparent.
-fn solid(colour: Color) -> Option<[u8; 3]> {
-    let hex = hex(colour);
-    if hex.len() != 7 {
-        return None;
-    }
-    let part = |at: usize| {
-        u8::from_str_radix(&hex[at..at + 2], 16).expect("a colour the highlighter wrote")
-    };
-    Some([part(1), part(3), part(5)])
-}
 
 /// How far apart two colours are in lightness, from 1 to 21, as WCAG
 /// reckons it.
@@ -564,8 +791,8 @@ fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
 /// `text` as it is where it can be read on `on`, and otherwise moved
 /// towards black or white, whichever stands further from `on`, by the
 /// least that makes it so. A part-transparent colour is left alone.
-fn legible(text: Color, on: Color) -> Color {
-    let (Some(from), Some(on)) = (solid(text), solid(on)) else {
+fn legible(text: Colour, on: Colour) -> Colour {
+    let (Some(from), Some(on)) = (text.solid(), on.solid()) else {
         return text;
     };
     if contrast(from, on) >= LEGIBLE {
@@ -587,12 +814,12 @@ fn legible(text: Color, on: Color) -> Color {
         .map(moved)
         .find(|colour| contrast(*colour, on) >= LEGIBLE)
         .unwrap_or(towards);
-    Color::from_hex(&format!("#{r:02x}{g:02x}{b:02x}")).expect("a colour written here")
+    Colour([r, g, b, 255])
 }
 
-fn opaque(colour: Color) -> Color {
-    let hex = hex(colour);
-    Color::from_hex(&hex[..7]).expect("a colour the highlighter wrote")
+fn opaque(colour: Colour) -> Colour {
+    let [r, g, b, _] = colour.0;
+    Colour([r, g, b, 255])
 }
 
 #[cfg(test)]

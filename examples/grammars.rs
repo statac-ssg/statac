@@ -1,8 +1,8 @@
 //! Writes what Statac colours code with, from the grammars of npm's
 //! `tm-grammars` package and the themes in `src/highlight/themes/`.
 //!
-//! The registry checked in was built from `tm-grammars` 1.32.22, the
-//! version [`PACKAGE`] names. To build it again, fetch and unpack that
+//! The grammars checked in were taken from `tm-grammars` 1.32.22, the
+//! version [`PACKAGE`] names. To take them again, fetch and unpack that
 //! version and hand the generator its folder:
 //!
 //! ```text
@@ -14,15 +14,19 @@
 //! The themes are kept in the repository, each with its source, version or
 //! commit, and licence in [`THEME_SOURCES`].
 //!
-//! - `src/highlight/registry.zst`: the grammars and themes the binary
-//!   carries. A grammar is carried only under a licence that lets it ship
-//!   inside a permissively licensed binary. Its bytes differ from one run
-//!   to the next, as giallo writes its themes from hash maps, in no fixed
-//!   order; what it holds does not.
+//! - `src/highlight/grammars.bin`: the grammars the binary carries, the same
+//!   bytes on every run. A grammar is carried only under a licence that lets
+//!   it ship inside a permissively licensed binary. Each is its JSON without
+//!   the space between its parts, deflated on its own, so a build reads only
+//!   the grammars its code is in. Before them the file lists, for each, its
+//!   scope, its deflated length, the grammars that add rules to it and the
+//!   grammars it can't be read without; then every name and alias in order,
+//!   with its grammar. A number is four bytes, the lowest first, and a text
+//!   follows its length.
 //! - `src/highlight/languages.rs`: every name and alias a fence can use.
-//! - `src/highlight/looks.rs`: for each style, every pair of looks, light
-//!   and dark, a piece of code can be given. The tests fail while it
-//!   differs from what the themes give.
+//! - `src/highlight/styles.rs`: for each style, the colour its light theme
+//!   and its dark give each kind of code, ordinary text and the background.
+//!   The tests fail while it differs from what the themes give.
 //! - `src/highlight/licences.md`: every grammar and theme carried, with its
 //!   licence and source.
 //! - `THIRD-PARTY-GRAMMARS.md`: the same list, each with the notice it asks
@@ -31,15 +35,18 @@
 //!   the one `src/highlight/notices-read-at-source.txt` holds. The tests
 //!   fail while a grammar or theme carried has no notice there.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use giallo::{
-    Color, FontStyle, HighlightOptions, PLAIN_GRAMMAR_NAME, Registry, Style, ThemeVariant,
+use ferriki_textmate::{
+    EncodedTokenAttributes, FontStyle, GrammarConfiguration, RawTheme, RawThemeScope,
+    RawThemeSetting, RawThemeStyle, SyncRegistry, parse_raw_grammar,
 };
+use statac::highlight::KINDS;
 use statac::source::Sources;
 use statac::yaml::{Node, Resolved, Value};
+
 /// A style `code_style` names: its light theme and its dark twin, by their
 /// files in `src/highlight/themes/`.
 pub struct Pair {
@@ -76,7 +83,7 @@ pub const STYLES: &[Pair] = &[
     },
 ];
 
-/// The version of `tm-grammars` the registry is built from. A new one is
+/// The version of `tm-grammars` the grammars are taken from. A new one is
 /// a change to this line, so the documentation above stays true.
 pub const PACKAGE: &str = "1.32.22";
 
@@ -234,29 +241,14 @@ fn main() {
         }
     }
 
-    let mut registry = Registry::default();
     let mut languages = Vec::new();
     for (grammar, _, _) in &carried {
-        let path = package
-            .join("grammars")
-            .join(format!("{}.json", grammar.name));
-        registry
-            .add_grammar_from_path(&path)
-            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
-        assert!(registry.contains_grammar(&grammar.name), "{}", grammar.name);
         languages.push(grammar.name.to_lowercase());
-        for alias in &grammar.aliases {
-            registry.add_alias(&grammar.name, alias);
-            languages.push(alias.to_lowercase());
-        }
+        languages.extend(grammar.aliases.iter().map(|alias| alias.to_lowercase()));
     }
-    for stem in STYLES.iter().flat_map(|style| [style.light, style.dark]) {
-        registry
-            .add_theme_from_path(theme_path(stem))
-            .unwrap_or_else(|error| panic!("{stem}: {error}"));
-    }
-    let dump = registry.dump().expect("the registry can be written");
-    std::fs::write(highlight_folder().join("registry.zst"), &dump).expect("registry.zst");
+    let grammars: Vec<&Grammar> = carried.iter().map(|(grammar, _, _)| grammar).collect();
+    let held = grammars_bin(&package, &grammars);
+    std::fs::write(highlight_folder().join("grammars.bin"), &held).expect("grammars.bin");
 
     languages.sort();
     languages.dedup();
@@ -265,7 +257,7 @@ fn main() {
         languages_rs(&languages),
     )
     .expect("languages.rs");
-    std::fs::write(highlight_folder().join("looks.rs"), looks_rs()).expect("looks.rs");
+    std::fs::write(highlight_folder().join("styles.rs"), styles_rs()).expect("styles.rs");
     std::fs::write(
         highlight_folder().join("licences.md"),
         licences_md(&version, &carried),
@@ -284,11 +276,11 @@ fn main() {
         .expect("THIRD-PARTY-GRAMMARS.md");
 
     println!(
-        "Carried {} grammars ({} names) and {} themes in {} bytes.",
+        "Carried {} grammars ({} names) in {} bytes, and {} themes.",
         carried.len(),
         languages.len(),
-        STYLES.len() * 2,
-        dump.len()
+        held.len(),
+        STYLES.len() * 2
     );
     println!("Left out: {}.", left_out.join(", "));
 }
@@ -315,6 +307,9 @@ struct Grammar {
     license: Option<String>,
     source: String,
     aliases: Vec<String>,
+    scope: String,
+    /// The scopes of the grammars it adds rules of its own to.
+    inject_to: Vec<String>,
 }
 
 /// `index.js` is generated, one key to a line: `    name: 'value',`, and
@@ -333,10 +328,12 @@ fn read_index(index: &str) -> Vec<Grammar> {
                     continue;
                 };
                 if let Some(key) = &list {
-                    if key == "aliases"
-                        && let Some(item) = quoted(line.trim().trim_end_matches(','))
-                    {
-                        grammar.aliases.push(item);
+                    if let Some(item) = quoted(line.trim().trim_end_matches(',')) {
+                        match key.as_str() {
+                            "aliases" => grammar.aliases.push(item),
+                            "injectTo" => grammar.inject_to.push(item),
+                            _ => {}
+                        }
                     }
                     continue;
                 }
@@ -355,6 +352,7 @@ fn read_index(index: &str) -> Vec<Grammar> {
                     "displayName" => grammar.display_name = value,
                     "license" => grammar.license = Some(value),
                     "source" => grammar.source = value,
+                    "scopeName" => grammar.scope = value,
                     _ => {}
                 }
             }
@@ -590,86 +588,6 @@ pub fn texts(written: &str) -> BTreeSet<usize> {
     numbers
 }
 
-/// `looks.rs`, from the themes alone.
-pub fn looks_rs() -> String {
-    let mut out = String::from(
-        "// Written by `cargo run --example grammars`. For each style, its two\n\
-         // themes' ordinary look, then every other pair of looks, light and dark,\n\
-         // a piece of code can be given.\n\n\
-         use super::{Look, Looks};\n\n#[rustfmt::skip]\npub(super) const LOOKS: &[Looks] = &[\n",
-    );
-    for style in STYLES {
-        let light = Theme::read(style.light);
-        let dark = Theme::read(style.dark);
-        let ordinary = [light.ordinary, dark.ordinary];
-        writeln!(out, "    Looks {{").unwrap();
-        writeln!(out, "        name: {:?},", style.name).unwrap();
-        writeln!(out, "        light: {:?},", light.name).unwrap();
-        writeln!(out, "        dark: {:?},", dark.name).unwrap();
-        writeln!(out, "        ordinary: {},", pair(&ordinary)).unwrap();
-        writeln!(out, "        pairs: &[").unwrap();
-        for looks in reachable(&light, &dark) {
-            if looks != ordinary {
-                writeln!(out, "            {},", pair(&looks)).unwrap();
-            }
-        }
-        writeln!(out, "        ],").unwrap();
-        writeln!(out, "    }},").unwrap();
-    }
-    out.push_str("];\n");
-    out
-}
-
-fn pair(looks: &[Style; 2]) -> String {
-    format!("[{}, {}]", look(&looks[0]), look(&looks[1]))
-}
-
-fn look(style: &Style) -> String {
-    let mut font = Vec::new();
-    for (bit, word) in [
-        (FontStyle::BOLD, "bold"),
-        (FontStyle::ITALIC, "italic"),
-        (FontStyle::UNDERLINE, "underline"),
-        (FontStyle::STRIKETHROUGH, "strikethrough"),
-    ] {
-        if style.font_style.contains(bit) {
-            font.push(word);
-        }
-    }
-    format!(
-        "Look({:?}, {:?}, {:?})",
-        style.foreground.as_hex().to_lowercase(),
-        style.background.as_hex().to_lowercase(),
-        font.join(" ")
-    )
-}
-
-/// A theme read as giallo reads it: its ordinary look and its rules, least
-/// specific first.
-struct Theme {
-    name: String,
-    ordinary: Style,
-    rules: Vec<Rule>,
-}
-
-struct Rule {
-    /// The scope it colours, cut to the atoms giallo keeps.
-    target: String,
-    /// What must stand above it, outermost last, as written.
-    parents: Vec<String>,
-    foreground: Option<Color>,
-    background: Option<Color>,
-    font: Option<FontStyle>,
-}
-
-/// What a run of rules sets, where it sets anything.
-#[derive(Copy, Clone, Default, PartialEq, Eq, Hash)]
-struct Settings {
-    foreground: Option<Color>,
-    background: Option<Color>,
-    font: Option<FontStyle>,
-}
-
 /// A JSON string's text.
 fn text_of(node: &Node) -> Option<String> {
     match &node.value {
@@ -678,196 +596,297 @@ fn text_of(node: &Node) -> Option<String> {
     }
 }
 
-/// giallo keeps the first eight atoms of a scope.
-const ATOMS: usize = 8;
+fn read_json(path: &Path) -> Node {
+    let text =
+        std::fs::read_to_string(path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    let mut sources = Sources::default();
+    let source = sources.add(path, text);
+    statac::yaml::read_json(&sources, source)
+        .unwrap_or_else(|_| panic!("{} is not JSON", path.display()))
+}
 
-impl Theme {
-    fn read(stem: &str) -> Theme {
-        let path = theme_path(stem);
-        let text = std::fs::read_to_string(&path).expect("a theme file");
-        let mut sources = Sources::default();
-        let source = sources.add(&path, text);
-        let json = statac::yaml::read_json(&sources, source).expect("a theme in JSON");
-        let mut rules = Vec::new();
-        let items = match json.get("tokenColors").map(|node| &node.value) {
-            Some(Value::Sequence(items)) => items.as_slice(),
-            _ => &[],
-        };
-        for item in items {
-            let scope: Vec<String> = match item.get("scope").map(|node| &node.value) {
-                Some(Value::Scalar(list)) => {
-                    list.split(',').map(|part| part.trim().to_owned()).collect()
-                }
-                Some(Value::Sequence(list)) => list.iter().filter_map(text_of).collect(),
-                _ => Vec::new(),
-            };
-            if scope.is_empty() {
-                continue;
+/// JSON without the space between its parts.
+fn minified(json: &str) -> String {
+    let mut out = String::with_capacity(json.len());
+    let mut inside = false;
+    let mut escaped = false;
+    for c in json.chars() {
+        if inside {
+            out.push(c);
+            match c {
+                _ if escaped => escaped = false,
+                '\\' => escaped = true,
+                '"' => inside = false,
+                _ => {}
             }
-            let setting = |key: &str| {
-                item.get("settings")
-                    .and_then(|settings| settings.get(key))
-                    .and_then(text_of)
-                    .filter(|value| value != "inherit")
-            };
-            let colour = |key| setting(key).map(|hex| Color::from_hex(&hex).expect(stem));
-            let foreground = colour("foreground");
-            let background = colour("background");
-            let font = setting("fontStyle").map(|font| FontStyle::from_theme_str(&font));
-            for selector in &scope {
-                let parts: Vec<&str> = selector.split_whitespace().collect();
-                let Some((&last, rest)) = parts.split_last() else {
-                    continue;
-                };
-                if last == ">" {
-                    continue;
-                }
-                rules.push(Rule {
-                    target: last.split('.').take(ATOMS).collect::<Vec<_>>().join("."),
-                    parents: rest.iter().rev().map(|part| (*part).to_owned()).collect(),
-                    foreground,
-                    background,
-                    font,
-                });
-            }
+        } else if !c.is_ascii_whitespace() {
+            out.push(c);
+            inside = c == '"';
         }
-        // giallo's order: by the atoms in the scope, then by the parents
-        // named, keeping the file's order between equals.
-        rules.sort_by_key(|rule| {
-            let atoms = if rule.target.is_empty() {
-                0
-            } else {
-                rule.target.matches('.').count() + 1
-            };
-            let parents = rule.parents.iter().filter(|part| *part != ">").count();
-            (atoms, parents)
-        });
-        // The ordinary look as giallo gives it, which leaves no reading of
-        // the theme's colours to repeat here.
-        let mut registry = Registry::default();
-        registry.add_plain_grammar(&[]).expect("a plain grammar");
-        registry
-            .add_theme_from_path(&path)
-            .expect("a theme giallo reads");
-        registry.link_grammars();
-        let name = json.get("name").and_then(text_of).expect("a theme's name");
-        let options = HighlightOptions::new(PLAIN_GRAMMAR_NAME, ThemeVariant::Single(&name));
-        let ordinary = match registry.highlight("", &options).expect("highlighted").theme {
-            ThemeVariant::Single(theme) => theme.default_style,
-            ThemeVariant::Dual { .. } => unreachable!("one theme asked for"),
-        };
-        Theme {
-            name,
-            ordinary,
-            rules,
+    }
+    out
+}
+
+/// The scopes of the other grammars a grammar includes rules of.
+fn included(node: &Node, scopes: &mut BTreeSet<String>) {
+    match &node.value {
+        Value::Scalar(_) => {}
+        Value::Sequence(items) => items.iter().for_each(|item| included(item, scopes)),
+        Value::Mapping(entries) => {
+            for entry in entries {
+                included(&entry.value, scopes);
+            }
+            let scope = node.get("include").and_then(text_of);
+            let scope = scope.and_then(|include| include.split('#').next().map(str::to_owned));
+            scopes.extend(scope.filter(|scope| !scope.is_empty() && !scope.starts_with('$')));
         }
     }
 }
 
-/// Whether `target` names `scope` or a scope it lies within, atom by atom.
-/// None for `scope` is one no rule names.
-fn names(target: &str, scope: Option<&str>) -> bool {
-    target.is_empty()
-        || scope.is_some_and(|scope| {
-            scope == target
-                || scope
-                    .strip_prefix(target)
-                    .is_some_and(|rest| rest.starts_with('.'))
-        })
-}
+/// `grammars.bin`, in the form the documentation above gives.
+fn grammars_bin(package: &Path, grammars: &[&Grammar]) -> Vec<u8> {
+    let place = |scope: &str| grammars.iter().position(|grammar| grammar.scope == scope);
+    let mut deflated = Vec::new();
+    let mut includes: Vec<BTreeSet<usize>> = Vec::new();
+    for grammar in grammars {
+        let path = package
+            .join("grammars")
+            .join(format!("{}.json", grammar.name));
+        let json = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        let json = minified(&json);
+        let read = parse_raw_grammar(&json, Some("grammar.json"))
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        assert_eq!(read.scope_name, grammar.scope, "{}", path.display());
+        deflated.push(miniz_oxide::deflate::compress_to_vec(json.as_bytes(), 10));
+        let mut scopes = BTreeSet::new();
+        included(&read_json(&path), &mut scopes);
+        includes.push(scopes.iter().filter_map(|scope| place(scope)).collect());
+    }
+    let mut injectors = vec![BTreeSet::new(); grammars.len()];
+    for (at, grammar) in grammars.iter().enumerate() {
+        for into in grammar.inject_to.iter().filter_map(|scope| place(scope)) {
+            injectors[into].insert(at);
+        }
+    }
 
-/// Every pair of looks code can be given, whatever scopes stand within
-/// which.
-///
-/// giallo builds a token's look scope by scope, outermost first, applying
-/// at each the rules that name it. Which of a theme's rules name a scope
-/// depends only on the longest rule target it lies within, so the targets
-/// of both themes, and a scope no rule names, stand for every scope there
-/// is. A rule that also needs other scopes above it may or may not apply,
-/// and both are followed; the same need in the two themes is met or not in
-/// both. From the two ordinary looks, every scope may then follow any
-/// other.
-fn reachable(light: &Theme, dark: &Theme) -> Vec<[Style; 2]> {
-    let themes = [light, dark];
-    let mut scopes: Vec<Option<&str>> = vec![None];
-    let targets: HashSet<&str> = themes
-        .iter()
-        .flat_map(|theme| theme.rules.iter().map(|rule| rule.target.as_str()))
-        .collect();
-    let mut targets: Vec<&str> = targets.into_iter().collect();
-    targets.sort_unstable();
-    scopes.extend(targets.into_iter().map(Some));
-
-    // What one scope can do to a pair of looks: each way its rules can
-    // apply, as the settings they leave in each theme, which don't depend
-    // on the looks they are applied to.
-    let steps: Vec<HashSet<[Settings; 2]>> = scopes
-        .iter()
-        .map(|&scope| {
-            let rules = themes.map(|theme| {
-                theme
-                    .rules
-                    .iter()
-                    .filter(|rule| names(&rule.target, scope))
-                    .collect::<Vec<_>>()
-            });
-            let mut needs: Vec<&[String]> = rules
-                .iter()
-                .flatten()
-                .filter(|rule| !rule.parents.is_empty())
-                .map(|rule| rule.parents.as_slice())
-                .collect();
-            needs.sort_unstable();
-            needs.dedup();
-            assert!(needs.len() <= 20, "too many conditions on one scope");
-            let mut ways = HashSet::new();
-            for met in 0..1u32 << needs.len() {
-                let applies = |rule: &Rule| {
-                    rule.parents.is_empty()
-                        || needs
-                            .iter()
-                            .position(|need| *need == rule.parents.as_slice())
-                            .is_some_and(|at| met & (1 << at) != 0)
-                };
-                ways.insert([0, 1].map(|side| {
-                    let mut settings = Settings::default();
-                    for rule in rules[side].iter().filter(|rule| applies(rule)) {
-                        settings = Settings {
-                            foreground: rule.foreground.or(settings.foreground),
-                            background: rule.background.or(settings.background),
-                            font: rule.font.or(settings.font),
-                        };
-                    }
-                    settings
-                }));
-            }
-            ways
-        })
-        .collect();
-
-    let start = [light.ordinary, dark.ordinary];
-    let mut seen: HashSet<[Style; 2]> = HashSet::from([start]);
-    let mut waiting = vec![start];
-    while let Some(looks) = waiting.pop() {
-        for ways in &steps {
-            for way in ways {
-                let next = [0, 1].map(|side| {
-                    let style = looks[side];
-                    Style {
-                        foreground: way[side].foreground.unwrap_or(style.foreground),
-                        background: way[side].background.unwrap_or(style.background),
-                        font_style: way[side].font.unwrap_or(style.font_style),
-                    }
-                });
-                if seen.insert(next) {
-                    waiting.push(next);
+    let mut out = Vec::new();
+    let number = |out: &mut Vec<u8>, number: usize| {
+        out.extend(u32::try_from(number).expect("four bytes").to_le_bytes());
+    };
+    let text = |out: &mut Vec<u8>, text: &str| {
+        number(out, text.len());
+        out.extend(text.as_bytes());
+    };
+    number(&mut out, grammars.len());
+    for (at, grammar) in grammars.iter().enumerate() {
+        let mut needs = BTreeSet::from([at]);
+        let mut waiting = vec![at];
+        while let Some(at) = waiting.pop() {
+            for &other in includes[at].iter().chain(&injectors[at]) {
+                if needs.insert(other) {
+                    waiting.push(other);
                 }
             }
         }
+        needs.remove(&at);
+        text(&mut out, &grammar.scope);
+        number(&mut out, deflated[at].len());
+        for places in [&injectors[at], &needs] {
+            number(&mut out, places.len());
+            places.iter().for_each(|&place| number(&mut out, place));
+        }
     }
-    let mut pairs: BTreeMap<String, [Style; 2]> = BTreeMap::new();
-    for looks in seen {
-        pairs.insert(pair(&looks), looks);
+    let mut names = BTreeMap::new();
+    for (at, grammar) in grammars.iter().enumerate() {
+        for name in std::iter::once(&grammar.name).chain(&grammar.aliases) {
+            let other = names.insert(name.to_lowercase(), at);
+            assert!(
+                other.is_none_or(|other| other == at),
+                "two grammars named {name}"
+            );
+        }
     }
-    pairs.into_values().collect()
+    number(&mut out, names.len());
+    for (name, at) in names {
+        text(&mut out, &name);
+        number(&mut out, at);
+    }
+    out.extend(deflated.into_iter().flatten());
+    out
+}
+
+/// The scopes each kind's colour is read at in a theme, the innermost last:
+/// the kind's usual scope, or where themes differ over that, the scopes of a
+/// common piece of code of the kind.
+const READ_AT: [(&str, &str); KINDS.len()] = [
+    ("comment", "comment"),
+    ("keyword", "keyword"),
+    ("string", "string"),
+    ("number", "constant.numeric"),
+    ("constant", "constant.language"),
+    ("function", "entity.name.function"),
+    ("type", "entity.name.type.class"),
+    ("variable", "variable.other.readwrite"),
+    ("property", "variable.other.property"),
+    ("tag", "entity.name.tag"),
+    ("attribute", "entity.other.attribute-name"),
+    ("operator", "keyword.operator"),
+    ("punctuation", "punctuation"),
+    (
+        "heading",
+        "markup.heading.markdown heading.1.markdown entity.name.section.markdown",
+    ),
+    ("emphasis", "markup.italic"),
+    ("strong", "markup.bold"),
+    (
+        "link",
+        "meta.link.inline.markdown markup.underline.link.markdown",
+    ),
+    ("inserted", "markup.inserted.diff"),
+    ("deleted", "markup.deleted.diff"),
+];
+
+/// A theme's rules for text: its editor's colours for ordinary text, then
+/// each rule's colour and font style. A rule's own background is left out.
+fn theme(stem: &str) -> RawTheme {
+    let json = read_json(&theme_path(stem));
+    let rule = |scope: Option<Vec<String>>, style: RawThemeStyle| {
+        let mut rule = RawThemeSetting::default();
+        rule.scope = scope.map(RawThemeScope::Array);
+        rule.settings = Some(style);
+        rule
+    };
+    let editor = |key: &str| {
+        let colour = json.get("colors").and_then(|colours| colours.get(key));
+        Some(colour.and_then(text_of).expect("an editor's colour"))
+    };
+    let mut ordinary = RawThemeStyle::default();
+    ordinary.foreground = editor("editor.foreground");
+    ordinary.background = editor("editor.background");
+    let mut rules = vec![rule(None, ordinary)];
+    let items = match json.get("tokenColors").map(|node| &node.value) {
+        Some(Value::Sequence(items)) => items.as_slice(),
+        _ => &[],
+    };
+    for item in items {
+        let scope: Vec<String> = match item.get("scope").map(|node| &node.value) {
+            Some(Value::Scalar(list)) => {
+                list.split(',').map(|part| part.trim().to_owned()).collect()
+            }
+            Some(Value::Sequence(list)) => list.iter().filter_map(text_of).collect(),
+            _ => continue,
+        };
+        let setting = |key: &str| {
+            let settings = item.get("settings")?;
+            settings.get(key).and_then(text_of)
+        };
+        let mut style = RawThemeStyle::default();
+        style.foreground = setting("foreground");
+        style.font_style = setting("fontStyle");
+        rules.push(rule(Some(scope), style));
+    }
+    let mut theme = RawTheme::default();
+    theme.settings = rules;
+    theme
+}
+
+/// What a theme gives code: the colour of ordinary text, the background,
+/// and each kind's colour and font style.
+struct Given {
+    text: String,
+    background: String,
+    kinds: Vec<(String, String)>,
+}
+
+/// Reads a theme by colouring, under it, a grammar of one rule to a kind,
+/// each giving one letter the scopes the kind is read at.
+fn given(stem: &str) -> Given {
+    let letters = || ('a'..).take(KINDS.len());
+    let mut grammar = String::from("{\"scopeName\":\"source.kinds\",\"patterns\":[");
+    for (letter, (kind, scope)) in letters().zip(READ_AT) {
+        assert_eq!(kind, KINDS[letter as usize - 'a' as usize]);
+        write!(grammar, "{{\"match\":\"{letter}\",\"name\":\"{scope}\"}},").unwrap();
+    }
+    grammar.pop();
+    grammar.push_str("]}");
+    let mut registry = SyncRegistry::new(Some(theme(stem)), None).expect(stem);
+    let grammar = parse_raw_grammar(&grammar, Some("kinds.json")).expect("a grammar");
+    registry.add_grammar(grammar, Vec::new());
+    let grammar = registry
+        .grammar_for_scope_name("source.kinds", GrammarConfiguration::default())
+        .expect(stem)
+        .expect("the grammar added");
+    let colours = registry.get_color_map();
+    let look = |text: &str| {
+        let read = grammar.tokenize_line2(text, None, 0).expect(stem);
+        let token = EncodedTokenAttributes::new(read.tokens[1]);
+        let colour = |number: u32| {
+            let colour = colours[number as usize].to_lowercase();
+            assert!(matches!(colour.len(), 7 | 9), "{stem}: {colour}");
+            colour
+        };
+        let mut font = Vec::new();
+        for (bit, word) in [
+            (FontStyle::BOLD, "bold"),
+            (FontStyle::ITALIC, "italic"),
+            (FontStyle::UNDERLINE, "underline"),
+            (FontStyle::STRIKETHROUGH, "strikethrough"),
+        ] {
+            if token.font_style().contains(bit) {
+                font.push(word);
+            }
+        }
+        (
+            colour(token.foreground()),
+            colour(token.background()),
+            font.join(" "),
+        )
+    };
+    let (text, background, _) = look(".");
+    let kinds = letters().map(|letter| {
+        let (colour, _, font) = look(&letter.to_string());
+        (colour, font)
+    });
+    Given {
+        kinds: kinds.collect(),
+        text,
+        background,
+    }
+}
+
+/// `styles.rs`, from the themes alone.
+pub fn styles_rs() -> String {
+    let mut out = String::from(
+        "// Written by `cargo run --example grammars`. For each style, the colour of\n\
+         // ordinary text and of the background, then each kind's colour and the\n\
+         // font style its light theme gives it. Each colour is the light theme's,\n\
+         // then the dark's.\n\n\
+         use super::Style;\n\n#[rustfmt::skip]\npub(super) const STYLES: &[Style] = &[\n",
+    );
+    for style in STYLES {
+        let (light, dark) = (given(style.light), given(style.dark));
+        writeln!(out, "    Style {{").unwrap();
+        writeln!(out, "        name: {:?},", style.name).unwrap();
+        writeln!(out, "        text: [{:?}, {:?}],", light.text, dark.text).unwrap();
+        writeln!(
+            out,
+            "        background: [{:?}, {:?}],",
+            light.background, dark.background
+        )
+        .unwrap();
+        writeln!(out, "        kinds: [").unwrap();
+        for (kind, (light, dark)) in KINDS.iter().zip(light.kinds.iter().zip(&dark.kinds)) {
+            writeln!(
+                out,
+                "            ([{:?}, {:?}], {:?}), // {kind}",
+                light.0, dark.0, light.1
+            )
+            .unwrap();
+        }
+        writeln!(out, "        ],").unwrap();
+        writeln!(out, "    }},").unwrap();
+    }
+    out.push_str("];\n");
+    out
 }

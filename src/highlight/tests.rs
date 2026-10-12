@@ -162,9 +162,8 @@ fn every_name_a_fence_can_use_is_a_grammar_statac_carries() {
         assert!(languages::LANGUAGES.contains(name), "{ending}");
         assert!(matches!(language(ending), Language::Unknown { .. }));
     }
-    for name in languages::LANGUAGES {
-        assert!(REGISTRY.contains_grammar(name), "{name}");
-    }
+    let carried: Vec<&str> = CARRIED.names.iter().map(|(name, _)| *name).collect();
+    assert_eq!(carried, languages::LANGUAGES);
     for (alias, name) in ALIASES {
         assert!(languages::LANGUAGES.contains(name), "{alias}");
         assert!(!languages::LANGUAGES.contains(alias), "{alias}");
@@ -191,11 +190,70 @@ fn coloured_code_shows_the_same_text_with_one_class_to_a_piece() {
 }
 
 #[test]
-fn text_in_the_ordinary_colour_carries_no_class() {
+fn each_piece_carries_the_class_of_its_kind_and_text_of_none_carries_none() {
     let html = Highlighter::new("ocean").unwrap().html("rust", RUST);
-    // The braces, the indentation and the blank line are ordinary text.
-    assert!(html.contains(") {\n    <span"), "{html}");
-    assert!(html.ends_with("\n\n}"), "{html}");
+    // The spaces, the indentation and the blank line are of no kind.
+    assert_eq!(
+        &*html,
+        "<span class=\"hl-keyword\">fn</span> <span class=\"hl-function\">main</span>\
+         <span class=\"hl-punctuation\">()</span> <span class=\"hl-punctuation\">{</span>\n    \
+         <span class=\"hl-keyword\">let</span> <span class=\"hl-variable\">x</span> \
+         <span class=\"hl-operator\">=</span> <span class=\"hl-string\">&quot;a&lt;b &amp; c&quot;</span>\
+         <span class=\"hl-punctuation\">;</span> <span class=\"hl-comment\">// note</span>\n\n\
+         <span class=\"hl-punctuation\">}</span>"
+    );
+}
+
+#[test]
+fn code_is_marked_the_same_in_every_style() {
+    let html = |style| Highlighter::new(style).unwrap().html("rust", RUST);
+    for &style in NAMES {
+        assert_eq!(html(style), html(NAMES[0]), "{style}");
+    }
+}
+
+#[test]
+fn a_piece_after_a_character_of_two_units_starts_where_it_should() {
+    let code = "let s = \"\u{e9}\u{1d11e}\"; // \u{1d11e} note\nlet t = 1;";
+    let html = Highlighter::new("ocean").unwrap().html("rust", code);
+    assert_eq!(shown(&html), code);
+    assert!(
+        html.contains("<span class=\"hl-string\">&quot;\u{e9}\u{1d11e}&quot;</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"hl-comment\">// \u{1d11e} note</span>\n"),
+        "{html}"
+    );
+}
+
+#[test]
+fn a_grammar_colours_the_languages_it_includes() {
+    let code = "<style>a { color: red; }</style>\n<script>let x = 1;</script>";
+    let html = Highlighter::new("ocean").unwrap().html("html", code);
+    assert!(
+        html.contains("<span class=\"hl-property\">color</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"hl-keyword\">let</span>"),
+        "{html}"
+    );
+}
+
+#[test]
+fn code_of_no_grammar_carried_is_shown_as_it_is() {
+    assert_eq!(coloured("no such language", "a < b"), "a &lt; b");
+}
+
+#[test]
+fn every_scope_is_of_a_kind_there_is_and_every_kind_has_a_scope() {
+    for (scope, kind) in SCOPES {
+        assert!(kind.is_none_or(|kind| KINDS.contains(&kind)), "{scope}");
+    }
+    for kind in KINDS {
+        assert!(SCOPES.iter().any(|(_, of)| *of == Some(kind)), "{kind}");
+    }
 }
 
 #[test]
@@ -217,18 +275,27 @@ fn a_line_is_too_long_past_the_longest_counted_in_characters() {
 }
 
 #[test]
-fn each_style_is_written_as_its_two_themes_and_its_classes() {
-    let looks: Vec<&str> = looks::LOOKS.iter().map(|looks| looks.name).collect();
-    assert_eq!(looks, NAMES);
+fn each_style_is_written_as_a_rule_to_a_kind_whose_colour_a_property_can_set() {
+    let styles: Vec<&str> = styles::STYLES.iter().map(|style| style.name).collect();
+    assert_eq!(styles, NAMES);
     for &name in NAMES {
         let css = stylesheet(name).unwrap_or_else(|| panic!("{name}"));
         assert!(css.contains(&format!("Code colours: {name},")), "{name}");
-        assert!(css.contains("\n.hl-0 {"), "{name}");
-        assert_eq!(
-            css.lines().filter(|line| line.starts_with(".hl-")).count(),
-            classes(name).unwrap().rules.len()
-        );
+        let rules: Vec<&str> = css.lines().filter(|line| line.starts_with('.')).collect();
+        assert_eq!(rules.len(), KINDS.len() + 1, "{name}");
+        for (kind, rule) in KINDS.iter().zip(&rules[1..]) {
+            let opens = format!(".hl-{kind} {{ color: var(--code-{kind}, ");
+            assert!(rule.starts_with(&opens), "{name}: {rule}");
+        }
     }
+    assert!(stylesheet("ocean").unwrap().contains(
+        ".hl-comment { color: var(--code-comment, light-dark(#6a6d76, #8e98a0)); }\n\
+         .hl-keyword { color: var(--code-keyword, light-dark(#80657b, #b48ead)); }\n"
+    ));
+    assert!(stylesheet("gruvbox").unwrap().contains(
+        ".hl-comment { color: var(--code-comment, light-dark(#786c60, #9a8c7f)); \
+         font-style: italic; }\n"
+    ));
     assert_eq!(stylesheet("dracula"), None);
 }
 
@@ -245,13 +312,15 @@ fn code_takes_the_look_of_the_nearest_data_theme_above_it() {
     for (name, colours) in [
         (
             "ocean",
-            "  color: light-dark(#4f5b66, #c0c5ce);\n  \
-             background-color: light-dark(#eff1f5, #2b303b);\n}\n\n.hl-0 {",
+            "  color: var(--code-text, light-dark(#4f5b66, #c0c5ce));\n  \
+             background-color: var(--code-background, light-dark(#eff1f5, #2b303b));\n}\n\n\
+             .hl-comment {",
         ),
         (
             "gruvbox",
-            "  color: light-dark(#3c3836, #ebdbb2);\n  \
-             background-color: light-dark(#fbf1c7, #282828);\n}\n\n.hl-0 {",
+            "  color: var(--code-text, light-dark(#3c3836, #ebdbb2));\n  \
+             background-color: var(--code-background, light-dark(#fbf1c7, #282828));\n}\n\n\
+             .hl-comment {",
         ),
     ] {
         let css = stylesheet(name).unwrap();
@@ -272,17 +341,15 @@ fn code_takes_the_look_of_the_nearest_data_theme_above_it() {
 
 #[test]
 fn every_colour_written_can_be_read_on_its_background() {
-    for classes in CLASSES.iter() {
-        let name = classes.looks.name;
-        let ordinary = classes.looks.ordinary.each_ref().map(Look::style);
-        let pairs = classes.looks.pairs.iter();
-        let pairs = pairs.map(|pair| pair.each_ref().map(Look::style));
-        for pair in pairs.chain([ordinary]) {
-            for style in pair {
-                let text = legible(style.foreground, style.background);
-                let (Some(text), Some(on)) = (solid(text), solid(style.background)) else {
+    for style in styles::STYLES {
+        let kinds = style.kinds.iter().map(|(colours, _)| colours);
+        for colours in kinds.chain([&style.text]) {
+            for (text, on) in colours.iter().zip(style.background) {
+                let (text, on) = (colour(text), colour(on));
+                let (Some(text), Some(on)) = (legible(text, on).solid(), on.solid()) else {
                     continue;
                 };
+                let name = style.name;
                 assert!(contrast(text, on) >= LEGIBLE, "{name}: {text:?} on {on:?}");
             }
         }
@@ -291,48 +358,41 @@ fn every_colour_written_can_be_read_on_its_background() {
 
 #[test]
 fn a_colour_that_can_be_read_is_left_and_one_too_faint_is_moved_the_least() {
-    let colour = |hex| Color::from_hex(hex).unwrap();
     let (paper, ink) = (colour("#eff1f5"), colour("#2b303b"));
     assert_eq!(legible(ink, paper), ink);
     assert_eq!(legible(paper, ink), paper);
     let green = colour("#a3be8c");
     assert_eq!(legible(green, ink), green);
     let darker = legible(green, paper);
-    let apart = contrast(solid(darker).unwrap(), solid(paper).unwrap());
+    let apart = contrast(darker.solid().unwrap(), paper.solid().unwrap());
     assert!((LEGIBLE..LEGIBLE + 0.2).contains(&apart), "{apart}");
     let faint = colour("#a3be8c80");
     assert_eq!(legible(faint, paper), faint);
 }
 
 #[test]
-fn every_look_a_grammar_gives_has_its_class() {
-    // Colouring checks every look against the style's classes as it goes.
+fn every_language_carried_colours_code() {
     let sample = "#include <stdio.h>\n/* c */ int main(void) { return 0; }\n\
                   # comment\nlet x = 'y'; def f(a): pass\n<a href=\"b\">c</a>\n\
                   $ echo \"$HOME\" | grep -v x > /dev/null\n- [ ] **bold** _it_ `code`\n";
-    for &style in NAMES {
-        let highlighter = Highlighter::new(style).unwrap();
-        for name in languages::LANGUAGES {
-            let html = highlighter.html(name, sample);
-            assert_eq!(shown(&html), sample, "{style} {name}");
+    for name in languages::LANGUAGES {
+        assert!(tokeniser(name).is_some(), "{name}");
+        let html = coloured(name, sample);
+        assert_eq!(shown(&html), sample, "{name}");
+        for class in carried(&html) {
+            let kind = class.strip_prefix(CLASS_PREFIX);
+            assert!(kind.is_some_and(|kind| KINDS.contains(&kind)), "{name}");
         }
     }
 }
 
 #[test]
-fn class_names_are_short_and_never_repeat() {
-    assert_eq!(class_name(0), "hl-0");
-    assert_eq!(class_name(35), "hl-z");
-    assert_eq!(class_name(36), "hl-10");
-    let names: std::collections::HashSet<String> = (0..2000).map(class_name).collect();
-    assert_eq!(names.len(), 2000);
-}
-
-#[test]
 fn a_colour_both_looks_share_is_written_once() {
-    let colour = Color::from_hex("#123456").unwrap();
-    assert_eq!(both(colour, colour), "#123456");
-    let faint = Color::from_hex("#12345630").unwrap();
-    assert_eq!(both(colour, faint), "light-dark(#123456, #12345630)");
-    assert_eq!(hex(opaque(faint)), "#123456");
+    let solid = colour("#123456");
+    assert_eq!(both(solid, solid), "#123456");
+    let faint = colour("#12345630");
+    assert_eq!(both(solid, faint), "light-dark(#123456, #12345630)");
+    assert_eq!(opaque(faint).hex(), "#123456");
+    assert_eq!(Colour::from_hex("#12345"), None);
+    assert_eq!(Colour::from_hex("123456"), None);
 }

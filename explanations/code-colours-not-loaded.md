@@ -18,12 +18,12 @@ warning  Code colours not loaded: no template asks for `code.css`
 
 ## Why Statac warns
 
-Statac colours code by giving each piece of it a class, such as `hl-4k`,
-and writes the style for each class into `code.css`. A page shows the
-colours only if it loads that stylesheet, which a template does with
-`css("code.css")`. If no template does, the stylesheet is published but
-no page uses it. Nothing on the page looks broken, so this is easy to
-miss.
+Statac colours code by giving each piece of it a class for the kind of
+thing it is, such as `hl-keyword`, and writes the colour of each kind
+into `code.css`. A page shows the colours only if it loads that
+stylesheet, which a template does with `css("code.css")`. If no template
+does, the stylesheet is published but no page uses it. Nothing on the
+page looks broken, so this is easy to miss.
 
 Statac decides from what the build actually read. If anything it built
 asked for `code.css`, with `css` or with `asset`, on any page, it says

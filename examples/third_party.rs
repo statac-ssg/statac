@@ -62,8 +62,9 @@ const NOTICES: &[&str] = &[
     "PATENTS",
 ];
 
-/// A licence text kept below a crate's top folder, by the crate's name.
-const DEEPER: &[(&str, &str)] = &[("onig_sys", "oniguruma/COPYING")];
+/// The licence of another's work a crate holds, which the crate's own
+/// licence doesn't name, by the crate's name.
+const HELD: &[(&str, &str)] = &[("ferriki-textmate", "LICENSE-vscode-textmate.md")];
 
 const APACHE: &str = "Apache-2.0";
 
@@ -283,8 +284,7 @@ fn notices(name: &str, folder: &Path, taken: &BTreeSet<String>) -> Vec<String> {
         })
         .collect();
     files.extend(
-        DEEPER
-            .iter()
+        HELD.iter()
             .filter(|(of, _)| *of == name)
             .map(|(_, file)| (*file).to_owned()),
     );
@@ -478,8 +478,6 @@ fn list() -> String {
         "\n### C libraries a crate carries\n\n\
          Each is built from the source its crate holds, under the crate's \
          entry below.\n\n\
-         - Oniguruma, in `onig_sys`: BSD-2-Clause.\n\
-         - Zstandard, in `zstd-sys`: BSD-3-Clause.\n\
          - AWS-LC, in `aws-lc-sys`: the licences its entry names.\n",
     );
 

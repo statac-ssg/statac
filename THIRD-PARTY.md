@@ -45,8 +45,6 @@ The paths are in `crates/avif-aom-sys/`.
 
 Each is built from the source its crate holds, under the crate's entry below.
 
-- Oniguruma, in `onig_sys`: BSD-2-Clause.
-- Zstandard, in `zstd-sys`: BSD-3-Clause.
 - AWS-LC, in `aws-lc-sys`: the licences its entry names.
 
 ### An acknowledgement
@@ -75,19 +73,19 @@ A binary for Linux that asks nothing of the system's C library links a C library
 
 ### Rust crates
 
-The 170 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
+The 166 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
 
 | Crate | Version | Its licence | Taken under | Texts |
 | --- | --- | --- | --- | --- |
 | `adler2` | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `ahash` | 0.8.12 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
+| `aho-corasick` | 1.1.5 | Unlicense OR MIT | MIT | [15] [16] |
 | `allocator-api2` | 0.2.21 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `arraydeque` | 0.5.1 | MIT/Apache-2.0 | Apache-2.0 | [1] |
 | `arrayvec` | 0.7.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `aws-lc-rs` | 1.18.1 | ISC AND (Apache-2.0 OR ISC) | Apache-2.0, ISC | [1] [19] |
 | `aws-lc-sys` | 0.45.0 | ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) | Apache-2.0, BSD-3-Clause, ISC, MIT | [1] [20] |
 | `base64` | 0.23.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `bitcode` | 0.6.9 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `bitflags` | 2.13.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `blake3` | 1.8.7 | CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception | Apache-2.0 | [1] |
 | `bytemuck` | 1.25.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
@@ -108,12 +106,13 @@ The 170 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `equivalent` | 1.0.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `errno` | 0.3.14 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `fdeflate` | 0.3.7 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
+| `ferriki-textmate` | 1.0.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] [23] |
+| `ferroni` | 2.1.0 | BSD-2-Clause | BSD-2-Clause | [24] |
 | `flate2` | 1.1.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `font-types` | 0.11.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `fontdb` | 0.23.0 | MIT | MIT | [23] |
+| `fontdb` | 0.23.0 | MIT | MIT | [25] |
 | `form_urlencoded` | 1.2.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `getrandom` | 0.2.17 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `giallo` | 0.5.2 | EUPL-1.2 | EUPL-1.2 | [24] |
 | `granit-parser` | 1.3.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `grass` | 0.13.4 | MIT | MIT | none in the crate |
 | `grass_compiler` | 0.13.4 | MIT | MIT | none in the crate |
@@ -122,94 +121,92 @@ The 170 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `hashbrown` | 0.17.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `http` | 1.5.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `httparse` | 1.10.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `icu_collections` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `icu_locale_core` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `icu_normalizer` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `icu_normalizer_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `icu_properties` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `icu_properties_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `icu_provider` | 2.3.1 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_collections` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_locale_core` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_normalizer` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_normalizer_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_properties` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_properties_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_provider` | 2.3.1 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `idna` | 1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `idna_adapter` | 1.2.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `image` | 0.25.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `image-webp` | 0.2.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `indexmap` | 2.14.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `inotify` | 0.11.5 | ISC | ISC | [26] |
-| `inotify-sys` | 0.1.8 | ISC | ISC | [26] |
+| `inotify` | 0.11.5 | ISC | ISC | [27] |
+| `inotify-sys` | 0.1.8 | ISC | ISC | [27] |
 | `itoa` | 1.0.18 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `jiff` | 0.2.37 | Unlicense OR MIT | MIT | [15] [16] |
 | `jiff-core` | 0.1.1 | Unlicense OR MIT | MIT | [15] [16] |
 | `jiff-tzdb` | 0.1.8 | Unlicense OR MIT | MIT | [15] [16] |
-| `jpeg-encoder` | 0.7.1 | (MIT OR Apache-2.0) AND IJG | Apache-2.0, IJG | [1] [27] |
+| `jpeg-encoder` | 0.7.1 | (MIT OR Apache-2.0) AND IJG | Apache-2.0, IJG | [1] [28] |
 | `kstring` | 2.0.5 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `lasso` | 0.7.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `libc` | 0.2.190 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `libm` | 0.2.16 | MIT | MIT | [14] |
-| `libmimalloc-sys` | 0.1.49 | MIT | MIT | [28] |
+| `libmimalloc-sys` | 0.1.49 | MIT | MIT | [29] |
 | `linebender_resource_handle` | 0.1.1 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `linux-raw-sys` | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `litemap` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `litemap` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `log` | 0.4.34 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `math-core` | 0.8.2 | MIT | MIT | none in the crate |
 | `math-core-renderer-internal` | 0.8.2 | MIT | MIT | none in the crate |
 | `memchr` | 2.8.3 | Unlicense OR MIT | MIT | [15] [16] |
 | `memmap2` | 0.9.11 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `memo-map` | 0.3.4 | Apache-2.0 | Apache-2.0 | [1] |
-| `mimalloc` | 0.1.52 | MIT | MIT | [28] |
+| `mimalloc` | 0.1.52 | MIT | MIT | [29] |
 | `minijinja` | 2.24.0 | Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.8.9 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.9.1 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
-| `mio` | 1.2.4 | MIT | MIT | [29] |
+| `mio` | 1.2.4 | MIT | MIT | [30] |
 | `moxcms` | 0.8.1 | BSD-3-Clause OR Apache-2.0 | Apache-2.0 | [1] |
-| `notify` | 9.0.0-rc.5 | CC0-1.0 | CC0-1.0 | [30] |
+| `notify` | 9.0.0-rc.5 | CC0-1.0 | CC0-1.0 | [31] |
 | `notify-types` | 2.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `num-traits` | 0.2.19 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `objc2-core-foundation` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `objc2-core-services` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `once_cell` | 1.21.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `onig-regset` | 6.7.0 | MIT | MIT | [31] |
-| `onig_sys` | 69.9.3 | MIT | MIT | [32] [33] |
-| `papaya` | 0.2.5 | MIT | MIT | [34] |
 | `percent-encoding` | 2.3.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `phf` | 0.11.3 | MIT | MIT | [35] |
-| `phf` | 0.14.0 | MIT | MIT | [35] |
-| `phf_shared` | 0.11.3 | MIT | MIT | [35] |
-| `phf_shared` | 0.14.0 | MIT | MIT | [35] |
+| `phf` | 0.11.3 | MIT | MIT | [32] |
+| `phf` | 0.14.0 | MIT | MIT | [32] |
+| `phf_shared` | 0.11.3 | MIT | MIT | [32] |
+| `phf_shared` | 0.14.0 | MIT | MIT | [32] |
 | `png` | 0.18.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `potential_utf` | 0.1.6 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `pulldown-cmark` | 0.13.4 | MIT | MIT | [36] |
+| `potential_utf` | 0.1.6 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `pulldown-cmark` | 0.13.4 | MIT | MIT | [33] |
 | `pxfm` | 0.1.30 | BSD-3-Clause OR Apache-2.0 | Apache-2.0 | [1] |
 | `quick-error` | 2.0.1 | MIT/Apache-2.0 | Apache-2.0 | [1] |
 | `rangemap` | 1.8.0 | MIT/Apache-2.0 | Apache-2.0 | [1] |
 | `rayon` | 1.12.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `rayon-core` | 1.13.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `read-fonts` | 0.37.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
+| `regex-automata` | 0.4.18 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
+| `regex-syntax` | 0.8.11 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `rustc-hash` | 2.1.3 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `rustix` | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `rustls` | 0.23.45 | Apache-2.0 OR ISC OR MIT | Apache-2.0 | [1] |
 | `rustls-pki-types` | 1.15.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `rustls-webpki` | 0.103.15 | ISC | ISC | [37] |
-| `same-file` | 1.0.6 | Unlicense/MIT | MIT | [15] [38] |
-| `seize` | 0.5.1 | MIT | MIT | [39] |
+| `rustls-webpki` | 0.103.15 | ISC | ISC | [34] |
+| `same-file` | 1.0.6 | Unlicense/MIT | MIT | [15] [35] |
 | `self_cell` | 1.3.0 | Apache-2.0 OR GPL-2.0-only | Apache-2.0 | [1] |
 | `serde` | 1.0.229 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_core` | 1.0.229 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_json` | 1.0.151 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_spanned` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `simd-adler32` | 0.3.10 | MIT | MIT | [40] |
+| `simd-adler32` | 0.3.10 | MIT | MIT | [36] |
 | `siphasher` | 1.0.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `skrifa` | 0.40.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `slotmap` | 1.1.1 | Zlib | Zlib | [41] |
+| `slotmap` | 1.1.1 | Zlib | Zlib | [37] |
 | `smallvec` | 1.16.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `smol_str` | 0.3.6 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `stable-arena` | 0.3.0 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `stable_deref_trait` | 1.2.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `static_assertions` | 1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `strum` | 0.28.0 | MIT | MIT | [42] |
-| `subtle` | 2.6.1 | BSD-3-Clause | BSD-3-Clause | [43] |
+| `strum` | 0.28.0 | MIT | MIT | [38] |
+| `subtle` | 2.6.1 | BSD-3-Clause | BSD-3-Clause | [39] |
 | `swash` | 0.2.10 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `sys-locale` | 0.3.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `tinystr` | 0.8.4 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `tinystr` | 0.8.4 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `tinyvec` | 1.13.3 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `toml` | 1.1.6+spec-1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `toml_datetime` | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
@@ -221,32 +218,29 @@ The 170 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `unicode-normalization` | 0.1.25 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `unicode-script` | 0.5.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `unicode-segmentation` | 1.13.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `untrusted` | 0.9.0 | ISC | ISC | [44] |
+| `untrusted` | 0.9.0 | ISC | ISC | [40] |
 | `ureq` | 3.4.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `ureq-proto` | 0.6.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `url` | 2.5.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `utf8-zero` | 0.8.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `utf8_iter` | 1.0.4 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `walkdir` | 2.5.0 | Unlicense/MIT | MIT | [15] [16] |
-| `webpki-roots` | 1.0.9 | CDLA-Permissive-2.0 | CDLA-Permissive-2.0 | [45] |
-| `winapi-util` | 0.1.11 | Unlicense OR MIT | MIT | [15] [38] |
+| `webpki-roots` | 1.0.9 | CDLA-Permissive-2.0 | CDLA-Permissive-2.0 | [41] |
+| `winapi-util` | 0.1.11 | Unlicense OR MIT | MIT | [15] [35] |
 | `windows-link` | 0.2.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `windows-sys` | 0.61.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `winnow` | 1.0.4 | MIT | MIT | [46] |
-| `writeable` | 0.6.4 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `xxhash-rust` | 0.8.19 | BSL-1.0 | BSL-1.0 | [47] |
+| `winnow` | 1.0.4 | MIT | MIT | [42] |
+| `writeable` | 0.6.4 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `xxhash-rust` | 0.8.19 | BSL-1.0 | BSL-1.0 | [43] |
 | `yazi` | 0.2.1 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `yoke` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `yoke` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `zeno` | 0.3.3 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `zerocopy` | 0.8.59 | BSD-2-Clause OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `zerofrom` | 0.1.8 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `zerofrom` | 0.1.8 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `zeroize` | 1.9.0 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `zerotrie` | 0.2.5 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `zerovec` | 0.11.8 | Unicode-3.0 | Unicode-3.0 | [25] |
-| `zmij` | 1.0.23 | MIT | MIT | [48] |
-| `zstd` | 0.13.3 | MIT | MIT | [49] |
-| `zstd-safe` | 7.3.0 | BSD-3-Clause | BSD-3-Clause | [50] |
-| `zstd-sys` | 2.1.0+zstd.1.5.7 | BSD-3-Clause | BSD-3-Clause | [50] [51] |
+| `zerotrie` | 0.2.5 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `zerovec` | 0.11.8 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `zmij` | 1.0.23 | MIT | MIT | [44] |
 | `zune-core` | 0.5.3 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 | `zune-jpeg` | 0.5.15 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 
@@ -254,12 +248,11 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 
 ## Crates in no binary
 
-`Cargo.lock` names 73 more crates. They build or test Statac, or another crate names them for a system or a feature Statac does not use, and no binary links them.
+`Cargo.lock` names 71 more crates. They build or test Statac, or another crate names them for a system or a feature Statac does not use, and no binary links them.
 
 | Crate | Version |
 | --- | --- |
 | `autocfg` | 1.5.1 |
-| `bitcode_derive` | 0.6.9 |
 | `bitflags` | 1.3.2 |
 | `bumpalo` | 3.20.3 |
 | `bytemuck_derive` | 1.12.1 |
@@ -277,7 +270,6 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 | `futures-task` | 0.3.34 |
 | `futures-util` | 0.3.34 |
 | `getrandom` | 0.4.3 |
-| `glam` | 0.34.0 |
 | `heck` | 0.5.0 |
 | `jiff-static` | 0.2.37 |
 | `jobserver` | 0.1.35 |
@@ -2050,7 +2042,7 @@ Copyright notices are retained in src/* files where relevant.
 
 ### [15]
 
-`licences/rust-std/COPYING-memchr`; `jiff` 0.2.37, `COPYING`; `jiff-core` 0.1.1, `COPYING`; `jiff-tzdb` 0.1.8, `COPYING`; `memchr` 2.8.3, `COPYING`; `same-file` 1.0.6, `COPYING`; `walkdir` 2.5.0, `COPYING`; `winapi-util` 0.1.11, `COPYING`.
+`licences/rust-std/COPYING-memchr`; `aho-corasick` 1.1.5, `COPYING`; `jiff` 0.2.37, `COPYING`; `jiff-core` 0.1.1, `COPYING`; `jiff-tzdb` 0.1.8, `COPYING`; `memchr` 2.8.3, `COPYING`; `same-file` 1.0.6, `COPYING`; `walkdir` 2.5.0, `COPYING`; `winapi-util` 0.1.11, `COPYING`.
 
 ````text
 This project is dual-licensed under the Unlicense and MIT licenses.
@@ -2060,7 +2052,7 @@ You may use this code under the terms of either license.
 
 ### [16]
 
-`licences/rust-std/LICENSE-MIT-memchr`; `byteorder-lite` 0.1.0, `LICENSE-MIT`; `jiff` 0.2.37, `LICENSE-MIT`; `jiff-core` 0.1.1, `LICENSE-MIT`; `jiff-tzdb` 0.1.8, `LICENSE-MIT`; `memchr` 2.8.3, `LICENSE-MIT`; `walkdir` 2.5.0, `LICENSE-MIT`.
+`licences/rust-std/LICENSE-MIT-memchr`; `aho-corasick` 1.1.5, `LICENSE-MIT`; `byteorder-lite` 0.1.0, `LICENSE-MIT`; `jiff` 0.2.37, `LICENSE-MIT`; `jiff-core` 0.1.1, `LICENSE-MIT`; `jiff-tzdb` 0.1.8, `LICENSE-MIT`; `memchr` 2.8.3, `LICENSE-MIT`; `walkdir` 2.5.0, `LICENSE-MIT`.
 
 ````text
 The MIT License (MIT)
@@ -3198,6 +3190,94 @@ SOFTWARE.
 
 ### [23]
 
+`ferriki-textmate` 1.0.0, `LICENSE-vscode-textmate.md`.
+
+````text
+The MIT License (MIT)
+
+Copyright (c) Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+````
+
+### [24]
+
+`ferroni` 2.1.0, `LICENSE`.
+
+````text
+BSD 2-Clause License
+
+Copyright (c) 2002-2021 K. Kosako <kkosako0@gmail.com> (Oniguruma C original)
+Copyright (c) 2026 Sebastian Software GmbH (Rust port)
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+---
+
+Portions of src/scanner.rs (Scanner API design and test cases) are derived
+from vscode-oniguruma, used under the MIT License:
+
+  MIT License
+
+  Copyright (c) Microsoft Corporation.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"),
+  to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+  and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+  THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  DEALINGS IN THE SOFTWARE.
+````
+
+### [25]
+
 `fontdb` 0.23.0, `LICENSE`.
 
 ````text
@@ -3224,301 +3304,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [24]
-
-`giallo` 0.5.2, `LICENSE`.
-
-````text
-                      EUROPEAN UNION PUBLIC LICENCE v. 1.2
-                      EUPL © the European Union 2007, 2016
-
-This European Union Public Licence (the ‘EUPL’) applies to the Work (as defined
-below) which is provided under the terms of this Licence. Any use of the Work,
-other than as authorised under this Licence is prohibited (to the extent such
-use is covered by a right of the copyright holder of the Work).
-
-The Work is provided under the terms of this Licence when the Licensor (as
-defined below) has placed the following notice immediately following the
-copyright notice for the Work:
-
-        Licensed under the EUPL
-
-or has expressed by any other means his willingness to license under the EUPL.
-
-1. Definitions
-
-In this Licence, the following terms have the following meaning:
-
-- ‘The Licence’: this Licence.
-
-- ‘The Original Work’: the work or software distributed or communicated by the
-  Licensor under this Licence, available as Source Code and also as Executable
-  Code as the case may be.
-
-- ‘Derivative Works’: the works or software that could be created by the
-  Licensee, based upon the Original Work or modifications thereof. This Licence
-  does not define the extent of modification or dependence on the Original Work
-  required in order to classify a work as a Derivative Work; this extent is
-  determined by copyright law applicable in the country mentioned in Article 15.
-
-- ‘The Work’: the Original Work or its Derivative Works.
-
-- ‘The Source Code’: the human-readable form of the Work which is the most
-  convenient for people to study and modify.
-
-- ‘The Executable Code’: any code which has generally been compiled and which is
-  meant to be interpreted by a computer as a program.
-
-- ‘The Licensor’: the natural or legal person that distributes or communicates
-  the Work under the Licence.
-
-- ‘Contributor(s)’: any natural or legal person who modifies the Work under the
-  Licence, or otherwise contributes to the creation of a Derivative Work.
-
-- ‘The Licensee’ or ‘You’: any natural or legal person who makes any usage of
-  the Work under the terms of the Licence.
-
-- ‘Distribution’ or ‘Communication’: any act of selling, giving, lending,
-  renting, distributing, communicating, transmitting, or otherwise making
-  available, online or offline, copies of the Work or providing access to its
-  essential functionalities at the disposal of any other natural or legal
-  person.
-
-2. Scope of the rights granted by the Licence
-
-The Licensor hereby grants You a worldwide, royalty-free, non-exclusive,
-sublicensable licence to do the following, for the duration of copyright vested
-in the Original Work:
-
-- use the Work in any circumstance and for all usage,
-- reproduce the Work,
-- modify the Work, and make Derivative Works based upon the Work,
-- communicate to the public, including the right to make available or display
-  the Work or copies thereof to the public and perform publicly, as the case may
-  be, the Work,
-- distribute the Work or copies thereof,
-- lend and rent the Work or copies thereof,
-- sublicense rights in the Work or copies thereof.
-
-Those rights can be exercised on any media, supports and formats, whether now
-known or later invented, as far as the applicable law permits so.
-
-In the countries where moral rights apply, the Licensor waives his right to
-exercise his moral right to the extent allowed by law in order to make effective
-the licence of the economic rights here above listed.
-
-The Licensor grants to the Licensee royalty-free, non-exclusive usage rights to
-any patents held by the Licensor, to the extent necessary to make use of the
-rights granted on the Work under this Licence.
-
-3. Communication of the Source Code
-
-The Licensor may provide the Work either in its Source Code form, or as
-Executable Code. If the Work is provided as Executable Code, the Licensor
-provides in addition a machine-readable copy of the Source Code of the Work
-along with each copy of the Work that the Licensor distributes or indicates, in
-a notice following the copyright notice attached to the Work, a repository where
-the Source Code is easily and freely accessible for as long as the Licensor
-continues to distribute or communicate the Work.
-
-4. Limitations on copyright
-
-Nothing in this Licence is intended to deprive the Licensee of the benefits from
-any exception or limitation to the exclusive rights of the rights owners in the
-Work, of the exhaustion of those rights or of other applicable limitations
-thereto.
-
-5. Obligations of the Licensee
-
-The grant of the rights mentioned above is subject to some restrictions and
-obligations imposed on the Licensee. Those obligations are the following:
-
-Attribution right: The Licensee shall keep intact all copyright, patent or
-trademarks notices and all notices that refer to the Licence and to the
-disclaimer of warranties. The Licensee must include a copy of such notices and a
-copy of the Licence with every copy of the Work he/she distributes or
-communicates. The Licensee must cause any Derivative Work to carry prominent
-notices stating that the Work has been modified and the date of modification.
-
-Copyleft clause: If the Licensee distributes or communicates copies of the
-Original Works or Derivative Works, this Distribution or Communication will be
-done under the terms of this Licence or of a later version of this Licence
-unless the Original Work is expressly distributed only under this version of the
-Licence — for example by communicating ‘EUPL v. 1.2 only’. The Licensee
-(becoming Licensor) cannot offer or impose any additional terms or conditions on
-the Work or Derivative Work that alter or restrict the terms of the Licence.
-
-Compatibility clause: If the Licensee Distributes or Communicates Derivative
-Works or copies thereof based upon both the Work and another work licensed under
-a Compatible Licence, this Distribution or Communication can be done under the
-terms of this Compatible Licence. For the sake of this clause, ‘Compatible
-Licence’ refers to the licences listed in the appendix attached to this Licence.
-Should the Licensee's obligations under the Compatible Licence conflict with
-his/her obligations under this Licence, the obligations of the Compatible
-Licence shall prevail.
-
-Provision of Source Code: When distributing or communicating copies of the Work,
-the Licensee will provide a machine-readable copy of the Source Code or indicate
-a repository where this Source will be easily and freely available for as long
-as the Licensee continues to distribute or communicate the Work.
-
-Legal Protection: This Licence does not grant permission to use the trade names,
-trademarks, service marks, or names of the Licensor, except as required for
-reasonable and customary use in describing the origin of the Work and
-reproducing the content of the copyright notice.
-
-6. Chain of Authorship
-
-The original Licensor warrants that the copyright in the Original Work granted
-hereunder is owned by him/her or licensed to him/her and that he/she has the
-power and authority to grant the Licence.
-
-Each Contributor warrants that the copyright in the modifications he/she brings
-to the Work are owned by him/her or licensed to him/her and that he/she has the
-power and authority to grant the Licence.
-
-Each time You accept the Licence, the original Licensor and subsequent
-Contributors grant You a licence to their contributions to the Work, under the
-terms of this Licence.
-
-7. Disclaimer of Warranty
-
-The Work is a work in progress, which is continuously improved by numerous
-Contributors. It is not a finished work and may therefore contain defects or
-‘bugs’ inherent to this type of development.
-
-For the above reason, the Work is provided under the Licence on an ‘as is’ basis
-and without warranties of any kind concerning the Work, including without
-limitation merchantability, fitness for a particular purpose, absence of defects
-or errors, accuracy, non-infringement of intellectual property rights other than
-copyright as stated in Article 6 of this Licence.
-
-This disclaimer of warranty is an essential part of the Licence and a condition
-for the grant of any rights to the Work.
-
-8. Disclaimer of Liability
-
-Except in the cases of wilful misconduct or damages directly caused to natural
-persons, the Licensor will in no event be liable for any direct or indirect,
-material or moral, damages of any kind, arising out of the Licence or of the use
-of the Work, including without limitation, damages for loss of goodwill, work
-stoppage, computer failure or malfunction, loss of data or any commercial
-damage, even if the Licensor has been advised of the possibility of such damage.
-However, the Licensor will be liable under statutory product liability laws as
-far such laws apply to the Work.
-
-9. Additional agreements
-
-While distributing the Work, You may choose to conclude an additional agreement,
-defining obligations or services consistent with this Licence. However, if
-accepting obligations, You may act only on your own behalf and on your sole
-responsibility, not on behalf of the original Licensor or any other Contributor,
-and only if You agree to indemnify, defend, and hold each Contributor harmless
-for any liability incurred by, or claims asserted against such Contributor by
-the fact You have accepted any warranty or additional liability.
-
-10. Acceptance of the Licence
-
-The provisions of this Licence can be accepted by clicking on an icon ‘I agree’
-placed under the bottom of a window displaying the text of this Licence or by
-affirming consent in any other similar way, in accordance with the rules of
-applicable law. Clicking on that icon indicates your clear and irrevocable
-acceptance of this Licence and all of its terms and conditions.
-
-Similarly, you irrevocably accept this Licence and all of its terms and
-conditions by exercising any rights granted to You by Article 2 of this Licence,
-such as the use of the Work, the creation by You of a Derivative Work or the
-Distribution or Communication by You of the Work or copies thereof.
-
-11. Information to the public
-
-In case of any Distribution or Communication of the Work by means of electronic
-communication by You (for example, by offering to download the Work from a
-remote location) the distribution channel or media (for example, a website) must
-at least provide to the public the information requested by the applicable law
-regarding the Licensor, the Licence and the way it may be accessible, concluded,
-stored and reproduced by the Licensee.
-
-12. Termination of the Licence
-
-The Licence and the rights granted hereunder will terminate automatically upon
-any breach by the Licensee of the terms of the Licence.
-
-Such a termination will not terminate the licences of any person who has
-received the Work from the Licensee under the Licence, provided such persons
-remain in full compliance with the Licence.
-
-13. Miscellaneous
-
-Without prejudice of Article 9 above, the Licence represents the complete
-agreement between the Parties as to the Work.
-
-If any provision of the Licence is invalid or unenforceable under applicable
-law, this will not affect the validity or enforceability of the Licence as a
-whole. Such provision will be construed or reformed so as necessary to make it
-valid and enforceable.
-
-The European Commission may publish other linguistic versions or new versions of
-this Licence or updated versions of the Appendix, so far this is required and
-reasonable, without reducing the scope of the rights granted by the Licence. New
-versions of the Licence will be published with a unique version number.
-
-All linguistic versions of this Licence, approved by the European Commission,
-have identical value. Parties can take advantage of the linguistic version of
-their choice.
-
-14. Jurisdiction
-
-Without prejudice to specific agreement between parties,
-
-- any litigation resulting from the interpretation of this License, arising
-  between the European Union institutions, bodies, offices or agencies, as a
-  Licensor, and any Licensee, will be subject to the jurisdiction of the Court
-  of Justice of the European Union, as laid down in article 272 of the Treaty on
-  the Functioning of the European Union,
-
-- any litigation arising between other parties and resulting from the
-  interpretation of this License, will be subject to the exclusive jurisdiction
-  of the competent court where the Licensor resides or conducts its primary
-  business.
-
-15. Applicable Law
-
-Without prejudice to specific agreement between parties,
-
-- this Licence shall be governed by the law of the European Union Member State
-  where the Licensor has his seat, resides or has his registered office,
-
-- this licence shall be governed by Belgian law if the Licensor has no seat,
-  residence or registered office inside a European Union Member State.
-
-Appendix
-
-‘Compatible Licences’ according to Article 5 EUPL are:
-
-- GNU General Public License (GPL) v. 2, v. 3
-- GNU Affero General Public License (AGPL) v. 3
-- Open Software License (OSL) v. 2.1, v. 3.0
-- Eclipse Public License (EPL) v. 1.0
-- CeCILL v. 2.0, v. 2.1
-- Mozilla Public Licence (MPL) v. 2
-- GNU Lesser General Public Licence (LGPL) v. 2.1, v. 3
-- Creative Commons Attribution-ShareAlike v. 3.0 Unported (CC BY-SA 3.0) for
-  works other than software
-- European Union Public Licence (EUPL) v. 1.1, v. 1.2
-- Québec Free and Open-Source Licence — Reciprocity (LiLiQ-R) or Strong
-  Reciprocity (LiLiQ-R+).
-
-The European Commission may update this Appendix to later versions of the above
-licences without producing a new version of the EUPL, as long as they provide
-the rights granted in Article 2 of this Licence and protect the covered Source
-Code from exclusive appropriation.
-
-All other changes or additions to this Appendix require the production of a new
-EUPL version.
-````
-
-### [25]
+### [26]
 
 `icu_collections` 2.3.0, `LICENSE`; `icu_locale_core` 2.3.0, `LICENSE`; `icu_normalizer` 2.3.0, `LICENSE`; `icu_normalizer_data` 2.3.0, `LICENSE`; `icu_properties` 2.3.0, `LICENSE`; `icu_properties_data` 2.3.0, `LICENSE`; `icu_provider` 2.3.1, `LICENSE`; `litemap` 0.8.3, `LICENSE`; `potential_utf` 0.1.6, `LICENSE`; `tinystr` 0.8.4, `LICENSE`; `writeable` 0.6.4, `LICENSE`; `yoke` 0.8.3, `LICENSE`; `zerofrom` 0.1.8, `LICENSE`; `zerotrie` 0.2.5, `LICENSE`; `zerovec` 0.11.8, `LICENSE`.
 
@@ -3571,7 +3357,7 @@ Portions of ICU4X may have been adapted from ICU4C and/or ICU4J.
 ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation and others.
 ````
 
-### [26]
+### [27]
 
 `inotify` 0.11.5, `LICENSE`; `inotify-sys` 0.1.8, `LICENSE`.
 
@@ -3591,7 +3377,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ````
 
-### [27]
+### [28]
 
 `jpeg-encoder` 0.7.1, `LICENSE-IJG`.
 
@@ -3667,7 +3453,7 @@ commercial products, provided that all warranty or liability claims are
 assumed by the product vendor.
 ````
 
-### [28]
+### [29]
 
 `libmimalloc-sys` 0.1.49, `LICENSE.txt`; `mimalloc` 0.1.52, `LICENSE.txt`.
 
@@ -3699,7 +3485,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ````
 
-### [29]
+### [30]
 
 `mio` 1.2.4, `LICENSE`.
 
@@ -3725,7 +3511,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [30]
+### [31]
 
 `notify` 9.0.0-rc.5, `LICENSE-CC0`.
 
@@ -3773,139 +3559,7 @@ For these and/or other purposes and motivations, and without any expectation of 
      d. Affirmer understands and acknowledges that Creative Commons is not a party to this document and has no duty or obligation with respect to this CC0 or use of the Work.
 ````
 
-### [31]
-
-`onig-regset` 6.7.0, `LICENSE.md`.
-
-````text
-# Rust-Onig is Open Source!
-
-All source code in this repository is distributed under the terms of
-the *MIT License* unless otherwise stated. The Oniguruma source code
-remains the property of the original authors and is re-distributed
-under the original license.
-
-> The MIT License (MIT)
->
-> Copyright (c) 2015 Will Speak <will@willspeak.me>, Ivan Ivashchenko
-> <defuz@me.com>, and contributors.
->
-> Permission is hereby granted, free of charge, to any person obtaining a copy
-> of this software and associated documentation files (the "Software"), to deal
-> in the Software without restriction, including without limitation the rights
-> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-> copies of the Software, and to permit persons to whom the Software is
-> furnished to do so, subject to the following conditions:
->
-> The above copyright notice and this permission notice shall be included in all
-> copies or substantial portions of the Software.
->
-> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-> SOFTWARE.
-````
-
 ### [32]
-
-`onig_sys` 69.9.3, `LICENSE.md`.
-
-````text
-# Rust-Onig is Open Source!
-
-All source code in this repository is distributed under the terms of
-the *MIT License* unless otherwise stated. The Oniguruma source code
-remains the property of the original authors and is re-distributed
-under the original license, see [COPYING](oniguruma/COPYING) for more
-information.
-
-> The MIT License (MIT)
->
-> Copyright (c) 2015 Will Speak <will@willspeak.me>, Ivan Ivashchenko
-> <defuz@me.com>, and contributors.
->
-> Permission is hereby granted, free of charge, to any person obtaining a copy
-> of this software and associated documentation files (the "Software"), to deal
-> in the Software without restriction, including without limitation the rights
-> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-> copies of the Software, and to permit persons to whom the Software is
-> furnished to do so, subject to the following conditions:
->
-> The above copyright notice and this permission notice shall be included in all
-> copies or substantial portions of the Software.
->
-> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-> SOFTWARE.
-````
-
-### [33]
-
-`onig_sys` 69.9.3, `oniguruma/COPYING`.
-
-````text
-Oniguruma LICENSE
------------------
-
-Copyright (c) 2002-2021  K.Kosako  <kkosako0@gmail.com>
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGE.
-````
-
-### [34]
-
-`papaya` 0.2.5, `LICENSE.md`.
-
-````text
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-````
-
-### [35]
 
 `phf` 0.11.3, `LICENSE`; `phf` 0.14.0, `LICENSE`; `phf_shared` 0.11.3, `LICENSE`; `phf_shared` 0.14.0, `LICENSE`.
 
@@ -3932,7 +3586,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [36]
+### [33]
 
 `pulldown-cmark` 0.13.4, `LICENSE`.
 
@@ -3960,7 +3614,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [37]
+### [34]
 
 `rustls-webpki` 0.103.15, `LICENSE`.
 
@@ -3986,7 +3640,7 @@ The files under third-party/chromium are licensed as described in
 third-party/chromium/LICENSE.
 ````
 
-### [38]
+### [35]
 
 `same-file` 1.0.6, `LICENSE-MIT`; `winapi-util` 0.1.11, `LICENSE-MIT`.
 
@@ -4014,35 +3668,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [39]
-
-`seize` 0.5.1, `LICENSE`.
-
-````text
-MIT License
-
-Copyright (c) 2022 Ibraheem Ahmed
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-````
-
-### [40]
+### [36]
 
 `simd-adler32` 0.3.10, `LICENSE.md`.
 
@@ -4070,7 +3696,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [41]
+### [37]
 
 `slotmap` 1.1.1, `LICENSE`.
 
@@ -4096,7 +3722,7 @@ the following restrictions:
  3. This notice may not be removed or altered from any source distribution.
 ````
 
-### [42]
+### [38]
 
 `strum` 0.28.0, `LICENSE`.
 
@@ -4124,7 +3750,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [43]
+### [39]
 
 `subtle` 2.6.1, `LICENSE`.
 
@@ -4160,7 +3786,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-### [44]
+### [40]
 
 `untrusted` 0.9.0, `LICENSE.txt`.
 
@@ -4180,7 +3806,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ````
 
-### [45]
+### [41]
 
 `webpki-roots` 1.0.9, `LICENSE`.
 
@@ -4248,7 +3874,7 @@ of Data, including for example machine learning models and models'
 insights.
 ````
 
-### [46]
+### [42]
 
 `winnow` 1.0.4, `LICENSE-MIT`.
 
@@ -4273,7 +3899,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [47]
+### [43]
 
 `xxhash-rust` 0.8.19, `LICENSE`.
 
@@ -4303,7 +3929,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ````
 
-### [48]
+### [44]
 
 `zmij` 1.0.23, `LICENSE-MIT`.
 
@@ -4331,93 +3957,4 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-````
-
-### [49]
-
-`zstd` 0.13.3, `LICENSE`.
-
-````text
-The MIT License (MIT)
-Copyright (c) 2016 Alexandre Bury
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
-
-### [50]
-
-`zstd-safe` 7.3.0, `LICENSE`; `zstd-sys` 2.1.0+zstd.1.5.7, `LICENSE`.
-
-````text
-BSD 3-Clause License
-
-Copyright (c) 2026, Alexandre Bury
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
-
-### [51]
-
-`zstd-sys` 2.1.0+zstd.1.5.7, `LICENSE.BSD-3-Clause`.
-
-````text
-The auto-generated bindings are under the 3-clause BSD license:
-
-BSD License
-
-For Zstandard software
-
-Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
- * Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
- * Neither the name Facebook, nor Meta, nor the names of its contributors may
-   be used to endorse or promote products derived from this software without
-   specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````

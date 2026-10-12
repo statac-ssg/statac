@@ -2,6 +2,20 @@
 
 What changed in each release of Statac, the newest first.
 
+## Unreleased
+
+### Changed
+
+- Coloured code is marked with the kind of each piece, such as
+  `hl-keyword` or `hl-comment`, in place of a numbered class, and is
+  marked the same whatever `code_style` is. `code.css` gives each kind
+  one rule, and a site changes a colour by setting its property, such as
+  `--code-comment`, in a stylesheet of its own. Rules a site wrote for
+  the numbered classes no longer apply.
+- Code is coloured by another library, so some pieces take another
+  colour than before, and Statac no longer builds the Oniguruma and
+  Zstandard C libraries or carries code under the EUPL.
+
 ## 0.2.0 - 2026-10-11
 
 ### New

@@ -63,9 +63,11 @@ fn every_piece_is_written_through_its_file_handed_what_the_writing_says() {
          <image address=a.png alt=A picture title=Shown width= height= photo=> \
          <inline_code code=x &lt; y>\
          <footnote number=1 shown=1 id=back-1 note=note-1></p>\n\
-         <code code=let x = 1 &lt; 2; body=<span class=\"hl-4k\">let</span> \
-         <span class=\"hl-52\">x</span> = <span class=\"hl-5z\">1</span> &lt; \
-         <span class=\"hl-5z\">2</span>; language=rust caption=example.rs>\n\
+         <code code=let x = 1 &lt; 2; body=<span class=\"hl-keyword\">let</span> \
+         <span class=\"hl-variable\">x</span> <span class=\"hl-operator\">=</span> \
+         <span class=\"hl-number\">1</span> <span class=\"hl-operator\">&lt;</span> \
+         <span class=\"hl-number\">2</span><span class=\"hl-punctuation\">;</span> \
+         language=rust caption=example.rs>\n\
          <callout kind=tip title=Tip body=<p>Words.</p>>\n\
          <footnotes notes=[1 1 note-1 back-1 <p>A note.</p>] label=back to the text>"
     );

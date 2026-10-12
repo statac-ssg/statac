@@ -1,4 +1,4 @@
-//! The looks Statac's styles give code are the ones their themes give, and
+//! The colours Statac's styles give code are the ones their themes give, and
 //! every grammar and theme carried has its notice.
 
 #[allow(dead_code, reason = "the tests use what is written, not `main`")]
@@ -6,12 +6,12 @@
 mod grammars;
 
 #[test]
-fn the_looks_written_are_the_ones_the_themes_give() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/highlight/looks.rs");
+fn the_styles_written_are_the_ones_the_themes_give() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/highlight/styles.rs");
     let written = std::fs::read_to_string(path).unwrap();
     assert!(
-        written.replace("\r\n", "\n") == grammars::looks_rs(),
-        "src/highlight/looks.rs differs from its themes; \
+        written.replace("\r\n", "\n") == grammars::styles_rs(),
+        "src/highlight/styles.rs differs from its themes; \
          run `cargo run --example grammars -- <tm-grammars>` to write it again"
     );
 }
