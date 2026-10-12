@@ -36,10 +36,13 @@ Ask for the stylesheet inside the `<head>` of your layout (the template
 your other templates extend), so that every page loads it.
 
 If the colours reach your pages in a way Statac can't see, such as rules
-copied into another stylesheet, or if you want code in one colour,
-quieten this warning with `quiet: [code-colours-not-loaded]` in
-`statac.yaml`. To show a single block without colour, give `text` as its
-language, or give no language.
+copied into another stylesheet, quieten this warning with
+`quiet: [code-colours-not-loaded]` in `statac.yaml`.
+
+If you want no coloured code at all, set `code_style: none` in
+`statac.yaml`. Statac then colours nothing and publishes no `code.css`,
+so there is nothing to warn of. To show a single block without colour,
+give `text` as its language, or give no language.
 
 ## Example
 

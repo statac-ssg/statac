@@ -31,6 +31,10 @@ this warning. If the word is there on purpose, so that your own
 stylesheet or script can find it in the class, quieten this warning with
 `quiet: [unknown-code-language]` in `statac.yaml`.
 
+If your own script colours all the site's code, set `code_style: none`
+in `statac.yaml` instead. Statac then colours nothing and has no warning
+for any language.
+
 ## Example
 
 In `content/post-1.md`:
