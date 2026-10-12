@@ -2,7 +2,7 @@
 
 What changed in each release of Statac, the newest first.
 
-## Unreleased
+## 0.3.0 - 2026-10-12
 
 ### New
 
