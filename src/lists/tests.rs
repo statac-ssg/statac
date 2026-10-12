@@ -1198,7 +1198,13 @@ fn related_posts_share_the_most_tags_first_then_keep_the_sites_order() {
         ("content/post-5.md", &tagged("2026-05-01", "Go")),
         ("content/post-6.md", &post("2026-06-01")),
     ]);
-    let related = |path: &str| shown(&read, &super::related(&read.site, page_id(&read, path)));
+    let related = |path: &str| {
+        let mut groups = super::related(&read.site, page_id(&read, path));
+        for group in &mut groups {
+            super::in_site_order(&read.site, group);
+        }
+        shown(&read, &groups.concat())
+    };
     assert_eq!(
         related("post-1.md"),
         ["post-3.md", "post-5.md", "post-2.md"]
@@ -1247,7 +1253,7 @@ fn a_page_sending_readers_on_is_in_no_list() {
     assert_eq!(read.site.neighbours[sending.index()], [None, None]);
     let post = page_id(&read, "post-1.md");
     assert_eq!(read.site.neighbours[post.index()], [None, None]);
-    assert_eq!(super::related(&read.site, post), Vec::<PageId>::new());
+    assert_eq!(super::related(&read.site, post), Vec::<Vec<PageId>>::new());
 }
 
 /// Where a page sending readers on speaks for a list, times what it

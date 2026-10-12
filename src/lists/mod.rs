@@ -31,7 +31,7 @@ mod tests;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-pub use filter::{Filter, related, tags_of};
+pub use filter::{Filter, in_site_order, related, tags_of};
 
 use crate::config::Settings;
 use crate::content::address::{Address, Top};

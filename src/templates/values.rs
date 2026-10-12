@@ -797,10 +797,28 @@ pub(super) enum Which {
     Stretch(ListId, usize),
     /// A list's page and each of its later pages, this many in all.
     Pager(PageId, usize),
-    These(Vec<PageId>),
+    /// Posts in groups, one group after another, each put in the site's
+    /// order when a post of it is first reached.
+    Groups(Vec<Group>),
     /// Pages chosen from, or put in order from, one of the lists above
     /// that is the same whichever page asks, by `asked`.
     Chosen(SomePages, Asked),
+}
+
+/// Posts in no order, and the same in the site's once it is asked for.
+#[derive(Debug)]
+pub(super) struct Group {
+    posts: Vec<PageId>,
+    ordered: std::sync::OnceLock<Vec<PageId>>,
+}
+
+impl Group {
+    pub fn of(posts: Vec<PageId>) -> Group {
+        Group {
+            posts,
+            ordered: std::sync::OnceLock::new(),
+        }
+    }
 }
 
 /// What a choice of pages worked out once for the site is known by: the
@@ -824,7 +842,7 @@ impl Pages {
             Which::Posts(list) => Some(of("posts", list)),
             Which::All(list) => Some(of("all", list)),
             Which::Chosen(_, asked) => Some(asked.clone()),
-            Which::Stretch(..) | Which::Pager(..) | Which::These(_) => None,
+            Which::Stretch(..) | Which::Pager(..) | Which::Groups(_) => None,
         }
     }
 
@@ -870,7 +888,7 @@ impl Pages {
             }
             Which::Stretch(list, number) => lists.get(*list).stretch(*number).len(),
             Which::Pager(_, pages) => *pages,
-            Which::These(pages) => pages.len(),
+            Which::Groups(groups) => groups.iter().map(|group| group.posts.len()).sum(),
             Which::Chosen(pages, _) => pages.len(),
         }
     }
@@ -889,7 +907,22 @@ impl Pages {
             }
             Which::Stretch(list, number) => lists.get(*list).stretch(*number).get(at).map(first),
             Which::Pager(page, pages) => (at < *pages).then_some((*page, at + 1)),
-            Which::These(pages) => pages.get(at).map(first),
+            Which::Groups(groups) => {
+                let mut at = at;
+                let group = groups.iter().find(|group| {
+                    let within = at < group.posts.len();
+                    if !within {
+                        at -= group.posts.len();
+                    }
+                    within
+                })?;
+                let ordered = group.ordered.get_or_init(|| {
+                    let mut posts = group.posts.clone();
+                    crate::lists::in_site_order(&self.shared.site, &mut posts);
+                    posts
+                });
+                ordered.get(at).map(first)
+            }
             Which::Chosen(pages, _) => pages.get(at).copied(),
         }
     }

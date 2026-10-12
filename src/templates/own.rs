@@ -13,7 +13,7 @@ use minijinja::{Environment, Error, State};
 use super::frame;
 use super::guard::{self, Callee, Input};
 use super::render::Shared;
-use super::values::{DateValue, ListValue, Lists, PageValue, Pages, Which};
+use super::values::{DateValue, Group, ListValue, Lists, PageValue, Pages, Which};
 use crate::content::words::PageWord;
 use crate::date::Date;
 use crate::dates::ShowDates;
@@ -594,9 +594,10 @@ fn related(shared: &Arc<Shared>, page: PageId) -> Value {
     for tag in crate::lists::tags_of(&shared.site, page) {
         super::values::read_whole(tag);
     }
+    let groups = crate::lists::related(&shared.site, page);
     Pages::value(
         shared,
-        Which::These(crate::lists::related(&shared.site, page)),
+        Which::Groups(groups.into_iter().map(Group::of).collect()),
     )
 }
 

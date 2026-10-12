@@ -2,9 +2,8 @@
 //! and a page's `posts:` line both come here, so the two can never read a
 //! filter differently. `related` chooses by a page's tags.
 
-use std::cell::OnceCell;
-use std::cmp::Reverse;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::cell::{OnceCell, RefCell};
+use std::collections::{BTreeSet, HashSet};
 
 use crate::content::words::PageWord;
 use crate::problem::{Kind, Word};
@@ -181,23 +180,51 @@ pub fn tags_of(site: &Site, page: PageId) -> Vec<ListId> {
     lists
 }
 
-/// The posts sharing at least one tag with `page`, those sharing most
-/// first, then in the site's order; never the page itself.
-pub fn related(site: &Site, page: PageId) -> Vec<PageId> {
-    let mut shared: HashMap<PageId, usize> = HashMap::new();
-    for tag in tags_of(site, page) {
-        for &member in &site.lists.get(tag).members {
-            if member != page {
-                *shared.entry(member).or_default() += 1;
+thread_local! {
+    /// How many tags each page shares with the one in hand, by page; all
+    /// nothing between one count and the next.
+    static SHARED: RefCell<Vec<u16>> = const { RefCell::new(Vec::new()) };
+}
+
+/// The posts sharing at least one tag with `page`, never the page itself,
+/// grouped by how many they share, those sharing most first. A group is
+/// in no order: [`in_site_order`] puts one in the site's.
+///
+/// The posts of a tag grow with the site, so this is counted without
+/// hashing or sorting, and the groups left in no order for whoever reads
+/// only the first few posts.
+pub fn related(site: &Site, page: PageId) -> Vec<Vec<PageId>> {
+    SHARED.with_borrow_mut(|shared| {
+        shared.resize(site.pages.len(), 0);
+        let mut sharing = Vec::new();
+        let mut most = 0;
+        for tag in tags_of(site, page) {
+            for &member in &site.lists.get(tag).members {
+                let count = &mut shared[member.index()];
+                if member != page {
+                    if *count == 0 {
+                        sharing.push(member);
+                    }
+                    *count = count.saturating_add(1);
+                    most = most.max(*count);
+                }
             }
         }
-    }
-    let mut related: Vec<(PageId, usize)> = shared.into_iter().collect();
-    related.sort_by_key(|&(member, count)| {
-        let place = site.places.get(member.index()).copied().flatten();
-        (Reverse(count), place.unwrap_or(usize::MAX), member)
+        let mut groups = vec![Vec::new(); usize::from(most)];
+        for member in sharing {
+            let count = std::mem::take(&mut shared[member.index()]);
+            groups[usize::from(most - count)].push(member);
+        }
+        groups
+    })
+}
+
+/// Posts put in the site's order, those in none after the rest.
+pub fn in_site_order(site: &Site, posts: &mut [PageId]) {
+    posts.sort_unstable_by_key(|&post| {
+        let place = site.places.get(post.index()).copied().flatten();
+        (place.unwrap_or(usize::MAX), post)
     });
-    related.into_iter().map(|(member, _)| member).collect()
 }
 
 /// The names of a language's lists of one kind, A to Z.
