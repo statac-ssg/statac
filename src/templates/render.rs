@@ -1307,6 +1307,10 @@ impl markdown::Snippets for Prose<'_> {
         self.shared.templates.pieces.contains_key(&piece) && !self.failed.borrow().contains(&piece)
     }
 
+    fn reads(&self, piece: Piece, name: &str) -> bool {
+        super::pieces::reads(self.shared, piece, name)
+    }
+
     fn piece(
         &self,
         piece: Piece,

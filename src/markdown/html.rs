@@ -24,6 +24,12 @@ pub trait Snippets {
         false
     }
 
+    /// Whether the site's file for `piece` can read what it is handed as
+    /// `name`. Where it can't, the value need not be made.
+    fn reads(&self, _piece: Piece, _name: &str) -> bool {
+        true
+    }
+
     /// `piece` as the site writes it, handed `values`, for the writing at
     /// `place`. None where the site's file couldn't write it, which is
     /// told; the piece is then written as Statac writes it.
@@ -321,12 +327,16 @@ impl<'a> Writer<'a> {
                 // fence is the code's.
                 let code = text.strip_suffix('\n').unwrap_or(text);
                 let code = code.strip_suffix('\r').unwrap_or(code);
-                let body = self.code(info, code);
                 let (language, caption) = pieces::fence(info);
+                let mut body = None;
                 if self.writes(Piece::Code) {
+                    // Colouring is most of the cost of a block.
+                    if self.options.snippets.reads(Piece::Code, "body") {
+                        body = Some(self.code(info, code));
+                    }
                     let values = vec![
                         ("code", PieceValue::Text(code.to_owned())),
-                        ("body", PieceValue::Html(body.clone())),
+                        ("body", PieceValue::Html(body.clone().unwrap_or_default())),
                         ("language", PieceValue::Text(language.to_owned())),
                         ("caption", PieceValue::Text(caption.to_owned())),
                     ];
@@ -334,6 +344,7 @@ impl<'a> Writer<'a> {
                         return;
                     }
                 }
+                let body = body.unwrap_or_else(|| self.code(info, code));
                 self.new_block();
                 // Words with no letter or digit caption nothing, and the
                 // line's first word is then the block's class, quoted or

@@ -1,4 +1,5 @@
 use super::*;
+use crate::highlight::Highlighter;
 use crate::origin::Style;
 use crate::problem::{Kind as ProblemKind, Unmatched};
 use crate::source::{LineColumn, Place};
@@ -2883,5 +2884,76 @@ fn html_that_reaches_past_the_writing_is_told_at_its_tag() {
         assert_eq!(unmatched_at(text), wanted, "{text:?}");
         let crlf = text.replace('\n', "\r\n");
         assert_eq!(unmatched_at(&crlf), wanted, "{crlf:?}");
+    }
+}
+
+/// Writes code as a site's own file would: `reads` says whether the file
+/// can read `body`, and `stops` that it stops, leaving the block to be
+/// written without it. Keeps each `body` it was handed.
+struct OwnCode {
+    reads: bool,
+    stops: bool,
+    handed: std::cell::RefCell<Vec<String>>,
+}
+
+impl Snippets for OwnCode {
+    fn html(&self, _: &Call, _: Place, _: Placement, _: Option<&str>) -> String {
+        String::new()
+    }
+
+    fn writes(&self, piece: Piece) -> bool {
+        piece == Piece::Code
+    }
+
+    fn reads(&self, _: Piece, _: &str) -> bool {
+        self.reads
+    }
+
+    fn piece(&self, _: Piece, values: Vec<(&'static str, PieceValue)>, _: Place) -> Option<String> {
+        for (name, value) in values {
+            if let ("body", PieceValue::Html(body)) = (name, value) {
+                self.handed.borrow_mut().push(body);
+            }
+        }
+        (!self.stops).then(|| "<pre>own</pre>".to_owned())
+    }
+}
+
+#[test]
+fn code_is_coloured_for_a_file_of_the_sites_only_where_the_file_can_read_it() {
+    let highlighter = Highlighter::new("ocean").unwrap();
+    let coloured = highlighter.html("yaml", "a: 1");
+    assert!(coloured.contains("<span"), "{coloured}");
+    let written =
+        format!("<pre class=\"code\"><code class=\"language-yaml\">{coloured}</code></pre>");
+    let cases = [
+        (true, false, coloured.as_ref(), "<pre>own</pre>"),
+        (false, false, "", "<pre>own</pre>"),
+        (true, true, coloured.as_ref(), written.as_str()),
+        (false, true, "", written.as_str()),
+    ];
+    for (reads, stops, handed, html) in cases {
+        let snippets = OwnCode {
+            reads,
+            stops,
+            handed: std::cell::RefCell::default(),
+        };
+        let (_, document) = read_text("```yaml\na: 1\n```\n");
+        let built = to_html(
+            &document,
+            &Options {
+                snippets: &snippets,
+                back_to_the_text: None,
+                digits: None,
+                right_to_left: false,
+                highlighter: Some(&highlighter),
+            },
+        );
+        assert_eq!(built, html, "reads {reads}, stops {stops}");
+        assert_eq!(
+            *snippets.handed.borrow(),
+            [handed],
+            "reads {reads}, stops {stops}"
+        );
     }
 }

@@ -23,6 +23,8 @@ What changed in each release of Statac, the newest first.
 - Code is coloured by another library, so some pieces take another
   colour than before, and Statac no longer builds the Oniguruma and
   Zstandard C libraries or carries code under the EUPL.
+- A site whose own `snippets/markdown/code.html` never shows `body`
+  builds faster: Statac no longer colours code that file can't show.
 
 ## 0.2.0 - 2026-10-11
 

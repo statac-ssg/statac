@@ -984,6 +984,11 @@ impl crate::markdown::Snippets for OfValue<'_> {
                 .is_some_and(|(shared, _)| shared.templates.pieces.contains_key(&piece))
     }
 
+    fn reads(&self, piece: Piece, name: &str) -> bool {
+        self.page
+            .is_none_or(|(shared, _)| super::pieces::reads(shared, piece, name))
+    }
+
     fn piece(
         &self,
         piece: Piece,

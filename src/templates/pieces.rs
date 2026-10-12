@@ -77,6 +77,22 @@ pub(super) fn build(
     Some(built.map(|html| html.trim_end().to_owned()))
 }
 
+/// Whether the site's file for `piece` can read what it is handed as
+/// `name`: it spells the name somewhere, or a word that reaches what it
+/// is handed some other way. A file that spells none of them can't, and
+/// one that spells one may still not.
+pub(super) fn reads(shared: &Shared, piece: Piece, name: &str) -> bool {
+    let templates = &shared.templates;
+    let Some(&file) = templates.pieces.get(&piece) else {
+        return true;
+    };
+    frame::read(Key::Template(Templates::id(file)));
+    let text = shared.sources.text(templates.files[file].source);
+    [name, "debug", "extends"]
+        .iter()
+        .any(|word| text.contains(word))
+}
+
 fn value(handed: PieceValue) -> Value {
     match handed {
         PieceValue::Text(text) => Value::from(text),

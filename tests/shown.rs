@@ -1449,6 +1449,35 @@ fn a_snippet_for_code_numbers_its_lines_and_names_those_picked_out() {
     );
 }
 
+#[test]
+fn a_snippet_for_code_is_handed_it_coloured_however_it_comes_to_read_it() {
+    let site = Site::new("own-code-coloured", "{{ page.content }}");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
+         quiet: [code-colours-not-loaded]\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\n---\n```yaml\na: 1\n```\n",
+    );
+    // The second reads what it was handed under a name it also sets,
+    // where the line setting it is never reached.
+    let snippets = [
+        "<pre><code>{{ body }}</code></pre>\n",
+        "{% if not code %}{% set body = \"\" %}{% endif %}<pre><code>{{ body }}</code></pre>\n",
+    ];
+    for snippet in snippets {
+        site.write("snippets/markdown/code.html", snippet);
+        site.build();
+        let page = site.page("post-1/index.html");
+        assert!(
+            page.starts_with("<pre><code><span class=\"hl-"),
+            "{snippet}: {page}"
+        );
+    }
+}
+
 const MENTIONED: &str = "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
                          url: https://example.org/\nwebmentions: true\n";
 
