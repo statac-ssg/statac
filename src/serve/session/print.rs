@@ -250,6 +250,7 @@ pub(super) struct Prints {
     beside: Slots,
     statics: Slots,
     every_list: OnceLock<u64>,
+    every_front: OnceLock<u64>,
     every_picture: OnceLock<u64>,
     every_file: OnceLock<u64>,
     /// What the reading holds under `fetched/`, by each file's key.
@@ -277,6 +278,7 @@ impl Prints {
             beside: slots(reading.beside.len()),
             statics: slots(reading.statics.len()),
             every_list: OnceLock::new(),
+            every_front: OnceLock::new(),
             every_picture: OnceLock::new(),
             every_file: OnceLock::new(),
             fetched: OnceLock::new(),
@@ -428,6 +430,8 @@ impl Taken<'_> {
                     .with((self.list(list), members, undated))
                     .done()
             }),
+            // Wider than the one name: what any page says of itself.
+            Key::FieldOfEvery(_) => self.every_front(),
             Key::Lists | Key::ListsIn(_) => self.every_list(),
             // Settings and languages are written in files the whole
             // site's fingerprint covers.
@@ -629,6 +633,18 @@ impl Taken<'_> {
                 print = print
                     .shown(&(&feed.address, &feed.template))
                     .place(sources, feed.placed);
+            }
+            print.done()
+        })
+    }
+
+    /// Everything every page says of itself before its writing.
+    fn every_front(&self) -> u64 {
+        *self.prints.every_front.get_or_init(|| {
+            let site = self.reading.renderer.site();
+            let mut print = Print::default();
+            for (id, _) in site.pages.iter() {
+                print = print.with(self.front(id));
             }
             print.done()
         })

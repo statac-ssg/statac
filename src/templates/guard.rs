@@ -457,28 +457,75 @@ fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value
         None => None,
     };
     let invert = callee.starts_with("reject");
-    let mut kept = Vec::new();
-    for item in input.try_iter()? {
-        let value = match &attribute {
-            Some(path) => field_of(&item, path),
-            None => item.clone(),
-        };
-        let passed = match &test {
-            None => value.is_true(),
-            Some((name, _)) if value.is_undefined() && Input::of_test(name) == Input::Whole => {
-                false
+    let choose = || {
+        let mut kept = Vec::new();
+        for item in input.try_iter()? {
+            let value = match &attribute {
+                Some(path) => field_of(&item, path),
+                None => item.clone(),
+            };
+            let passed = match &test {
+                None => value.is_true(),
+                Some((name, _)) if value.is_undefined() && Input::of_test(name) == Input::Whole => {
+                    false
+                }
+                Some((name, test)) => {
+                    let call: Vec<Value> =
+                        std::iter::once(value).chain(rest.iter().cloned()).collect();
+                    check_args(name, Callee::Test, &call, Input::of_test(name))?;
+                    test.call(state, &call)?.is_true()
+                }
+            };
+            if passed != invert {
+                kept.push(item);
             }
-            Some((name, test)) => {
-                let call: Vec<Value> = std::iter::once(value).chain(rest.iter().cloned()).collect();
-                check_args(name, Callee::Test, &call, Input::of_test(name))?;
-                test.call(state, &call)?.is_true()
-            }
-        };
-        if passed != invert {
-            kept.push(item);
         }
+        Ok::<_, Error>(kept)
+    };
+    // Every page chosen by what each writes under one name, which a
+    // layout asks on every page it builds: worked out once.
+    let plain = |value: &Value| {
+        matches!(
+            value.kind(),
+            ValueKind::None | ValueKind::Bool | ValueKind::Number | ValueKind::String
+        )
+    };
+    if let Some(pages) = input.downcast_object_ref::<super::values::EveryPage>()
+        && let Some(path) = &attribute
+        && let Some(field) = path.split('.').next()
+        && super::values::as_written(field)
+        && rest.iter().all(plain)
+    {
+        let shared = &pages.shared;
+        frame::read(crate::reads::Key::FieldOfEvery(shared.name_id(field)));
+        let tested = test.as_ref().map_or("", |(name, _)| name);
+        let asked = (format!("{callee} {path} {tested}"), rest.to_vec());
+        let known = |shared: &super::render::Shared| {
+            let chosen = shared.chosen.lock().expect("never poisoned");
+            chosen.get(&asked).cloned()
+        };
+        let chosen = match known(shared) {
+            Some(chosen) => chosen,
+            None => {
+                let kept = frame::unrecorded(choose)?;
+                let chosen: super::render::SomePages = std::sync::Arc::new(
+                    kept.iter()
+                        .filter_map(|page| page.downcast_object_ref::<super::values::PageValue>())
+                        .map(|page| (page.id, page.number))
+                        .collect(),
+                );
+                let mut all = shared.chosen.lock().expect("never poisoned");
+                std::sync::Arc::clone(all.entry(asked).or_insert(chosen))
+            }
+        };
+        return Ok(Value::from(
+            chosen
+                .iter()
+                .map(|&(id, number)| super::values::PageValue::numbered(shared, id, number))
+                .collect::<Vec<_>>(),
+        ));
     }
-    Ok(Value::from(kept))
+    Ok(Value::from(choose()?))
 }
 
 fn builtin_filter(name: &str) -> Value {

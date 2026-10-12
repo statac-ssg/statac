@@ -1944,3 +1944,45 @@ fn a_stamp_in_a_page_kept_as_a_link_is_told_and_left() {
     assert_eq!(text, waiting);
     site.same(&session, &round, "a stamp behind a link");
 }
+
+#[test]
+fn pages_chosen_from_every_page_by_a_field_follow_the_field() {
+    let site = Site::new("chosen");
+    // Each page lists the pages that ask to be in the menu, those of its
+    // own language, counts those that don't and those of another layout
+    // than the home page's, and lists those ranked past the first.
+    let menu = "<menu>{% for entry in site.pages | selectattr('menu') \
+                | selectattr('language', 'eq', page.language) %}\
+                <a href=\"{{ entry.url }}\">{{ entry.title }}</a>{% endfor %}\
+                {{ site.pages | rejectattr('menu') | list | length }} \
+                {{ site.pages | rejectattr('layout', 'eq', 'home') | list | length }} \
+                {% for entry in site.pages | selectattr('rank', '>', 1) %}{{ entry.url }} {% endfor %}\
+                </menu>\n";
+    site.write("templates/page.html", &format!("{BASE}{menu}{PAGE}"));
+    site.write("templates/home.html", &format!("{BASE}{menu}{HOME}"));
+    let page = |more: &str| format!("---\ntitle: Page 1\n{more}---\nA page.\n");
+    let built = through(
+        &site,
+        &[
+            ("a page", &|site| site.write("content/page-1.md", &page(""))),
+            ("into the menu", &|site| {
+                site.write("content/page-1.md", &page("menu: true\nrank: 2\n"))
+            }),
+            ("another in another language", &|site| {
+                site.write("content/de/page-2.md", &page("menu: true\n"))
+            }),
+            ("out of the menu", &|site| {
+                site.write("content/page-1.md", &page("menu: false\nrank: 1\n"))
+            }),
+            ("a layout of its own", &|site| {
+                site.write("content/page-1.md", &page("layout: home\n"))
+            }),
+            ("the page deleted", &|site| {
+                site.remove("content/de/page-2.md")
+            }),
+        ],
+    );
+    // A page joining the menu is shown on every page.
+    let outputs = built[2].1;
+    assert!(built[2].0 * 2 > outputs, "{built:?}");
+}

@@ -4,7 +4,7 @@
 //! they are part of here. A page's writing built while a template reads it
 //! is an output of its own, with a frame of its own on top.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -195,9 +195,27 @@ pub(super) fn with<R>(f: impl FnOnce(&mut Frame) -> R) -> Option<R> {
     FRAMES.with_borrow_mut(|frames| frames.last_mut().map(f))
 }
 
+thread_local! {
+    /// Whether what is read is being worked out for more than the output
+    /// being built, see [`unrecorded`].
+    static UNRECORDED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Runs `f` with nothing it reads or looks up recorded for the output
+/// being built: for what is worked out once and answered to every output
+/// that asks, each of which records the whole of it under one key.
+pub(super) fn unrecorded<R>(f: impl FnOnce() -> R) -> R {
+    let before = UNRECORDED.replace(true);
+    let made = f();
+    UNRECORDED.set(before);
+    made
+}
+
 /// Records that the output being built read `key`.
 pub(super) fn read(key: Key) {
-    with(|frame| frame.reads.read(key));
+    if !UNRECORDED.get() {
+        with(|frame| frame.reads.read(key));
+    }
 }
 
 /// Notes that the output being built names the copies of the photograph
@@ -212,6 +230,9 @@ pub(super) fn develops(id: crate::site::PictureId, place: Option<Place>, full: b
 }
 
 pub(super) fn missed(page: Option<PageId>, name: &str) {
+    if UNRECORDED.get() {
+        return;
+    }
     with(|frame| {
         frame.misses.push(Miss {
             page,

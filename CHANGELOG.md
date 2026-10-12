@@ -18,6 +18,9 @@ What changed in each release of Statac, the newest first.
   line one space deeper than its field is read, as YAML reads it, where
   it was refused as a quote never closed. A later line no deeper than
   the field is told at that line, with the spaces that mend it.
+- A large site whose layout chooses pages from `site.pages` by a field,
+  as the starter's menu does with `selectattr("menu")`, builds in a
+  fraction of the time: 10,000 posts in 2 seconds where 0.2.0 took 17.
 
 ### Changed
 

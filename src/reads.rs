@@ -18,6 +18,9 @@ use crate::source::{Place, SourceId};
 pub enum Key {
     /// A field of a page, by name: `title`, `date`, or the author's own.
     Field(PageId, NameId),
+    /// What every page writes under one name in its front matter, and
+    /// which pages there are to write it.
+    FieldOfEvery(NameId),
     /// A page's body as built.
     Body(PageId),
     /// The previous and next page in each of the page's lists.
@@ -131,6 +134,7 @@ impl Translation {
             Key::Mentions(page) => Key::Mentions(self.page(page)?),
             Key::ListPage(list, number) => Key::ListPage(self.list(list)?, number),
             Key::ListHead(list) => Key::ListHead(self.list(list)?),
+            Key::FieldOfEvery(name) => Key::FieldOfEvery(*self.names.get(name.index())?),
             Key::Setting(name) => Key::Setting(*self.names.get(name.index())?),
             Key::Template(id) => Key::Template(self.template(id)?),
             Key::Data(id) => Key::Data(carried(&self.data, id)?),

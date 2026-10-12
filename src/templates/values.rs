@@ -63,11 +63,53 @@ pub(super) const PAGE_ANSWERS: &[&str] = &[
 /// What a page is asked for a search box by.
 pub(super) const SEARCH_BOX: &str = "search_box";
 
+/// The names a page answers with more than its front matter writes under
+/// them, or with something else: every name [`PageValue::answer`] has an
+/// answer of its own for.
+const WORKED_OUT: &[&str] = &[
+    "key",
+    "post",
+    SEARCH_BOX,
+    "title",
+    "url",
+    "slug",
+    "date",
+    "content",
+    "words",
+    "toc",
+    "excerpt",
+    "opening",
+    "excerpt_marked",
+    "maths",
+    "number",
+    "next",
+    "previous",
+    "translations",
+    "language",
+    "direction",
+    "tags",
+    "series",
+    "posts",
+    "list",
+    "folder",
+    "source",
+    "card",
+    "webmentions",
+    "og_title",
+];
+
+/// Whether every page answers `key` with what its front matter writes
+/// under it and nothing else, so the answer turns on that alone.
+pub(super) fn as_written(key: &str) -> bool {
+    !WORKED_OUT.contains(&key) && !super::media::CALLS.contains(&key)
+}
+
 /// Whether `value` is one of Statac's own objects, which never hold a
 /// missing value and are too large to search.
 pub(super) fn opaque(value: &Value) -> bool {
     value.downcast_object_ref::<PageValue>().is_some()
         || value.downcast_object_ref::<SiteValue>().is_some()
+        || value.downcast_object_ref::<EveryPage>().is_some()
         || value.downcast_object_ref::<ListValue>().is_some()
         || value.downcast_object_ref::<Lists>().is_some()
         || value.downcast_object_ref::<Languages>().is_some()
@@ -178,6 +220,9 @@ impl PageValue {
     }
 
     fn answer(&self, key: &str) -> Option<Value> {
+        if as_written(key) {
+            return self.written(key);
+        }
         let shared = &self.shared;
         let page = shared.site.pages.get(self.id);
         let field = |name: &str| frame::read(field_key(shared, self.id, name));
@@ -351,21 +396,26 @@ impl PageValue {
                     },
                 })
             }
-            _ => {
-                field(key);
-                if let Some(word) = PageWord::named(key) {
-                    if later && FIRST_PAGES_OWN.contains(&word) {
-                        return None;
-                    }
-                    return page
-                        .words
-                        .get(word)
-                        .and_then(|value| statacs_value(shared, &value.value, value.origin.place));
-                }
-                let found = page.words.field(key)?;
-                Some(node_value(shared, &found.value, Some(key)))
-            }
+            _ => self.written(key),
         }
+    }
+
+    /// What the page's front matter writes as `key`.
+    fn written(&self, key: &str) -> Option<Value> {
+        let shared = &self.shared;
+        let page = shared.site.pages.get(self.id);
+        frame::read(field_key(shared, self.id, key));
+        if let Some(word) = PageWord::named(key) {
+            if self.number > 1 && FIRST_PAGES_OWN.contains(&word) {
+                return None;
+            }
+            return page
+                .words
+                .get(word)
+                .and_then(|value| statacs_value(shared, &value.value, value.origin.place));
+        }
+        let found = page.words.field(key)?;
+        Some(node_value(shared, &found.value, Some(key)))
     }
 
     /// The names the page answers to, for a template that walks them.
@@ -727,31 +777,32 @@ pub(super) fn pages_value(shared: &Arc<Shared>, pages: &[PageId]) -> Value {
 }
 
 /// Every page the site publishes, a list's later pages among them, in the
-/// order of their addresses.
-fn all_pages(shared: &Arc<Shared>) -> Value {
-    let site = &shared.site;
-    let mut pages: Vec<(&str, PageId, usize)> = site
-        .pages
-        .iter()
-        .filter(|(_, page)| page.lands())
-        .map(|(id, page)| (page.address.as_str(), id, 1))
-        .collect();
-    for (_, list) in site.lists.iter() {
-        if let Some(page) = list.page {
-            pages.extend(
-                (2..)
-                    .zip(&list.later)
-                    .map(|(number, address)| (address.as_str(), page, number)),
-            );
-        }
+/// order of their addresses: a list that makes each page's value as it is
+/// reached, since most templates that ask for it want a few of them.
+#[derive(Debug)]
+pub(super) struct EveryPage {
+    pub shared: Arc<Shared>,
+}
+
+impl Object for EveryPage {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
     }
-    pages.sort_unstable();
-    Value::from(
-        pages
-            .into_iter()
-            .map(|(_, id, number)| PageValue::numbered(shared, id, number))
-            .collect::<Vec<_>>(),
-    )
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let &(id, number) = self.shared.every_page().get(key.as_usize()?)?;
+        Some(PageValue::numbered(&self.shared, id, number))
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Seq(self.shared.every_page().len())
+    }
+}
+
+fn all_pages(shared: &Arc<Shared>) -> Value {
+    Value::from_object(EveryPage {
+        shared: Arc::clone(shared),
+    })
 }
 
 /// A page's headings as its table of contents: each with its words, its

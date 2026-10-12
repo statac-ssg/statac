@@ -59,6 +59,12 @@ pub(super) struct Shared {
     /// The page published at each address, by the address's key, a list's
     /// later pages under their first page; made when first asked.
     standing: OnceLock<HashMap<String, PageId>>,
+    /// Every page the site publishes, see [`Shared::every_page`].
+    every_page: OnceLock<Vec<(PageId, usize)>>,
+    /// The pages chosen from every page by what each writes under one
+    /// name, each choice worked out once: by the filter, the name and the
+    /// test, and the values the test was handed.
+    pub chosen: Mutex<HashMap<(String, Vec<Value>), SomePages>>,
     /// What colours the code in the writing, in the site's `code_style`.
     pub highlighter: Option<Highlighter>,
     /// What the site's cards come to, each worked out once.
@@ -71,7 +77,38 @@ impl std::fmt::Debug for Shared {
     }
 }
 
+/// Some of the site's pages, each with which of its list's pages it is.
+pub(super) type SomePages = Arc<Vec<(PageId, usize)>>;
+
 impl Shared {
+    /// Every page the site publishes, a list's later pages among them
+    /// with their numbers, in the order of their addresses.
+    pub fn every_page(&self) -> &[(PageId, usize)] {
+        self.every_page.get_or_init(|| {
+            let site = &self.site;
+            let mut pages: Vec<(&str, PageId, usize)> = site
+                .pages
+                .iter()
+                .filter(|(_, page)| page.lands())
+                .map(|(id, page)| (page.address.as_str(), id, 1))
+                .collect();
+            for (_, list) in site.lists.iter() {
+                if let Some(page) = list.page {
+                    pages.extend(
+                        (2..)
+                            .zip(&list.later)
+                            .map(|(number, address)| (address.as_str(), page, number)),
+                    );
+                }
+            }
+            pages.sort_unstable();
+            pages
+                .into_iter()
+                .map(|(_, id, number)| (id, number))
+                .collect()
+        })
+    }
+
     /// The id a field or setting is recorded by.
     pub fn name_id(&self, name: &str) -> NameId {
         if let Some(id) = self.known.get(name) {
@@ -289,6 +326,8 @@ impl Renderer {
                 feeds,
                 feed_of,
                 standing: OnceLock::new(),
+                every_page: OnceLock::new(),
+                chosen: Mutex::new(HashMap::new()),
                 highlighter,
                 cards,
             }),

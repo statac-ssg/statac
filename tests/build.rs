@@ -2593,3 +2593,77 @@ fn threads_building_pages_have_room_whatever_the_system_gives_a_thread() {
     assert!(output.status.success(), "{output:?}");
     assert!(site.out().join("post-1/index.html").exists());
 }
+
+#[test]
+fn every_page_as_a_list_and_chosen_by_a_field_is_as_any_list_is() {
+    let site = Site::new("every-page");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write("content/index.md", "---\ntitle: Home\n---\n");
+    let pages = [
+        ("post-1", "menu: true\nrank: 2\nbook:\n  author: Author 1\n"),
+        ("post-2", "menu: false\nrank: 1\n"),
+        ("post-3", "menu: yes\nlayout: other\n"),
+        ("post-4", "rank: 3\nbook:\n  author: Author 2\n"),
+        ("post-5", ""),
+    ];
+    for (name, more) in pages {
+        let text = format!("---\ntitle: {name}\n{more}---\nWords.\n");
+        site.write(&format!("content/{name}.md"), &text);
+    }
+    site.write("templates/page.html", "{{ page.title }}\n");
+    site.write("templates/other.html", "{{ page.title }}\n");
+    // Each as asked of every page, and of the same pages as a list made
+    // in the template, which is chosen from item by item.
+    let asked = [
+        "selectattr('menu')",
+        "rejectattr('menu')",
+        "selectattr('menu', 'eq', true)",
+        "selectattr('menu', 'eq', 'yes')",
+        "selectattr('menu', 'defined')",
+        "rejectattr('menu', 'defined')",
+        "selectattr('rank', '>', 1)",
+        "selectattr('rank', 'in', [1, 3])",
+        "selectattr('layout', 'eq', 'other')",
+        "rejectattr('layout', 'eq', 'other')",
+        "selectattr('book.author', 'eq', 'Author 2')",
+        "selectattr('book.author')",
+        "selectattr('title', 'eq', 'post-2')",
+        "selectattr('url', 'endingwith', '-3/')",
+        "selectattr('menu') | selectattr('rank')",
+    ];
+    let mut home = String::from(
+        "{{ site.pages | length }} {{ site.pages[1].title }} {{ site.pages[-1].title }} \
+         {{ site.pages[1:3] | map(attribute='title') | join(',') }} \
+         {{ (site.pages + site.pages) | length }} {{ site.pages | first is defined }} \
+         {{ page in site.pages }} {{ site.pages | reverse | map(attribute='url') | first }}\n",
+    );
+    for asking in asked {
+        let line = format!(
+            "{{{{ site.pages | {asking} | map(attribute='url') | join(' ') }}}}\
+             ={{{{ site.pages | list | {asking} | map(attribute='url') | join(' ') }}}}\n"
+        );
+        home.push_str(&line);
+    }
+    site.write("templates/home.html", &home);
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let built = fs::read_to_string(site.out().join("index.html")).unwrap();
+    let mut lines = built.lines();
+    assert_eq!(
+        lines.next(),
+        Some("6 post-1 post-5 post-1,post-2 12 True True /post-5/")
+    );
+    for (asking, line) in asked.iter().zip(lines) {
+        let (every, list) = line.split_once('=').unwrap();
+        assert_eq!(every, list, "{asking}");
+    }
+    assert_eq!(built.lines().count(), asked.len() + 1);
+    assert!(
+        built.contains("\n/post-1/ /post-3/=/post-1/ /post-3/\n"),
+        "{built}"
+    );
+    assert!(built.contains("\n/post-4/=/post-4/\n"), "{built}");
+}
