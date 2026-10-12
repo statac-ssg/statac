@@ -154,27 +154,61 @@ impl Translation {
 }
 
 /// The reads of one output, in the order they happened.
+///
+/// An output that reads fields of page after page, as a loop over every
+/// page does, would hold a read for each on a site of any size, and every
+/// output built so would. Past [`MANY`] of them it holds one read for each
+/// name instead, of that field on every page, which covers the rest.
 #[derive(Default, Clone, Debug)]
-pub struct Reads(Vec<Key>);
+pub struct Reads {
+    keys: Vec<Key>,
+    /// How many reads of a page's field it holds.
+    fields: usize,
+    /// The names it holds a read of on every page for, having held
+    /// [`MANY`] reads of fields.
+    every: Vec<NameId>,
+}
+
+/// How many reads of a page's field an output holds one by one.
+pub const MANY: usize = 1024;
 
 impl Reads {
     /// The reads `keys`, in that order.
     pub fn of(keys: Vec<Key>) -> Reads {
-        Reads(keys)
+        let mut reads = Reads::default();
+        for key in keys {
+            reads.read(key);
+        }
+        reads
     }
 
     #[inline]
     pub fn read(&mut self, key: Key) {
-        self.0.push(key);
+        // The read before it over again, as a loop asking each page the
+        // same thing of the site makes.
+        if self.keys.last() == Some(&key) {
+            return;
+        }
+        if let Key::Field(_, name) = key {
+            if self.fields >= MANY {
+                if !self.every.contains(&name) {
+                    self.every.push(name);
+                    self.keys.push(Key::FieldOfEvery(name));
+                }
+                return;
+            }
+            self.fields += 1;
+        }
+        self.keys.push(key);
     }
 
     pub fn keys(&self) -> &[Key] {
-        &self.0
+        &self.keys
     }
 
     /// The cards this output announced.
     pub fn cards(&self) -> impl Iterator<Item = PageId> + '_ {
-        self.0.iter().filter_map(|key| match key {
+        self.keys.iter().filter_map(|key| match key {
             Key::Card(page) => Some(*page),
             _ => None,
         })
@@ -192,7 +226,7 @@ impl Record {
     /// Replaces what `output` read last time.
     pub fn set(&mut self, output: OutputId, reads: Reads) {
         self.forget(output);
-        let mut keys = reads.0.clone();
+        let mut keys = reads.keys.clone();
         keys.sort_unstable();
         keys.dedup();
         for key in keys {
@@ -205,7 +239,7 @@ impl Record {
         let Some(old) = self.reads.remove(&output) else {
             return;
         };
-        for key in old.0 {
+        for key in old.keys {
             if let Some(readers) = self.readers.get_mut(&key) {
                 readers.retain(|&o| o != output);
                 if readers.is_empty() {
@@ -292,6 +326,34 @@ mod tests {
         reads.read(Key::Lists);
         record.set(output(3), reads);
         assert_eq!(record.affected(&[Key::Lists, Key::Lists]), [output(3)]);
+    }
+
+    #[test]
+    fn many_reads_of_fields_are_held_as_one_for_each_name() {
+        let mut names = Names::default();
+        let (title, date) = (names.intern("title"), names.intern("date"));
+        let mut reads = Reads::default();
+        for i in 0..MANY {
+            reads.read(Key::Field(page(i), title));
+        }
+        assert_eq!(reads.keys().len(), MANY);
+        for i in 0..MANY {
+            reads.read(Key::Field(page(MANY + i), title));
+            reads.read(Key::Field(page(i), date));
+            reads.read(Key::Body(page(i)));
+        }
+        let held = &reads.keys()[MANY..];
+        assert_eq!(
+            held[..3],
+            [
+                Key::FieldOfEvery(title),
+                Key::FieldOfEvery(date),
+                Key::Body(page(0))
+            ]
+        );
+        assert_eq!(held.len(), 2 + MANY);
+        // Carried to a later reading, they are held the same.
+        assert_eq!(Reads::of(reads.keys().to_vec()).keys(), reads.keys());
     }
 
     #[test]

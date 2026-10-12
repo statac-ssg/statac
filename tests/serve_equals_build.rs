@@ -1986,3 +1986,32 @@ fn pages_chosen_from_every_page_by_a_field_follow_the_field() {
     let outputs = built[2].1;
     assert!(built[2].0 * 2 > outputs, "{built:?}");
 }
+
+#[test]
+fn a_page_that_reads_fields_past_counting_follows_every_one() {
+    let site = Site::new("many-fields");
+    // More reads of fields than an output holds one by one, then a field
+    // of every page.
+    let many = "{% for n in range(1100) %}{% if page.title %}{% endif %}{% endfor %}\
+                <ul>{% for entry in site.pages if entry.shown is defined %}\
+                <li>{{ entry.url }} {{ entry.shown }}</li>{% endfor %}</ul>\n";
+    site.write("templates/page.html", &format!("{BASE}{many}{PAGE}"));
+    site.write("templates/home.html", &format!("{BASE}{many}{HOME}"));
+    let page = |more: &str| format!("---\ntitle: Page 1\n{more}---\nA page.\n");
+    through(
+        &site,
+        &[
+            ("a page", &|site| site.write("content/page-1.md", &page(""))),
+            ("a field", &|site| {
+                site.write("content/page-1.md", &page("shown: one\n"))
+            }),
+            ("the field changed", &|site| {
+                site.write("content/page-1.md", &page("shown: two\n"))
+            }),
+            ("another page", &|site| {
+                site.write("content/page-2.md", &page("shown: three\n"))
+            }),
+            ("the page deleted", &|site| site.remove("content/page-1.md")),
+        ],
+    );
+}

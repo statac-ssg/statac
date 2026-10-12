@@ -25,6 +25,9 @@ What changed in each release of Statac, the newest first.
   takes a few of them, or counts them, as `site.posts[:5]` and
   `tag.posts | length` do, no longer builds slower with the square of
   its size: with 8,000 posts, 1 second where it took 3 to 10.
+- A large site whose layout looks through every page on every page no
+  longer takes memory with the square of its size: with 8,000 posts,
+  under 1 GB where it took 4 GB, and 39 GB where it sorted them.
 
 ### Changed
 
