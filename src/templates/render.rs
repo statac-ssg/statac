@@ -70,7 +70,10 @@ pub(super) struct Shared {
     /// The pages chosen from every page by what each writes under one
     /// name, each choice worked out once: by the filter, the name and the
     /// test, and the values the test was handed.
-    pub chosen: Mutex<HashMap<(String, Vec<Value>), SomePages>>,
+    pub chosen: Mutex<HashMap<(String, Vec<Value>), Known>>,
+    /// What there is to tell of the pages a sort worked out once put
+    /// last, by what the sort is known by.
+    pub put_last: Mutex<HashMap<(String, Vec<Value>), PutLast>>,
     /// What colours the code in the writing, in the site's `code_style`.
     pub highlighter: Option<Highlighter>,
     /// What the site's cards come to, each worked out once.
@@ -81,6 +84,21 @@ impl std::fmt::Debug for Shared {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Shared")
     }
+}
+
+/// A choice of pages, once some page has worked it out; held by the page
+/// working it out while it does.
+pub(super) type Known = Arc<Mutex<Option<SomePages>>>;
+
+/// The pages a sort put last for lacking the field sorted by.
+#[derive(Clone, Debug)]
+pub(super) struct PutLast {
+    /// The field they lack, or every field sorted by where they differ.
+    pub field: String,
+    pub count: usize,
+    /// The first of them, and where it stood before the sort.
+    pub first: (PageId, usize),
+    pub index: usize,
 }
 
 /// Some of the site's pages, each with which of its list's pages it is.
@@ -388,6 +406,7 @@ impl Renderer {
                 statics_by_name: OnceLock::new(),
                 photographs: OnceLock::new(),
                 chosen: Mutex::new(HashMap::new()),
+                put_last: Mutex::new(HashMap::new()),
                 highlighter,
                 cards,
             }),

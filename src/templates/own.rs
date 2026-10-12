@@ -23,7 +23,7 @@ use crate::lists::Filter;
 use crate::markdown::{Piece, PieceValue, closed_up, words_of};
 use crate::problem::{Called, Kind, Problem, Relation, Stopped, Word};
 use crate::reads::Key;
-use crate::site::{ListId, PageId};
+use crate::site::{Id, ListId, PageId};
 use crate::source::{Place, Span};
 
 /// Statac's own filters, by the names templates use. `sort` is the
@@ -158,22 +158,40 @@ pub(super) fn install(env: &mut Environment<'_>) {
     });
     env.add_filter("newest_first", |posts: Value| {
         checked("newest_first", std::slice::from_ref(&posts))?;
-        let mut pages = pages_of(&posts, "newest_first")?;
         let shared = shared()?;
         let site = &shared.site;
-        let mut dated: Vec<(Value, &crate::site::Page, Option<i64>)> = pages
-            .drain(..)
-            .map(|(value, id)| {
-                date_read(&shared, id);
-                let page = site.pages.get(id);
-                (value, page, crate::lists::moment(&shared.dates, page))
-            })
-            .collect();
-        dated.sort_by(|a, b| {
-            crate::lists::by_moment(crate::lists::Order::NewestFirst, (a.1, a.2), (b.1, b.2))
-        });
+        let newest_first = |pages: Vec<(PageId, usize)>| {
+            let mut dated: Vec<_> = pages
+                .into_iter()
+                .map(|(id, number)| {
+                    date_read(&shared, id);
+                    let page = site.pages.get(id);
+                    (
+                        (id, number),
+                        page,
+                        crate::lists::moment(&shared.dates, page),
+                    )
+                })
+                .collect();
+            dated.sort_by(|a, b| {
+                crate::lists::by_moment(crate::lists::Order::NewestFirst, (a.1, a.2), (b.1, b.2))
+            });
+            dated.into_iter().map(|(page, _, _)| page).collect()
+        };
+        if let Some(pages) = posts.downcast_object_ref::<Pages>()
+            && let Some((mut asked, handed)) = pages.known_by()
+        {
+            frame::read(Key::FieldOfEvery(shared.name_id("date")));
+            asked.push_str(" | newest_first");
+            return pages.once((asked, handed), || Ok(newest_first(pages.each().collect())));
+        }
+        let pages = numbered_pages_of(&posts, "newest_first")?;
+        let sorted: Vec<(PageId, usize)> = newest_first(pages);
         Ok::<_, Error>(Value::from(
-            dated.into_iter().map(|(v, _, _)| v).collect::<Vec<_>>(),
+            sorted
+                .into_iter()
+                .map(|(id, number)| PageValue::numbered(&shared, id, number))
+                .collect::<Vec<_>>(),
         ))
     });
     env.add_filter("newest_date", |posts: Value| {
@@ -196,7 +214,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
         let language = frame::language();
         frame::read(Key::ListsIn(language));
         let filter = Filter::tagged(&shared.site, language, &name).map_err(frame::raise)?;
-        filtered(&shared, &posts, "tagged", &filter)
+        filtered(&shared, &posts, "tagged", &filter, &[&name])
     });
     env.add_filter("in", |posts: Value, name: String| {
         checked("in", &[posts.clone(), Value::from(name.as_str())])?;
@@ -204,7 +222,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
         let language = frame::language();
         frame::read(Key::ListsIn(language));
         let filter = Filter::in_folder(&shared.site, language, &name).map_err(frame::raise)?;
-        filtered(&shared, &posts, "in", &filter)
+        filtered(&shared, &posts, "in", &filter, &[&name])
     });
     env.add_filter("where", |posts: Value, field: String, wanted: Value| {
         checked("where", &[posts.clone(), wanted.clone()])?;
@@ -214,7 +232,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
             .as_str()
             .map_or_else(|| wanted.to_string(), str::to_owned);
         let filter = Filter::where_field(&shared.site, &field, &wanted).map_err(frame::raise)?;
-        filtered(&shared, &posts, "where", &filter)
+        filtered(&shared, &posts, "where", &filter, &[&field, &wanted])
     });
     env.add_filter("date", |value: Value, format: Option<String>| {
         checked("date", std::slice::from_ref(&value))?;
@@ -385,35 +403,101 @@ fn sorted(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
             .copied()
             .find(|k| guard::field_of(item, k).is_undefined())
     };
-    let mut carrying = Vec::new();
-    let mut without: Vec<(usize, Value, &str)> = Vec::new();
-    for (i, item) in value.try_iter()?.enumerate() {
-        match lacked(&item) {
-            Some(key) => without.push((i, item, key)),
-            None => carrying.push(item),
+    // The items carrying every field in order, then those without, with
+    // where each of those stood and the field it lacks.
+    let in_order = |kwargs: Kwargs| {
+        let mut carrying = Vec::new();
+        let mut without: Vec<(usize, Value, &str)> = Vec::new();
+        for (i, item) in value.try_iter()?.enumerate() {
+            match lacked(&item) {
+                Some(key) => without.push((i, item, key)),
+                None => carrying.push(item),
+            }
         }
+        let run = minijinja::filters::sort(state, Value::from(carrying), kwargs)?;
+        Ok::<_, Error>((run, without))
+    };
+    let field_of = |without: &[(usize, Value, &str)]| match without {
+        [(_, _, key), rest @ ..] if rest.iter().all(|(_, _, k)| k == key) => (*key).to_owned(),
+        _ => attribute.clone(),
+    };
+    let tell = |field: &str, count: usize, first: &Value, index: usize| {
+        frame::with(|frame| {
+            let problem = super::explain::sorted_last(
+                frame,
+                state.name(),
+                &attribute,
+                field,
+                count,
+                (first, index),
+            );
+            if !frame.problems.contains(&problem) {
+                frame.problems.push(problem);
+            }
+        });
+    };
+    // A list that is the same whichever page asks, put in order by what
+    // each page says of itself: worked out once, with what there is to
+    // tell of the pages put last, which every page asking is told.
+    if let Some(pages) = value.downcast_object_ref::<Pages>()
+        && let Some((mut asked, handed)) = pages.known_by()
+        && (keys.iter())
+            .all(|key| super::values::of_the_front(key.split('.').next().unwrap_or(key)))
+    {
+        let shared = &pages.shared;
+        let reverse = kwargs.get::<Option<bool>>("reverse")?;
+        let case_sensitive = kwargs.get::<Option<bool>>("case_sensitive")?;
+        asked.push_str(&format!(
+            " | sort {attribute} {reverse:?} {case_sensitive:?}"
+        ));
+        let asked = (asked, handed);
+        for key in &keys {
+            let field = key.split('.').next().unwrap_or(key);
+            frame::read(Key::FieldOfEvery(shared.name_id(field)));
+        }
+        let numbered = |item: &Value| {
+            let page = item.downcast_object_ref::<PageValue>()?;
+            Some((page.id, page.number))
+        };
+        let sorted = pages.once(asked.clone(), || {
+            let (run, without) = in_order(kwargs)?;
+            if let Some((index, first, _)) = without.first()
+                && let Some(first) = numbered(first)
+            {
+                let last = super::render::PutLast {
+                    field: field_of(&without),
+                    count: without.len(),
+                    first,
+                    index: *index,
+                };
+                let mut all = shared.put_last.lock().expect("never poisoned");
+                all.insert(asked.clone(), last);
+            }
+            let without = without.iter().map(|(_, item, _)| item.clone());
+            Ok(run
+                .try_iter()?
+                .chain(without)
+                .filter_map(|item| numbered(&item))
+                .collect())
+        })?;
+        let last = shared
+            .put_last
+            .lock()
+            .expect("never poisoned")
+            .get(&asked)
+            .cloned();
+        if let Some(last) = last {
+            let (id, number) = last.first;
+            let first = PageValue::numbered(shared, id, number);
+            tell(&last.field, last.count, &first, last.index);
+        }
+        return Ok(sorted);
     }
-    let run = minijinja::filters::sort(state, Value::from(carrying), kwargs)?;
-    let Some((index, first, key)) = without.first() else {
+    let (run, without) = in_order(kwargs)?;
+    let Some((index, first, _)) = without.first() else {
         return Ok(run);
     };
-    let field = match without.iter().all(|(_, _, k)| k == key) {
-        true => *key,
-        false => attribute.as_str(),
-    };
-    frame::with(|frame| {
-        let problem = super::explain::sorted_last(
-            frame,
-            state.name(),
-            &attribute,
-            field,
-            without.len(),
-            (first, *index),
-        );
-        if !frame.problems.contains(&problem) {
-            frame.problems.push(problem);
-        }
-    });
+    tell(&field_of(&without), without.len(), first, *index);
     Ok(Value::from_iter(
         run.try_iter()?
             .chain(without.into_iter().map(|(_, item, _)| item)),
@@ -439,14 +523,56 @@ fn pages_of(posts: &Value, filter: &str) -> Result<Vec<(Value, PageId)>, Error> 
         .collect()
 }
 
+/// The pages in a list handed to a filter that works on pages, each with
+/// which of its list's pages it is.
+fn numbered_pages_of(posts: &Value, filter: &str) -> Result<Vec<(PageId, usize)>, Error> {
+    let not_a_list = || {
+        frame::raise(Kind::TemplateStopped {
+            reason: Stopped::NotAList(filter.to_owned()),
+        })
+    };
+    let items = posts.try_iter().map_err(|_| not_a_list())?;
+    items
+        .map(|item| {
+            item.downcast_object_ref::<PageValue>()
+                .map(|page| (page.id, page.number))
+                .ok_or_else(not_a_list)
+        })
+        .collect()
+}
+
 /// The pages of `posts` that `filter` keeps, each recorded as read for what
-/// the filter asks of it.
-fn filtered(shared: &Shared, posts: &Value, name: &str, filter: &Filter) -> Result<Value, Error> {
-    let pages = pages_of(posts, name)?;
+/// the filter asks of it. Of a list that is the same whichever page asks,
+/// they are worked out once for the site, in the language of the page
+/// asking, and recorded as what the filter asks of every page.
+fn filtered(
+    shared: &Arc<Shared>,
+    posts: &Value,
+    name: &str,
+    filter: &Filter,
+    wanted: &[&str],
+) -> Result<Value, Error> {
     if let Filter::In(list, _) = filter {
         super::values::read_whole(*list);
     }
     let field = filter.reads().map(|field| shared.name_id(field));
+    if let Some(pages) = posts.downcast_object_ref::<Pages>()
+        && let Some((mut asked, mut handed)) = pages.known_by()
+    {
+        if let Some(field) = field {
+            frame::read(Key::FieldOfEvery(field));
+        }
+        let language = frame::language().index();
+        asked.push_str(&format!(" | {name} in {language} {}", wanted.len()));
+        handed.extend(wanted.iter().copied().map(Value::from));
+        return pages.once((asked, handed), || {
+            let kept = pages
+                .each()
+                .filter(|(id, _)| filter.keeps(&shared.site, *id));
+            Ok(kept.collect())
+        });
+    }
+    let pages = pages_of(posts, name)?;
     Ok(Value::from(
         pages
             .into_iter()

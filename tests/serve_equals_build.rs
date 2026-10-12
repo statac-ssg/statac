@@ -1988,6 +1988,77 @@ fn pages_chosen_from_every_page_by_a_field_follow_the_field() {
 }
 
 #[test]
+fn pages_chosen_and_put_in_order_once_for_the_site_follow_what_they_turn_on() {
+    // Each asked on every page of a site of its own, and shown so that
+    // nothing else the page reads turns on the pages left out: by a tag
+    // and a folder where the page's language has them, by a field, a
+    // title and an address, and in three orders.
+    let asked = [
+        "{% if page.language != 'de' %}{{ site.posts | tagged('one') | length }}{% endif %}",
+        "{% if page.language != 'de' %}{{ site.pages | in('blog') | length }}{% endif %}",
+        "{{ site.pages | where('kind', 'long') | length }}",
+        "{{ site.posts | selectattr('title', 'eq', 'Page 2') | length }}",
+        "{{ site.pages | selectattr('url', 'startingwith', '/blog/') | length }}",
+        "{{ (site.posts | sort(attribute='title') | first).url }}",
+        "{{ (site.pages | newest_first | first).url }}",
+        "{{ site.posts | selectattr('kind') | sort(attribute='kind', reverse=true) | length }}",
+    ];
+    let page = |title: &str, more: &str| format!("---\ntitle: {title}\n{more}---\nA page.\n");
+    for (at, asked) in asked.iter().enumerate() {
+        let site = Site::new(&format!("chosen-once-{at}"));
+        let asked = format!("<p>{asked}</p>\n");
+        site.write("templates/page.html", &format!("{BASE}{asked}{PAGE}"));
+        site.write("templates/post.html", &format!("{BASE}{asked}{PAGE}"));
+        site.write("templates/home.html", &format!("{BASE}{asked}{HOME}"));
+        let more = "date: 2026-07-01\nkind: brief\n";
+        site.write("content/blog/post-7.md", &page("Page 7", more));
+        through(
+            &site,
+            &[
+                ("a post", &|site| {
+                    site.write(
+                        "content/blog/post-8.md",
+                        &page("Page 1", "date: 2026-10-01\n"),
+                    )
+                }),
+                ("a tag", &|site| {
+                    let more = "date: 2026-10-01\ntags: [one]\n";
+                    site.write("content/blog/post-8.md", &page("Page 1", more))
+                }),
+                ("a field", &|site| {
+                    let more = "date: 2026-10-01\ntags: [one]\nkind: long\n";
+                    site.write("content/blog/post-8.md", &page("Page 1", more))
+                }),
+                ("another title", &|site| {
+                    let more = "date: 2026-10-01\ntags: [one]\nkind: long\n";
+                    site.write("content/blog/post-8.md", &page("Page 2", more))
+                }),
+                ("another, earlier", &|site| {
+                    let more = "date: 2026-09-01\ntags: [one]\nkind: brief\n";
+                    site.write("content/blog/post-9.md", &page("Page 0", more))
+                }),
+                ("another day", &|site| {
+                    let more = "date: 2026-08-01\nkind: long\n";
+                    site.write("content/blog/post-8.md", &page("Page 2", more))
+                }),
+                // A post shown nowhere so far comes first in each order.
+                ("an earlier post named the first", &|site| {
+                    let more = "date: 2026-07-01\nkind: wide\n";
+                    site.write("content/blog/post-7.md", &page("A page", more))
+                }),
+                ("and made the newest", &|site| {
+                    let more = "date: 2026-10-02\nkind: wide\n";
+                    site.write("content/blog/post-7.md", &page("A page", more))
+                }),
+                ("a post deleted", &|site| {
+                    site.remove("content/blog/post-9.md")
+                }),
+            ],
+        );
+    }
+}
+
+#[test]
 fn a_page_that_reads_fields_past_counting_follows_every_one() {
     let site = Site::new("many-fields");
     // More reads of fields than an output holds one by one, then a field

@@ -28,6 +28,11 @@ What changed in each release of Statac, the newest first.
 - A large site whose layout looks through every page on every page no
   longer takes memory with the square of its size: with 8,000 posts,
   under 1 GB where it took 4 GB, and 39 GB where it sorted them.
+- A large site whose layout chooses from the site's posts or pages on
+  every page, or puts them in order, with `tagged`, `in`, `where`,
+  `selectattr`, `rejectattr`, `sort` or `newest_first`, no longer builds
+  slower with the square of its size: with 8,000 posts, 1 second where
+  it took 6 to 90.
 
 ### Changed
 

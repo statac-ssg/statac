@@ -482,8 +482,9 @@ fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value
         }
         Ok::<_, Error>(kept)
     };
-    // Every page chosen by what each writes under one name, which a
-    // layout asks on every page it builds: worked out once.
+    // Pages chosen from a list that is the same whichever page asks, by
+    // what each says of itself, which a layout asks on every page it
+    // builds: worked out once.
     let plain = |value: &Value| {
         matches!(
             value.kind(),
@@ -491,40 +492,24 @@ fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value
         )
     };
     if let Some(pages) = input.downcast_object_ref::<super::values::Pages>()
-        && matches!(pages.which, super::values::Which::Every)
+        && let Some((mut asked, mut handed)) = pages.known_by()
         && let Some(path) = &attribute
         && let Some(field) = path.split('.').next()
-        && super::values::as_written(field)
+        && super::values::of_the_front(field)
         && rest.iter().all(plain)
     {
         let shared = &pages.shared;
         frame::read(crate::reads::Key::FieldOfEvery(shared.name_id(field)));
         let tested = test.as_ref().map_or("", |(name, _)| name);
-        let asked = (format!("{callee} {path} {tested}"), rest.to_vec());
-        let known = |shared: &super::render::Shared| {
-            let chosen = shared.chosen.lock().expect("never poisoned");
-            chosen.get(&asked).cloned()
-        };
-        let chosen = match known(shared) {
-            Some(chosen) => chosen,
-            None => {
-                let kept = frame::unrecorded(choose)?;
-                let chosen: super::render::SomePages = std::sync::Arc::new(
-                    kept.iter()
-                        .filter_map(|page| page.downcast_object_ref::<super::values::PageValue>())
-                        .map(|page| (page.id, page.number))
-                        .collect(),
-                );
-                let mut all = shared.chosen.lock().expect("never poisoned");
-                std::sync::Arc::clone(all.entry(asked).or_insert(chosen))
-            }
-        };
-        return Ok(Value::from(
-            chosen
+        asked.push_str(&format!(" | {callee} {path} {tested} {}", rest.len()));
+        handed.extend(rest.iter().cloned());
+        return pages.once((asked, handed), || {
+            Ok(choose()?
                 .iter()
-                .map(|&(id, number)| super::values::PageValue::numbered(shared, id, number))
-                .collect::<Vec<_>>(),
-        ));
+                .filter_map(|page| page.downcast_object_ref::<super::values::PageValue>())
+                .map(|page| (page.id, page.number))
+                .collect())
+        });
     }
     Ok(Value::from(choose()?))
 }

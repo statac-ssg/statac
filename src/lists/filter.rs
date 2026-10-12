@@ -2,6 +2,7 @@
 //! and a page's `posts:` line both come here, so the two can never read a
 //! filter differently. `related` chooses by a page's tags.
 
+use std::cell::OnceCell;
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -23,8 +24,9 @@ const DATE_PARTS: &[&str] = &["year", "month", "day"];
 pub enum Filter {
     /// The pages carrying a tag, however it is spelt.
     Tagged(ListId),
-    /// The pages filed in a folder, however deeply, by the folder's list.
-    In(ListId, HashSet<PageId>),
+    /// The pages filed in a folder, however deeply, by the folder's list,
+    /// gathered when a page is first asked of.
+    In(ListId, OnceCell<HashSet<PageId>>),
     /// The pages whose field answers to a value.
     Where { field: String, wanted: String },
 }
@@ -78,10 +80,7 @@ impl Filter {
                             || path.rsplit('/').next() == Some(wanted)))
         });
         match found {
-            Some((id, list)) => Ok(Filter::In(
-                id,
-                list.members.iter().chain(&list.undated).copied().collect(),
-            )),
+            Some((id, _)) => Ok(Filter::In(id, OnceCell::new())),
             None => {
                 let folders: Vec<&str> = site
                     .lists
@@ -152,7 +151,12 @@ impl Filter {
                 .unwrap_or_default()
                 .iter()
                 .any(|tag| site.spelt(p.language, &ListKey::Tag(tag.value.clone())) == Some(*list)),
-            Filter::In(_, members) => members.contains(&page),
+            Filter::In(list, members) => members
+                .get_or_init(|| {
+                    let list = site.lists.get(*list);
+                    list.members.iter().chain(&list.undated).copied().collect()
+                })
+                .contains(&page),
             Filter::Where { field, wanted } => answers(p, field, wanted),
         }
     }

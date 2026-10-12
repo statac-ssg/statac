@@ -17,7 +17,7 @@ use minijinja::value::{DynObject, Enumerator, Object, ObjectRepr, Value};
 use minijinja::{Error, State};
 
 use super::frame;
-use super::render::{Part, Shared};
+use super::render::{Part, Shared, SomePages};
 use crate::config::declarations::FieldKind;
 use crate::content::words::PageWord;
 use crate::date::{Date, When};
@@ -102,6 +102,16 @@ const WORKED_OUT: &[&str] = &[
 /// under it and nothing else, so the answer turns on that alone.
 pub(super) fn as_written(key: &str) -> bool {
     !WORKED_OUT.contains(&key) && !super::media::CALLS.contains(&key)
+}
+
+/// The names a page answers from what it says of itself before its
+/// writing and from where it stands, the same whichever page asks.
+const OF_THE_FRONT: &[&str] = &["title", "url", "slug", "date", "language"];
+
+/// Whether what every page answers to `key` turns on what the pages say
+/// of themselves before their writing, and on nothing of the page asking.
+pub(super) fn of_the_front(key: &str) -> bool {
+    as_written(key) || OF_THE_FRONT.contains(&key)
 }
 
 /// Whether `value` is one of Statac's own objects, which never hold a
@@ -788,7 +798,14 @@ pub(super) enum Which {
     /// A list's page and each of its later pages, this many in all.
     Pager(PageId, usize),
     These(Vec<PageId>),
+    /// Pages chosen from, or put in order from, one of the lists above
+    /// that is the same whichever page asks, by `asked`.
+    Chosen(SomePages, Asked),
 }
+
+/// What a choice of pages worked out once for the site is known by: the
+/// list and each filter it went through, and the values those were handed.
+pub(super) type Asked = (String, Vec<Value>);
 
 impl Pages {
     pub fn value(shared: &Arc<Shared>, which: Which) -> Value {
@@ -796,6 +813,50 @@ impl Pages {
             shared: Arc::clone(shared),
             which,
         })
+    }
+
+    /// What a choice from these pages is known by, where they are the
+    /// same whichever page asks.
+    pub fn known_by(&self) -> Option<Asked> {
+        let of = |word: &str, list: &ListId| (format!("{word} {}", list.index()), Vec::new());
+        match &self.which {
+            Which::Every => Some(("every".to_owned(), Vec::new())),
+            Which::Posts(list) => Some(of("posts", list)),
+            Which::All(list) => Some(of("all", list)),
+            Which::Chosen(_, asked) => Some(asked.clone()),
+            Which::Stretch(..) | Which::Pager(..) | Which::These(_) => None,
+        }
+    }
+
+    /// Each page, with which of its list's pages it is.
+    pub fn each(&self) -> impl Iterator<Item = (PageId, usize)> + '_ {
+        (0..self.len()).filter_map(|at| self.at(at))
+    }
+
+    /// The pages `choose` makes of these, known by `asked`: worked out
+    /// the first time any page asks, with nothing it reads recorded, so
+    /// the page asking records what the choice turns on itself. Pages
+    /// asking the same at once wait for the first.
+    pub fn once(
+        &self,
+        asked: Asked,
+        choose: impl FnOnce() -> Result<Vec<(PageId, usize)>, Error>,
+    ) -> Result<Value, Error> {
+        let shared = &self.shared;
+        let known = {
+            let mut all = shared.chosen.lock().expect("never poisoned");
+            Arc::clone(all.entry(asked.clone()).or_default())
+        };
+        let mut known = known.lock().expect("never poisoned");
+        let chosen = match &*known {
+            Some(chosen) => Arc::clone(chosen),
+            None => {
+                let chosen: SomePages = Arc::new(frame::unrecorded(choose)?);
+                *known = Some(Arc::clone(&chosen));
+                chosen
+            }
+        };
+        Ok(Pages::value(shared, Which::Chosen(chosen, asked)))
     }
 
     fn len(&self) -> usize {
@@ -810,6 +871,7 @@ impl Pages {
             Which::Stretch(list, number) => lists.get(*list).stretch(*number).len(),
             Which::Pager(_, pages) => *pages,
             Which::These(pages) => pages.len(),
+            Which::Chosen(pages, _) => pages.len(),
         }
     }
 
@@ -828,6 +890,7 @@ impl Pages {
             Which::Stretch(list, number) => lists.get(*list).stretch(*number).get(at).map(first),
             Which::Pager(page, pages) => (at < *pages).then_some((*page, at + 1)),
             Which::These(pages) => pages.get(at).map(first),
+            Which::Chosen(pages, _) => pages.get(at).copied(),
         }
     }
 }
