@@ -447,20 +447,7 @@ fn photos(
     let mut values = Vec::new();
     let Some(names) = names else {
         frame::read(Key::Pictures);
-        let site = &shared.site;
-        let mut beside: Vec<(&str, PictureId)> = site
-            .pictures
-            .iter()
-            .filter(|(_, picture)| matches!(picture.seen, Seen::Photograph { .. }))
-            .filter(|(_, picture)| {
-                picture
-                    .travelling
-                    .is_some_and(|at| site.files[at].page == Some(of))
-            })
-            .map(|(id, picture)| (picture.path.as_str(), id))
-            .collect();
-        beside.sort_unstable();
-        for (_, id) in beside {
+        for &id in shared.photographs_beside(of) {
             values.push(shown(shared, id, options, asking)?);
         }
         return Ok(Value::from(values));
@@ -784,7 +771,7 @@ pub(super) fn named(shared: &Shared, of: PageId, written: &str) -> Option<Named>
     let name = crate::content::address::decoded(written);
     let name = &name[..name.find(['?', '#']).unwrap_or(name.len())];
     let beside = |path: &str| {
-        let at = site.files.iter().position(|file| file.path == path)?;
+        let at = shared.file_at(path)?;
         Some(Named {
             key: Key::Beside(u32::try_from(at).ok()?),
             address: site.files[at].address.as_str().to_owned(),
@@ -805,7 +792,7 @@ pub(super) fn named(shared: &Shared, of: PageId, written: &str) -> Option<Named>
             paths.find_map(|path| {
                 beside(&path).or_else(|| {
                     let statics = shared.assets.statics();
-                    let at = statics.iter().position(|file| file.name == path)?;
+                    let at = shared.static_at(&path)?;
                     Some(Named {
                         key: Key::Static(u32::try_from(at).ok()?),
                         address: format!("/{path}"),

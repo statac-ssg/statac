@@ -61,6 +61,12 @@ pub(super) struct Shared {
     standing: OnceLock<HashMap<String, PageId>>,
     /// Every page the site publishes, see [`Shared::every_page`].
     every_page: OnceLock<Vec<(PageId, usize)>>,
+    /// Each file beside the writing's place in `site.files`, by path.
+    files_by_path: OnceLock<HashMap<String, usize>>,
+    /// Each static file's place among the assets' statics, by name.
+    statics_by_name: OnceLock<HashMap<String, usize>>,
+    /// The photographs beside each page, in the order of their paths.
+    photographs: OnceLock<HashMap<PageId, Vec<PictureId>>>,
     /// The pages chosen from every page by what each writes under one
     /// name, each choice worked out once: by the filter, the name and the
     /// test, and the values the test was handed.
@@ -107,6 +113,57 @@ impl Shared {
                 .map(|(_, id, number)| (id, number))
                 .collect()
         })
+    }
+
+    /// The place in `site.files` of the file at `path`, the first where
+    /// two share it.
+    pub fn file_at(&self, path: &str) -> Option<usize> {
+        let files = self.files_by_path.get_or_init(|| {
+            let mut files = HashMap::with_capacity(self.site.files.len());
+            for (at, file) in self.site.files.iter().enumerate() {
+                files.entry(file.path.clone()).or_insert(at);
+            }
+            files
+        });
+        files.get(path).copied()
+    }
+
+    /// The place among the assets' statics of the static file called
+    /// `name`, the first where two share it.
+    pub fn static_at(&self, name: &str) -> Option<usize> {
+        let statics = self.statics_by_name.get_or_init(|| {
+            let mut statics = HashMap::new();
+            for (at, file) in self.assets.statics().iter().enumerate() {
+                statics.entry(file.name.clone()).or_insert(at);
+            }
+            statics
+        });
+        statics.get(name).copied()
+    }
+
+    /// The photographs beside `page`, in the order of their paths.
+    pub fn photographs_beside(&self, page: PageId) -> &[PictureId] {
+        let photographs = self.photographs.get_or_init(|| {
+            let site = &self.site;
+            let mut beside: Vec<(&str, PictureId, PageId)> = site
+                .pictures
+                .iter()
+                .filter(|(_, picture)| {
+                    matches!(picture.seen, crate::album::Seen::Photograph { .. })
+                })
+                .filter_map(|(id, picture)| {
+                    let page = site.files[picture.travelling?].page?;
+                    Some((picture.path.as_str(), id, page))
+                })
+                .collect();
+            beside.sort_unstable();
+            let mut photographs: HashMap<PageId, Vec<PictureId>> = HashMap::new();
+            for (_, id, page) in beside {
+                photographs.entry(page).or_default().push(id);
+            }
+            photographs
+        });
+        photographs.get(&page).map_or(&[], Vec::as_slice)
     }
 
     /// The id a field or setting is recorded by.
@@ -327,6 +384,9 @@ impl Renderer {
                 feed_of,
                 standing: OnceLock::new(),
                 every_page: OnceLock::new(),
+                files_by_path: OnceLock::new(),
+                statics_by_name: OnceLock::new(),
+                photographs: OnceLock::new(),
                 chosen: Mutex::new(HashMap::new()),
                 highlighter,
                 cards,
