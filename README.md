@@ -1,8 +1,10 @@
-<p align="center">
-  <img src=".github/readme/logo.svg" alt="" width="96">
-</p>
-
-<h1 align="center">Statac</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/readme/statac-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset=".github/readme/statac-light.svg">
+    <img src=".github/readme/statac.svg" alt="Statac" width="300">
+  </picture>
+</h1>
 
 <p align="center">The friendly static site generator.</p>
 
