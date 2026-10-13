@@ -41,6 +41,7 @@ use files::{File, Role, Snippet};
 pub(crate) use files::{SNIPPETS, TEMPLATES};
 
 pub use card::{Asked, Gathered};
+pub use indent::Own;
 pub use layout::Chosen;
 pub use render::{REDIRECT, Rendered, Renderer, developed};
 pub use shows::{Explained, Group, Held, Holds, Member, Row};
@@ -89,6 +90,16 @@ impl Templates {
                 .and_then(|parent| self.by_name.get(parent).copied());
         }
         chain
+    }
+
+    /// The file whose text, as the engine holds it, has `address` in
+    /// memory inside it, and how far into the text that is.
+    fn holds(&self, address: usize) -> Option<(usize, usize)> {
+        self.files.iter().enumerate().find_map(|(at, file)| {
+            let template = self.env.get_template(&file.name).ok()?;
+            let offset = address.checked_sub(template.source().as_ptr() as usize)?;
+            (offset < template.source().len()).then_some((at, offset))
+        })
     }
 
     fn id(at: usize) -> TemplateId {

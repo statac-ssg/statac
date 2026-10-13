@@ -1,5 +1,9 @@
 //! Where in a template a link on a built page was written.
 //!
+//! A link in a tag that is a template's own text is placed by where the
+//! build wrote that text from, which is exact. What follows places the
+//! rest: a link in what a snippet wrote, or in a value a template printed.
+//!
 //! A template's text is read as HTML with each `{{ ... }}` and `{% ... %}`
 //! standing for anything, so `href="{{ site.url }}/tags/{{ tag }}/"` is an
 //! address that any `.../tags/.../` matches. A link that lands nowhere is
@@ -48,6 +52,13 @@ pub(super) struct Read {
 }
 
 impl Read {
+    /// The address attribute whose value starts at `start`, as far as it
+    /// is written.
+    pub(super) fn written_at(&self, start: usize) -> Option<Range<usize>> {
+        let pattern = self.patterns.iter().find(|p| p.at.start == start)?;
+        Some(pattern.at.clone())
+    }
+
     /// Whether `at` is where the template prints HTML whole.
     pub(super) fn prints(&self, at: &Range<usize>) -> bool {
         self.printed.iter().any(|(_, printed)| printed == at)

@@ -40,7 +40,7 @@ use crate::problem::{Kind, Problem};
 use crate::reads::{Key, Reads, Translation};
 use crate::site::{PageId, TemplateId};
 use crate::source::Place;
-use crate::templates::Renderer;
+use crate::templates::{Own, Renderer};
 use resolve::{Arrival, Leads};
 use scan::{Found, scan};
 
@@ -61,6 +61,8 @@ pub struct Page<'a> {
     /// The files its own sharing cards are published as, from the top of
     /// the built site, which the site holds once the page is built.
     pub cards: Vec<String>,
+    /// Where its HTML is the own text of the templates it is built with.
+    pub own: &'a Own,
 }
 
 /// What a built page's links came to, found as it was built.
@@ -104,7 +106,13 @@ impl Checked {
                 let blame = match &miss.blame {
                     Blame::Writing(place, handed) => Blame::Writing(to.place(*place)?, *handed),
                     Blame::Shown(place, handed) => Blame::Shown(to.place(*place)?, *handed),
-                    Blame::Template(found) => Blame::Template(found.clone()),
+                    Blame::Template(found, placed) => {
+                        let placed = match *placed {
+                            Some((template, at)) => Some((to.template(template)?, at)),
+                            None => None,
+                        };
+                        Blame::Template(found.clone(), placed)
+                    }
                 };
                 Some(Miss {
                     blame,
@@ -144,8 +152,10 @@ enum Blame {
     /// Another page's writing, at this place, shown on the page, and
     /// whether as a value handed to a snippet call.
     Shown(Place, bool),
-    /// A template or snippet, writing this link in its tag.
-    Template(Box<Found>),
+    /// A template or snippet, writing this link in its tag: where the
+    /// tag is a template's own text, the template and where in it the
+    /// attribute's value starts.
+    Template(Box<Found>, Option<(TemplateId, usize)>),
 }
 
 impl Site {
@@ -261,7 +271,14 @@ impl Site {
                 }
                 continue;
             }
-            let blame = Blame::Template(Box::new(link.clone()));
+            // What opens the value, a quote or the `=`, is the template's
+            // own where the template wrote the attribute.
+            let placed = link
+                .at
+                .checked_sub(1)
+                .and_then(|opens| renderer.written_at(page.own, opens))
+                .map(|(template, opens)| (template, opens + 1));
+            let blame = Blame::Template(Box::new(link.clone()), placed);
             self.follow(&written, &from, blame, &mut checked);
         }
         checked.asked.sort_unstable();
@@ -385,7 +402,7 @@ impl Site {
                     let kind = self.kind(miss, page, there, wrote, named(*place));
                     building(renderer, page, Problem::at(kind, *place))
                 }
-                Blame::Template(found) => {
+                Blame::Template(found, placed) => {
                     for &template in &page.templates {
                         templates.entry(template).or_insert_with(|| {
                             let source = renderer.template_source(template);
@@ -396,7 +413,11 @@ impl Site {
                         .templates
                         .iter()
                         .map(|template| (*template, &templates[template]));
-                    let best = blame::best(candidates, found);
+                    let placed = placed.and_then(|(template, at)| {
+                        let at = templates.get(&template)?.written_at(at)?;
+                        Some((template, at))
+                    });
+                    let best = placed.or_else(|| blame::best(candidates, found));
                     let wrote = match &best {
                         Some((template, at)) => {
                             let source = renderer.template_source(*template);

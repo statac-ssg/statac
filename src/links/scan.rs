@@ -39,6 +39,8 @@ pub struct Found {
     /// As written in the HTML, its character references undecoded.
     pub raw: String,
     pub before: Option<Tagged>,
+    /// Where the attribute's value starts on the page.
+    pub at: usize,
 }
 
 /// A start tag on a built page: its name, and each attribute's name and
@@ -96,6 +98,7 @@ pub fn scan(html: &str) -> Scanned {
                             attribute: kind,
                             raw: raw.to_owned(),
                             before: before.clone(),
+                            at: attribute.at.start,
                         });
                     }
                 }

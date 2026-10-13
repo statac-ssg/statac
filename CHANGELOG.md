@@ -10,6 +10,10 @@ What changed in each release of Statac, the newest first.
   `` ```"An example" ``, is no longer warned of as a language Statac has
   no colours for. The block was built rightly; only the warning was
   wrong.
+- A broken link a template writes from a value, as `href="{{ address }}"`,
+  is told at the line of the template that wrote it wherever the line
+  is. It was told at the page alone, or at another line, where the line
+  was inside a loop, opened a block or came after the page's writing.
 
 ## 0.3.0 - 2026-10-12
 

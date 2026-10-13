@@ -38,8 +38,48 @@ thread_local! {
     static LINES: RefCell<Vec<Line>> = const { RefCell::new(Vec::new()) };
 }
 
+/// A run of what a template wrote that wasn't a value's: where it lies in
+/// the output, and where in memory it was written from. The engine writes
+/// a template's own text from the text it holds, so that says where in the
+/// template the run is written.
+#[derive(Copy, Clone, Debug)]
+struct Run {
+    at: usize,
+    from: usize,
+    len: usize,
+}
+
+/// Where what a template wrote is its own text, in the order written.
+#[derive(Default, Debug)]
+pub struct Own(Vec<Run>);
+
+impl Own {
+    /// Where in memory the byte at `at` of the output was written from;
+    /// none for a byte of a value's.
+    pub(super) fn written_from(&self, at: usize) -> Option<usize> {
+        let after = self.0.partition_point(|run| run.at <= at);
+        let run = self.0[..after].last()?;
+        (at - run.at < run.len).then(|| run.from + (at - run.at))
+    }
+
+    /// Forgets what was written from `len` on, which the output no longer
+    /// holds.
+    fn truncate(&mut self, len: usize) {
+        while let Some(run) = self.0.last_mut() {
+            if run.at + run.len <= len {
+                break;
+            }
+            if run.at < len {
+                run.len = len - run.at;
+                break;
+            }
+            self.0.pop();
+        }
+    }
+}
+
 /// What one template writes.
-struct Sink(Vec<u8>);
+struct Sink(Vec<u8>, Own);
 
 impl Sink {
     fn new() -> Self {
@@ -53,7 +93,7 @@ impl Sink {
                 value: false,
             });
         });
-        Self(Vec::new())
+        Self(Vec::new(), Own::default())
     }
 }
 
@@ -90,6 +130,7 @@ impl io::Write for Sink {
                 };
                 if ending > 0 {
                     self.0.truncate(line.start);
+                    self.1.truncate(line.start);
                     line.indent.clear();
                     line.open = true;
                     line.emptied = false;
@@ -97,6 +138,13 @@ impl io::Write for Sink {
                 } else if !rest.is_empty() {
                     line.emptied = false;
                 }
+            }
+            if !line.value && !text.is_empty() {
+                self.1.0.push(Run {
+                    at: self.0.len(),
+                    from: text.as_ptr() as usize,
+                    len: text.len(),
+                });
             }
             self.0.extend_from_slice(text);
             let tail = match text.iter().rposition(|&byte| byte == b'\n') {
@@ -137,10 +185,19 @@ pub(super) fn render<'source>(
     template: &Template<'_, 'source>,
     context: impl Serialize,
 ) -> Result<(Captured<'source>, String), Error> {
+    render_placed(template, context).map(|(captured, text, _)| (captured, text))
+}
+
+/// Renders `template` as [`render`] does, giving as well where what it
+/// wrote is its own text.
+pub(super) fn render_placed<'source>(
+    template: &Template<'_, 'source>,
+    context: impl Serialize,
+) -> Result<(Captured<'source>, String, Own), Error> {
     let mut sink = Sink::new();
     let captured = template.render_captured_to(context, &mut sink)?;
     let text = String::from_utf8(std::mem::take(&mut sink.0)).expect("templates write text");
-    Ok((captured, text))
+    Ok((captured, text, std::mem::take(&mut sink.1)))
 }
 
 /// Runs `write`, which writes a value, so that the line endings it writes
@@ -349,7 +406,27 @@ fn names(text: &str, name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::indented;
+    use super::{Own, Run, indented};
+
+    #[test]
+    fn a_templates_own_text_is_found_where_it_was_written_from() {
+        let run = |at, from, len| Run { at, from, len };
+        let mut own = Own(vec![run(0, 100, 4), run(6, 110, 3), run(9, 200, 5)]);
+        assert_eq!(own.written_from(0), Some(100));
+        assert_eq!(own.written_from(3), Some(103));
+        // Between two runs a value was written.
+        assert_eq!(own.written_from(4), None);
+        assert_eq!(own.written_from(8), Some(112));
+        assert_eq!(own.written_from(9), Some(200));
+        assert_eq!(own.written_from(14), None);
+        // A line taken back takes what was written on it.
+        own.truncate(11);
+        assert_eq!(own.written_from(10), Some(201));
+        assert_eq!(own.written_from(11), None);
+        own.truncate(5);
+        assert_eq!(own.written_from(8), None);
+        assert_eq!(own.written_from(3), Some(103));
+    }
 
     #[test]
     fn each_further_line_takes_the_indent() {

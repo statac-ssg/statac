@@ -11,6 +11,7 @@ use minijinja::{Environment, Error, State};
 use super::card::Gathered;
 use super::files::{Snippet, Unnamed, unnamed_fills};
 use super::frame::{self, Frame, Handed};
+use super::indent::Own;
 use super::layout::{self, Chosen};
 use super::values::{ListValue, PageValue, SiteValue};
 use super::{Templates, explain};
@@ -294,6 +295,8 @@ pub struct Rendered {
     pub coloured: Vec<Place>,
     /// How many pages of lists of the whole site it reached.
     pub walked: u64,
+    /// Where its HTML is the own text of the templates it is built with.
+    pub own: Own,
 }
 
 impl Rendered {
@@ -328,6 +331,7 @@ impl Rendered {
             developed: frame.developed,
             coloured: frame.coloured,
             walked: frame.walked,
+            own: Own::default(),
         }
     }
 }
@@ -532,6 +536,14 @@ impl Renderer {
         out.push_str(&markdown::to_html(&document, &options));
         out.push_str(&text[range.end..]);
         Some(out)
+    }
+
+    /// The template whose own text the byte at `at` of an output is, and
+    /// where in that template it is written; none for a byte of a value's,
+    /// or of a snippet's.
+    pub fn written_at(&self, own: &Own, at: usize) -> Option<(TemplateId, usize)> {
+        let (file, offset) = self.shared.templates.holds(own.written_from(at)?)?;
+        Some((Templates::id(file), offset))
     }
 
     /// The file a template or snippet is read from.
@@ -751,6 +763,7 @@ impl Renderer {
         }
         let layout = shared.templates.by_name.get(name).copied();
         frame::with(|frame| frame.layout = layout);
+        let mut own = Own::default();
         let result = shared
             .templates
             .env
@@ -758,7 +771,14 @@ impl Renderer {
             .and_then(|template| {
                 let at = layout.expect("a template the engine holds");
                 frame::begin(at, None)?;
-                frame::end(at, super::indent::render(&template, context))?
+                let built = super::indent::render_placed(&template, context);
+                frame::end(
+                    at,
+                    built.map(|(captured, text, placed)| {
+                        own = placed;
+                        (captured, text)
+                    }),
+                )?
             });
         let mut frame = frame::pop();
         problems.append(&mut frame.problems);
@@ -774,7 +794,10 @@ impl Renderer {
                 .iter()
                 .any(|p| p.kind.severity() == crate::problem::Severity::Error)
         });
-        Rendered::of(html, frame, problems)
+        Rendered {
+            own,
+            ..Rendered::of(html, frame, problems)
+        }
     }
 }
 

@@ -1288,6 +1288,7 @@ pub(crate) fn build_output(
                     .iter()
                     .filter_map(|card| card.file().map(str::to_owned))
                     .collect(),
+                own: &rendered.own,
             };
             checked = Some(linked.check(renderer, page, &html));
             sized = sizes_a_picture(&html);

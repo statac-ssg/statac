@@ -2332,6 +2332,78 @@ fn a_link_naming_a_page_by_its_file_is_offered_the_pages_address() {
     );
 }
 
+/// A link a template writes from a value is told at the attribute that
+/// wrote it: on each turn of a loop, after the page's writing, and where
+/// its value has no quotes, in the template that holds the line.
+#[test]
+fn a_link_a_template_writes_from_a_value_is_told_at_its_own_line() {
+    let site = Site::new("written-from-a-value");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write(
+        "templates/base.html",
+        "<title>{{ page.title }}</title>\n\
+         <nav><a href=\"{{ page.url }}\">Here</a>\n\
+         {% for address in [\"/post-1/\", \"/post-2/\"] %}\n\
+         <a href=\"{{ address }}\">{{ address }}</a>\n\
+         {% endfor %}</nav>\n\
+         {% block main %}{% endblock %}\n",
+    );
+    site.write(
+        "templates/page.html",
+        "{% extends \"base\" %}\n\
+         {% block main %}\n\
+         {% for address in [\"/post-1/\", \"/post-3/\", \"/post-4/\"] %}\n\
+         <a href=\"{{ address }}\">{{ address }}</a>\n\
+         {% endfor %}\n\
+         {{ page.content }}\n\
+         <a href={{ \"/post-5/\" }}>Five</a>\n\
+         {% endblock %}\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\nPost 1.\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/post-2/`
+  templates/base.html, line 4
+   4 │ <a href=\"{{ address }}\">{{ address }}</a>
+     │          ^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-3/`
+  templates/page.html, line 4
+   4 │ <a href=\"{{ address }}\">{{ address }}</a>
+     │          ^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-4/`
+  templates/page.html, line 4
+   4 │ <a href=\"{{ address }}\">{{ address }}</a>
+     │          ^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-5/`
+  templates/page.html, line 7
+   7 │ <a href={{ \"/post-5/\" }}>Five</a>
+     │         ^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+4 warnings: 4 broken-link.
+"
+    );
+}
+
 /// On a site published under a path, an address written with `@url(...)`
 /// or a template's `url(...)` leads under the path and is offered back
 /// as another of the same; a plain link from the top of the domain is
