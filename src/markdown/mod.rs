@@ -40,7 +40,7 @@ pub use html::{Copies, Options, Picture, Placement, Snippets, to_html, write};
 pub use ids::give_heading_ids;
 pub use node::{Alignment, CalloutKind, Kind, Node};
 pub use opening::{Written, as_written, closed_up, words_of};
-pub use pieces::{Piece, PieceValue};
+pub use pieces::{Piece, PieceValue, language_word};
 pub use questions::{Heading, Link, has_callout, headings, links, plain_text, uses_maths};
 pub use read::DEEPEST_NESTING;
 pub use typography::{Typography, set_typography, set_words};

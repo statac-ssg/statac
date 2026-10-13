@@ -105,10 +105,8 @@ pub enum PieceValue {
 /// opens the caption, and the language is the one its name gives.
 pub(super) fn fence(info: &str) -> (&str, &str) {
     let info = info.trim();
-    let (language, rest) = match info.starts_with(['"', '\'']) {
-        true => ("", info),
-        false => info.split_once(char::is_whitespace).unwrap_or((info, "")),
-    };
+    let language = language_word(info).unwrap_or("");
+    let rest = &info[language.len()..];
     let (language, rest) = match highlight::first_word(language) {
         FirstWord::File(Language::Known(name)) => (name, info),
         FirstWord::File(_) => ("", info),
@@ -126,6 +124,16 @@ pub(super) fn fence(info: &str) -> (&str, &str) {
     (language, caption)
 }
 
+/// The word of a fence's opening line that names its language or its
+/// file: the first, and none where the line opens with a quoted caption.
+pub fn language_word(info: &str) -> Option<&str> {
+    let info = info.trim_start();
+    match info.starts_with(['"', '\'']) {
+        true => None,
+        false => info.split_whitespace().next(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,6 +144,8 @@ mod tests {
         assert_eq!(fence("rust example.rs"), ("rust", "example.rs"));
         assert_eq!(fence("rust \"The example\""), ("rust", "The example"));
         assert_eq!(fence("\"mermaid\""), ("", "mermaid"));
+        assert_eq!(fence("\"An example\""), ("", "An example"));
+        assert_eq!(fence("'An example'"), ("", "An example"));
         assert_eq!(fence(""), ("", ""));
     }
 

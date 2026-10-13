@@ -1207,7 +1207,7 @@ fn code_languages(
         let markdown::Kind::CodeBlock { info, text, .. } = &node.kind else {
             return;
         };
-        let Some(word) = info.split_whitespace().next() else {
+        let Some(word) = markdown::language_word(info) else {
             return;
         };
         match highlight::first_word(word).language() {

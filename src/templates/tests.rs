@@ -1746,7 +1746,8 @@ fn code_is_coloured_in_the_sites_style_and_a_language_it_lacks_is_told_at_its_wo
         (
             "content/post-1.md",
             "---\ntitle: Post 1\n---\n\n```rust\nfn main() {}\n```\n\n\
-             - item\n\n  ~~~ cosole\n  $ ls\n  ~~~\n\n```text\nas it is\n```\n",
+             - item\n\n  ~~~ cosole\n  $ ls\n  ~~~\n\n```text\nas it is\n```\n\n\
+             ```\"An example\"\nas it is\n```\n\n```'An example'\nas it is\n```\n",
         ),
         (
             "content/post-2.md",

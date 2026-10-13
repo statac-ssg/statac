@@ -2,6 +2,15 @@
 
 What changed in each release of Statac, the newest first.
 
+## Unreleased
+
+### Fixed
+
+- A code block opened with a caption in quotes and no language, as
+  `` ```"An example" ``, is no longer warned of as a language Statac has
+  no colours for. The block was built rightly; only the warning was
+  wrong.
+
 ## 0.3.0 - 2026-10-12
 
 ### New

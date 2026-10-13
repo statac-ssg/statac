@@ -768,10 +768,8 @@ impl<'a> Writer<'a> {
     /// A block's code as HTML: coloured where its fence names a language
     /// Statac colours and no line of it is too long, as it is otherwise.
     fn code(&self, info: &str, code: &str) -> String {
-        let language = info
-            .split_whitespace()
-            .next()
-            .map(|word| highlight::first_word(word).language());
+        let language =
+            pieces::language_word(info).map(|word| highlight::first_word(word).language());
         match (self.options.highlighter, language) {
             (Some(highlighter), Some(Language::Known(name)))
                 if highlight::too_long(code).is_none() =>
