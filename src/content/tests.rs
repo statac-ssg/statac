@@ -1003,29 +1003,126 @@ fn dates_in_the_name_and_the_front_matter_are_compared() {
     assert_eq!(problems(&read), []);
 }
 
+/// A `permalink` written on a folder's own page moves it as it moves any
+/// page, filled from the folder's name; the folder's other files stay, and
+/// nothing is left at the folder's address.
 #[test]
-fn a_folders_own_permalink_is_set_aside() {
+fn a_folders_own_permalink_moves_its_page() {
+    // (the folder's page, its `permalink`, where it lands)
+    let cases: [(&str, &str, &str); 8] = [
+        ("posts/index.md", "/blog/", "/blog/"),
+        ("posts/index.md", "/posts.html", "/posts.html"),
+        ("posts/index.md", "/posts/", "/posts/"),
+        ("posts/index.md", "/{year}/{slug}/", "/2026/posts/"),
+        (
+            "Folder 1/Folder 2/index.md",
+            "/{folder}/{name}/",
+            "/folder-2/Folder 2/",
+        ),
+        (
+            "Folder 1/Folder 2/index.md",
+            "/{slug}.html",
+            "/folder-2.html",
+        ),
+        ("index.md", "/start/", "/start/"),
+        ("index.md", "/index.html", "/index.html"),
+    ];
+    for (path, permalink, wanted) in cases {
+        let folder = path.strip_suffix("index.md").unwrap();
+        let index = format!("content/{path}");
+        let post = format!("content/{folder}post-1.md");
+        let file = format!("content/{folder}file-1.pdf");
+        let said = format!("---\ntitle: Folder\ndate: 2026-01-02\npermalink: {permalink}\n---\n");
+        let read = site(&[
+            ("statac.yaml", "language: en\ntimezone: UTC\n"),
+            (&index, &said),
+            (&post, "---\ntitle: Post 1\n---\n"),
+            (&file, "pdf"),
+        ]);
+        assert_eq!(problems(&read), [], "{path} {permalink}");
+        let moved = page(&read, path);
+        assert_eq!(moved.address.as_str(), wanted, "{path} {permalink}");
+        let speaker = read.site.lists.get(moved.folder).page;
+        let speaker = speaker.map(|id| read.site.pages.get(id).path.as_str());
+        assert_eq!(speaker, Some(path), "{path} {permalink}");
+        let files: Vec<&str> = read.site.files.iter().map(|f| f.address.as_str()).collect();
+        let stays = format!("/{}file-1.pdf", slug::tidied_path(folder));
+        assert_eq!(files, [stays.as_str()], "{path} {permalink}");
+        let old = format!("{}index.html", slug::tidied_path(folder));
+        let claimed: Vec<String> = read.claims().into_iter().map(|(file, _)| file).collect();
+        assert_eq!(
+            claimed.contains(&old),
+            moved.address.file() == old,
+            "{path} {permalink}: {claimed:?}"
+        );
+    }
+}
+
+/// A `permalink` handed down from a folder above, or from the settings,
+/// moves the pages beneath but never a folder's own page.
+#[test]
+fn a_handed_down_permalink_leaves_a_folders_own_page_at_its_folder() {
     let read = site(&[
         (
+            "statac.yaml",
+            "language: en\npages.permalink: /site/{slug}/\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
             "content/posts/index.md",
-            "---\ntitle: Posts\npermalink: /blog/\n---\n",
+            "---\ntitle: Posts\npages.permalink: /p/{slug}/\n---\n",
         ),
         ("content/posts/post-1.md", "---\ntitle: Post 1\n---\n"),
         (
-            "content/notes/index.md",
-            "---\ntitle: Notes\npermalink: /notes/\n---\n",
+            "content/posts/folder-1/index.md",
+            "---\ntitle: Folder 1\n---\n",
         ),
-        ("content/notes/post-2.md", "---\ntitle: Post 2\n---\n"),
+        (
+            "content/posts/folder-1/post-2.md",
+            "---\ntitle: Post 2\n---\n",
+        ),
+        ("content/folder-2/index.md", "---\ntitle: Folder 2\n---\n"),
+        ("content/folder-2/post-3.md", "---\ntitle: Post 3\n---\n"),
     ]);
+    assert_eq!(problems(&read), []);
     assert_eq!(
-        problems(&read),
-        [(
-            "set-aside",
-            "content/posts/index.md".to_owned(),
-            "/blog/".to_owned()
-        )]
+        addresses(&read),
+        [
+            ("folder-2/index.md".into(), "/folder-2/".into()),
+            ("folder-2/post-3.md".into(), "/site/post-3/".into()),
+            ("index.md".into(), "/".into()),
+            ("posts/folder-1/index.md".into(), "/posts/folder-1/".into()),
+            ("posts/folder-1/post-2.md".into(), "/p/post-2/".into()),
+            ("posts/index.md".into(), "/posts/".into()),
+            ("posts/post-1.md".into(), "/p/post-1/".into()),
+        ]
     );
-    assert_eq!(page(&read, "posts/index.md").address.as_str(), "/posts/");
+}
+
+/// A `permalink` on a language folder's own page, or a folder's in it, is
+/// read from the language folder's address.
+#[test]
+fn a_language_folders_own_permalink_is_read_from_its_address() {
+    let read = site(&[
+        ("statac.yaml", "language: [en, fr]\n"),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "content/fr/index.md",
+            "---\ntitle: Accueil\npermalink: /accueil/\n---\n",
+        ),
+        ("content/fr/post-1.md", "---\ntitle: Post 1\n---\n"),
+        (
+            "content/fr/folder-1/index.md",
+            "---\ntitle: Folder 1\npermalink: /{slug}.html\n---\n",
+        ),
+        ("content/fr/folder-1/post-2.md", "---\ntitle: Post 2\n---\n"),
+    ]);
+    assert_eq!(problems(&read), []);
+    assert_eq!(page(&read, "fr/index.md").address.as_str(), "/fr/accueil/");
+    assert_eq!(
+        page(&read, "fr/folder-1/index.md").address.as_str(),
+        "/fr/folder-1.html"
+    );
 }
 
 #[test]

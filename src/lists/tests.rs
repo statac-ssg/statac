@@ -976,7 +976,7 @@ fn a_list_goes_on_onto_later_pages_beneath_its_own() {
         usize,
         &'a [&'a str],
     );
-    let cases: [Case; 14] = [
+    let cases: [Case; 17] = [
         ("", ("blog/index.md", ""), blog(), 10, &[]),
         (
             "posts_per_page: 2\n",
@@ -984,6 +984,29 @@ fn a_list_goes_on_onto_later_pages_beneath_its_own() {
             blog(),
             2,
             &["/blog/page/2/"],
+        ),
+        // A folder's page its `permalink` moves goes on beneath where it
+        // stands, at a file beneath its name as a folder.
+        (
+            "posts_per_page: 2\n",
+            ("blog/index.md", "permalink: /posts/\n"),
+            blog(),
+            2,
+            &["/posts/page/2/"],
+        ),
+        (
+            "posts_per_page: 2\n",
+            ("blog/index.md", "permalink: /posts.html\n"),
+            blog(),
+            2,
+            &["/posts/page/2/"],
+        ),
+        (
+            "posts_per_page: 2\n",
+            ("index.md", "permalink: /start/\n"),
+            Some(folder("")),
+            2,
+            &["/start/page/2/"],
         ),
         (
             "posts_per_page: 2\n",

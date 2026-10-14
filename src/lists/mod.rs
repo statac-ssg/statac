@@ -298,7 +298,8 @@ fn address_part(name: &str, slugs: Option<&Sourced<Value>>) -> String {
     slug::slugify(name)
 }
 
-/// Where a folder's own page stands.
+/// Where a folder's own page stands unless a `permalink` written on it
+/// moves it.
 fn folder_address(path: &str) -> Option<Address> {
     Address::read(&format!("/{}", slug::tidied_path(&format!("{path}/")))).ok()
 }

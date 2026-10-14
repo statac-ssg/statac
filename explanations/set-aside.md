@@ -4,8 +4,6 @@ A page sets a field that Statac doesn't use. This happens when:
 
 - Statac fills that name itself on every page, such as `source` or
   `content`.
-- The field is a `permalink` on a folder's own `index.md`. That page
-  always stays at the folder's address.
 - The page sends readers on with `redirect_to`, and the field, such as
   `tags` or `feed`, has nothing to act on. A page that sends readers on
   uses only its `title`, `date`, `permalink`, `draft`, `needs` and
@@ -45,13 +43,12 @@ fields do nothing.
 ## How to fix it
 
 Give the field a name of your own if you want to use it in your
-templates. To choose where a page is published, write `permalink:`. To
-move a folder's page, rename the folder. On a page that sends readers on,
-remove the field, or remove `redirect_to` to publish the page. In the
-card's settings, correct the name to one a card uses. Statac suggests the
-nearest. On a page with both `card` and `og_image`, remove one of them.
-If nothing is written after the colon, give the line a value, or remove
-it.
+templates. To choose where a page is published, write `permalink:`. On
+a page that sends readers on, remove the field, or remove `redirect_to`
+to publish the page. In the card's settings, correct the name to one a
+card uses. Statac suggests the nearest. On a page with both `card` and
+`og_image`, remove one of them. If nothing is written after the colon,
+give the line a value, or remove it.
 
 ## Example
 

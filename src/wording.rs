@@ -278,9 +278,6 @@ pub(crate) fn headline(kind: &Kind) -> String {
                     root(*on)
                 )
             }
-            SetAside::FolderPermalink => {
-                "Field set aside: a folder's own page stays at the folder's address".into()
-            }
             SetAside::SendsOn => {
                 "Field set aside: a page sending readers on publishes only its redirect".into()
             }
@@ -1960,7 +1957,6 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             SetAside::StatacFills(_) => {
                 Some(format!("Give it a name of your own, such as `my_{field}`."))
             }
-            SetAside::FolderPermalink => Some("Rename the folder to move its page.".into()),
             SetAside::SendsOn => {
                 Some("Take it out, or take out `redirect_to` to publish the page.".into())
             }
@@ -6506,14 +6502,6 @@ mod tests {
                 },
                 "Setting set aside: `url` has nothing after its colon",
                 Some("Give it a value, or take the line out."),
-            ),
-            (
-                Kind::SetAside {
-                    field: "permalink".into(),
-                    why: SetAside::FolderPermalink,
-                },
-                "Field set aside: a folder's own page stays at the folder's address",
-                Some("Rename the folder to move its page."),
             ),
             (
                 wrong(

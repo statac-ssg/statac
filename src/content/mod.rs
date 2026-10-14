@@ -1449,8 +1449,9 @@ struct Target<'a> {
     head: Place,
 }
 
-/// Where a page lands: its `permalink`, written or handed down, filled in;
-/// or its folder and name.
+/// Where a page lands: its `permalink` filled in, written or handed down,
+/// though a folder's own page is moved only by one written on it; or its
+/// folder and name.
 fn address_of(words: &Words, target: &Target, problems: &mut Vec<Problem>) -> Address {
     let Target {
         place,
@@ -1489,30 +1490,7 @@ fn address_of(words: &Words, target: &Target, problems: &mut Vec<Problem>) -> Ad
         problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
         Address::made(path)
     };
-    let written = match (place, permalink) {
-        (PagePlace::Folder, Some(permalink)) if written_here => {
-            let stays = permalink
-                .value
-                .as_text()
-                .and_then(|p| Address::read(p).ok());
-            let folder = Address::read(&default).ok();
-            if stays.map(|a| a.key()) != folder.map(|a| a.key())
-                && let Some(at) = permalink.origin.place
-            {
-                problems.push(Problem::at(
-                    Kind::SetAside {
-                        field: "permalink".into(),
-                        why: SetAside::FolderPermalink,
-                    },
-                    at,
-                ));
-            }
-            None
-        }
-        (PagePlace::Folder, _) | (_, None) => None,
-        (_, Some(permalink)) => Some(permalink),
-    };
-    let Some(permalink) = written else {
+    let Some(permalink) = permalink.filter(|_| place != PagePlace::Folder || written_here) else {
         return match Address::read(&default) {
             Ok(address) => address,
             Err((fault, _)) => at(problems, fault),

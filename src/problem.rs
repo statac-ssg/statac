@@ -1851,8 +1851,6 @@ pub enum Translated {
 pub enum SetAside {
     /// A name Statac fills on every page itself.
     StatacFills(Root),
-    /// A `permalink` on a folder's own page, which stays at the folder.
-    FolderPermalink,
     /// A word on a page sending readers on, which publishes only its
     /// redirect.
     SendsOn,

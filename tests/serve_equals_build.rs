@@ -580,6 +580,47 @@ fn what_a_folder_hands_down_a_draft_and_an_old_address() {
 }
 
 #[test]
+fn a_folders_own_permalink_added_changed_and_removed() {
+    let site = Site::new("folder-permalink");
+    let folder = |permalink: &str| format!("---\ntitle: Notes\n{permalink}---\nThe notes.\n");
+    for n in 1..=3 {
+        site.write(
+            &format!("content/notes/note-{n}.md"),
+            &format!("---\ntitle: Note {n}\ndate: 2026-02-0{n}\n---\nNote {n}.\n"),
+        );
+    }
+    site.put("content/notes/photo-1.jpg", &jpeg(48, 32));
+    site.write("content/notes/index.md", &folder(""));
+    through(
+        &site,
+        &[
+            ("a permalink added", &|site| {
+                site.write("content/notes/index.md", &folder("permalink: /writing/\n"))
+            }),
+            ("a permalink changed to a file", &|site| {
+                site.write(
+                    "content/notes/index.md",
+                    &folder("permalink: /notes.html\n"),
+                )
+            }),
+            ("the home page's added", &|site| {
+                site.write(
+                    "content/index.md",
+                    "---\ntitle: Home\npermalink: /start/\n---\nThe home page.\n",
+                )
+            }),
+            ("a permalink removed", &|site| {
+                site.write("content/notes/index.md", &folder(""));
+                site.write(
+                    "content/index.md",
+                    "---\ntitle: Home\n---\nThe home page.\n",
+                )
+            }),
+        ],
+    );
+}
+
+#[test]
 fn a_field_naming_a_record_or_a_page_is_held_to_the_names_there_now() {
     let site = Site::new("named");
     let declared = "fields.first: one of data.items\nfields.second: one of folder.notes\n";

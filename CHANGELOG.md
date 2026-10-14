@@ -4,6 +4,15 @@ What changed in each release of Statac, the newest first.
 
 ## Unreleased
 
+### New
+
+- A `permalink` written on a folder's own `index.md`, the home page's
+  included, publishes the page and its list at that address, as it does
+  any other page, and the list's later pages and its feed follow it. It
+  was set aside, the page staying at the folder's address. A `permalink`
+  handed down from a folder above still leaves a folder's own page where
+  it is, and the folder's other files stay at the folder's address.
+
 ### Fixed
 
 - A code block opened with a caption in quotes and no language, as

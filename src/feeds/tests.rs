@@ -99,6 +99,24 @@ fn a_list_with_posts_has_its_feed_beside_its_page() {
             some("/posts/atom.xml"),
         ),
         (
+            "a folder's page moved",
+            vec![posts_index("permalink: /blog/")],
+            some("/feed.xml"),
+            some("/blog/feed.xml"),
+        ),
+        (
+            "a folder's page moved to a file",
+            vec![posts_index("permalink: /blog.html")],
+            some("/feed.xml"),
+            some("/blog.html.feed.xml"),
+        ),
+        (
+            "the site's page moved",
+            vec![("index.md", index("permalink: /start/"))],
+            some("/start/feed.xml"),
+            some("/posts/feed.xml"),
+        ),
+        (
             "a folder holds its feed back",
             vec![posts_index("feed: false")],
             some("/feed.xml"),
