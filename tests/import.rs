@@ -660,6 +660,113 @@ fn hugo_addresses_are_kept_by_each_placeholder_and_as_files() {
     assert_eq!(fixture("hugo-ugly"), [] as [&str; 0]);
 }
 
+/// Builds the site in `site` into `out`, having found no error.
+fn build_into(site: &Path, out: &Path) {
+    let outcome = build::run(&Options {
+        mode: Mode::Build,
+        site: site.to_path_buf(),
+        out: Some(out.to_path_buf()),
+        today: Some(today()),
+        drafts: false,
+        url: None,
+    });
+    let stopped = |problem: &&statac::problem::Problem| problem.kind.severity() == Severity::Error;
+    assert_eq!(outcome.problems.iter().filter(stopped).count(), 0);
+}
+
+/// A list Hugo published away from its folder stays at that address, its
+/// later pages beneath it and its feed where Hugo's was, and nothing sends
+/// readers on from it; a list at its folder's address is left there.
+#[test]
+fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
+    // The settings, the list's own front matter, the `permalink` written
+    // on it, and the files its page, its second page and its feed are
+    // built at. Hugo's later pages of a list at a file aren't known.
+    type Case<'a> = (&'a str, &'a str, Option<&'a str>, [Option<&'a str>; 3]);
+    let cases: [Case; 4] = [
+        (
+            "[permalinks.section]\nposts = '/blog/'\n",
+            "",
+            Some("/blog/"),
+            [
+                Some("blog/index.html"),
+                Some("blog/page/2/index.html"),
+                Some("blog/index.xml"),
+            ],
+        ),
+        (
+            "uglyURLs = true\n",
+            "",
+            Some("/posts.html"),
+            [Some("posts.html"), None, Some("posts/index.xml")],
+        ),
+        (
+            "",
+            "url: /blog/\n",
+            Some("/blog/"),
+            [
+                Some("blog/index.html"),
+                Some("blog/page/2/index.html"),
+                Some("blog/index.xml"),
+            ],
+        ),
+        (
+            "",
+            "",
+            None,
+            [
+                Some("posts/index.html"),
+                Some("posts/page/2/index.html"),
+                Some("posts/index.xml"),
+            ],
+        ),
+    ];
+    for (at, (settings, front, permalink, files)) in cases.into_iter().enumerate() {
+        let old = scratch(&format!("hugo-list-old-{at}"));
+        let new = scratch(&format!("hugo-list-new-{at}"));
+        let out = scratch(&format!("hugo-list-out-{at}"));
+        fs::create_dir_all(old.join("content/posts")).unwrap();
+        let top = "baseURL = 'https://example.org/'\ntitle = 'Lists'\n";
+        let paging = "[pagination]\npagerSize = 1\n";
+        fs::write(old.join("hugo.toml"), format!("{top}{settings}{paging}")).unwrap();
+        let list = format!("---\ntitle: Posts\n{front}---\n");
+        fs::write(old.join("content/posts/_index.md"), list).unwrap();
+        for n in 1..=2 {
+            let post = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\n---\nA post.\n");
+            fs::write(old.join(format!("content/posts/post-{n}.md")), post).unwrap();
+        }
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{at}: {told}");
+        let index = fs::read_to_string(new.join("content/posts/index.md")).unwrap();
+        match permalink {
+            Some(permalink) => {
+                assert!(
+                    index.contains(&format!("\npermalink: {permalink}\n")),
+                    "{at}: {index}"
+                )
+            }
+            None => assert!(!index.contains("permalink:"), "{at}: {index}"),
+        }
+        assert!(!index.contains("redirect_from"), "{at}: {index}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(
+            !report.contains("Nothing in the new site answers"),
+            "{at}: {report}"
+        );
+        assert!(
+            !report.contains("Feeds made by templates"),
+            "{at}: {report}"
+        );
+        build_into(&new, &out);
+        for file in files.into_iter().flatten() {
+            assert!(out.join(file).is_file(), "{at}: nothing at {file}");
+        }
+        if permalink.is_some() {
+            assert!(!out.join("posts/index.html").exists(), "{at}");
+        }
+    }
+}
+
 #[test]
 fn hugo_site_under_a_path_keeps_its_addresses_and_links() {
     assert_eq!(fixture("hugo-under-path"), [AS_TEXT]);
@@ -1797,6 +1904,69 @@ fn zola_lists_keep_their_order_pages_and_redirects() {
 #[test]
 fn zola_lists_answer_the_first_page_zola_sent_on_to_them() {
     assert_eq!(fixture("zola-first-pages"), [] as [&str; 0]);
+}
+
+/// Zola names a list's address by its folder as written, so a list in a
+/// folder Statac's address spells otherwise stays at Zola's, its later
+/// pages and its feed beside it, and nothing sends readers on from it; a
+/// list at its folder's address is left there.
+#[test]
+fn a_zola_list_stays_at_the_address_zola_gave_it() {
+    for (at, (folder, permalink)) in [("Folder-1", Some("/Folder-1/")), ("folder-1", None)]
+        .into_iter()
+        .enumerate()
+    {
+        let old = scratch(&format!("zola-list-old-{at}"));
+        let new = scratch(&format!("zola-list-new-{at}"));
+        let out = scratch(&format!("zola-list-out-{at}"));
+        fs::create_dir_all(old.join(format!("content/{folder}"))).unwrap();
+        let settings = "base_url = \"https://example.org\"\ntitle = \"Lists\"\n";
+        fs::write(old.join("config.toml"), settings).unwrap();
+        let list = "+++\ntitle = \"Folder 1\"\nsort_by = \"date\"\npaginate_by = 1\n\
+                    generate_feeds = true\n+++\n";
+        fs::write(old.join(format!("content/{folder}/_index.md")), list).unwrap();
+        for n in 1..=2 {
+            let post = format!("+++\ntitle = \"Post {n}\"\ndate = 2026-01-0{n}\n+++\nA post.\n");
+            fs::write(old.join(format!("content/{folder}/post-{n}.md")), post).unwrap();
+        }
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{at}: {told}");
+        let index = fs::read_to_string(new.join(format!("content/{folder}/index.md"))).unwrap();
+        match permalink {
+            Some(permalink) => {
+                assert!(
+                    index.contains(&format!("\npermalink: {permalink}\n")),
+                    "{at}: {index}"
+                )
+            }
+            None => assert!(!index.contains("permalink:"), "{at}: {index}"),
+        }
+        // Zola's first later page sends readers on to the list itself.
+        assert!(
+            !index.contains(&format!("  - /{folder}/\n")),
+            "{at}: {index}"
+        );
+        assert!(
+            index.contains(&format!("redirect_from:\n  - /{folder}/page/1/\n")),
+            "{at}: {index}"
+        );
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(
+            !report.contains("Nothing in the new site answers"),
+            "{at}: {report}"
+        );
+        build_into(&new, &out);
+        // A disk may not tell `Folder-1` from `folder-1`, so the names are
+        // read as written.
+        let names: Vec<String> = (fs::read_dir(&out).unwrap())
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.contains(&folder.to_owned()), "{at}: {names:?}");
+        for file in ["index.html", "page/2/index.html", "atom.xml"] {
+            let path = out.join(folder).join(file);
+            assert!(path.is_file(), "{at}: nothing at {folder}/{file}");
+        }
+    }
 }
 
 #[test]

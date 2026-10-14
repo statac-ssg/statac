@@ -45,8 +45,9 @@
 //! A reader must not:
 //!
 //! - rename a field that collides with one of Statac's words, write
-//!   `permalink` or `redirect_from`, or turn a date into ISO 8601: those
-//!   are the shared part's, so every tool's sites come out alike;
+//!   `permalink` or `redirect_from` on a page that came across, or turn a
+//!   date into ISO 8601: those are the shared part's, so every tool's
+//!   sites come out alike;
 //! - escape a call in the writing, or put blank lines round HTML: how
 //!   Statac's Markdown reads writing is the shared part's to know;
 //! - copy the tool's templates or theme: the new site has Statac's

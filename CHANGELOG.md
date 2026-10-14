@@ -12,6 +12,14 @@ What changed in each release of Statac, the newest first.
   was set aside, the page staying at the folder's address. A `permalink`
   handed down from a folder above still leaves a folder's own page where
   it is, and the folder's other files stay at the folder's address.
+- `statac import` keeps a list at the address the old site gave it,
+  where that isn't its folder's, as with Hugo's `uglyURLs`, a section's
+  `url` or a pattern in `permalinks.section`, or a Zola folder whose name
+  Statac spells otherwise: the folder's `index.md` carries that address
+  as its `permalink`, and the list's later pages and its feed follow it.
+  The list stood at its folder's address, sending readers on from the old
+  one, and a list Hugo made with no `_index.md` was left with nothing at
+  its old address.
 
 ### Fixed
 

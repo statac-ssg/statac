@@ -1209,28 +1209,12 @@ impl Reader<'_> {
         found
     }
 
-    /// Works out each folder's own page's address in Statac and keeps
-    /// Zola's where it differs, and the language roots.
+    /// Takes the address off each folder's own page Zola published none
+    /// for.
     fn lists(&mut self) {
         for doc in &mut self.docs {
-            if doc.shape != Shape::List {
-                continue;
-            }
-            if doc.draft || !doc.list.render {
+            if doc.shape == Shape::List && (doc.draft || !doc.list.render) {
                 doc.address = None;
-                continue;
-            }
-            let folder = parent(&doc.to);
-            let statacs = format!("/{}", statac_slug::tidied_path(folder));
-            let statacs = match statacs.ends_with('/') {
-                true => statacs,
-                false => format!("{statacs}/"),
-            };
-            if let Some(zolas) = doc.address.take() {
-                match zolas == statacs {
-                    true => doc.address = Some(zolas),
-                    false => doc.others.insert(0, zolas),
-                }
             }
         }
     }
@@ -1390,14 +1374,9 @@ impl Reader<'_> {
                 .clone()
                 .unwrap_or_else(|| "page".into());
             let path = path.trim_matches('/').to_owned();
-            let base = doc
-                .address
-                .clone()
-                .or_else(|| doc.others.first().cloned())
-                .unwrap_or_default();
-            if base.is_empty() {
+            let Some(base) = doc.address.clone() else {
                 continue;
-            }
+            };
             let (by, _) = doc.list.sort_by.clone().unwrap_or(("none".into(), None));
             let members: Vec<usize> = self
                 .members(list)
@@ -1511,16 +1490,16 @@ impl Reader<'_> {
                 laid_out.push(parent(&doc.to).to_owned());
             }
             let (_, names) = self.feeds_of(&language);
-            if doc.list.feeds == Some(true) && !doc.dir.is_empty() {
-                let base = doc.address.clone().or_else(|| doc.others.first().cloned());
-                if let Some(base) = base {
-                    words.push(Field::new("feed", Value::Text(names[0].clone()), None));
-                    kept.push(format!("{base}{}", names[0]));
-                    for name in &names {
-                        feed_addresses.push(format!("{base}{name}"));
-                    }
-                    extra_names.extend(names.iter().skip(1).cloned());
+            if doc.list.feeds == Some(true)
+                && !doc.dir.is_empty()
+                && let Some(base) = doc.address.clone()
+            {
+                words.push(Field::new("feed", Value::Text(names[0].clone()), None));
+                kept.push(format!("{base}{}", names[0]));
+                for name in &names {
+                    feed_addresses.push(format!("{base}{name}"));
                 }
+                extra_names.extend(names.iter().skip(1).cloned());
             }
             self.docs[at].words.extend(words);
         }
@@ -1777,7 +1756,7 @@ impl Reader<'_> {
         let refs = |path: &str| {
             let doc = docs.iter().find(|d| d.rel == path && !d.draft)?;
             match doc.shape {
-                Shape::List => {
+                Shape::List if doc.address.is_none() => {
                     let folder = parent(&doc.to);
                     let address = format!("/{}", statac_slug::tidied_path(folder));
                     Some(match address.ends_with('/') {

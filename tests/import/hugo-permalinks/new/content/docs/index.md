@@ -1,6 +1,5 @@
 ---
 title: Docs
-redirect_from:
-  - /manual/
+permalink: /manual/
 ---
 A list at an address of its own.

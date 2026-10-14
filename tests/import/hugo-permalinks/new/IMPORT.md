@@ -35,8 +35,7 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 Statac worked out where the old site published each page, read the new site, and looked for each of the 21 old addresses there: 21 are published there, or sent on from there.
 
-- 4 pages carry a `permalink` of their own, where no pattern fits.
-- 2 pages carry `redirect_from`, for the other addresses that led to them.
+- 6 pages carry a `permalink` of their own, where no pattern fits.
 
 Each address was also looked for in the old site's own built output, `public/`.
 

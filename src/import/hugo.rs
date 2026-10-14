@@ -1519,26 +1519,8 @@ impl Reader<'_> {
                     None
                 }
             };
+            let base = hugos.clone().unwrap_or_default();
             let mut others = Vec::new();
-            let address = match doc.shape {
-                Shape::List | Shape::Made => {
-                    let folder = parent(&doc.to);
-                    let statacs = format!("/{}", slug::tidied_path(folder));
-                    match hugos {
-                        Some(hugos) if hugos == statacs => Some(hugos),
-                        Some(hugos) => {
-                            others.push(hugos);
-                            None
-                        }
-                        None => None,
-                    }
-                }
-                _ => hugos,
-            };
-            let base = address
-                .clone()
-                .or(others.first().cloned())
-                .unwrap_or_default();
             for alias in &doc.aliases {
                 let alias = match alias.starts_with('/') {
                     true => alias.clone(),
@@ -1551,11 +1533,10 @@ impl Reader<'_> {
                 };
                 others.push(alias);
             }
-            let own_address =
-                own_url.is_some() && matches!(doc.shape, Shape::Single | Shape::Bundle);
+            let own_address = own_url.is_some();
             let draft = doc.draft;
             let doc = &mut self.docs[at];
-            doc.address = address.filter(|_| !draft);
+            doc.address = hugos.filter(|_| !draft);
             doc.own_address = own_address;
             doc.others = others;
         }
@@ -1799,7 +1780,9 @@ impl Reader<'_> {
         }
         for (doc, (writing, fences, called)) in docs.into_iter().zip(written) {
             if doc.shape == Shape::Made {
-                let fields = doc.fields.iter().chain(&doc.words);
+                let permalink = (self.made_permalink(&doc))
+                    .map(|within| Field::new("permalink", Value::Text(within), None));
+                let fields = doc.fields.iter().chain(&doc.words).chain(&permalink);
                 let front = super::yaml::fields(fields.map(|f| (f.name.as_str(), &f.value)));
                 self.import
                     .written
@@ -2090,6 +2073,7 @@ impl Reader<'_> {
         let mut laid_out = Vec::new();
         let mut homes: Vec<String> = Vec::new();
         let mut feed_addresses = Vec::new();
+        let mut whole: Vec<(String, String, String)> = Vec::new();
         let mut unfed = false;
         for at in 0..self.docs.len() {
             let doc = &self.docs[at];
@@ -2126,9 +2110,22 @@ impl Reader<'_> {
                 false => lists,
             };
             if fed && dated {
-                words.push(Field::new("feed", Value::Text(name.clone()), None));
                 let prefix = self.prefix(&doc.language);
-                feed_addresses.push(format!("/{prefix}{}", slug::tidied_path(&doc.dir)) + &name);
+                let page = (doc.address.clone())
+                    .unwrap_or_else(|| format!("/{prefix}{}", slug::tidied_path(&doc.dir)));
+                // Hugo's feeds take no ugly address: a list at `/posts.html`
+                // has its feed at `/posts/index.xml`, not beside its page.
+                let (feed, word) = match page.ends_with('/') {
+                    true => (format!("{page}{name}"), name.clone()),
+                    false => {
+                        let folder = page.rsplit_once('.').map_or(page.as_str(), |(f, _)| f);
+                        let feed = format!("{folder}/{name}");
+                        whole.push((page.clone(), doc.to.clone(), feed.clone()));
+                        (feed.clone(), feed)
+                    }
+                };
+                feed_addresses.push(feed);
+                words.push(Field::new("feed", Value::Text(word), None));
             } else if dated && !doc.dir.contains('/') {
                 words.push(off());
                 unfed = true;
@@ -2191,6 +2188,28 @@ impl Reader<'_> {
                  Atom feed {kept}"
             ),
         };
+        match whole.as_slice() {
+            [] => {}
+            [(page, to, feed)] => {
+                said += &format!(
+                    " A list published as its own file, {}, had its feed in the folder of the \
+                     same name, so {} gives the feed's whole address: {}.",
+                    code(page),
+                    code(&format!("content/{to}")),
+                    code(&format!("feed: {feed}"))
+                );
+            }
+            [(page, to, feed), ..] => {
+                said += &format!(
+                    " The lists published as their own files, such as {}, had their feeds in \
+                     the folders of the same names, so the page of each gives its feed's whole \
+                     address, as {} does: {}.",
+                    code(page),
+                    code(&format!("content/{to}")),
+                    code(&format!("feed: {feed}"))
+                );
+            }
+        }
         if unfed {
             said += match fed {
                 true => {
@@ -2238,14 +2257,51 @@ impl Reader<'_> {
                 )
             })
             .collect();
+        let moved: Vec<(String, String)> = (self.docs.iter())
+            .filter(|d| d.shape == Shape::Made)
+            .filter_map(|d| Some((d.to.clone(), self.made_permalink(d)?)))
+            .collect();
         if !made.is_empty() {
-            self.note(format!(
+            let mut said = format!(
                 "Hugo made a list of each folder at the top of the writing, and these had no \
                  `_index.md` of their own, so Statac wrote one to keep what the list was given: \
                  {}.",
                 made.join(", ")
-            ));
+            );
+            match moved.as_slice() {
+                [] => {}
+                [(to, permalink)] => {
+                    said += &format!(
+                        " {} keeps its list where Hugo published it, with {}.",
+                        code(&format!("content/{to}")),
+                        code(&format!("permalink: {permalink}"))
+                    );
+                }
+                [(to, permalink), ..] => {
+                    said += &format!(
+                        " {} of them keep their lists where Hugo published them, each with a \
+                         `permalink`, as {} does with {}.",
+                        moved.len(),
+                        code(&format!("content/{to}")),
+                        code(&format!("permalink: {permalink}"))
+                    );
+                }
+            }
+            self.note(said);
         }
+    }
+
+    /// The `permalink` that keeps a list Hugo made at the address Hugo
+    /// published it at, where that isn't its folder's. No page of it came
+    /// across, so the shared part keeps no address of it.
+    fn made_permalink(&self, doc: &Doc) -> Option<String> {
+        let folder = format!("/{}", slug::tidied_path(parent(&doc.to)));
+        let address = doc
+            .address
+            .as_deref()
+            .filter(|address| *address != folder)?;
+        let others = self.import.languages.get(1..).unwrap_or_default();
+        super::addresses::from_its_language(&doc.to, address, others)
     }
 
     /// The addresses of the pages Hugo made for each term, and the

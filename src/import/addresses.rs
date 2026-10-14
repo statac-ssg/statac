@@ -14,7 +14,7 @@ use crate::content::address::{self, Address, Pieces};
 use crate::content::{self, Run};
 use crate::date::Date;
 use crate::problem::{Named, Problem, Severity, Word};
-use crate::site::{ListKey, PageId};
+use crate::site::{ListKey, PageId, PagePlace};
 
 /// How the old addresses were kept.
 #[derive(Default, Debug)]
@@ -106,10 +106,15 @@ pub fn keep(
         }
     }
     folders.sort_by_key(|folder| (folder.matches('/').count(), folder.clone()));
+    let lists = folders_own(out.folder, today);
     let mut landed = first.clone();
     for folder in folders {
         let index = format!("{folder}/index.md");
-        let beneath = |page: &&Page| page.to.starts_with(&format!("{folder}/")) && page.to != index;
+        let beneath = |page: &&Page| {
+            page.to.starts_with(&format!("{folder}/"))
+                && page.to != index
+                && !lists.contains(&page.to)
+        };
         let held: Vec<(String, &String)> = pages
             .iter()
             .filter(beneath)
@@ -543,7 +548,7 @@ pub struct SentOn {
 /// `permalink` says it on the page at `to` under `content/`: without the
 /// folder of the page's language, where the page is in one of `others`.
 /// None where the address isn't beneath that folder.
-fn from_its_language(to: &str, address: &str, others: &[String]) -> Option<String> {
+pub(super) fn from_its_language(to: &str, address: &str, others: &[String]) -> Option<String> {
     let Some(language) = others
         .iter()
         .find(|language| to.starts_with(&format!("{language}/")))
@@ -586,6 +591,25 @@ fn landing(folder: &Path, today: Date) -> Landed {
 
 /// Where each page lands, by its path under `content/`, with its date.
 type Landed = HashMap<String, (String, Option<Date>)>;
+
+/// The path under `content/` of each folder's own page in the site in
+/// `folder`: a pattern handed down never moves one.
+fn folders_own(folder: &Path, today: Date) -> HashSet<String> {
+    let read = content::read(
+        folder,
+        &Run {
+            today: Some(today),
+            drafts: true,
+            url: None,
+        },
+    );
+    read.site
+        .pages
+        .iter()
+        .filter(|(_, page)| page.place == PagePlace::Folder)
+        .map(|(_, page)| page.path.clone())
+        .collect()
+}
 
 /// The patterns that might make the pages in `members` land at their old
 /// addresses, each with how many of them it does that for as Statac

@@ -1,6 +1,5 @@
 ---
 title: Notes
-redirect_from:
-  - /notes.html
+permalink: /notes.html
 ---
 A list published as its own file, notes.html.

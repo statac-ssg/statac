@@ -1,6 +1,5 @@
 ---
 title: Guide
-redirect_from:
-  - /manual/guide/
+permalink: /manual/guide/
 ---
 A list within a list.
