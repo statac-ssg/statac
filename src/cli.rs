@@ -71,7 +71,7 @@ const OPTIONS: [(&str, &[&str]); 7] = [
 const WAYS: [&str; 3] = ["auto", "native", "poll"];
 
 /// Options that take no value, and the commands that take each.
-const FLAGS: [(&str, &[&str]); 7] = [
+const FLAGS: [(&str, &[&str]); 8] = [
     ("--drafts", &["build", "check"]),
     ("--no-drafts", &["serve"]),
     ("--offline", &["serve"]),
@@ -79,6 +79,7 @@ const FLAGS: [(&str, &[&str]); 7] = [
     ("--cards", &["new"]),
     ("--update", &["new"]),
     ("--missing", &["new"]),
+    ("--no-starter", &["import"]),
 ];
 
 /// Options any command takes, which take no value.
@@ -179,7 +180,7 @@ const USAGE: [(&str, &str); 11] = [
 ];
 
 /// Each option's entry on the usage screen, as the screen sets it.
-const OPTION_LINES: [(&str, &str); 14] = [
+const OPTION_LINES: [(&str, &str); 15] = [
     (
         "--site",
         "  --site=<folder>        The site's folder, as the folder after the command
@@ -243,6 +244,13 @@ const OPTION_LINES: [(&str, &str); 14] = [
         "  --from=<tool>          The tool that made the site statac import reads:
                          jekyll, hugo, zola or eleventy. Without it, told
                          from the site's files.
+",
+    ),
+    (
+        "--no-starter",
+        "  --no-starter           For statac import, leave out the starter's
+                         templates, snippets, stylesheet and pages, for a
+                         site you design yourself.
 ",
     ),
     (
@@ -671,6 +679,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     let mut update = false;
     let mut cards = false;
     let mut missing = false;
+    let mut no_starter = false;
     let mut port = None;
     let mut watch = None;
     let wrong = |option: &str, expected, written: &str| Kind::WrongKind {
@@ -795,6 +804,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                     "--update" => &mut update,
                     "--cards" => &mut cards,
                     "--missing" => &mut missing,
+                    "--no-starter" => &mut no_starter,
                     _ => &mut offline,
                 };
                 if std::mem::replace(given, true) {
@@ -1014,6 +1024,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             new: new_folder,
             from,
             today,
+            starter: !no_starter,
         }),
         Some("refuse") => Request::Refuse(refuse::Options {
             site: site.unwrap_or_default(),

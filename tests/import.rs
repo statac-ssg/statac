@@ -50,12 +50,18 @@ fn files(folder: &Path) -> BTreeMap<String, Vec<u8>> {
 /// Imports `old` into `new` with the day fixed, giving the exit code and
 /// what was said.
 fn import(old: &Path, new: &Path, from: Option<Tool>) -> (u8, String) {
+    import_with(old, new, from, true)
+}
+
+/// [`import`], with the starter where `starter` says.
+fn import_with(old: &Path, new: &Path, from: Option<Tool>, starter: bool) -> (u8, String) {
     let mut said = Vec::new();
     let options = import::Options {
         old: old.to_path_buf(),
         new: Some(new.to_path_buf()),
         from,
         today: Some(today()),
+        starter,
     };
     let code = import::run(&options, None, &mut said, false);
     (code, String::from_utf8(said).unwrap())
@@ -70,6 +76,7 @@ fn import_answering(old: &Path, new: &Path, typed: &str, terminal: bool) -> (u8,
         new: Some(new.to_path_buf()),
         from: None,
         today: Some(today()),
+        starter: true,
     };
     let mut reader = typed.as_bytes();
     let input = statac::new::Input {
@@ -111,17 +118,8 @@ fn checked(site: &Path) -> Vec<String> {
     names
 }
 
-/// Imports the fixture `name`, compares what it wrote with what is kept,
-/// and gives the names of what `check` finds in it.
-fn fixture(name: &str) -> Vec<String> {
-    let old = PathBuf::from(format!("tests/import/{name}/old"));
-    let wanted = Path::new("tests/import").join(name).join("new");
-    let before = files(&old);
-    let new = scratch(name);
-    let (code, said) = import(&old, &new, None);
-    assert_eq!(code, 0, "{said}");
-    assert_eq!(files(&old), before, "{name}: the old site changed");
-    let mut made = files(&new);
+/// `made`, the files of a new site, with the `feed_key` the kept ones have.
+fn with_key(mut made: BTreeMap<String, Vec<u8>>) -> BTreeMap<String, Vec<u8>> {
     let settings = made.get_mut("statac.yaml").unwrap();
     let text = String::from_utf8(settings.clone()).unwrap();
     let fixed: Vec<String> = text
@@ -132,6 +130,20 @@ fn fixture(name: &str) -> Vec<String> {
         })
         .collect();
     *settings = (fixed.join("\n") + "\n").into_bytes();
+    made
+}
+
+/// Imports the fixture `name`, compares what it wrote with what is kept,
+/// and gives the names of what `check` finds in it.
+fn fixture(name: &str) -> Vec<String> {
+    let old = PathBuf::from(format!("tests/import/{name}/old"));
+    let wanted = Path::new("tests/import").join(name).join("new");
+    let before = files(&old);
+    let new = scratch(name);
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(files(&old), before, "{name}: the old site changed");
+    let made = with_key(files(&new));
     let kept = files(&wanted);
     for (path, bytes) in &made {
         let held = kept.get(path).cloned().or_else(|| starter(path));
@@ -451,21 +463,37 @@ fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
         )),
         "{said}"
     );
+    let listed = "### Errors in the new site\n\
+                  \n\
+                  Statac found these when it read the new site, and each stops it building: \
+                  `statac check` shows each one with what to do.\n\
+                  \n\
+                  - `content/posts/post-1.md`, line 3: ``Unclear date: `04/10/2026` could be 4 \
+                  October or 10 April``\n\
+                  - `content/posts/post-2.md`, line 8: ``Malformed maths: `{` is never closed``\n\
+                  \n";
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(report.contains(listed), "{report}");
+    // Without the starter, the templates it lacks are said once and the
+    // rest are listed as they are.
+    let bare = top.join("new-without");
+    let (code, said) = import_with(&old, &bare, None, false);
+    assert_eq!(code, 0, "{said}");
+    let shown = bare.to_string_lossy();
     assert!(
-        report.contains(
-            "### Errors in the new site\n\
+        said.ends_with(&format!(
+            "Left for you: 4 things of 3 kinds.\n\
+             The new site has no templates, so it won't build until you add your own: see \
+             https://statac.dev/templates/.\n\
+             The new site also has 2 errors, listed in `{shown}/IMPORT.md`.\n\
              \n\
-             Statac found these when it read the new site, and each stops it building: `statac \
-             check` shows each one with what to do.\n\
-             \n\
-             - `content/posts/post-1.md`, line 3: ``Unclear date: `04/10/2026` could be 4 October \
-             or 10 April``\n\
-             - `content/posts/post-2.md`, line 8: ``Malformed maths: `{` is never closed``\n\
-             \n"
-        ),
-        "{report}"
+             Next: `cd {shown}`, add your own templates to `templates/`, then `statac check`.\n"
+        )),
+        "{said}"
     );
+    let report = fs::read_to_string(bare.join("IMPORT.md")).unwrap();
+    assert!(report.contains(listed), "{report}");
+    assert!(!report.contains("Missing template"), "{report}");
     let outcome = build::run(&Options {
         mode: Mode::Check,
         site: new.clone(),
@@ -478,6 +506,98 @@ fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
         .filter(|problem| problem.kind.severity() == Severity::Error)
         .count();
     assert_eq!(errors, 2);
+}
+
+#[test]
+fn a_site_imported_without_the_starter_has_its_settings_and_what_came_across_alone() {
+    let starter = statac::new::files_of_a_new_site(true);
+    let addressed = "title: No starter\nurl: https://example.org\n";
+    for (name, settings_start) in [
+        ("no-starter", addressed),
+        ("hugo-no-starter", addressed),
+        ("zola-no-starter", addressed),
+        ("eleventy-no-starter", "title: Old\nlanguage: en\n"),
+    ] {
+        let old = PathBuf::from(format!("tests/import/{name}/old"));
+        let before = files(&old);
+        let new = scratch(&format!("{name}-without"));
+        let (code, said) = import_with(&old, &new, None, false);
+        assert_eq!(code, 0, "{said}");
+        assert_eq!(files(&old), before, "{name}: the old site changed");
+        let made = with_key(files(&new));
+        let kept = files(&Path::new("tests/import").join(name).join("new"));
+        for (path, bytes) in &made {
+            let shown = String::from_utf8_lossy(bytes);
+            assert!(
+                kept.get(path) == Some(bytes),
+                "{name}: `{path}` is now:\n{shown}"
+            );
+        }
+        for path in kept.keys() {
+            assert!(made.contains_key(path), "{name}: `{path}` wasn't written");
+        }
+        for (path, bytes) in &starter {
+            assert_ne!(
+                made.get(path),
+                Some(bytes),
+                "{name}: `{path}` is the starter's"
+            );
+            if !path.starts_with("content/") && !path.starts_with("snippets/") {
+                assert!(
+                    path == "statac.yaml" || !made.contains_key(path),
+                    "{name}: `{path}` was written"
+                );
+            }
+        }
+        let text = |path: &str| String::from_utf8(made[path].clone()).unwrap();
+        let post = text("content/posts/post-1.md");
+        assert!(post.contains("\n@note()\n"), "{name}: {post}");
+        assert!(made.contains_key("snippets/note.html"), "{name}");
+        assert!(
+            post.contains("redirect_from:\n  - /old/post-1/\n"),
+            "{name}: {post}"
+        );
+        assert!(made.contains_key("static/file-1.txt"), "{name}");
+        let settings = text("statac.yaml");
+        assert!(settings.starts_with(settings_start), "{name}: {settings}");
+        let report = text("IMPORT.md");
+        let templates = "It has none of the starter's templates, snippets, stylesheet or pages, \
+                         so it won't build until you add templates of your own: see \
+                         https://statac.dev/templates/.";
+        assert_eq!(report.matches(templates).count(), 1, "{name}: {report}");
+        assert!(!report.contains("Missing template"), "{name}: {report}");
+        assert!(
+            said.contains(
+                "The new site has no templates, so it won't build until you add your own: see \
+                 https://statac.dev/templates/.\n"
+            ),
+            "{name}: {said}"
+        );
+        // The only errors in the new site are the templates it lacks.
+        let outcome = build::run(&Options {
+            mode: Mode::Check,
+            site: new.clone(),
+            out: None,
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        let errors: Vec<&str> = (outcome.problems.iter())
+            .filter(|problem| problem.kind.severity() == Severity::Error)
+            .map(|problem| problem.kind.name())
+            .collect();
+        assert!(!errors.is_empty(), "{name}");
+        assert!(
+            errors.iter().all(|error| *error == "missing-template"),
+            "{name}: {errors:?}"
+        );
+        // With the starter, the call is kept clear of its `note`.
+        let with = scratch(&format!("{name}-with"));
+        let (code, said) = import(&old, &with, None);
+        assert_eq!(code, 0, "{said}");
+        let post = fs::read_to_string(with.join("content/posts/post-1.md")).unwrap();
+        assert!(post.contains("\n@old_note()\n"), "{name}: {post}");
+    }
 }
 
 /// What importing `old` says, having written nothing.

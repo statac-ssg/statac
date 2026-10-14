@@ -395,7 +395,7 @@ fn a_sample_pages_file_is_never_missed_where_it_isnt_here() {
         &answers,
         None,
         today,
-        false,
+        super::super::Writes::Starter,
     )
     .unwrap();
     std::fs::remove_dir_all(platform::join(&folder, "content/photos")).unwrap();
@@ -995,7 +995,7 @@ fn with_no_past_versions_a_new_site_builds_and_says_what_it_did_before() {
         &answers,
         None,
         crate::date::Date::day_only(2026, 10, 6),
-        true,
+        super::super::Writes::StarterAndCards,
     )
     .unwrap();
     let sites = [made];

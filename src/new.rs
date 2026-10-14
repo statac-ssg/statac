@@ -219,7 +219,7 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         &answers,
         timezone.as_deref(),
         today,
-        options.cards,
+        Writes::starter(options.cards),
     );
     let made = match made {
         Ok(made) => made,
@@ -700,6 +700,27 @@ pub(crate) fn site_mark(folder: &Path) -> io::Result<Option<SiteMark>> {
         .then_some(SiteMark::Content))
 }
 
+/// Which of a new site's files [`make`] writes.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub(crate) enum Writes {
+    /// The starter's, and those made from the answers.
+    Starter,
+    /// Those, and the sharing card's.
+    StarterAndCards,
+    /// `statac.yaml` alone.
+    Settings,
+}
+
+impl Writes {
+    /// The starter, with the sharing card's files where `cards` asks.
+    fn starter(cards: bool) -> Writes {
+        match cards {
+            true => Writes::StarterAndCards,
+            false => Writes::Starter,
+        }
+    }
+}
+
 /// Writes a new site from `answers` into `folder`, which must be empty
 /// or not yet there, with `timezone` in its settings where the machine
 /// has one and its sample pages dated from `today`. A site made by an
@@ -707,15 +728,14 @@ pub(crate) fn site_mark(folder: &Path) -> io::Result<Option<SiteMark>> {
 /// is followed, in the folder or inside it. Where anything stops it part
 /// way, the folder is left as it was found: every file written is
 /// removed, and every folder made, `folder` itself among them. A refusal
-/// names `by` as the command to run again. The sharing card's files are
-/// written where `cards` asks.
+/// names `by` as the command to run again. `writes` says which files.
 pub(crate) fn make(
     by: Maker,
     folder: &Path,
     answers: &Answers,
     timezone: Option<&str>,
     today: Date,
-    cards: bool,
+    writes: Writes,
 ) -> Result<Made, Problem> {
     make_with(
         by,
@@ -723,7 +743,7 @@ pub(crate) fn make(
         answers,
         timezone,
         today,
-        cards,
+        writes,
         &mut platform::make_file,
     )
 }
@@ -738,13 +758,13 @@ fn make_with(
     answers: &Answers,
     timezone: Option<&str>,
     today: Date,
-    cards: bool,
+    writes: Writes,
     write: &mut Writer<'_>,
 ) -> Result<Made, Problem> {
     refusal(folder, &folder.to_string_lossy(), by)?;
     let settings = settings(answers, timezone);
     let samples = (by == Maker::New).then_some(today);
-    let files = files(answers, &settings, samples, cards);
+    let files = files(answers, &settings, samples, writes);
     let mut made = Written::default();
     let written = (|| -> Result<(), (PathBuf, io::Error)> {
         made.outer(folder)?;
@@ -943,17 +963,22 @@ fn quoted(text: &str) -> String {
     out
 }
 
-/// Every file of a new site, by its path in the site: the starter's, the
-/// sharing card's where `cards` asks, those made from the answers, and the
+/// Every file of a new site `writes` asks for, by its path in the site:
+/// the starter's, the sharing card's, those made from the answers, and the
 /// sample pages with what is kept beside them, dated from `samples` where
 /// it gives a day.
 fn files<'a>(
     answers: &Answers,
     settings: &str,
     samples: Option<Date>,
-    cards: bool,
+    writes: Writes,
 ) -> Vec<(String, Cow<'a, [u8]>)> {
-    let asked: &[starter::File] = if cards { starter::CARDS } else { &[] };
+    let settings_file = (config::FILE_NAME.to_owned(), Cow::Owned(settings.into()));
+    let asked: &[starter::File] = match writes {
+        Writes::Settings => return vec![settings_file],
+        Writes::StarterAndCards => starter::CARDS,
+        Writes::Starter => &[],
+    };
     let mut files: Vec<(String, Cow<[u8]>)> = (starter::FILES.iter().chain(asked))
         .filter(|file| {
             let sample = starter::is_a_samples(file.path) && file.path != starter::POSTS_PAGE;
@@ -961,8 +986,8 @@ fn files<'a>(
         })
         .map(|file| (file.path.to_owned(), Cow::Borrowed(file.bytes)))
         .collect();
+    files.push(settings_file);
     let mut add = |path: String, text: String| files.push((path, Cow::Owned(text.into_bytes())));
-    add(config::FILE_NAME.to_owned(), settings.to_owned());
     add(".gitignore".to_owned(), ".statac/\n_site/\n".to_owned());
     add("data/words.yaml".to_owned(), words_file(&answers.languages));
     for (at, tag) in answers.languages.iter().enumerate() {
@@ -1002,7 +1027,7 @@ pub fn files_of_a_new_site(cards: bool) -> Vec<(String, Vec<u8>)> {
     let answers = defaults.answers();
     let settings = settings(&answers, None);
     let day = Date::day_only(2026, 1, 1);
-    files(&answers, &settings, Some(day), cards)
+    files(&answers, &settings, Some(day), Writes::starter(cards))
         .into_iter()
         .map(|(path, bytes)| (path, bytes.into_owned()))
         .collect()

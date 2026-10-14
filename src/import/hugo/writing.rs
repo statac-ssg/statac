@@ -18,6 +18,9 @@ use crate::import::{Finding, FindingKind, Spot};
 
 /// What the writing's tags are converted with.
 pub struct Context<'a> {
+    /// Whether the new site has the starter, whose snippets a call names
+    /// or is kept clear of.
+    pub starter: bool,
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
     pub base: &'a str,
@@ -527,7 +530,13 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
             false => closing_of(body, tag.end, &tag.name),
         };
         let own = cx.own.contains(&tag.name);
-        let builtin = if own { "" } else { tag.name.as_str() };
+        let builtin = match tag.name.as_str() {
+            _ if own => "",
+            // Without the starter there is no snippet for these to call, so
+            // each is called as any other tag is.
+            "figure" | "youtube" | "vimeo" if !cx.starter => "",
+            name => name,
+        };
         let value = cx.values.iter().find(|(name, _)| *name == tag.name);
         if let (Some((_, value)), true, None) = (value, own, &closing) {
             let shown = match value {
@@ -886,13 +895,15 @@ fn details(tag: &Written) -> Option<String> {
 }
 
 /// The snippet a tag's call names: its own name, made one a call can
-/// name, and kept clear of the starter's.
-pub fn snippet_name(tag: &str) -> String {
+/// name, and kept clear of the starter's where the new site has it.
+pub fn snippet_name(tag: &str, starter: bool) -> String {
     let mut name: String = tag
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
-    if !name.starts_with(|c: char| c.is_ascii_alphabetic()) || crate::new::has_snippet(&name) {
+    if !name.starts_with(|c: char| c.is_ascii_alphabetic())
+        || (starter && crate::new::has_snippet(&name))
+    {
         name = format!("old_{name}");
     }
     name
@@ -944,7 +955,7 @@ fn snippet_call(
         handed.push(format!("{name}={}", quoted(value)));
         names.push(name);
     }
-    let snippet = snippet_name(&tag.name);
+    let snippet = snippet_name(&tag.name, cx.starter);
     let mut text = format!("{OWN_CALL}@{snippet}({})", handed.join(", "));
     if wraps && closing.is_none() {
         text.push_str(&format!("\n{OWN_CALL}@end"));

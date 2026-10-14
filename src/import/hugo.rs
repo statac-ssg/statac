@@ -16,7 +16,10 @@ use std::path::Path;
 
 use super::inside;
 use super::report::code;
-use super::{Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value};
+use super::{
+    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, left_behind,
+    one_home_page,
+};
 use crate::content::slug;
 use crate::date::{self, Date};
 use crate::problem::{Kind, Problem, system_reason};
@@ -230,13 +233,20 @@ pub fn owns(folder: &Path) -> bool {
     settings::owns(folder)
 }
 
-/// Reads the site in `folder`.
-pub fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
+/// Reads the site in `folder`, for a new site with the starter where
+/// `starter` says.
+pub fn read(
+    folder: &Path,
+    today: Date,
+    given: Option<&str>,
+    starter: bool,
+) -> Result<Import, Box<Failed>> {
     let found = settings::found(folder)?;
     let s = settings::settle(folder, &found.entries);
     let mut reader = Reader {
         folder,
         given,
+        starter,
         import: Import::default(),
         making: Making {
             lower: s.lower,
@@ -317,6 +327,8 @@ struct Reader<'a> {
     /// The site's address as the author gave it, for settings that give
     /// none.
     given: Option<&'a str>,
+    /// Whether the new site has the starter.
+    starter: bool,
     import: Import,
     s: Settings,
     making: Making,
@@ -777,42 +789,57 @@ impl Reader<'_> {
             if dir && name == top_of(&s.data_dir) {
                 continue;
             }
+            let starter = self.starter;
             let special = [
                 (
                     s.publish_dir.as_str(),
-                    "the old site's built output, read only to check the addresses",
+                    "the old site's built output, read only to check the addresses".to_owned(),
                 ),
                 (
                     s.layout_dir.as_str(),
-                    "the old site's layouts, which the starter's templates take the place of",
+                    left_behind(
+                        "the old site's layouts",
+                        "the starter's templates take",
+                        starter,
+                    ),
                 ),
                 (
                     s.themes_dir.as_str(),
-                    "the old site's themes, which the starter's templates, snippets and \
-                     stylesheet take the place of",
+                    left_behind(
+                        "the old site's themes",
+                        "the starter's templates, snippets and stylesheet take",
+                        starter,
+                    ),
                 ),
                 (
                     s.asset_dir.as_str(),
-                    "the files Hugo's templates worked on, such as stylesheets, which the \
-                     starter's `assets/site.css` takes the place of",
+                    left_behind(
+                        "the files Hugo's templates worked on, such as stylesheets",
+                        "the starter's `assets/site.css` takes",
+                        starter,
+                    ),
                 ),
                 (
                     s.archetype_dir.as_str(),
-                    "the old site's patterns for new pages, which Statac has no equal for",
+                    "the old site's patterns for new pages, which Statac has no equal for"
+                        .to_owned(),
                 ),
                 (
                     s.i18n_dir.as_str(),
-                    "the words the old site's templates showed in each language, which the \
-                     starter's `data/words.yaml` takes the place of",
+                    left_behind(
+                        "the words the old site's templates showed in each language",
+                        "the starter's `data/words.yaml` takes",
+                        starter,
+                    ),
                 ),
                 (
                     s.resource_dir.as_str(),
-                    "the files Hugo kept from earlier builds",
+                    "the files Hugo kept from earlier builds".to_owned(),
                 ),
             ];
             match special.iter().find(|(special, _)| *special == name) {
                 Some((_, what)) if dir => {
-                    let what = (*what).to_owned();
+                    let what = what.clone();
                     self.left(&shown, &what);
                 }
                 _ => {
@@ -1755,6 +1782,7 @@ impl Reader<'_> {
                 emoji: self.s.emoji,
                 block_attributes: self.s.block_attributes,
                 summary_length: doc.summary_cut.then_some(self.s.summary_length),
+                starter: self.starter,
             };
             let converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
             for finding in converted.findings {
@@ -1885,11 +1913,15 @@ impl Reader<'_> {
         }
         if self.taken_off > 0 {
             self.note(format!(
-                "`layout` and `type` were taken off {}: each is built with the starter's template \
-                 for its kind, as https://statac.dev/templates/ describes.",
+                "`layout` and `type` were taken off {}: each is built with the {}template for its \
+                 kind, as https://statac.dev/templates/ describes.",
                 match self.taken_off {
                     1 => "1 page".to_owned(),
                     n => format!("{n} pages"),
+                },
+                match self.starter {
+                    true => "starter's ",
+                    false => "",
                 }
             ));
         }
@@ -2098,7 +2130,7 @@ impl Reader<'_> {
                     && (d.dir == doc.dir || d.dir.starts_with(&format!("{}/", doc.dir)))
             });
             let mut words = Vec::new();
-            if top && dated && !undated {
+            if self.starter && top && dated && !undated {
                 words.push(Field::new("pages.layout", Value::Text("post".into()), None));
                 laid_out.push(folder.clone());
             }
@@ -2164,28 +2196,40 @@ impl Reader<'_> {
                 .settings
                 .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
         }
-        let kept = format!(
-            "at the same address, written by `templates/feed.xml`, as `feed: {name}` on {} says, \
-             and `feed_ids_before` keeps each post's id the address Hugo gave it, so feed \
-             readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
-            match (home, lists) {
-                (true, false) => "the home page",
-                _ => "each list's page",
-            }
-        );
+        let on = match (home, lists) {
+            (true, false) => "the home page",
+            _ => "each list's page",
+        };
+        let (now, kept) = match self.starter {
+            true => (
+                "is now an Atom feed",
+                format!(
+                    "at the same address, written by `templates/feed.xml`, as `feed: {name}` on \
+                     {on} says, and `feed_ids_before` keeps each post's id the address Hugo gave \
+                     it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids."
+                ),
+            ),
+            false => (
+                "stays",
+                format!(
+                    "at the same address, as `feed: {name}` on {on} says, built with \
+                     `templates/feed.xml` once you add it, and `feed_ids_before` keeps each \
+                     post's id the address Hugo gave it, so feed readers see nothing new: see \
+                     https://statac.dev/feeds/#entry-ids."
+                ),
+            ),
+        };
         let mut said = match (fed, home, lists) {
             (false, ..) => String::new(),
             (true, true, true) => format!(
                 "Hugo's feeds were RSS, at `{name}` beside the home page and each list's own \
-                 page. Each is now an Atom feed {kept}"
+                 page. Each {now} {kept}"
             ),
-            (true, true, false) => format!(
-                "Hugo's feed was RSS, at `{name}` beside the home page. It is now an Atom feed \
-                 {kept}"
-            ),
+            (true, true, false) => {
+                format!("Hugo's feed was RSS, at `{name}` beside the home page. It {now} {kept}")
+            }
             (true, false, _) => format!(
-                "Hugo's feeds were RSS, at `{name}` beside each list's own page. Each is now an \
-                 Atom feed {kept}"
+                "Hugo's feeds were RSS, at `{name}` beside each list's own page. Each {now} {kept}"
             ),
         };
         match whole.as_slice() {
@@ -2509,13 +2553,11 @@ impl Reader<'_> {
             );
         }
         if self.s.pager_size.is_some() || more {
-            self.note(
-                "Where the old home page had later pages, nothing answers them: Statac's home \
-                 page shows the newest of each folder itself, so `content/index.md` keeps its \
-                 own list to one page with `posts_per_page: 0`, and Statac can't tell from the \
-                 writing which later pages Hugo made."
-                    .to_owned(),
-            );
+            self.note(format!(
+                "Where the old home page had later pages, nothing answers them: {}, and Statac \
+                 can't tell from the writing which later pages Hugo made.",
+                one_home_page(self.starter)
+            ));
         }
     }
 }

@@ -11,7 +11,7 @@ use pulldown_cmark::{Event, Parser, Tag};
 
 use super::{
     ABBREVIATIONS, ATTRIBUTE_LINES, EXCERPT_LEFT, EXTENSIONS, INLINE_MATHS, LINK_NOWHERE,
-    MARKDOWN_IN_HTML, TAG_IN_CODE, TAG_LEFT, TOC,
+    MARKDOWN_IN_HTML, TAG_IN_CODE, TAG_LEFT, TOC, TOC_NO_STARTER,
 };
 use crate::import::liquid::{
     code_ranges, excerpt, excerpts_inside, finding, highlight, include, options, raw, split_word,
@@ -21,6 +21,9 @@ use crate::import::{Finding, Spot};
 
 /// What the writing's tags are converted with.
 pub struct Context<'a> {
+    /// Whether the new site has the starter, whose snippets a call names
+    /// or is kept clear of.
+    pub starter: bool,
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
     pub base: &'a str,
@@ -143,7 +146,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                     continue;
                 }
             },
-            (true, "include") => match include(rest) {
+            (true, "include") => match include(rest, cx.starter) {
                 Some((snippet, names, call)) => {
                     calls.push(Call {
                         snippet,
@@ -187,7 +190,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
             findings.push(finding(&EXCERPT_LEFT, spot(start, separator)));
         }
     }
-    findings.extend(markdown_forms(body, &code, &spot));
+    findings.extend(markdown_forms(body, &code, cx.starter, &spot));
     let set_apart = definitions_after_footnotes(&mut out, [&mut fences, &mut called]);
     Converted {
         writing: out,
@@ -363,6 +366,7 @@ fn asks_for_markdown(line: &str, in_code: &dyn Fn(usize) -> bool) -> bool {
 fn markdown_forms(
     body: &str,
     code: &[Range<usize>],
+    starter: bool,
     spot: &dyn Fn(usize, &str) -> Spot,
 ) -> Vec<Finding> {
     let mut found = Vec::new();
@@ -381,7 +385,7 @@ fn markdown_forms(
         let kind = if asks_for_markdown(bare, &|at| within(code, start + at)) {
             Some(&MARKDOWN_IN_HTML)
         } else if trimmed == "{:toc}" {
-            Some(&TOC)
+            Some(if starter { &TOC } else { &TOC_NO_STARTER })
         } else if trimmed.starts_with("{::") || trimmed.starts_with("{:/") {
             Some(&EXTENSIONS)
         } else if trimmed.starts_with("{:") && trimmed.ends_with('}') {

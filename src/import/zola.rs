@@ -15,7 +15,10 @@ use std::path::Path;
 
 use super::inside;
 use super::report::code;
-use super::{Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value};
+use super::{
+    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, left_behind,
+    one_home_page,
+};
 use crate::content::address::{Address, name_fault};
 use crate::content::slug as statac_slug;
 use crate::date::{self, Date};
@@ -105,13 +108,20 @@ pub fn owns(folder: &Path) -> bool {
     settings::owns(folder)
 }
 
-/// Reads the site in `folder`.
-pub fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
+/// Reads the site in `folder`, for a new site with the starter where
+/// `starter` says.
+pub fn read(
+    folder: &Path,
+    today: Date,
+    given: Option<&str>,
+    starter: bool,
+) -> Result<Import, Box<Failed>> {
     let (file, entries) = settings::found(folder)?;
     let s = settings::settle(&entries);
     let mut reader = Reader {
         folder,
         given,
+        starter,
         import: Import::default(),
         s,
         today,
@@ -189,6 +199,8 @@ struct Reader<'a> {
     /// The site's address as the author gave it, for settings that give
     /// none.
     given: Option<&'a str>,
+    /// Whether the new site has the starter.
+    starter: bool,
     import: Import,
     s: Settings,
     today: Date,
@@ -692,7 +704,8 @@ impl Reader<'_> {
             if name == self.import.settings_file {
                 continue;
             }
-            let what = match (name.as_str(), dir) {
+            let starter = self.starter;
+            let what: String = match (name.as_str(), dir) {
                 ("content", true) => {
                     self.content("")?;
                     continue;
@@ -703,25 +716,30 @@ impl Reader<'_> {
                 }
                 (name, false) if settings::FILES.contains(&name) => {
                     "another settings file, which Zola reads only where `zola.toml` isn't there"
+                        .into()
                 }
-                ("templates", true) => {
-                    "the old site's templates, which the starter's templates take the place of"
-                }
-                ("themes", true) => {
-                    "the old site's themes, which the starter's templates, snippets and \
-                     stylesheet take the place of"
-                }
-                ("sass", true) => {
-                    "the old site's Sass stylesheets, which the starter's `assets/site.css` \
-                     takes the place of"
-                }
+                ("templates", true) => left_behind(
+                    "the old site's templates",
+                    "the starter's templates take",
+                    starter,
+                ),
+                ("themes", true) => left_behind(
+                    "the old site's themes",
+                    "the starter's templates, snippets and stylesheet take",
+                    starter,
+                ),
+                ("sass", true) => left_behind(
+                    "the old site's Sass stylesheets",
+                    "the starter's `assets/site.css` takes",
+                    starter,
+                ),
                 (name, true) if name == output_top => {
-                    "the old site's built output, read only to check the addresses"
+                    "the old site's built output, read only to check the addresses".into()
                 }
-                (_, true) => "a folder Zola doesn't publish",
-                (_, false) => "a file Zola doesn't publish",
+                (_, true) => "a folder Zola doesn't publish".into(),
+                (_, false) => "a file Zola doesn't publish".into(),
             };
-            self.left(&shown, what);
+            self.left(&shown, &what);
         }
         Ok(())
     }
@@ -1444,9 +1462,8 @@ impl Reader<'_> {
         self.note(note);
         if let Some((size, later)) = home_paged {
             let mut note = format!(
-                "The old site's home page showed its posts {size} to a page. Statac's home page \
-                 shows the newest of each folder itself, so `content/index.md` keeps its own \
-                 list to one page with `posts_per_page: 0`"
+                "The old site's home page showed its posts {size} to a page. {}",
+                one_home_page(self.starter)
             );
             if later {
                 note.push_str(
@@ -1485,7 +1502,7 @@ impl Reader<'_> {
             let dated = members.iter().any(|m| self.docs[*m].date.is_some());
             let undated = members.iter().any(|m| self.docs[*m].date.is_none());
             let mut words = Vec::new();
-            if top && dated && !undated {
+            if self.starter && top && dated && !undated {
                 words.push(Field::new("pages.layout", Value::Text("post".into()), None));
                 laid_out.push(parent(&doc.to).to_owned());
             }
@@ -1533,13 +1550,21 @@ impl Reader<'_> {
                 .settings
                 .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
             let shown: Vec<String> = kept.iter().map(|a| code(a)).collect();
-            let (feeds, are) = match shown.len() {
-                1 => ("feed", "is now Statac's Atom feed"),
-                _ => ("feeds", "are each now Statac's Atom feed"),
+            let (feeds, are) = match (shown.len(), self.starter) {
+                (1, true) => ("feed", "is now Statac's Atom feed"),
+                (_, true) => ("feeds", "are each now Statac's Atom feed"),
+                (1, false) => ("feed", "stays"),
+                (_, false) => ("feeds", "each stay"),
+            };
+            let written = match self.starter {
+                true => "written by `templates/feed.xml`, as `feed:` on each list's page says",
+                false => {
+                    "as `feed:` on each list's page says, built with `templates/feed.xml` once \
+                     you add it"
+                }
             };
             self.note(format!(
-                "Zola's {feeds}, at {}, {are} at the same address, written by \
-                 `templates/feed.xml`, as `feed:` on each list's page says, and \
+                "Zola's {feeds}, at {}, {are} at the same address, {written}, and \
                  `feed_ids_before` keeps each post's id the address Zola gave it, so feed \
                  readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
                 listed(&shown)
@@ -1689,32 +1714,32 @@ impl Reader<'_> {
     fn dropped_notes(&mut self) {
         let dropped = std::mem::take(&mut self.dropped);
         for (word, files) in dropped {
-            let what = match word {
-                "template" => {
-                    "it named the old site's template for the page, which the starter's \
-                     templates take the place of"
-                }
-                "page_template" => {
-                    "it named the old site's template for the list's pages, which the starter's \
-                     templates take the place of"
-                }
-                "transparent" => {
-                    "Zola listed the folder's pages among those of the folder above it, as \
-                     Statac's list of a folder holds every post beneath it already"
-                }
-                "render" => {
-                    "with `render = false` Zola published the list's pages but no page for the \
-                     list itself; `index_page: false` on the list's page does that in Statac"
-                }
-                "in_search_index" => {
-                    "it said whether Zola's search index held the page, and Statac makes no \
-                     search index"
-                }
-                _ => {
-                    "it put a link beside each heading, which a snippet of yours in \
-                     `snippets/markdown/heading.html` can do, as \
-                     https://statac.dev/snippets/#pieces-of-the-writing describes"
-                }
+            let what: String = match word {
+                "template" => left_behind(
+                    "it named the old site's template for the page",
+                    "the starter's templates take",
+                    self.starter,
+                ),
+                "page_template" => left_behind(
+                    "it named the old site's template for the list's pages",
+                    "the starter's templates take",
+                    self.starter,
+                ),
+                "transparent" => "Zola listed the folder's pages among those of the folder above \
+                                  it, as Statac's list of a folder holds every post beneath it \
+                                  already"
+                    .into(),
+                "render" => "with `render = false` Zola published the list's pages but no page \
+                             for the list itself; `index_page: false` on the list's page does \
+                             that in Statac"
+                    .into(),
+                "in_search_index" => "it said whether Zola's search index held the page, and \
+                                      Statac makes no search index"
+                    .into(),
+                _ => "it put a link beside each heading, which a snippet of yours in \
+                      `snippets/markdown/heading.html` can do, as \
+                      https://statac.dev/snippets/#pieces-of-the-writing describes"
+                    .into(),
             };
             let shown: Vec<String> = files.iter().map(|f| code(f)).collect();
             self.note(format!(
@@ -1773,6 +1798,7 @@ impl Reader<'_> {
             own: &self.own,
             wrapping: &wrapping,
             emoji: self.s.render_emoji,
+            starter: self.starter,
         };
         let mut calls = Vec::new();
         let mut written = Vec::new();

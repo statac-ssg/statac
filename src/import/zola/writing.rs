@@ -17,6 +17,9 @@ use crate::import::{Finding, FindingKind, Spot};
 
 /// What the writing is converted with.
 pub struct Context<'a> {
+    /// Whether the new site has the starter, whose snippets a call names
+    /// or is kept clear of.
+    pub starter: bool,
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
     pub base: &'a str,
@@ -416,12 +419,14 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                 }
             }
             _ => {
-                let own = cx.own.contains(&tag.name);
-                let video = match (own, tag.name.as_str(), tag.args.as_slice()) {
-                    (false, "youtube" | "vimeo", [(name, Given::Text(id))]) if name == "id" => {
+                // Without the starter there is no snippet for a video to
+                // call, so it is called as any other tag is.
+                let starters = cx.starter && !cx.own.contains(&tag.name);
+                let video = match (starters, tag.name.as_str(), tag.args.as_slice()) {
+                    (true, "youtube" | "vimeo", [(name, Given::Text(id))]) if name == "id" => {
                         Some(format!("{OWN_CALL}@{}({})", tag.name, quoted(id)))
                     }
-                    (false, "youtube" | "vimeo", _) => None,
+                    (true, "youtube" | "vimeo", _) => None,
                     _ => {
                         let wraps = cx.wrapping.contains(&tag.name);
                         let alone = opens_line(body, start) && ends_line(body, tag.end);
@@ -463,9 +468,9 @@ fn quoted(text: &str) -> String {
 }
 
 /// The snippet a tag's call names: its own name, kept clear of the
-/// starter's.
-pub fn snippet_name(tag: &str) -> String {
-    match crate::new::has_snippet(tag) || tag.starts_with('_') {
+/// starter's where the new site has it.
+pub fn snippet_name(tag: &str, starter: bool) -> String {
+    match (starter && crate::new::has_snippet(tag)) || tag.starts_with('_') {
         true => format!("old_{tag}"),
         false => tag.to_owned(),
     }
@@ -488,7 +493,7 @@ fn snippet_call(tag: &Written, cx: &Context) -> Option<(String, Call)> {
         handed.push(format!("{name}={value}"));
         names.push(name.clone());
     }
-    let snippet = snippet_name(&tag.name);
+    let snippet = snippet_name(&tag.name, cx.starter);
     Some((
         format!("{OWN_CALL}@{snippet}({})", handed.join(", ")),
         Call {

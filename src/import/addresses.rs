@@ -9,11 +9,13 @@ use std::path::Path;
 
 use super::write::{Out, page_text};
 use super::{Field, HomePages, Page, Value};
+use crate::assets::Assets;
 use crate::build::{self, Mode, Options};
 use crate::content::address::{self, Address, Pieces};
 use crate::content::{self, Run};
 use crate::date::Date;
-use crate::problem::{Named, Problem, Severity, Word};
+use crate::feeds::Feed;
+use crate::problem::{Kind, Named, Problem, Severity, Unwritten, Word};
 use crate::site::{ListKey, PageId, PagePlace};
 
 /// How the old addresses were kept.
@@ -91,14 +93,17 @@ pub fn keep(
         .collect();
     // A pattern goes only into a folder's page that is there already, the
     // highest first, so one line covers the most pages; a folder beneath
-    // gets one of its own only where it puts more pages right.
+    // gets one of its own only where it puts more pages right. Without the
+    // starter, the posts' folder has no page of its own, so one is written
+    // for it where a pattern is kept.
     let first = landing(out.folder, today);
     let mut folders: Vec<String> = Vec::new();
     for page in pages.iter() {
         let mut above = page.to.as_str();
         while let Some((folder, _)) = above.rsplit_once('/') {
             if !folders.iter().any(|known| known == folder)
-                && out.text(&format!("content/{folder}/index.md")).is_some()
+                && (out.text(&format!("content/{folder}/index.md")).is_some()
+                    || (!out.starter && folder == POSTS))
             {
                 folders.push(folder.to_owned());
             }
@@ -191,7 +196,7 @@ pub fn keep(
     // An old address the new site can't publish a redirect at would stop
     // the build, so each is looked for among what the site publishes,
     // every page at its kept address, before it is written.
-    let mut taken = published(out.folder, today);
+    let mut taken = published(out.folder, today, out.starter);
     for page in pages.iter_mut() {
         let own = page.address.as_deref().map(settled);
         let mut others: Vec<String> = Vec::new();
@@ -241,14 +246,15 @@ pub fn keep(
 /// Each file the site in `folder` publishes, by its path in the built
 /// site as a disk holds it, with why no redirect can stand there: what
 /// is published there.
-fn published(folder: &Path, today: Date) -> HashMap<String, String> {
-    let (read, assets, feeds) = build::read(
+fn published(folder: &Path, today: Date, starter: bool) -> HashMap<String, String> {
+    let (read, assets, feeds) = read_site(
         folder,
         &Run {
             today: Some(today),
             drafts: true,
             url: None,
         },
+        starter,
     );
     assets
         .claims()
@@ -289,13 +295,14 @@ pub fn send_on_to_tags(
     if known.is_empty() && (built.is_none() || names.is_empty()) {
         return Ok(sent_on);
     }
-    let (read, assets, feeds) = build::read(
+    let (read, assets, feeds) = read_site(
         out.folder,
         &Run {
             today: Some(today),
             drafts: true,
             url: None,
         },
+        out.starter,
     );
     let mut taken: HashSet<String> = HashSet::new();
     let mut tag_pages: Vec<(String, String)> = Vec::new();
@@ -447,13 +454,14 @@ pub fn send_on_to_later_pages(
     if home.addresses.is_empty() || home.per_page == 0 {
         return Ok(sent_on);
     }
-    let (read, assets, feeds) = build::read(
+    let (read, assets, feeds) = read_site(
         out.folder,
         &Run {
             today: Some(today),
             drafts: false,
             url: None,
         },
+        out.starter,
     );
     let site = &read.site;
     let posts = ListKey::Folder(POSTS.to_owned());
@@ -565,6 +573,18 @@ fn settled(written: &str) -> String {
         Ok(address) => address.as_str().to_owned(),
         Err(_) => written.to_owned(),
     }
+}
+
+/// The site in `folder` read as a build reads it. Without the `starter`
+/// it has no templates yet, so its feeds are those it will publish once it
+/// has them.
+fn read_site(folder: &Path, run: &Run, starter: bool) -> (content::Read, Assets, Vec<Feed>) {
+    let (read, assets, feeds) = build::read(folder, run);
+    if starter {
+        return (read, assets, feeds);
+    }
+    let (feeds, _) = crate::feeds::plan(&read.site, &read.settings, &read.sources, &|_| true);
+    (read, assets, feeds)
 }
 
 /// Where each page of the site in `folder` lands, drafts among them, by
@@ -822,13 +842,18 @@ pub struct Checked {
     /// Each error `statac check` finds, by its file, its line and its
     /// headline.
     pub errors: Vec<(String, Option<usize>, String)>,
+    /// Each template the site's pages and feeds are built with that it
+    /// doesn't have, by its path, in order.
+    pub templates: Vec<String>,
 }
 
 /// Reads the site in `folder` as a build of `today` does, looks for each
 /// old address, each address in `feeds` and in `lists`, and each page in
 /// `built`, the
 /// old site's built output where it is there, among what it publishes and
-/// sends on from, and checks it as `statac check` does.
+/// sends on from, and checks it as `statac check` does. Without the
+/// `starter` the site has no templates yet, so a missing one is told of
+/// in [`Checked::templates`] and not among the errors.
 pub fn check(
     folder: &Path,
     today: Date,
@@ -836,14 +861,16 @@ pub fn check(
     feeds: &[(String, String)],
     lists: &[(String, String)],
     built: Option<&Path>,
+    starter: bool,
 ) -> Checked {
-    let (read, assets, written) = build::read(
+    let (read, assets, written) = read_site(
         folder,
         &Run {
             today: Some(today),
             drafts: false,
             url: None,
         },
+        starter,
     );
     let mut published: HashSet<String> = HashSet::new();
     let claims = assets
@@ -863,6 +890,7 @@ pub fn check(
         pictures: Vec::new(),
         unworked: Vec::new(),
         errors: Vec::new(),
+        templates: Vec::new(),
     };
     let answered = |address: &str| {
         Address::read(address)
@@ -914,10 +942,25 @@ pub fn check(
         .map(|file| format!("/{file}"))
         .collect();
     let sources = outcome.sources();
+    for problem in &outcome.problems {
+        let template = match &problem.kind {
+            Kind::MissingTemplate { path, .. } => path,
+            Kind::FeedNotWritten {
+                why: Unwritten::NoTemplate(path),
+                ..
+            } => path,
+            _ => continue,
+        };
+        if !checked.templates.contains(template) {
+            checked.templates.push(template.clone());
+        }
+    }
+    checked.templates.sort();
     for problem in outcome
         .problems
         .iter()
         .filter(|p| p.kind.severity() == Severity::Error)
+        .filter(|p| starter || !matches!(p.kind, Kind::MissingTemplate { .. }))
     {
         let (file, line) = match problem.place {
             Some(place) => (

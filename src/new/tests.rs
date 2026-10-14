@@ -768,8 +768,8 @@ fn no_setting_is_written_at_statacs_own_value() {
 fn two_sites_have_different_feed_keys() {
     let (one, two) = (scratch("key-1"), scratch("key-2"));
     let answers = answers(&["en"], None);
-    make(Maker::New, &one, &answers, None, day(), false).unwrap();
-    make(Maker::New, &two, &answers, None, day(), false).unwrap();
+    make(Maker::New, &one, &answers, None, day(), Writes::Starter).unwrap();
+    make(Maker::New, &two, &answers, None, day(), Writes::Starter).unwrap();
     assert_ne!(feed_key(&one), feed_key(&two));
 }
 
@@ -778,7 +778,7 @@ fn a_folder_that_isnt_there_is_made_with_the_folders_above_it() {
     let outer = scratch("outer");
     let folder = outer.join("sites").join("site-1");
     let answers = answers(&["en"], None);
-    let made = make(Maker::New, &folder, &answers, None, day(), false).unwrap();
+    let made = make(Maker::New, &folder, &answers, None, day(), Writes::Starter).unwrap();
     assert_eq!(made.files, 86);
     assert!(folder.join("statac.yaml").is_file());
 }
@@ -892,8 +892,16 @@ fn a_write_that_fails_part_way_leaves_the_folder_as_found() {
                 written += 1;
                 platform::make_file(root, path, bytes)
             };
-            let problem =
-                make_with(Maker::New, folder, &answers, None, day(), true, &mut write).unwrap_err();
+            let problem = make_with(
+                Maker::New,
+                folder,
+                &answers,
+                None,
+                day(),
+                Writes::StarterAndCards,
+                &mut write,
+            )
+            .unwrap_err();
             assert!(
                 matches!(&problem.kind, Kind::CantWrite { reason, .. } if reason == "the disk is full"),
                 "{problem:?}"

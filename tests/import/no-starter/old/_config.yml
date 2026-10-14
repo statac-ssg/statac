@@ -1,0 +1,4 @@
+title: No starter
+url: https://example.org
+timezone: UTC
+plugins: [jekyll-redirect-from, jekyll-sitemap]

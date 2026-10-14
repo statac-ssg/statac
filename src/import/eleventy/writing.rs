@@ -29,6 +29,9 @@ pub enum Engine {
 
 /// What the writing is converted with.
 pub struct Context<'a> {
+    /// Whether the new site has the starter, whose snippets a call names
+    /// or is kept clear of.
+    pub starter: bool,
     pub engine: Engine,
     /// Whether the page is Markdown, rather than HTML.
     pub markdown: bool,
@@ -157,7 +160,7 @@ fn values(mut rest: &str) -> Option<Vec<String>> {
 
 /// An include, or Liquid's `render`, as a snippet call, and the call as
 /// written. None where the file or a value is a variable.
-fn include(rest: &str) -> Option<(Call, String)> {
+fn include(rest: &str, starter: bool) -> Option<(Call, String)> {
     let (file, mut params) = match quoted_value(rest) {
         Some((file, after)) => (file, after),
         None => {
@@ -196,7 +199,7 @@ fn include(rest: &str) -> Option<(Call, String)> {
         names.push(name);
         params = after;
     }
-    let snippet = include_snippet(&file);
+    let snippet = include_snippet(&file, starter);
     let text = format!("@{snippet}({})", handed.join(", "));
     Some((
         Call {
@@ -222,8 +225,9 @@ fn no_spot() -> Spot {
 }
 
 /// The snippet a tag of the site's own calls: its name, kept clear of the
-/// starter's, with each character a snippet's name can't hold as `_`.
-fn own_snippet(tag: &str) -> String {
+/// starter's where the new site has it, with each character a snippet's
+/// name can't hold as `_`.
+fn own_snippet(tag: &str, starter: bool) -> String {
     let name: String = tag
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
@@ -232,7 +236,7 @@ fn own_snippet(tag: &str) -> String {
         true => name,
         false => format!("tag_{name}"),
     };
-    match crate::new::has_snippet(&name) {
+    match starter && crate::new::has_snippet(&name) {
         true => format!("old_{name}"),
         false => name,
     }
@@ -385,7 +389,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                         None => left(&mut findings),
                     }
                 }
-                "include" | "render" => match include(words) {
+                "include" | "render" => match include(words, cx.starter) {
                     Some((call, text)) => {
                         out.push_str(&body[copied..start]);
                         called.push(out.len());
@@ -429,7 +433,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                     };
                     match handed.filter(|_| fits) {
                         Some(handed) => {
-                            let snippet = own_snippet(name);
+                            let snippet = own_snippet(name, cx.starter);
                             out.push_str(&body[copied..start]);
                             called.push(out.len());
                             out.push_str(&format!("@{snippet}({})", handed.join(", ")));
@@ -501,8 +505,11 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
             }
         }
         if cx.breaks {
-            let wrapping: HashSet<String> =
-                cx.wrapping.iter().map(|name| own_snippet(name)).collect();
+            let wrapping: HashSet<String> = cx
+                .wrapping
+                .iter()
+                .map(|name| own_snippet(name, cx.starter))
+                .collect();
             breaks = line_breaks(&mut out, &wrapping, [&mut fences, &mut called]);
         }
     }

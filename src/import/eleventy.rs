@@ -18,7 +18,10 @@ use std::path::Path;
 
 use super::inside;
 use super::report::code;
-use super::{Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Value};
+use super::{
+    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Value,
+    left_behind,
+};
 use crate::date::{self, Date};
 use crate::platform;
 use crate::problem::{Kind, Problem, system_reason};
@@ -243,8 +246,14 @@ const DATES_FROM_FILE: &[&str] = &[
     "git Created",
 ];
 
-/// Reads the site in `folder`.
-pub fn read(folder: &Path, _today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
+/// Reads the site in `folder`, for a new site with the starter where
+/// `starter` says.
+pub fn read(
+    folder: &Path,
+    _today: Date,
+    given: Option<&str>,
+    starter: bool,
+) -> Result<Import, Box<Failed>> {
     let found = settings::FILES
         .iter()
         .find(|name| inside::a_settings_file(folder, name));
@@ -260,6 +269,7 @@ pub fn read(folder: &Path, _today: Date, given: Option<&str>) -> Result<Import, 
     let mut reader = Reader {
         folder,
         given,
+        starter,
         import: Import::default(),
         s,
         input: String::new(),
@@ -332,6 +342,8 @@ struct Reader<'a> {
     folder: &'a Path,
     /// The site's address as the author gave it, the settings giving none.
     given: Option<&'a str>,
+    /// Whether the new site has the starter.
+    starter: bool,
     import: Import,
     s: Settings,
     /// The folders, by their paths in the old folder, `""` for its top.
@@ -1194,19 +1206,27 @@ impl Reader<'_> {
                 continue;
             }
             if dir && inner == self.includes {
+                let what = left_behind(
+                    "the old site's includes and layouts",
+                    "the starter's templates take",
+                    self.starter,
+                );
                 self.left(
                     &shown,
-                    "the old site's includes and layouts, which the starter's templates take the \
-                     place of; each include the writing calls has a snippet of its name standing \
-                     for it",
+                    &format!(
+                        "{what}; each include the writing calls has a snippet of its name \
+                         standing for it"
+                    ),
                 );
                 continue;
             }
             if dir && Some(&inner) == self.layouts.as_ref() {
-                self.left(
-                    &shown,
-                    "the old site's layouts, which the starter's templates take the place of",
+                let what = left_behind(
+                    "the old site's layouts",
+                    "the starter's templates take",
+                    self.starter,
                 );
+                self.left(&shown, &what);
                 continue;
             }
             if dir && inner == self.data {
@@ -2014,6 +2034,7 @@ impl Reader<'_> {
                 linkify: linkify_on,
                 html_off,
                 base: &base,
+                starter: self.starter,
             };
             let converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
             breaks += converted.breaks;
@@ -2584,9 +2605,13 @@ impl Reader<'_> {
         }
         if self.layouts_taken > 0 {
             notes.push(format!(
-                "`layout` was taken off {}: each is built with the starter's template for its \
-                 kind, as https://statac.dev/templates/ describes.",
-                counted(self.layouts_taken, "page or folder", "pages and folders")
+                "`layout` was taken off {}: each is built with the {}template for its kind, as \
+                 https://statac.dev/templates/ describes.",
+                counted(self.layouts_taken, "page or folder", "pages and folders"),
+                match self.starter {
+                    true => "starter's ",
+                    false => "",
+                }
             ));
         }
         if self.controls.0 > 0 {

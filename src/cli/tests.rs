@@ -532,6 +532,9 @@ Options:
   --from=<tool>          The tool that made the site statac import reads:
                          jekyll, hugo, zola or eleventy. Without it, told
                          from the site's files.
+  --no-starter           For statac import, leave out the starter's
+                         templates, snippets, stylesheet and pages, for a
+                         site you design yourself.
   --port=<number>        The port statac serve answers on. Without it,
                          3000, or the next port that is free.
   --watch=<way>          How statac serve learns of a save: native, by
@@ -947,6 +950,50 @@ error  Unknown option: `statac new` takes `--missing` only with `--update`
         Err(vec![Kind::OptionGivenTwice {
             option: "--cards".into()
         }])
+    );
+}
+
+#[test]
+fn import_takes_no_starter_and_no_other_command_does() {
+    let import = |starter| {
+        Ok(Request::Import(import::Options {
+            old: PathBuf::from("old-1"),
+            new: Some(PathBuf::from("new-1")),
+            from: None,
+            today: None,
+            starter,
+        }))
+    };
+    assert_eq!(parsed(&["import", "old-1", "new-1"]), import(true));
+    assert_eq!(
+        parsed(&["import", "--no-starter", "old-1", "new-1"]),
+        import(false)
+    );
+    assert_eq!(
+        parsed(&["--no-starter", "import", "old-1", "new-1"]),
+        import(false)
+    );
+    assert_eq!(
+        parsed(&["import", "old-1", "--no-starter", "--no-starter"]),
+        Err(vec![Kind::OptionGivenTwice {
+            option: "--no-starter".into()
+        }])
+    );
+    assert_eq!(
+        refused(&["new", "--no-starter"]),
+        "\
+error  Unknown option: `statac new` has no `--no-starter`
+  `--no-starter` is for `statac import`.
+  More: https://statac.dev/e/unknown-option/
+"
+    );
+    assert_eq!(
+        refused(&["import", "old-1", "--no-starter=true"]),
+        "\
+error  Unknown option: `--no-starter=true`
+  Did you mean `--no-starter`?
+  More: https://statac.dev/e/unknown-option/
+"
     );
 }
 

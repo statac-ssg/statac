@@ -1,6 +1,7 @@
-//! The new site written from an [`Import`]: the starter, then what came
-//! across, then the addresses kept and checked, then the report. Where
-//! anything stops it part way, the folder is left as it was found.
+//! The new site written from an [`Import`]: the starter, or without it
+//! only `statac.yaml`, then what came across, then the addresses kept and
+//! checked, then the report. Where anything stops it part way, the folder
+//! is left as it was found.
 
 use std::collections::HashSet;
 use std::io;
@@ -108,6 +109,14 @@ pub static FEED_LEFT: FindingKind = FindingKind {
                `feed:` line can put that list's feed at an address of its own, as `feed: \
                /index.rss`, and the starter's feed template writes Atom: see \
                https://statac.dev/feeds/.",
+};
+
+pub static FEED_LEFT_NO_STARTER: FindingKind = FindingKind {
+    heading: "Feeds made by templates",
+    sentence: "Readers subscribed to the old site's feed at each of these addresses, and the \
+               template that made it didn't come across, so nothing is there now. A list's \
+               `feed:` line can put that list's feed at an address of its own, as `feed: \
+               /index.rss`: see https://statac.dev/feeds/.",
 };
 
 pub static NEW_SITE_ERRORS: FindingKind = FindingKind {
@@ -258,13 +267,18 @@ pub struct Summary {
     /// The starter's pages left out, by their paths under `content/`, with
     /// what stands at their addresses instead.
     pub displaced: Vec<(String, String)>,
-    /// Whether the starter's home page stayed.
-    pub home_kept: bool,
+    /// Whether the starter was written.
+    pub starter: bool,
+    /// Whether the old site's home page came across.
+    pub home: bool,
     /// The path the site is under, where it is under one.
     pub base: String,
     pub built: Option<String>,
     /// How many errors `statac check` finds in the new site.
     pub errors: usize,
+    /// The templates the new site's pages and feeds are built with that it
+    /// doesn't have, by their paths.
+    pub templates: Vec<String>,
     /// The lists of terms whose names became tags.
     pub terms: Terms,
     /// What was changed in the pages' writing so Statac reads it as the
@@ -286,17 +300,26 @@ impl Summary {
 }
 
 /// Writes the site `import` describes into `folder`, which must be empty
-/// or not there, and the report. Where anything stops it, the folder is
-/// left as it was found.
+/// or not there, and the report, with the starter where `starter` asks.
+/// Where anything stops it, the folder is left as it was found.
 pub fn site(
     old: &Path,
     folder: &Path,
     import: Import,
     today: Date,
     shown: &Shown,
+    starter: bool,
 ) -> Result<Summary, Problem> {
     let undo = Undo::before(folder);
-    let written = write(old, folder, import, today, shown, &mut platform::make_file);
+    let written = write(
+        old,
+        folder,
+        import,
+        today,
+        shown,
+        starter,
+        &mut platform::make_file,
+    );
     if written.is_err() {
         undo.undo(folder);
     }
@@ -361,6 +384,8 @@ impl Undo {
 /// is the import's own, so a file is written over by removing it first.
 pub struct Out<'a> {
     pub folder: &'a Path,
+    /// Whether the starter was written into it.
+    pub starter: bool,
     write: &'a mut Writer<'a>,
     made: HashSet<String>,
 }
@@ -420,6 +445,7 @@ pub fn write<'a>(
     import: Import,
     today: Date,
     shown: &Shown,
+    starter: bool,
     write: &'a mut Writer<'a>,
 ) -> Result<Summary, Problem> {
     let Import {
@@ -461,16 +487,21 @@ pub fn write<'a>(
         date_format: new::dates_offered(&languages[0])[0].1.clone(),
         languages,
     };
+    let writes = match starter {
+        true => new::Writes::Starter,
+        false => new::Writes::Settings,
+    };
     let made = new::make(
         Maker::Import,
         folder,
         &answers,
         timezone.as_deref(),
         today,
-        false,
+        writes,
     )?;
     let mut out = Out {
         folder,
+        starter,
         write,
         made: HashSet::new(),
     };
@@ -494,6 +525,7 @@ pub fn write<'a>(
         notes,
         built: built.clone(),
         base: address.as_deref().map(base_of).unwrap_or_default(),
+        starter,
         ..Summary::default()
     };
     let followed = super::inside::followed();
@@ -520,7 +552,8 @@ pub fn write<'a>(
     // The starter's folder of posts with nothing in it would be published
     // as an empty list.
     let lands_in_posts = |to: &str| to.starts_with("posts/");
-    if !pages.iter().any(|page| lands_in_posts(&page.to))
+    if starter
+        && !pages.iter().any(|page| lands_in_posts(&page.to))
         && !files
             .iter()
             .any(|file| file.to.starts_with("content/posts/"))
@@ -533,9 +566,8 @@ pub fn write<'a>(
                 .to_owned(),
         );
     }
-    let home = pages.iter().any(|page| page.to == "index.md");
-    summary.home_kept = !home;
-    for (path, address) in STARTER_PAGES {
+    summary.home = pages.iter().any(|page| page.to == "index.md");
+    for (path, address) in STARTER_PAGES.iter().filter(|_| starter) {
         let by_page = pages
             .iter()
             .find(|page| page.to == *path || page.address.as_deref() == Some(address));
@@ -679,13 +711,19 @@ pub fn write<'a>(
     for (path, text) in &written {
         out.put(path, text.as_bytes())?;
     }
+    // Without the starter, a page the words are for that isn't there is
+    // written to hold them.
     for (path, field) in &words {
-        if !came.contains(path)
-            && let Some(text) = out.text(&format!("content/{path}"))
-        {
-            let text = with_word(&text, field);
-            out.put(&format!("content/{path}"), text.as_bytes())?;
+        if came.contains(path) {
+            continue;
         }
+        let text = match out.text(&format!("content/{path}")) {
+            Some(text) => text,
+            None if !starter => String::new(),
+            None => continue,
+        };
+        let text = with_word(&text, field);
+        out.put(&format!("content/{path}"), text.as_bytes())?;
     }
 
     summary.kept = addresses::keep(&mut out, &mut placed, today, &other_languages)?;
@@ -777,10 +815,15 @@ pub fn write<'a>(
         &feeds,
         &term_lists,
         built_at.as_deref(),
+        starter,
     );
     summary.kept.pictures = checked.pictures;
+    let feed_left = match starter {
+        true => &FEED_LEFT,
+        false => &FEED_LEFT_NO_STARTER,
+    };
     for (address, from) in &checked.feeds {
-        findings.push(Finding::at(&FEED_LEFT, from, None, address));
+        findings.push(Finding::at(feed_left, from, None, address));
     }
     summary.kept.answered = checked.answered;
     summary.kept.unanswered = checked.unanswered;
@@ -806,6 +849,7 @@ pub fn write<'a>(
         }
     }
     summary.errors = checked.errors.len();
+    summary.templates = checked.templates;
     findings.extend(
         checked
             .errors
