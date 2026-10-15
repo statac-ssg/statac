@@ -502,6 +502,22 @@ fn addresses(text: &mut String, summary: &Summary) {
             ),
         });
     }
+    if let Some((_, example)) = kept.list_pages.first() {
+        ways.push(match kept.list_pages.len() {
+            1 => format!(
+                "1 page at the top of `content/`, {}, sends readers on from an old page of a \
+                 list, found in the old site's built output, to the list's page with the same \
+                 number, with `permalink` and `redirect_to`.",
+                code(example)
+            ),
+            n => format!(
+                "{n} pages at the top of `content/`, such as {}, send readers on from old pages \
+                 of lists, found in the old site's built output, each to the list's page with \
+                 the same number, with `permalink` and `redirect_to`.",
+                code(example)
+            ),
+        });
+    }
     match kept.later.left {
         0 => {}
         1 => ways.push(

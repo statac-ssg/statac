@@ -212,12 +212,15 @@ impl Terms {
         }
     }
 
-    /// Each old page of a name in a list, as the tag the name became and
-    /// the page's address.
+    /// Each old page of a name in a list, or of a tag, as the tag the
+    /// name became and the page's address.
     fn old_pages(&self, pages: &[(String, String, String)]) -> Vec<(String, String)> {
         pages
             .iter()
             .filter_map(|(list, name, address)| {
+                if list == "tags" {
+                    return (self.tags.contains(name)).then(|| (name.clone(), address.clone()));
+                }
                 let (_, names) = self.lists.iter().find(|(known, _)| known == list)?;
                 let (_, tag) = names.iter().find(|(known, _)| known == name)?;
                 Some((tag.clone(), address.clone()))
@@ -775,6 +778,15 @@ pub fn write<'a>(
     summary.kept.sent_on = sent_on.pages;
     if let Some(home) = &home_pages {
         summary.kept.later = addresses::send_on_to_later_pages(&mut out, today, &placed, home)?;
+    }
+    if let Some(built) = &built_at {
+        let pages = addresses::send_on_to_list_pages(&mut out, today, built, &other_languages)?;
+        for (address, _) in &pages {
+            if !worked_out.iter().any(|(known, _)| known == address) {
+                worked_out.push((address.clone(), String::new()));
+            }
+        }
+        summary.kept.list_pages = pages;
     }
     summary.terms = terms;
     // The starter's page listing every tag stands where the old site's did.

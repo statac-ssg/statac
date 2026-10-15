@@ -44,6 +44,10 @@ pub struct Kept {
     /// The old home page's later pages that a page of their own now sends
     /// readers on from, and how many no page could.
     pub later: LaterPages,
+    /// The old pages of other lists, past the first, found in the old
+    /// built output, that a page of their own now sends readers on from:
+    /// each one's address, and the file written for it.
+    pub list_pages: Vec<(String, String)>,
     /// The old addresses of the photographs beside pages that the new
     /// site publishes only as copies.
     pub pictures: Vec<String>,
@@ -540,6 +544,98 @@ pub struct LaterPages {
     /// How many old pages held posts no one page of the posts' list
     /// holds, where the list has no page of their number either.
     pub left: usize,
+}
+
+/// Sends readers on from each page of a list in `built`, the old built
+/// output, that the new site doesn't publish, to the new list's page of
+/// the same number, and gives each old address so answered with the file
+/// written for it. Such a page stands where the new list's page of its
+/// number does, or its first would, by the new site's `later_pages`, or
+/// there as a file: `/posts/page/2.html` for `/posts/page/2/`, and
+/// `/tags/rust/page/1/` beside `/tags/rust/page/2/`. The home page's are
+/// [`send_on_to_later_pages`]'s.
+///
+/// A list's later pages are no files, nor is a tag's page, so each old
+/// address gets a page of its own, as [`send_on_to_tags`] writes.
+pub fn send_on_to_list_pages(
+    out: &mut Out,
+    today: Date,
+    built: &Path,
+    others: &[String],
+) -> Result<Vec<(String, String)>, Problem> {
+    let mut sent_on = Vec::new();
+    let (read, assets, feeds) = read_site(
+        out.folder,
+        &Run {
+            today: Some(today),
+            drafts: false,
+            url: None,
+        },
+        out.starter,
+    );
+    let site = &read.site;
+    let mut taken: HashSet<String> = assets
+        .claims()
+        .into_iter()
+        .chain(read.claims())
+        .chain(crate::feeds::claims(&feeds))
+        .chain(site.pictures.claims())
+        .map(|(file, _)| crate::platform::folded(&file))
+        .collect();
+    // Where each list's pages stand, and the address each sends readers
+    // on to, by where the list's first would stand.
+    let mut pages: HashMap<String, Address> = HashMap::new();
+    for (_, list) in site.lists.iter() {
+        let first = match list.page.map(|page| site.pages.get(page)) {
+            Some(page) if page.lands() => page.address.clone(),
+            Some(_) => continue,
+            None => match &list.address {
+                Some(address) => address.value.clone(),
+                None => continue,
+            },
+        };
+        if list.key == ListKey::Folder(String::new()) {
+            continue;
+        }
+        let Some(second) = list.later_address(2) else {
+            continue;
+        };
+        if let Some(above) = second.as_str().strip_suffix("/2/") {
+            pages.insert(crate::platform::folded(&format!("{above}/1/")), first);
+        }
+        for number in 2..=list.stretches() {
+            if let Some(later) = list.later_address(number) {
+                pages.insert(crate::platform::folded(later.as_str()), later.clone());
+            }
+        }
+    }
+    for page in pages_in(built) {
+        let file = crate::platform::folded(&page);
+        if taken.contains(&file) {
+            continue;
+        }
+        let folder = (page.strip_suffix("index.html"))
+            .or_else(|| page.strip_suffix(".html"))
+            .unwrap_or(&page);
+        let folder = format!("/{}/", folder.trim_end_matches('/'));
+        let Some(to) = pages.get(&crate::platform::folded(&folder)) else {
+            continue;
+        };
+        let old = match page.strip_suffix("index.html") {
+            Some(folder) => format!("/{folder}"),
+            None => format!("/{page}"),
+        };
+        let language = others
+            .iter()
+            .find(|language| old.starts_with(&format!("/{language}/")));
+        if !taken.insert(file) {
+            continue;
+        }
+        if let Some(written) = send_on(out, &old, to.as_str(), language.map(String::as_str))? {
+            sent_on.push((old, written));
+        }
+    }
+    Ok(sent_on)
 }
 
 /// What [`send_on_to_tags`] did and found.

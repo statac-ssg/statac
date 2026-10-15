@@ -221,7 +221,8 @@ pub struct Import {
     pub templated: Vec<(String, String)>,
     /// The address of the page the old site made for each name in a list
     /// of terms, with the list's name and the name: `categories`, `linux`
-    /// and `/categories/linux/`.
+    /// and `/categories/linux/`; and for a tag, as `tags`, where it isn't
+    /// where Statac's would be.
     pub term_pages: Vec<(String, String, String)>,
     /// The address of each page the old site made to list every tag, or
     /// every name of another list of that kind, with the list's name:

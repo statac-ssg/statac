@@ -919,6 +919,133 @@ fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
     }
 }
 
+/// Each later page of a list or a tag in the old built output, which
+/// Hugo before 0.148 published under `uglyURLs` as files, sends readers on
+/// to the new list's page of the same number.
+#[test]
+fn later_pages_in_the_old_built_output_send_readers_on() {
+    let old = scratch("hugo-built-later-old");
+    let new = scratch("hugo-built-later-new");
+    let out = scratch("hugo-built-later-out");
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    let settings = "baseURL = 'https://example.org/'\ntitle = 'Built'\nuglyURLs = true\n\
+                    [pagination]\npagerSize = 1\n";
+    fs::write(old.join("hugo.toml"), settings).unwrap();
+    for n in 1..=2 {
+        let post = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\ntags: [a]\n---\nA post.\n");
+        fs::write(old.join(format!("content/posts/post-{n}.md")), post).unwrap();
+    }
+    let built = [
+        "index.html",
+        "posts.html",
+        "posts/post-1.html",
+        "posts/post-2.html",
+        "posts/page/1.html",
+        "posts/page/2.html",
+        "tags.html",
+        "tags/a.html",
+        "tags/a/page/1.html",
+        "tags/a/page/2.html",
+        // No later page of the new site's stands there.
+        "posts/chapter/2.html",
+    ];
+    for page in built {
+        let path = old.join("public").join(page);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "<p>A page.</p>\n").unwrap();
+    }
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    // Each old page, the page written for it, and where it sends readers.
+    for (from, page, to) in [
+        ("/posts/page/1.html", "posts-page-1.md", "/posts/"),
+        ("/posts/page/2.html", "posts-page-2.md", "/posts/page/2/"),
+        ("/tags/a/page/1.html", "tags-a-page-1.md", "/tags/a/"),
+        ("/tags/a/page/2.html", "tags-a-page-2.md", "/tags/a/page/2/"),
+    ] {
+        let written = fs::read_to_string(new.join("content").join(page)).unwrap();
+        assert_eq!(
+            written,
+            format!("---\npermalink: {from}\nredirect_to: {to}\n---\n")
+        );
+    }
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(
+        report.contains(
+            "4 pages at the top of `content/`, such as `content/posts-page-1.md`, send readers \
+             on from old pages of lists, found in the old site's built output, each to the \
+             list's page with the same number"
+        ),
+        "{report}"
+    );
+    assert!(!report.contains("/page/2.html`"), "{report}");
+    assert!(report.contains("`/posts/chapter/2.html`"), "{report}");
+    assert!(!new.join("content/posts-chapter-2.md").exists());
+    assert!(
+        !report.contains("With the old site's built output"),
+        "{report}"
+    );
+    build_into(&new, &out);
+    for file in [
+        "posts/page/2.html",
+        "tags/a/page/2.html",
+        "tags/a/page/2/index.html",
+    ] {
+        assert!(out.join(file).is_file(), "nothing at {file}");
+    }
+}
+
+/// Without the old built output, a tag's page Hugo published under
+/// `uglyURLs` as a file sends readers on, as does the page listing every
+/// tag where Hugo before 0.148 published it, and the report says what
+/// nothing answers.
+#[test]
+fn hugo_tags_published_as_files_are_kept_without_the_built_output() {
+    let old = scratch("hugo-ugly-tags-old");
+    let new = scratch("hugo-ugly-tags-new");
+    let out = scratch("hugo-ugly-tags-out");
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    let settings = "baseURL = 'https://example.org/'\ntitle = 'Tags'\nuglyURLs = true\n\
+                    [pagination]\npagerSize = 1\n";
+    fs::write(old.join("hugo.toml"), settings).unwrap();
+    for n in 1..=2 {
+        let post = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\ntags: [a]\n---\nA post.\n");
+        fs::write(old.join(format!("content/posts/post-{n}.md")), post).unwrap();
+    }
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    let tags = fs::read_to_string(new.join("content/tags.md")).unwrap();
+    assert!(
+        tags.contains("\nredirect_from:\n  - /tags.html\n"),
+        "{tags}"
+    );
+    let tag = fs::read_to_string(new.join("content/tags-a.md")).unwrap();
+    assert_eq!(
+        tag,
+        "---\npermalink: /tags/a.html\nredirect_to: /tags/a/\n---\n"
+    );
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(
+        report.contains(
+            "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
+             `/posts.html`, which now sends readers on to the list, and its later pages as files \
+             too, such as `/posts/page/2.html`; and every version published a tag's later pages \
+             as files, such as `/tags/a/page/2.html`: nothing answers those. With the old \
+             site's built output in `public/`, `statac import` sends readers on from each it \
+             finds there."
+        ),
+        "{report}"
+    );
+    assert!(
+        !report.contains("Nothing in the new site answers"),
+        "{report}"
+    );
+    build_into(&new, &out);
+    for file in ["tags.html", "tags/a.html", "posts.html"] {
+        assert!(out.join(file).is_file(), "nothing at {file}");
+    }
+}
+
 /// Hugo's list held the pages in its folder, those in folders beneath it
 /// that are no lists, and each list beneath it, and each of its later
 /// pages is looked for in the new site.

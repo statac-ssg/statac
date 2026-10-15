@@ -261,6 +261,8 @@ pub fn read(
         own_files: Vec::new(),
         taken_off: 0,
         updated_elsewhere: 0,
+        older_lists: None,
+        files_later: None,
     };
     reader.import.settings_file = found.file;
     reader.import.left = found.left;
@@ -348,6 +350,12 @@ struct Reader<'a> {
     taken_off: usize,
     /// How many pages had their last change from the file or Git.
     updated_elsewhere: usize,
+    /// A list Hugo before 0.148 may have published as a file, and one of
+    /// its later pages, where some such list had them.
+    older_lists: Option<(String, String)>,
+    /// One of the later pages of a tag's page that Hugo published as
+    /// files, where some tag had them.
+    files_later: Option<String>,
 }
 
 /// The date a name opens with, `2026-10-04-`, and the rest of the name.
@@ -2373,8 +2381,20 @@ impl Reader<'_> {
     /// settings that keep those of tags and of a series.
     fn terms(&mut self) {
         let mut addresses: Vec<String> = Vec::new();
+        // How many pages each tag's page listed, by its address, where
+        // Statac's tag pages follow Hugo's, and whether it is a file.
+        let mut held: Vec<(String, usize, bool)> = Vec::new();
         for plural in ["tags", "series"] {
             let pattern = self.s.permalinks.term(plural).map(str::to_owned);
+            let statacs = pattern.as_ref().map(|pattern| {
+                let statacs = pattern
+                    .replace(":slug", "{slug}")
+                    .replace(":title", "{slug}");
+                format!("/{}/", statacs.trim_matches('/'))
+            });
+            let kept = (statacs.as_ref())
+                .is_none_or(|statacs| !statacs.contains(':') && statacs.ends_with("{slug}/"));
+            let ugly = self.s.ugly.of(plural);
             let mut slugs: Vec<(String, Value)> = Vec::new();
             for doc in self.docs.iter().filter(|d| !d.draft) {
                 let prefix = format!("/{}", self.prefix(&doc.language));
@@ -2385,7 +2405,6 @@ impl Reader<'_> {
                 if terms.is_empty() || !self.s.terms || (plural == "series" && terms.len() > 1) {
                     continue;
                 }
-                let ugly = self.s.ugly.of(plural);
                 for term in terms {
                     let hugos = self.making.made(term);
                     let path = match &pattern {
@@ -2394,6 +2413,12 @@ impl Reader<'_> {
                     };
                     let path = url::finished(&self.making.path(&path), ugly);
                     let address = format!("{prefix}{path}");
+                    if kept {
+                        match held.iter_mut().find(|(at, _, _)| *at == address) {
+                            Some((_, pages, _)) => *pages += 1,
+                            None => held.push((address.clone(), 1, ugly)),
+                        }
+                    }
                     if !addresses.contains(&address) {
                         addresses.push(address);
                     }
@@ -2414,19 +2439,15 @@ impl Reader<'_> {
                     .settings
                     .push((format!("{plural}.slugs"), Value::Fields(slugs)));
             }
-            if let Some(pattern) = pattern {
-                let statacs = pattern
-                    .replace(":slug", "{slug}")
-                    .replace(":title", "{slug}");
-                let statacs = format!("/{}/", statacs.trim_matches('/'));
-                match statacs.contains(':') || !statacs.ends_with("{slug}/") {
-                    true => self.note(format!(
+            if let (Some(pattern), Some(statacs)) = (pattern, statacs) {
+                match kept {
+                    false => self.note(format!(
                         "The settings' `[permalinks]` put the page of each of the `{plural}` at \
                          {}, which Statac has no pattern for, so each is at Statac's own \
                          address: those Hugo used are listed under Addresses.",
                         code(&pattern)
                     )),
-                    false => self
+                    true => self
                         .import
                         .settings
                         .push((format!("{plural}.permalink"), Value::Text(statacs))),
@@ -2474,14 +2495,52 @@ impl Reader<'_> {
             }
         }
         self.import.addresses.extend(addresses);
+        let path = self.pager_path();
+        for (address, pages, file) in held {
+            let pages = pages.div_ceil(self.pager_size());
+            match file {
+                // Hugo published a tag's page under `uglyURLs` as a file,
+                // `/tags/rust.html`, and its later pages as files beneath
+                // `/tags/rust/`, in every version.
+                true if pages > 1 && self.files_later.is_none() => {
+                    let folder = address.strip_suffix(".html").unwrap_or(&address);
+                    self.files_later = Some(format!("{folder}/{path}/2.html"));
+                }
+                true => {}
+                false => {
+                    for n in 2..=pages {
+                        (self.import.addresses).push(format!("{address}{path}/{n}/"));
+                    }
+                }
+            }
+        }
+        // Hugo before 0.148 published the page listing every tag under
+        // `uglyURLs` as a file; since, as a folder. The old built output,
+        // where it is there, tells which, and the shared part keeps it.
+        if self.s.ugly.of("tags") && self.import.built.is_none() && self.starter {
+            for (list, plural) in &self.import.term_lists {
+                if plural != "tags" {
+                    continue;
+                }
+                let within = list.trim_start_matches('/').trim_end_matches('/');
+                let path = match within.strip_suffix("tags") {
+                    Some(language) => format!("{language}tags.md"),
+                    None => continue,
+                };
+                let from = Value::List(vec![Value::Text(format!("/{within}.html"))]);
+                (self.import.words).push((path, Field::new("redirect_from", from, None)));
+            }
+        }
         // The page Hugo made for each name in any other list, and the one
-        // listing them all.
+        // listing them all; and for each tag, where it was a file.
         if self.s.terms {
             for doc in self.docs.iter().filter(|d| !d.draft) {
                 let prefix = format!("/{}", self.prefix(&doc.language));
                 let prefix = prefix.trim_end_matches('/');
                 for (plural, terms) in &doc.terms {
-                    if plural == "tags" || (plural == "series" && terms.len() < 2) {
+                    if (plural == "tags" && !self.s.ugly.of(plural))
+                        || (plural == "series" && terms.len() < 2)
+                    {
                         continue;
                     }
                     let ugly = self.s.ugly.of(plural);
@@ -2551,17 +2610,9 @@ impl Reader<'_> {
     /// later pages.
     fn later_pages(&mut self) -> bool {
         let lists = self.lists();
-        let size = (self.s.pager_size)
-            .and_then(|size| usize::try_from(size).ok())
-            .filter(|size| *size > 0)
-            .unwrap_or(10);
-        let path = (self.s.pager_path.as_deref())
-            .map(|path| path.trim_matches('/'))
-            .filter(|path| !path.is_empty())
-            .unwrap_or("page")
-            .to_owned();
+        let size = self.pager_size();
+        let path = self.pager_path();
         let mut any = false;
-        let mut older: Option<(String, String)> = None;
         for at in 0..self.docs.len() {
             let list = &self.docs[at];
             if !matches!(list.shape, Shape::List | Shape::Made) || list.dir.is_empty() {
@@ -2589,24 +2640,32 @@ impl Reader<'_> {
             }
             any = true;
             let file = format!("{}.html", address.trim_end_matches('/'));
-            if older.is_none() && list.others.contains(&file) {
-                older = Some((file, format!("{address}{path}/2.html")));
+            if self.older_lists.is_none() && list.others.contains(&file) {
+                self.older_lists = Some((file, format!("{address}{path}/2.html")));
             }
             self.docs[at].others.push(format!("{address}{path}/1/"));
             for n in 2..=pages {
                 self.import.addresses.push(format!("{address}{path}/{n}/"));
             }
         }
-        if let Some((list, later)) = older {
-            self.note(format!(
-                "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
-                 {}, which now sends readers on to the list, and its later pages as files too, \
-                 such as {}: nothing answers those.",
-                code(&list),
-                code(&later)
-            ));
-        }
         any
+    }
+
+    /// How many pages each of a list's pages showed.
+    fn pager_size(&self) -> usize {
+        (self.s.pager_size)
+            .and_then(|size| usize::try_from(size).ok())
+            .filter(|size| *size > 0)
+            .unwrap_or(10)
+    }
+
+    /// The folder a list's later pages stood in, by their numbers.
+    fn pager_path(&self) -> String {
+        (self.s.pager_path.as_deref())
+            .map(|path| path.trim_matches('/'))
+            .filter(|path| !path.is_empty())
+            .unwrap_or("page")
+            .to_owned()
     }
 
     /// The settings for a list's later pages, in a site of so many posts.
@@ -2643,6 +2702,40 @@ impl Reader<'_> {
                 "Hugo made later pages only for the lists whose templates asked for them, which \
                  Statac can't tell from the writing; Statac makes them for every list with more \
                  posts than a page shows: see https://statac.dev/lists/#pages-of-a-list.{firsts}"
+            ));
+        }
+        // The old built output, where it is there, shows which of these
+        // there were, and the shared part sends readers on from them.
+        let files = match (&self.older_lists, &self.files_later) {
+            _ if self.import.built.is_some() => None,
+            (Some((list, later)), None) => Some(format!(
+                "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
+                 {}, which now sends readers on to the list, and its later pages as files too, \
+                 such as {}: nothing answers those.",
+                code(list),
+                code(later)
+            )),
+            (Some((list, later)), Some(tags)) => Some(format!(
+                "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
+                 {}, which now sends readers on to the list, and its later pages as files too, \
+                 such as {}; and every version published a tag's later pages as files, such as \
+                 {}: nothing answers those.",
+                code(list),
+                code(later),
+                code(tags)
+            )),
+            (None, Some(tags)) => Some(format!(
+                "Hugo published a tag's later pages under `uglyURLs` as files, such as {}: \
+                 nothing answers those.",
+                code(tags)
+            )),
+            (None, None) => None,
+        };
+        if let Some(files) = files {
+            self.note(format!(
+                "{files} With the old site's built output in {}, `statac import` sends readers on \
+                 from each it finds there.",
+                code(&format!("{}/", self.s.publish_dir))
             ));
         }
         if self.s.pager_size.is_some() || more {
@@ -2692,5 +2785,50 @@ mod tests {
             front("+++\ntitle = \"Post 1\"\ndate = \n+++\n", "a.md").err(),
             Some((3, "date = ".to_owned()))
         );
+    }
+
+    /// A tag's later pages are looked for where Statac's tag pages stand
+    /// where Hugo's did; under `uglyURLs` Hugo's were files, and are
+    /// spoken of instead.
+    #[test]
+    fn the_later_pages_of_a_tag_are_looked_for_where_statac_publishes_them() {
+        let top = std::env::temp_dir().join(format!("statac-hugo-{}", std::process::id()));
+        // The settings, and whether a tag's second page is looked for.
+        for (at, (settings, looked_for)) in [("", true), ("uglyURLs = true\n", false)]
+            .into_iter()
+            .enumerate()
+        {
+            let folder = top.join(at.to_string());
+            let _ = std::fs::remove_dir_all(&folder);
+            std::fs::create_dir_all(folder.join("content/posts")).unwrap();
+            let paging = "[pagination]\npagerSize = 1\n";
+            let toml =
+                format!("baseURL = 'https://example.org/'\ntitle = 'Tags'\n{settings}{paging}");
+            std::fs::write(folder.join("hugo.toml"), toml).unwrap();
+            for n in 1..=2 {
+                let post = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\ntags: [a]\n---\n");
+                std::fs::write(folder.join(format!("content/posts/post-{n}.md")), post).unwrap();
+            }
+            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None, true) else {
+                panic!("{at}: the site wasn't read");
+            };
+            let has = |address: &str| import.addresses.iter().any(|a| a == address);
+            assert_eq!(
+                has("/tags/a/page/2/"),
+                looked_for,
+                "{at}: {:?}",
+                import.addresses
+            );
+            assert!(!has("/tags/a/page/3/"), "{at}: {:?}", import.addresses);
+            assert_eq!(
+                import
+                    .notes
+                    .iter()
+                    .any(|note| note.contains("`/tags/a/page/2.html`")),
+                !looked_for,
+                "{at}: {:?}",
+                import.notes
+            );
+        }
     }
 }

@@ -37,9 +37,17 @@ What changed in each release of Statac, the newest first.
   `/posts/page/1/`, to the list. A list under `uglyURLs` stays at its
   folder's address, where Hugo has published it since version 0.148,
   and sends readers on from `/posts.html`, where earlier versions did,
-  unless the old site's built output has no such file; the report says
-  that nothing answers those versions' later pages, `/posts/page/2.html`.
-  Neither kind of later page was looked for or named.
+  unless the old site's built output has no such file; without the built
+  output, the report says that nothing answers those versions' later
+  pages, `/posts/page/2.html`. Neither kind of later page was looked for
+  or named.
+- `statac import` sends readers on from each numbered page of a list or
+  a tag that it finds in the old site's built output, such as
+  `/posts/page/2.html` or `/tags/rust/page/1/`, to the new list's page of
+  the same number. From Hugo, it also looks for a tag's later pages where
+  Statac publishes them, and under `uglyURLs` sends readers on from a
+  tag's page, such as `/tags/rust.html`, and from `/tags.html`, where
+  Hugo before 0.148 listed every tag. Nothing answered these.
 - A code block opened with a caption in quotes and no language, as
   `` ```"An example" ``, is no longer warned of as a language Statac has
   no colours for. The block was built rightly; only the warning was
