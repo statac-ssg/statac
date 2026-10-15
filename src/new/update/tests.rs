@@ -229,7 +229,13 @@ fn every_state_of_a_file_is_told() {
         surveyed(&folder),
         [
             (PHOTO, Is::Newest),
-            ("snippets/note.html", Is::Yours { new: None }),
+            (
+                "snippets/note.html",
+                Is::Yours {
+                    copy: true,
+                    new: None
+                }
+            ),
             ("snippets/video.html", Is::NotHere { current: VIDEO_1 }),
             (
                 "templates/base.html",
@@ -321,7 +327,13 @@ fn a_file_nearest_the_newest_or_as_near_it_as_a_past_one_has_nothing_new() {
     let folder = made_site("as-near", &[("templates/base.html", between.as_bytes())]);
     assert_eq!(
         surveyed(&folder)[3],
-        ("templates/base.html", Is::Yours { new: None })
+        (
+            "templates/base.html",
+            Is::Yours {
+                copy: true,
+                new: None
+            }
+        )
     );
     assert_eq!(read(&folder, "templates/base.html"), between.as_bytes());
 }
@@ -395,7 +407,10 @@ fn a_sample_pages_file_is_never_missed_where_it_isnt_here() {
         &answers,
         None,
         today,
-        super::super::Writes::Starter,
+        super::super::Writes {
+            starter: true,
+            cards: false,
+        },
     )
     .unwrap();
     std::fs::remove_dir_all(platform::join(&folder, "content/photos")).unwrap();
@@ -554,6 +569,10 @@ fn starter_files_not_here_are_named_once_six_at_most() {
             path: "snippets/g.html",
             bytes: b"g\n",
         },
+        File {
+            path: "snippets/h.html",
+            bytes: b"h\n",
+        },
     ];
     let many = Starter {
         files: MANY,
@@ -561,7 +580,7 @@ fn starter_files_not_here_are_named_once_six_at_most() {
         past: &[],
         words: &[],
     };
-    let folder = site("seven-not-here", &[]);
+    let folder = site("seven-not-here", &[("snippets/h.html", b"h\n")]);
     let (said, _) = updated_by(&folder, Update::default(), &many);
     assert_eq!(
         said,
@@ -579,6 +598,57 @@ fn starter_files_not_here_are_named_once_six_at_most() {
         said,
         "1 starter file isn't here: `snippets/b.html`. To write it, run \
          `statac new --update --missing`.\n"
+    );
+}
+
+/// A site holding nothing of the starter's, its own file at one of the
+/// starter's paths among them, is told so once in place of each file and
+/// the words it lacks, and `--missing` writes the words with the files.
+#[test]
+fn a_site_without_the_starter_is_told_so_once_and_missing_writes_it_with_its_words() {
+    let none = "This site has none of the starter's files. To add them, run \
+                `statac new --update --missing`.\n";
+    let folder = site("without", &[("templates/base.html", b"<p>Mine.</p>\n")]);
+    let (said, code) = updated(&folder, Update::default());
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(said, none);
+
+    let (said, code) = updated(&folder, Update { missing: true });
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("Wrote `data/words.yaml`.\n"), "{said}");
+    let words = String::from_utf8(read(&folder, WORDS_FILE)).unwrap();
+    assert!(
+        words.ends_with(std::str::from_utf8(WORDS_EN).unwrap()),
+        "{words}"
+    );
+    assert_eq!(read(&folder, "templates/base.html"), b"<p>Mine.</p>\n");
+    let (said, code) = updated(&folder, Update::default());
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(said, format!("{}\n", wording::NOTHING_TO_UPDATE));
+
+    // A card it describes is still told each of its files the site lacks.
+    let with_font = Starter {
+        cards: &[
+            File {
+                path: CARD,
+                bytes: CARD_2,
+            },
+            File {
+                path: "templates/og/text.ttf",
+                bytes: b"font",
+            },
+        ],
+        ..STARTER
+    };
+    let folder = site("without-card", &[(CARD, b"font: mine.ttf\n")]);
+    let (said, code) = updated_by(&folder, Update::default(), &with_font);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        format!(
+            "{none}1 starter file isn't here: `templates/og/text.ttf`. To write it, run \
+             `statac new --update --missing`.\n"
+        )
     );
 }
 
@@ -869,9 +939,13 @@ fn a_file_unlike_every_version_is_the_authors_own_with_nothing_new() {
         (home.unwrap().is, told)
     };
     let new = Is::Yours {
+        copy: true,
         new: Some((HOME_W1, HOME_W2)),
     };
-    let own = Is::Yours { new: None };
+    let own = Is::Yours {
+        copy: false,
+        new: None,
+    };
     // Nothing of either version, and one line of four.
     assert_eq!(is(b"<p>Mine.</p>\n"), (own.clone(), false));
     let one_shared = b"{% extends \"base.html\" %}\n<p>One.</p>\n<p>Two.</p>\n<p>Three.</p>\n";
@@ -995,7 +1069,10 @@ fn with_no_past_versions_a_new_site_builds_and_says_what_it_did_before() {
         &answers,
         None,
         crate::date::Date::day_only(2026, 10, 6),
-        super::super::Writes::StarterAndCards,
+        super::super::Writes {
+            starter: true,
+            cards: true,
+        },
     )
     .unwrap();
     let sites = [made];

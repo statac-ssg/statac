@@ -1,4 +1,4 @@
-//! `statac new`: four questions, and a whole site written from the
+//! `statac new`: five questions, and a whole site written from the
 //! answers into an empty folder or a new one.
 //!
 //! The starter's files are written exactly as `starter/` keeps them, so
@@ -37,7 +37,7 @@ use crate::source::Sources;
 use crate::wording;
 use crate::yaml::{self, Resolved, Value as Yaml};
 pub(crate) use starter::has_snippet;
-use update::{CARD, Starter};
+use update::{CARD, Starter, WORDS_FILE};
 
 /// What `statac new` is asked.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -53,6 +53,9 @@ pub struct Options {
     /// Whether `--cards` is given: the sharing card's files written, into
     /// the site in the folder, or with a new site.
     pub cards: bool,
+    /// Whether `--no-starter` is given: a new site made without the
+    /// starter, which is then not asked about.
+    pub no_starter: bool,
 }
 
 /// What `statac new` learns from the machine it runs on.
@@ -125,7 +128,7 @@ pub fn today_on_this_machine() -> Date {
     )
 }
 
-/// The four answers a site is made from.
+/// The answers a site's settings are made from.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Answers {
     pub title: String,
@@ -179,7 +182,7 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         today,
         ..
     } = machine;
-    let answers = match input.filter(|_| !options.yes) {
+    let (answers, starter) = match input.filter(|_| !options.yes) {
         Some(input) => {
             if input.terminal {
                 say(&format!(
@@ -194,8 +197,8 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
                 colour,
                 terminal: input.terminal,
             };
-            match ask(&defaults, asking) {
-                Ok(answers) => answers,
+            match ask(&defaults, asking, !options.no_starter) {
+                Ok(asked) => asked,
                 Err(told) => {
                     say(&format!("{}\n", shown(&told)));
                     return 1;
@@ -210,7 +213,7 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
             if !without_words(&answers.languages).is_empty() {
                 say("\n");
             }
-            answers
+            (answers, !options.no_starter)
         }
     };
     let made = make(
@@ -219,7 +222,10 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         &answers,
         timezone.as_deref(),
         today,
-        Writes::starter(options.cards),
+        Writes {
+            starter,
+            cards: options.cards,
+        },
     );
     let made = match made {
         Ok(made) => made,
@@ -241,8 +247,9 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         say(&format!("  {}\n", shown(line)));
     }
     say("\n");
+    // Without the starter, nothing shows words of the site's own.
     let translated: Vec<&String> = (answers.languages.iter())
-        .filter(|tag| !english(tag))
+        .filter(|tag| starter && !english(tag))
         .collect();
     for tag in &translated {
         let file = lacks_shown_words(tag).then(|| language_path(tag));
@@ -253,7 +260,7 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         say("\n");
     }
     let away = options.folder.as_ref().map(|_| shown_as.as_str());
-    say(&format!("{}\n", shown(&wording::next_steps(away))));
+    say(&format!("{}\n", shown(&wording::next_steps(away, starter))));
     0
 }
 
@@ -466,8 +473,14 @@ impl Asking<'_> {
 
 /// Asks each question until it has an answer it can use, or gives what
 /// is told of an answer that can't be used where nobody is there to
-/// answer again.
-fn ask(defaults: &Defaults, mut asking: Asking) -> Result<Answers, String> {
+/// answer again. Gives the answers, and whether the site has the starter,
+/// which is asked last where `starter_asked` says, so that lines piped in
+/// for the questions before it still answer them.
+fn ask(
+    defaults: &Defaults,
+    mut asking: Asking,
+    starter_asked: bool,
+) -> Result<(Answers, bool), String> {
     asking.block(wording::ASK_TITLE, &[]);
     let title = match asking.reply(Some(&defaults.title)) {
         typed if typed.is_empty() => defaults.title.clone(),
@@ -502,7 +515,7 @@ fn ask(defaults: &Defaults, mut asking: Asking) -> Result<Answers, String> {
     }
     let offered = dates_offered(&languages[0]);
     let mut hints: Vec<String> = (offered.iter())
-        .map(|(number, example)| wording::ask_date_choice(*number, example))
+        .map(|(number, example)| wording::ask_choice(*number, example))
         .collect();
     hints.push(wording::ASK_DATES_OWN.to_owned());
     asking.block(wording::ASK_DATES, &hints);
@@ -523,12 +536,35 @@ fn ask(defaults: &Defaults, mut asking: Asking) -> Result<Answers, String> {
         }
     };
     asking.show("\n");
-    Ok(Answers {
+    let starter = match starter_asked {
+        true => ask_starter(&mut asking)?,
+        false => false,
+    };
+    let answers = Answers {
         title,
         address,
         languages,
         date_format,
-    })
+    };
+    Ok((answers, starter))
+}
+
+/// Asks whether the site has the starter.
+fn ask_starter(asking: &mut Asking) -> Result<bool, String> {
+    let hints = [
+        wording::ask_choice(1, wording::START_STARTER),
+        wording::ask_choice(2, wording::START_NOTHING),
+    ];
+    asking.block(wording::ASK_START, &hints);
+    let starter = loop {
+        match asking.reply(Some("1")).as_str() {
+            "" | "1" => break true,
+            "2" => break false,
+            typed => asking.refused(wording::not_one_or_two(typed))?,
+        }
+    };
+    asking.show("\n");
+    Ok(starter)
 }
 
 /// What is said of a language Statac has no words for.
@@ -700,25 +736,14 @@ pub(crate) fn site_mark(folder: &Path) -> io::Result<Option<SiteMark>> {
         .then_some(SiteMark::Content))
 }
 
-/// Which of a new site's files [`make`] writes.
+/// Which of a new site's files [`make`] writes, besides `statac.yaml` and
+/// `.gitignore`, which every site gets.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum Writes {
-    /// The starter's, and those made from the answers.
-    Starter,
-    /// Those, and the sharing card's.
-    StarterAndCards,
-    /// `statac.yaml` alone.
-    Settings,
-}
-
-impl Writes {
-    /// The starter, with the sharing card's files where `cards` asks.
-    fn starter(cards: bool) -> Writes {
-        match cards {
-            true => Writes::StarterAndCards,
-            false => Writes::Starter,
-        }
-    }
+pub(crate) struct Writes {
+    /// The starter's, and those made from the answers for it.
+    pub starter: bool,
+    /// The sharing card's.
+    pub cards: bool,
 }
 
 /// Writes a new site from `answers` into `folder`, which must be empty
@@ -964,32 +989,39 @@ fn quoted(text: &str) -> String {
 }
 
 /// Every file of a new site `writes` asks for, by its path in the site:
-/// the starter's, the sharing card's, those made from the answers, and the
-/// sample pages with what is kept beside them, dated from `samples` where
-/// it gives a day.
+/// `statac.yaml` and `.gitignore`, the sharing card's, and the starter's
+/// with those made from the answers for it and the sample pages with what
+/// is kept beside them, dated from `samples` where it gives a day.
 fn files<'a>(
     answers: &Answers,
     settings: &str,
     samples: Option<Date>,
     writes: Writes,
 ) -> Vec<(String, Cow<'a, [u8]>)> {
-    let settings_file = (config::FILE_NAME.to_owned(), Cow::Owned(settings.into()));
-    let asked: &[starter::File] = match writes {
-        Writes::Settings => return vec![settings_file],
-        Writes::StarterAndCards => starter::CARDS,
-        Writes::Starter => &[],
+    let starter_files: &[starter::File] = match writes.starter {
+        true => starter::FILES,
+        false => &[],
     };
-    let mut files: Vec<(String, Cow<[u8]>)> = (starter::FILES.iter().chain(asked))
+    let cards: &[starter::File] = match writes.cards {
+        true => starter::CARDS,
+        false => &[],
+    };
+    let mut files: Vec<(String, Cow<[u8]>)> = (starter_files.iter().chain(cards))
         .filter(|file| {
             let sample = starter::is_a_samples(file.path) && file.path != starter::POSTS_PAGE;
             samples.is_some() || !sample
         })
         .map(|file| (file.path.to_owned(), Cow::Borrowed(file.bytes)))
         .collect();
-    files.push(settings_file);
     let mut add = |path: String, text: String| files.push((path, Cow::Owned(text.into_bytes())));
+    add(config::FILE_NAME.to_owned(), settings.to_owned());
     add(".gitignore".to_owned(), ".statac/\n_site/\n".to_owned());
-    add("data/words.yaml".to_owned(), words_file(&answers.languages));
+    if !writes.starter {
+        files.sort_by(|(a, _), (b, _)| a.cmp(b));
+        return files;
+    }
+    let words = words_file(&answers.languages, words::WORDS);
+    add(WORDS_FILE.to_owned(), words);
     for (at, tag) in answers.languages.iter().enumerate() {
         let path = match at {
             0 => "content/index.md".to_owned(),
@@ -1027,7 +1059,11 @@ pub fn files_of_a_new_site(cards: bool) -> Vec<(String, Vec<u8>)> {
     let answers = defaults.answers();
     let settings = settings(&answers, None);
     let day = Date::day_only(2026, 1, 1);
-    files(&answers, &settings, Some(day), Writes::starter(cards))
+    let writes = Writes {
+        starter: true,
+        cards,
+    };
+    files(&answers, &settings, Some(day), writes)
         .into_iter()
         .map(|(path, bytes)| (path, bytes.into_owned()))
         .collect()
@@ -1045,15 +1081,15 @@ pub fn words() -> &'static [(&'static str, &'static str)] {
     words::WORDS
 }
 
-/// `data/words.yaml`: every word the starter reads, in English, under each
-/// of the site's languages.
-fn words_file(languages: &[String]) -> String {
+/// `data/words.yaml`: every one of `words` the starter reads, in English,
+/// under each of the site's languages.
+fn words_file(languages: &[impl AsRef<str>], words: &[(&str, &str)]) -> String {
     let mut text = String::from(
         "# The words the templates and snippets show readers, in each language: see /new/\n",
     );
     for tag in languages {
-        text.push_str(&format!("{}:\n", quoted(tag)));
-        for (name, english) in words::WORDS {
+        text.push_str(&format!("{}:\n", quoted(tag.as_ref())));
+        for (name, english) in words {
             text.push_str(&format!("  {name}: {}\n", quoted(english)));
         }
     }

@@ -13,6 +13,12 @@ fn scratch(label: &str) -> PathBuf {
     path
 }
 
+/// The starter, with no sharing card.
+const STARTER: Writes = Writes {
+    starter: true,
+    cards: false,
+};
+
 fn day() -> Date {
     Date::day_only(2026, 10, 6)
 }
@@ -51,6 +57,7 @@ fn run_with(
         yes,
         update: None,
         cards: false,
+        no_starter: false,
     };
     let mut out = Vec::new();
     let code = run(&options, machine, &mut out, false);
@@ -71,6 +78,7 @@ fn cards(folder: &Path) -> (String, u8) {
         yes: true,
         update: None,
         cards: true,
+        no_starter: false,
     };
     let mut out = Vec::new();
     let code = run(&options, machine, &mut out, false);
@@ -158,7 +166,7 @@ fn listed(folder: &Path) -> Vec<String> {
 #[test]
 fn every_default_is_taken_by_enter() {
     let folder = scratch("my-site");
-    let (said, code) = asked(&folder, "\n\n\n\n");
+    let (said, code) = asked(&folder, "\n\n\n\n\n");
     assert_eq!(code, 0, "{said}");
     let shown = folder.to_string_lossy();
     let key = feed_key(&folder);
@@ -181,6 +189,10 @@ fn every_default_is_taken_by_enter() {
              \x20 2  December 31, 2025\n\
              \x20 3  2025-12-31\n\
              \x20 Or type an example of your own.\n\
+             \x20 [1] > \n\
+             What should the site start with?\n\
+             \x20 1  The starter: templates, a stylesheet and sample pages\n\
+             \x20 2  Nothing: you write the templates yourself\n\
              \x20 [1] > \n\
              Made a new site in `{shown}`: 86 files.\n\
              Times are in Europe/London, as this machine is set.\n\
@@ -533,6 +545,7 @@ fn yes_reads_nothing_of_what_is_there_to_read() {
             yes: true,
             update: None,
             cards: false,
+            no_starter: false,
         };
         let mut out = Vec::new();
         assert_eq!(run(&options, machine, &mut out, false), 0);
@@ -768,8 +781,8 @@ fn no_setting_is_written_at_statacs_own_value() {
 fn two_sites_have_different_feed_keys() {
     let (one, two) = (scratch("key-1"), scratch("key-2"));
     let answers = answers(&["en"], None);
-    make(Maker::New, &one, &answers, None, day(), Writes::Starter).unwrap();
-    make(Maker::New, &two, &answers, None, day(), Writes::Starter).unwrap();
+    make(Maker::New, &one, &answers, None, day(), STARTER).unwrap();
+    make(Maker::New, &two, &answers, None, day(), STARTER).unwrap();
     assert_ne!(feed_key(&one), feed_key(&two));
 }
 
@@ -778,7 +791,7 @@ fn a_folder_that_isnt_there_is_made_with_the_folders_above_it() {
     let outer = scratch("outer");
     let folder = outer.join("sites").join("site-1");
     let answers = answers(&["en"], None);
-    let made = make(Maker::New, &folder, &answers, None, day(), Writes::Starter).unwrap();
+    let made = make(Maker::New, &folder, &answers, None, day(), STARTER).unwrap();
     assert_eq!(made.files, 86);
     assert!(folder.join("statac.yaml").is_file());
 }
@@ -898,7 +911,10 @@ fn a_write_that_fails_part_way_leaves_the_folder_as_found() {
                 &answers,
                 None,
                 day(),
-                Writes::StarterAndCards,
+                Writes {
+                    starter: true,
+                    cards: true,
+                },
                 &mut write,
             )
             .unwrap_err();
@@ -1197,11 +1213,126 @@ fn a_date_typed_as_an_example_of_ones_own_is_taken_at_the_last_answer() {
     assert!(
         said.contains(
             "\x20 Or type an example of your own.\n\
-             \x20 [1] > \nMade a new site in"
+             \x20 [1] > \nWhat should the site start with?\n"
         ),
         "{said}"
     );
     assert!(read(&folder, "statac.yaml").contains("\ndate_format: Wed 31 Dec 2025\n"));
+}
+
+/// What `statac new --no-starter` says making a site in `folder` with
+/// `typed` read as the answers, a person at the terminal where `terminal`
+/// says, with the sharing card where `cards` asks, and the exit code.
+fn without_starter(folder: &Path, typed: &str, terminal: bool, cards: bool) -> (String, u8) {
+    let mut reader = typed.as_bytes();
+    let machine = Machine {
+        input: Some(Input {
+            reader: &mut reader,
+            terminal,
+        }),
+        locale: Locale::default(),
+        timezone: Some("Europe/London".into()),
+        today: day(),
+    };
+    let options = Options {
+        folder: Some(folder.to_path_buf()),
+        yes: false,
+        update: None,
+        cards,
+        no_starter: true,
+    };
+    let mut out = Vec::new();
+    let code = run(&options, machine, &mut out, false);
+    (String::from_utf8(out).unwrap(), code)
+}
+
+#[test]
+fn nothing_asked_for_last_makes_a_site_of_its_settings_alone() {
+    let folder = scratch("nothing");
+    let (said, code) = asked(&folder, "\n\n\n\n2\n");
+    assert_eq!(code, 0, "{said}");
+    let shown = folder.to_string_lossy();
+    let key = feed_key(&folder);
+    assert!(
+        said.ends_with(&format!(
+            "\x20 [1] > \n\
+             What should the site start with?\n\
+             \x20 1  The starter: templates, a stylesheet and sample pages\n\
+             \x20 2  Nothing: you write the templates yourself\n\
+             \x20 [1] > \n\
+             Made a new site in `{shown}`: 2 files.\n\
+             Times are in Europe/London, as this machine is set.\n\
+             \n\
+             statac.yaml:\n\
+             \x20 title: Nothing\n\
+             \x20 language: en\n\
+             \x20 timezone: Europe/London\n\
+             \x20 date_format: 31 December 2025\n\
+             \x20 date_short: 31 Dec 2025\n\
+             \x20 date_day: 31 Dec\n\
+             \x20 date_stamp: 31 Dec 2025, 15:04\n\
+             \x20 feed_key: {key}\n\
+             \n\
+             Next: `cd {shown}`, then add your own templates to `templates/`: see \
+             https://statac.dev/templates/.\n"
+        )),
+        "{said}"
+    );
+    assert_eq!(listed(&folder), [".gitignore", "statac.yaml"]);
+    assert_eq!(read(&folder, ".gitignore"), ".statac/\n_site/\n");
+}
+
+#[test]
+fn no_starter_asks_four_questions_and_makes_the_same_site() {
+    let asked_folder = scratch("nothing-asked");
+    let (said, code) = asked(&asked_folder, "Site 1\nhttps://example.org\nfr\n2\n2\n");
+    assert_eq!(code, 0, "{said}");
+    for (label, terminal) in [("no-starter-shown", true), ("no-starter-piped", false)] {
+        let folder = scratch(label);
+        // A fifth line is never read as an answer.
+        let typed = "Site 1\nhttps://example.org\nfr\n2\n1\n";
+        let (said, code) = without_starter(&folder, typed, terminal, false);
+        assert_eq!(code, 0, "{said}");
+        assert!(!said.contains("start with"), "{said}");
+        assert!(!said.contains("words.yaml"), "{said}");
+        assert_eq!(listed(&folder), listed(&asked_folder), "{label}");
+        assert_eq!(
+            settings_without_key(&folder),
+            settings_without_key(&asked_folder),
+            "{label}"
+        );
+    }
+}
+
+#[test]
+fn an_answer_that_isnt_a_choice_is_told_and_asked_again() {
+    let folder = scratch("not-a-choice");
+    let (said, code) = asked(&folder, "\n\n\n\n3\n2\n");
+    assert_eq!(code, 0, "{said}");
+    assert!(
+        said.contains(
+            "\x20 [1] > \x20 `3` isn't one of the choices. Type 1 or 2.\n\x20 [1] > \nMade"
+        ),
+        "{said}"
+    );
+    assert_eq!(listed(&folder), [".gitignore", "statac.yaml"]);
+
+    let folder = scratch("not-a-choice-piped");
+    let (said, code) = piped(&folder, "\n\n\n\n3\n");
+    assert_eq!(code, 1, "{said}");
+    assert_eq!(said, "`3` isn't one of the choices. Type 1 or 2.\n");
+    assert!(!folder.exists());
+}
+
+#[test]
+fn cards_without_the_starter_writes_the_cards_files_with_the_settings() {
+    let folder = scratch("cards-no-starter");
+    let (said, code) = without_starter(&folder, "", false, true);
+    assert_eq!(code, 0, "{said}");
+    let mut expected = vec![".gitignore", "statac.yaml", "templates", "templates/og"];
+    expected.extend(CARD_FILES);
+    expected.sort_unstable();
+    assert_eq!(listed(&folder), expected);
 }
 
 /// What `statac new` says with `colour` as given, taking every default.
@@ -1221,6 +1352,7 @@ fn asked_with_colour(folder: &Path, colour: bool) -> String {
         yes: false,
         update: None,
         cards: false,
+        no_starter: false,
     };
     let mut out = Vec::new();
     let code = run(&options, machine, &mut out, colour);

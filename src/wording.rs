@@ -1781,6 +1781,10 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 option_name(written)
             ),
             OptionHint::CardsWithUpdate => "Run `statac new --cards` by itself.".into(),
+            OptionHint::NewSiteOnly => format!(
+                "`--update` works on the site that is here, so leave `{}` out.",
+                option_name(written)
+            ),
         }),
         Kind::MissingValue { option, value, .. } => Some(match value {
             Some(value) => format!("Write it as `{option}={value}`."),
@@ -3414,10 +3418,18 @@ pub(crate) const ASK_LANGUAGE: &str = "What language is it written in?";
 pub(crate) const ASK_LANGUAGE_HINT: &str = "For more than one, the main one first, as `en, fr`.";
 pub(crate) const ASK_DATES: &str = "How should dates look?";
 pub(crate) const ASK_DATES_OWN: &str = "Or type an example of your own.";
+pub(crate) const ASK_START: &str = "What should the site start with?";
+pub(crate) const START_STARTER: &str = "The starter: templates, a stylesheet and sample pages";
+pub(crate) const START_NOTHING: &str = "Nothing: you write the templates yourself";
 
-/// One example offered for dates, by its number.
-pub(crate) fn ask_date_choice(number: u8, example: &str) -> String {
-    format!("{number}  {example}")
+/// One answer offered, by its number.
+pub(crate) fn ask_choice(number: u8, offered: &str) -> String {
+    format!("{number}  {offered}")
+}
+
+/// What is told of `written` typed where 1 and 2 are offered.
+pub(crate) fn not_one_or_two(written: &str) -> String {
+    format!("`{written}` isn't one of the choices. Type 1 or 2.")
 }
 
 /// The answer Enter gives, as the line the answer is typed on shows it.
@@ -3477,11 +3489,16 @@ pub(crate) fn translate_words(tag: &str, file: Option<&str>) -> String {
 }
 
 /// The last thing `statac new` says, with the way to the site's folder
-/// where it isn't the folder Statac was run in.
-pub(crate) fn next_steps(folder: Option<&str>) -> String {
+/// where it isn't the folder Statac was run in, for a site with the
+/// `starter` or without it.
+pub(crate) fn next_steps(folder: Option<&str>, starter: bool) -> String {
+    let then = match starter {
+        true => "`statac serve`",
+        false => "add your own templates to `templates/`: see https://statac.dev/templates/",
+    };
     match folder {
-        Some(folder) => format!("Next: `cd {folder}`, then `statac serve`."),
-        None => "Next: `statac serve`.".into(),
+        Some(folder) => format!("Next: `cd {folder}`, then {then}."),
+        None => format!("Next: {then}."),
     }
 }
 
@@ -3529,6 +3546,11 @@ pub(crate) fn added_words(names: &[&str], tag: &str) -> String {
 }
 
 pub(crate) const NO_WORDS_FILE: &str = "No words were added: `data/words.yaml` isn't here.";
+
+/// What `statac new --update` says of a site with nothing of the
+/// starter's in it, in place of every starter file it lacks.
+pub(crate) const NONE_OF_THE_STARTER: &str = "This site has none of the starter's files. To add \
+     them, run `statac new --update --missing`.";
 
 pub(crate) const WORDS_UNREADABLE: &str =
     "No words were added: Statac can't read `data/words.yaml`. Run `statac check` to see why.";

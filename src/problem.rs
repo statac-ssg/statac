@@ -2287,6 +2287,8 @@ pub enum OptionHint {
     NotWithUpdate,
     /// `--cards`, given with `--update`.
     CardsWithUpdate,
+    /// An option for a new site alone, given with `--update`.
+    NewSiteOnly,
 }
 
 /// Something published, or an item a template handled, as a problem

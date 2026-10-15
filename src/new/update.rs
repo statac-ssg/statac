@@ -98,10 +98,11 @@ pub(super) enum Is {
         read: Vec<u8>,
         current: &'static [u8],
     },
-    /// Bytes of the author's own, and what is new since the version
-    /// nearest them: that version and the current one, where they differ
-    /// and the bytes are a copy of that version changed.
+    /// Bytes of the author's own: whether they are a copy of the version
+    /// nearest them changed, and what is new since that version: it and the
+    /// current one, where they differ and the bytes are a copy.
     Yours {
+        copy: bool,
         new: Option<(&'static [u8], &'static [u8])>,
     },
     /// Bytes of the author's own that aren't text, and whether the
@@ -200,10 +201,11 @@ fn told(bytes: Vec<u8>, versions: &Versions) -> Is {
             ));
         }
     }
+    let copy = nearest.is_some_and(|(_, _, copy)| copy);
     let new = nearest
         .filter(|(_, version, copy)| *copy && *version != current)
         .map(|(_, version, _)| (version, current));
-    Is::Yours { new }
+    Is::Yours { copy, new }
 }
 
 /// Whether a file of `own` lines is a version of `theirs` lines changed,
@@ -248,7 +250,7 @@ pub(crate) fn newer_starter(site: &Path, starter: &Starter) -> Option<Problem> {
     }
     let root = std::fs::canonicalize(site).ok()?;
     let files = (survey(&root, starter).iter())
-        .filter(|found| matches!(found.is, Is::Older { .. } | Is::Yours { new: Some(_) }))
+        .filter(|found| matches!(found.is, Is::Older { .. } | Is::Yours { new: Some(_), .. }))
         .count();
     (files > 0).then(|| Problem::nowhere(Kind::NewerStarter { files }))
 }
@@ -332,6 +334,7 @@ pub(super) fn run_holding(
     for found in &surveyed {
         if let Is::Yours {
             new: Some((nearest, current)),
+            ..
         } = &found.is
         {
             say(&wording::yours_with_new(found.path));
@@ -345,10 +348,22 @@ pub(super) fn run_holding(
         }
     }
 
+    // A site holding nothing of the starter's is told so once, in place of
+    // every file it lacks.
+    let without = !surveyed.iter().any(|found| {
+        let asked_apart = starter.is_a_cards(found.path) || starter::is_a_samples(found.path);
+        let starters = matches!(
+            found.is,
+            Is::Newest | Is::Older { .. } | Is::Yours { copy: true, .. }
+        );
+        starters && !asked_apart
+    });
     let (settings, _) = config::read(&root, &mut Sources::default());
     let languages: Vec<&str> = settings.languages().iter().map(|tag| tag.value).collect();
+    let mut words_missing = false;
     match add_words(&root, &languages, starter.words) {
         Words::Nothing => {}
+        Words::NotHere => words_missing = true,
         Words::Told { lines, wrote } => {
             for line in lines {
                 say(&line);
@@ -375,6 +390,23 @@ pub(super) fn run_holding(
         .collect();
     match update.missing {
         true => {
+            if words_missing {
+                let words = super::words_file(&languages, starter.words);
+                match write_missing(&root, WORDS_FILE, words.as_bytes()) {
+                    Ok(()) => {
+                        say(&wording::wrote_file(WORDS_FILE));
+                        updated += 1;
+                    }
+                    Err(error) => {
+                        failed = true;
+                        say(problem(Kind::CantWrite {
+                            path: WORDS_FILE.into(),
+                            reason: system_reason(&error),
+                        })
+                        .trim_end());
+                    }
+                }
+            }
             for (path, current) in &missing {
                 match write_missing(&root, path, current) {
                     Ok(()) => {
@@ -392,11 +424,24 @@ pub(super) fn run_holding(
                 }
             }
         }
-        false if !missing.is_empty() => {
-            let named: Vec<&str> = missing.iter().take(NAMED).map(|(path, _)| *path).collect();
-            say(&wording::not_here(&named, missing.len() - named.len()));
+        false => {
+            // The card's files are asked for apart from the starter, so
+            // a site without it is still told each of theirs it lacks.
+            let told_apart = without && (missing.iter()).any(|(path, _)| !starter.is_a_cards(path));
+            let named: Vec<&str> = (missing.iter())
+                .map(|(path, _)| *path)
+                .filter(|path| !told_apart || starter.is_a_cards(path))
+                .collect();
+            match told_apart {
+                true => say(wording::NONE_OF_THE_STARTER),
+                false if words_missing => say(wording::NO_WORDS_FILE),
+                false => {}
+            }
+            if !named.is_empty() {
+                let more = named.len().saturating_sub(NAMED);
+                say(&wording::not_here(&named[..named.len() - more], more));
+            }
         }
-        false => {}
     }
     for found in &surveyed {
         match &found.is {
@@ -496,6 +541,8 @@ pub(super) fn write_missing(root: &Path, path: &str, bytes: &[u8]) -> std::io::R
 enum Words {
     /// The site names no language, or every block has every word.
     Nothing,
+    /// The site has no `data/words.yaml`.
+    NotHere,
     /// What to say, and whether the file was written.
     Told { lines: Vec<String>, wrote: bool },
     /// The file couldn't be read or written.
@@ -521,7 +568,7 @@ fn add_words(root: &Path, languages: &[&str], words: &[(&str, &str)]) -> Words {
     };
     let bytes = match platform::read_file(root, WORDS_FILE) {
         Ok(Some(bytes)) => bytes,
-        Ok(None) => return told(wording::NO_WORDS_FILE.into()),
+        Ok(None) => return Words::NotHere,
         Err(error) => {
             return match link_on_the_way(root, WORDS_FILE) {
                 Some(link) => told(shown(&wording::left_for_a_link(WORDS_FILE, &link))),

@@ -87,7 +87,7 @@ cd site-1
 statac serve
 ```
 
-`statac new` asks four questions and writes a site you can change;
+`statac new` asks five questions and writes a site you can change;
 `statac serve` builds it, shows it at `http://localhost:3000/` and builds
 it again on every save.
 

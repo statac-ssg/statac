@@ -49,6 +49,7 @@ fn made_with(folder: &Path, typed: &str, cards: bool) {
         yes: false,
         update: None,
         cards,
+        no_starter: false,
     };
     let mut said = Vec::new();
     let code = new::run(&options, machine, &mut said, false);
@@ -729,6 +730,7 @@ fn ran(folder: &Path, cards: bool, update: Option<new::update::Update>) -> Strin
         yes: true,
         update,
         cards,
+        no_starter: false,
     };
     let mut said = Vec::new();
     let code = new::run(&options, machine, &mut said, false);

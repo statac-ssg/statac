@@ -487,9 +487,9 @@ pub fn write<'a>(
         date_format: new::dates_offered(&languages[0])[0].1.clone(),
         languages,
     };
-    let writes = match starter {
-        true => new::Writes::Starter,
-        false => new::Writes::Settings,
+    let writes = new::Writes {
+        starter,
+        cards: false,
     };
     let made = new::make(
         Maker::Import,

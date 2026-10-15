@@ -486,7 +486,7 @@ Usage:
                          Remove the webmention sent from the address, or
                          every one from a sender at or under it, and never
                          keep it again.
-  statac new [folder]    Ask four questions and write a new site from the
+  statac new [folder]    Ask five questions and write a new site from the
                          answers into the folder, which must be empty or
                          not there yet.
   statac new --cards [folder]
@@ -532,9 +532,9 @@ Options:
   --from=<tool>          The tool that made the site statac import reads:
                          jekyll, hugo, zola or eleventy. Without it, told
                          from the site's files.
-  --no-starter           For statac import, leave out the starter's
-                         templates, snippets, stylesheet and pages, for a
-                         site you design yourself.
+  --no-starter           For statac new and statac import, leave out the
+                         starter's templates, snippets, stylesheet and
+                         pages, for a site you design yourself.
   --port=<number>        The port statac serve answers on. Without it,
                          3000, or the next port that is free.
   --watch=<way>          How statac serve learns of a save: native, by
@@ -852,6 +852,7 @@ fn new_takes_update_for_and_missing_alone_and_together() {
             yes: false,
             update,
             cards: false,
+            no_starter: false,
         }))
     };
     let update = |missing| Some(new::update::Update { missing });
@@ -922,6 +923,7 @@ fn new_takes_cards_with_a_folder_or_none_and_never_with_update() {
             yes,
             update: None,
             cards: true,
+            no_starter: false,
         }))
     };
     assert_eq!(parsed(&["new", "--cards"]), new(None, false));
@@ -954,7 +956,7 @@ error  Unknown option: `statac new` takes `--missing` only with `--update`
 }
 
 #[test]
-fn import_takes_no_starter_and_no_other_command_does() {
+fn new_and_import_take_no_starter_and_no_other_command_does() {
     let import = |starter| {
         Ok(Request::Import(import::Options {
             old: PathBuf::from("old-1"),
@@ -980,10 +982,28 @@ fn import_takes_no_starter_and_no_other_command_does() {
         }])
     );
     assert_eq!(
-        refused(&["new", "--no-starter"]),
+        parsed(&["new", "--no-starter", "site-1"]),
+        Ok(Request::New(new::Options {
+            folder: Some(PathBuf::from("site-1")),
+            yes: false,
+            update: None,
+            cards: false,
+            no_starter: true,
+        }))
+    );
+    assert_eq!(
+        refused(&["build", "--no-starter"]),
         "\
-error  Unknown option: `statac new` has no `--no-starter`
-  `--no-starter` is for `statac import`.
+error  Unknown option: `statac build` has no `--no-starter`
+  `--no-starter` is for `statac new` and `statac import`.
+  More: https://statac.dev/e/unknown-option/
+"
+    );
+    assert_eq!(
+        refused(&["new", "--update", "--no-starter"]),
+        "\
+error  Unknown option: `--no-starter`
+  `--update` works on the site that is here, so leave `--no-starter` out.
   More: https://statac.dev/e/unknown-option/
 "
     );

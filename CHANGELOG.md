@@ -6,6 +6,15 @@ What changed in each release of Statac, the newest first.
 
 ### New
 
+- `statac new --no-starter` and `statac import --no-starter` make a site
+  without the starter's templates, snippets, stylesheet and pages, for an
+  author who writes their own: it holds `statac.yaml` and `.gitignore`,
+  besides what an import brings. `statac new` asks this last of its
+  questions, so answers piped in for the other four still answer them.
+  `statac new --update` says once that a site has none of the starter's
+  files, in place of naming each, and `--missing` writes
+  `data/words.yaml` where it isn't there, with the other files the site
+  lacks.
 - A `permalink` written on a folder's own `index.md`, the home page's
   included, publishes the page and its list at that address, as it does
   any other page, and the list's later pages and its feed follow it. It

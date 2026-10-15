@@ -79,7 +79,7 @@ const FLAGS: [(&str, &[&str]); 8] = [
     ("--cards", &["new"]),
     ("--update", &["new"]),
     ("--missing", &["new"]),
-    ("--no-starter", &["import"]),
+    ("--no-starter", &["new", "import"]),
 ];
 
 /// Options any command takes, which take no value.
@@ -141,7 +141,7 @@ const USAGE: [(&str, &str); 11] = [
     ),
     (
         "new",
-        "  statac new [folder]    Ask four questions and write a new site from the
+        "  statac new [folder]    Ask five questions and write a new site from the
                          answers into the folder, which must be empty or
                          not there yet.
 ",
@@ -248,9 +248,9 @@ const OPTION_LINES: [(&str, &str); 15] = [
     ),
     (
         "--no-starter",
-        "  --no-starter           For statac import, leave out the starter's
-                         templates, snippets, stylesheet and pages, for a
-                         site you design yourself.
+        "  --no-starter           For statac new and statac import, leave out the
+                         starter's templates, snippets, stylesheet and
+                         pages, for a site you design yourself.
 ",
     ),
     (
@@ -973,6 +973,12 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             hint: OptionHint::CardsWithUpdate,
         }));
     }
+    if update && no_starter {
+        problems.push(Problem::nowhere(Kind::UnknownOption {
+            written: "--no-starter".into(),
+            hint: OptionHint::NewSiteOnly,
+        }));
+    }
     if known == Some("import") && !old_named {
         problems.push(Problem::nowhere(Kind::MissingFolder));
     }
@@ -1018,6 +1024,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             yes,
             update: update.then_some(new::update::Update { missing }),
             cards,
+            no_starter,
         }),
         Some("import") => Request::Import(import::Options {
             old: old.expect("checked above"),

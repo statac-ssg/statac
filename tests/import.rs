@@ -536,7 +536,9 @@ fn a_site_imported_without_the_starter_has_its_settings_and_what_came_across_alo
         for path in kept.keys() {
             assert!(made.contains_key(path), "{name}: `{path}` wasn't written");
         }
-        for (path, bytes) in &starter {
+        // Every site gets the same `.gitignore`, with the starter or not.
+        assert!(made.contains_key(".gitignore"), "{name}");
+        for (path, bytes) in starter.iter().filter(|(path, _)| path != ".gitignore") {
             assert_ne!(
                 made.get(path),
                 Some(bytes),
