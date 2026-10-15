@@ -2395,6 +2395,9 @@ impl Reader<'_> {
             let kept = (statacs.as_ref())
                 .is_none_or(|statacs| !statacs.contains(':') && statacs.ends_with("{slug}/"));
             let ugly = self.s.ugly.of(plural);
+            // How many pages each of this list's pages listed, by its
+            // address.
+            let mut counts: Vec<(String, usize)> = Vec::new();
             let mut slugs: Vec<(String, Value)> = Vec::new();
             for doc in self.docs.iter().filter(|d| !d.draft) {
                 let prefix = format!("/{}", self.prefix(&doc.language));
@@ -2413,11 +2416,18 @@ impl Reader<'_> {
                     };
                     let path = url::finished(&self.making.path(&path), ugly);
                     let address = format!("{prefix}{path}");
-                    if kept {
-                        match held.iter_mut().find(|(at, _, _)| *at == address) {
-                            Some((_, pages, _)) => *pages += 1,
-                            None => held.push((address.clone(), 1, ugly)),
-                        }
+                    match counts.iter_mut().find(|(at, _)| *at == address) {
+                        Some((_, pages)) => *pages += 1,
+                        None => counts.push((address.clone(), 1)),
+                    }
+                    // A tag's page that isn't where Statac's stands sends
+                    // readers on.
+                    let page = (plural.to_owned(), term.clone(), address.clone());
+                    if plural == "tags"
+                        && (ugly || !kept)
+                        && !self.import.term_pages.contains(&page)
+                    {
+                        self.import.term_pages.push(page);
                     }
                     if !addresses.contains(&address) {
                         addresses.push(address);
@@ -2439,8 +2449,45 @@ impl Reader<'_> {
                     .settings
                     .push((format!("{plural}.slugs"), Value::Fields(slugs)));
             }
+            if kept {
+                held.extend(
+                    counts
+                        .iter()
+                        .map(|(address, pages)| (address.clone(), *pages, ugly)),
+                );
+            }
+            // Hugo put a tag's later pages beneath its page, whatever the
+            // pattern; the old built output, where it is there, shows
+            // which there were, and the shared part sends readers on.
+            let size = self.pager_size();
+            let path = self.pager_path();
+            let later = (counts.iter())
+                .find(|(_, pages)| *pages > size)
+                .filter(|_| self.import.built.is_none())
+                .map(|(address, _)| match address.strip_suffix(".html") {
+                    Some(folder) => format!("{folder}/{path}/2.html"),
+                    None => format!("{address}{path}/2/"),
+                });
             if let (Some(pattern), Some(statacs)) = (pattern, statacs) {
                 match kept {
+                    false if plural == "tags" && self.starter => {
+                        let later = match later {
+                            Some(later) => format!(
+                                " A tag's later pages stood beneath its page, such as {}: \
+                                 nothing answers those. With the old site's built output in {}, \
+                                 `statac import` sends readers on from each it finds there.",
+                                code(&later),
+                                code(&format!("{}/", self.s.publish_dir))
+                            ),
+                            None => String::new(),
+                        };
+                        self.note(format!(
+                            "The settings' `[permalinks]` put the page of each of the `tags` at \
+                             {}, which Statac has no pattern for, so each is at Statac's own \
+                             address, and a page at the old one sends readers on to it.{later}",
+                            code(&pattern)
+                        ))
+                    }
                     false => self.note(format!(
                         "The settings' `[permalinks]` put the page of each of the `{plural}` at \
                          {}, which Statac has no pattern for, so each is at Statac's own \
@@ -2532,7 +2579,7 @@ impl Reader<'_> {
             }
         }
         // The page Hugo made for each name in any other list, and the one
-        // listing them all; and for each tag, where it was a file.
+        // listing them all, which for tags under `uglyURLs` was a file.
         if self.s.terms {
             for doc in self.docs.iter().filter(|d| !d.draft) {
                 let prefix = format!("/{}", self.prefix(&doc.language));
@@ -2544,7 +2591,7 @@ impl Reader<'_> {
                         continue;
                     }
                     let ugly = self.s.ugly.of(plural);
-                    for term in terms {
+                    for term in terms.iter().filter(|_| plural != "tags") {
                         let path = format!("/{plural}/{}/", self.making.made(term));
                         let path = url::finished(&self.making.path(&path), ugly);
                         let page = (plural.clone(), term.clone(), format!("{prefix}{path}"));

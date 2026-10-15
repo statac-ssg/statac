@@ -48,6 +48,13 @@ What changed in each release of Statac, the newest first.
   Statac publishes them, and under `uglyURLs` sends readers on from a
   tag's page, such as `/tags/rust.html`, and from `/tags.html`, where
   Hugo before 0.148 listed every tag. Nothing answered these.
+- `statac import` from Hugo sends readers on to each tag's page from
+  the address `[permalinks]` gave it, where Statac has no pattern to
+  match, as `/tags/rust/posts/`, and from each of its later pages it
+  finds in the old site's built output; without the built output, the
+  report names one of those later pages, which nothing answers. The old
+  address was only listed as one nothing answered, and the later pages
+  were never named.
 - A code block opened with a caption in quotes and no language, as
   `` ```"An example" ``, is no longer warned of as a language Statac has
   no colours for. The block was built rightly; only the warning was

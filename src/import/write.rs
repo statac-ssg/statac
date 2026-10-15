@@ -780,7 +780,13 @@ pub fn write<'a>(
         summary.kept.later = addresses::send_on_to_later_pages(&mut out, today, &placed, home)?;
     }
     if let Some(built) = &built_at {
-        let pages = addresses::send_on_to_list_pages(&mut out, today, built, &other_languages)?;
+        let pages = addresses::send_on_to_list_pages(
+            &mut out,
+            today,
+            built,
+            &other_languages,
+            &sent_on.moved,
+        )?;
         for (address, _) in &pages {
             if !worked_out.iter().any(|(known, _)| known == address) {
                 worked_out.push((address.clone(), String::new()));

@@ -1046,6 +1046,145 @@ fn hugo_tags_published_as_files_are_kept_without_the_built_output() {
     }
 }
 
+/// A tag's page `[permalinks]` put where Statac's isn't sends readers on
+/// from the address the pattern gave it, and the report names a later
+/// page beneath it that nothing answers.
+#[test]
+fn a_hugo_tag_moved_by_permalinks_sends_readers_on() {
+    // The settings, the page written, the old address and the new, and
+    // the later page the report names.
+    for (at, (settings, page, from, to, later)) in [
+        (
+            "[permalinks]\ntags = '/tags/:slug/posts/'\n",
+            "tags-a-posts.md",
+            "/tags/a/posts/",
+            "/tags/a/",
+            Some("`/tags/a/posts/page/2/`"),
+        ),
+        (
+            "uglyURLs = true\n[permalinks]\ntags = '/topics/:slug/'\n",
+            "topics-a.md",
+            "/topics/a.html",
+            "/topics/a/",
+            None,
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let old = scratch(&format!("hugo-moved-tags-old-{at}"));
+        let new = scratch(&format!("hugo-moved-tags-new-{at}"));
+        let out = scratch(&format!("hugo-moved-tags-out-{at}"));
+        fs::create_dir_all(old.join("content/posts")).unwrap();
+        let settings = format!(
+            "baseURL = 'https://example.org/'\ntitle = 'Tags'\n{settings}\
+             [pagination]\npagerSize = 1\n"
+        );
+        fs::write(old.join("hugo.toml"), settings).unwrap();
+        for n in 1..=2 {
+            let post =
+                format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\ntags: [a]\n---\nA post.\n");
+            fs::write(old.join(format!("content/posts/post-{n}.md")), post).unwrap();
+        }
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{at}: {told}");
+        let written = fs::read_to_string(new.join("content").join(page)).unwrap();
+        assert_eq!(
+            written,
+            format!("---\npermalink: {from}\nredirect_to: {to}\n---\n"),
+            "{at}"
+        );
+        assert!(!new.join("content/tags-a.md").exists(), "{at}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(
+            !report.contains("Nothing in the new site answers"),
+            "{at}: {report}"
+        );
+        if let Some(later) = later {
+            assert!(
+                report.contains(&format!(
+                    "so each is at Statac's own address, and a page at the old one sends \
+                     readers on to it. A tag's later pages stood beneath its page, such as \
+                     {later}: nothing answers those."
+                )),
+                "{at}: {report}"
+            );
+        }
+        build_into(&new, &out);
+        let file = match from.strip_suffix('/') {
+            Some(folder) => format!("{}/index.html", &folder[1..]),
+            None => from[1..].to_owned(),
+        };
+        assert!(out.join(&file).is_file(), "{at}: nothing at {file}");
+    }
+}
+
+/// Each later page of a tag's page `[permalinks]` put where Statac's
+/// isn't, in the old built output, sends readers on to the tag's page of
+/// the same number.
+#[test]
+fn later_pages_of_a_moved_hugo_tag_in_the_built_output_send_readers_on() {
+    let old = scratch("hugo-moved-later-old");
+    let new = scratch("hugo-moved-later-new");
+    let out = scratch("hugo-moved-later-out");
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    let settings = "baseURL = 'https://example.org/'\ntitle = 'Built'\n\
+                    [pagination]\npagerSize = 1\n[permalinks]\ntags = '/tags/:slug/posts/'\n";
+    fs::write(old.join("hugo.toml"), settings).unwrap();
+    for n in 1..=2 {
+        let post = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\ntags: [a]\n---\nA post.\n");
+        fs::write(old.join(format!("content/posts/post-{n}.md")), post).unwrap();
+    }
+    for page in [
+        "index.html",
+        "posts/index.html",
+        "posts/post-1/index.html",
+        "posts/post-2/index.html",
+        "tags/index.html",
+        "tags/a/posts/index.html",
+        "tags/a/posts/page/1/index.html",
+        "tags/a/posts/page/2/index.html",
+    ] {
+        let path = old.join("public").join(page);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "<p>A page.</p>\n").unwrap();
+    }
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    // Each old page, the page written for it, and where it sends readers.
+    for (from, page, to) in [
+        ("/tags/a/posts/", "tags-a-posts.md", "/tags/a/"),
+        (
+            "/tags/a/posts/page/1/",
+            "tags-a-posts-page-1.md",
+            "/tags/a/",
+        ),
+        (
+            "/tags/a/posts/page/2/",
+            "tags-a-posts-page-2.md",
+            "/tags/a/page/2/",
+        ),
+    ] {
+        let written = fs::read_to_string(new.join("content").join(page)).unwrap();
+        assert_eq!(
+            written,
+            format!("---\npermalink: {from}\nredirect_to: {to}\n---\n")
+        );
+    }
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(!report.contains("`/tags/a/posts/page/2/`"), "{report}");
+    assert!(!report.contains("A tag's later pages"), "{report}");
+    build_into(&new, &out);
+    for file in [
+        "tags/a/posts/index.html",
+        "tags/a/posts/page/1/index.html",
+        "tags/a/posts/page/2/index.html",
+        "tags/a/page/2/index.html",
+    ] {
+        assert!(out.join(file).is_file(), "nothing at {file}");
+    }
+}
+
 /// Hugo's list held the pages in its folder, those in folders beneath it
 /// that are no lists, and each list beneath it, and each of its later
 /// pages is looked for in the new site.

@@ -396,6 +396,7 @@ pub fn send_on_to_tags(
             continue;
         }
         if let Some(written) = send_on(out, &old, to, language.map(String::as_str))? {
+            sent_on.moved.push((old.clone(), to.clone()));
             sent_on.pages.push((old, written));
         }
     }
@@ -552,7 +553,10 @@ pub struct LaterPages {
 /// written for it. Such a page stands where the new list's page of its
 /// number does, or its first would, by the new site's `later_pages`, or
 /// there as a file: `/posts/page/2.html` for `/posts/page/2/`, and
-/// `/tags/rust/page/1/` beside `/tags/rust/page/2/`. The home page's are
+/// `/tags/rust/page/1/` beside `/tags/rust/page/2/`; or beneath an old
+/// address in `moved` that now sends readers on to the list, each with the
+/// list's address: `/tags/rust/posts/page/2/` beneath
+/// `/tags/rust/posts/`, sent on to `/tags/rust/`. The home page's are
 /// [`send_on_to_later_pages`]'s.
 ///
 /// A list's later pages are no files, nor is a tag's page, so each old
@@ -562,6 +566,7 @@ pub fn send_on_to_list_pages(
     today: Date,
     built: &Path,
     others: &[String],
+    moved: &[(String, String)],
 ) -> Result<Vec<(String, String)>, Problem> {
     let mut sent_on = Vec::new();
     let (read, assets, feeds) = read_site(
@@ -600,12 +605,31 @@ pub fn send_on_to_list_pages(
         let Some(second) = list.later_address(2) else {
             continue;
         };
-        if let Some(above) = second.as_str().strip_suffix("/2/") {
-            pages.insert(crate::platform::folded(&format!("{above}/1/")), first);
+        // The folders the list's pages stood beneath: its own, and each
+        // old one sent on to it, as a folder.
+        let mut folders = vec![first.as_str().to_owned()];
+        for (old, _) in moved.iter().filter(|(_, to)| settled(to) == first.as_str()) {
+            let old = old.strip_suffix(".html").unwrap_or(old);
+            folders.push(format!("{}/", old.trim_end_matches('/')));
         }
-        for number in 2..=list.stretches() {
-            if let Some(later) = list.later_address(number) {
-                pages.insert(crate::platform::folded(later.as_str()), later.clone());
+        for folder in &folders {
+            let beneath = |later: &Address| match *folder == first.as_str() {
+                true => Some(crate::platform::folded(later.as_str())),
+                false => (later.as_str().strip_prefix(first.as_str()))
+                    .map(|rest| crate::platform::folded(&format!("{folder}{rest}"))),
+            };
+            if let Some(above) = beneath(second)
+                .as_deref()
+                .and_then(|a| a.strip_suffix("/2/"))
+            {
+                pages.insert(format!("{above}/1/"), first.clone());
+            }
+            for number in 2..=list.stretches() {
+                if let Some(later) = list.later_address(number)
+                    && let Some(at) = beneath(later)
+                {
+                    pages.insert(at, later.clone());
+                }
             }
         }
     }
@@ -643,6 +667,9 @@ pub fn send_on_to_list_pages(
 pub struct SentOn {
     /// Each old address now answered, with the file written for it.
     pub pages: Vec<(String, String)>,
+    /// Each old address now answered, with the tag's page it sends
+    /// readers on to.
+    pub moved: Vec<(String, String)>,
     /// Each page of the old built output that listed every name of a
     /// list, by its address, with the list's name.
     pub lists: Vec<(String, String)>,
