@@ -14,7 +14,7 @@ Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own p
 
 Hugo made a list of each folder at the top of the writing, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
 
-Hugo made later pages only for the lists whose templates asked for them, which Statac can't tell from the writing; Statac makes them for every list with more posts than a page shows: see https://statac.dev/lists/#pages-of-a-list.
+Hugo made later pages only for the lists whose templates asked for them, which Statac can't tell from the writing; Statac makes them for every list with more posts than a page shows: see https://statac.dev/lists/#pages-of-a-list. The first of a list's later pages, which Hugo sent on to the list, is in the list's `redirect_from`.
 
 Where the old home page had later pages, nothing answers them: Statac's home page shows the newest of each folder itself, so `content/index.md` keeps its own list to one page with `posts_per_page: 0`, and Statac can't tell from the writing which later pages Hugo made.
 
@@ -37,9 +37,9 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## Addresses
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old addresses there: 6 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 8 old addresses there: 8 are published there, or sent on from there.
 
-- Every page lands where the old site published it, with nothing added.
+- 1 page carries `redirect_from`, for the other addresses that led to it.
 
 ## Left for you
 

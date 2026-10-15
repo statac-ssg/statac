@@ -796,54 +796,72 @@ fn build_into(site: &Path, out: &Path) {
     assert_eq!(outcome.problems.iter().filter(stopped).count(), 0);
 }
 
-/// A list Hugo published away from its folder stays at that address, its
-/// later pages beneath it and its feed where Hugo's was, and nothing sends
-/// readers on from it; a list at its folder's address is left there.
+/// A list stays at the address Hugo gave it, its later pages and its feed
+/// where Hugo's were, and its first later page, which Hugo sent on to the
+/// list, sends readers on. Hugo before 0.148 published a list under
+/// `uglyURLs` as a file, which sends readers on too; since, it is a folder.
 #[test]
 fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
-    // The settings, the list's own front matter, the `permalink` written
-    // on it, and the files its page, its second page and its feed are
-    // built at. Hugo's later pages of a list at a file aren't known.
-    type Case<'a> = (&'a str, &'a str, Option<&'a str>, [Option<&'a str>; 3]);
+    // The settings, the list's own front matter, the `permalink` and the
+    // `redirect_from` written on it, and the files its page, its second
+    // page and its feed are built at.
+    type Case<'a> = (
+        &'a str,
+        &'a str,
+        Option<&'a str>,
+        &'a [&'a str],
+        [&'a str; 3],
+    );
     let cases: [Case; 4] = [
         (
             "[permalinks.section]\nposts = '/blog/'\n",
             "",
             Some("/blog/"),
+            &["/blog/page/1/"],
             [
-                Some("blog/index.html"),
-                Some("blog/page/2/index.html"),
-                Some("blog/index.xml"),
+                "blog/index.html",
+                "blog/page/2/index.html",
+                "blog/index.xml",
             ],
         ),
         (
             "uglyURLs = true\n",
             "",
-            Some("/posts.html"),
-            [Some("posts.html"), None, Some("posts/index.xml")],
+            None,
+            &["/posts.html", "/posts/page/1/"],
+            [
+                "posts/index.html",
+                "posts/page/2/index.html",
+                "posts/index.xml",
+            ],
         ),
         (
             "",
             "url: /blog/\n",
             Some("/blog/"),
+            &["/blog/page/1/"],
             [
-                Some("blog/index.html"),
-                Some("blog/page/2/index.html"),
-                Some("blog/index.xml"),
+                "blog/index.html",
+                "blog/page/2/index.html",
+                "blog/index.xml",
             ],
         ),
         (
             "",
             "",
             None,
+            &["/posts/page/1/"],
             [
-                Some("posts/index.html"),
-                Some("posts/page/2/index.html"),
-                Some("posts/index.xml"),
+                "posts/index.html",
+                "posts/page/2/index.html",
+                "posts/index.xml",
             ],
         ),
     ];
-    for (at, (settings, front, permalink, files)) in cases.into_iter().enumerate() {
+    let older = "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
+                 `/posts.html`, which now sends readers on to the list, and its later pages as \
+                 files too, such as `/posts/page/2.html`: nothing answers those.";
+    for (at, (settings, front, permalink, sent, files)) in cases.into_iter().enumerate() {
         let old = scratch(&format!("hugo-list-old-{at}"));
         let new = scratch(&format!("hugo-list-new-{at}"));
         let out = scratch(&format!("hugo-list-out-{at}"));
@@ -867,9 +885,13 @@ fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
                     "{at}: {index}"
                 )
             }
-            None => assert!(!index.contains("permalink:"), "{at}: {index}"),
+            None => assert!(!index.contains("\npermalink:"), "{at}: {index}"),
         }
-        assert!(!index.contains("redirect_from"), "{at}: {index}");
+        let from: String = sent.iter().map(|old| format!("  - {old}\n")).collect();
+        assert!(
+            index.contains(&format!("\nredirect_from:\n{from}")),
+            "{at}: {index}"
+        );
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         assert!(
             !report.contains("Nothing in the new site answers"),
@@ -879,14 +901,59 @@ fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
             !report.contains("Feeds made by templates"),
             "{at}: {report}"
         );
+        assert_eq!(report.contains(older), at == 1, "{at}: {report}");
         build_into(&new, &out);
-        for file in files.into_iter().flatten() {
+        for file in files {
             assert!(out.join(file).is_file(), "{at}: nothing at {file}");
+        }
+        for old in sent {
+            let file = match old.strip_suffix('/') {
+                Some(folder) => format!("{}/index.html", &folder[1..]),
+                None => old[1..].to_owned(),
+            };
+            assert!(out.join(&file).is_file(), "{at}: nothing at {file}");
         }
         if permalink.is_some() {
             assert!(!out.join("posts/index.html").exists(), "{at}");
         }
     }
+}
+
+/// Hugo's list held the pages in its folder, those in folders beneath it
+/// that are no lists, and each list beneath it, and each of its later
+/// pages is looked for in the new site.
+#[test]
+fn hugo_later_pages_count_what_hugo_listed() {
+    let old = scratch("hugo-held-old");
+    let new = scratch("hugo-held-new");
+    fs::create_dir_all(old.join("content/posts/2026")).unwrap();
+    fs::create_dir_all(old.join("content/posts/deep")).unwrap();
+    let settings = "baseURL = 'https://example.org/'\ntitle = 'Held'\n\
+                    [pagination]\npagerSize = 2\n";
+    fs::write(old.join("hugo.toml"), settings).unwrap();
+    let post = |n: u32| format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\n---\nA post.\n");
+    fs::write(old.join("content/posts/post-1.md"), post(1)).unwrap();
+    fs::write(old.join("content/posts/2026/post-2.md"), post(2)).unwrap();
+    fs::write(
+        old.join("content/posts/deep/_index.md"),
+        "---\ntitle: Deep\n---\n",
+    )
+    .unwrap();
+    fs::write(old.join("content/posts/deep/post-3.md"), post(3)).unwrap();
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    let index = fs::read_to_string(new.join("content/posts/index.md")).unwrap();
+    assert!(
+        index.contains("\nredirect_from:\n  - /posts/page/1/\n"),
+        "{index}"
+    );
+    let deep = fs::read_to_string(new.join("content/posts/deep/index.md")).unwrap();
+    assert!(!deep.contains("redirect_from"), "{deep}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(
+        !report.contains("Nothing in the new site answers"),
+        "{report}"
+    );
 }
 
 #[test]

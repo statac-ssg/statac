@@ -1,7 +1,8 @@
 ---
 title: Posts
 pages.layout: post
-feed: /posts/index.xml
-permalink: /posts.html
+feed: index.xml
+redirect_from:
+  - /posts.html
 pages.permalink: /posts/{slug}.html
 ---

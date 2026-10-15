@@ -9,11 +9,11 @@ It was made from `tests/import/hugo-ugly/old` by `statac import`, which changed 
 
 The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
 
-Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own page. Each is now an Atom feed at the same address, written by `templates/feed.xml`, as `feed: index.xml` on each list's page says, and `feed_ids_before` keeps each post's id the address Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. A list published as its own file, `/posts.html`, had its feed in the folder of the same name, so `content/posts/index.md` gives the feed's whole address: `feed: /posts/index.xml`. The feed Hugo made for each tag has no equal.
+Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own page. Each is now an Atom feed at the same address, written by `templates/feed.xml`, as `feed: index.xml` on each list's page says, and `feed_ids_before` keeps each post's id the address Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
 
 `content/posts/index.md` hands `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
 
-Hugo made a list of each folder at the top of the writing, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`. `content/posts/index.md` keeps its list where Hugo published it, with `permalink: /posts.html`.
+Hugo made a list of each folder at the top of the writing, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
 
 The settings written in `statac.yaml`:
 
@@ -33,11 +33,11 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## Addresses
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 9 old addresses there: 9 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 11 old addresses there: 11 are published there, or sent on from there.
 
 - `content/posts/index.md` hands `pages.permalink: /posts/{slug}.html` to every page in `content/posts/`, which puts 3 of them at their old addresses.
-- 2 pages carry a `permalink` of their own, where no pattern fits.
-- 1 page carries `redirect_from`, for the other addresses that led to it.
+- 1 page carries a `permalink` of its own, where no pattern fits.
+- 3 pages carry `redirect_from`, for the other addresses that led to them.
 
 ## Left for you
 

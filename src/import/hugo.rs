@@ -1514,6 +1514,7 @@ impl Reader<'_> {
                     false => format!("{}/", whole.trim_end_matches('/')),
                 }
             });
+            let mut older = None;
             let made: Result<String, String> = match doc.shape {
                 Shape::Single | Shape::Bundle => match self.s.permalinks.page(&section) {
                     Some(pattern) => url::expand(pattern, &pieces, &self.making)
@@ -1524,16 +1525,30 @@ impl Reader<'_> {
                         Ok(url::finished(&path, ugly))
                     }
                 },
-                Shape::List | Shape::Made => match self.s.permalinks.section(&section) {
-                    Some(pattern) if !doc.dir.is_empty() => {
-                        url::expand(pattern, &pieces, &self.making)
-                            .map(|path| url::finished(&path, ugly))
-                    }
-                    _ => Ok(url::finished(
-                        &self.making.path(&doc.dir),
-                        ugly && !doc.dir.is_empty(),
-                    )),
-                },
+                // Hugo before 0.148 published a folder's list under
+                // `uglyURLs` as a file, `/posts.html`; since, as a folder.
+                Shape::List | Shape::Made => {
+                    let path = match self.s.permalinks.section(&section) {
+                        Some(pattern) if !doc.dir.is_empty() => {
+                            url::expand(pattern, &pieces, &self.making)
+                        }
+                        _ => Ok(self.making.path(&doc.dir)),
+                    };
+                    path.map(|path| {
+                        if ugly && !doc.dir.is_empty() && own_url.is_none() && !doc.draft {
+                            let file = format!("{prefix}{}", url::finished(&path, true));
+                            // The old built output, where it is there,
+                            // tells which Hugo built the site.
+                            let built = (self.import.built.as_deref()).map(|built| {
+                                inside::a_file(self.folder, &format!("{built}{file}"))
+                            });
+                            if built != Some(false) {
+                                older = Some(file);
+                            }
+                        }
+                        url::finished(&path, false)
+                    })
+                }
             };
             let hugos = match (&own_url, made) {
                 (Some(url), _) => Some(url.clone()),
@@ -1547,7 +1562,7 @@ impl Reader<'_> {
                 }
             };
             let base = hugos.clone().unwrap_or_default();
-            let mut others = Vec::new();
+            let mut others: Vec<String> = older.into_iter().collect();
             for alias in &doc.aliases {
                 let alias = match alias.starts_with('/') {
                     true => alias.clone(),
@@ -1710,6 +1725,7 @@ impl Reader<'_> {
         self.made_lists();
         self.addresses();
         self.weights();
+        let firsts = self.later_pages();
         self.lists_and_feeds();
         self.terms();
         let wrapping: HashSet<String> = self
@@ -1815,6 +1831,11 @@ impl Reader<'_> {
                 self.import
                     .written
                     .push((format!("content/{}", doc.to), format!("---\n{front}---\n")));
+                if !doc.others.is_empty() {
+                    let from = doc.others.iter().cloned().map(Value::Text).collect();
+                    let from = Field::new("redirect_from", Value::List(from), None);
+                    self.import.words.push((doc.to.clone(), from));
+                }
                 self.import
                     .addresses
                     .extend(doc.address.into_iter().chain(doc.others));
@@ -1935,7 +1956,7 @@ impl Reader<'_> {
                 }
             ));
         }
-        self.paging(posts);
+        self.paging(posts, firsts);
     }
 }
 
@@ -2523,8 +2544,74 @@ impl Reader<'_> {
         }
     }
 
+    /// The addresses Hugo gave the later pages of each list below the home
+    /// page, where its template showed the list a few pages at a time, to
+    /// be looked for in the new site; the first, which Hugo sent on to the
+    /// list, goes among the list's other addresses. Whether any list had
+    /// later pages.
+    fn later_pages(&mut self) -> bool {
+        let lists = self.lists();
+        let size = (self.s.pager_size)
+            .and_then(|size| usize::try_from(size).ok())
+            .filter(|size| *size > 0)
+            .unwrap_or(10);
+        let path = (self.s.pager_path.as_deref())
+            .map(|path| path.trim_matches('/'))
+            .filter(|path| !path.is_empty())
+            .unwrap_or("page")
+            .to_owned();
+        let mut any = false;
+        let mut older: Option<(String, String)> = None;
+        for at in 0..self.docs.len() {
+            let list = &self.docs[at];
+            if !matches!(list.shape, Shape::List | Shape::Made) || list.dir.is_empty() {
+                continue;
+            }
+            // A list Hugo published as a file had no later pages.
+            let Some(address) = list.address.clone().filter(|a| a.ends_with('/')) else {
+                continue;
+            };
+            // Hugo's list holds the pages in its folder and in folders
+            // beneath that are no lists, and each list beneath it.
+            let held = (self.docs.iter())
+                .filter(|d| !d.draft && d.language == list.language)
+                .filter(|d| match d.shape {
+                    Shape::Single | Shape::Bundle => {
+                        self.sections(&d.language, &d.dir, &lists).join("/") == list.dir
+                    }
+                    Shape::List => parent(&d.dir) == list.dir,
+                    Shape::Made => false,
+                })
+                .count();
+            let pages = held.div_ceil(size);
+            if pages < 2 {
+                continue;
+            }
+            any = true;
+            let file = format!("{}.html", address.trim_end_matches('/'));
+            if older.is_none() && list.others.contains(&file) {
+                older = Some((file, format!("{address}{path}/2.html")));
+            }
+            self.docs[at].others.push(format!("{address}{path}/1/"));
+            for n in 2..=pages {
+                self.import.addresses.push(format!("{address}{path}/{n}/"));
+            }
+        }
+        if let Some((list, later)) = older {
+            self.note(format!(
+                "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
+                 {}, which now sends readers on to the list, and its later pages as files too, \
+                 such as {}: nothing answers those.",
+                code(&list),
+                code(&later)
+            ));
+        }
+        any
+    }
+
     /// The settings for a list's later pages, in a site of so many posts.
-    fn paging(&mut self, posts: u64) {
+    /// `firsts` is whether a list's first later page was sent on.
+    fn paging(&mut self, posts: u64, firsts: bool) {
         if let Some(size) = self.s.pager_size
             && size != 10
         {
@@ -2544,13 +2631,19 @@ impl Reader<'_> {
         // Later pages are the layouts' doing, which nothing here reads: a
         // site with more posts than a page shows may have had them.
         let more = posts > self.s.pager_size.unwrap_or(10);
-        if self.s.pager_size.is_some() || self.s.pager_path.is_some() || more {
-            self.note(
+        if self.s.pager_size.is_some() || self.s.pager_path.is_some() || more || firsts {
+            let firsts = match firsts {
+                true => {
+                    " The first of a list's later pages, which Hugo sent on to the list, is in \
+                     the list's `redirect_from`."
+                }
+                false => "",
+            };
+            self.note(format!(
                 "Hugo made later pages only for the lists whose templates asked for them, which \
                  Statac can't tell from the writing; Statac makes them for every list with more \
-                 posts than a page shows: see https://statac.dev/lists/#pages-of-a-list."
-                    .to_owned(),
-            );
+                 posts than a page shows: see https://statac.dev/lists/#pages-of-a-list.{firsts}"
+            ));
         }
         if self.s.pager_size.is_some() || more {
             self.note(format!(

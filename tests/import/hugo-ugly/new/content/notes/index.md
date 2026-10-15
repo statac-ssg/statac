@@ -1,5 +1,6 @@
 ---
 title: Notes
-permalink: /notes.html
+redirect_from:
+  - /notes.html
 ---
-A list published as its own file, notes.html.
+A folder's own page.

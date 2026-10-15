@@ -22,8 +22,8 @@ What changed in each release of Statac, the newest first.
   handed down from a folder above still leaves a folder's own page where
   it is, and the folder's other files stay at the folder's address.
 - `statac import` keeps a list at the address the old site gave it,
-  where that isn't its folder's, as with Hugo's `uglyURLs`, a section's
-  `url` or a pattern in `permalinks.section`, or a Zola folder whose name
+  where that isn't its folder's, as with a Hugo section's `url` or a
+  pattern in `permalinks.section`, or a Zola folder whose name
   Statac spells otherwise: the folder's `index.md` carries that address
   as its `permalink`, and the list's later pages and its feed follow it.
   The list stood at its folder's address, sending readers on from the old
@@ -32,6 +32,14 @@ What changed in each release of Statac, the newest first.
 
 ### Fixed
 
+- `statac import` from Hugo looks for each list's later pages at the
+  addresses Hugo gave them, and sends readers on from the first,
+  `/posts/page/1/`, to the list. A list under `uglyURLs` stays at its
+  folder's address, where Hugo has published it since version 0.148,
+  and sends readers on from `/posts.html`, where earlier versions did,
+  unless the old site's built output has no such file; the report says
+  that nothing answers those versions' later pages, `/posts/page/2.html`.
+  Neither kind of later page was looked for or named.
 - A code block opened with a caption in quotes and no language, as
   `` ```"An example" ``, is no longer warned of as a language Statac has
   no colours for. The block was built rightly; only the warning was
