@@ -44,11 +44,45 @@ use crate::templates::{Own, Renderer};
 use resolve::{Arrival, Leads};
 use scan::{Found, scan};
 
-/// What a page's writing links to, and what it hands its snippet calls.
+/// What a page's writing links to, what it hands its snippet calls, and
+/// what the snippets it calls write.
 #[derive(Default, Debug)]
 pub struct Writing {
     pub written: Vec<Linked>,
     pub handed: Vec<Linked>,
+    pub snipped: Vec<Snipped>,
+}
+
+/// A link a snippet wrote in a tag of its own text: its address as a
+/// browser follows it, and the snippet and where in it the attribute's
+/// value starts.
+#[derive(Clone, Debug)]
+pub struct Snipped {
+    pub address: String,
+    pub template: TemplateId,
+    pub at: usize,
+}
+
+/// Each link in `html`, what a snippet wrote, in a tag of a template's own
+/// text. `written_at` gives the template the byte at an offset of `html`
+/// is the own text of, and where in it; none for a byte of a value's.
+pub fn snipped(
+    html: &str,
+    written_at: impl Fn(usize) -> Option<(TemplateId, usize)>,
+) -> Vec<Snipped> {
+    let scanned = scan(html);
+    (scanned.links.iter())
+        .filter_map(|link| {
+            // What opens the value, a quote or the `=`, is the template's
+            // own where the template wrote the attribute.
+            let (template, opens) = written_at(link.at.checked_sub(1)?)?;
+            Some(Snipped {
+                address: link.address(),
+                template,
+                at: opens + 1,
+            })
+        })
+        .collect()
 }
 
 /// One built page, as the check reads it.
@@ -63,6 +97,8 @@ pub struct Page<'a> {
     pub cards: Vec<String>,
     /// Where its HTML is the own text of the templates it is built with.
     pub own: &'a Own,
+    /// What the snippets its templates call write.
+    pub snipped: &'a [Snipped],
 }
 
 /// What a built page's links came to, found as it was built.
@@ -158,6 +194,16 @@ enum Blame {
     Template(Box<Found>, Option<(TemplateId, usize)>),
 }
 
+/// Another page's writing shown on the page being checked, with each
+/// address it links to and each its snippets wrote, as spelled from the
+/// top of the site where that differs, in order.
+struct Shown<'a> {
+    page: PageId,
+    writing: &'a Writing,
+    linked: Vec<Option<String>>,
+    snipped: Vec<Option<String>>,
+}
+
 impl Site {
     /// Follows every link on `page`, built as `html`: what lands nowhere
     /// now, and what waits to be held to another page's ids.
@@ -211,21 +257,33 @@ impl Site {
         }
         // Shown here, the writing's addresses read from its own page are
         // spelled from the top of the site.
-        let shown: Vec<(PageId, &Writing, Vec<Option<String>>)> = shown
+        let shown: Vec<Shown> = shown
             .into_iter()
             .filter_map(|other| {
                 let writing = renderer.writing(other)?;
                 let home = format!("{}{}", self.base(), site.pages.get(other).address.as_str());
-                let moved = writing
-                    .written
-                    .iter()
+                let moved = |address: &str| {
+                    crate::elsewhere::address(address, &home).map(|moved| address::decoded(&moved))
+                };
+                let linked = (writing.written.iter())
                     .chain(&writing.handed)
-                    .map(|w| crate::elsewhere::address(&w.address, &home))
-                    .map(|moved| moved.map(|moved| address::decoded(&moved)))
+                    .map(|w| moved(&w.address))
                     .collect();
-                Some((other, writing, moved))
+                let snipped = writing.snipped.iter().map(|s| moved(&s.address)).collect();
+                Some(Shown {
+                    page: other,
+                    writing,
+                    linked,
+                    snipped,
+                })
             })
             .collect();
+        // What the snippets built for the page and for its writing wrote,
+        // and which of those links on the page have been placed.
+        let snipped: Vec<&Snipped> = (page.snipped.iter())
+            .chain(own.iter().flat_map(|own| &own.snipped))
+            .collect();
+        let mut placed_at: HashSet<usize> = HashSet::new();
         for link in &scanned.links {
             let written = link.address();
             if let Some((path, file)) = self.watched(&written, &from) {
@@ -247,14 +305,15 @@ impl Site {
                 self.follow(&written, &from, blame, &mut checked);
                 continue;
             }
-            let other = shown.iter().find_map(|(other, writing, moved)| {
+            let other = shown.iter().find_map(|shown| {
+                let writing = shown.writing;
                 let (w, _) = writing
                     .written
                     .iter()
                     .chain(&writing.handed)
-                    .zip(moved)
+                    .zip(&shown.linked)
                     .find(|(w, moved)| same(w) || moved.as_deref() == Some(key.as_str()))?;
-                Some((*other, w))
+                Some((shown.page, w))
             });
             if let Some((other, w)) = other {
                 let here = self.leads(&written, &from);
@@ -273,11 +332,47 @@ impl Site {
             }
             // What opens the value, a quote or the `=`, is the template's
             // own where the template wrote the attribute.
-            let placed = link
+            let mut placed = link
                 .at
                 .checked_sub(1)
                 .and_then(|opens| renderer.written_at(page.own, opens))
                 .map(|(template, opens)| (template, opens + 1));
+            // Else a snippet wrote it in its own text: each of a snippet's
+            // links with the same address is taken once, in order.
+            if placed.is_none() {
+                let same: Vec<usize> = (0..snipped.len())
+                    .filter(|&at| address::decoded(&snipped[at].address) == key)
+                    .collect();
+                let at = (same.iter())
+                    .find(|at| !placed_at.contains(at))
+                    .or(same.first());
+                if let Some(&at) = at {
+                    placed_at.insert(at);
+                    placed = Some((snipped[at].template, snipped[at].at));
+                }
+            }
+            // Or a snippet in another page's writing shown here, which is
+            // told on that page where it leads the same from there.
+            if placed.is_none() {
+                let other = shown.iter().find_map(|shown| {
+                    let snipped = shown.writing.snipped.iter().zip(&shown.snipped);
+                    let (s, _) = snipped.into_iter().find(|(s, moved)| {
+                        address::decoded(&s.address) == key
+                            || moved.as_deref() == Some(key.as_str())
+                    })?;
+                    Some((shown.page, s))
+                });
+                if let Some((other, s)) = other {
+                    let there = site.pages.get(other);
+                    let at_home = format!("{}{}", self.base(), there.address.as_str());
+                    if there.lands()
+                        && self.leads(&written, &at_home) == self.leads(&written, &from)
+                    {
+                        continue;
+                    }
+                    placed = Some((s.template, s.at));
+                }
+            }
             let blame = Blame::Template(Box::new(link.clone()), placed);
             self.follow(&written, &from, blame, &mut checked);
         }

@@ -63,6 +63,10 @@ What changed in each release of Statac, the newest first.
   is told at the line of the template that wrote it wherever the line
   is. It was told at the page alone, or at another line, where the line
   was inside a loop, opened a block or came after the page's writing.
+- A broken link a snippet writes from a value is told at the snippet's
+  line, whether the writing calls the snippet or a template does. It was
+  told where the template shows the page's writing, or at another line
+  of the snippet.
 
 ## 0.3.0 - 2026-10-12
 

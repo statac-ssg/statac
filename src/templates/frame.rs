@@ -87,6 +87,8 @@ pub(super) struct Frame {
     pub shows_writing: bool,
     /// How many pages of lists of the whole site what is built reached.
     pub walked: u64,
+    /// The links the snippets built for it wrote in their own text.
+    pub snipped: Vec<crate::links::Snipped>,
 }
 
 /// What a frame is the build of.
@@ -162,6 +164,7 @@ impl Frame {
             spent: false,
             shows_writing: false,
             walked: 0,
+            snipped: Vec::new(),
         }
     }
 

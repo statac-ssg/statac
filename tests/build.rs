@@ -2404,6 +2404,85 @@ warning  Broken link: nothing is published at `/post-5/`
     );
 }
 
+/// A link a snippet writes from a value is told at the snippet's line,
+/// whether the snippet is called in the writing or by a template, and told
+/// once where that writing is also shown on another page.
+#[test]
+fn a_link_a_snippet_writes_from_a_value_is_told_at_the_snippets_line() {
+    let site = Site::new("snippet-written-from-a-value");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write(
+        "templates/page.html",
+        "<title>{{ page.title }}</title>\n\
+         {{ page.content }}\n\
+         {{ footer() }}\n",
+    );
+    site.write(
+        "templates/shows.html",
+        "<title>{{ page.title }}</title>\n\
+         {% for p in site.pages %}{% if p.title == \"Post 1\" %}{{ p.content }}{% endif %}\
+         {% endfor %}\n",
+    );
+    site.write(
+        "snippets/links.html",
+        "{% for address in [\"/post-1/\", \"/post-2/\", \"/post-3/\"] %}\n\
+         <a href=\"{{ address }}\">{{ address }}</a>\n\
+         {% endfor %}\n\
+         <a href=\"{{ \"part/\" }}\">Part</a>\n",
+    );
+    site.write(
+        "snippets/footer.html",
+        "<footer>\n<a href=\"{{ \"/post-4/\" }}\">Four</a>\n</footer>\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n@links()\n",
+    );
+    site.write(
+        "content/shows.md",
+        "---\ntitle: Shows\nlayout: shows\n---\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/post-4/`
+  snippets/footer.html, line 2
+   2 │ <a href=\"{{ \"/post-4/\" }}\">Four</a>
+     │          ^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-2/`
+  snippets/links.html, line 2
+   2 │ <a href=\"{{ address }}\">{{ address }}</a>
+     │          ^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-3/`
+  snippets/links.html, line 2
+   2 │ <a href=\"{{ address }}\">{{ address }}</a>
+     │          ^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `part/`
+  snippets/links.html, line 4
+   4 │ <a href=\"{{ \"part/\" }}\">Part</a>
+     │          ^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+4 warnings: 4 broken-link.
+"
+    );
+}
+
 /// On a site published under a path, an address written with `@url(...)`
 /// or a template's `url(...)` leads under the path and is offered back
 /// as another of the same; a plain link from the top of the domain is

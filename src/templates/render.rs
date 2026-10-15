@@ -297,6 +297,8 @@ pub struct Rendered {
     pub walked: u64,
     /// Where its HTML is the own text of the templates it is built with.
     pub own: Own,
+    /// The links the snippets its templates call wrote in their own text.
+    pub snipped: Vec<crate::links::Snipped>,
 }
 
 impl Rendered {
@@ -332,6 +334,7 @@ impl Rendered {
             coloured: frame.coloured,
             walked: frame.walked,
             own: Own::default(),
+            snipped: frame.snipped,
         }
     }
 }
@@ -1057,6 +1060,7 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
         }
     };
     let mut frame = frame::pop();
+    links.snipped = std::mem::take(&mut frame.snipped);
     problems.append(&mut frame.problems);
     let wordless = wordless.into_iter().map(Problem::nowhere);
     problems.extend(wordless.map(|problem| met_building(problem, &frame)));
@@ -1871,7 +1875,26 @@ fn build_snippet(
     let built = templates
         .env
         .get_template(name)
-        .and_then(|template| super::indent::render(&template, context));
+        .and_then(|template| {
+            let source = template.source();
+            let (start, len) = (source.as_ptr() as usize, source.len());
+            let built = super::indent::render_placed(&template, context)?;
+            Ok((built, start, len))
+        })
+        .map(|((captured, text, own), start, len)| {
+            // The snippet's own text is nearly always its file's; another
+            // file's is one it extends.
+            let snipped = crate::links::snipped(&text, |at| {
+                let from = own.written_from(at)?;
+                let (file, offset) = match from.checked_sub(start).filter(|at| *at < len) {
+                    Some(offset) => (snippet.file, offset),
+                    None => templates.holds(from)?,
+                };
+                Some((Templates::id(file), offset))
+            });
+            frame::with(|frame| frame.snipped.extend(snipped));
+            (captured, text)
+        });
     frame::with(|frame| frame.snippets.pop());
     let built = frame::end(snippet.file, built)?;
     built.map_err(|inner| {
