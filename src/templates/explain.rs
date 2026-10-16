@@ -24,7 +24,7 @@ use super::values::PageValue;
 use crate::problem::{
     ArgumentFault, Instead, Kind, Lack, Named, Problem, Relation, Stopped, Unsupported,
 };
-use crate::source::{Place, SourceId, Span};
+use crate::source::{Place, SourceId, Span, line_starts};
 
 /// The words of the error a snippet's failure is wrapped in, so the
 /// engine places the wrapping at the call.
@@ -51,8 +51,15 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
     let located = |e: &Error| -> Option<(SourceId, Range<usize>)> {
         let at = *shared.templates.by_name.get(e.name()?)?;
         let source = shared.templates.files[at].source;
-        let len = shared.sources.text(source).len();
-        let range = e.range()?;
+        let text = shared.sources.text(source);
+        let len = text.len();
+        let range = match e.range() {
+            Some(range) => range,
+            // Running out of steps keeps to the head of the layout below,
+            // so it is told alike for every page.
+            None if e.kind() != ErrorKind::OutOfFuel => on_line(e, text)?,
+            None => return None,
+        };
         let start = range.start.min(len);
         Some((source, start..range.end.clamp(start, len)))
     };
@@ -216,6 +223,66 @@ fn engine(
         Some(path.to_string_lossy().replace('\\', "/"))
     };
     read_stopped(error, site, failed, &file_of)
+}
+
+/// Where on the line the engine gives, without a span, it stopped: the
+/// `self.name()` that names no block, or the tag of a block that is
+/// required or of an `autoescape`, inside its `{%` and `%}` as the engine
+/// places a statement.
+fn on_line(error: &Error, text: &str) -> Option<Range<usize>> {
+    let line = error.line()?;
+    let start = *line_starts(text).get(line.checked_sub(1)?)?;
+    let end = text[start..].find('\n').map_or(text.len(), |at| start + at);
+    let detail = error.detail().unwrap_or_default();
+    let block = detail.split('\'').nth(1).unwrap_or_default();
+    match error.kind() {
+        ErrorKind::UnknownBlock => self_call(error.name()?, text, line, block),
+        _ if detail.starts_with("Required block") => tag(text, start..end, |words| {
+            words == ["block", block, "required"]
+        }),
+        _ if detail == "invalid value to autoescape tag" => tag(text, start..end, |words| {
+            words.first() == Some(&"autoescape")
+        }),
+        _ => None,
+    }
+}
+
+/// `self.<block>()` on line `line`, the whole call.
+fn self_call(name: &str, text: &str, line: usize, block: &str) -> Option<Range<usize>> {
+    let ast = parse_template(name, text).ok()?;
+    let mut found = None;
+    visit_exprs(&ast, &mut |expr| {
+        if let Expr::Call(call) = expr
+            && let Expr::GetAttr(attr) = &call.expr
+            && let Expr::Var(var) = &attr.expr
+            && var.id == "self"
+            && attr.name == block
+            && expr.span().start_line as usize == line
+            && found.is_none()
+        {
+            let span = full_span(expr, text);
+            found = Some(span.start_offset as usize..span.end_offset as usize);
+        }
+    });
+    found
+}
+
+/// The inside of the first `{% %}` tag within `within` whose words `is`
+/// takes, without the marks that trim whitespace.
+fn tag(text: &str, within: Range<usize>, is: impl Fn(&[&str]) -> bool) -> Option<Range<usize>> {
+    let mut from = within.start;
+    while let Some(open) = text[from..within.end].find("{%") {
+        let inside = from + open + 2;
+        let close = inside + text[inside..within.end].find("%}")?;
+        let written = text[inside..close].trim_start_matches(['-', '+']);
+        let written = written.trim_end_matches(['-', '+']).trim();
+        if is(&written.split_whitespace().collect::<Vec<_>>()) {
+            let at = inside + text[inside..close].find(written)?;
+            return Some(at..at + written.len());
+        }
+        from = close + 2;
+    }
+    None
 }
 
 /// The whole of the expression the engine stopped at: it places a lookup

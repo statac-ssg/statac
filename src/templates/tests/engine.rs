@@ -1160,6 +1160,34 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
     check(&cases);
 }
 
+#[test]
+fn what_stops_the_engine_where_it_gives_only_a_line_is_told_at_that_line() {
+    let cases = [
+        case(
+            "<p>\n{% autoescape \"x\" %}{{ page.title }}{% endautoescape %}\n</p>",
+            "Template stopped: invalid value to autoescape tag",
+            None,
+            2,
+            "autoescape \"x\"",
+        ),
+        case(
+            "<main>\n  {% block main required %}{% endblock %}\n</main>",
+            "Template stopped: required block 'main' not found",
+            None,
+            2,
+            "block main required",
+        ),
+        case(
+            "<p>\n  <b>{{ page.title }}</b> {{ self.nosuch() }}\n</p>",
+            "Template stopped: block 'nosuch' not found",
+            None,
+            2,
+            "self.nosuch()",
+        ),
+    ];
+    check(&cases);
+}
+
 fn check(cases: &[Case]) {
     for case in cases {
         let (kind, line, at) = told(case.layout);
