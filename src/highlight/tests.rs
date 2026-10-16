@@ -242,6 +242,20 @@ fn a_grammar_colours_the_languages_it_includes() {
 }
 
 #[test]
+fn code_after_a_haxe_string_in_single_quotes_is_coloured() {
+    let code = "trace('a $b');";
+    let html = Highlighter::new("ocean").unwrap().html("haxe", code);
+    assert!(
+        html.contains("<span class=\"hl-variable\">b</span>"),
+        "{html}"
+    );
+    assert!(
+        html.ends_with("<span class=\"hl-punctuation\">);</span>"),
+        "{html}"
+    );
+}
+
+#[test]
 fn code_of_no_grammar_carried_is_shown_as_it_is() {
     assert_eq!(coloured("no such language", "a < b"), "a &lt; b");
 }
