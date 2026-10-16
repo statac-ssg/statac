@@ -1829,6 +1829,36 @@ fn the_code_stylesheet_and_the_feeds_are_named_by_their_addresses() {
 }
 
 #[test]
+fn a_feed_carries_code_uncoloured_where_its_page_colours_it() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+        ),
+        ("content/index.md", "# Home\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-10-01\n---\n```rust\nlet a = 1 < 2;\n```\n",
+        ),
+        BASE,
+        PAGE,
+        ("templates/home.html", ""),
+        (
+            "templates/feed.xml",
+            "{% for post in posts %}{{ post.content }}{% endfor %}|{{ 'fn f() {}' | highlight('rust') }}",
+        ),
+    ]);
+    assert!(built.html("post-1.md").contains("<span class=\"hl-"));
+    let feed = built.renderer.render_feed(&built.renderer.feeds()[0]);
+    assert!(feed.problems.is_empty(), "{:?}", feed.problems);
+    assert!(feed.coloured.is_empty());
+    assert_eq!(
+        feed.html.unwrap(),
+        "<pre class=\"code\"><code class=\"language-rust\">let a = 1 &lt; 2;</code></pre>|fn f() {}"
+    );
+}
+
+#[test]
 fn code_is_coloured_in_the_sites_style_and_a_language_it_lacks_is_told_at_its_word() {
     let built = site(&[
         (

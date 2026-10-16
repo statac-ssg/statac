@@ -268,11 +268,14 @@ pub(super) struct Body {
     after_boxes: Mutex<Vec<(usize, String)>>,
     /// The writing as shown on other pages, made when first shown there.
     elsewhere: OnceLock<Elsewhere>,
+    /// The writing as a feed shows it, made when first shown there.
+    in_feeds: OnceLock<Elsewhere>,
 }
 
-/// A page's writing as shown on other pages: its HTML and its excerpt, each
-/// with the addresses read from the page spelled from the top of the site;
-/// none where that changes nothing.
+/// A page's writing as shown other than on its own page, its HTML and its
+/// excerpt: with the addresses read from the page spelled from the top of
+/// the site, or in a feed without colour too; none where that changes
+/// nothing.
 #[derive(Debug)]
 struct Elsewhere {
     html: Option<String>,
@@ -1073,6 +1076,7 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
         coloured: frame.coloured,
         writing: links,
         elsewhere: OnceLock::new(),
+        in_feeds: OnceLock::new(),
         steps: frame.steps,
         spent: frame.spent,
         search_boxes: frame.search_boxes - boxes_before,
@@ -1291,6 +1295,10 @@ pub(super) fn code_html(
     let Language::Known(name) = language else {
         return highlight::plain(text);
     };
+    // A feed reader loads no stylesheet to colour it with.
+    if frame::with(|frame| frame.feed.is_some()).unwrap_or(false) {
+        return highlight::plain(text);
+    }
     if shared.highlighter.is_none() {
         frame::read(Key::Setting(shared.name_id("code_style")));
         return highlight::plain(text);
@@ -1368,9 +1376,13 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         Ok(body) => body,
         Err(error) => return Some(Value::from(error)),
     };
+    // A feed reader loads no stylesheet, so a feed carries code uncoloured.
+    let in_feed = frame::with(|frame| frame.feed.is_some()).unwrap_or(false);
     let own = match part {
         Part::Content => {
-            frame::with(|frame| frame.coloured.extend(&body.coloured));
+            if !in_feed {
+                frame::with(|frame| frame.coloured.extend(&body.coloured));
+            }
             &body.written.html
         }
         Part::Excerpt => body.written.excerpt.as_ref()?,
@@ -1380,9 +1392,13 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         let counted = matches!(part, Part::Content)
             && body.search_boxes > 0
             && making == Some(frame::Making::Output);
-        return Some(Value::from_safe_string(match counted {
+        let html = match counted {
             true => among_the_pages_boxes(shared, page, &body),
             false => own.clone(),
+        };
+        return Some(Value::from_safe_string(match in_feed {
+            true => highlight::uncoloured(&html).into_owned(),
+            false => html,
         }));
     }
     frame::read(Key::Field(page, shared.name_id("url")));
@@ -1401,8 +1417,30 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         Part::Content => &elsewhere.html,
         Part::Excerpt => &elsewhere.excerpt,
     };
+    let shown = moved.as_ref().unwrap_or(own);
+    if !in_feed {
+        return Some(Value::from_safe_string(shown.clone()));
+    }
+    let in_feeds = body.in_feeds.get_or_init(|| {
+        let uncoloured = |html: Option<&String>, own: Option<&String>| {
+            let html = html.or(own)?;
+            match highlight::uncoloured(html) {
+                std::borrow::Cow::Owned(html) => Some(html),
+                std::borrow::Cow::Borrowed(_) => None,
+            }
+        };
+        let written = &body.written;
+        Elsewhere {
+            html: uncoloured(elsewhere.html.as_ref(), Some(&written.html)),
+            excerpt: uncoloured(elsewhere.excerpt.as_ref(), written.excerpt.as_ref()),
+        }
+    });
+    let uncoloured = match part {
+        Part::Content => &in_feeds.html,
+        Part::Excerpt => &in_feeds.excerpt,
+    };
     Some(Value::from_safe_string(
-        moved.as_ref().unwrap_or(own).clone(),
+        uncoloured.as_ref().unwrap_or(shown).clone(),
     ))
 }
 

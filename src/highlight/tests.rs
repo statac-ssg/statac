@@ -399,3 +399,22 @@ fn a_colour_both_looks_share_is_written_once() {
     assert_eq!(Colour::from_hex("#12345"), None);
     assert_eq!(Colour::from_hex("123456"), None);
 }
+
+#[test]
+fn uncoloured_code_is_its_text_alone() {
+    let html = Highlighter::new("ocean").unwrap().html("rust", RUST);
+    let page = format!("<p>Before</p><pre><code>{html}</code></pre>");
+    assert_eq!(
+        uncoloured(&page),
+        format!("<p>Before</p><pre><code>{}</code></pre>", plain(RUST))
+    );
+    // Only a span as the highlighter writes it is taken out.
+    for kept in [
+        "<span class=\"hl-other\">a</span>",
+        "<span class=\"hl-keyword\"><b>a</b></span>",
+        "<span class=\"hl-keyword extra\">a</span>",
+        "<span class=\"hl-keyword\">a",
+    ] {
+        assert!(matches!(uncoloured(kept), Cow::Borrowed(_)), "{kept}");
+    }
+}
