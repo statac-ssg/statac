@@ -705,7 +705,7 @@ impl<'a> Checker<'a> {
                     };
                     self.imported.insert(bound.to_owned());
                     if let Expr::Var(v) = name {
-                        calls.push(self.replacement(v.id));
+                        calls.extend(self.replacement(v.id));
                     }
                 }
                 self.refuse("from", calls, stmt_span(stmt));
@@ -803,28 +803,28 @@ impl<'a> Checker<'a> {
             Expr::Const(c) => c
                 .value
                 .as_str()
-                .map(|file| {
+                .and_then(|file| {
                     let stem = file
                         .trim_start_matches("snippets/")
                         .trim_end_matches(".html");
-                    vec![self.replacement(stem)]
+                    self.replacement(stem)
                 })
-                .unwrap_or_default(),
+                .into_iter()
+                .collect(),
             _ => Vec::new(),
         };
         self.refuse("include", calls, span);
     }
 
     /// The call that does what including or importing `name` did, handed
-    /// the names the snippet reads.
-    fn replacement(&self, name: &str) -> String {
-        let params = self
-            .schema
-            .snippets
-            .get(name)
-            .map(|s| s.call_arguments())
-            .unwrap_or_default();
-        format!("{{{{ {name}({params}) }}}}")
+    /// the names the snippet reads; none where the snippet can't be read.
+    fn replacement(&self, name: &str) -> Option<String> {
+        let params = match self.schema.snippets.get(name) {
+            Some(snippet) if !snippet.readable => return None,
+            Some(snippet) => snippet.call_arguments(),
+            None => String::new(),
+        };
+        Some(format!("{{{{ {name}({params}) }}}}"))
     }
 
     /// Every `module.name(...)` call after an `import ... as module`,
@@ -1188,6 +1188,9 @@ impl<'a> Checker<'a> {
         snippet: &Snippet,
         infos: &[Info],
     ) {
+        if !snippet.readable {
+            return;
+        }
         let params = &snippet.params;
         let mut handed: Vec<Option<Ty>> = vec![None; params.len()];
         let mut unnamed: Vec<(&Expr<'_>, &Info)> = Vec::new();

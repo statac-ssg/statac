@@ -1297,6 +1297,68 @@ fn a_template_that_cant_be_read_is_told_where_it_stops() {
 }
 
 #[test]
+fn a_template_that_cant_be_read_is_told_once_and_not_at_what_uses_it() {
+    let broken = "{% if page.title %}<p>";
+    let page = "{% extends \"base\" %}{% block main %}{{ page.content }}{% endblock %}{% block aside %}{% endblock %}";
+    let calls = "{% extends \"base\" %}{% block main %}{{ page.content }}{{ card(pots=1) }}{{ card(1, 2, 3) }}{% endblock %}";
+    let plain = "---\ntitle: Post 1\n---\n";
+    let calling = "---\ntitle: Post 1\n---\n@card(pots=1)\n\n@card()\nwrapped\n@end\n";
+    let cases: [(&[(&str, &str)], &str); 4] = [
+        (
+            &[
+                ("templates/base.html", broken),
+                ("templates/page.html", page),
+                ("content/post-1.md", plain),
+            ],
+            "templates/base.html",
+        ),
+        (
+            &[
+                ("templates/base.html", broken),
+                (
+                    "templates/middle.html",
+                    "{% extends \"base\" %}{% block main %}{% endblock %}",
+                ),
+                ("templates/page.html", &page.replace("base", "middle")),
+                ("content/post-1.md", plain),
+            ],
+            "templates/base.html",
+        ),
+        (
+            &[
+                BASE,
+                ("templates/page.html", calls),
+                (
+                    "snippets/card.html",
+                    &format!("{{# takes photo #}}{{{{ photo }}}}{broken}"),
+                ),
+                ("content/post-1.md", calling),
+            ],
+            "snippets/card.html",
+        ),
+        (
+            &[
+                BASE,
+                PAGE,
+                ("snippets/card.html", &format!("{{{{ body }}}}{broken}")),
+                ("content/post-1.md", calling),
+            ],
+            "snippets/card.html",
+        ),
+    ];
+    for (files, at) in cases {
+        let built = site(files);
+        let told: Vec<_> = built
+            .template_problems()
+            .into_iter()
+            .map(|(name, file, _)| (name, file))
+            .collect();
+        assert_eq!(told, [("malformed-template", at.to_owned())], "{at}");
+        assert_eq!(built.render("post-1.md").problems, [], "{at}");
+    }
+}
+
+#[test]
 fn a_block_the_extended_template_hasnt_got_is_told() {
     let built = site(&[
         ("content/post-1.md", "---\ntitle: Post 1\n---\n"),

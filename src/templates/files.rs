@@ -71,6 +71,9 @@ pub(super) struct Snippet {
     /// which a call in a template hands by name.
     pub wrapped: Vec<String>,
     pub takes: Option<Takes>,
+    /// Whether the engine could read the file. Where it couldn't, what the
+    /// snippet reads is unknown, and no call is held to it.
+    pub readable: bool,
 }
 
 impl Snippet {

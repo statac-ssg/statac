@@ -104,7 +104,8 @@ pub enum MathsFault {
 
 /// What each snippet does with the writing a call stands above: `Some(true)`
 /// for one that wraps it up to an `@end`, `Some(false)` for one that
-/// doesn't, and none for a name the site has no snippet for.
+/// doesn't, and none for a name the site has no snippet for, or one whose
+/// snippet can't be read.
 pub type Wraps<'a> = &'a dyn Fn(&str) -> Option<bool>;
 
 pub struct Document {

@@ -888,10 +888,10 @@ fn has_writing(shared: &Shared, page: PageId) -> bool {
 
 /// Whether the site's snippet `name` wraps the writing below a call to it,
 /// which it does where it shows the writing; none where the site has no
-/// such snippet.
+/// such snippet, or its snippet can't be read.
 fn wraps(shared: &Shared, name: &str) -> Option<bool> {
     let snippet = shared.templates.snippets.get(name)?;
-    Some(!snippet.wrapped.is_empty())
+    snippet.readable.then_some(!snippet.wrapped.is_empty())
 }
 
 /// The file a page's writing is read from as Markdown; none for a page
@@ -1655,6 +1655,10 @@ impl markdown::Snippets for Prose<'_> {
                     .push(Problem::at(Kind::CallInHtml { name: name.clone() }, place))
             });
         }
+        if !snippet.readable {
+            frame::read(Key::Template(Templates::id(snippet.file)));
+            return String::new();
+        }
         if !snippet.wrapped.is_empty() && !call.wraps() {
             frame::with(|frame| {
                 frame.problems.push(Problem::at(
@@ -1924,6 +1928,10 @@ pub(super) fn register_snippet(env: &mut Environment<'static>, snippet: &Snippet
         let Some(shared) = frame::shared() else {
             return Err(frame::told());
         };
+        if !snippet.readable {
+            frame::read(Key::Template(Templates::id(snippet.file)));
+            return Err(frame::told());
+        }
         let raise = |fault| {
             frame::raise(Kind::WrongArgument {
                 snippet: snippet.name.clone(),

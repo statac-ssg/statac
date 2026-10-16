@@ -164,7 +164,7 @@ pub fn read(
         let text = sources.text(file.source);
         let ast = check::parse_template(&file.name, text).ok();
         extends.push(ast.as_ref().and_then(extended));
-        blocks.push(ast.as_ref().map(blocks_of).unwrap_or_default());
+        blocks.push(ast.as_ref().map(blocks_of));
         let Role::Snippet(name) = &file.role else {
             continue;
         };
@@ -192,6 +192,7 @@ pub fn read(
                 told.push((at, problem));
                 None
             }
+            Some(Ok(_)) if ast.is_none() => None,
             Some(Ok(line)) => {
                 let wrong = files::line_against(&line, file.source, &params);
                 let usable = wrong.is_empty();
@@ -207,6 +208,7 @@ pub fn read(
                 params,
                 wrapped,
                 takes,
+                readable: ast.is_some(),
             },
         );
     }
@@ -344,12 +346,15 @@ fn extended(ast: &minijinja::machinery::ast::Stmt<'_>) -> Option<String> {
     })
 }
 
-/// The blocks a template has, each with whether it is at the top of the
+/// A template's blocks by name, each with whether it is at the top of the
 /// file, where a template that extends another fills that one's blocks,
 /// and where its name is written.
-fn blocks_of(ast: &minijinja::machinery::ast::Stmt<'_>) -> Vec<(String, bool, usize)> {
+type Blocks = Vec<(String, bool, usize)>;
+
+/// The blocks a template has.
+fn blocks_of(ast: &minijinja::machinery::ast::Stmt<'_>) -> Blocks {
     use minijinja::machinery::ast::Stmt;
-    fn walk(stmts: &[Stmt<'_>], top: bool, out: &mut Vec<(String, bool, usize)>) {
+    fn walk(stmts: &[Stmt<'_>], top: bool, out: &mut Blocks) {
         for stmt in stmts {
             let inner: &[Stmt<'_>] = match stmt {
                 Stmt::Block(b) => {
@@ -377,11 +382,12 @@ fn blocks_of(ast: &minijinja::machinery::ast::Stmt<'_>) -> Vec<(String, bool, us
 }
 
 /// A block filled by a template that extends another, where no template
-/// it extends has a block of that name.
+/// it extends has a block of that name. Where one of them can't be read,
+/// its blocks are unknown and nothing is told.
 fn never_shown(
     files: &[File],
     extends: &[Option<String>],
-    blocks: &[Vec<(String, bool, usize)>],
+    blocks: &[Option<Blocks>],
     sources: &Sources,
 ) -> Vec<(usize, Problem)> {
     let by_name: HashMap<&str, usize> = files
@@ -405,12 +411,20 @@ fn never_shown(
         {
             ancestors.push(next);
         }
-        let shown: Vec<&str> = ancestors
+        let Some(shown) = ancestors
             .iter()
-            .flat_map(|&a| blocks[a].iter().map(|(name, _, _)| name.as_str()))
+            .map(|&a| blocks[a].as_deref())
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        let shown: Vec<&str> = shown
+            .into_iter()
+            .flatten()
+            .map(|(name, _, _)| name.as_str())
             .collect();
         let text = sources.text(file.source);
-        for (block, top, start) in &blocks[at] {
+        for (block, top, start) in blocks[at].iter().flatten() {
             if !top || shown.contains(&block.as_str()) {
                 continue;
             }
