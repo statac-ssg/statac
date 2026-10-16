@@ -517,6 +517,9 @@ impl Plan {
             .into_iter()
             .map(|(file, _)| file)
             .collect();
+        // Sass has said why a stylesheet is missing, and the build stops for
+        // it, so a link to it isn't broken as well.
+        published.extend(renderer.assets().unwritten().map(str::to_owned));
         published.extend(
             content::claims(site, renderer.sources(), renderer.settings())
                 .into_iter()

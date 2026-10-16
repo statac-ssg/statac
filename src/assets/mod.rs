@@ -484,6 +484,12 @@ impl Assets {
             .collect()
     }
 
+    /// The stylesheets Sass stopped on, each by the path it would have
+    /// been published at, which a page may still link.
+    pub fn unwritten(&self) -> impl Iterator<Item = &str> {
+        self.unwritten.iter().map(String::as_str)
+    }
+
     pub fn get(&self, name: &str) -> Option<&Asset> {
         self.names.get(name).map(|&id| self.assets.get(id))
     }

@@ -928,6 +928,24 @@ fn a_mistake_many_pages_meet_is_told_once_with_the_pages() {
 }
 
 #[test]
+fn a_stylesheet_sass_stopped_on_is_told_once_and_its_link_is_not_broken() {
+    let site = Site::new("sass-stopped");
+    fs::remove_file(site.root.join("assets/site.css")).unwrap();
+    site.write("assets/site.scss", "a { color: $nowhere; }\n");
+    site.write(
+        "templates/page.html",
+        "{{ css('site.css') }}\n<link rel=\"preload\" href=\"{{ asset('site.css') }}\">\n\
+         {{ page.content }}\n",
+    );
+
+    let (said, code) = site.run(&["check", "--today=2026-10-04"]);
+    assert_eq!(code, 1, "{said}");
+    assert_eq!(said.matches("error  Sass stopped").count(), 1, "{said}");
+    assert!(!said.contains("Broken link"), "{said}");
+    assert!(said.contains("1 error: 1 sass-stopped.\n"), "{said}");
+}
+
+#[test]
 fn a_value_read_as_markdown_on_many_pages_is_told_at_its_place_once() {
     let site = Site::new("markdown-value");
     site.write(
