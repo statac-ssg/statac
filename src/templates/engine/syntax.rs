@@ -150,17 +150,16 @@ impl<'a> Reading<'a> {
             tags,
             open: Vec::new(),
         };
-        reading.open = reading.blocks_open();
+        reading.open = reading.blocks_open(reading.at.start);
         reading
     }
 
-    /// The blocks open where the engine stopped, by the tags closed before
-    /// it.
-    fn blocks_open(&self) -> Vec<Block<'a>> {
+    /// The blocks open at `to`, by the tags closed before it.
+    fn blocks_open(&self, to: usize) -> Vec<Block<'a>> {
         let mut open: Vec<Block<'a>> = Vec::new();
         for tag in &self.tags {
             let Some(close) = tag.close else { continue };
-            if self.tokens[close].1.end > self.at.start
+            if self.tokens[close].1.end > to
                 || !matches!(self.tokens[tag.open].0, Token::BlockStart)
             {
                 continue;
@@ -446,7 +445,9 @@ impl<'a> Reading<'a> {
         if let Some(read) = self.unclosed_tag(true) {
             return read;
         }
-        if let Some(block) = self.open.last() {
+        // The engine places the end on the template's last token, which may
+        // be the end of the tag opening the block.
+        if let Some(block) = self.blocks_open(self.text.len()).last() {
             return (
                 SyntaxFault::Unclosed(Opener::Block(block.keyword.into())),
                 block.tag.clone(),

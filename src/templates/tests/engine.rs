@@ -71,6 +71,20 @@ fn what_the_engine_cant_read_is_told_in_statacs_words() {
             "{% if page.title %}",
         ),
         case(
+            "{% if page.title %}",
+            "Malformed template: `{% if %}` is never closed",
+            Some("Close it with `{% endif %}`."),
+            1,
+            "{% if page.title %}",
+        ),
+        case(
+            "{% if page.title %}a{% else %}\n",
+            "Malformed template: `{% if %}` is never closed",
+            Some("Close it with `{% endif %}`."),
+            1,
+            "{% if page.title %}",
+        ),
+        case(
             "{% for p in site.pages %}\n{{ p.title }}",
             "Malformed template: `{% for %}` is never closed",
             Some("Close it with `{% endfor %}`."),
