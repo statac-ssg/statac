@@ -71,6 +71,31 @@ What changed in each release of Statac, the newest first.
   runs, such as `statac build` beside `statac serve`, says that it is
   waiting and builds once the other has finished. Two at once could stop
   with `Can't write`, leave no built site, or warn `cache-not-written`.
+- A division by zero in a template, with `/`, `//` or `%`, stops the
+  template, told at the sum. `/` wrote `inf` or `nan` on the page and
+  nothing was said.
+- A minus before a field, as `{{ -page.date }}`, makes the field's value
+  negative, and stops the template at it where the value isn't a
+  number. It was told as an unknown field called `-page.date`.
+- A function that takes no names, handed one, as `url(to="/about/")`,
+  is told as having no argument called it. It was told as handed a
+  value that isn't an address.
+
+### Changed
+
+- The template language follows Jinja more closely, so a template may
+  write some things differently:
+  - `title` starts a word with a capital only after a space, a hyphen or
+    an opening bracket: `node.js` becomes `Node.js` where it became
+    `Node.Js`, and `at&t` becomes `At&t` where it became `At&T`.
+  - `round` takes a value halfway between two to the even one:
+    `2.5 | round` is `2.0`, where it was `3.0`.
+  - `//` and `%` round down for a negative divisor: `7 // -2` is `-4`
+    and `7 % -2` is `-1`, where they were `-3` and `1`.
+  - A list or map written on a page as it stands quotes its text in
+    single quotes, `['a']`, where it used double.
+  - `true` and `false` count as numbers to `is number` and `sum`, and
+    the `upper` and `lower` tests pass only text with a letter in it.
 
 ## 0.3.0 - 2026-10-12
 

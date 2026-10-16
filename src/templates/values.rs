@@ -481,7 +481,7 @@ impl Object for PageValue {
 
     fn call_method(
         self: &Arc<Self>,
-        state: &State<'_, '_>,
+        state: &mut State<'_, '_>,
         method: &str,
         args: &[Value],
     ) -> Result<Value, Error> {

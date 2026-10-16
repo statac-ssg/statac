@@ -261,9 +261,10 @@ pub fn read(
     let mut env = Environment::new();
     // The engine stops a run on the step after its last.
     env.set_fuel(Some(steps + 1));
-    env.set_keep_trailing_newline(check::WHITESPACE.keep_trailing_newline);
-    env.set_lstrip_blocks(check::WHITESPACE.lstrip_blocks);
-    env.set_trim_blocks(check::WHITESPACE.trim_blocks);
+    // On by default in a debug build only, where it adds to the engine's
+    // words, which are read here; off, a test runs as a release does.
+    env.set_debug(false);
+    env.set_syntax(check::reading());
     guard::install(&mut env);
     own::install(&mut env);
     env.set_auto_escape_callback(escaping);
@@ -327,7 +328,7 @@ fn escaping(name: &str) -> AutoEscape {
     let last = name.rsplit('/').next().unwrap_or(name);
     match last.rsplit_once('.').map(|(_, ext)| ext) {
         Some("txt") => AutoEscape::None,
-        Some("json" | "webmanifest") => AutoEscape::Custom(guard::JSON),
+        Some("json" | "webmanifest") => AutoEscape::Custom(guard::JSON.into()),
         _ => AutoEscape::Html,
     }
 }

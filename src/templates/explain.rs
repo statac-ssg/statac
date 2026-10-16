@@ -685,6 +685,9 @@ fn descend(text: &str, expr: &Expr<'_>, path: &[Step], empty: bool) -> (Range<us
         (Step::Index(i), Expr::List(list)) if *i < list.items.len() => {
             descend(text, &list.items[*i], rest, empty)
         }
+        (Step::Index(i), Expr::Tuple(tuple)) if *i < tuple.items.len() => {
+            descend(text, &tuple.items[*i], rest, empty)
+        }
         (Step::Key(k), Expr::Map(map)) => {
             for (key, value) in map.keys.iter().zip(&map.values) {
                 if let Expr::Const(c) = key

@@ -5,10 +5,9 @@
 use std::ops::Range;
 
 use minijinja::machinery::{Token, tokenize};
-use minijinja::syntax::SyntaxConfig;
 use minijinja::{Error, ErrorKind};
 
-use super::super::check::WHITESPACE;
+use super::super::check::reading;
 use super::{line_of, within};
 use crate::problem::{Awaited, Opener, Rewrite, SyntaxFault};
 use crate::suggest::nearest;
@@ -109,13 +108,10 @@ struct Reading<'a> {
 }
 
 impl<'a> Reading<'a> {
-    // `SyntaxConfig` is a unit struct unless the engine's `custom_syntax`
-    // feature is on.
-    #[allow(clippy::default_constructed_unit_structs)]
     fn new(text: &'a str, at: Range<usize>) -> Reading<'a> {
         let mut tokens = Vec::new();
         let mut stopped = None;
-        let lexed = tokenize(text, false, SyntaxConfig::default(), WHITESPACE);
+        let lexed = tokenize(text, false, reading());
         for token in lexed {
             match token {
                 Ok((token, span)) => {

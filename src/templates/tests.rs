@@ -4232,6 +4232,24 @@ fn an_address_inside_the_site_is_under_the_sites_path() {
     );
 }
 
+/// Names a loop or `set` unpacks a list or a tuple into are known to the
+/// rest of the template.
+#[test]
+fn names_unpacked_into_are_known() {
+    let built = site(&[
+        NO_HOME,
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        (
+            "templates/page.html",
+            "{% for a, b in [[1, 2]] %}{{ a }}{{ b }}{% endfor %}\
+             {% for (c, d) in [(3, 4)] %}{{ c }}{{ d }}{% endfor %}\
+             {% set e, f = 5, 6 %}{{ e }}{{ f }}",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(built.html("post-1.md"), "123456");
+}
+
 #[test]
 fn url_handed_anything_but_an_address_from_the_top_stops_the_template() {
     for written in [
@@ -4239,7 +4257,6 @@ fn url_handed_anything_but_an_address_from_the_top_stops_the_template() {
         "url(\"//example.org/\")",
         "url(\"https://example.org/about/\")",
         "url(3)",
-        "url(to=\"/about/\")",
         "url(page)",
     ] {
         let template = format!("<a href=\"{{{{ {written} }}}}\">About</a>");

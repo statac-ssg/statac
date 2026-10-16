@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 use std::sync::Arc;
 
 use minijinja::machinery::ast::CallType;
-use minijinja::value::{Kwargs, Rest, Value};
+use minijinja::value::{Kwargs, Rest, Value, ValueOrKwargs};
 use minijinja::{Environment, Error, State};
 
 use super::frame;
@@ -145,7 +145,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
     env.add_filter("json", |state: &State, value: Value| {
         checked("json", std::slice::from_ref(&value))?;
         // A template writing JSON writes every value so already.
-        if state.auto_escape() == minijinja::AutoEscape::Custom(super::guard::JSON) {
+        if super::guard::writes_json(state) {
             return Ok(value);
         }
         let mut out = String::new();
@@ -336,7 +336,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
     });
     env.add_function(
         "webmention",
-        |state: &State, given: Rest<Value>| -> Result<Value, Error> {
+        |state: &State, given: Rest<ValueOrKwargs>| -> Result<Value, Error> {
             if !given.is_empty() {
                 return Err(frame::raise(Kind::WrongArgument {
                     snippet: "webmention".into(),

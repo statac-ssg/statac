@@ -73,7 +73,7 @@ A binary for Linux that asks nothing of the system's C library links a C library
 
 ### Rust crates
 
-The 166 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
+The 165 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
 
 | Crate | Version | Its licence | Taken under | Texts |
 | --- | --- | --- | --- | --- |
@@ -153,9 +153,8 @@ The 166 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `math-core-renderer-internal` | 0.8.2 | MIT | MIT | none in the crate |
 | `memchr` | 2.8.3 | Unlicense OR MIT | MIT | [15] [16] |
 | `memmap2` | 0.9.11 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `memo-map` | 0.3.4 | Apache-2.0 | Apache-2.0 | [1] |
 | `mimalloc` | 0.1.52 | MIT | MIT | [29] |
-| `minijinja` | 2.24.0 | Apache-2.0 | Apache-2.0 | [1] |
+| `minijinja` | 3.0.1 | Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.8.9 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.9.1 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
 | `mio` | 1.2.4 | MIT | MIT | [30] |

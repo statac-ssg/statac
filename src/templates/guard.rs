@@ -21,7 +21,7 @@
 //! refused, naming the item and the field. `sort`, which puts such items
 //! last and says so, is Statac's own.
 
-use minijinja::value::{Rest, Value, ValueKind};
+use minijinja::value::{Rest, Value, ValueKind, ValueOrKwargs};
 use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 use super::frame;
@@ -447,7 +447,7 @@ fn check_by_field(callee: &str, args: &[Value]) -> Result<(), Error> {
 /// `select`, `reject`, `selectattr` and `rejectattr`, as the engine runs
 /// them, except that an item whose value is missing fails any test that
 /// would refuse it. The value is only tested, never shown.
-fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value, Error> {
+fn select_or_reject(state: &mut State, callee: &str, args: &[Value]) -> Result<Value, Error> {
     let name_in = |value: &Value, wanted| {
         value.as_str().map(str::to_owned).ok_or_else(|| {
             frame::raise(Kind::TemplateStopped {
@@ -485,7 +485,7 @@ fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value
         None => None,
     };
     let invert = callee.starts_with("reject");
-    let choose = || {
+    let mut choose = || {
         let mut kept = Vec::new();
         for item in input.try_iter()? {
             let value = match &attribute {
@@ -668,6 +668,11 @@ fn write_html(out: &mut minijinja::Output, text: &str) -> Result<(), Error> {
 /// a JSON value, markup and all.
 pub(super) const JSON: &str = "json";
 
+/// Whether the template `state` renders writes JSON.
+pub(super) fn writes_json(state: &State) -> bool {
+    matches!(state.auto_escape(), minijinja::AutoEscape::Custom(name) if name == JSON)
+}
+
 /// Sets semi-strict undefined, and replaces the formatter and every
 /// built-in filter, test and function with its guarded form.
 pub(super) fn install(env: &mut Environment<'_>) {
@@ -680,8 +685,9 @@ pub(super) fn install(env: &mut Environment<'_>) {
             if super::values::holds_bytes(value) {
                 return Err(super::values::not_text());
             }
-            let json = matches!(state.auto_escape(), minijinja::AutoEscape::Custom(JSON));
-            if !json && let Some(text) = value.as_str() {
+            if !writes_json(state)
+                && let Some(text) = value.as_str()
+            {
                 if text.is_empty() {
                     super::indent::nothing();
                     return Ok(());
@@ -706,7 +712,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
                         .map_or_else(|| value.to_string(), str::to_owned);
                     write_html(out, &text)
                 }
-                minijinja::AutoEscape::Custom(JSON) => {
+                minijinja::AutoEscape::Custom(name) if name == JSON => {
                     let mut json = String::new();
                     super::own::json(value, &mut json);
                     out.write_str(&json)
@@ -720,7 +726,8 @@ pub(super) fn install(env: &mut Environment<'_>) {
         let inner = builtin_filter(name);
         let input = Input::of_filter(name);
         let selects = matches!(name, "select" | "reject" | "selectattr" | "rejectattr");
-        env.add_filter(name, move |state: &State, args: Rest<Value>| {
+        env.add_filter(name, move |state: &mut State, args: Rest<ValueOrKwargs>| {
+            let args = args.into_values();
             check_args(name, Callee::Filter, &args, input)?;
             check_by_field(name, &args)?;
             match selects {
@@ -733,7 +740,8 @@ pub(super) fn install(env: &mut Environment<'_>) {
     for &name in TESTS {
         let inner = builtin_test(name);
         let input = Input::of_test(name);
-        env.add_test(name, move |state: &State, args: Rest<Value>| {
+        env.add_test(name, move |state: &mut State, args: Rest<ValueOrKwargs>| {
+            let args = args.into_values();
             check_args(name, Callee::Test, &args, input)?;
             let passed = inner
                 .call(state, &args)
@@ -743,7 +751,8 @@ pub(super) fn install(env: &mut Environment<'_>) {
     }
     for &name in FUNCTIONS {
         let inner = builtin_function(name);
-        env.add_function(name, move |state: &State, args: Rest<Value>| {
+        env.add_function(name, move |state: &mut State, args: Rest<ValueOrKwargs>| {
+            let args = args.into_values();
             check_args(name, Callee::Function, &args, Input::Whole)?;
             inner
                 .call(state, &args)

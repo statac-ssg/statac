@@ -5,7 +5,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
-use minijinja::value::{Rest, Value};
+use minijinja::value::{Rest, Value, ValueOrKwargs};
 use minijinja::{Environment, Error, State};
 
 use super::card::Gathered;
@@ -1956,7 +1956,8 @@ fn build_snippet(
 pub(super) fn register_snippet(env: &mut Environment<'static>, snippet: &Snippet) {
     let snippet = snippet.clone();
     let name = snippet.name.clone();
-    env.add_function(name, move |state: &State, args: Rest<Value>| {
+    env.add_function(name, move |state: &State, args: Rest<ValueOrKwargs>| {
+        let args = args.into_values();
         super::guard::check_args(
             &snippet.name,
             super::guard::Callee::Snippet,

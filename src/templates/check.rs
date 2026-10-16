@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use minijinja::machinery::ast::{self, BinOpKind, CallArg, CallType, Expr, Stmt};
-use minijinja::machinery::{Span, WhitespaceConfig, parse};
+use minijinja::machinery::{Span, parse};
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::Value;
 
@@ -24,24 +24,24 @@ use crate::source::{Place, SourceId, Sources};
 use crate::suggest::nearest;
 
 /// Reads a template the way the environment does.
-// `SyntaxConfig` is a unit struct unless the engine's `custom_syntax`
-// feature is on.
-#[allow(clippy::default_constructed_unit_structs)]
 pub(super) fn parse_template<'s>(
     name: &'s str,
     source: &'s str,
 ) -> Result<Stmt<'s>, minijinja::Error> {
-    parse(source, name, SyntaxConfig::default(), WHITESPACE)
+    parse(source, name, reading())
 }
 
 /// How a tag's surrounding whitespace is read: a block tag takes its line's
 /// leading spaces and its own line ending with it. Rendering uses the same,
 /// so a template read back for checking lines up with what is built.
-pub(super) const WHITESPACE: WhitespaceConfig = WhitespaceConfig {
-    keep_trailing_newline: true,
-    lstrip_blocks: true,
-    trim_blocks: true,
-};
+pub(super) fn reading() -> SyntaxConfig {
+    SyntaxConfig::builder()
+        .keep_trailing_newline(true)
+        .lstrip_blocks(true)
+        .trim_blocks(true)
+        .build()
+        .expect("the default delimiters are valid")
+}
 
 /// What a value is, as far as reading the template can tell.
 #[derive(Debug, Clone, PartialEq)]
@@ -976,22 +976,8 @@ impl<'a> Checker<'a> {
                 }
             }
             Expr::Call(call) => self.call(call, full_span(expr, self.text), seen),
-            Expr::List(list) => {
-                let mut tys = Vec::new();
-                let mut items_maybe_missing = false;
-                for item in &list.items {
-                    let info = self.expr(item, seen);
-                    if seen == Seen::Unseen && info.maybe_missing {
-                        self.hidden_in_literal(item, false);
-                    }
-                    items_maybe_missing |= info.maybe_missing;
-                    tys.push(info.ty);
-                }
-                Info {
-                    items_maybe_missing,
-                    ..Info::of(Ty::list(common(tys)))
-                }
-            }
+            Expr::List(list) => self.sequence(&list.items, seen),
+            Expr::Tuple(tuple) => self.sequence(&tuple.items, seen),
             Expr::Map(map) => {
                 for (key, value) in map.keys.iter().zip(&map.values) {
                     for part in [key, value] {
@@ -1003,6 +989,23 @@ impl<'a> Checker<'a> {
                 }
                 Info::of(Ty::Any)
             }
+        }
+    }
+
+    fn sequence(&mut self, items: &[Expr<'_>], seen: Seen) -> Info {
+        let mut tys = Vec::new();
+        let mut items_maybe_missing = false;
+        for item in items {
+            let info = self.expr(item, seen);
+            if seen == Seen::Unseen && info.maybe_missing {
+                self.hidden_in_literal(item, false);
+            }
+            items_maybe_missing |= info.maybe_missing;
+            tys.push(info.ty);
+        }
+        Info {
+            items_maybe_missing,
+            ..Info::of(Ty::list(common(tys)))
         }
     }
 
@@ -1738,6 +1741,11 @@ impl Free<'_> {
                     self.expr(item);
                 }
             }
+            Expr::Tuple(t) => {
+                for item in &t.items {
+                    self.expr(item);
+                }
+            }
             Expr::Map(m) => {
                 for (k, v) in m.keys.iter().zip(&m.values) {
                     self.expr(k);
@@ -1971,6 +1979,11 @@ pub(super) fn visit_exprs<'s>(stmt: &Stmt<'s>, f: &mut dyn FnMut(&Expr<'s>)) {
             }
             Expr::List(l) => {
                 for i in &l.items {
+                    expr(i, f);
+                }
+            }
+            Expr::Tuple(t) => {
+                for i in &t.items {
                     expr(i, f);
                 }
             }

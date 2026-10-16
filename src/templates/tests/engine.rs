@@ -625,11 +625,25 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             "css + 1",
         ),
         case(
+            "{{ 1 / 0 }}",
+            "Template stopped: can't divide by zero",
+            None,
+            1,
+            "1 / 0",
+        ),
+        case(
             "{{ 1 // 0 }}",
             "Template stopped: can't divide by zero",
             None,
             1,
             "1 // 0",
+        ),
+        case(
+            "{{ 1 % 0 }}",
+            "Template stopped: can't divide by zero",
+            None,
+            1,
+            "1 % 0",
         ),
         case(
             "{{ 2 ** 10000 }}",
@@ -658,6 +672,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             None,
             1,
             "-\"a\"",
+        ),
+        case(
+            "{{ -page.title }}",
+            "Template stopped: can't work out `-page.title`",
+            None,
+            1,
+            "-page.title",
         ),
         case(
             "{{ dict(1) }}",
@@ -826,6 +847,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             None,
             1,
             "[1] | join(a=1)",
+        ),
+        case(
+            "{{ url(to=\"/about/\") }}",
+            "Template stopped: `url` has no argument called `to`",
+            None,
+            1,
+            "url(to=\"/about/\")",
         ),
         case(
             "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(1, a=1) }}",

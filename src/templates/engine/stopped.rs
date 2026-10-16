@@ -436,6 +436,13 @@ impl Read<'_, '_> {
                 }
             }
             (ErrorKind::TooManyArguments, "") => Stopped::TooManyArguments(self.callee()?),
+            // Handed to a callable that takes no names, and naming none.
+            (ErrorKind::TooManyArguments, "unexpected keyword arguments") => {
+                let called = reader?
+                    .called()
+                    .filter(|c| self.failed.is_none_or(|f| f.callee == c.name))?;
+                self.no_such_argument(called.named.first()?)?
+            }
             (ErrorKind::InvalidOperation, "") => match reader?.called() {
                 Some(c) if c.name == "dict" => self.needs(Wanted::NamedValues, None)?,
                 _ => Stopped::CantWorkOut(reader?.written(&reader?.at)),

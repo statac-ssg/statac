@@ -28,7 +28,7 @@ jiff = { version = "0.2.37", default-features = false, features = ["std", "tz-sy
 jpeg-encoder = "0.7.1"
 math-core = "=0.8.2"
 miniz_oxide = "0.9.1"
-minijinja = { version = "=2.24.0", default-features = false, features = ["builtins", "debug", "macros", "multi_template", "adjacent_loop_items", "std_collections", "serde", "loop_controls", "unstable_machinery", "fuel"] }
+minijinja = { version = "=3.0.1", default-features = false, features = ["builtins", "debug", "macros", "multi_template", "adjacent_loop_items", "std_collections", "loop_controls", "unstable_machinery", "fuel"] }
 moxcms = "0.8"
 notify = { version = "=9.0.0-rc.5", default-features = false, features = ["macos_fsevent"] }
 pulldown-cmark = { version = "=0.13.4", default-features = false }

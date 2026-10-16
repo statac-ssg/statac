@@ -10,8 +10,7 @@
 use std::cell::RefCell;
 use std::io;
 
-use minijinja::{Captured, Error, Output, Template};
-use serde::Serialize;
+use minijinja::{Captured, Error, Output, Template, Value};
 
 /// The line a template is writing.
 struct Line {
@@ -183,7 +182,7 @@ fn blank(text: &[u8]) -> usize {
 /// Renders `template`, giving what it wrote beside the engine's own account.
 pub(super) fn render<'source>(
     template: &Template<'_, 'source>,
-    context: impl Serialize,
+    context: impl Into<Value>,
 ) -> Result<(Captured<'source>, String), Error> {
     render_placed(template, context).map(|(captured, text, _)| (captured, text))
 }
@@ -192,7 +191,7 @@ pub(super) fn render<'source>(
 /// wrote is its own text.
 pub(super) fn render_placed<'source>(
     template: &Template<'_, 'source>,
-    context: impl Serialize,
+    context: impl Into<Value>,
 ) -> Result<(Captured<'source>, String, Own), Error> {
     let mut sink = Sink::new();
     let captured = template.render_captured_to(context, &mut sink)?;
