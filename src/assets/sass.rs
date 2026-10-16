@@ -1,15 +1,20 @@
 //! Sass compiled to CSS, and everything Sass says, placed in the file and
 //! at the text it is about. Sass reads only within `assets/`.
 
+mod fault;
+
 use std::cell::{Cell, RefCell};
 use std::fs;
 use std::io;
+use std::ops::Range;
 use std::path::{Component, Path, PathBuf};
 
 use codemap::SpanLoc;
 
 use crate::problem::{Kind, Problem, Reach, system_reason};
 use crate::source::{Place, Sources, Span};
+
+pub use fault::{SassFault, SassType};
 
 pub(super) struct Compiled {
     pub(super) css: Result<String, Box<grass::Error>>,
@@ -71,14 +76,24 @@ fn unquoted(message: &str) -> &str {
 
 /// Where `loc` is, with its file added to `sources`.
 fn placed(loc: &SpanLoc, site: &Path, sources: &mut Sources) -> Place {
+    at(loc, bytes(loc), site, sources)
+}
+
+/// `span` of the file `loc` is in, with the file added to `sources`.
+fn at(loc: &SpanLoc, span: Range<usize>, site: &Path, sources: &mut Sources) -> Place {
     let text = loc.file.source().to_owned();
-    let start = offset(&text, loc.begin.line, loc.begin.column);
-    let end = offset(&text, loc.end.line, loc.end.column).max(start);
     let source = sources.add(shown(Path::new(loc.file.name()), site), text);
     Place {
         source,
-        span: Span::new(start, end),
+        span: Span::new(span.start, span.end),
     }
+}
+
+/// The bytes of its file `loc` covers.
+fn bytes(loc: &SpanLoc) -> Range<usize> {
+    let text = loc.file.source();
+    let start = offset(text, loc.begin.line, loc.begin.column);
+    start..offset(text, loc.end.line, loc.end.column).max(start)
 }
 
 /// `file` as a path in the site. Sass may name a file by its real path,
@@ -171,10 +186,15 @@ pub(super) fn stopped(
     let shown = |file: &Path| shown(file, site);
     match error.kind() {
         grass::ErrorKind::ParseError { message, loc, .. } => {
-            let mut place = placed(&loc, site, sources);
             if !refused {
-                return Problem::at(Kind::SassStopped { message }, place);
+                let file = Path::new(loc.file.name());
+                let assets = site.join(super::ASSETS);
+                let (fault, span) =
+                    fault::read(&message, loc.file.source(), bytes(&loc), file, &assets);
+                let place = at(&loc, span, site, sources);
+                return Problem::at(Kind::SassStopped { fault }, place);
             }
+            let mut place = placed(&loc, site, sources);
             let inside = quoted(sources.spelling(place));
             let start = place.span.start as usize;
             place.span = Span::new(start + inside.start, start + inside.end);

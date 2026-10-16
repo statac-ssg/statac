@@ -4,6 +4,7 @@
 use std::io;
 use std::path::PathBuf;
 
+use crate::assets::SassFault;
 use crate::markdown;
 use crate::platform::{Alike, Unwritable};
 use crate::publish::Occupant;
@@ -684,9 +685,9 @@ pub enum Kind {
         path: String,
         hint: Option<Hint>,
     },
-    /// Sass's own reason for stopping.
+    /// Why Sass stopped.
     SassStopped {
-        message: String,
+        fault: SassFault,
     },
     /// A worker named by a string in a script. Workers don't read the
     /// import map, so neither the name nor the worker's own imports reach

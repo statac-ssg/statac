@@ -1,13 +1,14 @@
 # Sass stopped
 
-A Sass file in `assets/` couldn't be compiled to CSS. The message gives
-Sass's reason, and points at the file and line where Sass stopped. This
-may be another file that the stylesheet uses.
+A Sass file in `assets/` couldn't be compiled to CSS. The message says
+why, and points at the file and line where Sass stopped. This may be
+another file that the stylesheet uses. Where an `@error` in your Sass
+stopped it, the message quotes what the `@error` says.
 
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Sass stopped: undefined variable
+error  Sass stopped: no variable called `$link`
   More: https://statac.dev/e/sass-stopped/
 ```
 

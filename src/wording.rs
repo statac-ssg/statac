@@ -5,6 +5,7 @@
 //! with no full stop. A suggestion is a full sentence, offered only when there
 //! is a good one.
 
+use crate::assets::{SassFault, SassType};
 use crate::build::{Carried, Published};
 use crate::fetch::Refusal;
 use crate::markdown;
@@ -128,7 +129,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
             format!("Unusable name: `{written}` holds a character that can't be shown")
         }
         Kind::MissingFile { path, .. } => format!("Missing file: there is no `{path}`"),
-        Kind::SassStopped { message } => format!("Sass stopped: {}", sentence_part(message)),
+        Kind::SassStopped { fault } => format!("Sass stopped: {}", sass_fault(fault)),
         Kind::WorkerOutsideImportMap { written } => {
             format!("Worker outside the import map: `{written}` isn't published under that name")
         }
@@ -1602,6 +1603,118 @@ fn json_fault(found: &JsonFault) -> String {
     }
 }
 
+fn sass_fault(fault: &SassFault) -> String {
+    match fault {
+        SassFault::Raised(said) => format!("`{said}`"),
+        SassFault::NoVariable(name) => format!("no variable called `{name}`"),
+        SassFault::NoMixin(name) => format!("no mixin called `{name}`"),
+        SassFault::NoFunction(name) => format!("no function called `{name}`"),
+        SassFault::Missing(c) => format!("a `{c}` is missing"),
+        SassFault::ReadsAsDeclaration(_) => "a `{` is missing".into(),
+        SassFault::Unclosed(opening) => format!("`{opening}` is never closed"),
+        SassFault::ClosesNothing => "`}` closes nothing".into(),
+        SassFault::NoValue => "a value is missing".into(),
+        SassFault::NoName => "a name is missing".into(),
+        SassFault::NoQuotedText => "a text in quotes is missing".into(),
+        SassFault::EndsEarly => "the stylesheet ends too soon".into(),
+        SassFault::UnknownFlag(flag) => format!("unknown flag `{flag}`"),
+        SassFault::Unspaced(operator) => {
+            format!("`{operator}` needs a space on each side in a calculation")
+        }
+        SassFault::TopLevelParent => "`&` has nothing to stand for outside a rule".into(),
+        SassFault::NotHere(rule) => format!("`{rule}` can't be used here"),
+        SassFault::ReturnOutsideFunction => "`@return` works only inside `@function`".into(),
+        SassFault::LoadAfterRules(rule) => format!("`{rule}` must come before any other rule"),
+        SassFault::ContentOutsideMixin => "`@content` works only inside `@mixin`".into(),
+        SassFault::ExtendOutsideRule => "`@extend` works only inside a rule".into(),
+        SassFault::InFunction(what) => format!("`@function` can't hold {what}"),
+        SassFault::NoContentBlock(name) => format!("the mixin `{name}` takes no content block"),
+        SassFault::NoReturn(name) => format!("`@function {name}` ends without `@return`"),
+        SassFault::MissingArgument { callable, argument } => {
+            format!("`{callable}` is missing `{argument}`")
+        }
+        SassFault::TooManyArguments {
+            callable,
+            takes,
+            given,
+        } => format!(
+            "`{callable}` takes {takes} {}, not {given}",
+            if *takes == 1 { "argument" } else { "arguments" }
+        ),
+        SassFault::NoArgument { callable, argument } => {
+            format!("`{callable}` has no argument called `{argument}`")
+        }
+        SassFault::NoStylesheet { written, .. } => format!("no stylesheet called `{written}`"),
+        SassFault::NoBuiltInModule(name) => format!("Sass has no module called `{name}`"),
+        SassFault::NoNamespace { name, .. } => format!("no module called `{name}`"),
+        SassFault::TwoModules(name) => format!("two modules are called `{name}`"),
+        SassFault::Private(name) => format!("`{name}` is private to its module"),
+        SassFault::NotDefault(name) => {
+            format!("`{name}` isn't set with `!default` in that module")
+        }
+        SassFault::LoadsItself => "this stylesheet loads itself".into(),
+        SassFault::Units(one, other) => format!("can't combine `{one}` and `{other}`"),
+        SassFault::Operation(operation) => format!("can't work out `{operation}`"),
+        SassFault::NotCss(value) => format!("`{value}` can't be written as CSS"),
+        SassFault::WrongType {
+            argument,
+            wanted,
+            value,
+        } => {
+            let wanted = match wanted {
+                SassType::Number => "a number",
+                SassType::Colour => "a colour",
+                SassType::Map => "a map",
+                SassType::String => "a string",
+                SassType::Function => "a function",
+                SassType::Arguments => "a list of arguments",
+                SassType::Calculation => "a calculation",
+                SassType::WholeNumber => "a whole number",
+            };
+            format!("`{argument}` needs {wanted}, not `{value}`")
+        }
+        SassFault::HasUnits { argument, value } => {
+            format!("`{argument}` needs a number without units, not `{value}`")
+        }
+        SassFault::OutOfRange {
+            argument,
+            index,
+            items,
+        } => format!(
+            "`{argument}` is {index}, but the list has {items} {}",
+            if *items == 1 { "item" } else { "items" }
+        ),
+        SassFault::RepeatedKey(key) => format!("the map has `{key}` twice"),
+        SassFault::ForUnits { from, to } => format!("`@for` can't count from `{from}` to `{to}`"),
+        SassFault::CompoundExtend(_) => "`@extend` can't take a compound selector".into(),
+        SassFault::IndentedSemicolon => "a `;` can't be used in a `.sass` file".into(),
+        SassFault::MixedIndent { tab: true } => "a tab where this file indents with spaces".into(),
+        SassFault::MixedIndent { tab: false } => "a space where this file indents with tabs".into(),
+        SassFault::FirstLineIndented => "the first line is indented".into(),
+        SassFault::Other(said) => sentence_part(said),
+    }
+}
+
+fn sass_suggestion(fault: &SassFault) -> Option<String> {
+    match fault {
+        SassFault::ReadsAsDeclaration(declaration) => Some(format!("Write it as `{declaration}`.")),
+        SassFault::UnknownFlag(_) => Some("Did you mean `!important`?".into()),
+        SassFault::NoStylesheet {
+            nearest: Some(nearest),
+            ..
+        } => Some(format!("Did you mean `{nearest}`?")),
+        SassFault::NoNamespace {
+            name,
+            built_in: true,
+        } => Some(format!(
+            "Add `@use \"sass:{name}\";` at the top of the file."
+        )),
+        SassFault::Units(..) => Some("Mix units with `calc()`.".into()),
+        SassFault::CompoundExtend(Some(rule)) => Some(format!("Write it as `{rule}`.")),
+        _ => None,
+    }
+}
+
 fn malformed(found: &Malformed) -> String {
     match found {
         Malformed::UnclosedQuote(quote) => format!("`{quote}` is never closed"),
@@ -1849,8 +1962,8 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Put the file itself in the site instead of a link to it.".into()
             }
         }),
-        Kind::SassStopped { .. }
-        | Kind::SassWarning { .. }
+        Kind::SassStopped { fault } => sass_suggestion(fault),
+        Kind::SassWarning { .. }
         | Kind::UnwritableName { .. }
         | Kind::CantRead { .. }
         | Kind::CantRemove { .. } => None,
@@ -5189,10 +5302,27 @@ mod tests {
             ),
             (
                 Kind::SassStopped {
-                    message: "Undefined variable.".into(),
+                    fault: SassFault::NoVariable("$link".into()),
                 },
-                "Sass stopped: undefined variable",
+                "Sass stopped: no variable called `$link`",
                 None,
+            ),
+            (
+                Kind::SassStopped {
+                    fault: SassFault::Raised("Something is wrong.".into()),
+                },
+                "Sass stopped: `Something is wrong.`",
+                None,
+            ),
+            (
+                Kind::SassStopped {
+                    fault: SassFault::NoNamespace {
+                        name: "math".into(),
+                        built_in: true,
+                    },
+                },
+                "Sass stopped: no module called `math`",
+                Some("Add `@use \"sass:math\";` at the top of the file."),
             ),
             (
                 Kind::SassWarning {
