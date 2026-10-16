@@ -1,14 +1,15 @@
 # Malformed template
 
 Statac couldn't read a template or a snippet. The message says what it
-found, in the template language's own terms, and points to the place to
-fix. Typical causes are a tag that is never closed, an `{% endif %}` with
-no `{% if %}`, or a `takes` line that Statac can't follow.
+found and points to the place to fix. Typical causes are a tag that is
+never closed, an `{% endif %}` with no `{% if %}`, or a `takes` line that
+Statac can't follow.
 
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Malformed template: unexpected end of input, expected end of block
+error  Malformed template: `{% if %}` is never closed
+  Close it with `{% endif %}`.
   More: https://statac.dev/e/malformed-template/
 ```
 

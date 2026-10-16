@@ -11,12 +11,13 @@ use crate::fetch::Refusal;
 use crate::markdown;
 use crate::platform::{Alike, Unwritable};
 use crate::problem::{
-    AddressFault, ArgumentFault, Called, CardFileFault, Chooser, Ended, Expected, FontWithThem,
-    FormatFault, Found, Held, Hint, Instead, Kind, Lack, ListFault, Maker, Missing, MoreAt, Named,
-    NamedIn, Needed, NotDrawn, OptionHint, Own, PictureFault, Piece, PublishedAsText, Reach,
-    RecordFault, Relation, Requirer, Root, SetAside, Severity, ShownBy, ShownWords, SiteMark, Sort,
-    Stopped, Taken, TakesFault, TemplateFault, Translated, Unheard, Unmatched, Unquietenable,
-    Unsupported, Unwritten, Waiting, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
+    AddressFault, ArgumentFault, Awaited, Called, CardFileFault, Chooser, Ended, Expected,
+    FontWithThem, FormatFault, Found, Held, Hint, Instead, Kind, Lack, ListFault, Maker, Missing,
+    MoreAt, Named, NamedIn, Needed, NotDrawn, Opener, OptionHint, Own, PictureFault, Piece,
+    PublishedAsText, Reach, RecordFault, Relation, Requirer, Rewrite, Root, SetAside, Severity,
+    Shape, ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault,
+    TemplateFault, Translated, Unheard, Unmatched, Unquietenable, Unsupported, Unwritten, Waiting,
+    Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 use crate::publish::Occupant;
 use crate::serve::live::Told;
@@ -481,7 +482,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::MalformedTemplate { found } => format!(
             "Malformed template: {}",
             match found {
-                TemplateFault::Syntax(detail) => sentence_part(detail),
+                TemplateFault::Syntax(fault) => syntax_fault(fault),
                 TemplateFault::Takes(fault) => takes_fault(fault),
             }
         ),
@@ -562,6 +563,96 @@ pub(crate) fn headline(kind: &Kind) -> String {
             "Template stopped: {}",
             match reason {
                 Stopped::Engine(detail) => sentence_part(detail),
+                Stopped::Operator { op, left, right } => format!(
+                    "can't use `{op}` on {} and {}",
+                    shape(*left),
+                    shape(*right)
+                ),
+                Stopped::DividedByZero => "can't divide by zero".into(),
+                Stopped::TooLarge(written) => format!("`{written}` is too large a number"),
+                Stopped::RepeatNotWhole => {
+                    "`*` repeats text only a whole number of times".into()
+                }
+                Stopped::RepeatedTooLong => "the repeated text would be too long".into(),
+                Stopped::CantWorkOut(written) => format!("can't work out `{written}`"),
+                Stopped::Needs {
+                    callee,
+                    wanted,
+                    given,
+                } => match given {
+                    Some(given) => format!(
+                        "`{callee}` needs {}, not {}",
+                        wanted_words(*wanted),
+                        shape(*given)
+                    ),
+                    None => format!("`{callee}` needs {}", wanted_words(*wanted)),
+                },
+                Stopped::CantSlice(of) => format!("can't take a slice of {}", shape(*of)),
+                Stopped::SliceStep => "a slice can't step by 0".into(),
+                Stopped::NotCallable(written) => format!("`{written}` can't be called"),
+                Stopped::NoMethod { of, name, .. } => {
+                    format!("{} has no method called `{name}`", shape(*of))
+                }
+                Stopped::MissingArgument { callee, .. } => {
+                    format!("`{callee}` is missing an argument")
+                }
+                Stopped::TooManyArguments(callee) => {
+                    format!("too many arguments for `{callee}`")
+                }
+                Stopped::NoSuchArgument { callee, name, .. } => {
+                    format!("`{callee}` has no argument called `{name}`")
+                }
+                Stopped::GivenTwice { name, callee } => {
+                    format!("`{name}` is given to `{callee}` twice")
+                }
+                Stopped::NoLength(of) => format!("{} has no length", shape(*of)),
+                Stopped::CantLoop(of) => format!("can't loop over {}", shape(*of)),
+                Stopped::CantList { callee, of } => {
+                    format!("`{callee}` can't make a list of {}", shape(*of))
+                }
+                Stopped::NotANumber(callee) => {
+                    format!("`{callee}` was given text that isn't a number")
+                }
+                Stopped::EmptyText(callee) => format!("`{callee}` was given empty text"),
+                Stopped::CantNumber { callee, of } => {
+                    format!("`{callee}` can't make a number of {}", shape(*of))
+                }
+                Stopped::FormatNeeds { mark, given } => format!(
+                    "`{mark}` in `format` needs a number, not {}",
+                    shape(*given)
+                ),
+                Stopped::FormatCharacter(mark) => {
+                    format!("`{mark}` in `format` needs one character")
+                }
+                Stopped::FormatHasNo(mark) => format!("`format` has no `{mark}`"),
+                Stopped::FormatTooFew => "`format` has more `%` marks than values".into(),
+                Stopped::FormatNamed(mark) => format!("`{mark}` in `format` needs named values"),
+                Stopped::RangeTooLong(most) => {
+                    format!("`range` would make more than {} numbers", grouped(most))
+                }
+                Stopped::RangeStep => "`range` can't step by 0".into(),
+                Stopped::LoopNotRecursive => "`loop()` works only in a `recursive` loop".into(),
+                Stopped::LoopTakesOne => "`loop()` takes one value".into(),
+                Stopped::Unpack(names) => format!("`{names}` needs each item to be a list"),
+                Stopped::UnpackCount {
+                    names,
+                    wants,
+                    given,
+                } => format!("`{names}` needs {wants} values in each item, not {given}"),
+                Stopped::NotANamespace(name) => format!("`{name}` isn't a namespace"),
+                Stopped::ExtendsTwice => "a template can extend only one other".into(),
+                Stopped::ExtendsName => {
+                    "`{% extends %}` needs a template's name in quotes".into()
+                }
+                Stopped::ExtendsItself(path) => format!("`{path}` extends itself"),
+                Stopped::ExtendsAgain(path) => {
+                    format!("`{path}` is reached again through `extends`")
+                }
+                Stopped::SuperOutside => "`super()` works only inside a block".into(),
+                Stopped::CallsTooDeep(Some(name)) => {
+                    format!("`{name}` calls itself too many times")
+                }
+                Stopped::CallsTooDeep(None) => "calls nest too deeply".into(),
                 Stopped::NoSiteAddress => "`absolute` needs the site's `url`".into(),
                 Stopped::NoFeedKey(_) => "`feed_id` needs the site's `feed_key`".into(),
                 Stopped::NotAPage(function) => format!("`{function}` needs a page"),
@@ -1324,6 +1415,195 @@ fn takes_fault(fault: &TakesFault) -> String {
         TakesFault::NeverRead(name) => format!("the snippet never reads `{name}`"),
         TakesFault::Supplied(name) => format!("Statac hands every snippet `{name}` itself"),
     }
+}
+
+fn syntax_fault(fault: &SyntaxFault) -> String {
+    match fault {
+        SyntaxFault::Unclosed(opener) => format!("`{}` is never closed", opened(opener)),
+        SyntaxFault::ClosesNothing { end, .. } => format!("`{{% {end} %}}` closes nothing"),
+        SyntaxFault::Astray(tag) => format!("`{{% {tag} %}}` belongs to no `if` or `for`"),
+        SyntaxFault::SecondElse(block) => {
+            format!("this `{block}` already has an `{{% else %}}`")
+        }
+        SyntaxFault::ElifAfterElse => "`{% elif %}` comes after `{% else %}`".into(),
+        SyntaxFault::UnknownTag { written, .. } => format!("there is no `{{% {written} %}}` tag"),
+        SyntaxFault::Foreign(written) => {
+            format!("`{written}` isn't part of the template language")
+        }
+        SyntaxFault::NoFilter => "`|` has no filter after it".into(),
+        SyntaxFault::NoField => "`.` has no field after it".into(),
+        SyntaxFault::BlockUnnamed => "`block` needs a name".into(),
+        SyntaxFault::FilterUnnamed => "`filter` needs a filter's name".into(),
+        SyntaxFault::EmptyTag => "`{% %}` is empty".into(),
+        SyntaxFault::Escape(written) => format!("unfinished escape `{written}`"),
+        SyntaxFault::NotANumber(written) => format!("`{written}` isn't a number"),
+        SyntaxFault::TooLarge(written) => format!("`{written}` is too large a number"),
+        SyntaxFault::TooDeep => "nested too deeply".into(),
+        SyntaxFault::NamedFirst => "a value without a name follows one with a name".into(),
+        SyntaxFault::OutsideLoop(tag) => format!("`{{% {tag} %}}` is outside a loop"),
+        SyntaxFault::Kept(name) => format!("`{name}` can't be set"),
+        SyntaxFault::BlockInMacro(tag) => {
+            format!("a `{{% block %}}` can't be inside a `{{% {tag} %}}`")
+        }
+        SyntaxFault::BlockTwice(name) => format!("there are two blocks called `{name}`"),
+        SyntaxFault::RequiredHolds => "a required block can hold only comments".into(),
+        SyntaxFault::EndNames { written, block } => {
+            format!("`{{% endblock {written} %}}` closes `{{% block {block} %}}`")
+        }
+        SyntaxFault::NoCall(tag) => format!("`{{% {tag} %}}` needs a call"),
+        SyntaxFault::Unexpected {
+            found: Some(found),
+            awaited,
+            ..
+        } => format!("unexpected `{found}`, expected {}", awaited_words(awaited)),
+        SyntaxFault::Unexpected {
+            found: None,
+            awaited,
+            ..
+        } => format!(
+            "the template ends too soon, expected {}",
+            awaited_words(awaited)
+        ),
+        SyntaxFault::Engine(detail) => sentence_part(detail),
+    }
+}
+
+fn syntax_suggestion(fault: &SyntaxFault) -> Option<String> {
+    match fault {
+        SyntaxFault::Unclosed(opener) => {
+            closed_by(opener).map(|close| format!("Close it with `{close}`."))
+        }
+        SyntaxFault::ClosesNothing {
+            open: Some((block, line)),
+            ..
+        } => Some(format!(
+            "The `{{% {block} %}}` on line {line} is still open: close it with \
+             `{{% end{block} %}}` first."
+        )),
+        SyntaxFault::ElifAfterElse => Some("Move it before the `{% else %}`.".into()),
+        SyntaxFault::UnknownTag {
+            nearest: Some(nearest),
+            ..
+        } => Some(format!("Did you mean `{{% {nearest} %}}`?")),
+        SyntaxFault::Foreign(written) => match written.as_str() {
+            "&&" | "&" => Some("Write `and`.".into()),
+            "||" => Some("Write `or`.".into()),
+            "!" => Some("Write `not`.".into()),
+            "?" => Some("Write it as `x if condition else y`.".into()),
+            "$" => Some("Take off the `$`.".into()),
+            _ => None,
+        },
+        SyntaxFault::Escape(written) if written.starts_with("\\u") => {
+            Some("`\\u` takes four hex digits, as in `\\u00e9`.".into())
+        }
+        SyntaxFault::Escape(written) if written.starts_with("\\x") => {
+            Some("`\\x` takes two hex digits, as in `\\x41`.".into())
+        }
+        SyntaxFault::NamedFirst => Some("Put the values with names last.".into()),
+        SyntaxFault::Kept(_) => {
+            Some("The template language keeps this name: choose another.".into())
+        }
+        SyntaxFault::Unexpected {
+            rewrite: Some(rewrite),
+            ..
+        } => Some(match rewrite {
+            Rewrite::Call(call) => format!("Write it as `{call}`."),
+            Rewrite::Close(close) => format!("Close it with `{close}`."),
+            Rewrite::Compare => "Write `==` to compare.".into(),
+            Rewrite::Elif => "Write it as `{% elif %}`.".into(),
+            Rewrite::In(names) => format!("Write `in` after `{names}`."),
+            Rewrite::Assign(names) => format!("Put `=` after `{names}`."),
+            Rewrite::DoubleQuotes(text) => {
+                format!("Write the text in double quotes: `\"{text}\"`.")
+            }
+        }),
+        _ => None,
+    }
+}
+
+/// What opens a thing that is never closed, as a template writes it.
+fn opened(opener: &Opener) -> String {
+    match opener {
+        Opener::Block(keyword) => format!("{{% {keyword} %}}"),
+        Opener::Tag => "{%".into(),
+        Opener::Output => "{{".into(),
+        Opener::Comment => "{#".into(),
+        Opener::Quote(quote) => quote.to_string(),
+    }
+}
+
+fn closed_by(opener: &Opener) -> Option<String> {
+    match opener {
+        Opener::Block(keyword) => Some(format!("{{% end{keyword} %}}")),
+        Opener::Tag => Some("%}".into()),
+        Opener::Output => Some("}}".into()),
+        Opener::Comment => Some("#}".into()),
+        Opener::Quote(_) => None,
+    }
+}
+
+fn awaited_words(awaited: &Awaited) -> String {
+    match awaited {
+        Awaited::Written(written) => format!("`{written}`"),
+        Awaited::Name => "a name".into(),
+        Awaited::NameOrNumber => "a name or a number".into(),
+        Awaited::Value => "a value".into(),
+        Awaited::TagName => "a tag's name".into(),
+    }
+}
+
+/// A kind of value, as a sentence names one.
+fn shape(shape: Shape) -> &'static str {
+    match shape {
+        Shape::Text => "text",
+        Shape::Number => "a number",
+        Shape::TrueFalse => "`true` or `false`",
+        Shape::None => "`none`",
+        Shape::List => "a list",
+        Shape::Map => "a map",
+        Shape::Date => "a date",
+        Shape::Bytes => "bytes",
+        Shape::Other => "this value",
+    }
+}
+
+fn wanted_words(wanted: Wanted) -> &'static str {
+    match wanted {
+        Wanted::Whole => "a whole number",
+        Wanted::WholeFromZero => "a whole number of 0 or more",
+        Wanted::Number => "a number",
+        Wanted::TrueFalse => "`true` or `false`",
+        Wanted::Character => "one character",
+        Wanted::Text => "text",
+        Wanted::List => "a list",
+        Wanted::Map => "a map",
+        Wanted::ListOrText => "a list or text",
+        Wanted::Numbers => "a list of numbers",
+        Wanted::Lists => "lists",
+        Wanted::LookIn => "text, a list or a map to look in",
+        Wanted::CountAboveZero => "a count above 0",
+        Wanted::FilterName => "a filter's name in quotes",
+        Wanted::NamedValues => "named values",
+    }
+}
+
+/// The values one of Statac's functions or filters is called with in the
+/// documentation, for one called without a value it needs.
+fn written_with(callee: &str) -> Option<&'static str> {
+    Some(match callee {
+        "css" => "\"site.css\"",
+        "js" => "\"app.js\"",
+        "asset" => "\"fonts/font-1.woff2\"",
+        "url" => "\"/about/\"",
+        "headline" | "feed_id" => "post",
+        "related" => "page",
+        "highlight" => "\"rust\"",
+        "truncate" => "160, \"…\"",
+        "tagged" => "\"Rust\"",
+        "in" => "\"blog\"",
+        "where" => "\"field\", \"value\"",
+        _ => return None,
+    })
 }
 
 /// Each item in backticks.
@@ -2252,7 +2532,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Some("Add `{{ css(\"code.css\") }}` inside a template's `<head>`.".into())
         }
         Kind::MalformedTemplate { found } => match found {
-            TemplateFault::Syntax(_) => None,
+            TemplateFault::Syntax(fault) => syntax_suggestion(fault),
             TemplateFault::Takes(fault) => Some(match fault {
                 TakesFault::Unclosed | TakesFault::Missing | TakesFault::NamesNothing => {
                     "Write it on one line, as `{# takes photo, alt #}`.".into()
@@ -2372,10 +2652,70 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Stopped::RanOn { .. } => Some(
                 "Look for a loop that never ends, or a loop inside a loop over long lists.".into(),
             ),
+            Stopped::Operator { op, left, right }
+                if op == "+" && (*left == Shape::Text || *right == Shape::Text) =>
+            {
+                Some("Join text with `~`.".into())
+            }
+            Stopped::NotCallable(_) => Some("Take off the `()`.".into()),
+            Stopped::NoMethod {
+                filter: Some(filter),
+                ..
+            } => Some(format!("Write it as a filter: `{filter}`.")),
+            Stopped::MissingArgument { callee, input } => {
+                let values = written_with(callee)?;
+                Some(match input {
+                    Some(input) => format!("Write it as `{input} | {callee}({values})`."),
+                    None => format!("Write it as `{callee}({values})`."),
+                })
+            }
+            Stopped::NoSuchArgument {
+                nearest: Some(nearest),
+                ..
+            } => Some(format!("Did you mean `{nearest}`?")),
+            Stopped::NotANamespace(name) => Some(format!(
+                "Make it with `{{% set {name} = namespace() %}}`."
+            )),
             Stopped::Engine(_)
             | Stopped::NotADate(_)
             | Stopped::ContentInItself
-            | Stopped::CardInCard => None,
+            | Stopped::CardInCard
+            | Stopped::Operator { .. }
+            | Stopped::DividedByZero
+            | Stopped::TooLarge(_)
+            | Stopped::RepeatNotWhole
+            | Stopped::RepeatedTooLong
+            | Stopped::CantWorkOut(_)
+            | Stopped::Needs { .. }
+            | Stopped::CantSlice(_)
+            | Stopped::SliceStep
+            | Stopped::NoMethod { .. }
+            | Stopped::TooManyArguments(_)
+            | Stopped::NoSuchArgument { .. }
+            | Stopped::GivenTwice { .. }
+            | Stopped::NoLength(_)
+            | Stopped::CantLoop(_)
+            | Stopped::CantList { .. }
+            | Stopped::NotANumber(_)
+            | Stopped::EmptyText(_)
+            | Stopped::CantNumber { .. }
+            | Stopped::FormatNeeds { .. }
+            | Stopped::FormatCharacter(_)
+            | Stopped::FormatHasNo(_)
+            | Stopped::FormatTooFew
+            | Stopped::FormatNamed(_)
+            | Stopped::RangeTooLong(_)
+            | Stopped::RangeStep
+            | Stopped::LoopNotRecursive
+            | Stopped::LoopTakesOne
+            | Stopped::Unpack(_)
+            | Stopped::UnpackCount { .. }
+            | Stopped::ExtendsTwice
+            | Stopped::ExtendsName
+            | Stopped::ExtendsItself(_)
+            | Stopped::ExtendsAgain(_)
+            | Stopped::SuperOutside
+            | Stopped::CallsTooDeep(_) => None,
             Stopped::CardInWriting => Some("Read `page.card` in a layout.".into()),
             Stopped::NotText => {
                 Some("Show something else here: a page can only show text.".into())
@@ -7518,11 +7858,18 @@ mod tests {
         vec![
             (
                 Kind::MalformedTemplate {
-                    found: TemplateFault::Syntax(
-                        "Unexpected end of input, expected end of block.".into(),
-                    ),
+                    found: TemplateFault::Syntax(SyntaxFault::Unclosed(Opener::Block("if".into()))),
                 },
-                "Malformed template: unexpected end of input, expected end of block",
+                "Malformed template: `{% if %}` is never closed",
+                Some("Close it with `{% endif %}`."),
+            ),
+            (
+                Kind::MalformedTemplate {
+                    found: TemplateFault::Syntax(SyntaxFault::Engine(
+                        "Too many arguments in function call".into(),
+                    )),
+                },
+                "Malformed template: too many arguments in function call",
                 None,
             ),
             (
@@ -7797,8 +8144,17 @@ mod tests {
                 Some("Add `url:` to `statac.yaml`."),
             ),
             (
-                stopped(Stopped::Engine("Tried to add incompatible types.".into())),
-                "Template stopped: tried to add incompatible types",
+                stopped(Stopped::Operator {
+                    op: "+".into(),
+                    left: Shape::Text,
+                    right: Shape::Number,
+                }),
+                "Template stopped: can't use `+` on text and a number",
+                Some("Join text with `~`."),
+            ),
+            (
+                stopped(Stopped::Engine("template \"home\" does not exist".into())),
+                "Template stopped: template \"home\" does not exist",
                 None,
             ),
             (

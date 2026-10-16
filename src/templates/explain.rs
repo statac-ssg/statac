@@ -15,9 +15,10 @@ use minijinja::machinery::ast::{CallArg, CallType, Expr};
 use minijinja::{Error, ErrorKind};
 
 use super::check::{full_span, parse_template, visit_exprs};
+use super::engine::{Site, missing_operand, read_stopped};
 use super::files::Role;
 use super::frame::{Frame, InData, Miss, RAISED, TOLD};
-use super::guard::{Callee, REFUSED, Refusal, Role as Held, Step};
+use super::guard::{Callee, Failed, REFUSED, Refusal, Role as Held, Step};
 use super::render::{Shared, building, met_building};
 use super::values::PageValue;
 use crate::problem::{
@@ -43,6 +44,7 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
         }
         next = inner.source();
     }
+    let stopped = frame.failed.take();
     if chain.iter().any(|e| e.detail() == Some(TOLD)) {
         return Vec::new();
     }
@@ -68,7 +70,7 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
         }
         let kind = match frame.raised.take() {
             Some(kind) if error.detail() == Some(RAISED) => kind,
-            _ => engine(error),
+            _ => engine(error, None, stopped.as_ref(), &shared).0,
         };
         // With no template to place it in, it is placed in the page's own
         // file where it has one.
@@ -158,7 +160,15 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
             }
         }
     } else {
-        (engine(failed), widen(name, text, &range))
+        let at = widen(name, text, &range);
+        let site = Site {
+            name,
+            text,
+            range: range.clone(),
+            at: at.clone(),
+        };
+        let (kind, told_at) = engine(failed, Some(&site), stopped.as_ref(), &shared);
+        (kind, told_at.unwrap_or(at))
     };
     let at = place(source, at);
     vec![located_problem(kind, at, calls, frame)]
@@ -188,17 +198,24 @@ fn place(source: SourceId, range: Range<usize>) -> Place {
     }
 }
 
-/// The engine's own words for why it stopped.
-fn engine(error: &Error) -> Kind {
-    let detail = match error.detail() {
-        Some(detail) if detail != RAISED && detail != REFUSED && detail != IN_SNIPPET => {
-            detail.to_owned()
-        }
-        _ => error.kind().to_string(),
-    };
-    Kind::TemplateStopped {
-        reason: Stopped::Engine(detail),
+/// Why the engine stopped, and where to tell it where that isn't the
+/// engine's place.
+fn engine(
+    error: &Error,
+    site: Option<&Site<'_>>,
+    failed: Option<&Failed>,
+    shared: &Shared,
+) -> (Kind, Option<Range<usize>>) {
+    if matches!(error.detail(), Some(RAISED | REFUSED | IN_SNIPPET)) {
+        let reason = Stopped::Engine(error.kind().to_string());
+        return (Kind::TemplateStopped { reason }, None);
     }
+    let file_of = |name: &str| {
+        let at = *shared.templates.by_name.get(name)?;
+        let path = shared.sources.path(shared.templates.files[at].source);
+        Some(path.to_string_lossy().replace('\\', "/"))
+    };
+    read_stopped(error, site, failed, &file_of)
 }
 
 /// The whole of the expression the engine stopped at: it places a lookup
@@ -271,9 +288,20 @@ fn missing(
             empty: refusal.empty,
         });
     }
-    if failed.kind() != ErrorKind::UndefinedError {
-        return None;
-    }
+    // The engine hands a missing value to an arithmetic operator without
+    // asking whether it is missing, and says so only in its words.
+    let range = &match failed.kind() {
+        ErrorKind::UndefinedError => range.clone(),
+        _ => {
+            let site = Site {
+                name,
+                text,
+                range: range.clone(),
+                at: widen(name, text, range),
+            };
+            missing_operand(failed, &site)?
+        }
+    };
     let (span, miss) = culprit_of_lookup(name, text, range, &frame.misses)
         .unwrap_or_else(|| (widen(name, text, range), None));
     Some(Missing::Value {

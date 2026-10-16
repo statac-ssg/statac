@@ -1572,10 +1572,110 @@ pub enum ListFault {
 /// What is wrong in a template file, as its reader found it.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum TemplateFault {
-    /// The template engine's own words for it.
-    Syntax(String),
+    /// Where the template engine stopped reading it.
+    Syntax(SyntaxFault),
     /// A `{# takes #}` line that doesn't say what a call's unnamed values fill.
     Takes(TakesFault),
+}
+
+/// What the template engine couldn't read. Text quoted from the template
+/// is as written.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum SyntaxFault {
+    Unclosed(Opener),
+    /// An end tag, by its keyword (`endif`), with no block of its kind
+    /// open; the innermost block open instead, by its keyword and line.
+    ClosesNothing {
+        end: String,
+        open: Option<(String, usize)>,
+    },
+    /// `else` or `elif` with no `if` or `for` open to belong to.
+    Astray(String),
+    /// A second `else` in the `if` or `for` named.
+    SecondElse(String),
+    ElifAfterElse,
+    /// A tag the template language doesn't have, and the one that may have
+    /// been meant.
+    UnknownTag {
+        written: String,
+        nearest: Option<String>,
+    },
+    /// Characters the template language doesn't have.
+    Foreign(String),
+    NoFilter,
+    NoField,
+    BlockUnnamed,
+    FilterUnnamed,
+    EmptyTag,
+    /// An escape in a string that isn't finished, such as `\u12`.
+    Escape(String),
+    NotANumber(String),
+    TooLarge(String),
+    TooDeep,
+    NamedFirst,
+    /// `break` or `continue`, by its keyword.
+    OutsideLoop(String),
+    /// A name the template language keeps, such as `loop`.
+    Kept(String),
+    /// A block inside a `macro` or a `call`, by that tag's keyword.
+    BlockInMacro(String),
+    BlockTwice(String),
+    RequiredHolds,
+    /// `{% endblock other %}` closing `{% block main %}`.
+    EndNames {
+        written: String,
+        block: String,
+    },
+    /// `call` or `do` without a call, by its keyword.
+    NoCall(String),
+    /// Text where the template language needs something else; none for
+    /// the template's end.
+    Unexpected {
+        found: Option<String>,
+        awaited: Awaited,
+        rewrite: Option<Rewrite>,
+    },
+    /// The engine's own words, for what isn't told otherwise.
+    Engine(String),
+}
+
+/// What is opened and never closed.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Opener {
+    /// A block, by its keyword (`if`).
+    Block(String),
+    Tag,
+    Output,
+    Comment,
+    Quote(char),
+}
+
+/// What the template language needs where it found something else.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Awaited {
+    /// Text as the template would write it, such as `%}` or `in`.
+    Written(String),
+    Name,
+    NameOrNumber,
+    Value,
+    TagName,
+}
+
+/// How to write what the template language couldn't read.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Rewrite {
+    /// A filter given its value without brackets, written with them.
+    Call(String),
+    /// The closing marks it needs.
+    Close(String),
+    Compare,
+    Elif,
+    /// `in` after the loop's names.
+    In(String),
+    /// `=` after the names set.
+    Assign(String),
+    /// Text cut short by an apostrophe, in double quotes.
+    DoubleQuotes(String),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1755,13 +1855,148 @@ pub enum Stopped {
     ContentInItself,
     /// An output whose building took all the engine's steps it may, told
     /// of the template it is built with.
-    RanOn { template: String, steps: u64 },
+    RanOn {
+        template: String,
+        steps: u64,
+    },
     /// A `!!binary` value whose bytes aren't text, shown or made into words.
     NotText,
     /// `page.card` asked for by a page's writing.
     CardInWriting,
     /// `page.card` asked for by a text of a card.
     CardInCard,
+    /// An operator, as written, used on values it can't work on, the left
+    /// first.
+    Operator {
+        op: String,
+        left: Shape,
+        right: Shape,
+    },
+    DividedByZero,
+    /// A sum, as written, whose answer is too large a number.
+    TooLarge(String),
+    RepeatNotWhole,
+    RepeatedTooLong,
+    /// An expression, as written, the engine can't work out.
+    CantWorkOut(String),
+    /// A function, filter, test or operator handed a value it can't work
+    /// on; the value's kind where it is known.
+    Needs {
+        callee: String,
+        wanted: Wanted,
+        given: Option<Shape>,
+    },
+    CantSlice(Shape),
+    SliceStep,
+    /// What is called, as written, that can't be.
+    NotCallable(String),
+    /// A method asked of a value with none of that name; the call written
+    /// as a filter, where the template language has one of the name.
+    NoMethod {
+        of: Shape,
+        name: String,
+        filter: Option<String>,
+    },
+    /// A function or filter called without a value it needs; for a
+    /// filter, its input as written.
+    MissingArgument {
+        callee: String,
+        input: Option<String>,
+    },
+    TooManyArguments(String),
+    NoSuchArgument {
+        callee: String,
+        name: String,
+        nearest: Option<String>,
+    },
+    GivenTwice {
+        name: String,
+        callee: String,
+    },
+    NoLength(Shape),
+    CantLoop(Shape),
+    /// A filter that makes a list, handed a value it can't make one of.
+    CantList {
+        callee: String,
+        of: Shape,
+    },
+    /// `int` or `float` handed text that doesn't read as a number.
+    NotANumber(String),
+    EmptyText(String),
+    CantNumber {
+        callee: String,
+        of: Shape,
+    },
+    /// A `%` mark of `format`'s, as written, handed a value of the wrong
+    /// kind.
+    FormatNeeds {
+        mark: String,
+        given: Shape,
+    },
+    FormatCharacter(String),
+    /// A `%` mark `format` doesn't have.
+    FormatHasNo(String),
+    FormatTooFew,
+    FormatNamed(String),
+    /// `range` asked for more numbers than the engine makes.
+    RangeTooLong(u64),
+    RangeStep,
+    LoopNotRecursive,
+    LoopTakesOne,
+    /// The names a loop or `set` unpacks each item into, as written.
+    Unpack(String),
+    UnpackCount {
+        names: String,
+        wants: usize,
+        given: usize,
+    },
+    NotANamespace(String),
+    ExtendsTwice,
+    ExtendsName,
+    /// A template, by its file, that extends itself.
+    ExtendsItself(String),
+    /// A template, by its file, reached again through `extends`.
+    ExtendsAgain(String),
+    SuperOutside,
+    /// Calls nested too deeply, by the macro calling itself where it is
+    /// known.
+    CallsTooDeep(Option<String>),
+}
+
+/// The kind of a value a template handed on, as the engine knows it.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Shape {
+    Text,
+    Number,
+    TrueFalse,
+    None,
+    List,
+    Map,
+    Date,
+    Bytes,
+    /// Any other value, such as a function.
+    Other,
+}
+
+/// What a function, filter, test or operator needs to be handed.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Wanted {
+    Whole,
+    WholeFromZero,
+    Number,
+    TrueFalse,
+    Character,
+    Text,
+    List,
+    Map,
+    ListOrText,
+    Numbers,
+    Lists,
+    /// Somewhere `in` can look: text, a list or a map.
+    LookIn,
+    CountAboveZero,
+    FilterName,
+    NamedValues,
 }
 
 /// How a file outside the site was reached for.

@@ -239,6 +239,28 @@ pub(super) fn refuse(callee: &str, kind: Callee, role: Role, found: Found) -> Er
 /// The words of an error a guard raised.
 pub(super) const REFUSED: &str = "refused a missing value";
 
+/// One of the engine's own filters, tests or functions that stopped, and
+/// what it was handed, the input first.
+#[derive(Debug, Clone)]
+pub(super) struct Failed {
+    pub callee: &'static str,
+    pub args: Vec<Value>,
+}
+
+/// Notes what `callee` was handed where it stopped, unless a callable it
+/// called stopped first.
+fn failed(callee: &'static str, args: &[Value], error: Error) -> Error {
+    frame::with(|frame| {
+        if frame.failed.is_none() {
+            frame.failed = Some(Failed {
+                callee,
+                args: args.to_vec(),
+            });
+        }
+    });
+    error
+}
+
 /// How much of a filter's or test's input is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Input {
@@ -699,6 +721,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
                 true => select_or_reject(state, name, &args),
                 false => inner.call(state, &args),
             }
+            .map_err(|error| failed(name, &args, error))
         });
     }
     for &name in TESTS {
@@ -706,14 +729,19 @@ pub(super) fn install(env: &mut Environment<'_>) {
         let input = Input::of_test(name);
         env.add_test(name, move |state: &State, args: Rest<Value>| {
             check_args(name, Callee::Test, &args, input)?;
-            Ok::<bool, Error>(inner.call(state, &args)?.is_true())
+            let passed = inner
+                .call(state, &args)
+                .map_err(|error| failed(name, &args, error))?;
+            Ok::<bool, Error>(passed.is_true())
         });
     }
     for &name in FUNCTIONS {
         let inner = builtin_function(name);
         env.add_function(name, move |state: &State, args: Rest<Value>| {
             check_args(name, Callee::Function, &args, Input::Whole)?;
-            inner.call(state, &args)
+            inner
+                .call(state, &args)
+                .map_err(|error| failed(name, &args, error))
         });
     }
 }

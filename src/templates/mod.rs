@@ -11,6 +11,7 @@
 mod card;
 mod check;
 mod data;
+mod engine;
 mod explain;
 mod files;
 mod frame;

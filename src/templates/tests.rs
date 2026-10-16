@@ -4049,6 +4049,7 @@ fn a_notes_way_back_says_where_it_goes_in_the_sites_language() {
 }
 
 mod building;
+mod engine;
 mod languages;
 mod lists;
 mod pieces;

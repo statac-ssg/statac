@@ -1444,19 +1444,14 @@ impl<'a> Checker<'a> {
 
 /// A template the engine can't read, at the place it stopped.
 pub(super) fn syntax(source: SourceId, text: &str, error: &minijinja::Error) -> Problem {
-    let range = error.range().unwrap_or(0..0);
-    let start = range.start.min(text.len());
-    let end = range.end.clamp(start, text.len());
-    let detail = error
-        .detail()
-        .map_or_else(|| error.kind().to_string(), str::to_owned);
+    let (fault, range) = super::engine::read_syntax(text, error);
     Problem::at(
         Kind::MalformedTemplate {
-            found: TemplateFault::Syntax(detail),
+            found: TemplateFault::Syntax(fault),
         },
         Place {
             source,
-            span: crate::source::Span::new(start, end),
+            span: crate::source::Span::new(range.start, range.end),
         },
     )
 }

@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use minijinja::{Captured, State, Value};
 
-use super::guard::Refusal;
+use super::guard::{Failed, Refusal};
 use super::render::Shared;
 use crate::assets::PageScripts;
 use crate::problem::{Kind, Problem, Stopped};
@@ -42,6 +42,9 @@ pub(super) struct Frame {
     pub misses: Vec<Miss>,
     /// What the last guard to refuse a value found.
     pub refusal: Option<Refusal>,
+    /// The innermost of the engine's own filters, tests and functions to
+    /// stop, and what it was handed.
+    pub failed: Option<Failed>,
     /// A problem Statac's own code raised, to be told in place of the
     /// engine's error it stopped the template with.
     pub raised: Option<Kind>,
@@ -146,6 +149,7 @@ impl Frame {
             problems: Vec::new(),
             misses: Vec::new(),
             refusal: None,
+            failed: None,
             raised: None,
             handed: None,
             snippets: Vec::new(),
