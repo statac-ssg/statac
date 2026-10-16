@@ -1,7 +1,8 @@
 //! How a built page's source keeps the indentation its templates were
 //! written with. What a template puts on a line of its own follows that
-//! line's indent on each of its lines, and a line whose only value came to
-//! nothing is not written.
+//! line's indent on each of its lines, a line whose only value came to
+//! nothing is not written, and a line leaves out indentation it has only
+//! for the template's sake (`dedent`).
 //!
 //! The engine can't say what column a value is printed at, so each render
 //! writes to a [`Sink`] that keeps account of the line being written, and
@@ -77,11 +78,43 @@ impl Own {
     }
 }
 
-/// What one template writes.
-struct Sink(Vec<u8>, Own);
+/// Where the templates' lines leave out indentation they have only for the
+/// template's sake: the address in memory of each such line's start, in
+/// order, with how many bytes of its indent are left out.
+#[derive(Default)]
+pub(super) struct Cuts(Vec<(usize, usize)>);
 
-impl Sink {
-    fn new() -> Self {
+impl Cuts {
+    /// Adds the cuts `dedent` finds in `source`, the text as the engine
+    /// holds it.
+    pub(super) fn add(&mut self, source: &str) {
+        let base = source.as_ptr() as usize;
+        let found = super::dedent::cuts(source);
+        if found.is_empty() {
+            return;
+        }
+        self.0
+            .extend(found.into_iter().map(|(at, len)| (base + at, len)));
+        self.0.sort_unstable();
+    }
+
+    /// The first cut in `text`, as where in it the line starts and how
+    /// many bytes are left out.
+    fn first(&self, text: &[u8]) -> Option<(usize, usize)> {
+        let start = text.as_ptr() as usize;
+        let after = self.0.partition_point(|&(at, _)| at < start);
+        let &(at, len) = self.0.get(after)?;
+        let at = at - start;
+        (at < text.len()).then_some((at, len))
+    }
+}
+
+/// What one template writes, and whether what it writes starts a line
+/// where it is put.
+struct Sink<'c>(Vec<u8>, Own, &'c Cuts, bool);
+
+impl<'c> Sink<'c> {
+    fn new(cuts: &'c Cuts, begins: bool) -> Self {
         LINES.with_borrow_mut(|lines| {
             lines.push(Line {
                 start: 0,
@@ -92,19 +125,65 @@ impl Sink {
                 value: false,
             });
         });
-        Self(Vec::new(), Own::default())
+        Self(Vec::new(), Own::default(), cuts, begins)
+    }
+
+    /// Writes the template's own text, leaving out of each line what
+    /// [`Cuts`] says it has only for the template's sake.
+    fn own(&mut self, text: &[u8]) {
+        let mut done = 0;
+        let mut from = 0;
+        while let Some((at, len)) = self.2.first(&text[from..]) {
+            let at = from + at;
+            from = at + 1;
+            // A cut is at a line's start in the template; the line is left
+            // whole where it isn't at one in the output too.
+            let starts = at > 0
+                || (self.3 || !self.0.is_empty())
+                    && LINES.with_borrow(|lines| {
+                        lines.last().is_some_and(|line| line.start == self.0.len())
+                    });
+            let end = at + len;
+            if !starts || end > text.len() || blank(&text[at..end]) < len {
+                continue;
+            }
+            if done < at {
+                self.put(&text[done..at]);
+            }
+            done = end;
+        }
+        if done < text.len() {
+            self.put(&text[done..]);
+        }
     }
 }
 
-impl Drop for Sink {
+impl Drop for Sink<'_> {
     fn drop(&mut self) {
         LINES.with_borrow_mut(Vec::pop);
     }
 }
 
-impl io::Write for Sink {
-    fn write(&mut self, mut text: &[u8]) -> io::Result<usize> {
-        let written = text.len();
+impl io::Write for Sink<'_> {
+    fn write(&mut self, text: &[u8]) -> io::Result<usize> {
+        if self.2.0.is_empty()
+            || text.is_empty()
+            || LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.value))
+        {
+            self.put(text);
+        } else {
+            self.own(text);
+        }
+        Ok(text.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Sink<'_> {
+    fn put(&mut self, mut text: &[u8]) {
         LINES.with_borrow_mut(|lines| {
             let line = lines.last_mut().expect("a sink has its line");
             // A line ending a value writes is the value's to keep: only
@@ -164,11 +243,6 @@ impl io::Write for Sink {
                 line.open = blank == tail.len();
             }
         });
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }
 
@@ -179,12 +253,16 @@ fn blank(text: &[u8]) -> usize {
         .count()
 }
 
-/// Renders `template`, giving what it wrote beside the engine's own account.
+/// Renders `template`, giving what it wrote beside the engine's own
+/// account. `begins` says whether what it writes starts a line where it is
+/// put, so that its first line may leave out what [`Cuts`] says.
 pub(super) fn render<'source>(
     template: &Template<'_, 'source>,
     context: impl Into<Value>,
+    cuts: &Cuts,
+    begins: bool,
 ) -> Result<(Captured<'source>, String), Error> {
-    render_placed(template, context).map(|(captured, text, _)| (captured, text))
+    render_placed(template, context, cuts, begins).map(|(captured, text, _)| (captured, text))
 }
 
 /// Renders `template` as [`render`] does, giving as well where what it
@@ -192,11 +270,19 @@ pub(super) fn render<'source>(
 pub(super) fn render_placed<'source>(
     template: &Template<'_, 'source>,
     context: impl Into<Value>,
+    cuts: &Cuts,
+    begins: bool,
 ) -> Result<(Captured<'source>, String, Own), Error> {
-    let mut sink = Sink::new();
+    let mut sink = Sink::new(cuts, begins);
     let captured = template.render_captured_to(context, &mut sink)?;
     let text = String::from_utf8(std::mem::take(&mut sink.0)).expect("templates write text");
     Ok((captured, text, std::mem::take(&mut sink.1)))
+}
+
+/// Whether nothing but spaces has been written on the line the template
+/// being rendered is writing.
+pub(super) fn at_line_start() -> bool {
+    LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.open))
 }
 
 /// Runs `write`, which writes a value, so that the line endings it writes

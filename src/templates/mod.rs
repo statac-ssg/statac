@@ -11,6 +11,7 @@
 mod card;
 mod check;
 mod data;
+mod dedent;
 mod engine;
 mod explain;
 mod files;
@@ -62,6 +63,9 @@ pub struct Templates {
     extends: Vec<Option<String>>,
     /// The cards the site describes, their texts among the files.
     cards: card::Cards,
+    /// Where the files' lines leave out indentation they have only for
+    /// the template's sake.
+    cuts: indent::Cuts,
     /// How many of the engine's steps building one output may take.
     steps: u64,
     /// How many pages of lists of the whole site the outputs running one
@@ -276,6 +280,16 @@ pub fn read(
         // A file the engine can't read was told about when it was checked.
         let _ = env.add_template_owned(file.name.clone(), text);
     }
+    // What tells indentation meant for the template from the page's is
+    // the markup; elsewhere an indent may mean something, and is kept.
+    let mut cuts = indent::Cuts::default();
+    for file in &files {
+        if matches!(escaping(&file.name), AutoEscape::Html)
+            && let Ok(template) = env.get_template(&file.name)
+        {
+            cuts.add(template.source());
+        }
+    }
     for snippet in snippets.values() {
         render::register_snippet(&mut env, snippet);
     }
@@ -288,6 +302,7 @@ pub fn read(
         unusable,
         extends,
         cards,
+        cuts,
         steps,
         many_walked: lowered_walked(root).unwrap_or(walks::MANY),
     };

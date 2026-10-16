@@ -72,9 +72,20 @@ pub(super) fn build(
         .get_template(&templates.files[file].name)
         .and_then(|template| {
             frame::begin(file, None)?;
-            frame::end(file, super::indent::render(&template, context))?
+            frame::end(
+                file,
+                super::indent::render(&template, context, &templates.cuts, stands_alone(piece)),
+            )?
         });
     Some(built.map(|html| html.trim_end().to_owned()))
+}
+
+/// Whether the writing puts `piece` on lines of its own, not among the words.
+fn stands_alone(piece: Piece) -> bool {
+    match piece {
+        Piece::Heading | Piece::Code | Piece::Footnotes | Piece::Callout => true,
+        Piece::Link | Piece::Image | Piece::InlineCode | Piece::Footnote => false,
+    }
 }
 
 /// Whether the site's file for `piece` can read what it is handed as

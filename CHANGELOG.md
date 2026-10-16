@@ -80,6 +80,13 @@ What changed in each release of Statac, the newest first.
 - A function that takes no names, handed one, as `url(to="/about/")`,
   is told as having no argument called it. It was told as handed a
   value that isn't an address.
+- The lines of a block indented under its tag only to read the
+  template, as a loop's body under `{% for %}` level with the line
+  before it, are written at the indent of the lines round them. They
+  were written that much further in. A body the markup indents, one
+  step inside the `<ul>` its tag stands level with, is written as typed,
+  as is any body where Statac can't tell which was meant. Pages look
+  the same; only their source changes.
 
 ### Changed
 

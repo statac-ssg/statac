@@ -394,6 +394,79 @@ fn what_is_put_on_a_line_of_its_own_follows_the_lines_indent() {
 }
 
 #[test]
+fn a_bodys_indent_for_the_templates_sake_is_left_out_of_the_page() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-10-01\n---\n",
+        ),
+        (
+            "content/post-2.md",
+            "---\ntitle: Post 2\ndate: 2026-10-02\n---\n",
+        ),
+        ("snippets/card.html", "<li>\n  {{ post.title }}\n</li>\n"),
+        (
+            "templates/home.html",
+            "<ul>\n  <li><a href=\"/\">Home</a></li>\n  {% for post in page.posts %}\n      <li>{{ post.title }}</li>\n      {{ card(post) }}\n  {% endfor %}\n</ul>\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(
+        built.html("index.md"),
+        "<ul>\n  <li><a href=\"/\">Home</a></li>\n  <li>Post 2</li>\n  <li>\n    Post 2\n  </li>\n  <li>Post 1</li>\n  <li>\n    Post 1\n  </li>\n</ul>\n"
+    );
+}
+
+#[test]
+fn a_snippet_put_among_other_things_on_a_line_keeps_the_spaces_it_starts_with() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "snippets/items.html",
+            "{% for item in [\"a\", \"b\"] %}\n    <b>{{ item }}</b>\n{% endfor %}\n",
+        ),
+        (
+            "templates/home.html",
+            "<p>Items:{{ items() }}</p>\n<div>\n  {{ items() }}\n</div>\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(
+        built.html("index.md"),
+        "<p>Items:    <b>a</b>\n<b>b</b>\n</p>\n<div>\n  <b>a</b>\n  <b>b</b>\n</div>\n"
+    );
+}
+
+#[test]
+fn a_template_writing_plain_text_keeps_its_bodys_indent() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        (
+            "content/notes.md",
+            "---\ntitle: Notes\npermalink: /notes.txt\nlayout: notes.txt\n---\n",
+        ),
+        (
+            "templates/notes.txt",
+            "- {{ page.title }}\n{% for line in [\"a\", \"b\"] %}\n    - {{ line }}\n{% endfor %}\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(built.html("notes.md"), "- Notes\n    - a\n    - b\n");
+}
+
+#[test]
 fn a_line_ending_a_value_writes_is_kept_after_a_value_that_came_to_nothing() {
     let built = site(&[
         (

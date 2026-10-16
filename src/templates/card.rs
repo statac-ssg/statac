@@ -669,7 +669,10 @@ fn build(shared: &Arc<Shared>, name: &str, id: PageId) -> Option<String> {
     frame::with(|frame| frame.layout = Some(at));
     let built = templates.env.get_template(name).and_then(|template| {
         frame::begin(at, None)?;
-        frame::end(at, super::indent::render(&template, context))?
+        frame::end(
+            at,
+            super::indent::render(&template, context, &templates.cuts, false),
+        )?
     });
     match built {
         Ok(text) => Some(text.trim().to_owned()),

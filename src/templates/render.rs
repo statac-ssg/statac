@@ -777,7 +777,8 @@ impl Renderer {
             .and_then(|template| {
                 let at = layout.expect("a template the engine holds");
                 frame::begin(at, None)?;
-                let built = super::indent::render_placed(&template, context);
+                let built =
+                    super::indent::render_placed(&template, context, &shared.templates.cuts, true);
                 frame::end(
                     at,
                     built.map(|(captured, text, placed)| {
@@ -1815,7 +1816,8 @@ impl markdown::Snippets for Prose<'_> {
             frame.calling.replace(place)
         })
         .flatten();
-        let built = build_snippet(shared, snippet, handed, page, site, None);
+        let standalone = placement == Placement::Standalone;
+        let built = build_snippet(shared, snippet, handed, page, site, None, standalone);
         frame::with(|frame| frame.calling = before);
         match built {
             Ok(html) => html,
@@ -1888,7 +1890,8 @@ fn escape(text: &str) -> String {
 }
 
 /// Builds a snippet with what a call handed it, and `page` and `site`,
-/// called by the run `calling` where a template calls it.
+/// called by the run `calling` where a template calls it. `begins` says
+/// whether what it writes starts a line where it is put.
 fn build_snippet(
     shared: &Arc<Shared>,
     snippet: &Snippet,
@@ -1896,6 +1899,7 @@ fn build_snippet(
     page: Value,
     site: Value,
     calling: Option<&State>,
+    begins: bool,
 ) -> Result<String, Error> {
     let templates = &shared.templates;
     frame::read(Key::Template(Templates::id(snippet.file)));
@@ -1920,7 +1924,7 @@ fn build_snippet(
         .and_then(|template| {
             let source = template.source();
             let (start, len) = (source.as_ptr() as usize, source.len());
-            let built = super::indent::render_placed(&template, context)?;
+            let built = super::indent::render_placed(&template, context, &templates.cuts, begins)?;
             Ok((built, start, len))
         })
         .map(|((captured, text, own), start, len)| {
@@ -2026,7 +2030,8 @@ pub(super) fn register_snippet(env: &mut Environment<'static>, snippet: &Snippet
         }
         let page = state.lookup("page").unwrap_or_default();
         let site = state.lookup("site").unwrap_or_default();
-        build_snippet(&shared, &snippet, handed, page, site, Some(state))
+        let begins = super::indent::at_line_start();
+        build_snippet(&shared, &snippet, handed, page, site, Some(state), begins)
             .map(Value::from_safe_string)
     });
 }
