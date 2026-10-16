@@ -2775,7 +2775,13 @@ impl Kind {
     /// Whether the problem is about the whole of the file it is placed
     /// in, so it is shown by the file's name with no line of it marked.
     pub fn of_a_whole_file(&self) -> bool {
-        matches!(self, Kind::UnusedCard { .. })
+        matches!(
+            self,
+            Kind::UnusedCard { .. }
+                | Kind::SassStopped {
+                    fault: SassFault::NotCss { placed: false, .. }
+                }
+        )
     }
 
     /// Whether an author may quieten this kind by name. Errors, and anything

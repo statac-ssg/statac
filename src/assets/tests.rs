@@ -1125,6 +1125,33 @@ fn why_sass_stopped_is_told_in_its_own_words_at_the_text_it_is_about() {
     }
 }
 
+/// A value CSS can't write is told by the stylesheet's name alone where
+/// Sass gives no place for it, and at the text where it gives one.
+#[test]
+fn a_value_css_cant_write_is_told_by_the_stylesheet_where_sass_gives_no_place() {
+    let cases = [
+        ("$x: 1px;\na { b: $x * $x; }\n", true),
+        ("a { b: (a: 1) + 1; }\n", false),
+    ];
+    for (i, (text, whole)) in cases.into_iter().enumerate() {
+        let site = Site::new(&format!("sass-not-css-{i}"), &[("assets/site.scss", text)]);
+        let (_, problems, _) = site.gather("");
+        let [problem] = &problems[..] else {
+            panic!("{text}: {problems:?}")
+        };
+        assert!(
+            matches!(
+                &problem.kind,
+                Kind::SassStopped {
+                    fault: SassFault::NotCss { .. }
+                }
+            ),
+            "{text}: {problem:?}"
+        );
+        assert_eq!(problem.kind.of_a_whole_file(), whole, "{text}");
+    }
+}
+
 #[test]
 fn a_worker_named_by_an_asset_is_warned_of_at_its_name() {
     let site = Site::new(

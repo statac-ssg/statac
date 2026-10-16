@@ -81,8 +81,13 @@ pub enum SassFault {
     Units(String, String),
     /// An operation Sass can't carry out.
     Operation(String),
-    /// A value, as Sass shows it, that CSS has no way to write.
-    NotCss(String),
+    /// A value, as Sass shows it, that CSS has no way to write, and
+    /// whether Sass said where: met as it writes the stylesheet out, it
+    /// gives no place.
+    NotCss {
+        value: String,
+        placed: bool,
+    },
     /// An argument handed the wrong kind of value, shown as Sass shows it.
     WrongType {
         argument: String,
@@ -362,7 +367,10 @@ fn worded(first: &str, text: &str, span: &mut Range<usize>) -> Option<SassFault>
         return Some(SassFault::InFunction(what.to_owned()));
     }
     if let Some(value) = first.strip_suffix(" isn't a valid CSS value.") {
-        return Some(SassFault::NotCss(value.to_owned()));
+        return Some(SassFault::NotCss {
+            value: value.to_owned(),
+            placed: span.start < span.end,
+        });
     }
     argument_fault(first)
 }

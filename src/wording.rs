@@ -1937,7 +1937,7 @@ fn sass_fault(fault: &SassFault) -> String {
         SassFault::LoadsItself => "this stylesheet loads itself".into(),
         SassFault::Units(one, other) => format!("can't combine `{one}` and `{other}`"),
         SassFault::Operation(operation) => format!("can't work out `{operation}`"),
-        SassFault::NotCss(value) => format!("`{value}` can't be written as CSS"),
+        SassFault::NotCss { value, .. } => format!("`{value}` can't be written as CSS"),
         SassFault::WrongType {
             argument,
             wanted,

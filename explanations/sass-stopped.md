@@ -2,8 +2,10 @@
 
 A Sass file in `assets/` couldn't be compiled to CSS. The message says
 why, and points at the file and line where Sass stopped. This may be
-another file that the stylesheet uses. Where an `@error` in your Sass
-stopped it, the message quotes what the `@error` says.
+another file that the stylesheet uses. Where Sass gives no place, as for
+a value CSS has no way to write, the message names only the stylesheet.
+Where an `@error` in your Sass stopped it, the message quotes what the
+`@error` says.
 
 ## What you'll see {#what-youll-see}
 
