@@ -1996,6 +1996,8 @@ pub enum Wanted {
     LookIn,
     CountAboveZero,
     FilterName,
+    TestName,
+    FieldName,
     NamedValues,
 }
 

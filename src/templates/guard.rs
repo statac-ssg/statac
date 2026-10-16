@@ -25,6 +25,7 @@ use minijinja::value::{Rest, Value, ValueKind};
 use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 use super::frame;
+use crate::problem::{Kind, Stopped, Wanted};
 
 /// Every filter the engine ships, by the name templates use. A filter not
 /// in this list is refused when templates are read, so one added by a
@@ -447,11 +448,16 @@ fn check_by_field(callee: &str, args: &[Value]) -> Result<(), Error> {
 /// them, except that an item whose value is missing fails any test that
 /// would refuse it. The value is only tested, never shown.
 fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value, Error> {
-    let name_in = |value: &Value| {
-        value
-            .as_str()
-            .map(str::to_owned)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "expected a name in quotes"))
+    let name_in = |value: &Value, wanted| {
+        value.as_str().map(str::to_owned).ok_or_else(|| {
+            frame::raise(Kind::TemplateStopped {
+                reason: Stopped::Needs {
+                    callee: callee.to_owned(),
+                    wanted,
+                    given: Some(super::engine::shape_of_value(value)),
+                },
+            })
+        })
     };
     let Some((input, mut rest)) = args.split_first() else {
         return Err(Error::from(ErrorKind::MissingArgument));
@@ -462,14 +468,14 @@ fn select_or_reject(state: &State, callee: &str, args: &[Value]) -> Result<Value
                 .split_first()
                 .ok_or_else(|| Error::from(ErrorKind::MissingArgument))?;
             rest = after;
-            Some(name_in(named)?)
+            Some(name_in(named, Wanted::FieldName)?)
         }
         false => None,
     };
     let test = match rest.split_first() {
         Some((named, after)) => {
             rest = after;
-            let named = name_in(named)?;
+            let named = name_in(named, Wanted::TestName)?;
             let &name = TESTS
                 .iter()
                 .find(|&&t| t == named)

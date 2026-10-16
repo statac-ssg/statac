@@ -295,7 +295,7 @@ fn shape_of(word: &str, function: bool) -> Option<Shape> {
 }
 
 /// A value's kind, as it was handed on.
-fn shape_of_value(value: &Value) -> Shape {
+pub(in crate::templates) fn shape_of_value(value: &Value) -> Shape {
     match value.kind() {
         ValueKind::String => Shape::Text,
         ValueKind::Number => Shape::Number,

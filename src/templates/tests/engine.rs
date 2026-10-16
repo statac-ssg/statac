@@ -968,6 +968,27 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             "[1] | map",
         ),
         case(
+            "{{ [1] | select(1) | list }}",
+            "Template stopped: `select` needs a test's name in quotes, not a number",
+            None,
+            1,
+            "[1] | select(1)",
+        ),
+        case(
+            "{{ site.pages | rejectattr(\"title\", none) | list }}",
+            "Template stopped: `rejectattr` needs a test's name in quotes, not `none`",
+            None,
+            1,
+            "site.pages | rejectattr(\"title\", none)",
+        ),
+        case(
+            "{{ site.pages | selectattr(1) | list }}",
+            "Template stopped: `selectattr` needs a field's name in quotes, not a number",
+            None,
+            1,
+            "site.pages | selectattr(1)",
+        ),
+        case(
             "{{ \"%d\" | format(\"a\") }}",
             "Template stopped: `%d` in `format` needs a number, not text",
             None,

@@ -9,7 +9,7 @@
 mod stopped;
 mod syntax;
 
-pub(super) use stopped::{Site, missing_operand, read_stopped};
+pub(super) use stopped::{Site, missing_operand, read_stopped, shape_of_value};
 pub(super) use syntax::read_syntax;
 
 use std::ops::Range;

@@ -1583,6 +1583,8 @@ fn wanted_words(wanted: Wanted) -> &'static str {
         Wanted::LookIn => "text, a list or a map to look in",
         Wanted::CountAboveZero => "a count above 0",
         Wanted::FilterName => "a filter's name in quotes",
+        Wanted::TestName => "a test's name in quotes",
+        Wanted::FieldName => "a field's name in quotes",
         Wanted::NamedValues => "named values",
     }
 }
