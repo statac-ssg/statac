@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use minijinja::machinery::ast::{self, CallArg, CallType, Expr, Stmt};
+use minijinja::machinery::ast::{self, BinOpKind, CallArg, CallType, Expr, Stmt};
 use minijinja::machinery::{Span, WhitespaceConfig, parse};
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::Value;
@@ -840,7 +840,7 @@ impl<'a> Checker<'a> {
                 && self.imported.contains(module.id)
                 && call.span().start_offset > import_span.end_offset
             {
-                let text = self.spelling(full_span(expr));
+                let text = self.spelling(full_span(expr, self.text));
                 let rewritten = text.replacen(&format!("{}.", module.id), "", 1);
                 found.push(format!("{{{{ {rewritten} }}}}"));
             }
@@ -975,7 +975,7 @@ impl<'a> Checker<'a> {
                     _ => Info::unknown(),
                 }
             }
-            Expr::Call(call) => self.call(call, full_span(expr), seen),
+            Expr::Call(call) => self.call(call, full_span(expr, self.text), seen),
             Expr::List(list) => {
                 let mut tys = Vec::new();
                 let mut items_maybe_missing = false;
@@ -1007,7 +1007,7 @@ impl<'a> Checker<'a> {
     }
 
     fn hidden_in_literal(&mut self, item: &Expr<'_>, map: bool) {
-        let span = full_span(item);
+        let span = full_span(item, self.text);
         let written = self.spelling(span).to_owned();
         self.tell(
             Kind::NoValue {
@@ -1021,7 +1021,7 @@ impl<'a> Checker<'a> {
 
     /// `base.name`, where `whole` is the lookup and `base_expr` its left.
     fn field(&mut self, whole: &Expr<'_>, base_expr: &Expr<'_>, base: Info, name: &str) -> Info {
-        let span = full_span(whole);
+        let span = full_span(whole, self.text);
         let present = Self::path_of(whole).is_some_and(|p| self.is_present(&p));
         match &base.ty {
             Ty::Record(rec) => match self.schema.record(*rec).get(name) {
@@ -1082,11 +1082,11 @@ impl<'a> Checker<'a> {
             name: attr.name.to_owned(),
             meant: format!("{}.{meant}", var.id),
         };
-        self.tell(kind, full_span(tested));
+        self.tell(kind, full_span(tested, self.text));
     }
 
     fn unknown_field(&mut self, rec: Rec, base_expr: &Expr<'_>, name: &str, span: Span) {
-        let base_text = self.spelling(full_span(base_expr)).to_owned();
+        let base_text = self.spelling(full_span(base_expr, self.text)).to_owned();
         let written = format!("{base_text}.{name}");
         let fields = self.schema.record(rec);
         let near = nearest(name, fields.keys().map(String::as_str));
@@ -1229,7 +1229,7 @@ impl<'a> Checker<'a> {
             }
         }
         if let Some((first, _)) = unnamed.first() {
-            let span = full_span(first);
+            let span = full_span(first, self.text);
             match super::files::unnamed_fills(snippet.takes.as_ref(), params, unnamed.len(), |p| {
                 named.contains(&p)
             }) {
@@ -1252,7 +1252,9 @@ impl<'a> Checker<'a> {
                     span,
                 ),
                 super::files::Unnamed::TooMany { takes, past } => {
-                    let at = unnamed.get(past).map_or(span, |(e, _)| full_span(e));
+                    let at = unnamed
+                        .get(past)
+                        .map_or(span, |(e, _)| full_span(e, self.text));
                     let others = params
                         .iter()
                         .filter(|p| !takes.contains(p))
@@ -1261,7 +1263,9 @@ impl<'a> Checker<'a> {
                     self.tell(wrong(ArgumentFault::TooMany { takes, others }), at);
                 }
                 super::files::Unnamed::Twice { name: twice, at } => {
-                    let at = unnamed.get(at).map_or(span, |(e, _)| full_span(e));
+                    let at = unnamed
+                        .get(at)
+                        .map_or(span, |(e, _)| full_span(e, self.text));
                     self.tell(wrong(ArgumentFault::Twice(twice)), at);
                 }
                 super::files::Unnamed::Nothing => {}
@@ -1414,7 +1418,7 @@ impl<'a> Checker<'a> {
             && var.id == "page"
         {
             self.printed_page_fields
-                .push((attr.name.to_owned(), full_span(expr)));
+                .push((attr.name.to_owned(), full_span(expr, self.text)));
         }
     }
 
@@ -1744,24 +1748,25 @@ impl Free<'_> {
     }
 }
 
-/// The span of an expression from its first character. The parser starts
-/// the span of each lookup or call after the first in a chain at its own
-/// `.`, `[` or `(`, so `page.book.author` is spanned `.book.author`, and a
-/// filter or test is spanned from its name.
-pub(super) fn full_span(expr: &Expr<'_>) -> Span {
+/// The span of an expression in `text` from its first character. The
+/// parser starts the span of each lookup or call after the first in a chain
+/// at its own `.`, `[` or `(`, so `page.book.author` is spanned
+/// `.book.author`, and a filter or test is spanned from its name. It starts
+/// a comparison, an `if ... else` value and an `a not in b` at the token
+/// before them, and a value in brackets inside them.
+pub(super) fn full_span(expr: &Expr<'_>, text: &str) -> Span {
     let end = expr.span();
-    if let Expr::IfExpr(i) = expr {
-        let first = full_span(&i.true_expr);
-        let last = i
-            .false_expr
-            .as_ref()
-            .map_or(full_span(&i.test_expr), full_span);
-        return Span {
-            end_line: last.end_line,
-            end_col: last.end_col,
-            end_offset: last.end_offset,
-            ..first
-        };
+    if let Some(first) = spanned_from_before(expr, text) {
+        let start = full_span(first, text);
+        return opened(
+            text,
+            Span {
+                end_line: end.end_line,
+                end_col: end.end_col,
+                end_offset: end.end_offset,
+                ..start
+            },
+        );
     }
     let inner = match expr {
         Expr::GetAttr(a) => Some(&a.expr),
@@ -1774,19 +1779,109 @@ pub(super) fn full_span(expr: &Expr<'_>) -> Span {
     };
     match inner {
         Some(inner) => {
-            let start = full_span(inner);
+            let start = full_span(inner, text);
             if start.start_offset < end.start_offset {
-                Span {
-                    start_line: start.start_line,
-                    start_col: start.start_col,
-                    start_offset: start.start_offset,
-                    ..end
-                }
+                opened(
+                    text,
+                    Span {
+                        start_line: start.start_line,
+                        start_col: start.start_col,
+                        start_offset: start.start_offset,
+                        ..end
+                    },
+                )
             } else {
                 end
             }
         }
         None => end,
+    }
+}
+
+/// The first value of an expression the parser spans from the token
+/// before it.
+fn spanned_from_before<'e, 's>(expr: &'e Expr<'s>, text: &str) -> Option<&'e Expr<'s>> {
+    match expr {
+        Expr::IfExpr(i) => Some(&i.true_expr),
+        Expr::Compare(c) => Some(&c.expr),
+        Expr::BinOp(op) if compares(op.op) => Some(&op.left),
+        // `a not in b` is read as `not` around `a in b`, both spanned alike.
+        Expr::UnaryOp(op) => match &op.expr {
+            Expr::BinOp(within) if matches!(within.op, BinOpKind::In) => {
+                let left = full_span(&within.left, text).end_offset as usize;
+                let right = full_span(&within.right, text).start_offset as usize;
+                text.get(left..right)?
+                    .contains("not")
+                    .then_some(&within.left)
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn compares(op: BinOpKind) -> bool {
+    matches!(
+        op,
+        BinOpKind::Eq
+            | BinOpKind::Ne
+            | BinOpKind::Lt
+            | BinOpKind::Lte
+            | BinOpKind::Gt
+            | BinOpKind::Gte
+            | BinOpKind::In
+    )
+}
+
+/// `span`, taken back over the brackets opened before it that it closes:
+/// the parser starts the span of a value in brackets inside them.
+fn opened(text: &str, span: Span) -> Span {
+    let from = span.start_offset as usize;
+    let Some(written) = text.get(from..span.end_offset as usize) else {
+        return span;
+    };
+    let mut unopened = 0usize;
+    let mut depth = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    for c in written.chars() {
+        match (quote, c) {
+            (Some(_), _) if escaped => escaped = false,
+            (Some(_), '\\') => escaped = true,
+            (Some(q), _) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, '"' | '\'') => quote = Some(c),
+            (None, '(') => depth += 1,
+            (None, ')') if depth > 0 => depth -= 1,
+            (None, ')') => unopened += 1,
+            _ => {}
+        }
+    }
+    let mut start = from;
+    while unopened > 0 {
+        let open = text[..start].trim_end().len();
+        if !text[..open].ends_with('(') {
+            break;
+        }
+        start = open - 1;
+        unopened -= 1;
+    }
+    let walked = &text[start..from];
+    let lines = walked.matches('\n').count();
+    let start_col = match lines {
+        0 => span.start_col.saturating_sub(walked.len() as u16),
+        _ => {
+            let line_start = text[..start].rfind('\n').map_or(0, |at| at + 1);
+            u16::try_from(text[line_start..start].chars().count()).unwrap_or(u16::MAX)
+        }
+    };
+    Span {
+        start_line: span
+            .start_line
+            .saturating_sub(u16::try_from(lines).unwrap_or(u16::MAX)),
+        start_col,
+        start_offset: start as u32,
+        ..span
     }
 }
 

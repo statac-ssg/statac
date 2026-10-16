@@ -114,7 +114,7 @@ fn calls(shared: &Shared, at: usize, wanted: &dyn Fn(&CallType) -> bool) -> Vec<
         if let Expr::Call(call) = expr
             && wanted(&call.identify_call())
         {
-            found.push(place(source, full_span(expr)));
+            found.push(place(source, full_span(expr, shared.sources.text(source))));
         }
     });
     found

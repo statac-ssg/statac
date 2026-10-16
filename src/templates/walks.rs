@@ -97,7 +97,7 @@ fn loops_in(stmts: &[Stmt<'_>], text: &str, source: crate::source::SourceId, out
             Stmt::Template(t) => &[&t.children],
             Stmt::ForLoop(looped) => {
                 if whole_list(&looped.iter) {
-                    let span = full_span(&looped.iter);
+                    let span = full_span(&looped.iter, text);
                     let (start, end) = (span.start_offset as usize, span.end_offset as usize);
                     let written = &text[start..end];
                     out.push(Loop {

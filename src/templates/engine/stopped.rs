@@ -125,8 +125,8 @@ struct Reader<'a> {
     ast: Option<Stmt<'a>>,
 }
 
-fn span_range(expr: &Expr<'_>) -> Range<usize> {
-    let span = full_span(expr);
+fn span_range(expr: &Expr<'_>, text: &str) -> Range<usize> {
+    let span = full_span(expr, text);
     span.start_offset as usize..span.end_offset as usize
 }
 
@@ -161,7 +161,7 @@ impl<'a> Reader<'a> {
                 return;
             }
             let own = own_range(expr);
-            let whole = span_range(expr);
+            let whole = span_range(expr, self.text);
             if [&self.range, &self.at]
                 .iter()
                 .any(|r| **r == own || **r == whole)
@@ -177,7 +177,7 @@ impl<'a> Reader<'a> {
         let ast = self.ast.as_ref()?;
         let mut found = None;
         visit_exprs(ast, &mut |expr| {
-            let whole = span_range(expr);
+            let whole = span_range(expr, self.text);
             if found.is_none() && whole.start >= self.at.start && whole.end <= self.at.end {
                 found = f(expr);
             }
@@ -192,11 +192,11 @@ impl<'a> Reader<'a> {
     fn operator(&self) -> Option<Operator> {
         self.find(|expr| {
             let Expr::BinOp(op) = expr else { return None };
-            let left = span_range(&op.left);
-            let right = span_range(&op.right);
+            let left = span_range(&op.left, self.text);
+            let right = span_range(&op.right, self.text);
             Some(Operator {
                 written: self.text.get(left.end..right.start)?.trim().to_owned(),
-                whole: span_range(expr),
+                whole: span_range(expr, self.text),
                 left_function: names_function(&op.left),
                 right_function: names_function(&op.right),
                 left,
@@ -211,10 +211,16 @@ impl<'a> Reader<'a> {
             let (name, input, args) = match expr {
                 Expr::Filter(f) => (
                     f.name,
-                    f.expr.as_ref().map(|e| text[span_range(e)].to_owned()),
+                    f.expr
+                        .as_ref()
+                        .map(|e| text[span_range(e, text)].to_owned()),
                     &f.args,
                 ),
-                Expr::Test(t) => (t.name, Some(text[span_range(&t.expr)].to_owned()), &t.args),
+                Expr::Test(t) => (
+                    t.name,
+                    Some(text[span_range(&t.expr, text)].to_owned()),
+                    &t.args,
+                ),
                 Expr::Call(c) => match c.identify_call() {
                     CallType::Function(name) => (name, None, &c.args),
                     _ => return None,
@@ -377,7 +383,7 @@ impl Read<'_, '_> {
                     written,
                     nearest,
                 },
-                span_range(named),
+                span_range(named, reader.text),
             ))
         })
     }
@@ -391,19 +397,17 @@ impl Read<'_, '_> {
             (_, "strings can only be multiplied with integers") => Stopped::RepeatNotWhole,
             (_, "repeated string is too large") => Stopped::RepeatedTooLong,
             (_, "cannot perform a containment check on this value") => {
-                // A comparison is spanned from the token before it, so it
-                // is placed from its first value to its last.
-                let place = reader?.find_within(|expr| match expr {
+                let reader = reader?;
+                let place = reader.find_within(|expr| match expr {
                     Expr::BinOp(op) if matches!(op.op, BinOpKind::In) => {
-                        Some(span_range(&op.left).start..span_range(&op.right).end)
+                        Some(span_range(expr, reader.text))
                     }
                     Expr::Compare(c)
                         if c.ops.iter().any(|op| {
                             matches!(op.op, CompareOpKind::In | CompareOpKind::NotIn)
                         }) =>
                     {
-                        let last = c.ops.last()?;
-                        Some(span_range(&c.expr).start..span_range(&last.expr).end)
+                        Some(span_range(expr, reader.text))
                     }
                     _ => None,
                 });
@@ -617,7 +621,9 @@ impl Read<'_, '_> {
     fn not_callable(&self) -> Option<Stopped> {
         let reader = self.reader?;
         reader.find(|expr| match expr {
-            Expr::Call(c) => Some(Stopped::NotCallable(reader.written(&span_range(&c.expr)))),
+            Expr::Call(c) => Some(Stopped::NotCallable(
+                reader.written(&span_range(&c.expr, reader.text)),
+            )),
             _ => None,
         })
     }
@@ -632,8 +638,10 @@ impl Read<'_, '_> {
             if method != name {
                 return None;
             }
-            let receiver = reader.written(&span_range(receiver));
-            let args = reader.text[span_range(&c.expr).end..span_range(expr).end].trim();
+            let receiver = reader.written(&span_range(receiver, reader.text));
+            let args = reader.text
+                [span_range(&c.expr, reader.text).end..span_range(expr, reader.text).end]
+                .trim();
             let args = match args.trim_start_matches('(').trim_end_matches(')').trim() {
                 "" => "",
                 _ => args,

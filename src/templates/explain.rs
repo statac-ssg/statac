@@ -228,7 +228,7 @@ fn widen(name: &str, text: &str, range: &Range<usize>) -> Range<usize> {
     visit_exprs(&ast, &mut |expr| {
         let span = expr.span();
         if span.start_offset as usize == range.start && span.end_offset as usize == range.end {
-            let full = full_span(expr);
+            let full = full_span(expr, text);
             widest = full.start_offset as usize..full.end_offset as usize;
         }
     });
@@ -407,7 +407,7 @@ fn item_named(item: &minijinja::Value, index: Option<usize>) -> Named {
 
 /// The filter `expr` written to take only the items that have `field`.
 fn leave_out(text: &str, expr: &Expr<'_>, input: Option<&Expr<'_>>, field: &str) -> Option<String> {
-    let input = full_span(input?);
+    let input = full_span(input?, text);
     let input = &text[input.start_offset as usize..input.end_offset as usize];
     let filter = expr.span();
     let filter = &text[filter.start_offset as usize..filter.end_offset as usize];
@@ -445,7 +445,7 @@ pub(super) fn sorted_last(
                     && let Some(named @ Expr::Const(c)) = kw(&f.args, "attribute")
                     && c.value.as_str() == Some(attribute)
                 {
-                    let span = full_span(named);
+                    let span = full_span(named, text);
                     let instead = leave_out(text, expr, f.expr.as_ref(), field);
                     found = Some((
                         place(source, span.start_offset as usize..span.end_offset as usize),
@@ -506,7 +506,7 @@ fn by_field(
                 }
                 named_it = names;
                 if let Some(named) = named {
-                    let span = full_span(named);
+                    let span = full_span(named, text);
                     at = span.start_offset as usize..span.end_offset as usize;
                 }
                 if let Some(written) = leave_out(text, expr, f.expr.as_ref(), field) {
@@ -574,7 +574,7 @@ fn culprit_of_refusal(
                 }
             }
             (Callee::Print, _)
-                if [expr.span(), full_span(expr)].iter().any(|s| {
+                if [expr.span(), full_span(expr, text)].iter().any(|s| {
                     s.start_offset as usize == range.start && s.end_offset as usize == range.end
                 }) =>
             {
@@ -583,7 +583,7 @@ fn culprit_of_refusal(
             _ => None,
         };
         if let Some(hit) = hit {
-            target = Some(descend(hit, &refusal.path, refusal.empty));
+            target = Some(descend(text, hit, &refusal.path, refusal.empty));
         }
     });
     target
@@ -604,11 +604,11 @@ fn left_missing<'e, 'a>(expr: &'e Expr<'a>, empty: bool) -> &'e Expr<'a> {
 
 /// Follows a path into list and map literals, as far as the template
 /// spells them out, and on to what left the value there missing.
-fn descend(expr: &Expr<'_>, path: &[Step], empty: bool) -> (Range<usize>, Vec<Step>) {
-    let span = full_span(expr);
+fn descend(text: &str, expr: &Expr<'_>, path: &[Step], empty: bool) -> (Range<usize>, Vec<Step>) {
+    let span = full_span(expr, text);
     let here = span.start_offset as usize..span.end_offset as usize;
     let Some((step, rest)) = path.split_first() else {
-        let span = full_span(left_missing(expr, empty));
+        let span = full_span(left_missing(expr, empty), text);
         return (
             span.start_offset as usize..span.end_offset as usize,
             Vec::new(),
@@ -616,14 +616,14 @@ fn descend(expr: &Expr<'_>, path: &[Step], empty: bool) -> (Range<usize>, Vec<St
     };
     match (step, expr) {
         (Step::Index(i), Expr::List(list)) if *i < list.items.len() => {
-            descend(&list.items[*i], rest, empty)
+            descend(text, &list.items[*i], rest, empty)
         }
         (Step::Key(k), Expr::Map(map)) => {
             for (key, value) in map.keys.iter().zip(&map.values) {
                 if let Expr::Const(c) = key
                     && c.value.as_str() == Some(k.as_str())
                 {
-                    return descend(value, rest, empty);
+                    return descend(text, value, rest, empty);
                 }
             }
             (here, path.to_vec())
@@ -661,7 +661,7 @@ fn culprit_of_lookup(
     let mut lookups: Vec<(Range<usize>, String)> = Vec::new();
     let mut names: Vec<Range<usize>> = Vec::new();
     visit_exprs(&ast, &mut |expr| {
-        let span = full_span(expr);
+        let span = full_span(expr, text);
         let (s, e) = (span.start_offset as usize, span.end_offset as usize);
         if s > range.end || e < range.start {
             return;
@@ -710,7 +710,7 @@ pub(super) fn filter(
         if let Expr::Filter(f) = expr
             && f.name == name
         {
-            let span = full_span(expr);
+            let span = full_span(expr, text);
             let holds = f
                 .expr
                 .as_ref()
