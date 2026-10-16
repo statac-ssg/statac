@@ -194,8 +194,13 @@ impl<'a> Reader<'a> {
             let Expr::BinOp(op) = expr else { return None };
             let left = span_range(&op.left, self.text);
             let right = span_range(&op.right, self.text);
+            // Only brackets and spaces stand between an operator and its
+            // values.
+            let written = self.text.get(left.end..right.start)?;
             Some(Operator {
-                written: self.text.get(left.end..right.start)?.trim().to_owned(),
+                written: written
+                    .trim_matches(|c: char| c == '(' || c == ')' || c.is_whitespace())
+                    .to_owned(),
                 whole: span_range(expr, self.text),
                 left_function: names_function(&op.left),
                 right_function: names_function(&op.right),

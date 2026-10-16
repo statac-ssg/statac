@@ -590,6 +590,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             "\"a\" + 1",
         ),
         case(
+            "{{ ((\"a\")) + (1) }}",
+            "Template stopped: can't use `+` on text and a number",
+            Some("Join text with `~`."),
+            1,
+            "((\"a\")) + (1)",
+        ),
+        case(
             "{{ \"Posted \" + page.date }}",
             "Template stopped: can't use `+` on text and a date",
             Some("Join text with `~`."),
