@@ -222,6 +222,37 @@ pub(super) fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
     Ok(Some(bytes))
 }
 
+/// [`super::lock_file`], by name in the folder, opened first and never
+/// through a link.
+pub(super) fn lock_file(folder: &Path, name: &str) -> io::Result<std::fs::File> {
+    let at = open_folder(CWD, folder).map_err(|error| refusal(CWD, folder, error))?;
+    let at = at.as_fd();
+    // Not waiting for a reader, where a pipe stands at the name.
+    let opened = OFlags::WRONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
+    let made = opened | OFlags::CREATE | OFlags::EXCL;
+    // Opened where it is there and made where it isn't, never in one step:
+    // where two ask at once to open a file in a folder already open,
+    // making it if need be, macOS can tell one that it isn't there.
+    let mut tries = 0;
+    let file = loop {
+        let found = match openat(at, name, opened, Mode::empty()) {
+            Err(Errno::NOENT) => openat(at, name, made, Mode::from_raw_mode(0o666)),
+            found => found,
+        };
+        match found {
+            Ok(file) => break file,
+            // Made by another meanwhile.
+            Err(Errno::EXIST) if tries < 8 => tries += 1,
+            Err(error) => return Err(refusal(at, Path::new(name), error)),
+        }
+    };
+    let found = fstat(&file).map_err(io::Error::from)?;
+    if FileType::from_raw_mode(found.st_mode) != FileType::RegularFile {
+        return Err(io::Error::other("it is not a file"));
+    }
+    Ok(std::fs::File::from(file))
+}
+
 /// [`super::rewrite`], with everything after the walk to the file's
 /// folder done by name in that folder, already open, and no link
 /// followed: so a folder on the way swapped for a link while this runs
@@ -435,5 +466,24 @@ mod tests {
         assert!(remove_folder(&link).is_err());
         assert!(fs::symlink_metadata(&link).unwrap().is_symlink());
         assert_eq!(names(&kept), ["drafts", "notes.txt"]);
+    }
+
+    #[test]
+    fn a_lock_file_is_never_opened_or_made_through_a_link() {
+        let scratch = Scratch::new("lock-link");
+        let kept = kept(&scratch);
+        let folder = scratch.0.join("folder");
+        fs::create_dir(&folder).unwrap();
+        symlink(kept.join("notes.txt"), folder.join("lock")).unwrap();
+        symlink(kept.join("absent"), folder.join("dangling")).unwrap();
+        for name in ["lock", "dangling"] {
+            let refused = lock_file(&folder, name).unwrap_err();
+            assert_eq!(refused.to_string(), "it is a link", "{name}");
+        }
+        symlink(&kept, scratch.0.join("linked")).unwrap();
+        let refused = lock_file(&scratch.0.join("linked"), "lock").unwrap_err();
+        assert_eq!(refused.to_string(), "it is a link");
+        assert_eq!(names(&kept), ["drafts", "notes.txt"]);
+        assert_eq!(fs::read(kept.join("notes.txt")).unwrap(), b"mine");
     }
 }

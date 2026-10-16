@@ -415,7 +415,10 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             let problems = &outcome.problems;
             let report = Report::new(outcome.sources(), &options.site, terminal.colour_out);
             let said = match options.mode {
-                Mode::Build => said_of_build(&report, &outcome, &options.out(), started.elapsed()),
+                Mode::Build => {
+                    let took = started.elapsed().saturating_sub(outcome.waited);
+                    said_of_build(&report, &outcome, &options.out(), took)
+                }
                 Mode::Check => {
                     // A stopped run leaves pages out, so what it carries is unknown.
                     let javascript = match outcome.stopped() {

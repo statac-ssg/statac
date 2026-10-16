@@ -154,6 +154,12 @@ impl Session {
     /// Builds the whole site into its folder, having run the command the
     /// site runs before a build.
     pub fn start(options: &Options) -> (Session, Round) {
+        Session::start_saying(options, &mut || {})
+    }
+
+    /// [`Session::start`], calling `waiting` where the round waits for
+    /// another build of the site to end.
+    pub fn start_saying(options: &Options, waiting: &mut dyn FnMut()) -> (Session, Round) {
         let folder = match options.site == Path::new(".") {
             true => Path::new(KEPT).join(FOLDER),
             false => options.site.join(KEPT).join(FOLDER),
@@ -174,7 +180,7 @@ impl Session {
             newer: None,
             took: Took::default(),
         };
-        let mut round = session.round(None);
+        let mut round = session.round(None, waiting);
         session.before = round.outcome.hooks.before;
         // Said by whoever says how the session began, not as a build's.
         if session.before == Before::Ran {
@@ -222,57 +228,74 @@ impl Session {
     /// Reads the site again, writes into its own files the dates and ids
     /// they are due, and builds what changed.
     pub fn rebuild(&mut self) -> Round {
-        self.round(Some(&[]))
+        self.round(Some(&[]), &mut || {})
     }
 
     /// [`Session::rebuild`], for a save of `changed`, files of the site by
     /// their paths from its folder: the command the site runs before a
     /// build is run first where it is to be run again for any of them.
     pub fn rebuild_for(&mut self, changed: &[String]) -> Round {
-        self.round(Some(changed))
+        self.round(Some(changed), &mut || {})
+    }
+
+    /// [`Session::rebuild_for`], calling `waiting` where the round waits
+    /// for another build of the site to end.
+    pub fn rebuild_for_saying(&mut self, changed: &[String], waiting: &mut dyn FnMut()) -> Round {
+        self.round(Some(changed), waiting)
     }
 
     /// One round, for a save of `changed`, or for none as the session
     /// starts, when the command the site runs before a build always runs.
-    fn round(&mut self, changed: Option<&[String]>) -> Round {
-        let began = Instant::now();
+    /// The round holds the site as a build does, for as long as it runs.
+    fn round(&mut self, changed: Option<&[String]>, waiting: &mut dyn FnMut()) -> Round {
         let at = self.options.site.clone();
         if let Err(problem) = build::a_folder(&at) {
             return Round::of_nothing(build::Outcome::unread(problem));
         }
+        let (hold, unheld) = publish::hold(&at, waiting);
+        let mut round = self.held(changed, &at, unheld);
+        round.outcome.waited = hold.waited;
+        round
+    }
+
+    /// [`Session::round`] once it holds the site, or knows why it can't.
+    fn held(&mut self, changed: Option<&[String]>, at: &Path, unheld: Option<Problem>) -> Round {
+        let began = Instant::now();
         // A starter file changed, or what changed isn't known.
         if changed.is_none_or(|changed| {
             changed.is_empty() || changed.iter().any(|path| Starter::OWN.reaches(path))
         }) {
             self.newer = None;
         }
-        let (settings, _) = crate::config::read(&at, &mut crate::source::Sources::default());
+        let (settings, _) = crate::config::read(at, &mut crate::source::Sources::default());
         let sets = settings.text(crate::hooks::BEFORE).is_some();
         let runs = match changed {
             Some(changed) => sets && crate::hooks::watched(&settings, changed),
             None => true,
         };
         if !runs {
-            return self.built(began.elapsed());
+            return self.built(began.elapsed(), unheld);
         }
         // What the command writes into the site is this round's to build,
         // and no save of the author's.
-        let was = if sets { marks(&at) } else { Marks::new() };
+        let was = if sets { marks(at) } else { Marks::new() };
         let ran = crate::hooks::before(&self.options, Progress::Silent, true);
         let hooked = if sets {
-            written_between(&at, &was, &marks(&at))
+            written_between(at, &was, &marks(at))
         } else {
             Vec::new()
         };
         let mut round = match ran {
             Ok(before) => {
-                let mut round = self.built(began.elapsed());
+                let mut round = self.built(began.elapsed(), unheld);
                 round.outcome.hooks.before = before;
                 round
             }
             Err(stopped) => {
                 let (sources, problem) = *stopped;
-                Round::of_nothing(build::Outcome::stopped_at(sources, problem))
+                let mut outcome = build::Outcome::stopped_at(sources, problem);
+                outcome.problems.extend(unheld);
+                Round::of_nothing(outcome)
             }
         };
         round.hooked = hooked;
@@ -280,8 +303,9 @@ impl Session {
     }
 
     /// Reads the site and builds what changed since the last round, the
-    /// round having taken `before` so far.
-    fn built(&mut self, before: Duration) -> Round {
+    /// round having taken `before` so far; `unheld` says why the round
+    /// doesn't hold the site.
+    fn built(&mut self, before: Duration, unheld: Option<Problem>) -> Round {
         let options = &self.options;
         let at = options.site.as_path();
         let mut took = Took {
@@ -443,6 +467,7 @@ impl Session {
             after: whole_site,
             serving: true,
             remembers: false,
+            unheld,
         };
         let mut outcome = build::publish(options, prepared, &plan, &built, concluded, publishing);
         let named = crate::hooks::names_output(renderer.settings(), renderer.sources(), options);

@@ -20,6 +20,16 @@ pub enum Progress {
 }
 
 impl Progress {
+    /// Says `line` on a line of its own that stays, where the build says
+    /// anything at all.
+    pub(crate) fn say(self, line: &str) {
+        if self != Progress::Silent {
+            let mut err = std::io::stderr().lock();
+            let _ = writeln!(err, "{line}");
+            let _ = err.flush();
+        }
+    }
+
     /// How long passes before the count is said, and then said again.
     fn pause(self) -> Duration {
         match self {

@@ -4,8 +4,10 @@ Statac couldn't save something in `.statac/`. This folder, inside the
 site's folder, is where Statac keeps work that saves time on the next
 build: the copies of photographs it made, the sharing cards it drew, the
 spare copy of the built site, or a record of where each post in a feed was
-published. The message says which of these it couldn't save, and gives
-the system's reason, such as no permission to write there.
+published. It also keeps there the lock, `.statac/lock`, that lets only
+one build of the site run at a time. The message says which of these it
+couldn't save, and gives the system's reason, such as no permission to
+write there.
 
 ## What you'll see {#what-youll-see}
 
@@ -24,12 +26,17 @@ can't keep the spare, `.statac/spare`, each build rewrites every file of
 the site and removes the old ones, instead of writing only the files that
 changed. If it can't keep `.statac/feeds` and a post moves before the next build,
 Statac can't offer that post the `id:` line that keeps it the same post in
-feed readers. Statac warns only once, however much it couldn't keep.
+feed readers. If it can't keep the lock, a build doesn't wait for
+another build of the same site, such as `statac serve` in another
+window, and two that run at once may get in each other's way. Statac
+warns only once, however much it couldn't keep.
 
 ## How to fix it
 
 Fix the cause the message gives. For example, give yourself permission
-to write in the site's folder, or free some space on the disk.
+to write in the site's folder, or free some space on the disk. If the
+disk can't lock a file, as some network disks can't, keep the site on a
+disk of the computer's own, or run one build of it at a time.
 
 If the reason is that something is a link, then `.statac`, the folder
 named in the message, or a file in it is a link to somewhere else. Statac

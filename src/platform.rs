@@ -446,6 +446,31 @@ pub fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
     }
 }
 
+/// Opens the file `name` in the folder `folder` for a lock to be taken on
+/// it, making it where nothing has the name. Only a file itself is
+/// opened, never through a link, and `folder` must be no link. On Unix
+/// the file is opened by name in the folder, already open; elsewhere each
+/// is asked what it is first, and a file Windows refuses for a moment
+/// while another program has it open is asked for again.
+pub fn lock_file(folder: &Path, name: &str) -> io::Result<std::fs::File> {
+    #[cfg(unix)]
+    {
+        unix::lock_file(folder, name)
+    }
+    #[cfg(not(unix))]
+    {
+        no_link_to(folder, name)?;
+        let open = || {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(folder.join(name))
+        };
+        retrying(open, transient, &PAUSES)
+    }
+}
+
 /// Refuses where `root`, or a folder on the way to `rel`, is a link or
 /// isn't there.
 #[cfg(not(unix))]
@@ -868,6 +893,51 @@ mod tests {
         std::fs::hard_link(root.join("a.txt"), root.join("b.txt")).unwrap();
         let twice = named_once(&std::fs::metadata(root.join("a.txt")).unwrap());
         assert_eq!(twice, !cfg!(unix));
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_lock_file_is_made_once_and_locked_by_one_handle_at_a_time() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-lock-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let first = lock_file(&root, "lock").unwrap();
+        first.lock().unwrap();
+        // Opened again, as another build opens it, the file is the same.
+        let second = lock_file(&root, "lock").unwrap();
+        assert!(matches!(
+            second.try_lock(),
+            Err(std::fs::TryLockError::WouldBlock)
+        ));
+        drop(first);
+        second.try_lock().unwrap();
+        drop(second);
+        assert_eq!(std::fs::read(root.join("lock")).unwrap(), b"");
+        // A folder with the name is no file to lock.
+        std::fs::create_dir(root.join("folder")).unwrap();
+        assert!(lock_file(&root, "folder").is_err());
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_lock_file_made_by_several_at_once_opens_for_each() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-locks-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for nth in 0..100 {
+            let folder = root.join(nth.to_string());
+            std::fs::create_dir_all(&folder).unwrap();
+            let ready = std::sync::Barrier::new(4);
+            std::thread::scope(|scope| {
+                for _ in 0..4 {
+                    scope.spawn(|| {
+                        ready.wait();
+                        lock_file(&folder, "lock").unwrap();
+                    });
+                }
+            });
+        }
         remove_folder(&root).unwrap();
     }
 

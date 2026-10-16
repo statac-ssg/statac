@@ -248,6 +248,56 @@ fn a_build_with_an_error_leaves_the_last_site_as_it_was() {
 }
 
 #[test]
+fn builds_started_together_wait_their_turn_and_publish_what_one_build_does() {
+    use std::io::BufRead;
+    let alone = Site::new("alone");
+    let (said, code) = alone.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let site = Site::new("together");
+    // Held here as a build holds it, so both start while another runs.
+    let (hold, unheld) = statac::publish::hold(&site.root, || panic!("nothing holds the site"));
+    assert!(unheld.is_none());
+    let mut builds: Vec<std::process::Child> = (0..2)
+        .map(|_| {
+            Command::new(env!("CARGO_BIN_EXE_statac"))
+                .args(["build", "--today=2026-10-04"])
+                .arg(&site.root)
+                .env("NO_COLOR", "1")
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .unwrap()
+        })
+        .collect();
+    for build in &mut builds {
+        let mut line = String::new();
+        let err = build.stderr.as_mut().unwrap();
+        std::io::BufReader::new(err).read_line(&mut line).unwrap();
+        assert_eq!(line, "Waiting for another build of the site to finish.\n");
+    }
+    assert!(!site.out().exists());
+    let held = std::time::Duration::from_secs(2);
+    std::thread::sleep(held);
+    drop(hold);
+    for build in builds {
+        let output = build.wait_with_output().unwrap();
+        // The line is said once.
+        assert!(output.stderr.is_empty(), "{output:?}");
+        let said = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(output.status.code(), Some(0), "{said}");
+        assert!(last_line(&said).starts_with("Wrote 2 pages"), "{said}");
+        assert!(!said.contains("warning"), "{said}");
+        // The time said is the build's own, not the wait's.
+        let seconds = said.lines().last().unwrap().rsplit_once(" in ").unwrap().1;
+        let seconds: f64 = seconds.trim_end_matches(" seconds.").parse().unwrap();
+        assert!(seconds < held.as_secs_f64(), "{said}");
+    }
+    assert_eq!(files(&site.out()), files(&alone.out()));
+    // The second build wrote into what the first published.
+    assert_eq!(files(&site.root.join(".statac/spare")), files(&site.out()));
+}
+
+#[test]
 fn check_draws_every_warning_and_writes_nothing() {
     let site = Site::new("check");
     site.write(

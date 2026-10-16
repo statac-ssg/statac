@@ -146,11 +146,18 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
     let (sender, batches) = mpsc::channel();
     let watching = watch::start(&options.site, options.watch, options.settle, sender);
     let started = Instant::now();
-    let (session, round) = Session::start(&building);
+    let (session, round) = Session::start_saying(&building, &mut || {
+        say(out, &format!("{}\n", wording::WAITING));
+    });
     let report = Report::new(round.outcome.sources(), &options.site, colour);
     say(
         out,
-        &cli::said_of_build(&report, &round.outcome, session.folder(), started.elapsed()),
+        &cli::said_of_build(
+            &report,
+            &round.outcome,
+            session.folder(),
+            started.elapsed().saturating_sub(round.outcome.waited),
+        ),
     );
     let stop = |out: &mut dyn Write, problem: Problem| {
         let sources = Sources::default();
@@ -316,8 +323,10 @@ impl Serving {
         }
 
         let started = Instant::now();
-        let round = self.session.rebuild_for(&batch.changed);
-        let took = started.elapsed();
+        let round = self.session.rebuild_for_saying(&batch.changed, &mut || {
+            say(out, &format!("{}\n", wording::WAITING));
+        });
+        let took = started.elapsed().saturating_sub(round.outcome.waited);
         self.left.extend(round.hooked.iter().cloned());
         // The names are the site's own, shown as any text of its is.
         let changed: Vec<String> = batch.changed.iter().map(|file| shown(file)).collect();

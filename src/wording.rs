@@ -3230,6 +3230,10 @@ pub(crate) fn running_hook(hook: &str) -> String {
     format!("Running `{hook}`.")
 }
 
+/// What `build` and `serve` say where another build of the site is
+/// running, before waiting for it to end.
+pub(crate) const WAITING: &str = "Waiting for another build of the site to finish.";
+
 /// What `build` says of a command of the site's own that it ran.
 pub(crate) fn ran_hook(hook: &str) -> String {
     format!("Ran `{hook}`.")

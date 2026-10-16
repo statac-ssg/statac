@@ -5,6 +5,7 @@ mod scripts;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use rayon::prelude::*;
 
@@ -101,6 +102,8 @@ pub struct Outcome {
     /// links, so only their copies are published and not the files
     /// themselves: each by where its own file would be published.
     pub held_back: Vec<String>,
+    /// How long the build waited for another build of the site to end.
+    pub waited: Duration,
 }
 
 /// What a build did with the sharing cards.
@@ -189,6 +192,7 @@ impl Outcome {
             hooks: crate::hooks::Ran::default(),
             fetched: crate::fetched::Ages::default(),
             held_back: Vec::new(),
+            waited: Duration::ZERO,
         }
     }
 }
@@ -568,18 +572,32 @@ pub(crate) fn run_holding(options: &Options, progress: Progress, starter: &Start
     {
         return Outcome::unread(problem);
     }
+    // A check writes nothing, so it has nothing to keep apart.
+    let (hold, unheld) = match options.mode {
+        Mode::Build => {
+            let (hold, unheld) =
+                publish::hold(&options.site, || progress.say(crate::wording::WAITING));
+            (Some(hold), unheld)
+        }
+        Mode::Check => (None, None),
+    };
+    let waited = hold.as_ref().map_or(Duration::ZERO, |hold| hold.waited);
     let before = match options.mode {
         Mode::Build => match crate::hooks::before(options, progress, false) {
             Ok(before) => before,
             Err(stopped) => {
                 let (sources, problem) = *stopped;
-                return Outcome::stopped_at(sources, problem);
+                let mut outcome = Outcome::stopped_at(sources, problem);
+                outcome.problems.extend(unheld);
+                outcome.waited = waited;
+                return outcome;
             }
         },
         Mode::Check => crate::hooks::Before::Unset,
     };
-    let mut outcome = built(options, progress, starter);
+    let mut outcome = built(options, progress, starter, unheld);
     outcome.hooks.before = before;
+    outcome.waited = waited;
     if let Held::Renderer(renderer) = &outcome.held {
         let named = crate::hooks::names_output(renderer.settings(), renderer.sources(), options);
         outcome.problems.extend(named);
@@ -615,8 +633,13 @@ fn locations_published(site: &crate::site::Site, held_back: &[String]) -> Vec<Pr
 }
 
 /// Reads the site and builds it, as [`run_saying`] does between the
-/// site's own commands.
-fn built(options: &Options, progress: Progress, starter: &Starter) -> Outcome {
+/// site's own commands; `unheld` says why the build doesn't hold the site.
+fn built(
+    options: &Options,
+    progress: Progress,
+    starter: &Starter,
+    unheld: Option<Problem>,
+) -> Outcome {
     let mut prepared = prepared(&options.site, &options.run());
     let note = crate::new::update::newer_starter(&options.site, starter);
     prepared.problems.extend(note);
@@ -669,6 +692,7 @@ fn built(options: &Options, progress: Progress, starter: &Starter) -> Outcome {
         after: true,
         serving: false,
         remembers: own_address,
+        unheld,
     };
     let mut outcome = publish(options, prepared, &plan, &built, concluded, published);
     outcome.record = record;
@@ -976,6 +1000,8 @@ pub(crate) struct Publishing {
     /// Whether the posts published are kept as what feed readers now
     /// know.
     pub remembers: bool,
+    /// Why the build doesn't hold the site, where it doesn't.
+    pub unheld: Option<Problem>,
 }
 
 /// Writes what the outputs `built` asked for beside them, the pictures a
@@ -1012,6 +1038,7 @@ pub(crate) fn publish(
         after,
         serving,
         remembers,
+        unheld,
     } = publishing;
     let site = renderer.site();
     let pictures = &site.pictures;
@@ -1058,12 +1085,16 @@ pub(crate) fn publish(
     }
     // Whatever else couldn't be kept has said so already, and once is
     // enough for the one cause they mostly share.
-    if let Some(unkept) = staging.as_ref().and_then(Staging::unkept)
-        && !problems
+    for unkept in [unheld, staging.as_ref().and_then(Staging::unkept)]
+        .into_iter()
+        .flatten()
+    {
+        if !problems
             .iter()
             .any(|problem| problem.kind.code() == Code::CacheNotWritten)
-    {
-        problems.push(unkept);
+        {
+            problems.push(unkept);
+        }
     }
     let mut hooks = crate::hooks::Ran::default();
     let published = match staging {
@@ -1154,6 +1185,7 @@ pub(crate) fn publish(
         hooks,
         fetched,
         held_back,
+        waited: Duration::ZERO,
     }
 }
 

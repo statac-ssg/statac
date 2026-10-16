@@ -922,6 +922,26 @@ fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
     assert_eq!(said.matches(unwritten).count(), 1, "{said}");
 }
 
+#[test]
+fn a_round_waits_for_a_build_holding_the_site_and_says_so_once() {
+    let served = served("waits", How::Native);
+    let (hold, unheld) = statac::publish::hold(&served.site.0, || {});
+    assert!(unheld.is_none());
+    let mark = served.said.text().len();
+    served
+        .site
+        .write("content/post-1.md", "# Post 1\n\nSaved again.\n");
+    let waiting = "Waiting for another build of the site to finish.\n";
+    let said = served.said.after(mark, waiting);
+    assert_eq!(said, waiting);
+    drop(hold);
+    let said = served
+        .said
+        .after(mark, "`content/post-1.md` changed. Built ");
+    assert_eq!(said.matches(waiting).count(), 1, "{said}");
+    assert!(served.page("/post-1/").contains("Saved again."));
+}
+
 const YOUTUBE: &str = "{# takes address #}\n{% set video = page.youtube(address) %}\n\
                        {% if video.still %}<img src=\"{{ video.still.src }}\">{% endif %}\n";
 

@@ -67,6 +67,10 @@ What changed in each release of Statac, the newest first.
   line, whether the writing calls the snippet or a template does. It was
   told where the template shows the page's writing, or at another line
   of the snippet.
+- Builds of one site run one at a time. A build started while another
+  runs, such as `statac build` beside `statac serve`, says that it is
+  waiting and builds once the other has finished. Two at once could stop
+  with `Can't write`, leave no built site, or warn `cache-not-written`.
 
 ## 0.3.0 - 2026-10-12
 

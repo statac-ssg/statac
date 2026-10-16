@@ -14,6 +14,10 @@
 //! An output folder is replaced only when it is empty or carries the marker
 //! Statac leaves in every folder it builds, so a mistyped output folder can
 //! never cost anyone their files.
+//!
+//! Only one build of a site runs at a time. Each holds a lock on a file in
+//! the site's `.statac` while it writes there and into its output, and
+//! another waits for it.
 
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
@@ -22,11 +26,11 @@ use std::io::{self, Read, Seek};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 use rayon::prelude::*;
 
-use crate::album::{KEPT, kept_in};
+use crate::album::{KEPT, kept, kept_in};
 use crate::platform::{self, Over};
 use crate::problem::{Kind, Problem, system_reason};
 
@@ -59,6 +63,9 @@ const MARKER_TEXT: &str = "Statac built this folder and replaces all of it on ev
 
 /// The spare's name in `.statac`.
 const SPARE: &str = "spare";
+
+/// The name in `.statac` of the file a build holds a lock on.
+const LOCK: &str = "lock";
 
 /// How many threads make files at once. A disk makes them no faster for
 /// more asking; the rest would only spin while they wait.
@@ -496,6 +503,59 @@ fn tidy(
         }
     }
     Ok(())
+}
+
+/// A site's builds held to one at a time: while it is held, no other build
+/// of the site, in this process or another, holds it. It is let go of when
+/// dropped, and by the system when the process ends, however it ends.
+#[derive(Debug)]
+#[must_use = "the hold is let go of when dropped"]
+pub struct Hold {
+    _locked: Option<fs::File>,
+    /// How long it took to have, waiting for another build included.
+    pub waited: Duration,
+}
+
+/// Takes the hold on the site at `site` for a build, calling `waiting`
+/// once and waiting where another build has it. Where it can't be had, as
+/// where `.statac` can't be written or its disk can't lock a file, the
+/// build goes ahead without it and the problem says why.
+pub fn hold(site: &Path, waiting: impl FnOnce()) -> (Hold, Option<Problem>) {
+    let asked = Instant::now();
+    let locked = locked(site, waiting);
+    let unheld = locked.as_ref().err().map(|error| {
+        Problem::nowhere(Kind::CacheNotWritten {
+            path: Path::new(KEPT).join(LOCK),
+            reason: system_reason(error),
+        })
+    });
+    let hold = Hold {
+        _locked: locked.ok(),
+        waited: asked.elapsed(),
+    };
+    (hold, unheld)
+}
+
+/// The file in the site's `.statac` whose lock is the hold, locked.
+fn locked(site: &Path, waiting: impl FnOnce()) -> io::Result<fs::File> {
+    kept(site)?;
+    match fs::create_dir(site.join(KEPT)) {
+        Err(error) if error.kind() != io::ErrorKind::AlreadyExists => return Err(error),
+        _ => {}
+    }
+    // Asked again once made: it may have been put there as a link.
+    let file = platform::lock_file(&kept(site)?, LOCK)?;
+    match file.try_lock() {
+        Ok(()) => return Ok(file),
+        Err(fs::TryLockError::WouldBlock) => waiting(),
+        Err(fs::TryLockError::Error(error)) => return Err(error),
+    }
+    loop {
+        match file.lock() {
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            locked => return locked.map(|()| file),
+        }
+    }
 }
 
 /// Starts a build of the site at `site` into `out`: checks the output is
@@ -2153,6 +2213,71 @@ mod tests {
         assert_eq!(names(&scratch.site()), [KEPT]);
         assert_eq!(names(&scratch.site().join(KEPT)), [SPARE]);
         assert_eq!(names(&scratch.spare()), [MARKER]);
+    }
+
+    #[test]
+    fn a_second_hold_on_a_site_says_once_that_it_waits_and_waits_for_the_first() {
+        let scratch = Scratch::new("held");
+        let (first, unheld) = hold(&scratch.site(), || panic!("nothing holds the site"));
+        assert!(unheld.is_none());
+        assert_eq!(names(&scratch.site().join(KEPT)), [LOCK]);
+        let (said, heard) = std::sync::mpsc::channel();
+        let (held, taken) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let (second, unheld) = hold(&scratch.site(), || said.send(()).unwrap());
+                held.send(unheld).unwrap();
+                drop(second);
+            });
+            heard.recv().unwrap();
+            let waits = std::time::Duration::from_millis(200);
+            assert!(taken.recv_timeout(waits).is_err());
+            drop(first);
+            assert!(taken.recv().unwrap().is_none());
+        });
+        assert!(heard.try_recv().is_err());
+        let (_again, unheld) = hold(&scratch.site(), || panic!("nothing holds the site"));
+        assert!(unheld.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_site_that_cant_be_held_goes_unheld_and_says_why() {
+        use std::os::unix::fs::symlink;
+        for (name, link) in [("link-lock", LOCK), ("link-kept-lock", "")] {
+            let scratch = Scratch::new(name);
+            let outside = scratch.0.join("outside");
+            fs::create_dir(&outside).unwrap();
+            fs::write(outside.join("notes.txt"), "mine").unwrap();
+            let kept = scratch.site().join(KEPT);
+            match link {
+                "" => symlink(&outside, &kept).unwrap(),
+                link => {
+                    fs::create_dir(&kept).unwrap();
+                    symlink(outside.join("notes.txt"), kept.join(link)).unwrap();
+                }
+            }
+            let (_hold, unheld) = hold(&scratch.site(), || panic!("nothing holds the site"));
+            assert_eq!(
+                unheld.map(|problem| problem.kind),
+                Some(Kind::CacheNotWritten {
+                    path: Path::new(KEPT).join(LOCK),
+                    reason: "it is a link".into(),
+                })
+            );
+            assert_eq!(names(&outside), ["notes.txt"]);
+            assert_eq!(fs::read(outside.join("notes.txt")).unwrap(), b"mine");
+        }
+        let scratch = Scratch::new("file-kept-lock");
+        fs::write(scratch.site().join(KEPT), "").unwrap();
+        let (_hold, unheld) = hold(&scratch.site(), || panic!("nothing holds the site"));
+        assert_eq!(
+            unheld.map(|problem| problem.kind),
+            Some(Kind::CacheNotWritten {
+                path: Path::new(KEPT).join(LOCK),
+                reason: "a file is in the way of a folder".into(),
+            })
+        );
     }
 
     #[test]
