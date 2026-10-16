@@ -743,7 +743,7 @@ impl<'a> Checker<'a> {
             self.expr(name, Seen::Unseen);
             return;
         };
-        let Some(wanted) = c.value.as_str() else {
+        let Some(wanted) = c.value.as_str().map(super::files::named) else {
             return;
         };
         if self.schema.templates.contains(wanted) {

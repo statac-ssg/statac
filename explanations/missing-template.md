@@ -13,7 +13,8 @@ Statac builds a page with the first of these that applies:
    a list, and `page` for the rest.
 
 A template's `{% extends "base" %}` refers to another template in the same
-way. Each name is the file's name in `templates/` without `.html`.
+way. Each name is the file's name in `templates/`, with or without
+`.html`: `base` and `base.html` are the same template.
 
 ## What you'll see {#what-youll-see}
 

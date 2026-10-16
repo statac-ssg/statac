@@ -105,6 +105,12 @@ pub(super) fn template_path(name: &str) -> String {
     }
 }
 
+/// The template a name in `extends` or `layout:` refers to, which may be
+/// written with its `.html`.
+pub(super) fn named(written: &str) -> &str {
+    written.strip_suffix(".html").unwrap_or(written)
+}
+
 /// The name the engine holds a piece's file under, which no call can
 /// name.
 pub(super) fn piece_name(piece: Piece) -> String {

@@ -34,12 +34,9 @@ pub(super) fn choose(
     page: &Page,
 ) -> Result<Chosen, Problem> {
     let named = |word: PageWord| {
-        page.words.text(word).map(|text| {
-            let name = text.value.strip_suffix(".html").unwrap_or(text.value);
-            Chosen {
-                name: name.to_owned(),
-                origin: text.origin,
-            }
+        page.words.text(word).map(|text| Chosen {
+            name: super::files::named(text.value).to_owned(),
+            origin: text.origin,
         })
     };
     let makes = page.makes_pages();

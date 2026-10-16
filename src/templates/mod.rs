@@ -267,6 +267,7 @@ pub fn read(
     guard::install(&mut env);
     own::install(&mut env);
     env.set_auto_escape_callback(escaping);
+    env.set_path_join_callback(|name, _| files::named(name).into());
     let mut by_name = HashMap::new();
     for (at, file) in files.iter().enumerate() {
         by_name.insert(file.name.clone(), at);
@@ -339,7 +340,7 @@ fn extended(ast: &minijinja::machinery::ast::Stmt<'_>) -> Option<String> {
     };
     template.children.iter().find_map(|stmt| match stmt {
         Stmt::Extends(e) => match &e.name {
-            Expr::Const(c) => c.value.as_str().map(str::to_owned),
+            Expr::Const(c) => c.value.as_str().map(|name| files::named(name).to_owned()),
             _ => None,
         },
         _ => None,
@@ -457,7 +458,7 @@ fn never_shown(
 /// naming none is built with are left out, being any page's.
 fn layouts_only_needing_url(site: &Site) -> BTreeSet<String> {
     use crate::content::words::PageWord;
-    let name = |layout: &str| layout.strip_suffix(".html").unwrap_or(layout).to_owned();
+    let name = |layout: &str| files::named(layout).to_owned();
     let mut waiting: BTreeSet<String> = site
         .layouts_needing_url
         .iter()

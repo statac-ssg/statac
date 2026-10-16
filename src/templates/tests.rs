@@ -239,6 +239,32 @@ fn a_page_is_built_through_its_layout_and_the_template_it_extends() {
 }
 
 #[test]
+fn a_template_is_named_with_or_without_its_html() {
+    let built = site(&[
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\nlayout: post.html\n---\n",
+        ),
+        (
+            "content/post-2.md",
+            "---\ntitle: Post 2\nlayout: computed\n---\n",
+        ),
+        BASE,
+        (
+            "templates/post.html",
+            "{% extends \"base.html\" %}{% block main %}{{ page.content }}{% endblock %}",
+        ),
+        (
+            "templates/computed.html",
+            "{% extends \"ba\" ~ \"se.html\" %}{% block main %}{{ page.content }}{% endblock %}",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(built.html("post-1.md"), "<title>Post 1</title>");
+    assert_eq!(built.html("post-2.md"), "<title>Post 2</title>");
+}
+
+#[test]
 fn the_layout_is_chosen_as_written_handed_down_typed_or_by_default() {
     let built = site(&[
         ("content/index.md", "---\ntitle: Home\n---\n"),
