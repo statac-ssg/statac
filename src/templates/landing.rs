@@ -40,8 +40,9 @@ pub(super) struct Landing {
     pub(super) bare: bool,
     /// Its indent is followed by a value.
     pub(super) valued: bool,
-    /// That value is a body the engine held back, whose lines line up
-    /// at the line's indent in place of the one they share.
+    /// That value, or what a `call` or `filter` on the line writes, is a
+    /// body the engine held back, whose lines line up at the line's indent
+    /// in place of the one they share.
     pub(super) held: bool,
     /// Its indent is one the engine is told to keep, before a tag.
     pub(super) kept: bool,

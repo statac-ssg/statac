@@ -465,6 +465,62 @@ fn a_body_written_at_an_indented_call_gives_up_the_indent_its_lines_share() {
 }
 
 #[test]
+fn what_a_call_or_filter_writes_at_an_indented_line_gives_up_the_indent_its_lines_share() {
+    let section =
+        "{% macro m() %}\n<section>\n  <p>{{ caller() }}</p>\n</section>\n{% endmacro %}\n";
+    let cases = [
+        (
+            "<div>\n  {% filter upper %}\n    <p>a</p>\n  {% endfilter %}\n</div>\n".to_owned(),
+            "<div>\n  <P>A</P>\n</div>\n",
+        ),
+        // Its lines keep their indent one to another.
+        (
+            "<div>\n  {% filter upper %}\n    <ul>\n      <li>a</li>\n    </ul>\n  {% endfilter %}\n</div>\n".to_owned(),
+            "<div>\n  <UL>\n    <LI>A</LI>\n  </UL>\n</div>\n",
+        ),
+        (
+            "<ul>\n  {% for e in [1, 2] %}\n    {% filter upper %}\n      <li>a</li>\n    {% endfilter %}\n  {% endfor %}\n</ul>\n".to_owned(),
+            "<ul>\n  <LI>A</LI>\n  <LI>A</LI>\n</ul>\n",
+        ),
+        (
+            format!("{section}<div>\n  {{% call m() %}}{{% endcall %}}\n</div>\n"),
+            "<div>\n  <section>\n    <p></p>\n  </section>\n</div>\n",
+        ),
+        (
+            format!("{section}<div>\n  {{% call m() %}}\n  {{% endcall %}}\n</div>\n"),
+            "<div>\n  <section>\n    <p></p>\n  </section>\n</div>\n",
+        ),
+        // At the left, each is written as typed.
+        (
+            "<div>\n{% filter upper %}\n  <p>a</p>\n{% endfilter %}\n</div>\n".to_owned(),
+            "<div>\n  <P>A</P>\n</div>\n",
+        ),
+        (
+            format!("{section}<div>\n{{% call m() %}}{{% endcall %}}\n</div>\n"),
+            "<div>\n<section>\n  <p></p>\n</section>\n</div>\n",
+        ),
+        // Inside `<pre>`, spaces show.
+        (
+            "<div>\n  <pre>\n  {% filter upper %}\n    a\n  {% endfilter %}\n  </pre>\n</div>\n"
+                .to_owned(),
+            "<div>\n  <pre>\n    A\n  </pre>\n</div>\n",
+        ),
+    ];
+    for (template, page) in cases {
+        let built = site(&[
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\npages.feed: false\n",
+            ),
+            ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("templates/home.html", &template),
+        ]);
+        assert!(built.problems.is_empty(), "{:?}", built.problems);
+        assert_eq!(built.html("index.md"), page, "{template}");
+    }
+}
+
+#[test]
 fn a_snippet_put_among_other_things_on_a_line_keeps_the_spaces_it_starts_with() {
     let built = site(&[
         (

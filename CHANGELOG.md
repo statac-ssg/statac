@@ -20,6 +20,13 @@ What changed in each release of Statac, the newest first.
   kept the indent its lines had in the template on top of the line's,
   as a body indented under its tag inside a `<div>`. Written from a line
   at the left, the body is written as typed.
+- What a `{% call %}` or a `{% filter %}` writes, where its tag stands
+  alone on an indented line outside `<pre>`, `<textarea>`, `<script>`
+  and `<style>`, starts at that line's indent, its lines keeping their
+  indent one to another. A filter's lines kept the indent they had in
+  the template in place of the line's, and a call's started at the
+  left. Where the tag is at the left, or shares its line, what it writes
+  is written as typed.
 
 ## 0.4.0 - 2026-10-17
 

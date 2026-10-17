@@ -286,8 +286,8 @@ pub fn read(
         // A card's text is drawn, and where a JSON file's lines break
         // doesn't matter.
         let read = match escaping(&file.name) {
-            AutoEscape::Html => dedent::facts(&text),
-            AutoEscape::None if !file.name.starts_with(card::PREFIX) => dedent::facts(&text),
+            AutoEscape::Html => dedent::facts(&text, true),
+            AutoEscape::None if !file.name.starts_with(card::PREFIX) => dedent::facts(&text, false),
             _ => None,
         };
         if let Some(read) = &read {

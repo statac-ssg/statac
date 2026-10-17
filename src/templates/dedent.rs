@@ -19,11 +19,13 @@
 //! The same reading gives what `landing` needs to place each line, and the
 //! lines whose indent and line ending the engine is told to keep: a line
 //! holding more than tags keeps both, which the engine would otherwise
-//! leave out round a tag opening or closing it, and the tag closing a
-//! branch, alone on its line, keeps its line ending to stand in for one
-//! the branch takes with it. In a body the engine holds back, a tag alone
-//! on its line opening or closing a branch, after a line ending the engine
-//! writes, leaves out that line ending and keeps its own in its place.
+//! leave out round a tag opening or closing it, the tag closing a branch,
+//! alone on its line, keeps its line ending to stand in for one the branch
+//! takes with it, and a `call` or `filter` alone on an indented line of
+//! markup keeps its indent, for what it writes to line up at. In a body
+//! the engine holds back, a tag alone on its line opening or closing a
+//! branch, after a line ending the engine writes, leaves out that line
+//! ending and keeps its own in its place.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -63,11 +65,12 @@ fn cuts(source: &str) -> Vec<(usize, usize)> {
 }
 
 /// What placing a template's lines in the built page needs to know of
-/// them. Nothing for a template the engine can't read.
-pub(super) fn facts(source: &str) -> Option<Facts> {
+/// them, `markup` saying whether it writes markup. Nothing for a template
+/// the engine can't read.
+pub(super) fn facts(source: &str, markup: bool) -> Option<Facts> {
     let mut template = Template::new(source, Read::of(source)?);
     template.decide();
-    Some(template.facts())
+    Some(template.facts(markup))
 }
 
 pub(super) struct Facts {
@@ -78,7 +81,8 @@ pub(super) struct Facts {
     pub(super) supers: Vec<usize>,
     pub(super) calls: Vec<Recursion>,
     /// Where a `+` takes the place of a space in a tag, so the engine
-    /// keeps the indent or the line end of a line holding more than tags.
+    /// keeps the indent or the line end of a line holding more than tags,
+    /// or the indent of one holding a `call` or `filter` it lines up at.
     pub(super) keeps: Vec<usize>,
     /// Where a `-` takes the place of a space after `{%`, so the engine
     /// leaves out the line ending before a tag alone on its line in a body
@@ -104,7 +108,8 @@ pub(super) struct Fact {
     /// Its indent is followed by a value.
     pub(super) valued: bool,
     /// That value is a body the engine holds back, written whole: a call
-    /// of a macro or the name of a `set` block, of this template's own.
+    /// of a macro or the name of a `set` block, of this template's own. Or
+    /// the line holds a `call` or `filter` writing one, its indent kept.
     pub(super) held: bool,
     /// Its indent is one the engine is told to keep, before a tag.
     pub(super) kept: bool,
@@ -152,6 +157,9 @@ struct Tag {
     name: Option<String>,
     /// The name a `macro` or `set` tag gives the body it holds back.
     holds: Option<String>,
+    /// Opens a `call` or `filter`, which writes where it stands a body
+    /// the engine holds back.
+    writes: bool,
     /// A `for` tag's loop can be run again from inside it.
     recursive: bool,
     /// Opens or closes `raw`.
@@ -299,6 +307,7 @@ impl Read {
                         controlled: controlled(&source[start..done]),
                         name,
                         holds,
+                        writes: matches!(word, "call" | "filter"),
                         recursive,
                         raw: false,
                     });
@@ -336,6 +345,7 @@ impl Read {
                 controlled: controlled(&source[start..end]),
                 name: None,
                 holds: None,
+                writes: false,
                 recursive: false,
                 raw,
             });
@@ -756,7 +766,7 @@ impl<'s> Template<'s> {
         Some(excess)
     }
 
-    fn facts(&self) -> Facts {
+    fn facts(&self, markup: bool) -> Facts {
         let bytes = self.source.as_bytes();
         let tags = &self.read.tags;
         let line_of = |at: usize| self.lines.partition_point(|line| line.start <= at) - 1;
@@ -819,6 +829,33 @@ impl<'s> Template<'s> {
                 })
             })
             .collect();
+        // A `call` or `filter` whose tags stand alone on an indented line
+        // of markup writes a body held back where that line stands, so the
+        // engine keeps the indent for the body to line up at. Inside
+        // another body held back, the line it is written on can't be seen.
+        let writing: Vec<bool> = (0..self.lines.len())
+            .map(|number| {
+                let line = &self.lines[number];
+                markup
+                    && line.indent > 0
+                    && line.shape == Shape::Tags
+                    && !line.shown
+                    && !line.scripted
+                    && line.tags.iter().all(|&at| !tags[at].controlled)
+                    && self.blocks.iter().any(|block| {
+                        tags[block.tag].writes
+                            && line.tags[0] == block.tag
+                            && matches!(bytes[tags[block.tag].span.start + 2], b' ' | b'\t')
+                            && (line.tags.len() == 1
+                                || line.tags.len() == 2 && block.end == Some(number))
+                    })
+                    && !self.blocks.iter().any(|block| {
+                        block.kind == Kind::Placed
+                            && block.opening < number
+                            && block.end.is_some_and(|end| end > number)
+                    })
+            })
+            .collect();
         let mut keeps = Vec::new();
         let mut later = vec![false; self.lines.len()];
         let mut writes = false;
@@ -834,7 +871,10 @@ impl<'s> Template<'s> {
                 .any(|block| block.opening == number && block.site == Site::Line);
             let more = line.shape == Shape::Content || placed;
             let first = line.tags.first().map(|&at| &tags[at]).filter(|tag| {
-                more && tag.span.start == line.start + line.indent && !tag.raw && !tag.controlled
+                (more || writing[number])
+                    && tag.span.start == line.start + line.indent
+                    && !tag.raw
+                    && !tag.controlled
             });
             if let Some(first) = first
                 && line.indent > 0
@@ -1051,11 +1091,12 @@ impl<'s> Template<'s> {
                 let valued = values
                     .get(values.partition_point(|value| value.start < opening))
                     .is_some_and(|value| value.start == opening);
-                let held = names
-                    .get(names.partition_point(|(start, _)| *start < opening))
-                    .is_some_and(|(start, name)| {
-                        *start == opening && holding.contains(&name.as_str())
-                    });
+                let held = writing[number]
+                    || names
+                        .get(names.partition_point(|(start, _)| *start < opening))
+                        .is_some_and(|(start, name)| {
+                            *start == opening && holding.contains(&name.as_str())
+                        });
                 Fact {
                     start: line.start,
                     indent: line.indent,
@@ -1355,7 +1396,7 @@ mod tests {
     /// The template as the engine is handed it.
     fn kept(source: &str) -> String {
         let mut out = source.as_bytes().to_vec();
-        let facts = super::facts(source).expect("a template");
+        let facts = super::facts(source, true).expect("a template");
         for at in facts.keeps {
             out[at] = b'+';
         }
@@ -1530,7 +1571,10 @@ mod tests {
             "<p>a</p>\n{% if a %}\n<p>b</p>{% endif %}\n<p>c</p>\n",
         ] {
             assert!(
-                super::facts(template).expect("a template").trims.is_empty(),
+                super::facts(template, true)
+                    .expect("a template")
+                    .trims
+                    .is_empty(),
                 "{template}"
             );
         }
@@ -1557,7 +1601,7 @@ mod tests {
     #[test]
     fn a_value_writing_a_body_held_back_is_known_at_its_line() {
         let held = |source: &str| -> Vec<usize> {
-            let facts = super::facts(source).expect("a template");
+            let facts = super::facts(source, true).expect("a template");
             (0..facts.lines.len())
                 .filter(|&number| facts.lines[number].held)
                 .collect()
@@ -1575,6 +1619,48 @@ mod tests {
         ] {
             assert!(held(template).is_empty(), "{template}");
         }
+    }
+
+    #[test]
+    fn a_call_or_filter_alone_on_an_indented_line_keeps_its_indent_for_what_it_writes() {
+        let cases = [
+            (
+                "<div>\n  {% filter upper %}\n    <p>a</p>\n  {% endfilter %}\n</div>\n",
+                "<div>\n  {%+filter upper %}\n    <p>a</p>\n  {% endfilter %}\n</div>\n",
+            ),
+            (
+                "<div>\n  {% call m() %}{% endcall %}\n</div>\n",
+                "<div>\n  {%+call m() %}{% endcall %}\n</div>\n",
+            ),
+        ];
+        for (template, handed) in cases {
+            assert_eq!(kept(template), handed, "{template}");
+            let facts = super::facts(template, true).expect("a template");
+            assert!(facts.lines[1].held, "{template}");
+        }
+        for template in [
+            // At the left there is no indent to keep.
+            "<div>\n{% filter upper %}\n  <p>a</p>\n{% endfilter %}\n</div>\n",
+            "<div>\n  {% call m() %}{% endcall %}{# a #}\n</div>\n",
+            "<div>\n  {%filter upper %}\n    <p>a</p>\n  {% endfilter %}\n</div>\n",
+            "<div>\n  {%- filter upper %}\n    <p>a</p>\n  {% endfilter %}\n</div>\n",
+            "<pre>\n  {% filter upper %}\n    a\n  {% endfilter %}\n</pre>\n",
+            "<script>\n  {% filter upper %}\n    go();\n  {% endfilter %}\n</script>\n",
+            // Inside a body held back, where it is written can't be seen.
+            "{% macro m() %}\n  {% filter upper %}\n    <p>a</p>\n  {% endfilter %}\n{% endmacro %}\n",
+        ] {
+            let facts = super::facts(template, true).expect("a template");
+            assert!(facts.lines.iter().all(|line| !line.held), "{template}");
+            assert_eq!(kept(template), template);
+        }
+        // Sharing its line, its indent is kept as any such line's is.
+        let template = "<div>\n  {% filter upper %}<p>a</p>{% endfilter %}\n</div>\n";
+        let facts = super::facts(template, true).expect("a template");
+        assert!(!facts.lines[1].held);
+        // Outside markup an indent may mean something.
+        let facts = super::facts("  {% filter upper %}\n    a\n  {% endfilter %}\n", false)
+            .expect("a template");
+        assert!(facts.keeps.is_empty() && !facts.lines[0].held);
     }
 
     #[test]
