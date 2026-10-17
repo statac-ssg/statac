@@ -25,7 +25,9 @@
 //! markup keeps its indent, for what it writes to line up at. In a body
 //! the engine holds back, a tag alone on its line opening or closing a
 //! branch, after a line ending the engine writes, leaves out that line
-//! ending and keeps its own in its place.
+//! ending and keeps its own in its place. A loop's tag alone on its line
+//! keeps its line ending, for each pass to start a line, where the loop's
+//! end tag closes the last line of a body opening indented.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -162,6 +164,8 @@ struct Tag {
     /// Opens a `call` or `filter`, which writes where it stands a body
     /// the engine holds back.
     writes: bool,
+    /// Opens a `for`, whose body is written once for each pass.
+    repeats: bool,
     /// A `for` tag's loop can be run again from inside it.
     recursive: bool,
     /// Opens or closes `raw`.
@@ -310,6 +314,7 @@ impl Read {
                         name,
                         holds,
                         writes: matches!(word, "call" | "filter"),
+                        repeats: word == "for",
                         recursive,
                         raw: false,
                     });
@@ -348,6 +353,7 @@ impl Read {
                 name: None,
                 holds: None,
                 writes: false,
+                repeats: false,
                 recursive: false,
                 raw,
             });
@@ -960,12 +966,43 @@ impl<'s> Template<'s> {
         // alone only where the tag also leaves out the line ending written
         // before it. The blocks are in the order they open, so a line
         // ending kept on the line before is known by then.
+        //
+        // A loop whose tag stands alone on its line and whose end tag
+        // closes the last line of its body writes no line ending between
+        // its passes. Where the body opens indented, the spaces between the
+        // passes say each was meant for lines of its own, so the line
+        // ending after its tag goes with each pass, the writer leaving it
+        // out where the line before is already ended. Unindented, or
+        // where spaces show or aren't markup, the passes run together as
+        // typed, a line ending between them being something a reader
+        // could see. Either way the line ending after the end tag is left
+        // out where no pass was written, in a body held back as elsewhere.
+        let mut closes_loop = vec![false; self.lines.len()];
         let mut trims = Vec::new();
         for block in &self.blocks {
             let Some(end) = block.end else {
                 continue;
             };
             if block.kind != Kind::Flowing {
+                continue;
+            }
+            if let Some(closer) = self.last_line_closer(block, &ends)
+                && lone(block.opening).is_some()
+            {
+                let first = &self.lines[block.opening + 1];
+                if markup
+                    && first.shape == Shape::Content
+                    && first.indent > 0
+                    && (block.opening..=end)
+                        .all(|line| !self.lines[line].shown && !self.lines[line].scripted)
+                {
+                    keeps.push(tags[block.tag].span.end - 3);
+                }
+                if later[end] && !kept_ends[end] {
+                    keeps.push(closer.span.end - 3);
+                    kept_ends[end] = true;
+                }
+                closes_loop[end] = kept_ends[end];
                 continue;
             }
             let mut edges = vec![block.opening];
@@ -1112,7 +1149,8 @@ impl<'s> Template<'s> {
                     valued,
                     held,
                     kept: kept[number],
-                    ending: (kept_ends[number] && !inside[number]).then_some(ends[number]),
+                    ending: (kept_ends[number] && (!inside[number] || closes_loop[number]))
+                        .then_some(ends[number]),
                 }
             })
             .collect();
@@ -1124,6 +1162,41 @@ impl<'s> Template<'s> {
             keeps,
             trims,
         }
+    }
+
+    /// The end tag of `block`, where it is a loop with no `else` and the
+    /// tag, written plainly, closes a line of its body holding more. `ends`
+    /// is where each line's text ends.
+    fn last_line_closer(&self, block: &Block, ends: &[usize]) -> Option<&Tag> {
+        let tags = &self.read.tags;
+        let end = block.end.filter(|&end| end > block.opening)?;
+        let line = &self.lines[end];
+        let last = &tags[*line.tags.last()?];
+        // Its end tag is the last on the line where no block opened before
+        // it ends there too, and the last closes a block opened before.
+        let mut depth = 0;
+        let mut outward = false;
+        for &at in &line.tags {
+            outward = false;
+            match tags[at].role {
+                Role::Opens(_) => depth += 1,
+                Role::Ends if depth == 0 => outward = true,
+                Role::Ends => depth -= 1,
+                Role::Middle | Role::Writes | Role::Quiet => {}
+            }
+        }
+        (tags[block.tag].repeats
+            && block.middles.is_empty()
+            && line.shape == Shape::Content
+            && outward
+            && !self
+                .blocks
+                .iter()
+                .any(|other| other.opening < block.opening && other.end == Some(end))
+            && last.span.end == ends[end]
+            && !last.controlled
+            && matches!(self.source.as_bytes()[last.span.end - 3], b' ' | b'\t'))
+        .then_some(last)
     }
 
     #[cfg(test)]
@@ -1555,6 +1628,58 @@ mod tests {
         for (template, handed) in cases {
             assert_eq!(kept(template), handed, "{template}");
         }
+    }
+
+    #[test]
+    fn a_loop_closing_its_last_line_keeps_its_tags_line_end_where_its_body_is_indented() {
+        let cases = [
+            (
+                "<div>\n  {% for i in l %}\n  <p>{{ i }}</p>{% endfor %}\n</div>\n",
+                "<div>\n  {% for i in l+%}\n  <p>{{ i }}</p>{% endfor+%}\n</div>\n",
+            ),
+            // In a body held back the same, nothing taken from before it.
+            (
+                "{% set s %}\n<div>\n  {% for i in l %}\n  <p>{{ i }}</p>{% endfor %}\n</div>\n{% endset %}\n",
+                "{% set s %}\n<div>\n  {% for i in l+%}\n  <p>{{ i }}</p>{% endfor+%}\n</div>\n{% endset %}\n",
+            ),
+            // Closing a branch inside it too.
+            (
+                "<ul>\n  {% for i in l %}\n  <li>\n    {% if i %}\n    <b>{{ i }}</b>{% endif %}</li>{% endfor %}\n</ul>\n",
+                "<ul>\n  {% for i in l+%}\n  <li>\n    {% if i %}\n    <b>{{ i }}</b>{% endif %}</li>{% endfor+%}\n</ul>\n",
+            ),
+            // Unindented, or where spaces show, the passes run together.
+            (
+                "<p>\n{% for i in l %}\n<b>{{ i }}</b>{% endfor %}\n</p>\n",
+                "<p>\n{% for i in l %}\n<b>{{ i }}</b>{% endfor+%}\n</p>\n",
+            ),
+            (
+                "{% macro m(l) %}\n<p>\n{% for i in l %}\n<b>{{ i }}</b>{% endfor %}\n</p>\n{% endmacro %}\n",
+                "{% macro m(l) %}\n<p>\n{% for i in l %}\n<b>{{ i }}</b>{% endfor+%}\n</p>\n{% endmacro %}\n",
+            ),
+            (
+                "<pre>\n  {% for i in l %}\n  {{ i }}{% endfor %}\n</pre>\n",
+                "<pre>\n  {% for i in l %}\n  {{ i }}{% endfor+%}\n</pre>\n",
+            ),
+            // A loop with `else`, or more after its end tag, is left.
+            (
+                "<div>\n  {% for i in l %}\n  <p>{{ i }}</p>{% else %}\n  <p>none</p>{% endfor %}\n</div>\n",
+                "<div>\n  {% for i in l %}\n  <p>{{ i }}</p>{% else+%}\n  <p>none</p>{% endfor+%}\n</div>\n",
+            ),
+            (
+                "<p>\n  {% for i in l %}\n  <b>{{ i }}</b>{% endfor %} after\n</p>\n",
+                "<p>\n  {% for i in l %}\n  <b>{{ i }}</b>{% endfor %} after\n</p>\n",
+            ),
+        ];
+        for (template, handed) in cases {
+            assert_eq!(kept(template), handed, "{template}");
+        }
+        // Where the template isn't markup, as plain text.
+        let source = "{% for i in l %}\n  {{ i }}{% endfor %}\n.\n";
+        let facts = super::facts(source, false).expect("a template");
+        assert_eq!(
+            facts.keeps,
+            [source.find("%}\n.").expect("its end tag") - 1]
+        );
     }
 
     #[test]

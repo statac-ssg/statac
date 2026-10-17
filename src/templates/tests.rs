@@ -655,6 +655,69 @@ fn a_body_held_back_lands_where_it_is_called_however_the_block_defining_it_moves
 }
 
 #[test]
+fn a_loop_closing_its_bodys_last_line_writes_each_pass_on_lines_of_its_own_where_indented() {
+    let recursive = "{% set items = [{\"t\": \"a\", \"c\": [{\"t\": \"b\", \"c\": []}, {\"t\": \"c\", \"c\": []}]}, {\"t\": \"d\", \"c\": []}] %}\n<ul>\n  {% for item in items recursive %}\n  <li>{{ item.t }}{% if item.c %}\n    <ul>\n      {{ loop(item.c) }}\n    </ul>{% endif %}</li>{% endfor %}\n</ul>\n";
+    let cases = [
+        (
+            "<div>\n  <p>a</p>\n  {% for i in [1, 2] %}\n  <p>{{ i }}</p>{% endfor %}\n</div>\n",
+            "<div>\n  <p>a</p>\n  <p>1</p>\n  <p>2</p>\n</div>\n",
+        ),
+        (
+            "<div>\n  <p>a</p>\n  {% for i in [] %}\n  <p>{{ i }}</p>{% endfor %}\n</div>\n",
+            "<div>\n  <p>a</p>\n</div>\n",
+        ),
+        (
+            "<ul>\n  {% for i in [1, 2] %}\n  <li>\n    {{ i }}\n  </li>{% endfor %}\n</ul>\n",
+            "<ul>\n  <li>\n    1\n  </li>\n  <li>\n    2\n  </li>\n</ul>\n",
+        ),
+        (
+            "<div>\r\n  {% for i in [1, 2] %}\r\n  <p>{{ i }}</p>{% endfor %}\r\n</div>\r\n",
+            "<div>\r\n  <p>1</p>\r\n  <p>2</p>\r\n</div>\r\n",
+        ),
+        // A recursive loop's deeper levels go in as far as its call.
+        (
+            recursive,
+            "<ul>\n  <li>a\n    <ul>\n      <li>b</li>\n      <li>c</li>\n    </ul></li>\n  <li>d</li>\n</ul>\n",
+        ),
+        // Unindented, or where the spaces show, the passes run together as
+        // typed, where a line ending between them would show.
+        (
+            "<p>\n{% for i in [1, 2] %}\n<b>{{ i }}</b>{% endfor %}\n</p>\n",
+            "<p>\n<b>1</b><b>2</b>\n</p>\n",
+        ),
+        (
+            "<p>\n{% for i in [] %}\n<b>{{ i }}</b>{% endfor %}\n</p>\n",
+            "<p>\n</p>\n",
+        ),
+        (
+            "<pre>\n  {% for i in [1, 2] %}\n  {{ i }}{% endfor %}\n</pre>\n",
+            "<pre>\n  1  2\n</pre>\n",
+        ),
+        // More after the end tag on its line is left as typed.
+        (
+            "<p>\n  {% for i in [1, 2] %}\n  <b>{{ i }}</b>{% endfor %} after\n</p>\n",
+            "<p>\n  <b>1</b>  <b>2</b> after\n</p>\n",
+        ),
+    ];
+    for (body, page) in cases {
+        // Straight into the page, and in a body the engine holds back.
+        let held = format!("{{% set s %}}\n{body}{{% endset %}}\n{{{{ s }}}}\n");
+        for template in [body, held.as_str()] {
+            let built = site(&[
+                (
+                    "statac.yaml",
+                    "language: en\ntimezone: UTC\npages.feed: false\n",
+                ),
+                ("content/index.md", "---\ntitle: Home\n---\n"),
+                ("templates/home.html", template),
+            ]);
+            assert!(built.problems.is_empty(), "{:?}", built.problems);
+            assert_eq!(built.html("index.md"), page, "{template}");
+        }
+    }
+}
+
+#[test]
 fn a_snippet_put_among_other_things_on_a_line_keeps_the_spaces_it_starts_with() {
     let built = site(&[
         (

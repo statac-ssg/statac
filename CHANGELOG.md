@@ -35,6 +35,14 @@ What changed in each release of Statac, the newest first.
   the `{% call %}` tag. A line in such a body that comes to nothing, as
   `  {% if x %}<p>b</p>{% endif %}` where `x` is false, is left out, where
   it left a line of spaces.
+- A loop whose tag stands alone on its line and whose end tag closes
+  the last line of its body, as `  <li>{{ i }}</li>{% endfor %}` on the
+  line after `{% for i in items %}`, writes each pass on lines of its
+  own where that body is indented. The passes ran together on one line,
+  each with the body's indent. Where the body is at the left, or inside
+  `<pre>`, `<textarea>`, `<script>` or `<style>`, or the template writes
+  plain text, the passes run together as typed, since a line ending
+  between them could change the page.
 
 ## 0.4.0 - 2026-10-17
 
