@@ -206,7 +206,7 @@ impl Shared {
     /// page is published there. Which page stands where is known from the
     /// site's pages, which is recorded as read.
     pub fn standing_at(&self, address: &crate::content::address::Address) -> Option<PageId> {
-        frame::read(Key::Lists);
+        frame::read(Key::Pages);
         let standing = self.standing.get_or_init(|| {
             let mut standing = HashMap::new();
             for (id, page) in self.site.pages.iter().filter(|(_, page)| page.lands()) {
@@ -719,6 +719,12 @@ impl Renderer {
             site => SiteValue::value(shared, frame::language()),
         };
         self.finish(REDIRECT, context, Vec::new())
+    }
+
+    /// Every page the site publishes, a list's later pages among them
+    /// with their numbers, in the order of their addresses.
+    pub fn every_page(&self) -> &[(PageId, usize)] {
+        self.shared.every_page()
     }
 
     /// Every feed the site publishes.

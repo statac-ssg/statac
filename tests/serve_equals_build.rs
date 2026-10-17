@@ -2154,6 +2154,124 @@ fn pages_chosen_from_every_page_by_a_field_follow_the_field() {
 }
 
 #[test]
+fn pages_chosen_from_every_page_by_what_some_write_follow_those_pages() {
+    let site = Site::new("chosen-writers");
+    // Each page shows the first page asking to be in the menu, how many
+    // pages do and how many don't, the pages written to be wide and how
+    // many aren't, and reads nothing else of any page.
+    let shown = "<title>{{ headline(page) }}</title>\n\
+                 <menu>{% for entry in site.pages | selectattr('menu') %}\
+                 {% if loop.first %}{{ entry.url }}{% endif %}{% endfor %} \
+                 {{ site.pages | selectattr('menu') | list | length }} \
+                 {{ site.pages | rejectattr('menu') | list | length }}</menu>\n\
+                 {{ site.pages | rejectattr('layout', 'eq', 'wide') | list | length }} \
+                 {% for entry in site.pages | selectattr('layout', 'eq', 'wide') %}\
+                 {{ entry.url }} {{ entry.language }};{% endfor %}\n{{ page.content }}\n";
+    for template in ["home", "folder", "page", "wide"] {
+        site.write(&format!("templates/{template}.html"), shown);
+    }
+    let page = |n: u32, more: &str| format!("---\ntitle: Page {n}\n{more}---\nA page.\n");
+    let home = site.read("content/index.md");
+    through(
+        &site,
+        &[
+            ("two pages in the menu", &|site| {
+                site.write("content/page-1.md", &page(1, "menu: true\n"));
+                site.write("content/page-2.md", &page(2, "menu: true\n"))
+            }),
+            ("the second put before the first", &|site| {
+                site.write(
+                    "content/page-2.md",
+                    &page(2, "menu: true\npermalink: /0/\n"),
+                )
+            }),
+            ("the second out of the menu", &|site| {
+                site.write(
+                    "content/page-2.md",
+                    &page(2, "menu: false\npermalink: /0/\n"),
+                )
+            }),
+            ("the home and its later pages in the menu", &|site| {
+                site.write(
+                    "content/index.md",
+                    &home.replace("title:", "menu: true\ntitle:"),
+                )
+            }),
+            ("a post giving the home another page", &|site| {
+                site.write(
+                    "content/post-7.md",
+                    &post("Post 7", "2026-01-07", "one", "Post 7."),
+                )
+            }),
+            ("a page written wide", &|site| {
+                site.write("content/page-1.md", &page(1, "layout: wide\n"))
+            }),
+            ("a German page written wide", &|site| {
+                site.write("content/de/page-3.md", &page(3, "layout: wide\n"))
+            }),
+            ("the German page made English", &|site| {
+                site.remove("content/de/page-3.md");
+                site.write("content/page-3.md", &page(3, "layout: wide\n"))
+            }),
+            ("a page written as wide but not as text", &|site| {
+                site.write("content/page-1.md", &page(1, "layout: [wide]\n"))
+            }),
+            ("the page written wide again", &|site| {
+                site.write("content/page-1.md", &page(1, "layout: \"wide\"\n"))
+            }),
+            ("a page writing neither", &|site| {
+                site.write("content/page-4.md", &page(4, ""))
+            }),
+            ("that page removed", &|site| {
+                site.remove("content/page-4.md")
+            }),
+        ],
+    );
+}
+
+#[test]
+fn every_page_a_template_walks_follows_which_pages_are_published_and_where() {
+    let site = Site::empty("every-page");
+    site.write("statac.yaml", "title: Site\nlanguage: en\ntimezone: UTC\n");
+    // Each page counts the pages published and shows where the last
+    // stands, and reads nothing else of any other page.
+    let shown = "{{ site.pages | length }} {% for entry in site.pages %}\
+                 {% if loop.last %}{{ entry.url }}{% endif %}{% endfor %}\n";
+    for template in ["home", "folder", "page"] {
+        site.write(&format!("templates/{template}.html"), shown);
+    }
+    site.write("content/index.md", "---\ntitle: Home\n---\n");
+    site.write("content/page-1.md", "---\ntitle: Page 1\n---\nA page.\n");
+    let notes = |more: &str| format!("---\ntitle: Notes\n{more}---\n");
+    let note = |n: u32, more: &str| {
+        format!("---\ntitle: Note {n}\ndate: 2026-01-0{n}\n{more}---\nA note.\n")
+    };
+    site.write("content/notes/index.md", &notes(""));
+    site.write("content/notes/note-1.md", &note(1, ""));
+    site.write("content/notes/note-2.md", &note(2, ""));
+    through(
+        &site,
+        &[
+            ("a note put last", &|site| {
+                site.write("content/notes/note-1.md", &note(1, "permalink: /zz/\n"))
+            }),
+            ("the notes' page publishing nothing", &|site| {
+                site.write("content/notes/index.md", &notes("index_page: false\n"))
+            }),
+            ("the notes' page published again", &|site| {
+                site.write("content/notes/index.md", &notes(""))
+            }),
+            ("the notes on a page each", &|site| {
+                site.write("content/notes/index.md", &notes("posts_per_page: 1\n"))
+            }),
+            ("the notes on one page", &|site| {
+                site.write("content/notes/index.md", &notes(""))
+            }),
+        ],
+    );
+}
+
+#[test]
 fn pages_chosen_by_a_field_a_folder_hands_down_follow_the_folder() {
     let site = Site::new("chosen-handed");
     // Each page lists the pages that ask to be in the menu, and reads
@@ -2317,13 +2435,36 @@ fn the_starters_posts_and_tags() {
             ("the post removed", &|site| {
                 site.remove("content/posts/post-9.md")
             }),
+            ("a tag no other post has", &|site| {
+                site.write("content/posts/post-2.md", &starter_post(2, "one, three"))
+            }),
+            ("the tag spelt with a capital", &|site| {
+                site.write("content/posts/post-2.md", &starter_post(2, "one, Three"))
+            }),
+            ("the tag renamed", &|site| {
+                site.write("content/posts/post-2.md", &starter_post(2, "one, four"))
+            }),
+            ("a tag every post has renamed on one", &|site| {
+                site.write("content/posts/post-2.md", &starter_post(2, "five, four"))
+            }),
+            ("a post moved to the notes", &|site| {
+                site.remove("content/posts/post-4.md");
+                site.write("content/notes/post-4.md", &starter_post(4, "one"))
+            }),
+            ("and back", &|site| {
+                site.remove("content/notes/post-4.md");
+                site.write("content/posts/post-4.md", &starter_post(4, "one"))
+            }),
         ],
     );
-    // A post's writing and its title show where the post is listed, not
-    // on every page.
-    let outputs = built[0].1;
-    assert!(built[1].0 > 0 && built[1].0 * 2 < outputs, "{built:?}");
-    assert!(built[2].0 > 0 && built[2].0 * 2 < outputs, "{built:?}");
+    // A post's writing, its title and its tags, and a post added or
+    // removed, show where the post is listed, not on every page.
+    for at in [1, 2, 3, 5, 6, 7] {
+        assert!(
+            built[at].0 > 0 && built[at].0 * 2 < built[at].1,
+            "{at}: {built:?}"
+        );
+    }
 }
 
 #[test]
@@ -2331,6 +2472,7 @@ fn the_starters_menu_folders_feed_and_languages() {
     let site = Site::starter("starter-menu");
     let settings = site.read("statac.yaml");
     let tags = site.read("content/tags.md");
+    let home = site.read("content/index.md");
     let menu = |more: &str| tags.replace("layout: tags\n", &format!("layout: tags\n{more}"));
     let more = |handed: &str| format!("---\ntitle: More\n{handed}---\n");
     through(
@@ -2365,14 +2507,72 @@ fn the_starters_menu_folders_feed_and_languages() {
             ("the folder handing them out of it", &|site| {
                 site.write("content/more/index.md", &more("pages.menu: false\n"))
             }),
+            ("the folder's title changed", &|site| {
+                site.write("content/more/index.md", "---\ntitle: Less\n---\n")
+            }),
+            ("the folder renamed", &|site| {
+                let content = site.root().join("content");
+                fs::rename(content.join("more"), content.join("extra")).unwrap()
+            }),
+            ("the folder moved before the others", &|site| {
+                let text = "---\ntitle: Less\npermalink: /a/\n---\n";
+                site.write("content/extra/index.md", text)
+            }),
             ("the folder removed", &|site| {
-                fs::remove_dir_all(site.root().join("content/more")).unwrap()
+                fs::remove_dir_all(site.root().join("content/extra")).unwrap()
+            }),
+            ("a folder in German", &|site| {
+                site.write("content/de/more/index.md", &more(""));
+                let text = post("Seite 1", "2026-02-01", "eins", "Seite 1 sagt das.");
+                site.write("content/de/more/page-1.md", &text)
+            }),
+            ("the German folder removed", &|site| {
+                fs::remove_dir_all(site.root().join("content/de/more")).unwrap()
+            }),
+            ("a page", &|site| {
+                site.write("content/page-1.md", "---\ntitle: Page 1\n---\nA page.\n")
+            }),
+            ("the page removed", &|site| site.remove("content/page-1.md")),
+            ("the home's title changed", &|site| {
+                site.write(
+                    "content/index.md",
+                    &home.replace("greeting:", "title: Home\ngreeting:"),
+                )
+            }),
+            ("the home's feed moved", &|site| {
+                site.write(
+                    "content/index.md",
+                    &home.replace("greeting:", "feed: news.xml\ngreeting:"),
+                )
+            }),
+            ("the home as it was", &|site| {
+                site.write("content/index.md", &home)
             }),
             ("the feed turned off", &|site| {
                 site.write("statac.yaml", &format!("{settings}pages.feed: false\n"))
             }),
             ("the feed turned on", &|site| {
                 site.write("statac.yaml", &settings)
+            }),
+            ("the tags page's layout another", &|site| {
+                site.write(
+                    "content/tags.md",
+                    &tags.replace("layout: tags", "layout: page"),
+                )
+            }),
+            ("and the tags page's again", &|site| {
+                site.write("content/tags.md", &tags)
+            }),
+            ("a German page of the tags", &|site| {
+                let text = "---\ntitle: Schlagworte\nlayout: tags\n---\n";
+                site.write("content/de/tags.md", text)
+            }),
+            ("the German page's layout another", &|site| {
+                let text = "---\ntitle: Schlagworte\nlayout: page\n---\n";
+                site.write("content/de/tags.md", text)
+            }),
+            ("the German page removed", &|site| {
+                site.remove("content/de/tags.md")
             }),
             ("the tags page removed", &|site| {
                 site.remove("content/tags.md")
@@ -2386,6 +2586,112 @@ fn the_starters_menu_folders_feed_and_languages() {
             }),
             ("the translation removed", &|site| {
                 site.remove("content/de/about.md")
+            }),
+        ],
+    );
+}
+
+#[test]
+fn what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them() {
+    let site = Site::empty("lists-shown");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: [en, de]\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+    );
+    // Each page shows its folder, the folders of its language, the site's
+    // feed and whether the German pages have a home; a page in a folder
+    // inside another shows only whether its folder has a page, and its
+    // order.
+    let shown = "{{ page.folder }} {{ page.folder.title }} {{ page.folder.url }} \
+                 [{{ page.folder.feed }}]\n\
+                 {% for folder in site.folders %}{{ folder.name }};{% endfor %}\n\
+                 [{{ site.feed }}] {{ site.languages['de'] is defined }}\n";
+    for template in ["home", "folder", "page"] {
+        site.write(&format!("templates/{template}.html"), shown);
+    }
+    site.write(
+        "templates/inner.html",
+        "{{ page.folder.page is defined }} {{ page.folder.order }}\n",
+    );
+    site.write("templates/feed.xml", FEED);
+    site.write("content/index.md", "---\ntitle: Home\n---\n");
+    site.write("content/a/index.md", "---\ntitle: A\n---\n");
+    site.write("content/a/page-1.md", "---\ntitle: Page 1\n---\nA page.\n");
+    let inner = "---\ntitle: Page 2\nlayout: inner\n---\nA page.\n";
+    site.write("content/a/b/page-2.md", inner);
+    site.write("content/c/index.md", "---\ntitle: C\n---\n");
+    site.write("content/c/page-3.md", "---\ntitle: Page 3\n---\nA page.\n");
+    let folder = |more: &str| format!("---\ntitle: B\n{more}---\n");
+    through(
+        &site,
+        &[
+            ("a dated post, which gives the folder a feed", &|site| {
+                let text = post("Post 1", "2026-01-01", "one", "Post 1 says this.");
+                site.write("content/a/post-1.md", &text)
+            }),
+            ("a page for the folder inside it", &|site| {
+                site.write("content/a/b/index.md", &folder(""))
+            }),
+            ("that folder's order turned", &|site| {
+                site.write("content/a/b/index.md", &folder("order: oldest first\n"))
+            }),
+            ("a folder moved before the others", &|site| {
+                site.write("content/c/index.md", "---\ntitle: C\npermalink: /0/\n---\n")
+            }),
+            ("a German page", &|site| {
+                site.write(
+                    "content/de/page-3.md",
+                    "---\ntitle: Seite 3\n---\nEine Seite.\n",
+                )
+            }),
+            ("the German home publishing no page", &|site| {
+                site.write("content/de/index.md", "---\nindex_page: false\n---\n")
+            }),
+            ("the German home publishing one", &|site| {
+                site.remove("content/de/index.md")
+            }),
+            ("the German pages removed", &|site| {
+                site.remove("content/de/page-3.md")
+            }),
+            ("the dated post removed", &|site| {
+                site.remove("content/a/post-1.md")
+            }),
+        ],
+    );
+}
+
+#[test]
+fn a_tag_or_a_series_found_by_a_spelling_follows_the_spellings_there_are() {
+    let site = Site::new("spellings");
+    let found = "[{{ site.tags['Cafe'] is defined }} {{ 'Cafe' in site.tags }} \
+                 {{ page.tags['Cafe'] is defined }} {{ site.series['Cafe'] is defined }}]\n";
+    // Nothing else on any page, so only the lookups can build it again.
+    for template in ["home", "folder", "page"] {
+        site.write(&format!("templates/{template}.html"), found);
+    }
+    let spelt = |n: u32, spelling: &str| {
+        let text = format!("Post {n} says this.");
+        let date = format!("2026-01-0{n}");
+        let tags = format!("one, {spelling}");
+        let written = post(&format!("Post {n}"), &date, &tags, &text);
+        written.replacen("---\n", &format!("---\nseries: {spelling}\n"), 1)
+    };
+    through(
+        &site,
+        &[
+            // Shown as most of their posts spell them, throughout.
+            ("a tag and a series", &|site| {
+                site.write("content/post-1.md", &spelt(1, "Café"));
+                site.write("content/post-3.md", &spelt(3, "Café"))
+            }),
+            ("a post spelling them another way", &|site| {
+                site.write("content/post-2.md", &spelt(2, "Cafe"))
+            }),
+            ("the post spelling them as the others do", &|site| {
+                site.write("content/post-2.md", &spelt(2, "Café"))
+            }),
+            ("and the other way again", &|site| {
+                site.write("content/post-2.md", &spelt(2, "Cafe"))
             }),
         ],
     );

@@ -182,6 +182,25 @@ impl Reading {
 /// turns on more than its answer to them.
 const CHOOSING: &[&str] = &["layout", "type"];
 
+/// A name every page is asked, and what a page answers to it by.
+struct Asking<'a> {
+    name: &'a str,
+    word: Option<PageWord>,
+    dated: bool,
+    choosing: bool,
+}
+
+impl Asking<'_> {
+    fn of(name: &str) -> Asking<'_> {
+        Asking {
+            name,
+            word: PageWord::named(name),
+            dated: name == "date" || crate::lists::DATE_PARTS.contains(&name),
+            choosing: CHOOSING.contains(&name),
+        }
+    }
+}
+
 /// A fingerprint being taken.
 #[derive(Default)]
 struct Print(DefaultHasher);
@@ -274,6 +293,9 @@ impl Print {
 
 type Slots = Vec<OnceLock<u64>>;
 
+/// Fingerprints by what they are of, added to as a reading is asked of.
+type Keyed<K> = Mutex<HashMap<K, Arc<OnceLock<u64>>>>;
+
 fn slots(len: usize) -> Slots {
     std::iter::repeat_with(OnceLock::new).take(len).collect()
 }
@@ -289,6 +311,7 @@ pub(super) struct Prints {
     neighbours: Slots,
     translations: Slots,
     lists: Slots,
+    lists_own: Slots,
     heads: Slots,
     /// Each list's pages, the first first.
     stretches: Vec<OnceLock<Vec<u64>>>,
@@ -301,9 +324,15 @@ pub(super) struct Prints {
     every_list: OnceLock<u64>,
     every_front: OnceLock<u64>,
     every_page: OnceLock<u64>,
+    spellings: OnceLock<u64>,
+    /// Each language's folders and home, by the language.
+    folders: Slots,
+    homes: Slots,
     /// What every page answers to a name, by the name; names are added to
     /// a reading as it is asked of.
-    fields_of_every: Mutex<HashMap<NameId, Arc<OnceLock<u64>>>>,
+    fields_of_every: Keyed<NameId>,
+    /// What every page writing a name answers to another, by the names.
+    fields_of_writers: Keyed<(NameId, Option<NameId>, NameId)>,
     every_picture: OnceLock<u64>,
     every_file: OnceLock<u64>,
     /// What the reading holds under `fetched/`, by each file's key.
@@ -315,6 +344,7 @@ pub(super) struct Prints {
 impl Prints {
     pub fn new(reading: &Reading) -> Prints {
         let (pages, lists) = (reading.pages.len(), reading.lists.len());
+        let languages = reading.renderer.site().languages.len();
         Prints {
             texts: slots(reading.sources.len()),
             fronts: slots(pages),
@@ -322,6 +352,7 @@ impl Prints {
             neighbours: slots(pages),
             translations: slots(pages),
             lists: slots(lists),
+            lists_own: slots(lists),
             heads: slots(lists),
             stretches: (std::iter::repeat_with(OnceLock::new).take(lists)).collect(),
             templates: slots(reading.templates.len()),
@@ -333,7 +364,11 @@ impl Prints {
             every_list: OnceLock::new(),
             every_front: OnceLock::new(),
             every_page: OnceLock::new(),
+            spellings: OnceLock::new(),
+            folders: slots(languages),
+            homes: slots(languages),
             fields_of_every: Mutex::default(),
+            fields_of_writers: Mutex::default(),
             every_picture: OnceLock::new(),
             every_file: OnceLock::new(),
             fetched: OnceLock::new(),
@@ -356,6 +391,13 @@ impl Taken<'_> {
         let pages = pages.iter();
         pages
             .map(|page| self.reading.pages[page.index()].as_str())
+            .collect()
+    }
+
+    fn lists_named(&self, lists: &[ListId]) -> Vec<&str> {
+        let lists = lists.iter();
+        lists
+            .map(|list| self.reading.lists[list.index()].as_str())
             .collect()
     }
 
@@ -487,7 +529,24 @@ impl Taken<'_> {
                         .done()
                 })
             }
+            Key::List(list) => self.list_own(list),
+            Key::Pages => self.every_page(),
+            Key::Spellings => self.spellings(),
+            Key::Folders(language) => *prints.folders[language.index()].get_or_init(|| {
+                let folders = site.folders(language);
+                Print::default().with(self.lists_named(&folders)).done()
+            }),
+            Key::Home(language) => *prints.homes[language.index()].get_or_init(|| {
+                let own = site
+                    .own_list(language)
+                    .map(|list| self.lists_named(&[list]));
+                let home = site.home(language).map(|page| self.named(&[page]));
+                Print::default().with((own, home)).done()
+            }),
             Key::FieldOfEvery(name) => self.field_of_every(name),
+            Key::FieldOfWriters(writing, wanted, name) => {
+                self.field_of_writers(writing, wanted, name)
+            }
             Key::Lists | Key::ListsIn(_) => self.every_list(),
             // Settings and languages are written in files the whole
             // site's fingerprint covers.
@@ -681,8 +740,12 @@ impl Taken<'_> {
             let page = list.page.map(|page| &reading.pages[page.index()]);
             let address = list.address.as_ref();
             let mut print = Print::default()
-                .with((&reading.lists[id.index()], page, list.numbered))
-                .with((list.per_page, list.members.len(), list.undated.len()))
+                .with((
+                    &reading.lists[id.index()],
+                    page,
+                    list.numbered,
+                    list.per_page,
+                ))
                 .shown(&(address.map(|address| &address.value), &list.later))
                 .place(sources, address.and_then(|address| address.origin.place));
             if let Some(feed) = renderer.feed_of(id) {
@@ -691,6 +754,22 @@ impl Taken<'_> {
                     .place(sources, feed.placed);
             }
             print.done()
+        })
+    }
+
+    /// What a list is known by but for its members, as a template asks
+    /// it: the page that speaks for it, where its feed is published, and
+    /// its order. Which list it is the id carries; its feed turns on its
+    /// members too, so where it is published is taken as it is worked out.
+    fn list_own(&self, id: ListId) -> u64 {
+        *self.prints.lists_own[id.index()].get_or_init(|| {
+            let renderer = &self.reading.renderer;
+            let list = renderer.site().lists.get(id);
+            let feed = renderer.feed_of(id).map(|feed| &feed.address);
+            Print::default()
+                .with(list.page.map(|page| self.named(&[page])))
+                .shown(&(feed, list.order))
+                .done()
         })
     }
 
@@ -747,56 +826,119 @@ impl Taken<'_> {
             if !crate::templates::of_the_front(&name) {
                 return self.every_front();
             }
-            let site = renderer.site();
-            let sources = renderer.sources();
-            let word = PageWord::named(&name);
-            let dated = name == "date" || crate::lists::DATE_PARTS.contains(&name.as_str());
-            let choosing = CHOOSING.contains(&name.as_str());
+            let asking = Asking::of(&name);
             let mut print = Print::default().with(self.every_page());
-            for (id, page) in site.pages.iter() {
-                let words = page.words.words.iter();
-                for (_, value) in words.filter(|(written, _)| Some(*written) == word) {
-                    print = print.with(1u8).word(sources, value);
-                }
-                for field in page.words.fields.iter().filter(|field| field.name == name) {
-                    print = (print.with(2u8))
-                        .place(sources, Some(field.key))
-                        .node(sources, &field.value)
-                        .origin(sources, &field.origin);
-                }
-                if let Some(title) = page.title.as_ref().filter(|_| name == "title") {
-                    print = print
-                        .with((3u8, &title.value))
-                        .origin(sources, &title.origin);
-                }
-                if let Some(date) = page.date.as_ref().filter(|_| dated) {
-                    print = (print.with(4u8))
-                        .shown(&date.value)
-                        .origin(sources, &date.origin);
-                }
-                if choosing {
-                    print = match renderer.layout_of(id) {
-                        Ok(chosen) => {
-                            (print.with((5u8, &chosen.name))).origin(sources, &chosen.origin)
-                        }
-                        Err(problem) => (print.with(6u8))
-                            .shown(&problem.kind)
-                            .place(sources, problem.place),
-                    };
-                }
-                print = print.with(0u8);
+            for (id, _) in renderer.site().pages.iter() {
+                print = self.answer(print, id, &asking).with(0u8);
             }
             print.done()
         })
     }
 
-    /// Which lists the site has and how long each is, and which pages it
-    /// publishes where.
+    /// What each page writing `writing`, or handed it, as the text
+    /// `wanted` where there is one, answers to `name`, as
+    /// [`Taken::field_of_every`] has it, in the order of their addresses,
+    /// with where each is published and in which language: a list's later
+    /// pages among them. Any other page is no part of it.
+    fn field_of_writers(&self, writing: NameId, wanted: Option<NameId>, name: NameId) -> u64 {
+        let slot = {
+            let mut all = self
+                .prints
+                .fields_of_writers
+                .lock()
+                .expect("never poisoned");
+            Arc::clone(all.entry((writing, wanted, name)).or_default())
+        };
+        *slot.get_or_init(|| {
+            let reading = self.reading;
+            let renderer = &reading.renderer;
+            let (writing, name) = (renderer.name_of(writing), renderer.name_of(name));
+            let wanted = wanted.map(|wanted| renderer.name_of(wanted));
+            if !crate::templates::of_the_front(&name) {
+                return self.every_front();
+            }
+            let site = renderer.site();
+            let asking = Asking::of(&name);
+            let mut print = Print::default();
+            for &(id, number) in renderer.every_page() {
+                let page = site.pages.get(id);
+                if !crate::templates::writes(page, &writing, wanted.as_deref()) {
+                    continue;
+                }
+                let address = match number {
+                    1 => Some(&page.address),
+                    _ => (page.speaks_for)
+                        .and_then(|list| site.lists.get(list).later_address(number)),
+                };
+                print = (print.with((&reading.pages[id.index()], number, page.language.index())))
+                    .shown(&address);
+                print = self.answer(print, id, &asking).with(0u8);
+            }
+            print.done()
+        })
+    }
+
+    /// `print` with what page `id` answers to the name `asking`, and where
+    /// it is written.
+    fn answer(&self, mut print: Print, id: PageId, asking: &Asking) -> Print {
+        let renderer = &self.reading.renderer;
+        let sources = renderer.sources();
+        let page = renderer.site().pages.get(id);
+        let words = page.words.words.iter();
+        for (_, value) in words.filter(|(written, _)| Some(*written) == asking.word) {
+            print = print.with(1u8).word(sources, value);
+        }
+        let fields = page.words.fields.iter();
+        for field in fields.filter(|field| field.name == asking.name) {
+            print = (print.with(2u8))
+                .place(sources, Some(field.key))
+                .node(sources, &field.value)
+                .origin(sources, &field.origin);
+        }
+        if let Some(title) = page.title.as_ref().filter(|_| asking.name == "title") {
+            print = print
+                .with((3u8, &title.value))
+                .origin(sources, &title.origin);
+        }
+        if let Some(date) = page.date.as_ref().filter(|_| asking.dated) {
+            print = (print.with(4u8))
+                .shown(&date.value)
+                .origin(sources, &date.origin);
+        }
+        if asking.choosing {
+            print = match renderer.layout_of(id) {
+                Ok(chosen) => (print.with((5u8, &chosen.name))).origin(sources, &chosen.origin),
+                Err(problem) => (print.with(6u8))
+                    .shown(&problem.kind)
+                    .place(sources, problem.place),
+            };
+        }
+        print
+    }
+
+    /// Which list each spelling of a tag or a series leads to, by the
+    /// list's name, which holds the spelling it is shown by.
+    fn spellings(&self) -> u64 {
+        *self.prints.spellings.get_or_init(|| {
+            let reading = self.reading;
+            let mut spelt: Vec<(usize, String, &str)> = (reading.renderer.site().spellings.iter())
+                .map(|((language, key), list)| {
+                    let list = reading.lists[list.index()].as_str();
+                    (language.index(), format!("{key:?}"), list)
+                })
+                .collect();
+            spelt.sort_unstable();
+            Print::default().with(spelt).done()
+        })
+    }
+
+    /// Which lists the site has, which spellings lead to each, and which
+    /// pages it publishes where.
     fn every_list(&self) -> u64 {
         *self.prints.every_list.get_or_init(|| {
             let reading = self.reading;
             let site = reading.renderer.site();
-            let mut print = Print::default();
+            let mut print = Print::default().with(self.spellings());
             for (id, _) in site.lists.iter() {
                 print = print.with(self.list(id));
             }

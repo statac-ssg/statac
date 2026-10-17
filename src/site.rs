@@ -496,6 +496,32 @@ impl Site {
             .map(|(id, _)| id)
     }
 
+    /// The page at the top of a language's pages, where it lands.
+    pub fn home(&self, language: LanguageId) -> Option<PageId> {
+        let page = self.lists.get(self.own_list(language)?).page?;
+        self.pages.get(page).lands().then_some(page)
+    }
+
+    /// A language's folders whose pages land, in the order of their
+    /// addresses, its home's left out.
+    pub fn folders(&self, language: LanguageId) -> Vec<ListId> {
+        let address = |id: ListId| {
+            let page = self.pages.get(self.lists.get(id).page?);
+            page.lands().then(|| page.address.as_str())
+        };
+        let mut lists: Vec<ListId> = (self.lists.iter())
+            .filter(|(id, list)| {
+                list.language == language
+                    && matches!(list.key, ListKey::Folder(_))
+                    && !self.is_home(*id)
+                    && address(*id).is_some()
+            })
+            .map(|(id, _)| id)
+            .collect();
+        lists.sort_by_key(|&id| address(id));
+        lists
+    }
+
     /// Whether `list` is a home's: a language's own list, or the folder at
     /// the top of `content/`.
     pub fn is_home(&self, list: ListId) -> bool {

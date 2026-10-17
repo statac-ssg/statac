@@ -485,26 +485,28 @@ fn select_or_reject(state: &mut State, callee: &str, args: &[Value]) -> Result<V
         None => None,
     };
     let invert = callee.starts_with("reject");
-    let mut choose = || {
+    let keeps = |state: &mut State, value: Value| {
+        let passed = match &test {
+            None => value.is_true(),
+            Some((name, _)) if value.is_undefined() && Input::of_test(name) == Input::Whole => {
+                false
+            }
+            Some((name, test)) => {
+                let call: Vec<Value> = std::iter::once(value).chain(rest.iter().cloned()).collect();
+                check_args(name, Callee::Test, &call, Input::of_test(name))?;
+                test.call(state, &call)?.is_true()
+            }
+        };
+        Ok::<_, Error>(passed != invert)
+    };
+    let choose = |state: &mut State| {
         let mut kept = Vec::new();
         for item in input.try_iter()? {
             let value = match &attribute {
                 Some(path) => field_of(&item, path),
                 None => item.clone(),
             };
-            let passed = match &test {
-                None => value.is_true(),
-                Some((name, _)) if value.is_undefined() && Input::of_test(name) == Input::Whole => {
-                    false
-                }
-                Some((name, test)) => {
-                    let call: Vec<Value> =
-                        std::iter::once(value).chain(rest.iter().cloned()).collect();
-                    check_args(name, Callee::Test, &call, Input::of_test(name))?;
-                    test.call(state, &call)?.is_true()
-                }
-            };
-            if passed != invert {
+            if keeps(state, value)? {
                 kept.push(item);
             }
         }
@@ -526,20 +528,39 @@ fn select_or_reject(state: &mut State, callee: &str, args: &[Value]) -> Result<V
         && super::values::of_the_front(field)
         && rest.iter().all(plain)
     {
+        use super::values::Over;
         let shared = &pages.shared;
-        frame::read(crate::reads::Key::FieldOfEvery(shared.name_id(field)));
+        let name = shared.name_id(field);
         let tested = test.as_ref().map_or("", |(name, _)| name);
+        // Of every page, a choice that keeps none answering nothing turns
+        // only on the pages writing the field, and one keeping only those
+        // answering a text, on those writing it.
+        let over = match pages.over() {
+            Over::Every
+                if super::values::as_written(field)
+                    && !keeps(state, Value::UNDEFINED).unwrap_or(true) =>
+            {
+                let equal = ["==", "eq", "equalto"].contains(&tested) && !invert;
+                let wanted = match rest {
+                    [wanted] if equal && field == path => wanted.as_str(),
+                    _ => None,
+                };
+                Over::Writing(name, wanted.map(|wanted| shared.name_id(wanted)))
+            }
+            over => over,
+        };
+        over.read_field(name);
         asked.push_str(&format!(" | {callee} {path} {tested} {}", rest.len()));
         handed.extend(rest.iter().cloned());
-        return pages.once((asked, handed), || {
-            Ok(choose()?
+        return pages.once((asked, handed), over, || {
+            Ok(choose(state)?
                 .iter()
                 .filter_map(|page| page.downcast_object_ref::<super::values::PageValue>())
                 .map(|page| (page.id, page.number))
                 .collect())
         });
     }
-    Ok(Value::from(choose()?))
+    Ok(Value::from(choose(state)?))
 }
 
 fn builtin_filter(name: &str) -> Value {

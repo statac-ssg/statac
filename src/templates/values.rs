@@ -25,7 +25,7 @@ use crate::dates::ShowDates;
 use crate::lists::Order;
 use crate::problem::{ArgumentFault, Kind, Needed, Unsupported};
 use crate::reads::Key;
-use crate::site::{Id, LanguageId, ListId, ListKey, PageId};
+use crate::site::{Id, LanguageId, ListId, ListKey, NameId, PageId};
 use crate::source::Place;
 use crate::value::Value as Statacs;
 use crate::yaml::{Node, Resolved, Tag, Value as Yaml};
@@ -102,6 +102,28 @@ const WORKED_OUT: &[&str] = &[
 /// under it and nothing else, so the answer turns on that alone.
 pub(super) fn as_written(key: &str) -> bool {
     !WORKED_OUT.contains(&key) && !super::media::CALLS.contains(&key)
+}
+
+/// Whether `page` writes `key` in its front matter, or is handed it, as
+/// the text `wanted` where it is given: a page that doesn't answers
+/// nothing to `key` where it [`as_written`], or nothing equal to that
+/// text, since a text a page writes is answered as itself and nothing
+/// else it writes is answered as a text.
+pub(crate) fn writes(page: &crate::site::Page, key: &str, wanted: Option<&str>) -> bool {
+    match PageWord::named(key) {
+        Some(word) => match (page.words.get(word), wanted) {
+            (Some(written), Some(wanted)) => {
+                matches!(&written.value, Statacs::Text(said) if said == wanted)
+            }
+            (written, _) => written.is_some(),
+        },
+        None => match (page.words.field(key), wanted) {
+            (Some(written), Some(wanted)) => {
+                matches!(&written.value.value, Yaml::Scalar(said) if said == wanted)
+            }
+            (written, _) => written.is_some(),
+        },
+    }
 }
 
 /// The names a page answers from what it says of itself before its
@@ -368,10 +390,7 @@ impl PageValue {
                         Some(Pages::value(shared, Which::Stretch(list, self.number)))
                     }
                     // A page making a page per item lists nothing of its own.
-                    None if page.speaks_for_a_list() => {
-                        frame::read(Key::Lists);
-                        Some(all_pages(shared))
-                    }
+                    None if page.speaks_for_a_list() => Some(all_pages(shared)),
                     None => None,
                 }
             }
@@ -409,7 +428,8 @@ impl PageValue {
         }
     }
 
-    /// What the page's front matter writes as `key`.
+    /// What the page's front matter writes as `key`, which is nothing
+    /// where it [`writes`] nothing.
     fn written(&self, key: &str) -> Option<Value> {
         let shared = &self.shared;
         let page = shared.site.pages.get(self.id);
@@ -629,13 +649,10 @@ impl SiteValue {
                     shared: Arc::clone(shared),
                 }))
             }
-            "pages" => {
-                frame::read(Key::Lists);
-                Some(all_pages(shared))
-            }
+            "pages" => Some(all_pages(shared)),
             "posts" => {
                 let Some(list) = shared.site.own_list(self.language) else {
-                    frame::read(Key::ListsIn(self.language));
+                    frame::read(Key::Home(self.language));
                     return None;
                 };
                 read_whole(list);
@@ -662,26 +679,8 @@ impl SiteValue {
                 Some(Lists::value(shared, lists))
             }
             "folders" => {
-                frame::read(Key::ListsIn(self.language));
-                let site = &shared.site;
-                let address = |id: ListId| {
-                    let page = site.lists.get(id).page?;
-                    let page = site.pages.get(page);
-                    page.lands().then(|| page.address.as_str())
-                };
-                let mut lists: Vec<ListId> = site
-                    .lists
-                    .iter()
-                    .filter(|(_, list)| list.language == self.language)
-                    .filter(|(id, list)| {
-                        matches!(list.key, ListKey::Folder(_))
-                            && !site.is_home(*id)
-                            && address(*id).is_some()
-                    })
-                    .map(|(id, _)| id)
-                    .collect();
-                lists.sort_by_key(|&id| address(id));
-                Some(Lists::value(shared, lists))
+                frame::read(Key::Folders(self.language));
+                Some(Lists::value(shared, shared.site.folders(self.language)))
             }
             "webmentions" => {
                 frame::read(setting_key(shared, key));
@@ -695,7 +694,7 @@ impl SiteValue {
             "feed" => Some(match shared.site.own_list(self.language) {
                 Some(list) => feed_value(shared, list),
                 None => {
-                    frame::read(Key::ListsIn(self.language));
+                    frame::read(Key::Home(self.language));
                     Value::from("")
                 }
             }),
@@ -802,7 +801,32 @@ pub(super) enum Which {
     Groups(Vec<Group>),
     /// Pages chosen from, or put in order from, one of the lists above
     /// that is the same whichever page asks, by `asked`.
-    Chosen(SomePages, Asked),
+    Chosen(SomePages, Asked, Over),
+}
+
+/// What pages chosen once for the site were chosen from, which decides
+/// what reading them turns on.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Over {
+    /// One list's pages, which reading the list recorded.
+    List,
+    /// Every page the site publishes.
+    Every,
+    /// Those of every page that write a name, as the text given where
+    /// one is: a choice that keeps no page lacking it, or answering
+    /// anything else to it, which turns on what those pages say and not
+    /// on which other pages there are.
+    Writing(NameId, Option<NameId>),
+}
+
+impl Over {
+    /// Records reading what each page chosen from answers to `name`.
+    pub fn read_field(self, name: NameId) {
+        frame::read(match self {
+            Over::Writing(writing, wanted) => Key::FieldOfWriters(writing, wanted, name),
+            Over::List | Over::Every => Key::FieldOfEvery(name),
+        });
+    }
 }
 
 /// Posts in no order, and the same in the site's once it is asked for.
@@ -841,8 +865,18 @@ impl Pages {
             Which::Every => Some(("every".to_owned(), Vec::new())),
             Which::Posts(list) => Some(of("posts", list)),
             Which::All(list) => Some(of("all", list)),
-            Which::Chosen(_, asked) => Some(asked.clone()),
+            Which::Chosen(_, asked, _) => Some(asked.clone()),
             Which::Stretch(..) | Which::Pager(..) | Which::Groups(_) => None,
+        }
+    }
+
+    /// What these pages are chosen from, where they are the same
+    /// whichever page asks.
+    pub fn over(&self) -> Over {
+        match &self.which {
+            Which::Every => Over::Every,
+            Which::Chosen(_, _, over) => *over,
+            _ => Over::List,
         }
     }
 
@@ -851,15 +885,20 @@ impl Pages {
         (0..self.len()).filter_map(|at| self.at(at))
     }
 
-    /// The pages `choose` makes of these, known by `asked`: worked out
-    /// the first time any page asks, with nothing it reads recorded, so
-    /// the page asking records what the choice turns on itself. Pages
+    /// The pages `choose` makes of these, known by `asked`, chosen `over`
+    /// what is given: worked out the first time any page asks, with
+    /// nothing it reads recorded, so the page asking records what the
+    /// choice turns on itself, save which pages the site publishes. Pages
     /// asking the same at once wait for the first.
     pub fn once(
         &self,
         asked: Asked,
+        over: Over,
         choose: impl FnOnce() -> Result<Vec<(PageId, usize)>, Error>,
     ) -> Result<Value, Error> {
+        if let Over::Every = over {
+            frame::read(Key::Pages);
+        }
         let shared = &self.shared;
         let known = {
             let mut all = shared.chosen.lock().expect("never poisoned");
@@ -874,13 +913,16 @@ impl Pages {
                 chosen
             }
         };
-        Ok(Pages::value(shared, Which::Chosen(chosen, asked)))
+        Ok(Pages::value(shared, Which::Chosen(chosen, asked, over)))
     }
 
     fn len(&self) -> usize {
         let lists = &self.shared.site.lists;
         match &self.which {
-            Which::Every => self.shared.every_page().len(),
+            Which::Every => {
+                frame::read(Key::Pages);
+                self.shared.every_page().len()
+            }
             Which::Posts(list) => lists.get(*list).members.len(),
             Which::All(list) => {
                 let list = lists.get(*list);
@@ -889,7 +931,7 @@ impl Pages {
             Which::Stretch(list, number) => lists.get(*list).stretch(*number).len(),
             Which::Pager(_, pages) => *pages,
             Which::Groups(groups) => groups.iter().map(|group| group.posts.len()).sum(),
-            Which::Chosen(pages, _) => pages.len(),
+            Which::Chosen(pages, ..) => pages.len(),
         }
     }
 
@@ -898,7 +940,10 @@ impl Pages {
         let lists = &self.shared.site.lists;
         let first = |id: &PageId| (*id, 1);
         match &self.which {
-            Which::Every => self.shared.every_page().get(at).copied(),
+            Which::Every => {
+                frame::read(Key::Pages);
+                self.shared.every_page().get(at).copied()
+            }
             Which::Posts(list) => lists.get(*list).members.get(at).map(first),
             Which::All(list) => {
                 let list = lists.get(*list);
@@ -923,7 +968,7 @@ impl Pages {
                 });
                 ordered.get(at).map(first)
             }
-            Which::Chosen(pages, _) => pages.get(at).copied(),
+            Which::Chosen(pages, ..) => pages.get(at).copied(),
         }
     }
 }
@@ -949,6 +994,8 @@ impl Object for Pages {
     }
 }
 
+/// Every page the site publishes, which records reading which pages
+/// those are as they are looked at.
 fn all_pages(shared: &Arc<Shared>) -> Value {
     Pages::value(shared, Which::Every)
 }
@@ -1006,7 +1053,7 @@ fn feed_value(shared: &Shared, list: ListId) -> Value {
             name => frame::read(setting_key(shared, name)),
         }
     }
-    frame::read(Key::ListsIn(language));
+    frame::read(Key::List(list));
     match shared.site.lists.get(list).page {
         Some(page) => {
             for name in ["feed", "index_page", "url", "redirect_to"] {
@@ -1060,14 +1107,14 @@ impl ListValue {
     fn answer(&self, key: &str) -> Option<Value> {
         let shared = &self.shared;
         let list = shared.site.lists.get(self.id);
-        let lists = Key::ListsIn(list.language);
+        let own = Key::List(self.id);
         match key {
             "name" => {
-                frame::read(lists);
+                frame::read(own);
                 Some(Value::from(list_name(shared, self.id)))
             }
             "title" => {
-                frame::read(lists);
+                frame::read(own);
                 if let Some(page) = list.page {
                     frame::read(field_key(shared, page, "title"));
                     if let Some(title) = &shared.site.pages.get(page).title {
@@ -1080,11 +1127,11 @@ impl ListValue {
                 }
             }
             "page" => {
-                frame::read(lists);
+                frame::read(own);
                 list.page.map(|page| PageValue::value(shared, page))
             }
             "url" => {
-                frame::read(lists);
+                frame::read(own);
                 match (list.page, &list.key) {
                     (Some(page), _) => {
                         frame::read(field_key(shared, page, "url"));
@@ -1123,7 +1170,7 @@ impl ListValue {
                 false => list.key.word(),
             })),
             "order" => {
-                read_whole(self.id);
+                frame::read(own);
                 Some(Value::from(list.order.map_or("", Order::word)))
             }
             _ => None,
@@ -1162,7 +1209,7 @@ impl Object for ListValue {
 
     /// A list printed is its name, so `{{ tag }}` shows the tag.
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        frame::read(Key::ListsIn(self.shared.site.lists.get(self.id).language));
+        frame::read(Key::List(self.id));
         f.write_str(&list_name(&self.shared, self.id))
     }
 }
@@ -1188,9 +1235,8 @@ impl Object for Languages {
             .find(|(_, language)| code(language) == tag)
             .map(|(id, _)| id);
         let home = language.and_then(|language| {
-            frame::read(Key::ListsIn(language));
-            let page = site.lists.get(site.own_list(language)?).page?;
-            site.pages.get(page).lands().then_some(page)
+            frame::read(Key::Home(language));
+            site.home(language)
         });
         if home.is_none() {
             frame::missed(None, tag);
@@ -1230,6 +1276,7 @@ impl Lists {
 
     /// The list `name` is a spelling of, among these.
     fn named(&self, name: &str) -> Option<ListId> {
+        frame::read(Key::Spellings);
         let site = &self.shared.site;
         self.lists.iter().copied().find(|&id| {
             let list = site.lists.get(id);

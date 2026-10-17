@@ -89,6 +89,13 @@ What changed in each release of Statac, the newest first.
   the starter's menu does. A post's new title built every page again;
   on a site of 10,000 posts it now builds 5 to 7, in about 0.2 seconds
   against 0.55.
+- `serve` builds again only the pages a tag added to a post, or a post
+  added or removed, can show on, where every page shows the site's
+  folders, its feed, its home and a menu chosen from its pages, as the
+  starter's do. Each built every page again; on a site of 10,000 posts a
+  tag no other post has now builds under 10 pages, one other posts have
+  about 550, and a post added or removed 700 to 1,600, each in about
+  0.25 seconds against 0.55.
 
 ## 0.4.0 - 2026-10-17
 

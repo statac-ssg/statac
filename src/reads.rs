@@ -21,6 +21,10 @@ pub enum Key {
     /// What every page writes under one name in its front matter, and
     /// which pages there are to write it.
     FieldOfEvery(NameId),
+    /// What each page writing the first name, or handed it, as the text
+    /// named second where there is one, answers to the third, in the order
+    /// of their addresses, and which pages those are.
+    FieldOfWriters(NameId, Option<NameId>, NameId),
     /// A page's body as built.
     Body(PageId),
     /// The previous and next page in each of the page's lists.
@@ -35,9 +39,22 @@ pub enum Key {
     ListHead(ListId),
     /// Every member of a list, dated or not.
     Members(ListId),
-    /// Which lists exist, and their sizes.
+    /// What a list is known by but for its members: the page that speaks
+    /// for it, its feed's address and its order.
+    List(ListId),
+    /// Which pages there are, where each is published and in which
+    /// language, a list's later pages among them.
+    Pages,
+    /// Which folders a language lists, and in what order.
+    Folders(LanguageId),
+    /// Which list is a language's own, and the home page that lands for
+    /// it.
+    Home(LanguageId),
+    /// Which list each spelling of a tag or a series leads to.
+    Spellings,
+    /// Which lists exist, and which spellings lead to each.
     Lists,
-    /// Which of one language's lists exist, and their sizes.
+    /// Which of one language's lists exist, and which spellings lead to each.
     ListsIn(LanguageId),
     Setting(NameId),
     /// A language: its tag as `language` declares it, and its words, from
@@ -137,7 +154,16 @@ impl Translation {
             Key::ListPage(list, number) => Key::ListPage(self.list(list)?, number),
             Key::ListHead(list) => Key::ListHead(self.list(list)?),
             Key::Members(list) => Key::Members(self.list(list)?),
+            Key::List(list) => Key::List(self.list(list)?),
             Key::FieldOfEvery(name) => Key::FieldOfEvery(*self.names.get(name.index())?),
+            Key::FieldOfWriters(writing, wanted, name) => {
+                let name_of = |name: NameId| self.names.get(name.index()).copied();
+                let wanted = match wanted {
+                    Some(wanted) => Some(name_of(wanted)?),
+                    None => None,
+                };
+                Key::FieldOfWriters(name_of(writing)?, wanted, name_of(name)?)
+            }
             Key::Setting(name) => Key::Setting(*self.names.get(name.index())?),
             Key::Template(id) => Key::Template(self.template(id)?),
             Key::Data(id) => Key::Data(carried(&self.data, id)?),
@@ -148,6 +174,7 @@ impl Translation {
             // The languages a site declares are part of what makes a
             // later reading comparable at all.
             Key::Lists | Key::ListsIn(_) | Key::Language(_) => key,
+            Key::Pages | Key::Folders(_) | Key::Home(_) | Key::Spellings => key,
             Key::Pictures | Key::Files | Key::Fetched(_) | Key::Today => key,
         })
     }
@@ -167,6 +194,9 @@ pub struct Reads {
     /// The names it holds a read of on every page for, having held
     /// [`MANY`] reads of fields.
     every: Vec<NameId>,
+    /// Whether it holds a read of which pages there are, which a loop
+    /// over every page reads at each.
+    pages: bool,
 }
 
 /// How many reads of a page's field an output holds one by one.
@@ -188,6 +218,12 @@ impl Reads {
         // same thing of the site makes.
         if self.keys.last() == Some(&key) {
             return;
+        }
+        if key == Key::Pages {
+            if self.pages {
+                return;
+            }
+            self.pages = true;
         }
         if let Key::Field(_, name) = key {
             if self.fields >= MANY {

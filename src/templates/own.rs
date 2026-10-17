@@ -13,7 +13,7 @@ use minijinja::{Environment, Error, State};
 use super::frame;
 use super::guard::{self, Callee, Input};
 use super::render::Shared;
-use super::values::{DateValue, Group, ListValue, Lists, PageValue, Pages, Which};
+use super::values::{DateValue, Group, ListValue, Lists, Over, PageValue, Pages, Which};
 use crate::content::words::PageWord;
 use crate::date::Date;
 use crate::dates::ShowDates;
@@ -181,9 +181,12 @@ pub(super) fn install(env: &mut Environment<'_>) {
         if let Some(pages) = posts.downcast_object_ref::<Pages>()
             && let Some((mut asked, handed)) = pages.known_by()
         {
-            frame::read(Key::FieldOfEvery(shared.name_id("date")));
+            let over = pages.over();
+            over.read_field(shared.name_id("date"));
             asked.push_str(" | newest_first");
-            return pages.once((asked, handed), || Ok(newest_first(pages.each().collect())));
+            return pages.once((asked, handed), over, || {
+                Ok(newest_first(pages.each().collect()))
+            });
         }
         let pages = numbered_pages_of(&posts, "newest_first")?;
         let sorted: Vec<(PageId, usize)> = newest_first(pages);
@@ -454,15 +457,16 @@ fn sorted(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
             " | sort {attribute} {reverse:?} {case_sensitive:?}"
         ));
         let asked = (asked, handed);
+        let over = pages.over();
         for key in &keys {
             let field = key.split('.').next().unwrap_or(key);
-            frame::read(Key::FieldOfEvery(shared.name_id(field)));
+            over.read_field(shared.name_id(field));
         }
         let numbered = |item: &Value| {
             let page = item.downcast_object_ref::<PageValue>()?;
             Some((page.id, page.number))
         };
-        let sorted = pages.once(asked.clone(), || {
+        let sorted = pages.once(asked.clone(), over, || {
             let (run, without) = in_order(kwargs)?;
             if let Some((index, first, _)) = without.first()
                 && let Some(first) = numbered(first)
@@ -568,7 +572,11 @@ fn filtered(
         let language = frame::language().index();
         asked.push_str(&format!(" | {name} in {language} {}", wanted.len()));
         handed.extend(wanted.iter().copied().map(Value::from));
-        return pages.once((asked, handed), || {
+        let over = match pages.over() {
+            Over::List => Over::List,
+            Over::Every | Over::Writing(..) => Over::Every,
+        };
+        return pages.once((asked, handed), over, || {
             let kept = pages
                 .each()
                 .filter(|(id, _)| filter.keeps(&shared.site, *id));
