@@ -59,6 +59,9 @@ What changed in each release of Statac, the newest first.
 - A site's file published at `.statac-clock`, at the top of the output,
   stays there in a build that runs `after_build`. The build removed it
   and counted it as removed by the command.
+- `serve` builds again a file of the site moved out of it and back
+  unchanged, as with the Bin's Put Back. It took the file's return as
+  no change and served the site without it until it was next saved.
 - A template that can't be read, named by `extends` with a name worked
   out as the template runs, as `{% extends "ho" ~ "me" %}`, is told
   once, where it can't be read. A page built through it also said the

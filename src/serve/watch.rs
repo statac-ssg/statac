@@ -398,7 +398,10 @@ fn look_at(
         let at = platform::join(root, &hint);
         match std::fs::metadata(&at) {
             Ok(found) if found.is_file() => {
-                if let Some(was) = as_found.get(&hint)
+                // One gone since watching began is new when it comes back,
+                // however like it is to what was found then.
+                if known.contains(&hint)
+                    && let Some(was) = as_found.get(&hint)
                     && stamp(&found).as_ref() == Some(was)
                 {
                     continue;
@@ -627,6 +630,41 @@ mod tests {
         assert_eq!(changed, ["content/post-1.md"]);
         let changed = look_at(&scratch.0, both(), &mut known, &mut found);
         assert_eq!(changed, ["content/post-1.md"]);
+    }
+
+    #[test]
+    fn a_file_gone_and_back_as_it_was_when_watching_began_is_a_change() {
+        let scratch = Scratch::new("back");
+        scratch.write("content/post-1.md");
+        scratch.write("content/post-2.md");
+        let mut known = scratch.known();
+        let later = SystemTime::now() + 2 * COARSEST;
+        let mut found = as_found(&scratch.0, &known, later);
+        let at = |name: &str| scratch.0.join("content").join(name);
+        // Out of the site, and empty again once the test is done.
+        let aside = scratch.0.with_extension("aside");
+        let one = || hints(&["content/post-1.md"]);
+        let two = || hints(&["content/post-2.md"]);
+
+        // Moved out and back, by a report of it or a rescan.
+        std::fs::rename(at("post-1.md"), &aside).unwrap();
+        assert_eq!(
+            look_at(&scratch.0, one(), &mut known, &mut found),
+            ["content/post-1.md"]
+        );
+        std::fs::rename(&aside, at("post-1.md")).unwrap();
+        assert_eq!(
+            look_at(&scratch.0, one(), &mut known, &mut found),
+            ["content/post-1.md"]
+        );
+
+        std::fs::rename(at("post-2.md"), &aside).unwrap();
+        assert_eq!(rescan_all(&scratch.0, &mut known), ["content/post-2.md"]);
+        std::fs::rename(&aside, at("post-2.md")).unwrap();
+        assert_eq!(
+            look_at(&scratch.0, two(), &mut known, &mut found),
+            ["content/post-2.md"]
+        );
     }
 
     #[test]
