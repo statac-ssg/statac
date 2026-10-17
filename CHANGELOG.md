@@ -67,6 +67,31 @@ What changed in each release of Statac, the newest first.
   line, whether the writing calls the snippet or a template does. It was
   told where the template shows the page's writing, or at another line
   of the snippet.
+- Why Sass stopped is told in Statac's own words, with a suggestion
+  where there is a good one: `` Sass stopped: no variable called `$link` ``
+  where it was `Sass stopped: undefined variable`. What an `@error` in
+  the site's Sass says is quoted exactly, where it lost its capital and
+  its full stop. A value CSS has no way to write, as `1px * 1px`, is
+  told by the stylesheet alone where Sass gives no place for it. It was
+  told at the stylesheet's first line.
+- What stops a template is told in Statac's own words, with a
+  suggestion where there is a good one: `` Malformed template: `{% if %}`
+  is never closed ``, with `` Close it with `{% endif %}`. ``, where it
+  was `Malformed template: unexpected end of input, expected end of
+  block`, and `` Template stopped: can't use `+` on text and a number ``.
+- A template that can't be read is told once, at the template. It was
+  told again at each template that extends it and at each call of it.
+- Where the template engine gives a line but no place, as for a
+  `{% block main required %}` that nothing fills, what stopped it is
+  told at its tag on that line. It was told at the page alone.
+- `{% extends "base.html" %}` takes the template `base`, as
+  `layout: base.html` does. It was told as a template that doesn't
+  exist.
+- A feed carries code as written, with its language's class, and
+  without the markup that colours it, since a feed reader loads no
+  stylesheet to colour it with.
+- Haxe is coloured after a string in single quotes. The rest of the
+  line was left uncoloured, and later lines could lose colours too.
 - Builds of one site run one at a time. A build started while another
   runs, such as `statac build` beside `statac serve`, says that it is
   waiting and builds once the other has finished. Two at once could stop
