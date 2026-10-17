@@ -106,8 +106,8 @@ The 165 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `equivalent` | 1.0.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `errno` | 0.3.14 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `fdeflate` | 0.3.7 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `ferriki-textmate` | 1.0.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] [23] |
-| `ferroni` | 2.1.0 | BSD-2-Clause | BSD-2-Clause | [24] |
+| `ferriki-textmate` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] [23] |
+| `ferroni` | 2.2.2 | BSD-2-Clause | BSD-2-Clause | [24] |
 | `flate2` | 1.1.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `font-types` | 0.11.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `fontdb` | 0.23.0 | MIT | MIT | [25] |
@@ -3189,7 +3189,7 @@ SOFTWARE.
 
 ### [23]
 
-`ferriki-textmate` 1.0.0, `LICENSE-vscode-textmate.md`.
+`ferriki-textmate` 1.1.1, `LICENSE-vscode-textmate.md`.
 
 ````text
 The MIT License (MIT)
@@ -3217,7 +3217,7 @@ SOFTWARE.
 
 ### [24]
 
-`ferroni` 2.1.0, `LICENSE`.
+`ferroni` 2.2.2, `LICENSE`.
 
 ````text
 BSD 2-Clause License

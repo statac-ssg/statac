@@ -361,9 +361,9 @@ dependencies = [
 
 [[package]]
 name = "ferriki-textmate"
-version = "1.0.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3db112e133f680fcee187d7fe0f59bce7f1d893a263c8b3a5b84b480c609bb64"
+checksum = "e586f8df179c57b197416f2044166b9fa19feed67712e350db22310fe9965abb"
 dependencies = [
  "ferroni",
  "serde",
@@ -372,9 +372,9 @@ dependencies = [
 
 [[package]]
 name = "ferroni"
-version = "2.1.0"
+version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d185cd9581342e21798b75cdad2dd09bd5476adfc94fe430b480811bc574e2ff"
+checksum = "0a41c3a0cc1fb1680c8c78624d828454fd9e74ae92b1c978279c0e00cb66381f"
 dependencies = [
  "aho-corasick",
  "bitflags 2.13.2",

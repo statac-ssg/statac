@@ -17,12 +17,12 @@
 //! - `src/highlight/grammars.bin`: the grammars the binary carries, the same
 //!   bytes on every run. A grammar is carried only under a licence that lets
 //!   it ship inside a permissively licensed binary. Each is its JSON without
-//!   the space between its parts or an empty `match`, deflated on its own,
-//!   so a build reads only the grammars its code is in. Before them the file
-//!   lists, for each, its scope, its deflated length, the grammars that add
-//!   rules to it and the grammars it can't be read without; then every name
-//!   and alias in order, with its grammar. A number is four bytes, the lowest
-//!   first, and a text follows its length.
+//!   the space between its parts, deflated on its own, so a build reads only
+//!   the grammars its code is in. Before them the file lists, for each, its
+//!   scope, its deflated length, the grammars that add rules to it and the
+//!   grammars it can't be read without; then every name and alias in order,
+//!   with its grammar. A number is four bytes, the lowest first, and a text
+//!   follows its length.
 //! - `src/highlight/languages.rs`: every name and alias a fence can use.
 //! - `src/highlight/styles.rs`: for each style, the colour its light theme
 //!   and its dark give each kind of code, ordinary text and the background.
@@ -627,18 +627,6 @@ fn minified(json: &str) -> String {
     out
 }
 
-/// Minified JSON with each empty `match` taken out. vscode-textmate, which
-/// the grammars are written for, reads one as no `match` at all;
-/// ferriki-textmate reads it as matching everywhere, and leaves the rest of
-/// the line uncoloured
-/// (<https://github.com/sebastian-software/ferriki/issues/271>).
-fn without_empty_matches(json: &str) -> String {
-    const EMPTY: &str = "\"match\":\"\"";
-    json.replace(&format!(",{EMPTY}"), "")
-        .replace(&format!("{EMPTY},"), "")
-        .replace(EMPTY, "")
-}
-
 /// The scopes of the other grammars a grammar includes rules of.
 fn included(node: &Node, scopes: &mut BTreeSet<String>) {
     match &node.value {
@@ -666,7 +654,7 @@ fn grammars_bin(package: &Path, grammars: &[&Grammar]) -> Vec<u8> {
             .join(format!("{}.json", grammar.name));
         let json = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
-        let json = without_empty_matches(&minified(&json));
+        let json = minified(&json);
         let read = parse_raw_grammar(&json, Some("grammar.json"))
             .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
         assert_eq!(read.scope_name, grammar.scope, "{}", path.display());
