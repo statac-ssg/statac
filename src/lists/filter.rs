@@ -16,7 +16,7 @@ pub const CHAINABLE: &[(&str, usize)] = &[("tagged", 1), ("in", 1), ("where", 2)
 
 /// The parts of a page's date `where` answers for by name, where no page
 /// writes a field of its own by that name.
-const DATE_PARTS: &[&str] = &["year", "month", "day"];
+pub const DATE_PARTS: &[&str] = &["year", "month", "day"];
 
 /// One filter, its values read against the site: which posts it keeps.
 #[derive(Debug)]

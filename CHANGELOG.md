@@ -82,6 +82,14 @@ What changed in each release of Statac, the newest first.
 - `webmention()` called more than once on a site without webmentions is
   told at a call. It was told at the page, with no line of the template.
 
+### Changed
+
+- `serve` builds again only the pages a change to a page's front matter
+  can show on, where a template chooses or orders pages by a field, as
+  the starter's menu does. A post's new title built every page again;
+  on a site of 10,000 posts it now builds 5 to 7, in about 0.2 seconds
+  against 0.55.
+
 ## 0.4.0 - 2026-10-17
 
 ### New

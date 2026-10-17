@@ -110,7 +110,7 @@ const OF_THE_FRONT: &[&str] = &["title", "url", "slug", "date", "language"];
 
 /// Whether what every page answers to `key` turns on what the pages say
 /// of themselves before their writing, and on nothing of the page asking.
-pub(super) fn of_the_front(key: &str) -> bool {
+pub(crate) fn of_the_front(key: &str) -> bool {
     as_written(key) || OF_THE_FRONT.contains(&key)
 }
 

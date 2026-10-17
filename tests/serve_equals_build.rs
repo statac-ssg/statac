@@ -2154,6 +2154,39 @@ fn pages_chosen_from_every_page_by_a_field_follow_the_field() {
 }
 
 #[test]
+fn pages_chosen_by_a_field_a_folder_hands_down_follow_the_folder() {
+    let site = Site::new("chosen-handed");
+    // Each page lists the pages that ask to be in the menu, and reads
+    // nothing else the folder's own page says.
+    let menu = "<!doctype html>\n<title>{{ headline(page) }}</title>\n\
+                <menu>{% for entry in site.pages | selectattr('menu') %}\
+                <a href=\"{{ entry.url }}\">{{ entry.title }}</a>{% endfor %}</menu>\n\
+                {{ page.content }}\n";
+    for template in ["home", "folder", "page"] {
+        site.write(&format!("templates/{template}.html"), menu);
+    }
+    let folder = |handed: &str| format!("---\ntitle: Notes\n{handed}---\nThe notes.\n");
+    through(
+        &site,
+        &[
+            ("a folder", &|site| {
+                site.write("content/notes/index.md", &folder(""));
+                site.write(
+                    "content/notes/note-1.md",
+                    "---\ntitle: Note 1\n---\nA note.\n",
+                )
+            }),
+            ("the folder handing its pages into the menu", &|site| {
+                site.write("content/notes/index.md", &folder("pages.menu: true\n"))
+            }),
+            ("the folder handing them out of it", &|site| {
+                site.write("content/notes/index.md", &folder("pages.menu: false\n"))
+            }),
+        ],
+    );
+}
+
+#[test]
 fn pages_chosen_and_put_in_order_once_for_the_site_follow_what_they_turn_on() {
     // Each asked on every page of a site of its own, and shown so that
     // nothing else the page reads turns on the pages left out: by a tag
@@ -2163,6 +2196,7 @@ fn pages_chosen_and_put_in_order_once_for_the_site_follow_what_they_turn_on() {
         "{% if page.language != 'de' %}{{ site.posts | tagged('one') | length }}{% endif %}",
         "{% if page.language != 'de' %}{{ site.pages | in('blog') | length }}{% endif %}",
         "{{ site.pages | where('kind', 'long') | length }}",
+        "{{ site.pages | where('month', '10') | length }}",
         "{{ site.posts | selectattr('title', 'eq', 'Page 2') | length }}",
         "{{ site.pages | selectattr('url', 'startingwith', '/blog/') | length }}",
         "{{ (site.posts | sort(attribute='title') | first).url }}",
@@ -2257,7 +2291,7 @@ fn a_page_that_reads_fields_past_counting_follows_every_one() {
 fn the_starters_posts_and_tags() {
     let site = Site::starter("starter-posts");
     let post_2 = |title: &str, tags: &str, text: &str| post(title, "2026-01-02", tags, text);
-    through(
+    let built = through(
         &site,
         &[
             ("a line of a post", &|site| {
@@ -2285,6 +2319,11 @@ fn the_starters_posts_and_tags() {
             }),
         ],
     );
+    // A post's writing and its title show where the post is listed, not
+    // on every page.
+    let outputs = built[0].1;
+    assert!(built[1].0 > 0 && built[1].0 * 2 < outputs, "{built:?}");
+    assert!(built[2].0 > 0 && built[2].0 * 2 < outputs, "{built:?}");
 }
 
 #[test]
@@ -2292,20 +2331,39 @@ fn the_starters_menu_folders_feed_and_languages() {
     let site = Site::starter("starter-menu");
     let settings = site.read("statac.yaml");
     let tags = site.read("content/tags.md");
+    let menu = |more: &str| tags.replace("layout: tags\n", &format!("layout: tags\n{more}"));
+    let more = |handed: &str| format!("---\ntitle: More\n{handed}---\n");
     through(
         &site,
         &[
             ("a page put in the menu", &|site| {
-                let text = tags.replace("layout: tags\n", "layout: tags\nmenu: true\n");
-                site.write("content/tags.md", &text)
+                site.write("content/tags.md", &menu("menu: true\n"))
+            }),
+            ("the page made a draft", &|site| {
+                site.write("content/tags.md", &menu("menu: true\ndraft: true\n"))
+            }),
+            ("the draft published", &|site| {
+                site.write("content/tags.md", &menu("menu: true\n"))
+            }),
+            ("the page's menu turned off", &|site| {
+                site.write("content/tags.md", &menu("menu: false\n"))
+            }),
+            ("and on again", &|site| {
+                site.write("content/tags.md", &menu("menu: true\n"))
             }),
             ("the page taken out of the menu", &|site| {
                 site.write("content/tags.md", &tags)
             }),
             ("a folder added", &|site| {
-                site.write("content/more/index.md", "---\ntitle: More\n---\n");
+                site.write("content/more/index.md", &more(""));
                 let text = post("Page 1", "2026-02-01", "one", "Page 1 says this.");
                 site.write("content/more/page-1.md", &text)
+            }),
+            ("the folder handing its pages into the menu", &|site| {
+                site.write("content/more/index.md", &more("pages.menu: true\n"))
+            }),
+            ("the folder handing them out of it", &|site| {
+                site.write("content/more/index.md", &more("pages.menu: false\n"))
             }),
             ("the folder removed", &|site| {
                 fs::remove_dir_all(site.root().join("content/more")).unwrap()

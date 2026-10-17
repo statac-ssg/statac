@@ -13,16 +13,18 @@ use std::fmt::{self, Debug, Write};
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::album::Root;
 use crate::build::{Options, Output, Plan};
 use crate::content::words::PageWord;
-use crate::origin::Origin;
+use crate::origin::{Origin, Sourced};
 use crate::reads::{Key, Translation};
 use crate::site::{Id, Item, ListId, ListKey, NameId, PageId, Site};
 use crate::source::{Place, SourceId, Sources};
 use crate::templates::Renderer;
+use crate::value::Value;
+use crate::yaml::{Node, Value as Yaml};
 
 /// One reading of a site, and what each of its ids names.
 pub(super) struct Reading {
@@ -176,6 +178,10 @@ impl Reading {
     }
 }
 
+/// The names a page's field is read under to choose its template, which
+/// turns on more than its answer to them.
+const CHOOSING: &[&str] = &["layout", "type"];
+
 /// A fingerprint being taken.
 #[derive(Default)]
 struct Print(DefaultHasher);
@@ -207,6 +213,49 @@ impl Print {
                 .with(sources.path(place.source))
                 .with((place.span.start, place.span.end)),
             None => self.with(()),
+        }
+    }
+
+    fn origin(self, sources: &Sources, origin: &Origin) -> Print {
+        self.place(sources, origin.place)
+            .shown(&(&origin.style, &origin.arrival))
+    }
+
+    /// With a value as YAML reads it, and where each part of it is
+    /// written.
+    fn node(self, sources: &Sources, node: &Node) -> Print {
+        let print = (self.place(sources, Some(node.place))).shown(&(&node.style, &node.tag));
+        match &node.value {
+            Yaml::Scalar(text) => print.with((0u8, text)),
+            Yaml::Sequence(items) => (items.iter())
+                .fold(print.with((1u8, items.len())), |print, item| {
+                    print.node(sources, item)
+                }),
+            Yaml::Mapping(entries) => (entries.iter())
+                .fold(print.with((2u8, entries.len())), |print, entry| {
+                    print.node(sources, &entry.key).node(sources, &entry.value)
+                }),
+        }
+    }
+
+    /// With a value as Statac reads one of its words, and where each part
+    /// of it is written.
+    fn word(self, sources: &Sources, word: &Sourced<Value>) -> Print {
+        let text = |print: Print, text: &Sourced<String>| {
+            print.with(&text.value).origin(sources, &text.origin)
+        };
+        let print = self.origin(sources, &word.origin);
+        match &word.value {
+            Value::Text(said) => print.with((0u8, said)),
+            Value::Bool(truth) => print.with((1u8, truth)),
+            Value::Whole(n) => print.with((2u8, n)),
+            Value::Texts(texts) => (texts.iter()).fold(print.with((3u8, texts.len())), text),
+            Value::Date(date) => print.with(4u8).shown(date),
+            Value::Table(rows) => (rows.iter())
+                .fold(print.with((5u8, rows.len())), |print, (name, given)| {
+                    text(text(print, name), given)
+                }),
+            Value::Refused => print.with(6u8),
         }
     }
 
@@ -251,6 +300,10 @@ pub(super) struct Prints {
     statics: Slots,
     every_list: OnceLock<u64>,
     every_front: OnceLock<u64>,
+    every_page: OnceLock<u64>,
+    /// What every page answers to a name, by the name; names are added to
+    /// a reading as it is asked of.
+    fields_of_every: Mutex<HashMap<NameId, Arc<OnceLock<u64>>>>,
     every_picture: OnceLock<u64>,
     every_file: OnceLock<u64>,
     /// What the reading holds under `fetched/`, by each file's key.
@@ -279,6 +332,8 @@ impl Prints {
             statics: slots(reading.statics.len()),
             every_list: OnceLock::new(),
             every_front: OnceLock::new(),
+            every_page: OnceLock::new(),
+            fields_of_every: Mutex::default(),
             every_picture: OnceLock::new(),
             every_file: OnceLock::new(),
             fetched: OnceLock::new(),
@@ -432,8 +487,7 @@ impl Taken<'_> {
                         .done()
                 })
             }
-            // Wider than the one name: what any page says of itself.
-            Key::FieldOfEvery(_) => self.every_front(),
+            Key::FieldOfEvery(name) => self.field_of_every(name),
             Key::Lists | Key::ListsIn(_) => self.every_list(),
             // Settings and languages are written in files the whole
             // site's fingerprint covers.
@@ -652,6 +706,90 @@ impl Taken<'_> {
         })
     }
 
+    /// Which pages there are, in the reading's order: in which language
+    /// each is, and whether and where it is published, a list's later
+    /// pages among them.
+    fn every_page(&self) -> u64 {
+        *self.prints.every_page.get_or_init(|| {
+            let reading = self.reading;
+            let site = reading.renderer.site();
+            let mut print = Print::default();
+            for (id, page) in site.pages.iter() {
+                let name = &reading.pages[id.index()];
+                print = print
+                    .with((name, page.language.index(), page.lands()))
+                    .shown(&page.address);
+            }
+            for (id, list) in site.lists.iter() {
+                if let Some(page) = list.page {
+                    let named = (&reading.lists[id.index()], &reading.pages[page.index()]);
+                    print = print.with(named).shown(&list.later);
+                }
+            }
+            print.done()
+        })
+    }
+
+    /// What every page answers to `name`, as a template looks it up or
+    /// `where` asks it, with where each answer is written, and which pages
+    /// there are to answer; for a name a page's template is chosen by,
+    /// the template each is built with too. For a name a page answers with
+    /// more than it says under that name, everything every page says of
+    /// itself.
+    fn field_of_every(&self, name: NameId) -> u64 {
+        let slot = {
+            let mut all = self.prints.fields_of_every.lock().expect("never poisoned");
+            Arc::clone(all.entry(name).or_default())
+        };
+        *slot.get_or_init(|| {
+            let renderer = &self.reading.renderer;
+            let name = renderer.name_of(name);
+            if !crate::templates::of_the_front(&name) {
+                return self.every_front();
+            }
+            let site = renderer.site();
+            let sources = renderer.sources();
+            let word = PageWord::named(&name);
+            let dated = name == "date" || crate::lists::DATE_PARTS.contains(&name.as_str());
+            let choosing = CHOOSING.contains(&name.as_str());
+            let mut print = Print::default().with(self.every_page());
+            for (id, page) in site.pages.iter() {
+                let words = page.words.words.iter();
+                for (_, value) in words.filter(|(written, _)| Some(*written) == word) {
+                    print = print.with(1u8).word(sources, value);
+                }
+                for field in page.words.fields.iter().filter(|field| field.name == name) {
+                    print = (print.with(2u8))
+                        .place(sources, Some(field.key))
+                        .node(sources, &field.value)
+                        .origin(sources, &field.origin);
+                }
+                if let Some(title) = page.title.as_ref().filter(|_| name == "title") {
+                    print = print
+                        .with((3u8, &title.value))
+                        .origin(sources, &title.origin);
+                }
+                if let Some(date) = page.date.as_ref().filter(|_| dated) {
+                    print = (print.with(4u8))
+                        .shown(&date.value)
+                        .origin(sources, &date.origin);
+                }
+                if choosing {
+                    print = match renderer.layout_of(id) {
+                        Ok(chosen) => {
+                            (print.with((5u8, &chosen.name))).origin(sources, &chosen.origin)
+                        }
+                        Err(problem) => (print.with(6u8))
+                            .shown(&problem.kind)
+                            .place(sources, problem.place),
+                    };
+                }
+                print = print.with(0u8);
+            }
+            print.done()
+        })
+    }
+
     /// Which lists the site has and how long each is, and which pages it
     /// publishes where.
     fn every_list(&self) -> u64 {
@@ -669,5 +807,67 @@ impl Taken<'_> {
             }
             print.done()
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// What every page answers to each of `names`, the site at `root`
+    /// having its first page written as `page`.
+    fn fields_of_every(root: &Path, page: &str, names: &[&str]) -> Vec<u64> {
+        fs::write(root.join("content/page-1.md"), page).unwrap();
+        let (renderer, _) = crate::build::renderer(root, None);
+        let reading = Reading::of(renderer);
+        let prints = Prints::new(&reading);
+        let taken = Taken {
+            reading: &reading,
+            at: root,
+            prints: &prints,
+        };
+        let renderer = &reading.renderer;
+        let names = names.iter();
+        names
+            .map(|name| taken.of(Key::FieldOfEvery(renderer.name_id(name))))
+            .collect()
+    }
+
+    #[test]
+    fn what_every_page_answers_to_one_name_turns_on_that_name_alone() {
+        let root = std::env::temp_dir().join(format!("statac-print-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("content")).unwrap();
+        fs::create_dir_all(root.join("templates")).unwrap();
+        fs::write(root.join("statac.yaml"), "title: Site\n").unwrap();
+        for template in ["page", "home"] {
+            let path = root.join(format!("templates/{template}.html"));
+            fs::write(path, "{{ page.content }}\n").unwrap();
+        }
+        let other = "---\ntitle: Page 2\nrank: 1\n---\nA page.\n";
+        fs::write(root.join("content/page-2.md"), other).unwrap();
+        // Each written where changing another leaves it.
+        let page = |rank: u32, title: &str, more: &str, text: &str| {
+            format!("---\nrank: {rank}\nmenu: true\ntitle: {title}\n{more}---\n{text}\n")
+        };
+        let names = ["rank", "menu", "title", "layout"];
+        let print = |page: String| fields_of_every(&root, &page, &names);
+        let was = print(page(1, "Page 1", "", "A page."));
+        let ranked = print(page(2, "Page 1", "", "A page."));
+        let titled = print(page(1, "Page one", "", "A page."));
+        let written = print(page(1, "Page 1", "", "Another page."));
+        // A `type` naming a template chooses it; one naming none doesn't.
+        let typed = print(page(1, "Page 1", "type: home\n", "A page."));
+        let untyped = print(page(1, "Page 1", "type: note\n", "A page."));
+        let _ = fs::remove_dir_all(&root);
+        assert_ne!(ranked[0], was[0]);
+        assert_eq!(ranked[1..], was[1..]);
+        assert_eq!(titled[..2], was[..2]);
+        assert_ne!(titled[2], was[2]);
+        assert_eq!(titled[3], was[3]);
+        assert_eq!(written, was);
+        assert_eq!(typed[..3], was[..3]);
+        assert_ne!(typed[3], was[3]);
+        assert_eq!(untyped, was);
     }
 }
