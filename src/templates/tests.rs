@@ -2221,11 +2221,22 @@ fn a_template_that_cant_be_read_is_told_once_and_not_at_what_uses_it() {
     let calls = "{% extends \"base\" %}{% block main %}{{ page.content }}{{ card(pots=1) }}{{ card(1, 2, 3) }}{% endblock %}";
     let plain = "---\ntitle: Post 1\n---\n";
     let calling = "---\ntitle: Post 1\n---\n@card(pots=1)\n\n@card()\nwrapped\n@end\n";
-    let cases: [(&[(&str, &str)], &str); 4] = [
+    let cases: [(&[(&str, &str)], &str); 5] = [
         (
             &[
                 ("templates/base.html", broken),
                 ("templates/page.html", page),
+                ("content/post-1.md", plain),
+            ],
+            "templates/base.html",
+        ),
+        (
+            &[
+                ("templates/base.html", broken),
+                (
+                    "templates/page.html",
+                    &page.replace("\"base\"", "\"ba\" ~ \"se\""),
+                ),
                 ("content/post-1.md", plain),
             ],
             "templates/base.html",

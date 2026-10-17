@@ -48,6 +48,12 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
     if chain.iter().any(|e| e.detail() == Some(TOLD)) {
         return Vec::new();
     }
+    // A template whose problem was told when it was read is none of the
+    // engine's: told already where a name worked out as the template ran
+    // asks for it, as where one written plainly does.
+    if chain.iter().any(|e| shared.templates.unusable_asked_for(e)) {
+        return Vec::new();
+    }
     let located = |e: &Error| -> Option<(SourceId, Range<usize>)> {
         let at = *shared.templates.by_name.get(e.name()?)?;
         let source = shared.templates.files[at].source;

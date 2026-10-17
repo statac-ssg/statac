@@ -76,6 +76,17 @@ pub struct Templates {
 }
 
 impl Templates {
+    /// Whether `error` is the engine not finding a template of the site's
+    /// that a problem told when it was read keeps from it.
+    fn unusable_asked_for(&self, error: &minijinja::Error) -> bool {
+        error.kind() == minijinja::ErrorKind::TemplateNotFound
+            && self.unusable.iter().any(|&at| {
+                // As the engine words it.
+                let unfound = format!("template {:?} does not exist", self.files[at].name);
+                error.detail() == Some(unfound.as_str())
+            })
+    }
+
     /// Whether `name` is a template a page can be built with.
     fn is_layout(&self, name: &str) -> bool {
         self.by_name

@@ -59,6 +59,10 @@ What changed in each release of Statac, the newest first.
 - A site's file published at `.statac-clock`, at the top of the output,
   stays there in a build that runs `after_build`. The build removed it
   and counted it as removed by the command.
+- A template that can't be read, named by `extends` with a name worked
+  out as the template runs, as `{% extends "ho" ~ "me" %}`, is told
+  once, where it can't be read. A page built through it also said the
+  template doesn't exist.
 - A template that sorts by the same field twice is told that pages were
   sorted last at each sort that put some last. Both were told at the
   first.
