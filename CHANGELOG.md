@@ -139,6 +139,10 @@ What changed in each release of Statac, the newest first.
   answered in between. It dropped the connection with nothing said.
 - `statac serve` answers each request a program sends on one connection
   before the first is answered. It answered the first alone.
+- The bar `statac serve` adds to each page, and its details, keep the
+  size the reader's browser gives text, whatever font size the site sets
+  on the page's `html`. A site setting `html { font-size: 62.5% }` drew
+  them at about 9 pixels.
 
 ### Changed
 

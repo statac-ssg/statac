@@ -27,66 +27,87 @@
   const root = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
   style.textContent = `
+    /* In em, not rem: rem reads the page's root font size through the shadow
+       root. A length is its size in px at the default 16px over the element's
+       own font size there. */
     :host { all: initial; display: block; }
     .bar {
       position: fixed; inset: auto 0 0 0; z-index: 2147483647; box-sizing: border-box;
       width: 100%; max-width: none; max-height: 70vh; margin: 0; padding: 0; border: 0;
       overflow: visible; display: flex; flex-direction: column;
-      font: 0.9375rem/1.45 ui-sans-serif, system-ui, sans-serif; color-scheme: dark;
+      font: 0.9375em/1.45 ui-sans-serif, system-ui, sans-serif; color-scheme: dark;
       background: #14181c; color: #b9c1c8; box-shadow: 0 -1px 10px rgb(0 0 0 / 0.3);
       text-align: left;
     }
-    .line { display: flex; flex: none; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; }
+    .line {
+      display: flex; flex: none; align-items: center; gap: calc(12em / 15);
+      padding: calc(8em / 15) calc(16em / 15);
+    }
     .brand { flex: none; font-weight: 650; color: #e4e9ed; }
     .status {
       margin: 0; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline;
-      gap: 0 0.75rem;
+      gap: 0 calc(12em / 15);
     }
-    .where { font: 0.875rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .where { font: calc(14em / 15)/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .stopped .line { background: #5b1d1d; color: #ffe4e4; }
     .stopped .brand { color: #fff; }
     .stopped .where { color: #ffc9c9; }
     .stopped .help, .stopped .more { color: #ffdcdc; }
     button {
-      flex: none; font: inherit; font-size: 0.875rem; color: inherit;
-      line-height: 1.45; background: transparent; cursor: pointer; padding: 0.125rem 0.625rem;
-      border: 1px solid #5d6770; border-radius: 0.375rem;
+      flex: none; font: inherit; font-size: calc(14em / 15); color: inherit;
+      line-height: 1.45; background: transparent; cursor: pointer;
+      padding: calc(2em / 14) calc(10em / 14);
+      border: 1px solid #5d6770; border-radius: calc(6em / 14);
     }
     .stopped button { border-color: #c98f8f; }
     button:focus-visible, a:focus-visible, .details:focus-visible {
-      outline: 0.1875rem solid #9cc4e8; outline-offset: 0.125rem;
+      outline: calc(3em / 15) solid #9cc4e8; outline-offset: calc(2em / 15);
     }
-    .details:focus-visible { outline: 0; box-shadow: inset 0 0.1875rem 0 #9cc4e8; }
-    .details { overflow: auto; padding: 0.25rem 1rem 1.125rem; border-top: 1px solid #2a3138; }
-    h2 { font-size: 0.9375rem; font-weight: 650; color: #e4e9ed; margin: 0.875rem 0 0.375rem; }
-    p, ul { margin: 0.25rem 0; }
-    ul { padding-left: 1.25rem; }
+    .details:focus-visible { outline: 0; box-shadow: inset 0 calc(3em / 15) 0 #9cc4e8; }
+    .details {
+      overflow: auto; padding: calc(4em / 15) calc(16em / 15) calc(18em / 15);
+      border-top: 1px solid #2a3138;
+    }
+    h2 {
+      font-size: 1em; font-weight: 650; color: #e4e9ed;
+      margin: calc(14em / 15) 0 calc(6em / 15);
+    }
+    p, ul { margin: calc(4em / 15) 0; }
+    ul { padding-left: calc(20em / 15); }
     a { color: #9cc4e8; }
     pre {
-      font: 0.875rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      margin: 0.375rem 0 0.75rem; overflow-x: auto; white-space: pre;
+      font: calc(14em / 15)/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      margin: calc(6em / 14) 0 calc(12em / 14); overflow-x: auto; white-space: pre;
     }
-    dl { margin: 0.25rem 0; display: grid; grid-template-columns: max-content 1fr; gap: 0.125rem 1rem; }
+    dl {
+      margin: calc(4em / 15) 0; display: grid; grid-template-columns: max-content 1fr;
+      gap: calc(2em / 15) calc(16em / 15);
+    }
     dt { grid-column: 1; color: #e4e9ed; }
     dd { grid-column: 2; margin: 0; overflow-wrap: anywhere; }
-    details { margin: 0.375rem 0; }
-    summary { cursor: pointer; color: #e4e9ed; padding: 0.125rem 0; }
-    summary:focus-visible { outline: 0.1875rem solid #9cc4e8; outline-offset: 0.125rem; }
-    table { border-collapse: collapse; width: 100%; margin: 0.375rem 0 0.75rem; }
+    details { margin: calc(6em / 15) 0; }
+    summary { cursor: pointer; color: #e4e9ed; padding: calc(2em / 15) 0; }
+    summary:focus-visible { outline: calc(3em / 15) solid #9cc4e8; outline-offset: calc(2em / 15); }
+    table { border-collapse: collapse; width: 100%; margin: calc(6em / 15) 0 calc(12em / 15); }
     th, td {
-      text-align: left; vertical-align: top; font-weight: 400; padding: 0.25rem 1rem 0.25rem 0;
+      text-align: left; vertical-align: top; font-weight: 400;
+      padding: calc(4em / 15) calc(16em / 15) calc(4em / 15) 0;
       border-top: 1px solid #2a3138; overflow-wrap: anywhere;
     }
     thead th { color: #e4e9ed; font-weight: 650; border-top: 0; }
-    code, .from { font: 0.875rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code, .from {
+      font: calc(14em / 15)/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
     tbody th, tbody th + td { white-space: nowrap; }
     tbody th { color: #e4e9ed; }
     .none { color: #8d98a2; font-style: italic; }
-    small { display: block; font-size: 0.875rem; color: #8d98a2; }
+    small { display: block; font-size: calc(14em / 15); color: #8d98a2; }
     .halted h2 { color: #ffc9c9; }
     .halted pre { color: #f3d6d6; }
     @media (forced-colors: active) {
-      .details:focus-visible { outline: 0.1875rem solid Highlight; outline-offset: -0.1875rem; }
+      .details:focus-visible {
+        outline: calc(3em / 15) solid Highlight; outline-offset: calc(-3em / 15);
+      }
       .bar { border-top: 1px solid CanvasText; }
       .details { border-top-color: CanvasText; }
     }
