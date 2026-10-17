@@ -51,6 +51,11 @@ What changed in each release of Statac, the newest first.
   the command wrote again at its length straight after the build wrote
   it. Where the disk's times move in steps, as by a few thousandths of a
   second on Linux, such a file kept its time and went uncounted.
+- `serve` shows a file of the site, such as one under `static/`, saved
+  again at its length straight after a build copied it, from the next
+  build on. Where the disk's times move in steps, such a file kept its
+  time, and serve kept the copy from before the save until the file
+  changed again.
 
 ## 0.4.0 - 2026-10-17
 

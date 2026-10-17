@@ -445,10 +445,10 @@ impl Session {
             (true, ..) => None,
             (false, Some(last), Some(mine)) => {
                 let into = Arc::clone(&into);
-                Some(publish::resume(&self.folder, mine, &last.left, into))
+                Some(publish::resume(at, &self.folder, mine, &last.left, into))
             }
             (false, ..) => match publish::begin(at, &self.folder) {
-                Ok(staging) => Some(staging.leaving(Arc::clone(&into))),
+                Ok(staging) => Some(staging.leaving(at, Arc::clone(&into))),
                 Err(problem) => {
                     concluded.problems.push(problem);
                     None

@@ -61,8 +61,9 @@ pub const MARKER: &str = ".statac-built";
 const MARKER_TEXT: &str = "Statac built this folder and replaces all of it on every build.\n\
                            Keep files you want published in the site's static/ folder.\n";
 
-/// The file written and removed at the top of the folder written into to
-/// read the time its disk gives a file written now.
+/// The file written and removed at the top of the folder written into, or
+/// of the site's `.statac`, to read the time its disk gives a file
+/// written now.
 const CLOCK: &str = ".statac-clock";
 
 /// The spare's name in `.statac`.
@@ -133,7 +134,8 @@ pub struct Left {
     /// The files the folder held before that it holds no more.
     pub removed: Vec<String>,
     /// Each file copied from one of the site's as it is, with what it
-    /// was copied from.
+    /// was copied from, where a later change to that file would change
+    /// its stamp.
     copied: HashMap<String, Stamp>,
 }
 
@@ -196,6 +198,10 @@ struct Notes {
     before: HashMap<String, Stamp>,
     written: Mutex<Vec<String>>,
     copied: Mutex<HashMap<String, Stamp>>,
+    /// The time the site's disk gave a file written as the build began.
+    /// A file last changed at that time or after may be written again
+    /// within the same step of the disk's times and keep its stamp.
+    clock: Option<SystemTime>,
     /// Where what the build left is put once it has finished.
     left: Arc<Mutex<Option<Left>>>,
 }
@@ -726,11 +732,12 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
 /// `files` are this build's to write anew or to remove where it doesn't
 /// ask for them; whatever else is there stays as it is. The build leaves
 /// in `into` what has become of `files`, and of any it added. A file
-/// copied from one of the site's is taken as still equal to it where that
-/// file has the length and the time it had when the build that `left` it
-/// copied it. A build dropped unfinished leaves the folder as far as it
-/// got.
+/// copied from one of the site at `site` is taken as still equal to it
+/// where that file has the length and the time it had when the build that
+/// `left` it copied it. A build dropped unfinished leaves the folder as
+/// far as it got.
 pub fn resume(
+    site: &Path,
     folder: &Path,
     files: impl IntoIterator<Item = String>,
     left: &Left,
@@ -757,9 +764,35 @@ pub fn resume(
             before: left.copied.clone(),
             written: Mutex::default(),
             copied: Mutex::default(),
+            clock: clock_of(site),
             left: into,
         }),
     }
+}
+
+/// The time the disk the site at `site` is on gives a file written now,
+/// read from one written in its `.statac` and removed. None where it
+/// can't be read.
+fn clock_of(site: &Path) -> Option<SystemTime> {
+    let kept = kept(site).ok()?;
+    time_now_in(&kept, CLOCK).ok()?
+}
+
+/// The time the disk `folder` is on gives a file written now, read from
+/// one written there as `name` and removed. None where the disk keeps no
+/// such time.
+fn time_now_in(folder: &Path, name: &str) -> io::Result<Option<SystemTime>> {
+    let at = folder.join(name);
+    // Made anew, so that it takes the time whatever was there before.
+    if exists(&at) {
+        fs::remove_file(&at)?;
+    }
+    let mut file = (fs::OpenOptions::new().write(true).create_new(true)).open(&at)?;
+    io::Write::write_all(&mut file, b"\n")?;
+    let now = file.metadata().and_then(|found| found.modified()).ok();
+    drop(file);
+    fs::remove_file(&at)?;
+    Ok(now)
 }
 
 /// Where the spare of the site at `site` is kept for a build into `out`:
@@ -826,13 +859,14 @@ impl Staging {
         self.unkept.clone()
     }
 
-    /// The same build, leaving in `into` once it has finished what the
-    /// output holds, for a build that [`resume`]s there.
-    pub fn leaving(mut self, into: Arc<Mutex<Option<Left>>>) -> Staging {
+    /// The same build of the site at `site`, leaving in `into` once it has
+    /// finished what the output holds, for a build that [`resume`]s there.
+    pub fn leaving(mut self, site: &Path, into: Arc<Mutex<Option<Left>>>) -> Staging {
         self.notes = Some(Notes {
             before: HashMap::new(),
             written: Mutex::default(),
             copied: Mutex::default(),
+            clock: clock_of(site),
             left: into,
         });
         self
@@ -874,8 +908,13 @@ impl Staging {
         }
     }
 
+    /// Notes `rel` as a copy of a file with the stamp `from`, for the next
+    /// build to trust by that stamp alone where a later change to the file
+    /// would change it. Any other is known by its bytes.
     fn copied(&self, rel: &str, from: Option<Stamp>) {
-        if let (Some(notes), Some(from)) = (&self.notes, from) {
+        if let (Some(notes), Some(from)) = (&self.notes, from)
+            && notes.clock.is_some_and(|clock| from.1 < clock)
+        {
             let mut copied = notes.copied.lock().expect("never poisoned");
             copied.insert(rel.to_owned(), from);
         }
@@ -1215,20 +1254,7 @@ impl Staging {
     /// from one written there and removed. None where the disk keeps no
     /// such time.
     fn disk_time(&self) -> Result<Option<SystemTime>, Problem> {
-        let at = self.fresh.join(CLOCK);
-        let cant_write = |error: io::Error| self.cant_write(CLOCK, &error);
-        // Made anew, so that it takes the time whatever was there before.
-        if exists(&at) {
-            fs::remove_file(&at).map_err(cant_write)?;
-        }
-        let mut file = (fs::OpenOptions::new().write(true).create_new(true))
-            .open(&at)
-            .map_err(cant_write)?;
-        io::Write::write_all(&mut file, b"\n").map_err(cant_write)?;
-        let now = file.metadata().and_then(|found| found.modified()).ok();
-        drop(file);
-        fs::remove_file(&at).map_err(cant_write)?;
-        Ok(now)
+        time_now_in(&self.fresh, CLOCK).map_err(|error| self.cant_write(CLOCK, &error))
     }
 
     /// Puts the folder written into in the output's place.
@@ -1469,7 +1495,7 @@ mod tests {
     fn a_build_resumed_where_the_last_stands_writes_only_what_differs() {
         let scratch = Scratch::new("resumed");
         let into = Arc::new(Mutex::new(None));
-        let staging = scratch.begin().leaving(Arc::clone(&into));
+        let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
         for (rel, text) in [
             ("index.html", "home"),
             ("a/index.html", "a"),
@@ -1486,7 +1512,13 @@ mod tests {
 
         // The home page is no file of this build's, and stays unasked for.
         let mine = ["a/index.html", "b/c.txt"].map(str::to_owned);
-        let staging = resume(&scratch.out(), mine, &left, Arc::clone(&into));
+        let staging = resume(
+            &scratch.site(),
+            &scratch.out(),
+            mine,
+            &left,
+            Arc::clone(&into),
+        );
         staging.write("a/index.html", b"a").unwrap();
         staging.write("d/index.html", b"d").unwrap();
         staging.finish().unwrap();
@@ -1509,7 +1541,7 @@ mod tests {
 
     /// A site of three pages built into the output, and what it left.
     fn three_pages(scratch: &Scratch, into: &Arc<Mutex<Option<Left>>>) -> Left {
-        let staging = scratch.begin().leaving(Arc::clone(into));
+        let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(into));
         for (rel, text) in [
             ("index.html", "home"),
             ("a/index.html", "a page"),
@@ -1527,7 +1559,13 @@ mod tests {
         let into = Arc::new(Mutex::new(None));
         let left = three_pages(&scratch, &into);
         let mine = left.files.clone();
-        let staging = resume(&scratch.out(), mine, &left, Arc::clone(&into));
+        let staging = resume(
+            &scratch.site(),
+            &scratch.out(),
+            mine,
+            &left,
+            Arc::clone(&into),
+        );
         staging.write("index.html", b"HOME").unwrap();
         staging.write("a/index.html", b"a").unwrap();
         staging.write("a/b/index.html", b"b, and more").unwrap();
@@ -1560,7 +1598,13 @@ mod tests {
         let page = scratch.out().join("a/index.html");
         let was = fs::metadata(&page).unwrap().ino();
         let mine = left.files.clone();
-        let staging = resume(&scratch.out(), mine, &left, Arc::clone(&into));
+        let staging = resume(
+            &scratch.site(),
+            &scratch.out(),
+            mine,
+            &left,
+            Arc::clone(&into),
+        );
         staging.write("a/index.html", b"another").unwrap();
         staging.finish().unwrap();
         assert_eq!(fs::read(&page).unwrap(), b"another");
@@ -1579,7 +1623,13 @@ mod tests {
         fs::remove_file(&page).unwrap();
         fs::hard_link(&outside, &page).unwrap();
         let mine = left.files.clone();
-        let staging = resume(&scratch.out(), mine, &left, Arc::clone(&into));
+        let staging = resume(
+            &scratch.site(),
+            &scratch.out(),
+            mine,
+            &left,
+            Arc::clone(&into),
+        );
         staging.write("a/index.html", b"another").unwrap();
         staging.finish().unwrap();
         assert_eq!(fs::read(&page).unwrap(), b"another");
@@ -1603,7 +1653,7 @@ mod tests {
         fs::remove_dir_all(out.join("a/b")).unwrap();
         symlink(outside.join("b"), out.join("a/b")).unwrap();
         let mine = left.files.clone();
-        let staging = resume(&out, mine, &left, Arc::clone(&into));
+        let staging = resume(&scratch.site(), &out, mine, &left, Arc::clone(&into));
         assert!(staging.write("index.html", b"HOME").is_err());
         assert!(staging.write("a/b/index.html", b"B").is_err());
         assert_eq!(fs::read(outside.join("index.html")).unwrap(), b"mine");
@@ -1615,8 +1665,9 @@ mod tests {
         let scratch = Scratch::new("resumed-copy");
         let from = scratch.site().join("file-1.txt");
         fs::write(&from, "one").unwrap();
+        change(&from, long_ago());
         let into = Arc::new(Mutex::new(None));
-        let staging = scratch.begin().leaving(Arc::clone(&into));
+        let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
         staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
         staging.finish().unwrap();
         let left = taken(&into);
@@ -1625,7 +1676,13 @@ mod tests {
         let copied = scratch.out().join("file-1.txt");
         fs::write(&copied, "ONE").unwrap();
         let mine = ["file-1.txt".to_owned()];
-        let staging = resume(&scratch.out(), mine.clone(), &left, Arc::clone(&into));
+        let staging = resume(
+            &scratch.site(),
+            &scratch.out(),
+            mine.clone(),
+            &left,
+            Arc::clone(&into),
+        );
         staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
         staging.finish().unwrap();
         let left = taken(&into);
@@ -1633,11 +1690,51 @@ mod tests {
         assert_eq!(fs::read_to_string(&copied).unwrap(), "ONE");
 
         fs::write(&from, "one and more").unwrap();
-        let staging = resume(&scratch.out(), mine, &left, Arc::clone(&into));
+        let staging = resume(
+            &scratch.site(),
+            &scratch.out(),
+            mine,
+            &left,
+            Arc::clone(&into),
+        );
         staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
         staging.finish().unwrap();
         assert_eq!(taken(&into).written, ["file-1.txt"]);
         assert_eq!(fs::read_to_string(&copied).unwrap(), "one and more");
+    }
+
+    #[test]
+    fn a_build_resumed_reads_a_copy_whose_file_changed_as_the_last_build_began() {
+        let scratch = Scratch::new("resumed-copy-same-step");
+        let from = scratch.site().join("file-1.txt");
+        fs::write(&from, "one").unwrap();
+        // Changed within the step the disk's times were in as the build
+        // began, as a disk whose times move in steps sees it.
+        let now = SystemTime::now() + Duration::from_secs(3600);
+        change(&from, now);
+        let into = Arc::new(Mutex::new(None));
+        let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
+        staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
+        staging.finish().unwrap();
+        let left = taken(&into);
+        assert!(!exists(&scratch.site().join(KEPT).join(CLOCK)));
+
+        // Written again at the same length, within the same step.
+        fs::write(&from, "two").unwrap();
+        change(&from, now);
+        let mine = ["file-1.txt".to_owned()];
+        let staging = resume(
+            &scratch.site(),
+            &scratch.out(),
+            mine,
+            &left,
+            Arc::clone(&into),
+        );
+        staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
+        staging.finish().unwrap();
+        assert_eq!(taken(&into).written, ["file-1.txt"]);
+        let copied = scratch.out().join("file-1.txt");
+        assert_eq!(fs::read_to_string(&copied).unwrap(), "two");
     }
 
     fn names(folder: &Path) -> Vec<String> {
