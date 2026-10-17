@@ -127,6 +127,10 @@ What changed in each release of Statac, the newest first.
   later line writes something. Both were left out, so the line was
   written at the left and ran into the next. A line whose tags write
   nothing between them is still not written.
+- Two `statac serve` sessions of one site at once each build into a
+  folder of their own, the second into `.statac/serve-2`. Both built
+  into `.statac/serve`, so each could show pages the other wrote, such
+  as drafts where only one was showing them.
 
 ### Changed
 

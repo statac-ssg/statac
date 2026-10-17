@@ -538,13 +538,7 @@ pub fn hold(site: &Path, waiting: impl FnOnce()) -> (Hold, Option<Problem>) {
 
 /// The file in the site's `.statac` whose lock is the hold, locked.
 fn locked(site: &Path, waiting: impl FnOnce()) -> io::Result<fs::File> {
-    kept(site)?;
-    match fs::create_dir(site.join(KEPT)) {
-        Err(error) if error.kind() != io::ErrorKind::AlreadyExists => return Err(error),
-        _ => {}
-    }
-    // Asked again once made: it may have been put there as a link.
-    let file = platform::lock_file(&kept(site)?, LOCK)?;
+    let file = lock_file(site, LOCK)?;
     match file.try_lock() {
         Ok(()) => return Ok(file),
         Err(fs::TryLockError::WouldBlock) => waiting(),
@@ -556,6 +550,41 @@ fn locked(site: &Path, waiting: impl FnOnce()) -> io::Result<fs::File> {
             locked => return locked.map(|()| file),
         }
     }
+}
+
+/// A folder in the site's `.statac` for one process at a time: `name`,
+/// or where another holds that, `name-2`, `name-3` and so on, the first
+/// no other holds. It is held by a lock on a file beside it, let go of as
+/// a [`Hold`] is. Where no file can be locked it is `name`, unheld, and
+/// the hold each build takes says why.
+pub fn claim(site: &Path, name: &str) -> (String, Option<fs::File>) {
+    for n in 1.. {
+        let folder = match n {
+            1 => name.to_owned(),
+            n => format!("{name}-{n}"),
+        };
+        let Ok(file) = lock_file(site, &format!("{folder}.lock")) else {
+            break;
+        };
+        match file.try_lock() {
+            Ok(()) => return (folder, Some(file)),
+            Err(fs::TryLockError::WouldBlock) => {}
+            Err(fs::TryLockError::Error(_)) => break,
+        }
+    }
+    (name.to_owned(), None)
+}
+
+/// The file `name` in the site's `.statac`, opened to lock, with the
+/// folder made where it isn't there.
+fn lock_file(site: &Path, name: &str) -> io::Result<fs::File> {
+    kept(site)?;
+    match fs::create_dir(site.join(KEPT)) {
+        Err(error) if error.kind() != io::ErrorKind::AlreadyExists => return Err(error),
+        _ => {}
+    }
+    // Asked again once made: it may have been put there as a link.
+    platform::lock_file(&kept(site)?, name)
 }
 
 /// Starts a build of the site at `site` into `out`: checks the output is

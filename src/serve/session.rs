@@ -35,13 +35,16 @@ use crate::reads::{Key, Reads, Translation};
 use crate::stamp::{self, Pass};
 use print::{Prints, Reading, Taken};
 
-/// The session's folder in the site's `.statac`.
+/// The session's folder in the site's `.statac`, where no other session
+/// of the site holds it.
 const FOLDER: &str = "serve";
 
 /// A site kept built in a folder of its own.
 pub struct Session {
     options: Options,
     folder: PathBuf,
+    /// Held while the session runs, so that no other takes `folder`.
+    _claim: Option<std::fs::File>,
     /// The last round that built the site; none before one has, and after
     /// one that stopped while writing, which the next round builds whole.
     last: Option<Last>,
@@ -160,9 +163,15 @@ impl Session {
     /// [`Session::start`], calling `waiting` where the round waits for
     /// another build of the site to end.
     pub fn start_saying(options: &Options, waiting: &mut dyn FnMut()) -> (Session, Round) {
+        // Two sessions building into one folder would each serve what the
+        // other wrote.
+        let (name, claim) = match build::a_folder(&options.site) {
+            Ok(()) => publish::claim(&options.site, FOLDER),
+            Err(_) => (FOLDER.to_owned(), None),
+        };
         let folder = match options.site == Path::new(".") {
-            true => Path::new(KEPT).join(FOLDER),
-            false => options.site.join(KEPT).join(FOLDER),
+            true => Path::new(KEPT).join(name),
+            false => options.site.join(KEPT).join(name),
         };
         let mut session = Session {
             options: Options {
@@ -171,6 +180,7 @@ impl Session {
                 ..options.clone()
             },
             folder,
+            _claim: claim,
             last: None,
             remembered: Remembered::default(),
             before: Before::Unset,

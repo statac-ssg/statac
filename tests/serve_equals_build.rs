@@ -1572,6 +1572,51 @@ fn a_session_asked_for_no_drafts_leaves_what_a_build_leaves() {
 }
 
 #[test]
+fn two_sessions_of_one_site_each_build_into_a_folder_of_their_own() {
+    let site = with_drafts("two-sessions");
+    let drafts = Options {
+        drafts: true,
+        ..site.options()
+    };
+    let (mut showing, round) = Session::start(&Options {
+        out: None,
+        ..drafts.clone()
+    });
+    site.same_as(&drafts, &showing, &round, "the first session's first build");
+    let (mut plain, round) = Session::start(&Options {
+        out: None,
+        ..site.options()
+    });
+    site.same(&plain, &round, "the second session's first build");
+    assert_eq!(showing.folder(), site.root().join(".statac/serve"));
+    assert_eq!(plain.folder(), site.root().join(".statac/serve-2"));
+    site.write(
+        "content/post-7.md",
+        "---\ntitle: Post 7\ndate: 2026-01-07\ntags: [two]\ndraft: true\n---\nEdited.\n",
+    );
+    let round = showing.rebuild();
+    site.same_as(&drafts, &showing, &round, "a draft edited");
+    let round = plain.rebuild();
+    site.same(&plain, &round, "a draft edited, for the second session");
+    let round = round_of(&mut showing);
+    site.same_as(&drafts, &showing, &round, "the second's rebuild");
+    // A folder no running session holds is taken again.
+    drop(showing);
+    let (next, _) = Session::start(&Options {
+        out: None,
+        ..site.options()
+    });
+    assert_eq!(next.folder(), site.root().join(".statac/serve"));
+}
+
+/// A round of `session` with nothing changed since its last.
+fn round_of(session: &mut Session) -> Round {
+    let round = session.rebuild();
+    assert_eq!(round.built, 0, "{:?}", round.written);
+    round
+}
+
+#[test]
 fn a_still_fetched_and_a_still_found_absent() {
     let site = Site::new("stills");
     site.write(
