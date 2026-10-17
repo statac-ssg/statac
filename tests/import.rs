@@ -1185,6 +1185,137 @@ fn later_pages_of_a_moved_hugo_tag_in_the_built_output_send_readers_on() {
     }
 }
 
+/// A Hugo site whose posts are each in the series `a`, with `settings`
+/// after the address and the title, showing one post to a page.
+fn hugo_series_site(old: &Path, settings: &str) {
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    let settings = format!(
+        "baseURL = 'https://example.org/'\ntitle = 'Series'\n{settings}\
+         [taxonomies]\ntag = 'tags'\nseries = 'series'\n[pagination]\npagerSize = 1\n"
+    );
+    fs::write(old.join("hugo.toml"), settings).unwrap();
+    for n in 1..=2 {
+        let post = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\nseries: [a]\n---\nA post.\n");
+        fs::write(old.join(format!("content/posts/post-{n}.md")), post).unwrap();
+    }
+}
+
+/// A series' page where Statac's isn't, by `[permalinks]` or under
+/// `uglyURLs`, sends readers on from the old address, and the report
+/// names a later page beneath it that nothing answers.
+#[test]
+fn a_hugo_series_page_where_statacs_isnt_sends_readers_on() {
+    // The settings, the page written, the old address and the new, and
+    // the later page the report names.
+    for (at, (settings, page, from, to, later)) in [
+        (
+            "[permalinks]\nseries = '/series/:slug/posts/'\n",
+            "series-a-posts.md",
+            "/series/a/posts/",
+            "/series/a/",
+            Some("`/series/a/posts/page/2/`"),
+        ),
+        (
+            "uglyURLs = true\n",
+            "series-a.md",
+            "/series/a.html",
+            "/series/a/",
+            None,
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let old = scratch(&format!("hugo-moved-series-old-{at}"));
+        let new = scratch(&format!("hugo-moved-series-new-{at}"));
+        let out = scratch(&format!("hugo-moved-series-out-{at}"));
+        hugo_series_site(&old, settings);
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{at}: {told}");
+        let written = fs::read_to_string(new.join("content").join(page)).unwrap();
+        assert_eq!(
+            written,
+            format!("---\npermalink: {from}\nredirect_to: {to}\n---\n"),
+            "{at}"
+        );
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(!report.contains(&format!("- `{from}`")), "{at}: {report}");
+        if let Some(later) = later {
+            assert!(
+                report.contains(&format!(
+                    "so each is at Statac's own address, and a page at the old one sends \
+                     readers on to it. A series' later pages stood beneath its page, such as \
+                     {later}: nothing answers those."
+                )),
+                "{at}: {report}"
+            );
+        }
+        build_into(&new, &out);
+        let file = match from.strip_suffix('/') {
+            Some(folder) => format!("{}/index.html", &folder[1..]),
+            None => from[1..].to_owned(),
+        };
+        assert!(out.join(&file).is_file(), "{at}: nothing at {file}");
+    }
+}
+
+/// Each later page of a series' page `[permalinks]` put where Statac's
+/// isn't, in the old built output, sends readers on to the series' page
+/// of the same number.
+#[test]
+fn later_pages_of_a_moved_hugo_series_in_the_built_output_send_readers_on() {
+    let old = scratch("hugo-moved-series-later-old");
+    let new = scratch("hugo-moved-series-later-new");
+    let out = scratch("hugo-moved-series-later-out");
+    hugo_series_site(&old, "[permalinks]\nseries = '/series/:slug/posts/'\n");
+    for page in [
+        "index.html",
+        "posts/index.html",
+        "posts/post-1/index.html",
+        "posts/post-2/index.html",
+        "series/a/posts/index.html",
+        "series/a/posts/page/1/index.html",
+        "series/a/posts/page/2/index.html",
+    ] {
+        let path = old.join("public").join(page);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "<p>A page.</p>\n").unwrap();
+    }
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    // Each old page, the page written for it, and where it sends readers.
+    for (from, page, to) in [
+        ("/series/a/posts/", "series-a-posts.md", "/series/a/"),
+        (
+            "/series/a/posts/page/1/",
+            "series-a-posts-page-1.md",
+            "/series/a/",
+        ),
+        (
+            "/series/a/posts/page/2/",
+            "series-a-posts-page-2.md",
+            "/series/a/page/2/",
+        ),
+    ] {
+        let written = fs::read_to_string(new.join("content").join(page)).unwrap();
+        assert_eq!(
+            written,
+            format!("---\npermalink: {from}\nredirect_to: {to}\n---\n")
+        );
+    }
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(!report.contains("A series' later pages"), "{report}");
+    build_into(&new, &out);
+    for file in [
+        "series/a/posts/index.html",
+        "series/a/posts/page/1/index.html",
+        "series/a/posts/page/2/index.html",
+        "series/a/page/2/index.html",
+    ] {
+        assert!(out.join(file).is_file(), "nothing at {file}");
+    }
+}
+
 /// Hugo's list held the pages in its folder, those in folders beneath it
 /// that are no lists, and each list beneath it, and each of its later
 /// pages is looked for in the new site.

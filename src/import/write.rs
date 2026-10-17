@@ -18,7 +18,7 @@ use crate::content::words::{self, OTHER_SPELLINGS, STATAC_FILLS};
 use crate::date::Date;
 use crate::new::{self, Answers};
 use crate::platform;
-use crate::problem::{Kind, Maker, Problem, system_reason};
+use crate::problem::{Kind, Maker, Problem, Word, system_reason};
 
 /// The file the report is written to, at the top of the new site.
 pub const REPORT: &str = "IMPORT.md";
@@ -213,19 +213,29 @@ impl Terms {
     }
 
     /// Each old page of a name in a list, or of a tag, as the tag the
-    /// name became and the page's address.
-    fn old_pages(&self, pages: &[(String, String, String)]) -> Vec<(String, String)> {
-        pages
-            .iter()
-            .filter_map(|(list, name, address)| {
-                if list == "tags" {
-                    return (self.tags.contains(name)).then(|| (name.clone(), address.clone()));
+    /// name became and the page's address. A series' page comes first as
+    /// the series, and then as its tag where the name was a later series
+    /// of some page: whichever of the two the new site has is sent on to.
+    fn old_pages(&self, pages: &[(String, String, String)]) -> Vec<(Word, String, String)> {
+        let mut old = Vec::new();
+        for (list, name, address) in pages {
+            if list == "tags" {
+                if self.tags.contains(name) {
+                    old.push((Word::Tag, name.clone(), address.clone()));
                 }
-                let (_, names) = self.lists.iter().find(|(known, _)| known == list)?;
-                let (_, tag) = names.iter().find(|(known, _)| known == name)?;
-                Some((tag.clone(), address.clone()))
-            })
-            .collect()
+                continue;
+            }
+            if list == "series" {
+                old.push((Word::Series, name.clone(), address.clone()));
+            }
+            let tag = (self.lists.iter())
+                .find(|(known, _)| known == list)
+                .and_then(|(_, names)| names.iter().find(|(known, _)| known == name));
+            if let Some((_, tag)) = tag {
+                old.push((Word::Tag, tag.clone(), address.clone()));
+            }
+        }
+        old
     }
 
     /// Every tag a page has, with the name it had, its list, and the
@@ -756,7 +766,7 @@ pub fn write<'a>(
         }
     }
     let built_at = built.as_ref().map(|built| super::inside::path(old, built));
-    let sent_on = addresses::send_on_to_tags(
+    let sent_on = addresses::send_on_to_tags_and_series(
         &mut out,
         today,
         &terms.old_pages(&term_pages),

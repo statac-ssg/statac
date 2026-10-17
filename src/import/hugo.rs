@@ -2420,13 +2420,10 @@ impl Reader<'_> {
                         Some((_, pages)) => *pages += 1,
                         None => counts.push((address.clone(), 1)),
                     }
-                    // A tag's page that isn't where Statac's stands sends
-                    // readers on.
+                    // A page that isn't where Statac's stands sends readers
+                    // on.
                     let page = (plural.to_owned(), term.clone(), address.clone());
-                    if plural == "tags"
-                        && (ugly || !kept)
-                        && !self.import.term_pages.contains(&page)
-                    {
+                    if (ugly || !kept) && !self.import.term_pages.contains(&page) {
                         self.import.term_pages.push(page);
                     }
                     if !addresses.contains(&address) {
@@ -2456,8 +2453,8 @@ impl Reader<'_> {
                         .map(|(address, pages)| (address.clone(), *pages, ugly)),
                 );
             }
-            // Hugo put a tag's later pages beneath its page, whatever the
-            // pattern; the old built output, where it is there, shows
+            // Hugo put the later pages of a tag's page or a series' beneath
+            // it, whatever the pattern; the old built output, where it is there, shows
             // which there were, and the shared part sends readers on.
             let size = self.pager_size();
             let path = self.pager_path();
@@ -2470,10 +2467,14 @@ impl Reader<'_> {
                 });
             if let (Some(pattern), Some(statacs)) = (pattern, statacs) {
                 match kept {
-                    false if plural == "tags" && self.starter => {
+                    false if self.starter => {
+                        let one = match plural {
+                            "tags" => "A tag's",
+                            _ => "A series'",
+                        };
                         let later = match later {
                             Some(later) => format!(
-                                " A tag's later pages stood beneath its page, such as {}: \
+                                " {one} later pages stood beneath its page, such as {}: \
                                  nothing answers those. With the old site's built output in {}, \
                                  `statac import` sends readers on from each it finds there.",
                                 code(&later),
@@ -2482,8 +2483,8 @@ impl Reader<'_> {
                             None => String::new(),
                         };
                         self.note(format!(
-                            "The settings' `[permalinks]` put the page of each of the `tags` at \
-                             {}, which Statac has no pattern for, so each is at Statac's own \
+                            "The settings' `[permalinks]` put the page of each of the `{plural}` \
+                             at {}, which Statac has no pattern for, so each is at Statac's own \
                              address, and a page at the old one sends readers on to it.{later}",
                             code(&pattern)
                         ))

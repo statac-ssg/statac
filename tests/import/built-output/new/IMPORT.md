@@ -33,7 +33,7 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old addresses there: 5 are published there, or sent on from there.
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
-- 3 pages at the top of `content/`, such as `content/categories-linux.md`, send readers on from the old page of a tag or a category to the tag's page, each with `permalink` and `redirect_to`.
+- 3 pages at the top of `content/`, such as `content/categories-linux.md`, send readers on from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
 
 Each address was also looked for in the old site's own built output, `_site/`.
 

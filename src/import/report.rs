@@ -453,13 +453,14 @@ fn addresses(text: &mut String, summary: &Summary) {
         ways.push(match kept.sent_on.len() {
             1 => format!(
                 "1 page at the top of `content/`, {}, sends readers on from the old page of a \
-                 tag or a category to the tag's page, with `permalink` and `redirect_to`.",
+                 tag, a category or a series to the page Statac makes for it, with `permalink` \
+                 and `redirect_to`.",
                 code(example)
             ),
             n => format!(
                 "{n} pages at the top of `content/`, such as {}, send readers on from the old \
-                 page of a tag or a category to the tag's page, each with `permalink` and \
-                 `redirect_to`.",
+                 page of a tag, a category or a series to the page Statac makes for it, each \
+                 with `permalink` and `redirect_to`.",
                 code(example)
             ),
         });

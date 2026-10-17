@@ -273,24 +273,26 @@ fn published(folder: &Path, today: Date, starter: bool) -> HashMap<String, Strin
         .collect()
 }
 
-/// Sends readers on from the old page of each tag to the page Statac makes
-/// for the tag, and gives each old address so answered with the file
-/// written for it, and each page of `built` that listed a whole list. `known` is each tag with an old address a reader worked
-/// out. `names` is every tag with the name it had in the old site and the
-/// folders a tool may have kept its page in, by which a page of `built`,
-/// the old built output, is taken for a tag's: `/categories/linux/` or
-/// `/category/linux.html` for `linux` of `categories`.
+/// Sends readers on from the old page of each tag and each series to the
+/// page Statac makes for it, and gives each old address so answered with
+/// the file written for it, and each page of `built` that listed a whole
+/// list. `known` is each tag or series with an old address a reader
+/// worked out. `names` is every tag with the name it had in the old site
+/// and the folders a tool may have kept its page in, by which a page of
+/// `built`, the old built output, is taken for a tag's:
+/// `/categories/linux/` or `/category/linux.html` for `linux` of
+/// `categories`.
 ///
-/// The page Statac makes for a tag is no file, so it can carry no
-/// `redirect_from`. A page of the author's standing at the tag's address
+/// The page Statac makes for a tag or a series is no file, so it can
+/// carry no `redirect_from`. A page of the author's standing at the tag's address
 /// could, but in a folder it brings that folder a list and a place in the
 /// navigation. So each old address gets a page of its own at the top of
 /// `content/`, holding its `permalink` and `redirect_to` and nothing
 /// else, which is in no list.
-pub fn send_on_to_tags(
+pub fn send_on_to_tags_and_series(
     out: &mut Out,
     today: Date,
-    known: &[(String, String)],
+    known: &[(Word, String, String)],
     names: &[(String, String, String, Vec<String>)],
     built: Option<&Path>,
     others: &[String],
@@ -309,7 +311,7 @@ pub fn send_on_to_tags(
         out.starter,
     );
     let mut taken: HashSet<String> = HashSet::new();
-    let mut tag_pages: Vec<(String, String)> = Vec::new();
+    let mut list_pages: Vec<(Word, String, String)> = Vec::new();
     let claims = assets
         .claims()
         .into_iter()
@@ -317,16 +319,16 @@ pub fn send_on_to_tags(
         .chain(crate::feeds::claims(&feeds))
         .chain(read.site.pictures.claims());
     for (file, named) in claims {
-        if let Named::ListPage(Word::Tag, tag) = &named {
+        if let Named::ListPage(word @ (Word::Tag | Word::Series), name) = &named {
             let address = match file.strip_suffix("index.html") {
                 Some(above) => format!("/{above}"),
                 None => format!("/{file}"),
             };
-            tag_pages.push((tag.clone(), address));
+            list_pages.push((*word, name.clone(), address));
         }
         taken.insert(crate::platform::folded(&file));
     }
-    let mut wanted: Vec<(String, String)> = known.to_vec();
+    let mut wanted: Vec<(Word, String, String)> = known.to_vec();
     for page in built.map(pages_in).unwrap_or_default() {
         if taken.contains(&crate::platform::folded(&page)) {
             continue;
@@ -366,24 +368,24 @@ pub fn send_on_to_tags(
                 Some(above) => format!("/{above}"),
                 None => format!("/{page}"),
             };
-            if !wanted.iter().any(|(_, known)| *known == address) {
-                wanted.push((tag.clone(), address));
+            if !wanted.iter().any(|(_, _, known)| *known == address) {
+                wanted.push((Word::Tag, tag.clone(), address));
             }
         }
     }
-    for (tag, old) in wanted {
+    for (word, name, old) in wanted {
         let language = others
             .iter()
             .find(|language| old.starts_with(&format!("/{language}/")));
-        let in_language = |address: &&(String, String)| match language {
-            Some(language) => address.1.starts_with(&format!("/{language}/")),
+        let in_language = |(_, _, address): &&(Word, String, String)| match language {
+            Some(language) => address.starts_with(&format!("/{language}/")),
             None => !others
                 .iter()
-                .any(|l| address.1.starts_with(&format!("/{l}/"))),
+                .any(|l| address.starts_with(&format!("/{l}/"))),
         };
-        let Some((_, to)) = tag_pages
+        let Some((_, _, to)) = list_pages
             .iter()
-            .filter(|(t, _)| *t == tag)
+            .filter(|(w, n, _)| *w == word && *n == name)
             .find(in_language)
         else {
             continue;
@@ -448,7 +450,7 @@ fn send_on(
 /// the same number, or left unanswered and counted where it has none.
 ///
 /// A list's later pages are no files, so none can carry `redirect_from`;
-/// each old address gets a page of its own, as [`send_on_to_tags`] writes.
+/// each old address gets a page of its own, as [`send_on_to_tags_and_series`] writes.
 pub fn send_on_to_later_pages(
     out: &mut Out,
     today: Date,
@@ -560,7 +562,7 @@ pub struct LaterPages {
 /// [`send_on_to_later_pages`]'s.
 ///
 /// A list's later pages are no files, nor is a tag's page, so each old
-/// address gets a page of its own, as [`send_on_to_tags`] writes.
+/// address gets a page of its own, as [`send_on_to_tags_and_series`] writes.
 pub fn send_on_to_list_pages(
     out: &mut Out,
     today: Date,
@@ -662,7 +664,7 @@ pub fn send_on_to_list_pages(
     Ok(sent_on)
 }
 
-/// What [`send_on_to_tags`] did and found.
+/// What [`send_on_to_tags_and_series`] did and found.
 #[derive(Default)]
 pub struct SentOn {
     /// Each old address now answered, with the file written for it.
