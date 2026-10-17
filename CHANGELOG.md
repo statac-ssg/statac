@@ -29,6 +29,16 @@ What changed in each release of Statac, the newest first.
   The list stood at its folder's address, sending readers on from the old
   one, and a list Hugo made with no `_index.md` was left with nothing at
   its old address.
+- A table takes an id and classes from a line of braces directly under
+  its last row, as `{#speed .comparison}`, written as a heading's are,
+  and Statac writes them on its `<table>`. Braces holding anything else,
+  or escaped as `\{`, stay a row of the table, as they were. An id given
+  twice, on a table or a heading, is told as a heading's always was.
+- A site can write tables its own way with `snippets/markdown/table.html`,
+  handed `head`, the heading row's cells, and `rows`, each a list of
+  cells, every cell with its `body` and its column's `align`, besides
+  the table's `id` and `classes`. Without the file, Statac writes a
+  table as it does now.
 
 ### Fixed
 

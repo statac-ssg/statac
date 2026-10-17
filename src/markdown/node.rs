@@ -47,7 +47,13 @@ pub enum Kind {
     /// Holds `Html` lines and the calls among them.
     HtmlBlock,
     Rule,
-    Table(Vec<Alignment>),
+    /// `id` and `classes` are the author's where a line of braces follows
+    /// the last row (`{#id .class}`).
+    Table {
+        alignments: Vec<Alignment>,
+        id: Option<String>,
+        classes: Vec<String>,
+    },
     TableRow {
         head: bool,
     },

@@ -391,7 +391,44 @@ impl<'a> Writer<'a> {
                 self.new_block();
                 self.out.push_str("<hr>");
             }
-            Kind::Table(alignments) => self.table(node, alignments),
+            Kind::Table {
+                alignments,
+                id,
+                classes,
+            } => {
+                if self.writes(Piece::Table) {
+                    let cells = |row: &Node| {
+                        let cells = (row.children.iter().enumerate())
+                            .map(|(column, cell)| {
+                                let align = aligned(alignments.get(column));
+                                PieceValue::Record(vec![
+                                    ("body", PieceValue::Html(self.inline_html(&cell.children))),
+                                    ("align", PieceValue::Text(align.to_owned())),
+                                ])
+                            })
+                            .collect();
+                        PieceValue::List(cells)
+                    };
+                    let mut head = PieceValue::List(Vec::new());
+                    let mut rows = Vec::new();
+                    for row in &node.children {
+                        match row.kind {
+                            Kind::TableRow { head: true } => head = cells(row),
+                            _ => rows.push(cells(row)),
+                        }
+                    }
+                    let values = vec![
+                        ("head", head),
+                        ("rows", PieceValue::List(rows)),
+                        ("id", PieceValue::Text(id.clone().unwrap_or_default())),
+                        ("classes", PieceValue::Text(classes.join(" "))),
+                    ];
+                    if self.pieced_block(Piece::Table, values, node) {
+                        return;
+                    }
+                }
+                self.table(node, alignments, id.as_deref(), classes);
+            }
             Kind::Call(call) => {
                 let html = self.call(call, node, Placement::Standalone);
                 if !html.trim().is_empty() {
@@ -412,9 +449,27 @@ impl<'a> Writer<'a> {
         self.close(close);
     }
 
-    fn table(&mut self, node: &Node, alignments: &[Alignment]) {
+    fn table(
+        &mut self,
+        node: &Node,
+        alignments: &[Alignment],
+        id: Option<&str>,
+        classes: &[String],
+    ) {
         self.open("<div class=\"scroll\">");
-        self.open("<table>");
+        let mut open = String::from("<table");
+        if let Some(id) = id {
+            open.push_str(" id=\"");
+            escape(id, &mut open);
+            open.push('"');
+        }
+        if !classes.is_empty() {
+            open.push_str(" class=\"");
+            escape(&classes.join(" "), &mut open);
+            open.push('"');
+        }
+        open.push('>');
+        self.open(&open);
         for row in &node.children {
             let head = matches!(row.kind, Kind::TableRow { head: true });
             if head {
@@ -423,13 +478,11 @@ impl<'a> Writer<'a> {
             self.open("<tr>");
             for (column, cell) in row.children.iter().enumerate() {
                 let tag = if head { "th" } else { "td" };
-                let style = match alignments.get(column) {
-                    Some(Alignment::Left) => " style=\"text-align: left\"",
-                    Some(Alignment::Centre) => " style=\"text-align: center\"",
-                    Some(Alignment::Right) => " style=\"text-align: right\"",
-                    _ => "",
+                let open = match aligned(alignments.get(column)) {
+                    "" => format!("<{tag}>"),
+                    align => format!("<{tag} style=\"text-align: {align}\">"),
                 };
-                self.open(&format!("<{tag}{style}>"));
+                self.open(&open);
                 self.line(&cell.children);
                 self.close(&format!("</{tag}>"));
             }
@@ -1016,6 +1069,16 @@ const PHRASING: &[&str] = &[
     "video",
     "wbr",
 ];
+
+/// The CSS keyword for a column's alignment, or empty where it has none.
+fn aligned(alignment: Option<&Alignment>) -> &'static str {
+    match alignment {
+        Some(Alignment::Left) => "left",
+        Some(Alignment::Centre) => "center",
+        Some(Alignment::Right) => "right",
+        Some(Alignment::None) | None => "",
+    }
+}
 
 /// Whether HTML opens with an element that can't stand inside a paragraph,
 /// such as `<figure>`. A custom element, its name holding a hyphen, can.

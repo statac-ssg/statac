@@ -1261,7 +1261,7 @@ fn kind_name(kind: &Kind) -> &'static str {
         Kind::CodeBlock { .. } => "code-block",
         Kind::HtmlBlock => "html-block",
         Kind::Rule => "rule",
-        Kind::Table(_) => "table",
+        Kind::Table { .. } => "table",
         Kind::TableRow { .. } => "table-row",
         Kind::TableCell => "table-cell",
         Kind::FootnoteDefinition { .. } => "footnote-definition",
@@ -1318,7 +1318,7 @@ fn written_as(node: &Node, s: &str) -> bool {
         Kind::Heading { .. } => t.starts_with('#') || s.trim_end().ends_with(['=', '-']),
         Kind::Quotation | Kind::Callout(_) => t.starts_with('>'),
         Kind::List { .. } | Kind::Item => starts_list(t),
-        Kind::DefinitionList | Kind::Term | Kind::Table(_) => !s.trim().is_empty(),
+        Kind::DefinitionList | Kind::Term | Kind::Table { .. } => !s.trim().is_empty(),
         Kind::Definition => t.starts_with(':'),
         Kind::CodeBlock { fenced: true, .. } => t.starts_with("```") || t.starts_with("~~~"),
         Kind::CodeBlock { text, .. } => s.contains(text.lines().next().unwrap_or_default()),
@@ -1657,6 +1657,100 @@ fn braces_ending_a_heading_give_its_id_and_classes() {
     }
 }
 
+/// The id, classes and rows of each table in the writing, its own or
+/// one inside a quotation or a list.
+fn tables(text: &str) -> Vec<(Option<String>, Vec<String>, usize)> {
+    let (_, document) = read_text(text);
+    assert!(document.problems.is_empty(), "{:?}", document.problems);
+    let mut found = Vec::new();
+    document.root.walk(&mut |node| {
+        if let Kind::Table { id, classes, .. } = &node.kind {
+            found.push((id.clone(), classes.clone(), node.children.len()));
+        }
+    });
+    found
+}
+
+/// A line of braces under a table's last row gives the table an id and
+/// classes, as braces ending a heading do, wherever the table stands.
+#[test]
+fn braces_under_a_tables_last_row_give_its_id_and_classes() {
+    let under = |line: &str| format!("| a | b |\n|---|---|\n| 1 | 2 |\n{line}\n");
+    let given = |id: Option<&str>, classes: &[&str]| {
+        let classes = classes.iter().map(|class| (*class).to_owned()).collect();
+        vec![(id.map(str::to_owned), classes, 2)]
+    };
+    for (line, id, classes) in [
+        ("{.wide}", None, &["wide"][..]),
+        ("{#x}", Some("x"), &[][..]),
+        ("{.wide #x .b}", Some("x"), &["wide", "b"][..]),
+        ("  {#x}\t", Some("x"), &[][..]),
+        ("{#x #y}", Some("y"), &[][..]),
+    ] {
+        assert_eq!(tables(&under(line)), given(id, classes), "{line}");
+        let crlf = under(line).replace('\n', "\r\n");
+        assert_eq!(tables(&crlf), given(id, classes), "{line}");
+    }
+    let quoted = "> | a | b |\n> |---|---|\n> | 1 | 2 |\n> {#x}\n";
+    let listed = "- An item:\n\n  | a | b |\n  |---|---|\n  | 1 | 2 |\n  {#x}\n";
+    let wrapped = "@box()\n| a | b |\n|---|---|\n| 1 | 2 |\n{#x}\n@end\n";
+    for text in [quoted, listed, wrapped] {
+        assert_eq!(tables(text), given(Some("x"), &[]), "{text}");
+    }
+    assert_eq!(
+        tables("| a | b |\n|---|---|\n{.wide}\n"),
+        [(None, vec!["wide".to_owned()], 1)]
+    );
+}
+
+/// Any other line under a table is the row GFM reads it as, and nothing
+/// is told: braces holding anything but an id and classes, braces with a
+/// row after them, braces between bars and braces escaped.
+#[test]
+fn braces_that_give_a_table_nothing_are_a_row() {
+    for (line, rows) in [
+        ("{foo}", 3),
+        ("{.a b}", 3),
+        ("{}", 3),
+        ("{#}", 3),
+        ("{.x}\n| 3 | 4 |", 4),
+        ("| {.x} |", 3),
+        ("{.x} |", 3),
+        ("\\{.x}", 3),
+        ("{.a\\.b}", 3),
+        ("{.a`b`}", 3),
+        ("{.a<b>}", 3),
+        ("{.a $b$}", 3),
+        ("{.a @x()}", 3),
+        ("{.a} {.b}", 3),
+    ] {
+        let text = format!("| a | b |\n|---|---|\n| 1 | 2 |\n{line}\n");
+        assert_eq!(tables(&text), [(None, vec![], rows)], "{line}");
+    }
+    assert_eq!(
+        html_of("| a |\n|---|\n| 1 |\n\\{.x}\n"),
+        "<div class=\"scroll\">\n  <table>\n    <thead>\n      <tr>\n        <th>a</th>\n      \
+         </tr>\n    </thead>\n    <tr>\n      <td>1</td>\n    </tr>\n    <tr>\n      \
+         <td>{.x}</td>\n    </tr>\n  </table>\n</div>"
+    );
+}
+
+/// A table's id and classes are written on it, escaped, the id first.
+#[test]
+fn a_tables_id_and_classes_are_written_on_it() {
+    assert_eq!(
+        html_of("| a |\n|:-:|\n| 1 |\n{.b\"c #x .d}\n"),
+        "<div class=\"scroll\">\n  <table id=\"x\" class=\"b&quot;c d\">\n    <thead>\n      \
+         <tr>\n        <th style=\"text-align: center\">a</th>\n      </tr>\n    </thead>\n    \
+         <tr>\n      <td style=\"text-align: center\">1</td>\n    </tr>\n  </table>\n</div>"
+    );
+    assert_eq!(
+        html_of("| a |\n|---|\n{.wide}\n"),
+        "<div class=\"scroll\">\n  <table class=\"wide\">\n    <thead>\n      <tr>\n        \
+         <th>a</th>\n      </tr>\n    </thead>\n  </table>\n</div>"
+    );
+}
+
 /// A written id something above already has is told at the second, the
 /// first heading shown; an id made from words steps aside instead.
 #[test]
@@ -1703,6 +1797,74 @@ fn an_id_written_twice_or_a_footnotes_is_told() {
         .map(|h| h.id.unwrap().to_owned())
         .collect();
     assert_eq!(ids, ["route", "route", "route-1", "note-1"]);
+}
+
+/// A table's id takes part as a heading's does: told where something above
+/// has it, and stepped aside from by an id made from a heading's words. A
+/// table holding it first is shown by its braces.
+#[test]
+fn a_tables_id_written_twice_is_told() {
+    let text = "## A {#x}\n\n| a |\n|---|\n| 1 |\n{#x}\n\n| b |\n|---|\n| 2 |\n{#y}\n\n\
+                ## Y\n\n## B {#y}\n\n| c |\n|---|\n| 3 |\n{#note-1}\n\nA claim.[^a]\n\n\
+                [^a]: Because.\n";
+    let (sources, mut document) = read_text(text);
+    give_heading_ids(&mut document, "content/post-1.md", text);
+    let told: Vec<(String, Option<String>, String, Option<String>)> = document
+        .problems
+        .iter()
+        .map(|problem| {
+            let first = match &problem.kind {
+                ProblemKind::IdUsedTwice {
+                    taken:
+                        crate::problem::Taken::Heading(first) | crate::problem::Taken::Table(first),
+                    ..
+                } => Some(sources.spelling(*first).to_owned()),
+                _ => None,
+            };
+            (
+                problem.headline(),
+                problem.suggestion(),
+                sources.spelling(problem.place.unwrap()).to_owned(),
+                first,
+            )
+        })
+        .collect();
+    let line = |headline: &str, suggestion: &str, at: &str, first: Option<&str>| {
+        (
+            headline.to_owned(),
+            Some(suggestion.to_owned()),
+            at.to_owned(),
+            first.map(str::to_owned),
+        )
+    };
+    assert_eq!(
+        told,
+        [
+            line(
+                "Id used twice: a heading above has the id `x`",
+                "Give this table an id of its own.",
+                "#x",
+                Some("## A {#x}")
+            ),
+            line(
+                "Id used twice: a table above has the id `y`",
+                "Give this heading an id of its own.",
+                "#y",
+                Some("#y")
+            ),
+            line(
+                "Id used twice: a footnote has the id `note-1`",
+                "Give this table an id of its own.",
+                "#note-1",
+                None
+            ),
+        ]
+    );
+    let ids: Vec<String> = headings(&document)
+        .into_iter()
+        .map(|h| h.id.unwrap().to_owned())
+        .collect();
+    assert_eq!(ids, ["x", "y-1", "y"]);
 }
 
 /// A note nothing points at is shown nowhere, and told at its label, with

@@ -495,9 +495,9 @@ pub(super) fn heading_brace(
     heading_line(b, opens, at, end).then_some(escaped)
 }
 
-/// Whether braces holding `inside` give a heading its id and classes:
-/// `#id`, `.class`, or both, and nothing else.
-fn is_id_and_classes(inside: &[u8]) -> bool {
+/// Whether braces holding `inside` give a heading or a table its id and
+/// classes: `#id`, `.class`, or both, and nothing else.
+pub(super) fn is_id_and_classes(inside: &[u8]) -> bool {
     let mut words = inside
         .split(u8::is_ascii_whitespace)
         .filter(|word| !word.is_empty())

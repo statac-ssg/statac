@@ -391,6 +391,32 @@ fn a_template_a_snippet_and_a_stylesheet() {
 }
 
 #[test]
+fn a_pieces_file_added_and_removed() {
+    let site = Site::new("pieces");
+    let text = "Post 1 has a table.\n\n| a |\n|---|\n| 1 |\n{#x .wide}";
+    site.write(
+        "content/post-1.md",
+        &post("Post 1", "2026-01-01", "one", text),
+    );
+    through(
+        &site,
+        &[
+            ("a table's file added", &|site| {
+                site.write(
+                    "snippets/markdown/table.html",
+                    "<table id=\"{{ id }}\">{% for row in rows %}<tr>\
+                     {% for cell in row %}<td>{{ cell.body }}</td>{% endfor %}</tr>\
+                     {% endfor %}</table>\n",
+                )
+            }),
+            ("a table's file removed", &|site| {
+                site.remove("snippets/markdown/table.html")
+            }),
+        ],
+    );
+}
+
+#[test]
 fn a_rule_narrowing_pictures_is_told_of_pages_kept_as_of_pages_built() {
     let site = Site::new("narrowed");
     let told = |round: &Round| {

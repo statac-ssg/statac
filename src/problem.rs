@@ -1226,11 +1226,13 @@ pub enum Kind {
         cells: Vec<String>,
         columns: usize,
     },
-    /// An id the author gave a heading that something before it on the
-    /// page has, so links to it land there: the id, and what has it.
+    /// An id the author gave a heading or a table that something before
+    /// it on the page has, so links to it land there: the id, what has
+    /// it, and what this id is on.
     IdUsedTwice {
         id: String,
         taken: Taken,
+        on: Braced,
     },
     /// Raw HTML in the writing, or in a value read as Markdown, that
     /// reaches past it into the page around it.
@@ -1494,13 +1496,22 @@ pub enum PictureFault {
     NotAStill,
 }
 
-/// What has an id before a heading the author gave it to.
+/// What has an id before a heading or a table the author gave it to.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Taken {
     /// Another heading, where its id is written.
     Heading(Place),
+    /// A table, where its id is written.
+    Table(Place),
     /// A footnote or its marker, whose ids Statac writes.
     Footnote,
+}
+
+/// What the author gives an id in braces.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Braced {
+    Heading,
+    Table,
 }
 
 /// What a page with no name of the author's is called by.
@@ -2809,7 +2820,7 @@ impl Kind {
                 vec![(Relation::Nested, Some(*nested))]
             }
             Kind::IdUsedTwice {
-                taken: Taken::Heading(first),
+                taken: Taken::Heading(first) | Taken::Table(first),
                 ..
             } => vec![(Relation::FirstWritten, Some(*first))],
             _ => Vec::new(),

@@ -13,6 +13,11 @@ fn every_name(piece: crate::markdown::Piece) -> (String, String) {
                         {{ note.back }} {{ note.body }}]{% endfor %}"
                 .to_owned(),
             "photo" => "photo={% if photo %}{{ photo.src }}{% endif %}".to_owned(),
+            "head" => "head={% for cell in head %}[{{ cell.body }} {{ cell.align }}]{% endfor %}"
+                .to_owned(),
+            "rows" => "rows={% for row in rows %}[{% for cell in row %}\
+                       [{{ cell.body }} {{ cell.align }}]{% endfor %}]{% endfor %}"
+                .to_owned(),
             _ => format!("{name}={{{{ {name} }}}}"),
         })
         .collect();
@@ -43,7 +48,8 @@ fn every_piece_is_written_through_its_file_handed_what_the_writing_says() {
              [In](/about/) [own](https://example.net/a) [out](https://other.org \"Other\") \
              ![A picture](a.png \"Shown\") `x < y`[^1]\n\n\
              ```rust example.rs\nlet x = 1 < 2;\n```\n\n\
-             > [!TIP]\n> Words.\n\n[^1]: A note.\n",
+             > [!TIP]\n> Words.\n\n| a | b |\n|:--|---|\n| *1* | 2 |\n{#x .wide}\n\n\
+             [^1]: A note.\n",
         ),
         BASE,
         PAGE,
@@ -69,6 +75,7 @@ fn every_piece_is_written_through_its_file_handed_what_the_writing_says() {
          <span class=\"hl-number\">2</span><span class=\"hl-punctuation\">;</span> \
          language=rust caption=example.rs>\n\
          <callout kind=tip title=Tip body=<p>Words.</p>>\n\
+         <table head=[a left][b ] rows=[[<em>1</em> left][2 ]] id=x classes=wide>\n\
          <footnotes notes=[1 1 note-1 back-1 <p>A note.</p>] label=back to the text>"
     );
     // Each piece's file is read by the page using it.
@@ -112,7 +119,7 @@ fn a_value_read_as_markdown_is_written_through_the_pieces_that_need_no_page() {
              ## A heading\n\n  \
              [In](/about/) ![A picture](a.png) `x < y`[^1]\n\n  \
              ```rust\n  let x = 1;\n  ```\n\n  \
-             > [!TIP]\n  > Words.\n\n  [^1]: A note.\n---\n",
+             > [!TIP]\n  > Words.\n\n  | a |\n  |---|\n  | 1 |\n\n  [^1]: A note.\n---\n",
         ),
         (
             "templates/page.html",
@@ -133,6 +140,7 @@ fn a_value_read_as_markdown_is_written_through_the_pieces_that_need_no_page() {
          <sup class=\"footnote\"><a href=\"#note-1\" id=\"back-1\">1</a></sup></p>\n\
          <code code=let x = 1; body=let x = 1; language=rust caption=>\n\
          <callout kind=tip title=Tip body=<p>Words.</p>>\n\
+         <table head=[a ] rows=[[1 ]] id= classes=>\n\
          <section class=\"footnotes\">\n  <ol>\n    <li id=\"note-1\">\n      \
          <p>A note. <a href=\"#back-1\" class=\"back\">\u{21a9}</a></p>\n    </li>\n  </ol>\n\
          </section>"
@@ -251,6 +259,7 @@ fn a_file_in_the_pieces_folder_that_is_no_piece_is_told_with_the_one_meant() {
         PAGE,
         ("snippets/markdown/headings.html", "<h1>{{ body }}</h1>"),
         ("snippets/markdown/notes.txt", "Notes."),
+        ("snippets/markdown/tables.html", "<table></table>"),
     ]);
     let told: Vec<_> = built
         .problems
@@ -267,6 +276,10 @@ fn a_file_in_the_pieces_folder_that_is_no_piece_is_told_with_the_one_meant() {
             (
                 "Unknown file: `snippets/markdown/notes.txt`".to_owned(),
                 None
+            ),
+            (
+                "Unknown file: `snippets/markdown/tables.html`".to_owned(),
+                Some("Did you mean `snippets/markdown/table.html`?".to_owned())
             ),
         ]
     );
@@ -401,4 +414,44 @@ fn a_footnote_marker_the_site_writes_is_left_out_of_the_excerpt() {
         ("templates/page.html", "{{ page.excerpt }}|{{ page.words }}"),
     ]);
     assert_eq!(built.html("post-1.md"), "<p>One two.</p>|3");
+}
+
+/// A table's file is handed its head and rows, each cell its body and its
+/// column's alignment, and the table's id and classes; a table it leaves
+/// out is written by no one.
+#[test]
+fn a_table_is_written_through_its_file_cell_by_cell() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\n| a | b | c |\n|:--|:-:|--:|\n| `1` | **2** | 3 |\n| 4 |\n\
+             {.wide .b #x}\n\n| d |\n|---|\n",
+        ),
+        BASE,
+        PAGE,
+        (
+            "snippets/markdown/table.html",
+            "{% if rows %}<table id=\"{{ id }}\" class=\"{{ classes }}\">\n\
+             <tr>{% for cell in head %}<th>{{ cell.body }}</th>{% endfor %}</tr>\n\
+             {% for row in rows %}<tr>{% for cell in row %}\
+             <td{% if cell.align %} style=\"text-align: {{ cell.align }}\"{% endif %}>\
+             {{ cell.body }}</td>{% endfor %}</tr>\n{% endfor %}</table>{% endif %}\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(
+        built.html("post-1.md"),
+        "<title>Post 1</title><table id=\"x\" class=\"wide b\">\n\
+         <tr><th>a</th><th>b</th><th>c</th></tr>\n\
+         <tr><td style=\"text-align: left\"><code>1</code></td>\
+         <td style=\"text-align: center\"><strong>2</strong></td>\
+         <td style=\"text-align: right\">3</td></tr>\n\
+         <tr><td style=\"text-align: left\">4</td><td style=\"text-align: center\"></td>\
+         <td style=\"text-align: right\"></td></tr>\n\
+         </table>"
+    );
 }

@@ -88,7 +88,7 @@ pub(super) fn build(
 /// Whether the writing puts `piece` on lines of its own, not among the words.
 fn stands_alone(piece: Piece) -> bool {
     match piece {
-        Piece::Heading | Piece::Code | Piece::Footnotes | Piece::Callout => true,
+        Piece::Heading | Piece::Code | Piece::Footnotes | Piece::Callout | Piece::Table => true,
         Piece::Link | Piece::Image | Piece::InlineCode | Piece::Footnote => false,
     }
 }

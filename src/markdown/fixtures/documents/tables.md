@@ -15,3 +15,10 @@ A bar that is part of the writing:
 |------|------|
 | Post 1 | one \| two |
 | Post 2 | `code` |
+
+A table given an id and classes:
+
+| Name | Count |
+|------|-------|
+| Post 1 | 1 |
+{#counts .wide}

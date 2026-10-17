@@ -7,18 +7,18 @@ use super::Document;
 use super::node::{Kind, Node};
 use super::questions::plain_text;
 use crate::content::slug::{anchor, made_slug};
-use crate::problem::{Kind as ProblemKind, Problem, Taken};
+use crate::problem::{Braced, Kind as ProblemKind, Problem, Taken};
 use crate::source::{Place, Span};
 
 /// Gives each heading without an id of the author's an id from its words,
 /// the headings in the writing first and then those in its footnotes. Two
 /// headings with the same words are told apart by a number, and none takes
-/// an id a footnote has or the author gave another heading. An id the
-/// author gave is theirs and kept as written, given twice or not, and
-/// told where an earlier heading or a footnote has it, as links to it land
-/// on that. Words that make no id, a heading of punctuation alone, are
-/// named from `path`, the file the writing is in, and the heading's place
-/// among them. `text` is that file's.
+/// an id a footnote has or the author gave another heading or a table. An
+/// id the author gave is theirs and kept as written, given twice or not,
+/// and told where an earlier heading, table or footnote has it, as links
+/// to it land on that. Words that make no id, a heading of punctuation
+/// alone, are named from `path`, the file the writing is in, and the
+/// heading's place among them. `text` is that file's.
 pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
     let mut ids = Ids::default();
     let tops = || std::iter::once(&document.root).chain(&document.notes);
@@ -37,24 +37,33 @@ pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
         });
     }
     let footnotes = ids.taken.clone();
-    let mut written: HashMap<String, Place> = HashMap::new();
+    let mut written: HashMap<String, (Place, Braced)> = HashMap::new();
     let mut twice = Vec::new();
     for top in tops() {
         top.walk(&mut |node| {
-            let Kind::Heading { id: Some(id), .. } = &node.kind else {
-                return;
+            let (id, on) = match &node.kind {
+                Kind::Heading { id: Some(id), .. } => (id, Braced::Heading),
+                Kind::Table { id: Some(id), .. } => (id, Braced::Table),
+                _ => return,
             };
             let taken = match written.get(id) {
-                Some(first) => Some(Taken::Heading(*first)),
+                Some(&(first, Braced::Heading)) => Some(Taken::Heading(first)),
+                Some(&(first, Braced::Table)) => Some(Taken::Table(first)),
                 None if footnotes.contains(id) => Some(Taken::Footnote),
                 None => None,
             };
-            written.entry(id.clone()).or_insert(node.place);
+            // A table as the first holder is shown by its braces alone.
+            let first = match on {
+                Braced::Heading => node.place,
+                Braced::Table => written_at(node.place, id, text),
+            };
+            written.entry(id.clone()).or_insert((first, on));
             ids.taken.insert(id.clone());
             if let Some(taken) = taken {
                 let kind = ProblemKind::IdUsedTwice {
                     id: id.clone(),
                     taken,
+                    on,
                 };
                 twice.push(Problem::at(kind, written_at(node.place, id, text)));
             }
@@ -91,17 +100,18 @@ pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
     }
 }
 
-/// Where a heading written at `heading` writes the id `id`: the `#id` in
-/// its braces, or the whole heading where that can't be found.
-fn written_at(heading: Place, id: &str, text: &str) -> Place {
-    let range = heading.span.range();
+/// Where a heading or table written at `braced` writes the id `id`: the
+/// `#id` in the braces ending it, or the whole of it where that can't be
+/// found.
+fn written_at(braced: Place, id: &str, text: &str) -> Place {
+    let range = braced.span.range();
     let written = format!("#{id}");
     match text[range.clone()].rfind(&written) {
         Some(at) => Place {
-            source: heading.source,
+            source: braced.source,
             span: Span::new(range.start + at, range.start + at + written.len()),
         },
-        None => heading,
+        None => braced,
     }
 }
 

@@ -315,7 +315,8 @@ fn handed_to(piece: Piece) -> Vec<(&'static str, Ty)> {
                 "body" => Ty::Html,
                 "level" | "number" => Ty::Number,
                 "outside" => Ty::Bool,
-                "notes" => Ty::list(Ty::Any),
+                "notes" | "head" => Ty::list(Ty::Any),
+                "rows" => Ty::list(Ty::list(Ty::Any)),
                 "width" | "height" | "photo" => Ty::Any,
                 _ => Ty::Text,
             };

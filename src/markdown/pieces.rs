@@ -20,10 +20,11 @@ pub enum Piece {
     /// The footnotes gathered at the foot of the page.
     Footnotes,
     Callout,
+    Table,
 }
 
 impl Piece {
-    pub const ALL: [Piece; 8] = [
+    pub const ALL: [Piece; 9] = [
         Piece::Heading,
         Piece::Link,
         Piece::Image,
@@ -32,6 +33,7 @@ impl Piece {
         Piece::Footnote,
         Piece::Footnotes,
         Piece::Callout,
+        Piece::Table,
     ];
 
     /// Its file's name in `snippets/markdown/`, without `.html`.
@@ -45,6 +47,7 @@ impl Piece {
             Piece::Footnote => "footnote",
             Piece::Footnotes => "footnotes",
             Piece::Callout => "callout",
+            Piece::Table => "table",
         }
     }
 
@@ -65,6 +68,7 @@ impl Piece {
             Piece::Footnote => &["number", "shown", "id", "note"],
             Piece::Footnotes => &["notes", "label"],
             Piece::Callout => &["kind", "title", "body"],
+            Piece::Table => &["head", "rows", "id", "classes"],
         }
     }
 
@@ -167,6 +171,7 @@ mod tests {
         assert_eq!(Piece::meant_by("codeblock"), Some(Piece::Code));
         assert_eq!(Piece::meant_by("footnotes-old"), Some(Piece::Footnotes));
         assert_eq!(Piece::meant_by("inlinecode"), Some(Piece::InlineCode));
+        assert_eq!(Piece::meant_by("tables"), Some(Piece::Table));
         assert_eq!(Piece::meant_by("blockquote"), None);
     }
 }

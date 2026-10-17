@@ -1078,7 +1078,13 @@ fn unescaped(written: &str) -> Option<(char, usize)> {
 /// them. The others need what only a page's own writing has: a heading
 /// and a footnote their ids, which a page showing many values would
 /// repeat, and a picture the folder of the file it is written in.
-const PIECES_OF_A_VALUE: [Piece; 4] = [Piece::Link, Piece::Code, Piece::InlineCode, Piece::Callout];
+const PIECES_OF_A_VALUE: [Piece; 5] = [
+    Piece::Link,
+    Piece::Code,
+    Piece::InlineCode,
+    Piece::Callout,
+    Piece::Table,
+];
 
 /// Writes the calls and pieces of a value read as Markdown: a call as the
 /// text it was written as.

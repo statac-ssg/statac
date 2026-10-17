@@ -11,7 +11,7 @@ use crate::fetch::Refusal;
 use crate::markdown;
 use crate::platform::{Alike, Unwritable};
 use crate::problem::{
-    AddressFault, ArgumentFault, Awaited, Called, CardFileFault, Chooser, Ended, Expected,
+    AddressFault, ArgumentFault, Awaited, Braced, Called, CardFileFault, Chooser, Ended, Expected,
     FontWithThem, FormatFault, Found, Held, Hint, Instead, Kind, Lack, ListFault, Maker, Missing,
     MoreAt, Named, NamedIn, Needed, NotDrawn, Opener, OptionHint, Own, PictureFault, Piece,
     PublishedAsText, Reach, RecordFault, Relation, Requirer, Rewrite, Root, SetAside, Severity,
@@ -861,8 +861,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 ),
             }
         }
-        Kind::IdUsedTwice { id, taken } => match taken {
+        Kind::IdUsedTwice { id, taken, .. } => match taken {
             Taken::Heading(_) => format!("Id used twice: a heading above has the id `{id}`"),
+            Taken::Table(_) => format!("Id used twice: a table above has the id `{id}`"),
             Taken::Footnote => format!("Id used twice: a footnote has the id `{id}`"),
         },
         Kind::UnmatchedTag { unmatched } => match unmatched {
@@ -2834,7 +2835,13 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
             .into(),
         ),
-        Kind::IdUsedTwice { .. } => Some("Give this heading an id of its own.".into()),
+        Kind::IdUsedTwice { on, .. } => Some(
+            match on {
+                Braced::Heading => "Give this heading an id of its own.",
+                Braced::Table => "Give this table an id of its own.",
+            }
+            .into(),
+        ),
         Kind::UnmatchedTag { unmatched } => Some(match unmatched {
             Unmatched::NeverClosed(name) => format!("Close it with `</{name}>` where it should end."),
             Unmatched::CommentNeverClosed => "Close it with `-->`.".into(),
@@ -4808,6 +4815,7 @@ mod tests {
                         source: crate::source::SourceId::from_index(0),
                         span: crate::source::Span::new(0, 1),
                     }),
+                    on: Braced::Heading,
                 },
                 "Id used twice: a heading above has the id `rust`",
                 Some("Give this heading an id of its own."),
@@ -4816,9 +4824,22 @@ mod tests {
                 Kind::IdUsedTwice {
                     id: "note-1".into(),
                     taken: Taken::Footnote,
+                    on: Braced::Heading,
                 },
                 "Id used twice: a footnote has the id `note-1`",
                 Some("Give this heading an id of its own."),
+            ),
+            (
+                Kind::IdUsedTwice {
+                    id: "rust".into(),
+                    taken: Taken::Table(crate::source::Place {
+                        source: crate::source::SourceId::from_index(0),
+                        span: crate::source::Span::new(0, 1),
+                    }),
+                    on: Braced::Table,
+                },
+                "Id used twice: a table above has the id `rust`",
+                Some("Give this table an id of its own."),
             ),
             (
                 Kind::UnmatchedTag {

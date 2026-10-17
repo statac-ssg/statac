@@ -12,7 +12,7 @@ use pulldown_cmark::{
 
 use super::call::{IN_SITE, Within};
 use super::html::{escape, escape_href};
-use super::mask::{Masked, OPEN, Piece, TokenKind, Wrapping};
+use super::mask::{self, Masked, OPEN, Piece, TokenKind, Wrapping};
 use super::node::{Alignment, CalloutKind, Kind, Node};
 use super::typography::SETS;
 use super::unmatched::{Block, Elements, Told};
@@ -605,8 +605,8 @@ impl<'a> Builder<'a> {
             Tag::DefinitionList => Kind::DefinitionList,
             Tag::DefinitionListTitle => Kind::Term,
             Tag::DefinitionListDefinition => Kind::Definition,
-            Tag::Table(alignments) => Kind::Table(
-                alignments
+            Tag::Table(alignments) => Kind::Table {
+                alignments: alignments
                     .iter()
                     .map(|a| match a {
                         Aligned::None => Alignment::None,
@@ -615,7 +615,9 @@ impl<'a> Builder<'a> {
                         Aligned::Right => Alignment::Right,
                     })
                     .collect(),
-            ),
+                id: None,
+                classes: Vec::new(),
+            },
             Tag::TableHead => Kind::TableRow { head: true },
             Tag::TableRow => Kind::TableRow { head: false },
             Tag::TableCell => Kind::TableCell,
@@ -705,11 +707,14 @@ impl<'a> Builder<'a> {
     fn close(&mut self) {
         let mut node = self.stack.pop().expect("an open node");
         self.depth -= usize::from(is_level(&node));
-        if let (Kind::TableRow { .. }, Some(Kind::Table(columns))) =
+        if let (Kind::TableRow { .. }, Some(Kind::Table { alignments, .. })) =
             (&node.kind, self.stack.last().map(|table| &table.kind))
-            && let Some(problem) = self.cells_past(columns.len())
+            && let Some(problem) = self.cells_past(alignments.len())
         {
             self.problems.push(problem);
+        }
+        if matches!(node.kind, Kind::Table { .. }) {
+            self.table_braces(&mut node);
         }
         if !node.is_inline() && !matches!(node.kind, Kind::Paragraph { tight: true }) {
             let mut end = self.trimmed(node.place.span, &['\n', '\r', ' ', '\t']);
@@ -751,6 +756,44 @@ impl<'a> Builder<'a> {
             return;
         }
         self.settle(node);
+    }
+
+    /// Takes the table's last row where it is a line of braces giving the
+    /// table an id and classes, as braces ending a heading do. GFM reads
+    /// such a line as one more row, its other cells filled.
+    fn table_braces(&self, table: &mut Node) {
+        let Some(row) = table.children.last() else {
+            return;
+        };
+        let line = self.text[row.place.span.range()].trim_matches([' ', '\t', '\r', '\n']);
+        let Some(inside) = line.strip_prefix('{').and_then(|l| l.strip_suffix('}')) else {
+            return;
+        };
+        // The line must read as the text typed, so nothing on it is
+        // markup, a call or an escape.
+        let as_typed = |cell: &Node| match cell.children.as_slice() {
+            [text] => matches!(&text.kind, Kind::Text(text) if text == line),
+            _ => false,
+        };
+        if !matches!(row.kind, Kind::TableRow { head: false })
+            || inside.contains(['{', '}', '<', '>', '\\', '|'])
+            || !mask::is_id_and_classes(inside.as_bytes())
+            || !row.children.first().is_some_and(as_typed)
+        {
+            return;
+        }
+        let (mut given_id, mut given_classes) = (None, Vec::new());
+        for word in inside.split_ascii_whitespace() {
+            match word.split_at(1) {
+                ("#", id) => given_id = Some(id.to_owned()),
+                (_, class) => given_classes.push(class.to_owned()),
+            }
+        }
+        table.children.pop();
+        if let Kind::Table { id, classes, .. } = &mut table.kind {
+            *id = given_id;
+            *classes = given_classes;
+        }
     }
 
     /// The cells of the row just read past the table's `columns`, which the
