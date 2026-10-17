@@ -764,10 +764,14 @@ impl Taken<'_> {
     fn list_own(&self, id: ListId) -> u64 {
         *self.prints.lists_own[id.index()].get_or_init(|| {
             let renderer = &self.reading.renderer;
-            let list = renderer.site().lists.get(id);
+            let site = renderer.site();
+            let list = site.lists.get(id);
             let feed = renderer.feed_of(id).map(|feed| &feed.address);
+            let page = list
+                .page
+                .map(|page| (self.named(&[page]), site.pages.get(page).lands()));
             Print::default()
-                .with(list.page.map(|page| self.named(&[page])))
+                .with(page)
                 .shown(&(feed, list.order))
                 .done()
         })

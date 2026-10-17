@@ -1156,6 +1156,7 @@ impl ListValue {
                 Some(Pages::value(shared, Which::All(self.id)))
             }
             "pager" => {
+                frame::read(own);
                 read_whole(self.id);
                 Some(match list.page {
                     Some(page) if shared.site.pages.get(page).lands() => {

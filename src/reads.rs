@@ -40,7 +40,8 @@ pub enum Key {
     /// Every member of a list, dated or not.
     Members(ListId),
     /// What a list is known by but for its members: the page that speaks
-    /// for it, its feed's address and its order.
+    /// for it and whether that is published, its feed's address and its
+    /// order.
     List(ListId),
     /// Which pages there are, where each is published and in which
     /// language, a list's later pages among them.

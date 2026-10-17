@@ -2696,3 +2696,29 @@ fn a_tag_or_a_series_found_by_a_spelling_follows_the_spellings_there_are() {
         ],
     );
 }
+
+#[test]
+fn a_folders_pager_follows_whether_its_page_is_published() {
+    let site = Site::new("pager");
+    let shown = "{{ page.folder.pager | length }}\n";
+    for template in ["home", "folder", "page"] {
+        site.write(&format!("templates/{template}.html"), shown);
+    }
+    let folder = |more: &str| format!("---\ntitle: Notes\n{more}---\n");
+    site.write("content/notes/index.md", &folder(""));
+    site.write(
+        "content/notes/note-1.md",
+        "---\ntitle: Note 1\n---\nA note.\n",
+    );
+    through(
+        &site,
+        &[
+            ("the folder's page publishing nothing", &|site| {
+                site.write("content/notes/index.md", &folder("index_page: false\n"))
+            }),
+            ("published again", &|site| {
+                site.write("content/notes/index.md", &folder(""))
+            }),
+        ],
+    );
+}
