@@ -1,6 +1,7 @@
 //! Building pages with the site's templates and snippets.
 //!
-//! The engine underneath is MiniJinja, unforked. Three things close the
+//! The engine underneath is MiniJinja, changed only to hand Statac each
+//! body it holds back to lay out (`indent`). Three things close the
 //! gaps where it would publish a missing value as `none`, `null`,
 //! `[undefined]` or nothing: semi-strict undefined; every filter, test,
 //! function and the formatter registered again behind a guard (`guard`);
@@ -32,6 +33,7 @@ mod walks;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
+use std::sync::Arc;
 
 use minijinja::{AutoEscape, Environment};
 
@@ -65,7 +67,7 @@ pub struct Templates {
     /// The cards the site describes, their texts among the files.
     cards: card::Cards,
     /// Where the files' lines are written.
-    landings: landing::Landings,
+    landings: Arc<landing::Landings>,
     /// How many of the engine's steps building one output may take.
     steps: u64,
     /// How many pages of lists of the whole site the outputs running one
@@ -98,8 +100,8 @@ impl Templates {
     }
 
     /// Where the file named `name` writes its lines when rendered.
-    fn placing(&self, name: &str) -> landing::Placing<'_> {
-        self.landings.placing(self.by_name.get(name).copied())
+    fn placing(&self, name: &str) -> landing::Place {
+        landing::Place::new(&self.landings, self.by_name.get(name).copied())
     }
 
     /// The file whose text, as the engine holds it, has `address` in
@@ -276,6 +278,7 @@ pub fn read(
     env.set_syntax(check::reading());
     guard::install(&mut env);
     own::install(&mut env);
+    env.set_held(indent::held);
     env.set_auto_escape_callback(escaping);
     env.set_path_join_callback(|name, _| files::named(name).into());
     let mut by_name = HashMap::new();
@@ -317,11 +320,11 @@ pub fn read(
         unusable,
         extends,
         cards,
-        landings: landing::Landings::default(),
+        landings: Arc::default(),
         steps,
         many_walked: lowered_walked(root).unwrap_or(walks::MANY),
     };
-    templates.landings = landings(&templates, &facts, sources);
+    templates.landings = Arc::new(landings(&templates, &facts, sources));
     (templates, problems)
 }
 

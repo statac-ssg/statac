@@ -1,3 +1,4 @@
+// Changed from MiniJinja 3.0.1 for Statac: `Held` is exported.
 //! <div align=center>
 //!   <img src="https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo.png" alt="" width=320>
 //!   <p><strong>MiniJinja: a powerful template engine for Rust with minimal dependencies</strong></p>
@@ -238,7 +239,7 @@ pub use self::defaults::{default_auto_escape_callback, escape_formatter};
 pub use self::environment::Environment;
 pub use self::error::{Error, ErrorKind};
 pub use self::expression::Expression;
-pub use self::output::Output;
+pub use self::output::{Held, Output};
 pub use self::template::{Captured, Template};
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 

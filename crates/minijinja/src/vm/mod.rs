@@ -1,3 +1,4 @@
+// Changed from MiniJinja 3.0.1 for Statac: a capture is begun with the environment, which may supply its writer.
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 #[cfg(feature = "macros")]
@@ -282,7 +283,7 @@ impl<'env> Executor<'env> {
                 // to.
                 next_loop_recursion_jump = Some((pc + 1, $capture));
                 if $capture {
-                    out.begin_capture(CaptureMode::Capture);
+                    out.begin_capture(CaptureMode::Capture, state.env());
                 }
                 pc = jump_target;
                 continue;
@@ -704,7 +705,7 @@ impl<'env> Executor<'env> {
                     state.auto_escape = auto_escape_stack.pop().unwrap();
                 }
                 Instruction::BeginCapture(mode) => {
-                    out.begin_capture(*mode);
+                    out.begin_capture(*mode, state.env());
                 }
                 Instruction::EndCapture => {
                     stack.push(out.end_capture(&state.auto_escape));
@@ -846,7 +847,7 @@ impl<'env> Executor<'env> {
                         ));
                     }
                     parent_instructions = Some(ctx_ok!(Self::load_blocks(a, state)));
-                    out.begin_capture(CaptureMode::Discard);
+                    out.begin_capture(CaptureMode::Discard, state.env());
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::Include(ignore_missing) => {
@@ -1026,7 +1027,7 @@ impl<'env> Executor<'env> {
             return Err(err);
         }
         if capture {
-            out.begin_capture(CaptureMode::Capture);
+            out.begin_capture(CaptureMode::Capture, state.env());
         }
 
         let instructions = state.blocks.get(name).unwrap().instructions();

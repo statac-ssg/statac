@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 use std::ops::Range;
+use std::sync::Arc;
 
 use super::dedent::{Facts, Site};
 
@@ -20,7 +21,9 @@ use super::dedent::{Facts, Site};
 pub(super) struct Landings {
     lines: Vec<Landing>,
     calls: Vec<Deeper>,
-    chains: HashMap<usize, Vec<(usize, Box<str>)>>,
+    chains: Vec<Vec<(usize, Box<str>)>>,
+    /// Which of `chains` each template's is, by its file.
+    chained: HashMap<usize, usize>,
 }
 
 /// A line of a template, by where in memory it starts.
@@ -47,11 +50,13 @@ pub(super) struct Landing {
     /// Its indent is one the engine is told to keep, before a tag.
     pub(super) kept: bool,
     /// Where in memory its line ending is, where the engine is told to
-    /// keep it, after a tag.
+    /// keep it, after a tag, to be left out where nothing has been written
+    /// for it to end.
     pub(super) ending: Option<usize>,
 }
 
 /// A recursive loop's call on a line of its own.
+#[derive(Clone)]
 pub(super) struct Deeper {
     /// Where in memory the call starts and ends.
     pub(super) at: usize,
@@ -138,17 +143,45 @@ impl Landings {
         moved.sort_by_key(|(at, _)| *at);
         moved.dedup_by_key(|(at, _)| *at);
         if !moved.is_empty() {
-            self.chains.insert(first, moved);
+            self.chained.insert(first, self.chains.len());
+            self.chains.push(moved);
+        }
+    }
+}
+
+/// Where the lines of one render are written, as long as it runs.
+#[derive(Clone)]
+pub(super) struct Place {
+    landings: Arc<Landings>,
+    chain: Option<usize>,
+}
+
+impl Place {
+    /// Where the template `file` writes its lines when rendered.
+    pub(super) fn new(landings: &Arc<Landings>, file: Option<usize>) -> Self {
+        Self {
+            landings: Arc::clone(landings),
+            chain: file.and_then(|file| landings.chained.get(&file).copied()),
         }
     }
 
-    /// Where the template `file` writes its lines when rendered.
-    pub(super) fn placing(&self, file: Option<usize>) -> Placing<'_> {
+    /// The same, with no block's body written in another template's place.
+    pub(super) fn unchained(&self) -> Self {
+        Self {
+            landings: Arc::clone(&self.landings),
+            chain: None,
+        }
+    }
+
+    /// Where each line is written.
+    pub(super) fn placing(&self) -> Placing<'_> {
+        let landings = &*self.landings;
         Placing {
-            landings: self,
-            chain: file
-                .and_then(|file| self.chains.get(&file))
-                .map_or(&[], Vec::as_slice),
+            lines: &landings.lines,
+            calls: &landings.calls,
+            chain: self
+                .chain
+                .map_or(&[], |chain| landings.chains[chain].as_slice()),
         }
     }
 }
@@ -156,18 +189,26 @@ impl Landings {
 /// Where the lines of one render are written.
 #[derive(Clone, Copy)]
 pub(super) struct Placing<'a> {
-    landings: &'a Landings,
+    lines: &'a [Landing],
+    calls: &'a [Deeper],
     chain: &'a [(usize, Box<str>)],
 }
 
 impl<'a> Placing<'a> {
+    /// Where nothing is known of any line.
+    pub(super) const NONE: Placing<'static> = Placing {
+        lines: &[],
+        calls: &[],
+        chain: &[],
+    };
+
     pub(super) fn is_empty(&self) -> bool {
-        self.landings.lines.is_empty()
+        self.lines.is_empty()
     }
 
     /// The lines starting in memory within `range`, in order.
     pub(super) fn starting(&self, range: Range<usize>) -> &'a [Landing] {
-        let lines = &self.landings.lines;
+        let lines = self.lines;
         let first = lines.partition_point(|line| line.at < range.start);
         let after = lines.partition_point(|line| line.at < range.end);
         &lines[first..after]
@@ -177,7 +218,7 @@ impl<'a> Placing<'a> {
     /// having been written up to `at` in memory: the first line from there
     /// that holds more than tags, where it opens with a value.
     pub(super) fn valued(&self, at: usize) -> Option<&'a Landing> {
-        let lines = &self.landings.lines;
+        let lines = self.lines;
         let first = lines.partition_point(|line| line.at < at);
         if lines.get(first)?.at != at {
             return None;
@@ -198,7 +239,7 @@ impl<'a> Placing<'a> {
 
     /// The line holding the byte at `at` in memory.
     pub(super) fn holding(&self, at: usize) -> Option<&'a Landing> {
-        let lines = &self.landings.lines;
+        let lines = self.lines;
         let after = lines.partition_point(|line| line.at <= at);
         let line = lines[..after].last()?;
         (at < line.at + line.len).then_some(line)
@@ -214,7 +255,7 @@ impl<'a> Placing<'a> {
 
     /// The recursive loop's call starting at `at` in memory.
     pub(super) fn call(&self, at: usize) -> Option<&'a Deeper> {
-        let calls = &self.landings.calls;
+        let calls = self.calls;
         calls
             .binary_search_by_key(&at, |call| call.at)
             .ok()

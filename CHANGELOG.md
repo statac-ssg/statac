@@ -27,6 +27,14 @@ What changed in each release of Statac, the newest first.
   the template in place of the line's, and a call's started at the
   left. Where the tag is at the left, or shares its line, what it writes
   is written as typed.
+- A value written alone on an indented line inside the body of a
+  `macro`, a `{% call %}`, a `{% filter %}` or a `{% set %}` block, such
+  as `  {{ card() }}` or `  {{ caller() }}`, lines up at that line's
+  indent as it does elsewhere, with no blank line added after it. A
+  body written by `caller()` gives up the indent its lines have under
+  the `{% call %}` tag. A line in such a body that comes to nothing, as
+  `  {% if x %}<p>b</p>{% endif %}` where `x` is false, is left out, where
+  it left a line of spaces.
 
 ## 0.4.0 - 2026-10-17
 

@@ -1,6 +1,8 @@
+// Changed from MiniJinja 3.0.1 for Statac: a held-back body may be written into a writer the environment supplies.
 use std::ptr::addr_of_mut;
 use std::{fmt, io};
 
+use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::utils::AutoEscape;
 use crate::value::Value;
@@ -14,6 +16,53 @@ pub enum CaptureMode {
     Discard,
 }
 
+/// A writer a held-back body is written into in place of a string.
+///
+/// A held-back body is template output the engine renders before it is
+/// written, if at all: the body of a `{% set %}` block, a `{% filter %}`
+/// block, a macro (and so of a `{% call %}` block), a block rendered by
+/// `super()`, and a recursive loop's level used as a value.  The writer is
+/// made by the function given to
+/// [`set_held`](crate::Environment::set_held).
+pub trait Held: fmt::Write {
+    /// Gives the text the body's value is made from.
+    fn finish(self: Box<Self>) -> String;
+}
+
+/// Where a held-back body is written.
+pub(crate) enum Capture {
+    Text(String),
+    Held(Box<dyn Held>),
+}
+
+impl Capture {
+    /// Creates the writer `env` gives a held-back body.
+    pub(crate) fn new(env: &Environment) -> Self {
+        match env.held() {
+            Some(held) => Capture::Held(held),
+            None => Capture::Text(String::new()),
+        }
+    }
+
+    /// Gives the text written.
+    pub(crate) fn finish(self) -> String {
+        match self {
+            Capture::Text(text) => text,
+            Capture::Held(held) => held.finish(),
+        }
+    }
+}
+
+impl fmt::Write for Capture {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        match self {
+            Capture::Text(text) => text.write_str(s),
+            Capture::Held(held) => held.write_str(s),
+        }
+    }
+}
+
 /// An abstraction over [`fmt::Write`](std::fmt::Write) for the rendering.
 ///
 /// This is a utility type used in the engine which can be written into like one
@@ -22,7 +71,7 @@ pub enum CaptureMode {
 pub struct Output<'a> {
     w: *mut (dyn fmt::Write + 'a),
     target: *mut (dyn fmt::Write + 'a),
-    capture_stack: Vec<Option<String>>,
+    capture_stack: Vec<Option<Capture>>,
 }
 
 impl<'a> Output<'a> {
@@ -47,10 +96,10 @@ impl<'a> Output<'a> {
         }
     }
 
-    /// Begins capturing into a string or discard.
-    pub(crate) fn begin_capture(&mut self, mode: CaptureMode) {
+    /// Begins capturing into a string, or the writer `env` gives, or discard.
+    pub(crate) fn begin_capture(&mut self, mode: CaptureMode, env: &Environment) {
         self.capture_stack.push(match mode {
-            CaptureMode::Capture => Some(String::new()),
+            CaptureMode::Capture => Some(Capture::new(env)),
             #[cfg(feature = "multi_template")]
             CaptureMode::Discard => None,
         });
@@ -60,6 +109,7 @@ impl<'a> Output<'a> {
     /// Ends capturing and returns the captured string as value.
     pub(crate) fn end_capture(&mut self, auto_escape: &AutoEscape) -> Value {
         let rv = if let Some(captured) = self.capture_stack.pop().unwrap() {
+            let captured = captured.finish();
             if !matches!(auto_escape, AutoEscape::None) {
                 Value::from_safe_string(captured)
             } else {
@@ -182,5 +232,54 @@ impl<W: io::Write> fmt::Write for WriteWrapper<W> {
                 self.err = Some(e);
                 fmt::Error
             })
+    }
+}
+
+#[cfg(all(test, feature = "macros"))]
+mod tests {
+    use std::fmt;
+    use std::sync::{Arc, Mutex};
+
+    use super::Held;
+    use crate::Environment;
+
+    /// Notes each body it is written and gives it back in capitals.
+    struct Shouting {
+        text: String,
+        seen: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl fmt::Write for Shouting {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            self.text.push_str(s);
+            Ok(())
+        }
+    }
+
+    impl Held for Shouting {
+        fn finish(self: Box<Self>) -> String {
+            self.seen.lock().unwrap().push(self.text.clone());
+            self.text.to_uppercase()
+        }
+    }
+
+    #[test]
+    fn test_held_writes_set_blocks_and_macro_bodies() {
+        let source = "{% macro m(a) %}<p>{{ a }}</p>{% endmacro %}\
+                      {% set s %}<i>{{ m('x') }}</i>{% endset %}[{{ s }}]";
+        let env = Environment::new();
+        assert_eq!(env.render_str(source, ()).unwrap(), "[<i><p>x</p></i>]");
+
+        let mut env = Environment::new();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let held = seen.clone();
+        env.set_held(move || {
+            Box::new(Shouting {
+                text: String::new(),
+                seen: held.clone(),
+            })
+        });
+        assert_eq!(env.render_str(source, ()).unwrap(), "[<I><P>X</P></I>]");
+        assert_eq!(*seen.lock().unwrap(), ["<p>x</p>", "<i><P>X</P></i>"]);
     }
 }

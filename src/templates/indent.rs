@@ -6,16 +6,18 @@
 //!
 //! The engine can't say what column a value is printed at, so each render
 //! writes to a [`Sink`] that keeps account of the line being written, and
-//! the formatter asks it.
+//! the formatter asks it. A body the engine holds back, such as a macro's,
+//! is written to a sink of its own, laid out as the template rendering it
+//! lays out its own lines, and is then a value written whole.
 
 use std::cell::RefCell;
-use std::io;
+use std::{fmt, io};
 
-use minijinja::{Captured, Error, Output, Template, Value};
+use minijinja::{Captured, Error, Held, Output, Template, Value};
 
-use super::landing::{Deeper, Landing, Placing};
+use super::landing::{Deeper, Landing, Place, Placing};
 
-/// The line a template is writing.
+/// The line a template, or a body the engine holds back, is writing.
 struct Line {
     /// Where it starts in the output.
     start: usize,
@@ -37,11 +39,12 @@ struct Line {
 }
 
 thread_local! {
-    /// One for each template being rendered, a snippet's above its
-    /// caller's. Output the engine holds back, such as a `{% set %}`
-    /// block's, never reaches a sink, so inside one the line is stale: it
-    /// is nearly always an empty one, which changes nothing.
+    /// One for each sink being written, the innermost last: a snippet's
+    /// above its caller's, a body's above the template's rendering it.
     static LINES: RefCell<Vec<Line>> = const { RefCell::new(Vec::new()) };
+    /// Where the lines of each template being rendered are written, a
+    /// snippet's above its caller's.
+    static PLACES: RefCell<Vec<Place>> = const { RefCell::new(Vec::new()) };
 }
 
 /// A run of what a template wrote that wasn't a value's: where it lies in
@@ -84,18 +87,25 @@ impl Own {
     }
 }
 
-/// What one template writes, and where its lines are written.
-struct Sink<'p> {
+/// What one template writes, or one body the engine holds back as it
+/// renders one, and where its lines are written: nowhere in particular
+/// where nothing is known of them.
+struct Sink {
+    place: Option<Place>,
+    layout: Layout,
+}
+
+/// What a sink has written, and the account it keeps of it.
+struct Layout {
     out: Vec<u8>,
     own: Own,
-    placing: Placing<'p>,
     /// Whether what it writes starts a line where it is put.
     begins: bool,
     /// Where in memory the template's own text last written ends, until
     /// anything else is written.
     last: Option<usize>,
     /// The recursive loops' calls being run, the deepest last.
-    deeper: Vec<&'p Deeper>,
+    deeper: Vec<Deeper>,
     /// How long the output was as the last line whose line ending is kept
     /// began to write what it holds, until a kept line ending is reached.
     /// Where that line's own is left out, as in a branch not taken, the
@@ -103,8 +113,8 @@ struct Sink<'p> {
     began: Option<usize>,
 }
 
-impl<'p> Sink<'p> {
-    fn new(placing: Placing<'p>, begins: bool) -> Self {
+impl Sink {
+    fn new(place: Option<Place>, begins: bool) -> Self {
         LINES.with_borrow_mut(|lines| {
             lines.push(Line {
                 start: 0,
@@ -117,24 +127,33 @@ impl<'p> Sink<'p> {
             });
         });
         Self {
-            out: Vec::new(),
-            own: Own::default(),
-            placing,
-            begins,
-            last: None,
-            deeper: Vec::new(),
-            began: None,
+            place,
+            layout: Layout {
+                out: Vec::new(),
+                own: Own::default(),
+                begins,
+                last: None,
+                deeper: Vec::new(),
+                began: None,
+            },
         }
     }
 
+    fn write(&mut self, text: &[u8]) {
+        let placing = self.place.as_ref().map_or(Placing::NONE, Place::placing);
+        self.layout.write(placing, text);
+    }
+}
+
+impl Layout {
     /// Writes the template's own text, each line that starts a line of the
     /// output at the indent [`Placing`] gives it. A line that came to
     /// nothing, spaces before its line ending and no more, isn't written.
-    fn own(&mut self, mut text: &[u8]) {
+    fn own(&mut self, placing: Placing<'_>, mut text: &[u8]) {
         let mut from = text.as_ptr() as usize;
         // A kept line ending is not written where nothing has been written
         // for it to end.
-        if let Some(line) = self.placing.holding(from)
+        if let Some(line) = placing.holding(from)
             && line.ending == Some(from)
         {
             let wrote = self.began.take().is_some_and(|len| self.out.len() > len);
@@ -145,10 +164,10 @@ impl<'p> Sink<'p> {
             }
         }
         let mut done = 0;
-        for line in self.placing.starting(from..from + text.len()) {
+        for line in placing.starting(from..from + text.len()) {
             let at = line.at - from;
             let starts = if at > 0 {
-                self.ending(&text[done..at]);
+                self.ending(placing, &text[done..at]);
                 done = at;
                 true
             } else {
@@ -166,12 +185,12 @@ impl<'p> Sink<'p> {
                 }
                 continue;
             }
-            if line.movable && self.land(line, Some(&text[at..end])) {
+            if line.movable && self.land(placing, line, Some(&text[at..end])) {
                 done = end;
             }
         }
         if done < text.len() {
-            self.ending(&text[done..]);
+            self.ending(placing, &text[done..]);
         }
     }
 
@@ -179,8 +198,8 @@ impl<'p> Sink<'p> {
     /// [`Placing`] and the recursive loops being run say, in place of any
     /// spaces already on it. `typed` is the indent as the template has it,
     /// where it is still to write. Whether anything was written.
-    fn land(&mut self, line: &Landing, typed: Option<&[u8]>) -> bool {
-        let written = self.placing.written(line);
+    fn land(&mut self, placing: Placing<'_>, line: &Landing, typed: Option<&[u8]>) -> bool {
+        let written = placing.written(line);
         let deeper: String = self.deeper.iter().map(|call| &*call.by).collect();
         let dangling =
             LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.start < self.out.len()));
@@ -204,12 +223,11 @@ impl<'p> Sink<'p> {
 
     /// Writes `text`, which ends a line of the template if it ends with a
     /// line ending, unless the line came to nothing.
-    fn ending(&mut self, text: &[u8]) {
+    fn ending(&mut self, placing: Placing<'_>, text: &[u8]) {
         let nothing = text.ends_with(b"\n")
             && text.iter().all(u8::is_ascii_whitespace)
             && self.open()
-            && self
-                .placing
+            && placing
                 .holding(text.as_ptr() as usize + text.len() - 1)
                 .is_some_and(|line| line.holds);
         if nothing {
@@ -247,45 +265,75 @@ impl<'p> Sink<'p> {
     /// template's own text written after it. `own` is where in memory the
     /// text now written is, where it is the template's, and `last` where its
     /// own text written before ends.
-    fn track(&mut self, own: Option<usize>, last: Option<usize>) {
+    fn track(&mut self, placing: Placing<'_>, own: Option<usize>, last: Option<usize>) {
         if let Some(own) = own
             && self.deeper.last().is_some_and(|call| call.end == own)
         {
             self.deeper.pop();
             return;
         }
-        if let Some(call) = last.and_then(|last| self.placing.call(last))
+        if let Some(call) = last.and_then(|last| placing.call(last))
             && own != Some(call.end)
         {
-            self.deeper.push(call);
+            self.deeper.push(call.clone());
         }
     }
 }
 
-impl Drop for Sink<'_> {
+impl Drop for Sink {
     fn drop(&mut self) {
         LINES.with_borrow_mut(Vec::pop);
     }
 }
 
-impl io::Write for Sink<'_> {
+impl io::Write for Sink {
     fn write(&mut self, text: &[u8]) -> io::Result<usize> {
+        Sink::write(self, text);
+        Ok(text.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// A body the engine holds back, such as a macro's or a `{% set %}`
+/// block's, written as the template rendering it writes its own lines.
+struct Body(Sink);
+
+impl fmt::Write for Body {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        self.0.write(text.as_bytes());
+        Ok(())
+    }
+}
+
+impl Held for Body {
+    fn finish(mut self: Box<Self>) -> String {
+        let out = std::mem::take(&mut self.0.layout.out);
+        String::from_utf8(out).expect("templates write text")
+    }
+}
+
+impl Layout {
+    /// Writes `text`, a value's or the template's own.
+    fn write(&mut self, placing: Placing<'_>, text: &[u8]) {
         if text.is_empty() {
-            return Ok(0);
+            return;
         }
         let value = LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.value));
         let from = text.as_ptr() as usize;
         let last = self.last.take();
-        self.track((!value).then_some(from), last);
-        if value || self.placing.is_empty() {
+        self.track(placing, (!value).then_some(from), last);
+        if value || placing.is_empty() {
             self.put(text);
         } else {
             let len = self.out.len();
-            self.own(text);
+            self.own(placing, text);
             let end = from + text.len();
             // Text reaching past the indent of a line whose line ending is
             // kept is what the line holds being written.
-            if let Some(line) = self.placing.holding(end - 1)
+            if let Some(line) = placing.holding(end - 1)
                 && line.ending.is_some_and(|ending| end <= ending)
                 && end > line.at + line.indent
             {
@@ -294,22 +342,22 @@ impl io::Write for Sink<'_> {
             // A value opening a line of the template with no indent before
             // it is placed by that line, before it is written, so that each
             // of its lines takes the indent.
-            if let Some(line) = self.placing.valued(end)
+            if let Some(line) = placing.valued(end)
                 && line.indent == 0
                 && line.movable
                 && (self.begins || !self.out.is_empty())
                 && self.open()
             {
-                self.land(line, None);
+                self.land(placing, line, None);
             }
-            if let Some(line) = self.placing.holding(end)
+            if let Some(line) = placing.holding(end)
                 && line.ending.is_some()
                 && line.at + line.indent == end
             {
                 self.began = Some(self.out.len());
             }
             // A body held back, called from a line indented as typed.
-            let placed = self.placing.holding(end).is_some_and(|line| {
+            let placed = placing.holding(end).is_some_and(|line| {
                 line.held && line.movable && line.indent > 0 && line.at + line.indent == end
             });
             if placed && self.open() {
@@ -323,15 +371,8 @@ impl io::Write for Sink<'_> {
         if !value {
             self.last = Some(from + text.len());
         }
-        Ok(text.len())
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-impl Sink<'_> {
     fn put(&mut self, mut text: &[u8]) {
         LINES.with_borrow_mut(|lines| {
             let line = lines.last_mut().expect("a sink has its line");
@@ -409,10 +450,10 @@ fn blank(text: &[u8]) -> usize {
 pub(super) fn render<'source>(
     template: &Template<'_, 'source>,
     context: impl Into<Value>,
-    placing: Placing<'_>,
+    place: Place,
     begins: bool,
 ) -> Result<(Captured<'source>, String), Error> {
-    render_placed(template, context, placing, begins).map(|(captured, text, _)| (captured, text))
+    render_placed(template, context, place, begins).map(|(captured, text, _)| (captured, text))
 }
 
 /// Renders `template` as [`render`] does, giving as well where what it
@@ -420,17 +461,45 @@ pub(super) fn render<'source>(
 pub(super) fn render_placed<'source>(
     template: &Template<'_, 'source>,
     context: impl Into<Value>,
-    placing: Placing<'_>,
+    place: Place,
     begins: bool,
 ) -> Result<(Captured<'source>, String, Own), Error> {
-    let mut sink = Sink::new(placing, begins);
+    let _rendering = Rendering::new(place.clone());
+    let mut sink = Sink::new(Some(place), begins);
     let captured = template.render_captured_to(context, &mut sink)?;
-    let text = String::from_utf8(std::mem::take(&mut sink.out)).expect("templates write text");
-    Ok((captured, text, std::mem::take(&mut sink.own)))
+    let layout = &mut sink.layout;
+    let text = String::from_utf8(std::mem::take(&mut layout.out)).expect("templates write text");
+    Ok((captured, text, std::mem::take(&mut layout.own)))
 }
 
-/// Whether nothing but spaces has been written on the line the template
-/// being rendered is writing.
+/// A template being rendered, whose place the bodies the engine holds back
+/// as it renders take.
+struct Rendering;
+
+impl Rendering {
+    fn new(place: Place) -> Self {
+        PLACES.with_borrow_mut(|places| places.push(place));
+        Self
+    }
+}
+
+impl Drop for Rendering {
+    fn drop(&mut self) {
+        PLACES.with_borrow_mut(Vec::pop);
+    }
+}
+
+/// The writer the engine writes a body it holds back to, laid out as the
+/// template being rendered lays out its lines. Where the body lands is the
+/// line writing it, so a block written in another template's place moves
+/// that line and not the body's own.
+pub(super) fn held() -> Box<dyn Held> {
+    let place = PLACES.with_borrow(|places| places.last().map(Place::unchained));
+    Box::new(Body(Sink::new(place, true)))
+}
+
+/// Whether nothing but spaces has been written on the line being written,
+/// by the template being rendered or a body the engine holds back.
 pub(super) fn at_line_start() -> bool {
     LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.open))
 }

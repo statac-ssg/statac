@@ -108,13 +108,15 @@ pub(super) struct Fact {
     /// Its indent is followed by a value.
     pub(super) valued: bool,
     /// That value is a body the engine holds back, written whole: a call
-    /// of a macro or the name of a `set` block, of this template's own. Or
-    /// the line holds a `call` or `filter` writing one, its indent kept.
+    /// of a macro or the name of a `set` block, of this template's own, or
+    /// a call of `caller`. Or the line holds a `call` or `filter` writing
+    /// one, its indent kept.
     pub(super) held: bool,
     /// Its indent is one the engine is told to keep, before a tag.
     pub(super) kept: bool,
     /// Where its line ending is, where the engine is told to keep it,
-    /// after a tag.
+    /// after a tag, to be left out where nothing has been written for it
+    /// to end.
     pub(super) ending: Option<usize>,
 }
 
@@ -634,7 +636,9 @@ impl<'s> Template<'s> {
     }
 
     /// The column a line is written at once the blocks round it have
-    /// given up what they give, none taking it left of its own tag.
+    /// given up what they give, none taking it left of its own tag. A body
+    /// the engine holds back is written where it is called, so the blocks
+    /// round the one holding it back give it nothing.
     fn column(&self, line: usize) -> usize {
         let mut column = self.lines[line].column;
         if self.lines[line].shown {
@@ -643,6 +647,9 @@ impl<'s> Template<'s> {
         let mut chain = Vec::new();
         let mut owner = self.owner[line];
         while let Some(block) = owner {
+            if self.blocks[block].kind == Kind::Placed {
+                break;
+            }
             chain.push(block);
             owner = self.blocks[block].parent;
         }
@@ -817,10 +824,11 @@ impl<'s> Template<'s> {
             });
         }
 
-        // The engine writes a body it holds back, such as a macro's, as it
-        // is, so no kept line ending there is left out where nothing has
-        // been written for it to end.
-        let held: Vec<bool> = (0..self.lines.len())
+        // In a body the engine holds back, such as a macro's, the line
+        // endings round a branch are settled here, so the writer leaves out
+        // no kept line ending there where nothing has been written for it to
+        // end.
+        let inside: Vec<bool> = (0..self.lines.len())
             .map(|number| {
                 self.blocks.iter().any(|block| {
                     block.kind == Kind::Placed
@@ -831,8 +839,7 @@ impl<'s> Template<'s> {
             .collect();
         // A `call` or `filter` whose tags stand alone on an indented line
         // of markup writes a body held back where that line stands, so the
-        // engine keeps the indent for the body to line up at. Inside
-        // another body held back, the line it is written on can't be seen.
+        // engine keeps the indent for the body to line up at.
         let writing: Vec<bool> = (0..self.lines.len())
             .map(|number| {
                 let line = &self.lines[number];
@@ -848,11 +855,6 @@ impl<'s> Template<'s> {
                             && matches!(bytes[tags[block.tag].span.start + 2], b' ' | b'\t')
                             && (line.tags.len() == 1
                                 || line.tags.len() == 2 && block.end == Some(number))
-                    })
-                    && !self.blocks.iter().any(|block| {
-                        block.kind == Kind::Placed
-                            && block.opening < number
-                            && block.end.is_some_and(|end| end > number)
                     })
             })
             .collect();
@@ -906,7 +908,7 @@ impl<'s> Template<'s> {
                 && let Some(last) = last
                 && matches!(bytes[last.span.end - 3], b' ' | b'\t')
             {
-                if first.is_some() || !held[number] || outward == 0 {
+                if first.is_some() || !inside[number] || outward == 0 {
                     keeps.push(last.span.end - 3);
                     kept_ends[number] = true;
                 } else if outward == 1 {
@@ -973,7 +975,7 @@ impl<'s> Template<'s> {
             // takes the line ending before it, where the tag closing it can
             // keep its own in its place.
             let opening = block.opening;
-            if held[opening]
+            if inside[opening]
                 && closing[edges[1]].is_some()
                 && let Some(tag) = lone(opening)
                 && after_ending(opening, &kept_ends)
@@ -987,7 +989,7 @@ impl<'s> Template<'s> {
                 if to == from || !kept_ends[from] {
                     continue;
                 }
-                if held[to] {
+                if inside[to] {
                     if let Some(at) = closing[to] {
                         keeps.push(at);
                         kept_ends[to] = true;
@@ -1071,6 +1073,8 @@ impl<'s> Template<'s> {
             .iter()
             .filter(|block| block.kind == Kind::Placed)
             .filter_map(|block| tags[block.tag].holds.as_deref())
+            // Writing the body of the `call` that called the macro.
+            .chain(["caller"])
             .collect();
         let names = &self.read.names;
         let lines = self
@@ -1108,7 +1112,7 @@ impl<'s> Template<'s> {
                     valued,
                     held,
                     kept: kept[number],
-                    ending: kept_ends[number].then_some(ends[number]),
+                    ending: (kept_ends[number] && !inside[number]).then_some(ends[number]),
                 }
             })
             .collect();
@@ -1611,6 +1615,10 @@ mod tests {
             [3]
         );
         assert_eq!(held("{% set s %}\n<p>a</p>\n{% endset %}\n{{ s }}\n"), [3]);
+        assert_eq!(
+            held("{% macro m() %}\n<p>\n  {{ caller() }}\n</p>\n{% endmacro %}\n"),
+            [2]
+        );
         for template in [
             "{% set s = 1 %}\n  {{ s }}\n",
             "{% macro m() %}\n<p>a</p>\n{% endmacro %}\n  {{ m() | upper }}\n",
@@ -1632,6 +1640,11 @@ mod tests {
                 "<div>\n  {% call m() %}{% endcall %}\n</div>\n",
                 "<div>\n  {%+call m() %}{% endcall %}\n</div>\n",
             ),
+            // Inside a body held back as well.
+            (
+                "{% macro m() %}\n  {% filter upper %}\n    <p>a</p>\n  {% endfilter %}\n{% endmacro %}\n",
+                "{% macro m() %}\n  {%+filter upper %}\n    <p>a</p>\n  {% endfilter %}\n{% endmacro %}\n",
+            ),
         ];
         for (template, handed) in cases {
             assert_eq!(kept(template), handed, "{template}");
@@ -1646,8 +1659,6 @@ mod tests {
             "<div>\n  {%- filter upper %}\n    <p>a</p>\n  {% endfilter %}\n</div>\n",
             "<pre>\n  {% filter upper %}\n    a\n  {% endfilter %}\n</pre>\n",
             "<script>\n  {% filter upper %}\n    go();\n  {% endfilter %}\n</script>\n",
-            // Inside a body held back, where it is written can't be seen.
-            "{% macro m() %}\n  {% filter upper %}\n    <p>a</p>\n  {% endfilter %}\n{% endmacro %}\n",
         ] {
             let facts = super::facts(template, true).expect("a template");
             assert!(facts.lines.iter().all(|line| !line.held), "{template}");

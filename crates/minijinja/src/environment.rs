@@ -1,3 +1,4 @@
+// Changed from MiniJinja 3.0.1 for Statac: `set_held` supplies the writer a held-back body is written into.
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -8,7 +9,7 @@ use crate::compiler::instructions::Instructions;
 use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error};
 use crate::expression::Expression;
-use crate::output::Output;
+use crate::output::{Held, Output};
 use crate::template::{
     AutoEscapeFunc, CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig,
 };
@@ -18,6 +19,7 @@ use crate::vm::State;
 use crate::{defaults, functions};
 
 type FormatterFunc = dyn Fn(&mut Output, &mut State, &Value) -> Result<(), Error> + Sync + Send;
+type HeldFunc = dyn Fn() -> Box<dyn Held> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 type UnknownMethodFunc =
     dyn Fn(&mut State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
@@ -76,6 +78,7 @@ pub struct Environment<'source> {
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
     formatter_is_default: bool,
+    held: Option<Arc<HeldFunc>>,
     #[cfg(feature = "debug")]
     debug: bool,
     #[cfg(feature = "fuel")]
@@ -118,6 +121,7 @@ impl<'source> Environment<'source> {
             undefined_behavior: UndefinedBehavior::default(),
             formatter: default_formatter(),
             formatter_is_default: true,
+            held: None,
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
@@ -141,6 +145,7 @@ impl<'source> Environment<'source> {
             undefined_behavior: UndefinedBehavior::default(),
             formatter: default_formatter(),
             formatter_is_default: true,
+            held: None,
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
@@ -549,6 +554,26 @@ impl<'source> Environment<'source> {
     {
         self.formatter = Arc::new(f);
         self.formatter_is_default = false;
+    }
+
+    /// Sets the function that makes the writer a held-back body is written
+    /// into.
+    ///
+    /// Without one, a held-back body, such as a `{% set %}` block's or a
+    /// macro's, is written into a string.  With one, it is written into a
+    /// writer the function makes, and the text that writer's
+    /// [`finish`](crate::Held::finish) gives is the body's value, escaped as
+    /// the string would be.
+    pub fn set_held<F>(&mut self, f: F)
+    where
+        F: Fn() -> Box<dyn Held> + 'static + Sync + Send,
+    {
+        self.held = Some(Arc::new(f));
+    }
+
+    /// Makes the writer a held-back body is written into, where one is set.
+    pub(crate) fn held(&self) -> Option<Box<dyn Held>> {
+        self.held.as_ref().map(|f| f())
     }
 
     /// Enable or disable the debug mode.

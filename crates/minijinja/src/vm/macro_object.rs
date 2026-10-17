@@ -1,9 +1,10 @@
+// Changed from MiniJinja 3.0.1 for Statac: a macro's body is written into the writer the environment may supply.
 use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::output::Output;
+use crate::output::{Capture, Output};
 use crate::utils::AutoEscape;
 use crate::value::{Enumerator, Kwargs, Object, Value};
 use crate::vm;
@@ -122,7 +123,7 @@ impl Object for Macro {
         }
 
         let (arg_values, caller) = ok!(self.prepare_args(args));
-        let mut rv = String::new();
+        let mut rv = Capture::new(state.env());
         ok!(vm::eval_macro(
             state,
             self.instructions_id,
@@ -132,6 +133,7 @@ impl Object for Macro {
             caller,
             arg_values
         ));
+        let rv = rv.finish();
 
         Ok(if !matches!(state.auto_escape(), AutoEscape::None) {
             Value::from_safe_string(rv)

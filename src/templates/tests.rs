@@ -521,6 +521,140 @@ fn what_a_call_or_filter_writes_at_an_indented_line_gives_up_the_indent_its_line
 }
 
 #[test]
+fn a_body_held_back_is_laid_out_line_by_line_as_the_page_is() {
+    let paragraphs = "{% macro inner() %}\n<p>a</p>\n<p>b</p>\n{% endmacro %}\n";
+    let lined = "<div>\n  <section>\n    <p>a</p>\n    <p>b</p>\n  </section>\n</div>\n";
+    let branch = |x: bool| {
+        let shown = if x { "    <p>b</p>\n" } else { "" };
+        format!("<div>\n  <section>\n{shown}  </section>\n</div>\n")
+    };
+    let cases = [
+        // A value written inside a macro's body, at its own line.
+        (
+            format!(
+                "{paragraphs}{{% macro outer() %}}\n<section>\n  {{{{ inner() }}}}\n</section>\n{{% endmacro %}}\n<div>\n  {{{{ outer() }}}}\n</div>\n"
+            ),
+            lined.to_owned(),
+        ),
+        // A call's body, written by `caller()`, gives up the indent it has
+        // under its tag.
+        (
+            "{% macro m() %}\n<section>\n  {{ caller() }}\n</section>\n{% endmacro %}\n<div>\n  {% call m() %}\n    <p>a</p>\n    <p>b</p>\n  {% endcall %}\n</div>\n".to_owned(),
+            lined.to_owned(),
+        ),
+        // A branch not taken leaves no line of spaces, in a macro's body
+        // and in a set block's.
+        (
+            "{% macro m(x) %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endmacro %}\n<div>\n  {{ m(true) }}\n</div>\n".to_owned(),
+            branch(true),
+        ),
+        (
+            "{% macro m(x) %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endmacro %}\n<div>\n  {{ m(false) }}\n</div>\n".to_owned(),
+            branch(false),
+        ),
+        (
+            "{% set x = true %}\n{% set s %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endset %}\n<div>\n  {{ s }}\n</div>\n".to_owned(),
+            branch(true),
+        ),
+        (
+            "{% set x = false %}\n{% set s %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endset %}\n<div>\n  {{ s }}\n</div>\n".to_owned(),
+            branch(false),
+        ),
+        // A macro called from inside a loop.
+        (
+            format!(
+                "{paragraphs}{{% macro item(e) %}}\n<li>\n  {{{{ inner() }}}}\n</li>\n{{% endmacro %}}\n<ul>\n  {{% for e in [1, 2] %}}\n  {{{{ item(e) }}}}\n  {{% endfor %}}\n</ul>\n"
+            ),
+            "<ul>\n  <li>\n    <p>a</p>\n    <p>b</p>\n  </li>\n  <li>\n    <p>a</p>\n    <p>b</p>\n  </li>\n</ul>\n".to_owned(),
+        ),
+        // A macro calling a macro calling a macro.
+        (
+            format!(
+                "{paragraphs}{{% macro middle() %}}\n<div>\n  {{{{ inner() }}}}\n</div>\n{{% endmacro %}}\n{{% macro outer() %}}\n<section>\n  {{{{ middle() }}}}\n</section>\n{{% endmacro %}}\n<main>\n  {{{{ outer() }}}}\n</main>\n"
+            ),
+            "<main>\n  <section>\n    <div>\n      <p>a</p>\n      <p>b</p>\n    </div>\n  </section>\n</main>\n".to_owned(),
+        ),
+        // Lines inside `<pre>` are left as typed.
+        (
+            "{% macro m() %}\n<section>\n  <pre>one\n  two\nthree</pre>\n</section>\n{% endmacro %}\n<div>\n  {{ m() }}\n</div>\n".to_owned(),
+            "<div>\n  <section>\n    <pre>one\n  two\nthree</pre>\n  </section>\n</div>\n".to_owned(),
+        ),
+        // A value inside a filter's body, and a filter inside a macro's.
+        (
+            format!(
+                "{paragraphs}<div>\n  {{% filter upper %}}\n    <section>\n      {{{{ inner() }}}}\n    </section>\n  {{% endfilter %}}\n</div>\n"
+            ),
+            "<div>\n  <SECTION>\n    <P>A</P>\n    <P>B</P>\n  </SECTION>\n</div>\n".to_owned(),
+        ),
+        (
+            "{% macro m() %}\n<section>\n  {% filter upper %}\n    <p>a</p>\n    <p>b</p>\n  {% endfilter %}\n</section>\n{% endmacro %}\n<div>\n  {{ m() }}\n</div>\n".to_owned(),
+            "<div>\n  <section>\n    <P>A</P>\n    <P>B</P>\n  </section>\n</div>\n".to_owned(),
+        ),
+    ];
+    for (template, page) in cases {
+        let built = site(&[
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\npages.feed: false\n",
+            ),
+            ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("templates/home.html", &template),
+        ]);
+        assert!(built.problems.is_empty(), "{:?}", built.problems);
+        assert_eq!(built.html("index.md"), page, "{template}");
+    }
+}
+
+#[test]
+fn a_body_held_back_lands_where_it_is_called_however_the_block_defining_it_moves() {
+    let base = "<body>\n  <main>\n    {% block content %}{% endblock %}\n  </main>\n</body>\n";
+    let list = "  {% macro m() %}\n  <ul>\n    {% for i in [1, 2] %}\n      <li>{{ i }}</li>\n    {% endfor %}\n  </ul>\n  {% endmacro %}\n";
+    let cases = [
+        // Called from an indented line, its lines give up the indent they
+        // share for the line's.
+        (
+            "  <div>\n    {{ m() }}\n  </div>\n",
+            "<body>\n  <main>\n    <div>\n      <ul>\n        <li>1</li>\n        <li>2</li>\n      </ul>\n    </div>\n  </main>\n</body>\n",
+        ),
+        // Called at the left of the block, which lands its left where the
+        // block stands, the call there with it.
+        (
+            "  <div>\n{{ m() }}\n  </div>\n",
+            "<body>\n  <main>\n      <div>\n      <ul>\n        <li>1</li>\n        <li>2</li>\n      </ul>\n      </div>\n  </main>\n</body>\n",
+        ),
+        // Called among other things on a line, it is written as typed,
+        // less only what its own loop gives up.
+        (
+            "  <div>{{ m() }}</div>\n",
+            "<body>\n  <main>\n    <div>  <ul>\n    <li>1</li>\n    <li>2</li>\n  </ul>\n</div>\n  </main>\n</body>\n",
+        ),
+    ];
+    for (calling, page) in cases {
+        // Defined inside the block, or at the top of the template.
+        for child in [
+            format!(
+                "{{% extends \"base.html\" %}}\n{{% block content %}}\n{list}{calling}{{% endblock %}}\n"
+            ),
+            format!(
+                "{{% extends \"base.html\" %}}\n{list}{{% block content %}}\n{calling}{{% endblock %}}\n"
+            ),
+        ] {
+            let built = site(&[
+                (
+                    "statac.yaml",
+                    "language: en\ntimezone: UTC\npages.feed: false\n",
+                ),
+                ("content/index.md", "---\ntitle: Home\n---\n"),
+                ("templates/base.html", base),
+                ("templates/home.html", &child),
+            ]);
+            assert!(built.problems.is_empty(), "{:?}", built.problems);
+            assert_eq!(built.html("index.md"), page, "{child}");
+        }
+    }
+}
+
+#[test]
 fn a_snippet_put_among_other_things_on_a_line_keeps_the_spaces_it_starts_with() {
     let built = site(&[
         (
