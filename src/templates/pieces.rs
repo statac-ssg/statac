@@ -74,7 +74,12 @@ pub(super) fn build(
             frame::begin(file, None)?;
             frame::end(
                 file,
-                super::indent::render(&template, context, &templates.cuts, stands_alone(piece)),
+                super::indent::render(
+                    &template,
+                    context,
+                    templates.placing(&templates.files[file].name),
+                    stands_alone(piece),
+                ),
             )?
         });
     Some(built.map(|html| html.trim_end().to_owned()))

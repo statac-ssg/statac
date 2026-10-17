@@ -777,8 +777,12 @@ impl Renderer {
             .and_then(|template| {
                 let at = layout.expect("a template the engine holds");
                 frame::begin(at, None)?;
-                let built =
-                    super::indent::render_placed(&template, context, &shared.templates.cuts, true);
+                let built = super::indent::render_placed(
+                    &template,
+                    context,
+                    shared.templates.placing(name),
+                    true,
+                );
                 frame::end(
                     at,
                     built.map(|(captured, text, placed)| {
@@ -1924,7 +1928,8 @@ fn build_snippet(
         .and_then(|template| {
             let source = template.source();
             let (start, len) = (source.as_ptr() as usize, source.len());
-            let built = super::indent::render_placed(&template, context, &templates.cuts, begins)?;
+            let built =
+                super::indent::render_placed(&template, context, templates.placing(name), begins)?;
             Ok((built, start, len))
         })
         .map(|((captured, text, own), start, len)| {

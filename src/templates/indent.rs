@@ -1,8 +1,7 @@
 //! How a built page's source keeps the indentation its templates were
 //! written with. What a template puts on a line of its own follows that
-//! line's indent on each of its lines, a line whose only value came to
-//! nothing is not written, and a line leaves out indentation it has only
-//! for the template's sake (`dedent`).
+//! line's indent on each of its lines, a line that came to nothing is not
+//! written, and each line is written where `landing` says.
 //!
 //! The engine can't say what column a value is printed at, so each render
 //! writes to a [`Sink`] that keeps account of the line being written, and
@@ -12,6 +11,8 @@ use std::cell::RefCell;
 use std::io;
 
 use minijinja::{Captured, Error, Output, Template, Value};
+
+use super::landing::{Deeper, Landing, Placing};
 
 /// The line a template is writing.
 struct Line {
@@ -78,43 +79,25 @@ impl Own {
     }
 }
 
-/// Where the templates' lines leave out indentation they have only for the
-/// template's sake: the address in memory of each such line's start, in
-/// order, with how many bytes of its indent are left out.
-#[derive(Default)]
-pub(super) struct Cuts(Vec<(usize, usize)>);
-
-impl Cuts {
-    /// Adds the cuts `dedent` finds in `source`, the text as the engine
-    /// holds it.
-    pub(super) fn add(&mut self, source: &str) {
-        let base = source.as_ptr() as usize;
-        let found = super::dedent::cuts(source);
-        if found.is_empty() {
-            return;
-        }
-        self.0
-            .extend(found.into_iter().map(|(at, len)| (base + at, len)));
-        self.0.sort_unstable();
-    }
-
-    /// The first cut in `text`, as where in it the line starts and how
-    /// many bytes are left out.
-    fn first(&self, text: &[u8]) -> Option<(usize, usize)> {
-        let start = text.as_ptr() as usize;
-        let after = self.0.partition_point(|&(at, _)| at < start);
-        let &(at, len) = self.0.get(after)?;
-        let at = at - start;
-        (at < text.len()).then_some((at, len))
-    }
+/// What one template writes, and where its lines are written.
+struct Sink<'p> {
+    out: Vec<u8>,
+    own: Own,
+    placing: Placing<'p>,
+    /// Whether what it writes starts a line where it is put.
+    begins: bool,
+    /// Where in memory the template's own text last written ends, until
+    /// anything else is written.
+    last: Option<usize>,
+    /// The recursive loops' calls being run, the deepest last.
+    deeper: Vec<&'p Deeper>,
+    /// The line whose kept line ending is to come, and how long the output
+    /// was as what the line holds began to be written.
+    began: Option<(usize, usize)>,
 }
 
-/// What one template writes, and whether what it writes starts a line
-/// where it is put.
-struct Sink<'c>(Vec<u8>, Own, &'c Cuts, bool);
-
-impl<'c> Sink<'c> {
-    fn new(cuts: &'c Cuts, begins: bool) -> Self {
+impl<'p> Sink<'p> {
+    fn new(placing: Placing<'p>, begins: bool) -> Self {
         LINES.with_borrow_mut(|lines| {
             lines.push(Line {
                 start: 0,
@@ -125,35 +108,149 @@ impl<'c> Sink<'c> {
                 value: false,
             });
         });
-        Self(Vec::new(), Own::default(), cuts, begins)
+        Self {
+            out: Vec::new(),
+            own: Own::default(),
+            placing,
+            begins,
+            last: None,
+            deeper: Vec::new(),
+            began: None,
+        }
     }
 
-    /// Writes the template's own text, leaving out of each line what
-    /// [`Cuts`] says it has only for the template's sake.
-    fn own(&mut self, text: &[u8]) {
+    /// Writes the template's own text, each line that starts a line of the
+    /// output at the indent [`Placing`] gives it. A line that came to
+    /// nothing, spaces before its line ending and no more, isn't written.
+    fn own(&mut self, mut text: &[u8]) {
+        let mut from = text.as_ptr() as usize;
+        // A line ending kept for a line that wrote nothing is not written.
+        if let Some(line) = self.placing.holding(from)
+            && line.ending == Some(from)
+        {
+            let wrote = self
+                .began
+                .take()
+                .is_some_and(|(at, len)| at == line.at && self.out.len() > len);
+            if !wrote {
+                let ending = if text.starts_with(b"\r\n") { 2 } else { 1 };
+                text = &text[ending.min(text.len())..];
+                from += ending;
+            }
+        }
         let mut done = 0;
-        let mut from = 0;
-        while let Some((at, len)) = self.2.first(&text[from..]) {
-            let at = from + at;
-            from = at + 1;
-            // A cut is at a line's start in the template; the line is left
-            // whole where it isn't at one in the output too.
-            let starts = at > 0
-                || (self.3 || !self.0.is_empty())
-                    && LINES.with_borrow(|lines| {
-                        lines.last().is_some_and(|line| line.start == self.0.len())
-                    });
-            let end = at + len;
-            if !starts || end > text.len() || blank(&text[at..end]) < len {
+        for line in self.placing.starting(from..from + text.len()) {
+            let at = line.at - from;
+            let starts = if at > 0 {
+                self.ending(&text[done..at]);
+                done = at;
+                true
+            } else {
+                self.begins || !self.out.is_empty()
+            };
+            let end = at + line.indent;
+            if end > text.len() || blank(&text[at..end]) < line.indent {
                 continue;
             }
-            if done < at {
-                self.put(&text[done..at]);
+            if !starts || !self.open() {
+                // An indent kept for a line of the output is no use inside one.
+                if line.kept {
+                    self.put(&text[done..at]);
+                    done = end;
+                }
+                continue;
             }
-            done = end;
+            if line.movable && self.land(line, Some(&text[at..end])) {
+                done = end;
+            }
         }
         if done < text.len() {
-            self.put(&text[done..]);
+            self.ending(&text[done..]);
+        }
+    }
+
+    /// Writes the indent of `line`, which starts the line being written, as
+    /// [`Placing`] and the recursive loops being run say, in place of any
+    /// spaces already on it. `typed` is the indent as the template has it,
+    /// where it is still to write. Whether anything was written.
+    fn land(&mut self, line: &Landing, typed: Option<&[u8]>) -> bool {
+        let written = self.placing.written(line);
+        let deeper: String = self.deeper.iter().map(|call| &*call.by).collect();
+        let dangling =
+            LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.start < self.out.len()));
+        if written.is_none() && deeper.is_empty() && !dangling {
+            return false;
+        }
+        self.clear();
+        self.made(&deeper);
+        match (written, typed) {
+            (Some(written), _) => self.made(written),
+            (None, Some(typed)) => self.put(typed),
+            (None, None) => {}
+        }
+        true
+    }
+
+    /// Whether nothing but spaces is written on the line being written.
+    fn open(&self) -> bool {
+        LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.open))
+    }
+
+    /// Writes `text`, which ends a line of the template if it ends with a
+    /// line ending, unless the line came to nothing.
+    fn ending(&mut self, text: &[u8]) {
+        let nothing = text.ends_with(b"\n")
+            && text.iter().all(u8::is_ascii_whitespace)
+            && self.open()
+            && self
+                .placing
+                .holding(text.as_ptr() as usize + text.len() - 1)
+                .is_some_and(|line| line.holds);
+        if nothing {
+            self.clear();
+        } else {
+            self.put(text);
+        }
+    }
+
+    /// Takes back the spaces written on the line being written.
+    fn clear(&mut self) {
+        LINES.with_borrow_mut(|lines| {
+            let line = lines.last_mut().expect("a sink has its line");
+            self.out.truncate(line.start);
+            self.own.truncate(line.start);
+            line.indent.clear();
+            line.open = true;
+            line.emptied = false;
+            line.ended = false;
+        });
+    }
+
+    /// Writes an indent that is none of the template's text.
+    fn made(&mut self, indent: &str) {
+        self.out.extend_from_slice(indent.as_bytes());
+        LINES.with_borrow_mut(|lines| {
+            let line = lines.last_mut().expect("a sink has its line");
+            line.indent.push_str(indent);
+        });
+    }
+
+    /// Notes a recursive loop's call starting to run, from what was written
+    /// before it and what is written now, or the call ending, from the
+    /// template's own text written after it. `own` is where in memory the
+    /// text now written is, where it is the template's, and `last` where its
+    /// own text written before ends.
+    fn track(&mut self, own: Option<usize>, last: Option<usize>) {
+        if let Some(own) = own
+            && self.deeper.last().is_some_and(|call| call.end == own)
+        {
+            self.deeper.pop();
+            return;
+        }
+        if let Some(call) = last.and_then(|last| self.placing.call(last))
+            && own != Some(call.end)
+        {
+            self.deeper.push(call);
         }
     }
 }
@@ -166,13 +263,46 @@ impl Drop for Sink<'_> {
 
 impl io::Write for Sink<'_> {
     fn write(&mut self, text: &[u8]) -> io::Result<usize> {
-        if self.2.0.is_empty()
-            || text.is_empty()
-            || LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.value))
-        {
+        if text.is_empty() {
+            return Ok(0);
+        }
+        let value = LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.value));
+        let from = text.as_ptr() as usize;
+        let last = self.last.take();
+        self.track((!value).then_some(from), last);
+        if value || self.placing.is_empty() {
             self.put(text);
         } else {
+            // Text from inside a line whose line ending is kept is what the
+            // line holds being written.
+            if let Some(line) = self.placing.holding(from)
+                && line.ending.is_some_and(|ending| from < ending)
+                && from > line.at + line.indent
+            {
+                self.began = Some((line.at, self.out.len()));
+            }
             self.own(text);
+            let end = from + text.len();
+            // A value opening a line of the template with no indent before
+            // it is placed by that line, before it is written, so that each
+            // of its lines takes the indent.
+            if let Some(line) = self.placing.valued(end)
+                && line.indent == 0
+                && line.movable
+                && (self.begins || !self.out.is_empty())
+                && self.open()
+            {
+                self.land(line, None);
+            }
+            if let Some(line) = self.placing.holding(end)
+                && line.ending.is_some()
+                && line.at + line.indent == end
+            {
+                self.began = Some((line.at, self.out.len()));
+            }
+        }
+        if !value {
+            self.last = Some(from + text.len());
         }
         Ok(text.len())
     }
@@ -207,8 +337,8 @@ impl Sink<'_> {
                     _ => 0,
                 };
                 if ending > 0 {
-                    self.0.truncate(line.start);
-                    self.1.truncate(line.start);
+                    self.out.truncate(line.start);
+                    self.own.truncate(line.start);
                     line.indent.clear();
                     line.open = true;
                     line.emptied = false;
@@ -218,17 +348,17 @@ impl Sink<'_> {
                 }
             }
             if !line.value && !text.is_empty() {
-                self.1.0.push(Run {
-                    at: self.0.len(),
+                self.own.0.push(Run {
+                    at: self.out.len(),
                     from: text.as_ptr() as usize,
                     len: text.len(),
                 });
             }
-            self.0.extend_from_slice(text);
+            self.out.extend_from_slice(text);
             let tail = match text.iter().rposition(|&byte| byte == b'\n') {
                 Some(at) => {
                     let tail = &text[at + 1..];
-                    line.start = self.0.len() - tail.len();
+                    line.start = self.out.len() - tail.len();
                     line.indent.clear();
                     line.open = true;
                     line.emptied = false;
@@ -255,14 +385,14 @@ fn blank(text: &[u8]) -> usize {
 
 /// Renders `template`, giving what it wrote beside the engine's own
 /// account. `begins` says whether what it writes starts a line where it is
-/// put, so that its first line may leave out what [`Cuts`] says.
+/// put, so that its first line may be written as [`Placing`] says.
 pub(super) fn render<'source>(
     template: &Template<'_, 'source>,
     context: impl Into<Value>,
-    cuts: &Cuts,
+    placing: Placing<'_>,
     begins: bool,
 ) -> Result<(Captured<'source>, String), Error> {
-    render_placed(template, context, cuts, begins).map(|(captured, text, _)| (captured, text))
+    render_placed(template, context, placing, begins).map(|(captured, text, _)| (captured, text))
 }
 
 /// Renders `template` as [`render`] does, giving as well where what it
@@ -270,13 +400,13 @@ pub(super) fn render<'source>(
 pub(super) fn render_placed<'source>(
     template: &Template<'_, 'source>,
     context: impl Into<Value>,
-    cuts: &Cuts,
+    placing: Placing<'_>,
     begins: bool,
 ) -> Result<(Captured<'source>, String, Own), Error> {
-    let mut sink = Sink::new(cuts, begins);
+    let mut sink = Sink::new(placing, begins);
     let captured = template.render_captured_to(context, &mut sink)?;
-    let text = String::from_utf8(std::mem::take(&mut sink.0)).expect("templates write text");
-    Ok((captured, text, std::mem::take(&mut sink.1)))
+    let text = String::from_utf8(std::mem::take(&mut sink.out)).expect("templates write text");
+    Ok((captured, text, std::mem::take(&mut sink.own)))
 }
 
 /// Whether nothing but spaces has been written on the line the template

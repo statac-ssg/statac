@@ -18,6 +18,7 @@ mod files;
 mod frame;
 mod guard;
 mod indent;
+mod landing;
 mod layout;
 mod media;
 mod own;
@@ -63,9 +64,8 @@ pub struct Templates {
     extends: Vec<Option<String>>,
     /// The cards the site describes, their texts among the files.
     cards: card::Cards,
-    /// Where the files' lines leave out indentation they have only for
-    /// the template's sake.
-    cuts: indent::Cuts,
+    /// Where the files' lines are written.
+    landings: landing::Landings,
     /// How many of the engine's steps building one output may take.
     steps: u64,
     /// How many pages of lists of the whole site the outputs running one
@@ -95,6 +95,11 @@ impl Templates {
                 .and_then(|parent| self.by_name.get(parent).copied());
         }
         chain
+    }
+
+    /// Where the file named `name` writes its lines when rendered.
+    fn placing(&self, name: &str) -> landing::Placing<'_> {
+        self.landings.placing(self.by_name.get(name).copied())
     }
 
     /// The file whose text, as the engine holds it, has `address` in
@@ -274,26 +279,33 @@ pub fn read(
     env.set_auto_escape_callback(escaping);
     env.set_path_join_callback(|name, _| files::named(name).into());
     let mut by_name = HashMap::new();
+    let mut facts = Vec::with_capacity(files.len());
     for (at, file) in files.iter().enumerate() {
         by_name.insert(file.name.clone(), at);
-        let text = sources.text(file.source).to_owned();
+        let mut text = sources.text(file.source).to_owned();
+        // A card's text is drawn, and where a JSON file's lines break
+        // doesn't matter.
+        let read = match escaping(&file.name) {
+            AutoEscape::Html => dedent::facts(&text),
+            AutoEscape::None if !file.name.starts_with(card::PREFIX) => dedent::facts(&text),
+            _ => None,
+        };
+        if let Some(read) = &read {
+            // The same length, so every place in the text stays where it is.
+            let mut bytes = std::mem::take(&mut text).into_bytes();
+            for &at in &read.keeps {
+                bytes[at] = b'+';
+            }
+            text = String::from_utf8(bytes).expect("a space written as a plus");
+        }
+        facts.push(read);
         // A file the engine can't read was told about when it was checked.
         let _ = env.add_template_owned(file.name.clone(), text);
-    }
-    // What tells indentation meant for the template from the page's is
-    // the markup; elsewhere an indent may mean something, and is kept.
-    let mut cuts = indent::Cuts::default();
-    for file in &files {
-        if matches!(escaping(&file.name), AutoEscape::Html)
-            && let Ok(template) = env.get_template(&file.name)
-        {
-            cuts.add(template.source());
-        }
     }
     for snippet in snippets.values() {
         render::register_snippet(&mut env, snippet);
     }
-    let templates = Templates {
+    let mut templates = Templates {
         env,
         files,
         by_name,
@@ -302,11 +314,49 @@ pub fn read(
         unusable,
         extends,
         cards,
-        cuts,
+        landings: landing::Landings::default(),
         steps,
         many_walked: lowered_walked(root).unwrap_or(walks::MANY),
     };
+    templates.landings = landings(&templates, &facts, sources);
     (templates, problems)
+}
+
+/// Where the lines of the site's files are written, from what is known of
+/// each. What tells an indent meant for the template from one meant for
+/// the page is the markup: elsewhere an indent may mean something, and
+/// is kept.
+fn landings(
+    templates: &Templates,
+    facts: &[Option<dedent::Facts>],
+    sources: &Sources,
+) -> landing::Landings {
+    let markup = |at: usize| matches!(escaping(&templates.files[at].name), AutoEscape::Html);
+    let held = |at: usize| {
+        let file = &templates.files[at];
+        let template = templates.env.get_template(&file.name).ok()?;
+        Some(landing::Held {
+            base: template.source().as_ptr() as usize,
+            source: sources.text(file.source),
+            facts: facts[at].as_ref()?,
+        })
+    };
+    let mut landings = landing::Landings::default();
+    for at in 0..templates.files.len() {
+        if let Some(held) = held(at) {
+            landings.add(&held, markup(at));
+        }
+    }
+    landings.sort();
+    for (at, file) in templates.files.iter().enumerate() {
+        let chain = templates.chain(&file.name);
+        if chain.iter().all(|&link| markup(link))
+            && let Some(chain) = chain.into_iter().map(held).collect::<Option<Vec<_>>>()
+        {
+            landings.chain(at, &chain);
+        }
+    }
+    landings
 }
 
 /// How many of the engine's steps building one output may take: enough

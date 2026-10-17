@@ -15,17 +15,23 @@
 //!
 //! A level is the file's commonest step into an element between lines with
 //! no tag line between them.
+//!
+//! The same reading gives what `landing` needs to place each line, and the
+//! lines whose indent and line ending the engine is told to keep: a line
+//! holding more than tags keeps both, which the engine would otherwise
+//! leave out round a tag opening or closing it.
 
 use std::collections::HashMap;
 use std::ops::Range;
 
 use minijinja::machinery::{Token, tokenize};
 
-/// Blocks whose body is written where the block stands.
-const FLOWING: [&str; 4] = ["for", "if", "with", "autoescape"];
+/// Blocks whose body is written where the block stands, as a `block`'s
+/// is where its template is the one rendered.
+const FLOWING: [&str; 5] = ["for", "if", "with", "autoescape", "block"];
 
 /// Blocks whose body is written somewhere else, or held back.
-const PLACED: [&str; 5] = ["block", "macro", "call", "filter", "set"];
+const PLACED: [&str; 4] = ["macro", "call", "filter", "set"];
 
 /// Elements whose lines show their spaces.
 const SHOWN: [&str; 2] = ["pre", "textarea"];
@@ -42,13 +48,86 @@ const VOID: [&str; 16] = [
 /// Where `source` has lines that give up indentation they have only for
 /// the template's sake: each such line's start, with how many bytes of its
 /// indent are left out. Nothing for a template the engine can't read.
-pub(super) fn cuts(source: &str) -> Vec<(usize, usize)> {
+#[cfg(test)]
+fn cuts(source: &str) -> Vec<(usize, usize)> {
     let Some(read) = Read::of(source) else {
         return Vec::new();
     };
     let mut template = Template::new(source, read);
     template.decide();
     template.cuts()
+}
+
+/// What placing a template's lines in the built page needs to know of
+/// them. Nothing for a template the engine can't read.
+pub(super) fn facts(source: &str) -> Option<Facts> {
+    let mut template = Template::new(source, Read::of(source)?);
+    template.decide();
+    Some(template.facts())
+}
+
+pub(super) struct Facts {
+    pub(super) lines: Vec<Fact>,
+    /// The `block`s, in the order they open.
+    pub(super) blocks: Vec<Named>,
+    /// The lines holding `{{ super() }}` and nothing else.
+    pub(super) supers: Vec<usize>,
+    pub(super) calls: Vec<Recursion>,
+    /// Where a `+` takes the place of a space in a tag, so the engine
+    /// keeps the indent or the line end of a line holding more than tags.
+    pub(super) keeps: Vec<usize>,
+}
+
+pub(super) struct Fact {
+    pub(super) start: usize,
+    /// The bytes of its indent.
+    pub(super) indent: usize,
+    /// How many of them it is written without.
+    pub(super) cut: usize,
+    /// It holds more than spaces.
+    pub(super) holds: bool,
+    /// It writes markup, not inside `<pre>` or `<textarea>`.
+    pub(super) content: bool,
+    /// Its indent may be written otherwise: it isn't inside a tag, `raw`,
+    /// `<pre>` or `<textarea>`.
+    pub(super) movable: bool,
+    /// It holds tags and nothing else.
+    pub(super) bare: bool,
+    /// Its indent is followed by a value.
+    pub(super) valued: bool,
+    /// Its indent is one the engine is told to keep, before a tag.
+    pub(super) kept: bool,
+    /// Where its line ending is, where the engine is told to keep it,
+    /// after a tag.
+    pub(super) ending: Option<usize>,
+}
+
+pub(super) struct Named {
+    pub(super) name: String,
+    pub(super) opening: usize,
+    pub(super) end: usize,
+    pub(super) site: Site,
+}
+
+/// Where a `block` stands, which says where a body written in its place
+/// lines up.
+#[derive(Clone, Copy, PartialEq)]
+pub(super) enum Site {
+    /// Its tags share their line with nothing else: at that line's indent.
+    Line,
+    /// Its tags stand alone round its body: where its body's lines are.
+    Body,
+    /// Among other things on a line: nowhere.
+    Among,
+}
+
+/// A recursive loop's call on a line of its own, the template's text
+/// written right up to it.
+pub(super) struct Recursion {
+    pub(super) line: usize,
+    /// The line of the loop's `for` tag.
+    pub(super) opening: usize,
+    pub(super) span: Range<usize>,
 }
 
 /// A tag of the template's own: a block's opening, middle or end, a
@@ -58,6 +137,12 @@ struct Tag {
     role: Role,
     /// Written with `-` or `+` to say what happens to the spaces round it.
     controlled: bool,
+    /// The name a `block` tag gives.
+    name: Option<String>,
+    /// A `for` tag's loop can be run again from inside it.
+    recursive: bool,
+    /// Opens or closes `raw`.
+    raw: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -76,12 +161,23 @@ enum Kind {
     Placed,
 }
 
+/// A value that is nothing but a call writing template text of its own.
+#[derive(Clone, Copy, PartialEq)]
+enum Calls {
+    /// `loop(...)`, running a recursive loop's body again.
+    Loop,
+    /// `super()`, writing the body of the block this one replaces.
+    Super,
+}
+
 /// What the engine's tokenizer reads in a template.
 #[derive(Default)]
 struct Read {
     tags: Vec<Tag>,
     /// Values printed, from `{{` to `}}`.
     values: Vec<Range<usize>>,
+    /// Those values that are a call and nothing more.
+    calls: Vec<(Range<usize>, Calls)>,
     /// The template's own text.
     text: Vec<Range<usize>>,
     /// Text between `raw` and `endraw`.
@@ -110,8 +206,31 @@ impl Read {
                     }
                 }
                 Token::VariableStart => {
-                    done = upto(&mut tokens, |token| matches!(token, Token::VariableEnd))?;
+                    let mut call = None;
+                    let mut seen = 0;
+                    let mut depth = 0;
+                    let mut whole = true;
+                    done = upto(&mut tokens, |token| {
+                        if matches!(token, Token::VariableEnd) {
+                            return true;
+                        }
+                        match (seen, token) {
+                            (0, Token::Ident("loop")) => call = Some(Calls::Loop),
+                            (0, Token::Ident("super")) => call = Some(Calls::Super),
+                            (1, Token::ParenOpen) => depth = 1,
+                            (0 | 1, _) => whole = false,
+                            _ if depth == 0 => whole = false,
+                            (_, Token::ParenOpen) => depth += 1,
+                            (_, Token::ParenClose) => depth -= 1,
+                            _ => {}
+                        }
+                        seen += 1;
+                        false
+                    })?;
                     read.values.push(start..done);
+                    if let Some(call) = call.filter(|_| whole && depth == 0) {
+                        read.calls.push((start..done, call));
+                    }
                 }
                 Token::BlockStart => {
                     let mut assigns = false;
@@ -119,8 +238,18 @@ impl Read {
                         Some(Ok((Token::Ident(word), _))) => *word,
                         _ => "",
                     };
+                    let mut idents = 0;
+                    let mut name = None;
+                    let mut recursive = false;
                     done = upto(&mut tokens, |token| {
                         assigns |= matches!(token, Token::Assign);
+                        if let Token::Ident(ident) = token {
+                            idents += 1;
+                            if idents == 2 && word == "block" {
+                                name = Some((*ident).to_owned());
+                            }
+                            recursive |= word == "for" && *ident == "recursive";
+                        }
                         matches!(token, Token::BlockEnd)
                     })?;
                     let role = match word {
@@ -136,6 +265,9 @@ impl Read {
                         span: start..done,
                         role,
                         controlled: controlled(&source[start..done]),
+                        name,
+                        recursive,
+                        raw: false,
                     });
                 }
                 _ => return None,
@@ -152,9 +284,10 @@ impl Read {
         while let Some(found) = source[at..range.end].find('{') {
             let start = at + found;
             let rest = &source[start..range.end];
+            let raw = rest.starts_with("{%");
             let close = if rest.starts_with("{#") {
                 "#}"
-            } else if rest.starts_with("{%") {
+            } else if raw {
                 *in_raw = !*in_raw;
                 "%}"
             } else {
@@ -168,6 +301,9 @@ impl Read {
                 span: start..end,
                 role: Role::Quiet,
                 controlled: controlled(&source[start..end]),
+                name: None,
+                recursive: false,
+                raw,
             });
             at = end;
         }
@@ -234,6 +370,8 @@ struct Line {
 
 struct Block {
     kind: Kind,
+    /// Its opening tag, by its place in [`Read::tags`].
+    tag: usize,
     opening: usize,
     middles: Vec<usize>,
     end: Option<usize>,
@@ -266,6 +404,7 @@ struct Template<'s> {
     /// Whether the file is indented with tabs, a column each.
     tabs: bool,
     step: Option<usize>,
+    read: Read,
 }
 
 impl<'s> Template<'s> {
@@ -365,9 +504,11 @@ impl<'s> Template<'s> {
             blocks: Vec::new(),
             tabs,
             step: None,
+            read: Read::default(),
         };
         template.nest(&read);
         template.step = template.step();
+        template.read = read;
         template
     }
 
@@ -384,6 +525,7 @@ impl<'s> Template<'s> {
                         open.push(self.blocks.len());
                         self.blocks.push(Block {
                             kind,
+                            tag: at,
                             opening: number,
                             middles: Vec::new(),
                             end: None,
@@ -580,6 +722,185 @@ impl<'s> Template<'s> {
         Some(excess)
     }
 
+    fn facts(&self) -> Facts {
+        let bytes = self.source.as_bytes();
+        let tags = &self.read.tags;
+        let line_of = |at: usize| self.lines.partition_point(|line| line.start <= at) - 1;
+        // Where each line's text ends, before its line ending.
+        let ends: Vec<usize> = (0..self.lines.len())
+            .map(|number| {
+                let Some(next) = self.lines.get(number + 1) else {
+                    return self.source.len();
+                };
+                let end = next.start - 1;
+                if end > 0 && bytes[end - 1] == b'\r' {
+                    end - 1
+                } else {
+                    end
+                }
+            })
+            .collect();
+        let holds: Vec<bool> = (0..self.lines.len())
+            .map(|number| {
+                !self.source[self.lines[number].start..ends[number]]
+                    .trim()
+                    .is_empty()
+            })
+            .collect();
+
+        let mut blocks = Vec::new();
+        for block in &self.blocks {
+            let (Some(name), Some(end)) = (&tags[block.tag].name, block.end) else {
+                continue;
+            };
+            let line = &self.lines[block.opening];
+            let site = if end == block.opening
+                && line.shape == Shape::Tags
+                && line.tags.len() == 2
+                && line.tags.iter().all(|&at| !tags[at].controlled)
+            {
+                Site::Line
+            } else if block.alone && end > block.opening {
+                Site::Body
+            } else {
+                Site::Among
+            };
+            blocks.push(Named {
+                name: name.clone(),
+                opening: block.opening,
+                end,
+                site,
+            });
+        }
+
+        let mut keeps = Vec::new();
+        let mut later = false;
+        let mut kept = vec![false; self.lines.len()];
+        let mut kept_ends = vec![false; self.lines.len()];
+        for number in (0..self.lines.len()).rev() {
+            let line = &self.lines[number];
+            let placed = blocks
+                .iter()
+                .any(|block| block.opening == number && block.site == Site::Line);
+            let first = line
+                .tags
+                .first()
+                .map(|&at| &tags[at])
+                .filter(|tag| tag.span.start == line.start + line.indent && !tag.raw);
+            if let Some(first) = first
+                && (line.shape == Shape::Content || placed)
+                && !first.controlled
+            {
+                if line.indent > 0 && matches!(bytes[first.span.start + 2], b' ' | b'\t') {
+                    keeps.push(first.span.start + 2);
+                    kept[number] = true;
+                }
+                let last = line
+                    .tags
+                    .last()
+                    .map(|&at| &tags[at])
+                    .filter(|tag| tag.span.end == ends[number] && !tag.raw && !tag.controlled);
+                if later
+                    && let Some(last) = last
+                    && matches!(bytes[last.span.end - 3], b' ' | b'\t')
+                {
+                    keeps.push(last.span.end - 3);
+                    kept_ends[number] = true;
+                }
+            }
+            // Tags, comments among them, write nothing after it.
+            later |= line.shape == Shape::Content || placed;
+        }
+        keeps.sort_unstable();
+
+        let alone = |span: &Range<usize>| {
+            let number = line_of(span.start);
+            let line = &self.lines[number];
+            (span.start == line.start + line.indent && span.end == ends[number]).then_some(number)
+        };
+        let mut supers = Vec::new();
+        let mut calls = Vec::new();
+        for (span, call) in &self.read.calls {
+            let Some(number) = alone(span) else {
+                continue;
+            };
+            match call {
+                Calls::Super => supers.push(number),
+                Calls::Loop => {
+                    // The line before ends with a tag the engine leaves the
+                    // line ending out after.
+                    let trimmed = number == 0
+                        || !kept_ends[number - 1]
+                            && self.lines[number - 1]
+                                .tags
+                                .last()
+                                .is_some_and(|&at| tags[at].span.end == ends[number - 1]);
+                    if self.lines[number].indent == 0 && trimmed {
+                        continue;
+                    }
+                    let opening = self
+                        .blocks
+                        .iter()
+                        .filter(|block| {
+                            tags[block.tag].recursive
+                                && block.opening < number
+                                && block.end.is_some_and(|end| end > number)
+                        })
+                        .map(|block| block.opening)
+                        .max();
+                    if let Some(opening) = opening {
+                        calls.push(Recursion {
+                            line: number,
+                            opening,
+                            span: span.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        let lines = self
+            .lines
+            .iter()
+            .enumerate()
+            .map(|(number, line)| {
+                let movable = matches!(line.shape, Shape::Content | Shape::Blank | Shape::Tags)
+                    && !line.shown;
+                let cut = if movable {
+                    let cut = line.column - self.column(number);
+                    if self.tabs { cut } else { cut.min(line.indent) }
+                } else {
+                    0
+                };
+                let opening = line.start + line.indent;
+                let values = &self.read.values;
+                let valued = values
+                    .get(values.partition_point(|value| value.start < opening))
+                    .is_some_and(|value| value.start == opening);
+                Fact {
+                    start: line.start,
+                    indent: line.indent,
+                    cut,
+                    holds: holds[number],
+                    content: line.shape == Shape::Content && !line.shown,
+                    movable,
+                    bare: line.shape == Shape::Tags,
+                    valued,
+                    kept: kept[number],
+                    ending: kept_ends[number].then_some(ends[number]),
+                }
+            })
+            .collect();
+        Facts {
+            lines,
+            blocks,
+            supers,
+            calls,
+            keeps,
+        }
+    }
+
+    #[cfg(test)]
     fn cuts(&self) -> Vec<(usize, usize)> {
         let mut cuts = Vec::new();
         for (number, line) in self.lines.iter().enumerate() {
@@ -840,6 +1161,68 @@ mod tests {
         );
         let shown = "<pre>\n{% if a %}\n    one\n{% endif %}\n</pre>\n";
         assert_eq!(cut(shown), shown);
+    }
+
+    #[test]
+    fn a_blocks_body_written_in_place_gives_up_its_indent_as_a_loops_does() {
+        assert_eq!(
+            cut("<ul>\n  {% block items %}\n    <li>a</li>\n  {% endblock %}\n</ul>\n"),
+            "<ul>\n  {% block items %}\n  <li>a</li>\n  {% endblock %}\n</ul>\n",
+        );
+    }
+
+    /// The template as the engine is handed it.
+    fn kept(source: &str) -> String {
+        let mut out = source.as_bytes().to_vec();
+        for at in super::facts(source).expect("a template").keeps {
+            out[at] = b'+';
+        }
+        String::from_utf8(out).expect("text")
+    }
+
+    #[test]
+    fn a_line_opening_with_a_tag_and_holding_more_keeps_its_indent_and_line_end() {
+        let cases = [
+            (
+                "<div>\n  {% if a %}<p>a</p>{% endif %}\n</div>\n",
+                "<div>\n  {%+if a %}<p>a</p>{% endif+%}\n</div>\n",
+            ),
+            // A line ending with what it holds keeps its line ending anyway.
+            (
+                "<div>\n  {% if a %}<p>a</p>\n  {% endif %}\n</div>\n",
+                "<div>\n  {%+if a %}<p>a</p>\n  {% endif %}\n</div>\n",
+            ),
+            // At the left, there is no indent to keep.
+            (
+                "{# a #}<p>a</p>{# b #}\n<p>b</p>\n",
+                "{# a #}<p>a</p>{# b+#}\n<p>b</p>\n",
+            ),
+            // A block written where its tags stand.
+            (
+                "<main>\n    {% block main %}{% endblock %}\n</main>\n",
+                "<main>\n    {%+block main %}{% endblock+%}\n</main>\n",
+            ),
+            // The last line's ending would follow what a snippet writes.
+            (
+                "<p>a</p>\n  {% if a %}<p>b</p>{% endif %}\n",
+                "<p>a</p>\n  {%+if a %}<p>b</p>{% endif %}\n",
+            ),
+        ];
+        for (template, handed) in cases {
+            assert_eq!(kept(template), handed, "{template}");
+        }
+    }
+
+    #[test]
+    fn tags_alone_or_saying_what_becomes_of_the_spaces_are_left() {
+        for template in [
+            "<div>\n  {% if a %}\n  <p>a</p>\n  {% endif %}\n</div>\n",
+            "<div>\n  {%- if a %}<p>a</p>{% endif -%}\n</div>\n",
+            "<div>\n  {%if a%}<p>a</p>{%endif%}\n</div>\n",
+            "<div>\n  <p>{% if a %}a{% endif %}</p>\n</div>\n",
+        ] {
+            assert_eq!(kept(template), template);
+        }
     }
 
     #[test]

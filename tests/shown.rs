@@ -1352,12 +1352,12 @@ fn snippets_of_a_sites_own_show_its_pictures_and_videos_as_they_are_written() {
     site.build();
     let page = site.page("post-1/index.html");
     for shown in [
-        "alt=\"In the call\" loading=\"lazy\" decoding=\"async\"></picture>\
+        "alt=\"In the call\" loading=\"lazy\" decoding=\"async\"></picture>\n\
          <figcaption>A <em>caption</em></figcaption>",
-        "alt=\"In its own file\" loading=\"lazy\" decoding=\"async\"></picture>\
+        "alt=\"In its own file\" loading=\"lazy\" decoding=\"async\"></picture>\n\
          <figcaption>Its own caption</figcaption>",
         "<img src=\"/post-1/diagram-1.gif\" width=\"40\" height=\"30\" alt=\"\" loading=\"lazy\" \
-         decoding=\"async\"></figure>",
+         decoding=\"async\">\n</figure>",
         "<a href=\"/post-1/photo-1-1000.#.jpg\" aria-label=\"Photo 1\">",
         "<a href=\"/post-1/photo-2-400.#.jpg\">",
         "sizes=\"(max-width: 30rem) 100vw, 15rem\"",
@@ -1410,8 +1410,8 @@ fn a_snippet_shows_a_picture_of_the_sites_own_in_place_of_the_still_fetched() {
     site.build();
     assert_eq!(
         site.page("post-1/index.html"),
-        "<a href=\"https://www.youtube-nocookie.com/embed/abcdefghijk?autoplay=1\">\n\
-         <img src=\"/post-1/still-1-400.#.jpg\" alt=\"Play the video\"></a>"
+        "<a href=\"https://www.youtube-nocookie.com/embed/abcdefghijk?autoplay=1\">\n  \
+         <img src=\"/post-1/still-1-400.#.jpg\" alt=\"Play the video\">\n</a>"
     );
 
     // Handed none, it shows the still fetched, and says where there is none.
@@ -1556,10 +1556,10 @@ fn a_pages_mentions_are_said_or_faces_oldest_first_with_every_field() {
     assert_eq!(
         site.page("post-1/index.html"),
         "said mentioned A https://a.example/ https://a.example/post-1/ 3 September 2026 2026 \
-         Words. /faces/0123456789abcdef-96.#.jpg 96 96 []\
-         said replied   https://a.example/post-1/ 5 September 2026 2026 Three. \
-         said replied   https://a.example/post-1/ 5 September 2026 2026  \
-         said bookmarked   https://a.example/post-1/   \
+         Words. /faces/0123456789abcdef-96.#.jpg 96 96 []\n\
+         said replied   https://a.example/post-1/ 5 September 2026 2026 Three. \n\
+         said replied   https://a.example/post-1/ 5 September 2026 2026  \n\
+         said bookmarked   https://a.example/post-1/   \n\
          faces liked https://a.example/post-1/\n\
          faces reposted https://a.example/post-1/"
     );

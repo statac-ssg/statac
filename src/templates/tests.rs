@@ -447,6 +447,114 @@ fn a_snippet_put_among_other_things_on_a_line_keeps_the_spaces_it_starts_with() 
 }
 
 #[test]
+fn a_block_written_in_another_templates_place_lines_up_where_it_lands() {
+    let base = (
+        "templates/base.html",
+        "<body>\n  <main>\n    {% block main %}{% endblock %}\n  </main>\n  <aside>\n  {% block aside %}\n    <p>Default</p>\n  {% endblock %}\n  </aside>\n</body>\n",
+    );
+    // Written flush left, under its tag, or at the depth it lands at.
+    for body in [
+        "<h1>{{ page.title }}</h1>\n<div>\n  <p>a</p>\n</div>\n{{ page.content }}\n",
+        "  <h1>{{ page.title }}</h1>\n  <div>\n    <p>a</p>\n  </div>\n  {{ page.content }}\n",
+        "    <h1>{{ page.title }}</h1>\n    <div>\n      <p>a</p>\n    </div>\n    {{ page.content }}\n",
+    ] {
+        let built = site(&[
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\npages.feed: false\n",
+            ),
+            ("content/index.md", "---\ntitle: Home\n---\nOne.\n\nTwo.\n"),
+            base,
+            (
+                "templates/home.html",
+                &format!(
+                    "{{% extends \"base\" %}}\n{{% block main %}}\n{body}{{% endblock %}}\n{{% block aside %}}\n<p>Mine</p>\n{{% endblock %}}\n"
+                ),
+            ),
+        ]);
+        assert!(built.problems.is_empty(), "{:?}", built.problems);
+        assert_eq!(
+            built.html("index.md"),
+            "<body>\n  <main>\n    <h1>Home</h1>\n    <div>\n      <p>a</p>\n    </div>\n    <p>One.</p>\n    <p>Two.</p>\n  </main>\n  <aside>\n    <p>Mine</p>\n  </aside>\n</body>\n",
+            "{body}"
+        );
+    }
+}
+
+#[test]
+fn super_writes_the_replaced_body_where_it_is_called() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "templates/base.html",
+            "<main>\n  {% block main %}\n  <p>Base</p>\n  {% endblock %}\n</main>\n",
+        ),
+        (
+            "templates/home.html",
+            "{% extends \"base\" %}\n{% block main %}\n<div>\n  {{ super() }}\n</div>\n{% endblock %}\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(
+        built.html("index.md"),
+        "<main>\n  <div>\n    <p>Base</p>\n  </div>\n</main>\n"
+    );
+}
+
+#[test]
+fn a_recursive_loops_deeper_levels_go_in_as_far_as_its_call() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "templates/home.html",
+            "<ul>\n  {% for item in [{\"t\": \"a\", \"c\": [{\"t\": \"b\", \"c\": [{\"t\": \"c\", \"c\": []}]}]}] recursive %}\n  <li>\n    {{ item.t }}\n    {% if item.c %}\n    <ul>\n      {{ loop(item.c) }}\n    </ul>\n    {% endif %}\n  </li>\n  {% endfor %}\n</ul>\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(
+        built.html("index.md"),
+        "<ul>\n  <li>\n    a\n    <ul>\n      <li>\n        b\n        <ul>\n          <li>\n            c\n          </li>\n        </ul>\n      </li>\n    </ul>\n  </li>\n</ul>\n"
+    );
+}
+
+#[test]
+fn a_line_holding_more_than_tags_keeps_its_indent_and_line_end() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "snippets/figure.html",
+            "<figure>{{ \"<img>\" | safe }}\n{% if caption is defined %}<figcaption>{{ caption }}</figcaption>{% endif %}\n</figure>\n",
+        ),
+        (
+            "snippets/joined.html",
+            "<b>\n{%- if true %}\n  {% if true %}<i>a</i>{% endif %}\n{%- endif %}\n</b>\n",
+        ),
+        ("snippets/among.html", "{% if true %}<i>a</i>{% endif %}\n"),
+        (
+            "templates/home.html",
+            "<div>\n  {% if page.title %}<p>yes</p>{% endif %}\n  {% if not page.title %}<p>no</p>{% endif %}\n  <p>after</p>\n  {{ figure() }}\n  {{ figure(caption=\"c\") }}\n  {{ joined() }}\n  <p>{{ among() }}.</p>\n</div>\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(
+        built.html("index.md"),
+        "<div>\n  <p>yes</p>\n  <p>after</p>\n  <figure><img>\n  </figure>\n  <figure><img>\n  <figcaption>c</figcaption>\n  </figure>\n  <b><i>a</i></b>\n  <p><i>a</i>.</p>\n</div>\n"
+    );
+}
+
+#[test]
 fn a_template_writing_plain_text_keeps_its_bodys_indent() {
     let built = site(&[
         (

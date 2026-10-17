@@ -87,6 +87,21 @@ What changed in each release of Statac, the newest first.
   step inside the `<ul>` its tag stands level with, is written as typed,
   as is any body where Statac can't tell which was meant. Pages look
   the same; only their source changes.
+- A block's body written in place of another template's `{% block %}`
+  lines up where it lands: its lines give up the indent they have in
+  common and take the indent of the line the `{% block %}` tags share,
+  or of the body they replace. It was written as typed, wherever that
+  left it. The body `{{ super() }}` writes lines up at that line's
+  indent, and a `{% block %}`'s own body gives up indent it has only for
+  the template's sake, as a loop's does. Each deeper level of a
+  recursive loop goes in as far as its `{{ loop() }}` stands inside its
+  `{% for %}` tag, where only the level's first line moved.
+- A line that opens with a tag and holds more than tags, as
+  `{% if page.summary %}<p>{{ page.summary }}</p>{% endif %}`, keeps its
+  indent, and keeps its line end if it also closes with a tag and a
+  later line writes something. Both were left out, so the line was
+  written at the left and ran into the next. A line whose tags write
+  nothing between them is still not written.
 
 ### Changed
 

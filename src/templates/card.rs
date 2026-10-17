@@ -671,7 +671,7 @@ fn build(shared: &Arc<Shared>, name: &str, id: PageId) -> Option<String> {
         frame::begin(at, None)?;
         frame::end(
             at,
-            super::indent::render(&template, context, &templates.cuts, false),
+            super::indent::render(&template, context, templates.placing(name), false),
         )?
     });
     match built {
