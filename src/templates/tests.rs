@@ -1938,6 +1938,29 @@ fn sort_puts_items_lacking_the_field_last_in_their_own_order_and_warns() {
 }
 
 #[test]
+fn two_sorts_by_one_field_in_one_template_are_each_told_at_their_own() {
+    let template = "{{ site.pages | sort(attribute=\"rank\") | length }}\n\
+                    {{ site.pages | sort(attribute=\"rank\") | length }}\n\
+                    {{ site.pages\n | sort(attribute=\"rank\") | length }}\n";
+    let built = site(&[
+        ("content/post-1.md", "---\ntitle: Post 1\nrank: 2\n---\n"),
+        ("content/post-2.md", "---\ntitle: Post 2\n---\n"),
+        NO_HOME,
+        ("templates/page.html", template),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    let rendered = built.render("post-1.md");
+    let at: Vec<u32> = (rendered.problems.iter())
+        .filter(|p| p.kind.name() == "sorted-last")
+        .map(|p| p.place.expect("placed").span.start)
+        .collect();
+    let written: Vec<u32> = (template.match_indices("\"rank\""))
+        .map(|(at, _)| at as u32)
+        .collect();
+    assert_eq!(at, written, "{:?}", rendered.problems);
+}
+
+#[test]
 fn a_sort_warning_is_told_once_for_every_page_built_through_its_template() {
     let temp = TempSite::new(&[
         ("content/post-1.md", "---\ntitle: Post 1\nrank: 2\n---\n"),

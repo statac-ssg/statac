@@ -7,6 +7,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
+use minijinja::machinery::Span;
 use minijinja::machinery::ast::{CallType, Expr};
 use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
 use minijinja::{Error, State};
@@ -45,6 +46,8 @@ pub(super) struct Asking {
     calling: Option<Place>,
     /// The template asking, by the engine's name for it.
     template: String,
+    /// The call in the template, as the engine places it, where it does.
+    written: Option<Span>,
 }
 
 impl Asking {
@@ -54,6 +57,15 @@ impl Asking {
             method: method.to_owned(),
             calling: frame::with(|frame| frame.calling).flatten(),
             template: template.to_owned(),
+            written: None,
+        }
+    }
+
+    /// Asked by the call the template `state` is running.
+    fn running(method: &str, state: &State<'_, '_>) -> Asking {
+        Asking {
+            written: state.calling_span(),
+            ..Asking::new(method, state.name())
         }
     }
 
@@ -65,13 +77,16 @@ impl Asking {
     }
 
     /// Where the asking is written: the call in the writing, or else the
-    /// call in the template, where the template makes only one such. The
-    /// engine doesn't say where a call runs.
+    /// call in the template, as the engine places it or, where it doesn't,
+    /// where the template makes only one such.
     fn place(&self, shared: &Shared) -> Option<Place> {
         if self.calling.is_some() {
             return self.calling;
         }
         let &at = shared.templates.by_name.get(&self.template)?;
+        if let Some(found) = self.written_in(shared, at) {
+            return Some(found);
+        }
         let found = calls(
             shared,
             at,
@@ -90,15 +105,49 @@ impl Asking {
             return self.calling;
         }
         let &at = shared.templates.by_name.get(&self.template)?;
+        if let Some(found) = self.written_in(shared, at) {
+            return Some(found);
+        }
         let wanted =
             |call: &CallType| matches!(call, CallType::Method(_, name) if *name == self.method);
         calls(shared, at, &wanted).first().copied()
     }
 
+    /// The call in the template file `at` the engine placed the asking at.
+    fn written_in(&self, shared: &Shared, at: usize) -> Option<Place> {
+        let written = self.written?;
+        let file = &shared.templates.files[at];
+        let text = shared.sources.text(file.source);
+        let ast = parse_template(&file.name, text).ok()?;
+        let mut found = None;
+        visit_exprs(&ast, &mut |expr| {
+            if found.is_none()
+                && let Expr::Call(call) = expr
+                && call.span() == written
+                && matches!(call.identify_call(), CallType::Method(_, name) if name == self.method)
+            {
+                found = Some(place(file.source, full_span(expr, text)));
+            }
+        });
+        found
+    }
+
     /// Tells `kind`, which doesn't stop the page, where the asking is
     /// written.
+    /// Told at a template as met building the page, so that the pages
+    /// building it are told of once, together.
     fn tell(&self, shared: &Shared, kind: Kind) {
-        told_at(self.place(shared), kind);
+        let at = self.place(shared);
+        frame::with(|frame| {
+            let problem = match at {
+                Some(at) => Problem::at(kind, at),
+                None => Problem::nowhere(kind),
+            };
+            let problem = met_building(problem, frame);
+            if !frame.problems.contains(&problem) {
+                frame.problems.push(problem);
+            }
+        });
     }
 }
 
@@ -228,7 +277,7 @@ pub(super) fn call(
     method: &str,
     args: &[Value],
 ) -> Result<Value, Error> {
-    let asking = Asking::new(method, state.name());
+    let asking = Asking::running(method, state);
     let (unnamed, named) = parted(args)?;
     match method {
         "photo" => {
@@ -729,9 +778,12 @@ impl Object for PhotoValue {
                     },
                 };
                 let at = self.asking.place(shared);
-                undescribed(picture.shown(), |frame| match at {
-                    Some(at) => Problem::at(kind, at),
-                    None => met_building(Problem::nowhere(kind), frame),
+                undescribed(picture.shown(), |frame| {
+                    let problem = match at {
+                        Some(at) => Problem::at(kind, at),
+                        None => Problem::nowhere(kind),
+                    };
+                    met_building(problem, frame)
                 });
             }
             _ => {}

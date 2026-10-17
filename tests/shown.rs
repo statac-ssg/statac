@@ -460,6 +460,18 @@ fn a_picture_shown_by_the_writing_and_the_layout_is_noted_once_at_the_writing() 
         .matches("note  Picture with no description: `static/img/photo-2.jpg`\n")
         .count();
     assert_eq!((at_writing, by_layout), (2, 1), "{said}");
+    assert!(
+        said.contains(
+            "note  Picture with no description: `static/img/photo-2.jpg`\n  \
+             templates/page.html, line 4\n   \
+             4 │ {{ page.photo('/img/photo-1.jpg').alt }}{{ page.photo('/img/photo-2.jpg').alt }}\n     \
+             │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  \
+             While building: content/post-1/index.md\n  \
+             And while building 1 more:\n    \
+             content/post-2/index.md\n"
+        ),
+        "{said}"
+    );
     assert_eq!(said.matches("Picture with no description").count(), 3);
 }
 
@@ -510,11 +522,13 @@ fn a_picture_a_template_shows_is_noted_where_its_description_is_read_empty() {
     site.put("static/img/photo-2.jpg", &jpeg(30, 20));
     let said = site.check();
     // Only the picture whose description the template reads is told, at
-    // the page: the template asks twice, so no one call is it.
+    // the call that asked for it.
     assert!(
         said.contains(
             "note  Picture with no description: `static/img/photo-2.jpg`\n  \
-             While building: content/post-1/index.md\n"
+             templates/page.html, line 4\n   \
+             4 │ {% set q = page.photo('/img/photo-2.jpg') %}<img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\">\n     \
+             │            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
         ) && said.contains("Describe it where it is shown, or mark it decorative."),
         "{said}"
     );
@@ -620,6 +634,36 @@ fn a_piece_that_names_no_copy_has_none_made() {
     let said = site.build();
     assert!(!said.contains("Made"), "{said}");
     assert!(site.published("post-1/photo-1.jpg"));
+}
+
+#[test]
+fn a_heic_picture_a_template_shows_is_told_at_the_call_that_asks_for_it() {
+    let site = Site::new(
+        "heic-template",
+        "{{ page.photo('/img/photo-1.jpg').src }}\n{{ page.photo('/img/photo-2.heic').src }}",
+    );
+    for n in [1, 2] {
+        site.write(
+            &format!("content/post-{n}/index.md"),
+            &format!("---\ntitle: Post {n}\n---\n"),
+        );
+    }
+    site.put("static/img/photo-1.jpg", &jpeg(30, 20));
+    site.put("static/img/photo-2.heic", HEIC);
+    let said = site.check();
+    let expected = "\
+warning  HEIC picture: `static/img/photo-2.heic` is published as it is, with no copies made
+  templates/page.html, line 4
+   4 │ {{ page.photo('/img/photo-2.heic').src }}
+     │    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  While building: content/post-1/index.md
+  And while building 1 more:
+    content/post-2/index.md
+  Export it as a JPEG: most browsers can't show a HEIC picture.
+  More: https://statac.dev/e/heic-picture/
+";
+    assert!(said.contains(expected), "{said}");
+    assert_eq!(said.matches("HEIC picture:").count(), 1, "{said}");
 }
 
 #[test]

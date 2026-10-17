@@ -59,6 +59,14 @@ What changed in each release of Statac, the newest first.
 - A site's file published at `.statac-clock`, at the top of the output,
   stays there in a build that runs `after_build`. The build removed it
   and counted it as removed by the command.
+- A template that sorts by the same field twice is told that pages were
+  sorted last at each sort that put some last. Both were told at the
+  first.
+- A picture with no description, or a HEIC picture, that a template
+  asks for with `page.photo` is told at the call that asked for it,
+  once, naming every page built through it. Where the template asked
+  for more than one picture, it was told at the page with no line of
+  the template, and where it asked for one, once for each page.
 
 ## 0.4.0 - 2026-10-17
 

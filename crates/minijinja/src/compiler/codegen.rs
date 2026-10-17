@@ -1,3 +1,4 @@
+// Changed from MiniJinja 3.0.1 for Statac: each call is given its own span, whatever line its arguments end on.
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::mem;
@@ -752,6 +753,7 @@ impl<'source> CodeGenerator<'source> {
                 }
                 let arg_count = self.compile_call_args(&f.args, 1, None);
                 let local_id = get_local_id(&mut self.filter_local_ids, f.name);
+                self.set_line_from_span(f.span());
                 self.add(Instruction::ApplyFilter(f.name, arg_count, local_id));
                 self.pop_span();
             }
@@ -760,6 +762,7 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_expr(&f.expr);
                 let arg_count = self.compile_call_args(&f.args, 1, None);
                 let local_id = get_local_id(&mut self.test_local_ids, f.name);
+                self.set_line_from_span(f.span());
                 self.add(Instruction::PerformTest(f.name, arg_count, local_id));
                 self.pop_span();
             }
@@ -814,6 +817,7 @@ impl<'source> CodeGenerator<'source> {
         match c.identify_call() {
             ast::CallType::Function(name) => {
                 let arg_count = self.compile_call_args(&c.args, 0, caller);
+                self.set_line_from_span(c.span());
                 self.add(Instruction::CallFunction(name, arg_count));
             }
             #[cfg(feature = "multi_template")]
@@ -825,11 +829,13 @@ impl<'source> CodeGenerator<'source> {
             ast::CallType::Method(expr, name) => {
                 self.compile_expr(expr);
                 let arg_count = self.compile_call_args(&c.args, 1, caller);
+                self.set_line_from_span(c.span());
                 self.add(Instruction::CallMethod(name, arg_count));
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr);
                 let arg_count = self.compile_call_args(&c.args, 1, caller);
+                self.set_line_from_span(c.span());
                 self.add(Instruction::CallObject(arg_count));
             }
         };

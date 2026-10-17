@@ -1,3 +1,4 @@
+// Changed from MiniJinja 3.0.1 for Statac: `calling_span` says where the call running now is written.
 use std::any::{Any, TypeId};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -6,6 +7,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::compiler::instructions::Instructions;
+use crate::compiler::tokens::Span;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::Output;
@@ -46,6 +48,9 @@ pub struct State<'template, 'env> {
     pub(crate) current_block: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'template Instructions<'env>,
+    /// The instruction calling the filter, test, function or method
+    /// running now, in `instructions`.
+    pub(crate) calling: Option<u32>,
     pub(crate) temps: BTreeMap<Box<str>, Value>,
     pub(crate) extensions: BTreeMap<TypeId, Box<dyn Any + Send>>,
     #[cfg(feature = "multi_template")]
@@ -110,6 +115,7 @@ impl<'template, 'env> State<'template, 'env> {
             current_block: None,
             auto_escape,
             instructions,
+            calling: None,
             #[cfg(feature = "multi_template")]
             blocks,
             temps: Default::default(),
@@ -152,6 +158,14 @@ impl<'template, 'env> State<'template, 'env> {
         self.instructions.name()
     }
 
+    /// Returns where in the current template the call of the filter, test,
+    /// function or method running now is written: the span the parser gave
+    /// that call. Only in debug mode, and only where the call's
+    /// instruction was given a span of its own.
+    pub fn calling_span(&self) -> Option<Span> {
+        self.instructions.get_span(self.calling?)
+    }
+
     /// Returns the current value of the auto escape flag.
     #[inline(always)]
     pub fn auto_escape(&self) -> &AutoEscape {
@@ -174,6 +188,7 @@ impl<'template, 'env> State<'template, 'env> {
             _ => Some(self.ctx.stack_depth()),
         };
         let old_instructions = std::mem::replace(&mut self.instructions, instructions);
+        let old_calling = self.calling.take();
         let old_auto_escape = std::mem::replace(&mut self.auto_escape, auto_escape);
         #[cfg(feature = "multi_template")]
         let old_current_block = std::mem::replace(&mut self.current_block, current_block);
@@ -205,6 +220,7 @@ impl<'template, 'env> State<'template, 'env> {
             self.ctx.restore_stack_depth(stack_depth);
         }
         self.instructions = old_instructions;
+        self.calling = old_calling;
         self.auto_escape = old_auto_escape;
         #[cfg(feature = "multi_template")]
         {

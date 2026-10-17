@@ -485,12 +485,12 @@ fn leave_out(text: &str, expr: &Expr<'_>, input: Option<&Expr<'_>>, field: &str)
 
 /// `sort` put `count` items without `field` last, the first of them
 /// `first` at `index`: told at the `attribute=` naming it in `template`,
-/// the template running the sort. The engine doesn't say where a filter
-/// runs, so the sort is found by its `attribute=` as written; a template
-/// sorting by the same twice is told at the first.
+/// the template running the sort, in the sort the engine places at
+/// `call`.
 pub(super) fn sorted_last(
     frame: &Frame,
     template: &str,
+    call: Option<minijinja::machinery::Span>,
     attribute: &str,
     field: &str,
     count: usize,
@@ -507,8 +507,11 @@ pub(super) fn sorted_last(
                 if found.is_some() {
                     return;
                 }
+                // Where the engine gives the call no span, the first such
+                // sort stands for it.
                 if let Expr::Filter(f) = expr
                     && f.name == "sort"
+                    && call.is_none_or(|call| f.span() == call)
                     && let Some(named @ Expr::Const(c)) = kw(&f.args, "attribute")
                     && c.value.as_str() == Some(attribute)
                 {

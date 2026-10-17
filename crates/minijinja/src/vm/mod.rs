@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: a capture is begun with the environment, which may supply its writer.
+// Changed from MiniJinja 3.0.1 for Statac: a capture is begun with the environment, which may supply its writer; the state is told which instruction makes each call.
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 #[cfg(feature = "macros")]
@@ -724,6 +724,7 @@ impl<'env> Executor<'env> {
                         }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
+                    state.calling = Some(pc);
                     a = ctx_ok!(filter.call(state, args));
                     stack.drop_top(arg_count);
                     stack.push(a);
@@ -741,6 +742,7 @@ impl<'env> Executor<'env> {
                     }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
+                    state.calling = Some(pc);
                     a = ctx_ok!(test.call(state, args));
                     stack.drop_top(arg_count);
                     stack.push(Value::from(a.is_true()));
@@ -774,6 +776,7 @@ impl<'env> Executor<'env> {
                             }
                             recurse_loop!(true, loop_object);
                         } else {
+                            state.calling = Some(pc);
                             ctx_ok!(func.call(state, args))
                         }
                     } else {
@@ -789,6 +792,7 @@ impl<'env> Executor<'env> {
                 Instruction::CallMethod(name, arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
+                    state.calling = Some(pc);
                     a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
                     stack.drop_top(arg_count);
                     stack.push(a);
@@ -796,6 +800,7 @@ impl<'env> Executor<'env> {
                 Instruction::CallObject(arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
+                    state.calling = Some(pc);
                     a = ctx_ok!(args[0].call(state, &args[1..]));
                     stack.drop_top(arg_count);
                     stack.push(a);

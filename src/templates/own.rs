@@ -426,6 +426,7 @@ fn sorted(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
             let problem = super::explain::sorted_last(
                 frame,
                 state.name(),
+                state.calling_span(),
                 &attribute,
                 field,
                 count,
