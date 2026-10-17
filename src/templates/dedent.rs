@@ -919,6 +919,12 @@ impl<'s> Template<'s> {
                     kept_ends[number] = true;
                 } else if outward == 1 {
                     closing[number] = Some(last.span.end - 3);
+                } else {
+                    // Closing more than one branch, it can stand in for the
+                    // line ending of none: it is kept, and the writer leaves
+                    // it out where nothing has been written on the line.
+                    keeps.push(last.span.end - 3);
+                    kept_ends[number] = true;
                 }
             }
             // Tags, comments among them, write nothing after it.
@@ -1546,6 +1552,16 @@ mod tests {
         for (template, handed) in cases {
             assert_eq!(kept(template), handed, "{template}");
         }
+    }
+
+    #[test]
+    fn in_a_body_held_back_a_line_closing_two_branches_keeps_its_line_end() {
+        assert_eq!(
+            kept(
+                "{% macro m(a, b) %}\n<div>\n  {% if a %}\n  {% if b %}\n  <p>x</p>{% endif %}{% endif %}\n</div>\n{% endmacro %}\n"
+            ),
+            "{% macro m(a, b) %}\n<div>\n  {% if a %}\n  {% if b %}\n  <p>x</p>{% endif %}{% endif+%}\n</div>\n{% endmacro %}\n",
+        );
     }
 
     #[test]

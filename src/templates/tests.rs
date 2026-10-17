@@ -718,6 +718,41 @@ fn a_loop_closing_its_bodys_last_line_writes_each_pass_on_lines_of_its_own_where
 }
 
 #[test]
+fn a_line_closing_two_branches_keeps_the_lines_round_it_apart_in_a_body_held_back() {
+    let templates = [
+        "<div>\n  {% if a %}\n  {% if b %}\n  <p>x</p>{% endif %}{% endif %}\n</div>\n",
+        // After a line whose line ending goes with the outer branch.
+        "<div>\n  <p>w</p>{% if a %}\n  {% if b %}\n  <p>x</p>{% endif %}{% endif %}\n  <p>y</p>\n</div>\n",
+        // Closing one branch and dividing another.
+        "<div>\n  {% if a %}\n  <p>w</p>\n  {% if b %}\n  <p>x</p>{% endif %}{% else %}\n  <p>y</p>{% endif %}\n</div>\n",
+    ];
+    for template in templates {
+        for (a, b) in [(true, true), (true, false), (false, true), (false, false)] {
+            let set = format!("{{% set a = {a} %}}{{% set b = {b} %}}\n");
+            let page = |template: &str| {
+                let built = site(&[
+                    (
+                        "statac.yaml",
+                        "language: en\ntimezone: UTC\npages.feed: false\n",
+                    ),
+                    ("content/index.md", "---\ntitle: Home\n---\n"),
+                    ("templates/home.html", template),
+                ]);
+                assert!(built.problems.is_empty(), "{:?}", built.problems);
+                built.html("index.md")
+            };
+            // Built as it is straight into the page.
+            let straight = page(&format!("{set}{template}"));
+            assert!(!straight.contains("></"), "{straight}");
+            let held = page(&format!(
+                "{set}{{% set s %}}\n{template}{{% endset %}}\n{{{{ s }}}}\n"
+            ));
+            assert_eq!(held, straight, "{template} {a} {b}");
+        }
+    }
+}
+
+#[test]
 fn a_snippet_put_among_other_things_on_a_line_keeps_the_spaces_it_starts_with() {
     let built = site(&[
         (

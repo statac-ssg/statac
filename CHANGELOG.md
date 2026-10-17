@@ -43,6 +43,10 @@ What changed in each release of Statac, the newest first.
   `<pre>`, `<textarea>`, `<script>` or `<style>`, or the template writes
   plain text, the passes run together as typed, since a line ending
   between them could change the page.
+- A line in the body of a `macro`, a `{% set %}` block, a `{% call %}`
+  or a `{% filter %}` whose tags at its end close two branches, as
+  `<p>x</p>{% endif %}{% endif %}`, keeps the line after it apart. It
+  ran into the line after it where it was written.
 
 ## 0.4.0 - 2026-10-17
 
