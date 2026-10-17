@@ -8,14 +8,16 @@ use std::path::{Path, PathBuf};
 
 use image::{ImageFormat, Rgb, RgbImage};
 use statac::build::{self, Mode, Options, Outcome};
+use statac::new::{self, Input, Locale, Machine};
 use statac::report::Report;
 use statac::serve::session::{Round, Session};
 
-/// A site in two languages with paged lists, tags, a feed, a snippet, a
-/// data file, a stylesheet, an old address and a photograph.
+/// A site in a folder of its own, removed with it.
 struct Site {
     top: PathBuf,
 }
+
+const TODAY: &str = "2026-10-04";
 
 const SETTINGS: &str = "title: Site\nlanguage: [en, de]\nurl: https://example.org\n\
                         feed_key: key\ntimezone: UTC\nposts_per_page: 2\n";
@@ -57,11 +59,23 @@ fn post(title: &str, date: &str, tags: &str, text: &str) -> String {
     format!("---\ntitle: {title}\ndate: {date}\ntags: [{tags}]\n---\n{text}\n")
 }
 
+/// A post in the starter's folder of posts.
+fn starter_post(n: u32, tags: &str) -> String {
+    let text = format!("Post {n} says this.");
+    post(&format!("Post {n}"), &format!("2026-01-0{n}"), tags, &text)
+}
+
 impl Site {
-    fn new(name: &str) -> Site {
+    fn empty(name: &str) -> Site {
         let top = std::env::temp_dir().join(format!("statac-serve-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&top);
-        let site = Site { top };
+        Site { top }
+    }
+
+    /// A site in two languages with paged lists, tags, a feed, a snippet, a
+    /// data file, a stylesheet, an old address and a photograph.
+    fn new(name: &str) -> Site {
+        let site = Site::empty(name);
         site.write("statac.yaml", SETTINGS);
         site.write("templates/home.html", &format!("{BASE}{HOME}"));
         site.write("templates/folder.html", &format!("{BASE}{HOME}"));
@@ -103,6 +117,42 @@ impl Site {
         site
     }
 
+    /// The site `statac new` makes in English and German with an address,
+    /// with eight more posts, tagged `one` and some `two`, three to a page.
+    fn starter(name: &str) -> Site {
+        let site = Site::empty(name);
+        let mut typed = "Site\nhttps://example.org\nen, de\n\n".as_bytes();
+        let machine = Machine {
+            input: Some(Input {
+                reader: &mut typed,
+                terminal: false,
+            }),
+            locale: Locale::default(),
+            timezone: Some("UTC".into()),
+            today: statac::date::read(TODAY).unwrap(),
+        };
+        let options = new::Options {
+            folder: Some(site.root()),
+            yes: false,
+            update: None,
+            cards: false,
+            no_starter: false,
+        };
+        let mut said = Vec::new();
+        let code = new::run(&options, machine, &mut said, false);
+        assert_eq!(code, 0, "{}", String::from_utf8_lossy(&said));
+        let settings = fs::read_to_string(site.root().join("statac.yaml")).unwrap();
+        site.write("statac.yaml", &format!("{settings}posts_per_page: 3\n"));
+        for n in 1..=8 {
+            let tags = if n % 3 == 0 { "one, two" } else { "one" };
+            site.write(
+                &format!("content/posts/post-{n}.md"),
+                &starter_post(n, tags),
+            );
+        }
+        site
+    }
+
     fn root(&self) -> PathBuf {
         self.top.join("site")
     }
@@ -117,6 +167,10 @@ impl Site {
         fs::write(path, bytes).unwrap();
     }
 
+    fn read(&self, path: &str) -> String {
+        fs::read_to_string(self.root().join(path)).unwrap()
+    }
+
     fn remove(&self, path: &str) {
         fs::remove_file(self.root().join(path)).unwrap();
     }
@@ -126,7 +180,7 @@ impl Site {
             mode: Mode::Build,
             site: self.root(),
             out: Some(self.top.join("fresh")),
-            today: statac::date::read("2026-10-04").ok(),
+            today: statac::date::read(TODAY).ok(),
             drafts: false,
             url: None,
         }
@@ -2195,6 +2249,86 @@ fn a_page_that_reads_fields_past_counting_follows_every_one() {
                 site.write("content/page-2.md", &page("shown: three\n"))
             }),
             ("the page deleted", &|site| site.remove("content/page-1.md")),
+        ],
+    );
+}
+
+#[test]
+fn the_starters_posts_and_tags() {
+    let site = Site::starter("starter-posts");
+    let post_2 = |title: &str, tags: &str, text: &str| post(title, "2026-01-02", tags, text);
+    through(
+        &site,
+        &[
+            ("a line of a post", &|site| {
+                let text = post_2("Post 2", "one", "Post 2 says something else.");
+                site.write("content/posts/post-2.md", &text)
+            }),
+            ("a post's title", &|site| {
+                let text = post_2("Post 2 again", "one", "Post 2 says something else.");
+                site.write("content/posts/post-2.md", &text)
+            }),
+            ("a new tag", &|site| {
+                site.write("content/posts/post-2.md", &starter_post(2, "one, three"))
+            }),
+            ("the new tag removed", &|site| {
+                site.write("content/posts/post-2.md", &starter_post(2, "one"))
+            }),
+            ("a tag another post has", &|site| {
+                site.write("content/posts/post-2.md", &starter_post(2, "one, two"))
+            }),
+            ("a post added", &|site| {
+                site.write("content/posts/post-9.md", &starter_post(9, "two"))
+            }),
+            ("the post removed", &|site| {
+                site.remove("content/posts/post-9.md")
+            }),
+        ],
+    );
+}
+
+#[test]
+fn the_starters_menu_folders_feed_and_languages() {
+    let site = Site::starter("starter-menu");
+    let settings = site.read("statac.yaml");
+    let tags = site.read("content/tags.md");
+    through(
+        &site,
+        &[
+            ("a page put in the menu", &|site| {
+                let text = tags.replace("layout: tags\n", "layout: tags\nmenu: true\n");
+                site.write("content/tags.md", &text)
+            }),
+            ("the page taken out of the menu", &|site| {
+                site.write("content/tags.md", &tags)
+            }),
+            ("a folder added", &|site| {
+                site.write("content/more/index.md", "---\ntitle: More\n---\n");
+                let text = post("Page 1", "2026-02-01", "one", "Page 1 says this.");
+                site.write("content/more/page-1.md", &text)
+            }),
+            ("the folder removed", &|site| {
+                fs::remove_dir_all(site.root().join("content/more")).unwrap()
+            }),
+            ("the feed turned off", &|site| {
+                site.write("statac.yaml", &format!("{settings}pages.feed: false\n"))
+            }),
+            ("the feed turned on", &|site| {
+                site.write("statac.yaml", &settings)
+            }),
+            ("the tags page removed", &|site| {
+                site.remove("content/tags.md")
+            }),
+            ("the tags page put back", &|site| {
+                site.write("content/tags.md", &tags)
+            }),
+            ("a translation", &|site| {
+                let text = "---\ntitle: Seite\nmenu: true\n---\nDie Seite.\n";
+                site.write("content/de/about.md", text)
+            }),
+            ("the translation removed", &|site| {
+                site.remove("content/de/about.md")
+            }),
         ],
     );
 }
