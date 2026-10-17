@@ -67,6 +67,13 @@ What changed in each release of Statac, the newest first.
   once, naming every page built through it. Where the template asked
   for more than one picture, it was told at the page with no line of
   the template, and where it asked for one, once for each page.
+- A problem with a value shown through `highlight` or `markdown` is told
+  at the filter that showed it, with the caret under the whole of what
+  it was handed. Where a template used the filter on two values worked
+  out as it ran, both were told at the first, and the caret left out an
+  opening bracket.
+- `webmention()` called more than once on a site without webmentions is
+  told at a call. It was told at the page, with no line of the template.
 
 ## 0.4.0 - 2026-10-17
 

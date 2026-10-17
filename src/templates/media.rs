@@ -115,21 +115,12 @@ impl Asking {
 
     /// The call in the template file `at` the engine placed the asking at.
     fn written_in(&self, shared: &Shared, at: usize) -> Option<Place> {
-        let written = self.written?;
-        let file = &shared.templates.files[at];
-        let text = shared.sources.text(file.source);
-        let ast = parse_template(&file.name, text).ok()?;
-        let mut found = None;
-        visit_exprs(&ast, &mut |expr| {
-            if found.is_none()
-                && let Expr::Call(call) = expr
-                && call.span() == written
-                && matches!(call.identify_call(), CallType::Method(_, name) if name == self.method)
-            {
-                found = Some(place(file.source, full_span(expr, text)));
-            }
-        });
-        found
+        call_at(
+            shared,
+            at,
+            self.written?,
+            &|call| matches!(call, CallType::Method(_, name) if *name == self.method),
+        )
     }
 
     /// Tells `kind`, which doesn't stop the page, where the asking is
@@ -164,6 +155,30 @@ fn calls(shared: &Shared, at: usize, wanted: &dyn Fn(&CallType) -> bool) -> Vec<
             && wanted(&call.identify_call())
         {
             found.push(place(source, full_span(expr, shared.sources.text(source))));
+        }
+    });
+    found
+}
+
+/// The call `wanted` picks in the template file `at` that the parser
+/// places at `span`, as the engine places a call it is running.
+pub(super) fn call_at(
+    shared: &Shared,
+    at: usize,
+    span: Span,
+    wanted: &dyn Fn(&CallType) -> bool,
+) -> Option<Place> {
+    let file = &shared.templates.files[at];
+    let text = shared.sources.text(file.source);
+    let ast = parse_template(&file.name, text).ok()?;
+    let mut found = None;
+    visit_exprs(&ast, &mut |expr| {
+        if found.is_none()
+            && let Expr::Call(call) = expr
+            && call.span() == span
+            && wanted(&call.identify_call())
+        {
+            found = Some(place(file.source, full_span(expr, text)));
         }
     });
     found

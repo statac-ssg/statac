@@ -775,6 +775,50 @@ warning  Code colours not loaded: no template asks for `code.css`
 }
 
 #[test]
+fn an_unknown_language_is_told_at_its_own_highlight_where_two_colour_worked_out_text() {
+    let site = Site::new(
+        "highlight-two",
+        "<code>{{ (\"let x\" ~ \" = 1;\") | highlight(\"pyhton\") }}</code>\n\
+         <code>{{ (\"let x\" ~ \" = 1;\") | highlight(\"rbuy\") }}</code>",
+    );
+    site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
+    let said = site.check();
+    for (word, line, carets) in [("pyhton", 3, 41), ("rbuy", 4, 39)] {
+        assert!(
+            said.contains(&format!(
+                "Statac has no colours for `{word}`\n  templates/page.html, line {line}\n   \
+                 {line} │ <code>{{{{ (\"let x\" ~ \" = 1;\") | highlight(\"{word}\") }}}}</code>\n     \
+                 │          {}\n",
+                "^".repeat(carets)
+            )),
+            "{said}"
+        );
+    }
+}
+
+#[test]
+fn html_left_open_is_told_at_its_own_markdown_where_two_show_worked_out_values() {
+    let site = Site::new(
+        "markdown-two",
+        "{{ (\"<div>a\" ~ \"\") | markdown }}\n{{ (\"<section>b\" ~ \"\") | markdown }}",
+    );
+    site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
+    let said = site.check();
+    for (tag, line, value) in [("div", 3, "<div>a"), ("section", 4, "<section>b")] {
+        let call = format!("(\"{value}\" ~ \"\") | markdown");
+        assert!(
+            said.contains(&format!(
+                "`<{tag}>` is never closed\n  templates/page.html, line {line}\n   \
+                 {line} │ {{{{ {call} }}}}\n     \
+                 │    {}\n",
+                "^".repeat(call.len())
+            )),
+            "{said}"
+        );
+    }
+}
+
+#[test]
 fn text_a_template_colours_is_told_of_a_language_unknown_and_a_line_too_long() {
     let site = Site::new(
         "highlight",
@@ -1902,6 +1946,20 @@ fn a_misspelt_name_of_a_mention_is_told_with_the_nearest() {
     );
     assert!(
         said.contains("Unknown field: `m.wrds`") && said.contains("Did you mean `m.words`?"),
+        "{said}"
+    );
+}
+
+#[test]
+fn webmention_called_twice_on_a_site_without_webmentions_is_told_at_a_call() {
+    let site = Site::mentioned("webmention-twice", "{{ webmention() }}\n{{ webmention() }}");
+    site.write("statac.yaml", &MENTIONED.replace("webmentions: true\n", ""));
+    let said = site.check();
+    assert!(
+        said.contains(
+            "warning  Webmentions off: `webmention()` writes nothing here\n  \
+             templates/page.html, line 3\n"
+        ),
         "{said}"
     );
 }

@@ -761,9 +761,9 @@ fn culprit_of_lookup(
         .map(|span| (span, None))
 }
 
-/// Where the template running now runs the filter `name` on `text`.
-/// The engine doesn't say where a filter runs, so it is found in the
-/// template: its one such, or else the one whose input, a literal, a
+/// Where the template running now runs the filter `name` on `text`: where
+/// the engine places the call running. Where it gives no place, the
+/// template's one such filter, or else the one whose input, a literal, a
 /// name or a path of names, holds `text` here, and whose first value
 /// written the same way holds `given`, where there is one; failing those,
 /// the first.
@@ -778,12 +778,17 @@ pub(super) fn filter(
     let source = shared.templates.files[*shared.templates.by_name.get(template)?].source;
     let written = shared.sources.text(source);
     let ast = parse_template(template, written).ok()?;
+    let running = state.calling_span();
+    let mut exact = None;
     let mut found: Vec<(Range<usize>, bool)> = Vec::new();
     visit_exprs(&ast, &mut |expr| {
         if let Expr::Filter(f) = expr
             && f.name == name
         {
-            let span = full_span(expr, text);
+            let span = full_span(expr, written);
+            if running == Some(f.span()) {
+                exact = Some(span.start_offset as usize..span.end_offset as usize);
+            }
             let holds = f
                 .expr
                 .as_ref()
@@ -799,6 +804,9 @@ pub(super) fn filter(
             found.push((span.start_offset as usize..span.end_offset as usize, holds));
         }
     });
+    if let Some(exact) = exact {
+        return Some(place(source, exact));
+    }
     let range = match found.as_slice() {
         [(only, _)] => only.clone(),
         _ => found

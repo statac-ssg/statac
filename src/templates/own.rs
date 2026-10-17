@@ -343,7 +343,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
                     fault: crate::problem::ArgumentFault::NeedsNames { wanted: Vec::new() },
                 }));
             }
-            webmention(&shared()?, state.name())
+            webmention(&shared()?, state)
         },
     );
 }
@@ -351,14 +351,16 @@ pub(super) fn install(env: &mut Environment<'_>) {
 /// The line naming the relay that receives the site's mentions, from the
 /// host of its `url`. Nothing on a site without webmentions, which is told
 /// at the call; nothing on one without `url`, which the site is told of.
-fn webmention(shared: &Arc<Shared>, template: &str) -> Result<Value, Error> {
+fn webmention(shared: &Arc<Shared>, state: &State) -> Result<Value, Error> {
     for name in ["webmentions", "url"] {
         frame::read(Key::Setting(shared.name_id(name)));
     }
     if shared.settings.truth("webmentions") != Some(true) {
-        let at = super::media::only_call(shared, template, &|call| {
-            matches!(call, CallType::Function("webmention"))
-        });
+        let wanted = |call: &CallType| matches!(call, CallType::Function("webmention"));
+        let running = (state.calling_span())
+            .zip(shared.templates.by_name.get(state.name()))
+            .and_then(|(span, &at)| super::media::call_at(shared, at, span, &wanted));
+        let at = running.or_else(|| super::media::only_call(shared, state.name(), &wanted));
         super::media::told_at(at, Kind::WebmentionsOff);
         return Ok(Value::from_safe_string(String::new()));
     }
