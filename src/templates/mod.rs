@@ -296,6 +296,9 @@ pub fn read(
             for &at in &read.keeps {
                 bytes[at] = b'+';
             }
+            for &at in &read.trims {
+                bytes[at] = b'-';
+            }
             text = String::from_utf8(bytes).expect("a space written as a plus");
         }
         facts.push(read);

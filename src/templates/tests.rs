@@ -724,6 +724,90 @@ fn a_branch_not_written_leaves_the_line_before_it_its_line_end() {
             ],
         ),
         (
+            "{% macro m(x) %}\n  <p>a</p>{% if x %}\n  <p>b</p>\n  {% endif %}\n  <p>c</p>\n{% endmacro %}\n{{ m(@x) }}\n",
+            &[
+                ("true", "[]", "  <p>a</p>\n  <p>b</p>\n  <p>c</p>\n"),
+                ("false", "[]", "  <p>a</p>\n  <p>c</p>\n"),
+            ],
+        ),
+        (
+            "{% set s %}\n<p>a</p>{% if @x %}\n<p>b</p>\n{% else %}\n<p>c</p>\n{% endif %}\n<p>d</p>\n{% endset %}\n{{ s }}\n",
+            &[
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>d</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>c</p>\n<p>d</p>\n"),
+            ],
+        ),
+        (
+            "{% macro w() %}{{ caller() }}{% endmacro %}\n{% call w() %}\n<p>a</p>{% for i in @l %}\n<p>{{ i }}</p>\n{% endfor %}\n<p>c</p>\n{% endcall %}\n",
+            &[
+                ("true", "[1, 2]", "<p>a</p>\n<p>1</p>\n<p>2</p>\n<p>c</p>\n"),
+                ("true", "[]", "<p>a</p>\n<p>c</p>\n"),
+            ],
+        ),
+        (
+            "{% macro m(x) %}\n  <p>a</p>\n  {% if x %}\n  <p>b</p>{% else %}\n  <p>c</p>{% endif %}\n  <p>d</p>\n{% endmacro %}\n{{ m(@x) }}\n",
+            &[
+                ("true", "[]", "  <p>a</p>\n  <p>b</p>\n  <p>d</p>\n"),
+                ("false", "[]", "  <p>a</p>\n  <p>c</p>\n  <p>d</p>\n"),
+            ],
+        ),
+        (
+            "{% set s %}\n  <p>a</p>\n  {% for i in @l %}\n  <p>{{ i }}</p>{% endfor %}\n  <p>c</p>\n{% endset %}\n{{ s }}\n",
+            &[
+                (
+                    "true",
+                    "[1, 2]",
+                    "  <p>a</p>\n  <p>1</p>\n  <p>2</p>\n  <p>c</p>\n",
+                ),
+                ("true", "[]", "  <p>a</p>\n  <p>c</p>\n"),
+            ],
+        ),
+        (
+            "{% filter upper %}\na\n{% if @x %}\nb{% endif %}\nc\n{% endfilter %}\n",
+            &[("true", "[]", "A\nB\nC\n"), ("false", "[]", "A\nC\n")],
+        ),
+        // One branch after another, and one inside another.
+        (
+            "{% macro m(x) %}\n<p>c</p>{% if x %}\n<p>d</p>\n{% endif %}\n{% if x %}\n<p>e</p>{% endif %}\n<p>f</p>\n{% endmacro %}\n{{ m(@x) }}\n",
+            &[
+                ("true", "[]", "<p>c</p>\n<p>d</p>\n<p>e</p>\n<p>f</p>\n"),
+                ("false", "[]", "<p>c</p>\n<p>f</p>\n"),
+            ],
+        ),
+        (
+            "{% macro m(a, b) %}\n<p>x</p>\n{% if a %}\n{% if b %}\n<p>y</p>{% endif %}\n<p>z</p>{% endif %}\n<p>w</p>\n{% endmacro %}\n{{ m(@x, @l) }}\n",
+            &[
+                ("true", "[1]", "<p>x</p>\n<p>y</p>\n<p>z</p>\n<p>w</p>\n"),
+                ("true", "[]", "<p>x</p>\n<p>z</p>\n<p>w</p>\n"),
+                ("false", "[1]", "<p>x</p>\n<p>w</p>\n"),
+                ("false", "[]", "<p>x</p>\n<p>w</p>\n"),
+            ],
+        ),
+        // The branch ending the body, which writes a line end either way.
+        (
+            "{% macro m(x) %}\n<p>a</p>{% if x %}\n<p>b</p>\n{% endif %}\n{% endmacro %}\n{{ m(@x) }}<p>z</p>\n",
+            &[
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>z</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>z</p>\n"),
+            ],
+        ),
+        // Where Statac can't tell, after a blank line or a line ending with
+        // a tag, the engine is handed the template as typed.
+        (
+            "{% macro m(x) %}\n<p>a</p>{% if x %}\n<p>b</p>\n\n{% endif %}\n<p>c</p>\n{% endmacro %}\n{{ m(@x) }}\n",
+            &[
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n\n<p>c</p>\n"),
+                ("false", "[]", "<p>a</p><p>c</p>\n"),
+            ],
+        ),
+        (
+            "{% macro m(x) %}\n<p>a</p>{% if x %}\n<p>b</p>{# b #}\n{% endif %}\n<p>c</p>\n{% endmacro %}\n{{ m(@x) }}\n",
+            &[
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>c</p>\n"),
+                ("false", "[]", "<p>a</p><p>c</p>\n"),
+            ],
+        ),
+        (
             "<ul>\n{% for i in @l %}\n  <li>{{ i }}</li>{% if @x %}\n  <li>more</li>\n  {% endif %}\n{% endfor %}\n</ul>\n",
             &[
                 (

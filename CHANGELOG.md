@@ -2,6 +2,19 @@
 
 What changed in each release of Statac, the newest first.
 
+## Unreleased
+
+### Fixed
+
+- A branch in the body of a `macro`, a `{% set %}` block, a
+  `{% call %}` or a `{% filter %}` keeps the lines round it apart,
+  whether or not it is written, where a tag alone on its line opens or
+  closes it, as `<p>a</p>{% if x %}` with `{% endif %}` on the line
+  after the branch, or `{% if x %}` on the line after `<p>a</p>` with
+  `<p>b</p>{% endif %}`. The line before the branch ran into the line
+  after it where the branch wasn't written, or the branch's last line
+  ran into the line after it where it was.
+
 ## 0.4.0 - 2026-10-17
 
 ### New
