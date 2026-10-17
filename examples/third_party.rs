@@ -468,6 +468,19 @@ fn list() -> String {
     )
     .unwrap();
 
+    out.push_str("\n### The template engine\n\n");
+    writeln!(
+        out,
+        "- The template engine that writes a site's pages, kept here \
+         in `crates/minijinja/`, is MiniJinja 3.0.1, whose licence names no \
+         copyright holder: Apache-2.0. https://github.com/mitsuhiko/minijinja. \
+         It holds part of self_cell, in \
+         `crates/minijinja/src/vendor/self_cell/`, also under Apache-2.0. A \
+         change made to the engine here is marked in the file it touches. \
+         [{apache}]"
+    )
+    .unwrap();
+
     out.push_str(
         "\n### C libraries built from source kept here\n\n\
          The paths are in `crates/avif-aom-sys/`.\n\n",

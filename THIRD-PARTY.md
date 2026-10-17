@@ -27,6 +27,10 @@ Statac's own code is offered under MIT or Apache-2.0, at your choice. A built `s
 
 - The HTTP server `statac serve` answers with, in `src/serve/server/`, is the server of oxhttp 0.3.3, Copyright (c) 2018 Oxigraph developers: MIT OR Apache-2.0, taken under Apache-2.0. https://github.com/oxigraph/oxhttp. [1]
 
+### The template engine
+
+- The template engine that writes a site's pages, kept here in `crates/minijinja/`, is MiniJinja 3.0.1, whose licence names no copyright holder: Apache-2.0. https://github.com/mitsuhiko/minijinja. It holds part of self_cell, in `crates/minijinja/src/vendor/self_cell/`, also under Apache-2.0. A change made to the engine here is marked in the file it touches. [1]
+
 ### C libraries built from source kept here
 
 The paths are in `crates/avif-aom-sys/`.
@@ -73,7 +77,7 @@ A binary for Linux that asks nothing of the system's C library links a C library
 
 ### Rust crates
 
-The 165 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
+The 164 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
 
 | Crate | Version | Its licence | Taken under | Texts |
 | --- | --- | --- | --- | --- |
@@ -154,7 +158,6 @@ The 165 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `memchr` | 2.8.3 | Unlicense OR MIT | MIT | [15] [16] |
 | `memmap2` | 0.9.11 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `mimalloc` | 0.1.52 | MIT | MIT | [29] |
-| `minijinja` | 3.0.1 | Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.8.9 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.9.1 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
 | `mio` | 1.2.4 | MIT | MIT | [30] |

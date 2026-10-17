@@ -1,0 +1,1354 @@
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+#[cfg(feature = "macros")]
+use std::mem;
+
+use crate::compiler::instructions::{
+    CompareOp, Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
+};
+use crate::environment::Environment;
+use crate::error::{Error, ErrorKind};
+use crate::output::{CaptureMode, Output};
+use crate::utils::{untrusted_size_hint, write_escaped, AutoEscape, UndefinedBehavior};
+use crate::value::namespace_object::Namespace;
+use crate::value::{
+    checked, ops, value_map_with_capacity, Kwargs, MaybeInvalid, ObjectRepr, UndefinedOrigin,
+    UndefinedType, Value, ValueMap, ValueRepr,
+};
+use crate::vm::context::{Frame, Stack};
+use crate::vm::loop_object::{Loop, LoopState};
+#[cfg(feature = "multi_template")]
+use crate::vm::state::{BlockStack, BlockState};
+
+pub(crate) use crate::vm::context::Context;
+pub use crate::vm::state::State;
+
+#[cfg(feature = "macros")]
+type ClosureId = usize;
+#[cfg(feature = "macros")]
+type Closure<'env> = BTreeMap<&'env str, Value>;
+
+mod context;
+#[cfg(feature = "fuel")]
+mod fuel;
+mod loop_object;
+#[cfg(feature = "macros")]
+mod macro_object;
+#[cfg(feature = "multi_template")]
+mod module_object;
+mod state;
+
+// the cost of a single include against the stack limit.
+#[cfg(feature = "multi_template")]
+const INCLUDE_RECURSION_COST: usize = 10;
+
+// the cost of a single macro call against the stack limit.
+#[cfg(feature = "macros")]
+const MACRO_RECURSION_COST: usize = 4;
+
+struct Executor<'env>(std::marker::PhantomData<&'env Environment<'env>>);
+
+#[cfg(feature = "multi_template")]
+pub(crate) fn prepare_blocks<'env, 'template>(
+    blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+) -> BTreeMap<&'env str, BlockStack<'template, 'env>> {
+    let mut rv = BTreeMap::new();
+    for (name, instr) in blocks.iter() {
+        rv.insert(*name, BlockStack::new(instr));
+    }
+    rv
+}
+
+fn get_or_lookup_local<'a, F>(vec: &mut [Option<&'a Value>], idx: u8, f: F) -> Option<&'a Value>
+where
+    F: FnOnce() -> Option<&'a Value>,
+{
+    if idx == !0 {
+        f()
+    } else if let Some(Some(rv)) = vec.get(idx as usize) {
+        Some(*rv)
+    } else {
+        let val = some!(f());
+        vec[idx as usize] = Some(val);
+        Some(val)
+    }
+}
+
+fn normalize_filter_test_name(name: &str) -> Cow<'_, str> {
+    if name.as_bytes().iter().any(|b| b.is_ascii_whitespace()) {
+        let mut normalized = String::with_capacity(name.len());
+        normalized.extend(name.chars().filter(|c| !c.is_ascii_whitespace()));
+        Cow::Owned(normalized)
+    } else {
+        Cow::Borrowed(name)
+    }
+}
+
+pub(crate) fn eval<'env, 'template>(
+    env: &'env Environment<'env>,
+    instructions: &'template Instructions<'env>,
+    root: Value,
+    blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+    out: &mut Output,
+    auto_escape: AutoEscape,
+) -> Result<(Option<Value>, State<'template, 'env>), Error> {
+    Executor::eval(env, instructions, root, blocks, out, auto_escape)
+}
+
+#[cfg(feature = "multi_template")]
+pub(crate) fn call_block<'env>(
+    name: &str,
+    state: &mut State<'_, 'env>,
+    out: &mut Output,
+) -> Result<Option<Value>, Error> {
+    Executor::call_block(name, state, out)
+}
+
+#[cfg(feature = "macros")]
+pub(crate) fn eval_macro<'env, 'template>(
+    state: &mut State<'template, 'env>,
+    instructions_id: usize,
+    pc: u32,
+    out: &mut Output,
+    closure: Option<ClosureId>,
+    caller: Option<Value>,
+    args: Vec<Value>,
+) -> Result<Option<Value>, Error> {
+    Executor::eval_macro(state, instructions_id, pc, out, closure, caller, args)
+}
+
+impl<'env> Executor<'env> {
+    pub(crate) fn eval<'template>(
+        env: &'env Environment<'env>,
+        instructions: &'template Instructions<'env>,
+        root: Value,
+        _blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+        out: &mut Output,
+        auto_escape: AutoEscape,
+    ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
+        let mut state = State::new(
+            Context::new_with_frame(env, ok!(Frame::new_checked(root))),
+            auto_escape,
+            instructions,
+            #[cfg(feature = "multi_template")]
+            prepare_blocks(_blocks),
+        );
+        Self::eval_state(&mut state, out).map(|x| (x, state))
+    }
+
+    /// Evaluates a macro by temporarily switching the active state.
+    #[cfg(feature = "macros")]
+    pub(crate) fn eval_macro<'template>(
+        state: &mut State<'template, 'env>,
+        instructions_id: usize,
+        pc: u32,
+        out: &mut Output,
+        closure: Option<ClosureId>,
+        caller: Option<Value>,
+        args: Vec<Value>,
+    ) -> Result<Option<Value>, Error> {
+        let instructions = *state
+            .macro_instructions
+            .get(&instructions_id)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    "cannot call this macro. template state went away.",
+                )
+            })?;
+        let context_base = state.ctx.clone_base();
+        let mut ctx = state
+            .macro_context_pool
+            .pop()
+            .unwrap_or_else(|| Context::new(state.env()));
+        ctx.reset_with_frame(Frame::new(context_base));
+        let closure_frame = Frame {
+            closure_context: closure,
+            ..Frame::default()
+        };
+        if let Err(err) = ctx.push_frame(closure_frame) {
+            ctx.clear();
+            state.macro_context_pool.push(ctx);
+            return Err(err);
+        }
+        if let Some(caller) = caller {
+            ctx.store(&mut state.closures, "caller", caller);
+        }
+        if let Err(err) = ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST) {
+            ctx.clear();
+            state.macro_context_pool.push(ctx);
+            return Err(err);
+        }
+
+        let old_ctx = mem::replace(&mut state.ctx, ctx);
+        let auto_escape = state.auto_escape.clone();
+        let rv = state.with_execution_state(
+            instructions,
+            auto_escape,
+            #[cfg(feature = "multi_template")]
+            None,
+            #[cfg(feature = "multi_template")]
+            BlockState::Isolate,
+            |state| Self::do_eval(state, out, Stack::from(args), pc),
+        );
+
+        let mut macro_ctx = mem::replace(&mut state.ctx, old_ctx);
+        macro_ctx.clear();
+        state.macro_context_pool.push(macro_ctx);
+        rv
+    }
+
+    /// This is the actual evaluation loop that works with a specific context.
+    #[inline(always)]
+    fn eval_state(state: &mut State<'_, 'env>, out: &mut Output) -> Result<Option<Value>, Error> {
+        Self::do_eval(state, out, Stack::default(), 0)
+    }
+
+    /// Performs the actual evaluation, optionally with stack growth functionality.
+    fn do_eval(
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+        stack: Stack,
+        pc: u32,
+    ) -> Result<Option<Value>, Error> {
+        #[cfg(feature = "stacker")]
+        {
+            stacker::maybe_grow(32 * 1024, 1024 * 1024, || {
+                Self::eval_impl(state, out, stack, pc)
+            })
+        }
+        #[cfg(not(feature = "stacker"))]
+        {
+            Self::eval_impl(state, out, stack, pc)
+        }
+    }
+
+    #[inline]
+    fn eval_impl(
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+        mut stack: Stack,
+        mut pc: u32,
+    ) -> Result<Option<Value>, Error> {
+        let initial_auto_escape = state.auto_escape.clone();
+        let undefined_behavior = state.undefined_behavior();
+        let strict_undefined = matches!(
+            undefined_behavior,
+            UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict
+        );
+        #[cfg(feature = "debug")]
+        let track_undefined_origins = state.env().debug();
+
+        // in debug mode, undefined values remember the instruction that
+        // created them so that errors can later point back to it.
+        macro_rules! undefined_origin {
+            () => {{
+                #[cfg(feature = "debug")]
+                {
+                    if track_undefined_origins {
+                        state.make_undefined_origin(pc)
+                    } else {
+                        UndefinedOrigin::NONE
+                    }
+                }
+                #[cfg(not(feature = "debug"))]
+                {
+                    UndefinedOrigin::NONE
+                }
+            }};
+        }
+        let mut auto_escape_stack = vec![];
+        let mut next_loop_recursion_jump = None;
+        let mut loaded_filters = [None; MAX_LOCALS];
+        let mut loaded_tests = [None; MAX_LOCALS];
+
+        // If we are extending we are holding the instructions of the target parent
+        // template here.  This is used to detect multiple extends and the evaluation
+        // uses these instructions when it makes it to the end of the instructions.
+        #[cfg(feature = "multi_template")]
+        let mut parent_instructions = None;
+
+        macro_rules! recurse_loop {
+            ($capture:expr, $loop_object:expr) => {{
+                let Some(jump_target) = $loop_object.recurse_jump_target else {
+                    bail!(Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot recurse outside of recursive loop",
+                    ))
+                };
+                // the way this works is that we remember the next instruction
+                // as loop exit jump target.  Whenever a loop is pushed, it
+                // memorizes the value in `next_loop_iteration_jump` to jump
+                // to.
+                next_loop_recursion_jump = Some((pc + 1, $capture));
+                if $capture {
+                    out.begin_capture(CaptureMode::Capture);
+                }
+                pc = jump_target;
+                continue;
+            }};
+        }
+
+        // looks nicer this way
+        #[allow(clippy::while_let_loop)]
+        loop {
+            let instr = match state.instructions.get(pc) {
+                Some(instr) => instr,
+                #[cfg(not(feature = "multi_template"))]
+                None => break,
+                #[cfg(feature = "multi_template")]
+                None => {
+                    // when an extends statement appears in a template, when we hit the
+                    // last instruction we need to check if parent instructions were
+                    // stashed away (which means we found an extends tag which invoked
+                    // `LoadBlocks`).  If we do find instructions, we reset back to 0
+                    // from the new instructions.
+                    state.instructions = match parent_instructions.take() {
+                        Some(instr) => instr,
+                        None => break,
+                    };
+                    out.end_capture(&AutoEscape::None);
+                    pc = 0;
+                    // because we swap out the instructions we also need to unload all
+                    // the filters and tests to ensure that we are not accidentally
+                    // reusing the local_ids for completely different filters.
+                    loaded_filters = [None; MAX_LOCALS];
+                    loaded_tests = [None; MAX_LOCALS];
+                    continue;
+                }
+            };
+
+            // if we only have two arguments that we pull from the stack, we
+            // can assign them to a and b.  This slightly reduces the amount of
+            // code bloat generated here.  Same with the error.
+            let a;
+            let b;
+            let mut err;
+
+            macro_rules! func_binop {
+                ($method:ident) => {{
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push(ctx_ok!(ops::$method(&a, &b)));
+                }};
+            }
+
+            macro_rules! op_binop {
+                ($op:tt) => {{
+                    b = stack.pop();
+                    a = stack.pop();
+                    ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                    ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                    stack.push(Value::from(a $op b));
+                }};
+            }
+
+            macro_rules! bail {
+                ($err:expr) => {{
+                    err = $err;
+                    process_err(&mut err, pc, state);
+                    return Err(err);
+                }};
+            }
+
+            macro_rules! ctx_ok {
+                ($expr:expr) => {
+                    match $expr {
+                        Ok(rv) => rv,
+                        Err(err) => bail!(err),
+                    }
+                };
+            }
+
+            macro_rules! assert_valid {
+                ($expr:expr) => {{
+                    let val = $expr;
+                    match val.validate() {
+                        Ok(val) => val,
+                        Err(err) => bail!(err),
+                    }
+                }};
+            }
+
+            // if the fuel consumption feature is enabled, track the fuel
+            // consumption here.
+            #[cfg(feature = "fuel")]
+            if let Some(ref mut tracker) = state.fuel_tracker {
+                ctx_ok!(tracker.track(instr));
+            }
+
+            match instr {
+                Instruction::Swap => {
+                    a = stack.pop();
+                    b = stack.pop();
+                    stack.push(a);
+                    stack.push(b);
+                }
+                Instruction::EmitRaw(val) => {
+                    // this only produces a format error, no need to attach
+                    // location information.
+                    ok!(out.write_str(val).map_err(Error::from));
+                }
+                Instruction::Emit => {
+                    let value = stack.pop();
+                    if state.env().is_default_formatter() {
+                        if strict_undefined
+                            && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default, _))
+                        {
+                            bail!(Error::undefined(&value));
+                        }
+                        ctx_ok!(write_escaped(out, &state.auto_escape, &value));
+                    } else {
+                        ctx_ok!(state.env().format(&value, state, out));
+                    }
+                }
+                Instruction::StoreLocal(name) => {
+                    state.ctx.store(
+                        #[cfg(feature = "macros")]
+                        &mut state.closures,
+                        name,
+                        stack.pop(),
+                    );
+                }
+                Instruction::Lookup(name) => {
+                    stack.push(match state.lookup(name) {
+                        Some(value) => assert_valid!(value),
+                        None => Value::undefined_with_origin(undefined_origin!()),
+                    });
+                }
+                Instruction::GetAttr(name) => {
+                    a = stack.pop();
+                    // This is a common enough operation that it's interesting to consider a fast
+                    // path here.  This is slightly faster than the regular attr lookup because we
+                    // do not need to pass down the error object for the more common success case.
+                    // Only when we cannot look up something, we start to consider the undefined
+                    // special case.
+                    stack.push(match a.get_attr_fast(name) {
+                        Some(value) => assert_valid!(value),
+                        None => {
+                            ctx_ok!(undefined_behavior.handle_undefined(&a, undefined_origin!()))
+                        }
+                    });
+                }
+                Instruction::SetAttr(name) => {
+                    b = stack.pop();
+                    a = stack.pop();
+                    if let Some(ns) = b.downcast_object_ref::<Namespace>() {
+                        ns.set_value(name, a);
+                    } else {
+                        bail!(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("can only assign to namespaces, not {}", b.kind())
+                        )
+                        .with_undefined_origin(&b));
+                    }
+                }
+                Instruction::GetItem => {
+                    a = stack.pop();
+                    b = stack.pop();
+                    stack.push(match b.get_item_opt(&a) {
+                        Some(value) => assert_valid!(value),
+                        None => {
+                            ctx_ok!(undefined_behavior.handle_undefined(&b, undefined_origin!()))
+                        }
+                    });
+                }
+                Instruction::Slice => {
+                    let step = stack.pop();
+                    let stop = stack.pop();
+                    b = stack.pop();
+                    a = stack.pop();
+                    if a.is_undefined() && matches!(undefined_behavior, UndefinedBehavior::Strict) {
+                        bail!(Error::undefined(&a));
+                    }
+                    stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
+                }
+                Instruction::LoadConst(value) => {
+                    stack.push(value.clone());
+                }
+                Instruction::BuildMap(pair_count) => {
+                    let mut map = value_map_with_capacity(*pair_count);
+                    stack.reverse_top(*pair_count * 2);
+                    for _ in 0..*pair_count {
+                        let key = stack.pop();
+                        let value = stack.pop();
+                        map.insert(key, value);
+                    }
+                    stack.push(Value::from_object(map))
+                }
+                Instruction::BuildKwargs(pair_count) => {
+                    let mut map = value_map_with_capacity(*pair_count);
+                    stack.reverse_top(*pair_count * 2);
+                    for _ in 0..*pair_count {
+                        let key = stack.pop();
+                        let value = stack.pop();
+                        map.insert(key, value);
+                    }
+                    stack.push(Kwargs::wrap(map))
+                }
+                Instruction::MergeKwargs(count) => {
+                    let mut kwargs_sources = Vec::from_iter((0..*count).map(|_| stack.pop()));
+                    kwargs_sources.reverse();
+                    stack.push(ctx_ok!(Self::merge_kwargs(state, kwargs_sources)));
+                }
+                Instruction::BuildList(n) => {
+                    let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
+                    let mut v = Vec::with_capacity(untrusted_size_hint(count));
+                    for _ in 0..count {
+                        v.push(stack.pop());
+                    }
+                    v.reverse();
+                    stack.push(Value::from_object(v))
+                }
+                Instruction::BuildTuple(n) => {
+                    use crate::value::Tuple;
+                    let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
+                    let tuple = match count {
+                        0 => Tuple::default(),
+                        1 => Tuple::from([stack.pop()]),
+                        2 => {
+                            let second = stack.pop();
+                            Tuple::from([stack.pop(), second])
+                        }
+                        _ => {
+                            let mut values = Vec::with_capacity(untrusted_size_hint(count));
+                            for _ in 0..count {
+                                values.push(stack.pop());
+                            }
+                            values.reverse();
+                            Tuple::from(values)
+                        }
+                    };
+                    stack.push(Value::from(tuple))
+                }
+                Instruction::UnpackList(count) => {
+                    ctx_ok!(Self::unpack_list(&mut stack, *count));
+                }
+                Instruction::UnpackLists(count) => {
+                    let lists = Vec::from_iter((0..*count).map(|_| stack.pop()));
+                    let mut len = 0;
+                    for list in lists.into_iter().rev() {
+                        for item in ctx_ok!(list.try_iter()) {
+                            ctx_ok!(item.check());
+                            stack.push(item);
+                            len += 1;
+                        }
+                    }
+                    stack.push(Value::from(len));
+                }
+                Instruction::Add => func_binop!(add),
+                Instruction::Sub => func_binop!(sub),
+                Instruction::Mul => func_binop!(mul),
+                Instruction::Div => func_binop!(div),
+                Instruction::IntDiv => func_binop!(int_div),
+                Instruction::Rem => func_binop!(rem),
+                Instruction::Pow => func_binop!(pow),
+                Instruction::Eq => op_binop!(==),
+                Instruction::Ne => op_binop!(!=),
+                Instruction::Gt => op_binop!(>),
+                Instruction::Gte => op_binop!(>=),
+                Instruction::Lt => op_binop!(<),
+                Instruction::Lte => op_binop!(<=),
+                Instruction::Not => {
+                    a = stack.pop();
+                    stack.push(Value::from(!ctx_ok!(undefined_behavior.is_true(&a))));
+                }
+                Instruction::StringConcat => {
+                    a = stack.pop();
+                    b = stack.pop();
+                    ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                    ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                    stack.push(ops::string_concat(b, &a));
+                }
+                Instruction::In => {
+                    a = stack.pop();
+                    b = stack.pop();
+                    // the in-operator can fail if either side is undefined and
+                    // we are in strict mode.
+                    ctx_ok!(state.undefined_behavior().assert_iterable(&a));
+                    ctx_ok!(state.undefined_behavior().assert_value_not_undefined(&b));
+                    stack.push(ctx_ok!(ops::contains(&a, &b)));
+                }
+                Instruction::CompareAndPreserve(op) => {
+                    b = stack.pop();
+                    a = stack.pop();
+                    let result = match op {
+                        CompareOp::Eq => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a == b
+                        }
+                        CompareOp::Ne => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a != b
+                        }
+                        CompareOp::Lt => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a < b
+                        }
+                        CompareOp::Lte => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a <= b
+                        }
+                        CompareOp::Gt => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a > b
+                        }
+                        CompareOp::Gte => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a >= b
+                        }
+                        CompareOp::In | CompareOp::NotIn => {
+                            ctx_ok!(undefined_behavior.assert_iterable(&b));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            let contains = ctx_ok!(ops::contains(&b, &a)).is_true();
+                            if matches!(op, CompareOp::NotIn) {
+                                !contains
+                            } else {
+                                contains
+                            }
+                        }
+                    };
+                    stack.push(b);
+                    stack.push(Value::from(result));
+                }
+                Instruction::Neg => {
+                    a = stack.pop();
+                    stack.push(ctx_ok!(ops::neg(&a)));
+                }
+                Instruction::PushWith => {
+                    ctx_ok!(state.ctx.push_frame(Frame::default()));
+                }
+                Instruction::PopFrame => {
+                    state.ctx.pop_frame();
+                }
+                Instruction::PopLoopFrame => {
+                    let mut l = state.ctx.pop_frame().current_loop.unwrap();
+                    if let Some((target, end_capture)) = l.current_recursion_jump.take() {
+                        pc = target;
+                        if end_capture {
+                            stack.push(out.end_capture(&state.auto_escape));
+                        }
+                        continue;
+                    }
+                }
+                #[cfg(feature = "macros")]
+                Instruction::IsUndefined => {
+                    a = stack.pop();
+                    stack.push(Value::from(a.is_undefined()));
+                }
+                Instruction::PushLoop(flags) => {
+                    a = stack.pop();
+                    ctx_ok!(Self::push_loop(
+                        state,
+                        a,
+                        *flags,
+                        pc,
+                        next_loop_recursion_jump.take()
+                    ));
+                }
+                Instruction::Iterate(jump_target) => {
+                    match state.ctx.next_loop_item() {
+                        Some(item) => stack.push(assert_valid!(item)),
+                        None => {
+                            pc = *jump_target;
+                            continue;
+                        }
+                    };
+                }
+                Instruction::PushDidNotIterate => {
+                    stack.push(Value::from(
+                        state.ctx.current_loop().unwrap().did_not_iterate(),
+                    ));
+                }
+                Instruction::Jump(jump_target) => {
+                    pc = *jump_target;
+                    continue;
+                }
+                Instruction::JumpIfFalse(jump_target) => {
+                    a = stack.pop();
+                    if !ctx_ok!(undefined_behavior.is_true(&a)) {
+                        pc = *jump_target;
+                        continue;
+                    }
+                }
+                Instruction::JumpIfFalseOrPop(jump_target) => {
+                    if !ctx_ok!(undefined_behavior.is_true(stack.peek())) {
+                        pc = *jump_target;
+                        continue;
+                    } else {
+                        stack.pop();
+                    }
+                }
+                Instruction::JumpIfTrueOrPop(jump_target) => {
+                    if ctx_ok!(undefined_behavior.is_true(stack.peek())) {
+                        pc = *jump_target;
+                        continue;
+                    } else {
+                        stack.pop();
+                    }
+                }
+                Instruction::PushAutoEscape => {
+                    a = stack.pop();
+                    let new_auto_escape =
+                        ctx_ok!(Self::derive_auto_escape(a, &initial_auto_escape));
+                    auto_escape_stack
+                        .push(std::mem::replace(&mut state.auto_escape, new_auto_escape));
+                }
+                Instruction::PopAutoEscape => {
+                    state.auto_escape = auto_escape_stack.pop().unwrap();
+                }
+                Instruction::BeginCapture(mode) => {
+                    out.begin_capture(*mode);
+                }
+                Instruction::EndCapture => {
+                    stack.push(out.end_capture(&state.auto_escape));
+                }
+                Instruction::ApplyFilter(name, arg_count, local_id) => {
+                    let normalized_name = normalize_filter_test_name(name);
+                    let filter =
+                        ctx_ok!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
+                            state.env().get_filter(normalized_name.as_ref())
+                        })
+                        .ok_or_else(|| {
+                            Error::new(
+                                ErrorKind::UnknownFilter,
+                                format!("filter {} is unknown", normalized_name.as_ref()),
+                            )
+                        }));
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
+                    a = ctx_ok!(filter.call(state, args));
+                    stack.drop_top(arg_count);
+                    stack.push(a);
+                }
+                Instruction::PerformTest(name, arg_count, local_id) => {
+                    let normalized_name = normalize_filter_test_name(name);
+                    let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
+                        state.env().get_test(normalized_name.as_ref())
+                    })
+                    .ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::UnknownTest,
+                            format!("test {} is unknown", normalized_name.as_ref()),
+                        )
+                    }));
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
+                    a = ctx_ok!(test.call(state, args));
+                    stack.drop_top(arg_count);
+                    stack.push(Value::from(a.is_true()));
+                }
+                Instruction::CallFunction(name, arg_count) => {
+                    let args = stack.get_call_args(*arg_count);
+                    // super is a special function reserved for super-ing into blocks.
+                    let rv = if cfg!(feature = "multi_template") && *name == "super" {
+                        #[cfg(feature = "multi_template")]
+                        {
+                            if !args.is_empty() {
+                                bail!(Error::new(
+                                    ErrorKind::InvalidOperation,
+                                    "super() takes no arguments",
+                                ));
+                            }
+                            ctx_ok!(Self::perform_super(state, out, true))
+                        }
+                        #[cfg(not(feature = "multi_template"))]
+                        unreachable!()
+                    } else if let Some(func) = state.lookup(name) {
+                        // calling loops is a special operation that starts the recursion process.
+                        // this bypasses the actual `call` implementation which would just fail
+                        // with an error.
+                        if let Some(loop_object) = func.downcast_object_ref::<Loop>() {
+                            if args.len() != 1 {
+                                bail!(Error::new(
+                                    ErrorKind::InvalidOperation,
+                                    "loop() takes one argument"
+                                ));
+                            }
+                            recurse_loop!(true, loop_object);
+                        } else {
+                            ctx_ok!(func.call(state, args))
+                        }
+                    } else {
+                        bail!(Error::new(
+                            ErrorKind::UnknownFunction,
+                            format!("{name} is unknown"),
+                        ));
+                    };
+                    let arg_count = args.len();
+                    stack.drop_top(arg_count);
+                    stack.push(rv);
+                }
+                Instruction::CallMethod(name, arg_count) => {
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
+                    a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
+                    stack.drop_top(arg_count);
+                    stack.push(a);
+                }
+                Instruction::CallObject(arg_count) => {
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
+                    a = ctx_ok!(args[0].call(state, &args[1..]));
+                    stack.drop_top(arg_count);
+                    stack.push(a);
+                }
+                Instruction::DupTop => {
+                    stack.push(stack.peek().clone());
+                }
+                Instruction::DiscardTop => {
+                    stack.pop();
+                }
+                #[cfg(feature = "multi_template")]
+                Instruction::FastSuper => {
+                    ctx_ok!(Self::perform_super(state, out, false));
+                }
+                Instruction::FastRecurse => match state.ctx.current_loop() {
+                    Some(l) => recurse_loop!(false, &l.object),
+                    None => bail!(Error::new(ErrorKind::UnknownFunction, "loop is unknown")),
+                },
+                // Explanation on the behavior of `LoadBlocks` and rendering of
+                // inherited templates:
+                //
+                // MiniJinja inherits the behavior from Jinja2 where extending
+                // loads the blocks (`LoadBlocks`) and the rest of the template
+                // keeps executing but with output disabled, only at the end the
+                // parent template is then invoked.  This has the effect that
+                // you can still set variables or declare macros and that they
+                // become visible in the blocks.
+                //
+                // This behavior has a few downsides.  First of all what happens
+                // in the parent template overrides what happens in the child.
+                // For instance if you declare a macro named `foo` after `{%
+                // extends %}` and then a variable with that named is also set
+                // in the parent template, then you won't be able to call that
+                // macro in the body.
+                //
+                // The reason for this is that blocks unlike macros do not have
+                // closures in Jinja2/MiniJinja.
+                //
+                // However for the common case this is convenient because it
+                // lets you put some imports there and for as long as you do not
+                // create name clashes this works fine.
+                #[cfg(feature = "multi_template")]
+                Instruction::LoadBlocks => {
+                    a = stack.pop();
+                    if parent_instructions.is_some() {
+                        bail!(Error::new(
+                            ErrorKind::InvalidOperation,
+                            "tried to extend a second time in a template"
+                        ));
+                    }
+                    parent_instructions = Some(ctx_ok!(Self::load_blocks(a, state)));
+                    out.begin_capture(CaptureMode::Discard);
+                }
+                #[cfg(feature = "multi_template")]
+                Instruction::Include(ignore_missing) => {
+                    a = stack.pop();
+                    ctx_ok!(Self::perform_include(a, state, out, *ignore_missing));
+                }
+                #[cfg(feature = "multi_template")]
+                Instruction::ExportLocals => {
+                    let captured = stack.pop();
+                    let locals = state.ctx.current_locals_mut();
+                    let mut values = value_map_with_capacity(locals.len());
+                    for (key, value) in locals.iter() {
+                        values.insert(Value::from(*key), value.clone());
+                    }
+                    stack.push(Value::from_object(crate::vm::module_object::Module::new(
+                        values, captured,
+                    )));
+                }
+                #[cfg(feature = "multi_template")]
+                Instruction::CallBlock(name) => {
+                    if parent_instructions.is_none() && !out.is_discarding() {
+                        ctx_ok!(Self::call_block(name, state, out));
+                    }
+                }
+                #[cfg(feature = "macros")]
+                Instruction::BuildMacro(name, offset, flags) => {
+                    Self::build_macro(&mut stack, state, *offset, name, *flags);
+                }
+                #[cfg(feature = "macros")]
+                Instruction::Return => break,
+                #[cfg(feature = "macros")]
+                Instruction::Enclose(name) => {
+                    // The first enclosed value creates a state-owned closure shared
+                    // by all macros declared in this frame.
+                    if state.ctx.closure().is_none() {
+                        let closure = state.closures.len();
+                        state.closures.push(Closure::new());
+                        state.ctx.reset_closure(Some(closure));
+                    }
+                    state.ctx.enclose(&mut state.closures, name);
+                }
+                #[cfg(feature = "macros")]
+                Instruction::GetClosure => {
+                    stack.push(state.ctx.closure().map_or(Value::UNDEFINED, Value::from));
+                }
+            }
+            pc += 1;
+        }
+
+        Ok(stack.try_pop())
+    }
+
+    fn merge_kwargs(state: &State, values: Vec<Value>) -> Result<Value, Error> {
+        let mut rv = ValueMap::new();
+        for value in values {
+            ok!(state.undefined_behavior().assert_iterable(&value));
+            let iter = ok!(value
+                .as_object()
+                .filter(|x| x.repr() == ObjectRepr::Map)
+                .and_then(|x| x.try_iter_pairs())
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!(
+                            "attempted to apply keyword arguments from non map (got {})",
+                            value.kind()
+                        ),
+                    )
+                }));
+            for pair in checked(iter) {
+                let (key, value) = ok!(pair);
+                rv.insert(key, value);
+            }
+        }
+        Ok(Kwargs::wrap(rv))
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn perform_include(
+        name: Value,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+        ignore_missing: bool,
+    ) -> Result<(), Error> {
+        let obj = name.as_object();
+        let choices = obj
+            .as_ref()
+            .and_then(|d| d.try_iter())
+            .into_iter()
+            .flatten()
+            .chain(obj.is_none().then(|| name.clone()));
+
+        let mut templates_tried = vec![];
+        for choice in checked(choices) {
+            let choice = ok!(choice);
+            let name = ok!(choice.as_str().ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    "template name was not a string",
+                )
+            }));
+            let tmpl = match state.get_template(name) {
+                Ok(tmpl) => tmpl,
+                Err(err) => {
+                    if err.kind() == ErrorKind::TemplateNotFound {
+                        templates_tried.push(choice);
+                    } else {
+                        return Err(err);
+                    }
+                    continue;
+                }
+            };
+
+            let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
+            ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
+            let current_block = state.current_block;
+            #[cfg(feature = "macros")]
+            let old_closure = state.ctx.take_closure();
+            let rv = state.with_execution_state(
+                new_instructions,
+                tmpl.initial_auto_escape(),
+                current_block,
+                BlockState::Replace(prepare_blocks(new_blocks)),
+                |state| Self::eval_state(state, out),
+            );
+            #[cfg(feature = "macros")]
+            state.ctx.reset_closure(old_closure);
+            state.ctx.decr_depth(INCLUDE_RECURSION_COST);
+            ok!(rv.map_err(|err| {
+                Error::new(
+                    ErrorKind::BadInclude,
+                    format!("error in \"{}\"", tmpl.name()),
+                )
+                .with_source(err)
+            }));
+            return Ok(());
+        }
+        if !templates_tried.is_empty() && !ignore_missing {
+            Err(Error::new(
+                ErrorKind::TemplateNotFound,
+                if templates_tried.len() == 1 {
+                    format!(
+                        "tried to include non-existing template {:?}",
+                        templates_tried[0]
+                    )
+                } else {
+                    format!(
+                        "tried to include one of multiple templates, none of which existed {}",
+                        Value::from(templates_tried)
+                    )
+                },
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn perform_super(
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+        capture: bool,
+    ) -> Result<Value, Error> {
+        let name = ok!(state.current_block.ok_or_else(|| {
+            Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
+        }));
+
+        if !state.blocks.get_mut(name).unwrap().push() {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "no parent block exists",
+            ));
+        }
+
+        if let Err(err) = state.ctx.push_frame(Frame::default()) {
+            state.blocks.get_mut(name).unwrap().pop();
+            return Err(err);
+        }
+        if capture {
+            out.begin_capture(CaptureMode::Capture);
+        }
+
+        let instructions = state.blocks.get(name).unwrap().instructions();
+        let auto_escape = state.auto_escape.clone();
+        let current_block = state.current_block;
+        let rv = state.with_execution_state(
+            instructions,
+            auto_escape,
+            current_block,
+            BlockState::Keep,
+            |state| Self::eval_state(state, out),
+        );
+        state.ctx.pop_frame();
+        state.blocks.get_mut(name).unwrap().pop();
+
+        ok!(rv.map_err(|err| {
+            Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
+        }));
+        if capture {
+            Ok(out.end_capture(&state.auto_escape))
+        } else {
+            Ok(Value::UNDEFINED)
+        }
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn load_blocks(
+        name: Value,
+        state: &mut State<'_, 'env>,
+    ) -> Result<&'env Instructions<'env>, Error> {
+        let Some(name) = name.as_str() else {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "template name was not a string",
+            ));
+        };
+        if state.loaded_templates.contains(&name) {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("cycle in template inheritance. {name:?} was referenced more than once"),
+            ));
+        }
+        let tmpl = ok!(state.get_template(name));
+        let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
+        state.loaded_templates.insert(new_instructions.name());
+        for (name, instr) in new_blocks.iter() {
+            state
+                .blocks
+                .entry(name)
+                .or_default()
+                .append_instructions(instr);
+        }
+        Ok(new_instructions)
+    }
+
+    #[cfg(feature = "multi_template")]
+    pub(crate) fn call_block(
+        name: &str,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+    ) -> Result<Option<Value>, Error> {
+        if let Some((name, block_stack)) = state.blocks.get_key_value(name) {
+            if block_stack.len() == 1 && block_stack.instructions().is_required_block() {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("Required block '{name}' not found"),
+                ));
+            }
+            let instructions = block_stack.instructions();
+            let auto_escape = state.auto_escape.clone();
+            state.with_execution_state(
+                instructions,
+                auto_escape,
+                Some(name),
+                BlockState::Keep,
+                |state| {
+                    ok!(state.ctx.push_frame(Frame::default()));
+                    Self::eval_state(state, out)
+                },
+            )
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownBlock,
+                format!("block '{name}' not found"),
+            ))
+        }
+    }
+
+    fn derive_auto_escape(
+        value: Value,
+        initial_auto_escape: &AutoEscape,
+    ) -> Result<AutoEscape, Error> {
+        match (value.as_str(), value == Value::from(true)) {
+            (Some("html"), _) => Ok(AutoEscape::Html),
+            #[cfg(feature = "json")]
+            (Some("json"), _) => Ok(AutoEscape::Json),
+            (Some("none"), _) | (None, false) => Ok(AutoEscape::None),
+            (None, true) => Ok(if matches!(initial_auto_escape, AutoEscape::None) {
+                AutoEscape::Html
+            } else {
+                initial_auto_escape.clone()
+            }),
+            _ => Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "invalid value to autoescape tag",
+            )),
+        }
+    }
+
+    fn push_loop(
+        state: &mut State<'_, 'env>,
+        iterable: Value,
+        flags: u8,
+        pc: u32,
+        current_recursion_jump: Option<(u32, bool)>,
+    ) -> Result<(), Error> {
+        let iter = ok!(state
+            .undefined_behavior()
+            .try_iter(iterable)
+            .map_err(|mut err| {
+                if let Some((jump_instr, _)) = current_recursion_jump {
+                    // When a recursion error happens, we need to process the error at both the
+                    // recursion call site and the loop definition.  This is because the error
+                    // happens at the recursion call site, but the loop definition is where the
+                    // recursion is defined.  This helps provide a more helpful error message.
+                    // For better reporting we basically turn this around.  jump_pc - 1 is the
+                    // location of FastRecurse or CallFunction.
+                    process_err(&mut err, pc, state);
+                    let mut call_err = Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot recurse because of non-iterable value",
+                    );
+                    process_err(&mut call_err, jump_instr - 1, state);
+                    call_err.with_source(err)
+                } else {
+                    err
+                }
+            }));
+        let depth = state
+            .ctx
+            .current_loop()
+            .filter(|x| x.object.recurse_jump_target.is_some())
+            .map_or(0, |x| x.object.depth + 1);
+        state.ctx.push_frame(Frame {
+            current_loop: Some(LoopState::new(
+                iter,
+                depth,
+                flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
+                (flags & LOOP_FLAG_RECURSIVE != 0).then_some(pc),
+                current_recursion_jump,
+            )),
+            ..Frame::default()
+        })
+    }
+
+    fn unpack_list(stack: &mut Stack, count: usize) -> Result<(), Error> {
+        let top = stack.pop();
+        let iter = ok!(top.as_object().and_then(|x| x.try_iter()).ok_or_else(|| {
+            Error::new(ErrorKind::CannotUnpack, "value is not iterable").with_undefined_origin(&top)
+        }));
+
+        let mut n = 0;
+        for item in checked(iter) {
+            stack.push(ok!(item));
+            n += 1;
+        }
+
+        if n == count {
+            stack.reverse_top(n);
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::CannotUnpack,
+                format!("sequence of wrong length (expected {count}, got {n})",),
+            ))
+        }
+    }
+
+    #[cfg(feature = "macros")]
+    fn build_macro(stack: &mut Stack, state: &mut State, offset: u32, name: &str, flags: u8) {
+        use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::Macro};
+
+        let arg_spec = stack.pop().try_iter().unwrap().collect();
+        let closure = stack.pop().as_usize();
+        let instructions_id = state.instructions as *const Instructions<'_> as usize;
+        state
+            .macro_instructions
+            .entry(instructions_id)
+            .or_insert(state.instructions);
+        stack.push(Value::from_object(Macro {
+            name: Value::from(name),
+            arg_spec,
+            instructions_id,
+            offset,
+            state_id: state.id,
+            closure,
+            caller_reference: (flags & MACRO_CALLER) != 0,
+        }));
+    }
+}
+
+#[inline(never)]
+#[cold]
+fn process_err(err: &mut Error, pc: u32, state: &State) {
+    // only attach line information if the error does not have line info yet.
+    if err.line().is_none() {
+        if let Some(span) = state.instructions.get_span(pc) {
+            err.set_filename_and_span(state.instructions.name(), span);
+        } else if let Some(lineno) = state.instructions.get_line(pc) {
+            err.set_filename_and_line(state.instructions.name(), lineno);
+        }
+    }
+    // only attach debug info if we don't have one yet and we are in debug mode.
+    #[cfg(feature = "debug")]
+    {
+        if let Some(origin) = err.take_undefined_origin() {
+            if let Some((expr, location)) = describe_undefined_origin(origin, err, state) {
+                let detail = match (err.detail(), location) {
+                    (None, None) => format!("`{expr}` is undefined"),
+                    (None, Some(loc)) => format!("`{expr}` is undefined (from {loc})"),
+                    (Some(detail), None) => format!("{detail} (`{expr}` is undefined)"),
+                    (Some(detail), Some(loc)) => {
+                        format!("{detail} (`{expr}` is undefined, from {loc})")
+                    }
+                };
+                err.set_detail(detail);
+            }
+        }
+        if state.env().debug() && err.debug_info().is_none() {
+            err.attach_debug_info(state.make_debug_info(pc, state.instructions));
+        }
+    }
+}
+
+/// Resolves the origin of an undefined value.
+///
+/// Returns the expression that produced the undefined value (eg: `user.name`)
+/// and, if it differs from where the error is reported, the location where
+/// it was created.
+#[cfg(feature = "debug")]
+fn describe_undefined_origin(
+    origin: UndefinedOrigin,
+    err: &Error,
+    state: &State,
+) -> Option<(String, Option<String>)> {
+    let instructions = state.undefined_origins.get(&origin.instructions_id)?;
+    let expr = describe_expr_at(instructions, origin.pc, &jump_targets(instructions))?;
+    let location = instructions.get_line(origin.pc).and_then(|line| {
+        if err.name() != Some(instructions.name()) {
+            Some(format!("{}:{}", instructions.name(), line))
+        } else if err.line() != Some(line) {
+            Some(format!("line {line}"))
+        } else {
+            None
+        }
+    });
+    Some((expr, location))
+}
+
+/// Returns all instruction indexes that are targets of jumps.
+#[cfg(feature = "debug")]
+fn jump_targets(instructions: &Instructions<'_>) -> std::collections::BTreeSet<u32> {
+    let mut rv = std::collections::BTreeSet::new();
+    for instr in instructions.instructions.iter() {
+        match *instr {
+            Instruction::Jump(target)
+            | Instruction::JumpIfFalse(target)
+            | Instruction::JumpIfFalseOrPop(target)
+            | Instruction::JumpIfTrueOrPop(target)
+            | Instruction::Iterate(target) => {
+                rv.insert(target);
+            }
+            _ => {}
+        }
+    }
+    rv
+}
+
+/// Reconstructs a simple expression like `foo.bar[0]` that produced the
+/// value at `pc` by walking the instructions backwards.
+///
+/// The operand of an instruction can only be attributed to the directly
+/// preceding instruction if control flow cannot enter in between, so we
+/// stop at jump targets.  If the base cannot be described, `(...)` is
+/// used instead.
+#[cfg(feature = "debug")]
+fn describe_expr_at(
+    instructions: &Instructions<'_>,
+    pc: u32,
+    jump_targets: &std::collections::BTreeSet<u32>,
+) -> Option<String> {
+    fn base(
+        instructions: &Instructions<'_>,
+        pc: u32,
+        operands: u32,
+        jump_targets: &std::collections::BTreeSet<u32>,
+    ) -> String {
+        if pc < operands || (pc - operands + 1..=pc).any(|x| jump_targets.contains(&x)) {
+            return "(...)".into();
+        }
+        describe_expr_at(instructions, pc - operands, jump_targets)
+            .unwrap_or_else(|| "(...)".into())
+    }
+
+    match instructions.get(pc)? {
+        Instruction::Lookup(name) => Some(name.to_string()),
+        Instruction::GetAttr(name) => Some(format!(
+            "{}.{}",
+            base(instructions, pc, 1, jump_targets),
+            name
+        )),
+        Instruction::GetItem => {
+            let key = match pc.checked_sub(1).and_then(|x| instructions.get(x)) {
+                Some(Instruction::LoadConst(key)) => format!("{key:?}"),
+                _ => "...".into(),
+            };
+            Some(format!(
+                "{}[{}]",
+                base(instructions, pc, 2, jump_targets),
+                key
+            ))
+        }
+        _ => None,
+    }
+}
