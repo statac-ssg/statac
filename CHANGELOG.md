@@ -14,6 +14,12 @@ What changed in each release of Statac, the newest first.
   `<p>b</p>{% endif %}`. The line before the branch ran into the line
   after it where the branch wasn't written, or the branch's last line
   ran into the line after it where it was.
+- The body of a `macro`, or of a `{% set %}` block, written by its call
+  or its name alone on an indented line, as `  {{ card() }}`, starts at
+  that line's indent, its lines keeping their indent one to another. It
+  kept the indent its lines had in the template on top of the line's,
+  as a body indented under its tag inside a `<div>`. Written from a line
+  at the left, the body is written as typed.
 
 ## 0.4.0 - 2026-10-17
 

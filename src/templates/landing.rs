@@ -40,6 +40,9 @@ pub(super) struct Landing {
     pub(super) bare: bool,
     /// Its indent is followed by a value.
     pub(super) valued: bool,
+    /// That value is a body the engine held back, whose lines line up
+    /// at the line's indent in place of the one they share.
+    pub(super) held: bool,
     /// Its indent is one the engine is told to keep, before a tag.
     pub(super) kept: bool,
     /// Where in memory its line ending is, where the engine is told to
@@ -92,6 +95,7 @@ impl Landings {
                 movable: line.movable,
                 bare: line.bare,
                 valued: line.valued,
+                held: markup && line.held,
                 kept: line.kept,
                 ending: line.ending.map(|ending| base + ending),
             });

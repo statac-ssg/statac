@@ -103,6 +103,9 @@ pub(super) struct Fact {
     pub(super) bare: bool,
     /// Its indent is followed by a value.
     pub(super) valued: bool,
+    /// That value is a body the engine holds back, written whole: a call
+    /// of a macro or the name of a `set` block, of this template's own.
+    pub(super) held: bool,
     /// Its indent is one the engine is told to keep, before a tag.
     pub(super) kept: bool,
     /// Where its line ending is, where the engine is told to keep it,
@@ -147,6 +150,8 @@ struct Tag {
     controlled: bool,
     /// The name a `block` tag gives.
     name: Option<String>,
+    /// The name a `macro` or `set` tag gives the body it holds back.
+    holds: Option<String>,
     /// A `for` tag's loop can be run again from inside it.
     recursive: bool,
     /// Opens or closes `raw`.
@@ -186,6 +191,9 @@ struct Read {
     values: Vec<Range<usize>>,
     /// Those values that are a call and nothing more.
     calls: Vec<(Range<usize>, Calls)>,
+    /// Where each value that is a name, or a call of one, and nothing
+    /// more starts, with the name.
+    names: Vec<(usize, String)>,
     /// The template's own text.
     text: Vec<Range<usize>>,
     /// Text between `raw` and `endraw`.
@@ -215,6 +223,7 @@ impl Read {
                 }
                 Token::VariableStart => {
                     let mut call = None;
+                    let mut name = None;
                     let mut seen = 0;
                     let mut depth = 0;
                     let mut whole = true;
@@ -223,8 +232,14 @@ impl Read {
                             return true;
                         }
                         match (seen, token) {
-                            (0, Token::Ident("loop")) => call = Some(Calls::Loop),
-                            (0, Token::Ident("super")) => call = Some(Calls::Super),
+                            (0, Token::Ident(ident)) => {
+                                name = Some(*ident);
+                                call = match *ident {
+                                    "loop" => Some(Calls::Loop),
+                                    "super" => Some(Calls::Super),
+                                    _ => None,
+                                };
+                            }
                             (1, Token::ParenOpen) => depth = 1,
                             (0 | 1, _) => whole = false,
                             _ if depth == 0 => whole = false,
@@ -236,8 +251,13 @@ impl Read {
                         false
                     })?;
                     read.values.push(start..done);
-                    if let Some(call) = call.filter(|_| whole && depth == 0) {
-                        read.calls.push((start..done, call));
+                    if whole && depth == 0 {
+                        if let Some(call) = call {
+                            read.calls.push((start..done, call));
+                        }
+                        if let Some(name) = name {
+                            read.names.push((start, name.to_owned()));
+                        }
                     }
                 }
                 Token::BlockStart => {
@@ -248,6 +268,7 @@ impl Read {
                     };
                     let mut idents = 0;
                     let mut name = None;
+                    let mut holds = None;
                     let mut recursive = false;
                     done = upto(&mut tokens, |token| {
                         assigns |= matches!(token, Token::Assign);
@@ -255,6 +276,9 @@ impl Read {
                             idents += 1;
                             if idents == 2 && word == "block" {
                                 name = Some((*ident).to_owned());
+                            }
+                            if idents == 2 && matches!(word, "macro" | "set") {
+                                holds = Some((*ident).to_owned());
                             }
                             recursive |= word == "for" && *ident == "recursive";
                         }
@@ -274,6 +298,7 @@ impl Read {
                         role,
                         controlled: controlled(&source[start..done]),
                         name,
+                        holds,
                         recursive,
                         raw: false,
                     });
@@ -310,6 +335,7 @@ impl Read {
                 role: Role::Quiet,
                 controlled: controlled(&source[start..end]),
                 name: None,
+                holds: None,
                 recursive: false,
                 raw,
             });
@@ -1000,6 +1026,13 @@ impl<'s> Template<'s> {
             }
         }
 
+        let holding: Vec<&str> = self
+            .blocks
+            .iter()
+            .filter(|block| block.kind == Kind::Placed)
+            .filter_map(|block| tags[block.tag].holds.as_deref())
+            .collect();
+        let names = &self.read.names;
         let lines = self
             .lines
             .iter()
@@ -1018,6 +1051,11 @@ impl<'s> Template<'s> {
                 let valued = values
                     .get(values.partition_point(|value| value.start < opening))
                     .is_some_and(|value| value.start == opening);
+                let held = names
+                    .get(names.partition_point(|(start, _)| *start < opening))
+                    .is_some_and(|(start, name)| {
+                        *start == opening && holding.contains(&name.as_str())
+                    });
                 Fact {
                     start: line.start,
                     indent: line.indent,
@@ -1027,6 +1065,7 @@ impl<'s> Template<'s> {
                     movable,
                     bare: line.shape == Shape::Tags,
                     valued,
+                    held,
                     kept: kept[number],
                     ending: kept_ends[number].then_some(ends[number]),
                 }
@@ -1512,6 +1551,29 @@ mod tests {
             "<p>a</p>{% if a -%}\n<p>b</p>\n{% endif %}\n<p>c</p>\n",
         ] {
             assert_eq!(kept(template), template);
+        }
+    }
+
+    #[test]
+    fn a_value_writing_a_body_held_back_is_known_at_its_line() {
+        let held = |source: &str| -> Vec<usize> {
+            let facts = super::facts(source).expect("a template");
+            (0..facts.lines.len())
+                .filter(|&number| facts.lines[number].held)
+                .collect()
+        };
+        assert_eq!(
+            held("{% macro m(a) %}\n<p>{{ a }}</p>\n{% endmacro %}\n  {{ m(1) }}\n"),
+            [3]
+        );
+        assert_eq!(held("{% set s %}\n<p>a</p>\n{% endset %}\n{{ s }}\n"), [3]);
+        for template in [
+            "{% set s = 1 %}\n  {{ s }}\n",
+            "{% macro m() %}\n<p>a</p>\n{% endmacro %}\n  {{ m() | upper }}\n",
+            "{% macro m() %}\n<p>a</p>\n{% endmacro %}\n  <p>{{ m() }}</p>\n",
+            "{% macro m() %}\n<p>a</p>\n{% endmacro %}\n  {{ n() }}\n",
+        ] {
+            assert!(held(template).is_empty(), "{template}");
         }
     }
 

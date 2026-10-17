@@ -1,6 +1,7 @@
 //! How a built page's source keeps the indentation its templates were
 //! written with. What a template puts on a line of its own follows that
-//! line's indent on each of its lines, a line that came to nothing is not
+//! line's indent on each of its lines, a body the engine held back in
+//! place of the indent its lines share, a line that came to nothing is not
 //! written, and each line is written where `landing` says.
 //!
 //! The engine can't say what column a value is printed at, so each render
@@ -29,6 +30,10 @@ struct Line {
     /// Whether what is being written is a value, not the template's own
     /// text.
     value: bool,
+    /// Whether a value written next is a body the engine held back, alone
+    /// on an indented line of the template outside `<pre>` and
+    /// `<textarea>`, so that its lines line up at the line.
+    placed: bool,
 }
 
 thread_local! {
@@ -108,6 +113,7 @@ impl<'p> Sink<'p> {
                 emptied: false,
                 ended: false,
                 value: false,
+                placed: false,
             });
         });
         Self {
@@ -223,6 +229,7 @@ impl<'p> Sink<'p> {
             line.open = true;
             line.emptied = false;
             line.ended = false;
+            line.placed = false;
         });
     }
 
@@ -301,6 +308,17 @@ impl io::Write for Sink<'_> {
             {
                 self.began = Some(self.out.len());
             }
+            // A body held back, called from a line indented as typed.
+            let placed = self.placing.holding(end).is_some_and(|line| {
+                line.held && line.movable && line.indent > 0 && line.at + line.indent == end
+            });
+            if placed && self.open() {
+                LINES.with_borrow_mut(|lines| {
+                    if let Some(line) = lines.last_mut() {
+                        line.placed = true;
+                    }
+                });
+            }
         }
         if !value {
             self.last = Some(from + text.len());
@@ -317,6 +335,7 @@ impl Sink<'_> {
     fn put(&mut self, mut text: &[u8]) {
         LINES.with_borrow_mut(|lines| {
             let line = lines.last_mut().expect("a sink has its line");
+            line.placed &= text.is_empty();
             // A line ending a value writes is the value's to keep: only
             // the template's own takes the place of one already written,
             // or goes with a line left empty.
@@ -459,39 +478,77 @@ pub(super) fn ended() {
 }
 
 /// Writes markup of several lines with each line after its first indented
-/// as the line it is put on, where it is the first thing on that line.
-/// `None` where there is nothing to add and the markup is still to write.
+/// as the line it is put on, where it is the first thing on that line. A
+/// body the engine held back gives up the indent its lines share, which
+/// they have only for the template's sake, as a macro's body indented
+/// under its tag. `None` where there is nothing to change and the markup is
+/// still to write.
 pub(super) fn write(out: &mut Output, markup: &str) -> Option<Result<(), Error>> {
-    let indent = LINES.with_borrow(|lines| {
+    let (indent, placed) = LINES.with_borrow(|lines| {
         lines
             .last()
             .filter(|line| line.open && !line.indent.is_empty())
-            .map(|line| line.indent.clone())
+            .map(|line| (line.indent.clone(), line.placed))
     })?;
     if !markup.contains('\n') {
         return None;
     }
+    let shared = if placed { shared(markup) } else { "" };
     Some(
-        out.write_str(&indented(markup, &indent))
+        out.write_str(&indented(markup, shared, &indent))
             .map_err(|_| Error::from(minijinja::ErrorKind::WriteFailure)),
     )
 }
 
-/// `markup` with `indent` before each line after its first. An empty line
-/// stays empty, and so does a line the spaces would change: one inside
-/// `<pre>` or `<textarea>`, where they would show, or inside an attribute's
-/// value.
-fn indented(markup: &str, indent: &str) -> String {
+/// The spaces and tabs that every line of `markup` holding more opens
+/// with, of the lines [`indented`] would indent.
+fn shared(markup: &str) -> &str {
+    let mut reader = Reader {
+        escaped: !markup.contains('<'),
+        ..Reader::default()
+    };
+    let mut shared: Option<&str> = None;
+    for line in markup.split_inclusive('\n') {
+        if reader.takes_indent() && !line.trim().is_empty() {
+            let opening = &line[..blank(line.as_bytes())];
+            let len = shared.map_or(opening.len(), |shared| {
+                shared
+                    .bytes()
+                    .zip(opening.bytes())
+                    .take_while(|(a, b)| a == b)
+                    .count()
+            });
+            if len == 0 {
+                return "";
+            }
+            shared = Some(&opening[..len]);
+        }
+        reader.read(line);
+    }
+    shared.unwrap_or("")
+}
+
+/// `markup` with `indent` before each line after its first, in place of
+/// `shared` before each line. An empty line stays empty, and so does a
+/// line the spaces would change: one inside `<pre>` or `<textarea>`, where
+/// they would show, or inside an attribute's value.
+fn indented(markup: &str, shared: &str, indent: &str) -> String {
     let mut out = String::with_capacity(markup.len() + markup.len() / 8);
     let mut reader = Reader {
         escaped: !markup.contains('<'),
         ..Reader::default()
     };
     for (number, line) in markup.split_inclusive('\n').enumerate() {
-        if number > 0 && reader.takes_indent() && !matches!(line, "\n" | "\r\n") {
+        let takes = reader.takes_indent();
+        let rest = match line.strip_prefix(shared) {
+            Some(rest) if takes => rest,
+            None if takes && line.trim().is_empty() => line.trim_start_matches([' ', '\t']),
+            _ => line,
+        };
+        if number > 0 && takes && !matches!(rest, "\n" | "\r\n") {
             out.push_str(indent);
         }
-        out.push_str(line);
+        out.push_str(rest);
         reader.read(line);
     }
     out
@@ -622,7 +679,7 @@ fn names(text: &str, name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Own, Run, indented};
+    use super::{Own, Run, indented, shared};
 
     #[test]
     fn a_templates_own_text_is_found_where_it_was_written_from() {
@@ -647,18 +704,38 @@ mod tests {
     #[test]
     fn each_further_line_takes_the_indent() {
         assert_eq!(
-            indented("<ul>\n  <li>one</li>\n</ul>\n", "    "),
+            indented("<ul>\n  <li>one</li>\n</ul>\n", "", "    "),
             "<ul>\n      <li>one</li>\n    </ul>\n"
         );
     }
 
     #[test]
+    fn the_indent_every_line_shares_gives_way_to_the_lines() {
+        let markup = "    <ul>\n      <li>one</li>\n\n  \n    </ul>\n";
+        assert_eq!(shared(markup), "    ");
+        assert_eq!(
+            indented(markup, shared(markup), "  "),
+            "<ul>\n    <li>one</li>\n\n\n  </ul>\n"
+        );
+        // Lines whose spaces would show neither count nor move.
+        let markup = "  <pre>\none\n  two</pre>\n  <p>a</p>\n";
+        assert_eq!(shared(markup), "  ");
+        assert_eq!(
+            indented(markup, shared(markup), "\t"),
+            "<pre>\none\n  two</pre>\n\t<p>a</p>\n"
+        );
+        assert_eq!(shared("    <p>a</p>\n  <p>b</p>\n"), "  ");
+        assert_eq!(shared("  <p>a</p>\n\t<p>b</p>\n"), "");
+        assert_eq!(shared("<p>a</p>\n  <p>b</p>\n"), "");
+    }
+
+    #[test]
     fn an_empty_line_stays_empty() {
         assert_eq!(
-            indented("<p>a</p>\n\n<p>b</p>", "\t"),
+            indented("<p>a</p>\n\n<p>b</p>", "", "\t"),
             "<p>a</p>\n\n\t<p>b</p>"
         );
-        assert_eq!(indented("a\r\n\r\nb", "  "), "a\r\n\r\n  b");
+        assert_eq!(indented("a\r\n\r\nb", "", "  "), "a\r\n\r\n  b");
     }
 
     #[test]
@@ -666,21 +743,26 @@ mod tests {
         assert_eq!(
             indented(
                 "<p>a</p>\n<pre><code>one\n  two</code></pre>\n<p>b</p>",
+                "",
                 "  "
             ),
             "<p>a</p>\n  <pre><code>one\n  two</code></pre>\n  <p>b</p>"
         );
         assert_eq!(
-            indented("<TextArea>\none\n</TEXTAREA>\n<p>b</p>", "  "),
+            indented("<TextArea>\none\n</TEXTAREA>\n<p>b</p>", "", "  "),
             "<TextArea>\none\n</TEXTAREA>\n  <p>b</p>"
         );
-        assert_eq!(indented("<pretty>\none", "  "), "<pretty>\n  one");
+        assert_eq!(indented("<pretty>\none", "", "  "), "<pretty>\n  one");
     }
 
     #[test]
     fn an_attributes_value_is_left_and_its_tags_other_lines_are_not() {
         assert_eq!(
-            indented("<img alt=\"one\ntwo\"\n  src=\"a.png\">\n<p>b</p>", "  "),
+            indented(
+                "<img alt=\"one\ntwo\"\n  src=\"a.png\">\n<p>b</p>",
+                "",
+                "  "
+            ),
             "<img alt=\"one\ntwo\"\n    src=\"a.png\">\n  <p>b</p>"
         );
     }
@@ -690,15 +772,16 @@ mod tests {
         assert_eq!(
             indented(
                 "<script>\nif (a < b) {\n  c = \"\n}\n</script>\n<p>b</p>",
+                "",
                 "  "
             ),
             "<script>\n  if (a < b) {\n    c = \"\n  }\n  </script>\n  <p>b</p>"
         );
         assert_eq!(
-            indented("<!-- it's\n<pre>\n-->\n<p>b</p>", "  "),
+            indented("<!-- it's\n<pre>\n-->\n<p>b</p>", "", "  "),
             "<!-- it's\n  <pre>\n  -->\n  <p>b</p>"
         );
-        assert_eq!(indented("a < b and \"c\nd", "  "), "a < b and \"c\n  d");
+        assert_eq!(indented("a < b and \"c\nd", "", "  "), "a < b and \"c\n  d");
     }
 
     #[test]
@@ -706,6 +789,7 @@ mod tests {
         assert_eq!(
             indented(
                 "<p>Inside <code>&lt;pre&gt;</code>, nothing is.</p>\n<p>b</p>\n<p>c</p>",
+                "",
                 "  "
             ),
             "<p>Inside <code>&lt;pre&gt;</code>, nothing is.</p>\n  <p>b</p>\n  <p>c</p>"
@@ -717,6 +801,7 @@ mod tests {
         assert_eq!(
             indented(
                 "&lt;p&gt;a&lt;/p&gt;\n&lt;pre&gt;one\n  two&lt;/pre&gt;\n&lt;p&gt;b",
+                "",
                 "  "
             ),
             "&lt;p&gt;a&lt;/p&gt;\n  &lt;pre&gt;one\n  two&lt;/pre&gt;\n  &lt;p&gt;b"

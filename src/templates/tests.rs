@@ -423,6 +423,48 @@ fn a_bodys_indent_for_the_templates_sake_is_left_out_of_the_page() {
 }
 
 #[test]
+fn a_body_written_at_an_indented_call_gives_up_the_indent_its_lines_share() {
+    let cases = [
+        (
+            "<div>\n  {% macro m() %}\n    <p>a</p>\n    <p>b</p>\n  {% endmacro %}\n  {{ m() }}\n</div>\n",
+            "<div>\n  <p>a</p>\n  <p>b</p>\n</div>\n",
+        ),
+        (
+            "<div>\n  {% set s %}\n    <p>a</p>\n    <p>b</p>\n  {% endset %}\n  {{ s }}\n</div>\n",
+            "<div>\n  <p>a</p>\n  <p>b</p>\n</div>\n",
+        ),
+        // Its lines keep their indent one to another.
+        (
+            "{% macro m() %}\n  <li>\n    a\n  </li>\n{% endmacro %}\n<div>\n  <ul>\n    {{ m() }}\n  </ul>\n</div>\n",
+            "<div>\n  <ul>\n    <li>\n      a\n    </li>\n  </ul>\n</div>\n",
+        ),
+        // Called at the left, it is written as typed.
+        (
+            "{% macro m() %}\n  <li>a</li>\n  <li>b</li>\n{% endmacro %}\n<ul>\n{{ m() }}\n</ul>\n",
+            "<ul>\n  <li>a</li>\n  <li>b</li>\n</ul>\n",
+        ),
+        // A snippet's lines are no block's body.
+        (
+            "<div>\n  {{ card() }}\n</div>\n",
+            "<div>\n    <p>a</p>\n    <p>b</p>\n</div>\n",
+        ),
+    ];
+    for (template, page) in cases {
+        let built = site(&[
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\npages.feed: false\n",
+            ),
+            ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("snippets/card.html", "  <p>a</p>\n  <p>b</p>\n"),
+            ("templates/home.html", template),
+        ]);
+        assert!(built.problems.is_empty(), "{:?}", built.problems);
+        assert_eq!(built.html("index.md"), page, "{template}");
+    }
+}
+
+#[test]
 fn a_snippet_put_among_other_things_on_a_line_keeps_the_spaces_it_starts_with() {
     let built = site(&[
         (
