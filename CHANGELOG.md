@@ -99,6 +99,10 @@ What changed in each release of Statac, the newest first.
   tag no other post has now builds under 10 pages, one other posts have
   about 550, and a post added or removed 700 to 1,600, each in about
   0.25 seconds against 0.55.
+- `serve` reads again only the pages' files that changed since its last
+  build, where it can tell, in place of every file at each save. On a
+  site of 10,000 posts a save of one post's text takes about 0.14
+  seconds against 0.2. Not on Windows, where Statac can't tell.
 
 ## 0.4.0 - 2026-10-17
 

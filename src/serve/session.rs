@@ -50,6 +50,8 @@ pub struct Session {
     last: Option<Last>,
     /// What each file published as it is was found to hold.
     remembered: Remembered,
+    /// The texts of the site's pages as the last round read them.
+    texts: crate::content::Texts,
     /// What became of the command the site runs before a build, as the
     /// session started.
     before: Before,
@@ -183,6 +185,7 @@ impl Session {
             _claim: claim,
             last: None,
             remembered: Remembered::default(),
+            texts: crate::content::Texts::keeping(),
             before: Before::Unset,
             watches: false,
             sets_after: false,
@@ -327,12 +330,13 @@ impl Session {
             *part = clock.elapsed();
             clock = Instant::now();
         };
-        let mut prepared = build::prepared(at, &options.run());
+        let texts = &mut self.texts;
+        let mut prepared = build::prepared_with(at, &options.run(), texts);
         let newer = (self.newer)
             .get_or_insert_with(|| crate::new::update::newer_starter(at, &Starter::OWN));
         prepared.problems.extend(newer.clone());
         let fixed = options.today.is_some();
-        let (stamps, mut prepared) = stamp::write(at, &options.run(), prepared, fixed);
+        let (stamps, mut prepared) = stamp::write(at, &options.run(), prepared, fixed, texts);
         let plan = Plan::of(&prepared.renderer, &mut prepared.problems).noting();
         lap(&mut took.reading);
 

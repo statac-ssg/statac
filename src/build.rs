@@ -235,7 +235,17 @@ pub enum Carried {
 /// with everything published at one address found once, whichever of the
 /// three it comes from, and the feeds it publishes.
 pub fn read(site: &Path, run: &content::Run) -> (content::Read, Assets, Vec<feeds::Feed>) {
-    let mut read = content::read(site, run);
+    read_with(site, run, &mut content::Texts::default())
+}
+
+/// [`read`], taking the texts of the site's pages from `texts` as
+/// [`content::read_with`] does.
+pub(crate) fn read_with(
+    site: &Path,
+    run: &content::Run,
+    texts: &mut content::Texts,
+) -> (content::Read, Assets, Vec<feeds::Feed>) {
+    let mut read = content::read_with(site, run, texts);
     let base = read.settings.base();
     let (assets, problems) = assets::gather(
         site,
@@ -353,7 +363,17 @@ pub(crate) struct Prepared {
 }
 
 pub(crate) fn prepared(site: &Path, run: &content::Run) -> Prepared {
-    let (mut read, assets, feeds) = read(site, run);
+    prepared_with(site, run, &mut content::Texts::default())
+}
+
+/// [`prepared`], taking the texts of the site's pages from `texts` as
+/// [`content::read_with`] does.
+pub(crate) fn prepared_with(
+    site: &Path,
+    run: &content::Run,
+    texts: &mut content::Texts,
+) -> Prepared {
+    let (mut read, assets, feeds) = read_with(site, run, texts);
     let mut left_out: Vec<PictureId> = read
         .drafts
         .iter()

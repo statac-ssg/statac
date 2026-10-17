@@ -770,27 +770,38 @@ pub fn resume(
     }
 }
 
-/// The time the disk the site at `site` is on gives a file written now,
-/// read from one written in its `.statac` and removed. None where it
-/// can't be read.
+/// The time [`written_now`] gives.
 fn clock_of(site: &Path) -> Option<SystemTime> {
+    written_now(site)?.modified().ok()
+}
+
+/// What the disk the site at `site` is on gives a file written now, read
+/// from one written in its `.statac` and removed. None where it can't be
+/// read.
+pub(crate) fn written_now(site: &Path) -> Option<fs::Metadata> {
     let kept = kept(site).ok()?;
-    time_now_at(&kept.join(CLOCK)).ok()?
+    found_now_at(&kept.join(CLOCK)).ok()?
 }
 
 /// The time the disk gives a file written now, read from one written at
 /// `at` and removed. None where the disk keeps no such time.
 fn time_now_at(at: &Path) -> io::Result<Option<SystemTime>> {
+    Ok(found_now_at(at)?.and_then(|found| found.modified().ok()))
+}
+
+/// What the disk gives a file written now, read from one written at `at`
+/// and removed.
+fn found_now_at(at: &Path) -> io::Result<Option<fs::Metadata>> {
     // Made anew, so that it takes the time whatever was there before.
     if exists(at) {
         fs::remove_file(at)?;
     }
     let mut file = (fs::OpenOptions::new().write(true).create_new(true)).open(at)?;
     io::Write::write_all(&mut file, b"\n")?;
-    let now = file.metadata().and_then(|found| found.modified()).ok();
+    let found = file.metadata().ok();
     drop(file);
     fs::remove_file(at)?;
-    Ok(now)
+    Ok(found)
 }
 
 /// Where the spare of the site at `site` is kept for a build into `out`:

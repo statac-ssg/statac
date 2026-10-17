@@ -5,6 +5,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 use image::{ImageFormat, Rgb, RgbImage};
 use statac::build::{self, Mode, Options, Outcome};
@@ -414,6 +415,98 @@ fn a_post_added_and_deleted() {
             ("a post deleted", &|site| site.remove("content/a-post.md")),
             ("an older post deleted", &|site| {
                 site.remove("content/post-2.md")
+            }),
+        ],
+    );
+}
+
+/// Writes `text` at `path` in `site`, giving the file `modified` as the
+/// time its bytes last changed.
+fn written_at(site: &Site, path: &str, text: &str, modified: SystemTime) {
+    site.write(path, text);
+    let file = fs::File::options().write(true).open(site.root().join(path));
+    file.unwrap().set_modified(modified).unwrap();
+}
+
+/// Post 2 saying `says`, which is as long as every other saying of four
+/// letters.
+fn post_2(says: &str) -> String {
+    let text = format!("Post 2 says {says}.");
+    post("Post 2", "2026-01-02", "one", &text)
+}
+
+#[test]
+fn a_page_written_again_at_its_length_and_time_is_read_again() {
+    let site = Site::new("same-stamp");
+    let hour = Duration::from_secs(3600);
+    let (earlier, later) = (SystemTime::now() - hour, SystemTime::now() + hour);
+    let at = "content/post-2.md";
+    through(
+        &site,
+        &[
+            ("a page given an earlier time", &|site| {
+                written_at(site, at, &post_2("this"), earlier)
+            }),
+            // Read again once its time is surely before the clock's, so
+            // its text is kept.
+            ("no edit", &|_| {}),
+            // Its time set back is no time a write gave it: what tells is
+            // the time anything of the file last changed, which no program
+            // sets.
+            ("written again at its length and given its time", &|site| {
+                written_at(site, at, &post_2("that"), earlier)
+            }),
+            ("no edit", &|_| {}),
+            ("another of its length and time put there", &|site| {
+                let aside = site.top.join("post-2.md");
+                fs::write(&aside, post_2("what")).unwrap();
+                let file = fs::File::options().write(true).open(&aside).unwrap();
+                file.set_modified(earlier).unwrap();
+                fs::rename(&aside, site.root().join(at)).unwrap();
+            }),
+            ("no edit", &|_| {}),
+            // A time the round's clock is before, as a file written within
+            // the step a disk's times were in as the round began has.
+            ("a page given a later time", &|site| {
+                written_at(site, at, &post_2("then"), later)
+            }),
+            ("no edit", &|_| {}),
+            ("written again within the step", &|site| {
+                written_at(site, at, &post_2("when"), later)
+            }),
+        ],
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_page_replaced_by_a_link_or_a_folder() {
+    let site = Site::new("page-replaced");
+    let earlier = SystemTime::now() - Duration::from_secs(3600);
+    let at = "content/post-2.md";
+    through(
+        &site,
+        &[
+            ("a page given an earlier time", &|site| {
+                written_at(site, at, &post_2("this"), earlier)
+            }),
+            ("no edit", &|_| {}),
+            ("a link to another page in its place", &|site| {
+                site.remove(at);
+                std::os::unix::fs::symlink("post-3.md", site.root().join(at)).unwrap();
+            }),
+            ("the page back", &|site| {
+                site.remove(at);
+                written_at(site, at, &post_2("this"), earlier);
+            }),
+            ("no edit", &|_| {}),
+            ("a folder in its place", &|site| {
+                site.remove(at);
+                site.write(&format!("{at}/index.md"), &post_2("this"));
+            }),
+            ("the page back again", &|site| {
+                fs::remove_dir_all(site.root().join(at)).unwrap();
+                written_at(site, at, &post_2("this"), earlier);
             }),
         ],
     );

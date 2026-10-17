@@ -11,6 +11,7 @@ mod made;
 pub mod slug;
 #[cfg(test)]
 mod tests;
+mod texts;
 mod translations;
 pub mod words;
 
@@ -34,6 +35,7 @@ use crate::source::{Place, SourceId, Sources, Span};
 use crate::value::Value;
 use crate::yaml::Node;
 use address::{Address, Pieces, Top};
+pub(crate) use texts::Texts;
 use words::{Holder, PageWord, Words};
 
 /// What a run asks of reading the site.
@@ -131,6 +133,14 @@ pub fn claims(site: &Site, sources: &Sources, settings: &Settings) -> Vec<(Strin
 
 /// Reads the settings and content of the site at `root`, and its lists.
 pub fn read(root: &Path, run: &Run) -> Read {
+    read_with(root, run, &mut Texts::default())
+}
+
+/// [`read`], taking from `texts` the text of each file that may be a
+/// page as an earlier reading kept it, where it can, and keeping there
+/// what this reading read.
+pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
+    texts.begin(root);
     let mut sources = Sources::default();
     let (mut settings, mut problems) = config::read(root, &mut sources);
     if let Some(address) = &run.url {
@@ -186,7 +196,7 @@ pub fn read(root: &Path, run: &Run) -> Read {
         held_back: Vec::new(),
         layouts_needing_url: Vec::new(),
     };
-    reader.read_docs(&content, &mut sources);
+    reader.read_docs(&content, &mut sources, texts);
     reader.build(&sources, &mut site);
     let page_names = match settings.declarations.naming().next() {
         Some(_) => reader.page_names(&sources),
@@ -501,7 +511,7 @@ impl Reader<'_> {
 
     /// Reads every file that may be a page, in parallel, and their front
     /// matter; then settles what each folder is and reads each page's words.
-    fn read_docs(&mut self, content: &Path, sources: &mut Sources) {
+    fn read_docs(&mut self, content: &Path, sources: &mut Sources, kept: &mut Texts) {
         let wanted: Vec<(usize, String)> = self
             .folders
             .iter()
@@ -512,16 +522,19 @@ impl Reader<'_> {
             .par_iter()
             .map(|(at, name)| {
                 let path = content.join(&self.folders[*at].rel).join(name);
-                let text = std::fs::read_to_string(path)?;
-                let lines = crate::source::line_starts(&text);
-                Ok::<_, std::io::Error>((text, lines))
+                let text = kept.read(&path);
+                (path, text)
             })
             .collect();
+        let read = texts
+            .iter()
+            .filter_map(|(path, text)| Some((path.as_path(), text.as_ref().ok()?)));
+        kept.keep(read);
         let mut added = Vec::new();
-        for ((at, name), text) in wanted.into_iter().zip(texts) {
+        for ((at, name), (_, text)) in wanted.into_iter().zip(texts) {
             let path = format!("content/{}{name}", self.folders[at].rel);
             let (text, lines) = match text {
-                Ok(read) => read,
+                Ok(read) => (read.text, read.lines),
                 Err(error) => {
                     self.problems.push(Problem::nowhere(Kind::CantRead {
                         path: path.into(),

@@ -510,6 +510,27 @@ pub fn named_once(found: &std::fs::Metadata) -> bool {
     }
 }
 
+/// When anything of the file `found` describes last changed, in seconds
+/// and nanoseconds, which no program sets back as it can the time of its
+/// bytes, and which disk and which file on it it is. Stable Rust reads
+/// none of them on Windows.
+pub fn changed_and_placed(found: &std::fs::Metadata) -> Option<((i64, i64), u64, u64)> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        Some((
+            (found.ctime(), found.ctime_nsec()),
+            found.dev(),
+            found.ino(),
+        ))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = found;
+        None
+    }
+}
+
 /// Whether a folder in `from` can be moved into `to` without copying it,
 /// which only two folders on one disk allow. Told by moving an empty
 /// folder called `probe` from one to `landing` in the other, neither of

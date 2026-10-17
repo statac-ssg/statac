@@ -466,20 +466,22 @@ enum Part {
 /// `id:` line for each post `write_feed_ids` asks one for: a post is
 /// known for one only once its dates are written. `fixed` is whether the
 /// day was given, so that the run can be repeated. Gives the site as it
-/// reads once written.
+/// reads once written, the texts of its pages taken from `texts` as
+/// [`crate::content::read_with`] does.
 pub(crate) fn write(
     site: &Path,
     run: &crate::content::Run,
     mut prepared: build::Prepared,
     fixed: bool,
+    texts: &mut crate::content::Texts,
 ) -> (Pass, build::Prepared) {
     let mut pass = written(site, &prepared, fixed, Part::Stamps);
     if pass.wrote() {
-        prepared = build::prepared(site, run);
+        prepared = build::prepared_with(site, run, texts);
     }
     let ids = written(site, &prepared, fixed, Part::Ids);
     if ids.wrote() {
-        prepared = build::prepared(site, run);
+        prepared = build::prepared_with(site, run, texts);
     }
     pass.ids = ids.ids;
     pass.files.extend(ids.files);
@@ -703,7 +705,8 @@ pub fn run(options: &Options) -> Outcome {
     };
     let prepared = build::prepared(&options.site, &run);
     let fixed = options.today.is_some();
-    let (mut pass, mut prepared) = write(&options.site, &run, prepared, fixed);
+    let unkept = &mut crate::content::Texts::default();
+    let (mut pass, mut prepared) = write(&options.site, &run, prepared, fixed, unkept);
     // Of the site as it reads now, which the places are in.
     let read = std::mem::take(&mut prepared.problems);
     let renderer = &prepared.renderer;
