@@ -91,9 +91,11 @@ struct Sink<'p> {
     last: Option<usize>,
     /// The recursive loops' calls being run, the deepest last.
     deeper: Vec<&'p Deeper>,
-    /// The line whose kept line ending is to come, and how long the output
-    /// was as what the line holds began to be written.
-    began: Option<(usize, usize)>,
+    /// How long the output was as the last line whose line ending is kept
+    /// began to write what it holds, until a kept line ending is reached.
+    /// Where that line's own is left out, as in a branch not taken, the
+    /// next kept one ends what it wrote.
+    began: Option<usize>,
 }
 
 impl<'p> Sink<'p> {
@@ -124,14 +126,12 @@ impl<'p> Sink<'p> {
     /// nothing, spaces before its line ending and no more, isn't written.
     fn own(&mut self, mut text: &[u8]) {
         let mut from = text.as_ptr() as usize;
-        // A line ending kept for a line that wrote nothing is not written.
+        // A kept line ending is not written where nothing has been written
+        // for it to end.
         if let Some(line) = self.placing.holding(from)
             && line.ending == Some(from)
         {
-            let wrote = self
-                .began
-                .take()
-                .is_some_and(|(at, len)| at == line.at && self.out.len() > len);
+            let wrote = self.began.take().is_some_and(|len| self.out.len() > len);
             if !wrote {
                 let ending = if text.starts_with(b"\r\n") { 2 } else { 1 };
                 text = &text[ending.min(text.len())..];
@@ -273,16 +273,17 @@ impl io::Write for Sink<'_> {
         if value || self.placing.is_empty() {
             self.put(text);
         } else {
-            // Text from inside a line whose line ending is kept is what the
-            // line holds being written.
-            if let Some(line) = self.placing.holding(from)
-                && line.ending.is_some_and(|ending| from < ending)
-                && from > line.at + line.indent
-            {
-                self.began = Some((line.at, self.out.len()));
-            }
+            let len = self.out.len();
             self.own(text);
             let end = from + text.len();
+            // Text reaching past the indent of a line whose line ending is
+            // kept is what the line holds being written.
+            if let Some(line) = self.placing.holding(end - 1)
+                && line.ending.is_some_and(|ending| end <= ending)
+                && end > line.at + line.indent
+            {
+                self.began = Some(len);
+            }
             // A value opening a line of the template with no indent before
             // it is placed by that line, before it is written, so that each
             // of its lines takes the indent.
@@ -298,7 +299,7 @@ impl io::Write for Sink<'_> {
                 && line.ending.is_some()
                 && line.at + line.indent == end
             {
-                self.began = Some((line.at, self.out.len()));
+                self.began = Some(self.out.len());
             }
         }
         if !value {

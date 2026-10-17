@@ -139,6 +139,15 @@ What changed in each release of Statac, the newest first.
   later line writes something. Both were left out, so the line was
   written at the left and ran into the next. A line whose tags write
   nothing between them is still not written.
+- A line that holds more than tags and closes with one, as
+  `<p>{{ page.title }}</p>{% if page.summary %}` or a recursive loop's
+  `</ul>{% endif %}`, keeps its line end where a later line writes
+  something, whether or not it opens with a tag, inside `<pre>` and
+  `<script>` as anywhere. It was left out, so the next line ran into
+  it. Where the branch after such a line isn't written, as an
+  `{% if %}` that is false or a `{% for %}` over nothing, the tag
+  closing it on a line of its own ends the line instead, which ran
+  into the line after the branch.
 - Two `statac serve` sessions of one site at once each build into a
   folder of their own, the second into `.statac/serve-2`. Both built
   into `.statac/serve`, so each could show pages the other wrote, such

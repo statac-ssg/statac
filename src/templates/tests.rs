@@ -555,6 +555,222 @@ fn a_line_holding_more_than_tags_keeps_its_indent_and_line_end() {
 }
 
 #[test]
+fn a_line_ending_with_a_tag_and_holding_more_keeps_its_line_end() {
+    let following = "<div>\n    <p>{{ page.title }}</p>{% if page.summary %}\n    <p>{{ page.summary }}</p>{% endif %}\n    <p>after</p>\n</div>\n";
+    let alone = "<div>\n    <p>{{ page.title }}</p>\n    {% if page.summary %}\n    <p>{{ page.summary }}</p>{% endif %}\n    <p>after</p>\n</div>\n";
+    for template in [following, alone] {
+        for (summary, built) in [
+            (
+                "\nsummary: Summary\n",
+                "<div>\n    <p>Home</p>\n    <p>Summary</p>\n    <p>after</p>\n</div>\n",
+            ),
+            ("\n", "<div>\n    <p>Home</p>\n    <p>after</p>\n</div>\n"),
+        ] {
+            let page = format!("---\ntitle: Home{summary}---\n");
+            let site = site(&[
+                (
+                    "statac.yaml",
+                    "language: en\ntimezone: UTC\npages.feed: false\n",
+                ),
+                ("content/index.md", page.as_str()),
+                ("templates/home.html", template),
+            ]);
+            assert!(site.problems.is_empty(), "{:?}", site.problems);
+            assert_eq!(site.html("index.md"), built, "{template}{summary}");
+        }
+    }
+}
+
+#[test]
+fn a_recursive_loop_ending_a_line_with_a_tag_keeps_its_line_ends() {
+    let items = "[{\"t\": \"a\", \"c\": [{\"t\": \"b\", \"c\": []}]}, {\"t\": \"c\", \"c\": []}]";
+    for opening in ["\n    {% if item.c %}", "{% if item.c %}"] {
+        let template = format!(
+            "<ul>\n  {{% for item in {items} recursive %}}\n  <li>\n    {{{{ item.t }}}}{opening}\n    <ul>\n      {{{{ loop(item.c) }}}}\n    </ul>{{% endif %}}\n  </li>\n  {{% endfor %}}\n</ul>\n"
+        );
+        let built = site(&[
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\npages.feed: false\n",
+            ),
+            ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("templates/home.html", template.as_str()),
+        ]);
+        assert!(built.problems.is_empty(), "{:?}", built.problems);
+        assert_eq!(
+            built.html("index.md"),
+            "<ul>\n  <li>\n    a\n    <ul>\n      <li>\n        b\n      </li>\n    </ul>\n  </li>\n  <li>\n    c\n  </li>\n</ul>\n",
+            "{template}"
+        );
+    }
+}
+
+/// Builds `template` with `@x` taken as a branch's condition and `@l` as a
+/// loop's list, giving the page.
+fn built_with(template: &str, x: &str, l: &str) -> String {
+    let template = template.replace("@x", x).replace("@l", l);
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        ("templates/home.html", template.as_str()),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    built.html("index.md")
+}
+
+#[test]
+fn a_branch_not_written_leaves_the_line_before_it_its_line_end() {
+    // A condition, a list and the page a template builds from them.
+    type Builds<'a> = &'a [(&'a str, &'a str, &'a str)];
+    let cases: &[(&str, Builds)] = &[
+        // The branch's end tag alone on its line.
+        (
+            "<p>a</p>{% if @x %}\n<p>b</p>\n{% endif %}\n<p>c</p>\n",
+            &[
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>c</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>c</p>\n"),
+            ],
+        ),
+        // Blank lines as typed, round the branch and in it.
+        (
+            "<p>a</p>{% if @x %}\n\n<p>b</p>\n\n{% endif %}\n\n<p>c</p>\n",
+            &[
+                ("true", "[]", "<p>a</p>\n\n<p>b</p>\n\n\n<p>c</p>\n"),
+                ("false", "[]", "<p>a</p>\n\n<p>c</p>\n"),
+            ],
+        ),
+        (
+            "<div>\n  <p>a</p>{% if @x %}\n  <p>b</p>\n  {% endif %}\n  <p>c</p>\n</div>\n",
+            &[
+                (
+                    "true",
+                    "[]",
+                    "<div>\n  <p>a</p>\n  <p>b</p>\n  <p>c</p>\n</div>\n",
+                ),
+                ("false", "[]", "<div>\n  <p>a</p>\n  <p>c</p>\n</div>\n"),
+            ],
+        ),
+        (
+            "<p>a</p>{% if @x %}\n<p>b</p>\n{% else %}\n<p>c</p>\n{% endif %}\n<p>d</p>\n",
+            &[
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>d</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>c</p>\n<p>d</p>\n"),
+            ],
+        ),
+        (
+            "<p>a</p>{% if @x %}\n<p>b</p>{% else %}\n<p>c</p>{% endif %}\n<p>d</p>\n",
+            &[
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>d</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>c</p>\n<p>d</p>\n"),
+            ],
+        ),
+        (
+            "<p>a</p>{% for i in @l %}\n<p>{{ i }}</p>\n{% endfor %}\n<p>c</p>\n",
+            &[
+                ("true", "[1, 2]", "<p>a</p>\n<p>1</p>\n<p>2</p>\n<p>c</p>\n"),
+                ("true", "[]", "<p>a</p>\n<p>c</p>\n"),
+            ],
+        ),
+        (
+            "<p>a</p>{% for i in @l %}\n<p>{{ i }}</p>\n{% else %}\n<p>none</p>\n{% endfor %}\n<p>c</p>\n",
+            &[
+                ("true", "[1, 2]", "<p>a</p>\n<p>1</p>\n<p>2</p>\n<p>c</p>\n"),
+                ("true", "[]", "<p>a</p>\n<p>none</p>\n<p>c</p>\n"),
+            ],
+        ),
+        // Branches one after another.
+        (
+            "<p>a</p>{% if @x %}\n<p>b</p>\n{% endif %}\n{% if @l %}\n<p>c</p>\n{% endif %}\n<p>d</p>\n",
+            &[
+                ("true", "[1]", "<p>a</p>\n<p>b</p>\n<p>c</p>\n<p>d</p>\n"),
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>d</p>\n"),
+                ("false", "[1]", "<p>a</p>\n<p>c</p>\n<p>d</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>d</p>\n"),
+            ],
+        ),
+        (
+            "<p>a</p>{% if @x %}\n<p>b</p>{% for i in @l %}\n<p>{{ i }}</p>\n{% endfor %}\n{% endif %}\n<p>c</p>\n",
+            &[
+                (
+                    "true",
+                    "[1, 2]",
+                    "<p>a</p>\n<p>b</p>\n<p>1</p>\n<p>2</p>\n<p>c</p>\n",
+                ),
+                ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>c</p>\n"),
+                ("false", "[1, 2]", "<p>a</p>\n<p>c</p>\n"),
+            ],
+        ),
+        (
+            "<p>a</p>{% if @x %}{% if @l %}\n<p>b</p>\n{% endif %}\n{% endif %}\n<p>c</p>\n",
+            &[
+                ("true", "[1]", "<p>a</p>\n<p>b</p>\n<p>c</p>\n"),
+                ("true", "[]", "<p>a</p>\n<p>c</p>\n"),
+                ("false", "[1]", "<p>a</p>\n<p>c</p>\n"),
+            ],
+        ),
+        // A body the engine holds back.
+        (
+            "{% macro m(x) %}\n<p>a</p>{% if x %}\n<p>b</p>{% else %}\n<p>c</p>{% endif %}\n<p>d</p>{% if x %}\n<p>e</p>{% endif %}\n<p>f</p>\n{% endmacro %}\n{{ m(@x) }}\n",
+            &[
+                (
+                    "true",
+                    "[]",
+                    "<p>a</p>\n<p>b</p>\n<p>d</p>\n<p>e</p>\n<p>f</p>\n",
+                ),
+                ("false", "[]", "<p>a</p>\n<p>c</p>\n<p>d</p>\n<p>f</p>\n"),
+            ],
+        ),
+        (
+            "<ul>\n{% for i in @l %}\n  <li>{{ i }}</li>{% if @x %}\n  <li>more</li>\n  {% endif %}\n{% endfor %}\n</ul>\n",
+            &[
+                (
+                    "true",
+                    "[1, 2]",
+                    "<ul>\n  <li>1</li>\n  <li>more</li>\n  <li>2</li>\n  <li>more</li>\n</ul>\n",
+                ),
+                (
+                    "false",
+                    "[1, 2]",
+                    "<ul>\n  <li>1</li>\n  <li>2</li>\n</ul>\n",
+                ),
+                ("false", "[]", "<ul>\n</ul>\n"),
+            ],
+        ),
+        // Inside `<pre>` and `<script>` the line end shows or means something.
+        (
+            "<pre>\na{% if @x %}\nb{% endif %}\nc\n{% if @x %}\nd{% endif %}\ne{% if @x %}\nf\n{% endif %}\ng</pre>\n",
+            &[
+                ("true", "[]", "<pre>\na\nb\nc\nd\ne\nf\ng</pre>\n"),
+                ("false", "[]", "<pre>\na\nc\ne\ng</pre>\n"),
+            ],
+        ),
+        (
+            "<script>\n  go(); // a{% if @x %}\n  stop();{% endif %}\n  end();\n</script>\n",
+            &[
+                (
+                    "true",
+                    "[]",
+                    "<script>\n  go(); // a\n  stop();\n  end();\n</script>\n",
+                ),
+                (
+                    "false",
+                    "[]",
+                    "<script>\n  go(); // a\n  end();\n</script>\n",
+                ),
+            ],
+        ),
+    ];
+    for &(template, cases) in cases {
+        for &(x, l, built) in cases {
+            assert_eq!(built_with(template, x, l), built, "{template} {x} {l}");
+        }
+    }
+}
+
+#[test]
 fn a_template_writing_plain_text_keeps_its_bodys_indent() {
     let built = site(&[
         (
