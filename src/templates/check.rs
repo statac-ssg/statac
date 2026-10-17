@@ -405,6 +405,8 @@ struct Checker<'a> {
     /// Inside a test of whether something is there, where a field nothing
     /// has is the answer, not a mistake.
     probing: bool,
+    /// Inside a for loop's own `if`, where its `loop` isn't set yet.
+    in_for_if: bool,
     /// Names bound by `import`, already refused.
     imported: BTreeSet<String>,
     problems: Vec<Problem>,
@@ -442,6 +444,7 @@ impl<'a> Checker<'a> {
             scopes: vec![BTreeMap::new()],
             present: vec![BTreeSet::new()],
             probing: false,
+            in_for_if: false,
             imported: BTreeSet::new(),
             problems: Vec::new(),
             calls: Vec::new(),
@@ -547,14 +550,19 @@ impl<'a> Checker<'a> {
     fn unknown_var(&mut self, name: &str, span: Span) {
         let visible = self.visible();
         let nearest = nearest(name, visible.iter().map(String::as_str)).map(str::to_owned);
-        self.tell(
-            Kind::UnknownWord {
-                word: Word::Name,
-                written: name.to_owned(),
-                nearest,
-            },
-            span,
-        );
+        let kind = self.unknown_word(Word::Name, name, nearest);
+        self.tell(kind, span);
+    }
+
+    fn unknown_word(&self, word: Word, written: &str, nearest: Option<String>) -> Kind {
+        if self.in_for_if && written == "loop" {
+            return Kind::LoopInForIf { word };
+        }
+        Kind::UnknownWord {
+            word,
+            written: written.to_owned(),
+            nearest,
+        }
     }
 
     // Narrowing by `if`
@@ -641,14 +649,16 @@ impl<'a> Checker<'a> {
                 };
                 self.scopes.push(BTreeMap::new());
                 self.bind_target(&f.target, Info::maybe(item, iter.items_maybe_missing));
-                self.bind("loop", Info::of(Ty::Record(Rec::Loop)));
                 let proven = match &f.filter_expr {
                     Some(filter) => {
+                        let was = std::mem::replace(&mut self.in_for_if, true);
                         self.probe(filter, Seen::Unseen);
+                        self.in_for_if = was;
                         Self::proves(filter).0
                     }
                     None => Vec::new(),
                 };
+                self.bind("loop", Info::of(Ty::Record(Rec::Loop)));
                 self.with_present(proven, |c| c.body(&f.body));
                 self.scopes.pop();
                 self.body(&f.else_body);
@@ -1153,14 +1163,8 @@ impl<'a> Checker<'a> {
                         .chain(guard::FUNCTIONS.iter().copied())
                         .chain(own::FUNCTIONS.iter().copied());
                     let nearest = nearest(name, callables).map(str::to_owned);
-                    self.tell(
-                        Kind::UnknownWord {
-                            word: Word::Snippet,
-                            written: name.to_owned(),
-                            nearest,
-                        },
-                        call.expr.span(),
-                    );
+                    let kind = self.unknown_word(Word::Snippet, name, nearest);
+                    self.tell(kind, call.expr.span());
                     let _ = span;
                     Info::told()
                 }
@@ -1589,13 +1593,13 @@ impl Free<'_> {
                 self.expr(&f.iter);
                 self.scoped(|walk| {
                     walk.bind(&f.target);
+                    if let Some(filter) = &f.filter_expr {
+                        walk.expr(filter);
+                    }
                     walk.scopes
                         .last_mut()
                         .expect("a scope")
                         .insert("loop".into());
-                    if let Some(filter) = &f.filter_expr {
-                        walk.expr(filter);
-                    }
                     walk.body(&f.body);
                 });
                 self.body(&f.else_body);

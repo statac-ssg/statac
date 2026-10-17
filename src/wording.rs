@@ -46,8 +46,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
             format!("Broken link: nothing is published at `{target}`")
         }
         Kind::OtherSpelling { word, written, .. } | Kind::UnknownWord { word, written, .. } => {
-            format!("Unknown {}: `{written}`", word_name(*word))
+            unknown(*word, written)
         }
+        Kind::LoopInForIf { word } => unknown(*word, "loop"),
         Kind::AlwaysFalse { name, .. } => format!("Always false: no page has `{name}`"),
         Kind::CantWrite { path, reason } => {
             format!("Can't write `{}`: {reason}", path.display())
@@ -1742,6 +1743,10 @@ pub(crate) fn listed(items: &[String]) -> String {
     }
 }
 
+fn unknown(word: Word, written: &str) -> String {
+    format!("Unknown {}: `{written}`", word_name(word))
+}
+
 fn word_name(word: Word) -> &'static str {
     match word {
         Word::Field => "field",
@@ -2321,6 +2326,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             .into(),
         ),
         Kind::ControlCharacter { character } => Some(retype(*character)),
+        Kind::LoopInForIf { .. } => {
+            Some("`loop` is set only inside the loop: test it with an `{% if %}` there.".into())
+        }
         Kind::UnknownWord { nearest, .. } => {
             nearest.as_ref().map(|s| format!("Did you mean `{s}`?"))
         }
@@ -6926,6 +6934,27 @@ mod tests {
                     nearest: None,
                 },
                 "Unknown kind: `colour`",
+                None,
+            ),
+            (
+                Kind::LoopInForIf { word: Word::Name },
+                "Unknown name: `loop`",
+                Some("`loop` is set only inside the loop: test it with an `{% if %}` there."),
+            ),
+            (
+                Kind::LoopInForIf {
+                    word: Word::Snippet,
+                },
+                "Unknown snippet: `loop`",
+                Some("`loop` is set only inside the loop: test it with an `{% if %}` there."),
+            ),
+            (
+                Kind::UnknownWord {
+                    word: Word::Name,
+                    written: "loop".into(),
+                    nearest: None,
+                },
+                "Unknown name: `loop`",
                 None,
             ),
             (

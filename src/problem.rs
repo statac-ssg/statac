@@ -788,6 +788,11 @@ pub enum Kind {
         written: String,
         nearest: Option<String>,
     },
+    /// `loop` read in a for loop's own `if`, where it isn't set yet: as a
+    /// name, or as a snippet for `loop(...)` in a recursive loop's `if`.
+    LoopInForIf {
+        word: Word,
+    },
     /// A template's test of whether a page has a field no page has, one
     /// slip from a field a page can have, so it is false on every page:
     /// the field's name, and the field meant as the template reads it.
@@ -2674,7 +2679,7 @@ impl Kind {
             Kind::ControlCharacter { .. } => Code::ControlCharacter,
             Kind::ColonInCall { .. } => Code::ColonInCall,
             Kind::PublishedAsText { .. } => Code::PublishedAsText,
-            Kind::UnknownWord { .. } => Code::UnknownWord,
+            Kind::UnknownWord { .. } | Kind::LoopInForIf { .. } => Code::UnknownWord,
             Kind::AlwaysFalse { .. } => Code::AlwaysFalse,
             Kind::ReadAsYourOwn { .. } => Code::ReadAsYourOwn,
             Kind::NestedSetting { .. } => Code::NestedSetting,

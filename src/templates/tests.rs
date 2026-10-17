@@ -1370,6 +1370,64 @@ fn a_name_nothing_has_is_told_when_the_template_is_read() {
     );
 }
 
+/// `loop` is set in a for loop's body, not in the loop's own `if`, so
+/// reading it there is told when the template is read, at the `loop`.
+#[test]
+fn loop_in_a_fors_own_if_is_told_when_the_template_is_read() {
+    let name = "Unknown name: `loop`";
+    let in_if = Some("`loop` is set only inside the loop: test it with an `{% if %}` there.");
+    for (template, told) in [
+        (
+            "{% for x in [1, 2] if loop.index0 == 1 %}{{ x }}{% endfor %}",
+            vec![("loop", name, in_if)],
+        ),
+        (
+            "{% for x in [1, 2] if loop %}{{ x }}{% endfor %}",
+            vec![("loop", name, in_if)],
+        ),
+        (
+            "{% for x in [[1]] if loop(x) recursive %}{{ x }}{% endfor %}",
+            vec![("loop", "Unknown snippet: `loop`", in_if)],
+        ),
+        (
+            "{% for x in [1, 2] %}{{ loop.index }}{{ x }}{% endfor %}",
+            vec![],
+        ),
+        ("{% for x in [1, 2] if x == 1 %}{{ x }}{% endfor %}", vec![]),
+        (
+            "{% for a in [1] %}{% for x in [1, 2] if loop.first %}{{ x }}{% endfor %}{% endfor %}",
+            vec![],
+        ),
+        ("{{ loop.index }}", vec![("loop", name, None)]),
+    ] {
+        let built = site(&[
+            NO_HOME,
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("templates/page.html", template),
+        ]);
+        let at = built.template_problems();
+        assert_eq!(at.len(), built.problems.len(), "{:?}", built.problems);
+        let got: Vec<_> = built
+            .problems
+            .iter()
+            .zip(at)
+            .map(|(p, (code, _, at))| (code, at, p.headline(), p.suggestion()))
+            .collect();
+        let want: Vec<_> = told
+            .into_iter()
+            .map(|(at, headline, suggestion)| {
+                (
+                    "unknown-word",
+                    at.to_owned(),
+                    headline.to_owned(),
+                    suggestion.map(str::to_owned),
+                )
+            })
+            .collect();
+        assert_eq!(got, want, "{template}");
+    }
+}
+
 /// What reading `template` as a site's page layout told, where a post has
 /// a `subtitle` and a `top`.
 fn guarded(template: &str) -> Vec<(Kind, String)> {

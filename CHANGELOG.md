@@ -153,6 +153,11 @@ What changed in each release of Statac, the newest first.
   size the reader's browser gives text, whatever font size the site sets
   on the page's `html`. A site setting `html { font-size: 62.5% }` drew
   them at about 9 pixels.
+- `loop` in a loop's own `if`, as in `{% for x in xs if loop.first %}`,
+  is told as an unknown name when the template is read, at the `loop`,
+  with `` `loop` is set only inside the loop: test it with an `{% if %}`
+  there. `` It was accepted, and the build stopped at the first page
+  with no value for it, suggesting a `default` that stopped it again.
 
 ### Changed
 
