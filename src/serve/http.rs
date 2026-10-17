@@ -64,8 +64,14 @@ impl Site {
 
 /// Answers for `site` on this machine only, at `port` or, where another
 /// program has it, the first free port of the next few. Port 0 asks for
-/// any free port. Gives the port taken.
-pub fn listen(site: &Arc<Site>, port: u16) -> Result<u16, Problem> {
+/// any free port. Gives the port taken. `unanswered` is handed what kept
+/// the browser from being answered, once for each run of such faults.
+pub fn listen(
+    site: &Arc<Site>,
+    port: u16,
+    unanswered: impl Fn(&io::Error) + Send + Sync + 'static,
+) -> Result<u16, Problem> {
+    let unanswered: Arc<Unanswered> = Arc::new(unanswered);
     let cant = |port, last, why| Problem::nowhere(Kind::CantListen { port, last, why });
     let first = match port {
         0 => free_port().map_err(|error| cant(0, 0, Unheard::System(system_reason(&error))))?,
@@ -74,7 +80,7 @@ pub fn listen(site: &Arc<Site>, port: u16) -> Result<u16, Problem> {
     let last = first.saturating_add(NEXT_PORTS);
     let mut trying = first;
     loop {
-        match open(site, trying) {
+        match open(site, trying, &unanswered) {
             Ok(()) => return Ok(trying),
             Err(Refused::InUse) if trying < last => trying += 1,
             Err(Refused::InUse) => return Err(cant(first, last, Unheard::InUse)),
@@ -90,12 +96,14 @@ enum Refused {
     System(io::Error),
 }
 
+type Unanswered = dyn Fn(&io::Error) + Send + Sync;
+
 const LOOPBACKS: [IpAddr; 2] = [
     IpAddr::V6(Ipv6Addr::LOCALHOST),
     IpAddr::V4(Ipv4Addr::LOCALHOST),
 ];
 
-fn open(site: &Arc<Site>, port: u16) -> Result<(), Refused> {
+fn open(site: &Arc<Site>, port: u16, unanswered: &Arc<Unanswered>) -> Result<(), Refused> {
     // A program listening on every address of the machine leaves these
     // two free to bind on some systems, and would still be the one a
     // browser reached by another name.
@@ -120,9 +128,13 @@ fn open(site: &Arc<Site>, port: u16) -> Result<(), Refused> {
     // Before the first request can arrive, which is held to it.
     site.port.store(port, Ordering::Relaxed);
     let site = site.clone();
-    let mut server = Server::new(move |request| answer(&site, request))
-        .with_global_timeout(Duration::from_secs(60))
-        .with_max_concurrent_connections(512);
+    let unanswered = unanswered.clone();
+    let mut server = Server::new(
+        move |request| answer(&site, request),
+        move |error| unanswered(error),
+    )
+    .with_global_timeout(Duration::from_secs(60))
+    .with_max_concurrent_connections(512);
     for address in addresses {
         server = server.bind(address);
     }
@@ -153,7 +165,7 @@ fn own_host(written: &str, port: u16) -> bool {
     own && at.parse() == Ok(port) && !at.starts_with('+')
 }
 
-fn answer(site: &Site, request: &Request<Body>) -> Response<Body> {
+fn answer(site: &Site, request: &Request<()>) -> Response<Body> {
     let port = site.port.load(Ordering::Relaxed);
     let named = |name: header::HeaderName| request.headers().get(name).map(HeaderValue::to_str);
     let host = matches!(named(header::HOST), Some(Ok(host)) if own_host(host, port));
@@ -652,7 +664,7 @@ mod tests {
         for (name, value) in headers {
             request = request.header(name, *value);
         }
-        let response = answer(site, &request.body(Body::empty()).unwrap());
+        let response = answer(site, &request.body(()).unwrap());
         let text = |name: header::HeaderName| {
             response
                 .headers()
@@ -1154,7 +1166,7 @@ mod tests {
         let site = Arc::new(scratch.site(""));
         let taken = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let asked = taken.local_addr().unwrap().port();
-        let port = listen(&site, asked).unwrap();
+        let port = listen(&site, asked, |_| {}).unwrap();
         assert!(port > asked && port <= asked + NEXT_PORTS, "{asked} {port}");
     }
 }

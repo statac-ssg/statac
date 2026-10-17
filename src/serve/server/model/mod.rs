@@ -5,5 +5,5 @@
 //! The main entry points are [`Request`] and [`Response`].
 mod body;
 
-pub use body::{Body, ChunkedTransferPayload};
+pub use body::Body;
 pub use http::*;

@@ -4,12 +4,12 @@ use crate::serve::server::model::header::{
 use crate::serve::server::model::request::Builder as RequestBuilder;
 use crate::serve::server::model::uri::{Authority, Scheme};
 use crate::serve::server::model::{
-    Body, ChunkedTransferPayload, HeaderMap, HeaderName, HeaderValue, Method, Request, Uri, Version,
+    HeaderMap, HeaderName, HeaderValue, Method, Request, Uri, Version,
 };
 use crate::serve::server::utils::invalid_data_error;
 use httparse::Header;
 use std::cmp::min;
-use std::io::{BufRead, Error, ErrorKind, Read, Result};
+use std::io::{BufRead, Error, ErrorKind, Read, Result, copy, sink};
 use std::str::FromStr;
 
 const DEFAULT_SIZE: usize = 1024;
@@ -80,17 +80,17 @@ pub fn decode_request_headers(reader: &mut impl BufRead) -> Result<RequestBuilde
     Ok(request.uri(Uri::from_parts(uri_parts).unwrap()))
 }
 
-pub fn decode_request_body(
+/// Reads past the request's body, which nothing answering reads, leaving
+/// `reader` where the connection's next request begins.
+pub fn skip_request_body(
     request: RequestBuilder,
-    reader: impl BufRead + 'static,
-) -> Result<Request<Body>> {
-    let body = if let Some(headers) = request.headers_ref() {
-        decode_body(headers, reader)?
-    } else {
-        Body::empty()
-    };
+    reader: &mut impl BufRead,
+) -> Result<Request<()>> {
+    if let Some(headers) = request.headers_ref() {
+        skip_body(headers, reader)?;
+    }
     request
-        .body(body)
+        .body(())
         .map_err(|e| invalid_data_error(format!("Unexpected error when parsing the request: {e}")))
 }
 
@@ -124,46 +124,51 @@ fn read_header_bytes(reader: impl BufRead) -> Result<Vec<u8>> {
     Ok(buffer)
 }
 
-fn decode_body(headers: &HeaderMap, reader: impl BufRead + 'static) -> Result<Body> {
+fn skip_body(headers: &HeaderMap, reader: &mut impl BufRead) -> Result<()> {
     let content_length = unique_header(headers, &CONTENT_LENGTH)?;
     let transfer_encoding = unique_header(headers, &TRANSFER_ENCODING)?;
-    let body = match (content_length, transfer_encoding) {
-        (Some(_), Some(_)) => {
-            return Err(invalid_data_error(
-                "Transfer-Encoding and Content-Length should not be set at the same time",
-            ));
-        }
+    unique_header(headers, &CONTENT_ENCODING)?;
+    match (content_length, transfer_encoding) {
+        (Some(_), Some(_)) => Err(invalid_data_error(
+            "Transfer-Encoding and Content-Length should not be set at the same time",
+        )),
         (Some(content_length), None) => {
             let len = content_length
                 .to_str()
                 .map_err(invalid_data_error)?
                 .parse::<u64>()
                 .map_err(invalid_data_error)?;
-            Body::from_read_and_len(reader, len)
+            let skipped = copy(&mut reader.take(len), &mut sink())?;
+            if skipped < len {
+                return Err(Error::new(
+                    ErrorKind::ConnectionAborted,
+                    format!(
+                        "The body was expected to contain {len} bytes but we have been able to only read {skipped}"
+                    ),
+                ));
+            }
+            Ok(())
         }
         (None, Some(transfer_encoding)) => {
             if transfer_encoding.as_ref().eq_ignore_ascii_case(b"chunked") {
-                Body::from_chunked_transfer_payload(ChunkedDecoder {
+                let mut chunks = ChunkedDecoder {
                     reader,
                     buffer: Vec::with_capacity(DEFAULT_SIZE),
                     is_start: true,
                     chunk_position: 0,
                     chunk_size: 0,
                     trailers: None,
-                })
+                };
+                copy(&mut chunks, &mut sink()).map(drop)
             } else {
-                return Err(invalid_data_error(format!(
+                Err(invalid_data_error(format!(
                     "Transfer-Encoding: {} is not supported",
                     transfer_encoding.to_str().map_err(invalid_data_error)?
-                )));
+                )))
             }
         }
-        (None, None) => Body::empty(),
-    };
-
-    // The body is handed on as it was sent, whatever its encoding.
-    unique_header(headers, &CONTENT_ENCODING)?;
-    Ok(body)
+        (None, None) => Ok(()),
+    }
 }
 
 fn decode_headers(from: &[Header<'_>], to: &mut HeaderMap) -> Result<()> {
@@ -297,12 +302,6 @@ impl<R: BufRead> Read for ChunkedDecoder<R> {
     }
 }
 
-impl<R: BufRead> ChunkedTransferPayload for ChunkedDecoder<R> {
-    fn trailers(&self) -> Option<&HeaderMap> {
-        self.trailers.as_ref()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,12 +417,12 @@ mod tests {
     }
 
     #[test]
-    fn decode_request_with_body() -> Result<()> {
+    fn skip_request_with_body() -> Result<()> {
         let mut read =
-            b"GET / HTTP/1.1\nHost: www.example.org:8001\ncontent-length: 9\n\nfoobarbar"
+            b"GET / HTTP/1.1\nHost: www.example.org:8001\ncontent-length: 9\n\nfoobarbarnext"
                 .as_slice();
-        let request = decode_request_body(decode_request_headers(&mut read)?, read)?;
-        assert_eq!(read_to_string(request.into_body())?, "foobarbar");
+        skip_request_body(decode_request_headers(&mut read)?, &mut read)?;
+        assert_eq!(read_to_string(read)?, "next");
         Ok(())
     }
 
@@ -479,99 +478,83 @@ mod tests {
     }
 
     #[test]
-    fn decode_request_stop_in_body() -> Result<()> {
+    fn skip_request_stop_in_body() -> Result<()> {
         let mut read =
             b"POST / HTTP/1.1\r\nhost: example.com\r\ncontent-length: 12\r\n\r\nfoobar".as_slice();
         assert_eq!(
-            read_to_string(
-                decode_request_body(decode_request_headers(&mut read)?, read)?.into_body()
-            )
-            .err()
-            .map(|e| e.kind()),
+            skip_request_body(decode_request_headers(&mut read)?, &mut read)
+                .err()
+                .map(|e| e.kind()),
             Some(ErrorKind::ConnectionAborted)
         );
         Ok(())
     }
 
     #[test]
-    fn decode_request_http_1_0() -> Result<()> {
+    fn skip_request_http_1_0() -> Result<()> {
         let mut read =
-            b"POST http://example.com/foo HTTP/1.0\r\ncontent-length: 12\r\n\r\nfoobar".as_slice();
-        let request = decode_request_body(decode_request_headers(&mut read)?, read)?;
+            b"POST http://example.com/foo HTTP/1.0\r\ncontent-length: 6\r\n\r\nfoobar".as_slice();
+        let request = skip_request_body(decode_request_headers(&mut read)?, &mut read)?;
         assert_eq!(request.version(), Version::HTTP_10);
         assert_eq!(request.uri().to_string(), "http://example.com/foo");
         Ok(())
     }
 
     #[test]
-    fn decode_request_unsupported_transfer_encoding() -> Result<()> {
+    fn skip_request_unsupported_transfer_encoding() -> Result<()> {
         let mut read = b"POST / HTTP/1.1\r\nhost: example.com\r\ncontent-length: 12\r\ntransfer-encoding: foo\r\n\r\nfoobar".as_slice();
-        assert!(decode_request_body(decode_request_headers(&mut read)?, read).is_err());
+        assert!(skip_request_body(decode_request_headers(&mut read)?, &mut read).is_err());
         Ok(())
     }
 
     const CHUNKED: &str =
         "POST / HTTP/1.1\r\nhost: example.com\r\ntransfer-encoding:chunked\r\n\r\n";
 
-    fn chunked(payload: &str) -> Result<Body> {
+    /// What is left to read once a chunked body of `payload` is skipped.
+    fn after_chunked(payload: &str) -> Result<String> {
         let mut read = Cursor::new(format!("{CHUNKED}{payload}").into_bytes());
-        Ok(decode_request_body(decode_request_headers(&mut read)?, read)?.into_body())
+        skip_request_body(decode_request_headers(&mut read)?, &mut read)?;
+        read_to_string(read)
     }
 
     #[test]
-    fn decode_request_with_chunked_payload() -> Result<()> {
-        let body = chunked("4\r\nWiki\r\n5\r\npedia\r\nE\r\n in\r\n\r\nchunks.\r\n0\r\n\r\n")?;
-        assert_eq!(read_to_string(body)?, "Wikipedia in\r\n\r\nchunks.");
-        Ok(())
-    }
-
-    #[test]
-    fn decode_request_with_trailer() -> Result<()> {
-        let mut body = chunked(
-            "4\r\nWiki\r\n5\r\npedia\r\nE\r\n in\r\n\r\nchunks.\r\n0\r\ntest: foo\r\n\r\n",
-        )?;
-        let mut buf = String::new();
-        body.read_to_string(&mut buf)?;
-        assert_eq!(buf, "Wikipedia in\r\n\r\nchunks.");
+    fn skip_request_with_chunked_payload() -> Result<()> {
         assert_eq!(
-            body.trailers()
-                .unwrap()
-                .get(HeaderName::from_static("test"))
-                .unwrap(),
-            "foo"
+            after_chunked("4\r\nWiki\r\n5\r\npedia\r\nE\r\n in\r\n\r\nchunks.\r\n0\r\n\r\nnext")?,
+            "next"
         );
         Ok(())
     }
 
     #[test]
-    fn decode_request_with_invalid_chunk_header() -> Result<()> {
-        assert!(read_to_string(chunked("h\r\nWiki\r\n0\r\n\r\n")?).is_err());
+    fn skip_request_with_trailer() -> Result<()> {
+        assert_eq!(
+            after_chunked(
+                "4\r\nWiki\r\n5\r\npedia\r\nE\r\n in\r\n\r\nchunks.\r\n0\r\ntest: foo\r\n\r\nnext",
+            )?,
+            "next"
+        );
         Ok(())
     }
 
     #[test]
-    fn decode_request_with_invalid_trailer() -> Result<()> {
-        assert!(read_to_string(chunked("f\r\nWiki\r\n0\r\ntest\n: foo\r\n\r\n")?).is_err());
-        Ok(())
+    fn skip_request_with_invalid_chunk_header() {
+        assert!(after_chunked("h\r\nWiki\r\n0\r\n\r\n").is_err());
     }
 
     #[test]
-    fn decode_request_with_not_ended_trailer() -> Result<()> {
-        assert!(read_to_string(chunked("f\r\nWiki")?).is_err());
-        Ok(())
+    fn skip_request_with_invalid_trailer() {
+        assert!(after_chunked("f\r\nWiki\r\n0\r\ntest\n: foo\r\n\r\n").is_err());
     }
 
     #[test]
-    fn decode_request_content_length_and_transfer_encoding() {
+    fn skip_request_with_not_ended_trailer() {
+        assert!(after_chunked("f\r\nWiki").is_err());
+    }
+
+    #[test]
+    fn skip_request_content_length_and_transfer_encoding() {
         let mut read = b"POST / HTTP/1.1\r\nhost: example.com\r\ntransfer-encoding:chunked\r\ncontent-length: 222\r\n\r\n".as_slice();
-        assert!(decode_request_body(decode_request_headers(&mut read).unwrap(), read).is_err());
-    }
-
-    #[test]
-    fn decode_request_with_chunked_payload_read_after_end() -> Result<()> {
-        let mut body = chunked("4\r\nWiki\r\n5\r\npedia\r\nE\r\n in\r\n\r\nchunks.\r\n0\r\n\r\n")?;
-        body.read_to_end(&mut Vec::new())?;
-        assert_eq!(body.read(&mut [0; 1])?, 0);
-        Ok(())
+        assert!(skip_request_body(decode_request_headers(&mut read).unwrap(), &mut read).is_err());
     }
 }

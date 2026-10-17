@@ -5,7 +5,7 @@ use crate::serve::server::model::header::{
 };
 use crate::serve::server::model::{Body, HeaderMap, HeaderName, Response, StatusCode, Version};
 use crate::serve::server::utils::invalid_input_error;
-use std::io::{Read, Result, Write, copy};
+use std::io::{Result, Write, copy};
 
 pub fn encode_response<W: Write>(response: &mut Response<Body>, mut writer: W) -> Result<W> {
     let status = response.status();
@@ -29,37 +29,11 @@ fn encode_headers(headers: &HeaderMap, writer: &mut impl Write) -> Result<()> {
 }
 
 fn encode_body(body: &mut Body, writer: &mut impl Write, must_include_body: bool) -> Result<()> {
-    if let Some(length) = body.len() {
-        if must_include_body || length > 0 {
-            write!(writer, "content-length: {length}\r\n\r\n")?;
-            copy(body, writer)?;
-        } else {
-            write!(writer, "\r\n")?;
-        }
+    let length = body.len();
+    if must_include_body || length > 0 {
+        write!(writer, "content-length: {length}\r\n\r\n")?;
+        copy(body, writer)?;
     } else {
-        write!(writer, "transfer-encoding: chunked\r\n\r\n")?;
-        let mut buffer = vec![b'\0'; 4096];
-        loop {
-            let mut read = 0;
-            while read < 1024 {
-                // We try to avoid too small chunks
-                let new_read = body.read(&mut buffer[read..])?;
-                if new_read == 0 {
-                    break; // EOF
-                }
-                read += new_read;
-            }
-            write!(writer, "{read:X}\r\n")?;
-            writer.write_all(&buffer[..read])?;
-            if read == 0 {
-                break; // Done
-            } else {
-                write!(writer, "\r\n")?;
-            }
-        }
-        if let Some(trailers) = body.trailers() {
-            encode_headers(trailers, writer)?;
-        }
         write!(writer, "\r\n")?;
     }
     Ok(())
@@ -106,28 +80,8 @@ fn serialize_version(version: Version) -> Result<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::serve::server::model::header::{ACCEPT, CONTENT_LANGUAGE};
-    use crate::serve::server::model::{ChunkedTransferPayload, HeaderMap, HeaderValue};
+    use crate::serve::server::model::header::ACCEPT;
     use std::str;
-
-    #[test]
-    fn encode_response_with_chunked() -> Result<()> {
-        let mut trailers = HeaderMap::new();
-        trailers.append(CONTENT_LANGUAGE, HeaderValue::from_static("foo"));
-
-        let mut response = Response::builder()
-            .body(Body::from_chunked_transfer_payload(SimpleTrailers {
-                read: b"testbodybody".as_slice(),
-                trailers,
-            }))
-            .unwrap();
-        let buffer = encode_response(&mut response, Vec::new())?;
-        assert_eq!(
-            str::from_utf8(&buffer).unwrap(),
-            "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nC\r\ntestbodybody\r\n0\r\ncontent-language: foo\r\n\r\n"
-        );
-        Ok(())
-    }
 
     #[test]
     fn encode_response_ok() -> Result<()> {
@@ -180,22 +134,5 @@ mod tests {
             )
             .is_err()
         );
-    }
-
-    struct SimpleTrailers {
-        read: &'static [u8],
-        trailers: HeaderMap,
-    }
-
-    impl Read for SimpleTrailers {
-        fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-            self.read.read(buf)
-        }
-    }
-
-    impl ChunkedTransferPayload for SimpleTrailers {
-        fn trailers(&self) -> Option<&HeaderMap> {
-            Some(&self.trailers)
-        }
     }
 }

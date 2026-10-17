@@ -1,7 +1,7 @@
 mod decoder;
 mod encoder;
 
-pub use decoder::{decode_request_body, decode_request_headers};
+pub use decoder::{decode_request_headers, skip_request_body};
 pub use encoder::encode_response;
 
 /// Capacity for buffers.

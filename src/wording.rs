@@ -3631,6 +3631,12 @@ pub(crate) fn port_moved(asked: u16, port: u16) -> String {
     format!("Port {asked} is in use: serving on port {port} instead.")
 }
 
+/// What `serve` says where the system kept it from answering the browser,
+/// once for each run of such faults.
+pub(crate) fn cant_answer(reason: &str) -> String {
+    format!("Can't answer the browser: {reason}.")
+}
+
 /// What `serve` says where it polls the site's folder, and why where the
 /// author didn't ask it to.
 pub(crate) fn polling(every: std::time::Duration, because: Option<&Because>) -> String {

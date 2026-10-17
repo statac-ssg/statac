@@ -1,23 +1,26 @@
 //! An HTTP/1.1 server on plain threads: the server of oxhttp 0.3.3,
 //! https://github.com/oxigraph/oxhttp, which is offered under MIT or
-//! Apache-2.0, less its client, its TLS and its content decoding. It says
-//! nothing of its own: a connection that fails is closed in silence.
+//! Apache-2.0, less its client, its TLS, its content decoding and the
+//! reading of a request's body. It says nothing of its own: a connection
+//! it can't take or answer is handed to its owner to tell.
 
 mod io;
 pub mod model;
 mod utils;
 
-use io::{BUFFER_CAPACITY, decode_request_body, decode_request_headers, encode_response};
+use io::{BUFFER_CAPACITY, decode_request_headers, encode_response, skip_request_body};
 use model::header::{CONNECTION, CONTENT_TYPE, EXPECT};
 use model::request::Builder as RequestBuilder;
 use model::{Body, Request, Response, StatusCode, Version};
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Result, Write, copy, sink};
+use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Result, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::Builder as ThreadBuilder;
 use std::time::Duration;
 
-type OnRequest = dyn Fn(&mut Request<Body>) -> Response<Body> + Send + Sync + 'static;
+type OnRequest = dyn Fn(&Request<()>) -> Response<Body> + Send + Sync + 'static;
+type OnFault = dyn Fn(&Error) + Send + Sync + 'static;
 
 /// An HTTP server.
 ///
@@ -25,6 +28,7 @@ type OnRequest = dyn Fn(&mut Request<Body>) -> Response<Body> + Send + Sync + 's
 /// To avoid crashes it is possible to set an upper bound to the number of concurrent connections using the [`Server::with_max_concurrent_connections`] function.
 pub struct Server {
     on_request: Arc<OnRequest>,
+    on_fault: Arc<OnFault>,
     socket_addrs: Vec<SocketAddr>,
     timeout: Option<Duration>,
     max_num_thread: Option<usize>,
@@ -32,12 +36,18 @@ pub struct Server {
 
 impl Server {
     /// Builds the server using the given `on_request` method that builds a `Response` from a given `Request`.
+    ///
+    /// `on_fault` is handed what kept a connection from being taken or
+    /// answered: the first of each run of such faults, since one that
+    /// lasts recurs with every connection.
     #[inline]
     pub fn new(
-        on_request: impl Fn(&mut Request<Body>) -> Response<Body> + Send + Sync + 'static,
+        on_request: impl Fn(&Request<()>) -> Response<Body> + Send + Sync + 'static,
+        on_fault: impl Fn(&Error) + Send + Sync + 'static,
     ) -> Self {
         Self {
             on_request: Arc::new(on_request),
+            on_fault: Arc::new(on_fault),
             socket_addrs: Vec::new(),
             timeout: None,
             max_num_thread: None,
@@ -73,34 +83,48 @@ impl Server {
     pub fn spawn(self) -> Result<()> {
         let timeout = self.timeout;
         let thread_limit = self.max_num_thread.map(Semaphore::new);
+        let faults = Faults {
+            on_fault: self.on_fault,
+            failing: Arc::new(AtomicBool::new(false)),
+        };
         for listener_addr in self.socket_addrs {
             let listener = TcpListener::bind(listener_addr)?;
             let thread_name = format!("{listener_addr}: listener thread of the server");
             let thread_limit = thread_limit.clone();
             let on_request = Arc::clone(&self.on_request);
+            let faults = faults.clone();
             ThreadBuilder::new().name(thread_name).spawn(move || {
                 for stream in listener.incoming() {
-                    let Ok(stream) = stream else {
-                        // A fault that lasts, such as no file handles
-                        // left, would otherwise turn this loop at full
-                        // speed.
-                        std::thread::sleep(Duration::from_millis(100));
-                        continue;
-                    };
-                    let Ok(peer_addr) = stream.peer_addr() else {
-                        continue;
+                    let stream = match stream {
+                        Ok(stream) => stream,
+                        // Given up by the client before it was taken.
+                        Err(error) if error.kind() == ErrorKind::ConnectionAborted => continue,
+                        Err(error) => {
+                            faults.fault(&error);
+                            // A fault that lasts, such as no file handles
+                            // left, would otherwise turn this loop at full
+                            // speed.
+                            std::thread::sleep(Duration::from_millis(100));
+                            continue;
+                        }
                     };
                     let _ = stream.set_nodelay(true);
-                    let thread_name = format!("{peer_addr}: responding thread of the server");
+                    let thread_name = match stream.peer_addr() {
+                        Ok(peer_addr) => format!("{peer_addr}: responding thread of the server"),
+                        Err(_) => "responding thread of the server".to_owned(),
+                    };
                     let thread_guard = thread_limit.as_ref().map(|s| s.lock());
                     let on_request = Arc::clone(&on_request);
-                    // A thread that can't be started drops the connection.
-                    let _ = ThreadBuilder::new().name(thread_name).spawn(move || {
+                    let spawned = ThreadBuilder::new().name(thread_name).spawn(move || {
                         // A failure here is nearly always the browser
                         // closing the connection before its answer.
                         let _ = accept_request(stream, &*on_request, timeout);
                         drop(thread_guard);
                     });
+                    match spawned {
+                        Ok(_) => faults.clear(),
+                        Err(error) => faults.fault(&error),
+                    }
                 }
             })?;
         }
@@ -108,16 +132,41 @@ impl Server {
     }
 }
 
+/// Where faults go, each run of them told once at its first, whichever
+/// listener meets it.
+#[derive(Clone)]
+struct Faults {
+    on_fault: Arc<OnFault>,
+    failing: Arc<AtomicBool>,
+}
+
+impl Faults {
+    fn fault(&self, error: &Error) {
+        if !self.failing.swap(true, Ordering::Relaxed) {
+            (self.on_fault)(error);
+        }
+    }
+
+    /// Ends a run of faults, so the next fault is told.
+    fn clear(&self) {
+        self.failing.store(false, Ordering::Relaxed);
+    }
+}
+
 fn accept_request(
-    mut stream: TcpStream,
-    on_request: &dyn Fn(&mut Request<Body>) -> Response<Body>,
+    stream: TcpStream,
+    on_request: &dyn Fn(&Request<()>) -> Response<Body>,
     timeout: Option<Duration>,
 ) -> Result<()> {
     stream.set_read_timeout(timeout)?;
     stream.set_write_timeout(timeout)?;
+    // One reader for the whole connection: what it reads past a request
+    // is the start of the next, sent before the first was answered. It
+    // shares the socket with the writer rather than holding a copy, which
+    // would take a second file handle where none may be left.
+    let mut reader = BufReader::with_capacity(BUFFER_CAPACITY, &stream);
     let mut connection_state = ConnectionState::KeepAlive;
     while connection_state == ConnectionState::KeepAlive {
-        let mut reader = BufReader::with_capacity(BUFFER_CAPACITY, stream.try_clone()?);
         let (mut response, new_connection_state) = match decode_request_headers(&mut reader) {
             Ok(request) => {
                 // Handles Expect header
@@ -125,8 +174,8 @@ fn accept_request(
                     if request.version_ref().is_none_or(|v| *v >= Version::HTTP_11)
                         && expect.as_bytes().eq_ignore_ascii_case(b"100-continue")
                     {
-                        stream.write_all(b"HTTP/1.1 100 Continue\r\n\r\n")?;
-                        read_body_and_build_response(request, reader, on_request)
+                        (&stream).write_all(b"HTTP/1.1 100 Continue\r\n\r\n")?;
+                        read_body_and_build_response(request, &mut reader, on_request)
                     } else {
                         (
                             build_text_response(
@@ -140,7 +189,7 @@ fn accept_request(
                         )
                     }
                 } else {
-                    read_body_and_build_response(request, reader, on_request)
+                    read_body_and_build_response(request, &mut reader, on_request)
                 }
             }
             Err(error) => {
@@ -153,9 +202,9 @@ fn accept_request(
         };
         connection_state = new_connection_state;
 
-        stream = encode_response(
+        encode_response(
             &mut response,
-            BufWriter::with_capacity(BUFFER_CAPACITY, stream),
+            BufWriter::with_capacity(BUFFER_CAPACITY, &stream),
         )?
         .into_inner()
         .map_err(|e| e.into_error())?;
@@ -171,33 +220,28 @@ enum ConnectionState {
 
 fn read_body_and_build_response(
     request: RequestBuilder,
-    reader: BufReader<TcpStream>,
-    on_request: &dyn Fn(&mut Request<Body>) -> Response<Body>,
+    reader: &mut impl BufRead,
+    on_request: &dyn Fn(&Request<()>) -> Response<Body>,
 ) -> (Response<Body>, ConnectionState) {
-    match decode_request_body(request, reader) {
-        Ok(mut request) => {
-            let response = on_request(&mut request);
-            // We make sure to finish reading the body
-            if let Err(error) = copy(request.body_mut(), &mut sink()) {
-                (build_error(error), ConnectionState::Close) // TODO: ignore?
-            } else {
-                let connection_state = request
-                    .headers()
-                    .get(CONNECTION)
-                    .and_then(|v| {
-                        v.as_bytes()
-                            .eq_ignore_ascii_case(b"close")
-                            .then_some(ConnectionState::Close)
-                    })
-                    .unwrap_or_else(|| {
-                        if request.version() <= Version::HTTP_10 {
-                            ConnectionState::Close
-                        } else {
-                            ConnectionState::KeepAlive
-                        }
-                    });
-                (response, connection_state)
-            }
+    match skip_request_body(request, reader) {
+        Ok(request) => {
+            let response = on_request(&request);
+            let connection_state = request
+                .headers()
+                .get(CONNECTION)
+                .and_then(|v| {
+                    v.as_bytes()
+                        .eq_ignore_ascii_case(b"close")
+                        .then_some(ConnectionState::Close)
+                })
+                .unwrap_or_else(|| {
+                    if request.version() <= Version::HTTP_10 {
+                        ConnectionState::Close
+                    } else {
+                        ConnectionState::KeepAlive
+                    }
+                });
+            (response, connection_state)
         }
         Err(error) => (build_error(error), ConnectionState::Close),
     }
@@ -319,21 +363,7 @@ mod tests {
         requests: impl IntoIterator<Item = &'static str>,
         responses: impl IntoIterator<Item = &'static str>,
     ) -> Result<()> {
-        let server_port = free_port()?;
-        Server::new(|request| {
-            if request.uri().path() == "/" {
-                Response::builder().body(Body::from("home")).unwrap()
-            } else {
-                Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Body::empty())
-                    .unwrap()
-            }
-        })
-        .bind((Ipv4Addr::LOCALHOST, server_port))
-        .with_global_timeout(Duration::from_secs(1))
-        .spawn()?;
-        let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, server_port))?;
+        let mut stream = home_server()?;
         for (request, response) in requests.into_iter().zip(responses) {
             stream.write_all(request.as_bytes())?;
             let mut output = vec![b'\0'; response.len()];
@@ -343,16 +373,80 @@ mod tests {
         Ok(())
     }
 
+    /// A connection to a server answering `/` with "home" and anything
+    /// else with nothing found.
+    fn home_server() -> Result<TcpStream> {
+        let server_port = free_port()?;
+        Server::new(
+            |request| {
+                if request.uri().path() == "/" {
+                    Response::builder().body(Body::from("home")).unwrap()
+                } else {
+                    Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Body::empty())
+                        .unwrap()
+                }
+            },
+            |_| {},
+        )
+        .bind((Ipv4Addr::LOCALHOST, server_port))
+        .with_global_timeout(Duration::from_secs(1))
+        .spawn()?;
+        TcpStream::connect((Ipv4Addr::LOCALHOST, server_port))
+    }
+
+    #[test]
+    fn requests_sent_together_are_each_answered() -> Result<()> {
+        let mut stream = home_server()?;
+        stream.write_all(
+            b"POST /foo HTTP/1.1\nhost: localhost:9999\ncontent-length: 4\n\nabcd\
+              GET / HTTP/1.1\nhost: localhost:9999\n\n\
+              GET / HTTP/1.1\nhost: localhost:9999\nconnection: close\n\n",
+        )?;
+        let mut output = String::new();
+        stream.read_to_string(&mut output)?;
+        assert_eq!(
+            output,
+            "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n\
+             HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\nhome\
+             HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\nhome"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_run_of_faults_is_told_once() {
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let faults = Faults {
+            on_fault: Arc::new({
+                let told = told.clone();
+                move |error: &Error| told.lock().unwrap().push(error.to_string())
+            }),
+            failing: Arc::new(AtomicBool::new(false)),
+        };
+        let other = faults.clone();
+        faults.fault(&Error::other("first"));
+        other.fault(&Error::other("second"));
+        faults.fault(&Error::other("third"));
+        other.clear();
+        faults.fault(&Error::other("fourth"));
+        assert_eq!(*told.lock().unwrap(), ["first", "fourth"]);
+    }
+
     #[test]
     fn test_thread_limit() -> Result<()> {
         let server_port = free_port()?;
         let request = b"GET / HTTP/1.1\nhost: localhost:9999\n\n";
         let response = b"HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\nhome";
-        Server::new(|_| Response::builder().body(Body::from("home")).unwrap())
-            .bind((Ipv4Addr::LOCALHOST, server_port))
-            .with_global_timeout(Duration::from_secs(1))
-            .with_max_concurrent_connections(2)
-            .spawn()?;
+        Server::new(
+            |_| Response::builder().body(Body::from("home")).unwrap(),
+            |_| {},
+        )
+        .bind((Ipv4Addr::LOCALHOST, server_port))
+        .with_global_timeout(Duration::from_secs(1))
+        .with_max_concurrent_connections(2)
+        .spawn()?;
         let streams = (0..128)
             .map(|_| {
                 let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, server_port))?;

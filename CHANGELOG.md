@@ -133,6 +133,12 @@ What changed in each release of Statac, the newest first.
   folder of their own, the second into `.statac/serve-2`. Both built
   into `.statac/serve`, so each could show pages the other wrote, such
   as drafts where only one was showing them.
+- `statac serve` says when the system keeps it from answering the
+  browser, as when no file handles are left: "Can't answer the browser:
+  too many open files." It says so once, and again only after it has
+  answered in between. It dropped the connection with nothing said.
+- `statac serve` answers each request a program sends on one connection
+  before the first is answered. It answered the first alone.
 
 ### Changed
 

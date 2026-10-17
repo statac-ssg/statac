@@ -1,9 +1,8 @@
-use crate::serve::server::model::HeaderMap;
 use std::borrow::Cow;
 use std::fmt;
-use std::io::{Cursor, Error, ErrorKind, Read, Result};
+use std::io::{Cursor, Read, Result};
 
-/// A request or response [body](https://httpwg.org/http-core/draft-ietf-httpbis-messaging-latest.html#message.body).
+/// A response's [body](https://httpwg.org/http-core/draft-ietf-httpbis-messaging-latest.html#message.body).
 ///
 /// It implements the [`Read`] API.
 pub struct Body(BodyAlt);
@@ -11,54 +10,21 @@ pub struct Body(BodyAlt);
 enum BodyAlt {
     SimpleOwned(Cursor<Vec<u8>>),
     SimpleBorrowed(&'static [u8]),
-    Sized {
-        content: Box<dyn Read>,
-        total_len: u64,
-        consumed_len: u64,
-    },
-    Chunked(Box<dyn ChunkedTransferPayload>),
 }
 
 impl Body {
-    #[inline]
-    pub(crate) fn from_read_and_len(read: impl Read + 'static, len: u64) -> Self {
-        Self(BodyAlt::Sized {
-            total_len: len,
-            consumed_len: 0,
-            content: Box::new(read.take(len)),
-        })
-    }
-
-    /// Creates a [chunked transfer encoding](https://httpwg.org/http-core/draft-ietf-httpbis-messaging-latest.html#chunked.encoding) body with optional [trailers](https://httpwg.org/http-core/draft-ietf-httpbis-semantics-latest.html#trailer.fields).
-    #[inline]
-    pub fn from_chunked_transfer_payload(payload: impl ChunkedTransferPayload + 'static) -> Self {
-        Self(BodyAlt::Chunked(Box::new(payload)))
-    }
-
     /// The empty body
     #[inline]
     pub fn empty() -> Self {
         Self(BodyAlt::SimpleBorrowed(b""))
     }
 
-    /// The number of bytes in the body (if known).
+    /// The number of bytes in the body.
     #[inline]
-    pub fn len(&self) -> Option<u64> {
+    pub fn len(&self) -> u64 {
         match &self.0 {
-            BodyAlt::SimpleOwned(d) => Some(d.get_ref().len().try_into().unwrap()),
-            BodyAlt::SimpleBorrowed(d) => Some(d.len().try_into().unwrap()),
-            BodyAlt::Sized { total_len, .. } => Some(*total_len),
-            BodyAlt::Chunked(_) => None,
-        }
-    }
-
-    /// Returns the chunked transfer encoding trailers if they exists and are already received.
-    /// You should fully consume the body before attempting to fetch them.
-    #[inline]
-    pub fn trailers(&self) -> Option<&HeaderMap> {
-        match &self.0 {
-            BodyAlt::SimpleOwned(_) | BodyAlt::SimpleBorrowed(_) | BodyAlt::Sized { .. } => None,
-            BodyAlt::Chunked(c) => c.trailers(),
+            BodyAlt::SimpleOwned(d) => d.get_ref().len().try_into().unwrap(),
+            BodyAlt::SimpleBorrowed(d) => d.len().try_into().unwrap(),
         }
     }
 
@@ -81,44 +47,16 @@ impl Body {
         match &self.0 {
             BodyAlt::SimpleOwned(d) => s.field("content-length", &d.get_ref().len()),
             BodyAlt::SimpleBorrowed(d) => s.field("content-length", &d.len()),
-            BodyAlt::Sized { total_len, .. } => s.field("content-length", total_len),
-            BodyAlt::Chunked(_) => s.field("transfer-encoding", &"chunked"),
         }
     }
 }
 
 impl Read for Body {
     #[inline]
-    fn read(&mut self, mut buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         match &mut self.0 {
             BodyAlt::SimpleOwned(c) => c.read(buf),
             BodyAlt::SimpleBorrowed(c) => c.read(buf),
-            BodyAlt::Sized {
-                content,
-                consumed_len,
-                total_len,
-            } => {
-                let remaining_size = *total_len - *consumed_len;
-                if remaining_size < u64::try_from(buf.len()).unwrap() {
-                    buf = &mut buf[..usize::try_from(remaining_size).unwrap()];
-                }
-                if buf.is_empty() {
-                    return Ok(0); // Nothing to read
-                }
-                let read = content.read(buf)?;
-                *consumed_len += u64::try_from(read).unwrap();
-                if read == 0 {
-                    // We are missing some bytes
-                    return Err(Error::new(
-                        ErrorKind::ConnectionAborted,
-                        format!(
-                            "The body was expected to contain {total_len} bytes but we have been able to only read {consumed_len}"
-                        ),
-                    ));
-                }
-                Ok(read)
-            }
-            BodyAlt::Chunked(inner) => inner.read(buf),
         }
     }
 }
@@ -190,13 +128,4 @@ impl fmt::Debug for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.debug_fields(&mut f.debug_struct("Body")).finish()
     }
-}
-
-/// Trait to give to [`Body::from_chunked_transfer_payload`] a body to serialize
-/// as [chunked transfer encoding](https://httpwg.org/http-core/draft-ietf-httpbis-messaging-latest.html#chunked.encoding).
-///
-/// It allows to provide [trailers](https://httpwg.org/http-core/draft-ietf-httpbis-semantics-latest.html#trailer.fields) to serialize.
-pub trait ChunkedTransferPayload: Read {
-    /// The [trailers](https://httpwg.org/http-core/draft-ietf-httpbis-semantics-latest.html#trailer.fields) to serialize.
-    fn trailers(&self) -> Option<&HeaderMap>;
 }

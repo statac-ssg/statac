@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 use crate::build::{self, Mode};
 use crate::content::address::on_the_wire;
 use crate::date::Date;
-use crate::problem::{Kind, Problem, Severity};
+use crate::problem::{Kind, Problem, Severity, system_reason};
 use crate::refresh::{self, Fetch, Token};
 use crate::report::{Report, shown};
 use crate::source::Sources;
@@ -78,8 +78,8 @@ impl std::fmt::Debug for Fetcher {
 /// What a round waits for.
 enum Heard {
     Saves(Batch),
-    /// A line the fetching said.
-    Fetched(String),
+    /// A line said by the fetching or the server.
+    Said(String),
     /// The site's folder is no longer watched.
     Ended,
 }
@@ -182,16 +182,23 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
         hub.clone(),
         base(&options.site).unwrap_or_default(),
     ));
-    let port = match http::listen(&site, options.port) {
+    // One receiver holds the saves and what the fetching and the server
+    // say, so only the thread running rounds writes, and no line is torn.
+    let (tell, heard) = mpsc::channel();
+    let unanswered = {
+        let tell = tell.clone();
+        move |error: &std::io::Error| {
+            let line = wording::cant_answer(&system_reason(error));
+            let _ = tell.send(Heard::Said(format!("{line}\n")));
+        }
+    };
+    let port = match http::listen(&site, options.port, unanswered) {
         Ok(port) => port,
         Err(problem) => {
             stop(out, problem);
             return None;
         }
     };
-    // One receiver holds both the saves and what the fetching says, so
-    // only the thread running rounds writes, and no line is torn.
-    let (tell, heard) = mpsc::channel();
     {
         let tell = tell.clone();
         std::thread::spawn(move || {
@@ -288,8 +295,9 @@ impl Serving {
     }
 
     /// Waits for the site's files to change, builds what changed, tells the
-    /// browser and says on `out` what happened, and each line fetching
-    /// said meanwhile. False once the folder is no longer watched.
+    /// browser and says on `out` what happened, and each line the fetching
+    /// or the server said meanwhile. False once the folder is no longer
+    /// watched.
     pub fn round(&mut self, out: &mut dyn Write) -> bool {
         let mut batch = loop {
             if self.ended {
@@ -298,7 +306,7 @@ impl Serving {
             }
             match self.heard.recv() {
                 Ok(Heard::Saves(batch)) => break batch,
-                Ok(Heard::Fetched(line)) => say(out, &line),
+                Ok(Heard::Said(line)) => say(out, &line),
                 Ok(Heard::Ended) | Err(_) => self.ended = true,
             }
         };
@@ -309,7 +317,7 @@ impl Serving {
                     batch.changed.extend(more.changed);
                     batch.rescan |= more.rescan;
                 }
-                Heard::Fetched(line) => say(out, &line),
+                Heard::Said(line) => say(out, &line),
                 Heard::Ended => self.ended = true,
             }
         }
@@ -393,7 +401,7 @@ impl Serving {
         let (tell, colour) = (self.tell.clone(), self.colour);
         std::thread::spawn(move || {
             let mut say = |line: &str| {
-                let _ = tell.send(Heard::Fetched(line.to_owned()));
+                let _ = tell.send(Heard::Said(line.to_owned()));
             };
             // A fault is said in a line of serve's own, not as Rust prints
             // a panic.
