@@ -56,6 +56,9 @@ What changed in each release of Statac, the newest first.
   build on. Where the disk's times move in steps, such a file kept its
   time, and serve kept the copy from before the save until the file
   changed again.
+- A site's file published at `.statac-clock`, at the top of the output,
+  stays there in a build that runs `after_build`. The build removed it
+  and counted it as removed by the command.
 
 ## 0.4.0 - 2026-10-17
 

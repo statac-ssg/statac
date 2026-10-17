@@ -61,9 +61,9 @@ pub const MARKER: &str = ".statac-built";
 const MARKER_TEXT: &str = "Statac built this folder and replaces all of it on every build.\n\
                            Keep files you want published in the site's static/ folder.\n";
 
-/// The file written and removed at the top of the folder written into, or
-/// of the site's `.statac`, to read the time its disk gives a file
-/// written now.
+/// The file written and removed in the site's `.statac`, and the end of the
+/// name of one written and removed beside the output, to read the time
+/// their disk gives a file written now.
 const CLOCK: &str = ".statac-clock";
 
 /// The spare's name in `.statac`.
@@ -775,23 +775,21 @@ pub fn resume(
 /// can't be read.
 fn clock_of(site: &Path) -> Option<SystemTime> {
     let kept = kept(site).ok()?;
-    time_now_in(&kept, CLOCK).ok()?
+    time_now_at(&kept.join(CLOCK)).ok()?
 }
 
-/// The time the disk `folder` is on gives a file written now, read from
-/// one written there as `name` and removed. None where the disk keeps no
-/// such time.
-fn time_now_in(folder: &Path, name: &str) -> io::Result<Option<SystemTime>> {
-    let at = folder.join(name);
+/// The time the disk gives a file written now, read from one written at
+/// `at` and removed. None where the disk keeps no such time.
+fn time_now_at(at: &Path) -> io::Result<Option<SystemTime>> {
     // Made anew, so that it takes the time whatever was there before.
-    if exists(&at) {
-        fs::remove_file(&at)?;
+    if exists(at) {
+        fs::remove_file(at)?;
     }
-    let mut file = (fs::OpenOptions::new().write(true).create_new(true)).open(&at)?;
+    let mut file = (fs::OpenOptions::new().write(true).create_new(true)).open(at)?;
     io::Write::write_all(&mut file, b"\n")?;
     let now = file.metadata().and_then(|found| found.modified()).ok();
     drop(file);
-    fs::remove_file(&at)?;
+    fs::remove_file(at)?;
     Ok(now)
 }
 
@@ -1233,7 +1231,7 @@ impl Staging {
     /// its bytes.
     pub fn files_to_compare(&self) -> Result<Inventory, Problem> {
         let mut inventory = self.files()?;
-        let now = self.disk_time()?;
+        let now = self.disk_time();
         let unsure: Vec<String> = (inventory.stamps.iter())
             .filter(|(_, stamp)| match (stamp, now) {
                 (Some((_, changed)), Some(now)) => *changed >= now,
@@ -1250,11 +1248,16 @@ impl Staging {
         Ok(inventory)
     }
 
-    /// The time the disk the folder is on gives a file written now, read
-    /// from one written there and removed. None where the disk keeps no
-    /// such time.
-    fn disk_time(&self) -> Result<Option<SystemTime>, Problem> {
-        time_now_in(&self.fresh, CLOCK).map_err(|error| self.cant_write(CLOCK, &error))
+    /// The time the disk the output is on gives a file written now, read
+    /// from one written beside the output under a name of Statac's own and
+    /// removed: the folder written into may hold a file of the site's by
+    /// any name. None where the disk keeps no such time or the file can't
+    /// be written there.
+    fn disk_time(&self) -> Option<SystemTime> {
+        let mut name = std::ffi::OsString::from(".");
+        name.push(self.out.file_name()?);
+        name.push(CLOCK);
+        time_now_at(&self.out.with_file_name(name)).ok()?
     }
 
     /// Puts the folder written into in the output's place.
@@ -1790,17 +1793,20 @@ mod tests {
         for rel in ["kept.txt", "same.txt", "rewritten.txt", "old.txt"] {
             staging.write(rel, b"one\n").unwrap();
         }
+        // A file of the site's by the name the disk's time is read from.
+        staging.write(CLOCK, b"mine\n").unwrap();
         // Written within the step the disk's times are in, as a disk whose
         // times move in steps sees them, or long before.
         let now = SystemTime::now() + Duration::from_secs(3600);
         for rel in ["same.txt", "rewritten.txt"] {
             change(&at(rel), now);
         }
-        for rel in ["kept.txt", "old.txt"] {
+        for rel in ["kept.txt", "old.txt", CLOCK] {
             change(&at(rel), long_ago());
         }
         let before = staging.files_to_compare().unwrap();
-        assert!(!exists(&at(CLOCK)));
+        assert_eq!(fs::read(at(CLOCK)).unwrap(), b"mine\n");
+        assert!(!exists(&scratch.0.join(format!(".out{CLOCK}"))));
         // Written again at the same length, within the same step.
         for (rel, text) in [("same.txt", b"one\n"), ("rewritten.txt", b"two\n")] {
             fs::write(at(rel), text).unwrap();
