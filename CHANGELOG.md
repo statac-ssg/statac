@@ -47,6 +47,10 @@ What changed in each release of Statac, the newest first.
   or a `{% filter %}` whose tags at its end close two branches, as
   `<p>x</p>{% endif %}{% endif %}`, keeps the line after it apart. It
   ran into the line after it where it was written.
+- "Ran `after_build`, which added N files and changed M" counts a file
+  the command wrote again at its length straight after the build wrote
+  it. Where the disk's times move in steps, as by a few thousandths of a
+  second on Linux, such a file kept its time and went uncounted.
 
 ## 0.4.0 - 2026-10-17
 

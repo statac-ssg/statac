@@ -61,6 +61,10 @@ pub const MARKER: &str = ".statac-built";
 const MARKER_TEXT: &str = "Statac built this folder and replaces all of it on every build.\n\
                            Keep files you want published in the site's static/ folder.\n";
 
+/// The file written and removed at the top of the folder written into to
+/// read the time its disk gives a file written now.
+const CLOCK: &str = ".statac-clock";
+
 /// The spare's name in `.statac`.
 const SPARE: &str = "spare";
 
@@ -136,6 +140,50 @@ pub struct Left {
 /// A file's length and when it was last changed: what a file copied from
 /// it is trusted by, by a build that writes where an earlier one wrote.
 pub type Stamp = (u64, SystemTime);
+
+/// The files a folder held at one moment, for a later look at it to say
+/// which were added, changed or removed.
+pub struct Inventory {
+    root: PathBuf,
+    /// Each file by its path from the top, with its stamp where the
+    /// system gives one.
+    stamps: HashMap<String, Option<Stamp>>,
+    /// The hash of the bytes of each file whose stamp may not show that
+    /// it was written again.
+    hashes: HashMap<String, blake3::Hash>,
+}
+
+impl Inventory {
+    pub fn holds(&self, rel: &str) -> bool {
+        self.stamps.contains_key(rel)
+    }
+
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.stamps.keys().map(String::as_str)
+    }
+
+    /// How many of the files `before` held, and this holds, have changed.
+    pub fn changed_since(&self, before: &Inventory) -> usize {
+        (self.stamps.par_iter())
+            .filter(|(rel, stamp)| {
+                let Some(was) = before.stamps.get(*rel) else {
+                    return false;
+                };
+                was != *stamp
+                    || (before.hashes.get(*rel)).is_some_and(|hash| {
+                        hashed(&platform::join(&self.root, rel)).as_ref() != Some(hash)
+                    })
+            })
+            .count()
+    }
+}
+
+/// The hash of the bytes of the file at `path`, where it can be read.
+fn hashed(path: &Path) -> Option<blake3::Hash> {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update_reader(fs::File::open(path).ok()?).ok()?;
+    Some(hasher.finalize())
+}
 
 fn stamp(file: &fs::File) -> Option<Stamp> {
     let found = file.metadata().ok()?;
@@ -1119,7 +1167,7 @@ impl Staging {
 
     /// Every file the folder written into holds now, each by its path
     /// with forward slashes, with its stamp where the system gives one.
-    pub fn files(&self) -> Result<HashMap<String, Option<Stamp>>, Problem> {
+    pub fn files(&self) -> Result<Inventory, Problem> {
         let held = Held::under(&self.fresh, "").map_err(|error| {
             Problem::nowhere(Kind::CantRead {
                 path: self.shown.clone(),
@@ -1131,7 +1179,56 @@ impl Staging {
             let stamp = found.and_then(|found| Some((found.len(), found.modified().ok()?)));
             (rel, stamp)
         });
-        Ok(stamped.collect())
+        Ok(Inventory {
+            root: self.fresh.clone(),
+            stamps: stamped.collect(),
+            hashes: HashMap::new(),
+        })
+    }
+
+    /// Every file the folder written into holds now, as [`Staging::files`]
+    /// gives them, known well enough for a later look to tell one written
+    /// again at the same length. Writing a file moves its time where it
+    /// was last changed before the disk's time now; one changed since may
+    /// keep its time, the disk's times moving in steps, so it is known by
+    /// its bytes.
+    pub fn files_to_compare(&self) -> Result<Inventory, Problem> {
+        let mut inventory = self.files()?;
+        let now = self.disk_time()?;
+        let unsure: Vec<String> = (inventory.stamps.iter())
+            .filter(|(_, stamp)| match (stamp, now) {
+                (Some((_, changed)), Some(now)) => *changed >= now,
+                _ => true,
+            })
+            .map(|(rel, _)| rel.clone())
+            .collect();
+        inventory.hashes = (unsure.into_par_iter())
+            .filter_map(|rel| {
+                let hash = hashed(&platform::join(&self.fresh, &rel))?;
+                Some((rel, hash))
+            })
+            .collect();
+        Ok(inventory)
+    }
+
+    /// The time the disk the folder is on gives a file written now, read
+    /// from one written there and removed. None where the disk keeps no
+    /// such time.
+    fn disk_time(&self) -> Result<Option<SystemTime>, Problem> {
+        let at = self.fresh.join(CLOCK);
+        let cant_write = |error: io::Error| self.cant_write(CLOCK, &error);
+        // Made anew, so that it takes the time whatever was there before.
+        if exists(&at) {
+            fs::remove_file(&at).map_err(cant_write)?;
+        }
+        let mut file = (fs::OpenOptions::new().write(true).create_new(true))
+            .open(&at)
+            .map_err(cant_write)?;
+        io::Write::write_all(&mut file, b"\n").map_err(cant_write)?;
+        let now = file.metadata().and_then(|found| found.modified()).ok();
+        drop(file);
+        fs::remove_file(&at).map_err(cant_write)?;
+        Ok(now)
     }
 
     /// Puts the folder written into in the output's place.
@@ -1586,6 +1683,34 @@ mod tests {
 
     fn long_ago() -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000_000)
+    }
+
+    #[test]
+    fn a_file_written_again_is_told_changed_though_its_length_and_time_stay() {
+        let scratch = Scratch::new("compared");
+        let staging = scratch.begin();
+        let at = |rel: &str| staging.root().join(rel);
+        for rel in ["kept.txt", "same.txt", "rewritten.txt", "old.txt"] {
+            staging.write(rel, b"one\n").unwrap();
+        }
+        // Written within the step the disk's times are in, as a disk whose
+        // times move in steps sees them, or long before.
+        let now = SystemTime::now() + Duration::from_secs(3600);
+        for rel in ["same.txt", "rewritten.txt"] {
+            change(&at(rel), now);
+        }
+        for rel in ["kept.txt", "old.txt"] {
+            change(&at(rel), long_ago());
+        }
+        let before = staging.files_to_compare().unwrap();
+        assert!(!exists(&at(CLOCK)));
+        // Written again at the same length, within the same step.
+        for (rel, text) in [("same.txt", b"one\n"), ("rewritten.txt", b"two\n")] {
+            fs::write(at(rel), text).unwrap();
+            change(&at(rel), now);
+        }
+        fs::write(at("old.txt"), b"two\n").unwrap();
+        assert_eq!(staging.files().unwrap().changed_since(&before), 2);
     }
 
     #[test]

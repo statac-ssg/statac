@@ -223,7 +223,7 @@ fn after(
     };
     // Whatever an earlier build's command left in the folder goes first.
     staging.settle()?;
-    let before = staging.files()?;
+    let before = staging.files_to_compare()?;
     let hook = Hook {
         setting: AFTER,
         line: line.value,
@@ -236,18 +236,12 @@ fn after(
         .map_err(|stopped| Problem::placed(told(AFTER, stopped), line.origin.place))?;
     let after = staging.files()?;
     let changed = Changed {
-        added: (after.keys())
-            .filter(|file| !before.contains_key(*file))
-            .count(),
-        changed: (after.iter())
-            .filter(|(file, stamp)| before.get(*file).is_some_and(|was| was != *stamp))
-            .count(),
-        removed: (before.keys())
-            .filter(|file| !after.contains_key(*file))
-            .count(),
+        added: after.names().filter(|file| !before.holds(file)).count(),
+        changed: after.changed_since(&before),
+        removed: before.names().filter(|file| !after.holds(file)).count(),
     };
     let held = |rel: &str, folder: bool| {
-        (!folder && after.contains_key(rel)) || after.keys().any(|file| within(file, rel))
+        (!folder && after.holds(rel)) || after.names().any(|file| within(file, rel))
     };
     Ok((Some(changed), unmade(settings, held)))
 }

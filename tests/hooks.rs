@@ -143,14 +143,9 @@ fn in_out(name: &str) -> String {
 fn after_build_is_told_by_the_files_it_added_changed_and_removed() {
     let added =
         |n: usize| (1..=n).map(|n| format!("echo added> {}", in_out(&format!("added-{n}.txt"))));
-    // The same length as what the build wrote, so only its time changes;
-    // and after a moment, since a disk's times move in steps a quick
-    // command can stay inside.
+    // The same length as what the build wrote, so only its bytes change,
+    // and its time where the disk's times have moved on.
     let changed = format!("echo KEPT> {}", in_out("kept.txt"));
-    let changed = match cfg!(windows) {
-        true => changed,
-        false => format!("sleep 0.05 && {changed}"),
-    };
     let removed = (1..=3).map(|n| in_out(&format!("removed-{n}.txt")));
     let removed = match cfg!(windows) {
         true => format!("del {}", removed.collect::<Vec<_>>().join(" ")),
