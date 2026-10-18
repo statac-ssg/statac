@@ -14,7 +14,7 @@ use super::guard::{Failed, Refusal};
 use super::render::Shared;
 use crate::assets::PageScripts;
 use crate::problem::{Kind, Problem, Stopped};
-use crate::reads::{Key, Reads};
+use crate::reads::{Asked, Key, Reads};
 use crate::site::{DataId, Id, LanguageId, PageId};
 use crate::source::Place;
 
@@ -35,6 +35,8 @@ pub(super) struct Frame {
     /// addresses.
     pub redirect: bool,
     pub reads: Reads,
+    /// What it asked of its own page and of the site, by name.
+    pub asked: Asked,
     /// Problems met along the way that didn't stop the template, such as a
     /// snippet call in the writing that couldn't be built.
     pub problems: Vec<Problem>,
@@ -146,6 +148,7 @@ impl Frame {
             feed: None,
             redirect: false,
             reads: Reads::default(),
+            asked: Asked::default(),
             problems: Vec::new(),
             misses: Vec::new(),
             refusal: None,
@@ -225,6 +228,39 @@ pub(super) fn unrecorded<R>(f: impl FnOnce() -> R) -> R {
 pub(super) fn read(key: Key) {
     if !UNRECORDED.get() {
         with(|frame| frame.reads.read(key));
+    }
+}
+
+/// Notes that the output being built asked `page`, as its list's page
+/// `number`, for `name`, where that is the page it is built for.
+pub(super) fn ask_page(page: PageId, number: usize, name: &str) {
+    if !UNRECORDED.get() {
+        with(|frame| {
+            if frame.page == Some(page) && frame.number == number {
+                let name = frame.shared.name_id(name);
+                frame.asked.ask_page(name);
+            }
+        });
+    }
+}
+
+/// Notes that the output being built asked the site, as it answers in
+/// `language`, for `name`, where that is the output's language.
+pub(super) fn ask_site(language: LanguageId, name: &str) {
+    if !UNRECORDED.get() {
+        with(|frame| {
+            if frame.language == language {
+                let name = frame.shared.name_id(name);
+                frame.asked.ask_site(name);
+            }
+        });
+    }
+}
+
+/// Notes that the output being built reached `file` under `data/`.
+pub(super) fn reach(file: DataId) {
+    if !UNRECORDED.get() {
+        with(|frame| frame.asked.reach(file));
     }
 }
 

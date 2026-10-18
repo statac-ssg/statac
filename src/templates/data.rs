@@ -40,6 +40,33 @@ impl FolderValue {
         }
         folder
     }
+
+    /// Every file in the folder, however deep.
+    pub fn files(&self) -> Vec<DataId> {
+        let mut files = Vec::new();
+        files_in(self.folder(), &mut files);
+        files
+    }
+
+    /// The files `name` in the folder is: itself, or every file in it.
+    pub fn files_of(&self, name: &str) -> Vec<DataId> {
+        let mut files = Vec::new();
+        match self.folder().entries.get(name) {
+            Some(Entry::File(id)) => files.push(*id),
+            Some(Entry::Folder(inner)) => files_in(inner, &mut files),
+            None => {}
+        }
+        files
+    }
+}
+
+fn files_in(folder: &Folder, files: &mut Vec<DataId>) {
+    for entry in folder.entries.values() {
+        match entry {
+            Entry::File(id) => files.push(*id),
+            Entry::Folder(inner) => files_in(inner, files),
+        }
+    }
 }
 
 impl Object for FolderValue {
@@ -81,6 +108,7 @@ impl Object for FolderValue {
 /// A data file's value, made once and kept.
 fn file_value(shared: &Arc<Shared>, id: DataId) -> Value {
     frame::read(Key::Data(id));
+    frame::reach(id);
     let Some(node) = &shared.site.data.file(id).node else {
         // The file couldn't be read, which is told already.
         return Value::from(frame::told());

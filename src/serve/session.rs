@@ -100,6 +100,8 @@ pub struct Read {
     /// The page each built file is, and which of its list's pages, counted
     /// from 1.
     pub pages: HashMap<String, (crate::site::PageId, usize)>,
+    /// Every output of the round, with what each read.
+    pub(crate) built: Arc<Vec<Built>>,
 }
 
 /// A page there is something to say of to whoever is looking at it: one
@@ -144,7 +146,7 @@ struct Last {
     /// What the session can't account for output by output: where this
     /// differs, every output is built.
     whole: u64,
-    built: Vec<Built>,
+    built: Arc<Vec<Built>>,
     /// What each output is built from besides what it read.
     own: Vec<u64>,
     /// What each output's file holds, by the file.
@@ -498,6 +500,7 @@ impl Session {
         if whole_site && outcome.published.is_some() {
             self.after = after;
         }
+        let built = Arc::new(built);
         let noted = noted(renderer, &built, &outcome.problems);
         let pages = built.iter().filter_map(|built| {
             let page = match built.output {
@@ -522,6 +525,7 @@ impl Session {
             read: Some(Read {
                 renderer: renderer.clone(),
                 pages,
+                built: Arc::clone(&built),
             }),
         };
         match left.filter(|_| round.outcome.published.is_some()) {
@@ -782,6 +786,7 @@ fn carry(last: &Last, now: Taken<'_>, plan: &Plan, own: &[u64]) -> Vec<Option<Bu
             (was.of(key) == now.of(carried)).then_some(carried)
         });
         let reads: Vec<Key> = same.collect::<Option<_>>()?;
+        let asked = old.asked.carried(&to)?;
         let problems = old.problems.iter().map(|problem| moved(problem, &to));
         let problems: Vec<Problem> = problems.collect::<Option<_>>()?;
         let links = match &old.links {
@@ -815,6 +820,7 @@ fn carry(last: &Last, now: Taken<'_>, plan: &Plan, own: &[u64]) -> Vec<Option<Bu
             file: old.file.clone(),
             html: None,
             reads: Reads::of(reads),
+            asked,
             problems,
             scripts: old.scripts.clone(),
             pieces: old.pieces.clone(),

@@ -488,6 +488,7 @@ impl Object for PageValue {
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let key = key.as_str()?;
+        frame::ask_page(self.id, self.number, key);
         let answer = self.answer(key);
         if answer.is_none() {
             frame::missed(Some(self.id), key);
@@ -505,6 +506,7 @@ impl Object for PageValue {
         method: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
+        frame::ask_page(self.id, self.number, method);
         if method == SEARCH_BOX {
             return search_box(args);
         }
@@ -718,6 +720,7 @@ impl Object for SiteValue {
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let key = key.as_str()?;
+        frame::ask_site(self.language, key);
         let answer = self.answer(key);
         if answer.is_none() {
             frame::missed(None, key);

@@ -18,7 +18,7 @@ use crate::links;
 use crate::new::update::Starter;
 use crate::problem::{Code, Kind, Named, Problem, Severity, system_reason};
 use crate::publish::{self, Staging};
-use crate::reads::{Key, Reads, Record};
+use crate::reads::{Asked, Key, Reads, Record};
 use crate::report::Quiet;
 use crate::site::{Id, ListId, OutputId, PageId, PictureId};
 use crate::source::{Place, SourceId, Sources};
@@ -447,6 +447,8 @@ pub(crate) struct Built {
     /// Its text, where it was built whole and is held to be written later.
     pub html: Option<String>,
     pub reads: Reads,
+    /// What it asked of its own page and of the site, by name.
+    pub asked: Asked,
     pub problems: Vec<Problem>,
     pub scripts: Vec<Finding>,
     /// Each piece of JavaScript written into it where a browser runs it.
@@ -1363,6 +1365,7 @@ pub(crate) fn build_output(
         file,
         html: held,
         reads: rendered.reads,
+        asked: rendered.asked,
         problems,
         scripts,
         pieces,

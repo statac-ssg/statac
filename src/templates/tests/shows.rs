@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::origin::Arrival;
-use crate::templates::{Held, Holds, Row};
+use crate::templates::{Held, Holds, Reached, Row};
 
 fn explained_site() -> Built {
     site(&[
@@ -111,4 +111,84 @@ fn asking_what_a_page_shows_leaves_no_frame_behind() {
     built.renderer.explained(page, 1);
     let rendered = built.renderer.render(page);
     assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
+}
+
+#[test]
+fn a_name_is_reached_by_its_top_name_or_under_data_by_its_file() {
+    let built = explained_site();
+    let renderer = &built.renderer;
+    let explained = renderer.explained(built.at("/blog/post-1/"), 1);
+    let page = &explained.groups[0].rows;
+    let on_page = |name: &str| Reached::Page(renderer.name_id(name));
+    assert_eq!(row(page, "page.title").reached, on_page("title"));
+    assert_eq!(row(page, "page.book.author").reached, on_page("book"));
+    assert_eq!(row(page, "page.photo").reached, on_page("photo"));
+    let site = &explained.groups[1].rows;
+    let on_site = Reached::Site(renderer.name_id("motto"));
+    assert_eq!(row(site, "site.motto").reached, on_site);
+    let data = &explained.groups[2].rows;
+    let people = row(data, "site.data.people");
+    assert!(
+        matches!(&people.reached, Reached::Data(files) if files.len() == 1),
+        "{:?}",
+        people.reached
+    );
+    let role = row(data, "site.data.people[\"person-1\"].role");
+    assert_eq!(role.reached, people.reached);
+    assert_eq!(row(site, "site.data").reached, people.reached);
+}
+
+/// A site whose post's layout writes its title and its writing alone, and
+/// its date through a snippet handed the post.
+fn asking_site() -> Built {
+    site(&[
+        (
+            "statac.yaml",
+            "language: en\ntitle: Site\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-10-01\n---\nSome writing.\n",
+        ),
+        ("data/people.yaml", "person-1: Person 1\n"),
+        ("snippets/dated.html", "{{ post.date }}"),
+        (
+            "templates/page.html",
+            "{{ page.title }}{{ page.content }}{{ dated(page) }}{{ site.data.people[\"person-1\"] }}",
+        ),
+        (
+            "templates/home.html",
+            "{% for post in site.posts %}{{ post.title }}{% endfor %}",
+        ),
+    ])
+}
+
+#[test]
+fn an_output_notes_what_it_asks_of_its_own_page_and_the_site_by_name() {
+    let built = asking_site();
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    let renderer = &built.renderer;
+    let name = |name: &str| renderer.name_id(name);
+
+    let post = built.render("post-1.md");
+    assert!(post.problems.is_empty(), "{:?}", post.problems);
+    let asked = &post.asked;
+    for written in ["title", "content", "date"] {
+        assert!(asked.asked_page(name(written)), "{written}");
+    }
+    // Answered from the same writing, or the same language, but never
+    // asked for.
+    for unwritten in ["excerpt", "maths", "direction", "words"] {
+        assert!(!asked.asked_page(name(unwritten)), "{unwritten}");
+    }
+    assert!(asked.asked_site(name("data")));
+    let people = (renderer.site().data.files.iter()).map(|(id, _)| id).next();
+    assert!(asked.reached(people.unwrap()));
+
+    // Another page's title, reached in a loop, is no name of this one's.
+    let home = built.render("index.md");
+    assert!(home.problems.is_empty(), "{:?}", home.problems);
+    assert!(home.asked.asked_site(name("posts")));
+    assert!(!home.asked.asked_page(name("title")));
 }

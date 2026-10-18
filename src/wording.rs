@@ -3806,9 +3806,34 @@ pub(crate) fn panel_layout(name: &str, written: Option<&str>, handed_down: bool)
 
 /// A list a page is in, and where it comes among the list's posts.
 pub(crate) fn panel_member(word: Word, name: &str, at: usize, of: usize) -> String {
+    format!(
+        "{}: {} of {}.",
+        panel_list(word, name),
+        grouped(at),
+        grouped(of)
+    )
+}
+
+/// A list a page is in, as the panel names it.
+pub(crate) fn panel_list(word: Word, name: &str) -> String {
     let list = the_list(word, name);
     let list = list.strip_prefix("the ").unwrap_or(&list);
-    format!("The {list}: {} of {}.", grouped(at), grouped(of))
+    format!("The {list}")
+}
+
+/// What a page's build read that is no one file of the site's.
+pub(crate) const PANEL_READ_PAGES: &str = "Which pages there are";
+pub(crate) const PANEL_READ_LISTS: &str = "Which lists there are";
+pub(crate) const PANEL_READ_ORDER: &str = "The order of the pages in their lists";
+pub(crate) const PANEL_READ_TRANSLATIONS: &str = "Which pages are translations of which";
+pub(crate) const PANEL_READ_FILES: &str = "Which pictures and other files the site has";
+pub(crate) const PANEL_READ_MENTIONS: &str = "The webmentions in `fetched/mentions/`";
+pub(crate) const PANEL_READ_TODAY: &str = "Today's date";
+pub(crate) fn panel_read_list(word: Word, name: &str) -> String {
+    format!("The pages of {}", the_list(word, name))
+}
+pub(crate) fn panel_read_field(name: &str) -> String {
+    format!("What every page writes as `{name}`")
 }
 
 /// The panel's table of every name a template can write on the page.

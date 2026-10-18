@@ -1138,7 +1138,7 @@ mod tests {
              \"hide\":\"Hide details\",\"name\":\"Statac\",\"sections\":[],\"problems\":[],\
              \"stoppedBy\":null,\"explanations\":{},\"round\":null,\"rounds\":[],\
              \"site\":{\"kinds\":[],\"gone\":null,\"drafts\":[],\"waiting\":[],\"written\":[]},\
-             \"root\":null}"
+             \"root\":null,\"page\":null,\"names\":[]}"
         );
     }
 

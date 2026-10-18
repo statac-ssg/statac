@@ -50,7 +50,7 @@ pub use card::{Asked, Gathered};
 pub use indent::Own;
 pub use layout::Chosen;
 pub use render::{REDIRECT, Rendered, Renderer, developed};
-pub use shows::{Explained, Group, Held, Holds, Member, Row};
+pub use shows::{Explained, Group, Held, Holds, Member, Neighbour, Reached, Row};
 
 /// The site's templates and snippets, read and checked, ready to build
 /// pages with.

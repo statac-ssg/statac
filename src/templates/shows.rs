@@ -12,11 +12,13 @@ use minijinja::Value;
 use minijinja::value::ValueKind;
 
 use super::check::{Rec, Ty};
+use super::data::FolderValue;
 use super::frame::{self, Frame};
 use super::values::{self, Lists, PageValue, SiteValue};
 use super::{Chosen, Renderer};
 use crate::content::words::PageWord;
-use crate::site::PageId;
+use crate::language::Direction;
+use crate::site::{DataId, NameId, PageId};
 use crate::source::{Place, SourceId};
 
 /// How deep the author's own nested fields are followed.
@@ -33,9 +35,16 @@ const DATA: &str = "site.data";
 pub struct Explained {
     /// The file it is written in; none for a page Statac made.
     pub source: Option<SourceId>,
+    pub title: Option<String>,
     pub address: String,
+    /// Its language's tag, as a template is handed it, and which way its
+    /// lines run.
+    pub language: String,
+    pub direction: Direction,
     /// The template that builds it; none where there isn't one to.
     pub layout: Option<Chosen>,
+    /// The files of that template and of each it extends, in turn.
+    pub templates: Vec<SourceId>,
     pub lists: Vec<Member>,
     /// Where each feed carrying it is published.
     pub feeds: Vec<String>,
@@ -50,6 +59,16 @@ pub struct Member {
     pub list: String,
     pub at: usize,
     pub of: usize,
+    /// The posts before and after it in the list.
+    pub previous: Option<Neighbour>,
+    pub next: Option<Neighbour>,
+}
+
+/// A post beside the page in a list: what it is called, a title or the
+/// name Statac gives a page without one, and where it stands.
+pub struct Neighbour {
+    pub called: String,
+    pub address: String,
 }
 
 pub struct Group {
@@ -67,6 +86,19 @@ pub struct Row {
     pub from: Option<Place>,
     /// The names it answers in turn, as `page.date` answers `year`.
     pub has: Vec<String>,
+    pub reached: Reached,
+}
+
+/// What a template asks for on its way to a name.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Reached {
+    /// A name of the page's at the top, as `page.book` is for
+    /// `page.book.author`.
+    Page(NameId),
+    /// A name of the site's at the top.
+    Site(NameId),
+    /// Any of these files under `data/`.
+    Data(Vec<DataId>),
 }
 
 /// The kind of thing a name holds.
@@ -122,14 +154,21 @@ impl Renderer {
         let page_rows = self.rows("page", &as_page, &schema, Rec::Page, Some(page));
         let as_site = SiteValue::value(shared, held.language);
         let site_rows = self.rows("site", &as_site, &schema, Rec::Site, None);
+        let neighbour = |id: PageId| Neighbour {
+            called: super::own::headline(shared, id).unwrap_or_else(|_| shared.address_of(id)),
+            address: shared.address_of(id),
+        };
         let lists = site.lists.iter().filter_map(|(id, list)| {
             let at = list.members.iter().position(|&member| member == page)?;
             let (word, name) = crate::feeds::described(site, &shared.sources, id);
+            let beside = |at: Option<usize>| list.members.get(at?).copied().map(neighbour);
             Some(Member {
                 word,
                 list: name,
                 at: at + 1,
                 of: list.members.len(),
+                previous: beside(at.checked_sub(1)),
+                next: beside(at.checked_add(1)),
             })
         });
         let lists: Vec<Member> = lists.collect();
@@ -160,10 +199,20 @@ impl Renderer {
             .filter(|(_, list)| list.members.contains(&page))
             .filter_map(|(id, _)| self.feeds().iter().find(|feed| feed.list == id))
             .map(|feed| format!("{}{}", shared.base, feed.address.as_str()));
+        let layout = self.layout_of(page).ok();
+        let templates = &shared.templates;
+        let chain = layout.as_ref().map(|chosen| templates.chain(&chosen.name));
         Explained {
             source: held.source,
+            title: held.title.as_ref().map(|title| title.value.clone()),
             address,
-            layout: self.layout_of(page).ok(),
+            language: (site.languages.get(held.language).tag.clone())
+                .unwrap_or_else(|| crate::language::ENGLISH.to_owned()),
+            direction: shared.dates.language(held.language).words.direction,
+            layout,
+            templates: (chain.into_iter().flatten())
+                .map(|at| templates.files[at].source)
+                .collect(),
             lists,
             feeds: feeds.collect(),
             groups,
@@ -198,7 +247,15 @@ impl Renderer {
                 _ => Vec::new(),
             };
             let from = from.filter(|_| value.is_some());
-            self.row(&mut rows, full, &field.ty, value, from, has, 1);
+            let folder = value
+                .as_ref()
+                .and_then(Value::downcast_object_ref::<FolderValue>);
+            let reached = match folder {
+                Some(folder) => Reached::Data(folder.files()),
+                None if rec == Rec::Page => Reached::Page(self.name_id(name)),
+                None => Reached::Site(self.name_id(name)),
+            };
+            self.row(&mut rows, full, &field.ty, value, from, has, reached, 1);
         }
         rows
     }
@@ -214,9 +271,19 @@ impl Renderer {
         value: Option<Value>,
         from: Option<Place>,
         has: Vec<String>,
+        reached: Reached,
         depth: usize,
     ) {
         let holds = holds(ty, value.as_ref());
+        // A field is reached through what holds it, save under `data/`,
+        // where each file is reached as itself.
+        let folder = value
+            .as_ref()
+            .and_then(Value::downcast_object_ref::<FolderValue>);
+        let reached_by = |key: &str| match folder {
+            Some(folder) => Reached::Data(folder.files_of(key)),
+            None => reached.clone(),
+        };
         let fields = value.as_ref().filter(|value| {
             matches!(ty, Ty::Any)
                 && value.kind() == ValueKind::Map
@@ -236,14 +303,15 @@ impl Renderer {
         let more = fields
             .and_then(|value| value.len())
             .map_or(0, |fields| fields.saturating_sub(WIDEST));
-        let inner: Vec<(String, Value)> = fields
+        let inner: Vec<(String, Value, Reached)> = fields
             .and_then(|value| value.try_iter().ok())
             .into_iter()
             .flatten()
             .take(WIDEST)
             .filter_map(|key| {
                 let inner = value.as_ref()?.get_item(&key).ok()?;
-                Some((within(&name, key.as_str()?), inner))
+                let key = key.as_str()?;
+                Some((within(&name, key), inner, reached_by(key)))
             })
             .collect();
         let further = (more > 0).then(|| Row {
@@ -252,6 +320,7 @@ impl Renderer {
             held: Held::More(more),
             from: None,
             has: Vec::new(),
+            reached: reached.clone(),
         });
         rows.push(Row {
             name,
@@ -259,11 +328,21 @@ impl Renderer {
             held,
             from,
             has,
+            reached,
         });
-        for (name, value) in inner {
+        for (name, value, reached) in inner {
             let from = frame::origin(&value);
             let value = Some(value).filter(|value| !nothing(value));
-            self.row(rows, name, &Ty::Any, value, from, Vec::new(), depth + 1);
+            self.row(
+                rows,
+                name,
+                &Ty::Any,
+                value,
+                from,
+                Vec::new(),
+                reached,
+                depth + 1,
+            );
         }
         rows.extend(further);
     }

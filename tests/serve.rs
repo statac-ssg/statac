@@ -896,6 +896,134 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
 }
 
 #[test]
+fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
+    let served = served_as("panel-page", How::Native, true, |site| {
+        site.write(
+            "templates/base.html",
+            "<title>{{ page.title }} - {{ site.title }}</title>\n{% block main %}{% endblock %}\n",
+        );
+        site.write(
+            "templates/post.html",
+            "{% extends \"base\" %}{% block main %}{{ page.content }}\
+             {% if page.next %}{{ page.next.title }}{% endif %}{% endblock %}",
+        );
+        site.write(
+            "content/posts/index.md",
+            "---\ntitle: Posts\nlayout: page\npages.layout: post\n---\n",
+        );
+        for n in 2..=4 {
+            site.write(
+                &format!("content/posts/post-{n}.md"),
+                &format!("---\ntitle: Post {n}\ndate: 2026-10-0{n}\n---\nPost {n}.\n"),
+            );
+        }
+    });
+    // A post built with a layout its folder hands down, which extends
+    // another, between two others in each of its lists.
+    let post = panel(&served, "/posts/post-3/");
+    assert!(
+        post.contains(
+            "\"page\":{\"title\":\"Post 3\",\"draft\":false,\"waiting\":null,\
+             \"file\":\"content/posts/post-3.md\",\"address\":\"/posts/post-3/\",\
+             \"language\":{\"tag\":\"en\",\"direction\":\"ltr\"},\
+             \"layout\":{\"name\":\"post\",\"file\":\"templates/post.html\",\
+             \"extends\":[\"templates/base.html\"],\
+             \"chosenAt\":{\"file\":\"content/posts/index.md\",\"line\":4},\"handedDown\":true},\
+             \"lists\":[{\"said\":[{\"text\":\"The site's own list\"}],\"at\":2,\"of\":3,\
+             \"previous\":{\"text\":\"Post 4\",\"href\":\"/posts/post-4/\"},\
+             \"next\":{\"text\":\"Post 2\",\"href\":\"/posts/post-2/\"}},\
+             {\"said\":[{\"text\":\"The folder \"},{\"code\":\"content/posts/\"}],\"at\":2,\"of\":3,\
+             \"previous\":{\"text\":\"Post 4\",\"href\":\"/posts/post-4/\"},\
+             \"next\":{\"text\":\"Post 2\",\"href\":\"/posts/post-2/\"}}],\"feeds\":[],\
+             \"reads\":{\"files\":[\"content/posts/post-2.md\",\"content/posts/post-3.md\",\
+             \"statac.yaml\",\"templates/base.html\",\"templates/post.html\"],\
+             \"also\":[[{\"text\":\"The order of the pages in their lists\"}]]}},\
+             \"names\":[{\"group\":\"page\",\"count\":"
+        ),
+        "{post}"
+    );
+    // What the layout writes, and what it doesn't.
+    assert!(
+        post.contains(
+            "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Post 3\",\"empty\":false,\
+             \"has\":[],\"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2},\"used\":true}"
+        ) && post.contains(
+            "{\"name\":\"page.date\",\"holds\":\"date\",\"value\":\"3 October 2026\",\
+             \"empty\":false,\"has\":[\"day\",\"month\",\"weekday\",\"year\"],\
+             \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":3},\"used\":false}"
+        ) && post.contains(
+            "{\"name\":\"page.summary\",\"holds\":\"text\",\"value\":\"no value\",\
+             \"empty\":true,\"has\":[],\"from\":null,\"used\":false}"
+        ),
+        "{post}"
+    );
+    // Answered from the same writing, but asked for only as itself.
+    let used = |name: &str, value: &str, used: bool| {
+        format!(
+            "{{\"name\":\"page.{name}\",\"holds\":\"HTML\",\"value\":\"{value}\",\
+             \"empty\":false,\"has\":[],\"from\":null,\"used\":{used}}}"
+        )
+    };
+    let writing = "\\u003cp>Post 3.\\u003c/p>";
+    assert!(
+        post.contains(&used("content", writing, true))
+            && post.contains(&used("excerpt", writing, false)),
+        "{post}"
+    );
+
+    // Built again for another page's sake alone, the post keeps what its
+    // build asked for.
+    let mark = served.said.text().len();
+    served.site.write(
+        "content/posts/post-4.md",
+        "---\ntitle: Post 4\ndate: 2026-10-04\n---\nPost 4, again.\n",
+    );
+    let said = served.said.after(mark, "Browser told to reload.\n");
+    assert!(said.contains(" changed. Built 1 of "), "{said}");
+    let kept = panel(&served, "/posts/post-3/");
+    assert!(
+        kept.contains(&used("content", writing, true))
+            && kept.contains(&used("excerpt", writing, false))
+            && kept.contains(
+                "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Post 3\",\
+                 \"empty\":false,\"has\":[],\
+                 \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2},\"used\":true}"
+            ),
+        "{kept}"
+    );
+
+    // The page speaking for the folder names its own layout and is in no
+    // list; it lists its posts, which its layout never asks for.
+    let list = panel(&served, "/posts/");
+    assert!(
+        list.contains(
+            "\"page\":{\"title\":\"Posts\",\"draft\":false,\"waiting\":null,\
+             \"file\":\"content/posts/index.md\",\"address\":\"/posts/\",\
+             \"language\":{\"tag\":\"en\",\"direction\":\"ltr\"},\
+             \"layout\":{\"name\":\"page\",\"file\":\"templates/page.html\",\"extends\":[],\
+             \"chosenAt\":{\"file\":\"content/posts/index.md\",\"line\":3},\"handedDown\":false},\
+             \"lists\":[],\"feeds\":[],\
+             \"reads\":{\"files\":[\"assets/site.css\",\"content/posts/index.md\",\
+             \"statac.yaml\",\"templates/page.html\"],\"also\":[]}}"
+        ) && list.contains(
+            "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Posts\",\"empty\":false,\
+             \"has\":[],\"from\":{\"file\":\"content/posts/index.md\",\"line\":2},\"used\":true}"
+        ) && list.contains(
+            "{\"name\":\"page.posts\",\"holds\":\"pages\",\"value\":\"3 pages\",\
+             \"empty\":false,\"has\":[],\"from\":null,\"used\":false}"
+        ),
+        "{list}"
+    );
+
+    // An address with no page at it has none to tell of.
+    let nowhere = panel(&served, "/site.css");
+    assert!(
+        nowhere.ends_with("\"page\":null,\"names\":[]}"),
+        "{nowhere}"
+    );
+}
+
+#[test]
 fn asked_for_no_drafts_serve_shows_what_a_build_publishes() {
     let served = served_as("no-drafts", How::Native, false, |site| {
         site.write(

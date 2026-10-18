@@ -252,6 +252,76 @@ impl Reads {
     }
 }
 
+/// What an output asked for by name: the names at the top of its own page
+/// and of the site, and the files under `data/` it reached. Each is held
+/// once, in order. Unlike its reads, this decides nothing of a build; it
+/// says which names a page's templates use.
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
+pub struct Asked {
+    page: Vec<NameId>,
+    site: Vec<NameId>,
+    data: Vec<DataId>,
+}
+
+impl Asked {
+    pub fn ask_page(&mut self, name: NameId) {
+        hold(&mut self.page, name);
+    }
+
+    pub fn ask_site(&mut self, name: NameId) {
+        hold(&mut self.site, name);
+    }
+
+    pub fn reach(&mut self, file: DataId) {
+        hold(&mut self.data, file);
+    }
+
+    pub fn asked_page(&self, name: NameId) -> bool {
+        self.page.binary_search(&name).is_ok()
+    }
+
+    pub fn asked_site(&self, name: NameId) -> bool {
+        self.site.binary_search(&name).is_ok()
+    }
+
+    pub fn reached(&self, file: DataId) -> bool {
+        self.data.binary_search(&file).is_ok()
+    }
+
+    /// Holds what `other` asked too.
+    pub fn extend(&mut self, other: &Asked) {
+        other.page.iter().for_each(|&name| self.ask_page(name));
+        other.site.iter().for_each(|&name| self.ask_site(name));
+        other.data.iter().for_each(|&file| self.reach(file));
+    }
+
+    /// The same as the later reading `to` names it; none where it has
+    /// nothing of a name or file asked.
+    pub fn carried(&self, to: &Translation) -> Option<Asked> {
+        use crate::site::Id;
+        let name = |name: &NameId| to.names.get(name.index()).copied();
+        let mut asked = Asked::default();
+        for name in self.page.iter().map(name) {
+            asked.ask_page(name?);
+        }
+        for name in self.site.iter().map(name) {
+            asked.ask_site(name?);
+        }
+        for &file in &self.data {
+            asked.reach(carried(&to.data, file)?);
+        }
+        Some(asked)
+    }
+}
+
+/// Holds `it` among `held`, once and in order.
+#[inline]
+fn hold<T: Ord>(held: &mut Vec<T>, it: T) {
+    if let Err(at) = held.binary_search(&it) {
+        held.insert(at, it);
+    }
+}
+
 /// Every output's reads, and the reverse: who read a key.
 #[derive(Default)]
 pub struct Record {
@@ -391,6 +461,38 @@ mod tests {
         assert_eq!(held.len(), 2 + MANY);
         // Carried to a later reading, they are held the same.
         assert_eq!(Reads::of(reads.keys().to_vec()).keys(), reads.keys());
+    }
+
+    #[test]
+    fn what_is_asked_is_held_once_in_order_and_carried_by_name() {
+        let mut names = Names::default();
+        let (title, date) = (names.intern("title"), names.intern("date"));
+        let mut asked = Asked::default();
+        asked.ask_page(date);
+        asked.ask_page(title);
+        asked.ask_page(date);
+        asked.ask_site(title);
+        asked.reach(DataId::from_index(1));
+        assert_eq!(asked.page, [title, date]);
+        assert!(asked.asked_page(title) && asked.asked_site(title) && !asked.asked_site(date));
+        assert!(asked.reached(DataId::from_index(1)) && !asked.reached(DataId::from_index(0)));
+
+        // A later reading that numbers the names the other way about.
+        let to = Translation {
+            names: vec![date, title],
+            data: vec![None, Some(DataId::from_index(0))],
+            ..Translation::default()
+        };
+        let carried = asked.carried(&to).unwrap();
+        assert_eq!(carried.page, [title, date]);
+        assert!(carried.asked_site(date) && carried.reached(DataId::from_index(0)));
+        // A file the later reading holds changed can't be carried.
+        let to = Translation {
+            names: vec![title, date],
+            data: vec![None, None],
+            ..Translation::default()
+        };
+        assert_eq!(asked.carried(&to), None);
     }
 
     #[test]

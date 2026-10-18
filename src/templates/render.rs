@@ -25,7 +25,7 @@ use crate::problem::{
     ArgumentFault, Chooser, Kind, Named, NamedFeed, Problem, Relation, ShownBy, ShownWords,
     Stopped, Word,
 };
-use crate::reads::{Key, Reads};
+use crate::reads::{Asked, Key, Reads};
 use crate::site::{
     Id, LanguageId, ListId, NameId, Names, PageId, PictureId, Redirect, SentTo, Site, TemplateId,
 };
@@ -248,6 +248,7 @@ impl Shared {
 pub(super) struct Body {
     written: markdown::Written,
     reads: Reads,
+    asked: Asked,
     problems: Vec<Problem>,
     /// The pictures the writing was told to show with no description.
     undescribed: Vec<String>,
@@ -288,6 +289,7 @@ struct Elsewhere {
 pub struct Rendered {
     pub html: Option<String>,
     pub reads: Reads,
+    pub asked: Asked,
     pub problems: Vec<Problem>,
     /// The photographs whose copies it names, as each was named.
     pub developed: Vec<crate::album::Shown>,
@@ -332,6 +334,7 @@ impl Rendered {
                 .map(|page| super::card::asked(&frame.shared, page))
                 .collect(),
             reads: frame.reads,
+            asked: frame.asked,
             problems,
             developed: frame.developed,
             coloured: frame.coloured,
@@ -877,6 +880,10 @@ fn body(shared: &Arc<Shared>, page: PageId) -> Result<Arc<Body>, Error> {
         for &key in body.reads.keys() {
             frame.reads.read(key);
         }
+        // What the writing asked of its page, the output's own page asked.
+        if frame.page == Some(page) && frame.number == 1 {
+            frame.asked.extend(&body.asked);
+        }
         frame.developed.extend(body.developed.iter().copied());
     });
     Ok(body)
@@ -1082,6 +1089,7 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
         written,
         undescribed: frame.undescribed,
         reads: frame.reads,
+        asked: frame.asked,
         problems,
         developed: frame.developed,
         coloured: frame.coloured,

@@ -7,6 +7,7 @@
 //! Statac's own goes as its pieces, each name apart from the words round
 //! it, where a terminal is shown it in backticks.
 
+mod page;
 mod problems;
 
 use std::collections::HashMap;
@@ -19,7 +20,7 @@ use crate::content::address::on_the_wire;
 use crate::origin::Arrival;
 use crate::problem::{Code, Problem, Severity};
 use crate::report::{Piece, Quiet, Report, pieces, shown};
-use crate::templates::{Explained, Held, Holds, Row};
+use crate::templates::{Explained, Held, Row};
 use crate::wording;
 use problems::{Addresses, Parts};
 
@@ -348,10 +349,24 @@ impl Panel {
             let &(page, number) = read.pages.get(file?)?;
             Some((read, read.renderer.explained(page, number)))
         });
+        let mut facts = "null".to_owned();
+        let mut names = "[]".to_owned();
         if let Some((read, explained)) = explained {
             let report = Report::new(read.renderer.sources(), &built.site, false);
             sections.push(comes_from(&report, &explained));
             sections.push(shows(&report, &explained));
+            let output = (read.built.iter()).find(|output| Some(output.file.as_str()) == file);
+            let on = page::On {
+                report: &report,
+                renderer: &read.renderer,
+                explained: &explained,
+                reads: output.map(|output| &output.reads),
+                asked: output.map(|output| &output.asked),
+                site: &built.site,
+            };
+            let waiting = page.and_then(|page| page.waiting.as_deref());
+            facts = on.facts(page.is_some_and(|page| page.draft), waiting);
+            names = on.names();
         }
         if !built.line.is_empty() {
             let lines = match built.counts.is_empty() {
@@ -368,7 +383,7 @@ impl Panel {
             sections.push(section(wording::PANEL_WRITTEN, &self.written, "", &[]));
         }
         format!(
-            "{{\"v\":2,\"line\":{},\"stopped\":{},\"error\":{error},\"show\":{},\"hide\":{},\"name\":{},\"sections\":[{}],{}}}",
+            "{{\"v\":2,\"line\":{},\"stopped\":{},\"error\":{error},\"show\":{},\"hide\":{},\"name\":{},\"sections\":[{}],{},\"page\":{facts},\"names\":{names}}}",
             pieced(&line),
             self.stopped.is_some(),
             json_string(wording::PANEL_SHOW),
@@ -526,44 +541,13 @@ fn comes_from(report: &Report, explained: &Explained) -> String {
 /// Every name a template can write on the page, a table for `page` and
 /// one for `site`.
 fn shows(report: &Report, explained: &Explained) -> String {
-    let count = |row: &Row, one: &str, many: &str| match row.held {
-        Held::Count(count) => wording::panel_count(count, one, many),
-        _ => String::new(),
-    };
     let tables: Vec<String> = (explained.groups.iter())
         .map(|group| {
             let empty = |row: &&Row| row.held == Held::Nothing;
             let rows: Vec<String> = (group.rows.iter())
                 .map(|row| {
-                    let holds = match row.holds {
-                        Holds::Text => "text",
-                        Holds::Html => "HTML",
-                        Holds::Number => "number",
-                        Holds::Truth => "true or false",
-                        Holds::Date => "date",
-                        Holds::Page => "page",
-                        Holds::Pages => "pages",
-                        Holds::List => "list",
-                        Holds::Lists => "lists",
-                        Holds::Items => "list",
-                        Holds::Fields => "fields",
-                        Holds::Mentions => "webmentions",
-                        Holds::Call => "call",
-                        Holds::Unknown => "",
-                    };
-                    let value = match &row.held {
-                        Held::Shown(text) => shown(text),
-                        Held::Count(_) => match row.holds {
-                            Holds::Pages => count(row, "page", "pages"),
-                            Holds::Lists => count(row, "list", "lists"),
-                            Holds::Mentions => count(row, "mention", "mentions"),
-                            _ => count(row, "item", "items"),
-                        },
-                        Held::Fields => wording::PANEL_FIELDS_BELOW.to_owned(),
-                        Held::Call => wording::PANEL_A_CALL.to_owned(),
-                        Held::More(more) => wording::panel_more_fields(*more),
-                        Held::Nothing => wording::PANEL_NO_VALUE.to_owned(),
-                    };
+                    let holds = page::holds(row.holds);
+                    let value = page::value(row);
                     let has = match row.has.is_empty() {
                         true => String::new(),
                         false => wording::panel_has(&row.has),
