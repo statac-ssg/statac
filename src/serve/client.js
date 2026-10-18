@@ -701,14 +701,17 @@
       border-top: 1px solid var(--rule);
     }
     .tally-line .fill { flex: 1; }
-    .took { display: flex; gap: 2px; border-radius: ${em(4)}; overflow: hidden; height: ${em(10)}; }
     .column > * { flex: none; }
-    .took span { min-width: 2px; }
-    .took span:nth-child(odd) { background: var(--note); }
-    .took span:nth-child(even) { background: var(--edge-strong); }
-    .took span.building { background: var(--brand); }
-    .took-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(${em(84)}, 1fr)); gap: ${em(8)}; }
-    .took-parts span { display: flex; flex-direction: column; }
+    .took {
+      display: grid; grid-template-columns: max-content 1fr max-content;
+      column-gap: ${em(12)}; row-gap: ${em(6)}; margin: 0; align-items: center;
+    }
+    .took > div { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
+    .took :is(dt, dd) { margin: 0; }
+    .took dt { color: var(--text-muted); }
+    .took .length { display: block; height: ${em(8)}; border-radius: 0 ${em(4)} ${em(4)} 0; background: var(--brand); }
+    .took .length.some { min-width: 2px; }
+    .took dd:last-child { text-align: end; font-variant-numeric: tabular-nums; }
     .rounds li {
       display: grid; grid-template-columns: ${em(72)} minmax(0, 1fr) auto; gap: ${em(10)};
       padding: ${em(8)} 0; border-top: 1px solid var(--rule);
@@ -2451,34 +2454,29 @@
     ];
     const ms = (n) => told("ms", { n: n >= 10 ? Math.round(n) : n });
     const took = round.took;
+    const longest = Math.max(...parts.map(([key]) => took[key]));
     const first = make(
       "div",
       { class: "column" },
       make("h3", {}, told("lastRound")),
       make("p", {}, opening, opening.length ? " " : null, pieces(panel.rounds[0]?.said)),
       make(
-        "div",
-        {
-          class: "took",
-          role: "img",
-          "aria-label": parts.map(([key, word]) => `${told(word)} ${ms(took[key])}`).join(", "),
-        },
-        parts.map(([key]) =>
-          make("span", {
-            class: key === "building" ? "building" : "",
-            style: `flex: ${Math.max(took[key], 0.0001)}`,
-          }),
-        ),
-      ),
-      make(
-        "div",
-        { class: "took-parts meta" },
+        "dl",
+        { class: "took" },
         parts.map(([key, word]) =>
           make(
-            "span",
+            "div",
             {},
-            make("span", {}, told(word)),
-            make("span", { class: "code" }, ms(took[key])),
+            make("dt", {}, told(word)),
+            make(
+              "dd",
+              { "aria-hidden": "true" },
+              make("span", {
+                class: took[key] > 0 ? "length some" : "length",
+                style: `width: ${longest > 0 ? (took[key] / longest) * 100 : 0}%`,
+              }),
+            ),
+            make("dd", { class: "code" }, ms(took[key])),
           ),
         ),
       ),
