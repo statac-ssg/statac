@@ -464,7 +464,9 @@ fn list() -> String {
         "- The HTTP server `statac serve` answers with, in \
          `src/serve/server/`, is the server of oxhttp 0.3.3, Copyright (c) \
          2018 Oxigraph developers: MIT OR Apache-2.0, taken under \
-         Apache-2.0. https://github.com/oxigraph/oxhttp. [{apache}]"
+         Apache-2.0. https://github.com/oxigraph/oxhttp. It is the server \
+         alone, without oxhttp's client; a change made to it here is marked \
+         in the file it touches. [{apache}]"
     )
     .unwrap();
 
