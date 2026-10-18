@@ -1,3 +1,4 @@
+// Changed from oxhttp 0.3.3 for Statac: exports only what the server uses.
 mod decoder;
 mod encoder;
 

@@ -1,3 +1,4 @@
+// Changed from oxhttp 0.3.3 for Statac: request encoding and chunked bodies with trailers are removed; a response body always has a known length.
 use crate::serve::server::model::header::{
     ACCEPT_CHARSET, ACCEPT_ENCODING, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_REQUEST_HEADERS,
     CONNECTION, CONTENT_LENGTH, DATE, EXPECT, HOST, ORIGIN, TE, TRAILER, TRANSFER_ENCODING,

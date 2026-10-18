@@ -1,3 +1,4 @@
+// Changed from oxhttp 0.3.3 for Statac: response decoding, content decoding and request-body reading are removed, HTTPS URLs are refused, and `skip_request_body` reads past a request body.
 use crate::serve::server::model::header::{
     CONTENT_ENCODING, CONTENT_LENGTH, HOST, TRANSFER_ENCODING,
 };

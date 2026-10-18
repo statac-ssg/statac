@@ -1,3 +1,4 @@
+// Changed from oxhttp 0.3.3 for Statac: bodies built from a reader, chunked payloads, trailers and gzip or deflate decoding are removed; a body length is always known.
 use std::borrow::Cow;
 use std::fmt;
 use std::io::{Cursor, Read, Result};

@@ -1,3 +1,4 @@
+# Changed from MiniJinja 3.0.1 for Statac: the registry metadata (authors, keywords, docs.rs settings, dev-dependencies) is dropped, the package is marked unpublished and described as kept with Statac, and the repository is Statac's.
 [package]
 name = "minijinja"
 version = "3.0.1"
