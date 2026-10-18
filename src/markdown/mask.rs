@@ -12,6 +12,8 @@
 //! source. A call that wraps writing is masked whole, from its `@` to its
 //! `@end`, with a placeholder on every line, blank ones too, so the parser
 //! reads it as one paragraph; its writing is read on its own (see `block`).
+//! A character of the author's that placeholders are made of is masked
+//! too, and put back as itself, so it is never read as a placeholder.
 //!
 //! The three rules: dollar maths by pandoc's rule, so `$30 and $60` stays
 //! prices; a colon opening a line starts a definition only with a space
@@ -165,6 +167,7 @@ pub(super) fn mask(
         pieces: Vec::new(),
         segments: Vec::new(),
         line: Line::default(),
+        own: Vec::new(),
     };
     let b = text.as_bytes();
     let mut unread = Vec::new();
@@ -307,10 +310,13 @@ pub(super) fn mask(
             }
             _ => {
                 let c = text[at..].chars().next().expect("a character");
+                let to = at + c.len_utf8();
                 if controls::left_out(c) {
-                    let to = at + c.len_utf8();
                     left_out.push((Span::new(at, to), c));
                     masker.remove(at, to);
+                    i = to;
+                } else if in_placeholders(c) {
+                    masker.own(at, c);
                     i = to;
                 }
             }
@@ -342,6 +348,9 @@ struct Masker<'a> {
     pieces: Vec<Piece>,
     segments: Vec<(usize, usize, usize, usize)>,
     line: Line,
+    /// Each of the author's characters placeholders are made of, and the
+    /// piece every one of them is masked as.
+    own: Vec<(char, usize)>,
 }
 
 impl Masker<'_> {
@@ -395,6 +404,22 @@ impl Masker<'_> {
         self.copied = to;
     }
 
+    /// Masks the author's `c` at `at`, one of the characters placeholders
+    /// are made of, as every other `c` is, so labels holding it still match.
+    fn own(&mut self, at: usize, c: char) {
+        let to = at + c.len_utf8();
+        let Some(&(_, piece)) = self.own.iter().find(|(own, _)| *own == c) else {
+            self.own.push((c, self.pieces.len()));
+            self.replace(at, to, TokenKind::Literal, false);
+            return;
+        };
+        self.out.push_str(&self.text[self.copied..at]);
+        let masked = self.out.len();
+        write_placeholder(&mut self.out, piece);
+        self.segments.push((masked, self.out.len(), at, to));
+        self.copied = to;
+    }
+
     /// Leaves `from..to` out of the masked text.
     fn remove(&mut self, from: usize, to: usize) {
         self.out.push_str(&self.text[self.copied..from]);
@@ -436,16 +461,23 @@ fn write_placeholder(out: &mut String, index: usize) {
     out.push(CLOSE);
 }
 
+/// Whether `c` is one of the characters placeholders are made of, which
+/// the author's text must not be read as.
+fn in_placeholders(c: char) -> bool {
+    c == OPEN || c == CLOSE || (DIGIT..DIGIT + 16).contains(&u32::from(c))
+}
+
 /// The bytes that may start a call, maths, a colon opening a line, braces
-/// ending a heading or a control character: `0xC2` leads every C1 control
-/// in UTF-8.
+/// ending a heading, a control character or a character placeholders are
+/// made of: `0xC2` leads every C1 control in UTF-8, and `0xEE` every
+/// placeholder character.
 const SPECIAL: [bool; 256] = {
     let mut special = [false; 256];
     let mut byte = 0;
     while byte < 256 {
         special[byte] = matches!(
             byte as u8,
-            b'@' | b'$' | b':' | b'{' | 0x00..=0x08 | 0x0b | 0x0c | 0x0e..=0x1f | 0x7f | 0xc2
+            b'@' | b'$' | b':' | b'{' | 0x00..=0x08 | 0x0b | 0x0c | 0x0e..=0x1f | 0x7f | 0xc2 | 0xee
         );
         byte += 1;
     }

@@ -640,6 +640,86 @@ fn tabs_after_a_closing_fence_still_close_it() {
     assert!(html_of("```\na\tb\n```\n").contains("a\tb"));
 }
 
+#[test]
+fn private_use_characters_are_written_where_the_author_wrote_them() {
+    let all: String = ('\u{E000}'..='\u{E001}')
+        .chain('\u{E010}'..='\u{E01F}')
+        .collect();
+    let cases = [
+        (
+            "<div class=\"icon\">\u{E000}</div>\n".to_owned(),
+            "<div class=\"icon\">\u{E000}</div>".to_owned(),
+        ),
+        (
+            "Plain \u{E000}\u{E001} words @url(/about/).\n".to_owned(),
+            "<p>Plain \u{E000}\u{E001} words /about/.</p>".to_owned(),
+        ),
+        (
+            "A <span title=\"\u{E000}\">\u{E001}</span> and \u{E010}.\n".to_owned(),
+            "<p>A <span title=\"\u{E000}\">\u{E001}</span> and \u{E010}.</p>".to_owned(),
+        ),
+        (
+            "<a href=\"@url(/about/)\" title=\"\u{E001}\">\u{E000}</a>\n".to_owned(),
+            "<p><a href=\"/about/\" title=\"\u{E001}\">\u{E000}</a></p>".to_owned(),
+        ),
+        (
+            "`\u{E000}` and\n\n```\n\u{E000}\u{E001}\n```\n".to_owned(),
+            "<p><code>\u{E000}</code> and</p>\n\
+             <pre class=\"code\"><code>\u{E000}\u{E001}</code></pre>"
+                .to_owned(),
+        ),
+        (
+            "[\u{E000} *\u{E001}*](/a\u{E010}/ \"\u{E011}\") ![\u{E012}](b.jpg)\n".to_owned(),
+            "<p><a href=\"/a%EE%80%90/\" title=\"\u{E011}\">\u{E000} <em>\u{E001}</em></a> \
+             <img src=\"b.jpg\" alt=\"\u{E012}\" loading=\"lazy\" decoding=\"async\"></p>"
+                .to_owned(),
+        ),
+        (
+            "[\u{E000}] and [a][\u{E000}].\n\n[\u{E000}]: /a/\n".to_owned(),
+            "<p><a href=\"/a/\">\u{E000}</a> and <a href=\"/a/\">a</a>.</p>".to_owned(),
+        ),
+        (
+            "# Heading \u{E000} {#a\u{E001}}\n\n| \u{E010} |\n| - |\n| \u{E011} |\n".to_owned(),
+            "<h1 id=\"a\u{E001}\">Heading \u{E000}</h1>\n<div class=\"scroll\">\n  <table>\n    \
+             <thead>\n      <tr>\n        <th>\u{E010}</th>\n      </tr>\n    </thead>\n    \
+             <tr>\n      <td>\u{E011}</td>\n    </tr>\n  </table>\n</div>"
+                .to_owned(),
+        ),
+        (
+            "Words.[^\u{E000}]\n\n[^\u{E000}]: A note \u{E001}.\n".to_owned(),
+            "<p>Words.<sup class=\"footnote\"><a href=\"#note-1\" id=\"back-1\">1</a></sup></p>\n\
+             <section class=\"footnotes\">\n  <ol>\n    <li id=\"note-1\">\n      \
+             <p>A note \u{E001}. <a href=\"#back-1\" class=\"back\" aria-label=\"back to the text\">\u{21a9}</a></p>\n    \
+             </li>\n  </ol>\n</section>"
+                .to_owned(),
+        ),
+        (
+            "@x(\"\u{E000}\") $\u{E001}$\n\n@box()\nInside \u{E010} @url(/a/).\n@end\n".to_owned(),
+            "<p><call x=prose> <math><mi>\u{E001}</mi></math></p>\n\
+             <call box=alone>\n<p>Inside \u{E010} /a/.</p>\n</call>"
+                .to_owned(),
+        ),
+        (
+            format!("{all}\n\n`{all}`\n"),
+            format!("<p>{all}</p>\n<p><code>{all}</code></p>"),
+        ),
+    ];
+    for (text, html) in cases {
+        let (_, document) = read_text(&text);
+        assert!(document.problems.is_empty(), "{:?}", document.problems);
+        assert_eq!(html_of(&text), html, "{text:?}");
+    }
+    let handed = arguments("@x(\"\u{E000}\", a=\u{E001}\u{E010})\n");
+    let values: Vec<&Value> = handed.iter().map(|(_, value, ..)| value).collect();
+    assert_eq!(
+        values,
+        [
+            &Value::Text("\u{E000}".to_owned()),
+            &Value::Text("\u{E001}\u{E010}".to_owned())
+        ]
+    );
+}
+
 /// The calls a text holds, and its HTML with every call written by the
 /// stand-in.
 fn masked(text: &str) -> (Vec<(String, Within, String)>, String) {

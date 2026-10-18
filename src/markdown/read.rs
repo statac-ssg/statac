@@ -1204,6 +1204,7 @@ impl<'a> Builder<'a> {
                     pending.push_str(if piece.first { &written[1..] } else { &written });
                     self.mark_literal(piece.span);
                 }
+                TokenKind::Literal => pending.push_str(&written),
                 _ => {
                     pending.push_str(&written);
                     self.mark_literal(piece.span);

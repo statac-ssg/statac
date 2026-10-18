@@ -90,6 +90,11 @@ What changed in each release of Statac, the newest first.
   opening bracket.
 - `webmention()` called more than once on a site without webmentions is
   told at a call. It was told at the page, with no line of the template.
+- A character from the start of Unicode's private use area, as icon
+  fonts use, is published where it is written. In HTML it stopped the
+  build with a fault of Statac's own, and elsewhere a few of them
+  together could be published as something else written on the page,
+  such as the address an `@url(...)` stands for.
 
 ### Changed
 
