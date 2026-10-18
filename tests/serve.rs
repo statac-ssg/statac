@@ -635,13 +635,23 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
              {\"heading\":\"This page\",\"lines\":[[{\"text\":\"No problems on this page.\"}]],\
              \"drawn\":\"\",\"lists\":[]},\
              {\"heading\":\"Where this page comes from\","
-        ) && plain.ends_with(
+        ) && plain.contains(
             "{\"heading\":\"The site\",\"lines\":[[{\"text\":\"1 warning: 1 broken-link.\"}],\
              [{\"text\":\"1 note: 1 no-site-address.\"}]],\"drawn\":\"\",\
              \"lists\":[{\"label\":[{\"text\":\"Drafts:\"}],\"links\":[\
              {\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}]},\
              {\"label\":[{\"text\":\"Waiting for their day:\"}],\"links\":[\
-             {\"text\":\"Post 3 (2999-01-01)\",\"href\":\"/post-3/\"}]}]}]}"
+             {\"text\":\"Post 3 (2999-01-01)\",\"href\":\"/post-3/\"}]}]}],\
+             \"problems\":[],\"stoppedBy\":null,\"explanations\":{},"
+        ) && plain.contains(
+            "\"site\":{\"kinds\":[\
+             {\"kind\":\"broken-link\",\"severity\":\"warning\",\"title\":\"Broken link\",\
+             \"count\":1,\"quietened\":0},\
+             {\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
+             \"count\":1,\"quietened\":0}],\"gone\":null,\
+             \"drafts\":[{\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}],\
+             \"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
+             \"written\":[]},"
         ),
         "{plain}"
     );
@@ -725,8 +735,163 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
                 "{\"heading\":\"Written into your files\",\
                  \"lines\":[[{\"text\":\"Stamped \"},{\"code\":\"content/post-1.md\"},\
                  {\"text\":\": \"},{\"code\":\"updated\"},{\"text\":\" is \"},{\"code\":\""
+            )
+            && stopped.contains(
+                "\"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
+                 \"written\":[[{\"text\":\"Stamped \"},{\"code\":\"content/post-1.md\"},\
+                 {\"text\":\": \"},{\"code\":\"updated\"},{\"text\":\" is \"},{\"code\":\""
             ),
         "{stopped}"
+    );
+}
+
+#[test]
+fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
+    let served = served_as("panel-parts", How::Native, true, |site| {
+        site.write(
+            "statac.yaml",
+            "title: Site\nlanguage: en\ntimezone: Europe/London\nquiet: [broken-link]\n",
+        );
+        site.write(
+            "templates/page.html",
+            &LAYOUT.replace("</body>", "<a href=\"/post-8/\">Post 8</a>\n</body>"),
+        );
+        site.write(
+            "content/post-2.md",
+            "# Post 2\n\nSee [Post 9](/post-9/)\tthen.\n\nThe end.\n",
+        );
+    });
+    // The page's own problem, quietened, with the lines either side of
+    // its own as the terminal shows them.
+    let built = panel(&served, "/post-2/");
+    let link = "{\"severity\":\"warning\",\"kind\":\"broken-link\",\
+        \"headline\":[{\"text\":\"Broken link: nothing is published at \"},{\"code\":\"/post-9/\"}],\
+        \"file\":\"content/post-2.md\",\"line\":3,\"column\":14,\"excerpt\":[\
+        {\"line\":2,\"text\":[]},\
+        {\"line\":3,\"text\":[{\"text\":\"See [Post 9](\"},{\"mark\":\"/post-9/\"},{\"text\":\")  then.\"}]},\
+        {\"line\":4,\"text\":[]}],\
+        \"related\":[],\"built\":[],\"builtMore\":0,\"printed\":null,\
+        \"suggestion\":[{\"text\":\"Did you mean \"},{\"code\":\"/post-1/\"},{\"text\":\"?\"}],\
+        \"suggests\":null,\"explanation\":\"https://statac.dev/e/broken-link/\",\"quietened\":true}";
+    let at = between(&built, "\"round\":{\"state\":\"built\",\"at\":\"", "\"").to_owned();
+    assert!(
+        built.contains(&format!(
+            "\"problems\":[{link}],\"stoppedBy\":null,\"explanations\":{{\
+             \"broken-link\":{{\"title\":\"Broken link\",\"opening\":[{{\"said\":[\
+             {{\"text\":\"A link, or a page's \"}},{{\"code\":\"redirect_to\"}},\
+             {{\"text\":\", points at an address on this site, but nothing is published at \
+             that address. A reader who follows it lands on a missing page.\"}}]}}],\
+             \"fix\":[{{\"said\":[{{\"text\":\"Change the link to an address the site publishes."
+        )) && built.contains(&format!(
+            "\"round\":{{\"state\":\"built\",\"at\":\"{at}\",\"builtAt\":\"{at}\",\"changed\":[],\
+             \"built\":3,\"outputs\":3,\"took\":{{\"before\":"
+        )) && built.contains(&format!(
+            "\"counts\":{{\"error\":0,\"warning\":0,\"note\":0}}}},\"rounds\":[\
+             {{\"state\":\"built\",\"at\":\"{at}\",\"said\":[{{\"text\":\"Wrote 3 pages and 2 \
+             other files to \"}},{{\"code\":\""
+        )) && built.contains(
+            "\"site\":{\"kinds\":[{\"kind\":\"broken-link\",\"severity\":\"warning\",\
+             \"title\":\"Broken link\",\"count\":2,\"quietened\":2}],\"gone\":null,\
+             \"drafts\":[],\"waiting\":[],\"written\":[]},\"root\":\""
+        ),
+        "{built}"
+    );
+    let root = between(&built, ",\"root\":\"", "\"").replace("\\\\", "\\");
+    assert!(std::path::Path::new(&root).is_absolute(), "{root}");
+    assert_eq!(
+        std::fs::canonicalize(&root).unwrap(),
+        std::fs::canonicalize(&served.site.0).unwrap()
+    );
+
+    // The whole site's, in order, one met building a page.
+    let template = "{\"severity\":\"warning\",\"kind\":\"broken-link\",\
+        \"headline\":[{\"text\":\"Broken link: nothing is published at \"},{\"code\":\"/post-8/\"}],\
+        \"file\":\"templates/page.html\",\"line\":9,\"column\":10,\"excerpt\":[\
+        {\"line\":8,\"text\":[{\"text\":\"{{ page.content }}\"}]},\
+        {\"line\":9,\"text\":[{\"text\":\"\\u003ca href=\\\"\"},{\"mark\":\"/post-8/\"},\
+        {\"text\":\"\\\">Post 8\\u003c/a>\"}]},\
+        {\"line\":10,\"text\":[{\"text\":\"\\u003c/body>\"}]}],\"related\":[],\
+        \"built\":[{\"page\":[{\"code\":\"content/index.md\"}],\"href\":\"/\",\
+        \"file\":\"content/index.md\",\"line\":null}],\"builtMore\":0,";
+    for asked in ["", "?kind=broken-link"] {
+        let every = served.page(&format!("/.statac-live/problems{asked}"));
+        assert!(
+            every.starts_with(&format!("{{\"v\":2,\"problems\":[{link},{template}"))
+                && every
+                    .contains("\"quietened\":true}],\"more\":0,\"explanations\":{\"broken-link\":"),
+            "{asked}: {every}"
+        );
+    }
+    assert_eq!(
+        served.page("/.statac-live/problems?kind=unknown-word"),
+        "{\"v\":2,\"problems\":[],\"more\":0,\"explanations\":{}}"
+    );
+
+    // A round that stops has every error in its parts, and the page's
+    // problems are those of the round before.
+    let mark = served.said.text().len();
+    let broken = std::fs::read_to_string(served.site.path("templates/page.html")).unwrap();
+    served.site.write(
+        "templates/page.html",
+        &broken.replace("{{ page.title }}", "{{ page.sumary }}"),
+    );
+    served.said.after(mark, "unknown-word/\n");
+    let stopped = panel(&served, "/post-2/");
+    let then = between(&stopped, "\"stoppedBy\":{\"at\":\"", "\"").to_owned();
+    assert!(
+        stopped.contains(&format!(
+            "\"problems\":[{link}],\"stoppedBy\":{{\"at\":\"{then}\",\"errors\":[\
+             {{\"severity\":\"error\",\"kind\":\"unknown-word\",\
+             \"headline\":[{{\"text\":\"Unknown field: \"}},{{\"code\":\"page.sumary\"}}],\
+             \"file\":\"templates/page.html\",\"line\":4,\"column\":11,\"excerpt\":[\
+             {{\"line\":3,\"text\":[{{\"text\":\"\\u003chead>\"}}]}},\
+             {{\"line\":4,\"text\":[{{\"text\":\"\\u003ctitle>{{{{ \"}},{{\"mark\":\"page.sumary\"}},\
+             {{\"text\":\" }}}}\\u003c/title>\"}}]}},\
+             {{\"line\":5,\"text\":[{{\"text\":\"{{{{ css(\\\"site.css\\\") }}}}\"}}]}}],\
+             \"related\":[],\"built\":[],\"builtMore\":0,\"printed\":null,\
+             \"suggestion\":[{{\"text\":\"Did you mean \"}},{{\"code\":\"page.summary\"}},\
+             {{\"text\":\"?\"}}],\"suggests\":\"page.summary\",\
+             \"explanation\":\"https://statac.dev/e/unknown-word/\",\"quietened\":false}}]}},\
+             \"explanations\":{{\"broken-link\":{{\"title\":\"Broken link\","
+        )) && stopped.contains("\"unknown-word\":{\"title\":\"Unknown word\",\"opening\":[")
+            && stopped.contains(&format!(
+                "\"round\":{{\"state\":\"stopped\",\"at\":\"{then}\",\"builtAt\":\"{at}\",\
+                 \"changed\":[\"templates/page.html\"],\"built\":3,\"outputs\":3,"
+            ))
+            && stopped.contains(&format!(
+                "\"counts\":{{\"error\":1,\"warning\":0,\"note\":0}}}},\"rounds\":[\
+                 {{\"state\":\"stopped\",\"at\":\"{then}\",\
+                 \"said\":[{{\"text\":\"1 error stopped the build.\"}}],\
+                 \"counts\":{{\"error\":1,\"warning\":0,\"note\":0}}}},\
+                 {{\"state\":\"built\",\"at\":\"{at}\",\"said\":[{{\"text\":\"Wrote 3 pages"
+            ))
+            && stopped.contains("\"site\":{\"kinds\":[{\"kind\":\"broken-link\","),
+        "{stopped}"
+    );
+
+    // Mended, what stopped it is gone, and the rounds are three.
+    let mark = served.said.text().len();
+    served.site.write("templates/page.html", &broken);
+    served
+        .said
+        .after(mark, "Gone since the last build: 1 unknown-word.\n");
+    let mended = panel(&served, "/post-2/");
+    let now = between(&mended, "\"round\":{\"state\":\"built\",\"at\":\"", "\"").to_owned();
+    assert!(
+        mended.contains(
+            "\"stoppedBy\":null,\"explanations\":{\"broken-link\":{\"title\":\"Broken link\","
+        ) && mended.contains(&format!("\"builtAt\":\"{now}\""))
+            && mended.contains(&format!(
+                "\"rounds\":[{{\"state\":\"built\",\"at\":\"{now}\",\
+                 \"said\":[{{\"text\":\"Built "
+            ))
+            && mended.contains(&format!(
+                "{{\"state\":\"stopped\",\"at\":\"{then}\",\
+                 \"said\":[{{\"text\":\"1 error stopped the build.\"}}],"
+            ))
+            && mended
+                .contains("\"gone\":[{\"text\":\"Gone since the last build: 1 unknown-word.\"}],"),
+        "{mended}"
     );
 }
 

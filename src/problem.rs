@@ -215,11 +215,7 @@ impl Code {
             } else if fence > 0 && ticks >= fence && line[ticks..].trim().is_empty() {
                 fence = 0;
             } else if fence == 0 && line.starts_with('#') {
-                let heading = line
-                    .rsplit_once(" {#")
-                    .filter(|(_, id)| id.ends_with('}'))
-                    .map_or(line, |(heading, _)| heading);
-                out.push_str(heading);
+                out.push_str(unanchored(line));
                 out.push('\n');
                 continue;
             }
@@ -2971,6 +2967,15 @@ impl Problem {
             })
             .collect()
     }
+}
+
+/// A heading of an explanation without its `{#id}`, which only a page can
+/// use.
+pub(crate) fn unanchored(heading: &str) -> &str {
+    heading
+        .rsplit_once(" {#")
+        .filter(|(_, id)| id.ends_with('}'))
+        .map_or(heading, |(heading, _)| heading)
 }
 
 /// The system's reason in plain words, without the error number.

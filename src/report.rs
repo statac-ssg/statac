@@ -130,7 +130,7 @@ impl Quiet {
 
 /// How many of the other pages whose builds met a problem are named
 /// where not every one is.
-const NAMED: usize = 5;
+pub(crate) const NAMED: usize = 5;
 
 /// Draws problems placed in `sources`, naming files relative to the site's folder.
 pub struct Report<'a> {
@@ -500,7 +500,7 @@ impl<'a> Report<'a> {
     /// first few. The whole first line of a file says no more than the
     /// file's name, so a page placed there is named by its file alone.
     fn built(&self, out: &mut String, problem: &Problem, every: bool, width: usize) {
-        let whole = |place: Place| place == crate::content::words::head(self.sources, place.source);
+        let whole = |place: Place| self.whole(place);
         let mut pages = problem.built();
         let Some((named, place)) = pages.next() else {
             return;
@@ -549,6 +549,12 @@ impl<'a> Report<'a> {
         }
     }
 
+    /// Whether `place` is the whole first line of its file, which says no
+    /// more than the file's name.
+    pub(crate) fn whole(&self, place: Place) -> bool {
+        place == crate::content::words::head(self.sources, place.source)
+    }
+
     fn path(&self, id: SourceId) -> String {
         let path = self.sources.path(id);
         shown(
@@ -560,7 +566,8 @@ impl<'a> Report<'a> {
         )
     }
 
-    fn first_line(&self, place: Place) -> usize {
+    /// The line a place starts on.
+    pub(crate) fn first_line(&self, place: Place) -> usize {
         let text = self.sources.text(place.source);
         let start = text.floor_char_boundary(place.span.start as usize);
         self.sources.line_number(place.source, start)
@@ -575,50 +582,12 @@ impl<'a> Report<'a> {
         width: usize,
         style: &str,
     ) {
-        let id = place.source;
-        let text = self.sources.text(id);
-        let start = text.floor_char_boundary(place.span.start as usize);
-        let end = text.ceil_char_boundary((place.span.end as usize).max(start));
-        let first = self.sources.line_number(id, start);
-        // A place that ends with a line ending ends on that line, not the next.
-        let last = if end > start {
-            self.sources.line_number(id, end - 1)
-        } else {
-            first
-        };
-        let location = wording::location(&self.path(id), first);
+        let (first, last, drawn) = self.marked(place);
+        let location = wording::location(&self.path(place.source), first);
         match label {
             Some(label) => out.push_str(&format!("  {}: {location}\n", shown(label))),
             None => out.push_str(&format!("  {location}\n")),
         }
-
-        let mut line_start = self.sources.line_start(id, first);
-        let mut line = self.sources.line(id, first);
-        if first == 1
-            && let Some(rest) = line.strip_prefix('\u{feff}')
-        {
-            line = rest;
-            line_start += '\u{feff}'.len_utf8();
-        }
-        let from = start.saturating_sub(line_start).min(line.len());
-        let to = if last == first {
-            end.saturating_sub(line_start).min(line.len())
-        } else {
-            line.len()
-        };
-        // Secrets on the line, as byte ranges within it.
-        let line_end = line_start + line.len();
-        let hidden: Vec<std::ops::Range<usize>> = self
-            .sources
-            .hidden(id)
-            .iter()
-            .filter(|span| (span.start as usize) < line_end && (span.end as usize) > line_start)
-            .map(|span| {
-                let start = (span.start as usize).max(line_start) - line_start;
-                start..(span.end as usize).min(line_end) - line_start
-            })
-            .collect();
-        let drawn = Drawn::masked(line, from, to.max(from), &hidden);
 
         let gutter = |number: &str| {
             let bar = format!("{number:>width$} \u{2502}");
@@ -644,6 +613,122 @@ impl<'a> Report<'a> {
         out.push_str(&under);
         out.push('\n');
     }
+
+    /// The line a place starts on as it is drawn, with the numbers of the
+    /// lines it starts and ends on.
+    fn marked(&self, place: Place) -> (usize, usize, Drawn) {
+        let id = place.source;
+        let text = self.sources.text(id);
+        let start = text.floor_char_boundary(place.span.start as usize);
+        let end = text.ceil_char_boundary((place.span.end as usize).max(start));
+        let first = self.sources.line_number(id, start);
+        // A place that ends with a line ending ends on that line, not the next.
+        let last = if end > start {
+            self.sources.line_number(id, end - 1)
+        } else {
+            first
+        };
+        let (line, line_start) = self.line(id, first);
+        let from = start.saturating_sub(line_start).min(line.len());
+        let to = if last == first {
+            end.saturating_sub(line_start).min(line.len())
+        } else {
+            line.len()
+        };
+        let hidden = self.hidden(id, line, line_start);
+        (
+            first,
+            last,
+            Drawn::masked(line, from, to.max(from), &hidden),
+        )
+    }
+
+    /// Line `number` of a source, without a byte-order mark it opens with,
+    /// and where what is left of it starts.
+    fn line(&self, id: SourceId, number: usize) -> (&str, usize) {
+        let start = self.sources.line_start(id, number);
+        let line = self.sources.line(id, number);
+        match line.strip_prefix('\u{feff}') {
+            Some(rest) if number == 1 => (rest, start + '\u{feff}'.len_utf8()),
+            _ => (line, start),
+        }
+    }
+
+    /// The secrets on `line`, which starts at `start`, as byte ranges
+    /// within it.
+    fn hidden(&self, id: SourceId, line: &str, start: usize) -> Vec<std::ops::Range<usize>> {
+        let end = start + line.len();
+        (self.sources.hidden(id).iter())
+            .filter(|span| (span.start as usize) < end && (span.end as usize) > start)
+            .map(|span| {
+                (span.start as usize).max(start) - start..(span.end as usize).min(end) - start
+            })
+            .collect()
+    }
+
+    /// The line a place starts on as a terminal is shown it, in three
+    /// parts: before the place, the place, and after it. Where `beside` is
+    /// set, the lines either side come with it, cut to the same columns.
+    pub(crate) fn excerpt(&self, place: Place, beside: bool) -> Excerpt {
+        let id = place.source;
+        let (first, last, drawn) = self.marked(place);
+        let text = self.sources.text(id);
+        let other = |number: usize| {
+            let (line, start) = self.line(id, number);
+            let hidden = self.hidden(id, line, start);
+            Shown {
+                number,
+                before: Drawn::beside(line, &hidden, drawn.window),
+                marked: None,
+                after: String::new(),
+            }
+        };
+        let mut lines = Vec::new();
+        if beside && first > 1 {
+            lines.push(other(first - 1));
+        }
+        let Drawn {
+            text: line, marked, ..
+        } = &drawn;
+        lines.push(Shown {
+            number: first,
+            before: line[..marked.start].to_owned(),
+            marked: Some(line[marked.clone()].to_owned()),
+            after: line[marked.end..].to_owned(),
+        });
+        // A file's last line ending opens no line of its own.
+        let after = (first < self.sources.line_number(id, text.len()))
+            .then(|| self.sources.line_start(id, first + 1))
+            .is_some_and(|start| start < text.len());
+        if beside && after {
+            lines.push(other(first + 1));
+        }
+        let start = text.floor_char_boundary(place.span.start as usize);
+        Excerpt {
+            first,
+            last,
+            column: self.sources.line_column(id, start).column,
+            lines,
+        }
+    }
+}
+
+/// Where a place is, and its line, as [`Report::excerpt`] gives them.
+pub(crate) struct Excerpt {
+    /// The lines the place starts and ends on.
+    pub first: usize,
+    pub last: usize,
+    /// Where on its first line the place starts, in characters from 1.
+    pub column: usize,
+    pub lines: Vec<Shown>,
+}
+
+/// One line of an excerpt. A line beside the place's own is all `before`.
+pub(crate) struct Shown {
+    pub number: usize,
+    pub before: String,
+    pub marked: Option<String>,
+    pub after: String,
 }
 
 /// Problems counted by kind, a line for each of `severities` that has any,
@@ -679,6 +764,10 @@ struct Drawn {
     text: String,
     column: usize,
     carets: usize,
+    /// What of `text` the carets are under, in bytes.
+    marked: std::ops::Range<usize>,
+    /// The columns of the line kept, where it was cut to a window.
+    window: Option<(usize, usize)>,
 }
 
 impl Drawn {
@@ -690,33 +779,7 @@ impl Drawn {
 
     /// The same, with each of `hidden` shown as a mask, whatever it holds.
     fn masked(line: &str, from: usize, to: usize, hidden: &[std::ops::Range<usize>]) -> Drawn {
-        let mut cells = Vec::new();
-        let mut column = 0;
-        for (byte, c) in line.char_indices() {
-            let secret = hidden.iter().find(|range| range.contains(&byte));
-            let (shown, width) = match c {
-                _ if secret.is_some_and(|range| range.start == byte) => (MASK.to_owned(), 3),
-                _ if secret.is_some() => (String::new(), 0),
-                '\t' => {
-                    let width = TAB - column % TAB;
-                    (" ".repeat(width), width)
-                }
-                c if picture(c).is_some() => (picture(c).unwrap_or(c).to_string(), 1),
-                c if c.is_control() || invisible(c) => {
-                    let named = named(c);
-                    let width = named.chars().count();
-                    (named, width)
-                }
-                c => (c.to_string(), self::width(c)),
-            };
-            cells.push(Cell {
-                byte,
-                column,
-                shown,
-            });
-            column += width;
-        }
-        let total = column;
+        let (cells, total) = cells(line, hidden);
         let column_of = |offset: usize| {
             cells
                 .iter()
@@ -724,23 +787,106 @@ impl Drawn {
                 .map_or(total, |cell| cell.column)
         };
         let (start, end) = (column_of(from), column_of(to));
+        let window = (total > LONGEST).then(|| {
+            let low = start.saturating_sub(LEAD);
+            match low + WINDOW > total {
+                true => (total - WINDOW, total),
+                false => (low, low + WINDOW),
+            }
+        });
+        let (low, high) = window.unwrap_or((0, total));
+        let cut = Cut::of(&cells, total, low, high, from..to);
+        let carets = match end.min(cut.kept_to).checked_sub(start) {
+            Some(n) if n > 0 => n,
+            _ => 1,
+        };
+        Drawn {
+            text: cut.text,
+            column: cut.lead + start.saturating_sub(cut.kept_from),
+            carets,
+            marked: cut.marked,
+            window,
+        }
+    }
 
-        if total <= LONGEST {
-            return Drawn {
-                text: cells.iter().map(|cell| cell.shown.as_str()).collect(),
-                column: start,
-                carets: (end - start).max(1),
-            };
-        }
-        let mut low = start.saturating_sub(LEAD);
-        let mut high = low + WINDOW;
-        if high > total {
-            high = total;
-            low = total - WINDOW;
-        }
+    /// A line beside one drawn, unmarked: cut to the same columns where
+    /// that one was cut to a window, and drawn as any line is otherwise.
+    fn beside(
+        line: &str,
+        hidden: &[std::ops::Range<usize>],
+        window: Option<(usize, usize)>,
+    ) -> String {
+        let Some((low, high)) = window else {
+            return Drawn::masked(line, 0, 0, hidden).text;
+        };
+        let (cells, total) = cells(line, hidden);
+        Cut::of(&cells, total, low, high, 0..0).text
+    }
+}
+
+/// Each character of `line` as shown, with each of `hidden` shown as a
+/// mask, and the columns the whole takes.
+fn cells(line: &str, hidden: &[std::ops::Range<usize>]) -> (Vec<Cell>, usize) {
+    let mut cells = Vec::new();
+    let mut column = 0;
+    for (byte, c) in line.char_indices() {
+        let secret = hidden.iter().find(|range| range.contains(&byte));
+        let (shown, width) = match c {
+            _ if secret.is_some_and(|range| range.start == byte) => (MASK.to_owned(), 3),
+            _ if secret.is_some() => (String::new(), 0),
+            '\t' => {
+                let width = TAB - column % TAB;
+                (" ".repeat(width), width)
+            }
+            c if picture(c).is_some() => (picture(c).unwrap_or(c).to_string(), 1),
+            c if c.is_control() || invisible(c) => {
+                let named = named(c);
+                let width = named.chars().count();
+                (named, width)
+            }
+            c => (c.to_string(), self::width(c)),
+        };
+        cells.push(Cell {
+            byte,
+            column,
+            shown,
+        });
+        column += width;
+    }
+    (cells, column)
+}
+
+struct Cell {
+    byte: usize,
+    column: usize,
+    shown: String,
+}
+
+/// The cells of a line within columns `low..high`, an ellipsis standing
+/// for any cut off either side.
+struct Cut {
+    text: String,
+    /// The columns kept.
+    kept_from: usize,
+    kept_to: usize,
+    /// The columns an ellipsis opening `text` takes.
+    lead: usize,
+    /// What of `text` the bytes `place` of the line are shown as.
+    marked: std::ops::Range<usize>,
+}
+
+impl Cut {
+    fn of(
+        cells: &[Cell],
+        total: usize,
+        low: usize,
+        high: usize,
+        place: std::ops::Range<usize>,
+    ) -> Cut {
         let mut text = String::new();
         let mut kept: Option<(usize, usize)> = None;
         let mut cut_after = false;
+        let (mut start, mut end) = (None, None);
         for (i, cell) in cells.iter().enumerate() {
             let next = cells.get(i + 1).map_or(total, |next| next.column);
             if cell.column < low {
@@ -751,33 +897,33 @@ impl Drawn {
                 break;
             }
             kept = Some((kept.map_or(cell.column, |(from, _)| from), next));
+            if cell.byte >= place.start {
+                start.get_or_insert(text.len());
+            }
+            if cell.byte >= place.end {
+                end.get_or_insert(text.len());
+            }
             text.push_str(&cell.shown);
         }
         let (kept_from, kept_to) = kept.unwrap_or((low, low));
-        let mut lead = 0;
-        if kept_from > 0 {
+        let lead = usize::from(kept_from > 0);
+        if lead > 0 {
             text.insert(0, ELLIPSIS);
-            lead = 1;
         }
+        let opened = lead * ELLIPSIS.len_utf8();
+        let start = start.map_or(text.len(), |start| start + opened);
+        let end = end.map_or(text.len(), |end| end + opened);
         if cut_after {
             text.push(ELLIPSIS);
         }
-        let carets = match end.min(kept_to).checked_sub(start) {
-            Some(n) if n > 0 => n,
-            _ => 1,
-        };
-        Drawn {
+        Cut {
             text,
-            column: lead + start.saturating_sub(kept_from),
-            carets,
+            kept_from,
+            kept_to,
+            lead,
+            marked: start..end,
         }
     }
-}
-
-struct Cell {
-    byte: usize,
-    column: usize,
-    shown: String,
 }
 
 /// A piece of a sentence of Statac's own.

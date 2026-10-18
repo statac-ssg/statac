@@ -7,18 +7,26 @@
 //! Statac's own goes as its pieces, each name apart from the words round
 //! it, where a terminal is shown it in backticks.
 
+mod problems;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use super::live::json_string;
-use super::session::{Read, Round};
+use super::session::{Read, Round, Took};
 use crate::content::address::on_the_wire;
 use crate::origin::Arrival;
-use crate::problem::{Problem, Severity};
-use crate::report::{Piece, Report, pieces, shown};
+use crate::problem::{Code, Problem, Severity};
+use crate::report::{Piece, Quiet, Report, pieces, shown};
 use crate::templates::{Explained, Held, Holds, Row};
 use crate::wording;
+use problems::{Addresses, Parts};
+
+/// The most problems the panel is handed at once.
+const MOST: usize = 200;
+/// How many rounds the panel keeps.
+const ROUNDS: usize = 10;
 
 /// What the panel shows after one round.
 #[derive(Default)]
@@ -29,6 +37,24 @@ pub struct Panel {
     built: Arc<Built>,
     /// What the round wrote into the site's own files, a line for each.
     written: Vec<String>,
+    /// The round, as JSON; none before the first.
+    round: Option<String>,
+    /// The last few rounds, the newest first, each as JSON.
+    rounds: Vec<String>,
+    /// The problems gone since the round before, said.
+    gone: Option<String>,
+    /// The site's folder, whole; none before the first round.
+    root: Option<String>,
+}
+
+/// What serve knows of a round besides the round itself.
+pub struct Besides<'a> {
+    pub took: Took,
+    /// The files it was for, as they are shown; none for the first.
+    pub changed: &'a [String],
+    /// What the terminal said of how it ended.
+    pub said: &'a str,
+    pub gone: Option<&'a str>,
 }
 
 struct Stopped {
@@ -40,6 +66,9 @@ struct Stopped {
     more: usize,
     /// Each error, drawn as `check` draws it.
     drawn: String,
+    /// When it stopped, and each error in its parts, with its kind.
+    at: String,
+    errors: Vec<(Code, String)>,
 }
 
 struct First {
@@ -54,6 +83,8 @@ struct First {
 struct Built {
     /// When, by this machine's clock; empty before any round has built.
     line: String,
+    /// The time alone; empty likewise.
+    at: String,
     /// What there is to say of a page, by the file it is published as.
     pages: HashMap<String, Page>,
     /// The site's problems counted by kind, a line for each severity.
@@ -63,6 +94,13 @@ struct Built {
     /// The site as that round read it, and its folder.
     read: Option<Read>,
     site: PathBuf,
+    /// Every problem of that round, and the kinds quietened.
+    problems: Vec<Problem>,
+    quiet: Quiet,
+    /// The problems counted by kind, as JSON.
+    kinds: String,
+    /// Where the pages that round built are published, once asked.
+    addresses: OnceLock<Addresses>,
 }
 
 struct Page {
@@ -70,11 +108,16 @@ struct Page {
     waiting: Option<String>,
     /// Its problems, drawn as `check` draws them; empty where it has none.
     drawn: String,
+    /// Its problems, quietened ones among them.
+    problems: Vec<Problem>,
 }
 
 struct Link {
     text: String,
     href: String,
+    /// What it names, and the day it waits for, apart.
+    named: String,
+    day: Option<String>,
 }
 
 /// The time of day on this machine's clock.
@@ -86,7 +129,15 @@ impl Panel {
     /// The panel after `round` of the site at `site`, published under
     /// `base`. `before` is the panel of the round before, whose pages are
     /// still the ones answered where this round stopped.
-    pub fn after(round: &Round, site: &Path, base: &str, before: &Panel) -> Panel {
+    pub fn after(
+        mut round: Round,
+        site: &Path,
+        base: &str,
+        besides: Besides,
+        before: &Panel,
+    ) -> Panel {
+        let at = now();
+        let stopped = round.outcome.stopped();
         let outcome = &round.outcome;
         let report = Report::new(outcome.sources(), site, false);
         let unquietened = |problem: &&Problem| !outcome.quiet.quietens(&problem.kind);
@@ -95,26 +146,72 @@ impl Panel {
             .lines()
             .map(str::to_owned)
             .collect();
-        if round.outcome.stopped() {
+        let counts = problems::counts(&outcome.problems, &outcome.quiet);
+        let state = json_string(match stopped {
+            true => "stopped",
+            false => "built",
+        });
+        let built_at = match stopped {
+            true => Some(&before.built.at).filter(|at| !at.is_empty()),
+            false => Some(&at),
+        };
+        let changed: Vec<String> = (besides.changed.iter())
+            .map(|file| json_string(file))
+            .collect();
+        let this = format!(
+            "{{\"state\":{state},\"at\":{},\"builtAt\":{},\"changed\":[{}],\"built\":{},\
+             \"outputs\":{},\"took\":{},\"counts\":{counts}}}",
+            json_string(&at),
+            built_at.map_or_else(|| "null".to_owned(), |at| json_string(at)),
+            changed.join(","),
+            round.built,
+            round.outputs,
+            problems::took(&besides.took),
+        );
+        let mut rounds = vec![format!(
+            "{{\"state\":{state},\"at\":{},\"said\":{},\"counts\":{counts}}}",
+            json_string(&at),
+            pieced(besides.said),
+        )];
+        rounds.extend(before.rounds.iter().take(ROUNDS - 1).cloned());
+        let mut panel = Panel {
+            stopped: None,
+            built: Arc::clone(&before.built),
+            written,
+            round: Some(this),
+            rounds,
+            gone: besides.gone.map(str::to_owned),
+            root: Some(shown(&whole(site))),
+        };
+        if stopped {
             let errors: Vec<&Problem> = (outcome.problems.iter())
                 .filter(|problem| problem.kind.severity() == Severity::Error)
                 .collect();
             let kept = !before.built.line.is_empty();
-            let first = report.ordered(errors.iter().copied()).into_iter().next();
-            return Panel {
-                stopped: Some(Stopped {
-                    line: wording::panel_stopped(&now(), errors.len(), kept),
-                    first: first.map(|first| First {
-                        headline: shown(&first.headline()),
-                        location: report.location(first).unwrap_or_default(),
-                        suggestion: first.suggestion().map(|it| shown(&it)).unwrap_or_default(),
-                    }),
-                    more: errors.len().saturating_sub(1),
-                    drawn: report.problems(errors),
-                }),
-                built: Arc::clone(&before.built),
-                written,
+            let ordered = report.ordered(errors.iter().copied());
+            let addresses = OnceLock::new();
+            let parts = Parts {
+                report: &report,
+                quiet: &outcome.quiet,
+                read: round.read.as_ref(),
+                addresses: &addresses,
             };
+            let first = ordered.first().copied();
+            panel.stopped = Some(Stopped {
+                line: wording::panel_stopped(&at, errors.len(), kept),
+                first: first.map(|first| First {
+                    headline: shown(&first.headline()),
+                    location: report.location(first).unwrap_or_default(),
+                    suggestion: first.suggestion().map(|it| shown(&it)).unwrap_or_default(),
+                }),
+                more: errors.len().saturating_sub(1),
+                drawn: report.problems(errors.iter().copied()),
+                errors: (ordered.iter())
+                    .map(|error| (error.kind.code(), parts.of(error)))
+                    .collect(),
+                at,
+            });
+            return panel;
         }
         let count = |severity| {
             let of = |problem: &&Problem| problem.kind.severity() == severity;
@@ -126,7 +223,7 @@ impl Panel {
                 .count()
         };
         let line = wording::panel_built(
-            &now(),
+            &at,
             count(Severity::Error),
             count(Severity::Warning),
             count(Severity::Note),
@@ -140,37 +237,59 @@ impl Panel {
             Link {
                 text: shown(&text),
                 href: on_the_wire(&format!("{base}{}", noted.address)),
+                named: shown(named),
+                day: day.map(str::to_owned),
             }
         };
-        let read = round.read.as_ref().map(|read| Read {
-            renderer: read.renderer.clone(),
-            pages: read.pages.clone(),
-        });
         let mut built = Built {
             line,
+            at,
             counts: report.counted(&outcome.problems, &outcome.quiet),
-            read,
             site: site.to_owned(),
+            kinds: problems::kinds(&outcome.problems, &outcome.quiet),
             ..Built::default()
         };
-        for noted in &round.noted {
+        for noted in std::mem::take(&mut round.noted) {
             if noted.draft {
-                built.drafts.push(link(noted, None));
+                built.drafts.push(link(&noted, None));
             } else if let Some(day) = &noted.waiting {
-                built.waiting.push(link(noted, Some(day)));
+                built.waiting.push(link(&noted, Some(day)));
             }
             let page = Page {
                 draft: noted.draft,
-                waiting: noted.waiting.clone(),
+                waiting: noted.waiting,
                 drawn: report.problems(noted.problems.iter().filter(unquietened)),
+                problems: noted.problems,
             };
-            built.pages.insert(noted.file.clone(), page);
+            built.pages.insert(noted.file, page);
         }
-        Panel {
-            stopped: None,
-            built: Arc::new(built),
-            written,
-        }
+        built.read = round.read.take();
+        built.problems = std::mem::take(&mut round.outcome.problems);
+        built.quiet = std::mem::take(&mut round.outcome.quiet);
+        panel.built = Arc::new(built);
+        panel
+    }
+
+    /// The last round to build the site's problems, of the kind named
+    /// `kind` or of every kind, quietened ones among them, in their parts,
+    /// as JSON.
+    pub fn problems(&self, kind: Option<&str>) -> String {
+        let built = &self.built;
+        let Some(read) = &built.read else {
+            return "{\"v\":2,\"problems\":[],\"more\":0,\"explanations\":{}}".to_owned();
+        };
+        let report = Report::new(read.renderer.sources(), &built.site, false);
+        let of_kind = |problem: &&Problem| kind.is_none_or(|kind| problem.kind.name() == kind);
+        let ordered = report.ordered(built.problems.iter().filter(of_kind));
+        let more = ordered.len().saturating_sub(MOST);
+        let told = &ordered[..ordered.len() - more];
+        let parts = built.parts(&report, read);
+        let problems: Vec<String> = told.iter().map(|problem| parts.of(problem)).collect();
+        format!(
+            "{{\"v\":2,\"problems\":[{}],\"more\":{more},\"explanations\":{}}}",
+            problems.join(","),
+            problems::explanations(told.iter().map(|problem| problem.kind.code())),
+        )
     }
 
     /// The panel for the page published as `file`, or for an address with
@@ -249,14 +368,104 @@ impl Panel {
             sections.push(section(wording::PANEL_WRITTEN, &self.written, "", &[]));
         }
         format!(
-            "{{\"v\":2,\"line\":{},\"stopped\":{},\"error\":{error},\"show\":{},\"hide\":{},\"name\":{},\"sections\":[{}]}}",
+            "{{\"v\":2,\"line\":{},\"stopped\":{},\"error\":{error},\"show\":{},\"hide\":{},\"name\":{},\"sections\":[{}],{}}}",
             pieced(&line),
             self.stopped.is_some(),
             json_string(wording::PANEL_SHOW),
             json_string(wording::PANEL_HIDE),
             json_string(wording::PANEL_NAME),
             sections.join(","),
+            self.parts(page),
         )
+    }
+
+    /// The page's problems and the round's in their parts, the rounds,
+    /// and the site, as the members of a JSON object.
+    fn parts(&self, page: Option<&Page>) -> String {
+        let built = &self.built;
+        let mut codes: Vec<Code> = Vec::new();
+        let mut problems = Vec::new();
+        if let (Some(page), Some(read)) = (page, &built.read) {
+            let report = Report::new(read.renderer.sources(), &built.site, false);
+            let parts = built.parts(&report, read);
+            for problem in report.ordered(&page.problems) {
+                codes.push(problem.kind.code());
+                problems.push(parts.of(problem));
+            }
+        }
+        let stopped = match &self.stopped {
+            Some(stopped) => {
+                codes.extend(stopped.errors.iter().map(|(code, _)| *code));
+                let errors: Vec<&str> = (stopped.errors.iter())
+                    .map(|(_, error)| error.as_str())
+                    .collect();
+                format!(
+                    "{{\"at\":{},\"errors\":[{}]}}",
+                    json_string(&stopped.at),
+                    errors.join(",")
+                )
+            }
+            None => "null".to_owned(),
+        };
+        let link = |link: &Link| {
+            let day = match &link.day {
+                Some(day) => format!(",\"day\":{}", json_string(day)),
+                None => String::new(),
+            };
+            format!(
+                "{{\"text\":{},\"href\":{}{day}}}",
+                json_string(&link.named),
+                json_string(&link.href)
+            )
+        };
+        let links = |links: &[Link]| links.iter().map(link).collect::<Vec<_>>().join(",");
+        let written: Vec<String> = self.written.iter().map(|line| pieced(line)).collect();
+        let site = format!(
+            "{{\"kinds\":[{}],\"gone\":{},\"drafts\":[{}],\"waiting\":[{}],\"written\":[{}]}}",
+            built.kinds,
+            self.gone
+                .as_deref()
+                .map_or_else(|| "null".to_owned(), pieced),
+            links(&built.drafts),
+            links(&built.waiting),
+            written.join(","),
+        );
+        let or_null = |json: Option<String>| json.unwrap_or_else(|| "null".to_owned());
+        format!(
+            "\"problems\":[{}],\"stoppedBy\":{stopped},\"explanations\":{},\"round\":{},\
+             \"rounds\":[{}],\"site\":{site},\"root\":{}",
+            problems.join(","),
+            problems::explanations(codes),
+            or_null(self.round.clone()),
+            self.rounds.join(","),
+            or_null(self.root.as_deref().map(json_string)),
+        )
+    }
+}
+
+impl Built {
+    /// What turns this round's problems into their parts.
+    fn parts<'a>(&'a self, report: &'a Report<'a>, read: &'a Read) -> Parts<'a> {
+        Parts {
+            report,
+            quiet: &self.quiet,
+            read: Some(read),
+            addresses: &self.addresses,
+        }
+    }
+}
+
+/// The site's folder as a whole path, as an editor takes it.
+fn whole(site: &Path) -> String {
+    let whole = std::fs::canonicalize(site)
+        .or_else(|_| std::path::absolute(site))
+        .unwrap_or_else(|_| site.to_owned())
+        .display()
+        .to_string();
+    // Windows gives a canonical path a prefix no editor's link takes.
+    match whole.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with(r"UNC\") => rest.to_owned(),
+        _ => whole,
     }
 }
 

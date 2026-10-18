@@ -730,3 +730,142 @@ fn a_hidden_span_is_drawn_masked_whatever_the_problem() {
     let out = drawn(&sources, &Problem::at(duplicate, token));
     assert!(out.contains("│                   ^^^\n"), "{out}");
 }
+
+/// The lines of a place's excerpt, each after its number, the place
+/// between brackets on the line that has it, and where the place starts
+/// and ends.
+fn excerpt(sources: &Sources, place: Place) -> (Vec<String>, usize, usize, usize) {
+    let excerpt = Report::new(sources, Path::new(SITE), false).excerpt(place, true);
+    let lines = (excerpt.lines.iter())
+        .map(|line| {
+            let marked = line.marked.as_ref().map(|marked| format!("[{marked}]"));
+            let marked = marked.unwrap_or_default();
+            format!("{} {}{marked}{}", line.number, line.before, line.after)
+        })
+        .collect();
+    (lines, excerpt.first, excerpt.last, excerpt.column)
+}
+
+#[test]
+fn an_excerpt_is_the_line_the_terminal_draws_and_those_either_side() {
+    let text = "title: Post 1\ntags:\tRust\nsummary: The first post.\n";
+    let (sources, place) = one(text, "Rust");
+    assert!(drawn(&sources, &Problem::at(broken_link(), place)).contains("2 │ tags:   Rust\n"));
+    assert_eq!(
+        excerpt(&sources, place),
+        (
+            vec![
+                "1 title: Post 1".to_owned(),
+                "2 tags:   [Rust]".to_owned(),
+                "3 summary: The first post.".to_owned(),
+            ],
+            2,
+            2,
+            7
+        )
+    );
+    // The first line has none before it, and the last none after.
+    let (lines, ..) = excerpt(&sources, one(text, "title").1);
+    assert_eq!(lines, ["1 [title]: Post 1", "2 tags:   Rust"]);
+    let (lines, ..) = excerpt(&sources, one(text, "first").1);
+    assert_eq!(lines, ["2 tags:   Rust", "3 summary: The [first] post."]);
+}
+
+#[test]
+fn an_excerpt_masks_a_secret_on_any_of_its_lines() {
+    let text = "title: Site 1\nwebmention_token: s3cr3t-t0ken\nlanguage: en\n";
+    let (mut sources, token) = one(text, "s3cr3t-t0ken");
+    sources.hide(token);
+    let (lines, ..) = excerpt(&sources, token);
+    assert_eq!(lines[1], "2 webmention_token: [•••]");
+    let (lines, ..) = excerpt(&sources, one(text, "language").1);
+    assert_eq!(lines, ["2 webmention_token: •••", "3 [language]: en"]);
+}
+
+#[test]
+fn an_excerpt_marks_a_place_of_no_width_with_nothing() {
+    let text = "title: Post 1\n";
+    let (sources, place) = one(text, "Post");
+    let place = at(
+        place.source,
+        place.span.start as usize,
+        place.span.start as usize,
+    );
+    assert_eq!(
+        excerpt(&sources, place),
+        (vec!["1 title: []Post 1".to_owned()], 1, 1, 8)
+    );
+}
+
+#[test]
+fn an_excerpt_of_a_place_over_several_lines_marks_its_first_to_the_end() {
+    let text = "title: Post 1\nsummary: !local |\n  one\n  two\n";
+    let (sources, place) = one(text, "!local");
+    let place = at(place.source, place.span.start as usize, text.len());
+    assert_eq!(
+        excerpt(&sources, place),
+        (
+            vec![
+                "1 title: Post 1".to_owned(),
+                "2 summary: [!local |]".to_owned(),
+                "3   one".to_owned(),
+            ],
+            2,
+            4,
+            10
+        )
+    );
+}
+
+#[test]
+fn an_excerpt_leaves_out_a_byte_order_mark() {
+    let text = "\u{feff}title: Post 1\nsummary: The first post.\n";
+    let (sources, place) = one(text, "Post 1");
+    assert_eq!(
+        excerpt(&sources, place),
+        (
+            vec![
+                "1 title: [Post 1]".to_owned(),
+                "2 summary: The first post.".to_owned(),
+            ],
+            1,
+            1,
+            8
+        )
+    );
+    let (lines, ..) = excerpt(&sources, one(text, "summary").1);
+    assert_eq!(lines[0], "1 title: Post 1");
+}
+
+#[test]
+fn an_excerpt_of_a_long_line_cuts_the_lines_beside_it_to_the_same_columns() {
+    let digits = |n: usize| {
+        (0..n)
+            .map(|i| char::from(b'0' + (i % 10) as u8))
+            .collect::<String>()
+    };
+    let long = format!("{}[Post 2](/post-2/){}", "x".repeat(60), "y".repeat(80));
+    let text = format!("{}\n{long}\n{}\n", digits(150), digits(20));
+    let (sources, place) = one(&text, "/post-2/");
+    let drawing = drawn(&sources, &Problem::at(broken_link(), place));
+    let (lines, ..) = excerpt(&sources, place);
+    // The marked line is the terminal's window, and the line before is cut
+    // to its columns; the line after ends before them.
+    let window = &digits(150)[45..125];
+    assert_eq!(lines[0], format!("1 …{window}…"));
+    let shown = format!(
+        "2 …{}[Post 2]([/post-2/]){}…",
+        "x".repeat(15),
+        "y".repeat(47)
+    );
+    assert_eq!(lines[1], shown);
+    assert!(
+        drawing.contains(&format!(
+            "2 │ …{}[Post 2](/post-2/){}…\n",
+            "x".repeat(15),
+            "y".repeat(47)
+        )),
+        "{drawing}"
+    );
+    assert_eq!(lines[2], "3 …");
+}

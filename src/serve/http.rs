@@ -222,6 +222,12 @@ fn answer(site: &Site, request: &Request<()>) -> Response<Body> {
             let panel = site.hub.panel().to_json(page.as_deref());
             respond(StatusCode::OK, "application/json", panel)
         }
+        Some("problems") => {
+            let kind = param(query, "kind").map(|kind| unescaped(kind.as_bytes()));
+            let kind = kind.as_deref().map(String::from_utf8_lossy);
+            let problems = site.hub.panel().problems(kind.as_deref());
+            respond(StatusCode::OK, "application/json", problems)
+        }
         Some("waiting") => respond(
             StatusCode::OK,
             "text/plain; charset=utf-8",
@@ -794,6 +800,7 @@ mod tests {
                 403,
                 "{foreign}"
             );
+            assert_eq!(from("/.statac-live/problems", foreign), 403, "{foreign}");
         }
         assert_eq!(
             sent(&site, Method::GET, wait, std::slice::from_ref(&host)).status,
@@ -820,6 +827,7 @@ mod tests {
             "/.statac-live/client.js",
             "/.statac-live/waiting",
             "/.statac-live/panel?page=%2F",
+            "/.statac-live/problems?kind=broken-link",
         ] {
             for from in ["cross-site", "same-site", "none", ""] {
                 assert_eq!(marked(target, from).status, 403, "{target} {from}");
@@ -1046,6 +1054,14 @@ mod tests {
             (head.status, head.kind.as_str(), head.body.as_str()),
             (200, "text/plain; charset=utf-8", "")
         );
+        for target in ["/.statac-live/panel?page=%2F", "/.statac-live/problems"] {
+            assert_eq!(asked(&site, Method::POST, target, None).status, 405);
+            let head = asked(&site, Method::HEAD, target, None);
+            assert_eq!(
+                (head.status, head.kind.as_str(), head.body.as_str()),
+                (200, "application/json", "")
+            );
+        }
     }
 
     #[test]
@@ -1119,8 +1135,35 @@ mod tests {
         assert_eq!(
             answer.body,
             "{\"v\":2,\"line\":[],\"stopped\":false,\"error\":null,\"show\":\"Show details\",\
-             \"hide\":\"Hide details\",\"name\":\"Statac\",\"sections\":[]}"
+             \"hide\":\"Hide details\",\"name\":\"Statac\",\"sections\":[],\"problems\":[],\
+             \"stoppedBy\":null,\"explanations\":{},\"round\":null,\"rounds\":[],\
+             \"site\":{\"kinds\":[],\"gone\":null,\"drafts\":[],\"waiting\":[],\"written\":[]},\
+             \"root\":null}"
         );
+    }
+
+    #[test]
+    fn the_sites_problems_are_asked_for_of_one_kind_or_every_kind() {
+        let scratch = Scratch::new("problems");
+        let site = scratch.site("/blog");
+        for target in [
+            "/.statac-live/problems",
+            "/.statac-live/problems?kind=broken-link",
+            "/.statac-live/problems?kind=broken%2Dlink",
+            "/.statac-live/problems?kind=%ff",
+        ] {
+            let answer = get(&site, target);
+            assert_eq!(
+                (answer.status, answer.kind.as_str()),
+                (200, "application/json"),
+                "{target}"
+            );
+            // Nothing has been built yet for there to be any.
+            assert_eq!(
+                answer.body, "{\"v\":2,\"problems\":[],\"more\":0,\"explanations\":{}}",
+                "{target}"
+            );
+        }
     }
 
     #[test]

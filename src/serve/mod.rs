@@ -25,7 +25,7 @@ use crate::report::{Report, shown};
 use crate::source::Sources;
 use crate::{cli, config, wording};
 use live::{Hub, Status, Told};
-use panel::Panel;
+use panel::{Besides, Panel};
 use session::{Round, Session};
 use watch::{Batch, How, Settle, Watching};
 
@@ -128,6 +128,8 @@ pub struct Serving {
     left: HashMap<String, Option<blake3::Hash>>,
     /// Whether it has been said that no ids are written yet.
     said_unrecorded: bool,
+    /// What the last round said of the problems gone since the one before.
+    gone: Option<String>,
 }
 
 /// Builds the site, starts answering for it and watching it, and says on
@@ -150,15 +152,23 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
         say(out, &format!("{}\n", wording::WAITING));
     });
     let report = Report::new(round.outcome.sources(), &options.site, colour);
+    let took = started.elapsed().saturating_sub(round.outcome.waited);
     say(
         out,
-        &cli::said_of_build(
-            &report,
-            &round.outcome,
-            session.folder(),
-            started.elapsed().saturating_sub(round.outcome.waited),
-        ),
+        &cli::said_of_build(&report, &round.outcome, session.folder(), took),
     );
+    // What the terminal was told of how the round ended.
+    let ended = match round.outcome.published {
+        Some(published) => {
+            let folder = session.folder().display().to_string();
+            wording::wrote(&published, &folder, took.as_secs_f64())
+        }
+        None => wording::wrote_nothing(
+            (round.outcome.problems.iter())
+                .filter(|problem| problem.kind.severity() == Severity::Error)
+                .count(),
+        ),
+    };
     let stop = |out: &mut dyn Write, problem: Problem| {
         let sources = Sources::default();
         let report = Report::new(&sources, &options.site, colour);
@@ -225,11 +235,11 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
         last: Vec::new(),
         left: HashMap::new(),
         said_unrecorded: false,
+        gone: None,
     };
     serving.last = serving.identities(&round);
     serving.left.extend(round.hooked.iter().cloned());
     serving.hub.set_status(serving.status(&round, None));
-    serving.set_panel(&round);
 
     let mut said = serving.stamps(&round);
     let included = round.outcome.included;
@@ -267,6 +277,7 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
         said.push_str(&format!("{}\n", wording::polling(every, because)));
     }
     said.push_str(&format!("{}\n", wording::STOP_SERVING));
+    serving.set_panel(round, &shown(&ended), &[]);
     say(out, &said);
     Some(serving)
 }
@@ -368,7 +379,7 @@ impl Serving {
             report.said(&wording::files_changed(&changed)),
             match stopped {
                 true => report.stopped(&result),
-                false => result,
+                false => result.clone(),
             }
         );
         said.push(' ');
@@ -380,7 +391,7 @@ impl Serving {
         said.push_str(&more);
 
         let status = self.status(&round, Some(took));
-        self.set_panel(&round);
+        self.set_panel(round, &result, &changed);
         self.hub.publish(told, changed, status);
         say(out, &said);
         true
@@ -462,10 +473,23 @@ impl Serving {
         said
     }
 
-    /// Hands the pages the panel for `round`.
-    fn set_panel(&self, round: &Round) {
+    /// Hands the pages the panel for `round`, which was for a save of
+    /// `changed` and ended as `said` says.
+    fn set_panel(&self, round: Round, said: &str, changed: &[String]) {
         let before = self.hub.panel();
-        let panel = Panel::after(round, &self.options.site, &self.site.base(), &before);
+        let besides = Besides {
+            took: self.session.took(),
+            changed,
+            said,
+            gone: self.gone.as_deref(),
+        };
+        let panel = Panel::after(
+            round,
+            &self.options.site,
+            &self.site.base(),
+            besides,
+            &before,
+        );
         self.hub.set_panel(panel);
     }
 
@@ -554,8 +578,9 @@ impl Serving {
         if !shown.is_empty() {
             said.push_str(&format!("\n{}\n", report.problems(shown)));
         }
-        if !gone.is_empty() {
-            said.push_str(&format!("{}\n", wording::gone(&gone)));
+        self.gone = (!gone.is_empty()).then(|| wording::gone(&gone));
+        if let Some(gone) = &self.gone {
+            said.push_str(&format!("{gone}\n"));
         }
         said
     }

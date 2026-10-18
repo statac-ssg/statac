@@ -263,6 +263,7 @@ impl Session {
     fn round(&mut self, changed: Option<&[String]>, waiting: &mut dyn FnMut()) -> Round {
         let at = self.options.site.clone();
         if let Err(problem) = build::a_folder(&at) {
+            self.took = Took::default();
             return Round::of_nothing(build::Outcome::unread(problem));
         }
         let (hold, unheld) = publish::hold(&at, waiting);
@@ -305,6 +306,10 @@ impl Session {
                 round
             }
             Err(stopped) => {
+                self.took = Took {
+                    before: began.elapsed(),
+                    ..Took::default()
+                };
                 let (sources, problem) = *stopped;
                 let mut outcome = build::Outcome::stopped_at(sources, problem);
                 outcome.problems.extend(unheld);
