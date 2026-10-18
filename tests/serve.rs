@@ -632,9 +632,12 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
             && plain.contains(
                 "\"site\":{\"kinds\":[\
                  {\"kind\":\"broken-link\",\"severity\":\"warning\",\"title\":\"Broken link\",\
-                 \"count\":1,\"quietened\":0},\
+                 \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Did you mean \"},\
+                 {\"code\":\"/post-1/\"},{\"text\":\"?\"}]},\
                  {\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
-                 \"count\":1,\"quietened\":0}],\"gone\":null,\
+                 \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site's address \
+                 to \"},{\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
+                 {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}],\"gone\":null,\
                  \"drafts\":[{\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}],\
                  \"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
                  \"written\":[]},"
@@ -761,7 +764,8 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
              other files to \"}},{{\"code\":\""
         )) && built.contains(
             "\"site\":{\"kinds\":[{\"kind\":\"broken-link\",\"severity\":\"warning\",\
-             \"title\":\"Broken link\",\"count\":2,\"quietened\":2}],\"gone\":null,\
+             \"title\":\"Broken link\",\"count\":2,\"quietened\":2,\"suggestion\":[\
+             {\"text\":\"Did you mean \"},{\"code\":\"/post-1/\"},{\"text\":\"?\"}]}],\"gone\":null,\
              \"drafts\":[],\"waiting\":[],\"written\":[]},\"root\":\""
         ),
         "{built}"
@@ -832,9 +836,13 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
                 "\"counts\":{{\"error\":1,\"warning\":0,\"note\":0}}}},\"rounds\":[\
                  {{\"state\":\"stopped\",\"at\":\"{then}\",\
                  \"said\":[{{\"text\":\"1 error stopped the build.\"}}],\
-                 \"counts\":{{\"error\":1,\"warning\":0,\"note\":0}}}},\
+                 \"counts\":{{\"error\":1,\"warning\":0,\"note\":0}},\"first\":false}},\
                  {{\"state\":\"built\",\"at\":\"{at}\",\"said\":[{{\"text\":\"Wrote 3 pages"
             ))
+            && stopped.contains(
+                "\"counts\":{\"error\":0,\"warning\":0,\"note\":0},\"first\":true}],\"site\":"
+            )
+            && stopped.matches("\"first\":true").count() == 1
             && stopped.contains("\"site\":{\"kinds\":[{\"kind\":\"broken-link\","),
         "{stopped}"
     );
@@ -859,9 +867,47 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
                 "{{\"state\":\"stopped\",\"at\":\"{then}\",\
                  \"said\":[{{\"text\":\"1 error stopped the build.\"}}],"
             ))
+            && mended.matches("\"first\":false").count() == 2
+            && mended.contains("\"first\":true}],\"site\":")
             && mended
                 .contains("\"gone\":[{\"text\":\"Gone since the last build: 1 unknown-word.\"}],"),
         "{mended}"
+    );
+}
+
+#[test]
+fn the_panel_is_handed_a_kinds_suggestion_where_each_of_its_problems_has_it() {
+    let served = served_as("panel-kinds", How::Native, true, |site| {
+        for n in 2..=3 {
+            site.write(
+                &format!("content/post-{n}.md"),
+                &format!("---\ntitle: Post {n}\nneeds: url\n---\nPost {n}.\n"),
+            );
+        }
+        site.write("content/about.md", "# About\n\nAbout the site.\n");
+        site.write(
+            "content/links.md",
+            "# Links\n\nSee [one](/post-9/) and [another](/abut/).\n",
+        );
+    });
+    let site = panel(&served, "/post-1/");
+    assert!(
+        site.contains(
+            "{\"kind\":\"broken-link\",\"severity\":\"warning\",\"title\":\"Broken link\",\
+             \"count\":2,\"quietened\":0,\"suggestion\":null}"
+        ) && site.contains(
+            "{\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
+             \"count\":2,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site's address to \"},\
+             {\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
+             {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}"
+        ),
+        "{site}"
+    );
+    let suggestions = served.page("/.statac-live/problems?kind=broken-link");
+    assert!(
+        suggestions.contains("{\"code\":\"/post-1/\"}")
+            && suggestions.contains("{\"code\":\"/about/\"}"),
+        "{suggestions}"
     );
 }
 
@@ -922,19 +968,25 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
         ),
         "{post}"
     );
-    // What the layout writes, and what it doesn't.
+    // What the layout writes, and what it doesn't, with the line each
+    // value is written on.
+    let title = "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Post 3\",\
+        \"empty\":false,\"has\":[],\"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2,\
+        \"excerpt\":[{\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Post 3\"}]}]},\
+        \"used\":true}";
     assert!(
-        post.contains(
-            "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Post 3\",\"empty\":false,\
-             \"has\":[],\"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2},\"used\":true}"
-        ) && post.contains(
-            "{\"name\":\"page.date\",\"holds\":\"date\",\"value\":\"3 October 2026\",\
-             \"empty\":false,\"has\":[\"day\",\"month\",\"weekday\",\"year\"],\
-             \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":3},\"used\":false}"
-        ) && post.contains(
-            "{\"name\":\"page.summary\",\"holds\":\"text\",\"value\":\"no value\",\
-             \"empty\":true,\"has\":[],\"from\":null,\"used\":false}"
-        ),
+        post.contains(title)
+            && post.contains(
+                "{\"name\":\"page.date\",\"holds\":\"date\",\"value\":\"3 October 2026\",\
+                 \"empty\":false,\"has\":[\"day\",\"month\",\"weekday\",\"year\"],\
+                 \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":3,\"excerpt\":[\
+                 {\"line\":3,\"text\":[{\"text\":\"date: \"},{\"mark\":\"2026-10-03\"}]}]},\
+                 \"used\":false}"
+            )
+            && post.contains(
+                "{\"name\":\"page.summary\",\"holds\":\"text\",\"value\":\"no value\",\
+                 \"empty\":true,\"has\":[],\"from\":null,\"used\":false}"
+            ),
         "{post}"
     );
     // Answered from the same writing, but asked for only as itself.
@@ -964,11 +1016,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
     assert!(
         kept.contains(&used("content", writing, true))
             && kept.contains(&used("excerpt", writing, false))
-            && kept.contains(
-                "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Post 3\",\
-                 \"empty\":false,\"has\":[],\
-                 \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2},\"used\":true}"
-            ),
+            && kept.contains(title),
         "{kept}"
     );
 
@@ -987,7 +1035,8 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
              \"statac.yaml\",\"templates/page.html\"],\"also\":[]}}"
         ) && list.contains(
             "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Posts\",\"empty\":false,\
-             \"has\":[],\"from\":{\"file\":\"content/posts/index.md\",\"line\":2},\"used\":true}"
+             \"has\":[],\"from\":{\"file\":\"content/posts/index.md\",\"line\":2,\"excerpt\":[\
+             {\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Posts\"}]}]},\"used\":true}"
         ) && list.contains(
             "{\"name\":\"page.posts\",\"holds\":\"pages\",\"value\":\"3 pages\",\
              \"empty\":false,\"has\":[],\"from\":null,\"used\":false}"

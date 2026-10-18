@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::pieced;
+use super::problems::lines;
 use crate::content::address::on_the_wire;
 use crate::origin::Arrival;
 use crate::reads::{Asked, Key, Reads};
@@ -136,7 +137,21 @@ impl On<'_> {
             json_string(&value(row)),
             row.held == Held::Nothing,
             has.join(","),
-            self.place(row.from),
+            self.written_at(row.from),
+        )
+    }
+
+    /// A place as its file and line and that line as written, or null.
+    fn written_at(&self, place: Option<Place>) -> String {
+        let Some(place) = place else {
+            return "null".to_owned();
+        };
+        let excerpt = self.report.excerpt(place, false);
+        format!(
+            "{{\"file\":{},\"line\":{},\"excerpt\":{}}}",
+            json_string(&self.report.file(place.source)),
+            excerpt.first,
+            lines(&excerpt),
         )
     }
 

@@ -4029,6 +4029,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("tookWriting", said("Writing")),
         ("ms", said("{n} ms")),
         ("rounds", said("Rounds since serve started")),
+        ("firstRound", said("first")),
         ("acrossSite", said("Problems across the site")),
         ("leftOut", said("Left out of `statac build`")),
         ("drafts", said(PANEL_DRAFTS)),

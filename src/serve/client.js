@@ -651,6 +651,7 @@
     .detail dl { display: grid; grid-template-columns: ${em(96)} minmax(0, 1fr); gap: ${em(8)} ${em(12)}; }
     .detail dt { color: var(--text-muted); }
     .detail dd { overflow-wrap: anywhere; }
+    .detail .written-at { display: flex; flex-direction: column; gap: ${em(8)}; }
     .expression { display: flex; align-items: center; gap: ${em(10)}; }
     .expression code {
       flex: 1; font-size: ${em(15)}; color: var(--text-strong); background: var(--selected);
@@ -712,11 +713,15 @@
       display: grid; grid-template-columns: ${em(72)} minmax(0, 1fr) auto; gap: ${em(10)};
       padding: ${em(8)} 0; border-top: 1px solid var(--rule);
     }
+    .rounds .end { display: flex; gap: ${em(8)}; }
     .rounds .error { color: var(--error); }
     .rounds .warning { color: var(--warning); }
     .kinds { display: flex; flex-direction: column; gap: ${em(10)}; }
-    .kinds li { display: flex; gap: ${em(10)}; align-items: baseline; }
-    .kinds li .fill { flex: 1; }
+    .kinds li {
+      display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: ${em(4)} ${em(10)};
+      align-items: baseline;
+    }
+    .kinds li p { grid-column: 2 / -1; }
     .kinds .shape { position: relative; top: 0.05em; }
     .links { display: flex; flex-direction: column; gap: ${em(6)}; }
     .links li { display: flex; flex-wrap: wrap; gap: 0 ${em(8)}; align-items: baseline; }
@@ -2223,7 +2228,12 @@
         row.from
           ? [
               make("dt", {}, told("columnAt")),
-              make("dd", { class: "code" }, located(row.from.file, row.from.line)),
+              make(
+                "dd",
+                { class: "written-at" },
+                make("div", { class: "code" }, located(row.from.file, row.from.line)),
+                frame(row.from.excerpt, "note"),
+              ),
             ]
           : null,
       ),
@@ -2483,9 +2493,14 @@
             {},
             make("span", { class: "muted" }, round.at),
             spoken("span", round.said),
-            worst
-              ? make("span", { class: worst }, told(plural[worst], { n: round.counts[worst] }))
-              : make("span"),
+            make(
+              "span",
+              { class: "end" },
+              worst
+                ? make("span", { class: worst }, told(plural[worst], { n: round.counts[worst] }))
+                : null,
+              round.first ? make("span", { class: "muted" }, told("firstRound")) : null,
+            ),
           );
         }),
       ),
@@ -2506,7 +2521,7 @@
                 shape(kind.severity),
                 make(
                   "span",
-                  { class: "fill" },
+                  {},
                   told("times", { title: kind.title, n: kind.count }),
                   kind.quietened ? [" ", make("span", { class: "meta" }, say("quietened"))] : null,
                 ),
@@ -2524,6 +2539,7 @@
                   },
                   told("show"),
                 ),
+                kind.suggestion ? spoken("p", kind.suggestion, { class: "muted" }) : null,
               ),
             ),
           )

@@ -145,9 +145,10 @@ impl Panel {
             problems::took(&besides.took),
         );
         let mut rounds = vec![format!(
-            "{{\"state\":{state},\"at\":{},\"said\":{},\"counts\":{counts}}}",
+            "{{\"state\":{state},\"at\":{},\"said\":{},\"counts\":{counts},\"first\":{}}}",
             json_string(&at),
             pieced(besides.said),
+            before.round.is_none(),
         )];
         rounds.extend(before.rounds.iter().take(ROUNDS - 1).cloned());
         let mut panel = Panel {

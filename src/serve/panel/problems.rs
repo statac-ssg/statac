@@ -129,7 +129,7 @@ impl Parts<'_> {
 
 /// An excerpt's lines, each as its number and its pieces: the words, and
 /// the place as `{"mark": ...}`, empty where the place is.
-fn lines(excerpt: &Excerpt) -> String {
+pub(super) fn lines(excerpt: &Excerpt) -> String {
     let lines: Vec<String> = (excerpt.lines.iter())
         .map(|line| {
             let text = |words: &str| format!("{{\"text\":{}}}", json_string(words));
@@ -369,25 +369,34 @@ pub(super) fn took(took: &Took) -> String {
 }
 
 /// The problems counted by kind, as the members of a JSON list: errors,
-/// then warnings, then notes, the kind with most first within each.
+/// then warnings, then notes, the kind with most first within each. A
+/// kind whose problems all suggest the same, its quietened ones only
+/// where it has no others, has that suggestion.
 pub(super) fn kinds(problems: &[Problem], quiet: &Quiet) -> String {
-    let mut counted: HashMap<Code, (usize, usize)> = HashMap::new();
+    let mut counted: HashMap<Code, [Vec<&Problem>; 2]> = HashMap::new();
     for problem in problems {
-        let (count, quietened) = counted.entry(problem.kind.code()).or_default();
-        *count += 1;
-        *quietened += usize::from(quiet.quietens(&problem.kind));
+        let quietened = usize::from(quiet.quietens(&problem.kind));
+        counted.entry(problem.kind.code()).or_default()[quietened].push(problem);
     }
     let mut counted: Vec<_> = counted.into_iter().collect();
-    counted.sort_by_key(|&(code, (count, _))| {
+    counted.sort_by_key(|(code, [heard, hushed])| {
+        let count = heard.len() + hushed.len();
         (code.severity(), std::cmp::Reverse(count), code.name())
     });
     let kinds: Vec<String> = (counted.into_iter())
-        .map(|(code, (count, quietened))| {
+        .map(|(code, [heard, hushed])| {
+            let (count, quietened) = (heard.len() + hushed.len(), hushed.len());
+            let told = if heard.is_empty() { hushed } else { heard };
+            let mut said = told.iter().map(|problem| problem.suggestion());
+            let first = said.next().flatten();
+            let shared = first.filter(|first| said.all(|other| other.as_ref() == Some(first)));
             format!(
-                "{{\"kind\":{},\"severity\":{},\"title\":{},\"count\":{count},\"quietened\":{quietened}}}",
+                "{{\"kind\":{},\"severity\":{},\"title\":{},\"count\":{count},\
+                 \"quietened\":{quietened},\"suggestion\":{}}}",
                 json_string(code.name()),
                 json_string(wording::severity(code.severity())),
                 json_string(title(code)),
+                shared.map_or_else(|| "null".to_owned(), |said| pieced(&shown(&said))),
             )
         })
         .collect();
