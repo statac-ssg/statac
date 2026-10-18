@@ -30,6 +30,7 @@
     onlyUsed: false,
     away: "",
     undocked: "corner",
+    editor: "none",
   };
   const settings = structuredClone(defaults);
   try {
@@ -42,6 +43,15 @@
       }
     }
   } catch {}
+  const editors = [
+    ["none", "editorNone"],
+    ["vscode", "editorCode"],
+    ["vscode-insiders", "editorInsiders"],
+    ["cursor", "editorCursor"],
+    ["zed", "editorZed"],
+    ["sublime", "editorSublime"],
+  ];
+  if (!editors.some(([editor]) => editor === settings.editor)) settings.editor = defaults.editor;
   const keep = () => {
     try {
       localStorage.setItem(kept, JSON.stringify(settings));
@@ -104,7 +114,10 @@
   const say = (name, holes) => pieces(fill(words[name], holes));
   const woven = (name, elements, holes) =>
     fill(words[name], holes).flatMap((piece) => {
-      if ("code" in piece) return [make("code", {}, piece.code)];
+      if ("code" in piece) {
+        const hole = /^\{(\w+)\}$/.exec(piece.code)?.[1];
+        return [elements[hole] ?? make("code", {}, piece.code)];
+      }
       return piece.text
         .split(/(\{\w+\})/)
         .filter(Boolean)
@@ -173,6 +186,12 @@
         ["rect", { x: 8, y: 8, width: 13, height: 13, rx: 2 }],
         ["path", { d: "M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" }],
       ),
+    copied: () => icon(["path", { d: "M5 12.5l4.5 4.5L19 7.5" }]),
+    edit: () =>
+      icon(
+        ["path", { d: "M12 20h9" }],
+        ["path", { d: "M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" }],
+      ),
   };
 
   // Only ever a page of this site, or Statac's own explanations.
@@ -188,6 +207,41 @@
       }
     } catch {}
     return made;
+  };
+
+  // A link that opens a file at its line in the reader's editor, or null
+  // where there is none. No other scheme is ever made.
+  const opener = (editor, folder, file, line, column) => {
+    const schemes = {
+      vscode: "vscode://file",
+      "vscode-insiders": "vscode-insiders://file",
+      cursor: "cursor://file",
+      zed: "zed://file",
+    };
+    if (!folder || !file) return null;
+    if (!Object.hasOwn(schemes, editor) && editor !== "sublime") return null;
+    const windows = /^[a-z]:[\\/]|^\\\\/i.test(folder);
+    const slashed = (path) => (windows ? path.replaceAll("\\", "/") : path);
+    let whole = slashed(file);
+    if (!/^\/|^[a-z]:\//i.test(whole)) whole = `${slashed(folder).replace(/\/+$/, "")}/${whole}`;
+    if (!whole.startsWith("/")) whole = `/${whole}`;
+    const at = Number.isInteger(line) ? [line] : [];
+    if (at.length && Number.isInteger(column)) at.push(column);
+    // SublimeUrl decodes the query value once and takes the path in the
+    // file URL as it finds it.
+    if (editor === "sublime") {
+      const query = [`url=${encodeURIComponent(`file://${whole}`)}`];
+      if (at.length) query.push(`line=${at[0]}`);
+      if (at.length > 1) query.push(`column=${at[1]}`);
+      return `subl://open?${query.join("&")}`;
+    }
+    const path = whole
+      .split("/")
+      .map((part, index) =>
+        index === 1 && windows && /^[a-z]:$/i.test(part) ? part : encodeURIComponent(part),
+      )
+      .join("/");
+    return `${schemes[editor]}${path}${at.map((n) => `:${n}`).join("")}`;
   };
 
   // The style. Sizes are in em, not rem: rem reads the page's root font
@@ -247,7 +301,7 @@
     .layer > * { pointer-events: auto; position: absolute; box-sizing: border-box; }
     .layer *, .layer *::before, .layer *::after { box-sizing: border-box; }
     [hidden] { display: none !important; }
-    button, input { font: inherit; color: inherit; margin: 0; }
+    button, input, select { font: inherit; color: inherit; margin: 0; }
     button { cursor: pointer; background: transparent; border: 0; padding: 0; text-align: inherit; }
     code, .code { font-family: ${mono}; font-size: ${em(13)}; }
     h2, h3, h4, p, ul, ol, dl, dd, figure, pre { margin: 0; }
@@ -279,7 +333,7 @@
     .count.note { color: var(--note); }
     .muted { color: var(--text-muted); }
     .meta { color: var(--text-muted); font-size: ${em(13)}; }
-    .meta code { font-size: 1em; }
+    .meta :is(code, .code) { font-size: 1em; }
     .none { color: var(--text-muted); font-style: italic; }
     .label {
       display: inline-block; padding: 0 ${em(7, 13)}; font-size: ${em(13)};
@@ -413,6 +467,20 @@
     .fix code { color: var(--text-strong); }
     .printed pre { font-family: ${mono}; font-size: ${em(13)}; white-space: pre-wrap; color: var(--text-muted); }
     .related { display: flex; flex-direction: column; gap: ${em(6)}; }
+
+    /* A file and line, with what opens and copies it. */
+    .located { display: inline-flex; align-items: center; gap: ${em(4)}; max-width: 100%; }
+    .located .where { min-width: 0; overflow-wrap: anywhere; }
+    .icon-button.small {
+      width: ${em(24)}; height: ${em(24)}; min-width: 24px; min-height: 24px; border-radius: ${em(4)};
+    }
+    .icon-button.small .icon { width: ${em(14)}; height: ${em(14)}; }
+    .spot { display: flex; flex-wrap: wrap; align-items: center; gap: ${em(4)} ${em(14)}; }
+    .spot .open {
+      display: inline-flex; align-items: center; gap: ${em(6, 13)}; min-height: 24px;
+      font-size: ${em(13)};
+    }
+    .spot .open .icon { width: ${em(13, 13)}; height: ${em(13, 13)}; }
 
     /* The drawer. */
     .drawer {
@@ -578,6 +646,8 @@
     .names .holds, .names .at { color: var(--text-muted); }
     .names .holds { font-size: ${em(13)}; }
     .names .at { font-family: ${mono}; font-size: ${em(13)}; }
+    .names .at .located { display: flex; }
+    .names .at .where { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .detail dl { display: grid; grid-template-columns: ${em(96)} minmax(0, 1fr); gap: ${em(8)} ${em(12)}; }
     .detail dt { color: var(--text-muted); }
     .detail dd { overflow-wrap: anywhere; }
@@ -683,6 +753,12 @@
       border-top: 1px solid var(--rule);
     }
     .settings .keys { display: flex; flex-wrap: wrap; align-items: center; gap: ${em(6)}; }
+    .settings .field { display: flex; flex-direction: column; gap: ${em(8)}; }
+    .settings .field > label { color: var(--text-muted); }
+    .settings select {
+      min-height: ${em(32)}; padding: 0 ${em(8)}; border: 1px solid var(--edge-strong);
+      border-radius: ${em(6)}; background: var(--raise); color: var(--text);
+    }
 
     /* Narrow: docked to the side, or a phone. */
     @container drawer (width < 64em) {
@@ -735,8 +811,10 @@
       .settings { left: ${em(12)}; width: auto; }
     }
     @media (width < 40em), (pointer: coarse) {
-      .icon-button, .tabs [role="tab"], .button, .segments button, .choice, .check, .settings .option { min-height: 44px; }
-      .icon-button { min-width: 44px; }
+      .icon-button, .tabs [role="tab"], .button, .segments button, .choice, .check, .settings .option,
+      .settings select, .spot .open { min-height: 44px; }
+      .icon-button, .icon-button.small { min-width: 44px; }
+      .icon-button.small { min-height: 44px; }
       .names .write button { min-height: 44px; }
       .problem h3 button { min-height: 44px; }
     }
@@ -1036,6 +1114,75 @@
     return line == null ? file : told("place", { file, line });
   };
 
+  const editorName = () => told(editors.find(([editor]) => editor === settings.editor)[1]);
+  const opens = (file, line, column) => opener(settings.editor, panel?.root, file, line, column);
+
+  // A file and its line as the panel shows it, linked to the reader's
+  // editor unless `linked` is false, and a button that copies it as an
+  // editor's go-to-file box takes it.
+  const located = (file, line, column, { code = false, linked = true } = {}) => {
+    const place = where(file, line);
+    const href = linked ? opens(file, line, column) : null;
+    const opening = told("openPlace", { place, editor: editorName() });
+    const shown = href
+      ? make(
+          "a",
+          { class: code ? "where code" : "where", href, title: opening, "aria-label": opening },
+          place,
+        )
+      : make("span", { class: code ? "where code" : "where" }, place);
+    const copy = make(
+      "button",
+      {
+        class: "icon-button small",
+        type: "button",
+        title: told("copyPlace"),
+        "aria-label": told("copyPlaceLabel", { place }),
+      },
+      icons.copy(),
+    );
+    let shownAgain = 0;
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(line == null ? file : `${file}:${line}`);
+        refill(copy, icons.copied());
+        copy.title = told("copied");
+        copy.setAttribute("aria-label", told("copied"));
+        clearTimeout(shownAgain);
+        shownAgain = setTimeout(() => {
+          refill(copy, icons.copy());
+          copy.title = told("copyPlace");
+          copy.setAttribute("aria-label", told("copyPlaceLabel", { place }));
+        }, 2000);
+      } catch {
+        getSelection()?.selectAllChildren(shown);
+      }
+    });
+    return make("span", { class: "located" }, shown, copy);
+  };
+
+  // A problem's file and line, and the link that opens it.
+  const spot = (file, line, column) => {
+    const href = opens(file, line, column);
+    return make(
+      "div",
+      { class: "spot" },
+      make("span", { class: "place" }, located(file, line, column, { linked: false })),
+      href
+        ? make(
+            "a",
+            {
+              class: "open",
+              href,
+              title: told("openPlace", { place: where(file, line), editor: editorName() }),
+            },
+            icons.edit(),
+            told("openInEditor"),
+          )
+        : null,
+    );
+  };
+
   const named = (name) => {
     for (const group of panel?.names || []) {
       const row = group.rows.find((row) => row.name === name);
@@ -1078,9 +1225,13 @@
       }
     });
     const others = problem.built.filter((_, at) => at !== here);
-    const named = others.map((built) =>
-      built.href ? link(built.href, pieces(built.page)) : spoken("span", built.page),
-    );
+    const named = others.map((built) => {
+      const page = built.href ? link(built.href, pieces(built.page)) : spoken("span", built.page);
+      if (!built.file) return page;
+      const place = make("span", { class: "place" }, located(built.file, built.line));
+      // A page with no name of its own is named by its file.
+      return plain(built.page) === built.file ? place : [page, " ", place];
+    });
     const listed = named.flatMap((made, at) => (at ? [", ", made] : [made]));
     const more = problem.builtMore ? [", ", say("builtMore", { n: problem.builtMore })] : [];
     if (here >= 0) {
@@ -1105,7 +1256,7 @@
       make("code", {}, problem.kind),
       problem.quietened ? [" ", say("quietened")] : null,
     ),
-    problem.file ? make("p", { class: "place" }, where(problem.file, problem.line)) : null,
+    problem.file ? spot(problem.file, problem.line, problem.column) : null,
     frame(problem.excerpt, problem.severity),
     fix(problem),
     problem.printed
@@ -1126,7 +1277,7 @@
           {},
           pieces(related.label),
           related.file
-            ? [" ", make("span", { class: "place" }, where(related.file, related.line))]
+            ? [" ", make("span", { class: "place" }, located(related.file, related.line))]
             : null,
         ),
         frame(related.excerpt, "note"),
@@ -1205,7 +1356,7 @@
       "div",
       { class: "body" },
       spoken("h2", error.headline),
-      error.file ? make("p", { class: "place" }, where(error.file, error.line)) : null,
+      error.file ? spot(error.file, error.line, error.column) : null,
       frame(error.excerpt, "error"),
       fix(error),
       builtWhile(error),
@@ -1468,6 +1619,7 @@
         view.group,
         settings.hideEmpty,
         settings.onlyUsed,
+        settings.editor,
       ]),
     ].join("|");
     if (drawnFor[name] === key) return;
@@ -1897,7 +2049,15 @@
       ]),
       make("span", { class: "fill" }),
       layout?.file
-        ? make("p", { class: "meta" }, say("layoutFrom", { name: layout.name, file: layout.file }))
+        ? make(
+            "p",
+            { class: "meta" },
+            woven(
+              "layoutFrom",
+              { file: located(layout.file, null, null, { code: true }) },
+              { name: layout.name },
+            ),
+          )
         : null,
     );
     const rows = (needle ? panel.names : panel.names.filter((group) => group.group === view.group))
@@ -1966,7 +2126,7 @@
     );
     value.title = row.value;
     const at = row.from ? where(row.from.file, row.from.line) : "";
-    return make(
+    const made = make(
       "tr",
       {
         class: chosen ? "name-row chosen" : "name-row",
@@ -1976,8 +2136,15 @@
       make("td", { class: "write" }, button),
       make("td", { class: "holds" }, row.holds || told("holdsUnknown")),
       value,
-      make("td", { class: "at", title: at }, at),
+      make("td", { class: "at", title: at }, row.from ? located(row.from.file, row.from.line) : ""),
     );
+    reachable(made, chosen);
+    return made;
+  };
+
+  // Only the chosen row's place is reached by Tab, as only its name is.
+  const reachable = (row, chosen) => {
+    for (const made of row.querySelectorAll(".at a, .at button")) made.tabIndex = chosen ? 0 : -1;
   };
 
   const pick = (name, focus) => {
@@ -1989,6 +2156,7 @@
       const button = row.querySelector("button");
       button.setAttribute("aria-pressed", String(chosen));
       button.tabIndex = chosen ? 0 : -1;
+      reachable(row, chosen);
       if (chosen && focus) button.focus();
     }
     view.name = name;
@@ -2055,7 +2223,7 @@
         row.from
           ? [
               make("dt", {}, told("columnAt")),
-              make("dd", { class: "code" }, where(row.from.file, row.from.line)),
+              make("dd", { class: "code" }, located(row.from.file, row.from.line)),
             ]
           : null,
       ),
@@ -2104,11 +2272,12 @@
     const layout = facts.layout;
     let chosen = null;
     if (layout?.chosenAt) {
-      const at = where(layout.chosenAt.file, layout.chosenAt.line);
-      chosen = say(layout.handedDown ? "layoutHanded" : "layoutNamed", {
-        name: layout.name,
-        place: at,
-      });
+      const at = located(layout.chosenAt.file, layout.chosenAt.line, null, { code: true });
+      chosen = woven(
+        layout.handedDown ? "layoutHanded" : "layoutNamed",
+        { place: at },
+        { name: layout.name },
+      );
     } else if (layout) {
       chosen = say("layoutUnnamed", { name: layout.name });
     }
@@ -2116,10 +2285,10 @@
       ? make(
           "span",
           { class: "chain" },
-          make("code", {}, layout.file),
+          located(layout.file, null, null, { code: true }),
           layout.extends.map((file) => [
             make("span", { class: "muted" }, told("extends")),
-            make("code", {}, file),
+            located(file, null, null, { code: true }),
           ]),
         )
       : null;
@@ -2136,7 +2305,11 @@
         "dl",
         { class: "facts" },
         make("dt", {}, told("file")),
-        make("dd", {}, facts.file ? make("code", {}, facts.file) : say("noFile")),
+        make(
+          "dd",
+          {},
+          facts.file ? located(facts.file, null, null, { code: true }) : say("noFile"),
+        ),
         make("dt", {}, told("address")),
         make("dd", {}, make("code", {}, facts.address)),
         make("dt", {}, told("layout")),
@@ -2213,7 +2386,7 @@
       make(
         "ul",
         { class: "files" },
-        facts.reads.files.map((file) => make("li", {}, file)),
+        facts.reads.files.map((file) => make("li", {}, located(file))),
         facts.reads.also.map((said) => spoken("li", said, { class: "also" })),
       ),
       make("span", { class: "fill" }),
@@ -2491,6 +2664,32 @@
         ["light", "light"],
         ["dark", "dark"],
       ]),
+      make(
+        "div",
+        { class: "field" },
+        make("label", { for: "editor" }, told("openIn")),
+        make(
+          "select",
+          {
+            id: "editor",
+            "data-setting": "editor",
+            "aria-describedby": settings.editor === "sublime" ? "editor-note" : null,
+            onchange: (event) => {
+              settings.editor = event.target.value;
+              keep();
+              drawCard();
+              if (settings.open) drawPane();
+              drawSettings();
+            },
+          },
+          editors.map(([value, word]) =>
+            make("option", { value, selected: settings.editor === value }, told(word)),
+          ),
+        ),
+        settings.editor === "sublime"
+          ? make("span", { class: "meta", id: "editor-note" }, told("sublimeNeeds"))
+          : null,
+      ),
       make(
         "fieldset",
         {},

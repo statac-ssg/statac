@@ -1191,6 +1191,14 @@ mod tests {
                 assert!(words.contains(&format!("\"{name}\":")), "{name}");
             }
         }
+        // And every editor the settings offer.
+        let offered = CLIENT.match_indices("\", \"editor").count();
+        assert!(offered >= 6, "{offered}");
+        for (at, _) in CLIENT.match_indices("\", \"editor") {
+            let name = &CLIENT[at + 4..];
+            let name = &name[..name.find('"').unwrap()];
+            assert!(words.contains(&format!("\"{name}\":")), "{name}");
+        }
     }
 
     #[test]

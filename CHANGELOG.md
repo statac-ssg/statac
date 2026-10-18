@@ -101,6 +101,9 @@ What changed in each release of Statac, the newest first.
   the site, which can be resized, docked to the side or kept as a bar
   across the page. It is light or dark as the system is, opens and closes
   with Alt+Shift+S, and keeps its settings in the browser.
+- The panel opens a file it names at its line in VS Code, VS Code
+  Insiders, Cursor, Zed or Sublime Text, as its settings choose, and
+  copies the file and line as `file:line` for any other editor.
 - `serve` builds again only the pages a change to a page's front matter
   can show on, where a template chooses or orders pages by a field, as
   the starter's menu does. A post's new title built every page again;
