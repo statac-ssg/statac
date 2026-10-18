@@ -65,6 +65,9 @@ What changed in each release of Statac, the newest first.
 - `serve` builds again a file of the site moved out of it and back
   unchanged, as with the Bin's Put Back. It took the file's return as
   no change and served the site without it until it was next saved.
+- `serve` says nothing where the system loses its reports of changes and
+  a look finds nothing changed, as serve's own writing on a large site
+  can cause as it starts. It said "Files changed" and built nothing.
 - A template that can't be read, named by `extends` with a name worked
   out as the template runs, as `{% extends "ho" ~ "me" %}`, is told
   once, where it can't be read. A page built through it also said the

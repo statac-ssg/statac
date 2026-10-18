@@ -350,6 +350,17 @@ impl Serving {
             }
         };
         let sources = Sources::default();
+        let mut more =
+            Report::new(&sources, &self.options.site, self.colour).hooks(round.outcome.hooks);
+        more.push_str(&self.stamps(&round));
+        more.push_str(&self.differences(&round));
+        more.push_str(&self.fetch(&round));
+        // The system lost reports and no file came or went, which serve's
+        // own writing can cause. A round that changed nothing the author
+        // can see found no save, and says nothing.
+        if batch.changed.is_empty() && !stopped && told == Told::Nothing && more.is_empty() {
+            return true;
+        }
         let report = Report::new(&sources, &self.options.site, self.colour);
         let result = self.result(&round, Some(took));
         let mut said = format!(
@@ -366,10 +377,7 @@ impl Serving {
             false => wording::told(&told),
         });
         said.push('\n');
-        said.push_str(&report.hooks(round.outcome.hooks));
-        said.push_str(&self.stamps(&round));
-        said.push_str(&self.differences(&round));
-        said.push_str(&self.fetch(&round));
+        said.push_str(&more);
 
         let status = self.status(&round, Some(took));
         self.set_panel(&round);
@@ -653,6 +661,103 @@ mod tests {
 
     fn pair(old: &str, new: &str) -> (String, String) {
         (old.into(), new.into())
+    }
+
+    /// A small site served from the system's temporary folder, polled so
+    /// seldom that only what a test hands it starts a round.
+    struct Served {
+        folder: PathBuf,
+        serving: Serving,
+    }
+
+    impl Served {
+        fn new(label: &str) -> Served {
+            let folder = std::env::temp_dir()
+                .join(format!("statac-serve-unit-{label}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&folder);
+            let write = |relative: &str, text: &str| {
+                let path = folder.join(relative);
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                std::fs::write(path, text).unwrap();
+            };
+            write("statac.yaml", "title: Site\nlanguage: en\n");
+            write(
+                "templates/page.html",
+                "<!doctype html>\n<title>{{ page.title }}</title>\n{{ page.content }}\n",
+            );
+            write("content/index.md", "---\nlayout: page\n---\n# Home\n");
+            write("content/post-1.md", "# Post 1\n\nThe first post.\n");
+            let options = Options {
+                site: folder.clone(),
+                port: 0,
+                watch: How::Poll {
+                    every: Duration::from_secs(3600),
+                },
+                settle: Settle::default(),
+                today: None,
+                drafts: true,
+                fetcher: None,
+                token: None,
+            };
+            let mut opened = Vec::new();
+            let serving = start(&options, &mut opened, false).unwrap_or_else(|| {
+                panic!("serve didn't start:\n{}", String::from_utf8_lossy(&opened))
+            });
+            Served { folder, serving }
+        }
+
+        /// What serve says of a round for a batch the system's reports were
+        /// lost from, naming `changed`.
+        fn rescan(&mut self, changed: &[&str]) -> String {
+            let now = Instant::now();
+            let batch = Batch {
+                changed: paths(changed),
+                rescan: true,
+                first_event: now,
+                settled: now,
+            };
+            self.serving.tell.send(Heard::Saves(batch)).unwrap();
+            let mut said = Vec::new();
+            assert!(self.serving.round(&mut said));
+            String::from_utf8(said).unwrap()
+        }
+    }
+
+    impl Drop for Served {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.folder);
+        }
+    }
+
+    #[test]
+    fn reports_lost_with_nothing_changed_say_nothing() {
+        let mut served = Served::new("lost");
+        let generation = served.serving.hub.generation();
+        assert_eq!(served.rescan(&[]), "");
+        assert_eq!(served.serving.hub.generation(), generation);
+    }
+
+    #[test]
+    fn reports_lost_over_a_save_say_what_it_built() {
+        let mut served = Served::new("lost-save");
+        std::fs::write(
+            served.folder.join("content/post-1.md"),
+            "# Post 1\n\nThe first post, saved.\n",
+        )
+        .unwrap();
+        let generation = served.serving.hub.generation();
+        let said = served.rescan(&[]);
+        assert!(said.starts_with("Files changed. Built 1 of "), "{said}");
+        assert_ne!(served.serving.hub.generation(), generation);
+    }
+
+    #[test]
+    fn reports_lost_naming_a_file_say_it_even_where_nothing_changed() {
+        let mut served = Served::new("lost-named");
+        std::fs::write(served.folder.join("content/post-2.md"), "# Post 2\n").unwrap();
+        std::fs::remove_file(served.folder.join("content/post-2.md")).unwrap();
+        let said = served.rescan(&["content/post-2.md"]);
+        assert!(said.starts_with("`content/post-2.md` changed."), "{said}");
     }
 
     #[test]
