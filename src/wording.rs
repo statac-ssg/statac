@@ -4041,6 +4041,10 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
                  date after today, is listed here with a link to it.",
             ),
         ),
+        (
+            "leftOutUnbuilt",
+            said("Serve was started with `--no-drafts`, so these have no page to open."),
+        ),
         ("written", said(PANEL_WRITTEN)),
         (
             "writtenNone",

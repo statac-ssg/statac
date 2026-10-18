@@ -2545,6 +2545,7 @@
           )
         : make("p", { class: "muted" }, told("siteClear")),
     );
+    // A page left out has no address, only the file it is written in.
     const linked = (links) =>
       make(
         "ul",
@@ -2553,12 +2554,18 @@
           make(
             "li",
             {},
-            link(to.href, to.text),
+            "href" in to
+              ? link(to.href, to.text)
+              : [
+                  to.text !== to.file ? make("span", { class: "code" }, to.text) : null,
+                  to.file ? located(to.file, to.line, null, { code: true }) : null,
+                ],
             to.day ? make("span", { class: "meta" }, to.day) : null,
           ),
         ),
       );
     const { drafts, waiting, written } = panel.site;
+    const unbuilt = [...drafts, ...waiting].some((to) => !("href" in to));
     const third = make(
       "div",
       { class: "column" },
@@ -2569,6 +2576,7 @@
             waiting.length
               ? [make("p", { class: "muted" }, told("waiting")), linked(waiting)]
               : null,
+            unbuilt ? make("p", { class: "muted" }, say("leftOutUnbuilt")) : null,
           ]
         : make("p", { class: "muted" }, say("leftOutNone")),
       make("h3", { class: "later" }, told("written")),

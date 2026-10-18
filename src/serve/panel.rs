@@ -11,14 +11,15 @@
 mod page;
 mod problems;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use super::live::json_string;
 use super::session::{Read, Round, Took};
+use crate::build::Outcome;
 use crate::content::address::on_the_wire;
-use crate::problem::{Code, Problem, Severity};
+use crate::problem::{Code, Kind, Problem, Severity};
 use crate::report::{Piece, Quiet, Report, pieces, shown};
 use crate::wording::{self, PanelWord};
 use problems::{Addresses, Parts};
@@ -93,8 +94,16 @@ struct Page {
 struct Link {
     /// What it names, and the day it waits for.
     named: String,
-    href: String,
+    to: To,
     day: Option<String>,
+}
+
+enum To {
+    /// Its address.
+    Page(String),
+    /// A page left out, which has none: the file it is written in, and
+    /// the line where the file holds more than the one page.
+    File(Option<String>, Option<usize>),
 }
 
 /// The time of day on this machine's clock.
@@ -180,7 +189,7 @@ impl Panel {
         }
         let link = |noted: &super::session::Noted, day: Option<&str>| Link {
             named: shown(noted.title.as_deref().unwrap_or(&noted.address)),
-            href: on_the_wire(&format!("{base}{}", noted.address)),
+            to: To::Page(on_the_wire(&format!("{base}{}", noted.address))),
             day: day.map(str::to_owned),
         };
         let mut built = Built {
@@ -202,6 +211,7 @@ impl Panel {
             };
             built.pages.insert(noted.file, page);
         }
+        left_out(&mut built, outcome, &report);
         built.read = round.read.take();
         built.problems = std::mem::take(&mut round.outcome.problems);
         built.quiet = std::mem::take(&mut round.outcome.quiet);
@@ -296,11 +306,16 @@ impl Panel {
                 Some(day) => format!(",\"day\":{}", json_string(day)),
                 None => String::new(),
             };
-            format!(
-                "{{\"text\":{},\"href\":{}{day}}}",
-                json_string(&link.named),
-                json_string(&link.href)
-            )
+            let to = match &link.to {
+                To::Page(href) => format!("\"href\":{}", json_string(href)),
+                To::File(file, line) => format!(
+                    "\"file\":{},\"line\":{}",
+                    file.as_deref()
+                        .map_or_else(|| "null".to_owned(), json_string),
+                    line.map_or_else(|| "null".to_owned(), |line| line.to_string()),
+                ),
+            };
+            format!("{{\"text\":{},{to}{day}}}", json_string(&link.named))
         };
         let links = |links: &[Link]| links.iter().map(link).collect::<Vec<_>>().join(",");
         let written: Vec<String> = self.written.iter().map(|line| pieced(line)).collect();
@@ -324,6 +339,40 @@ impl Panel {
             self.rounds.join(","),
             or_null(self.root.as_deref().map(json_string)),
         )
+    }
+}
+
+/// Lists the pages `outcome` leaves out, as its problems name them.
+fn left_out(built: &mut Built, outcome: &Outcome, report: &Report) {
+    let sources = outcome.sources();
+    let mut files: Option<HashMap<_, _>> = None;
+    let mut listed = HashSet::new();
+    for problem in report.ordered(&outcome.problems) {
+        let (links, path, day) = match &problem.kind {
+            Kind::DraftLeftOut { path } => (&mut built.drafts, path, None),
+            Kind::WaitingForItsDay { path, date } => (&mut built.waiting, path, Some(date)),
+            _ => continue,
+        };
+        if !listed.insert(path) {
+            continue;
+        }
+        let files =
+            files.get_or_insert_with(|| (sources.ids()).map(|id| (sources.path(id), id)).collect());
+        // A page made from an item is named by its file and the item, and
+        // opened where its problem is.
+        let to = match (files.get(Path::new(path)), problem.place) {
+            (Some(&id), _) => To::File(Some(report.file(id)), None),
+            (None, Some(place)) => To::File(
+                Some(report.file(place.source)),
+                Some(report.first_line(place)),
+            ),
+            (None, None) => To::File(None, None),
+        };
+        links.push(Link {
+            named: shown(path),
+            to,
+            day: day.cloned(),
+        });
     }
 }
 

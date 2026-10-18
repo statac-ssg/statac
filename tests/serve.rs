@@ -1055,17 +1055,52 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
 #[test]
 fn asked_for_no_drafts_serve_shows_what_a_build_publishes() {
     let served = served_as("no-drafts", How::Native, false, |site| {
+        site.write("templates/folder.html", LAYOUT);
         site.write(
             "content/post-2.md",
             "---\ntitle: Post 2\ndraft: true\n---\nA draft.\n",
         );
+        site.write(
+            "content/post-3.md",
+            "---\ntitle: Post 3\ndate: 2999-01-01\n---\nLater.\n",
+        );
+        site.write(
+            "content/later/index.md",
+            "---\ntitle: Later\npages.draft: true\n---\n",
+        );
+        site.write("content/later/post-4.md", "# Post 4\n");
+        site.write(
+            "content/items.md",
+            "---\ntitle: Items\neach: data.items\npermalink: /items/{key}/\n---\n",
+        );
+        site.write(
+            "data/items.yaml",
+            "item-1:\n  title: Item 1\nitem-2:\n  draft: true\n",
+        );
     });
     let said = served.said.text();
     assert!(!said.contains("Showing"), "{said}");
-    assert!(said.contains("1 note: 1 draft-left-out."), "{said}");
+    assert!(
+        said.contains("4 notes: 3 draft-left-out, 1 waiting-for-its-day."),
+        "{said}"
+    );
     let (status, _) = get(served.port, "/post-2/");
     assert!(status.contains("404"), "{status}");
-    assert!(panel(&served, "/post-1/").contains("\"drafts\":[],\"waiting\":[],"));
+    // Each page left out is listed by its file, opened at the start
+    // of a page's own file and at the item of one a file holds many of.
+    let answer = panel(&served, "/post-1/");
+    assert!(
+        answer.contains(
+            "\"drafts\":[\
+             {\"text\":\"content/later/post-4.md\",\"file\":\"content/later/post-4.md\",\
+             \"line\":null},\
+             {\"text\":\"content/post-2.md\",\"file\":\"content/post-2.md\",\"line\":null},\
+             {\"text\":\"data/items.yaml: item-2\",\"file\":\"data/items.yaml\",\"line\":4}],\
+             \"waiting\":[{\"text\":\"content/post-3.md\",\"file\":\"content/post-3.md\",\
+             \"line\":null,\"day\":\"2999-01-01\"}],"
+        ),
+        "{answer}"
+    );
 }
 
 /// A file's name is the site's own text: it reaches neither the terminal
