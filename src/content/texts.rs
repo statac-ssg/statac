@@ -244,8 +244,21 @@ mod tests {
         kept.text = "two".to_owned();
         assert_eq!(read(&mut texts, &[&path]), ["two"]);
 
-        // Written again at the same length, and given its time back.
-        scratch.write("post.md", "six", earlier);
+        // Written again at the same length, and given its time back. The
+        // clock moved on says the first writing's step is over, so the
+        // disk's own time must have left that step too, which a coarse
+        // disk's may not have done this soon after it.
+        let first = Stamp::of(&fs::metadata(&path).unwrap()).unwrap();
+        let mut tries = 0;
+        loop {
+            scratch.write("post.md", "six", earlier);
+            if Stamp::of(&fs::metadata(&path).unwrap()).unwrap() != first {
+                break;
+            }
+            tries += 1;
+            assert!(tries < 1000, "the disk's time never moved");
+            std::thread::sleep(Duration::from_millis(1));
+        }
         assert_eq!(read(&mut texts, &[&path]), ["six"]);
 
         // Another file, at the same length and time, put in its place.
