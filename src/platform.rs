@@ -595,6 +595,15 @@ pub fn remote_disk(path: &Path) -> Option<String> {
     }
 }
 
+/// How often a disk must be written for the system's reports of changes
+/// on it to stay prompt. macOS's come up to a second and a half late
+/// after fifteen seconds or more with nothing written. Nothing where they
+/// come as promptly whatever the quiet.
+pub const KEEPS_REPORTS_PROMPT: Option<Duration> = match cfg!(target_os = "macos") {
+    true => Some(Duration::from_secs(10)),
+    false => None,
+};
+
 /// Whether a disk macOS calls `kind` is remote, `local` being whether the
 /// system counts it as one of the machine's own.
 pub fn remote_by_name(kind: &str, local: bool) -> bool {

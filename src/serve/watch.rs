@@ -72,9 +72,37 @@ pub enum Because {
 /// The watcher in use. Watching ends when this is dropped.
 pub struct Watching {
     _native: Option<RecommendedWatcher>,
+    _awake: Option<Awake>,
     /// How often the folder is looked at, where it is polled.
     pub polling: Option<Duration>,
     pub because: Option<Because>,
+}
+
+/// Where the system's reports of changes come late after a quiet spell
+/// on the disk, a file made and removed in the site's `.statac` folder
+/// now and then keeps them prompt. Ends when dropped.
+struct Awake {
+    _ends: mpsc::Sender<()>,
+}
+
+/// The file [`Awake`] makes and removes, from the site's folder.
+const AWAKE: &str = ".statac/awake";
+
+fn keep_awake(root: &Path, every: Duration) -> io::Result<Awake> {
+    let (tx, rx) = mpsc::channel::<()>();
+    let root = root.to_path_buf();
+    std::thread::Builder::new()
+        .name("awake".into())
+        .spawn(move || {
+            while let Err(RecvTimeoutError::Timeout) = rx.recv_timeout(every) {
+                // Nothing is made where `.statac` isn't there yet or is a
+                // link. One left by a session that ended between the two
+                // goes at the next turn.
+                let _ = platform::make_file(&root, AWAKE, b"");
+                let _ = platform::remove_file(&root, AWAKE);
+            }
+        })?;
+    Ok(Awake { _ends: tx })
 }
 
 enum Source {
@@ -102,6 +130,10 @@ pub fn start(
     let mut known = BTreeSet::new();
     walk(&root, &root, &mut known);
     let as_found = as_found(&root, &known, SystemTime::now());
+    let awake = match (&source, platform::KEEPS_REPORTS_PROMPT) {
+        (Source::Native(_), Some(every)) => Some(keep_awake(&canonical, every).map_err(io)?),
+        _ => None,
+    };
     let settler = Settler {
         roots: [root, canonical],
         known,
@@ -127,6 +159,7 @@ pub fn start(
     };
     Ok(Watching {
         _native: native,
+        _awake: awake,
         polling,
         because,
     })
@@ -522,6 +555,22 @@ mod tests {
 
     fn hints(paths: &[&str]) -> BTreeSet<String> {
         paths.iter().map(|path| path.to_string()).collect()
+    }
+
+    #[test]
+    fn keeping_awake_leaves_no_file_behind() {
+        let scratch = Scratch::new("awake");
+        scratch.write(AWAKE);
+        let awake = keep_awake(&scratch.0, Duration::from_millis(10)).unwrap();
+        let left = platform::join(&scratch.0, AWAKE);
+        let began = Instant::now();
+        while left.exists() {
+            assert!(began.elapsed() < Duration::from_secs(10), "never removed");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        drop(awake);
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(!left.exists());
     }
 
     #[test]

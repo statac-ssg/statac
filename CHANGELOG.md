@@ -106,6 +106,11 @@ What changed in each release of Statac, the newest first.
   build, where it can tell, in place of every file at each save. On a
   site of 10,000 posts a save of one post's text takes about 0.14
   seconds against 0.2. Not on Windows, where Statac can't tell.
+- `serve` on macOS builds a save made after a pause as promptly as one
+  made straight after another, in about 0.2 seconds on a site of 10,000
+  posts against up to 1.6. macOS tells of a change late once nothing has
+  been written to the disk for a while, so serve makes and removes a
+  file in `.statac` every 10 seconds.
 
 ## 0.4.0 - 2026-10-17
 
