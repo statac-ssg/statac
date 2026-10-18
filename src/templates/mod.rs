@@ -44,7 +44,7 @@ use crate::source::Sources;
 use check::{Checked, Field, Rec, Schema, Ty};
 use files::{File, Role, Snippet};
 pub(crate) use files::{SNIPPETS, TEMPLATES};
-pub(crate) use values::{of_the_front, writes};
+pub(crate) use values::{SEARCH_BOX, of_the_front, writes};
 
 pub use card::{Asked, Gathered};
 pub use indent::Own;

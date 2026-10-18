@@ -93,6 +93,14 @@ What changed in each release of Statac, the newest first.
 
 ### Changed
 
+- The panel `statac serve` adds to each page is a tab at the foot of the
+  page, showing the counts of problems and when the site was last built,
+  and saying when a build runs or stops. A build that stops opens a card
+  of what stopped it, with the lines and the fix. Opened, the panel is a
+  drawer of the problems, the names a template can write, this page and
+  the site, which can be resized, docked to the side or kept as a bar
+  across the page. It is light or dark as the system is, opens and closes
+  with Alt+Shift+S, and keeps its settings in the browser.
 - `serve` builds again only the pages a change to a page's front matter
   can show on, where a template chooses or orders pages by a field, as
   the starter's menu does. A post's new title built every page again;

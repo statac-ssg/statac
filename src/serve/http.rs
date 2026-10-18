@@ -8,7 +8,7 @@ use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::{Arc, PoisonError, RwLock};
+use std::sync::{Arc, OnceLock, PoisonError, RwLock};
 use std::time::Duration;
 
 use super::live::Hub;
@@ -23,6 +23,16 @@ use crate::{platform, wording};
 pub const LIVE: &str = "/.statac-live/";
 
 const CLIENT: &str = include_str!("client.js");
+
+/// What stands in the client for the panel's words, which serve puts in
+/// its place.
+const WORDS: &str = "/* the panel's words */ {}";
+
+/// The client, with the panel's words in it.
+fn client() -> &'static str {
+    static CLIENT_WITH_WORDS: OnceLock<String> = OnceLock::new();
+    CLIENT_WITH_WORDS.get_or_init(|| CLIENT.replacen(WORDS, super::panel::words(), 1))
+}
 
 /// How long a request is held before it is answered with nothing new.
 const LONGEST_WAIT: Duration = Duration::from_secs(25);
@@ -205,7 +215,7 @@ fn answer(site: &Site, request: &Request<()>) -> Response<Body> {
     let path = request.uri().path();
     let query = request.uri().query().unwrap_or("");
     let mut response = match path.strip_prefix(LIVE) {
-        Some("client.js") => respond(StatusCode::OK, "text/javascript; charset=utf-8", CLIENT),
+        Some("client.js") => respond(StatusCode::OK, "text/javascript; charset=utf-8", client()),
         Some("wait") => {
             let since = param(query, "since")
                 .and_then(|value| value.parse().ok())
@@ -214,7 +224,10 @@ fn answer(site: &Site, request: &Request<()>) -> Response<Body> {
                 .and_then(|value| value.parse().ok())
                 .map_or(LONGEST_WAIT, Duration::from_millis)
                 .min(LONGEST_WAIT);
-            let reply = site.hub.wait(since, longest);
+            // Asked by a page that shows whether a round is building, a
+            // round starting is answered too.
+            let building = param(query, "building").map(|building| building == "1");
+            let reply = site.hub.wait(since, building, longest);
             respond(StatusCode::OK, "application/json", reply.to_json())
         }
         Some("panel") => {
@@ -1075,10 +1088,19 @@ mod tests {
         );
         assert_eq!(nothing.kind, "application/json");
         assert!(
-            nothing.body.contains("\"kind\":\"none\""),
+            nothing.body.contains("\"kind\":\"none\"")
+                && nothing.body.contains("\"building\":false"),
             "{}",
             nothing.body
         );
+        // A page that knows a round to be building is answered once none is.
+        let asked = std::time::Instant::now();
+        let told = get(
+            &site,
+            &format!("/.statac-live/wait?since={since}&timeout=20000&building=1"),
+        );
+        assert!(told.body.contains("\"building\":false"), "{}", told.body);
+        assert!(asked.elapsed() < Duration::from_secs(10));
         site.hub.publish(
             Told::Reload,
             vec!["content/post-1.md".into()],
@@ -1134,12 +1156,41 @@ mod tests {
         // Nothing has been built yet for there to be anything to say.
         assert_eq!(
             answer.body,
-            "{\"v\":2,\"line\":[],\"stopped\":false,\"error\":null,\"show\":\"Show details\",\
-             \"hide\":\"Hide details\",\"name\":\"Statac\",\"sections\":[],\"problems\":[],\
-             \"stoppedBy\":null,\"explanations\":{},\"round\":null,\"rounds\":[],\
+            "{\"v\":2,\"problems\":[],\"stopped\":null,\"explanations\":{},\"round\":null,\
+             \"rounds\":[],\
              \"site\":{\"kinds\":[],\"gone\":null,\"drafts\":[],\"waiting\":[],\"written\":[]},\
              \"root\":null,\"page\":null,\"names\":[]}"
         );
+    }
+
+    #[test]
+    fn the_client_is_handed_every_word_the_panel_puts_together() {
+        let scratch = Scratch::new("words");
+        let site = scratch.site("");
+        let client = get(&site, "/.statac-live/client.js");
+        assert_eq!(client.kind, "text/javascript; charset=utf-8");
+        assert!(!client.body.contains(WORDS), "the words stand in its place");
+        assert!(
+            client.body.contains(
+                "const words = {\"name\":[{\"text\":\"Statac\"}],\"building\":[{\"text\":\"Building\"}],"
+            ) && client.body.contains(
+                "\"warnings\":{\"one\":[{\"text\":\"{n} warning\"}],\"many\":[{\"text\":\"{n} warnings\"}]},"
+            ) && client.body.contains(
+                "\"layoutFrom\":[{\"text\":\"Layout \"},{\"code\":\"{name}\"},{\"text\":\", from \"},\
+                 {\"code\":\"{file}\"}],"
+            ),
+            "{}",
+            client.body
+        );
+        // Every word the client asks for by its name is one it is handed.
+        let words = super::super::panel::words();
+        for asking in ["told(\"", "say(\"", "woven(\""] {
+            for (at, _) in CLIENT.match_indices(asking) {
+                let name = &CLIENT[at + asking.len()..];
+                let name = &name[..name.find('"').unwrap()];
+                assert!(words.contains(&format!("\"{name}\":")), "{name}");
+            }
+        }
     }
 
     #[test]

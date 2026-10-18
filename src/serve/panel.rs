@@ -5,7 +5,8 @@
 //! place. Whatever comes from the site is text a page sets as text, never
 //! as markup, and is shown as a terminal is shown it. A sentence of
 //! Statac's own goes as its pieces, each name apart from the words round
-//! it, where a terminal is shown it in backticks.
+//! it, where a terminal is shown it in backticks. The panel's own words
+//! are handed to the page once, in the script that draws it.
 
 mod page;
 mod problems;
@@ -17,11 +18,9 @@ use std::sync::{Arc, OnceLock};
 use super::live::json_string;
 use super::session::{Read, Round, Took};
 use crate::content::address::on_the_wire;
-use crate::origin::Arrival;
 use crate::problem::{Code, Problem, Severity};
 use crate::report::{Piece, Quiet, Report, pieces, shown};
-use crate::templates::{Explained, Held, Row};
-use crate::wording;
+use crate::wording::{self, PanelWord};
 use problems::{Addresses, Parts};
 
 /// The most problems the panel is handed at once.
@@ -59,37 +58,17 @@ pub struct Besides<'a> {
 }
 
 struct Stopped {
-    /// When it stopped, and how many errors stopped it.
-    line: String,
-    /// The first error, for the line a closed panel shows.
-    first: Option<First>,
-    /// How many errors there are after the first.
-    more: usize,
-    /// Each error, drawn as `check` draws it.
-    drawn: String,
     /// When it stopped, and each error in its parts, with its kind.
     at: String,
     errors: Vec<(Code, String)>,
 }
 
-struct First {
-    headline: String,
-    /// Its file and line; empty for an error in no file.
-    location: String,
-    /// Its suggestion; empty where it has none.
-    suggestion: String,
-}
-
 #[derive(Default)]
 struct Built {
     /// When, by this machine's clock; empty before any round has built.
-    line: String,
-    /// The time alone; empty likewise.
     at: String,
     /// What there is to say of a page, by the file it is published as.
     pages: HashMap<String, Page>,
-    /// The site's problems counted by kind, a line for each severity.
-    counts: Vec<String>,
     drafts: Vec<Link>,
     waiting: Vec<Link>,
     /// The site as that round read it, and its folder.
@@ -107,17 +86,14 @@ struct Built {
 struct Page {
     draft: bool,
     waiting: Option<String>,
-    /// Its problems, drawn as `check` draws them; empty where it has none.
-    drawn: String,
     /// Its problems, quietened ones among them.
     problems: Vec<Problem>,
 }
 
 struct Link {
-    text: String,
-    href: String,
-    /// What it names, and the day it waits for, apart.
+    /// What it names, and the day it waits for.
     named: String,
+    href: String,
     day: Option<String>,
 }
 
@@ -141,7 +117,6 @@ impl Panel {
         let stopped = round.outcome.stopped();
         let outcome = &round.outcome;
         let report = Report::new(outcome.sources(), site, false);
-        let unquietened = |problem: &&Problem| !outcome.quiet.quietens(&problem.kind);
         let written: Vec<String> = report
             .stamps(&round.stamps)
             .lines()
@@ -185,11 +160,8 @@ impl Panel {
             root: Some(shown(&whole(site))),
         };
         if stopped {
-            let errors: Vec<&Problem> = (outcome.problems.iter())
-                .filter(|problem| problem.kind.severity() == Severity::Error)
-                .collect();
-            let kept = !before.built.line.is_empty();
-            let ordered = report.ordered(errors.iter().copied());
+            let errors = (outcome.problems.iter())
+                .filter(|problem| problem.kind.severity() == Severity::Error);
             let addresses = OnceLock::new();
             let parts = Parts {
                 report: &report,
@@ -197,55 +169,21 @@ impl Panel {
                 read: round.read.as_ref(),
                 addresses: &addresses,
             };
-            let first = ordered.first().copied();
             panel.stopped = Some(Stopped {
-                line: wording::panel_stopped(&at, errors.len(), kept),
-                first: first.map(|first| First {
-                    headline: shown(&first.headline()),
-                    location: report.location(first).unwrap_or_default(),
-                    suggestion: first.suggestion().map(|it| shown(&it)).unwrap_or_default(),
-                }),
-                more: errors.len().saturating_sub(1),
-                drawn: report.problems(errors.iter().copied()),
-                errors: (ordered.iter())
+                errors: (report.ordered(errors).iter())
                     .map(|error| (error.kind.code(), parts.of(error)))
                     .collect(),
                 at,
             });
             return panel;
         }
-        let count = |severity| {
-            let of = |problem: &&Problem| problem.kind.severity() == severity;
-            outcome
-                .problems
-                .iter()
-                .filter(unquietened)
-                .filter(of)
-                .count()
-        };
-        let line = wording::panel_built(
-            &at,
-            count(Severity::Error),
-            count(Severity::Warning),
-            count(Severity::Note),
-        );
-        let link = |noted: &super::session::Noted, day: Option<&str>| {
-            let named = noted.title.as_deref().unwrap_or(&noted.address);
-            let text = match day {
-                Some(day) => format!("{named} ({day})"),
-                None => named.to_owned(),
-            };
-            Link {
-                text: shown(&text),
-                href: on_the_wire(&format!("{base}{}", noted.address)),
-                named: shown(named),
-                day: day.map(str::to_owned),
-            }
+        let link = |noted: &super::session::Noted, day: Option<&str>| Link {
+            named: shown(noted.title.as_deref().unwrap_or(&noted.address)),
+            href: on_the_wire(&format!("{base}{}", noted.address)),
+            day: day.map(str::to_owned),
         };
         let mut built = Built {
-            line,
             at,
-            counts: report.counted(&outcome.problems, &outcome.quiet),
             site: site.to_owned(),
             kinds: problems::kinds(&outcome.problems, &outcome.quiet),
             ..Built::default()
@@ -259,7 +197,6 @@ impl Panel {
             let page = Page {
                 draft: noted.draft,
                 waiting: noted.waiting,
-                drawn: report.problems(noted.problems.iter().filter(unquietened)),
                 problems: noted.problems,
             };
             built.pages.insert(noted.file, page);
@@ -298,53 +235,6 @@ impl Panel {
     pub fn to_json(&self, file: Option<&str>) -> String {
         let built = &self.built;
         let page = file.and_then(|file| built.pages.get(file));
-        let mut line = match &self.stopped {
-            Some(_) => wording::PANEL_LINE_STOPPED.to_owned(),
-            None => built.line.clone(),
-        };
-        match page {
-            Some(page) if page.draft => line.push_str(&format!(" {}", wording::PANEL_DRAFT)),
-            Some(Page {
-                waiting: Some(day), ..
-            }) => line.push_str(&format!(" {}", wording::panel_waiting(day))),
-            _ => {}
-        }
-        let mut sections = Vec::new();
-        let mut error = "null".to_owned();
-        if let Some(stopped) = &self.stopped {
-            let said = [stopped.line.clone()];
-            sections.push(section(wording::PANEL_STOPPED, &said, &stopped.drawn, &[]));
-            if let Some(first) = &stopped.first {
-                let more = match stopped.more {
-                    0 => String::new(),
-                    more => wording::panel_more_errors(more),
-                };
-                error = format!(
-                    "{{\"headline\":{},\"location\":{},\"suggestion\":{},\"more\":{}}}",
-                    pieced(&first.headline),
-                    json_string(&first.location),
-                    pieced(&first.suggestion),
-                    pieced(&more),
-                );
-            }
-        }
-        if file.is_some() && !built.line.is_empty() {
-            let mut lines = Vec::new();
-            let mut drawn = "";
-            if let Some(page) = page {
-                if page.draft {
-                    lines.push(wording::PANEL_IS_DRAFT.to_owned());
-                }
-                if let Some(day) = &page.waiting {
-                    lines.push(wording::panel_is_waiting(day));
-                }
-                drawn = &page.drawn;
-            }
-            if drawn.is_empty() {
-                lines.push(wording::PANEL_PAGE_CLEAR.to_owned());
-            }
-            sections.push(section(wording::PANEL_PAGE, &lines, drawn, &[]));
-        }
         let explained = built.read.as_ref().and_then(|read| {
             let &(page, number) = read.pages.get(file?)?;
             Some((read, read.renderer.explained(page, number)))
@@ -353,8 +243,6 @@ impl Panel {
         let mut names = "[]".to_owned();
         if let Some((read, explained)) = explained {
             let report = Report::new(read.renderer.sources(), &built.site, false);
-            sections.push(comes_from(&report, &explained));
-            sections.push(shows(&report, &explained));
             let output = (read.built.iter()).find(|output| Some(output.file.as_str()) == file);
             let on = page::On {
                 report: &report,
@@ -368,28 +256,8 @@ impl Panel {
             facts = on.facts(page.is_some_and(|page| page.draft), waiting);
             names = on.names();
         }
-        if !built.line.is_empty() {
-            let lines = match built.counts.is_empty() {
-                true => vec![wording::NO_PROBLEMS.to_owned()],
-                false => built.counts.clone(),
-            };
-            let lists = [
-                (wording::PANEL_DRAFTS, &built.drafts),
-                (wording::PANEL_WAITING, &built.waiting),
-            ];
-            sections.push(section(wording::PANEL_SITE, &lines, "", &lists));
-        }
-        if !self.written.is_empty() {
-            sections.push(section(wording::PANEL_WRITTEN, &self.written, "", &[]));
-        }
         format!(
-            "{{\"v\":2,\"line\":{},\"stopped\":{},\"error\":{error},\"show\":{},\"hide\":{},\"name\":{},\"sections\":[{}],{},\"page\":{facts},\"names\":{names}}}",
-            pieced(&line),
-            self.stopped.is_some(),
-            json_string(wording::PANEL_SHOW),
-            json_string(wording::PANEL_HIDE),
-            json_string(wording::PANEL_NAME),
-            sections.join(","),
+            "{{\"v\":2,{},\"page\":{facts},\"names\":{names}}}",
             self.parts(page),
         )
     }
@@ -447,7 +315,7 @@ impl Panel {
         );
         let or_null = |json: Option<String>| json.unwrap_or_else(|| "null".to_owned());
         format!(
-            "\"problems\":[{}],\"stoppedBy\":{stopped},\"explanations\":{},\"round\":{},\
+            "\"problems\":[{}],\"stopped\":{stopped},\"explanations\":{},\"round\":{},\
              \"rounds\":[{}],\"site\":{site},\"root\":{}",
             problems.join(","),
             problems::explanations(codes),
@@ -484,142 +352,6 @@ fn whole(site: &Path) -> String {
     }
 }
 
-/// What builds the page and which lists hold it, a label and what it
-/// names on each line.
-fn comes_from(report: &Report, explained: &Explained) -> String {
-    let file = match explained.source {
-        Some(source) => format!("`{}`", report.file(source)),
-        None => wording::PANEL_NO_FILE.to_owned(),
-    };
-    let layout = match &explained.layout {
-        Some(chosen) => {
-            let written = chosen.origin.place.map(|place| report.at(place));
-            let handed_down = chosen.origin.arrival == Arrival::HandedDown;
-            wording::panel_layout(&shown(&chosen.name), written.as_deref(), handed_down)
-        }
-        None => wording::PANEL_NO_LAYOUT.to_owned(),
-    };
-    let lists: Vec<String> = (explained.lists.iter())
-        .map(|member| {
-            wording::panel_member(member.word, &shown(&member.list), member.at, member.of)
-        })
-        .collect();
-    let feeds: Vec<String> = (explained.feeds.iter())
-        .map(|feed| format!("`{}`", shown(feed)))
-        .collect();
-    let or = |said: Vec<String>, none: &str| match said.is_empty() {
-        true => vec![none.to_owned()],
-        false => said,
-    };
-    let facts = [
-        (wording::PANEL_FILE, vec![file]),
-        (
-            wording::PANEL_ADDRESS,
-            vec![format!("`{}`", shown(&explained.address))],
-        ),
-        (wording::PANEL_LAYOUT, vec![layout]),
-        (wording::PANEL_LISTS, or(lists, wording::PANEL_IN_NO_LIST)),
-        (wording::PANEL_FEEDS, or(feeds, wording::PANEL_IN_NO_FEED)),
-    ];
-    let facts: Vec<String> = (facts.iter())
-        .map(|(label, said)| {
-            let lines: Vec<String> = said.iter().map(|line| pieced(line)).collect();
-            format!(
-                "{{\"label\":{},\"said\":[{}]}}",
-                json_string(label),
-                lines.join(",")
-            )
-        })
-        .collect();
-    format!(
-        "{{\"heading\":{},\"lines\":[],\"drawn\":\"\",\"lists\":[],\"facts\":[{}]}}",
-        json_string(wording::PANEL_FROM),
-        facts.join(","),
-    )
-}
-
-/// Every name a template can write on the page, a table for `page` and
-/// one for `site`.
-fn shows(report: &Report, explained: &Explained) -> String {
-    let tables: Vec<String> = (explained.groups.iter())
-        .map(|group| {
-            let empty = |row: &&Row| row.held == Held::Nothing;
-            let rows: Vec<String> = (group.rows.iter())
-                .map(|row| {
-                    let holds = page::holds(row.holds);
-                    let value = page::value(row);
-                    let has = match row.has.is_empty() {
-                        true => String::new(),
-                        false => wording::panel_has(&row.has),
-                    };
-                    let from = row.from.map(|place| report.at(place)).unwrap_or_default();
-                    format!(
-                        "{{\"name\":{},\"holds\":{},\"value\":{},\"empty\":{},\"has\":{},\"from\":{}}}",
-                        json_string(&shown(&row.name)),
-                        json_string(holds),
-                        json_string(&value),
-                        row.held == Held::Nothing,
-                        pieced(&has),
-                        json_string(&from),
-                    )
-                })
-                .collect();
-            let caption = wording::panel_group(
-                group.of,
-                group.rows.len(),
-                group.rows.iter().filter(empty).count(),
-            );
-            format!(
-                "{{\"caption\":{},\"rows\":[{}]}}",
-                pieced(&caption),
-                rows.join(",")
-            )
-        })
-        .collect();
-    let columns: Vec<String> = (wording::PANEL_COLUMNS.iter())
-        .map(|column| json_string(column))
-        .collect();
-    format!(
-        "{{\"heading\":{},\"lines\":[{}],\"drawn\":\"\",\"lists\":[],\"columns\":[{}],\"tables\":[{}]}}",
-        json_string(wording::PANEL_SHOWS),
-        pieced(wording::PANEL_SHOWS_HOW),
-        columns.join(","),
-        tables.join(","),
-    )
-}
-
-/// One part of the panel: its heading, its lines, what is drawn beneath
-/// them, and its lists of links, each under its own line.
-fn section(heading: &str, lines: &[String], drawn: &str, lists: &[(&str, &Vec<Link>)]) -> String {
-    let lines: Vec<String> = lines.iter().map(|line| pieced(line)).collect();
-    let lists: Vec<String> = (lists.iter())
-        .filter(|(_, links)| !links.is_empty())
-        .map(|(label, links)| {
-            let links: Vec<String> = (links.iter())
-                .map(|link| {
-                    format!(
-                        "{{\"text\":{},\"href\":{}}}",
-                        json_string(&link.text),
-                        json_string(&link.href)
-                    )
-                })
-                .collect();
-            format!(
-                "{{\"label\":{},\"links\":[{}]}}",
-                pieced(label),
-                links.join(",")
-            )
-        })
-        .collect();
-    format!(
-        "{{\"heading\":{},\"lines\":[{}],\"drawn\":{},\"lists\":[{}]}}",
-        json_string(heading),
-        lines.join(","),
-        json_string(drawn.trim_end()),
-        lists.join(","),
-    )
-}
-
 /// A sentence of Statac's own as JSON: its pieces in order, each a name,
 /// `{"code": ...}`, or the words between, `{"text": ...}`.
 fn pieced(sentence: &str) -> String {
@@ -630,4 +362,25 @@ fn pieced(sentence: &str) -> String {
         })
         .collect();
     format!("[{}]", pieces.join(","))
+}
+
+/// Every word the panel puts together for itself, as a JSON object of
+/// each by its name: a sentence's pieces, or for a count, the pieces said
+/// of one and of any other number.
+pub fn words() -> &'static str {
+    static WORDS: OnceLock<String> = OnceLock::new();
+    WORDS.get_or_init(|| {
+        let words: Vec<String> = (wording::panel_words().into_iter())
+            .map(|(name, word)| {
+                let said = match word {
+                    PanelWord::Said(said) => pieced(&said),
+                    PanelWord::Counted(one, many) => {
+                        format!("{{\"one\":{},\"many\":{}}}", pieced(one), pieced(many))
+                    }
+                };
+                format!("{}:{said}", json_string(name))
+            })
+            .collect();
+        format!("{{{}}}", words.join(","))
+    })
 }

@@ -49,6 +49,8 @@ pub struct Reply {
     pub kind: Kind,
     /// The site's files that changed since the asker's generation.
     pub changed: Vec<String>,
+    /// Whether a round is building now.
+    pub building: bool,
     pub status: Status,
 }
 
@@ -68,6 +70,7 @@ struct State {
     status: Status,
     panel: Arc<Panel>,
     waiting: usize,
+    building: bool,
 }
 
 impl Default for Hub {
@@ -91,6 +94,7 @@ impl Hub {
                 status: Status::default(),
                 panel: Arc::default(),
                 waiting: 0,
+                building: false,
             }),
             moved: Condvar::new(),
         }
@@ -126,6 +130,16 @@ impl Hub {
         Arc::clone(&self.state().panel)
     }
 
+    /// Whether a round is building, which answers every held request
+    /// that asked to be told.
+    pub fn set_building(&self, building: bool) {
+        let mut state = self.state();
+        if state.building != building {
+            state.building = building;
+            self.moved.notify_all();
+        }
+    }
+
     /// Records a round, answers every held request, and gives the round's
     /// generation.
     pub fn publish(&self, told: Told, changed: Vec<String>, status: Status) -> u64 {
@@ -139,17 +153,19 @@ impl Hub {
             }
         }
         state.status = status;
+        state.building = false;
         self.moved.notify_all();
         generation
     }
 
     /// Answers at once when a round has run since `since`, and otherwise
-    /// holds until one does or `longest` passes.
-    pub fn wait(&self, since: u64, longest: Duration) -> Reply {
+    /// holds until one does or `longest` passes. Given whether the asker
+    /// knows a round to be building, it answers too once that isn't so.
+    pub fn wait(&self, since: u64, building: Option<bool>, longest: Duration) -> Reply {
         let deadline = Instant::now() + longest;
         let mut state = self.state();
         state.waiting += 1;
-        while state.generation == since {
+        while state.generation == since && building.is_none_or(|known| known == state.building) {
             let left = deadline.saturating_duration_since(Instant::now());
             if left.is_zero() {
                 break;
@@ -171,6 +187,7 @@ fn reply(state: &State, since: u64) -> Reply {
         generation,
         kind,
         changed,
+        building: state.building,
         status: state.status.clone(),
     };
     if since == generation {
@@ -226,10 +243,11 @@ impl Reply {
         let changed: Vec<String> = self.changed.iter().map(|path| json_string(path)).collect();
         format!(
             "{{\"generation\":{},\"kind\":\"{kind}\",\"styles\":[{}],\"changed\":[{}],\
-             \"status\":{{\"stopped\":{},\"line\":{},\"problems\":{}}}}}",
+             \"building\":{},\"status\":{{\"stopped\":{},\"line\":{},\"problems\":{}}}}}",
             self.generation,
             styles.join(","),
             changed.join(","),
+            self.building,
             self.status.stopped,
             json_string(&self.status.line),
             json_string(&self.status.problems),
@@ -265,7 +283,7 @@ mod tests {
     }
 
     fn asked(hub: &Hub, since: u64) -> Reply {
-        hub.wait(since, Duration::ZERO)
+        hub.wait(since, None, Duration::ZERO)
     }
 
     #[test]
@@ -359,13 +377,40 @@ mod tests {
         let since = hub.generation();
         let asker = {
             let hub = hub.clone();
-            std::thread::spawn(move || hub.wait(since, Duration::from_secs(10)))
+            std::thread::spawn(move || hub.wait(since, None, Duration::from_secs(10)))
         };
         while hub.waiting() == 0 {
             std::thread::yield_now();
         }
+        // One that didn't ask to be told of building isn't.
+        hub.set_building(true);
         hub.publish(Told::Reload, vec![], Status::default());
-        assert_eq!(asker.join().unwrap().kind, Kind::Reload);
+        let reply = asker.join().unwrap();
+        assert_eq!((reply.kind, reply.building), (Kind::Reload, false));
+    }
+
+    #[test]
+    fn a_held_ask_is_answered_when_a_round_starts_building_and_ends() {
+        let hub = std::sync::Arc::new(Hub::new());
+        let since = hub.generation();
+        let ask = |building| {
+            let hub = hub.clone();
+            std::thread::spawn(move || hub.wait(since, Some(building), Duration::from_secs(10)))
+        };
+        let asker = ask(false);
+        while hub.waiting() == 0 {
+            std::thread::yield_now();
+        }
+        hub.set_building(true);
+        let reply = asker.join().unwrap();
+        assert_eq!((reply.kind, reply.building), (Kind::None, true));
+        let asker = ask(true);
+        while hub.waiting() == 0 {
+            std::thread::yield_now();
+        }
+        hub.set_building(false);
+        let reply = asker.join().unwrap();
+        assert_eq!((reply.kind, reply.building), (Kind::None, false));
     }
 
     #[test]
@@ -374,6 +419,7 @@ mod tests {
             generation: 7,
             kind: Kind::Styles(vec![("/a \"1\".css".into(), "/a.css".into())]),
             changed: vec!["content/a\\b.md".into()],
+            building: true,
             status: Status {
                 stopped: false,
                 line: "one\ntwo".into(),
@@ -384,7 +430,7 @@ mod tests {
             reply.to_json(),
             "{\"generation\":7,\"kind\":\"styles\",\
              \"styles\":[[\"/a \\\"1\\\".css\",\"/a.css\"]],\
-             \"changed\":[\"content/a\\\\b.md\"],\
+             \"changed\":[\"content/a\\\\b.md\"],\"building\":true,\
              \"status\":{\"stopped\":false,\"line\":\"one\\u000atwo\",\
              \"problems\":\"\\u003c/script>\"}}"
         );

@@ -625,85 +625,62 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     );
     let plain = panel(&served, "/post-1/");
     assert!(
-        plain.starts_with("{\"v\":2,\"line\":[{\"text\":\"Built at "),
+        plain.starts_with(
+            "{\"v\":2,\"problems\":[],\"stopped\":null,\"explanations\":{},\
+             \"round\":{\"state\":\"built\",\"at\":\""
+        ) && plain.contains("\"counts\":{\"error\":0,\"warning\":1,\"note\":1}}")
+            && plain.contains(
+                "\"site\":{\"kinds\":[\
+                 {\"kind\":\"broken-link\",\"severity\":\"warning\",\"title\":\"Broken link\",\
+                 \"count\":1,\"quietened\":0},\
+                 {\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
+                 \"count\":1,\"quietened\":0}],\"gone\":null,\
+                 \"drafts\":[{\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}],\
+                 \"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
+                 \"written\":[]},"
+            ),
         "{plain}"
     );
+    // What builds the page, then every name its template can write, with
+    // what each holds here and where that is written.
     assert!(
         plain.contains(
-            "1 warning, 1 note.\"}],\"stopped\":false,\"error\":null,\"show\":\"Show details\",\
-             \"hide\":\"Hide details\",\"name\":\"Statac\",\"sections\":[\
-             {\"heading\":\"This page\",\"lines\":[[{\"text\":\"No problems on this page.\"}]],\
-             \"drawn\":\"\",\"lists\":[]},\
-             {\"heading\":\"Where this page comes from\","
+            "\"page\":{\"title\":\"Post 1\",\"draft\":false,\"waiting\":null,\
+             \"file\":\"content/post-1.md\",\"address\":\"/post-1/\","
         ) && plain.contains(
-            "{\"heading\":\"The site\",\"lines\":[[{\"text\":\"1 warning: 1 broken-link.\"}],\
-             [{\"text\":\"1 note: 1 no-site-address.\"}]],\"drawn\":\"\",\
-             \"lists\":[{\"label\":[{\"text\":\"Drafts:\"}],\"links\":[\
-             {\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}]},\
-             {\"label\":[{\"text\":\"Waiting for their day:\"}],\"links\":[\
-             {\"text\":\"Post 3 (2999-01-01)\",\"href\":\"/post-3/\"}]}]}],\
-             \"problems\":[],\"stoppedBy\":null,\"explanations\":{},"
-        ) && plain.contains(
-            "\"site\":{\"kinds\":[\
-             {\"kind\":\"broken-link\",\"severity\":\"warning\",\"title\":\"Broken link\",\
-             \"count\":1,\"quietened\":0},\
-             {\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
-             \"count\":1,\"quietened\":0}],\"gone\":null,\
-             \"drafts\":[{\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}],\
-             \"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
-             \"written\":[]},"
-        ),
-        "{plain}"
-    );
-    // What builds the page and holds it, then every name its template
-    // can write, with what each holds here and where that is written.
-    assert!(
-        plain.contains(
-            "\"facts\":[{\"label\":\"File\",\"said\":[[{\"code\":\"content/post-1.md\"}]]},\
-             {\"label\":\"Address\",\"said\":[[{\"code\":\"/post-1/\"}]]},\
-             {\"label\":\"Layout\",\"said\":[[{\"code\":\"page\"},\
-             {\"text\":\", the file \"},{\"code\":\"templates/page.html\"},\
-             {\"text\":\", as nothing names one.\"}]]},"
-        ) && plain.contains(
-            "{\"heading\":\"What a template can show here\",\
-             \"lines\":[[{\"text\":\"Every name a template can write on this page, \
-             and what each holds here.\"}]],\"drawn\":\"\",\"lists\":[],\
-             \"columns\":[\"Write\",\"Holds\",\"On this page\",\"Written at\"],\
-             \"tables\":[{\"caption\":[{\"code\":\"page\"},{\"text\":\": "
+            "\"layout\":{\"name\":\"page\",\"file\":\"templates/page.html\",\"extends\":[],\
+             \"chosenAt\":null,\"handedDown\":false}"
         ) && plain.contains(
             "{\"name\":\"page.summary\",\"holds\":\"text\",\"value\":\"no value\",\
-             \"empty\":true,\"has\":[],\"from\":\"\"}"
+             \"empty\":true,\"has\":[],\"from\":null,"
         ) && plain.contains("{\"name\":\"page.url\",\"holds\":\"text\",\"value\":\"/post-1/\","),
         "{plain}"
     );
     let draft = panel(&served, "/post-2/");
     assert!(
-        draft.contains("1 warning, 1 note. Draft.\"}],\"stopped\":false")
+        draft.contains("\"problems\":[],\"stopped\":null,")
             && draft.contains(
-                "{\"heading\":\"This page\",\
-                 \"lines\":[[{\"text\":\"A draft: \"},{\"code\":\"statac build\"},\
-                 {\"text\":\" leaves it out.\"}],\
-                 [{\"text\":\"No problems on this page.\"}]],\"drawn\":\"\",\"lists\":[]}"
+                "\"page\":{\"title\":\"Post \\u003c2>\",\"draft\":true,\"waiting\":null,"
             ),
         "{draft}"
     );
-    // By the file's own name too, and with what the page itself is told.
+    // By the file's own name too, with the page's own problem.
     let waiting = panel(&served, "/post-3/index.html");
     assert!(
-        waiting.contains("1 warning, 1 note. Waiting for 2999-01-01.\"}],\"stopped\":false")
+        waiting
+            .contains("\"page\":{\"title\":\"Post 3\",\"draft\":false,\"waiting\":\"2999-01-01\",")
             && waiting.contains(
-                "\"lines\":[[{\"text\":\"Waiting for its day, 2999-01-01: \"},\
-                 {\"code\":\"statac build\"},{\"text\":\" leaves it out until then.\"}]],\
-                 \"drawn\":\"warning  Broken link: nothing is published at `/post-9/`"
+                "\"problems\":[{\"severity\":\"warning\",\"kind\":\"broken-link\",\
+                 \"headline\":[{\"text\":\"Broken link: nothing is published at \"},\
+                 {\"code\":\"/post-9/\"}],\"file\":\"content/post-3.md\","
             ),
         "{waiting}"
     );
     // An address with no page at it is told of the site alone.
     let nowhere = panel(&served, "/site.css");
     assert!(
-        !nowhere.contains("This page")
-            && !nowhere.contains("What a template can show here")
-            && nowhere.contains("The site"),
+        nowhere.contains("\"site\":{\"kinds\":[{\"kind\":\"broken-link\",")
+            && nowhere.ends_with("\"page\":null,\"names\":[]}"),
         "{nowhere}"
     );
 
@@ -717,25 +694,18 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     served.said.after(mark, "unclear-date/\n\n");
     let stopped = panel(&served, "/post-2/");
     assert!(
-        stopped.starts_with(
-            "{\"v\":2,\"line\":[{\"text\":\"Build stopped. Draft.\"}],\"stopped\":true,\
-             \"error\":{\"headline\":[{\"text\":\"Unclear date: \"},{\"code\":\"4/10/2026\"},\
-             {\"text\":\" could be 4 October or 10 April\"}],\
-             \"location\":\"content/post-1.md, line 2\",\
-             \"suggestion\":[{\"text\":\"Write it as \"},{\"code\":\"2026-10-04\"},\
-             {\"text\":\" or \"},{\"code\":\"2026-04-10\"},{\"text\":\".\"}],\"more\":[]},"
-        ) && stopped.contains(
-            "\"sections\":[{\"heading\":\"What stopped the build\",\
-                 \"lines\":[[{\"text\":\"1 error stopped the build at "
-        ) && stopped.contains(
-            ". This page is as last built.\"}]],\
-                 \"drawn\":\"error  Unclear date: `4/10/2026` could be 4 October or 10 April"
-        ) && stopped.contains("{\"heading\":\"This page\",\"lines\":[[{\"text\":\"A draft: ")
+        stopped.contains("\"stopped\":{\"at\":\"")
             && stopped.contains(
-                "{\"heading\":\"Written into your files\",\
-                 \"lines\":[[{\"text\":\"Stamped \"},{\"code\":\"content/post-1.md\"},\
-                 {\"text\":\": \"},{\"code\":\"updated\"},{\"text\":\" is \"},{\"code\":\""
+                "\"errors\":[{\"severity\":\"error\",\"kind\":\"unclear-date\",\
+             \"headline\":[{\"text\":\"Unclear date: \"},{\"code\":\"4/10/2026\"},\
+             {\"text\":\" could be 4 October or 10 April\"}],\
+             \"file\":\"content/post-1.md\",\"line\":2,"
             )
+            && stopped.contains(
+                "\"suggestion\":[{\"text\":\"Write it as \"},{\"code\":\"2026-10-04\"},\
+             {\"text\":\" or \"},{\"code\":\"2026-04-10\"},{\"text\":\".\"}],"
+            )
+            && stopped.contains("\"page\":{\"title\":\"Post \\u003c2>\",\"draft\":true,")
             && stopped.contains(
                 "\"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
                  \"written\":[[{\"text\":\"Stamped \"},{\"code\":\"content/post-1.md\"},\
@@ -776,7 +746,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     let at = between(&built, "\"round\":{\"state\":\"built\",\"at\":\"", "\"").to_owned();
     assert!(
         built.contains(&format!(
-            "\"problems\":[{link}],\"stoppedBy\":null,\"explanations\":{{\
+            "\"problems\":[{link}],\"stopped\":null,\"explanations\":{{\
              \"broken-link\":{{\"title\":\"Broken link\",\"opening\":[{{\"said\":[\
              {{\"text\":\"A link, or a page's \"}},{{\"code\":\"redirect_to\"}},\
              {{\"text\":\", points at an address on this site, but nothing is published at \
@@ -837,10 +807,10 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     );
     served.said.after(mark, "unknown-word/\n");
     let stopped = panel(&served, "/post-2/");
-    let then = between(&stopped, "\"stoppedBy\":{\"at\":\"", "\"").to_owned();
+    let then = between(&stopped, "\"stopped\":{\"at\":\"", "\"").to_owned();
     assert!(
         stopped.contains(&format!(
-            "\"problems\":[{link}],\"stoppedBy\":{{\"at\":\"{then}\",\"errors\":[\
+            "\"problems\":[{link}],\"stopped\":{{\"at\":\"{then}\",\"errors\":[\
              {{\"severity\":\"error\",\"kind\":\"unknown-word\",\
              \"headline\":[{{\"text\":\"Unknown field: \"}},{{\"code\":\"page.sumary\"}}],\
              \"file\":\"templates/page.html\",\"line\":4,\"column\":11,\"excerpt\":[\
@@ -879,7 +849,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     let now = between(&mended, "\"round\":{\"state\":\"built\",\"at\":\"", "\"").to_owned();
     assert!(
         mended.contains(
-            "\"stoppedBy\":null,\"explanations\":{\"broken-link\":{\"title\":\"Broken link\","
+            "\"stopped\":null,\"explanations\":{\"broken-link\":{\"title\":\"Broken link\","
         ) && mended.contains(&format!("\"builtAt\":\"{now}\""))
             && mended.contains(&format!(
                 "\"rounds\":[{{\"state\":\"built\",\"at\":\"{now}\",\
@@ -939,6 +909,16 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
              \"statac.yaml\",\"templates/base.html\",\"templates/post.html\"],\
              \"also\":[[{\"text\":\"The order of the pages in their lists\"}]]}},\
              \"names\":[{\"group\":\"page\",\"count\":"
+        ),
+        "{post}"
+    );
+    // A call is written with its brackets, empty where it takes nothing.
+    assert!(
+        post.contains(
+            "{\"name\":\"page.audio\",\"written\":\"page.audio(\u{2026})\",\"holds\":\"call\",\
+             \"value\":\"called, not shown\","
+        ) && post.contains(
+            "{\"name\":\"page.search_box\",\"written\":\"page.search_box()\",\"holds\":\"call\","
         ),
         "{post}"
     );
@@ -1036,7 +1016,7 @@ fn asked_for_no_drafts_serve_shows_what_a_build_publishes() {
     assert!(said.contains("1 note: 1 draft-left-out."), "{said}");
     let (status, _) = get(served.port, "/post-2/");
     assert!(status.contains("404"), "{status}");
-    assert!(!panel(&served, "/post-1/").contains("Drafts:"));
+    assert!(panel(&served, "/post-1/").contains("\"drafts\":[],\"waiting\":[],"));
 }
 
 /// A file's name is the site's own text: it reaches neither the terminal
@@ -1212,9 +1192,8 @@ fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
     let id = between(&second, "id: ", "\n");
     assert!(served.page("/feed.xml").contains(&format!("urn:uuid:{id}")));
     assert!(panel(&served, "/post-2/").contains(
-        "{\"heading\":\"Written into your files\",\
-             \"lines\":[[{\"text\":\"Wrote an \"},{\"code\":\"id\"},\
-             {\"text\":\" into \"},{\"code\":\"content/post-2.md\"},{\"text\":\".\"}]]"
+        "\"written\":[[{\"text\":\"Wrote an \"},{\"code\":\"id\"},\
+         {\"text\":\" into \"},{\"code\":\"content/post-2.md\"},{\"text\":\".\"}]]"
     ));
     assert_eq!(
         std::fs::read_to_string(served.site.path("content/post-1.md")).unwrap(),

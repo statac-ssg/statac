@@ -61,7 +61,7 @@ pub(super) const PAGE_ANSWERS: &[&str] = &[
 ];
 
 /// What a page is asked for a search box by.
-pub(super) const SEARCH_BOX: &str = "search_box";
+pub(crate) const SEARCH_BOX: &str = "search_box";
 
 /// The names a page answers with more than its front matter writes under
 /// them, or with something else: every name [`PageValue::answer`] has an

@@ -22,6 +22,7 @@ use crate::problem::{
 use crate::publish::Occupant;
 use crate::serve::live::Told;
 use crate::serve::watch::Because;
+use crate::templates::Holds;
 use crate::yaml::{JsonFault, Malformed, Repeated};
 
 const EXPLANATIONS: &str = "https://statac.dev/e/";
@@ -3717,58 +3718,7 @@ pub(crate) const BROWSER_KEEPS: &str = "The browser keeps the pages as last buil
 /// After a round of `serve` that stopped, on the page.
 pub(crate) const PAGE_KEPT: &str = "This page is as last built.";
 
-/// The panel's line on a page `serve` answers, for a site built at
-/// `time` with this many problems of each severity shown.
-pub(crate) fn panel_built(time: &str, errors: usize, warnings: usize, notes: usize) -> String {
-    let mut counts = Vec::new();
-    for (n, one, many) in [
-        (errors, "error", "errors"),
-        (warnings, "warning", "warnings"),
-        (notes, "note", "notes"),
-    ] {
-        if n > 0 {
-            counts.push(how_many(n, one, many));
-        }
-    }
-    match counts.is_empty() {
-        true => format!("Built at {time}. {NO_PROBLEMS}"),
-        false => format!("Built at {time}. {}.", counts.join(", ")),
-    }
-}
-
-/// The panel's line for a build that stopped at `time`. `kept` is whether
-/// an earlier build's pages are still answered.
-pub(crate) fn panel_stopped(time: &str, errors: usize, kept: bool) -> String {
-    let stopped = format!(
-        "{} stopped the build at {time}.",
-        how_many(errors, "error", "errors")
-    );
-    match kept {
-        true => format!("{stopped} {PAGE_KEPT}"),
-        false => stopped,
-    }
-}
-
-/// What opens the panel's line where a build stopped, ahead of the first
-/// error's own words, and what closes it where there are more.
-pub(crate) const PANEL_LINE_STOPPED: &str = "Build stopped.";
-pub(crate) fn panel_more_errors(more: usize) -> String {
-    format!("And {}.", how_many(more, "more error", "more errors"))
-}
-
-/// After the panel's line, on a page a build leaves out.
-pub(crate) const PANEL_DRAFT: &str = "Draft.";
-pub(crate) fn panel_waiting(day: &str) -> String {
-    format!("Waiting for {day}.")
-}
-
-/// The panel's button, closed and open, and what the panel is called.
-pub(crate) const PANEL_SHOW: &str = "Show details";
-pub(crate) const PANEL_HIDE: &str = "Hide details";
-pub(crate) const PANEL_NAME: &str = NAME;
-
-/// The headings in the panel.
-pub(crate) const PANEL_STOPPED: &str = "What stopped the build";
+/// What the panel on a served page calls the page it is on and the site.
 pub(crate) const PANEL_PAGE: &str = "This page";
 pub(crate) const PANEL_SITE: &str = "The site";
 pub(crate) const PANEL_WRITTEN: &str = "Written into your files";
@@ -3782,37 +3732,13 @@ pub(crate) const PANEL_PAGE_CLEAR: &str = "No problems on this page.";
 
 /// The panel's account of the page it is on: what builds it and which
 /// lists hold it.
-pub(crate) const PANEL_FROM: &str = "Where this page comes from";
 pub(crate) const PANEL_FILE: &str = "File";
 pub(crate) const PANEL_ADDRESS: &str = "Address";
 pub(crate) const PANEL_LAYOUT: &str = "Layout";
-pub(crate) const PANEL_LISTS: &str = "Lists";
 pub(crate) const PANEL_FEEDS: &str = "Feeds";
 pub(crate) const PANEL_NO_FILE: &str = "None: Statac made this page.";
 pub(crate) const PANEL_NO_LAYOUT: &str = "None.";
-pub(crate) const PANEL_IN_NO_LIST: &str = "None.";
 pub(crate) const PANEL_IN_NO_FEED: &str = "None.";
-
-/// The template building a page, and what chose it: where its name is
-/// written, on the page or handed down to it, or that nothing names one.
-pub(crate) fn panel_layout(name: &str, written: Option<&str>, handed_down: bool) -> String {
-    let template = format!("`{name}`, the file `templates/{name}.html`");
-    match (written, handed_down) {
-        (Some(at), false) => format!("{template}, named at {at}."),
-        (Some(at), true) => format!("{template}, handed down from {at}."),
-        (None, _) => format!("{template}, as nothing names one."),
-    }
-}
-
-/// A list a page is in, and where it comes among the list's posts.
-pub(crate) fn panel_member(word: Word, name: &str, at: usize, of: usize) -> String {
-    format!(
-        "{}: {} of {}.",
-        panel_list(word, name),
-        grouped(at),
-        grouped(of)
-    )
-}
 
 /// A list a page is in, as the panel names it.
 pub(crate) fn panel_list(word: Word, name: &str) -> String {
@@ -3837,27 +3763,38 @@ pub(crate) fn panel_read_field(name: &str) -> String {
 }
 
 /// The panel's table of every name a template can write on the page.
-pub(crate) const PANEL_SHOWS: &str = "What a template can show here";
-pub(crate) const PANEL_SHOWS_HOW: &str =
-    "Every name a template can write on this page, and what each holds here.";
 pub(crate) const PANEL_COLUMNS: [&str; 4] = ["Write", "Holds", "On this page", "Written at"];
 pub(crate) const PANEL_NO_VALUE: &str = "no value";
 pub(crate) const PANEL_FIELDS_BELOW: &str = "the fields beneath";
 pub(crate) const PANEL_A_CALL: &str = "called, not shown";
 
-/// What heads one group of the table: whose names they are, how many, and
-/// how many hold nothing on this page.
-pub(crate) fn panel_group(of: &str, names: usize, empty: usize) -> String {
-    let names = how_many(names, "name", "names");
-    match empty {
-        0 => format!("`{of}`: {names}"),
-        _ => format!("`{of}`: {names}, {} with no value", grouped(empty)),
+/// What a name holds, in a word or two; nothing where that isn't known.
+pub(crate) fn panel_holds(holds: Holds) -> &'static str {
+    match holds {
+        Holds::Text => "text",
+        Holds::Html => "HTML",
+        Holds::Number => "number",
+        Holds::Truth => "true or false",
+        Holds::Date => "date",
+        Holds::Page => "page",
+        Holds::Pages => "pages",
+        Holds::List | Holds::Items => "list",
+        Holds::Lists => "lists",
+        Holds::Fields => "fields",
+        Holds::Mentions => "webmentions",
+        Holds::Call => "call",
+        Holds::Unknown => "",
     }
 }
 
 /// A list a name holds, counted in what it holds.
-pub(crate) fn panel_count(count: usize, one: &str, many: &str) -> String {
-    how_many(count, one, many)
+pub(crate) fn panel_count(holds: Holds, count: usize) -> String {
+    match holds {
+        Holds::Pages => how_many(count, "page", "pages"),
+        Holds::Lists => how_many(count, "list", "lists"),
+        Holds::Mentions => how_many(count, "mention", "mentions"),
+        _ => how_many(count, "item", "items"),
+    }
 }
 
 /// After the fields of a value with more than the panel shows.
@@ -3865,15 +3802,280 @@ pub(crate) fn panel_more_fields(more: usize) -> String {
     format!("and {}", how_many(more, "more field", "more fields"))
 }
 
-/// The names a value answers in turn, each as it follows the value's own.
-pub(crate) fn panel_has(names: &[String]) -> String {
-    let names: Vec<String> = names.iter().map(|name| format!(".{name}")).collect();
-    format!("Also {}", names.join(" "))
-}
-
 /// Above the panel's links to the pages a build leaves out.
 pub(crate) const PANEL_DRAFTS: &str = "Drafts:";
 pub(crate) const PANEL_WAITING: &str = "Waiting for their day:";
+
+/// A word of the panel's, which the page fills in where it has holes,
+/// each written as `{name}` with a count's as `{n}`.
+pub(crate) enum PanelWord {
+    Said(String),
+    /// Said of one, and of any other count.
+    Counted(&'static str, &'static str),
+}
+
+/// Every word the panel on a served page shows that the page itself puts
+/// together, by the name the page knows it by.
+pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
+    use PanelWord::{Counted, Said};
+    let said = |text: &str| Said(text.to_owned());
+    vec![
+        // The tab, closed, and what a screen reader is told of it.
+        ("name", said(NAME)),
+        ("building", said("Building")),
+        ("buildStopped", said("Build stopped")),
+        ("draft", said("Draft")),
+        ("waits", said("Waits for {day}")),
+        ("tabLabel", said("Statac: {said}. Open the panel")),
+        ("labelBuiltAt", said("built at {time}")),
+        ("labelBuilding", said("building")),
+        ("labelStopped", said("build stopped")),
+        ("labelDraft", said("a draft")),
+        ("labelWaits", said("waits for {day}")),
+        ("errors", Counted("{n} error", "{n} errors")),
+        ("warnings", Counted("{n} warning", "{n} warnings")),
+        ("notes", Counted("{n} note", "{n} notes")),
+        // The summary the tab shows under a pointer or focus.
+        ("builtAt", said("Built at {time}")),
+        ("stoppedAt", said("Build stopped at {time}")),
+        (
+            "errorsElsewhere",
+            Counted(
+                "{n} error elsewhere on the site",
+                "{n} errors elsewhere on the site",
+            ),
+        ),
+        (
+            "warningsElsewhere",
+            Counted(
+                "{n} warning elsewhere on the site",
+                "{n} warnings elsewhere on the site",
+            ),
+        ),
+        (
+            "notesElsewhere",
+            Counted(
+                "{n} note elsewhere on the site",
+                "{n} notes elsewhere on the site",
+            ),
+        ),
+        ("clickToOpen", said("Click to open")),
+        // The card a stopped build opens.
+        ("pageKept", said(PAGE_KEPT)),
+        ("atOf", said("{at} of {of}")),
+        ("previousError", said("Previous error")),
+        ("nextError", said("Next error")),
+        ("putAway", said("Put the card away")),
+        ("place", said("{file}, line {line}")),
+        ("holdsHere", said("On this page it holds {value}.")),
+        ("holdsNothing", said("On this page it holds no value.")),
+        ("showInNames", said("Show in Names")),
+        ("explain", said("What it means, and how to fix it")),
+        ("allProblems", said("All problems")),
+        ("builtThis", said("While building this page")),
+        (
+            "builtThisAnd",
+            said("While building this page, and {n} more:"),
+        ),
+        ("builtOn", said("While building")),
+        ("builtMore", said("and {n} more")),
+        ("more", Said(more("{link}"))),
+        ("quietened", said("Quietened in `statac.yaml`")),
+        // The drawer, and its tabs.
+        ("problems", said("Problems")),
+        ("names", said("Names")),
+        ("page", said(PANEL_PAGE)),
+        ("site", said(PANEL_SITE)),
+        ("parts", said("What the panel shows")),
+        (
+            "statusStopped",
+            said("Stopped at {time}; the page is as built at {built}"),
+        ),
+        ("statusStoppedFirst", said("Stopped at {time}")),
+        ("find", said("Find a name")),
+        ("findHow", said("Find a name or a value")),
+        ("settings", said("Settings")),
+        ("dockSide", said("Dock to the side")),
+        ("dockBottom", said("Dock to the bottom")),
+        ("close", said("Close the panel")),
+        ("resize", said("Resize the panel")),
+        // Problems.
+        ("onThisPage", said("On this page")),
+        ("wholeSite", said("The whole site")),
+        ("errorsShown", said("Errors")),
+        ("warningsShown", said("Warnings")),
+        ("notesShown", said("Notes")),
+        ("goneNone", said("Gone since the last build: none.")),
+        ("times", Counted("{title}, once", "{title}, {n} times")),
+        ("pageClear", said(PANEL_PAGE_CLEAR)),
+        ("siteClear", said(NO_PROBLEMS)),
+        ("filteredOut", said("The filters hide every problem here.")),
+        ("onlyKind", said("Only {title}")),
+        ("everyKind", said("Show every kind")),
+        (
+            "moreProblems",
+            said("And {n} more, which `statac check` shows."),
+        ),
+        ("asking", said("Asking serve for the site's problems.")),
+        ("aboutKind", said("About this kind of problem")),
+        ("fromExplain", said("From `statac explain {kind}`")),
+        ("howToFix", said("How to fix it")),
+        ("readOnline", said("Read it on statac.dev")),
+        // Names.
+        ("held", said("{held} of {count} hold a value")),
+        ("found", said("{n} found")),
+        ("hideEmpty", said("Hide names with no value here")),
+        ("onlyUsed", said("Only names this page uses")),
+        ("layoutFrom", said("Layout `{name}`, from `{file}`")),
+        ("columnWrite", said(PANEL_COLUMNS[0])),
+        ("columnHolds", said(PANEL_COLUMNS[1])),
+        ("columnHere", said(PANEL_COLUMNS[2])),
+        ("columnAt", said(PANEL_COLUMNS[3])),
+        ("holdsUnknown", said("nothing yet")),
+        (
+            "noMatch",
+            said(
+                "No name here matches \u{201c}{query}\u{201d}. Names are written as a \
+                 template writes them, like `page.title`.",
+            ),
+        ),
+        ("noneLeft", said("The filters leave no name here.")),
+        ("noPage", said("No page is published at this address.")),
+        ("chosen", said("The chosen name")),
+        ("copy", said("Copy")),
+        ("copied", said("Copied")),
+        ("here", said("Here")),
+        (
+            "uses",
+            said("Uses it: the page read it while it was built."),
+        ),
+        ("usesNot", said("Doesn't use it.")),
+        ("answers", said("It answers these in turn")),
+        ("ways", said("Ways to write it")),
+        ("wayAsWritten", said("As the site writes dates")),
+        ("wayYear", said("Only the year, written by example")),
+        ("wayTime", said("In a time element, for machines to read")),
+        ("wayEachPost", said("Each post in it")),
+        ("wayLink", said("A link to it")),
+        ("wayEachList", said("A link to each")),
+        ("wayEachPage", said("Each page")),
+        ("wayLinkIf", said("A link to it, where there is one")),
+        ("wayTrue", said("Only where it is true")),
+        ("wayHtml", said("As it is, as HTML")),
+        ("wayFaces", said("Each face of those who replied or liked")),
+        ("wayEachItem", said("Each item in it")),
+        ("wayHasOne", said("Only on the pages that have one")),
+        ("wayAsIs", said("As it is")),
+        // This page.
+        ("published", said("Published by `statac build`")),
+        ("isDraft", said(PANEL_IS_DRAFT)),
+        ("isWaiting", Said(panel_is_waiting("{day}"))),
+        ("file", said(PANEL_FILE)),
+        ("address", said(PANEL_ADDRESS)),
+        ("layout", said(PANEL_LAYOUT)),
+        ("language", said("Language")),
+        ("feeds", said(PANEL_FEEDS)),
+        ("noFile", said(PANEL_NO_FILE)),
+        ("noLayout", said(PANEL_NO_LAYOUT)),
+        ("noFeed", said(PANEL_IN_NO_FEED)),
+        ("extends", said("extends")),
+        ("layoutNamed", said("Named `layout: {name}` at {place}.")),
+        (
+            "layoutHanded",
+            said("Named `layout: {name}` at {place}, and handed down to every page in the folder."),
+        ),
+        (
+            "layoutUnnamed",
+            said("Nothing names one, so it is `{name}`."),
+        ),
+        ("leftToRight", said("{tag}, left to right")),
+        ("rightToLeft", said("{tag}, right to left")),
+        ("inLists", Counted("In {n} list", "In {n} lists")),
+        ("inNoList", said("In no list")),
+        ("previous", said("Previous: {title}")),
+        ("next", said("Next: {title}")),
+        ("rebuilt", said("Rebuilt when these change")),
+        (
+            "rebuiltHow",
+            said("What building this page read, from serve's own record."),
+        ),
+        (
+            "errorsHere",
+            Counted("{n} error on this page", "{n} errors on this page"),
+        ),
+        (
+            "warningsHere",
+            Counted("{n} warning on this page", "{n} warnings on this page"),
+        ),
+        (
+            "notesHere",
+            Counted("{n} note on this page", "{n} notes on this page"),
+        ),
+        ("show", said("Show")),
+        // The site.
+        ("lastRound", said("The last round")),
+        ("changedOne", said("`{file}` changed.")),
+        ("changedTwo", said("`{file}` and `{other}` changed.")),
+        ("changedMany", said("`{file}` and {n} other files changed.")),
+        ("tookBefore", said("Getting ready")),
+        ("tookReading", said("Reading")),
+        ("tookComparing", said("Comparing")),
+        ("tookBuilding", said("Building")),
+        ("tookConcluding", said("Concluding")),
+        ("tookWriting", said("Writing")),
+        ("ms", said("{n} ms")),
+        ("rounds", said("Rounds since serve started")),
+        ("acrossSite", said("Problems across the site")),
+        ("leftOut", said("Left out of `statac build`")),
+        ("drafts", said(PANEL_DRAFTS)),
+        ("waiting", said(PANEL_WAITING)),
+        (
+            "leftOutNone",
+            said(
+                "No drafts, and no page waits for its day. A page with `draft: true`, or a \
+                 date after today, is listed here with a link to it.",
+            ),
+        ),
+        ("written", said(PANEL_WRITTEN)),
+        (
+            "writtenNone",
+            said(
+                "Nothing this round. When a stamp such as `=today` is turned into a date, \
+                 the file and line show here.",
+            ),
+        ),
+        // Settings.
+        ("settingsLabel", said("Panel settings")),
+        ("sits", said("Where the panel sits")),
+        ("corner", said("Corner")),
+        ("bar", said("Bar")),
+        ("side", said("Side")),
+        ("whichCorner", said("Which corner")),
+        ("bottomLeft", said("Bottom left")),
+        ("bottomRight", said("Bottom right")),
+        ("topLeft", said("Top left")),
+        ("topRight", said("Top right")),
+        ("colours", said("Colours")),
+        ("system", said("As the system")),
+        ("light", said("Light")),
+        ("dark", said("Dark")),
+        ("whenStopped", said("When a build stops")),
+        ("openCard", said("Open the error card")),
+        ("tabOnly", said("Only turn the tab red")),
+        ("hide", said("Hide until I reload")),
+        ("shortcut", said("Shortcut")),
+        ("change", said("Change")),
+        (
+            "pressKeys",
+            said("Press the new keys, or Esc to keep these"),
+        ),
+        ("alt", said("Alt")),
+        ("shift", said("Shift")),
+        ("ctrl", said("Ctrl")),
+        ("meta", said("Meta")),
+        ("keptHere", said("Kept in this browser.")),
+    ]
+}
 
 /// The problems a round of `serve` no longer has, counted by kind.
 pub(crate) fn gone(kinds: &[(&str, usize)]) -> String {

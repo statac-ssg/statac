@@ -335,15 +335,6 @@ impl<'a> Report<'a> {
         out
     }
 
-    /// The problems counted by kind as `build` counts them, a line for
-    /// each severity that has any.
-    pub fn counted(&self, problems: &[Problem], quiet: &Quiet) -> Vec<String> {
-        let all = [Severity::Error, Severity::Warning, Severity::Note];
-        let counts = counts(&problems.iter().collect::<Vec<_>>(), quiet, &all);
-        let lines = counts.into_iter().map(|(line, _)| format!("{line}."));
-        lines.collect()
-    }
-
     /// What `check` says: every problem not quietened in full, then the count.
     pub fn check(&self, problems: &[Problem], quiet: &Quiet) -> String {
         self.check_with(problems, quiet, &[])
@@ -421,21 +412,6 @@ impl<'a> Report<'a> {
     /// A file of the site, as a problem names it.
     pub fn file(&self, source: SourceId) -> String {
         self.path(source)
-    }
-
-    /// The file and line of a place.
-    pub fn at(&self, place: Place) -> String {
-        wording::location(&self.path(place.source), self.first_line(place))
-    }
-
-    /// The file and line a problem is placed at; none for one in no file.
-    pub fn location(&self, problem: &Problem) -> Option<String> {
-        problem
-            .place
-            .map(|place| match problem.kind.of_a_whole_file() {
-                true => self.path(place.source),
-                false => self.at(place),
-            })
     }
 
     /// One problem in full.

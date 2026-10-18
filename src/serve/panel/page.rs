@@ -12,7 +12,7 @@ use crate::reads::{Asked, Key, Reads};
 use crate::report::{Report, shown};
 use crate::serve::live::json_string;
 use crate::source::Place;
-use crate::templates::{Explained, Held, Holds, Neighbour, Reached, Renderer, Row};
+use crate::templates::{Explained, Held, Holds, Neighbour, Reached, Renderer, Row, SEARCH_BOX};
 use crate::wording;
 
 /// The page as the last round to build it left it.
@@ -117,10 +117,22 @@ impl On<'_> {
             Reached::Site(name) => asked.asked_site(*name),
             Reached::Data(files) => files.iter().any(|&file| asked.reached(file)),
         });
+        // A call is written with its brackets, which hold what it takes.
+        let written = match row.holds {
+            Holds::Call => {
+                let takes = !row.name.ends_with(&format!(".{SEARCH_BOX}"));
+                let brackets = if takes { "(\u{2026})" } else { "()" };
+                format!(
+                    ",\"written\":{}",
+                    json_string(&shown(&format!("{}{brackets}", row.name)))
+                )
+            }
+            _ => String::new(),
+        };
         format!(
-            "{{\"name\":{},\"holds\":{},\"value\":{},\"empty\":{},\"has\":[{}],\"from\":{},\"used\":{used}}}",
+            "{{\"name\":{}{written},\"holds\":{},\"value\":{},\"empty\":{},\"has\":[{}],\"from\":{},\"used\":{used}}}",
             json_string(&shown(&row.name)),
-            json_string(holds(row.holds)),
+            json_string(wording::panel_holds(row.holds)),
             json_string(&value(row)),
             row.held == Held::Nothing,
             has.join(","),
@@ -257,40 +269,11 @@ fn or_null(text: Option<&str>) -> String {
     text.map_or_else(|| "null".to_owned(), json_string)
 }
 
-/// What a name holds, in a word or two.
-pub(super) fn holds(holds: Holds) -> &'static str {
-    match holds {
-        Holds::Text => "text",
-        Holds::Html => "HTML",
-        Holds::Number => "number",
-        Holds::Truth => "true or false",
-        Holds::Date => "date",
-        Holds::Page => "page",
-        Holds::Pages => "pages",
-        Holds::List => "list",
-        Holds::Lists => "lists",
-        Holds::Items => "list",
-        Holds::Fields => "fields",
-        Holds::Mentions => "webmentions",
-        Holds::Call => "call",
-        Holds::Unknown => "",
-    }
-}
-
 /// What a name holds on the page, as the panel shows it.
 pub(super) fn value(row: &Row) -> String {
-    let count = |one: &str, many: &str| match row.held {
-        Held::Count(count) => wording::panel_count(count, one, many),
-        _ => String::new(),
-    };
     match &row.held {
         Held::Shown(text) => shown(text),
-        Held::Count(_) => match row.holds {
-            Holds::Pages => count("page", "pages"),
-            Holds::Lists => count("list", "lists"),
-            Holds::Mentions => count("mention", "mentions"),
-            _ => count("item", "items"),
-        },
+        Held::Count(count) => wording::panel_count(row.holds, *count),
         Held::Fields => wording::PANEL_FIELDS_BELOW.to_owned(),
         Held::Call => wording::PANEL_A_CALL.to_owned(),
         Held::More(more) => wording::panel_more_fields(*more),

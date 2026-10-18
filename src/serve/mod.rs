@@ -342,6 +342,7 @@ impl Serving {
         }
 
         let started = Instant::now();
+        self.hub.set_building(true);
         let round = self.session.rebuild_for_saying(&batch.changed, &mut || {
             say(out, &format!("{}\n", wording::WAITING));
         });
@@ -370,6 +371,7 @@ impl Serving {
         // own writing can cause. A round that changed nothing the author
         // can see found no save, and says nothing.
         if batch.changed.is_empty() && !stopped && told == Told::Nothing && more.is_empty() {
+            self.hub.set_building(false);
             return true;
         }
         let report = Report::new(&sources, &self.options.site, self.colour);
