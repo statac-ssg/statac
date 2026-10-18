@@ -199,25 +199,38 @@
     return made;
   };
 
+  // A sentence of serve's comes as pieces: words, and names to show as code.
+  const pieces = (sentence) =>
+    sentence.map((piece) =>
+      "code" in piece ? element("code", piece.code) : document.createTextNode(piece.text),
+    );
+  const spoken = (name, sentence) => {
+    const made = element(name);
+    made.append(...pieces(sentence));
+    return made;
+  };
+  const plain = (sentence) => sentence.map((piece) => piece.code ?? piece.text).join("");
+
   const draw = (panel) => {
     words = panel;
     brand.textContent = panel.name;
     // The first error is said on the line itself, with where it is and
     // what to do about it.
     const error = panel.error;
-    said.textContent = error ? `${panel.line} ${error.headline}` : panel.line;
+    said.replaceChildren(...pieces(panel.line));
+    if (error) said.append(" ", ...pieces(error.headline));
     where.textContent = error ? error.location : "";
-    help.textContent = error ? error.suggestion : "";
-    more.textContent = error ? error.more : "";
+    help.replaceChildren(...pieces(error ? error.suggestion : []));
+    more.replaceChildren(...pieces(error ? error.more : []));
     bar.classList.toggle("stopped", panel.stopped);
     details.setAttribute("aria-label", panel.name);
     const sections = panel.sections.map((section, at) => {
       const parts = [];
       parts.push(element("h2", section.heading));
-      for (const text of section.lines) parts.push(element("p", text));
+      for (const sentence of section.lines) parts.push(spoken("p", sentence));
       if (section.drawn) parts.push(element("pre", section.drawn));
       for (const list of section.lists) {
-        parts.push(element("p", list.label));
+        parts.push(spoken("p", list.label));
         const items = element("ul");
         for (const link of list.links) {
           const item = element("li");
@@ -233,7 +246,7 @@
       if (section.facts) {
         const facts = element("dl");
         for (const fact of section.facts) {
-          const said = fact.said.map((text) => element("dd", text));
+          const said = fact.said.map((sentence) => spoken("dd", sentence));
           facts.append(element("dt", fact.label), ...said);
         }
         parts.push(facts);
@@ -241,7 +254,7 @@
       for (const table of section.tables || []) {
         // Closed until asked for, and as it was left across a reload.
         const group = element("details");
-        const key = `${kept}-${table.caption.split(":")[0]}`;
+        const key = `${kept}-${plain(table.caption).split(":")[0]}`;
         try {
           group.open = localStorage.getItem(key) === "open";
         } catch {}
@@ -265,7 +278,7 @@
           name.append(element("code", row.name));
           const value = element("td", row.value);
           if (row.empty) value.className = "none";
-          if (row.has) value.append(element("small", row.has));
+          if (row.has.length) value.append(spoken("small", row.has));
           const from = element("td", row.from);
           from.className = "from";
           line.append(name, element("td", row.holds), value, from);
@@ -274,7 +287,7 @@
         const top = element("thead");
         top.append(head);
         made.append(top, body);
-        group.append(element("summary", table.caption), made);
+        group.append(spoken("summary", table.caption), made);
         parts.push(group);
       }
       const within = element("section");
@@ -284,7 +297,7 @@
       return within;
     });
     details.replaceChildren(...sections);
-    bar.hidden = !panel.line;
+    bar.hidden = !panel.line.length;
     show(open, false);
     place();
   };

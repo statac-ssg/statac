@@ -3,7 +3,9 @@
 //!
 //! Everything is worked out here and handed to the page as text for it to
 //! place. Whatever comes from the site is text a page sets as text, never
-//! as markup, and is shown as a terminal is shown it.
+//! as markup, and is shown as a terminal is shown it. A sentence of
+//! Statac's own goes as its pieces, each name apart from the words round
+//! it, where a terminal is shown it in backticks.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -14,7 +16,7 @@ use super::session::{Read, Round};
 use crate::content::address::on_the_wire;
 use crate::origin::Arrival;
 use crate::problem::{Problem, Severity};
-use crate::report::{Report, shown};
+use crate::report::{Piece, Report, pieces, shown};
 use crate::templates::{Explained, Held, Holds, Row};
 use crate::wording;
 
@@ -199,10 +201,10 @@ impl Panel {
                 };
                 error = format!(
                     "{{\"headline\":{},\"location\":{},\"suggestion\":{},\"more\":{}}}",
-                    json_string(&first.headline),
+                    pieced(&first.headline),
                     json_string(&first.location),
-                    json_string(&first.suggestion),
-                    json_string(&more),
+                    pieced(&first.suggestion),
+                    pieced(&more),
                 );
             }
         }
@@ -247,8 +249,8 @@ impl Panel {
             sections.push(section(wording::PANEL_WRITTEN, &self.written, "", &[]));
         }
         format!(
-            "{{\"line\":{},\"stopped\":{},\"error\":{error},\"show\":{},\"hide\":{},\"name\":{},\"sections\":[{}]}}",
-            json_string(&line),
+            "{{\"v\":2,\"line\":{},\"stopped\":{},\"error\":{error},\"show\":{},\"hide\":{},\"name\":{},\"sections\":[{}]}}",
+            pieced(&line),
             self.stopped.is_some(),
             json_string(wording::PANEL_SHOW),
             json_string(wording::PANEL_HIDE),
@@ -297,11 +299,11 @@ fn comes_from(report: &Report, explained: &Explained) -> String {
     ];
     let facts: Vec<String> = (facts.iter())
         .map(|(label, said)| {
-            let said: Vec<String> = said.iter().map(|line| json_string(line)).collect();
+            let lines: Vec<String> = said.iter().map(|line| pieced(line)).collect();
             format!(
                 "{{\"label\":{},\"said\":[{}]}}",
                 json_string(label),
-                said.join(",")
+                lines.join(",")
             )
         })
         .collect();
@@ -364,7 +366,7 @@ fn shows(report: &Report, explained: &Explained) -> String {
                         json_string(holds),
                         json_string(&value),
                         row.held == Held::Nothing,
-                        json_string(&has),
+                        pieced(&has),
                         json_string(&from),
                     )
                 })
@@ -376,7 +378,7 @@ fn shows(report: &Report, explained: &Explained) -> String {
             );
             format!(
                 "{{\"caption\":{},\"rows\":[{}]}}",
-                json_string(&caption),
+                pieced(&caption),
                 rows.join(",")
             )
         })
@@ -387,7 +389,7 @@ fn shows(report: &Report, explained: &Explained) -> String {
     format!(
         "{{\"heading\":{},\"lines\":[{}],\"drawn\":\"\",\"lists\":[],\"columns\":[{}],\"tables\":[{}]}}",
         json_string(wording::PANEL_SHOWS),
-        json_string(wording::PANEL_SHOWS_HOW),
+        pieced(wording::PANEL_SHOWS_HOW),
         columns.join(","),
         tables.join(","),
     )
@@ -396,7 +398,7 @@ fn shows(report: &Report, explained: &Explained) -> String {
 /// One part of the panel: its heading, its lines, what is drawn beneath
 /// them, and its lists of links, each under its own line.
 fn section(heading: &str, lines: &[String], drawn: &str, lists: &[(&str, &Vec<Link>)]) -> String {
-    let lines: Vec<String> = lines.iter().map(|line| json_string(line)).collect();
+    let lines: Vec<String> = lines.iter().map(|line| pieced(line)).collect();
     let lists: Vec<String> = (lists.iter())
         .filter(|(_, links)| !links.is_empty())
         .map(|(label, links)| {
@@ -411,7 +413,7 @@ fn section(heading: &str, lines: &[String], drawn: &str, lists: &[(&str, &Vec<Li
                 .collect();
             format!(
                 "{{\"label\":{},\"links\":[{}]}}",
-                json_string(label),
+                pieced(label),
                 links.join(",")
             )
         })
@@ -423,4 +425,16 @@ fn section(heading: &str, lines: &[String], drawn: &str, lists: &[(&str, &Vec<Li
         json_string(drawn.trim_end()),
         lists.join(","),
     )
+}
+
+/// A sentence of Statac's own as JSON: its pieces in order, each a name,
+/// `{"code": ...}`, or the words between, `{"text": ...}`.
+fn pieced(sentence: &str) -> String {
+    let pieces: Vec<String> = (pieces(sentence).into_iter())
+        .map(|piece| match piece {
+            Piece::Name(name) => format!("{{\"code\":{}}}", json_string(name)),
+            Piece::Words(words) => format!("{{\"text\":{}}}", json_string(words)),
+        })
+        .collect();
+    format!("[{}]", pieces.join(","))
 }

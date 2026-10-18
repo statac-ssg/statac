@@ -624,20 +624,23 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
         "{said}"
     );
     let plain = panel(&served, "/post-1/");
-    assert!(plain.starts_with("{\"line\":\"Built at "), "{plain}");
+    assert!(
+        plain.starts_with("{\"v\":2,\"line\":[{\"text\":\"Built at "),
+        "{plain}"
+    );
     assert!(
         plain.contains(
-            "1 warning, 1 note.\",\"stopped\":false,\"error\":null,\"show\":\"Show details\",\
+            "1 warning, 1 note.\"}],\"stopped\":false,\"error\":null,\"show\":\"Show details\",\
              \"hide\":\"Hide details\",\"name\":\"Statac\",\"sections\":[\
-             {\"heading\":\"This page\",\"lines\":[\"No problems on this page.\"],\
+             {\"heading\":\"This page\",\"lines\":[[{\"text\":\"No problems on this page.\"}]],\
              \"drawn\":\"\",\"lists\":[]},\
              {\"heading\":\"Where this page comes from\","
         ) && plain.ends_with(
-            "{\"heading\":\"The site\",\"lines\":[\"1 warning: 1 broken-link.\",\
-             \"1 note: 1 no-site-address.\"],\"drawn\":\"\",\
-             \"lists\":[{\"label\":\"Drafts:\",\"links\":[\
+            "{\"heading\":\"The site\",\"lines\":[[{\"text\":\"1 warning: 1 broken-link.\"}],\
+             [{\"text\":\"1 note: 1 no-site-address.\"}]],\"drawn\":\"\",\
+             \"lists\":[{\"label\":[{\"text\":\"Drafts:\"}],\"links\":[\
              {\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}]},\
-             {\"label\":\"Waiting for their day:\",\"links\":[\
+             {\"label\":[{\"text\":\"Waiting for their day:\"}],\"links\":[\
              {\"text\":\"Post 3 (2999-01-01)\",\"href\":\"/post-3/\"}]}]}]}"
         ),
         "{plain}"
@@ -646,39 +649,41 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     // can write, with what each holds here and where that is written.
     assert!(
         plain.contains(
-            "\"facts\":[{\"label\":\"File\",\"said\":[\"`content/post-1.md`\"]},\
-             {\"label\":\"Address\",\"said\":[\"`/post-1/`\"]},\
-             {\"label\":\"Layout\",\"said\":[\"`page`, the file `templates/page.html`, \
-             as nothing names one.\"]},"
+            "\"facts\":[{\"label\":\"File\",\"said\":[[{\"code\":\"content/post-1.md\"}]]},\
+             {\"label\":\"Address\",\"said\":[[{\"code\":\"/post-1/\"}]]},\
+             {\"label\":\"Layout\",\"said\":[[{\"code\":\"page\"},\
+             {\"text\":\", the file \"},{\"code\":\"templates/page.html\"},\
+             {\"text\":\", as nothing names one.\"}]]},"
         ) && plain.contains(
             "{\"heading\":\"What a template can show here\",\
-             \"lines\":[\"Every name a template can write on this page, \
-             and what each holds here.\"],\"drawn\":\"\",\"lists\":[],\
+             \"lines\":[[{\"text\":\"Every name a template can write on this page, \
+             and what each holds here.\"}]],\"drawn\":\"\",\"lists\":[],\
              \"columns\":[\"Write\",\"Holds\",\"On this page\",\"Written at\"],\
-             \"tables\":[{\"caption\":\"`page`: "
+             \"tables\":[{\"caption\":[{\"code\":\"page\"},{\"text\":\": "
         ) && plain.contains(
             "{\"name\":\"page.summary\",\"holds\":\"text\",\"value\":\"no value\",\
-             \"empty\":true,\"has\":\"\",\"from\":\"\"}"
+             \"empty\":true,\"has\":[],\"from\":\"\"}"
         ) && plain.contains("{\"name\":\"page.url\",\"holds\":\"text\",\"value\":\"/post-1/\","),
         "{plain}"
     );
     let draft = panel(&served, "/post-2/");
     assert!(
-        draft.contains("1 warning, 1 note. Draft.\",\"stopped\":false")
+        draft.contains("1 warning, 1 note. Draft.\"}],\"stopped\":false")
             && draft.contains(
                 "{\"heading\":\"This page\",\
-                 \"lines\":[\"A draft: `statac build` leaves it out.\",\
-                 \"No problems on this page.\"],\"drawn\":\"\",\"lists\":[]}"
+                 \"lines\":[[{\"text\":\"A draft: \"},{\"code\":\"statac build\"},\
+                 {\"text\":\" leaves it out.\"}],\
+                 [{\"text\":\"No problems on this page.\"}]],\"drawn\":\"\",\"lists\":[]}"
             ),
         "{draft}"
     );
     // By the file's own name too, and with what the page itself is told.
     let waiting = panel(&served, "/post-3/index.html");
     assert!(
-        waiting.contains("1 warning, 1 note. Waiting for 2999-01-01.\",\"stopped\":false")
+        waiting.contains("1 warning, 1 note. Waiting for 2999-01-01.\"}],\"stopped\":false")
             && waiting.contains(
-                "\"lines\":[\"Waiting for its day, 2999-01-01: \
-                 `statac build` leaves it out until then.\"],\
+                "\"lines\":[[{\"text\":\"Waiting for its day, 2999-01-01: \"},\
+                 {\"code\":\"statac build\"},{\"text\":\" leaves it out until then.\"}]],\
                  \"drawn\":\"warning  Broken link: nothing is published at `/post-9/`"
             ),
         "{waiting}"
@@ -703,20 +708,23 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     let stopped = panel(&served, "/post-2/");
     assert!(
         stopped.starts_with(
-            "{\"line\":\"Build stopped. Draft.\",\"stopped\":true,\"error\":{\
-             \"headline\":\"Unclear date: `4/10/2026` could be 4 October or 10 April\",\
+            "{\"v\":2,\"line\":[{\"text\":\"Build stopped. Draft.\"}],\"stopped\":true,\
+             \"error\":{\"headline\":[{\"text\":\"Unclear date: \"},{\"code\":\"4/10/2026\"},\
+             {\"text\":\" could be 4 October or 10 April\"}],\
              \"location\":\"content/post-1.md, line 2\",\
-             \"suggestion\":\"Write it as `2026-10-04` or `2026-04-10`.\",\"more\":\"\"},"
+             \"suggestion\":[{\"text\":\"Write it as \"},{\"code\":\"2026-10-04\"},\
+             {\"text\":\" or \"},{\"code\":\"2026-04-10\"},{\"text\":\".\"}],\"more\":[]},"
         ) && stopped.contains(
             "\"sections\":[{\"heading\":\"What stopped the build\",\
-                 \"lines\":[\"1 error stopped the build at "
+                 \"lines\":[[{\"text\":\"1 error stopped the build at "
         ) && stopped.contains(
-            ". This page is as last built.\"],\
+            ". This page is as last built.\"}]],\
                  \"drawn\":\"error  Unclear date: `4/10/2026` could be 4 October or 10 April"
-        ) && stopped.contains("{\"heading\":\"This page\",\"lines\":[\"A draft: ")
+        ) && stopped.contains("{\"heading\":\"This page\",\"lines\":[[{\"text\":\"A draft: ")
             && stopped.contains(
                 "{\"heading\":\"Written into your files\",\
-                 \"lines\":[\"Stamped `content/post-1.md`: `updated` is `"
+                 \"lines\":[[{\"text\":\"Stamped \"},{\"code\":\"content/post-1.md\"},\
+                 {\"text\":\": \"},{\"code\":\"updated\"},{\"text\":\" is \"},{\"code\":\""
             ),
         "{stopped}"
     );
@@ -912,7 +920,8 @@ fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
     assert!(served.page("/feed.xml").contains(&format!("urn:uuid:{id}")));
     assert!(panel(&served, "/post-2/").contains(
         "{\"heading\":\"Written into your files\",\
-             \"lines\":[\"Wrote an `id` into `content/post-2.md`.\"]"
+             \"lines\":[[{\"text\":\"Wrote an \"},{\"code\":\"id\"},\
+             {\"text\":\" into \"},{\"code\":\"content/post-2.md\"},{\"text\":\".\"}]]"
     ));
     assert_eq!(
         std::fs::read_to_string(served.site.path("content/post-1.md")).unwrap(),

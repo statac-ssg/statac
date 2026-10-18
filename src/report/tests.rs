@@ -446,6 +446,32 @@ fn a_run_opens_with_statacs_name_only_where_there_is_colour() {
 }
 
 #[test]
+fn a_sentence_comes_apart_into_its_names_and_the_words_round_them() {
+    use Piece::{Name, Words};
+    assert_eq!(
+        pieces("No `a` in `b`?"),
+        [
+            Words("No "),
+            Name("a"),
+            Words(" in "),
+            Name("b"),
+            Words("?")
+        ]
+    );
+    assert_eq!(pieces("`a`"), [Name("a")]);
+    assert_eq!(
+        pieces("`a` and ` alone"),
+        [Name("a"), Words(" and ` alone")]
+    );
+    assert_eq!(pieces("It ended on `"), [Words("It ended on `")]);
+    assert_eq!(
+        pieces("Empty: ``."),
+        [Words("Empty: "), Name(""), Words(".")]
+    );
+    assert_eq!(pieces(""), []);
+}
+
+#[test]
 fn a_name_in_backticks_is_picked_out_and_a_lone_backtick_is_left() {
     let paint = Paint {
         on: true,

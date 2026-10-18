@@ -780,6 +780,35 @@ struct Cell {
     shown: String,
 }
 
+/// A piece of a sentence of Statac's own.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Piece<'a> {
+    /// A name, written between backticks.
+    Name(&'a str),
+    Words(&'a str),
+}
+
+/// The sentence's names and the words between them, in order. A backtick
+/// with none to close it is a character like any other.
+pub fn pieces(sentence: &str) -> Vec<Piece<'_>> {
+    let mut pieces = Vec::new();
+    let mut rest = sentence;
+    while let Some(open) = rest.find('`') {
+        let Some(close) = rest[open + 1..].find('`') else {
+            break;
+        };
+        if open > 0 {
+            pieces.push(Piece::Words(&rest[..open]));
+        }
+        pieces.push(Piece::Name(&rest[open + 1..open + 1 + close]));
+        rest = &rest[open + 1 + close + 1..];
+    }
+    if !rest.is_empty() {
+        pieces.push(Piece::Words(rest));
+    }
+    pieces
+}
+
 /// Text Statac didn't write, made safe to put on a terminal: a control
 /// character is shown as its picture rather than acted on, and an invisible
 /// one is named.
@@ -1039,14 +1068,11 @@ impl Paint {
             return sentence.to_owned();
         }
         let named = format!("38;{}", self.pick(IN_BACKTICKS));
-        let spans: Vec<&str> = sentence.split('`').collect();
-        let last = spans.len() - 1;
         let mut out = String::new();
-        for (at, span) in spans.into_iter().enumerate() {
-            match (at % 2, at == last) {
-                (1, false) => out.push_str(&self.paint(&named, &format!("`{span}`"))),
-                (1, true) => out.push_str(&self.paint(style, &format!("`{span}"))),
-                _ => out.push_str(&self.paint(style, span)),
+        for piece in pieces(sentence) {
+            match piece {
+                Piece::Name(name) => out.push_str(&self.paint(&named, &format!("`{name}`"))),
+                Piece::Words(words) => out.push_str(&self.paint(style, words)),
             }
         }
         out

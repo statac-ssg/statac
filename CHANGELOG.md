@@ -68,6 +68,9 @@ What changed in each release of Statac, the newest first.
 - `serve` says nothing where the system loses its reports of changes and
   a look finds nothing changed, as serve's own writing on a large site
   can cause as it starts. It said "Files changed" and built nothing.
+- The panel `serve` adds to each page shows each name, such as a field
+  or a file, in a code type, as its terminal picks names out. It showed
+  the backticks round them.
 - A template that can't be read, named by `extends` with a name worked
   out as the template runs, as `{% extends "ho" ~ "me" %}`, is told
   once, where it can't be read. A page built through it also said the

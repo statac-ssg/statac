@@ -1118,7 +1118,7 @@ mod tests {
         // Nothing has been built yet for there to be anything to say.
         assert_eq!(
             answer.body,
-            "{\"line\":\"\",\"stopped\":false,\"error\":null,\"show\":\"Show details\",\
+            "{\"v\":2,\"line\":[],\"stopped\":false,\"error\":null,\"show\":\"Show details\",\
              \"hide\":\"Hide details\",\"name\":\"Statac\",\"sections\":[]}"
         );
     }
