@@ -93,7 +93,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
         },
         Kind::UnknownCommand { written, .. } => format!("Unknown command: `{written}`"),
         Kind::MissingCommand => {
-            "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, `import` or `explain`".into()
+            "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, \
+             `import` or `explain`"
+                .into()
         }
         Kind::UnknownOption { written, hint } => match hint {
             OptionHint::ForOther {
@@ -436,10 +438,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
             ),
         },
         Kind::MissingWords {
-            tag,
-            words,
-            pages,
-            ..
+            tag, words, pages, ..
         } => {
             let pages = how_many(*pages, "page", "pages");
             match words {
@@ -566,11 +565,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
             "Template stopped: {}",
             match reason {
                 Stopped::Engine(detail) => sentence_part(detail),
-                Stopped::Operator { op, left, right } => format!(
-                    "can't use `{op}` on {} and {}",
-                    shape(*left),
-                    shape(*right)
-                ),
+                Stopped::Operator { op, left, right } =>
+                    format!("can't use `{op}` on {} and {}", shape(*left), shape(*right)),
                 Stopped::DividedByZero => "can't divide by zero".into(),
                 Stopped::TooLarge(written) => format!("`{written}` is too large a number"),
                 Stopped::RepeatNotWhole => {
@@ -620,10 +616,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 Stopped::CantNumber { callee, of } => {
                     format!("`{callee}` can't make a number of {}", shape(*of))
                 }
-                Stopped::FormatNeeds { mark, given } => format!(
-                    "`{mark}` in `format` needs a number, not {}",
-                    shape(*given)
-                ),
+                Stopped::FormatNeeds { mark, given } =>
+                    format!("`{mark}` in `format` needs a number, not {}", shape(*given)),
                 Stopped::FormatCharacter(mark) => {
                     format!("`{mark}` in `format` needs one character")
                 }
@@ -984,7 +978,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 "Can't tell what made the site: `{folder}` has no settings file Statac knows"
             ),
             true => format!(
-                "Can't tell what made the site: `{folder}` has the settings files of more than one tool"
+                "Can't tell what made the site: `{folder}` has the settings files of more than \
+                 one tool"
             ),
         },
         Kind::MissingFolder => {
@@ -2130,7 +2125,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::MoreWrittenTwice { .. } => Some("Delete the later one.".into()),
         Kind::MalformedJson { found } => match found {
             JsonFault::UnclosedString => Some("End the text with another `\"`.".into()),
-            JsonFault::UnclosedBracket(open) => Some(format!("Close it with `{}`.", closing(*open))),
+            JsonFault::UnclosedBracket(open) => {
+                Some(format!("Close it with `{}`.", closing(*open)))
+            }
             JsonFault::MismatchedBracket { open, .. } => {
                 Some(format!("Close it with `{}`.", closing(*open)))
             }
@@ -2180,10 +2177,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 }
             }
             OptionHint::None => "Run `statac --help` to see the options.".into(),
-            OptionHint::OnlyWithUpdate => format!(
-                "Add `--update`, or leave `{}` out.",
-                option_name(written)
-            ),
+            OptionHint::OnlyWithUpdate => {
+                format!("Add `--update`, or leave `{}` out.", option_name(written))
+            }
             OptionHint::NotWithUpdate => format!(
                 "`--update` asks nothing, so leave `{}` out.",
                 option_name(written)
@@ -2270,16 +2266,22 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
             markdown::Malformed::TextAfterQuote => "Put the whole value inside the quotes.".into(),
             markdown::Malformed::Name(_) => {
-                r"Name the snippet with the letters a to z, digits and `_`, or write `\@` to show this as text.".into()
+                "Name the snippet with the letters a to z, digits and `_`, or write `\\@` to show \
+                 this as text."
+                    .into()
             }
             markdown::Malformed::NoEnd(_) => {
                 "Put `@end` on a line of its own where the writing it wraps ends.".into()
             }
             markdown::Malformed::StrayEnd => {
-                "Take the line out: only a call to a snippet that shows `body` wraps the writing up to an `@end`.".into()
+                "Take the line out: only a call to a snippet that shows `body` wraps the writing \
+                 up to an `@end`."
+                    .into()
             }
             markdown::Malformed::WrapsNothing(_) => {
-                "Write the call on a line of its own, the writing it wraps below it, and `@end` on a line after that.".into()
+                "Write the call on a line of its own, the writing it wraps below it, and `@end` \
+                 on a line after that."
+                    .into()
             }
             markdown::Malformed::NotOneAddress => "Write it as `@url(/about/)`.".into(),
         }),
@@ -2375,7 +2377,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             SetAside::SendsOn => {
                 Some("Take it out, or take out `redirect_to` to publish the page.".into())
             }
-            SetAside::NotOnCard { nearest: Some(name) } => Some(format!("Did you mean `{name}`?")),
+            SetAside::NotOnCard {
+                nearest: Some(name),
+            } => Some(format!("Did you mean `{name}`?")),
             SetAside::NotOnCard { nearest: None } => Some(
                 "A card reads `background`, `font` and `padding`, and `text`, `place`, `size` \
                  and `colour` for each text."
@@ -2425,10 +2429,14 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 format!("Add `{field}:`, which `statac.yaml` requires on pages of type `{name}`.")
             }
             Requirer::Each => {
-                format!("Add a `{field}:` pattern, such as `/people/{{key}}/`, to give each item its address.")
+                format!(
+                    "Add a `{field}:` pattern, such as `/people/{{key}}/`, to give each item \
+                     its address."
+                )
             }
             Requirer::EachPost => format!(
-                "Add a `{field}:` pattern, such as `/cards/{{name}}/`, to give the page made for each post its address."
+                "Add a `{field}:` pattern, such as `/cards/{{name}}/`, to give the page made for \
+                 each post its address."
             ),
             Requirer::Card => format!("Add `{field}:`, which every card needs."),
             Requirer::CardText => format!("Add `{field}:`, which each text on a card needs."),
@@ -2454,9 +2462,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 Some(format!("Write `{bare}:` in `statac.yaml` instead."))
             }
             WrongPlace::Item => Some("Write it on a page in `content/` instead.".into()),
-            WrongPlace::NoCommand(command) => {
-                Some(format!("Add the `{command}:` line it describes, or take it out."))
-            }
+            WrongPlace::NoCommand(command) => Some(format!(
+                "Add the `{command}:` line it describes, or take it out."
+            )),
             WrongPlace::More(MoreAt::Element(name)) => {
                 Some(format!("Move it outside the `<{name}>`."))
             }
@@ -2531,9 +2539,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::NoPagesInLanguage { tag } => Some(format!(
             "Put the pages written in `{tag}` in `content/{tag}/`."
         )),
-        Kind::LanguageFolderInPattern { without, .. } => {
-            Some(format!("Write it as `{without}`."))
-        }
+        Kind::LanguageFolderInPattern { without, .. } => Some(format!("Write it as `{without}`.")),
         Kind::SameTranslation { tag, by, .. } => Some(match by {
             Translated::Key(_) => format!("Give each page in `{tag}` its own key."),
             Translated::Place(_) => "Rename one of them, or give one a `translation_key`.".into(),
@@ -2565,9 +2571,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                     "Write a name as the snippet reads it, in letters, digits and `_`.".into()
                 }
                 TakesFault::Twice(_) => "Keep one of them.".into(),
-                TakesFault::TooMany => {
-                    "Have calls name the rest, as `caption=...`.".into()
-                }
+                TakesFault::TooMany => "Have calls name the rest, as `caption=...`.".into(),
                 TakesFault::NeverRead(_) | TakesFault::Supplied(_) => {
                     "Take it out of the line.".into()
                 }
@@ -2626,9 +2630,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             },
             ArgumentFault::Twice(_) => Some("Keep one of them.".into()),
             ArgumentFault::Supplied(_) => Some("Take it out of the call.".into()),
-            ArgumentFault::NotGiven(name) => {
-                Some(format!("Write it as `{snippet}({name}=...)`."))
-            }
+            ArgumentFault::NotGiven(name) => Some(format!("Write it as `{snippet}({name}=...)`.")),
             ArgumentFault::Needs(needed) => match needed {
                 Needed::Name(sort) => {
                     let example = match sort {
@@ -2694,9 +2696,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 nearest: Some(nearest),
                 ..
             } => Some(format!("Did you mean `{nearest}`?")),
-            Stopped::NotANamespace(name) => Some(format!(
-                "Make it with `{{% set {name} = namespace() %}}`."
-            )),
+            Stopped::NotANamespace(name) => {
+                Some(format!("Make it with `{{% set {name} = namespace() %}}`."))
+            }
             Stopped::Engine(_)
             | Stopped::NotADate(_)
             | Stopped::ContentInItself
@@ -2738,9 +2740,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             | Stopped::SuperOutside
             | Stopped::CallsTooDeep(_) => None,
             Stopped::CardInWriting => Some("Read `page.card` in a layout.".into()),
-            Stopped::NotText => {
-                Some("Show something else here: a page can only show text.".into())
-            }
+            Stopped::NotText => Some("Show something else here: a page can only show text.".into()),
         },
         Kind::PageInSnippet { handed, .. } => Some(format!("Did you mean `{handed}`?")),
         Kind::TextNeverShown { nearest, .. } => {
@@ -2807,16 +2807,19 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::NoSiteAddress { .. } => {
             Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`.".into())
         }
-        Kind::FeedIdChanged { id, item: false, .. } => Some(format!(
+        Kind::FeedIdChanged {
+            id, item: false, ..
+        } => Some(format!(
             "Add `id: {id}` to its front matter to keep it the same post in feed readers."
         )),
         Kind::FeedIdChanged { id, item: true, .. } => Some(format!(
             "Add `id: {id}` to the item to keep it the same post in feed readers."
         )),
-        Kind::NoLanguage => Some("Add the site's language to `statac.yaml`, as `language: en`.".into()),
+        Kind::NoLanguage => {
+            Some("Add the site's language to `statac.yaml`, as `language: en`.".into())
+        }
         Kind::RobotsBeneathPath { .. } => Some(
-            "Copy its lines into the `robots.txt` at the top of the host to have them read."
-                .into(),
+            "Copy its lines into the `robots.txt` at the top of the host to have them read.".into(),
         ),
         Kind::RedirectToItself { .. } => {
             Some("Point `redirect_to` at the address readers should reach.".into())
@@ -2832,14 +2835,21 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             .as_ref()
             .map(|written| format!("Write `{written}` to choose the pages once for the site.")),
         Kind::CallInHtml { name } => Some(format!("To show it as text, write `\\@{name}`.")),
-        Kind::UntitledPage { page, .. } => Some(match page {
-            Named::ListPage(..) => "Add `title:` to `statac.yaml`; the home page is called by it.",
-            _ => "Give it a `title`, or open its writing with a `# heading`. A folder whose pages go without titles says `pages.untitled: true`.",
+        Kind::UntitledPage { page, .. } => {
+            let words = match page {
+                Named::ListPage(..) => {
+                    "Add `title:` to `statac.yaml`; the home page is called by it."
+                }
+                _ => {
+                    "Give it a `title`, or open its writing with a `# heading`. A folder whose \
+                     pages go without titles says `pages.untitled: true`."
+                }
+            };
+            Some(words.into())
         }
-        .into()),
-        Kind::MissingDefinition { nearest, .. } => {
-            nearest.as_ref().map(|label| format!("Did you mean `{label}`?"))
-        }
+        Kind::MissingDefinition { nearest, .. } => nearest
+            .as_ref()
+            .map(|label| format!("Did you mean `{label}`?")),
         Kind::MissingAnchor { suggestion, .. } => {
             suggestion.as_ref().map(|s| format!("Did you mean `{s}`?"))
         }
@@ -2864,7 +2874,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             .into(),
         ),
         Kind::UnmatchedTag { unmatched } => Some(match unmatched {
-            Unmatched::NeverClosed(name) => format!("Close it with `</{name}>` where it should end."),
+            Unmatched::NeverClosed(name) => {
+                format!("Close it with `</{name}>` where it should end.")
+            }
             Unmatched::CommentNeverClosed => "Close it with `-->`.".into(),
             Unmatched::ClosesNothing(_) => "Take it out, or open the element above it.".into(),
         }),
@@ -2927,9 +2939,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Write the file's path, its hash or `absent`, and the day, parted by tabs.".into(),
             ),
             RecordFault::Path(_) => None,
-            RecordFault::Held(_) => Some(
-                "Write the first 16 hex digits of the file's BLAKE3 hash, or `absent`.".into(),
-            ),
+            RecordFault::Held(_) => {
+                Some("Write the first 16 hex digits of the file's BLAKE3 hash, or `absent`.".into())
+            }
             RecordFault::Day(_) => Some("Write the day as `2026-10-06`.".into()),
             RecordFault::Twice(_) => Some("Keep one of them.".into()),
             RecordFault::RefusedOpening => {
@@ -2961,9 +2973,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
         }),
         Kind::AlreadyASite { by, has, .. } => match (by, has) {
-            (Maker::New, SiteMark::Settings) => Some(
-                "To bring its starter files up to date, run `statac new --update`.".into(),
-            ),
+            (Maker::New, SiteMark::Settings) => {
+                Some("To bring its starter files up to date, run `statac new --update`.".into())
+            }
             (Maker::New, SiteMark::Content) | (Maker::Import, _) => None,
         },
         Kind::NoSiteHere { .. } => {
@@ -2975,7 +2987,10 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 .into(),
         ),
         Kind::CantTellWhatMade { tools, .. } => {
-            let options: Vec<String> = tools.iter().map(|tool| format!("`--from={tool}`")).collect();
+            let options: Vec<String> = tools
+                .iter()
+                .map(|tool| format!("`--from={tool}`"))
+                .collect();
             let named = match options.split_last() {
                 Some((last, [])) => last.clone(),
                 Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
@@ -2984,21 +2999,27 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Some(format!("Say what made it with {named}."))
         }
         Kind::MissingFolder => Some("Name it after the command: `statac import <folder>`.".into()),
-        Kind::UnusableCardFile { fault, .. } => Some(match fault {
-            CardFileFault::BackgroundSize { .. } => {
-                "Save the background 1,200 pixels wide and 630 tall."
+        Kind::UnusableCardFile { fault, .. } => Some(
+            match fault {
+                CardFileFault::BackgroundSize { .. } => {
+                    "Save the background 1,200 pixels wide and 630 tall."
+                }
+                CardFileFault::NotAStill => "Save the background as a PNG or a JPEG.",
+                CardFileFault::Font => "Name a TrueType or OpenType font file.",
             }
-            CardFileFault::NotAStill => "Save the background as a PNG or a JPEG.",
-            CardFileFault::Font => "Name a TrueType or OpenType font file.",
-        }
-        .into()),
+            .into(),
+        ),
         Kind::CardNotDrawn { why, .. } => Some(match why {
             NotDrawn::NoFont {
                 characters,
                 more,
                 font,
             } => {
-                let them = if characters.len() + more == 1 { "it" } else { "them" };
+                let them = if characters.len() + more == 1 {
+                    "it"
+                } else {
+                    "them"
+                };
                 match font.as_deref() {
                     Some(FontWithThem::Here(font)) => {
                         format!("Add `{font}`, which has {them}, to the card's `font`.")
@@ -3016,17 +3037,17 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
             NotDrawn::NoRoom => "Make the texts at the top and bottom smaller or shorter.".into(),
         }),
-        Kind::UnusedCard { name: None } => {
-            Some(
-                "Write the card's `<meta>` lines in a layout, or remove the card's settings and \
+        Kind::UnusedCard { name: None } => Some(
+            "Write the card's `<meta>` lines in a layout, or remove the card's settings and \
                  `templates/og/`."
-                    .into(),
-            )
-        }
+                .into(),
+        ),
         Kind::UnusedCard { name: Some(name) } => Some(format!(
             "Write `card: {name}` on the pages it is for, or remove the card's settings."
         )),
-        Kind::ImageMayNotShow { .. } => Some("For a picture more link previews show, save it as a PNG.".into()),
+        Kind::ImageMayNotShow { .. } => {
+            Some("For a picture more link previews show, save it as a PNG.".into())
+        }
     }
 }
 
@@ -3434,7 +3455,8 @@ pub(crate) fn drafts_not_refreshed(errors: usize) -> String {
     let them = if errors == 1 { "it" } else { "them" };
     let errors = how_many(errors, "error", "errors");
     format!(
-        "Drafts weren't looked at: the site has {errors} with {them}. Run `statac check --drafts` to see {them}."
+        "Drafts weren't looked at: the site has {errors} with {them}. Run `statac check --drafts` \
+         to see {them}."
     )
 }
 
@@ -3552,7 +3574,8 @@ pub(crate) fn refused_here(id: u64, address: &str) -> String {
 /// What `refresh` says of a mention kept without its sender's address.
 pub(crate) fn sender_not_kept(id: u64, address: &str) -> String {
     format!(
-        "Webmention `{id}`: `{address}` isn't a web address, so the sender's own address isn't kept."
+        "Webmention `{id}`: `{address}` isn't a web address, so the sender's own address isn't \
+         kept."
     )
 }
 
@@ -4720,11 +4743,13 @@ mod tests {
         assert_eq!(refreshed(0, 0, 0), "Fetched no stills.");
         assert_eq!(
             drafts_not_refreshed(1),
-            "Drafts weren't looked at: the site has 1 error with it. Run `statac check --drafts` to see it."
+            "Drafts weren't looked at: the site has 1 error with it. Run `statac check --drafts` \
+             to see it."
         );
         assert_eq!(
             drafts_not_refreshed(2),
-            "Drafts weren't looked at: the site has 2 errors with them. Run `statac check --drafts` to see them."
+            "Drafts weren't looked at: the site has 2 errors with them. Run `statac check \
+             --drafts` to see them."
         );
         assert_eq!(and_more(1), "and 1 more. Run `statac check` to see it.");
         assert_eq!(
@@ -4925,7 +4950,8 @@ mod tests {
                 },
                 "Size kept: at `bottom`, `up to 36` is drawn at 36",
                 Some(
-                    "Write `footer.size: 36`; only a text at `left`, `centre` or `right` is fitted.",
+                    "Write `footer.size: 36`; only a text at `left`, `centre` or `right` is \
+                     fitted.",
                 ),
             ),
             (
@@ -5367,7 +5393,8 @@ mod tests {
                     spellings: vec![("Rust".into(), 12), ("rust".into(), 2)],
                     chosen: "Rust".into(),
                 },
-                "Tag spelled two ways: `Rust` (12 pages) and `rust` (2 pages) are one tag, shown as `Rust`",
+                "Tag spelled two ways: `Rust` (12 pages) and `rust` (2 pages) are one tag, shown \
+                 as `Rust`",
                 Some("Use one spelling on every page to choose how it's shown."),
             ),
             (
@@ -5656,9 +5683,11 @@ mod tests {
                     by: Called::OpeningWords,
                     name: "Post 1 opens\u{2026}".into(),
                 },
-                "Untitled page: `content/post-1.md` is called by its opening words, `Post 1 opens\u{2026}`",
+                "Untitled page: `content/post-1.md` is called by its opening words, `Post 1 \
+                 opens\u{2026}`",
                 Some(
-                    "Give it a `title`, or open its writing with a `# heading`. A folder whose pages go without titles says `pages.untitled: true`.",
+                    "Give it a `title`, or open its writing with a `# heading`. A folder whose \
+                     pages go without titles says `pages.untitled: true`.",
                 ),
             ),
             (
@@ -5838,7 +5867,8 @@ mod tests {
                 "No names to check: `data/people.yaml` is a list, so `fields.author` can't name \
                  one of its items",
                 Some(
-                    "Give each item a name with its fields beneath, or declare the field as `text`.",
+                    "Give each item a name with its fields beneath, or declare the field as \
+                     `text`.",
                 ),
             ),
             (
@@ -5848,7 +5878,8 @@ mod tests {
                 },
                 "Missing field: `permalink`",
                 Some(
-                    "Add a `permalink:` pattern, such as `/people/{key}/`, to give each item its address.",
+                    "Add a `permalink:` pattern, such as `/people/{key}/`, to give each item its \
+                     address.",
                 ),
             ),
             (
@@ -6651,7 +6682,8 @@ mod tests {
                 call(markdown::Malformed::Name("café".into())),
                 "Malformed call: a snippet can't be called `café`",
                 Some(
-                    r"Name the snippet with the letters a to z, digits and `_`, or write `\@` to show this as text.",
+                    "Name the snippet with the letters a to z, digits and `_`, or write `\\@` to \
+                     show this as text.",
                 ),
             ),
             (
@@ -6663,14 +6695,16 @@ mod tests {
                 call(markdown::Malformed::StrayEnd),
                 "Malformed call: `@end` closes nothing",
                 Some(
-                    "Take the line out: only a call to a snippet that shows `body` wraps the writing up to an `@end`.",
+                    "Take the line out: only a call to a snippet that shows `body` wraps the \
+                     writing up to an `@end`.",
                 ),
             ),
             (
                 call(markdown::Malformed::WrapsNothing("note".into())),
                 "Malformed call: `@note` isn't on a line of its own",
                 Some(
-                    "Write the call on a line of its own, the writing it wraps below it, and `@end` on a line after that.",
+                    "Write the call on a line of its own, the writing it wraps below it, and \
+                     `@end` on a line after that.",
                 ),
             ),
             (
@@ -6807,7 +6841,8 @@ mod tests {
                 },
                 "Control character: U+0092 is left out of the page",
                 Some(
-                    "This is usually a character such as \u{2019} saved in an old encoding: type it again.",
+                    "This is usually a character such as \u{2019} saved in an old encoding: type \
+                     it again.",
                 ),
             ),
             (
@@ -6852,7 +6887,8 @@ mod tests {
             ),
             (
                 Kind::MissingCommand,
-                "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, `import` or `explain`",
+                "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, \
+                 `new`, `import` or `explain`",
                 Some("Run `statac --help` to see the commands."),
             ),
             (
@@ -7003,7 +7039,8 @@ mod tests {
                 Kind::MissingAddress,
                 "Missing address: `statac refuse` needs the address of a webmention or a sender",
                 Some(
-                    "Give the address after the command, as `statac refuse https://a.example/post-1/`.",
+                    "Give the address after the command, as `statac refuse \
+                     https://a.example/post-1/`.",
                 ),
             ),
             (
@@ -7409,7 +7446,8 @@ mod tests {
                     Found::Written("no".into()),
                     Some("false"),
                 ),
-                "Wrong kind of value: `neighbours` is `site`, `folder`, `series` or `false`, not `no`",
+                "Wrong kind of value: `neighbours` is `site`, `folder`, `series` or `false`, not \
+                 `no`",
                 Some("Write it as `false`."),
             ),
             (
@@ -8805,7 +8843,8 @@ mod tests {
                 malformed(Malformed::ControlCharacter('\u{92}')),
                 "Malformed YAML: U+0092, a control character YAML allows nowhere",
                 Some(
-                    "This is usually a character such as \u{2019} saved in an old encoding: type it again.",
+                    "This is usually a character such as \u{2019} saved in an old encoding: type \
+                     it again.",
                 ),
             ),
             (
