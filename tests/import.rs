@@ -2586,6 +2586,47 @@ fn zola_tags_in_the_writing_convert_or_stay_as_written() {
 }
 
 #[test]
+fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
+    let words = "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n\n\
+                 ```\n\u{E001}\u{E000}\n```\n\n";
+    let front = "+++\ntitle = \"Post 1\"\ndate = 2026-01-01\n+++\n";
+    // The tool, its settings file and what it holds, and a tag that
+    // becomes a call.
+    let tools = [
+        (
+            "hugo",
+            "hugo.toml",
+            "baseURL = \"https://example.org/\"\n",
+            "{{< youtube \"\u{E000}\" >}}",
+        ),
+        (
+            "zola",
+            "config.toml",
+            "base_url = \"https://example.org\"\n",
+            "{{ youtube(id=\"\u{E000}\") }}",
+        ),
+    ];
+    for (tool, settings, set, tag) in tools {
+        let old = scratch(&format!("{tool}-private-use-old"));
+        fs::create_dir_all(old.join("content/posts")).unwrap();
+        fs::write(old.join(settings), set).unwrap();
+        fs::write(
+            old.join("content/posts/post-1.md"),
+            format!("{front}{words}{tag}\n"),
+        )
+        .unwrap();
+        let new = scratch(&format!("{tool}-private-use"));
+        let (code, said) = import(&old, &new, None);
+        assert_eq!(code, 0, "{tool}: {said}");
+        let post = fs::read_to_string(new.join("content/posts/post-1.md")).unwrap();
+        assert!(
+            post.ends_with(&format!("\n---\n{words}@youtube('\u{E000}')\n")),
+            "{tool}: {post:?}"
+        );
+    }
+}
+
+#[test]
 fn zola_site_under_a_path_keeps_its_addresses_and_links() {
     assert_eq!(fixture("zola-under-path"), ["robots-beneath-path"]);
 }

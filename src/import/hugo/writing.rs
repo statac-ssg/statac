@@ -14,6 +14,7 @@ use super::{
     ATTRIBUTE_LINES, CODE_OPTIONS, EMOJI, FIGURE_HTML, LINK_NOWHERE, RAW_HTML, SUMMARY_CUT,
     TAG_IN_ADDRESS, TAG_IN_CODE, TAG_LEFT,
 };
+use crate::import::writing::Marked;
 use crate::import::{Finding, FindingKind, Spot};
 
 /// What the writing's tags are converted with.
@@ -423,27 +424,6 @@ enum Open {
     Left,
 }
 
-/// Written before each snippet call, each call's `@end` and each code
-/// fence made here, in the Unicode private use area, so each can be found
-/// again whatever is cut or put in around it before the writing is done.
-const OWN_CALL: char = '\u{E000}';
-const OWN_FENCE: char = '\u{E001}';
-
-/// `text` without its marks, and where each fence and each call marked
-/// starts in it.
-fn marks_taken(text: &str) -> (String, Vec<usize>, Vec<usize>) {
-    let mut out = String::with_capacity(text.len());
-    let (mut fences, mut called) = (Vec::new(), Vec::new());
-    for c in text.chars() {
-        match c {
-            OWN_CALL => called.push(out.len()),
-            OWN_FENCE => fences.push(out.len()),
-            c => out.push(c),
-        }
-    }
-    (out, fences, called)
-}
-
 /// Converts the writing of `file`, whose first line is line `first_line`
 /// of the file.
 pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
@@ -482,7 +462,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
     let mut figures = 0;
     let mut plainer = 0;
     let mut valued = 0;
-    let mut out = String::with_capacity(body.len());
+    let mut out = Marked::default();
     let mut open: Vec<(String, Open)> = Vec::new();
     let mut copied = 0;
     let mut at = 0;
@@ -493,13 +473,13 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
             continue;
         };
         let written = &body[tag.start..tag.end];
-        let mut replace = |out: &mut String, with: &str, resume: usize| {
+        let mut replace = |out: &mut Marked, with: Marked, resume: usize| {
             out.push_str(&body[copied..start]);
-            out.push_str(with);
+            out.push(with);
             copied = resume;
         };
         if let Some(shown) = &tag.shown {
-            replace(&mut out, shown, tag.end);
+            replace(&mut out, shown.clone().into(), tag.end);
             at = tag.end;
             continue;
         }
@@ -515,8 +495,8 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                 Some(found) => {
                     let (_, what) = open.remove(found);
                     match what {
-                        Open::End => replace(&mut out, &format!("{OWN_CALL}@end"), tag.end),
-                        Open::Details => replace(&mut out, "</details>", tag.end),
+                        Open::End => replace(&mut out, Marked::call("@end"), tag.end),
+                        Open::Details => replace(&mut out, "</details>".to_owned().into(), tag.end),
                         Open::Left => left(&mut findings, &TAG_LEFT),
                     }
                 }
@@ -546,7 +526,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                 SiteValue::Base if refers(body, tag.end, cx) => String::new(),
                 SiteValue::Base => format!("{}/", cx.base),
             };
-            replace(&mut out, &shown, tag.end);
+            replace(&mut out, shown.into(), tag.end);
             valued += 1;
             at = tag.end;
             continue;
@@ -579,10 +559,13 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                     [(Some(name), id)] if name == "id" => Some(id),
                     _ => None,
                 };
-                id.map(|id| (format!("{OWN_CALL}@{}({})", tag.name, quoted(id)), tag.end))
+                id.map(|id| {
+                    let call = format!("@{}({})", tag.name, quoted(id));
+                    (Marked::call(call), tag.end)
+                })
             }
             "ref" | "relref" if closing.is_none() => match referred(&tag, cx) {
-                Some(Some(address)) => Some((address, tag.end)),
+                Some(Some(address)) => Some((address.into(), tag.end)),
                 Some(None) => {
                     left(&mut findings, &LINK_NOWHERE);
                     at = tag.end;
@@ -618,10 +601,10 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                 .and_then(|_| details(&tag))
                 .map(|text| {
                     open.push((tag.name.clone(), Open::Details));
-                    (text, tag.end)
+                    (text.into(), tag.end)
                 }),
             "param" if closing.is_none() => match tag.args.as_slice() {
-                [(None | Some(_), name)] => (cx.param)(name).map(|value| (value, tag.end)),
+                [(None | Some(_), name)] => (cx.param)(name).map(|value| (value.into(), tag.end)),
                 _ => None,
             },
             "figure" | "youtube" | "vimeo" | "ref" | "relref" | "param" => None,
@@ -638,7 +621,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
         };
         match done {
             Some((text, resume)) => {
-                replace(&mut out, &text, resume);
+                replace(&mut out, text, resume);
                 at = resume;
             }
             None => {
@@ -652,11 +635,10 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
     }
     out.push_str(&body[copied..]);
     findings.sort_by_key(|finding| finding.spots[0].line);
-    let (out, fences, called) = marks_taken(&out);
     Converted {
-        writing: out,
-        fences,
-        called,
+        writing: out.text,
+        fences: out.fences,
+        called: out.called,
         findings,
         calls,
         titles,
@@ -689,7 +671,7 @@ fn escaped(text: &str) -> String {
 
 /// What became of a `figure`.
 struct Figure {
-    text: String,
+    text: Marked,
     /// Whether it had a title, now opening the caption.
     titled: bool,
     /// Whether it is the HTML Hugo wrote, not a call.
@@ -771,7 +753,7 @@ fn figure(tag: &Written, cx: &Context, in_html: bool) -> Option<Figure> {
         false => None,
     };
     if let Some(src) = own {
-        let mut call = format!("{OWN_CALL}@figure({}", quoted(&src));
+        let mut call = format!("@figure({}", quoted(&src));
         if let Some(alt) = get("alt") {
             call.push_str(&format!(", alt={}", quoted(alt)));
         }
@@ -785,7 +767,7 @@ fn figure(tag: &Written, cx: &Context, in_html: bool) -> Option<Figure> {
         }
         call.push(')');
         return Some(Figure {
-            text: call,
+            text: Marked::call(call),
             titled: title.is_some(),
             html: false,
             plainer,
@@ -844,7 +826,7 @@ fn figure(tag: &Written, cx: &Context, in_html: bool) -> Option<Figure> {
     }
     html.push_str("</figure>");
     Some(Figure {
-        text: html,
+        text: html.into(),
         titled: false,
         html: true,
         plainer: false,
@@ -852,7 +834,7 @@ fn figure(tag: &Written, cx: &Context, in_html: bool) -> Option<Figure> {
 }
 
 /// The code `highlight` wraps as a fenced code block.
-fn fenced(language: &str, inside: &str) -> String {
+fn fenced(language: &str, inside: &str) -> Marked {
     let inside = inside
         .strip_prefix("\r\n")
         .or_else(|| inside.strip_prefix('\n'))
@@ -867,7 +849,7 @@ fn fenced(language: &str, inside: &str) -> String {
         longest = longest.max(run);
     }
     let fence = "`".repeat(longest.max(2) + 1);
-    format!("{OWN_FENCE}{fence}{language}\n{inside}\n{fence}")
+    Marked::fence(format!("{fence}{language}\n{inside}\n{fence}"))
 }
 
 /// The opening of a `details` element, as Hugo wrote it.
@@ -916,7 +898,7 @@ fn snippet_call(
     body: &str,
     closing: Option<&Written>,
     cx: &Context,
-) -> Option<(String, Call)> {
+) -> Option<(Marked, Call)> {
     let wraps = cx.wrapping.contains(&tag.name);
     if wraps {
         let alone = opens_line(body, tag.start) && ends_line(body, tag.end);
@@ -956,9 +938,10 @@ fn snippet_call(
         names.push(name);
     }
     let snippet = snippet_name(&tag.name, cx.starter);
-    let mut text = format!("{OWN_CALL}@{snippet}({})", handed.join(", "));
+    let mut text = Marked::call(format!("@{snippet}({})", handed.join(", ")));
     if wraps && closing.is_none() {
-        text.push_str(&format!("\n{OWN_CALL}@end"));
+        text.push_str("\n");
+        text.push(Marked::call("@end"));
     }
     Some((
         text,
@@ -1175,6 +1158,78 @@ mod tests {
         let close = closing_of(text, 13, "aside").unwrap();
         assert_eq!(&text[close.start..], "{{< /aside >}}");
         assert_eq!(paired(text), vec!["aside".to_owned()]);
+    }
+
+    #[test]
+    fn private_use_characters_are_kept_and_never_taken_for_a_call_or_a_fence() {
+        let wrapping = HashSet::from(["aside".to_owned()]);
+        let cx = Context {
+            starter: true,
+            base: "",
+            whole: None,
+            refs: &|_, _| None,
+            param: &|_| None,
+            picture: &|src| src == "a.jpg",
+            own: &[],
+            values: &[],
+            wrapping: &wrapping,
+            html: false,
+            unsafe_html: true,
+            emoji: false,
+            block_attributes: false,
+            summary_length: None,
+        };
+        // The writing, what it becomes, and the line from each call made
+        // and from each fence made.
+        let cases: [(&str, &str, &[&str], &[&str]); 6] = [
+            (
+                "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n",
+                "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n",
+                &[],
+                &[],
+            ),
+            (
+                "```\n\u{E001}\u{E000}\n```\n",
+                "```\n\u{E001}\u{E000}\n```\n",
+                &[],
+                &[],
+            ),
+            (
+                "{{< highlight text >}}\n\u{E001}\u{E000}\n{{< /highlight >}}\n",
+                "```text\n\u{E001}\u{E000}\n```\n",
+                &[],
+                &["```text"],
+            ),
+            (
+                "\u{E000}{{< youtube \"\u{E000}\" >}}\n\n{{< aside \"\u{E001}\" >}}\n",
+                "\u{E000}@youtube('\u{E000}')\n\n@aside(value_1='\u{E001}')\n@end\n",
+                &["@youtube('\u{E000}')", "@aside(value_1='\u{E001}')", "@end"],
+                &[],
+            ),
+            (
+                "{{< aside >}}\n\u{E000}\u{E001}\n{{< /aside >}}\n",
+                "@aside()\n\u{E000}\u{E001}\n@end\n",
+                &["@aside()", "@end"],
+                &[],
+            ),
+            (
+                "{{< figure src=\"a.jpg\" caption=\"\u{E000}\" >}}\n",
+                "@figure('a.jpg', caption='\u{E000}')\n",
+                &["@figure('a.jpg', caption='\u{E000}')"],
+                &[],
+            ),
+        ];
+        for (body, writing, called, fences) in cases {
+            let converted = convert(body, 1, "a.md", &cx);
+            assert_eq!(converted.writing, writing, "{body:?}");
+            let lines = |marks: &[usize]| -> Vec<String> {
+                (marks.iter())
+                    .map(|at| writing[*at..].lines().next().unwrap_or_default().to_owned())
+                    .collect()
+            };
+            assert_eq!(lines(&converted.called), called, "{body:?}");
+            assert_eq!(lines(&converted.fences), fences, "{body:?}");
+        }
     }
 
     #[test]

@@ -2,6 +2,17 @@
 
 What changed in each release of Statac, the newest first.
 
+## Unreleased
+
+### Fixed
+
+- `statac import` from Hugo or Zola keeps a character from the start of
+  Unicode's private use area, as icon fonts use, where the post has it:
+  in its words, its HTML, its code and the values of a tag it converts.
+  It was left out of the new post without a word, and could change what
+  was made of the writing round it, such as a blank line put inside a
+  block of HTML.
+
 ## 0.5.0 - 2026-10-18
 
 ### Fixed

@@ -13,6 +13,7 @@ use std::ops::Range;
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
 use super::{CODE_OPTIONS, EMOJI, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT};
+use crate::import::writing::Marked;
 use crate::import::{Finding, FindingKind, Spot};
 
 /// What the writing is converted with.
@@ -305,24 +306,6 @@ fn ends_line(text: &str, at: usize) -> bool {
     text[at..end].trim().is_empty()
 }
 
-/// Written before each snippet call and each call's `@end` made here, in
-/// the Unicode private use area, so each can be found again whatever is
-/// put in around it before the writing is done.
-const OWN_CALL: char = '\u{E000}';
-
-/// `text` without its marks, and where each call marked starts in it.
-fn marks_taken(text: &str) -> (String, Vec<usize>) {
-    let mut out = String::with_capacity(text.len());
-    let mut called = Vec::new();
-    for c in text.chars() {
-        match c {
-            OWN_CALL => called.push(out.len()),
-            c => out.push(c),
-        }
-    }
-    (out, called)
-}
-
 fn finding(kind: &'static FindingKind, spot: Spot) -> Finding {
     Finding {
         kind,
@@ -361,7 +344,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
     }
     let code = code_ranges(body);
     let mut calls = Vec::new();
-    let mut out = String::with_capacity(body.len());
+    let mut out = Marked::default();
     let mut open: Vec<Open> = Vec::new();
     let mut copied = 0;
     let mut at = 0;
@@ -372,14 +355,14 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
             continue;
         };
         let written = &body[tag.start..tag.end];
-        let mut replace = |out: &mut String, with: &str, resume: usize| {
+        let mut replace = |out: &mut Marked, with: Marked, resume: usize| {
             out.push_str(&body[copied..start]);
-            out.push_str(with);
+            out.push(with);
             copied = resume;
         };
         at = tag.end;
         if let Form::Shown(shown) = &tag.form {
-            replace(&mut out, shown, tag.end);
+            replace(&mut out, shown.clone().into(), tag.end);
             continue;
         }
         if within(&code, start) {
@@ -390,7 +373,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
             |findings: &mut Vec<Finding>| findings.push(finding(&TAG_LEFT, spot(start, written)));
         match tag.form {
             Form::End => match open.pop() {
-                Some(Open::End) => replace(&mut out, &format!("{OWN_CALL}@end"), tag.end),
+                Some(Open::End) => replace(&mut out, Marked::call("@end"), tag.end),
                 _ => left(&mut findings),
             },
             Form::Opening => {
@@ -408,7 +391,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                             ..call
                         });
                         open.push(Open::End);
-                        replace(&mut out, &text, tag.end);
+                        replace(&mut out, text, tag.end);
                     }
                     None => {
                         left(&mut findings);
@@ -424,28 +407,28 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
                 let starters = cx.starter && !cx.own.contains(&tag.name);
                 let video = match (starters, tag.name.as_str(), tag.args.as_slice()) {
                     (true, "youtube" | "vimeo", [(name, Given::Text(id))]) if name == "id" => {
-                        Some(format!("{OWN_CALL}@{}({})", tag.name, quoted(id)))
+                        Some(Marked::call(format!("@{}({})", tag.name, quoted(id))))
                     }
                     (true, "youtube" | "vimeo", _) => None,
                     _ => {
                         let wraps = cx.wrapping.contains(&tag.name);
                         let alone = opens_line(body, start) && ends_line(body, tag.end);
-                        snippet_call(&tag, cx)
-                            .filter(|_| !wraps || alone)
-                            .map(|(text, call)| {
-                                calls.push(Call {
-                                    spot: spot(start, written),
-                                    ..call
-                                });
-                                match wraps {
-                                    true => format!("{text}\n{OWN_CALL}@end"),
-                                    false => text,
-                                }
-                            })
+                        let made = snippet_call(&tag, cx).filter(|_| !wraps || alone);
+                        made.map(|(mut text, call)| {
+                            calls.push(Call {
+                                spot: spot(start, written),
+                                ..call
+                            });
+                            if wraps {
+                                text.push_str("\n");
+                                text.push(Marked::call("@end"));
+                            }
+                            text
+                        })
                     }
                 };
                 match video {
-                    Some(text) => replace(&mut out, &text, tag.end),
+                    Some(text) => replace(&mut out, text, tag.end),
                     None => left(&mut findings),
                 }
             }
@@ -453,12 +436,11 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
     }
     out.push_str(&body[copied..]);
     findings.sort_by_key(|finding| finding.spots[0].line);
-    let (out, called) = marks_taken(&out);
     Converted {
-        writing: out,
+        writing: out.text,
         findings,
         calls,
-        called,
+        called: out.called,
     }
 }
 
@@ -478,7 +460,7 @@ pub fn snippet_name(tag: &str, starter: bool) -> String {
 
 /// A tag as a call to a snippet of its name, where its values can be
 /// handed.
-fn snippet_call(tag: &Written, cx: &Context) -> Option<(String, Call)> {
+fn snippet_call(tag: &Written, cx: &Context) -> Option<(Marked, Call)> {
     let mut names = Vec::new();
     let mut handed = Vec::new();
     for (name, given) in &tag.args {
@@ -495,7 +477,7 @@ fn snippet_call(tag: &Written, cx: &Context) -> Option<(String, Call)> {
     }
     let snippet = snippet_name(&tag.name, cx.starter);
     Some((
-        format!("{OWN_CALL}@{snippet}({})", handed.join(", ")),
+        Marked::call(format!("@{snippet}({})", handed.join(", "))),
         Call {
             snippet,
             tag: tag.name.clone(),
@@ -694,6 +676,55 @@ mod tests {
         );
         assert!(tag_at("{{ page.title }}", 0).is_none());
         assert!(tag_at("{{ a(b=\"open) }}", 0).is_none());
+    }
+
+    #[test]
+    fn private_use_characters_are_kept_and_never_taken_for_a_call() {
+        let wrapping = HashSet::from(["aside".to_owned()]);
+        let cx = Context {
+            starter: true,
+            base: "",
+            refs: &|_| None,
+            own: &[],
+            wrapping: &wrapping,
+            emoji: false,
+        };
+        // The writing, what it becomes, and the line from each call made.
+        let cases: [(&str, &str, &[&str]); 5] = [
+            (
+                "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n",
+                "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n",
+                &[],
+            ),
+            (
+                "```\n\u{E001}\u{E000}\n```\n",
+                "```\n\u{E001}\u{E000}\n```\n",
+                &[],
+            ),
+            (
+                "\u{E000}{{ youtube(id=\"\u{E000}\") }}\n",
+                "\u{E000}@youtube('\u{E000}')\n",
+                &["@youtube('\u{E000}')"],
+            ),
+            (
+                "{% aside(a=\"\u{E001}\") %}\n\u{E000}\n{% end %}\n",
+                "@aside(a='\u{E001}')\n\u{E000}\n@end\n",
+                &["@aside(a='\u{E001}')", "@end"],
+            ),
+            (
+                "{{ aside(a=\"\u{E000}\") }}\n",
+                "@aside(a='\u{E000}')\n@end\n",
+                &["@aside(a='\u{E000}')", "@end"],
+            ),
+        ];
+        for (body, writing, called) in cases {
+            let converted = convert(body, 1, "a.md", &cx);
+            assert_eq!(converted.writing, writing, "{body:?}");
+            let lines: Vec<&str> = (converted.called.iter())
+                .map(|at| writing[*at..].lines().next().unwrap_or_default())
+                .collect();
+            assert_eq!(lines, called, "{body:?}");
+        }
     }
 
     #[test]

@@ -58,6 +58,59 @@ impl Settled {
     }
 }
 
+/// Writing being made, with where each snippet call, each call's `@end`
+/// and each code fence written into it starts, kept beside the text so
+/// nothing the author wrote can be taken for one.
+#[derive(Default, Debug)]
+pub struct Marked {
+    pub text: String,
+    pub called: Vec<usize>,
+    pub fences: Vec<usize>,
+}
+
+impl Marked {
+    /// `call`, a snippet call or an `@end`.
+    pub fn call(call: impl Into<String>) -> Marked {
+        Marked {
+            text: call.into(),
+            called: vec![0],
+            fences: Vec::new(),
+        }
+    }
+
+    /// `fence`, a fenced code block.
+    pub fn fence(fence: impl Into<String>) -> Marked {
+        Marked {
+            text: fence.into(),
+            called: Vec::new(),
+            fences: vec![0],
+        }
+    }
+
+    pub fn push_str(&mut self, text: &str) {
+        self.text.push_str(text);
+    }
+
+    /// Writes `other` here, with what it marks.
+    pub fn push(&mut self, other: Marked) {
+        let at = self.text.len();
+        self.called
+            .extend(other.called.iter().map(|mark| at + mark));
+        self.fences
+            .extend(other.fences.iter().map(|mark| at + mark));
+        self.text.push_str(&other.text);
+    }
+}
+
+impl From<String> for Marked {
+    fn from(text: String) -> Marked {
+        Marked {
+            text,
+            ..Marked::default()
+        }
+    }
+}
+
 /// How many times one kind of change is made to a page's writing and the
 /// writing read again: each pass makes every change of its kind the
 /// reading shows, and a later pass is for what the one before uncovered,
