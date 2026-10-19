@@ -749,11 +749,32 @@ mod tests {
 
     #[test]
     fn a_pages_pattern_takes_a_declared_field_as_a_piece() {
-        let declared = ["isbn"];
+        let declared = ["isbn", "book.author"];
         let unusable = |fault| Kind::UnusableAddress { fault };
         let cases = [
             ("/books/{isbn}/", None),
             ("/{year}/{isbn}.html", None),
+            ("/books/{book.author}/", None),
+            (
+                "/books/{book.autor}/",
+                Some((
+                    unusable(AddressFault::UnknownPiece {
+                        written: "{book.autor}".into(),
+                        nearest: Some("{book.author}".into()),
+                    }),
+                    "{book.autor}",
+                )),
+            ),
+            (
+                "/books/{book}/",
+                Some((
+                    unusable(AddressFault::UnknownPiece {
+                        written: "{book}".into(),
+                        nearest: None,
+                    }),
+                    "{book}",
+                )),
+            ),
             (
                 "/books/:isbn/",
                 Some((

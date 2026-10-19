@@ -780,7 +780,8 @@ pub(super) enum Whose {
 }
 
 /// What a page's own `words` fill `{token}` with: one of Statac's words
-/// or a field of the author's, by that name. None where they hold neither.
+/// or a field of the author's, by that name or nested at that path, as
+/// `book.author`. None where they hold neither.
 fn own_piece(
     sources: &Sources,
     words: &Words,
@@ -803,20 +804,18 @@ fn own_piece(
             _ => Err(lacks()),
         });
     }
-    let field = words.field(token)?;
-    Some(
-        match value::Reader::new(sources, token).text(&field.value) {
-            Ok(Some(text)) => Ok(piece(&text.value, named)),
-            Ok(None) => Err(lacks()),
-            Err(problem) => {
-                // A declared field's value is already told where it is read.
-                if !problems.contains(&problem) {
-                    problems.push(problem);
-                }
-                Err(Unfilled::Told)
+    let field = words.at(token)?;
+    Some(match value::Reader::new(sources, token).text(field) {
+        Ok(Some(text)) => Ok(piece(&text.value, named)),
+        Ok(None) => Err(lacks()),
+        Err(problem) => {
+            // A declared field's value is already told where it is read.
+            if !problems.contains(&problem) {
+                problems.push(problem);
             }
-        },
-    )
+            Err(Unfilled::Told)
+        }
+    })
 }
 
 /// `written` with each piece naming a field rather than one of

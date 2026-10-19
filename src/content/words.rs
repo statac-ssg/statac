@@ -266,21 +266,21 @@ impl Words {
     /// Whether the field at `path` is written: under that name, or nested,
     /// as `book:` with `author:` beneath it is `book.author`.
     pub fn has(&self, path: &str) -> bool {
-        if self.field(path).is_some() {
-            return true;
+        self.at(path).is_some()
+    }
+
+    /// The value of the field at `path`, written under that name or
+    /// nested, as [`Words::has`] finds it.
+    pub fn at(&self, path: &str) -> Option<&Node> {
+        if let Some(field) = self.field(path) {
+            return Some(&field.value);
         }
         let mut names = path.split('.');
-        let Some(field) = names.next().and_then(|head| self.field(head)) else {
-            return false;
-        };
-        let mut node = &field.value;
+        let mut node = &self.field(names.next()?)?.value;
         for name in names {
-            match node.get(name) {
-                Some(inner) => node = inner,
-                None => return false,
-            }
+            node = node.get(name)?;
         }
-        true
+        Some(node)
     }
 
     fn set(&mut self, word: PageWord, value: Sourced<Value>) {

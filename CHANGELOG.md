@@ -79,6 +79,10 @@ What changed in each release of Statac, the newest first.
   `code-colours-not-loaded` where no template asks for `code.css`, at
   the first block the excerpt shows. It said nothing, and the code
   showed without its colours.
+- A `permalink` piece naming a nested field, as `{book.author}` for
+  `author:` written beneath `book:`, is filled from that value, on a
+  page and in the pattern of a page with `each:` alike. Such a page or
+  item was told it had no `book.author`, however the field was written.
 
 ## 0.5.0 - 2026-10-18
 

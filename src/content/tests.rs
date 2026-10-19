@@ -984,6 +984,60 @@ fn a_declared_field_fills_a_pages_pattern_as_it_fills_an_items() {
 }
 
 #[test]
+fn a_nested_declared_field_fills_its_piece_from_where_it_is_nested() {
+    let declared = "language: en\nfields.book.author: text\n";
+    let read = site(&[
+        ("statac.yaml", declared),
+        (
+            "content/a.md",
+            "---\ntitle: A\nbook:\n  author: Name 1\npermalink: /a/{book.author}/\n---\n",
+        ),
+        (
+            "content/b.md",
+            "---\neach: data.b\npermalink: /b/{book.author}/\n---\n",
+        ),
+        (
+            "data/b.yaml",
+            "- book:\n    author: Name 2\n- book:\n    author: Name 3\n  permalink: /own/{book.author}/\n",
+        ),
+    ]);
+    assert_eq!(problems(&read), []);
+    let at = |path: &str| page(&read, path).address.as_str().to_owned();
+    assert_eq!(at("a.md"), "/a/name-1/");
+    assert_eq!(at("b.md/1"), "/b/name-2/");
+    assert_eq!(at("b.md/2"), "/own/name-3/");
+
+    let lacks = |fault| (Kind::UnusableAddress { fault }, "{book.author}".to_owned());
+    let read = site(&[
+        ("statac.yaml", declared),
+        (
+            "content/a.md",
+            "---\nbook:\n  title: Title 1\npermalink: /a/{book.author}/\n---\n",
+        ),
+        (
+            "content/b.md",
+            "---\neach: data.b\npermalink: /b/{book.author}/\n---\n",
+        ),
+        ("data/b.yaml", "- book: Text\n"),
+    ]);
+    assert_eq!(
+        kinds_at(&read),
+        [
+            lacks(AddressFault::PageLacks {
+                page: "content/a.md".into(),
+                field: "book.author".into(),
+                piece: "{book.author}".into(),
+            }),
+            lacks(AddressFault::ItemLacks {
+                item: "data/b.yaml: item 1".into(),
+                field: "book.author".into(),
+                piece: "{book.author}".into(),
+            }),
+        ]
+    );
+}
+
+#[test]
 fn a_pattern_asking_for_a_field_a_page_lacks_is_refused_where_it_asks() {
     let declared = "language: en\nfields.isbn: text\n";
     let lacks = |page: &str| Kind::UnusableAddress {

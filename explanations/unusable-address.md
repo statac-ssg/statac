@@ -10,11 +10,12 @@ of them.
 A pattern can use `{year}`, `{month}`, `{day}`, `{folder}` and `{name}`,
 and `{slug}`, which is the page's own name made suitable for an address.
 It can also use a field declared in `statac.yaml`, such as `{isbn}` for
-`fields.isbn: text`, and each page it gives an address must have that
-field. The pieces of a date need a page that has a date. The pattern of
-a page with `each:` can also use any field of the items or posts it
-makes pages for, such as `{key}` or `{isbn}`, and each item or post must
-have the fields the pattern uses.
+`fields.isbn: text` or `{book.author}` for `fields.book.author: text`,
+and each page it gives an address must have that field. The pieces of
+a date need a page that has a date. The pattern of a page with `each:`
+can also use any field of the items or posts it makes pages for, such
+as `{key}` or `{isbn}`, and each item or post must have the fields the
+pattern uses.
 
 ## What you'll see {#what-youll-see}
 
