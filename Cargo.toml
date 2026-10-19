@@ -18,24 +18,32 @@ default-members = [".", "crates/avif-aom-sys"]
 avif-aom-sys = { path = "crates/avif-aom-sys" }
 blake3 = "1.8.7"
 cosmic-text = { version = "0.19", default-features = false, features = ["std", "swash"] }
+# Its `SpanLoc` is how grass hands over a warning's place (src/assets/sass.rs), so it moves with grass.
 codemap = "=0.1.3"
+# src/highlight/styles.rs is written by tokenising with it, and a test fails if that changes.
 ferriki-textmate = "=1.1.1"
+# Its error kinds are matched one by one, and its spans put right, in src/yaml/parser.rs.
 granit-parser = "=1.3.0"
+# Its error words are matched as written, in src/assets/sass/fault.rs.
 grass = { version = "=0.13.4", default-features = false }
 http = "1.5.0"
 httparse = "1.10.1"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 jiff = { version = "0.2.37", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
 jpeg-encoder = "0.7.1"
+# Its error labels and messages are matched as written, in src/markdown/maths.rs.
 math-core = "=0.8.2"
 miniz_oxide = "0.9.1"
 minijinja = { path = "crates/minijinja", default-features = false, features = ["builtins", "debug", "macros", "multi_template", "adjacent_loop_items", "std_collections", "loop_controls", "unstable_machinery", "fuel"] }
 moxcms = "0.8"
+# A release candidate: without `=`, Cargo would take a later candidate, which may break.
 notify = { version = "=9.0.0-rc.5", default-features = false, features = ["macos_fsevent"] }
+# src/markdown/read.rs follows where it splits text, table cells, HTML blocks and definition lists.
 pulldown-cmark = { version = "=0.13.4", default-features = false }
 rayon = "1.12.0"
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std"] }
 unicode-normalization = "0.1.25"
+# src/fetch.rs uses its unversioned modules, which follow no semver promise.
 ureq = { version = "=3.4.2", default-features = false, features = ["rustls-no-provider", "rustls-webpki-roots"] }
 url = "2.5.8"
 toml = { version = "1.1", default-features = false, features = ["parse"] }
