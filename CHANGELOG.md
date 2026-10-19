@@ -2,7 +2,7 @@
 
 What changed in each release of Statac, the newest first.
 
-## Unreleased
+## 0.5.1 - 2026-10-19
 
 ### Fixed
 
@@ -26,6 +26,10 @@ What changed in each release of Statac, the newest first.
   `permalink`. A page without the field stops the build, as
   `` `content/a.md` has no `isbn` for `{isbn}` ``. The pattern stopped
   with "there is no piece `{isbn}`" on every page.
+- A `permalink` piece naming a nested field, as `{book.author}` for
+  `author:` written beneath `book:`, is filled from that value, on a
+  page and in the pattern of a page with `each:` alike. Such a page or
+  item was told it had no `book.author`, however the field was written.
 - A post made from a data file by a page with `each:` that comes to be
   published at another address, with no `id:` of its own, is told as
   `feed-id-changed`, as a post in a file of its own is, with the `id:`
@@ -34,6 +38,10 @@ What changed in each release of Statac, the newest first.
   name is known by its name, and an item in a list by its fields
   written exactly as before. `write_feed_ids` never writes into a data
   file, so such a post always takes the line by hand.
+- A feed keeps a span in a post whose class starts `hl-`, as
+  `<span class="hl-keyword">own</span>`, as the author wrote it. The
+  feed took the span out and kept only its words, as it takes out the
+  markup that colours code.
 - `page.words` and `page.opening`, and an excerpt taken from the
   author's own `<p>`, read the author's HTML as a browser does. A `>`
   inside a quoted attribute, as in `<abbr title="a > b">`, or inside a
@@ -41,10 +49,27 @@ What changed in each release of Statac, the newest first.
   could show in the opening or the excerpt. A `<` that opens no tag, as
   in `<p>1 < 2</p>`, hid the words up to the next `>`, and `<pre` or
   `<p>` inside an attribute was taken for the element.
+- `page.words` and `page.opening` leave out the text of the author's
+  `<script>`, `<style>` and `<title>`, and of `<iframe>`, `<noembed>`,
+  `<noframes>` and `<noscript>`, which a browser doesn't show. They
+  counted it as words, and a script inside the opening paragraph showed
+  in the opening. The text of a `<textarea>`, which a reader sees, is
+  still counted.
+- A page showing coloured code only in another page's excerpt, as a
+  list of posts whose excerpts hold a block of code, warns
+  `code-colours-not-loaded` where no template asks for `code.css`, at
+  the first block the excerpt shows. It said nothing, and the code
+  showed without its colours.
 - A snippet handed a value through more than four snippets in turn is
   checked, when the templates are read, against everything it may be
   handed. It was checked against only what came through the first four,
   so a mistake in it could go untold until a page was built through it.
+- A value a snippet passes on as it was handed, as `{{ two(x=x) }}`, is
+  checked as what it is however many snippets pass it on, so a field
+  misspelt in the third snippet a page reaches, or one further on, is
+  told when the templates are read. From the third snippet on, the
+  value was taken as anything, and the mistake went untold until a page
+  was built through it.
 - A page published where a list's later page goes, as
   `content/blog/page/2.md` where page 2 of `/blog/` goes, is told at
   `later_pages` in `statac.yaml`, with the page's first line shown
@@ -58,31 +83,6 @@ What changed in each release of Statac, the newest first.
   file changed again. A file `before_build` writes again in that way is
   taken as the command's writing, where serve took it for a save of the
   author's.
-- A feed keeps a span in a post whose class starts `hl-`, as
-  `<span class="hl-keyword">own</span>`, as the author wrote it. The
-  feed took the span out and kept only its words, as it takes out the
-  markup that colours code.
-- `page.words` and `page.opening` leave out the text of the author's
-  `<script>`, `<style>` and `<title>`, and of `<iframe>`, `<noembed>`,
-  `<noframes>` and `<noscript>`, which a browser doesn't show. They
-  counted it as words, and a script inside the opening paragraph showed
-  in the opening. The text of a `<textarea>`, which a reader sees, is
-  still counted.
-- A value a snippet passes on as it was handed, as `{{ two(x=x) }}`, is
-  checked as what it is however many snippets pass it on, so a field
-  misspelt in the third snippet a page reaches, or one further on, is
-  told when the templates are read. From the third snippet on, the
-  value was taken as anything, and the mistake went untold until a page
-  was built through it.
-- A page showing coloured code only in another page's excerpt, as a
-  list of posts whose excerpts hold a block of code, warns
-  `code-colours-not-loaded` where no template asks for `code.css`, at
-  the first block the excerpt shows. It said nothing, and the code
-  showed without its colours.
-- A `permalink` piece naming a nested field, as `{book.author}` for
-  `author:` written beneath `book:`, is filled from that value, on a
-  page and in the pattern of a page with `each:` alike. Such a page or
-  item was told it had no `book.author`, however the field was written.
 
 ## 0.5.0 - 2026-10-18
 
