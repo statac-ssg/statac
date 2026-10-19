@@ -1605,6 +1605,26 @@ fn plain_text_runs_on_through_emphasis_and_links() {
     );
 }
 
+/// A script or a style in a heading shows nothing, so its text is no part
+/// of the heading's id or its entry in the contents.
+#[test]
+fn a_heading_leaves_out_the_text_of_a_script_or_a_style() {
+    let text = "## Setup <script>x()</script>\n\n## Look <style>b { c: d }</style>\n";
+    let (_, mut document) = read_text(text);
+    give_heading_ids(&mut document, "content/post-1.md", text);
+    let found: Vec<(String, String)> = headings(&document)
+        .into_iter()
+        .map(|h| (h.id.unwrap().to_owned(), h.text))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            ("setup".to_owned(), "Setup".to_owned()),
+            ("look".to_owned(), "Look".to_owned()),
+        ]
+    );
+}
+
 #[test]
 fn links_and_headings_are_found_with_their_places() {
     let text = "# One\n\nA [link](/post-1/) and ![a picture](a.jpg).[^n]\n\n## Two `code`\n\n[^n]: A [note link](/post-2/).\n";

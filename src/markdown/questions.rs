@@ -9,26 +9,16 @@ use crate::source::Place;
 /// The words of `node` as plain text, for headings and opening words:
 /// writing, code and maths as written, each block on a line of its own.
 /// Raw HTML, calls, footnote markers and pictures' descriptions are no
-/// part of it.
+/// part of it, nor is the text of the elements a browser doesn't show.
 pub fn plain_text(node: &Node) -> String {
-    text(node, false)
-}
-
-/// [`plain_text`] without the text of the elements a browser doesn't show,
-/// for the words a reader reads.
-pub(super) fn seen_text(node: &Node) -> String {
-    text(node, true)
-}
-
-fn text(node: &Node, seen: bool) -> String {
     let mut out = String::new();
-    text_of(node, &mut out, seen);
+    text_of(node, &mut out);
     let kept = out.trim_end().len();
     out.truncate(kept);
     out
 }
 
-fn text_of(node: &Node, out: &mut String, seen: bool) {
+fn text_of(node: &Node, out: &mut String) {
     match &node.kind {
         Kind::Text(text) | Kind::Literal(text) | Kind::Code(text) | Kind::Maths { text, .. } => {
             out.push_str(text)
@@ -49,7 +39,7 @@ fn text_of(node: &Node, out: &mut String, seen: bool) {
             // text isn't shown.
             let mut unseen: Option<String> = None;
             for child in &node.children {
-                if let (true, Kind::Html(html)) = (seen, &child.kind) {
+                if let Kind::Html(html) = &child.kind {
                     for (_, piece) in crate::html::markup(html) {
                         match piece {
                             Markup::Start(tag)
@@ -63,7 +53,7 @@ fn text_of(node: &Node, out: &mut String, seen: bool) {
                     }
                 }
                 if unseen.is_none() {
-                    text_of(child, out, seen);
+                    text_of(child, out);
                 }
             }
             let holds_words =

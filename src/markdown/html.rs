@@ -266,7 +266,7 @@ impl<'a> Writer<'a> {
                 let start = self.out.len();
                 self.line(&node.children);
                 if self.main && self.opening.is_none() {
-                    let words = opening::closed_up(&super::questions::seen_text(node));
+                    let words = opening::closed_up(&super::questions::plain_text(node));
                     if !words.is_empty() {
                         self.opening = Some(Opening {
                             inner: start..self.out.len(),
