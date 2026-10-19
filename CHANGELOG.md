@@ -50,6 +50,14 @@ What changed in each release of Statac, the newest first.
   `later_pages` in `statac.yaml`, with the page's first line shown
   beneath, or at the page where the site doesn't set `later_pages`. It
   was told in no file.
+- `serve` shows what a page shows of a file through `page.file()`,
+  beside the page or in `static/`, as the file is after a save made
+  while a build ran. Where the disk's times move in steps, it does so
+  too after a save at the file's length straight after a build read it,
+  which left the file its time. Serve kept the page as it was until the
+  file changed again. A file `before_build` writes again in that way is
+  taken as the command's writing, where serve took it for a save of the
+  author's.
 
 ## 0.5.0 - 2026-10-18
 

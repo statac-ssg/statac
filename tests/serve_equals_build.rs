@@ -478,6 +478,43 @@ fn a_page_written_again_at_its_length_and_time_is_read_again() {
     );
 }
 
+#[test]
+fn a_file_a_page_shows_written_again_at_its_length_within_the_step_is_read_again() {
+    let site = Site::new("file-same-step");
+    site.write(
+        "templates/note.html",
+        "{{ page.file('note.txt').text }}\n{{ page.file('/note.txt').text }}\n",
+    );
+    site.write(
+        "content/notes/index.md",
+        "---\ntitle: Notes\ntype: note\n---\nNotes.\n",
+    );
+    site.write("content/notes/note.txt", "one\n");
+    site.write("static/note.txt", "one\n");
+    // A time the round's clock is before, as a file written within the
+    // step a disk's times were in as the round began has.
+    let later = SystemTime::now() + Duration::from_secs(3600);
+    through(
+        &site,
+        &[
+            ("a file beside a page given a later time", &|site| {
+                written_at(site, "content/notes/note.txt", "two\n", later)
+            }),
+            ("a file in static/ given a later time", &|site| {
+                written_at(site, "static/note.txt", "two\n", later)
+            }),
+            ("no edit", &|_| {}),
+            ("the file beside written again within the step", &|site| {
+                written_at(site, "content/notes/note.txt", "six\n", later)
+            }),
+            (
+                "the file in static/ written again within the step",
+                &|site| written_at(site, "static/note.txt", "six\n", later),
+            ),
+        ],
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn a_page_replaced_by_a_link_or_a_folder() {
@@ -1514,6 +1551,36 @@ fn the_command_before_a_build_runs_again_only_for_what_it_watches() {
     // The command's own writing, come back as a save, runs nothing.
     session.rebuild_for(&changed(&["tokens.txt.old", "stylesheets/site.css"]));
     assert_eq!(ran(), 3, "names that only open as a watched one does");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_file_the_command_before_a_build_writes_again_within_the_step_is_told() {
+    let site = Site::new("before-same-step");
+    let commands = "before_build: cp next.txt made.txt && touch -r later.txt made.txt\n\
+                    before_build_watches: [next.txt]\n";
+    site.write("statac.yaml", &format!("{SETTINGS}{commands}"));
+    site.write("next.txt", "one\n");
+    // A time the round's clock is before, as a file written within the
+    // step a disk's times were in as the round began has.
+    let later = SystemTime::now() + Duration::from_secs(3600);
+    written_at(&site, "later.txt", "", later);
+    let (mut session, round) = Session::start(&Options {
+        out: None,
+        ..site.options()
+    });
+    assert!(!round.outcome.stopped(), "{}", site.said(&round.outcome));
+    let wrote = |round: &Round| -> Vec<String> {
+        round.hooked.iter().map(|(file, _)| file.clone()).collect()
+    };
+    assert_eq!(wrote(&round), ["made.txt"]);
+
+    // Written again at its length and given the same time.
+    site.write("next.txt", "two\n");
+    let round = session.rebuild_for(&["next.txt".to_owned()]);
+    assert_eq!(wrote(&round), ["made.txt"]);
+    let made = blake3::hash(b"two\n");
+    assert_eq!(round.hooked[0].1, Some(made));
 }
 
 #[cfg(unix)]

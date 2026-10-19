@@ -10,14 +10,15 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Write};
-use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::album::Root;
 use crate::build::{Options, Output, Plan};
 use crate::content::words::PageWord;
+use crate::disk::{Clock, Stamp};
 use crate::origin::{Origin, Sourced};
 use crate::reads::{Key, Translation};
 use crate::site::{Id, Item, ListId, ListKey, NameId, PageId, Site};
@@ -278,12 +279,18 @@ impl Print {
         }
     }
 
-    /// With a file on disk as it stands: its length and when it was last
-    /// changed.
-    fn on_disk(self, path: &Path) -> Print {
-        let found = fs::metadata(path).ok();
-        let changed = found.as_ref().and_then(|found| found.modified().ok());
-        self.with(found.map(|found| found.len())).with(changed)
+    /// With a file on disk as the reading read it: its stamp, where
+    /// `clock`, read as the reading began, settles it. Otherwise the file
+    /// may have changed since it was read, and the print is equal to no
+    /// other.
+    fn on_disk(self, path: &Path, clock: Option<&Clock>) -> Print {
+        static UNSETTLED: AtomicU64 = AtomicU64::new(0);
+        match Stamp::at(path) {
+            Some(stamp) if !clock.is_some_and(|clock| stamp.settled(clock)) => {
+                self.with((1u8, UNSETTLED.fetch_add(1, Ordering::Relaxed)))
+            }
+            stamp => self.with((0u8, stamp)),
+        }
     }
 
     fn done(self) -> u64 {
@@ -304,6 +311,8 @@ fn slots(len: usize) -> Slots {
 /// what a later reading is held to is what this one held when it was read
 /// and not what the disk holds by then.
 pub(super) struct Prints {
+    /// What the site's disk gave a file written as the reading began.
+    clock: Option<Clock>,
     /// Each file read, by its source.
     texts: Slots,
     fronts: Slots,
@@ -342,10 +351,12 @@ pub(super) struct Prints {
 }
 
 impl Prints {
-    pub fn new(reading: &Reading) -> Prints {
+    /// The prints of `reading`, which began once `clock` was read.
+    pub fn new(reading: &Reading, clock: Option<Clock>) -> Prints {
         let (pages, lists) = (reading.pages.len(), reading.lists.len());
         let languages = reading.renderer.site().languages.len();
         Prints {
+            clock,
             texts: slots(reading.sources.len()),
             fronts: slots(pages),
             bodies: slots(pages),
@@ -423,6 +434,7 @@ impl Taken<'_> {
         let renderer = &reading.renderer;
         let sources = renderer.sources();
         let site = renderer.site();
+        let clock = self.prints.clock.as_ref();
         let templates: HashSet<SourceId> =
             (reading.template_files.iter().map(|(source, _)| *source)).collect();
         let mut print = Print::default();
@@ -442,7 +454,7 @@ impl Taken<'_> {
         }
         for file in renderer.card_files() {
             print = print
-                .on_disk(&crate::platform::join(self.at, &file))
+                .on_disk(&crate::platform::join(self.at, &file), clock)
                 .with(file);
         }
         print
@@ -490,6 +502,7 @@ impl Taken<'_> {
         let prints = self.prints;
         let renderer = &reading.renderer;
         let site = renderer.site();
+        let clock = prints.clock.as_ref();
         match key {
             Key::Field(page, _) | Key::Card(page) => self.front(page),
             Key::Body(page) => self.body(page),
@@ -590,14 +603,14 @@ impl Taken<'_> {
                 Print::default()
                     .with((self.every_file(), &file.path, page))
                     .shown(&file.address)
-                    .on_disk(&crate::platform::join(&site.content, &file.path))
+                    .on_disk(&crate::platform::join(&site.content, &file.path), clock)
                     .done()
             }),
             Key::Static(at) => *prints.statics[at as usize].get_or_init(|| {
                 let file = &renderer.assets().statics()[at as usize];
                 Print::default()
                     .with((self.every_file(), &file.name))
-                    .on_disk(file.path())
+                    .on_disk(file.path(), clock)
                     .done()
             }),
             Key::Files => self.every_file(),
@@ -959,6 +972,8 @@ impl Taken<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::Duration;
 
     /// What every page answers to each of `names`, the site at `root`
     /// having its first page written as `page`.
@@ -966,7 +981,7 @@ mod tests {
         fs::write(root.join("content/page-1.md"), page).unwrap();
         let (renderer, _) = crate::build::renderer(root, None);
         let reading = Reading::of(renderer);
-        let prints = Prints::new(&reading);
+        let prints = Prints::new(&reading, None);
         let taken = Taken {
             reading: &reading,
             at: root,
@@ -1015,5 +1030,48 @@ mod tests {
         assert_eq!(typed[..3], was[..3]);
         assert_ne!(typed[3], was[3]);
         assert_eq!(untyped, was);
+    }
+
+    #[test]
+    fn a_file_changed_after_the_reading_began_is_held_to_no_print() {
+        let root = std::env::temp_dir().join(format!("statac-print-disk-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("content")).unwrap();
+        fs::create_dir_all(root.join("templates")).unwrap();
+        fs::write(root.join("statac.yaml"), "title: Site\n").unwrap();
+        for template in ["page", "home"] {
+            let path = root.join(format!("templates/{template}.html"));
+            fs::write(path, "{{ page.content }}\n").unwrap();
+        }
+        fs::write(root.join("content/page-1.md"), "A page.\n").unwrap();
+        let note = root.join("content/note-1.txt");
+        fs::write(&note, "one\n").unwrap();
+        // What a reading begun once `clock` was read takes of the file.
+        let print = |clock: Option<Clock>| {
+            let (renderer, _) = crate::build::renderer(&root, None);
+            let reading = Reading::of(renderer);
+            let prints = Prints::new(&reading, clock);
+            let taken = Taken {
+                reading: &reading,
+                at: &root,
+                prints: &prints,
+            };
+            taken.of(Key::Beside(0))
+        };
+        // A clock its times are surely before, however coarse the disk's.
+        let long_after =
+            || Clock::of_site(&root).map(|clock| clock.later(Duration::from_secs(3600)));
+
+        let began = Clock::of_site(&root);
+        // Saved at its length once the reading began, before what the
+        // reading read of it is taken.
+        fs::write(&note, "two\n").unwrap();
+        let during = print(began);
+        let after = print(long_after());
+        let again = print(long_after());
+        let _ = fs::remove_dir_all(&root);
+        assert!(began.is_some());
+        assert_ne!(during, after);
+        assert_eq!(after, again);
     }
 }

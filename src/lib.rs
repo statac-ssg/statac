@@ -8,6 +8,7 @@ pub mod content;
 pub mod data;
 pub mod date;
 pub mod dates;
+pub mod disk;
 mod elsewhere;
 pub mod feeds;
 pub mod fetch;

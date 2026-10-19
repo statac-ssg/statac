@@ -7,7 +7,8 @@ use std::fs;
 use std::io::{self, Read as _};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
+
+use crate::disk::{Clock, Stamp};
 
 /// Texts kept from one reading of a site for the next. The default keeps
 /// nothing, and every file is read.
@@ -16,7 +17,7 @@ pub struct Texts {
     keeps: bool,
     /// What a file written as this reading began was found to be, where
     /// that could be read.
-    clock: Option<Stamp>,
+    clock: Option<Clock>,
     kept: HashMap<PathBuf, Arc<Kept>>,
 }
 
@@ -33,45 +34,12 @@ pub(super) struct Text {
     kept: Option<Arc<Kept>>,
 }
 
-/// What a file was found to be: its length, when its bytes and when
-/// anything of it last changed, and which file on which disk it is. Any
-/// change to a file after its stamp was taken, or another file put in its
-/// place, is found as another stamp, where the stamp is [`Stamp::settled`].
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct Stamp {
-    len: u64,
-    modified: SystemTime,
-    changed: (i64, i64),
-    disk: u64,
-    file: u64,
-}
-
-impl Stamp {
-    fn of(found: &fs::Metadata) -> Option<Stamp> {
-        if !found.is_file() {
-            return None;
-        }
-        // Off Unix none of these can be read, and a stamp without them
-        // could miss a file written again and given back its time, or
-        // another put in its place: nothing is kept.
-        let (changed, disk, file) = crate::platform::changed_and_placed(found)?;
-        Some(Stamp {
-            len: found.len(),
-            modified: found.modified().ok()?,
-            changed,
-            disk,
-            file,
-        })
-    }
-
-    /// Whether a file stamped as this one, on a disk where `clock` was
-    /// read from a file written as the reading began, was last changed
-    /// before then. A disk's times move in steps, and a file changed again
-    /// within the step it was last changed in keeps its times; a change
-    /// after the clock was read takes a time no earlier than the clock's.
-    fn settled(&self, clock: &Stamp) -> bool {
-        self.disk == clock.disk && self.modified < clock.modified && self.changed < clock.changed
-    }
+/// The stamp of what `found` describes, where it is a file whose every
+/// change since gives another stamp, as [`Stamp::placed`] says.
+fn stamp_of(found: &fs::Metadata) -> Option<Stamp> {
+    // Off Unix a stamp can't say which file it is, or when anything of it
+    // last changed: nothing is kept.
+    Stamp::of(found).filter(|stamp| found.is_file() && stamp.placed())
 }
 
 impl Texts {
@@ -87,9 +55,7 @@ impl Texts {
     /// be a page is read.
     pub(super) fn begin(&mut self, site: &Path) {
         self.clock = match self.keeps {
-            true => crate::publish::written_now(site)
-                .as_ref()
-                .and_then(Stamp::of),
+            true => Clock::of_site(site),
             false => None,
         };
     }
@@ -107,7 +73,7 @@ impl Texts {
             });
         };
         if let Some(kept) = self.kept.get(path)
-            && fs::metadata(path).is_ok_and(|found| Stamp::of(&found) == Some(kept.stamp))
+            && fs::metadata(path).is_ok_and(|found| stamp_of(&found) == Some(kept.stamp))
         {
             return Ok(Text {
                 text: kept.text.clone(),
@@ -118,7 +84,7 @@ impl Texts {
         // Stamped as opened, so the stamp is of the file read whatever is
         // put at `path` meanwhile.
         let mut file = fs::File::open(path)?;
-        let stamp = file.metadata().ok().as_ref().and_then(Stamp::of);
+        let stamp = file.metadata().ok().as_ref().and_then(stamp_of);
         let mut text = String::new();
         file.read_to_string(&mut text)?;
         let lines = crate::source::line_starts(&text);
@@ -144,7 +110,7 @@ impl Texts {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use std::time::{Duration, SystemTime};
 
     const HOUR: Duration = Duration::from_secs(3600);
 
@@ -174,37 +140,11 @@ mod tests {
         }
     }
 
-    fn stamp(len: u64, modified: SystemTime, changed: i64, disk: u64) -> Stamp {
-        Stamp {
-            len,
-            modified,
-            changed: (changed, 0),
-            disk,
-            file: 1,
-        }
-    }
-
     /// What a reading gives of each of `paths`, kept for the next.
     fn read(texts: &mut Texts, paths: &[&Path]) -> Vec<String> {
         let read: Vec<Text> = paths.iter().map(|path| texts.read(path).unwrap()).collect();
         texts.keep(paths.iter().copied().zip(&read));
         read.into_iter().map(|text| text.text).collect()
-    }
-
-    #[test]
-    fn a_stamp_is_settled_only_where_both_times_are_before_the_clock_on_its_disk() {
-        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000);
-        let clock = stamp(1, now, 1_800_000_000, 7);
-        let earlier = now - HOUR;
-        assert!(stamp(5, earlier, 1_799_999_999, 7).settled(&clock));
-        // Within the clock's step, or after it.
-        assert!(!stamp(5, now, 1_799_999_999, 7).settled(&clock));
-        assert!(!stamp(5, now + HOUR, 1_799_999_999, 7).settled(&clock));
-        assert!(!stamp(5, earlier, 1_800_000_000, 7).settled(&clock));
-        // A time of its bytes set back says nothing of a change since.
-        assert!(!stamp(5, earlier, 1_800_000_001, 7).settled(&clock));
-        // Another disk keeps its own time.
-        assert!(!stamp(5, earlier, 1_799_999_999, 8).settled(&clock));
     }
 
     #[test]
@@ -232,10 +172,8 @@ mod tests {
         let mut texts = Texts::keeping();
         texts.begin(&scratch.0);
         // A clock its times are surely before, however coarse the disk's.
-        let mut clock = texts.clock.expect("a clock on this disk");
-        clock.modified += 2 * HOUR;
-        clock.changed.0 += 7200;
-        texts.clock = Some(clock);
+        let clock = texts.clock.expect("a clock on this disk");
+        texts.clock = Some(clock.later(2 * HOUR));
         assert_eq!(read(&mut texts, &[&path]), ["one"]);
         assert_eq!(texts.kept.len(), 1);
 
@@ -248,11 +186,11 @@ mod tests {
         // clock moved on says the first writing's step is over, so the
         // disk's own time must have left that step too, which a coarse
         // disk's may not have done this soon after it.
-        let first = Stamp::of(&fs::metadata(&path).unwrap()).unwrap();
+        let first = Stamp::at(&path).unwrap();
         let mut tries = 0;
         loop {
             scratch.write("post.md", "six", earlier);
-            if Stamp::of(&fs::metadata(&path).unwrap()).unwrap() != first {
+            if Stamp::at(&path).unwrap() != first {
                 break;
             }
             tries += 1;

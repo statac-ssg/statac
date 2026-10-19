@@ -237,7 +237,7 @@ fn after(
     let after = staging.files()?;
     let changed = Changed {
         added: after.names().filter(|file| !before.holds(file)).count(),
-        changed: after.changed_since(&before),
+        changed: after.changed_since(&before).len(),
         removed: before.names().filter(|file| !after.holds(file)).count(),
     };
     let held = |rel: &str, folder: bool| {

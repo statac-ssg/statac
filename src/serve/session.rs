@@ -27,6 +27,7 @@ use rayon::prelude::*;
 use crate::album::{KEPT, Progress};
 use crate::build::{self, Built, Mode, Options, Output, Plan, Publishing, Remembered, Writes};
 use crate::content::words::PageWord;
+use crate::disk::{Clock, Inventory};
 use crate::hooks::Before;
 use crate::new::update::Starter;
 use crate::problem::{Kind, Problem};
@@ -294,12 +295,18 @@ impl Session {
         }
         // What the command writes into the site is this round's to build,
         // and no save of the author's.
-        let was = if sets { marks(at) } else { Marks::new() };
+        let was = sets.then(|| {
+            let clock = Clock::of_site(at);
+            let files = own_files(at);
+            Inventory::to_compare(at, files, |path| std::fs::metadata(path), clock.as_ref())
+        });
         let ran = crate::hooks::before(&self.options, Progress::Silent, true);
-        let hooked = if sets {
-            written_between(at, &was, &marks(at))
-        } else {
-            Vec::new()
+        let hooked = match was {
+            Some(was) => {
+                let now = Inventory::of(at, own_files(at), |path| std::fs::metadata(path));
+                written_between(at, &was, &now)
+            }
+            None => Vec::new(),
         };
         let mut round = match ran {
             Ok(before) => {
@@ -337,6 +344,9 @@ impl Session {
             *part = clock.elapsed();
             clock = Instant::now();
         };
+        // Read before the round reads any file of the site, so that a
+        // stamp it settles is of the file as the round read it.
+        let disk = Clock::of_site(at);
         let texts = &mut self.texts;
         let mut prepared = build::prepared_with(at, &options.run(), texts);
         let newer = (self.newer)
@@ -360,7 +370,7 @@ impl Session {
         if after != self.after && !build::stops(&prepared.problems) {
             self.last = None;
         }
-        let prints = Prints::new(&reading);
+        let prints = Prints::new(&reading, disk);
         let taken = Taken {
             reading: &reading,
             at,
@@ -663,33 +673,29 @@ fn noted(
     noted.collect()
 }
 
-/// Every file of a site's own, by its path from the site's folder, with
-/// its length and when it was last changed.
-type Marks = HashMap<String, (u64, Option<std::time::SystemTime>)>;
-
-fn marks(site: &Path) -> Marks {
-    let files = crate::serve::watch::files(site).into_iter();
-    let marked = files.filter_map(|file| {
-        let found = std::fs::metadata(crate::platform::join(site, &file)).ok()?;
-        Some((file, (found.len(), found.modified().ok())))
-    });
-    marked.collect()
+/// Every file of the site's own at `site`, by its path from the site's
+/// folder.
+fn own_files(site: &Path) -> Vec<String> {
+    crate::serve::watch::files(site).into_iter().collect()
 }
 
 /// The files of the site at `site` that differ between `was` and `now`,
 /// each with what it holds, or nothing where it has gone.
-fn written_between(site: &Path, was: &Marks, now: &Marks) -> Vec<(String, Option<blake3::Hash>)> {
-    let changed = now
-        .iter()
-        .filter(|(file, mark)| was.get(*file) != Some(mark));
+fn written_between(
+    site: &Path,
+    was: &Inventory,
+    now: &Inventory,
+) -> Vec<(String, Option<blake3::Hash>)> {
+    let added = now.names().filter(|file| !was.holds(file));
+    let changed = added.chain(now.changed_since(was));
     let mut written: Vec<(String, Option<blake3::Hash>)> = changed
-        .map(|(file, _)| {
-            let held = std::fs::read(crate::platform::join(site, file));
-            (file.clone(), held.ok().map(|held| blake3::hash(&held)))
+        .map(|file| {
+            let held = crate::disk::hashed(&crate::platform::join(site, file));
+            (file.to_owned(), held)
         })
         .collect();
-    let gone = was.keys().filter(|file| !now.contains_key(*file));
-    written.extend(gone.map(|file| (file.clone(), None)));
+    let gone = was.names().filter(|file| !now.holds(file));
+    written.extend(gone.map(|file| (file.to_owned(), None)));
     written.sort_by(|a, b| a.0.cmp(&b.0));
     written
 }

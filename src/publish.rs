@@ -26,11 +26,12 @@ use std::io::{self, Read, Seek};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 
 use crate::album::{KEPT, kept, kept_in};
+use crate::disk::{CLOCK, Clock, Inventory, Stamp};
 use crate::platform::{self, Over};
 use crate::problem::{Kind, Problem, system_reason};
 
@@ -60,11 +61,6 @@ pub const MARKER: &str = ".statac-built";
 
 const MARKER_TEXT: &str = "Statac built this folder and replaces all of it on every build.\n\
                            Keep files you want published in the site's static/ folder.\n";
-
-/// The file written and removed in the site's `.statac`, and the end of the
-/// name of one written and removed beside the output, to read the time
-/// their disk gives a file written now.
-const CLOCK: &str = ".statac-clock";
 
 /// The spare's name in `.statac`.
 const SPARE: &str = "spare";
@@ -139,69 +135,16 @@ pub struct Left {
     copied: HashMap<String, Stamp>,
 }
 
-/// A file's length and when it was last changed: what a file copied from
-/// it is trusted by, by a build that writes where an earlier one wrote.
-pub type Stamp = (u64, SystemTime);
-
-/// The files a folder held at one moment, for a later look at it to say
-/// which were added, changed or removed.
-pub struct Inventory {
-    root: PathBuf,
-    /// Each file by its path from the top, with its stamp where the
-    /// system gives one.
-    stamps: HashMap<String, Option<Stamp>>,
-    /// The hash of the bytes of each file whose stamp may not show that
-    /// it was written again.
-    hashes: HashMap<String, blake3::Hash>,
-}
-
-impl Inventory {
-    pub fn holds(&self, rel: &str) -> bool {
-        self.stamps.contains_key(rel)
-    }
-
-    pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.stamps.keys().map(String::as_str)
-    }
-
-    /// How many of the files `before` held, and this holds, have changed.
-    pub fn changed_since(&self, before: &Inventory) -> usize {
-        (self.stamps.par_iter())
-            .filter(|(rel, stamp)| {
-                let Some(was) = before.stamps.get(*rel) else {
-                    return false;
-                };
-                was != *stamp
-                    || (before.hashes.get(*rel)).is_some_and(|hash| {
-                        hashed(&platform::join(&self.root, rel)).as_ref() != Some(hash)
-                    })
-            })
-            .count()
-    }
-}
-
-/// The hash of the bytes of the file at `path`, where it can be read.
-fn hashed(path: &Path) -> Option<blake3::Hash> {
-    let mut hasher = blake3::Hasher::new();
-    hasher.update_reader(fs::File::open(path).ok()?).ok()?;
-    Some(hasher.finalize())
-}
-
-fn stamp(file: &fs::File) -> Option<Stamp> {
-    let found = file.metadata().ok()?;
-    Some((found.len(), found.modified().ok()?))
-}
-
 #[derive(Debug)]
 struct Notes {
     /// What the files the folder holds were copied from.
     before: HashMap<String, Stamp>,
     written: Mutex<Vec<String>>,
     copied: Mutex<HashMap<String, Stamp>>,
-    /// The time the site's disk gave a file written as the build began.
-    /// A file last changed at that time or after may be written again
-    /// within the same step of the disk's times and keep its stamp.
-    clock: Option<SystemTime>,
+    /// What the site's disk gave a file written as the build began. A
+    /// file whose stamp it doesn't settle may be written again and keep
+    /// its stamp.
+    clock: Option<Clock>,
     /// Where what the build left is put once it has finished.
     left: Arc<Mutex<Option<Left>>>,
 }
@@ -733,9 +676,9 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
 /// ask for them; whatever else is there stays as it is. The build leaves
 /// in `into` what has become of `files`, and of any it added. A file
 /// copied from one of the site at `site` is taken as still equal to it
-/// where that file has the length and the time it had when the build that
-/// `left` it copied it. A build dropped unfinished leaves the folder as
-/// far as it got.
+/// where that file has the stamp it had when the build that `left` it
+/// copied it. A build dropped unfinished leaves the folder as far as it
+/// got.
 pub fn resume(
     site: &Path,
     folder: &Path,
@@ -764,44 +707,10 @@ pub fn resume(
             before: left.copied.clone(),
             written: Mutex::default(),
             copied: Mutex::default(),
-            clock: clock_of(site),
+            clock: Clock::of_site(site),
             left: into,
         }),
     }
-}
-
-/// The time [`written_now`] gives.
-fn clock_of(site: &Path) -> Option<SystemTime> {
-    written_now(site)?.modified().ok()
-}
-
-/// What the disk the site at `site` is on gives a file written now, read
-/// from one written in its `.statac` and removed. None where it can't be
-/// read.
-pub(crate) fn written_now(site: &Path) -> Option<fs::Metadata> {
-    let kept = kept(site).ok()?;
-    found_now_at(&kept.join(CLOCK)).ok()?
-}
-
-/// The time the disk gives a file written now, read from one written at
-/// `at` and removed. None where the disk keeps no such time.
-fn time_now_at(at: &Path) -> io::Result<Option<SystemTime>> {
-    Ok(found_now_at(at)?.and_then(|found| found.modified().ok()))
-}
-
-/// What the disk gives a file written now, read from one written at `at`
-/// and removed.
-fn found_now_at(at: &Path) -> io::Result<Option<fs::Metadata>> {
-    // Made anew, so that it takes the time whatever was there before.
-    if exists(at) {
-        fs::remove_file(at)?;
-    }
-    let mut file = (fs::OpenOptions::new().write(true).create_new(true)).open(at)?;
-    io::Write::write_all(&mut file, b"\n")?;
-    let found = file.metadata().ok();
-    drop(file);
-    fs::remove_file(at)?;
-    Ok(found)
 }
 
 /// Where the spare of the site at `site` is kept for a build into `out`:
@@ -875,7 +784,7 @@ impl Staging {
             before: HashMap::new(),
             written: Mutex::default(),
             copied: Mutex::default(),
-            clock: clock_of(site),
+            clock: Clock::of_site(site),
             left: into,
         });
         self
@@ -922,7 +831,7 @@ impl Staging {
     /// would change it. Any other is known by its bytes.
     fn copied(&self, rel: &str, from: Option<Stamp>) {
         if let (Some(notes), Some(from)) = (&self.notes, from)
-            && notes.clock.is_some_and(|clock| from.1 < clock)
+            && notes.clock.is_some_and(|clock| from.settled(&clock))
         {
             let mut copied = notes.copied.lock().expect("never poisoned");
             copied.insert(rel.to_owned(), from);
@@ -1012,7 +921,10 @@ impl Staging {
             })
         };
         let mut source = fs::File::open(from).map_err(|error| cant_read(&error))?;
-        let found = self.notes.as_ref().and_then(|_| stamp(&source));
+        let found = self.notes.as_ref().and_then(|_| {
+            let found = source.metadata().ok()?;
+            Stamp::of(&found)
+        });
         if self.stands_as_left(rel, found) {
             return Ok(());
         }
@@ -1054,7 +966,7 @@ impl Staging {
             })
         })?;
         let changed = found.modified().ok();
-        let from_stamp = changed.map(|changed| (found.len(), changed));
+        let from_stamp = Stamp::of(&found);
         if self.stands_as_left(rel, from_stamp) {
             return Ok(());
         }
@@ -1091,9 +1003,9 @@ impl Staging {
     }
 
     /// Whether the folder, written where it stands, holds at `rel` the
-    /// copy the build before left of a file that had the length and the
-    /// time `from` has now. Such a copy is this build's as it stands:
-    /// nothing of it is read, written or removed.
+    /// copy the build before left of a file that had the stamp `from` is.
+    /// Such a copy is this build's as it stands: nothing of it is read,
+    /// written or removed.
     fn stands_as_left(&self, rel: &str, from: Option<Stamp>) -> bool {
         let (true, Some(notes), Some(spare), Some(from)) =
             (self.in_place, &self.notes, &self.spare, from)
@@ -1216,59 +1128,44 @@ impl Staging {
     /// Every file the folder written into holds now, each by its path
     /// with forward slashes, with its stamp where the system gives one.
     pub fn files(&self) -> Result<Inventory, Problem> {
+        let found = |path: &Path| fs::symlink_metadata(path);
+        Ok(Inventory::of(&self.fresh, self.held()?, found))
+    }
+
+    /// Every file the folder written into holds now, as [`Staging::files`]
+    /// gives them, known well enough for a later look to tell one written
+    /// again at its length and time, as [`Inventory::to_compare`] has it.
+    pub fn files_to_compare(&self) -> Result<Inventory, Problem> {
+        let clock = self.disk_clock();
+        let found = |path: &Path| fs::symlink_metadata(path);
+        Ok(Inventory::to_compare(
+            &self.fresh,
+            self.held()?,
+            found,
+            clock.as_ref(),
+        ))
+    }
+
+    /// Every file the folder written into holds, by its path from the top.
+    fn held(&self) -> Result<Vec<String>, Problem> {
         let held = Held::under(&self.fresh, "").map_err(|error| {
             Problem::nowhere(Kind::CantRead {
                 path: self.shown.clone(),
                 reason: system_reason(&error),
             })
         })?;
-        let stamped = held.files.into_par_iter().map(|rel| {
-            let found = fs::symlink_metadata(platform::join(&self.fresh, &rel)).ok();
-            let stamp = found.and_then(|found| Some((found.len(), found.modified().ok()?)));
-            (rel, stamp)
-        });
-        Ok(Inventory {
-            root: self.fresh.clone(),
-            stamps: stamped.collect(),
-            hashes: HashMap::new(),
-        })
+        Ok(held.files)
     }
 
-    /// Every file the folder written into holds now, as [`Staging::files`]
-    /// gives them, known well enough for a later look to tell one written
-    /// again at the same length. Writing a file moves its time where it
-    /// was last changed before the disk's time now; one changed since may
-    /// keep its time, the disk's times moving in steps, so it is known by
-    /// its bytes.
-    pub fn files_to_compare(&self) -> Result<Inventory, Problem> {
-        let mut inventory = self.files()?;
-        let now = self.disk_time();
-        let unsure: Vec<String> = (inventory.stamps.iter())
-            .filter(|(_, stamp)| match (stamp, now) {
-                (Some((_, changed)), Some(now)) => *changed >= now,
-                _ => true,
-            })
-            .map(|(rel, _)| rel.clone())
-            .collect();
-        inventory.hashes = (unsure.into_par_iter())
-            .filter_map(|rel| {
-                let hash = hashed(&platform::join(&self.fresh, &rel))?;
-                Some((rel, hash))
-            })
-            .collect();
-        Ok(inventory)
-    }
-
-    /// The time the disk the output is on gives a file written now, read
-    /// from one written beside the output under a name of Statac's own and
-    /// removed: the folder written into may hold a file of the site's by
-    /// any name. None where the disk keeps no such time or the file can't
-    /// be written there.
-    fn disk_time(&self) -> Option<SystemTime> {
+    /// The clock of the disk the output is on, read from a file written
+    /// beside the output under a name of Statac's own and removed: the
+    /// folder written into may hold a file of the site's by any name. None
+    /// where the disk keeps no time or the file can't be written there.
+    fn disk_clock(&self) -> Option<Clock> {
         let mut name = std::ffi::OsString::from(".");
         name.push(self.out.file_name()?);
         name.push(CLOCK);
-        time_now_at(&self.out.with_file_name(name)).ok()?
+        Clock::at(&self.out.with_file_name(name)).ok()?
     }
 
     /// Puts the folder written into in the output's place.
@@ -1680,6 +1577,7 @@ mod tests {
         let from = scratch.site().join("file-1.txt");
         fs::write(&from, "one").unwrap();
         change(&from, long_ago());
+        crate::disk::wait_until_settled(&scratch.site(), &from);
         let into = Arc::new(Mutex::new(None));
         let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
         staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
@@ -1818,13 +1716,15 @@ mod tests {
         let before = staging.files_to_compare().unwrap();
         assert_eq!(fs::read(at(CLOCK)).unwrap(), b"mine\n");
         assert!(!exists(&scratch.0.join(format!(".out{CLOCK}"))));
-        // Written again at the same length, within the same step.
-        for (rel, text) in [("same.txt", b"one\n"), ("rewritten.txt", b"two\n")] {
-            fs::write(at(rel), text).unwrap();
-            change(&at(rel), now);
-        }
+        // Written again at the same length, within the same step, which a
+        // file of that step left as it is is not.
+        fs::write(at("rewritten.txt"), b"two\n").unwrap();
+        change(&at("rewritten.txt"), now);
         fs::write(at("old.txt"), b"two\n").unwrap();
-        assert_eq!(staging.files().unwrap().changed_since(&before), 2);
+        let after = staging.files().unwrap();
+        let mut changed = after.changed_since(&before);
+        changed.sort_unstable();
+        assert_eq!(changed, ["old.txt", "rewritten.txt"]);
     }
 
     #[test]

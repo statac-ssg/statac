@@ -10,10 +10,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use notify::{Config, Event, EventKind, PollWatcher, RecommendedWatcher, RecursiveMode, Watcher};
 
+use crate::disk::{Clock, Stamp};
 use crate::platform;
 use crate::problem::system_reason;
 use crate::publish::MARKER;
@@ -129,7 +130,7 @@ pub fn start(
 
     let mut known = BTreeSet::new();
     walk(&root, &root, &mut known);
-    let as_found = as_found(&root, &known, SystemTime::now());
+    let as_found = as_found(&root, &known, Clock::of_site(&root).as_ref());
     let awake = match (&source, platform::KEEPS_REPORTS_PROMPT) {
         (Source::Native(_), Some(every)) => Some(keep_awake(&canonical, every).map_err(io)?),
         _ => None,
@@ -387,38 +388,24 @@ fn within<'a>(known: &'a BTreeSet<String>, folder: &str) -> impl Iterator<Item =
         .take_while(move |path| path.starts_with(&prefix))
 }
 
-/// A file's size and the time it was last written.
-type Stamp = (u64, SystemTime);
 type Found = BTreeMap<String, Stamp>;
 
-fn stamp(found: &std::fs::Metadata) -> Option<Stamp> {
-    Some((found.len(), found.modified().ok()?))
-}
-
-/// The stamp of each file in `known` as it is at `now`, for telling a
-/// report of a change made before watching began, which can arrive after
-/// it, from a save. A time with no fraction of a second may be all the
-/// disk keeps, and a save within the same second or two would leave such
-/// a stamp as it was, so one that recent is left out.
-fn as_found(root: &Path, known: &BTreeSet<String>, now: SystemTime) -> Found {
-    let settled = |written: SystemTime| {
-        let whole = written
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .is_ok_and(|since| since.subsec_nanos() == 0);
-        !whole || now.duration_since(written).is_ok_and(|ago| ago > COARSEST)
+/// The stamp of each file in `known`, for telling a report of a change
+/// made before watching began, which can arrive after it, from a save.
+/// Only a stamp `clock`, read before, settles is kept: a save since could
+/// leave another as it was.
+fn as_found(root: &Path, known: &BTreeSet<String>, clock: Option<&Clock>) -> Found {
+    let Some(clock) = clock else {
+        return Found::new();
     };
     known
         .iter()
         .filter_map(|path| {
-            let found = std::fs::metadata(platform::join(root, path)).ok()?;
-            let stamp = stamp(&found).filter(|(_, written)| settled(*written))?;
-            Some((path.clone(), stamp))
+            let stamp = Stamp::at(&platform::join(root, path))?;
+            stamp.settled(clock).then(|| (path.clone(), stamp))
         })
         .collect()
 }
-
-/// The longest step between the times a disk in use keeps for a file.
-const COARSEST: Duration = Duration::from_secs(2);
 
 fn look_at(
     root: &Path,
@@ -435,7 +422,7 @@ fn look_at(
                 // however like it is to what was found then.
                 if known.contains(&hint)
                     && let Some(was) = as_found.get(&hint)
-                    && stamp(&found).as_ref() == Some(was)
+                    && Stamp::of(&found).as_ref() == Some(was)
                 {
                     continue;
                 }
@@ -522,6 +509,8 @@ fn walk(root: &Path, folder: &Path, into: &mut BTreeSet<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const HOUR: Duration = Duration::from_secs(3600);
 
     struct Scratch(PathBuf);
 
@@ -666,8 +655,8 @@ mod tests {
         scratch.write("content/post-1.md");
         scratch.write("content/post-2.md");
         let mut known = scratch.known();
-        let later = SystemTime::now() + 2 * COARSEST;
-        let mut found = as_found(&scratch.0, &known, later);
+        let clock = Clock::of_site(&scratch.0).expect("a clock on this disk");
+        let mut found = as_found(&scratch.0, &known, Some(&clock.later(HOUR)));
         assert_eq!(found.len(), 2);
 
         let both = || hints(&["content/post-1.md", "content/post-2.md"]);
@@ -682,13 +671,32 @@ mod tests {
     }
 
     #[test]
+    fn a_file_changed_within_the_step_the_clock_was_read_in_is_not_taken_as_found() {
+        let scratch = Scratch::new("as-found-unsettled");
+        scratch.write("content/post-1.md");
+        scratch.write("content/post-2.md");
+        let known = scratch.known();
+        let clock = Clock::of_site(&scratch.0).expect("a clock on this disk");
+        let clock = clock.later(HOUR);
+        // A time the clock is before, as a file changed within the clock's
+        // step on a disk whose times move in steps has.
+        let post = scratch.0.join("content").join("post-2.md");
+        let file = std::fs::File::options().write(true).open(post).unwrap();
+        file.set_modified(std::time::SystemTime::now() + 2 * HOUR)
+            .unwrap();
+        let found = as_found(&scratch.0, &known, Some(&clock));
+        assert_eq!(found.keys().collect::<Vec<_>>(), ["content/post-1.md"]);
+        assert!(as_found(&scratch.0, &known, None).is_empty());
+    }
+
+    #[test]
     fn a_file_gone_and_back_as_it_was_when_watching_began_is_a_change() {
         let scratch = Scratch::new("back");
         scratch.write("content/post-1.md");
         scratch.write("content/post-2.md");
         let mut known = scratch.known();
-        let later = SystemTime::now() + 2 * COARSEST;
-        let mut found = as_found(&scratch.0, &known, later);
+        let clock = Clock::of_site(&scratch.0).expect("a clock on this disk");
+        let mut found = as_found(&scratch.0, &known, Some(&clock.later(HOUR)));
         let at = |name: &str| scratch.0.join("content").join(name);
         // Out of the site, and empty again once the test is done.
         let aside = scratch.0.with_extension("aside");
