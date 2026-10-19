@@ -2608,6 +2608,40 @@ fn the_words_and_the_opening_skip_tags_as_a_browser_does() {
     }
 }
 
+/// What a browser doesn't show is no words, in the count or the opening:
+/// a script, a style, a title in the writing and what stands in for
+/// what the browser can do. A text field shows its text.
+#[test]
+fn the_words_and_the_opening_leave_out_what_a_browser_does_not_show() {
+    let cases = [
+        (
+            "One <script>let a = b;</script>two three.\n",
+            "One two three.",
+        ),
+        (
+            "One <style>p { color: red }</style>two three.\n",
+            "One two three.",
+        ),
+        ("One <title>a b</title>two three.\n", "One two three."),
+        ("One <noscript>a b</noscript>two three.\n", "One two three."),
+        ("One <iframe>a b</iframe>two three.\n", "One two three."),
+        ("One <textarea>two</textarea> three.\n", "One two three."),
+        (
+            "<script>\nlet a = b;\n</script>\n\nOne two three.\n",
+            "One two three.",
+        ),
+    ];
+    for (text, opening) in cases {
+        let written = written(text);
+        assert_eq!(written.words, 3, "{text:?}");
+        assert_eq!(written.opening.as_deref(), Some(opening), "{text:?}");
+    }
+    let html = "<style>p { color: red }</style><p>One <script>a b</script>two.</p>\n";
+    let written = as_written(html);
+    assert_eq!(written.words, 2);
+    assert_eq!(written.opening.as_deref(), Some("One two."));
+}
+
 #[test]
 fn the_words_of_html_are_parted_where_a_reader_sees_them_apart() {
     assert_eq!(words_of("<p>a</p><p>b</p>"), "a b");

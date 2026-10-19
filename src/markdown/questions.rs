@@ -2,6 +2,8 @@
 
 use super::Document;
 use super::node::{Kind, Node};
+use super::opening::UNSEEN;
+use crate::html::Markup;
 use crate::source::Place;
 
 /// The words of `node` as plain text, for headings and opening words:
@@ -9,14 +11,24 @@ use crate::source::Place;
 /// Raw HTML, calls, footnote markers and pictures' descriptions are no
 /// part of it.
 pub fn plain_text(node: &Node) -> String {
+    text(node, false)
+}
+
+/// [`plain_text`] without the text of the elements a browser doesn't show,
+/// for the words a reader reads.
+pub(super) fn seen_text(node: &Node) -> String {
+    text(node, true)
+}
+
+fn text(node: &Node, seen: bool) -> String {
     let mut out = String::new();
-    text_of(node, &mut out);
+    text_of(node, &mut out, seen);
     let kept = out.trim_end().len();
     out.truncate(kept);
     out
 }
 
-fn text_of(node: &Node, out: &mut String) {
+fn text_of(node: &Node, out: &mut String, seen: bool) {
     match &node.kind {
         Kind::Text(text) | Kind::Literal(text) | Kind::Code(text) | Kind::Maths { text, .. } => {
             out.push_str(text)
@@ -33,8 +45,26 @@ fn text_of(node: &Node, out: &mut String) {
         | Kind::Task { .. }
         | Kind::Rule => {}
         _ => {
+            // The element of the author's HTML open among the words whose
+            // text isn't shown.
+            let mut unseen: Option<String> = None;
             for child in &node.children {
-                text_of(child, out);
+                if let (true, Kind::Html(html)) = (seen, &child.kind) {
+                    for (_, piece) in crate::html::markup(html) {
+                        match piece {
+                            Markup::Start(tag)
+                                if unseen.is_none() && UNSEEN.contains(&tag.name.as_str()) =>
+                            {
+                                unseen = Some(tag.name);
+                            }
+                            Markup::End(tag) if unseen.as_ref() == Some(&tag.name) => unseen = None,
+                            _ => {}
+                        }
+                    }
+                }
+                if unseen.is_none() {
+                    text_of(child, out, seen);
+                }
             }
             let holds_words =
                 !node.is_inline() && node.children.first().is_some_and(Node::is_inline);

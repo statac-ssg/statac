@@ -353,8 +353,17 @@ pub fn words_of(html: &str) -> String {
     read_words(html, false)
 }
 
+/// Elements whose text a browser reads without markup and doesn't show:
+/// `iframe`, `noembed` and `noframes` show theirs only where the browser
+/// can't do what they stand in for, and `noscript` only where scripts
+/// are off.
+pub(super) const UNSEEN: &[&str] = &[
+    "script", "style", "title", "iframe", "noembed", "noframes", "noscript",
+];
+
 /// [`words_of`], each `<pre>` element taken out where `without_code`, a
-/// space kept in its place so the words either side stay apart.
+/// space kept in its place so the words either side stay apart. What a
+/// browser doesn't show is taken out always.
 fn read_words(html: &str, without_code: bool) -> String {
     let mut out = String::with_capacity(html.len());
     let mut parted = false;
@@ -363,15 +372,21 @@ fn read_words(html: &str, without_code: bool) -> String {
     while let Some((at, piece)) = pieces.next() {
         text_words(&mut out, &html[from..at.start], &mut parted);
         from = at.end;
+        let mut past_end = |name: &str| {
+            pieces
+                .find_map(|(at, piece)| match piece {
+                    Markup::End(tag) if tag.name == name => Some(at.end),
+                    _ => None,
+                })
+                .unwrap_or(html.len())
+        };
         match piece {
             Markup::Start(tag) if without_code && tag.name == "pre" => {
                 out.push(' ');
-                from = pieces
-                    .find_map(|(at, piece)| match piece {
-                        Markup::End(tag) if tag.name == "pre" => Some(at.end),
-                        _ => None,
-                    })
-                    .unwrap_or(html.len());
+                from = past_end("pre");
+            }
+            Markup::Start(tag) if UNSEEN.contains(&tag.name.as_str()) => {
+                from = past_end(&tag.name);
             }
             Markup::Start(tag) | Markup::End(tag) => parted |= parts_words(&tag.name),
             Markup::Other => {}

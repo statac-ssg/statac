@@ -62,6 +62,12 @@ What changed in each release of Statac, the newest first.
   `<span class="hl-keyword">own</span>`, as the author wrote it. The
   feed took the span out and kept only its words, as it takes out the
   markup that colours code.
+- `page.words` and `page.opening` leave out the text of the author's
+  `<script>`, `<style>` and `<title>`, and of `<iframe>`, `<noembed>`,
+  `<noframes>` and `<noscript>`, which a browser doesn't show. They
+  counted it as words, and a script inside the opening paragraph showed
+  in the opening. The text of a `<textarea>`, which a reader sees, is
+  still counted.
 
 ## 0.5.0 - 2026-10-18
 
