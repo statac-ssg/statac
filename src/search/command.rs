@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::{Index, Record, asked, fold, records, spans};
+use super::{Asked, Index, Record, fold, records, spans};
 use crate::date::Date;
 use crate::problem::{Problem, Severity};
 use crate::site::PageId;
@@ -13,8 +13,8 @@ use crate::templates::Renderer;
 /// How many pages are shown, best first.
 pub const SHOWN: usize = 10;
 
-/// About how many characters of a record's text are shown around the
-/// first word matched.
+/// About how many UTF-16 code units of a record's text are shown around
+/// the first word matched.
 const BEFORE: usize = 60;
 const AFTER: usize = 140;
 
@@ -78,33 +78,58 @@ pub fn run(options: &Options) -> Outcome {
     }
     let renderer = prepared.renderer;
     let index = Index::of(renderer.site(), records(&renderer));
-    let found = index.search(&options.words);
-    let asked = asked(&options.words);
+    let results = results(&renderer, &index, &options.words, false, SHOWN);
+    Outcome {
+        pages: results.pages,
+        some: results.some,
+        shown: results.shown,
+        errors,
+        renderer: Some(renderer),
+    }
+}
+
+/// What a search finds, as a reader's browser shows it.
+#[derive(Debug, PartialEq)]
+pub struct Results {
+    /// The pages found, best first, at most as many as asked.
+    pub shown: Vec<Shown>,
+    /// How many pages were found in all.
+    pub pages: usize,
+    /// Whether no page held every word, and those found hold some.
+    pub some: bool,
+}
+
+/// The pages of the site `renderer` read that `index` finds for `query`,
+/// each once at its best part, the first `most` shown; with its last word
+/// being typed where `typing`.
+pub fn results(
+    renderer: &Renderer,
+    index: &Index,
+    query: &str,
+    typing: bool,
+    most: usize,
+) -> Results {
+    let asked = Asked::of(query, typing);
+    let found = index.search(&asked);
     // Records holding every word, or where none does, those holding most.
-    let most = found.first().map_or(0, |found| found.matched);
-    let some = most < asked.len();
+    let best_matched = found.first().map_or(0, |found| found.matched);
     let mut seen: HashSet<PageId> = HashSet::new();
     let best = (found.iter())
-        .take_while(|found| found.matched == most)
+        .take_while(|found| found.matched == best_matched)
         .map(|found| found.record)
         .filter(|&record| seen.insert(index.records[record].page));
     let best: Vec<usize> = best.collect();
     // A word of the text is marked where it shares a stem with one asked.
-    let matched: HashSet<u32> = (asked.iter())
-        .flat_map(|word| index.entries_of(word))
-        .copied()
-        .collect();
+    let matched = index.matched(&asked);
     let marked =
         |word: &str| (index.entries_of(&fold(word)).iter()).any(|entry| matched.contains(entry));
-    let shown = (best.iter().take(SHOWN))
-        .map(|&record| shown(&renderer, &index.records[record], &marked))
+    let shown = (best.iter().take(most))
+        .map(|&record| shown(renderer, &index.records[record], &marked))
         .collect();
-    Outcome {
-        pages: best.len(),
-        some,
+    Results {
         shown,
-        errors,
-        renderer: Some(renderer),
+        pages: best.len(),
+        some: best_matched < asked.words.len(),
     }
 }
 
@@ -124,7 +149,8 @@ fn shown(renderer: &Renderer, record: &Record, marked: &impl Fn(&str) -> bool) -
 }
 
 /// The text around the first word in `text` that is `marked`, or its
-/// start, cut at words, in pieces saying which are marked.
+/// start, cut at words, in pieces saying which are marked. Lengths are
+/// counted in UTF-16 code units, as a browser counts them.
 pub fn excerpt(text: &str, marked: impl Fn(&str) -> bool) -> Vec<(String, bool)> {
     let spans: Vec<_> = spans(text).collect();
     let matched = |span: &std::ops::Range<usize>| marked(&text[span.clone()]);
@@ -132,12 +158,13 @@ pub fn excerpt(text: &str, marked: impl Fn(&str) -> bool) -> Vec<(String, bool)>
     let Some(at) = spans.get(first) else {
         return Vec::new();
     };
+    let units = |from: usize, to: usize| text[from..to].encode_utf16().count();
     let from = (spans[..first].iter().rev())
-        .take_while(|span| at.start - span.start <= BEFORE)
+        .take_while(|span| units(span.start, at.start) <= BEFORE)
         .last()
         .map_or(at.start, |span| span.start);
     let last = (spans[first..].iter())
-        .take_while(|span| span.end - from <= BEFORE + AFTER)
+        .take_while(|span| units(from, span.end) <= BEFORE + AFTER)
         .last()
         .map_or(at.end, |span| span.end);
     // On to the space after the last word, so its stop goes with it.

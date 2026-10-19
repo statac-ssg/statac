@@ -143,13 +143,14 @@ fn a_page_asking_for_a_search_box_publishes_the_index_its_files_named_by_content
         (1, 1, 4),
         "{index:?}"
     );
-    assert_eq!(
-        text(&index, "index.json"),
-        format!(
-            "{{\"format\":1,\"records\":\"{}\",\"words\":[[\"\",\"{}\"]]}}\n",
-            records[0], words[0]
-        )
+    // The script reading them, after their names.
+    let script = text(&index, "index.js");
+    let names = format!(
+        "const FILES = {{\"records\":\"{}\",\"words\":[[\"\",\"{}\"]]}};\n\n",
+        records[0], words[0]
     );
+    assert!(script.starts_with(&names), "{script}");
+    assert!(script.contains("export async function search("), "{script}");
     // The pages with no date come first, then the dated from the oldest.
     let order = ["Home", "Search", "Post 1", "Post 2"];
     let shown: Vec<&str> = order
@@ -172,7 +173,7 @@ fn a_page_asking_for_a_search_box_publishes_the_index_its_files_named_by_content
     );
     let built = fs::read_to_string(site.root.join("_site/search/index.html")).unwrap();
     assert!(
-        built.contains("data-index=\"/blog/search/index.json\""),
+        built.contains("data-index=\"/blog/search/index.js\""),
         "{built}"
     );
     let post = text(&index, &format!("pages/{}", shown[2]));
@@ -219,11 +220,195 @@ fn a_page_edited_changes_its_own_text_and_leaves_every_other_pages() {
 #[test]
 fn a_file_at_an_address_of_the_index_is_told_as_a_clash() {
     let site = Site::new("clash");
-    site.write("static/search/index.json", "{}\n");
+    site.write("static/search/index.js", "\n");
     let (said, code) = site.run(&["check", "--today=2026-10-04"]);
     assert_eq!(code, 1, "{said}");
     assert!(
-        said.contains("`static/search/index.json` and the site's search index"),
+        said.contains("`static/search/index.js` and the site's search index"),
         "{said}"
     );
+}
+
+/// `text` as `JSON.stringify` writes it.
+fn json(text: &str) -> String {
+    let mut out = String::from("\"");
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            c if u32::from(c) < 0x20 => out.push_str(&format!("\\u{:04x}", u32::from(c))),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+fn json_or_null(text: Option<&str>) -> String {
+    text.map_or("null".into(), json)
+}
+
+#[test]
+fn the_browsers_script_finds_what_statac_search_finds() {
+    let site = Site::new("reader");
+    let long = "Words before the match go on for a while, and then some more. ".repeat(3);
+    site.write(
+        "content/post-3.md",
+        &format!(
+            "---\ntitle: Café notes\ndate: 2026-01-03\n---\n\
+             A naïve start, about cafés.\n\n## Brewing {{#brewing}}\n\n\
+             {long}Brewing runs best slowly. {long}\n\n## Running {{#running}}\n\n\
+             Runners run, and running is fun.\n"
+        ),
+    );
+    site.write(
+        "content/post-4.md",
+        "---\ntitle: 日本語のブログ\ndate: 2026-01-04\n---\n日本語のブログを書く。ログを読む。\n",
+    );
+    let built = site.index();
+    assert!(!built.is_empty());
+    let asked: &[(&str, bool)] = &[
+        ("running", false),
+        ("run", false),
+        ("cafe", false),
+        ("CAFÉ NAIVE", false),
+        ("brewing slowly", false),
+        ("post", false),
+        ("running nowhere", false),
+        ("nowhere", false),
+        ("ru", true),
+        ("caf", true),
+        ("r", true),
+        ("the first ", true),
+        ("ブログ", false),
+        ("ログ", false),
+        ("日本", true),
+        ("", false),
+    ];
+    let rust = statac_finds(&site, asked);
+    assert!(rust.contains("\"Running\""), "{rust}");
+    let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
+        return;
+    };
+    for ((words, _), (rust, browser)) in asked.iter().zip(split(&rust).iter().zip(split(&browser)))
+    {
+        assert_eq!(rust, &browser, "{words}");
+    }
+    assert_eq!(rust, browser);
+}
+
+#[test]
+fn a_browser_holding_the_script_from_an_earlier_build_reads_the_later_one() {
+    let site = Site::new("earlier");
+    site.index();
+    let held = site.root.join("held");
+    fs::create_dir_all(&held).unwrap();
+    fs::copy(
+        site.root.join("_site/search/index.js"),
+        held.join("index.js"),
+    )
+    .unwrap();
+    site.write(
+        "content/post-2.md",
+        "---\ntitle: Post 2\ndate: 2026-01-02\n---\nThe second post, on running too.\n",
+    );
+    let later = site.index();
+    // The later build's files, beside the earlier build's script.
+    for (rel, _) in &later {
+        if rel != "index.js" {
+            let to = held.join(rel);
+            fs::create_dir_all(to.parent().unwrap()).unwrap();
+            fs::copy(site.root.join("_site/search").join(rel), to).unwrap();
+        }
+    }
+    let asked = &[("running", false)];
+    let Some(browser) = browser_finds(
+        &held.join("index.js"),
+        asked,
+        Some(&site.root.join("_site/search/index.js")),
+    ) else {
+        return;
+    };
+    assert_eq!(browser, statac_finds(&site, asked));
+    assert!(browser.contains("post-2"), "{browser}");
+}
+
+/// What `statac search` finds in `site` for each of `asked`, written as
+/// the browser's script is by `search_reader.mjs`.
+fn statac_finds(site: &Site, asked: &[(&str, bool)]) -> String {
+    let today = statac::date::read("2026-10-04").ok();
+    let (renderer, _) = statac::build::renderer(&site.root, today);
+    let index = statac::search::Index::of(renderer.site(), statac::search::records(&renderer));
+    let found: Vec<String> = asked
+        .iter()
+        .map(|&(words, typing)| {
+            let results = statac::search::results(&renderer, &index, words, typing, 100);
+            let shown: Vec<String> = (results.shown.iter())
+                .map(|shown| {
+                    let excerpt: Vec<String> = (shown.excerpt.iter())
+                        .map(|(text, marked)| format!("[{},{marked}]", json(text)))
+                        .collect();
+                    format!(
+                        "[{},{},{},[{}]]",
+                        json(&format!("/blog{}", shown.address)),
+                        json_or_null(shown.title.as_deref()),
+                        json_or_null(shown.heading.as_deref()),
+                        excerpt.join(",")
+                    )
+                })
+                .collect();
+            format!("[{},{},[{}]]", results.pages, results.some, shown.join(","))
+        })
+        .collect();
+    format!("[{}]", found.join(","))
+}
+
+/// What the browser's script at `script` finds for each of `asked`, run by
+/// `node`, with `later` written over it once it is read; none where `node`
+/// is not installed.
+fn browser_finds(
+    script: &std::path::Path,
+    asked: &[(&str, bool)],
+    later: Option<&std::path::Path>,
+) -> Option<String> {
+    if Command::new("node").arg("--version").output().is_err() {
+        eprintln!("node is not installed: the browser's script is not run");
+        return None;
+    }
+    let questions: Vec<String> = (asked.iter())
+        .map(|&(words, typing)| format!("[{},{typing}]", json(words)))
+        .collect();
+    let harness = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/search_reader.mjs");
+    let mut node = Command::new("node");
+    node.arg(harness)
+        .arg(script)
+        .arg(format!("[{}]", questions.join(",")));
+    node.args(later);
+    let output = node.output().unwrap();
+    assert!(output.status.success(), "{output:?}");
+    Some(String::from_utf8(output.stdout).unwrap())
+}
+
+/// The items of a JSON list, split at its top level.
+fn split(list: &str) -> Vec<String> {
+    let inner = &list[1..list.len() - 1];
+    let (mut items, mut depth, mut quoted, mut escaped, mut from) =
+        (Vec::new(), 0, false, false, 0);
+    for (at, c) in inner.char_indices() {
+        match c {
+            _ if escaped => escaped = false,
+            '\\' if quoted => escaped = true,
+            '"' => quoted = !quoted,
+            '[' | '{' if !quoted => depth += 1,
+            ']' | '}' if !quoted => depth -= 1,
+            ',' if !quoted && depth == 0 => {
+                items.push(inner[from..at].to_owned());
+                from = at + 1;
+            }
+            _ => {}
+        }
+    }
+    items.push(inner[from..].to_owned());
+    items
 }

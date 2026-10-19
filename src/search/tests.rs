@@ -145,7 +145,7 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
     let index = Index::of(renderer.site(), records(&renderer));
     let _ = std::fs::remove_dir_all(root);
     let first = |words: &str| {
-        let found = index.search(words);
+        let found = index.search(&Asked::of(words, false));
         let record = &index.records[found[0].record];
         (
             record.page,
@@ -156,9 +156,9 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
     assert_eq!(first("zfs"), (zfs, None));
     assert_eq!(first("zfs speed"), (zfs, Some("speed".to_owned())));
     assert_eq!(first("drive"), (zfs, Some("setting-up".to_owned())));
-    assert!(index.search("nowhere").is_empty());
+    assert!(index.search(&Asked::of("nowhere", false)).is_empty());
     // Another form of a word the site writes finds the others.
-    let running = index.search("running");
+    let running = index.search(&Asked::of("running", false));
     let records = running.iter().map(|found| &index.records[found.record]);
     let speed = |record: &&Record| record.heading.as_ref().is_some_and(|(id, _)| id == "speed");
     assert!(
@@ -187,14 +187,14 @@ fn each_page_is_searched_in_its_own_languages_forms() {
     let _ = std::fs::remove_dir_all(root);
     let chant = page(&renderer, "chant.md");
     for words in ["cafe", "CAFÉ"] {
-        let found = index.search(words);
+        let found = index.search(&Asked::of(words, false));
         assert_eq!(index.records[found[0].record].page, chant, "{words}");
     }
     // A word the site writes somewhere finds its other forms; one it
     // never writes finds nothing, as a reader's browser holds no rules.
-    assert_eq!(index.search("chanteuse").len(), 2);
-    assert_eq!(index.search("chanteuses").len(), 2);
-    assert!(index.search("chanter").is_empty());
+    assert_eq!(index.search(&Asked::of("chanteuse", false)).len(), 2);
+    assert_eq!(index.search(&Asked::of("chanteuses", false)).len(), 2);
+    assert!(index.search(&Asked::of("chanter", false)).is_empty());
 }
 
 #[test]

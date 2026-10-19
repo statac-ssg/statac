@@ -1,9 +1,10 @@
 //! The files a reader's browser searches the site with, under `search/`.
 //!
-//! `index.json` is read first and leads to the rest, which are named by
-//! their content, so a browser may keep each for good and a build leaves
-//! every file whose content is unchanged as it was. Those are JSON packed
-//! with zlib, which the browser's `DecompressionStream("deflate")`
+//! `index.js` is the script that reads the rest, written with their names,
+//! so the script and the index always come from one build. The rest are
+//! named by their content, so a browser may keep each for good and a build
+//! leaves every file whose content is unchanged as it was. They are JSON
+//! packed with zlib, which the browser's `DecompressionStream("deflate")`
 //! unpacks, so no host has to be set to compress them; they end in `.bin`,
 //! not `.gz`, which some hosts send marked as packed for the browser to
 //! unpack itself.
@@ -13,7 +14,7 @@
 //! - `words.*.bin`: a run of the site's words in the order of their UTF-16
 //!   code units, each with the entries of its stems among the piece's,
 //!   and each entry's records as gaps from the last, each with its weight.
-//!   `index.json` gives the first word of each.
+//!   `index.js` gives the first word of each.
 //! - `pages/*.bin`: one page's address, title, date and parts, each part
 //!   its heading's id and words, none for the opening, and its text.
 
@@ -29,11 +30,12 @@ use crate::templates::Renderer;
 /// The folder the files are published in.
 pub const FOLDER: &str = "search";
 
-/// The file read first, by its path from the top of the built site.
-pub const ENTRY: &str = "search/index.json";
+/// The script reading the index, by its path from the top of the built
+/// site.
+pub const ENTRY: &str = "search/index.js";
 
-/// The version of the files' format, for the script reading them.
-const FORMAT: u32 = 1;
+/// The script, which the names of the index's files are written before.
+const READER: &str = include_str!("reader.js");
 
 /// The word list stays one file up to this size packed, and is cut into
 /// pieces of about `PIECE` packed otherwise.
@@ -51,7 +53,7 @@ pub struct File {
     pub bytes: Vec<u8>,
 }
 
-/// Every file of `index`, the site `renderer` read, `index.json` first.
+/// Every file of `index`, the site `renderer` read, the script first.
 pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
     let site = renderer.site();
     let base = renderer.settings().base();
@@ -116,7 +118,7 @@ pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
     let records = packed(&format!("{FOLDER}/records."), &json);
 
     let pieces = pieces(index, WHOLE, PIECE);
-    let mut entry = format!("{{\"format\":{FORMAT},\"records\":");
+    let mut entry = String::from("const FILES = {\"records\":");
     string(name_in_folder(&records.path), &mut entry);
     entry.push_str(",\"words\":[");
     for (i, (first, piece)) in pieces.iter().enumerate() {
@@ -129,7 +131,8 @@ pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
         string(name_in_folder(&piece.path), &mut entry);
         entry.push(']');
     }
-    entry.push_str("]}\n");
+    entry.push_str("]};\n\n");
+    entry.push_str(READER);
 
     let mut files = vec![File {
         path: ENTRY.to_owned(),

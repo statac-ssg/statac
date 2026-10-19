@@ -2770,7 +2770,7 @@ fn a_page_reading_its_search_boxs_index_asks_the_build_for_the_index() {
             "{% for p in site.pages %}{% if p.title == 'Post 1' %}{{ p.content }}{% endif %}{% endfor %}",
         ),
     ]);
-    assert_eq!(built.html("post-1.md"), "/blog/search/index.json");
+    assert_eq!(built.html("post-1.md"), "/blog/search/index.js");
     assert!(built.render("post-1.md").indexed);
     // A box whose index is never read asks for none.
     assert!(!built.render("post-2.md").indexed);

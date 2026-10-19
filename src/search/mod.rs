@@ -9,7 +9,7 @@ mod words;
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rayon::prelude::*;
 
@@ -18,7 +18,7 @@ use crate::html::{Markup, markup};
 use crate::site::{Id, ListKey, Page, PageId, Site};
 use crate::templates::Renderer;
 
-pub use command::{Options, Outcome, SHOWN, Shown, excerpt, run};
+pub use command::{Options, Outcome, Results, SHOWN, Shown, excerpt, results, run};
 pub use files::{ENTRY, FOLDER, File, claims};
 pub use words::{Stemmer, fold, spans};
 
@@ -31,6 +31,9 @@ const TAG: u32 = 3;
 const SUMMARY: u32 = 2;
 const DESCRIBED: u32 = 2;
 const TEXT: u32 = 1;
+
+/// How much a word being typed counts in a longer word it starts.
+const STARTING: f64 = 0.8;
 
 /// BM25's constants, as most search engines set them.
 const K1: f64 = 1.2;
@@ -283,14 +286,52 @@ impl Index {
         }
     }
 
-    /// The records holding any word of `query`: those holding more of its
+    /// The entries `asked` looks in for each of its words, each with how
+    /// much a match there counts.
+    fn looked_in(&self, asked: &Asked) -> Vec<Vec<(u32, f64)>> {
+        let words = asked.words.iter();
+        words
+            .map(|word| {
+                if asked.typing.as_ref() != Some(word) {
+                    return self
+                        .entries_of(word)
+                        .iter()
+                        .map(|&entry| (entry, 1.0))
+                        .collect();
+                }
+                let from =
+                    (self.words).partition_point(|(listed, _)| in_utf16(listed, word).is_lt());
+                let starting = self.words[from..].iter();
+                let starting = starting.take_while(|(listed, _)| listed.starts_with(word.as_str()));
+                let mut entries: Vec<(u32, f64)> = Vec::new();
+                for (listed, listed_in) in starting {
+                    let counts = if listed == word { 1.0 } else { STARTING };
+                    for &entry in listed_in {
+                        match entries.iter_mut().find(|(held, _)| *held == entry) {
+                            Some((_, kept)) => *kept = kept.max(counts),
+                            None => entries.push((entry, counts)),
+                        }
+                    }
+                }
+                entries
+            })
+            .collect()
+    }
+
+    /// Every entry `asked` looks in.
+    pub fn matched(&self, asked: &Asked) -> HashSet<u32> {
+        let looked = self.looked_in(asked).into_iter().flatten();
+        looked.map(|(entry, _)| entry).collect()
+    }
+
+    /// The records holding any word `asked`: those holding more of its
     /// words first, then the best matched, then in order.
-    pub fn search(&self, query: &str) -> Vec<Found> {
+    pub fn search(&self, asked: &Asked) -> Vec<Found> {
         let count = self.records.len() as f64;
         let mut found: HashMap<u32, (usize, f64)> = HashMap::new();
-        for word in asked(query) {
+        for entries in self.looked_in(asked) {
             let mut best: HashMap<u32, f64> = HashMap::new();
-            for &entry in self.entries_of(&word) {
+            for (entry, counts) in entries {
                 let held = &self.entries[entry as usize];
                 let holding = held.len() as f64;
                 let rarity = (1.0 + (count - holding + 0.5) / (holding + 0.5)).ln();
@@ -300,7 +341,7 @@ impl Index {
                     let score =
                         rarity * weight * (K1 + 1.0) / (weight + K1 * (1.0 - B + B * length));
                     let kept = best.entry(record).or_default();
-                    *kept = kept.max(score);
+                    *kept = kept.max(score * counts);
                 }
             }
             for (record, score) in best {
@@ -332,12 +373,52 @@ impl Index {
     }
 }
 
-/// The words of `query`, folded, each once, in order.
-pub fn asked(query: &str) -> Vec<String> {
-    let mut asked: Vec<String> = spans(query).map(|span| fold(&query[span])).collect();
-    asked.sort_unstable();
-    asked.dedup();
-    asked
+/// What a search asks for: its words, folded, each once, in the order of
+/// their UTF-16 code units, and the one being typed, if any, which is
+/// looked for as the start of longer words too.
+#[derive(Debug, PartialEq)]
+pub struct Asked {
+    pub words: Vec<String>,
+    pub typing: Option<String>,
+}
+
+impl Asked {
+    /// The words of `query`, its last being typed where `typing` and
+    /// nothing follows it, and it is two letters or more, or one of a
+    /// script written without spaces.
+    pub fn of(query: &str, typing: bool) -> Asked {
+        let spans: Vec<_> = spans(query).collect();
+        let typed = (spans.last())
+            .filter(|span| typing && span.end == query.len())
+            .map(|span| fold(&query[span.clone()]))
+            .filter(|word| word.chars().nth(1).is_some() || word.chars().any(unspaced));
+        let mut words: Vec<String> = spans
+            .iter()
+            .map(|span| fold(&query[span.clone()]))
+            .collect();
+        words.sort_unstable_by(|a, b| in_utf16(a, b));
+        words.dedup();
+        Asked {
+            words,
+            typing: typed,
+        }
+    }
+}
+
+/// Whether `c` is of Chinese, Japanese or Korean, where one letter may
+/// start many words.
+fn unspaced(c: char) -> bool {
+    matches!(c,
+        '\u{1100}'..='\u{11ff}'
+        | '\u{3040}'..='\u{30ff}'
+        | '\u{3130}'..='\u{318f}'
+        | '\u{31f0}'..='\u{31ff}'
+        | '\u{3400}'..='\u{4dbf}'
+        | '\u{4e00}'..='\u{9fff}'
+        | '\u{ac00}'..='\u{d7af}'
+        | '\u{f900}'..='\u{faff}'
+        | '\u{ff66}'..='\u{ff9f}'
+        | '\u{20000}'..='\u{2ffff}')
 }
 
 /// `a` against `b` by their UTF-16 code units, as a browser orders strings.
