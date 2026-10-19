@@ -5,6 +5,7 @@ use std::ops::Range;
 
 use super::Document;
 use super::node::{Kind, Node};
+use crate::html::{Markup, markup};
 use crate::problem::{Kind as ProblemKind, MoreAt, Problem, Word, WrongPlace};
 use crate::source::{Place, Span};
 
@@ -278,21 +279,24 @@ pub fn as_written(html: &str) -> Written {
 /// Where the first `<p>` holding words holds them in `html`, without the
 /// space around them.
 pub(super) fn first_html_paragraph(html: &str) -> Option<Range<usize>> {
-    let lower = html.to_ascii_lowercase();
-    let mut at = 0;
-    while let Some(found) = lower[at..].find("<p") {
-        at += found + "<p".len();
-        if !lower[at..].starts_with(['>', ' ', '\t', '\n', '\r']) {
+    let mut pieces = markup(html);
+    while let Some((at, piece)) = pieces.next() {
+        let Markup::Start(tag) = piece else {
+            continue;
+        };
+        if tag.name != "p" {
             continue;
         }
-        let inside = at + lower[at..].find('>')? + 1;
-        let closes = inside + lower[inside..].find("</p>")?;
+        let inside = at.end;
+        let closes = pieces.find_map(|(at, piece)| match piece {
+            Markup::End(tag) if tag.name == "p" => Some(at.start),
+            _ => None,
+        })?;
         let held = &html[inside..closes];
         if !closed_up(&words_of(held)).is_empty() {
             let start = inside + (held.len() - held.trim_start().len());
             return Some(start..inside + held.trim_end().len());
         }
-        at = closes;
     }
     None
 }
@@ -308,7 +312,7 @@ pub fn closed_up(text: &str) -> String {
 /// runs on without spaces, Chinese and Japanese, each character is one.
 pub(super) fn count_words(html: &str) -> usize {
     let mut words = 0;
-    for token in words_of(&without_code(html)).split_whitespace() {
+    for token in read_words(html, true).split_whitespace() {
         let mut in_a_word = false;
         for c in token.chars() {
             if runs_without_spaces(c) {
@@ -342,66 +346,54 @@ fn runs_without_spaces(c: char) -> bool {
     )
 }
 
-/// HTML with every `<pre>` element taken out, a space kept in its place so
-/// the words either side stay apart.
-fn without_code(html: &str) -> std::borrow::Cow<'_, str> {
-    // Lowered only to be searched: every byte keeps its place.
-    let lowered = html.to_ascii_lowercase();
-    if !lowered.contains("<pre") {
-        return std::borrow::Cow::Borrowed(html);
-    }
-    let mut kept = String::with_capacity(html.len());
-    let mut from = 0;
-    while let Some(found) = lowered[from..].find("<pre") {
-        let open = from + found;
-        let after = lowered.as_bytes().get(open + 4).copied();
-        if !matches!(after, Some(b'>' | b' ' | b'\t' | b'\n' | b'\r' | b'/')) {
-            kept.push_str(&html[from..open + 4]);
-            from = open + 4;
-            continue;
-        }
-        kept.push_str(&html[from..open]);
-        kept.push(' ');
-        from = match lowered[open..].find("</pre>") {
-            Some(close) => open + close + "</pre>".len(),
-            None => html.len(),
-        };
-    }
-    kept.push_str(&html[from..]);
-    std::borrow::Cow::Owned(kept)
-}
-
 /// The words of a piece of HTML, its tags taken off and its character
 /// references read. A line break or a block's edge parts the words either
 /// side, though no space stands between them.
 pub fn words_of(html: &str) -> String {
+    read_words(html, false)
+}
+
+/// [`words_of`], each `<pre>` element taken out where `without_code`, a
+/// space kept in its place so the words either side stay apart.
+fn read_words(html: &str, without_code: bool) -> String {
     let mut out = String::with_capacity(html.len());
-    let mut rest = html;
     let mut parted = false;
-    while let Some(at) = rest.find(['<', '&']) {
-        if parted && at > 0 {
-            part(&mut out, &rest[..at]);
-            parted = false;
+    let mut from = 0;
+    let mut pieces = markup(html);
+    while let Some((at, piece)) = pieces.next() {
+        text_words(&mut out, &html[from..at.start], &mut parted);
+        from = at.end;
+        match piece {
+            Markup::Start(tag) if without_code && tag.name == "pre" => {
+                out.push(' ');
+                from = pieces
+                    .find_map(|(at, piece)| match piece {
+                        Markup::End(tag) if tag.name == "pre" => Some(at.end),
+                        _ => None,
+                    })
+                    .unwrap_or(html.len());
+            }
+            Markup::Start(tag) | Markup::End(tag) => parted |= parts_words(&tag.name),
+            Markup::Other => {}
         }
+    }
+    text_words(&mut out, &html[from..], &mut parted);
+    out
+}
+
+/// The words of `text`, standing between tags, onto `out`: its character
+/// references read, and parted from the words before where `parted` says.
+fn text_words(out: &mut String, text: &str, parted: &mut bool) {
+    if text.is_empty() {
+        return;
+    }
+    if std::mem::take(parted) {
+        part(out, text);
+    }
+    let mut rest = text;
+    while let Some(at) = rest.find('&') {
         out.push_str(&rest[..at]);
         rest = &rest[at..];
-        if rest.starts_with('<') {
-            match rest.find('>') {
-                Some(end) => {
-                    parted |= parts_words(&rest[1..end]);
-                    rest = &rest[end + 1..];
-                }
-                None => {
-                    out.push_str(rest);
-                    rest = "";
-                }
-            }
-            continue;
-        }
-        if parted {
-            part(&mut out, rest);
-            parted = false;
-        }
         let end = rest[1..]
             .find(|c: char| !(c.is_ascii_alphanumeric() || c == '#'))
             .map(|n| n + 1);
@@ -417,11 +409,7 @@ pub fn words_of(html: &str) -> String {
             }
         }
     }
-    if parted {
-        part(&mut out, rest);
-    }
     out.push_str(rest);
-    out
 }
 
 /// A space between the words so far and `next`, where neither brings one.
@@ -435,9 +423,9 @@ fn part(out: &mut String, next: &str) {
     }
 }
 
-/// Whether a tag, as written between its brackets, stands between words:
-/// a line break, or a block's start or end.
-fn parts_words(tag: &str) -> bool {
+/// Whether a tag named `name` stands between words: a line break, or a
+/// block's start or end.
+fn parts_words(name: &str) -> bool {
     const PARTING: &[&str] = &[
         "br",
         "p",
@@ -469,13 +457,7 @@ fn parts_words(tag: &str) -> bool {
         "figure",
         "figcaption",
     ];
-    let name = tag.strip_prefix('/').unwrap_or(tag);
-    let name = &name[..name
-        .find(|c: char| !c.is_ascii_alphanumeric())
-        .unwrap_or(name.len())];
-    PARTING
-        .iter()
-        .any(|parting| parting.eq_ignore_ascii_case(name))
+    PARTING.contains(&name)
 }
 
 /// A character reference as written, `&amp;` or `&#8212;`, read as the

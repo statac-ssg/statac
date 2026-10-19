@@ -2570,6 +2570,44 @@ fn words_are_counted_as_a_reader_reads_them() {
     assert_eq!(count("\u{5c71}\u{3092}\u{767b}\u{308b} and\n"), 5);
 }
 
+/// The author's HTML is read as a browser reads it: a `>` inside a quoted
+/// attribute ends no tag, nor does one inside a comment, `<pre` inside an
+/// attribute opens no code, and a `<` that opens no tag is text.
+#[test]
+fn the_words_and_the_opening_skip_tags_as_a_browser_does() {
+    let cases = [
+        ("One <abbr title=\"a > b c d e\">two</abbr> three.\n", 3),
+        ("One <abbr title='a > b c d e'>two</abbr> three.\n", 3),
+        ("One <abbr title=abcde>two</abbr> three.\n", 3),
+        ("One <abbr title=\"<pre>\">two</abbr> three.\n", 3),
+    ];
+    for (text, words) in cases {
+        let written = written(text);
+        assert_eq!(written.words, words, "{text:?}");
+        assert_eq!(
+            written.opening.as_deref(),
+            Some("One two three."),
+            "{text:?}"
+        );
+    }
+    let cases = [
+        (
+            "<p title=\"a > b\">One <!-- c > d --> two.</p>\n",
+            "One two.",
+        ),
+        (
+            "<div title=\"<p>c d</p>\"><p>One two.</p></div>\n",
+            "One two.",
+        ),
+        ("<p>One < two.</p>\n", "One < two."),
+    ];
+    for (html, opening) in cases {
+        let written = as_written(html);
+        assert_eq!(written.words, 2, "{html:?}");
+        assert_eq!(written.opening.as_deref(), Some(opening), "{html:?}");
+    }
+}
+
 #[test]
 fn the_words_of_html_are_parted_where_a_reader_sees_them_apart() {
     assert_eq!(words_of("<p>a</p><p>b</p>"), "a b");

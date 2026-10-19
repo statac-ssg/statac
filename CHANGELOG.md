@@ -34,6 +34,13 @@ What changed in each release of Statac, the newest first.
   name is known by its name, and an item in a list by its fields
   written exactly as before. `write_feed_ids` never writes into a data
   file, so such a post always takes the line by hand.
+- `page.words` and `page.opening`, and an excerpt taken from the
+  author's own `<p>`, read the author's HTML as a browser does. A `>`
+  inside a quoted attribute, as in `<abbr title="a > b">`, or inside a
+  comment ended the tag early, so the rest was counted as words and
+  could show in the opening or the excerpt. A `<` that opens no tag, as
+  in `<p>1 < 2</p>`, hid the words up to the next `>`, and `<pre` or
+  `<p>` inside an attribute was taken for the element.
 
 ## 0.5.0 - 2026-10-18
 

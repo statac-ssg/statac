@@ -42,40 +42,66 @@ pub(crate) const RAW_TEXT: &[&str] = &[
 /// Calls `each` with every start tag in `html`, read as a browser reads an
 /// HTML document.
 pub(crate) fn start_tags(html: &str, mut each: impl FnMut(&Tag)) {
-    let b = html.as_bytes();
-    let mut at = 0;
-    while let Some(lt) = next(b, b'<', at) {
-        let rest = &b[lt..];
-        if rest.starts_with(b"<!--") {
-            at = comment_end(b, lt + 4);
-            continue;
-        }
-        if rest.starts_with(b"<!") || rest.starts_with(b"<?") {
-            at = next(b, b'>', lt + 2).map_or(b.len(), |gt| gt + 1);
-            continue;
-        }
-        if rest.starts_with(b"</") {
-            at = match b.get(lt + 2) {
-                Some(c) if c.is_ascii_alphabetic() => tag(html, lt + 2, usize::MAX).end,
-                Some(_) => next(b, b'>', lt + 2).map_or(b.len(), |gt| gt + 1),
-                None => b.len(),
-            };
-            continue;
-        }
-        if !b.get(lt + 1).is_some_and(u8::is_ascii_alphabetic) {
-            at = lt + 1;
-            continue;
-        }
-        let tag = tag(html, lt + 1, usize::MAX);
-        at = tag.end;
-        each(&tag);
-        if tag.name == "plaintext" {
-            return;
-        }
-        if tag.name == "script" || RAW_TEXT.contains(&tag.name.as_str()) {
-            at = end_tag(b, at, tag.name.as_bytes()).unwrap_or(b.len());
+    for (_, piece) in markup(html) {
+        if let Markup::Start(tag) = piece {
+            each(&tag);
         }
     }
+}
+
+/// A piece of markup as the tokenizer reads it.
+pub(crate) enum Markup {
+    Start(Tag),
+    End(Tag),
+    /// A comment, a doctype or the like, which holds nothing.
+    Other,
+}
+
+/// Each piece of markup in `html` with where it is written, read as a
+/// browser reads an HTML document. What stands between them is text.
+pub(crate) fn markup(html: &str) -> impl Iterator<Item = (Range<usize>, Markup)> + '_ {
+    let b = html.as_bytes();
+    let mut at = 0;
+    std::iter::from_fn(move || {
+        loop {
+            let lt = next(b, b'<', at)?;
+            let rest = &b[lt..];
+            let (end, piece) = if rest.starts_with(b"<!--") {
+                (comment_end(b, lt + 4), Markup::Other)
+            } else if rest.starts_with(b"<!") || rest.starts_with(b"<?") {
+                let end = next(b, b'>', lt + 2).map_or(b.len(), |gt| gt + 1);
+                (end, Markup::Other)
+            } else if rest.starts_with(b"</") {
+                match b.get(lt + 2) {
+                    Some(c) if c.is_ascii_alphabetic() => {
+                        let tag = tag(html, lt + 2, usize::MAX);
+                        (tag.end, Markup::End(tag))
+                    }
+                    Some(_) => {
+                        let end = next(b, b'>', lt + 2).map_or(b.len(), |gt| gt + 1);
+                        (end, Markup::Other)
+                    }
+                    None => return None,
+                }
+            } else if b.get(lt + 1).is_some_and(u8::is_ascii_alphabetic) {
+                let tag = tag(html, lt + 1, usize::MAX);
+                let end = tag.end;
+                at = match tag.name.as_str() {
+                    "plaintext" => b.len(),
+                    name if name == "script" || RAW_TEXT.contains(&name) => {
+                        end_tag(b, end, name.as_bytes()).unwrap_or(b.len())
+                    }
+                    _ => end,
+                };
+                return Some((lt..end, Markup::Start(tag)));
+            } else {
+                at = lt + 1;
+                continue;
+            };
+            at = end;
+            return Some((lt..end, piece));
+        }
+    })
 }
 
 /// Reads the tag whose name starts at `at`, as the tokenizer does: its
