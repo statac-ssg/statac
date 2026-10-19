@@ -587,3 +587,36 @@ fn split(list: &str) -> Vec<String> {
     items.push(inner[from..].to_owned());
     items
 }
+
+#[test]
+fn a_link_to_the_script_reading_an_index_some_page_asks_for_lands() {
+    let linking = "{% set box = page.search_box() %}\
+                   <link rel=\"modulepreload\" href=\"{{ box.index }}\">\
+                   <script type=\"module\" src=\"{{ box.index }}\"></script>\n";
+    for (name, languages, url) in [
+        ("linked", false, "https://example.org/blog/"),
+        ("linked-top", true, "https://example.org/"),
+        ("linked-languages", true, "https://example.org/blog/"),
+    ] {
+        let site = match languages {
+            true => Site::in_two_languages(name, url),
+            false => Site::new(name),
+        };
+        site.write("snippets/find.html", linking);
+        let (said, _) = site.run(&["check", "--today=2026-10-04"]);
+        assert!(!said.contains("broken-link"), "{name}: {said}");
+    }
+    // A link to the script with no page asking for its index lands nowhere.
+    let site = Site::new("linked-unasked");
+    site.write("content/search.md", "---\ntitle: Search\n---\nNo box.\n");
+    site.write(
+        "templates/page.html",
+        "<script type=\"module\" src=\"{{ url(\"/search/index.js\") }}\"></script>\
+         {{ page.content }}\n",
+    );
+    let (said, _) = site.run(&["check", "--today=2026-10-04"]);
+    assert!(
+        said.contains("nothing is published at `/blog/search/index.js`"),
+        "{said}"
+    );
+}

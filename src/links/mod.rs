@@ -435,13 +435,14 @@ impl Site {
     }
 
     /// Every link on the built pages that lands nowhere, each told once,
-    /// where it was written. `cards` are the files the pages' sharing
-    /// cards are published as, which a link from any page lands on.
+    /// where it was written. `made` are files known only once the pages
+    /// are built, which a link from any page lands on: the pages' sharing
+    /// cards, and the scripts reading the search index.
     pub fn told<'a>(
         &self,
         renderer: &Renderer,
         checked: impl IntoIterator<Item = &'a Checked>,
-        cards: &HashSet<&str>,
+        made: &HashSet<&str>,
     ) -> Vec<Problem> {
         let checked: Vec<&Checked> = checked.into_iter().collect();
         let ids: HashMap<&str, &[String]> = checked
@@ -459,9 +460,9 @@ impl Site {
                     .is_some_and(|ids| !has_id(ids, fragment))
             });
             let nowhere = page.misses.iter().filter(|miss| {
-                let on_a_card = |file: &str| cards.contains(file);
-                let found = miss.file.is_none() && !miss.arrival.outside && !cards.is_empty();
-                !(found && self.file_among(&miss.arrival.path, on_a_card).is_some())
+                let made_later = |file: &str| made.contains(file);
+                let found = miss.file.is_none() && !miss.arrival.outside && !made.is_empty();
+                !(found && self.file_among(&miss.arrival.path, made_later).is_some())
             });
             misses.extend(nowhere.chain(anchors).map(|miss| (*page, miss)));
         }

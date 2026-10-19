@@ -801,11 +801,22 @@ pub(crate) fn conclude(
             }
         })
         .collect();
-    let card_files: HashSet<&str> = cards.files().collect();
+    // The languages some page names the search index of.
+    let indexed = built.iter().flat_map(|built| &built.indexed);
+    let mut indexed: Vec<crate::site::LanguageId> = indexed.copied().collect();
+    indexed.sort_unstable();
+    indexed.dedup();
+    let entries: Vec<String> = (indexed.iter())
+        .map(|&language| crate::search::entry(site, language))
+        .collect();
+    let made: HashSet<&str> = cards
+        .files()
+        .chain(entries.iter().map(String::as_str))
+        .collect();
     let broken = linked.told(
         renderer,
         built.iter().filter_map(|built| built.links.as_ref()),
-        &card_files,
+        &made,
     );
     // What each list's pages told, by list.
     let mut on_list: HashMap<ListId, Vec<Problem>> = HashMap::new();
@@ -952,10 +963,6 @@ pub(crate) fn conclude(
     let wanted = renderer.cards_wanted(&cards);
     // Made only for the languages some page names it for, and only of a
     // site that builds.
-    let indexed = built.iter().flat_map(|built| &built.indexed);
-    let mut indexed: Vec<crate::site::LanguageId> = indexed.copied().collect();
-    indexed.sort_unstable();
-    indexed.dedup();
     let search = match stops(&problems) {
         false => crate::search::files(renderer, &indexed),
         true => Vec::new(),
