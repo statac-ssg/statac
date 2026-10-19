@@ -58,6 +58,10 @@ What changed in each release of Statac, the newest first.
   file changed again. A file `before_build` writes again in that way is
   taken as the command's writing, where serve took it for a save of the
   author's.
+- A feed keeps a span in a post whose class starts `hl-`, as
+  `<span class="hl-keyword">own</span>`, as the author wrote it. The
+  feed took the span out and kept only its words, as it takes out the
+  markup that colours code.
 
 ## 0.5.0 - 2026-10-18
 

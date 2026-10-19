@@ -257,6 +257,9 @@ pub(super) struct Body {
     /// Where the first block of code coloured in the writing names its
     /// language, and the same for each page whose writing it shows whole.
     coloured: Vec<Place>,
+    /// Whether the writing shows any code coloured, its own or another
+    /// page's.
+    colours: bool,
     /// What the writing links to, for checking once the site is built.
     writing: crate::links::Writing,
     /// The steps the engine took building it, and whether they ran out.
@@ -269,7 +272,8 @@ pub(super) struct Body {
     after_boxes: Mutex<Vec<(usize, String)>>,
     /// The writing as shown on other pages, made when first shown there.
     elsewhere: OnceLock<Elsewhere>,
-    /// The writing as a feed shows it, made when first shown there.
+    /// The writing as a feed shows it, built again without colour when
+    /// first shown there.
     in_feeds: OnceLock<Elsewhere>,
 }
 
@@ -743,6 +747,7 @@ impl Renderer {
         let page = shared.site.lists.get(feed.list).page;
         frame::push(Frame {
             feed: Some(feed.clone()),
+            colourless: true,
             language: shared.site.lists.get(feed.list).language,
             ..Frame::new(Arc::clone(shared), page)
         });
@@ -859,17 +864,19 @@ thread_local! {
 /// recorded on the output asking for it.
 fn body(shared: &Arc<Shared>, page: PageId) -> Result<Arc<Body>, Error> {
     frame::read(Key::Body(page));
+    // Built again, writing that shows itself stops as it did when built
+    // first, though by then it is kept.
+    if WRITING.with_borrow(|writing| writing.contains(&page)) {
+        return Err(frame::raise(Kind::TemplateStopped {
+            reason: Stopped::ContentInItself,
+        }));
+    }
     let slot = &shared.bodies[page.index()];
     let body = match slot.get() {
         Some(body) => Arc::clone(body),
         None => {
-            if WRITING.with_borrow(|writing| writing.contains(&page)) {
-                return Err(frame::raise(Kind::TemplateStopped {
-                    reason: Stopped::ContentInItself,
-                }));
-            }
             WRITING.with_borrow_mut(|writing| writing.push(page));
-            let built = Arc::new(build_body(shared, page, 0));
+            let built = Arc::new(build_body(shared, page, 0, false));
             WRITING.with_borrow_mut(Vec::pop);
             // Another thread may have built it meanwhile; the first kept wins.
             let _ = slot.set(built);
@@ -1002,12 +1009,13 @@ pub(super) fn outline(shared: &Shared, page: PageId) -> Arc<Vec<Section>> {
 }
 
 /// Builds a page's writing, its search boxes numbered after
-/// `boxes_before` others.
-fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
+/// `boxes_before` others, and its code without colour where `colourless`.
+fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize, colourless: bool) -> Body {
     let p = shared.site.pages.get(page);
     frame::push(Frame {
         making: frame::Making::Writing,
         search_boxes: boxes_before,
+        colourless,
         ..Frame::new(Arc::clone(shared), Some(page))
     });
     let mut problems = Vec::new();
@@ -1027,7 +1035,10 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
             links.handed = crate::links::handed(&document);
             problems.extend(document.problems.iter().cloned());
             if let Some(place) = code_languages(shared, &document, &mut problems) {
-                frame::with(|frame| frame.coloured.push(place));
+                frame::with(|frame| {
+                    frame.coloured.push(place);
+                    frame.colours = true;
+                });
             }
             for top in std::iter::once(&document.root).chain(&document.notes) {
                 undescribed_in_node(shared, page, top);
@@ -1056,7 +1067,7 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
                     back_to_the_text: words.back_to_the_text.as_deref(),
                     digits: words.digits.as_ref(),
                     right_to_left: words.direction == crate::language::Direction::RightToLeft,
-                    highlighter: shared.highlighter.as_ref(),
+                    highlighter: shared.highlighter.as_ref().filter(|_| !colourless),
                 },
             );
             wordless = missing_words(shared, p.language, &document);
@@ -1093,6 +1104,7 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize) -> Body {
         problems,
         developed: frame.developed,
         coloured: frame.coloured,
+        colours: frame.colours,
         writing: links,
         elsewhere: OnceLock::new(),
         in_feeds: OnceLock::new(),
@@ -1130,7 +1142,7 @@ fn among_the_pages_boxes(shared: &Arc<Shared>, page: PageId, body: &Body) -> Str
     }
     // What building it again tells and reads, the first building did.
     WRITING.with_borrow_mut(|writing| writing.push(page));
-    let again = build_body(shared, page, before);
+    let again = build_body(shared, page, before, false);
     WRITING.with_borrow_mut(Vec::pop);
     let mut kept = body.after_boxes.lock().expect("never poisoned");
     kept.push((before, again.written.html.clone()));
@@ -1314,8 +1326,7 @@ pub(super) fn code_html(
     let Language::Known(name) = language else {
         return highlight::plain(text);
     };
-    // A feed reader loads no stylesheet to colour it with.
-    if frame::with(|frame| frame.feed.is_some()).unwrap_or(false) {
+    if frame::with(|frame| frame.colourless).unwrap_or(false) {
         return highlight::plain(text);
     }
     if shared.highlighter.is_none() {
@@ -1332,7 +1343,10 @@ pub(super) fn code_html(
     }
     frame::read(Key::Setting(shared.name_id("code_style")));
     let at = at();
-    frame::with(|frame| frame.coloured.extend(at));
+    frame::with(|frame| {
+        frame.coloured.extend(at);
+        frame.colours = true;
+    });
     match &shared.highlighter {
         Some(highlighter) => highlighter.html(name, text).as_ref().to_owned(),
         None => highlight::plain(text),
@@ -1386,24 +1400,27 @@ pub(super) enum Part {
 
 /// `page.content` or `page.excerpt`: as built on the page's own page, and
 /// elsewhere with each address read from the page spelled from the top of
-/// the site, so it leads where it leads there. That depends on where the
-/// page is published, which is recorded as read. Where building it
-/// stopped, the refusal that stops the template asking.
+/// the site, so it leads where it leads there, and in a feed built without
+/// colour. That depends on where the page is published, which is recorded
+/// as read. Where building it stopped, the refusal that stops the template
+/// asking.
 pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<Value> {
     frame::with(|frame| frame.shows_writing |= frame.home() == Some(page));
     let body = match body(shared, page) {
         Ok(body) => body,
         Err(error) => return Some(Value::from(error)),
     };
-    // A feed reader loads no stylesheet, so a feed carries code uncoloured.
-    let in_feed = frame::with(|frame| frame.feed.is_some()).unwrap_or(false);
-    let own = match part {
-        Part::Content => {
-            if !in_feed {
-                frame::with(|frame| frame.coloured.extend(&body.coloured));
+    let colourless = frame::with(|frame| frame.colourless).unwrap_or(false);
+    if !colourless {
+        frame::with(|frame| {
+            if matches!(part, Part::Content) {
+                frame.coloured.extend(&body.coloured);
             }
-            &body.written.html
-        }
+            frame.colours |= body.colours;
+        });
+    }
+    let own = match part {
+        Part::Content => &body.written.html,
         Part::Excerpt => body.written.excerpt.as_ref()?,
     };
     let (home, making) = frame::with(|frame| (frame.home(), frame.making)).unzip();
@@ -1411,13 +1428,9 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         let counted = matches!(part, Part::Content)
             && body.search_boxes > 0
             && making == Some(frame::Making::Output);
-        let html = match counted {
+        return Some(Value::from_safe_string(match counted {
             true => among_the_pages_boxes(shared, page, &body),
             false => own.clone(),
-        };
-        return Some(Value::from_safe_string(match in_feed {
-            true => highlight::uncoloured(&html).into_owned(),
-            false => html,
         }));
     }
     frame::read(Key::Field(page, shared.name_id("url")));
@@ -1437,23 +1450,27 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         Part::Excerpt => &elsewhere.excerpt,
     };
     let shown = moved.as_ref().unwrap_or(own);
-    if !in_feed {
+    if !colourless || !body.colours {
         return Some(Value::from_safe_string(shown.clone()));
     }
-    let in_feeds = body.in_feeds.get_or_init(|| {
-        let uncoloured = |html: Option<&String>, own: Option<&String>| {
-            let html = html.or(own)?;
-            match highlight::uncoloured(html) {
-                std::borrow::Cow::Owned(html) => Some(html),
-                std::borrow::Cow::Borrowed(_) => None,
-            }
-        };
-        let written = &body.written;
-        Elsewhere {
-            html: uncoloured(elsewhere.html.as_ref(), Some(&written.html)),
-            excerpt: uncoloured(elsewhere.excerpt.as_ref(), written.excerpt.as_ref()),
+    let in_feeds = match body.in_feeds.get() {
+        Some(in_feeds) => in_feeds,
+        None => {
+            // What building it again tells and reads, the first building did.
+            WRITING.with_borrow_mut(|writing| writing.push(page));
+            let again = build_body(shared, page, 0, true).written;
+            WRITING.with_borrow_mut(Vec::pop);
+            let address = shared.address_of(page);
+            let moved =
+                |html: String| Some(crate::elsewhere::html(&html, &address).unwrap_or(html));
+            // Another thread may have built it meanwhile; the first kept wins.
+            let _ = body.in_feeds.set(Elsewhere {
+                html: moved(again.html),
+                excerpt: again.excerpt.and_then(moved),
+            });
+            body.in_feeds.get().expect("set just now")
         }
-    });
+    };
     let uncoloured = match part {
         Part::Content => &in_feeds.html,
         Part::Excerpt => &in_feeds.excerpt,

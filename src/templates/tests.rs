@@ -2788,6 +2788,93 @@ fn a_feed_carries_code_uncoloured_where_its_page_colours_it() {
 }
 
 #[test]
+fn a_feed_carries_the_writing_built_without_colour_with_the_authors_own_spans() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+        ),
+        (
+            "content/index.md",
+            "---\ntitle: Home\n---\n```rust\nlet b = 2;\n```\n",
+        ),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-10-01\n---\nAn <span class=\"hl-keyword\">own</span> word.\n\n\
+             ```rust\nlet a = 1;\n```\n\n<!--more-->\n\nAfter.\n",
+        ),
+        (
+            "content/post-2.md",
+            "---\ntitle: Post 2\ndate: 2026-10-02\n---\nTwo.\n\n@shown()\n",
+        ),
+        (
+            "snippets/shown.html",
+            "{% for p in site.pages %}{% if p.title == 'Post 1' %}{{ p.content }}{% endif %}{% endfor %}",
+        ),
+        BASE,
+        PAGE,
+        ("templates/home.html", "{{ page.content }}"),
+        (
+            "templates/feed.xml",
+            "{{ page.content }}|{% for post in posts %}{{ post.content }}|{{ post.excerpt }}|{% endfor %}",
+        ),
+    ]);
+    for page in ["index.md", "post-1.md", "post-2.md"] {
+        let html = built.html(page);
+        assert!(
+            html.contains("<code class=\"language-rust\"><span class=\"hl-"),
+            "{html}"
+        );
+    }
+    let feed = built.renderer.render_feed(&built.renderer.feeds()[0]);
+    assert!(feed.problems.is_empty(), "{:?}", feed.problems);
+    assert!(feed.coloured.is_empty());
+    let excerpt = "<p>An <span class=\"hl-keyword\">own</span> word.</p>\n\
+                   <pre class=\"code\"><code class=\"language-rust\">let a = 1;</code></pre>";
+    let content = format!("{excerpt}\n<p>After.</p>");
+    assert_eq!(
+        feed.html.unwrap(),
+        format!(
+            "<pre class=\"code\"><code class=\"language-rust\">let b = 2;</code></pre>|\
+             <p>Two.</p>\n{content}|<p>Two.</p>|{content}|{excerpt}|"
+        )
+    );
+}
+
+#[test]
+fn writing_built_again_for_a_feed_still_cannot_show_itself() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+        ),
+        ("content/index.md", "# Home\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-10-01\n---\n```rust\nlet a = 1;\n```\n\n@shown()\n",
+        ),
+        (
+            "snippets/shown.html",
+            "{% for p in site.pages %}{% if p.title == 'Post 1' %}{{ p.content }}{% endif %}{% endfor %}",
+        ),
+        ("templates/page.html", "{{ page.content }}"),
+        ("templates/home.html", ""),
+        (
+            "templates/feed.xml",
+            "{% for post in posts %}{{ post.content }}{% endfor %}",
+        ),
+    ]);
+    let page = built.render("post-1.md");
+    assert_eq!(page.html, None);
+    let feed = built.renderer.render_feed(&built.renderer.feeds()[0]);
+    assert!(feed.problems.is_empty(), "{:?}", feed.problems);
+    assert_eq!(
+        feed.html.unwrap(),
+        "<pre class=\"code\"><code class=\"language-rust\">let a = 1;</code></pre>"
+    );
+}
+
+#[test]
 fn code_is_coloured_in_the_sites_style_and_a_language_it_lacks_is_told_at_its_word() {
     let built = site(&[
         (

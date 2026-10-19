@@ -31,6 +31,9 @@ pub(super) struct Frame {
     pub number: usize,
     /// The feed being built, where it is one.
     pub feed: Option<crate::feeds::Feed>,
+    /// Whether code is shown without colour: in a feed, as a feed reader
+    /// loads no stylesheet, and in writing built for one.
+    pub colourless: bool,
     /// Whether what is built is the page left at one of the page's old
     /// addresses.
     pub redirect: bool,
@@ -75,6 +78,9 @@ pub(super) struct Frame {
     /// Where the first block of code coloured names its language, in each
     /// page's writing what is built shows whole.
     pub coloured: Vec<Place>,
+    /// Whether what is built shows any code coloured, its own or in the
+    /// writing of a page it shows, whole or as its excerpt.
+    pub colours: bool,
     pub making: Making,
     /// The template the output is built with, by its index among the
     /// files; none for a page's writing, which is built for its page's.
@@ -146,6 +152,7 @@ impl Frame {
             language,
             number: 1,
             feed: None,
+            colourless: false,
             redirect: false,
             reads: Reads::default(),
             asked: Asked::default(),
@@ -164,6 +171,7 @@ impl Frame {
             boxes_before_writing: None,
             developed: Vec::new(),
             coloured: Vec::new(),
+            colours: false,
             making: Making::Output,
             layout: None,
             steps: 0,

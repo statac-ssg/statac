@@ -15,7 +15,6 @@
 mod languages;
 mod styles;
 
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -651,38 +650,6 @@ pub fn plain(code: &str) -> String {
     let mut out = String::with_capacity(code.len());
     escape(code, &mut out);
     out
-}
-
-/// `html` with each piece of coloured code as its text alone, for a
-/// reader that loads no stylesheet. Only a span as [`Highlighter::html`]
-/// writes it is taken out: one of the kinds' classes, round text.
-pub fn uncoloured(html: &str) -> Cow<'_, str> {
-    const OPEN: &str = "<span class=\"hl-";
-    const CLOSE: &str = "</span>";
-    let mut out = String::new();
-    let mut copied = 0;
-    let mut from = 0;
-    while let Some(at) = html[from..].find(OPEN).map(|at| from + at) {
-        from = at + OPEN.len();
-        let Some((kind, rest)) = html[from..].split_once("\">") else {
-            break;
-        };
-        let Some(end) = rest.find('<') else {
-            break;
-        };
-        if !KINDS.contains(&kind) || !rest[end..].starts_with(CLOSE) {
-            continue;
-        }
-        out.push_str(&html[copied..at]);
-        out.push_str(&rest[..end]);
-        from = html.len() - rest.len() + end + CLOSE.len();
-        copied = from;
-    }
-    if copied == 0 {
-        return Cow::Borrowed(html);
-    }
-    out.push_str(&html[copied..]);
-    Cow::Owned(out)
 }
 
 /// The four characters that would otherwise be read as HTML.
