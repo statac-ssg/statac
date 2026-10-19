@@ -1136,6 +1136,9 @@ pub enum Kind {
     FeedIdChanged {
         was: String,
         id: String,
+        /// Whether the post is made from an item of a table, which takes
+        /// the line in its record.
+        item: bool,
     },
     /// A site naming no language, read as English.
     NoLanguage,

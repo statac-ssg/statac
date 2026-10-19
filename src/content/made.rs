@@ -295,6 +295,7 @@ impl Reader<'_> {
                     by: asked.by,
                     item: entry.item,
                     head,
+                    fields: Some(entry.node.place),
                 }),
             });
         }
@@ -394,6 +395,7 @@ pub(super) fn make_for_posts(
                     by: asked.by,
                     item: Item::Post { page: post, named },
                     head,
+                    fields: None,
                 }),
             });
         }

@@ -130,6 +130,7 @@ fn changed(was: &str) -> Vec<(Kind, Option<String>)> {
     let kind = Kind::FeedIdChanged {
         was: was.into(),
         id: ID.into(),
+        item: false,
     };
     vec![(kind, Some("---".into()))]
 }
@@ -509,4 +510,147 @@ fn the_ids_to_write_are_those_of_new_posts_and_of_posts_that_moved() {
         feed.contains(&format!("Post 5=urn:uuid:{fifth};")),
         "{feed}"
     );
+}
+
+/// A page making a post of each item of `data/items.yaml`.
+const ITEMS: &str = "---\ntitle: Items\neach: data.items\npermalink: /items/{slug}/\n---\n";
+
+const ITEM: &str = "  title: Item 1\n  date: 2026-01-03\n";
+
+/// The id the site's own feed gives the post `title`.
+fn id_of(kept: &Kept, title: &str) -> String {
+    let feed = std::fs::read_to_string(kept.root.join("out/feed.xml")).unwrap();
+    let entry = feed
+        .split(';')
+        .find_map(|e| e.strip_prefix(&format!("{title}=")));
+    let entry = entry.unwrap_or_else(|| panic!("{feed}"));
+    entry.strip_prefix("urn:uuid:").unwrap().to_owned()
+}
+
+fn item_changed(was: &str, id: &str, at: &str) -> (Kind, Option<String>) {
+    let kind = Kind::FeedIdChanged {
+        was: was.into(),
+        id: id.into(),
+        item: true,
+    };
+    (kind, Some(at.into()))
+}
+
+#[test]
+fn a_post_made_from_a_named_item_that_moved_is_offered_the_id_it_had() {
+    let items = format!("one:\n{ITEM}");
+    let cases = [
+        (
+            "its pattern changed",
+            ITEMS.replace("/items/", "/elsewhere/"),
+            items.clone(),
+            "one",
+        ),
+        (
+            "its name changed",
+            ITEMS.replace("{slug}", "{key}"),
+            format!("two:\n{ITEM}"),
+            "two",
+        ),
+    ];
+    for (case, page, moved, at) in cases {
+        let kept = Kept::new(SETTINGS);
+        kept.write("content/items.md", &ITEMS.replace("{slug}", "{key}"));
+        kept.write("data/items.yaml", &items);
+        assert_eq!(told(&kept.build()), [], "{case}");
+        let id = id_of(&kept, "Item 1");
+
+        kept.write("content/items.md", &page);
+        kept.write("data/items.yaml", &moved);
+        let offered = [item_changed("/items/one/", &id, at)];
+        for _ in 0..2 {
+            assert_eq!(told(&kept.build()), offered, "{case}");
+            assert_ne!(id_of(&kept, "Item 1"), id, "{case}");
+        }
+
+        kept.write("data/items.yaml", &format!("{moved}  id: {id}\n"));
+        assert_eq!(told(&kept.build()), [], "{case}");
+        assert_eq!(id_of(&kept, "Item 1"), id, "{case}");
+    }
+}
+
+/// Each a site built with one item in a list, then the list and the
+/// pattern as given, and what is said.
+#[test]
+fn a_post_made_from_an_item_in_a_list_is_known_by_its_fields_alone() {
+    let moved = ITEMS.replace("/items/", "/elsewhere/");
+    let item = format!("-{}", &ITEM[1..]);
+    let added = format!("- title: Item 2\n  date: 2026-01-04\n{item}");
+    let edited = format!("{item}  summary: Text.\n");
+    let sent_on = format!("{edited}  redirect_from: [/items/item-1/]\n");
+    let cases = [
+        ("its pattern changed", &item, &moved, true),
+        ("an item added above it", &added, &ITEMS.to_owned(), false),
+        (
+            "an item added above it, its pattern changed",
+            &added,
+            &moved,
+            true,
+        ),
+        (
+            "its fields changed, its pattern too",
+            &edited,
+            &moved,
+            false,
+        ),
+        (
+            "its fields changed, sending readers on",
+            &sent_on,
+            &moved,
+            true,
+        ),
+    ];
+    for (case, list, page, offered) in cases {
+        let kept = Kept::new(SETTINGS);
+        kept.write("content/items.md", ITEMS);
+        kept.write("data/items.yaml", &item);
+        assert_eq!(told(&kept.build()), [], "{case}");
+        let id = id_of(&kept, "Item 1");
+
+        kept.write("content/items.md", page);
+        kept.write("data/items.yaml", list);
+        let expected = match offered {
+            true => vec![item_changed("/items/item-1/", &id, "title: Item 1")],
+            false => Vec::new(),
+        };
+        assert_eq!(told(&kept.build()), expected, "{case}");
+    }
+}
+
+#[test]
+fn two_items_written_alike_are_neither_offered_an_id() {
+    let kept = Kept::new(SETTINGS);
+    let item = format!("-{}", &ITEM[1..]);
+    kept.write("data/items.yaml", &item);
+    kept.write("content/a.md", &ITEMS.replace("/items/", "/a/"));
+    kept.write("content/b.md", &ITEMS.replace("/items/", "/b/"));
+    assert_eq!(told(&kept.build()), []);
+    // Known by no path, and by fields two posts share.
+    let lines = kept.kept().unwrap();
+    for address in ["/a/item-1/", "/b/item-1/"] {
+        assert!(lines.contains(&format!("\n\t{address}\t")), "{lines}");
+    }
+    kept.write("content/a.md", &ITEMS.replace("/items/", "/c/"));
+    kept.write("content/b.md", &ITEMS.replace("/items/", "/d/"));
+    assert_eq!(told(&kept.build()), []);
+}
+
+#[test]
+fn a_post_made_from_an_item_is_given_no_id_to_write() {
+    let kept = Kept::new(&format!("{SETTINGS}write_feed_ids: true\n"));
+    kept.write("content/items.md", &ITEMS.replace("{slug}", "{key}"));
+    kept.write("data/items.yaml", &format!("one:\n{ITEM}"));
+    kept.build();
+    assert_eq!(to_write(&kept), []);
+    kept.write("content/items.md", &ITEMS.replace("{slug}", "{key}/x"));
+    kept.write(
+        "data/items.yaml",
+        &format!("one:\n{ITEM}two:\n  title: Item 2\n  date: 2026-01-04\n"),
+    );
+    assert_eq!(to_write(&kept), []);
 }

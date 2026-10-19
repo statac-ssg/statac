@@ -2806,8 +2806,11 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::NoSiteAddress { .. } => {
             Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`.".into())
         }
-        Kind::FeedIdChanged { id, .. } => Some(format!(
+        Kind::FeedIdChanged { id, item: false, .. } => Some(format!(
             "Add `id: {id}` to its front matter to keep it the same post in feed readers."
+        )),
+        Kind::FeedIdChanged { id, item: true, .. } => Some(format!(
+            "Add `id: {id}` to the item to keep it the same post in feed readers."
         )),
         Kind::NoLanguage => Some("Add the site's language to `statac.yaml`, as `language: en`.".into()),
         Kind::RobotsBeneathPath { .. } => Some(
@@ -5279,11 +5282,24 @@ mod tests {
                 Kind::FeedIdChanged {
                     was: "/posts/post-1/".into(),
                     id: "fc370633-88f0-8092-9f96-7749dbfff0eb".into(),
+                    item: false,
                 },
                 "Feed id changed: this post was published at `/posts/post-1/`",
                 Some(
                     "Add `id: fc370633-88f0-8092-9f96-7749dbfff0eb` to its front matter to \
                      keep it the same post in feed readers.",
+                ),
+            ),
+            (
+                Kind::FeedIdChanged {
+                    was: "/books/one/".into(),
+                    id: "fc370633-88f0-8092-9f96-7749dbfff0eb".into(),
+                    item: true,
+                },
+                "Feed id changed: this post was published at `/books/one/`",
+                Some(
+                    "Add `id: fc370633-88f0-8092-9f96-7749dbfff0eb` to the item to keep it the \
+                     same post in feed readers.",
                 ),
             ),
             (

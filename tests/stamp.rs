@@ -457,3 +457,36 @@ fn an_id_is_written_for_a_post_new_since_the_site_was_published() {
     assert_eq!(code, Some(1));
     assert_eq!(site.read("content/post-3.md"), flow);
 }
+
+#[test]
+fn no_id_is_written_for_a_post_made_from_an_item() {
+    let site = Site::new("item-ids");
+    site.write(
+        "statac.yaml",
+        &format!("{SETTINGS}url: https://example.org\nfeed_key: key\nwrite_feed_ids: true\n"),
+    );
+    site.write(
+        "templates/feed.xml",
+        "{% for post in posts %}{{ feed_id(post) }} {% endfor %}\n",
+    );
+    let page = "---\ntitle: Items\ntype: page\neach: data.items\npermalink: /items/{key}/\n---\n";
+    site.write("content/items.md", page);
+    site.write(
+        "data/items.yaml",
+        "one:\n  title: Item 1\n  date: 2026-01-01\n",
+    );
+    let (said, code) = site.run("build", &["--today=2026-10-06"]);
+    assert_eq!(code, Some(0), "{said}");
+
+    // One item moved, and one new.
+    let moved = page.replace("/items/", "/elsewhere/");
+    site.write("content/items.md", &moved);
+    let items =
+        "one:\n  title: Item 1\n  date: 2026-01-01\ntwo:\n  title: Item 2\n  date: 2026-01-02\n";
+    site.write("data/items.yaml", items);
+    let (said, code) = site.stamp();
+    assert!(!said.contains("Wrote an `id`"), "{said}");
+    assert_eq!(code, Some(0), "{said}");
+    assert_eq!(site.read("data/items.yaml"), items);
+    assert_eq!(site.read("content/items.md"), moved);
+}

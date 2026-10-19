@@ -26,6 +26,14 @@ What changed in each release of Statac, the newest first.
   `permalink`. A page without the field stops the build, as
   `` `content/a.md` has no `isbn` for `{isbn}` ``. The pattern stopped
   with "there is no piece `{isbn}`" on every page.
+- A post made from a data file by a page with `each:` that comes to be
+  published at another address, with no `id:` of its own, is told as
+  `feed-id-changed`, as a post in a file of its own is, with the `id:`
+  line to add to its item in the data file. Its feed id changed with
+  nothing said, so feed readers showed it again as new. An item with a
+  name is known by its name, and an item in a list by its fields
+  written exactly as before. `write_feed_ids` never writes into a data
+  file, so such a post always takes the line by hand.
 
 ## 0.5.0 - 2026-10-18
 

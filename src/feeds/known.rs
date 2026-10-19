@@ -8,11 +8,18 @@
 //! the `id:` line that gives it back the id they know. Until the line is
 //! written the post stays known as it was, so every build says it again.
 //!
-//! A post is the one known at its file's path. Where no page is at a
-//! known path any more, the post it was is the one sending readers on from
-//! the address known, or the one post whose file holds the same bytes.
+//! A post is the one known at its file's path, or one made from a named
+//! item of a table at its page's path, made of the page that made it and
+//! the item's name. Where no page is at a known path any more, the post it
+//! was is the one sending readers on from the address known, or the one
+//! post whose file holds the same bytes, or for an item, whose fields are
+//! written the same. An item in a list has no path of its own, its place in the
+//! list changing as items are added, so it is known only those two ways.
 //! Nothing is guessed from a title or a day. Losing the file loses only
 //! what it would have offered.
+//!
+//! An item takes its `id:` in its record, by hand: nothing here writes
+//! into a data file.
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -26,7 +33,7 @@ use crate::config::Settings;
 use crate::content::words::PageWord;
 use crate::dates::Dates;
 use crate::problem::{Kind, Problem};
-use crate::site::{Page, PageId, SentTo, Site};
+use crate::site::{Item, Made, Page, PageId, SentTo, Site};
 use crate::source::Sources;
 
 /// The file's name in what Statac keeps.
@@ -40,13 +47,13 @@ const MADE: &str = "urn:uuid:";
 /// A post as feed readers know it.
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct Line {
-    /// Its file's path under `content/`.
+    /// Its path, as [`path_of`] gives it; empty for an item in a list.
     path: String,
     /// Where it was published, without the site's own path.
     address: String,
     /// The id its entry had.
     id: String,
-    /// What its file held.
+    /// What its file held, or its item's fields.
     hash: String,
 }
 
@@ -88,6 +95,28 @@ fn hash_of(text: &str) -> String {
     blake3::hash(text.as_bytes()).to_hex()[..32].to_owned()
 }
 
+/// The path a post is known at: its file's under `content/`, or for a
+/// post made from a named item, its page's. None for an item in a list.
+fn path_of(page: &Page) -> Option<&str> {
+    match &page.made {
+        None => Some(&page.path),
+        Some(Made {
+            item: Item::Key(_), ..
+        }) => Some(&page.path),
+        Some(_) => None,
+    }
+}
+
+/// The hash of what a post holds: its file's text, or where it is made
+/// from an item, its item's fields as written.
+fn hash_held(page: &Page, sources: &Sources) -> Option<String> {
+    let text = match page.made.as_ref().map(|made| made.fields) {
+        None => sources.text(page.source?),
+        Some(fields) => sources.spelling(fields?),
+    };
+    Some(hash_of(text))
+}
+
 /// Whether a run that builds drafts brought `page` in: a draft, or a post
 /// waiting for its day.
 fn brought_in(page: &Page, dates: &Dates) -> bool {
@@ -100,19 +129,15 @@ fn brought_in(page: &Page, dates: &Dates) -> bool {
 }
 
 /// The posts the site's feeds carry, each once, in the order of their
-/// files: those written as files of their own, and published whatever the
-/// run brings in.
+/// pages' paths: those written in files of their own or made from items,
+/// and published whatever the run brings in.
 fn posts(site: &Site, dates: &Dates, feeds: &[Feed]) -> Vec<PageId> {
     let mut posts: Vec<PageId> = feeds
         .iter()
         .flat_map(|feed| site.lists.get(feed.list).members.iter().copied())
         .filter(|&post| {
             let page = site.pages.get(post);
-            page.date.is_some()
-                && page.source.is_some()
-                && page.made.is_none()
-                && page.lands()
-                && !brought_in(page, dates)
+            page.date.is_some() && page.source.is_some() && page.lands() && !brought_in(page, dates)
         })
         .collect();
     posts.sort_unstable();
@@ -154,6 +179,7 @@ impl Known {
                 let kind = Kind::FeedIdChanged {
                     was: format!("{base}{}", line.address),
                     id: id.to_owned(),
+                    item: site.pages.get(post).made.is_some(),
                 };
                 Some(Problem::placed(kind, site.head(post, sources)))
             })
@@ -186,12 +212,14 @@ impl Known {
     fn hold_to(&mut self, site: &Site, sources: &Sources) {
         let lines = &self.lines;
         let at_path: HashMap<&str, usize> = (lines.iter().enumerate())
+            .filter(|(_, line)| !line.path.is_empty())
             .map(|(at, line)| (line.path.as_str(), at))
             .collect();
         let mut by = HashMap::new();
         let mut unknown = Vec::new();
         for &post in &self.posts {
-            match at_path.get(site.pages.get(post).path.as_str()) {
+            let path = path_of(site.pages.get(post));
+            match path.and_then(|path| at_path.get(path)) {
                 Some(&line) => {
                     by.insert(post, line);
                 }
@@ -200,8 +228,8 @@ impl Known {
         }
         if !unknown.is_empty() && by.len() < lines.len() {
             let standing: HashSet<&str> = (site.pages.iter())
-                .filter(|(_, page)| page.source.is_some() && page.made.is_none())
-                .map(|(_, page)| page.path.as_str())
+                .filter(|(_, page)| page.source.is_some())
+                .filter_map(|(_, page)| path_of(page))
                 .collect();
             let mut gone: Vec<usize> = (0..lines.len())
                 .filter(|&line| !standing.contains(lines[line].path.as_str()))
@@ -227,8 +255,7 @@ impl Known {
             }
             let mut holding: HashMap<String, Vec<PageId>> = HashMap::new();
             for &post in unknown.iter().filter(|post| !by.contains_key(post)) {
-                if let Some(source) = site.pages.get(post).source {
-                    let hash = hash_of(sources.text(source));
+                if let Some(hash) = hash_held(site.pages.get(post), sources) {
                     holding.entry(hash).or_default().push(post);
                 }
             }
@@ -285,7 +312,7 @@ impl Known {
             .par_iter()
             .filter_map(|&post| {
                 let page = site.pages.get(post);
-                let hash = hash_of(sources.text(page.source?));
+                let hash = hash_held(page, sources)?;
                 let (address, id) = match self.moved(site, settings, dates, post) {
                     Some((line, _)) => (line.address.clone(), line.id.clone()),
                     None => (
@@ -294,7 +321,7 @@ impl Known {
                     ),
                 };
                 let line = Line {
-                    path: page.path.clone(),
+                    path: path_of(page).unwrap_or_default().to_owned(),
                     address,
                     id,
                     hash,
@@ -337,13 +364,15 @@ pub enum IdsToWrite {
 /// The posts `write_feed_ids` gives an `id:` line, held to what the last
 /// build to publish kept: a post in a feed with no `id:` that feed
 /// readers don't know yet, given the id it has now, and one they know at
-/// another address, given the id it had there. None on a site that leaves
-/// the setting off.
+/// another address, given the id it had there. A post made from an item
+/// is given none, its line written in its record by hand. None on a site
+/// that leaves the setting off.
 pub fn ids_to_write(known: &Known, site: &Site, settings: &Settings, dates: &Dates) -> IdsToWrite {
     if settings.truth("write_feed_ids") != Some(true) {
         return IdsToWrite::Lines(Vec::new());
     }
     let lines: Vec<(PageId, String)> = (known.posts.iter())
+        .filter(|&&post| site.pages.get(post).made.is_none())
         .filter_map(|&post| {
             let id = match known.by.contains_key(&post) {
                 true => known.moved(site, settings, dates, post)?.1.to_owned(),

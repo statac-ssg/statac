@@ -174,6 +174,8 @@ pub struct Made {
     /// Where the item is written: its name, or its first line; for a post,
     /// the `each:` line.
     pub head: Place,
+    /// Where an item's fields are written; none for a post.
+    pub fields: Option<Place>,
 }
 
 /// What a page was made for: an item of a table, by its name or by its

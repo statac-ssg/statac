@@ -27,12 +27,19 @@ old address in its `redirect_from:`. If a post is moved and edited at the
 same time, with no `redirect_from:`, Statac can't tell it from a new
 post, and says nothing about it.
 
+A post made from a data file, by a page with `each:`, Statac knows by
+that page and its item: an item with a name by its name, and an item in
+a list by its fields being written exactly as before, or by the old
+address in its `redirect_from:`. Two items in a list written alike are
+both taken as new.
+
 ## How to fix it
 
 Add the `id:` line that the message suggests to the post's front matter.
-It is the id the post had at its old address, so feed readers keep
-treating it as the same post. From then on, the id stays with the post
-wherever it moves.
+For a post made from a data file, the line goes in the item's record in
+the data file. It is the id the post had at its old address, so feed
+readers keep treating it as the same post. From then on, the id stays
+with the post wherever it moves.
 
 Statac warns on every build until the line is there. If you want readers
 to see the post as new after all, delete `.statac/feeds`. Statac then
@@ -41,7 +48,9 @@ next build.
 
 Statac never writes the line itself unless you ask it to, with
 `write_feed_ids: true` in `statac.yaml`. With that set, `statac serve`
-and `statac stamp` write it for you, and the warning goes away.
+and `statac stamp` write it for you, and the warning goes away. They
+never write into a data file, so a post made from one always takes the
+line by hand.
 
 ## Example
 
