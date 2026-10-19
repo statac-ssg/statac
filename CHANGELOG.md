@@ -19,6 +19,13 @@ What changed in each release of Statac, the newest first.
   was linked to the other. Where a page in another language stands at
   the author's page's own path, the two are still each other's
   translations.
+- A page's `permalink`, written on it or handed down to it, can use a
+  field declared in `statac.yaml`, as `/books/{isbn}/` with
+  `fields.isbn: text`, filled from the page's own value as the pages
+  `each:` makes fill it from their items. So can an item's own
+  `permalink`. A page without the field stops the build, as
+  `` `content/a.md` has no `isbn` for `{isbn}` ``. The pattern stopped
+  with "there is no piece `{isbn}`" on every page.
 
 ## 0.5.0 - 2026-10-18
 

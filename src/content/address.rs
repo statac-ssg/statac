@@ -162,20 +162,49 @@ pub fn name_fault(piece: &str) -> Option<AddressFault> {
 
 /// Everything wrong with a `permalink` pattern, each with where it is in
 /// the pattern: a piece no pattern fills, a brace with no partner, another
-/// tool's `:piece`, and the first piece no disk will write. A pattern
+/// tool's `:piece`, and the first piece no disk will write. Its pieces are
+/// [`PIECES`] and the fields `declared` for the site's pages. A pattern
 /// `handed` to many pages must ask for at least one piece, or every page
 /// lands at one address.
-pub fn pattern_faults(pattern: &str, handed: bool) -> Vec<(Kind, Span)> {
-    faults(pattern, handed, false)
+pub fn pattern_faults(pattern: &str, handed: bool, declared: &[&str]) -> Vec<(Kind, Span)> {
+    faults(pattern, handed, Fields::Declared(declared))
 }
 
 /// Everything wrong with the pattern a page making pages gives its items,
 /// whose pieces are the items' own fields, so any name in braces is one.
 pub fn item_pattern_faults(pattern: &str) -> Vec<(Kind, Span)> {
-    faults(pattern, true, true)
+    faults(pattern, true, Fields::Any)
 }
 
-fn faults(pattern: &str, handed: bool, items: bool) -> Vec<(Kind, Span)> {
+/// Which names in braces a pattern may ask for besides [`PIECES`].
+#[derive(Copy, Clone)]
+enum Fields<'a> {
+    /// Any name, each an item's own field.
+    Any,
+    /// The fields declared for the site's pages.
+    Declared(&'a [&'a str]),
+}
+
+impl<'a> Fields<'a> {
+    fn has(self, token: &str) -> bool {
+        match self {
+            Fields::Any => is_field_name(token),
+            Fields::Declared(declared) => declared.contains(&token),
+        }
+    }
+
+    /// The piece nearest `written`, of [`PIECES`] and the fields declared.
+    fn nearest(self, written: &str) -> Option<&'a str> {
+        let declared = match self {
+            Fields::Any => &[][..],
+            Fields::Declared(declared) => declared,
+        };
+        crate::suggest::nearest(written, PIECES.iter().chain(declared).copied())
+    }
+}
+
+fn faults(pattern: &str, handed: bool, fields: Fields) -> Vec<(Kind, Span)> {
+    let items = matches!(fields, Fields::Any);
     let mut found = Vec::new();
     let unusable = |fault| Kind::UnusableAddress { fault };
     let mut chars = pattern.char_indices().peekable();
@@ -191,8 +220,8 @@ fn faults(pattern: &str, handed: bool, items: bool) -> Vec<(Kind, Span)> {
                 let ours = match word {
                     word if items => Some(word),
                     "title" | "name" | "filename" => Some("slug"),
-                    word if PIECES.contains(&word) => Some(word),
-                    word => crate::suggest::nearest(word, PIECES.iter().copied()),
+                    word if PIECES.contains(&word) || fields.has(word) => Some(word),
+                    word => fields.nearest(word),
                 };
                 let written = format!(":{word}");
                 found.push((
@@ -222,14 +251,14 @@ fn faults(pattern: &str, handed: bool, items: bool) -> Vec<(Kind, Span)> {
                 let end = start + close + 1;
                 while chars.next_if(|&(at, _)| at < end).is_some() {}
                 let token = &pattern[start + 1..end - 1];
-                if PIECES.contains(&token) || (items && is_field_name(token)) {
+                if PIECES.contains(&token) || fields.has(token) {
                     fills = true;
                     continue;
                 }
                 let nearest = match token {
                     "section" => Some("folder"),
                     "title" | "filename" => Some("slug"),
-                    token => crate::suggest::nearest(token, PIECES.iter().copied()),
+                    token => fields.nearest(token),
                 };
                 found.push((
                     unusable(AddressFault::UnknownPiece {
@@ -243,7 +272,7 @@ fn faults(pattern: &str, handed: bool, items: bool) -> Vec<(Kind, Span)> {
         }
     }
     if found.is_empty() {
-        if let Some(fault) = first_unwritable(pattern, items) {
+        if let Some(fault) = first_unwritable(pattern) {
             found.push(fault);
         } else if handed && !fills {
             found.push((
@@ -271,21 +300,14 @@ fn colon_word<'a>(before: &str, rest: &'a str) -> &'a str {
     &rest[..end]
 }
 
-/// The first piece of a well-braced pattern no disk will write, with each
-/// `{piece}` standing for a plain name: each of `PIECES`, or for `items`
-/// any name in braces.
-fn first_unwritable(pattern: &str, items: bool) -> Option<(Kind, Span)> {
+/// The first piece of a pattern with no other fault that no disk will
+/// write, each `{piece}` standing for a plain name.
+fn first_unwritable(pattern: &str) -> Option<(Kind, Span)> {
     let mut at = 0;
     for piece in pattern.split('/') {
         let start = at;
         at += piece.len() + 1;
-        let mut named = piece.to_owned();
-        if items {
-            named = filled(&named, |_| Ok::<_, ()>("x".to_owned())).unwrap_or_default();
-        }
-        for token in PIECES {
-            named = named.replace(&format!("{{{token}}}"), "x");
-        }
+        let named = filled(piece, |_| Ok::<_, ()>("x".to_owned())).unwrap_or_default();
         if named.is_empty() {
             continue;
         }
@@ -707,15 +729,15 @@ mod tests {
             ),
         ];
         for (pattern, kind, at) in cases {
-            let faults = pattern_faults(pattern, false);
+            let faults = pattern_faults(pattern, false, &[]);
             assert_eq!(faults[0].0, kind, "{pattern}");
             assert_eq!(&pattern[faults[0].1.range()], at, "{pattern}");
         }
-        assert_eq!(pattern_faults("/:year/:title/", false).len(), 2);
-        assert!(pattern_faults("/{year}/{month}/{day}/{slug}/", true).is_empty());
-        assert!(pattern_faults("/about/", false).is_empty());
+        assert_eq!(pattern_faults("/:year/:title/", false, &[]).len(), 2);
+        assert!(pattern_faults("/{year}/{month}/{day}/{slug}/", true, &[]).is_empty());
+        assert!(pattern_faults("/about/", false, &[]).is_empty());
         assert_eq!(
-            pattern_faults("/blog/", true),
+            pattern_faults("/blog/", true, &[]),
             [(
                 unusable(AddressFault::FillsNothing {
                     pattern: "/blog/".into()
@@ -723,6 +745,49 @@ mod tests {
                 Span::new(0, 6)
             )]
         );
+    }
+
+    #[test]
+    fn a_pages_pattern_takes_a_declared_field_as_a_piece() {
+        let declared = ["isbn"];
+        let unusable = |fault| Kind::UnusableAddress { fault };
+        let cases = [
+            ("/books/{isbn}/", None),
+            ("/{year}/{isbn}.html", None),
+            (
+                "/books/:isbn/",
+                Some((
+                    Kind::OtherSpelling {
+                        word: Word::AddressPiece,
+                        written: ":isbn".into(),
+                        ours: "{isbn}".into(),
+                    },
+                    ":isbn",
+                )),
+            ),
+            (
+                "/books/{ibsn}/",
+                Some((
+                    unusable(AddressFault::UnknownPiece {
+                        written: "{ibsn}".into(),
+                        nearest: Some("{isbn}".into()),
+                    }),
+                    "{ibsn}",
+                )),
+            ),
+            (
+                "/books/{isbn}./",
+                Some((unusable(AddressFault::TrailingSpaceOrDot('.')), "{isbn}.")),
+            ),
+        ];
+        for (pattern, expected) in cases {
+            let faults = pattern_faults(pattern, true, &declared);
+            let found = faults
+                .first()
+                .map(|(kind, span)| (kind.clone(), &pattern[span.range()]));
+            assert_eq!(found, expected, "{pattern}");
+        }
+        assert!(!pattern_faults("/books/{isbn}/", true, &[]).is_empty());
     }
 
     #[test]

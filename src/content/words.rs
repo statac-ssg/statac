@@ -418,7 +418,7 @@ pub fn read_front_matter(
             };
             read.problems.extend(empty(&name, Word::Field, key, value));
             read.problems.extend(one_tag(sources, word, key, value));
-            match read_word(sources, word, value, false, shape) {
+            match read_word(sources, word, value, (false, declarations), shape) {
                 Ok(Some(value)) => read.own.set(word, value),
                 Ok(None) => {}
                 Err(problems) => {
@@ -474,7 +474,7 @@ pub fn read_handed(
         }
         problems.extend(empty(&name, Word::Field, key, value));
         problems.extend(one_tag(sources, word, key, value));
-        match read_word(sources, word, value, true, None) {
+        match read_word(sources, word, value, (true, declarations), None) {
             Ok(Some(value)) => layer.set(word, value),
             Ok(None) => {}
             Err(found) => problems.extend(found),
@@ -694,12 +694,12 @@ pub fn nested(sources: &Sources, under: &str, value: &Node) -> Vec<Problem> {
 
 /// Reads one of Statac's words, as `shape` where it is given. `handed`
 /// says the value is written for the pages inside, where a pattern must ask
-/// for a piece.
+/// for a piece; a pattern may ask for a field `declarations` declare.
 fn read_word(
     sources: &Sources,
     word: PageWord,
     node: &Node,
-    handed: bool,
+    (handed, declarations): (bool, &Declarations),
     shape: Option<Shape>,
 ) -> Result<Option<Sourced<Value>>, Vec<Problem>> {
     let reader = Reader::new(sources, word.name());
@@ -767,7 +767,10 @@ fn read_word(
             Some(pattern) => {
                 let faults = match shape {
                     Some(Shape::ItemPattern) => item_pattern_faults(&pattern.value),
-                    _ => pattern_faults(&pattern.value, handed),
+                    _ => {
+                        let declared: Vec<&str> = declarations.names().collect();
+                        pattern_faults(&pattern.value, handed, &declared)
+                    }
                 };
                 if faults.is_empty() {
                     Some(pattern.map(Value::Text))

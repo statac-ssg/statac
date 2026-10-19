@@ -925,7 +925,7 @@ impl Reader<'_> {
                 path: &path,
                 head,
             };
-            let address = address_of(&words, &target, &mut unsaid);
+            let address = address_of(sources, &words, &target, &mut unsaid);
             let from = words.get(PageWord::RedirectFrom);
             let from = from
                 .and_then(|from| from.value.as_texts())
@@ -976,7 +976,7 @@ impl Reader<'_> {
             path: &path,
             head,
         };
-        let address = address_of(&words, &target, problems);
+        let address = address_of(sources, &words, &target, problems);
         Some(Page {
             source: Some(d.source),
             language: self.language_of(folder_at),
@@ -1464,8 +1464,14 @@ struct Target<'a> {
 
 /// Where a page lands: its `permalink` filled in, written or handed down,
 /// though a folder's own page is moved only by one written on it; or its
-/// folder and name.
-fn address_of(words: &Words, target: &Target, problems: &mut Vec<Problem>) -> Address {
+/// folder and name. A piece naming a declared field is filled from the
+/// page's own, as an item's is.
+fn address_of(
+    sources: &Sources,
+    words: &Words,
+    target: &Target,
+    problems: &mut Vec<Problem>,
+) -> Address {
     let Target {
         place,
         own,
@@ -1524,8 +1530,14 @@ fn address_of(words: &Words, target: &Target, problems: &mut Vec<Problem>) -> Ad
         name,
     };
     let top = Top::new(top);
+    let written = (pattern.as_str(), &permalink.origin);
     let pattern = top.pattern(pattern, permalink.origin.place, problems);
-    let expanded = match address::expand(pattern, &pieces) {
+    let filling = (path, made::Whose::Page, head);
+    let Some(pattern) = made::own_fields(sources, words, pattern, written, filling, problems)
+    else {
+        return Address::made(path);
+    };
+    let expanded = match address::expand(&pattern, &pieces) {
         Ok(expanded) => top.address(&expanded),
         Err(fault) => {
             problems.push(Problem::at(Kind::UnusableAddress { fault }, head));

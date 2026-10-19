@@ -695,8 +695,18 @@ impl Filling<'_> {
                 folder: self.folder,
                 name: self.name.unwrap_or(self.slug.unwrap_or_default()),
             };
+            let pattern = (written.as_str(), &own.origin);
             let written = top.pattern(written, own.origin.place, problems);
-            return match address::expand(written, &pieces) {
+            let filling = (self.named, Whose::Item, head);
+            let written = own_fields(
+                self.sources,
+                self.words,
+                written,
+                pattern,
+                filling,
+                problems,
+            )?;
+            return match address::expand(&written, &pieces) {
                 Ok(expanded) => Some(top.address(&expanded)),
                 Err(fault) => {
                     let place = own.origin.place.unwrap_or(head);
@@ -709,35 +719,19 @@ impl Filling<'_> {
         let filled = address::filled(written, |token| self.piece(token, problems));
         match filled {
             Ok(expanded) => Some(top.address(&expanded)),
-            Err(Unfilled::Told) => None,
-            Err(Unfilled::Lacks { field, token }) => {
-                let braced = format!("{{{token}}}");
-                let place = pattern
-                    .value
-                    .find(&braced)
-                    .and_then(|at| {
-                        value::place_within(
-                            self.sources,
-                            &pattern.origin,
-                            &pattern.value,
-                            Span::new(at, at + braced.len()),
-                        )
-                    })
-                    .unwrap_or(head);
-                let named = self.named.to_owned();
-                let fault = match self.post {
-                    true => AddressFault::PostLacks {
-                        post: named,
-                        field,
-                        piece: braced,
-                    },
-                    false => AddressFault::ItemLacks {
-                        item: named,
-                        field,
-                        piece: braced,
-                    },
+            Err(unfilled) => {
+                let whose = match self.post {
+                    true => Whose::Post,
+                    false => Whose::Item,
                 };
-                problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
+                let pattern = (pattern.value.as_str(), &pattern.origin);
+                told(
+                    self.sources,
+                    pattern,
+                    unfilled,
+                    (self.named, whose, head),
+                    problems,
+                );
                 None
             }
         }
@@ -746,31 +740,13 @@ impl Filling<'_> {
     /// What the item fills `{token}` with: its own field of that name, or
     /// else a piece every page has.
     fn piece(&self, token: &str, problems: &mut Vec<Problem>) -> Result<String, Unfilled> {
+        if let Some(own) = own_piece(self.sources, self.words, token, self.named, problems) {
+            return own;
+        }
         let lacks = |field: &str| Unfilled::Lacks {
             field: field.to_owned(),
             token: token.to_owned(),
         };
-        if let Some(word) = PageWord::named(token)
-            && let Some(written) = self.words.get(word)
-        {
-            return match &written.value {
-                Value::Text(text) => Ok(piece(text, self.named)),
-                Value::Whole(n) => Ok(n.to_string()),
-                Value::Date(date) => Ok(date.iso_day()),
-                Value::Bool(b) => Ok(b.to_string()),
-                _ => Err(lacks(token)),
-            };
-        }
-        if let Some(field) = self.words.field(token) {
-            return match value::Reader::new(self.sources, token).text(&field.value) {
-                Ok(Some(text)) => Ok(piece(&text.value, self.named)),
-                Ok(None) => Err(lacks(token)),
-                Err(problem) => {
-                    problems.push(problem);
-                    Err(Unfilled::Told)
-                }
-            };
-        }
         match token {
             "key" => self
                 .key
@@ -790,6 +766,129 @@ impl Filling<'_> {
             _ => Err(lacks(token)),
         }
     }
+}
+
+/// What a pattern is filled in for, as its problems name it.
+#[derive(Copy, Clone)]
+pub(super) enum Whose {
+    Item,
+    Post,
+    /// A page of the author's, by its `permalink`.
+    Page,
+}
+
+/// What a page's own `words` fill `{token}` with: one of Statac's words
+/// or a field of the author's, by that name. None where they hold neither.
+fn own_piece(
+    sources: &Sources,
+    words: &Words,
+    token: &str,
+    named: &str,
+    problems: &mut Vec<Problem>,
+) -> Option<Result<String, Unfilled>> {
+    let lacks = || Unfilled::Lacks {
+        field: token.to_owned(),
+        token: token.to_owned(),
+    };
+    if let Some(word) = PageWord::named(token)
+        && let Some(written) = words.get(word)
+    {
+        return Some(match &written.value {
+            Value::Text(text) => Ok(piece(text, named)),
+            Value::Whole(n) => Ok(n.to_string()),
+            Value::Date(date) => Ok(date.iso_day()),
+            Value::Bool(b) => Ok(b.to_string()),
+            _ => Err(lacks()),
+        });
+    }
+    let field = words.field(token)?;
+    Some(
+        match value::Reader::new(sources, token).text(&field.value) {
+            Ok(Some(text)) => Ok(piece(&text.value, named)),
+            Ok(None) => Err(lacks()),
+            Err(problem) => {
+                // A declared field's value is already told where it is read.
+                if !problems.contains(&problem) {
+                    problems.push(problem);
+                }
+                Err(Unfilled::Told)
+            }
+        },
+    )
+}
+
+/// `written` with each piece naming a field rather than one of
+/// [`address::PIECES`] filled in from the page's own `words`, as an item's
+/// fields fill its pattern, the rest left for [`address::expand`]. None
+/// where a field can't fill its piece, with why said at the piece in
+/// `pattern`, the text and origin `written` was read from.
+pub(super) fn own_fields(
+    sources: &Sources,
+    words: &Words,
+    written: &str,
+    pattern: (&str, &crate::origin::Origin),
+    filling: (&str, Whose, Place),
+    problems: &mut Vec<Problem>,
+) -> Option<String> {
+    let (named, ..) = filling;
+    let filled = address::filled(written, |token| {
+        if address::PIECES.contains(&token) {
+            return Ok(format!("{{{token}}}"));
+        }
+        own_piece(sources, words, token, named, problems).unwrap_or(Err(Unfilled::Lacks {
+            field: token.to_owned(),
+            token: token.to_owned(),
+        }))
+    });
+    match filled {
+        Ok(filled) => Some(filled),
+        Err(unfilled) => {
+            told(sources, pattern, unfilled, filling, problems);
+            None
+        }
+    }
+}
+
+/// Says why a pattern couldn't be filled in for what `named` names: at
+/// the piece it lacks a field for, where the pattern is written, or else
+/// at `head`.
+fn told(
+    sources: &Sources,
+    (pattern, origin): (&str, &crate::origin::Origin),
+    unfilled: Unfilled,
+    (named, whose, head): (&str, Whose, Place),
+    problems: &mut Vec<Problem>,
+) {
+    let Unfilled::Lacks { field, token } = unfilled else {
+        return;
+    };
+    let braced = format!("{{{token}}}");
+    let place = pattern
+        .find(&braced)
+        .and_then(|at| {
+            value::place_within(sources, origin, pattern, Span::new(at, at + braced.len()))
+        })
+        .unwrap_or(head);
+    let named = named.to_owned();
+    let piece = braced;
+    let fault = match whose {
+        Whose::Item => AddressFault::ItemLacks {
+            item: named,
+            field,
+            piece,
+        },
+        Whose::Post => AddressFault::PostLacks {
+            post: named,
+            field,
+            piece,
+        },
+        Whose::Page => AddressFault::PageLacks {
+            page: named,
+            field,
+            piece,
+        },
+    };
+    problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
 }
 
 /// `text` as a name in an address, made from where it comes from where it

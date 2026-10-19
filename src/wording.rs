@@ -1865,6 +1865,11 @@ pub(crate) fn address_fault(fault: &AddressFault) -> String {
             post: named,
             field,
             piece,
+        }
+        | AddressFault::PageLacks {
+            page: named,
+            field,
+            piece,
         } => format!("`{named}` has no `{field}` for `{piece}`"),
         AddressFault::FeedAtFolder { .. } => "a feed can't be published at a folder".into(),
         AddressFault::SlashBesidePage { .. } => "a name beside the page can't hold `/`".into(),
@@ -2488,6 +2493,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             )),
             AddressFault::PostLacks { field, piece, .. } => Some(format!(
                 "Add `{field}:` to the post, or take `{piece}` out of the pattern."
+            )),
+            AddressFault::PageLacks { field, piece, .. } => Some(format!(
+                "Add `{field}:` to the page, or take `{piece}` out of the pattern."
             )),
             AddressFault::FeedAtFolder { nearest } | AddressFault::SlashBesidePage { nearest } => {
                 Some(format!("Did you mean `{nearest}`?"))
@@ -5865,6 +5873,17 @@ mod tests {
                 },
                 "Unusable address: `content/post-1.md` has no `isbn` for `{isbn}`",
                 Some("Add `isbn:` to the post, or take `{isbn}` out of the pattern."),
+            ),
+            (
+                Kind::UnusableAddress {
+                    fault: AddressFault::PageLacks {
+                        page: "content/a.md".into(),
+                        field: "isbn".into(),
+                        piece: "{isbn}".into(),
+                    },
+                },
+                "Unusable address: `content/a.md` has no `isbn` for `{isbn}`",
+                Some("Add `isbn:` to the page, or take `{isbn}` out of the pattern."),
             ),
             (
                 Kind::MissingField {

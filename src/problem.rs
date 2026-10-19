@@ -2380,6 +2380,13 @@ pub enum AddressFault {
         field: String,
         piece: String,
     },
+    /// A page lacking the field a piece of its own pattern asks for.
+    PageLacks {
+        /// The page, as `content/a.md`.
+        page: String,
+        field: String,
+        piece: String,
+    },
     /// A feed's address naming a folder, with the nearest that names a
     /// file.
     FeedAtFolder {

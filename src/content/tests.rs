@@ -945,6 +945,143 @@ fn every_piece_of_an_address_is_filled() {
 }
 
 #[test]
+fn a_declared_field_fills_a_pages_pattern_as_it_fills_an_items() {
+    let declared = "language: en\ntimezone: UTC\nfields.isbn: text\ntypes.book.edition: number\n";
+    let read = site(&[
+        ("statac.yaml", declared),
+        (
+            "content/a.md",
+            "---\ntitle: A\nisbn: Number 1\npermalink: /books/{isbn}/\n---\n",
+        ),
+        (
+            "content/b.md",
+            "---\ntitle: B\ntype: book\nedition: 2\npermalink: /books/{edition}.html\n---\n",
+        ),
+        (
+            "content/c/index.md",
+            "---\npages.permalink: /{year}/{isbn}/\n---\n",
+        ),
+        (
+            "content/c/d.md",
+            "---\ntitle: D\ndate: 2026-01-01\nisbn: Number 4\n---\n",
+        ),
+        (
+            "content/e.md",
+            "---\neach: data.e\npermalink: /made/{isbn}/\n---\n",
+        ),
+        (
+            "data/e.yaml",
+            "- isbn: Number 1\n- isbn: Number 5\n  permalink: /own/{isbn}/\n",
+        ),
+    ]);
+    assert_eq!(problems(&read), []);
+    let at = |path: &str| page(&read, path).address.as_str().to_owned();
+    assert_eq!(at("a.md"), "/books/number-1/");
+    assert_eq!(at("e.md/1"), "/made/number-1/");
+    assert_eq!(at("b.md"), "/books/2.html");
+    assert_eq!(at("c/d.md"), "/2026/number-4/");
+    assert_eq!(at("e.md/2"), "/own/number-5/");
+}
+
+#[test]
+fn a_pattern_asking_for_a_field_a_page_lacks_is_refused_where_it_asks() {
+    let declared = "language: en\nfields.isbn: text\n";
+    let lacks = |page: &str| Kind::UnusableAddress {
+        fault: AddressFault::PageLacks {
+            page: page.into(),
+            field: "isbn".into(),
+            piece: "{isbn}".into(),
+        },
+    };
+    let no_piece = |nearest: Option<&str>| Kind::UnusableAddress {
+        fault: AddressFault::UnknownPiece {
+            written: "{isbn}".into(),
+            nearest: nearest.map(str::to_owned),
+        },
+    };
+    type Files<'a> = Vec<(&'a str, &'a str)>;
+    let cases: [(Files, Kind, &str, &str); 5] = [
+        (
+            vec![
+                ("statac.yaml", declared),
+                ("content/a.md", "---\npermalink: /books/{isbn}/\n---\n"),
+            ],
+            lacks("content/a.md"),
+            "content/a.md",
+            "{isbn}",
+        ),
+        (
+            vec![
+                ("statac.yaml", declared),
+                (
+                    "content/c/index.md",
+                    "---\npages.permalink: /c/{isbn}/\n---\n",
+                ),
+                ("content/c/a.md", "---\ntitle: A\n---\n"),
+            ],
+            lacks("content/c/a.md"),
+            "content/c/index.md",
+            "{isbn}",
+        ),
+        (
+            vec![
+                ("statac.yaml", declared),
+                (
+                    "content/a.md",
+                    "---\nisbn: [1, 2]\npermalink: /{isbn}/\n---\n",
+                ),
+            ],
+            Kind::WrongKind {
+                field: "isbn".into(),
+                expected: Expected::Text,
+                found: Found::List,
+                respelt: None,
+            },
+            "content/a.md",
+            "[1, 2]",
+        ),
+        (
+            vec![(
+                "content/a.md",
+                "---\nisbn: Number 1\npermalink: /books/{isbn}/\n---\n",
+            )],
+            no_piece(None),
+            "content/a.md",
+            "{isbn}",
+        ),
+        (
+            vec![
+                ("statac.yaml", "language: en\nfields.isbm: text\n"),
+                (
+                    "content/a.md",
+                    "---\nisbm: Number 1\npermalink: /{isbn}/\n---\n",
+                ),
+            ],
+            no_piece(Some("{isbm}")),
+            "content/a.md",
+            "{isbn}",
+        ),
+    ];
+    for (files, kind, file, at) in cases {
+        let read = site(&files);
+        assert_eq!(kinds_at(&read), [(kind, at.to_owned())], "{files:?}");
+        let place = read.problems[0].place.unwrap();
+        assert_eq!(read.sources.path(place.source), Path::new(file));
+    }
+    let read = site(&[
+        ("statac.yaml", declared),
+        (
+            "content/a.md",
+            "---\nisbn: 3.10\npermalink: /{isbn}/\n---\n",
+        ),
+    ]);
+    assert_eq!(
+        problems(&read),
+        [("needs-quotes", "content/a.md".into(), "3.10".into())]
+    );
+}
+
+#[test]
 fn a_pattern_needing_a_date_on_a_page_without_one_is_refused() {
     let read = site(&[
         (
