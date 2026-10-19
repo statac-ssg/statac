@@ -18,6 +18,8 @@ pub(crate) struct Tag {
 pub(crate) struct Attribute {
     /// In small letters.
     pub name: String,
+    /// Where the name is written.
+    pub name_at: Range<usize>,
     /// As written, its character references undecoded.
     pub value: String,
     /// Where the value is written, inside any quotes.
@@ -143,6 +145,7 @@ pub(crate) fn tag(html: &str, at: usize, longest: usize) -> Tag {
             i += 1;
         }
         let name = html[start..i].to_ascii_lowercase();
+        let name_end = i;
         let mut after = i;
         while after < limit && is_space(b[after]) {
             after += 1;
@@ -150,6 +153,7 @@ pub(crate) fn tag(html: &str, at: usize, longest: usize) -> Tag {
         if after >= limit || b[after] != b'=' {
             attributes.push(Attribute {
                 name,
+                name_at: start..i,
                 value: String::new(),
                 at: i..i,
             });
@@ -177,6 +181,7 @@ pub(crate) fn tag(html: &str, at: usize, longest: usize) -> Tag {
         };
         attributes.push(Attribute {
             name,
+            name_at: start..name_end,
             value: html[at.clone()].to_owned(),
             at,
         });

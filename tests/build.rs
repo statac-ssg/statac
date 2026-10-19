@@ -2990,3 +2990,46 @@ fn every_list_of_pages_a_template_is_handed_is_as_any_list_is() {
         assert!(first.contains(&format!("\n{line};\n")), "{line}\n{first}");
     }
 }
+
+/// A template holding the control characters blame once filled its
+/// expressions with is told at the same place as one without.
+#[test]
+fn a_link_in_a_template_holding_control_characters_is_told_where_it_was_written() {
+    for lead in ["", "\u{1}", "\u{2}"] {
+        let site = Site::new("control-characters");
+        site.write(
+            "statac.yaml",
+            "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+        );
+        site.write(
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-01\nsummary: '<a href=\"/gone/\">x</a>'\n---\n",
+        );
+        site.write(
+            "templates/page.html",
+            &format!("{lead}{{{{ page.summary | safe }}}}\n{{{{ page.content }}}}\n"),
+        );
+        let (said, code) = site.check_without_javascript(&[]);
+        assert_eq!(code, 0, "{said}");
+        let (shown, margin) = match lead {
+            "\u{1}" => ("\u{2401}", " "),
+            "\u{2}" => ("\u{2402}", " "),
+            _ => ("", ""),
+        };
+        assert_eq!(
+            said,
+            format!(
+                "\
+warning  Broken link: nothing is published at `/gone/`
+  templates/page.html, line 1
+   1 \u{2502} {shown}{{{{ page.summary | safe }}}}
+     \u{2502} {margin}^^^^^^^^^^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+1 warning: 1 broken-link.
+"
+            )
+        );
+    }
+}

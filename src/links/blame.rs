@@ -72,16 +72,38 @@ enum Piece {
     Any,
 }
 
-/// What stands for printed text in the template read as HTML: a byte no
-/// template's HTML holds.
-const PRINTED: char = '\u{1}';
-/// What stands for a tag such as `{% if %}`.
-const CHOSEN: char = '\u{2}';
+/// What fills the place of a `{{ ... }}` or `{% ... %}` in the template
+/// read as HTML. A template may hold it as text, so which places are
+/// filled is kept in `Expressions`, never read back from the text.
+const FILL: char = '\u{1}';
+
+/// Where a template has `{{ ... }}` and `{% ... %}`, in order.
+struct Expressions(Vec<Expression>);
+
+struct Expression {
+    at: Range<usize>,
+    /// Whether it prints, `{{ ... }}`, and not a tag such as `{% if %}`.
+    prints: bool,
+}
+
+impl Expressions {
+    /// Whether any of `at` is inside an expression.
+    fn touch(&self, at: &Range<usize>) -> bool {
+        self.0
+            .iter()
+            .any(|expression| expression.at.start < at.end && at.start < expression.at.end)
+    }
+
+    /// Whether the byte at `offset` is inside an expression.
+    fn cover(&self, offset: usize) -> bool {
+        self.touch(&(offset..offset + 1))
+    }
+}
 
 /// Every address attribute in `template`, as a pattern, and where it
 /// prints HTML whole.
 pub(super) fn read(template: &str) -> Read {
-    let flat = flattened(template);
+    let (flat, expressions) = flattened(template);
     let mut found = Vec::new();
     let mut before: Option<TagPattern> = None;
     start_tags(&flat, |tag| {
@@ -90,14 +112,19 @@ pub(super) fn read(template: &str) -> Read {
         let open = tag
             .attributes
             .iter()
-            .any(|attribute| attribute.name.contains([PRINTED, CHOSEN]));
+            .any(|attribute| expressions.touch(&attribute.name_at));
         let this = TagPattern {
             name: tag.name.clone(),
             attributes: tag
                 .attributes
                 .iter()
-                .filter(|attribute| !attribute.name.contains([PRINTED, CHOSEN]))
-                .map(|attribute| (attribute.name.clone(), pieces(&flat[attribute.at.clone()])))
+                .filter(|attribute| !expressions.touch(&attribute.name_at))
+                .map(|attribute| {
+                    (
+                        attribute.name.clone(),
+                        pieces(&flat, &expressions, attribute.at.clone()),
+                    )
+                })
                 .collect(),
             open,
         };
@@ -105,7 +132,7 @@ pub(super) fn read(template: &str) -> Read {
             let Some(kind) = Attribute::of(&attribute.name).filter(|_| tag.name != "base") else {
                 continue;
             };
-            let mut written = pieces(&flat[attribute.at.clone()]);
+            let mut written = pieces(&flat, &expressions, attribute.at.clone());
             if kind == Attribute::Srcset {
                 written.insert(0, Piece::Any);
                 written.push(Piece::Any);
@@ -128,26 +155,31 @@ pub(super) fn read(template: &str) -> Read {
     });
     Read {
         patterns: found,
-        printed: printed(template, &flat),
+        printed: printed(template, &flat, &expressions),
     }
 }
 
 /// Where `template`, read as `flat`, prints HTML whole outside any tag:
 /// through `markdown` or `safe` first, then a page's `content`.
-fn printed(template: &str, flat: &str) -> Vec<(u8, Range<usize>)> {
-    let b = flat.as_bytes();
+fn printed(template: &str, flat: &str, expressions: &Expressions) -> Vec<(u8, Range<usize>)> {
     let mut found = Vec::new();
-    let mut i = 0;
-    while let Some(at) = flat[i..].find(PRINTED).map(|at| i + at) {
-        let end = at + b[at..].iter().take_while(|&&c| c == PRINTED as u8).count();
-        i = end;
-        let opened = flat[..at].rfind('<');
-        let closed = flat[..at].rfind('>');
+    // Adjacent expressions are one place, as the output cannot tell them
+    // apart.
+    let mut places: Vec<Range<usize>> = Vec::new();
+    for expression in expressions.0.iter().filter(|e| e.prints) {
+        match places.last_mut() {
+            Some(last) if last.end == expression.at.start => last.end = expression.at.end,
+            _ => places.push(expression.at.clone()),
+        }
+    }
+    for at in places {
+        let opened = flat[..at.start].rfind('<');
+        let closed = flat[..at.start].rfind('>');
         let in_tag = opened.is_some_and(|open| closed.is_none_or(|close| open > close));
         if in_tag {
             continue;
         }
-        let expression = &template[at..end];
+        let expression = &template[at.clone()];
         let rank = if expression.contains("markdown") || expression.contains("safe") {
             0
         } else if expression.contains("content") {
@@ -155,25 +187,24 @@ fn printed(template: &str, flat: &str) -> Vec<(u8, Range<usize>)> {
         } else {
             continue;
         };
-        found.push((rank, at..end));
+        found.push((rank, at));
     }
     found
 }
 
 /// An attribute's value written in a template, as pieces.
-fn pieces(value: &str) -> Vec<Piece> {
+fn pieces(flat: &str, expressions: &Expressions, at: Range<usize>) -> Vec<Piece> {
     let mut pieces = Vec::new();
-    for c in value.chars() {
-        match c {
-            PRINTED | CHOSEN => {
-                if pieces.last() != Some(&Piece::Any) {
-                    pieces.push(Piece::Any);
-                }
+    for (offset, c) in flat[at.clone()].char_indices() {
+        if expressions.cover(at.start + offset) {
+            if pieces.last() != Some(&Piece::Any) {
+                pieces.push(Piece::Any);
             }
-            _ => match pieces.last_mut() {
+        } else {
+            match pieces.last_mut() {
                 Some(Piece::Text(text)) => text.push(c),
                 _ => pieces.push(Piece::Text(c.to_string())),
-            },
+            }
         }
     }
     pieces
@@ -283,17 +314,18 @@ fn matches(pieces: &[Piece], raw: &str) -> bool {
 }
 
 /// `template` with each `{{ ... }}` and `{% ... %}` replaced by as many
-/// stand-in characters, and each `{# ... #}` by spaces, so every offset is
-/// the template's own.
-fn flattened(template: &str) -> String {
+/// fill characters, and each `{# ... #}` by spaces, so every offset is the
+/// template's own; and where the first two were.
+fn flattened(template: &str) -> (String, Expressions) {
     let b = template.as_bytes();
     let mut out = b.to_vec();
+    let mut expressions = Vec::new();
     let mut i = 0;
     while i + 1 < b.len() {
-        let (close, with) = match (b[i], b[i + 1]) {
-            (b'{', b'{') => ("}}", PRINTED as u8),
-            (b'{', b'%') => ("%}", CHOSEN as u8),
-            (b'{', b'#') => ("#}", b' '),
+        let (close, with, prints) = match (b[i], b[i + 1]) {
+            (b'{', b'{') => ("}}", FILL as u8, true),
+            (b'{', b'%') => ("%}", FILL as u8, false),
+            (b'{', b'#') => ("#}", b' ', false),
             _ => {
                 i += 1;
                 continue;
@@ -305,9 +337,13 @@ fn flattened(template: &str) -> String {
         for byte in &mut out[i..end] {
             *byte = with;
         }
+        if with != b' ' {
+            expressions.push(Expression { at: i..end, prints });
+        }
         i = end;
     }
-    String::from_utf8(out).unwrap_or_else(|_| template.to_owned())
+    let flat = String::from_utf8(out).unwrap_or_else(|_| template.to_owned());
+    (flat, Expressions(expressions))
 }
 
 /// Where the link `found` was written: of `candidates`, each a template's

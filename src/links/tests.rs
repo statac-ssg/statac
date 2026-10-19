@@ -345,3 +345,25 @@ fn an_address_inside_the_site_is_spelled_as_what_stands_for_it_takes_it() {
         "{{ url(\"/about/\") }}"
     );
 }
+
+/// A template may hold the characters blame fills the places of `{{ }}`
+/// and `{% %}` with, in its text and in its addresses.
+#[test]
+fn a_template_holding_control_characters_is_read_by_where_it_has_tags() {
+    let template = "<p>\u{1}\u{2}{{ body | markdown }}</p>\n\
+        <a href=\"/a\u{1}b/\">a</a>\n\
+        <a href=\"/c\u{2}d/{{ id }}\">c</a>\n";
+    let page = "<p><a href=\"/printed/\">p</a></p>\
+        <a href=\"/a/x/b/\">a</a>\
+        <a href=\"/a\u{1}b/\">a</a>\
+        <a href=\"/c\u{2}d/1/\">c</a>";
+    assert_eq!(
+        placed(template, page),
+        [
+            "1: {{ body | markdown }}",
+            "1: {{ body | markdown }}",
+            "2: /a\u{1}b/",
+            "3: /c\u{2}d/{{ id }}",
+        ]
+    );
+}
