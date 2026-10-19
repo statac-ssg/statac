@@ -1126,7 +1126,8 @@ fn a_page_standing_where_a_later_page_goes_is_told() {
         [&Kind::LaterPageTaken {
             list: "/blog/".into(),
             number: 2,
-            page: "content/blog/page/2.md".into(),
+            page: Box::new("content/blog/page/2.md".into()),
+            page_at: None,
             address: "/blog/page/2/".into(),
         }]
     );
@@ -1136,6 +1137,59 @@ fn a_page_standing_where_a_later_page_goes_is_told() {
         .iter()
         .filter(|(file, _)| file == "blog/page/2/index.html");
     assert_eq!(at.count(), 1);
+}
+
+#[test]
+fn a_later_page_taken_is_told_at_the_setting_placing_it_or_else_at_the_page() {
+    // (what the site sets, the page in the way, where it is told, and the
+    // place shown beneath)
+    type Case<'a> = (&'a str, &'a str, [&'a str; 2], Option<[&'a str; 2]>);
+    let cases: [Case; 2] = [
+        (
+            "",
+            "content/blog/page/2.md",
+            ["content/blog/page/2.md", "---"],
+            None,
+        ),
+        (
+            "later_pages: \"{list}more/{n}/\"\n",
+            "content/blog/more/2.md",
+            ["statac.yaml", "\"{list}more/{n}/\""],
+            Some(["content/blog/more/2.md", "---"]),
+        ),
+    ];
+    for (setting, path, [file, written], beneath) in cases {
+        let settings = format!("language: en\ntimezone: UTC\nposts_per_page: 1\n{setting}");
+        let read = site(&[
+            ("statac.yaml", &settings),
+            ("content/blog/index.md", "---\ntitle: Blog\n---\n"),
+            ("content/blog/post-1.md", &post("2026-01-01")),
+            ("content/blog/post-2.md", &post("2026-02-01")),
+            (path, "---\ntitle: Page 2\n---\n"),
+        ]);
+        assert_eq!(
+            problems(&read),
+            [("same-address", file.to_owned(), written.to_owned())],
+            "{setting}"
+        );
+        let related: Vec<(String, String, String)> = read.problems[0]
+            .related()
+            .into_iter()
+            .map(|related| {
+                let place = related.place.expect("placed");
+                (
+                    related.label,
+                    read.sources.path(place.source).display().to_string(),
+                    read.sources.spelling(place).to_owned(),
+                )
+            })
+            .collect();
+        let wanted: Vec<(String, String, String)> = beneath
+            .map(|[file, written]| ("Also published there".into(), file.into(), written.into()))
+            .into_iter()
+            .collect();
+        assert_eq!(related, wanted, "{setting}");
+    }
 }
 
 /// Which run a page walks, as it says or by default, and where it stands

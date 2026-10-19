@@ -20,7 +20,8 @@ const LATER: &str = "{list}page/{n}/";
 
 /// Settles how many posts each list's pages show, where its later pages
 /// stand, and each page's previous and next. Gives the problem with each
-/// later page an author's page already stands at.
+/// later page an author's page already stands at, told at `later_pages`
+/// where the site sets it, or else at the page.
 pub(super) fn settle(site: &mut Site, settings: &Settings, sources: &Sources) -> Vec<Problem> {
     let problems = pages(site, settings, sources);
     walks(site);
@@ -32,9 +33,9 @@ fn pages(site: &mut Site, settings: &Settings, sources: &Sources) -> Vec<Problem
         .whole("posts_per_page")
         .and_then(|n| usize::try_from(n).ok())
         .unwrap_or_default();
-    let pattern = settings
-        .text("later_pages")
-        .map_or_else(|| LATER.to_owned(), |later| later.value.to_owned());
+    let written = settings.text("later_pages");
+    let setting = written.as_ref().and_then(|later| later.origin.place);
+    let pattern = written.map_or_else(|| LATER.to_owned(), |later| later.value.to_owned());
     let after = pattern.strip_prefix("{list}").unwrap_or(&pattern);
     let base = settings.base();
     let mut landed: HashMap<String, PageId> = HashMap::new();
@@ -73,12 +74,15 @@ fn pages(site: &mut Site, settings: &Settings, sources: &Sources) -> Vec<Problem
             if let Some(&other) = landed.get(&address.file())
                 && other != speaker
             {
-                problems.push(Problem::nowhere(Kind::LaterPageTaken {
+                let head = site.head(other, sources);
+                let kind = Kind::LaterPageTaken {
                     list: format!("{base}{}", page.address.as_str()),
                     number,
-                    page: site.named(other, sources),
+                    page: Box::new(site.named(other, sources)),
+                    page_at: setting.and(head),
                     address: format!("{base}{}", address.as_str()),
-                }));
+                };
+                problems.push(Problem::placed(kind, setting.or(head)));
             }
             later.push(address);
         }

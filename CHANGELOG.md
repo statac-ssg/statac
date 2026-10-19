@@ -45,6 +45,11 @@ What changed in each release of Statac, the newest first.
   checked, when the templates are read, against everything it may be
   handed. It was checked against only what came through the first four,
   so a mistake in it could go untold until a page was built through it.
+- A page published where a list's later page goes, as
+  `content/blog/page/2.md` where page 2 of `/blog/` goes, is told at
+  `later_pages` in `statac.yaml`, with the page's first line shown
+  beneath, or at the page where the site doesn't set `later_pages`. It
+  was told in no file.
 
 ## 0.5.0 - 2026-10-18
 

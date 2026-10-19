@@ -160,6 +160,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
             number,
             page,
             address,
+            ..
         } => format!(
             "Same address: {} and {} are both published at `{address}`",
             later(*number, list),
@@ -3052,6 +3053,7 @@ pub(crate) fn relation(relation: &Relation) -> String {
         Relation::Building(page) => while_building(page.as_ref()),
         Relation::CalledFrom => "Called here".into(),
         Relation::ReadAsMarkdown => "Read as Markdown here".into(),
+        Relation::AlsoPublished => "Also published there".into(),
     }
 }
 
@@ -6019,7 +6021,8 @@ mod tests {
                 Kind::LaterPageTaken {
                     list: "/blog/".into(),
                     number: 2,
-                    page: "content/blog/page/2.md".into(),
+                    page: Box::new("content/blog/page/2.md".into()),
+                    page_at: None,
                     address: "/blog/page/2/".into(),
                 },
                 "Same address: page 2 of `/blog/` and `content/blog/page/2.md` are both \

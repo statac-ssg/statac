@@ -704,7 +704,10 @@ pub enum Kind {
         /// Where the list's first page stands.
         list: String,
         number: usize,
-        page: Named,
+        page: Box<Named>,
+        /// Where the page is shown, where the problem is told at
+        /// `later_pages`.
+        page_at: Option<Place>,
         address: String,
     },
     /// A page left out as a draft or until its day, at whose address, as
@@ -2633,6 +2636,8 @@ pub enum Relation {
     CalledFrom,
     /// The `markdown` filter that read a value as writing.
     ReadAsMarkdown,
+    /// Another thing published at the problem's address.
+    AlsoPublished,
 }
 
 impl Kind {
@@ -2834,6 +2839,9 @@ impl Kind {
                 taken: Taken::Heading(first) | Taken::Table(first),
                 ..
             } => vec![(Relation::FirstWritten, Some(*first))],
+            Kind::LaterPageTaken {
+                page_at: Some(at), ..
+            } => vec![(Relation::AlsoPublished, Some(*at))],
             _ => Vec::new(),
         }
     }

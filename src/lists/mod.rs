@@ -688,9 +688,8 @@ fn by_hand(
                     nearest: crate::suggest::nearest(&name.value, known).map(str::to_owned),
                     written: name.value.clone(),
                 };
-                if let Some(place) = name.origin.place.or(names.origin.place) {
-                    problems.push(Problem::at(kind, place));
-                }
+                let place = name.origin.place.expect("an order is written");
+                problems.push(Problem::at(kind, place));
             }
         }
     }
@@ -701,9 +700,8 @@ fn by_hand(
                 .map(|&member| address_name(site.pages.get(member)).to_owned())
                 .collect(),
         };
-        if let Some(place) = names.origin.place {
-            problems.push(Problem::at(kind, place));
-        }
+        let place = names.origin.place.expect("an order is written");
+        problems.push(Problem::at(kind, place));
     }
     placed.extend(members);
     placed

@@ -1405,9 +1405,9 @@ fn a_long_list_goes_on_onto_later_pages() {
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 1, "{said}");
     assert!(
-        said.starts_with(
+        said.contains(
             "error  Same address: page 2 of `/` and `content/page/2.md` are both published \
-             at `/page/2/`\n"
+             at `/page/2/`\n  content/page/2.md, line 1\n"
         ),
         "{said}"
     );
