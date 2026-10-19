@@ -77,7 +77,7 @@ A binary for Linux that asks nothing of the system's C library links a C library
 
 ### Rust crates
 
-The 164 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
+The 169 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
 
 | Crate | Version | Its licence | Taken under | Texts |
 | --- | --- | --- | --- | --- |
@@ -127,11 +127,15 @@ The 164 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `httparse` | 1.10.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `icu_collections` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `icu_locale_core` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_locale_fallback` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_locale_fallback_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `icu_normalizer` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `icu_normalizer_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `icu_properties` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `icu_properties_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `icu_provider` | 2.3.1 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_segmenter` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_segmenter_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
 | `idna` | 1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `idna_adapter` | 1.2.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `image` | 0.25.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
@@ -168,6 +172,7 @@ The 164 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `objc2-core-foundation` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `objc2-core-services` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `once_cell` | 1.21.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
+| `pagefind_stem` | 1.0.0 | MIT | MIT | none in the crate |
 | `percent-encoding` | 2.3.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `phf` | 0.11.3 | MIT | MIT | [32] |
 | `phf` | 0.14.0 | MIT | MIT | [32] |
@@ -246,7 +251,7 @@ The 164 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `zune-core` | 0.5.3 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 | `zune-jpeg` | 0.5.15 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 
-These crates hold no licence file, so there is no copyright line of theirs to give. Each one's manifest names its licence and its source: `grass` 0.13.4 (https://github.com/connorskees/grass), `grass_compiler` 0.13.4 (https://github.com/connorskees/grass), `harfrust` 0.5.2 (https://github.com/harfbuzz/harfrust), `math-core` 0.8.2 (https://github.com/tmke8/math-core), `math-core-renderer-internal` 0.8.2 (https://github.com/tmke8/math-core).
+These crates hold no licence file, so there is no copyright line of theirs to give. Each one's manifest names its licence and its source: `grass` 0.13.4 (https://github.com/connorskees/grass), `grass_compiler` 0.13.4 (https://github.com/connorskees/grass), `harfrust` 0.5.2 (https://github.com/harfbuzz/harfrust), `math-core` 0.8.2 (https://github.com/tmke8/math-core), `math-core-renderer-internal` 0.8.2 (https://github.com/tmke8/math-core), `pagefind_stem` 1.0.0 ().
 
 ## Crates in no binary
 
@@ -3308,7 +3313,7 @@ SOFTWARE.
 
 ### [26]
 
-`icu_collections` 2.3.0, `LICENSE`; `icu_locale_core` 2.3.0, `LICENSE`; `icu_normalizer` 2.3.0, `LICENSE`; `icu_normalizer_data` 2.3.0, `LICENSE`; `icu_properties` 2.3.0, `LICENSE`; `icu_properties_data` 2.3.0, `LICENSE`; `icu_provider` 2.3.1, `LICENSE`; `litemap` 0.8.3, `LICENSE`; `potential_utf` 0.1.6, `LICENSE`; `tinystr` 0.8.4, `LICENSE`; `writeable` 0.6.4, `LICENSE`; `yoke` 0.8.3, `LICENSE`; `zerofrom` 0.1.8, `LICENSE`; `zerotrie` 0.2.5, `LICENSE`; `zerovec` 0.11.8, `LICENSE`.
+`icu_collections` 2.3.0, `LICENSE`; `icu_locale_core` 2.3.0, `LICENSE`; `icu_locale_fallback` 2.3.0, `LICENSE`; `icu_locale_fallback_data` 2.3.0, `LICENSE`; `icu_normalizer` 2.3.0, `LICENSE`; `icu_normalizer_data` 2.3.0, `LICENSE`; `icu_properties` 2.3.0, `LICENSE`; `icu_properties_data` 2.3.0, `LICENSE`; `icu_provider` 2.3.1, `LICENSE`; `icu_segmenter` 2.3.0, `LICENSE`; `icu_segmenter_data` 2.3.0, `LICENSE`; `litemap` 0.8.3, `LICENSE`; `potential_utf` 0.1.6, `LICENSE`; `tinystr` 0.8.4, `LICENSE`; `writeable` 0.6.4, `LICENSE`; `yoke` 0.8.3, `LICENSE`; `zerofrom` 0.1.8, `LICENSE`; `zerotrie` 0.2.5, `LICENSE`; `zerovec` 0.11.8, `LICENSE`.
 
 ````text
 UNICODE LICENSE V3

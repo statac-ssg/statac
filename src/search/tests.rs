@@ -1,20 +1,48 @@
 use super::*;
 
+fn words(text: &str) -> Vec<&str> {
+    spans(text).map(|span| &text[span]).collect()
+}
+
 #[test]
-fn words_are_runs_of_letters_and_digits_in_small_letters() {
-    let found: Vec<String> = words("Don't panic: the Pi 5's GPIO, café-au-lait 2026!").collect();
+fn words_are_found_as_unicode_finds_them() {
     assert_eq!(
-        found,
+        words("Don't panic: the Pi 5's GPIO, café-au-lait 2026!"),
         [
-            "don't", "panic", "the", "pi", "5's", "gpio", "café", "au", "lait", "2026"
+            "Don't", "panic", "the", "Pi", "5", "s", "GPIO", "café", "au", "lait", "2026"
         ]
     );
 }
 
 #[test]
-fn an_apostrophe_not_between_letters_ends_the_word() {
-    let found: Vec<String> = words("the writers' room 'quoted' rock’n’roll").collect();
-    assert_eq!(found, ["the", "writers", "room", "quoted", "rock’n’roll"]);
+fn japanese_is_split_into_words_by_dictionary() {
+    let found = words("日本語のブログを書く");
+    assert!(
+        found.contains(&"日本語") && found.contains(&"ブログ"),
+        "{found:?}"
+    );
+    assert!(!found.contains(&"ログ"), "{found:?}");
+}
+
+#[test]
+fn a_word_is_folded_to_small_letters_without_its_accents() {
+    assert_eq!(fold("Ｃafé"), "cafe");
+    assert_eq!(fold("NAÏVE"), "naive");
+    assert_eq!(fold("Ελληνικά"), "ελληνικα");
+    // The kana's voicing changes the word, so it stays.
+    assert_eq!(fold("ガイド"), "ガイド");
+}
+
+#[test]
+fn a_word_is_cut_to_its_stem_by_its_language() {
+    let english = Stemmer::of(Some("en-GB"));
+    for word in ["running", "runs", "run"] {
+        assert_eq!(english.term(word), "run", "{word}");
+    }
+    assert_eq!(Stemmer::of(None).term("Photos"), "photo");
+    let french = Stemmer::of(Some("fr"));
+    assert_eq!(french.term("chanteuses"), french.term("chanteuse"));
+    assert_eq!(Stemmer::of(Some("ja")).term("ブログ"), "ブログ");
 }
 
 /// A site at a folder of its own, read, with its files as `files` gives
@@ -129,6 +157,31 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
     assert_eq!(first("zfs speed"), (zfs, Some("speed".to_owned())));
     assert_eq!(first("drive"), (zfs, Some("setting-up".to_owned())));
     assert!(index.search("nowhere").is_empty());
+    // Other forms of a word, and the word without its accents.
+    assert_eq!(first("ZFS speeds"), (zfs, Some("speed".to_owned())));
+    assert_eq!(first("Drives"), (zfs, Some("setting-up".to_owned())));
+}
+
+#[test]
+fn each_page_is_searched_in_its_own_languages_forms() {
+    let (renderer, root) = site(
+        "languages",
+        &[
+            ("statac.yaml", "title: Site\nlanguage: fr\n"),
+            ("content/index.md", "---\ntitle: Accueil\n---\nBienvenue.\n"),
+            (
+                "content/chant.md",
+                "---\ntitle: Chant\n---\nLes chanteuses du café.\n",
+            ),
+        ],
+    );
+    let index = Index::of(renderer.site(), records(&renderer));
+    let _ = std::fs::remove_dir_all(root);
+    let chant = page(&renderer, "chant.md");
+    for words in ["chanteuse", "cafe", "CAFÉ"] {
+        let found = index.search(words);
+        assert_eq!(index.records[found[0].record].page, chant, "{words}");
+    }
 }
 
 #[test]
@@ -139,16 +192,20 @@ fn an_excerpt_is_cut_at_words_around_the_first_word_asked_for() {
         "Before ".repeat(20),
         "after ".repeat(40)
     );
-    let pieces = excerpt(&text, &asked);
+    let stemmer = Stemmer::of(None);
+    let pieces = excerpt(&text, &asked, &stemmer);
     assert_eq!(pieces.first().unwrap().0, "\u{2026}");
     assert_eq!(pieces.last().unwrap().0, "\u{2026}");
     assert!(pieces.contains(&("ZFS".to_owned(), true)));
     let shown: String = pieces.iter().map(|(text, _)| text.as_str()).collect();
     assert!(shown.len() < 220, "{shown}");
     assert_eq!(
-        excerpt("Nothing asked.", &asked),
+        excerpt("Nothing asked.", &asked, &stemmer),
         [("Nothing asked.".to_owned(), false)]
     );
+    // A form of the word asked for is marked as it is written.
+    let plain = excerpt("Plain zfs's here.", &asked, &stemmer);
+    assert!(plain.contains(&("zfs's".to_owned(), true)), "{plain:?}");
 }
 
 #[test]

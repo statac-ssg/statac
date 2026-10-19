@@ -28,6 +28,7 @@ granit-parser = "=1.3.0"
 grass = { version = "=0.13.4", default-features = false }
 http = "1.5.0"
 httparse = "1.10.1"
+icu_segmenter = { version = "2.3.0", default-features = false, features = ["compiled_data"] }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 jiff = { version = "0.2.37", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
 jpeg-encoder = "0.7.1"
@@ -38,6 +39,7 @@ minijinja = { path = "crates/minijinja", default-features = false, features = ["
 moxcms = "0.8"
 # A release candidate: without `=`, Cargo would take a later candidate, which may break.
 notify = { version = "=9.0.0-rc.5", default-features = false, features = ["macos_fsevent"] }
+pagefind_stem = { version = "1.0.0", features = ["arabic", "armenian", "basque", "catalan", "danish", "dutch", "english", "esperanto", "estonian", "finnish", "french", "german", "greek", "hindi", "hungarian", "indonesian", "irish", "italian", "lithuanian", "nepali", "norwegian", "polish", "portuguese", "romanian", "russian", "serbian", "spanish", "swedish", "tamil", "turkish", "yiddish"] }
 # src/markdown/read.rs follows where it splits text, table cells, HTML blocks and definition lists.
 pulldown-cmark = { version = "=0.13.4", default-features = false }
 rayon = "1.12.0"

@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::{Index, Record, records, spans, words};
+use super::{Index, Record, Stemmer, fold, records, spans};
 use crate::date::Date;
 use crate::problem::{Problem, Severity};
 use crate::site::PageId;
@@ -79,18 +79,24 @@ pub fn run(options: &Options) -> Outcome {
     let renderer = prepared.renderer;
     let index = Index::of(renderer.site(), records(&renderer));
     let found = index.search(&options.words);
-    let asked: HashSet<String> = words(&options.words).collect();
+    let asked: HashSet<String> = (spans(&options.words))
+        .map(|span| fold(&options.words[span]))
+        .collect();
     // Records holding every word, or where none does, those holding most.
     let most = found.first().map_or(0, |found| found.matched);
     let some = most < asked.len();
     let mut seen: HashSet<PageId> = HashSet::new();
     let best = (found.iter())
         .take_while(|found| found.matched == most)
-        .map(|found| &index.records[found.record])
-        .filter(|record| seen.insert(record.page));
-    let best: Vec<&Record> = best.collect();
+        .map(|found| found.record)
+        .filter(|&record| seen.insert(index.records[record].page));
+    let best: Vec<usize> = best.collect();
     let shown = (best.iter().take(SHOWN))
-        .map(|record| shown(&renderer, record, &asked))
+        .map(|&record| {
+            let stemmer = index.stemmer(record);
+            let terms = asked.iter().map(|word| stemmer.term(word)).collect();
+            shown(&renderer, &index.records[record], &terms, stemmer)
+        })
         .collect();
     Outcome {
         pages: best.len(),
@@ -101,7 +107,12 @@ pub fn run(options: &Options) -> Outcome {
     }
 }
 
-fn shown(renderer: &Renderer, record: &Record, asked: &HashSet<String>) -> Shown {
+fn shown(
+    renderer: &Renderer,
+    record: &Record,
+    terms: &HashSet<String>,
+    stemmer: &Stemmer,
+) -> Shown {
     let page = renderer.site().pages.get(record.page);
     let mut address = page.address.as_str().to_owned();
     if let Some((id, _)) = &record.heading {
@@ -112,16 +123,17 @@ fn shown(renderer: &Renderer, record: &Record, asked: &HashSet<String>) -> Shown
         title: page.title.as_ref().map(|title| title.value.clone()),
         heading: record.heading.as_ref().map(|(_, words)| words.clone()),
         address,
-        excerpt: excerpt(&record.text, asked),
+        excerpt: excerpt(&record.text, terms, stemmer),
     }
 }
 
-/// The text around the first word of `asked` in `text`, or its start, cut
-/// at words, in pieces saying which are words asked for.
-pub fn excerpt(text: &str, asked: &HashSet<String>) -> Vec<(String, bool)> {
+/// The text around the first word in `text` whose form `stemmer` gives
+/// is one of `terms`, or its start, cut at words, in pieces saying which
+/// are words asked for.
+pub fn excerpt(text: &str, terms: &HashSet<String>, stemmer: &Stemmer) -> Vec<(String, bool)> {
     let spans: Vec<_> = spans(text).collect();
     let matched =
-        |span: &std::ops::Range<usize>| asked.contains(&text[span.clone()].to_lowercase());
+        |span: &std::ops::Range<usize>| terms.contains(&stemmer.term(&text[span.clone()]));
     let first = spans.iter().position(matched).unwrap_or(0);
     let Some(at) = spans.get(first) else {
         return Vec::new();
