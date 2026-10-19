@@ -15,10 +15,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
-use super::live::json_string;
 use super::session::{Read, Round, Took};
 use crate::build::Outcome;
 use crate::content::address::on_the_wire;
+use crate::json;
 use crate::problem::{Code, Kind, Problem, Severity};
 use crate::report::{Piece, Quiet, Report, pieces, shown};
 use crate::wording::{self, PanelWord};
@@ -132,7 +132,7 @@ impl Panel {
             .map(str::to_owned)
             .collect();
         let counts = problems::counts(&outcome.problems, &outcome.quiet);
-        let state = json_string(match stopped {
+        let state = json::string(match stopped {
             true => "stopped",
             false => "built",
         });
@@ -141,13 +141,13 @@ impl Panel {
             false => Some(&at),
         };
         let changed: Vec<String> = (besides.changed.iter())
-            .map(|file| json_string(file))
+            .map(|file| json::string(file))
             .collect();
         let this = format!(
             "{{\"state\":{state},\"at\":{},\"builtAt\":{},\"changed\":[{}],\"built\":{},\
              \"outputs\":{},\"took\":{},\"counts\":{counts}}}",
-            json_string(&at),
-            built_at.map_or_else(|| "null".to_owned(), |at| json_string(at)),
+            json::string(&at),
+            built_at.map_or_else(|| "null".to_owned(), |at| json::string(at)),
             changed.join(","),
             round.built,
             round.outputs,
@@ -155,7 +155,7 @@ impl Panel {
         );
         let mut rounds = vec![format!(
             "{{\"state\":{state},\"at\":{},\"said\":{},\"counts\":{counts},\"first\":{}}}",
-            json_string(&at),
+            json::string(&at),
             pieced(besides.said),
             before.round.is_none(),
         )];
@@ -295,7 +295,7 @@ impl Panel {
                     .collect();
                 format!(
                     "{{\"at\":{},\"errors\":[{}]}}",
-                    json_string(&stopped.at),
+                    json::string(&stopped.at),
                     errors.join(",")
                 )
             }
@@ -303,19 +303,19 @@ impl Panel {
         };
         let link = |link: &Link| {
             let day = match &link.day {
-                Some(day) => format!(",\"day\":{}", json_string(day)),
+                Some(day) => format!(",\"day\":{}", json::string(day)),
                 None => String::new(),
             };
             let to = match &link.to {
-                To::Page(href) => format!("\"href\":{}", json_string(href)),
+                To::Page(href) => format!("\"href\":{}", json::string(href)),
                 To::File(file, line) => format!(
                     "\"file\":{},\"line\":{}",
                     file.as_deref()
-                        .map_or_else(|| "null".to_owned(), json_string),
+                        .map_or_else(|| "null".to_owned(), json::string),
                     line.map_or_else(|| "null".to_owned(), |line| line.to_string()),
                 ),
             };
-            format!("{{\"text\":{},{to}{day}}}", json_string(&link.named))
+            format!("{{\"text\":{},{to}{day}}}", json::string(&link.named))
         };
         let links = |links: &[Link]| links.iter().map(link).collect::<Vec<_>>().join(",");
         let written: Vec<String> = self.written.iter().map(|line| pieced(line)).collect();
@@ -337,7 +337,7 @@ impl Panel {
             problems::explanations(codes),
             or_null(self.round.clone()),
             self.rounds.join(","),
-            or_null(self.root.as_deref().map(json_string)),
+            or_null(self.root.as_deref().map(json::string)),
         )
     }
 }
@@ -407,8 +407,8 @@ fn whole(site: &Path) -> String {
 fn pieced(sentence: &str) -> String {
     let pieces: Vec<String> = (pieces(sentence).into_iter())
         .map(|piece| match piece {
-            Piece::Name(name) => format!("{{\"code\":{}}}", json_string(name)),
-            Piece::Words(words) => format!("{{\"text\":{}}}", json_string(words)),
+            Piece::Name(name) => format!("{{\"code\":{}}}", json::string(name)),
+            Piece::Words(words) => format!("{{\"text\":{}}}", json::string(words)),
         })
         .collect();
     format!("[{}]", pieces.join(","))
@@ -428,7 +428,7 @@ pub fn words() -> &'static str {
                         format!("{{\"one\":{},\"many\":{}}}", pieced(one), pieced(many))
                     }
                 };
-                format!("{}:{said}", json_string(name))
+                format!("{}:{said}", json::string(name))
             })
             .collect();
         format!("{{{}}}", words.join(","))

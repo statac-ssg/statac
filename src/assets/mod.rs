@@ -429,8 +429,8 @@ impl Assets {
             write!(
                 out,
                 "    {}: {}",
-                json_string(&written),
-                json_string(&self.address(asset))
+                crate::json::string(&written),
+                crate::json::string(&self.address(asset))
             )
             .expect("writing to a string can't fail");
         }
@@ -970,26 +970,6 @@ fn escaped(text: &str) -> String {
             c => out.push(c),
         }
     }
-    out
-}
-
-/// A JSON string safe inside a `<script>` element: `<` is escaped so no
-/// name can close the element or open a comment.
-fn json_string(text: &str) -> String {
-    let mut out = String::with_capacity(text.len() + 2);
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '<' => out.push_str("\\u003c"),
-            c if c.is_control() => {
-                write!(out, "\\u{:04x}", c as u32).expect("writing to a string can't fail")
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
     out
 }
 

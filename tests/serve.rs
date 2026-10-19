@@ -635,10 +635,10 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
                  \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Did you mean \"},\
                  {\"code\":\"/post-1/\"},{\"text\":\"?\"}]},\
                  {\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
-                 \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site's address \
+                 \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site\\u0027s address \
                  to \"},{\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
                  {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}],\"gone\":null,\
-                 \"drafts\":[{\"text\":\"Post \\u003c2>\",\"href\":\"/post-2/\"}],\
+                 \"drafts\":[{\"text\":\"Post \\u003c2\\u003e\",\"href\":\"/post-2/\"}],\
                  \"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
                  \"written\":[]},"
             ),
@@ -663,7 +663,7 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     assert!(
         draft.contains("\"problems\":[],\"stopped\":null,")
             && draft.contains(
-                "\"page\":{\"title\":\"Post \\u003c2>\",\"draft\":true,\"waiting\":null,"
+                "\"page\":{\"title\":\"Post \\u003c2\\u003e\",\"draft\":true,\"waiting\":null,"
             ),
         "{draft}"
     );
@@ -708,7 +708,7 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
                 "\"suggestion\":[{\"text\":\"Write it as \"},{\"code\":\"2026-10-04\"},\
              {\"text\":\" or \"},{\"code\":\"2026-04-10\"},{\"text\":\".\"}],"
             )
-            && stopped.contains("\"page\":{\"title\":\"Post \\u003c2>\",\"draft\":true,")
+            && stopped.contains("\"page\":{\"title\":\"Post \\u003c2\\u003e\",\"draft\":true,")
             && stopped.contains(
                 "\"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
                  \"written\":[[{\"text\":\"Stamped \"},{\"code\":\"content/post-1.md\"},\
@@ -751,7 +751,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
         built.contains(&format!(
             "\"problems\":[{link}],\"stopped\":null,\"explanations\":{{\
              \"broken-link\":{{\"title\":\"Broken link\",\"opening\":[{{\"said\":[\
-             {{\"text\":\"A link, or a page's \"}},{{\"code\":\"redirect_to\"}},\
+             {{\"text\":\"A link, or a page\\u0027s \"}},{{\"code\":\"redirect_to\"}},\
              {{\"text\":\", points at an address on this site, but nothing is published at \
              that address. A reader who follows it lands on a missing page.\"}}]}}],\
              \"fix\":[{{\"said\":[{{\"text\":\"Change the link to an address the site publishes."
@@ -783,8 +783,8 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
         \"file\":\"templates/page.html\",\"line\":9,\"column\":10,\"excerpt\":[\
         {\"line\":8,\"text\":[{\"text\":\"{{ page.content }}\"}]},\
         {\"line\":9,\"text\":[{\"text\":\"\\u003ca href=\\\"\"},{\"mark\":\"/post-8/\"},\
-        {\"text\":\"\\\">Post 8\\u003c/a>\"}]},\
-        {\"line\":10,\"text\":[{\"text\":\"\\u003c/body>\"}]}],\"related\":[],\
+        {\"text\":\"\\\"\\u003ePost 8\\u003c/a\\u003e\"}]},\
+        {\"line\":10,\"text\":[{\"text\":\"\\u003c/body\\u003e\"}]}],\"related\":[],\
         \"built\":[{\"page\":[{\"code\":\"content/index.md\"}],\"href\":\"/\",\
         \"file\":\"content/index.md\",\"line\":null}],\"builtMore\":0,";
     for asked in ["", "?kind=broken-link"] {
@@ -818,9 +818,9 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
              {{\"severity\":\"error\",\"kind\":\"unknown-word\",\
              \"headline\":[{{\"text\":\"Unknown field: \"}},{{\"code\":\"page.sumary\"}}],\
              \"file\":\"templates/page.html\",\"line\":4,\"column\":11,\"excerpt\":[\
-             {{\"line\":3,\"text\":[{{\"text\":\"\\u003chead>\"}}]}},\
-             {{\"line\":4,\"text\":[{{\"text\":\"\\u003ctitle>{{{{ \"}},{{\"mark\":\"page.sumary\"}},\
-             {{\"text\":\" }}}}\\u003c/title>\"}}]}},\
+             {{\"line\":3,\"text\":[{{\"text\":\"\\u003chead\\u003e\"}}]}},\
+             {{\"line\":4,\"text\":[{{\"text\":\"\\u003ctitle\\u003e{{{{ \"}},{{\"mark\":\"page.sumary\"}},\
+             {{\"text\":\" }}}}\\u003c/title\\u003e\"}}]}},\
              {{\"line\":5,\"text\":[{{\"text\":\"{{{{ css(\\\"site.css\\\") }}}}\"}}]}}],\
              \"related\":[],\"built\":[],\"builtMore\":0,\"printed\":null,\
              \"suggestion\":[{{\"text\":\"Did you mean \"}},{{\"code\":\"page.summary\"}},\
@@ -897,7 +897,7 @@ fn the_panel_is_handed_a_kinds_suggestion_where_each_of_its_problems_has_it() {
              \"count\":2,\"quietened\":0,\"suggestion\":null}"
         ) && site.contains(
             "{\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
-             \"count\":2,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site's address to \"},\
+             \"count\":2,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site\\u0027s address to \"},\
              {\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
              {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}"
         ),
@@ -945,7 +945,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
              \"layout\":{\"name\":\"post\",\"file\":\"templates/post.html\",\
              \"extends\":[\"templates/base.html\"],\
              \"chosenAt\":{\"file\":\"content/posts/index.md\",\"line\":4},\"handedDown\":true},\
-             \"lists\":[{\"said\":[{\"text\":\"The site's own list\"}],\"at\":2,\"of\":3,\
+             \"lists\":[{\"said\":[{\"text\":\"The site\\u0027s own list\"}],\"at\":2,\"of\":3,\
              \"previous\":{\"text\":\"Post 4\",\"href\":\"/posts/post-4/\"},\
              \"next\":{\"text\":\"Post 2\",\"href\":\"/posts/post-2/\"}},\
              {\"said\":[{\"text\":\"The folder \"},{\"code\":\"content/posts/\"}],\"at\":2,\"of\":3,\
@@ -996,7 +996,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
              \"empty\":false,\"has\":[],\"from\":null,\"used\":{used}}}"
         )
     };
-    let writing = "\\u003cp>Post 3.\\u003c/p>";
+    let writing = "\\u003cp\\u003ePost 3.\\u003c/p\\u003e";
     assert!(
         post.contains(&used("content", writing, true))
             && post.contains(&used("excerpt", writing, false)),
@@ -1126,7 +1126,7 @@ fn a_changed_files_name_is_shown_harmless_in_the_terminal_and_to_the_page() {
         &format!("/.statac-live/wait?since={before}&timeout=0"),
     );
     assert!(
-        body.contains("\"changed\":[\"content/post\u{241b}[2J\\u003cb>.md\"]"),
+        body.contains("\"changed\":[\"content/post\u{241b}[2J\\u003cb\\u003e.md\"]"),
         "{body}"
     );
     assert!(!body.contains('\u{1b}') && !body.contains('<'), "{body}");

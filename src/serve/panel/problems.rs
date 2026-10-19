@@ -8,9 +8,9 @@ use std::time::Duration;
 
 use super::pieced;
 use crate::content::address::on_the_wire;
+use crate::json;
 use crate::problem::{Code, Kind, Named, Problem, Severity, Word, unanchored};
 use crate::report::{Excerpt, NAMED, Quiet, Report, shown};
-use crate::serve::live::json_string;
 use crate::serve::session::{Read, Took};
 use crate::source::Place;
 use crate::wording;
@@ -34,7 +34,7 @@ impl Parts<'_> {
         let (file, line, column, excerpt) = match problem.place {
             None => (null(), null(), null(), "[]".to_owned()),
             Some(place) if kind.of_a_whole_file() => (
-                json_string(&report.file(place.source)),
+                json::string(&report.file(place.source)),
                 null(),
                 null(),
                 "[]".to_owned(),
@@ -42,7 +42,7 @@ impl Parts<'_> {
             Some(place) => {
                 let excerpt = report.excerpt(place, true);
                 (
-                    json_string(&report.file(place.source)),
+                    json::string(&report.file(place.source)),
                     excerpt.first.to_string(),
                     excerpt.column.to_string(),
                     lines(&excerpt),
@@ -54,7 +54,7 @@ impl Parts<'_> {
                 let (file, line, excerpt) = match related.place {
                     Some(place) => {
                         let excerpt = report.excerpt(place, false);
-                        let file = json_string(&report.file(place.source));
+                        let file = json::string(&report.file(place.source));
                         (file, excerpt.first.to_string(), lines(&excerpt))
                     }
                     None => (null(), null(), "[]".to_owned()),
@@ -81,7 +81,7 @@ impl Parts<'_> {
                 });
                 let (file, line) = match place {
                     Some(place) => (
-                        json_string(&report.file(place.source)),
+                        json::string(&report.file(place.source)),
                         match report.whole(place) {
                             true => null(),
                             false => report.first_line(place).to_string(),
@@ -92,13 +92,14 @@ impl Parts<'_> {
                 format!(
                     "{{\"page\":{},\"href\":{},\"file\":{file},\"line\":{line}}}",
                     pieced(&said),
-                    href.as_deref().map_or_else(null, json_string),
+                    href.as_deref().map_or_else(null, json::string),
                 )
             })
             .collect();
         let printed = match wording::printed(kind) {
             Some((heading, said)) => {
-                let said: Vec<String> = said.iter().map(|line| json_string(&shown(line))).collect();
+                let said: Vec<String> =
+                    said.iter().map(|line| json::string(&shown(line))).collect();
                 format!(
                     "{{\"heading\":{},\"lines\":[{}]}}",
                     pieced(&heading),
@@ -113,15 +114,15 @@ impl Parts<'_> {
              \"column\":{column},\"excerpt\":{excerpt},\"related\":[{}],\"built\":[{}],\
              \"builtMore\":{},\"printed\":{printed},\"suggestion\":{},\"suggests\":{},\
              \"explanation\":{},\"quietened\":{}}}",
-            json_string(wording::severity(kind.severity())),
-            json_string(kind.name()),
+            json::string(wording::severity(kind.severity())),
+            json::string(kind.name()),
             pieced(&shown(&problem.headline())),
             related.join(","),
             built.join(","),
             pages.len() - named,
             suggestion.map_or_else(null, |said| pieced(&shown(&said))),
-            suggests(kind).map_or_else(null, |name| json_string(&shown(name))),
-            json_string(&problem.explanation_link()),
+            suggests(kind).map_or_else(null, |name| json::string(&shown(name))),
+            json::string(&problem.explanation_link()),
             self.quiet.quietens(kind),
         )
     }
@@ -132,13 +133,13 @@ impl Parts<'_> {
 pub(super) fn lines(excerpt: &Excerpt) -> String {
     let lines: Vec<String> = (excerpt.lines.iter())
         .map(|line| {
-            let text = |words: &str| format!("{{\"text\":{}}}", json_string(words));
+            let text = |words: &str| format!("{{\"text\":{}}}", json::string(words));
             let mut pieces = Vec::new();
             if !line.before.is_empty() {
                 pieces.push(text(&line.before));
             }
             if let Some(marked) = &line.marked {
-                pieces.push(format!("{{\"mark\":{}}}", json_string(marked)));
+                pieces.push(format!("{{\"mark\":{}}}", json::string(marked)));
             }
             if !line.after.is_empty() {
                 pieces.push(text(&line.after));
@@ -260,7 +261,7 @@ pub(super) fn explanations(codes: impl IntoIterator<Item = Code>) -> String {
             seen.push(code);
             said.push(format!(
                 "{}:{}",
-                json_string(code.name()),
+                json::string(code.name()),
                 explained(code).json
             ));
         }
@@ -296,7 +297,7 @@ fn explain(code: Code) -> Explained {
         if let Some((fence, held)) = &mut code {
             if ticks >= *fence && line[ticks..].trim().is_empty() {
                 if let Some(part) = part {
-                    let block = format!("{{\"code\":{}}}", json_string(&held.join("\n")));
+                    let block = format!("{{\"code\":{}}}", json::string(&held.join("\n")));
                     parts[part].push(block);
                 }
                 code = None;
@@ -330,7 +331,7 @@ fn explain(code: Code) -> Explained {
     Explained {
         json: format!(
             "{{\"title\":{},\"opening\":[{}],\"fix\":[{}]}}",
-            json_string(title),
+            json::string(title),
             opening.join(","),
             fix.join(",")
         ),
@@ -393,9 +394,9 @@ pub(super) fn kinds(problems: &[Problem], quiet: &Quiet) -> String {
             format!(
                 "{{\"kind\":{},\"severity\":{},\"title\":{},\"count\":{count},\
                  \"quietened\":{quietened},\"suggestion\":{}}}",
-                json_string(code.name()),
-                json_string(wording::severity(code.severity())),
-                json_string(title(code)),
+                json::string(code.name()),
+                json::string(wording::severity(code.severity())),
+                json::string(title(code)),
                 shared.map_or_else(|| "null".to_owned(), |said| pieced(&shown(&said))),
             )
         })

@@ -11,6 +11,7 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::panel::Panel;
+use crate::json;
 
 /// What one round asks of the pages already open.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -238,9 +239,9 @@ impl Reply {
         };
         let styles: Vec<String> = styles
             .iter()
-            .map(|(old, new)| format!("[{},{}]", json_string(old), json_string(new)))
+            .map(|(old, new)| format!("[{},{}]", json::string(old), json::string(new)))
             .collect();
-        let changed: Vec<String> = self.changed.iter().map(|path| json_string(path)).collect();
+        let changed: Vec<String> = self.changed.iter().map(|path| json::string(path)).collect();
         format!(
             "{{\"generation\":{},\"kind\":\"{kind}\",\"styles\":[{}],\"changed\":[{}],\
              \"building\":{},\"status\":{{\"stopped\":{},\"line\":{},\"problems\":{}}}}}",
@@ -249,29 +250,10 @@ impl Reply {
             changed.join(","),
             self.building,
             self.status.stopped,
-            json_string(&self.status.line),
-            json_string(&self.status.problems),
+            json::string(&self.status.line),
+            json::string(&self.status.problems),
         )
     }
-}
-
-pub(super) fn json_string(text: &str) -> String {
-    let mut out = String::with_capacity(text.len() + 2);
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            // A page may hold the answer inside a script, which `<` could end.
-            '<' => out.push_str("\\u003c"),
-            c if (c as u32) < 0x20 || c == '\u{2028}' || c == '\u{2029}' => {
-                out.push_str(&format!("\\u{:04x}", c as u32));
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
 }
 
 #[cfg(test)]
@@ -431,8 +413,8 @@ mod tests {
             "{\"generation\":7,\"kind\":\"styles\",\
              \"styles\":[[\"/a \\\"1\\\".css\",\"/a.css\"]],\
              \"changed\":[\"content/a\\\\b.md\"],\"building\":true,\
-             \"status\":{\"stopped\":false,\"line\":\"one\\u000atwo\",\
-             \"problems\":\"\\u003c/script>\"}}"
+             \"status\":{\"stopped\":false,\"line\":\"one\\ntwo\",\
+             \"problems\":\"\\u003c/script\\u003e\"}}"
         );
     }
 }

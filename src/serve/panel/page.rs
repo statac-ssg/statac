@@ -8,10 +8,10 @@ use std::path::Path;
 use super::pieced;
 use super::problems::lines;
 use crate::content::address::on_the_wire;
+use crate::json;
 use crate::origin::Arrival;
 use crate::reads::{Asked, Key, Reads};
 use crate::report::{Report, shown};
-use crate::serve::live::json_string;
 use crate::source::Place;
 use crate::templates::{Explained, Held, Holds, Neighbour, Reached, Renderer, Row, SEARCH_BOX};
 use crate::wording;
@@ -39,17 +39,17 @@ impl On<'_> {
         let file = explained.source.map(|source| report.file(source));
         let language = format!(
             "{{\"tag\":{},\"direction\":{}}}",
-            json_string(&shown(&explained.language)),
-            json_string(explained.direction.as_str()),
+            json::string(&shown(&explained.language)),
+            json::string(explained.direction.as_str()),
         );
         let layout = match &explained.layout {
             Some(chosen) => {
                 let mut files = explained.templates.iter().map(|&at| report.file(at));
                 let file = files.next();
-                let extends: Vec<String> = files.map(|file| json_string(&file)).collect();
+                let extends: Vec<String> = files.map(|file| json::string(&file)).collect();
                 format!(
                     "{{\"name\":{},\"file\":{},\"extends\":[{}],\"chosenAt\":{},\"handedDown\":{}}}",
-                    json_string(&shown(&chosen.name)),
+                    json::string(&shown(&chosen.name)),
                     or_null(file.as_deref()),
                     extends.join(","),
                     self.place(chosen.origin.place),
@@ -72,10 +72,10 @@ impl On<'_> {
             })
             .collect();
         let feeds: Vec<String> = (explained.feeds.iter())
-            .map(|feed| json_string(&shown(feed)))
+            .map(|feed| json::string(&shown(feed)))
             .collect();
         let (files, also) = self.read();
-        let files: Vec<String> = files.iter().map(|file| json_string(file)).collect();
+        let files: Vec<String> = files.iter().map(|file| json::string(file)).collect();
         let also: Vec<String> = also.iter().map(|said| pieced(said)).collect();
         format!(
             "{{\"title\":{},\"draft\":{draft},\"waiting\":{},\"file\":{},\"address\":{},\
@@ -84,7 +84,7 @@ impl On<'_> {
             or_null(title.as_deref()),
             or_null(waiting),
             or_null(file.as_deref()),
-            json_string(&shown(&explained.address)),
+            json::string(&shown(&explained.address)),
             lists.join(","),
             feeds.join(","),
             files.join(","),
@@ -101,7 +101,7 @@ impl On<'_> {
                 let rows: Vec<String> = group.rows.iter().map(|row| self.row(row)).collect();
                 format!(
                     "{{\"group\":{},\"count\":{},\"held\":{},\"rows\":[{}]}}",
-                    json_string(group.of),
+                    json::string(group.of),
                     group.rows.len(),
                     group.rows.iter().filter(held).count(),
                     rows.join(","),
@@ -112,7 +112,7 @@ impl On<'_> {
     }
 
     fn row(&self, row: &Row) -> String {
-        let has: Vec<String> = row.has.iter().map(|name| json_string(name)).collect();
+        let has: Vec<String> = row.has.iter().map(|name| json::string(name)).collect();
         let used = self.asked.is_some_and(|asked| match &row.reached {
             Reached::Page(name) => asked.asked_page(*name),
             Reached::Site(name) => asked.asked_site(*name),
@@ -125,16 +125,16 @@ impl On<'_> {
                 let brackets = if takes { "(\u{2026})" } else { "()" };
                 format!(
                     ",\"written\":{}",
-                    json_string(&shown(&format!("{}{brackets}", row.name)))
+                    json::string(&shown(&format!("{}{brackets}", row.name)))
                 )
             }
             _ => String::new(),
         };
         format!(
             "{{\"name\":{}{written},\"holds\":{},\"value\":{},\"empty\":{},\"has\":[{}],\"from\":{},\"used\":{used}}}",
-            json_string(&shown(&row.name)),
-            json_string(wording::panel_holds(row.holds)),
-            json_string(&value(row)),
+            json::string(&shown(&row.name)),
+            json::string(wording::panel_holds(row.holds)),
+            json::string(&value(row)),
             row.held == Held::Nothing,
             has.join(","),
             self.written_at(row.from),
@@ -149,7 +149,7 @@ impl On<'_> {
         let excerpt = self.report.excerpt(place, false);
         format!(
             "{{\"file\":{},\"line\":{},\"excerpt\":{}}}",
-            json_string(&self.report.file(place.source)),
+            json::string(&self.report.file(place.source)),
             excerpt.first,
             lines(&excerpt),
         )
@@ -160,7 +160,7 @@ impl On<'_> {
         match place {
             Some(place) => format!(
                 "{{\"file\":{},\"line\":{}}}",
-                json_string(&self.report.file(place.source)),
+                json::string(&self.report.file(place.source)),
                 self.report.first_line(place),
             ),
             None => "null".to_owned(),
@@ -273,15 +273,15 @@ fn link(neighbour: Option<&Neighbour>) -> String {
     match neighbour {
         Some(neighbour) => format!(
             "{{\"text\":{},\"href\":{}}}",
-            json_string(&shown(&neighbour.called)),
-            json_string(&on_the_wire(&neighbour.address)),
+            json::string(&shown(&neighbour.called)),
+            json::string(&on_the_wire(&neighbour.address)),
         ),
         None => "null".to_owned(),
     }
 }
 
 fn or_null(text: Option<&str>) -> String {
-    text.map_or_else(|| "null".to_owned(), json_string)
+    text.map_or_else(|| "null".to_owned(), json::string)
 }
 
 /// What a name holds on the page, as the panel shows it.

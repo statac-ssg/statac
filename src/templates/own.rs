@@ -1220,13 +1220,13 @@ pub(super) fn json(value: &Value, out: &mut String) {
     use minijinja::value::ValueKind;
     if let Some(date) = value.downcast_object_ref::<DateValue>() {
         let printed = date.part_printed();
-        return json_string(&printed.unwrap_or_else(|| date.date.to_string()), out);
+        return crate::json::write_string(&printed.unwrap_or_else(|| date.date.to_string()), out);
     }
     if let Some(page) = value.downcast_object_ref::<PageValue>() {
-        return json_string(&page.shared.address_of(page.id), out);
+        return crate::json::write_string(&page.shared.address_of(page.id), out);
     }
     if let Some(list) = value.downcast_object_ref::<ListValue>() {
-        return json_string(&super::values::list_name(&list.shared, list.id), out);
+        return crate::json::write_string(&super::values::list_name(&list.shared, list.id), out);
     }
     if let Some(lists) = value.downcast_object_ref::<Lists>() {
         out.push('[');
@@ -1234,7 +1234,7 @@ pub(super) fn json(value: &Value, out: &mut String) {
             if i > 0 {
                 out.push(',');
             }
-            json_string(&super::values::list_name(&lists.shared, id), out);
+            crate::json::write_string(&super::values::list_name(&lists.shared, id), out);
         }
         out.push(']');
         return;
@@ -1259,33 +1259,14 @@ pub(super) fn json(value: &Value, out: &mut String) {
                 if i > 0 {
                     out.push(',');
                 }
-                json_string(&key.to_string(), out);
+                crate::json::write_string(&key.to_string(), out);
                 out.push(':');
                 json(&value.get_item(&key).unwrap_or_default(), out);
             }
             out.push('}');
         }
-        _ => json_string(value.as_str().unwrap_or(&value.to_string()), out),
+        _ => crate::json::write_string(value.as_str().unwrap_or(&value.to_string()), out),
     }
-}
-
-fn json_string(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '<' | '>' | '&' | '\'' => {
-                write!(out, "\\u{:04x}", c as u32).expect("writing to a string can't fail")
-            }
-            c if c.is_control() => {
-                write!(out, "\\u{:04x}", c as u32).expect("writing to a string can't fail")
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
 }
 
 /// Text written as part of an address: everything but letters, digits and

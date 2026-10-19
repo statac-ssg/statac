@@ -301,11 +301,19 @@ fn a_script_loading_modules_as_it_runs_brings_the_map_too() {
 }
 
 #[test]
-fn a_name_in_the_map_cant_close_its_element() {
-    assert_eq!(
-        json_string("a</script>\"\\"),
-        "\"a\\u003c/script>\\\"\\\\\""
+fn a_name_in_the_map_is_safe_inside_its_element() {
+    let site = Site::new(
+        "modules",
+        &[
+            ("assets/app.js", "import './a&b\\'c.js';\n"),
+            ("assets/a&b'c.js", "export const a = 1;\n"),
+        ],
     );
+    let (assets, _, _) = site.gather("");
+    let tags = assets
+        .js("app.js", &mut PageScripts::default(), &mut Reads::default())
+        .unwrap();
+    assert!(tags.contains("\"/a\\u0026b\\u0027c.js\": "), "{tags}");
 }
 
 #[test]
