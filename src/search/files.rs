@@ -1,4 +1,5 @@
-//! The files a reader's browser searches the site with, under `search/`.
+//! The files a reader's browser searches the site with: for each language,
+//! the pages of that language, under `search/` at the language's top.
 //!
 //! `index.js` is the script that reads the rest, written with their names,
 //! so the script and the index always come from one build. The rest are
@@ -11,9 +12,9 @@
 //!
 //! - `records.*.bin`: each page's text file and how many records it has,
 //!   the records in order, and each record's length.
-//! - `words.*.bin`: a run of the site's words in the order of their UTF-16
-//!   code units, each with the entries of its stems among the piece's,
-//!   and each entry's records as gaps from the last, each with its weight.
+//! - `words.*.bin`: a run of the language's words in the order of their
+//!   UTF-16 code units, each with its stem's entry among the piece's, and
+//!   each entry's records as gaps from the last, each with its weight.
 //!   `index.js` gives the first word of each.
 //! - `pages/*.bin`: one page's address, title, date and parts, each part
 //!   its heading's id and words, none for the opening, and its text.
@@ -24,15 +25,30 @@ use std::fmt::Write as _;
 use rayon::prelude::*;
 
 use super::Index;
+use crate::content::address::Top;
 use crate::problem::Named;
+use crate::site::{LanguageId, Site};
 use crate::templates::Renderer;
 
-/// The folder the files are published in.
-pub const FOLDER: &str = "search";
+/// The folder each language's files are published in, at its top.
+const FOLDER: &str = "search";
 
-/// The script reading the index, by its path from the top of the built
-/// site.
-pub const ENTRY: &str = "search/index.js";
+/// The script reading the index, by its path in the folder.
+const ENTRY: &str = "index.js";
+
+/// The folder `language`'s files are published in, by its path from the
+/// top of the built site: `search`, or `fr/search` beneath a language's
+/// folder.
+pub fn folder(site: &Site, language: LanguageId) -> String {
+    let top = Top::new(site.top(language)).address("/");
+    format!("{}{FOLDER}", top.trim_start_matches('/'))
+}
+
+/// The script reading `language`'s index, by its path from the top of the
+/// built site.
+pub fn entry(site: &Site, language: LanguageId) -> String {
+    format!("{}/{ENTRY}", folder(site, language))
+}
 
 /// The script, which the names of the index's files are written before.
 const READER: &str = include_str!("reader.js");
@@ -53,8 +69,9 @@ pub struct File {
     pub bytes: Vec<u8>,
 }
 
-/// Every file of `index`, the site `renderer` read, the script first.
-pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
+/// Every file of `index`, the site `renderer` read, in `folder`, the
+/// script first.
+pub fn files(renderer: &Renderer, folder: &str, index: &Index) -> Vec<File> {
     let site = renderer.site();
     let base = renderer.settings().base();
     // Each page's records, which stand together.
@@ -100,7 +117,7 @@ pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
                 json.push(']');
             }
             json.push_str("]}");
-            packed(&format!("{FOLDER}/pages/"), &json)
+            packed("pages/", &json)
         })
         .collect();
 
@@ -115,11 +132,11 @@ pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
     json.push_str("],\"lengths\":");
     numbers(index.lengths.iter().copied(), &mut json);
     json.push('}');
-    let records = packed(&format!("{FOLDER}/records."), &json);
+    let records = packed("records.", &json);
 
     let pieces = pieces(index, WHOLE, PIECE);
     let mut entry = String::from("const FILES = {\"records\":");
-    string(name_in_folder(&records.path), &mut entry);
+    string(&records.path, &mut entry);
     entry.push_str(",\"words\":[");
     for (i, (first, piece)) in pieces.iter().enumerate() {
         if i > 0 {
@@ -128,7 +145,7 @@ pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
         entry.push('[');
         string(first, &mut entry);
         entry.push(',');
-        string(name_in_folder(&piece.path), &mut entry);
+        string(&piece.path, &mut entry);
         entry.push(']');
     }
     entry.push_str("]};\n\n");
@@ -141,6 +158,9 @@ pub fn files(renderer: &Renderer, index: &Index) -> Vec<File> {
     files.push(records);
     files.extend(pieces.into_iter().map(|(_, piece)| piece));
     files.extend(texts);
+    for file in &mut files {
+        file.path = format!("{folder}/{}", file.path);
+    }
     files
 }
 
@@ -149,11 +169,6 @@ pub fn claims(files: &[File]) -> Vec<(String, Named)> {
     (files.iter())
         .map(|file| (file.path.clone(), Named::Search))
         .collect()
-}
-
-/// The path of a file under `search/` from there.
-fn name_in_folder(path: &str) -> &str {
-    &path[FOLDER.len() + 1..]
 }
 
 /// The word list in pieces, each with its first word, the first piece's
@@ -173,15 +188,15 @@ pub(super) fn pieces(index: &Index, whole: usize, each: usize) -> Vec<(String, F
                     0 => String::new(),
                     at => index.words[at].0.clone(),
                 };
-                (first, named("words.", &piece(index, range)))
+                (first, packed("words.", &piece(index, range)))
             })
             .collect();
-        let packed: usize = pieces.iter().map(|(_, file)| file.bytes.len()).sum();
-        if packed <= whole {
+        let size: usize = pieces.iter().map(|(_, file)| file.bytes.len()).sum();
+        if size <= whole {
             let all = piece(index, 0..index.words.len());
-            return vec![(String::new(), named("words.", &all))];
+            return vec![(String::new(), packed("words.", &all))];
         }
-        let measured = written as f64 / packed as f64;
+        let measured = written as f64 / size as f64;
         if again || (measured / packs - 1.0).abs() < 0.15 {
             return pieces;
         }
@@ -201,13 +216,10 @@ fn cuts(index: &Index, most: usize) -> (Vec<usize>, usize) {
     let mut cuts: Vec<usize> = vec![0];
     let (mut size, mut written) = (0, 0);
     let mut held: std::collections::HashSet<u32> = std::collections::HashSet::new();
-    for (at, (word, entries)) in index.words.iter().enumerate() {
-        let listed = word.len() + 4 + 6 * entries.len();
-        let new = entries.iter().filter(|entry| !held.contains(entry));
-        let adds = listed
-            + new
-                .map(|&entry| written_length(&index.entries[entry as usize]))
-                .sum::<usize>();
+    for (at, (word, entry)) in index.words.iter().enumerate() {
+        let listed = word.len() + 10;
+        let records = written_length(&index.entries[*entry as usize]);
+        let adds = listed + if held.contains(entry) { 0 } else { records };
         if size > 0 && size + adds > most {
             cuts.push(at);
             written += size;
@@ -215,10 +227,8 @@ fn cuts(index: &Index, most: usize) -> (Vec<usize>, usize) {
             held.clear();
         }
         size += listed;
-        for &entry in entries {
-            if held.insert(entry) {
-                size += written_length(&index.entries[entry as usize]);
-            }
+        if held.insert(*entry) {
+            size += records;
         }
     }
     cuts.push(index.words.len());
@@ -231,7 +241,7 @@ fn written_length(records: &[(u32, u32)]) -> usize {
 }
 
 /// The words of `index` in `range`, as JSON: the words, each word's
-/// entries as their places among the piece's, and each entry's records.
+/// entry as its place among the piece's, and each entry's records.
 fn piece(index: &Index, range: std::ops::Range<usize>) -> String {
     let words = &index.words[range];
     let mut local: HashMap<u32, usize> = HashMap::new();
@@ -243,22 +253,17 @@ fn piece(index: &Index, range: std::ops::Range<usize>) -> String {
         }
         string(word, &mut json);
     }
-    json.push_str("],\"stems\":[");
-    for (i, (_, entries)) in words.iter().enumerate() {
-        if i > 0 {
-            json.push(',');
+    json.push_str("],\"stems\":");
+    let places = words.iter().map(|&(_, entry)| {
+        let next = order.len();
+        let place = *local.entry(entry).or_insert(next);
+        if place == next {
+            order.push(entry);
         }
-        let places = entries.iter().map(|&entry| {
-            let next = order.len();
-            let place = *local.entry(entry).or_insert(next);
-            if place == next {
-                order.push(entry);
-            }
-            u32::try_from(place).expect("fewer stems than u32 holds")
-        });
-        numbers(places.collect::<Vec<_>>().into_iter(), &mut json);
-    }
-    json.push_str("],\"records\":[");
+        u32::try_from(place).expect("fewer stems than u32 holds")
+    });
+    numbers(places.collect::<Vec<_>>().into_iter(), &mut json);
+    json.push_str(",\"records\":[");
     for (i, &entry) in order.iter().enumerate() {
         if i > 0 {
             json.push(',');
@@ -275,12 +280,6 @@ fn piece(index: &Index, range: std::ops::Range<usize>) -> String {
     }
     json.push_str("]}");
     json
-}
-
-/// `json` packed and named by its packed content under `search/`, after
-/// `stem`.
-fn named(stem: &str, json: &str) -> File {
-    packed(&format!("{FOLDER}/{stem}"), json)
 }
 
 /// `json` packed, at `before` followed by its mark and `.bin`.

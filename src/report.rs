@@ -186,9 +186,29 @@ impl<'a> Report<'a> {
         out
     }
 
-    /// What `statac search` found for `words`: how many pages, then each
-    /// shown at the part that matched best, the words matched in bold.
+    /// What `statac search` found for `words`. Of one language searched:
+    /// how many pages, then each shown at the part that matched best, the
+    /// words matched in bold. Of several: that for each language that found
+    /// any, under its code.
     pub fn found(&self, words: &str, found: &crate::search::Outcome) -> String {
+        if let [(_, results)] = found.found.as_slice() {
+            return self.results(words, results);
+        }
+        let blocks: Vec<String> = (found.found.iter())
+            .filter(|(_, results)| results.pages > 0)
+            .map(|(code, results)| {
+                let heading = self.paint.paint(BOLD, code);
+                format!("{heading}\n{}", self.results(words, results))
+            })
+            .collect();
+        match blocks.is_empty() {
+            true => format!("{}\n", self.said(&wording::found(words, 0, false))),
+            false => blocks.join("\n"),
+        }
+    }
+
+    /// What one language's search found for `words`.
+    fn results(&self, words: &str, found: &crate::search::Results) -> String {
         let (shown, pages) = (&found.shown, found.pages);
         let mut out = self.said(&wording::found(words, pages, found.some));
         out.push('\n');

@@ -12,7 +12,7 @@ use crate::problem::{
     TemplateFault, Unsupported, Word,
 };
 use crate::reads::Key;
-use crate::site::{Id, PageId};
+use crate::site::{Id, LanguageId, PageId};
 
 /// A site written to a fresh folder, removed when dropped.
 struct TempSite {
@@ -2745,16 +2745,28 @@ fn a_page_numbers_the_search_boxes_it_is_asked_for() {
 }
 
 #[test]
-fn a_page_reading_its_search_boxs_index_asks_the_build_for_the_index() {
+fn a_page_reading_its_search_boxs_index_asks_the_build_for_its_languages_index() {
+    let shows = |title: &str| {
+        format!(
+            "{{% for p in site.pages %}}{{% if p.title == '{title}' %}}{{{{ p.content }}}}\
+             {{% endif %}}{{% endfor %}}"
+        )
+    };
+    let (shows_post, shows_article) = (shows("Post 1"), shows("Article 1"));
     let built = site(&[
         (
             "statac.yaml",
-            "title: Site\nurl: https://example.org/blog/\n",
+            "title: Site\nlanguage: [en, fr]\nurl: https://example.org/blog/\n",
         ),
         ("content/post-1.md", "---\ntitle: Post 1\n---\n@find()\n"),
+        (
+            "content/fr/article-1.md",
+            "---\ntitle: Article 1\n---\n@find()\n",
+        ),
         ("templates/page.html", "{{ page.content }}"),
         ("snippets/find.html", "{{ page.search_box().index }}"),
         ("content/index.md", "---\ntitle: Home\n---\n"),
+        ("content/fr/index.md", "---\ntitle: Accueil\n---\n"),
         ("templates/home.html", ""),
         (
             "content/post-2.md",
@@ -2763,19 +2775,32 @@ fn a_page_reading_its_search_boxs_index_asks_the_build_for_the_index() {
         ("templates/plain.html", "{{ page.search_box().id }}"),
         (
             "content/post-3.md",
-            "---\ntitle: Post 3\nlayout: shows\n---\n",
+            "---\ntitle: Post 3\nlayout: post\n---\n",
         ),
+        ("templates/post.html", &shows_post),
         (
-            "templates/shows.html",
-            "{% for p in site.pages %}{% if p.title == 'Post 1' %}{{ p.content }}{% endif %}{% endfor %}",
+            "content/post-4.md",
+            "---\ntitle: Post 4\nlayout: article\n---\n",
         ),
+        ("templates/article.html", &shows_article),
     ]);
-    assert_eq!(built.html("post-1.md"), "/blog/search/index.js");
-    assert!(built.render("post-1.md").indexed);
-    // A box whose index is never read asks for none.
-    assert!(!built.render("post-2.md").indexed);
-    // Writing that reads it asks for it wherever it is shown.
-    assert!(built.render("post-3.md").indexed);
+    let (en, fr) = (LanguageId::from_index(0), LanguageId::from_index(1));
+    let cases: &[(&str, Option<&str>, &[LanguageId])] = &[
+        ("post-1.md", Some("/blog/search/index.js"), &[en]),
+        ("fr/article-1.md", Some("/blog/fr/search/index.js"), &[fr]),
+        // A box whose index is never read asks for none.
+        ("post-2.md", None, &[]),
+        // Writing that reads it asks for its own language's wherever it
+        // is shown.
+        ("post-3.md", Some("/blog/search/index.js"), &[en]),
+        ("post-4.md", Some("/blog/fr/search/index.js"), &[fr]),
+    ];
+    for &(path, index, indexed) in cases {
+        if let Some(index) = index {
+            assert_eq!(built.html(path), index, "{path}");
+        }
+        assert_eq!(built.render(path).indexed, indexed, "{path}");
+    }
 }
 
 #[test]

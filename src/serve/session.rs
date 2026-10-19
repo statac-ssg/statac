@@ -874,7 +874,7 @@ fn carry(last: &Last, now: Taken<'_>, plan: &Plan, own: &[u64]) -> Vec<Option<Bu
             coloured: coloured.collect::<Option<_>>()?,
             walked: old.walked,
             written: true,
-            indexed: old.indexed,
+            indexed: old.indexed.clone(),
         })
     };
     let outputs = plan.outputs.par_iter().enumerate();

@@ -45,6 +45,38 @@ impl Site {
         site
     }
 
+    /// The site in English and French at `url`, whose French search page
+    /// shows a box too.
+    fn in_two_languages(name: &str, url: &str) -> Site {
+        let site = Site::new(name);
+        site.write(
+            "statac.yaml",
+            &format!(
+                "title: Site\nlanguage: [en, fr]\ntimezone: UTC\nurl: {url}\n\
+                 pages.feed: false\n"
+            ),
+        );
+        site.write(
+            "content/fr/index.md",
+            "---\ntitle: Accueil\n---\nLa page d'accueil.\n",
+        );
+        site.write(
+            "content/fr/article-1.md",
+            "---\ntitle: Article 1\ndate: 2026-01-01\n---\n\
+             Le premier article, sur les chanteuses du café.\n\n\
+             ## Plus tard {#plus-tard}\n\nUne chanteuse, running.\n",
+        );
+        site.write(
+            "content/fr/article-2.md",
+            "---\ntitle: Article 2\ndate: 2026-01-02\n---\nLe second article, et un post.\n",
+        );
+        site.write(
+            "content/fr/chercher.md",
+            "---\ntitle: Chercher\n---\n@find()\n",
+        );
+        site
+    }
+
     fn write(&self, path: &str, text: &str) {
         let path = self.root.join(path);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -70,9 +102,15 @@ impl Site {
     /// Builds the site, and gives each file under `search/` by its path
     /// there, unpacked where it is packed.
     fn index(&self) -> Vec<(String, String)> {
+        self.index_in("search")
+    }
+
+    /// Builds the site, and gives each file of the index in `folder` of the
+    /// built site by its path there, unpacked where it is packed.
+    fn index_in(&self, folder: &str) -> Vec<(String, String)> {
         let (said, code) = self.run(&["build", "--today=2026-10-04"]);
         assert_eq!(code, 0, "{said}");
-        let folder = self.root.join("_site/search");
+        let folder = self.root.join("_site").join(folder);
         let mut found = Vec::new();
         let mut folders = vec![folder.clone()];
         while let Some(next) = folders.pop() {
@@ -219,14 +257,68 @@ fn a_page_edited_changes_its_own_text_and_leaves_every_other_pages() {
 
 #[test]
 fn a_file_at_an_address_of_the_index_is_told_as_a_clash() {
-    let site = Site::new("clash");
-    site.write("static/search/index.js", "\n");
-    let (said, code) = site.run(&["check", "--today=2026-10-04"]);
-    assert_eq!(code, 1, "{said}");
-    assert!(
-        said.contains("`static/search/index.js` and the site's search index"),
-        "{said}"
-    );
+    for file in ["static/search/index.js", "static/fr/search/index.js"] {
+        let site = Site::in_two_languages("clash", "https://example.org/blog/");
+        site.write(file, "\n");
+        let (said, code) = site.run(&["check", "--today=2026-10-04"]);
+        assert_eq!(code, 1, "{file}: {said}");
+        assert!(
+            said.contains(&format!("`{file}` and the site's search index")),
+            "{said}"
+        );
+    }
+}
+
+#[test]
+fn each_language_a_page_asks_for_has_an_index_of_its_own_pages_at_its_top() {
+    // The site's path, the pages whose box reads the index, and the
+    // folders of the indexes built.
+    let cases: &[(&str, &[&str], &[&str])] = &[
+        (
+            "/blog",
+            &["search.md", "fr/chercher.md"],
+            &["search", "fr/search"],
+        ),
+        ("", &["fr/chercher.md"], &["fr/search"]),
+        ("", &["search.md"], &["search"]),
+        ("", &[], &[]),
+    ];
+    for &(path, asking, indexed) in cases {
+        let site = Site::in_two_languages("languages", &format!("https://example.org{path}/"));
+        for page in ["search.md", "fr/chercher.md"] {
+            if !asking.contains(&page) {
+                site.write(
+                    &format!("content/{page}"),
+                    "---\ntitle: Search\n---\nNo box.\n",
+                );
+            }
+        }
+        for (folder, page) in [
+            ("search", "search/index.html"),
+            ("fr/search", "fr/chercher/index.html"),
+        ] {
+            let index = site.index_in(folder);
+            if !indexed.contains(&folder) {
+                assert!(index.is_empty(), "{path} {asking:?} {folder}: {index:?}");
+                continue;
+            }
+            // Each language's index holds its own pages, and no other's.
+            let pages = named(&index, "pages/");
+            assert_eq!(pages.len(), 4, "{path} {folder}: {index:?}");
+            let home = format!("{path}/{}", folder.trim_end_matches("search"));
+            for page in pages {
+                let text = text(&index, page);
+                let at = format!("{{\"url\":\"{home}");
+                assert!(text.starts_with(&at), "{path} {folder}: {text}");
+                if folder == "search" {
+                    assert!(!text.contains("/fr/"), "{text}");
+                }
+            }
+            let built = fs::read_to_string(site.root.join("_site").join(page)).unwrap();
+            let address = format!("data-index=\"{path}/{folder}/index.js\"");
+            assert!(built.contains(&address), "{path} {page}: {built}");
+        }
+    }
 }
 
 /// `text` as `JSON.stringify` writes it.
@@ -286,7 +378,7 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         ("日本", true),
         ("", false),
     ];
-    let rust = statac_finds(&site, asked);
+    let rust = statac_finds(&site, 0, asked);
     assert!(rust.contains("\"Running\""), "{rust}");
     let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
         return;
@@ -296,6 +388,60 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         assert_eq!(rust, &browser, "{words}");
     }
     assert_eq!(rust, browser);
+}
+
+#[test]
+fn each_languages_script_finds_what_statac_search_finds_in_that_language() {
+    let site = Site::in_two_languages("reader-languages", "https://example.org/blog/");
+    site.write(
+        "content/post-2.md",
+        "---\ntitle: Post 2\ndate: 2026-01-02\n---\nThe second post, on a café and a chanteuse.\n",
+    );
+    for folder in ["search", "fr/search"] {
+        assert!(!site.index_in(folder).is_empty(), "{folder}");
+    }
+    let asked: &[(&str, bool)] = &[
+        ("running", false),
+        ("runs", false),
+        ("chanteuse", false),
+        ("chanteuses", false),
+        ("cafe", false),
+        ("post", false),
+        ("article", false),
+        ("premier post", false),
+        ("nowhere", false),
+        ("ch", true),
+        ("ru", true),
+        ("p", true),
+    ];
+    let cases = [
+        (0, "_site/search/index.js"),
+        (1, "_site/fr/search/index.js"),
+    ];
+    let found: Vec<(String, Option<String>)> = (cases.iter())
+        .map(|&(language, script)| {
+            let rust = statac_finds(&site, language, asked);
+            (rust, browser_finds(&site.root.join(script), asked, None))
+        })
+        .collect();
+    // Each language finds its own pages for a word both write.
+    let (english, french) = (&found[0].0, &found[1].0);
+    let cafe = |found: &str| split(found)[4].clone();
+    assert!(cafe(english).contains("/blog/post-2/"), "{english}");
+    assert!(!cafe(english).contains("/fr/"), "{english}");
+    assert!(cafe(french).contains("/blog/fr/article-1/"), "{french}");
+    assert!(!cafe(french).contains("/blog/post-"), "{french}");
+    for ((language, _), (rust, browser)) in cases.iter().zip(&found) {
+        let Some(browser) = browser else {
+            return;
+        };
+        for ((words, _), (rust, browser)) in
+            asked.iter().zip(split(rust).iter().zip(split(browser)))
+        {
+            assert_eq!(rust, &browser, "{language} {words}");
+        }
+        assert_eq!(rust, browser, "{language}");
+    }
 }
 
 #[test]
@@ -330,16 +476,20 @@ fn a_browser_holding_the_script_from_an_earlier_build_reads_the_later_one() {
     ) else {
         return;
     };
-    assert_eq!(browser, statac_finds(&site, asked));
+    assert_eq!(browser, statac_finds(&site, 0, asked));
     assert!(browser.contains("post-2"), "{browser}");
 }
 
-/// What `statac search` finds in `site` for each of `asked`, written as
-/// the browser's script is by `search_reader.mjs`.
-fn statac_finds(site: &Site, asked: &[(&str, bool)]) -> String {
+/// What `statac search` finds in the pages of `site`'s language at
+/// `language` in its order for each of `asked`, written as the browser's
+/// script is by `search_reader.mjs`.
+fn statac_finds(site: &Site, language: usize, asked: &[(&str, bool)]) -> String {
+    use statac::site::Id;
     let today = statac::date::read("2026-10-04").ok();
     let (renderer, _) = statac::build::renderer(&site.root, today);
-    let index = statac::search::Index::of(renderer.site(), statac::search::records(&renderer));
+    let language = statac::site::LanguageId::from_index(language);
+    let records = statac::search::records(&renderer, language);
+    let index = statac::search::Index::of(renderer.site(), language, records);
     let found: Vec<String> = asked
         .iter()
         .map(|&(words, typing)| {

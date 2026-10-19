@@ -1,4 +1,19 @@
 use super::*;
+use crate::site::Id;
+
+/// The site's language at `at` in its order, the main one first.
+fn language(at: usize) -> LanguageId {
+    LanguageId::from_index(at)
+}
+
+/// The index of the pages `renderer` read in the site's language at `at`.
+fn index_of(renderer: &Renderer, at: usize) -> Index {
+    Index::of(
+        renderer.site(),
+        language(at),
+        records(renderer, language(at)),
+    )
+}
 
 fn words(text: &str) -> Vec<&str> {
     spans(text).map(|span| &text[span]).collect()
@@ -104,7 +119,7 @@ fn a_page_is_cut_at_each_heading_with_what_it_shows() {
             ("content/hidden.md", hidden),
         ],
     );
-    let records = records(&renderer);
+    let records = records(&renderer, language(0));
     let _ = std::fs::remove_dir_all(root);
     let of = |path: &str| {
         let page = page(&renderer, path);
@@ -142,7 +157,7 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
         "rank",
         &[("content/zfs.md", ZFS), ("content/notes.md", other)],
     );
-    let index = Index::of(renderer.site(), records(&renderer));
+    let index = index_of(&renderer, 0);
     let _ = std::fs::remove_dir_all(root);
     let first = |words: &str| {
         let found = index.search(&Asked::of(words, false));
@@ -183,7 +198,7 @@ fn each_page_is_searched_in_its_own_languages_forms() {
             ("content/voix.md", "---\ntitle: Voix\n---\nUne chanteuse.\n"),
         ],
     );
-    let index = Index::of(renderer.site(), records(&renderer));
+    let index = index_of(&renderer, 0);
     let _ = std::fs::remove_dir_all(root);
     let chant = page(&renderer, "chant.md");
     for words in ["cafe", "CAFÉ"] {
@@ -229,25 +244,16 @@ fn the_command_shows_each_page_found_once_at_its_best_part() {
         "command",
         &[("content/zfs.md", ZFS), ("content/notes.md", other)],
     );
-    let said = |words: &str| {
-        let options = Options {
-            site: root.clone(),
-            words: words.to_owned(),
-            today: None,
-            drafts: false,
-        };
-        let outcome = run(&options);
-        let report = crate::report::Report::new(outcome.sources().unwrap(), &root, false);
-        report.found(words, &outcome)
-    };
-    let zfs = said("zfs");
-    let fast = said("fast pi");
-    let some = said("fast nowhere");
-    let none = said("nowhere");
-    let _ = std::fs::remove_dir_all(&root);
-    assert_eq!(
-        zfs,
-        "\
+    // A site in one language reads the same with its language asked for.
+    for language in [None, Some("en")] {
+        let said = |words: &str| said(&root, words, language).unwrap();
+        let zfs = said("zfs");
+        let fast = said("fast pi");
+        let some = said("fast nowhere");
+        let none = said("nowhere");
+        assert_eq!(
+            zfs,
+            "\
 2 pages hold `zfs`, best first:
 
   ZFS on the Pi
@@ -257,23 +263,188 @@ fn the_command_shows_each_page_found_once_at_its_best_part() {
   Notes
   /notes/
   ZFS came up once.
-"
-    );
-    assert_eq!(
-        fast,
-        "\
+",
+            "{language:?}"
+        );
+        assert_eq!(
+            fast,
+            "\
 1 page holds `fast pi`:
 
   ZFS on the Pi \u{203a} Speed
   /zfs/#speed
   It runs fast.
-"
-    );
-    assert!(
-        some.starts_with("No page holds every word of `fast nowhere`; 1 holds some:\n"),
-        "{some}"
-    );
-    assert_eq!(none, "No page holds `nowhere`.\n");
+",
+            "{language:?}"
+        );
+        assert!(
+            some.starts_with("No page holds every word of `fast nowhere`; 1 holds some:\n"),
+            "{some}"
+        );
+        assert_eq!(none, "No page holds `nowhere`.\n", "{language:?}");
+    }
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// What `statac search` says of the site at `root` for `words`, of the
+/// one language `language` where it is given; or the mistake it tells.
+fn said(root: &std::path::Path, words: &str, language: Option<&str>) -> Result<String, String> {
+    let options = Options {
+        site: root.to_owned(),
+        words: words.to_owned(),
+        today: None,
+        drafts: false,
+        language: language.map(str::to_owned),
+    };
+    let outcome = run(&options);
+    let report = crate::report::Report::new(outcome.sources().unwrap(), root, false);
+    assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
+    match &outcome.mistake {
+        Some(mistake) => Err(report.problems(std::slice::from_ref(mistake))),
+        None => Ok(report.found(words, &outcome)),
+    }
+}
+
+/// A site in English and French, each with pages holding `photo`, and
+/// English pages holding `running` and `runs`, and French pages too.
+fn in_two_languages(name: &str) -> (Renderer, std::path::PathBuf) {
+    site(
+        name,
+        &[
+            ("statac.yaml", "title: Site\nlanguage: [en, fr]\n"),
+            (
+                "content/fr/index.md",
+                "---\ntitle: Accueil\n---\nBienvenue.\n",
+            ),
+            ("content/photo.md", "---\ntitle: Photo\n---\nA photo.\n"),
+            ("content/run-1.md", "---\ntitle: Post 1\n---\nRunning.\n"),
+            ("content/run-2.md", "---\ntitle: Post 2\n---\nRuns.\n"),
+            (
+                "content/fr/photo.md",
+                "---\ntitle: Photo\n---\nUne photo.\n",
+            ),
+            ("content/fr/run-1.md", "---\ntitle: Post 1\n---\nRunning.\n"),
+            ("content/fr/run-2.md", "---\ntitle: Post 2\n---\nRuns.\n"),
+        ],
+    )
+}
+
+#[test]
+fn each_language_is_searched_apart_its_words_cut_by_its_own_rules() {
+    let (renderer, root) = in_two_languages("apart");
+    let _ = std::fs::remove_dir_all(root);
+    let site = renderer.site();
+    let found = |at: usize, words: &str| {
+        let index = index_of(&renderer, at);
+        let found = index.search(&Asked::of(words, false)).into_iter();
+        let mut paths: Vec<&str> = found
+            .map(|found| {
+                site.pages
+                    .get(index.records[found.record].page)
+                    .path
+                    .as_str()
+            })
+            .collect();
+        paths.sort_unstable();
+        paths
+    };
+    let cases: &[(usize, &str, &[&str])] = &[
+        // A word both languages write finds each language's pages in its
+        // own index only.
+        (0, "photo", &["photo.md"]),
+        (1, "photo", &["fr/photo.md"]),
+        // English cuts `running` to `run`, as it does `runs`; French cuts
+        // only `runs`.
+        (0, "runs", &["run-1.md", "run-2.md"]),
+        (1, "runs", &["fr/run-2.md"]),
+        (1, "running", &["fr/run-1.md"]),
+        (0, "bienvenue", &[]),
+        (1, "bienvenue", &["fr/index.md"]),
+    ];
+    for &(at, words, paths) in cases {
+        assert_eq!(found(at, words), paths, "{at} {words}");
+    }
+    // Each index counts only its own language's records.
+    for at in [0, 1] {
+        assert_eq!(index_of(&renderer, at).records.len(), 4, "{at}");
+    }
+}
+
+#[test]
+fn the_command_shows_what_each_language_found_under_its_code() {
+    let (_, root) = in_two_languages("command-languages");
+    let cases: &[(&str, Option<&str>, Result<&str, &str>)] = &[
+        (
+            "photo",
+            None,
+            Ok("\
+en
+1 page holds `photo`:
+
+  Photo
+  /photo/
+  A photo.
+
+fr
+1 page holds `photo`:
+
+  Photo
+  /fr/photo/
+  Une photo.
+"),
+        ),
+        // A language that finds nothing is left out.
+        (
+            "bienvenue",
+            None,
+            Ok("\
+fr
+1 page holds `bienvenue`:
+
+  Accueil
+  /fr/
+  Bienvenue.
+"),
+        ),
+        ("nowhere", None, Ok("No page holds `nowhere`.\n")),
+        // One language asked for reads as a site in one does.
+        (
+            "photo",
+            Some("fr"),
+            Ok("\
+1 page holds `photo`:
+
+  Photo
+  /fr/photo/
+  Une photo.
+"),
+        ),
+        ("bienvenue", Some("en"), Ok("No page holds `bienvenue`.\n")),
+        (
+            "photo",
+            Some("de"),
+            Err("\
+error  Wrong kind of value: `--language` is `en` or `fr`, not `de`
+  More: https://statac.dev/e/wrong-kind-of-value/
+"),
+        ),
+        (
+            "photo",
+            Some("FR"),
+            Err("\
+error  Wrong kind of value: `--language` is `en` or `fr`, not `FR`
+  More: https://statac.dev/e/wrong-kind-of-value/
+"),
+        ),
+    ];
+    let said: Vec<Result<String, String>> = (cases.iter())
+        .map(|&(words, language, _)| said(&root, words, language))
+        .collect();
+    let _ = std::fs::remove_dir_all(&root);
+    for (&(words, language, wanted), said) in cases.iter().zip(&said) {
+        let said = said.as_ref().map(String::as_str).map_err(String::as_str);
+        assert_eq!(said, wanted, "{words} {language:?}");
+    }
 }
 
 #[test]
@@ -295,7 +466,7 @@ fn a_long_word_list_is_cut_into_pieces_each_word_in_the_one_its_first_word_says(
         .map(|(p, t)| (p.as_str(), t.as_str()))
         .collect();
     let (renderer, root) = site("pieces", &files);
-    let index = Index::of(renderer.site(), records(&renderer));
+    let index = index_of(&renderer, 0);
     let _ = std::fs::remove_dir_all(root);
     let pieces = files::pieces(&index, 0, 200);
     assert!(pieces.len() > 3, "{}", pieces.len());

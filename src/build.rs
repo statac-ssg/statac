@@ -468,8 +468,8 @@ pub(crate) struct Built {
     pub walked: u64,
     /// Whether the built site holds it.
     pub written: bool,
-    /// Whether it names the site's search index.
-    pub indexed: bool,
+    /// The languages whose search index it names.
+    pub indexed: Vec<crate::site::LanguageId>,
 }
 
 /// Where an output goes once it is built.
@@ -736,7 +736,7 @@ pub(crate) struct Concluded {
     /// The held pictures no page links, by their place among the files
     /// beside the writing.
     held_back: HashSet<usize>,
-    /// The search index, where a page names it.
+    /// The search index of each language some page names it for.
     search: Vec<crate::search::File>,
 }
 
@@ -950,11 +950,15 @@ pub(crate) fn conclude(
         .collect();
     problems.extend(of_cards);
     let wanted = renderer.cards_wanted(&cards);
-    // Made only for a site some page of which names it, and only of one
-    // that builds.
-    let search = match built.iter().any(|built| built.indexed) && !stops(&problems) {
-        true => crate::search::files(renderer),
-        false => Vec::new(),
+    // Made only for the languages some page names it for, and only of a
+    // site that builds.
+    let indexed = built.iter().flat_map(|built| &built.indexed);
+    let mut indexed: Vec<crate::site::LanguageId> = indexed.copied().collect();
+    indexed.sort_unstable();
+    indexed.dedup();
+    let search = match stops(&problems) {
+        false => crate::search::files(renderer, &indexed),
+        true => Vec::new(),
     };
     if !wanted.is_empty() || !search.is_empty() {
         // A card's address is known only once its page is built, and the

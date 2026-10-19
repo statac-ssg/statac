@@ -1,6 +1,7 @@
-// Reads the site's search index and ranks what it finds, as `statac
-// search` does. Statac writes it at each build, after the names of the
-// index's files. A site's own script imports it and calls `search`.
+// Reads the search index of one of the site's languages and ranks what it
+// finds, as `statac search` does. Statac writes it at each build, after
+// the names of the index's files. A site's own script imports it and
+// calls `search`.
 
 const K1 = 1.2;
 const B = 0.75;
@@ -102,15 +103,14 @@ async function lookedIn(word, typing, marked) {
       if (listed !== word && !(typing && listed.startsWith(word))) {
         break;
       }
-      for (const stem of piece.stems[place]) {
-        counts.set(stem, Math.max(counts.get(stem) ?? 0, listed === word ? 1 : STARTING));
-      }
+      const stem = piece.stems[place];
+      counts.set(stem, Math.max(counts.get(stem) ?? 0, listed === word ? 1 : STARTING));
     }
     for (const [stem, count] of counts) {
       looked.push([piece.records[stem], count]);
     }
     piece.words.forEach((listed, place) => {
-      if (piece.stems[place].some((stem) => counts.has(stem))) {
+      if (counts.has(piece.stems[place])) {
         marked.add(listed);
       }
     });

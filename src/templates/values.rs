@@ -562,10 +562,10 @@ impl Object for PageValue {
 /// A search box for what is being built: the id its element takes, a
 /// second and later box each taking one of its own, whether it is the
 /// first, which is the one to carry what every box shares, and the
-/// address of the site's search index. A page's writing counts its own
-/// boxes, since it is built once for every page that shows it; the page's
-/// own output counts them with its layout's where it shows the writing
-/// whole.
+/// address of the search index of the language of what is built. A page's
+/// writing counts its own boxes, since it is built once for every page
+/// that shows it; the page's own output counts them with its layout's
+/// where it shows the writing whole.
 fn search_box(shared: &Arc<Shared>, args: &[Value]) -> Result<Value, Error> {
     if !args.is_empty() {
         return Err(search_box_given(true));
@@ -603,11 +603,12 @@ impl Object for SearchBox {
             "id" => Some(Value::from(self.id.as_str())),
             "first" => Some(Value::from(self.first)),
             // Read only where a page uses Statac's own search, which has
-            // the build make the index.
+            // the build make the index of the page's language.
             "index" => {
                 frame::read(Key::Setting(self.shared.name_id("url")));
-                frame::with(|frame| frame.indexed = true);
-                let entry = crate::search::ENTRY;
+                let language = frame::language();
+                frame::with(|frame| frame.names_index(language));
+                let entry = crate::search::entry(&self.shared.site, language);
                 Some(Value::from(format!("{}/{entry}", self.shared.base)))
             }
             other => {

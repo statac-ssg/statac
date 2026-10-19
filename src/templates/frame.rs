@@ -72,9 +72,9 @@ pub(super) struct Frame {
     /// How many search boxes the output had asked for when it first showed
     /// its own page's writing whole.
     pub boxes_before_writing: Option<usize>,
-    /// Whether what is built names the site's search index, in any page's
-    /// writing it shows too.
-    pub indexed: bool,
+    /// The languages whose search index what is built names, each once, in
+    /// any page's writing it shows too.
+    pub indexed: Vec<LanguageId>,
     /// The photographs whose copies what is built names, as each was
     /// named.
     pub developed: Vec<crate::album::Shown>,
@@ -172,7 +172,7 @@ impl Frame {
             undescribed: Vec::new(),
             search_boxes: 0,
             boxes_before_writing: None,
-            indexed: false,
+            indexed: Vec::new(),
             developed: Vec::new(),
             coloured: Vec::new(),
             colours: false,
@@ -197,6 +197,13 @@ impl Frame {
     pub fn home(&self) -> Option<PageId> {
         self.page
             .filter(|_| self.number == 1 && self.feed.is_none() && !self.redirect)
+    }
+
+    /// Records that what is built names `language`'s search index.
+    pub fn names_index(&mut self, language: LanguageId) {
+        if !self.indexed.contains(&language) {
+            self.indexed.push(language);
+        }
     }
 }
 

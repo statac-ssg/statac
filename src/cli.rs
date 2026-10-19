@@ -51,7 +51,7 @@ const COMMANDS: [&str; 10] = [
 ];
 
 /// The options that take a value, and the commands that take each.
-const OPTIONS: [(&str, &[&str]); 7] = [
+const OPTIONS: [(&str, &[&str]); 8] = [
     (
         "--site",
         &[
@@ -69,6 +69,7 @@ const OPTIONS: [(&str, &[&str]); 7] = [
     ("--port", &["serve"]),
     ("--watch", &["serve"]),
     ("--from", &["import"]),
+    ("--language", &["search"]),
 ];
 
 /// The ways `--watch` names of watching the site's folder.
@@ -179,7 +180,8 @@ const USAGE: [(&str, &str); 12] = [
         "search",
         "  statac search <words> [folder]
                          Show the pages a reader of the site would find
-                         for the words, best first.
+                         for the words, best first, each language's
+                         apart on a site in several.
 ",
     ),
     (
@@ -191,7 +193,7 @@ const USAGE: [(&str, &str); 12] = [
 ];
 
 /// Each option's entry on the usage screen, as the screen sets it.
-const OPTION_LINES: [(&str, &str); 15] = [
+const OPTION_LINES: [(&str, &str); 16] = [
     (
         "--site",
         "  --site=<folder>        The site's folder, as the folder after the command
@@ -277,6 +279,12 @@ const OPTION_LINES: [(&str, &str); 15] = [
                          every file twice a second; or auto, which
                          polls only where reports can't be relied on.
                          Without it, auto.
+",
+    ),
+    (
+        "--language",
+        "  --language=<code>      Search only the pages in this language, named
+                         by its code in statac.yaml.
 ",
     ),
     ("--help", "  --help                 Show this.\n"),
@@ -501,6 +509,16 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
                 say(terminal.out, &report.problems(&outcome.errors));
                 return 1;
             }
+            // A code the site doesn't declare is a mistake on the command
+            // line, told as one is.
+            if let Some(mistake) = &outcome.mistake {
+                let report = Report::new(&nowhere, Path::new(""), terminal.colour_err);
+                say(
+                    terminal.err,
+                    &report.problems(std::slice::from_ref(mistake)),
+                );
+                return 2;
+            }
             say(terminal.out, &report.found(&options.words, &outcome));
         }
         Request::Import(options) => {
@@ -709,6 +727,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     let mut no_starter = false;
     let mut port = None;
     let mut watch = None;
+    let mut language = None;
     let wrong = |option: &str, expected, written: &str| Kind::WrongKind {
         field: option.into(),
         expected,
@@ -945,6 +964,16 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             }
             continue;
         }
+        // Read against the codes the site declares once it is read.
+        if option == "--language" {
+            match language {
+                Some(_) => mistake(Kind::OptionGivenTwice {
+                    option: option.into(),
+                }),
+                None => language = Some(value.to_owned()),
+            }
+            continue;
+        }
         if option == "--watch" {
             let how = match value {
                 "auto" => Some(How::Auto),
@@ -1072,6 +1101,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             words: words.expect("checked above").to_owned(),
             today,
             drafts,
+            language,
         }),
         Some("refuse") => Request::Refuse(refuse::Options {
             site: site.unwrap_or_default(),

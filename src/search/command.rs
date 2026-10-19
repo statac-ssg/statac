@@ -3,10 +3,12 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use rayon::prelude::*;
+
 use super::{Asked, Index, Record, fold, records, spans};
 use crate::date::Date;
-use crate::problem::{Problem, Severity};
-use crate::site::PageId;
+use crate::problem::{Expected, Found, Kind, Problem, Severity};
+use crate::site::{Language, LanguageId, PageId};
 use crate::source::Sources;
 use crate::templates::Renderer;
 
@@ -25,6 +27,9 @@ pub struct Options {
     pub today: Option<Date>,
     /// Whether drafts and posts waiting for their day are searched too.
     pub drafts: bool,
+    /// The code of the one language whose pages are searched; none for
+    /// every language's.
+    pub language: Option<String>,
 }
 
 /// One page found, at the part of it that matched best.
@@ -43,12 +48,11 @@ pub struct Outcome {
     renderer: Option<Renderer>,
     /// The errors that stopped the site being read.
     pub errors: Vec<Problem>,
-    /// The pages found, best first, at most [`SHOWN`].
-    pub shown: Vec<Shown>,
-    /// How many pages were found in all.
-    pub pages: usize,
-    /// Whether no page held every word, and those found hold some.
-    pub some: bool,
+    /// The language asked for, where the site declares none of its code.
+    pub mistake: Option<Problem>,
+    /// What each language searched found, by its code, in the site's
+    /// order of languages, at most [`SHOWN`] pages shown of each.
+    pub found: Vec<(String, Results)>,
 }
 
 impl Outcome {
@@ -67,25 +71,52 @@ pub fn run(options: &Options) -> Outcome {
     let errors: Vec<Problem> = (prepared.problems.into_iter())
         .filter(|problem| problem.kind.severity() == Severity::Error)
         .collect();
-    if !errors.is_empty() {
+    let renderer = prepared.renderer;
+    let site = renderer.site();
+    let mut languages: Vec<(String, LanguageId)> = (site.languages.iter())
+        .map(|(id, language)| (code(language).to_owned(), id))
+        .collect();
+    let mut mistake = None;
+    if let Some(asked) = &options.language {
+        match languages.iter().position(|(code, _)| code == asked) {
+            Some(at) => languages = vec![languages.swap_remove(at)],
+            None => {
+                let codes = languages.iter().map(|(code, _)| code.clone()).collect();
+                mistake = Some(Problem::nowhere(Kind::WrongKind {
+                    field: "--language".into(),
+                    expected: Expected::OneOf(codes),
+                    found: Found::Written(asked.clone()),
+                    respelt: None,
+                }));
+            }
+        }
+    }
+    if !errors.is_empty() || mistake.is_some() {
         return Outcome {
-            renderer: Some(prepared.renderer),
+            renderer: Some(renderer),
             errors,
-            shown: Vec::new(),
-            pages: 0,
-            some: false,
+            mistake,
+            found: Vec::new(),
         };
     }
-    let renderer = prepared.renderer;
-    let index = Index::of(renderer.site(), records(&renderer));
-    let results = results(&renderer, &index, &options.words, false, SHOWN);
+    let found = (languages.into_par_iter())
+        .map(|(code, language)| {
+            let index = Index::of(site, language, records(&renderer, language));
+            let results = results(&renderer, &index, &options.words, false, SHOWN);
+            (code, results)
+        })
+        .collect();
     Outcome {
-        pages: results.pages,
-        some: results.some,
-        shown: results.shown,
-        errors,
         renderer: Some(renderer),
+        errors,
+        mistake,
+        found,
     }
+}
+
+/// A language's code, as the site declares it.
+fn code(language: &Language) -> &str {
+    language.tag.as_deref().unwrap_or(crate::language::ENGLISH)
 }
 
 /// What a search finds, as a reader's browser shows it.
@@ -121,8 +152,7 @@ pub fn results(
     let best: Vec<usize> = best.collect();
     // A word of the text is marked where it shares a stem with one asked.
     let matched = index.matched(&asked);
-    let marked =
-        |word: &str| (index.entries_of(&fold(word)).iter()).any(|entry| matched.contains(entry));
+    let marked = |word: &str| (index.entry_of(&fold(word))).is_some_and(|e| matched.contains(&e));
     let shown = (best.iter().take(most))
         .map(|&record| shown(renderer, &index.records[record], &marked))
         .collect();

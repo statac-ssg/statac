@@ -506,7 +506,8 @@ Usage:
                          name ending -statac. The old site is only read.
   statac search <words> [folder]
                          Show the pages a reader of the site would find
-                         for the words, best first.
+                         for the words, best first, each language's
+                         apart on a site in several.
   statac explain <name>  Explain a kind of problem. Its name is the last part
                          of the problem's More: link.
 
@@ -547,6 +548,8 @@ Options:
                          every file twice a second; or auto, which
                          polls only where reports can't be relied on.
                          Without it, auto.
+  --language=<code>      Search only the pages in this language, named
+                         by its code in statac.yaml.
   --help                 Show this.
   --version              Show which version of Statac this is.
 ";
@@ -1491,6 +1494,16 @@ fn search_is_read_with_its_words_and_options() {
             words: words.into(),
             today: today.map(|day| date::read(day).unwrap()),
             drafts,
+            language: None,
+        }))
+    };
+    let in_language = |language: &str| {
+        Ok(Request::Search(search::Options {
+            site: UNNAMED.into(),
+            words: "zfs".into(),
+            today: None,
+            drafts: false,
+            language: Some(language.into()),
         }))
     };
     assert_eq!(
@@ -1504,6 +1517,30 @@ fn search_is_read_with_its_words_and_options() {
     assert_eq!(
         parsed(&["--site=docs", "search", "zfs", "--today=2026-10-06"]),
         searching("zfs", "docs", false, Some("2026-10-06"))
+    );
+    // The code is read against the site's once the site is read.
+    for (args, language) in [
+        (&["search", "zfs", "--language=fr"][..], "fr"),
+        (&["search", "--language=pt-BR", "zfs"], "pt-BR"),
+        (&["search", "zfs", "--language=xx"], "xx"),
+    ] {
+        assert_eq!(parsed(args), in_language(language), "{args:?}");
+    }
+    assert_eq!(
+        refused(&["search", "zfs", "--language=en", "--language=fr"]),
+        "\
+error  Option given twice: `--language`
+  Keep one of them.
+  More: https://statac.dev/e/option-given-twice/
+"
+    );
+    assert_eq!(
+        refused(&["build", "--language=fr"]),
+        "\
+error  Unknown option: `statac build` has no `--language`
+  `--language` is for `statac search`.
+  More: https://statac.dev/e/unknown-option/
+"
     );
     for words in [
         &["search"][..],

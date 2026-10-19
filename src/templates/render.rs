@@ -274,8 +274,8 @@ pub(super) struct Body {
     spent: bool,
     /// How many search boxes the writing asks for.
     search_boxes: usize,
-    /// Whether it names the site's search index.
-    indexed: bool,
+    /// The languages whose search index it names.
+    indexed: Vec<LanguageId>,
     /// The writing as its own page shows it whole after search boxes of
     /// the layout's, by how many, its own numbered after them.
     after_boxes: Mutex<Vec<(usize, String)>>,
@@ -340,8 +340,8 @@ pub struct Rendered {
     pub own: Own,
     /// The links the snippets its templates call wrote in their own text.
     pub snipped: Vec<crate::links::Snipped>,
-    /// Whether it names the site's search index.
-    pub indexed: bool,
+    /// The languages whose search index it names.
+    pub indexed: Vec<LanguageId>,
 }
 
 impl Rendered {
@@ -1543,7 +1543,11 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         Ok(body) => body,
         Err(error) => return Some(Value::from(error)),
     };
-    frame::with(|frame| frame.indexed |= body.indexed);
+    frame::with(|frame| {
+        for &language in &body.indexed {
+            frame.names_index(language);
+        }
+    });
     let colourless = frame::with(|frame| frame.colourless).unwrap_or(false);
     if !colourless {
         frame::with(|frame| {

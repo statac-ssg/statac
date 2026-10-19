@@ -619,6 +619,21 @@ fn the_search_index_follows_the_writing_and_the_boxes_asking_for_it() {
             ("the box put back", &|site| {
                 site.write("content/search.md", asking)
             }),
+            ("a box on a German page", &|site| {
+                site.write("content/de/suche.md", "---\ntitle: Suche\n---\n@find()\n")
+            }),
+            ("a German page's writing edited", &|site| {
+                site.write(
+                    "content/de/index.md",
+                    "---\ntitle: Start\n---\nDie neue Startseite.\n",
+                )
+            }),
+            ("the English box taken out", &|site| {
+                site.write("content/search.md", "---\ntitle: Search\n---\nNone.\n")
+            }),
+            ("the German box taken out", &|site| {
+                site.write("content/de/suche.md", "---\ntitle: Suche\n---\nKeine.\n")
+            }),
         ],
     );
 }
