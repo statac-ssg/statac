@@ -10,7 +10,7 @@ use super::node::{Alignment, Kind, Node};
 use super::opening::{self, Written, words_of};
 use super::pieces::{self, Piece, PieceValue};
 use crate::highlight::{self, Highlighter, Language};
-use crate::source::Place;
+use crate::source::{Place, Span};
 
 /// What writes a snippet call's HTML, and the pieces of the writing the
 /// site writes itself.
@@ -149,9 +149,22 @@ pub fn write(document: &Document, options: &Options<'_>) -> Written {
             .as_ref()
             .map(|opening| format!("<p>{}</p>", read(opening.inner.clone()))),
     };
+    let children = &document.root.children;
+    let excerpt_span = match more {
+        Some((at, after)) => {
+            let shown = &children[..at + usize::from(after)];
+            shown.first().zip(shown.last()).map(|(first, last)| Span {
+                start: first.place.span.start,
+                end: last.place.span.end,
+            })
+        }
+        None => opening.as_ref().map(|opening| opening.written),
+    }
+    .filter(|_| excerpt.is_some());
     let words = opening::count_words(&read(0..writer.out.len()));
     Written {
         excerpt,
+        excerpt_span,
         excerpt_marked: more.is_some(),
         opening: opening.map(|opening| opening.words),
         words,
@@ -180,10 +193,12 @@ fn uncut(html: &str, cuts: &[Range<usize>], range: Range<usize>) -> String {
 }
 
 /// The paragraph the writing opens with: where its words stand in the
-/// HTML, and the words themselves as plain text.
+/// HTML, the words themselves as plain text, and where it is written.
 struct Opening {
     inner: Range<usize>,
     words: String,
+    /// Where its block is written: the paragraph, or the HTML holding it.
+    written: Span,
 }
 
 struct Writer<'a> {
@@ -256,6 +271,7 @@ impl<'a> Writer<'a> {
                         self.opening = Some(Opening {
                             inner: start..self.out.len(),
                             words,
+                            written: node.place.span,
                         });
                     }
                 }
@@ -383,7 +399,11 @@ impl<'a> Writer<'a> {
                         opening::first_html_paragraph(&self.out[start..]).map(|inner| {
                             let inner = start + inner.start..start + inner.end;
                             let words = opening::closed_up(&words_of(&self.out[inner.clone()]));
-                            Opening { inner, words }
+                            Opening {
+                                inner,
+                                words,
+                                written: node.place.span,
+                            }
                         });
                 }
             }

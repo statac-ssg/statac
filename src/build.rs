@@ -462,7 +462,7 @@ pub(crate) struct Built {
     /// Whether it is a page showing a picture with its width and height.
     pub sized: bool,
     /// Where the first block of code coloured names its language, in each
-    /// page's writing it shows whole.
+    /// page's writing it shows, whole or as its excerpt.
     pub coloured: Vec<Place>,
     /// How many pages of lists of the whole site it reached.
     pub walked: u64,

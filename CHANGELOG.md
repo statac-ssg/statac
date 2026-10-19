@@ -74,6 +74,11 @@ What changed in each release of Statac, the newest first.
   told when the templates are read. From the third snippet on, the
   value was taken as anything, and the mistake went untold until a page
   was built through it.
+- A page showing coloured code only in another page's excerpt, as a
+  list of posts whose excerpts hold a block of code, warns
+  `code-colours-not-loaded` where no template asks for `code.css`, at
+  the first block the excerpt shows. It said nothing, and the code
+  showed without its colours.
 
 ## 0.5.0 - 2026-10-18
 

@@ -76,7 +76,7 @@ pub(super) struct Frame {
     /// named.
     pub developed: Vec<crate::album::Shown>,
     /// Where the first block of code coloured names its language, in each
-    /// page's writing what is built shows whole.
+    /// page's writing what is built shows, whole or as its excerpt.
     pub coloured: Vec<Place>,
     /// Whether what is built shows any code coloured, its own or in the
     /// writing of a page it shows, whole or as its excerpt.

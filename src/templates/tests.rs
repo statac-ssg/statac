@@ -2910,6 +2910,57 @@ fn a_feed_carries_the_writing_built_without_colour_with_the_authors_own_spans() 
     );
 }
 
+/// A page showing another's excerpt shows the code coloured in it, at the
+/// first block the excerpt holds and at each call in it that colours any,
+/// and none the excerpt leaves out.
+#[test]
+fn coloured_code_in_an_excerpt_is_shown_where_the_excerpt_is() {
+    // A call's colours are placed at the filter in its snippet.
+    const FILTER: &str = "'let a' | highlight('rust')";
+    let cases: [(&str, &[&str]); 7] = [
+        (
+            "```rust\nlet a = 1;\n```\n\n<!--more-->\n\n```yaml\nb: 2\n```\n",
+            &["rust"],
+        ),
+        (
+            "```text\nas it is\n```\n\n```yaml\nb: 2\n```\n\n<!--more-->\n\n```rust\nlet a = 1;\n```\n",
+            &["yaml"],
+        ),
+        ("One.\n\n<!--more-->\n\n```rust\nlet a = 1;\n```\n", &[]),
+        ("One.\n\n```rust\nlet a = 1;\n```\n", &[]),
+        ("@coloured()\n\n<!--more-->\n\nTwo.\n", &[FILTER]),
+        ("One @coloured() two.\n\nThree.\n", &[FILTER]),
+        ("One.\n\n<!--more-->\n\n@coloured()\n", &[]),
+    ];
+    for (writing, shown) in cases {
+        let built = site(&[
+            NO_HOME,
+            (
+                "content/post-1.md",
+                &format!("---\ntitle: Post 1\n---\n{writing}"),
+            ),
+            ("content/posts.md", "---\ntitle: Posts\n---\n"),
+            (
+                "snippets/coloured.html",
+                "{{ 'let a' | highlight('rust') }}",
+            ),
+            (
+                "templates/page.html",
+                "{% for post in site.pages %}{% if post.title == 'Post 1' %}{{ post.excerpt }}{% endif %}{% endfor %}",
+            ),
+        ]);
+        let rendered = built.render("posts.md");
+        assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
+        let sources = built.renderer.sources();
+        let spelt: Vec<&str> = rendered
+            .coloured
+            .iter()
+            .map(|&place| sources.spelling(place))
+            .collect();
+        assert_eq!(spelt, shown, "{writing:?}");
+    }
+}
+
 #[test]
 fn writing_built_again_for_a_feed_still_cannot_show_itself() {
     let built = site(&[

@@ -16,6 +16,9 @@ pub struct Written {
     /// The writing before the more marker, or else its opening paragraph,
     /// as HTML, without the footnotes' markers; none where that is empty.
     pub excerpt: Option<String>,
+    /// Where the writing the excerpt shows is written in the page's file;
+    /// none for a page written in HTML.
+    pub excerpt_span: Option<Span>,
     /// Whether the writing has a more marker, so the excerpt ends where the
     /// author said.
     pub excerpt_marked: bool,
@@ -269,6 +272,7 @@ pub fn as_written(html: &str) -> Written {
     Written {
         html: html.to_owned(),
         excerpt,
+        excerpt_span: None,
         excerpt_marked: more_at.is_some(),
         opening: opening.map(|inner| closed_up(&words_of(&html[inner]))),
         words: count_words(html),
