@@ -2578,6 +2578,8 @@ pub enum Named {
     Item(String),
     /// What `after_build` makes, as `after_build_makes` names it.
     MadeAfter(String),
+    /// The files a reader's browser searches the site with.
+    Search,
 }
 
 impl Named {

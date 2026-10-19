@@ -3,12 +3,13 @@
 //! BM25 over words weighted by where they stand.
 
 mod command;
+mod files;
 mod words;
 
 #[cfg(test)]
 mod tests;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use rayon::prelude::*;
 
@@ -18,21 +19,22 @@ use crate::site::{Id, ListKey, Page, PageId, Site};
 use crate::templates::Renderer;
 
 pub use command::{Options, Outcome, SHOWN, Shown, excerpt, run};
+pub use files::{ENTRY, FOLDER, File, claims};
 pub use words::{Stemmer, fold, spans};
 
 /// How much a word counts where it stands. A page's title counts in every
 /// part of the page, most in its opening.
-const TITLE_OPENING: f32 = 5.0;
-const TITLE: f32 = 2.0;
-const HEADING: f32 = 3.0;
-const TAG: f32 = 3.0;
-const SUMMARY: f32 = 2.0;
-const DESCRIBED: f32 = 2.0;
-const TEXT: f32 = 1.0;
+const TITLE_OPENING: u32 = 5;
+const TITLE: u32 = 2;
+const HEADING: u32 = 3;
+const TAG: u32 = 3;
+const SUMMARY: u32 = 2;
+const DESCRIBED: u32 = 2;
+const TEXT: u32 = 1;
 
 /// BM25's constants, as most search engines set them.
-const K1: f32 = 1.2;
-const B: f32 = 0.75;
+const K1: f64 = 1.2;
+const B: f64 = 0.75;
 
 /// One part of a page as search reads it.
 #[derive(Debug)]
@@ -58,11 +60,18 @@ pub fn searched(page: &Page) -> bool {
         && page.words.truth(PageWord::Search) != Some(false)
 }
 
-/// Every searched page's records, in the order of the site's pages.
+/// Every searched page's records: the pages with no date by their paths,
+/// then the dated from the oldest, so a new post's records come last and
+/// leave every other record where it was.
 pub fn records(renderer: &Renderer) -> Vec<Record> {
     let site = renderer.site();
     let pages = site.pages.iter().filter(|(_, page)| searched(page));
-    let pages: Vec<PageId> = pages.map(|(id, _)| id).collect();
+    let mut pages: Vec<PageId> = pages.map(|(id, _)| id).collect();
+    pages.sort_by_cached_key(|&id| {
+        let page = site.pages.get(id);
+        let day = (page.date.as_ref()).map(|date| date.value.iso_day());
+        (day, page.path.clone())
+    });
     let records = pages.par_iter().flat_map_iter(|&page| {
         renderer.cut_at_headings(page).into_iter().map(move |cut| {
             let mut text = crate::markdown::words_of(&cut.html);
@@ -81,6 +90,12 @@ pub fn records(renderer: &Renderer) -> Vec<Record> {
         })
     });
     records.collect()
+}
+
+/// The files a reader's browser searches the site `renderer` read with.
+pub fn files(renderer: &Renderer) -> Vec<File> {
+    let index = Index::of(renderer.site(), records(renderer));
+    files::files(renderer, &index)
 }
 
 /// The descriptions of the pictures `html` shows.
@@ -109,17 +124,17 @@ fn tag_names(site: &Site, page: PageId) -> Vec<String> {
     .collect()
 }
 
-/// The form of each word `record` holds, by the rules of `stemmer`, with
-/// its weight there, and the record's length: its words counted by weight.
-fn weighed(site: &Site, record: &Record, stemmer: &Stemmer) -> (HashMap<String, f32>, f32) {
+/// The words of `record`, folded, each with its weight there, and the
+/// record's length: its words counted by weight.
+fn weighed(site: &Site, record: &Record) -> (HashMap<String, u32>, u32) {
     let page = site.pages.get(record.page);
     // Each page's records begin with the part before its first heading.
     let opening = record.heading.is_none();
-    let mut forms: HashMap<String, f32> = HashMap::new();
-    let mut length = 0.0;
-    let mut add = |text: &str, weight: f32| {
-        for term in stemmer.terms(text) {
-            *forms.entry(term).or_default() += weight;
+    let mut words: HashMap<String, u32> = HashMap::new();
+    let mut length = 0;
+    let mut add = |text: &str, weight: u32| {
+        for span in spans(text) {
+            *words.entry(fold(&text[span])).or_default() += weight;
             length += weight;
         }
     };
@@ -141,21 +156,26 @@ fn weighed(site: &Site, record: &Record, stemmer: &Stemmer) -> (HashMap<String, 
         add(description, DESCRIBED);
     }
     add(&record.text, TEXT);
-    (forms, length)
+    (words, length)
 }
 
 /// The records of a site, and which hold each word.
+///
+/// Each word's stem in one language is an entry, listing the records of
+/// that language holding a word with that stem. Every word the site holds
+/// is listed with the entries of its stem in each of the site's languages,
+/// so a word is looked up as it is typed, with no stemming: what a reader's
+/// browser does with the index files.
 pub struct Index {
     pub records: Vec<Record>,
-    /// The rules each of the site's languages cuts words to stems by.
-    stemmers: Vec<Stemmer>,
-    /// Each record's language, by its place among the site's.
-    languages: Vec<usize>,
     /// Each record's length, its words counted by weight.
-    lengths: Vec<f32>,
-    average: f32,
-    /// Each word's form, and the records holding it with its weight in each.
-    postings: BTreeMap<String, Vec<(u32, f32)>>,
+    lengths: Vec<u32>,
+    average: f64,
+    /// Every word the site holds, folded, in the order of their UTF-16 code
+    /// units, with the entries of its stems.
+    words: Vec<(String, Vec<u32>)>,
+    /// Each entry's records, in order, with the stem's weight in each.
+    entries: Vec<Vec<(u32, u32)>>,
 }
 
 /// A record found, and how well it matched.
@@ -164,7 +184,7 @@ pub struct Found {
     pub record: usize,
     /// How many of the words asked for it holds.
     pub matched: usize,
-    pub score: f32,
+    pub score: f64,
 }
 
 impl Index {
@@ -175,64 +195,108 @@ impl Index {
         let languages: Vec<usize> = (records.iter())
             .map(|record| site.pages.get(record.page).language.index())
             .collect();
-        let weighed: Vec<(HashMap<String, f32>, f32)> = (records.par_iter().zip(&languages))
-            .map(|(record, &language)| weighed(site, record, &stemmers[language]))
+        let weighed: Vec<(HashMap<String, u32>, u32)> = (records.par_iter())
+            .map(|record| weighed(site, record))
             .collect();
-        let mut postings: BTreeMap<String, Vec<(u32, f32)>> = BTreeMap::new();
-        let mut lengths = Vec::with_capacity(records.len());
-        for (at, (forms, length)) in weighed.into_iter().enumerate() {
-            let at = u32::try_from(at).expect("fewer records than u32 holds");
-            for (term, weight) in forms {
-                postings.entry(term).or_default().push((at, weight));
+        let mut words: Vec<&str> = (weighed.iter())
+            .flat_map(|(words, _)| words.keys().map(String::as_str))
+            .collect();
+        words.par_sort_unstable_by(|a, b| in_utf16(a, b));
+        words.dedup();
+        // Each word's stem in each language, and every stem numbered in
+        // order of its language and itself.
+        let stems: Vec<Vec<String>> = (words.par_iter())
+            .map(|word| stemmers.iter().map(|stemmer| stemmer.stem(word)).collect())
+            .collect();
+        let mut keys: Vec<(usize, &str)> = (stems.iter())
+            .flat_map(|stems| stems.iter().map(String::as_str).enumerate())
+            .collect();
+        keys.par_sort_unstable();
+        keys.dedup();
+        let numbered: HashMap<(usize, &str), u32> = (keys.iter().enumerate())
+            .map(|(id, &key)| (key, u32::try_from(id).expect("fewer stems than u32 holds")))
+            .collect();
+        let numbers: Vec<Vec<u32>> = (stems.par_iter())
+            .map(|stems| {
+                let stems = stems.iter().enumerate();
+                stems
+                    .map(|(language, stem)| numbered[&(language, stem.as_str())])
+                    .collect()
+            })
+            .collect();
+        let at: HashMap<&str, usize> = words.iter().enumerate().map(|(i, &w)| (w, i)).collect();
+        // Each record's stems, with their weights there.
+        let held: Vec<HashMap<u32, u32>> = (weighed.par_iter().zip(&languages))
+            .map(|((words, _), &language)| {
+                let mut held: HashMap<u32, u32> = HashMap::new();
+                for (word, weight) in words {
+                    *held
+                        .entry(numbers[at[word.as_str()]][language])
+                        .or_default() += weight;
+                }
+                held
+            })
+            .collect();
+        let mut listed: Vec<Vec<(u32, u32)>> = vec![Vec::new(); keys.len()];
+        for (record, held) in held.into_iter().enumerate() {
+            let record = u32::try_from(record).expect("fewer records than u32 holds");
+            for (stem, weight) in held {
+                listed[stem as usize].push((record, weight));
             }
-            lengths.push(length);
         }
+        // An entry for each stem some record holds, in the same order.
+        let mut entry_of = vec![None; keys.len()];
+        let mut entries: Vec<Vec<(u32, u32)>> = Vec::new();
+        for (stem, records) in listed.into_iter().enumerate() {
+            if !records.is_empty() {
+                entry_of[stem] =
+                    Some(u32::try_from(entries.len()).expect("fewer stems than u32 holds"));
+                entries.push(records);
+            }
+        }
+        let words: Vec<(String, Vec<u32>)> = (words.iter().zip(&numbers))
+            .map(|(&word, numbers)| {
+                let entries = numbers.iter().filter_map(|&stem| entry_of[stem as usize]);
+                (word.to_owned(), entries.collect())
+            })
+            .collect();
+        let lengths: Vec<u32> = weighed.iter().map(|(_, length)| *length).collect();
         let average = match lengths.len() {
             0 => 1.0,
-            n => (lengths.iter().sum::<f32>() / n as f32).max(1.0),
+            n => (lengths.iter().map(|&l| f64::from(l)).sum::<f64>() / n as f64).max(1.0),
         };
         Index {
             records,
-            stemmers,
-            languages,
             lengths,
             average,
-            postings,
+            words,
+            entries,
         }
     }
 
-    /// The rules the words of `record` are cut to stems by.
-    pub fn stemmer(&self, record: usize) -> &Stemmer {
-        &self.stemmers[self.languages[record]]
+    /// The entries `word`, folded, is listed with; none for a word the
+    /// site never holds.
+    pub fn entries_of(&self, word: &str) -> &[u32] {
+        match (self.words).binary_search_by(|(listed, _)| in_utf16(listed, word)) {
+            Ok(at) => &self.words[at].1,
+            Err(_) => &[],
+        }
     }
 
-    /// The records holding any word of `query`, each word looked for in
-    /// its form in each record's language: those holding more of its words
-    /// first, then the best matched.
+    /// The records holding any word of `query`: those holding more of its
+    /// words first, then the best matched, then in order.
     pub fn search(&self, query: &str) -> Vec<Found> {
-        let mut asked: Vec<String> = spans(query).map(|span| fold(&query[span])).collect();
-        asked.sort_unstable();
-        asked.dedup();
-        let count = self.records.len() as f32;
-        let mut found: HashMap<u32, (usize, f32)> = HashMap::new();
-        for word in &asked {
-            // The word's form in each language, and the languages giving it.
-            let mut forms: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-            for (language, stemmer) in self.stemmers.iter().enumerate() {
-                forms.entry(stemmer.term(word)).or_default().push(language);
-            }
-            let mut best: HashMap<u32, f32> = HashMap::new();
-            for (term, languages) in &forms {
-                let Some(held) = self.postings.get(term) else {
-                    continue;
-                };
-                let holding = held.len() as f32;
+        let count = self.records.len() as f64;
+        let mut found: HashMap<u32, (usize, f64)> = HashMap::new();
+        for word in asked(query) {
+            let mut best: HashMap<u32, f64> = HashMap::new();
+            for &entry in self.entries_of(&word) {
+                let held = &self.entries[entry as usize];
+                let holding = held.len() as f64;
                 let rarity = (1.0 + (count - holding + 0.5) / (holding + 0.5)).ln();
-                let held = held
-                    .iter()
-                    .filter(|(record, _)| languages.contains(&self.languages[*record as usize]));
                 for &(record, weight) in held {
-                    let length = self.lengths[record as usize] / self.average;
+                    let weight = f64::from(weight);
+                    let length = f64::from(self.lengths[record as usize]) / self.average;
                     let score =
                         rarity * weight * (K1 + 1.0) / (weight + K1 * (1.0 - B + B * length));
                     let kept = best.entry(record).or_default();
@@ -261,8 +325,22 @@ impl Index {
         found
     }
 
-    /// Each word's form the index holds, in order.
-    pub fn terms(&self) -> impl Iterator<Item = &str> {
-        self.postings.keys().map(String::as_str)
+    /// Every word the site holds, folded, in the order of their UTF-16
+    /// code units.
+    pub fn words(&self) -> impl Iterator<Item = &str> {
+        self.words.iter().map(|(word, _)| word.as_str())
     }
+}
+
+/// The words of `query`, folded, each once, in order.
+pub fn asked(query: &str) -> Vec<String> {
+    let mut asked: Vec<String> = spans(query).map(|span| fold(&query[span])).collect();
+    asked.sort_unstable();
+    asked.dedup();
+    asked
+}
+
+/// `a` against `b` by their UTF-16 code units, as a browser orders strings.
+pub fn in_utf16(a: &str, b: &str) -> std::cmp::Ordering {
+    a.encode_utf16().cmp(b.encode_utf16())
 }

@@ -468,6 +468,8 @@ pub(crate) struct Built {
     pub walked: u64,
     /// Whether the built site holds it.
     pub written: bool,
+    /// Whether it names the site's search index.
+    pub indexed: bool,
 }
 
 /// Where an output goes once it is built.
@@ -734,6 +736,8 @@ pub(crate) struct Concluded {
     /// The held pictures no page links, by their place among the files
     /// beside the writing.
     held_back: HashSet<usize>,
+    /// The search index, where a page names it.
+    search: Vec<crate::search::File>,
 }
 
 impl Concluded {
@@ -946,9 +950,16 @@ pub(crate) fn conclude(
         .collect();
     problems.extend(of_cards);
     let wanted = renderer.cards_wanted(&cards);
-    if !wanted.is_empty() {
-        // A card's address is known only once its page is built, so it is
-        // held to the addresses already taken here.
+    // Made only for a site some page of which names it, and only of one
+    // that builds.
+    let search = match built.iter().any(|built| built.indexed) && !stops(&problems) {
+        true => crate::search::files(renderer),
+        false => Vec::new(),
+    };
+    if !wanted.is_empty() || !search.is_empty() {
+        // A card's address is known only once its page is built, and the
+        // search index's once every page is, so they are held to the
+        // addresses already taken here.
         let mut outputs = renderer.assets().claims();
         outputs.extend(content::claims(
             site,
@@ -964,6 +975,7 @@ pub(crate) fn conclude(
                 outputs.push((card.file.clone(), Named::File(card.from.to_owned())));
             }
         }
+        outputs.extend(crate::search::claims(&search));
         let same = assets::same_address(&outputs, &renderer.settings().base());
         let new: Vec<Problem> = same
             .into_iter()
@@ -978,6 +990,7 @@ pub(crate) fn conclude(
         developed,
         cards,
         held_back,
+        search,
     }
 }
 
@@ -1051,6 +1064,7 @@ pub(crate) fn publish(
         developed,
         cards: asked,
         held_back,
+        search,
     } = concluded;
     let Publishing {
         staging,
@@ -1104,6 +1118,14 @@ pub(crate) fn publish(
         cards.drawn = drew.drawn;
         files += drew.published;
         problems.extend(drew.problems);
+    }
+    if let Some(staging) = &staging
+        && !stops(&problems)
+    {
+        let written = (search.par_iter()).map(|file| staging.write(&file.path, &file.bytes));
+        let unwritten: Vec<Problem> = written.filter_map(Result::err).collect();
+        files += search.len();
+        problems.extend(unwritten);
     }
     // Whatever else couldn't be kept has said so already, and once is
     // enough for the one cause they mostly share.
@@ -1376,6 +1398,7 @@ pub(crate) fn build_output(
         coloured: rendered.coloured,
         walked: rendered.walked,
         written,
+        indexed: rendered.indexed,
     }
 }
 

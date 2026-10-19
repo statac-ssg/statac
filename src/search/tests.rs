@@ -137,7 +137,7 @@ fn a_page_is_cut_at_each_heading_with_what_it_shows() {
 
 #[test]
 fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
-    let other = "---\ntitle: Notes\n---\nZFS came up once, and speed twice: speed.\n";
+    let other = "---\ntitle: Notes\n---\nZFS came up once, and speed twice: speed. Running.\n";
     let (renderer, root) = site(
         "rank",
         &[("content/zfs.md", ZFS), ("content/notes.md", other)],
@@ -157,9 +157,16 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
     assert_eq!(first("zfs speed"), (zfs, Some("speed".to_owned())));
     assert_eq!(first("drive"), (zfs, Some("setting-up".to_owned())));
     assert!(index.search("nowhere").is_empty());
-    // Other forms of a word, and the word without its accents.
-    assert_eq!(first("ZFS speeds"), (zfs, Some("speed".to_owned())));
-    assert_eq!(first("Drives"), (zfs, Some("setting-up".to_owned())));
+    // Another form of a word the site writes finds the others.
+    let running = index.search("running");
+    let records = running.iter().map(|found| &index.records[found.record]);
+    let speed = |record: &&Record| record.heading.as_ref().is_some_and(|(id, _)| id == "speed");
+    assert!(
+        records
+            .clone()
+            .any(|record| record.page == zfs && speed(&record))
+    );
+    assert_eq!(running.len(), 2);
 }
 
 #[test]
@@ -173,15 +180,21 @@ fn each_page_is_searched_in_its_own_languages_forms() {
                 "content/chant.md",
                 "---\ntitle: Chant\n---\nLes chanteuses du café.\n",
             ),
+            ("content/voix.md", "---\ntitle: Voix\n---\nUne chanteuse.\n"),
         ],
     );
     let index = Index::of(renderer.site(), records(&renderer));
     let _ = std::fs::remove_dir_all(root);
     let chant = page(&renderer, "chant.md");
-    for words in ["chanteuse", "cafe", "CAFÉ"] {
+    for words in ["cafe", "CAFÉ"] {
         let found = index.search(words);
         assert_eq!(index.records[found[0].record].page, chant, "{words}");
     }
+    // A word the site writes somewhere finds its other forms; one it
+    // never writes finds nothing, as a reader's browser holds no rules.
+    assert_eq!(index.search("chanteuse").len(), 2);
+    assert_eq!(index.search("chanteuses").len(), 2);
+    assert!(index.search("chanter").is_empty());
 }
 
 #[test]
@@ -193,18 +206,19 @@ fn an_excerpt_is_cut_at_words_around_the_first_word_asked_for() {
         "after ".repeat(40)
     );
     let stemmer = Stemmer::of(None);
-    let pieces = excerpt(&text, &asked, &stemmer);
+    let marked = |word: &str| asked.contains(&stemmer.term(word));
+    let pieces = excerpt(&text, marked);
     assert_eq!(pieces.first().unwrap().0, "\u{2026}");
     assert_eq!(pieces.last().unwrap().0, "\u{2026}");
     assert!(pieces.contains(&("ZFS".to_owned(), true)));
     let shown: String = pieces.iter().map(|(text, _)| text.as_str()).collect();
     assert!(shown.len() < 220, "{shown}");
     assert_eq!(
-        excerpt("Nothing asked.", &asked, &stemmer),
+        excerpt("Nothing asked.", marked),
         [("Nothing asked.".to_owned(), false)]
     );
     // A form of the word asked for is marked as it is written.
-    let plain = excerpt("Plain zfs's here.", &asked, &stemmer);
+    let plain = excerpt("Plain zfs's here.", marked);
     assert!(plain.contains(&("zfs's".to_owned(), true)), "{plain:?}");
 }
 
@@ -260,4 +274,56 @@ fn the_command_shows_each_page_found_once_at_its_best_part() {
         "{some}"
     );
     assert_eq!(none, "No page holds `nowhere`.\n");
+}
+
+#[test]
+fn a_long_word_list_is_cut_into_pieces_each_word_in_the_one_its_first_word_says() {
+    // Words that pack poorly, each on a page of its own.
+    let posts: Vec<(String, String)> = (0..120u32)
+        .map(|n| {
+            let word: String = (0..8)
+                .map(|i| char::from(b'a' + ((n * 7 + i * 13 + n * i) % 26) as u8))
+                .collect();
+            (
+                format!("content/post-{n}.md"),
+                format!("---\ntitle: P{n}\n---\n{word} w{n}x\n"),
+            )
+        })
+        .collect();
+    let files: Vec<(&str, &str)> = posts
+        .iter()
+        .map(|(p, t)| (p.as_str(), t.as_str()))
+        .collect();
+    let (renderer, root) = site("pieces", &files);
+    let index = Index::of(renderer.site(), records(&renderer));
+    let _ = std::fs::remove_dir_all(root);
+    let pieces = files::pieces(&index, 0, 200);
+    assert!(pieces.len() > 3, "{}", pieces.len());
+    assert_eq!(pieces[0].0, "");
+    let firsts: Vec<&str> = pieces.iter().map(|(first, _)| first.as_str()).collect();
+    assert!(
+        firsts
+            .windows(2)
+            .all(|pair| in_utf16(pair[0], pair[1]).is_lt())
+    );
+    let unpacked: Vec<String> = (pieces.iter())
+        .map(|(_, file)| {
+            let bytes = miniz_oxide::inflate::decompress_to_vec_zlib(&file.bytes).unwrap();
+            String::from_utf8(bytes).unwrap()
+        })
+        .collect();
+    for word in index.words() {
+        let at = firsts
+            .iter()
+            .rposition(|first| in_utf16(first, word).is_le())
+            .unwrap();
+        let quoted = format!("\"{word}\"");
+        let holding: Vec<usize> = (unpacked.iter().enumerate())
+            .filter(|(_, json)| json.contains(&quoted))
+            .map(|(at, _)| at)
+            .collect();
+        assert_eq!(holding, [at], "{word}");
+    }
+    // Whole where it is small enough.
+    assert_eq!(files::pieces(&index, usize::MAX, 200).len(), 1);
 }

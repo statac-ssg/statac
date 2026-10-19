@@ -538,7 +538,7 @@ impl Object for PageValue {
     ) -> Result<Value, Error> {
         frame::ask_page(self.id, self.number, method);
         if method == SEARCH_BOX {
-            return search_box(args);
+            return search_box(&self.shared, args);
         }
         if super::media::CALLS.contains(&method) {
             return super::media::call(&self.shared, self.id, state, method, args);
@@ -560,12 +560,13 @@ impl Object for PageValue {
 }
 
 /// A search box for what is being built: the id its element takes, a
-/// second and later box each taking one of its own, and whether it is the
-/// first, which is the one to carry what every box shares. A page's
-/// writing counts its own boxes, since it is built once for every page
-/// that shows it; the page's own output counts them with its layout's
-/// where it shows the writing whole.
-fn search_box(args: &[Value]) -> Result<Value, Error> {
+/// second and later box each taking one of its own, whether it is the
+/// first, which is the one to carry what every box shares, and the
+/// address of the site's search index. A page's writing counts its own
+/// boxes, since it is built once for every page that shows it; the page's
+/// own output counts them with its layout's where it shows the writing
+/// whole.
+fn search_box(shared: &Arc<Shared>, args: &[Value]) -> Result<Value, Error> {
     if !args.is_empty() {
         return Err(search_box_given(true));
     }
@@ -577,10 +578,48 @@ fn search_box(args: &[Value]) -> Result<Value, Error> {
         0 | 1 => "statac-search".to_owned(),
         later => format!("statac-search-{later}"),
     };
-    Ok(Value::from_object(Ordered(vec![
-        ("id".into(), Value::from(id)),
-        ("first".into(), Value::from(asked.unwrap_or(1) <= 1)),
-    ])))
+    Ok(Value::from_object(SearchBox {
+        shared: Arc::clone(shared),
+        id,
+        first: asked.unwrap_or(1) <= 1,
+    }))
+}
+
+/// What `page.search_box()` gives.
+#[derive(Debug)]
+struct SearchBox {
+    shared: Arc<Shared>,
+    id: String,
+    first: bool,
+}
+
+impl Object for SearchBox {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Map
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        match key.as_str()? {
+            "id" => Some(Value::from(self.id.as_str())),
+            "first" => Some(Value::from(self.first)),
+            // Read only where a page uses Statac's own search, which has
+            // the build make the index.
+            "index" => {
+                frame::read(Key::Setting(self.shared.name_id("url")));
+                frame::with(|frame| frame.indexed = true);
+                let entry = crate::search::ENTRY;
+                Some(Value::from(format!("{}/{entry}", self.shared.base)))
+            }
+            other => {
+                frame::missed(None, other);
+                None
+            }
+        }
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Str(&["id", "first", "index"])
+    }
 }
 
 /// `page.search_box` named without being called, or `given` values it

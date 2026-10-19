@@ -72,6 +72,9 @@ pub(super) struct Frame {
     /// How many search boxes the output had asked for when it first showed
     /// its own page's writing whole.
     pub boxes_before_writing: Option<usize>,
+    /// Whether what is built names the site's search index, in any page's
+    /// writing it shows too.
+    pub indexed: bool,
     /// The photographs whose copies what is built names, as each was
     /// named.
     pub developed: Vec<crate::album::Shown>,
@@ -169,6 +172,7 @@ impl Frame {
             undescribed: Vec::new(),
             search_boxes: 0,
             boxes_before_writing: None,
+            indexed: false,
             developed: Vec::new(),
             coloured: Vec::new(),
             colours: false,

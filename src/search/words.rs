@@ -64,18 +64,17 @@ impl Stemmer {
         Stemmer(algorithm(&language).map(pagefind_stem::Stemmer::create))
     }
 
-    /// The form `word` is indexed and looked up by.
+    /// The form `word` is indexed by.
     pub fn term(&self, word: &str) -> String {
-        let folded = fold(word);
-        match &self.0 {
-            Some(stemmer) => stemmer.stem(&folded).into_owned(),
-            None => folded,
-        }
+        self.stem(&fold(word))
     }
 
-    /// The form of each word of `text`.
-    pub fn terms<'a>(&'a self, text: &'a str) -> impl Iterator<Item = String> + 'a {
-        spans(text).map(|span| self.term(&text[span]))
+    /// The stem of `folded`, a word as [`fold`] leaves it.
+    pub fn stem(&self, folded: &str) -> String {
+        match &self.0 {
+            Some(stemmer) => stemmer.stem(folded).into_owned(),
+            None => folded.to_owned(),
+        }
     }
 }
 

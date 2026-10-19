@@ -2745,6 +2745,40 @@ fn a_page_numbers_the_search_boxes_it_is_asked_for() {
 }
 
 #[test]
+fn a_page_reading_its_search_boxs_index_asks_the_build_for_the_index() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "title: Site\nurl: https://example.org/blog/\n",
+        ),
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n@find()\n"),
+        ("templates/page.html", "{{ page.content }}"),
+        ("snippets/find.html", "{{ page.search_box().index }}"),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        ("templates/home.html", ""),
+        (
+            "content/post-2.md",
+            "---\ntitle: Post 2\nlayout: plain\n---\n",
+        ),
+        ("templates/plain.html", "{{ page.search_box().id }}"),
+        (
+            "content/post-3.md",
+            "---\ntitle: Post 3\nlayout: shows\n---\n",
+        ),
+        (
+            "templates/shows.html",
+            "{% for p in site.pages %}{% if p.title == 'Post 1' %}{{ p.content }}{% endif %}{% endfor %}",
+        ),
+    ]);
+    assert_eq!(built.html("post-1.md"), "/blog/search/index.json");
+    assert!(built.render("post-1.md").indexed);
+    // A box whose index is never read asks for none.
+    assert!(!built.render("post-2.md").indexed);
+    // Writing that reads it asks for it wherever it is shown.
+    assert!(built.render("post-3.md").indexed);
+}
+
+#[test]
 fn a_lists_feed_is_answered_by_the_feeds_the_build_publishes() {
     let temp = TempSite::new(&[
         (

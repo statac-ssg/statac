@@ -1163,6 +1163,7 @@ pub(crate) fn named(named: &Named) -> String {
         ),
         Named::Item(item) => item.clone(),
         Named::MadeAfter(place) => format!("what `after_build` makes at `{place}`"),
+        Named::Search => "the site's search index".into(),
     }
 }
 

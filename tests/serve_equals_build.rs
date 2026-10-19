@@ -592,6 +592,37 @@ fn a_post_added_and_deleted() {
     );
 }
 
+#[test]
+fn the_search_index_follows_the_writing_and_the_boxes_asking_for_it() {
+    let site = Site::new("search");
+    let asking = "---\ntitle: Search\n---\n@find()\n";
+    site.write(
+        "snippets/find.html",
+        "{% set box = page.search_box() %}\
+         <search id=\"{{ box.id }}\" data-index=\"{{ box.index }}\"></search>\n",
+    );
+    site.write("content/search.md", asking);
+    let edited = post("Post 2", "2026-01-02", "one", "Post 2 says something new.");
+    let added = post("Post 7", "2026-01-07", "one", "Post 7 says this.");
+    through(
+        &site,
+        &[
+            ("a post's writing edited", &|site| {
+                site.write("content/post-2.md", &edited)
+            }),
+            ("a post added", &|site| {
+                site.write("content/post-7.md", &added)
+            }),
+            ("the box taken out", &|site| {
+                site.write("content/search.md", "---\ntitle: Search\n---\nNone.\n")
+            }),
+            ("the box put back", &|site| {
+                site.write("content/search.md", asking)
+            }),
+        ],
+    );
+}
+
 /// Writes `text` at `path` in `site`, giving the file `modified` as the
 /// time its bytes last changed.
 fn written_at(site: &Site, path: &str, text: &str, modified: SystemTime) {

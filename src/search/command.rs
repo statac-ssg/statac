@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::{Index, Record, Stemmer, fold, records, spans};
+use super::{Index, Record, asked, fold, records, spans};
 use crate::date::Date;
 use crate::problem::{Problem, Severity};
 use crate::site::PageId;
@@ -79,9 +79,7 @@ pub fn run(options: &Options) -> Outcome {
     let renderer = prepared.renderer;
     let index = Index::of(renderer.site(), records(&renderer));
     let found = index.search(&options.words);
-    let asked: HashSet<String> = (spans(&options.words))
-        .map(|span| fold(&options.words[span]))
-        .collect();
+    let asked = asked(&options.words);
     // Records holding every word, or where none does, those holding most.
     let most = found.first().map_or(0, |found| found.matched);
     let some = most < asked.len();
@@ -91,12 +89,15 @@ pub fn run(options: &Options) -> Outcome {
         .map(|found| found.record)
         .filter(|&record| seen.insert(index.records[record].page));
     let best: Vec<usize> = best.collect();
+    // A word of the text is marked where it shares a stem with one asked.
+    let matched: HashSet<u32> = (asked.iter())
+        .flat_map(|word| index.entries_of(word))
+        .copied()
+        .collect();
+    let marked =
+        |word: &str| (index.entries_of(&fold(word)).iter()).any(|entry| matched.contains(entry));
     let shown = (best.iter().take(SHOWN))
-        .map(|&record| {
-            let stemmer = index.stemmer(record);
-            let terms = asked.iter().map(|word| stemmer.term(word)).collect();
-            shown(&renderer, &index.records[record], &terms, stemmer)
-        })
+        .map(|&record| shown(&renderer, &index.records[record], &marked))
         .collect();
     Outcome {
         pages: best.len(),
@@ -107,12 +108,7 @@ pub fn run(options: &Options) -> Outcome {
     }
 }
 
-fn shown(
-    renderer: &Renderer,
-    record: &Record,
-    terms: &HashSet<String>,
-    stemmer: &Stemmer,
-) -> Shown {
+fn shown(renderer: &Renderer, record: &Record, marked: &impl Fn(&str) -> bool) -> Shown {
     let page = renderer.site().pages.get(record.page);
     let mut address = page.address.as_str().to_owned();
     if let Some((id, _)) = &record.heading {
@@ -123,17 +119,15 @@ fn shown(
         title: page.title.as_ref().map(|title| title.value.clone()),
         heading: record.heading.as_ref().map(|(_, words)| words.clone()),
         address,
-        excerpt: excerpt(&record.text, terms, stemmer),
+        excerpt: excerpt(&record.text, marked),
     }
 }
 
-/// The text around the first word in `text` whose form `stemmer` gives
-/// is one of `terms`, or its start, cut at words, in pieces saying which
-/// are words asked for.
-pub fn excerpt(text: &str, terms: &HashSet<String>, stemmer: &Stemmer) -> Vec<(String, bool)> {
+/// The text around the first word in `text` that is `marked`, or its
+/// start, cut at words, in pieces saying which are marked.
+pub fn excerpt(text: &str, marked: impl Fn(&str) -> bool) -> Vec<(String, bool)> {
     let spans: Vec<_> = spans(text).collect();
-    let matched =
-        |span: &std::ops::Range<usize>| terms.contains(&stemmer.term(&text[span.clone()]));
+    let matched = |span: &std::ops::Range<usize>| marked(&text[span.clone()]);
     let first = spans.iter().position(matched).unwrap_or(0);
     let Some(at) = spans.get(first) else {
         return Vec::new();
