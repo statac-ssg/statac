@@ -3157,6 +3157,58 @@ fn the_table_of_contents_lists_the_headings_each_holding_those_beneath() {
     );
 }
 
+/// A page's contents asked elsewhere first build its writing, which its
+/// own page then shows. The page asking reads what the headings turn on,
+/// and nothing else of the writing.
+#[test]
+fn contents_asked_first_build_the_writing_and_read_what_its_headings_do() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\nurl: https://example.org\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-10-01\n---\n## One\n\n\"Two\" [three](@url(/post-1/)).\n\n@aside()\n",
+        ),
+        ("snippets/aside.html", "<aside>Four</aside>"),
+        (
+            "templates/home.html",
+            "{% for post in page.posts %}{{ post.toc | length }}{% endfor %}",
+        ),
+        ("templates/page.html", "{{ page.content }}"),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    let id = built.id("post-1.md");
+    let setting = |name: &str| Key::Setting(built.renderer.shared.name_id(name));
+    let home = built.render("index.md");
+    assert_eq!(home.html.as_deref(), Some("1"));
+    assert!(built.renderer.shared.bodies[id.index()].get().is_some());
+    for read in [Key::Body(id), setting("typography"), setting("url")] {
+        assert!(home.reads.keys().contains(&read), "{read:?}");
+    }
+    let snippets = home.reads.keys().iter().filter(|key| match key {
+        Key::Template(template) => {
+            let source = built.renderer.template_source(*template);
+            built
+                .renderer
+                .sources()
+                .path(source)
+                .starts_with("snippets")
+        }
+        _ => false,
+    });
+    assert_eq!(snippets.count(), 0, "{:?}", home.reads.keys());
+    let post = built.render("post-1.md");
+    let html = post.html.expect("built");
+    assert!(html.contains("\u{201c}Two\u{201d}"), "{html}");
+    assert!(html.contains("<aside>Four</aside>"), "{html}");
+    for read in [setting("typography"), setting("url")] {
+        assert!(post.reads.keys().contains(&read), "{read:?}");
+    }
+}
+
 /// A list reads each post's excerpt, opening and words as a read of that
 /// post's writing.
 #[test]

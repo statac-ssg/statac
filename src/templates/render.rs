@@ -50,7 +50,7 @@ pub(super) struct Shared {
     /// Names first met while building, numbered on from `known`.
     later: RwLock<Names>,
     /// Each page's writing once built, by page.
-    bodies: Vec<OnceLock<Arc<Body>>>,
+    pub bodies: Vec<OnceLock<Arc<Body>>>,
     /// Each data file's value once a template has reached it, by file,
     /// with where each text in it is written, by the text's address.
     pub data_values: Vec<OnceLock<(Value, frame::Origins)>>,
@@ -249,6 +249,9 @@ impl Shared {
 pub(super) struct Body {
     written: markdown::Written,
     reads: Reads,
+    /// Those of `reads` reading the writing as Markdown read, which its
+    /// headings turn on.
+    reading: Vec<Key>,
     asked: Asked,
     problems: Vec<Problem>,
     /// The pictures the writing was told to show with no description.
@@ -875,18 +878,7 @@ fn body(shared: &Arc<Shared>, page: PageId) -> Result<Arc<Body>, Error> {
             reason: Stopped::ContentInItself,
         }));
     }
-    let slot = &shared.bodies[page.index()];
-    let body = match slot.get() {
-        Some(body) => Arc::clone(body),
-        None => {
-            WRITING.with_borrow_mut(|writing| writing.push(page));
-            let built = Arc::new(build_body(shared, page, 0, false));
-            WRITING.with_borrow_mut(Vec::pop);
-            // Another thread may have built it meanwhile; the first kept wins.
-            let _ = slot.set(built);
-            Arc::clone(slot.get().expect("set just now"))
-        }
-    };
+    let body = kept_body(shared, page);
     frame::with(|frame| {
         for &key in body.reads.keys() {
             frame.reads.read(key);
@@ -898,6 +890,20 @@ fn body(shared: &Arc<Shared>, page: PageId) -> Result<Arc<Body>, Error> {
         frame.developed.extend(body.developed.iter().copied());
     });
     Ok(body)
+}
+
+/// A page's writing, built the first time it is asked for and kept.
+fn kept_body(shared: &Arc<Shared>, page: PageId) -> Arc<Body> {
+    let slot = &shared.bodies[page.index()];
+    if let Some(body) = slot.get() {
+        return Arc::clone(body);
+    }
+    WRITING.with_borrow_mut(|writing| writing.push(page));
+    let built = Arc::new(build_body(shared, page, 0, false));
+    WRITING.with_borrow_mut(Vec::pop);
+    // Another thread may have built it meanwhile; the first kept wins.
+    let _ = slot.set(built);
+    Arc::clone(slot.get().expect("set just now"))
 }
 
 /// Whether a page's file holds writing: anything below its front matter
@@ -1002,10 +1008,32 @@ fn sections(document: &markdown::Document) -> Vec<Section> {
 
 /// `page.toc`'s headings, read once and kept. The writing's own calls may
 /// ask for them while it is being built.
-pub(super) fn outline(shared: &Shared, page: PageId) -> Arc<Vec<Section>> {
+pub(super) fn outline(shared: &Arc<Shared>, page: PageId) -> Arc<Vec<Section>> {
     frame::read(Key::Body(page));
-    if let Some(kept) = shared.outlines.lock().expect("never poisoned").get(&page) {
-        return Arc::clone(kept);
+    let kept = || {
+        let outlines = shared.outlines.lock().expect("never poisoned");
+        outlines.get(&page).map(Arc::clone)
+    };
+    if let Some(kept) = kept() {
+        return kept;
+    }
+    // A page published at its own address has its writing built in every
+    // build, which keeps the headings, so building it now reads it once.
+    // Not while other writing is being built, which the page's writing
+    // may show and would then find showing itself, nor where nothing read
+    // is recorded, which would keep the writing with none of its reads.
+    if written_as_markdown(shared, page).is_some()
+        && shared.site.pages.get(page).lands()
+        && WRITING.with_borrow(Vec::is_empty)
+        && frame::recording()
+    {
+        let body = kept_body(shared, page);
+        for &key in &body.reading {
+            frame::read(key);
+        }
+        if let Some(kept) = kept() {
+            return kept;
+        }
     }
     let found = Arc::new(writing(shared, page).map_or_else(Vec::new, |d| sections(&d)));
     let mut outlines = shared.outlines.lock().expect("never poisoned");
@@ -1026,7 +1054,10 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize, colourles
     let mut wordless = Vec::new();
     let mut excerpt_coloured = Vec::new();
     let mut links = crate::links::Writing::default();
-    let written = match writing(shared, page) {
+    let document = writing(shared, page);
+    // The frame is new, so what it has read the reading read.
+    let reading = frame::with(|frame| frame.reads.keys().to_vec()).unwrap_or_default();
+    let written = match document {
         None => match p.source {
             Some(source) => {
                 undescribed_in_html(shared, page, source, p.body);
@@ -1130,6 +1161,7 @@ fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize, colourles
         written,
         undescribed: frame.undescribed,
         reads: frame.reads,
+        reading,
         asked: frame.asked,
         problems,
         developed: frame.developed,

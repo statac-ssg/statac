@@ -232,6 +232,11 @@ pub(super) fn unrecorded<R>(f: impl FnOnce() -> R) -> R {
     made
 }
 
+/// Whether what is read now is recorded, see [`unrecorded`].
+pub(super) fn recording() -> bool {
+    !UNRECORDED.get()
+}
+
 /// Records that the output being built read `key`.
 pub(super) fn read(key: Key) {
     if !UNRECORDED.get() {
