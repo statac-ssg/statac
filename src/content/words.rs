@@ -41,6 +41,7 @@ pub enum PageWord {
     Id,
     TranslationKey,
     Untitled,
+    Search,
 }
 
 /// How a word's value is read.
@@ -132,6 +133,7 @@ const WORDS: &[Spec] = &[
         false,
     ),
     spec(PageWord::Untitled, "untitled", Shape::Truth, true),
+    spec(PageWord::Search, "search", Shape::Truth, true),
 ];
 
 /// The names Statac fills on every page itself, so a page writing one is

@@ -294,6 +294,29 @@ struct Elsewhere {
     excerpt: Option<String>,
 }
 
+/// A part of a page's writing as built: the heading it starts with, by
+/// its id and its words, none for the part before the first heading; and
+/// its HTML, the heading's own included.
+#[derive(Debug)]
+pub struct Cut {
+    pub heading: Option<(String, String)>,
+    pub html: String,
+}
+
+/// The words of the heading `html` starts with.
+fn heading_words(html: &str) -> String {
+    let mut end = html.len();
+    for (at, piece) in crate::html::markup(html) {
+        if let crate::html::Markup::End(tag) = piece
+            && matches!(tag.name.as_str(), "h1" | "h2" | "h3" | "h4" | "h5" | "h6")
+        {
+            end = at.end;
+            break;
+        }
+    }
+    markdown::words_of(&html[..end]).trim().to_owned()
+}
+
 /// One page built: its HTML, what it read, its problems, and what it asks
 /// the build to make beside it. No HTML where a problem stopped it.
 #[derive(Debug)]
@@ -595,6 +618,43 @@ impl Renderer {
     pub fn writing(&self, page: PageId) -> Option<&crate::links::Writing> {
         let body = self.shared.bodies[page.index()].get()?;
         Some(&body.writing)
+    }
+
+    /// `page`'s writing as built, cut where each heading with an id
+    /// starts: the part before the first heading, then each heading's
+    /// part. Built now where no output has built it.
+    pub fn cut_at_headings(&self, page: PageId) -> Vec<Cut> {
+        let shared = &self.shared;
+        let body = kept_body(shared, page);
+        let written = &body.written;
+        let outline = shared.outlines.lock().expect("never poisoned");
+        let outline = outline.get(&page);
+        let words_of = |id: &str, html: &str| {
+            let section = outline.and_then(|sections| sections.iter().find(|s| s.id == id));
+            match section {
+                Some(section) => section.text.clone(),
+                None => heading_words(html),
+            }
+        };
+        let mut cuts = Vec::with_capacity(written.headings.len() + 1);
+        let starts = written.headings.iter().map(|(at, _)| *at);
+        let ends = starts.skip(1).chain(std::iter::once(written.html.len()));
+        let first = written
+            .headings
+            .first()
+            .map_or(written.html.len(), |(at, _)| *at);
+        cuts.push(Cut {
+            heading: None,
+            html: written.html[..first].to_owned(),
+        });
+        for ((at, id), end) in written.headings.iter().zip(ends) {
+            let html = &written.html[*at..end];
+            cuts.push(Cut {
+                heading: Some((id.clone(), words_of(id, html))),
+                html: html.to_owned(),
+            });
+        }
+        cuts
     }
 
     /// How a problem met building `page`, or its list's page `number`

@@ -170,7 +170,7 @@ error  Option given twice: `--drafts`
         refused(&["explain", "draft-left-out", "--drafts"]),
         "\
 error  Unknown option: `statac explain` has no `--drafts`
-  `--drafts` is for `statac build` and `statac check`.
+  `--drafts` is for `statac build`, `statac check` and `statac search`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -438,7 +438,9 @@ error  Unknown problem name: `brokn-link`
             hint: OptionHint::ForOther {
                 command: "explain".into(),
                 option: "--site".into(),
-                takers: Box::new(["build", "check", "serve", "stamp", "refresh", "refuse"]),
+                takers: Box::new([
+                    "build", "check", "serve", "stamp", "refresh", "refuse", "search",
+                ]),
             },
         }])
     );
@@ -502,6 +504,9 @@ Usage:
                          into the new folder, which must be empty or not
                          there yet; without one, beside the old site, its
                          name ending -statac. The old site is only read.
+  statac search <words> [folder]
+                         Show the pages a reader of the site would find
+                         for the words, best first.
   statac explain <name>  Explain a kind of problem. Its name is the last part
                          of the problem's More: link.
 
@@ -1060,7 +1065,7 @@ fn stamp_is_read_with_its_options() {
         refused(&["stamp", "--drafts"]),
         "\
 error  Unknown option: `statac stamp` has no `--drafts`
-  `--drafts` is for `statac build` and `statac check`.
+  `--drafts` is for `statac build`, `statac check` and `statac search`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1108,7 +1113,7 @@ fn refresh_is_read_with_its_options() {
         refused(&["refresh", "--drafts"]),
         "\
 error  Unknown option: `statac refresh` has no `--drafts`
-  `--drafts` is for `statac build` and `statac check`.
+  `--drafts` is for `statac build`, `statac check` and `statac search`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1234,7 +1239,7 @@ error  Unexpected argument: `fetched`
         refused(&["refuse", post, "--drafts"]),
         "\
 error  Unknown option: `statac refuse` has no `--drafts`
-  `--drafts` is for `statac build` and `statac check`.
+  `--drafts` is for `statac build`, `statac check` and `statac search`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1476,4 +1481,49 @@ fn a_fault_of_statacs_own_is_told_after_rusts_report() {
         );
     }
     assert_eq!(ran(Some("build"), |_| 1), (String::new(), String::new(), 1));
+}
+
+#[test]
+fn search_is_read_with_its_words_and_options() {
+    let searching = |words: &str, site: &str, drafts: bool, today: Option<&str>| {
+        Ok(Request::Search(search::Options {
+            site: site.into(),
+            words: words.into(),
+            today: today.map(|day| date::read(day).unwrap()),
+            drafts,
+        }))
+    };
+    assert_eq!(
+        parsed(&["search", "raspberry pi"]),
+        searching("raspberry pi", UNNAMED, false, None)
+    );
+    assert_eq!(
+        parsed(&["search", "zfs", "docs", "--drafts"]),
+        searching("zfs", "docs", true, None)
+    );
+    assert_eq!(
+        parsed(&["--site=docs", "search", "zfs", "--today=2026-10-06"]),
+        searching("zfs", "docs", false, Some("2026-10-06"))
+    );
+    for words in [
+        &["search"][..],
+        &["search", " "],
+        &["search", "--site=docs"],
+    ] {
+        assert_eq!(
+            refused(words),
+            "\
+error  Nothing to search for: `statac search` needs the words to look for
+  Give them after the command, as `statac search \"raspberry pi\"`.
+  More: https://statac.dev/e/nothing-to-search/
+"
+        );
+    }
+    assert_eq!(
+        refused(&["search", "zfs", "docs", "fetched"]),
+        "\
+error  Unexpected argument: `fetched`
+  More: https://statac.dev/e/unexpected-argument/
+"
+    );
 }

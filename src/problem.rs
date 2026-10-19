@@ -75,6 +75,7 @@ codes! {
     UnexpectedArgument "unexpected-argument",
     MissingName "missing-name",
     MissingAddress "missing-address",
+    NothingToSearch "nothing-to-search",
     NotAWebAddress "not-a-web-address",
     UnreadableName "unreadable-name",
     UnusableName "unusable-name",
@@ -318,6 +319,7 @@ impl Code {
             | Code::UnexpectedArgument
             | Code::MissingName
             | Code::MissingAddress
+            | Code::NothingToSearch
             | Code::NotAWebAddress
             | Code::UnreadableName
             | Code::UnusableName
@@ -465,6 +467,7 @@ impl Code {
             | Code::UnexpectedArgument
             | Code::MissingName
             | Code::MissingAddress
+            | Code::NothingToSearch
             | Code::NotAWebAddress
             | Code::UnreadableName
             | Code::UnusableName
@@ -658,6 +661,8 @@ pub enum Kind {
     MissingName,
     /// `statac refuse` given no address.
     MissingAddress,
+    /// `statac search` given no words to search for.
+    NothingToSearch,
     /// `statac refuse` given an address that isn't `http` or `https`, as
     /// written, and the address with `https://` before it where that is
     /// one.
@@ -2669,6 +2674,7 @@ impl Kind {
             Kind::UnexpectedArgument { .. } => Code::UnexpectedArgument,
             Kind::MissingName => Code::MissingName,
             Kind::MissingAddress => Code::MissingAddress,
+            Kind::NothingToSearch => Code::NothingToSearch,
             Kind::NotAWebAddress { .. } => Code::NotAWebAddress,
             Kind::UnreadableName { .. } => Code::UnreadableName,
             Kind::UnusableName { .. } => Code::UnusableName,

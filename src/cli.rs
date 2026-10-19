@@ -16,6 +16,7 @@ use crate::problem::{Code, Expected, Found, Kind, Missing, OptionHint, Problem};
 use crate::refresh;
 use crate::refuse;
 use crate::report::{Quiet, Report};
+use crate::search;
 use crate::serve;
 use crate::serve::watch::{self, How};
 use crate::source::Sources;
@@ -38,28 +39,31 @@ pub enum Request {
     Refuse(refuse::Options),
     New(new::Options),
     Import(import::Options),
+    Search(search::Options),
     Explain(Code),
     /// The usage screen, for the command named before `--help`, or whole.
     Help(Option<&'static str>),
     Version,
 }
 
-const COMMANDS: [&str; 9] = [
-    "build", "check", "serve", "stamp", "refresh", "refuse", "new", "import", "explain",
+const COMMANDS: [&str; 10] = [
+    "build", "check", "serve", "stamp", "refresh", "refuse", "new", "import", "search", "explain",
 ];
 
 /// The options that take a value, and the commands that take each.
 const OPTIONS: [(&str, &[&str]); 7] = [
     (
         "--site",
-        &["build", "check", "serve", "stamp", "refresh", "refuse"],
+        &[
+            "build", "check", "serve", "stamp", "refresh", "refuse", "search",
+        ],
     ),
     ("--out", &["build"]),
     ("--url", &["build", "check"]),
     (
         "--today",
         &[
-            "build", "check", "serve", "stamp", "refresh", "refuse", "import",
+            "build", "check", "serve", "stamp", "refresh", "refuse", "import", "search",
         ],
     ),
     ("--port", &["serve"]),
@@ -72,7 +76,7 @@ const WAYS: [&str; 3] = ["auto", "native", "poll"];
 
 /// Options that take no value, and the commands that take each.
 const FLAGS: [(&str, &[&str]); 8] = [
-    ("--drafts", &["build", "check"]),
+    ("--drafts", &["build", "check", "search"]),
     ("--no-drafts", &["serve"]),
     ("--offline", &["serve"]),
     ("--yes", &["new"]),
@@ -100,7 +104,7 @@ const OTHER_SPELLINGS: [(&str, &str); 7] = [
 const INTRO: &str = "Statac builds a website from a folder of writing.\n";
 
 /// Each command's entry on the usage screen, as the screen sets it.
-const USAGE: [(&str, &str); 11] = [
+const USAGE: [(&str, &str); 12] = [
     (
         "build",
         "  statac build [folder]  Read the site and write it out, ready to publish.\n",
@@ -169,6 +173,13 @@ const USAGE: [(&str, &str); 11] = [
                          into the new folder, which must be empty or not
                          there yet; without one, beside the old site, its
                          name ending -statac. The old site is only read.
+",
+    ),
+    (
+        "search",
+        "  statac search <words> [folder]
+                         Show the pages a reader of the site would find
+                         for the words, best first.
 ",
     ),
     (
@@ -349,6 +360,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>, terminal: &mut Terminal) ->
         Request::Import(_) => Some("import"),
         Request::New(_) => Some("new"),
         Request::Serve { .. } => Some("serve"),
+        Request::Search(_) => Some("search"),
     };
     guarded(command, terminal, |terminal| {
         act(request, command, terminal)
@@ -480,6 +492,17 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
         Request::Refuse(options) => {
             return refuse::run(&options, terminal.out, terminal.colour_out);
         }
+        Request::Search(options) => {
+            let outcome = search::run(&options);
+            let nowhere = Sources::default();
+            let sources = outcome.sources().unwrap_or(&nowhere);
+            let report = Report::new(sources, &options.site, terminal.colour_out);
+            if !outcome.errors.is_empty() {
+                say(terminal.out, &report.problems(&outcome.errors));
+                return 1;
+            }
+            say(terminal.out, &report.found(&options.words, &outcome));
+        }
         Request::Import(options) => {
             let stdin = std::io::stdin();
             let answering = std::io::IsTerminal::is_terminal(&stdin);
@@ -540,6 +563,7 @@ fn site_of(request: &mut Request) -> Option<&mut PathBuf> {
         Request::Stamp(options) => Some(&mut options.site),
         Request::Refresh(options) => Some(&mut options.site),
         Request::Refuse(options) => Some(&mut options.site),
+        Request::Search(options) => Some(&mut options.site),
         Request::New(_)
         | Request::Import(_)
         | Request::Explain(_)
@@ -693,6 +717,8 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     };
     let mut name = None;
     let mut address = None;
+    // The words `search` looks for.
+    let mut words = None;
     // The folder `new` makes the site in.
     let mut folder = None;
     // The folders `import` reads from and writes into.
@@ -736,6 +762,8 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                         respelt,
                     });
                 }
+            } else if known == Some("search") && words.is_none() {
+                words = Some(arg);
             } else if known == Some("new") && folder.is_none() {
                 match unusable_name(arg, unreadable(i - 1)) {
                     Some(kind) => mistake(kind),
@@ -754,7 +782,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                 }
             } else if matches!(
                 known,
-                Some("build" | "check" | "serve" | "stamp" | "refresh" | "refuse")
+                Some("build" | "check" | "serve" | "stamp" | "refresh" | "refuse" | "search")
             ) && !site_bare
             {
                 site_bare = true;
@@ -958,6 +986,9 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     if known == Some("refuse") && address.is_none() {
         problems.push(Problem::nowhere(Kind::MissingAddress));
     }
+    if known == Some("search") && words.is_none_or(|words| words.trim().is_empty()) {
+        problems.push(Problem::nowhere(Kind::NothingToSearch));
+    }
     if missing && !update {
         problems.push(Problem::nowhere(Kind::UnknownOption {
             written: "--missing".into(),
@@ -1035,6 +1066,12 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             from,
             today,
             starter: !no_starter,
+        }),
+        Some("search") => Request::Search(search::Options {
+            site: site.unwrap_or_default(),
+            words: words.expect("checked above").to_owned(),
+            today,
+            drafts,
         }),
         Some("refuse") => Request::Refuse(refuse::Options {
             site: site.unwrap_or_default(),

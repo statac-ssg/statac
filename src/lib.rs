@@ -33,6 +33,7 @@ pub mod refresh;
 pub mod refuse;
 pub mod report;
 pub mod rewrite;
+pub mod search;
 pub mod serve;
 pub mod site;
 pub mod source;

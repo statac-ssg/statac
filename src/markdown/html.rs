@@ -169,6 +169,7 @@ pub fn write(document: &Document, options: &Options<'_>) -> Written {
         opening: opening.map(|opening| opening.words),
         words,
         maths: super::uses_maths(document),
+        headings: writer.headings,
         html: writer.out,
     }
 }
@@ -221,6 +222,9 @@ struct Writer<'a> {
     /// Where a comment among the words was left out just after a space,
     /// so the words either side aren't left two spaces apart.
     after_comment: Option<usize>,
+    /// Where each heading with an id starts in `out`, with the id; only
+    /// where this writes the page's own writing.
+    headings: Vec<(usize, String)>,
 }
 
 impl<'a> Writer<'a> {
@@ -234,6 +238,7 @@ impl<'a> Writer<'a> {
             html_opening: None,
             frames,
             after_comment: None,
+            headings: Vec::new(),
         }
     }
 
@@ -278,6 +283,11 @@ impl<'a> Writer<'a> {
                 self.close("</p>");
             }
             Kind::Heading { level, id, classes } => {
+                if self.main
+                    && let Some(id) = id
+                {
+                    self.headings.push((self.out.len(), id.clone()));
+                }
                 if self.writes(Piece::Heading) {
                     let values = vec![
                         ("level", PieceValue::Number(u64::from(*level))),

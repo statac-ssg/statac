@@ -186,6 +186,40 @@ impl<'a> Report<'a> {
         out
     }
 
+    /// What `statac search` found for `words`: how many pages, then each
+    /// shown at the part that matched best, the words matched in bold.
+    pub fn found(&self, words: &str, found: &crate::search::Outcome) -> String {
+        let (shown, pages) = (&found.shown, found.pages);
+        let mut out = self.said(&wording::found(words, pages, found.some));
+        out.push('\n');
+        for found in shown.iter() {
+            let named = match (&found.title, &found.heading) {
+                (Some(title), Some(heading)) => format!("{title} \u{203a} {heading}"),
+                (Some(named), None) | (None, Some(named)) => named.clone(),
+                (None, None) => found.address.clone(),
+            };
+            out.push('\n');
+            out.push_str(&format!("  {}\n", self.paint.paint(BOLD, &named)));
+            out.push_str(&format!("  {}\n", self.paint.paint(CYAN, &found.address)));
+            if !found.excerpt.is_empty() {
+                out.push_str("  ");
+                for (text, matched) in &found.excerpt {
+                    match matched {
+                        true => out.push_str(&self.paint.paint(BOLD, text)),
+                        false => out.push_str(text),
+                    }
+                }
+                out.push('\n');
+            }
+        }
+        if pages > shown.len() {
+            out.push('\n');
+            out.push_str(&wording::more_found(pages - shown.len()));
+            out.push('\n');
+        }
+        out
+    }
+
     /// What `--drafts` brought into the run, ahead of the rest; nothing
     /// where it brought nothing.
     pub fn included(&self, included: Included) -> String {

@@ -121,6 +121,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::MissingAddress => {
             "Missing address: `statac refuse` needs the address of a webmention or a sender".into()
         }
+        Kind::NothingToSearch => {
+            "Nothing to search for: `statac search` needs the words to look for".into()
+        }
         Kind::NotAWebAddress { written, .. } => {
             format!(
                 "Not a web address: `statac refuse` takes an address starting `https://` or \
@@ -1685,6 +1688,27 @@ fn unwritable(path: &str, why: &Unwritable) -> String {
 }
 
 /// `1 file`, `2 files`.
+/// The line `statac search` opens what it found for `words` with: pages
+/// holding every word, or where none does, `some` pages holding some.
+pub(crate) fn found(words: &str, pages: usize, some: bool) -> String {
+    match (pages, some) {
+        (0, _) => format!("No page holds `{words}`."),
+        (1, false) => format!("1 page holds `{words}`:"),
+        (pages, false) => format!("{} pages hold `{words}`, best first:", grouped(pages)),
+        (1, true) => format!("No page holds every word of `{words}`; 1 holds some:"),
+        (pages, true) => format!(
+            "No page holds every word of `{words}`; {} hold some, best first:",
+            grouped(pages)
+        ),
+    }
+}
+
+/// The line after the pages `statac search` shows, where it found more.
+pub(crate) fn more_found(more: usize) -> String {
+    let pages = if more == 1 { "page" } else { "pages" };
+    format!("And {} more {pages}.", grouped(more))
+}
+
 fn how_many(n: usize, one: &str, many: &str) -> String {
     format!("{} {}", grouped(n), if n == 1 { one } else { many })
 }
@@ -2200,6 +2224,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             "Give the address after the command, as `statac refuse https://a.example/post-1/`."
                 .into(),
         ),
+        Kind::NothingToSearch => {
+            Some("Give them after the command, as `statac search \"raspberry pi\"`.".into())
+        }
         Kind::NotAWebAddress { respelt, .. } => Some(match respelt {
             Some(address) => format!("Did you mean `{address}`?"),
             None => "Give the whole address, as the browser shows it.".into(),
@@ -7042,6 +7069,11 @@ mod tests {
                     "Give the address after the command, as `statac refuse \
                      https://a.example/post-1/`.",
                 ),
+            ),
+            (
+                Kind::NothingToSearch,
+                "Nothing to search for: `statac search` needs the words to look for",
+                Some("Give them after the command, as `statac search \"raspberry pi\"`."),
             ),
             (
                 Kind::NotAWebAddress {

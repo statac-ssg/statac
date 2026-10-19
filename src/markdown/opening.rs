@@ -30,6 +30,10 @@ pub struct Written {
     pub words: usize,
     /// Whether the writing holds any maths.
     pub maths: bool,
+    /// Where each heading with an id starts in `html`, with its id, in
+    /// order: where the part of the writing it heads begins. Footnotes
+    /// written at the end fall in the last part.
+    pub headings: Vec<(usize, String)>,
 }
 
 /// Which of the writing's blocks holds the more marker that ends the
@@ -277,7 +281,22 @@ pub fn as_written(html: &str) -> Written {
         opening: opening.map(|inner| closed_up(&words_of(&html[inner]))),
         words: count_words(html),
         maths: false,
+        headings: headings_in_html(html),
     }
+}
+
+/// Where each heading with an id starts in `html`, with its id as written.
+fn headings_in_html(html: &str) -> Vec<(usize, String)> {
+    let heading = |name: &str| matches!(name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6");
+    markup(html)
+        .filter_map(|(at, piece)| match piece {
+            Markup::Start(tag) if heading(&tag.name) => {
+                let id = tag.get("id").filter(|id| !id.is_empty())?;
+                Some((at.start, id.to_owned()))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Where the first `<p>` holding words holds them in `html`, without the
