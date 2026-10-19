@@ -279,6 +279,54 @@ fn pages_statac_makes_match_by_their_lists() {
 }
 
 #[test]
+fn an_authors_page_at_a_lists_address_matches_the_page_statac_makes_for_it() {
+    let post = |path, line| (path, format!("---\ndate: 2026-01-01\n{line}\n---\n"));
+    let cases = [
+        (
+            [
+                post("content/post-1.md", "tags: [Rust]"),
+                post("content/en/post-1.md", "tags: [Rust]"),
+                ("content/tags/rust.md", "# Rust\n".into()),
+            ],
+            ("tags/rust.md", "/en/tags/rust/"),
+        ),
+        (
+            [
+                post("content/post-1.md", "tags: [Rust]"),
+                post("content/en/post-1.md", "tags: [Rust]"),
+                ("content/en/tags/rust.md", "# Rust\n".into()),
+            ],
+            ("en/tags/rust.md", "/tags/rust/"),
+        ),
+        (
+            [
+                post("content/post-1.md", "series: One"),
+                post("content/en/post-1.md", "series: One"),
+                ("content/series/one.md", "# One\n".into()),
+            ],
+            ("series/one.md", "/en/series/one/"),
+        ),
+        // A page in another language at its path is its translation.
+        (
+            [
+                post("content/post-1.md", "tags: [Rust]"),
+                ("content/tags/rust.md", "# Rust\n".into()),
+                ("content/en/tags/rust.md", "# Rust\n".into()),
+            ],
+            ("tags/rust.md", "en/tags/rust.md"),
+        ),
+    ];
+    for (files, (page, translation)) in cases {
+        let mut files: Vec<(&str, &str)> = files.iter().map(|(p, t)| (*p, t.as_str())).collect();
+        files.push(TWO);
+        let read = site(&files);
+        assert_eq!(problems(&read), [], "{page}");
+        assert_eq!(translations(&read, page), [translation], "{page}");
+        assert_eq!(translations(&read, translation), [page], "{page}");
+    }
+}
+
+#[test]
 fn a_draft_translation_is_no_pages_translation_and_shares_its_key() {
     let files = [
         TWO,

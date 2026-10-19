@@ -11,7 +11,9 @@
 //! Pages Statac makes match too: a folder's page as the folder's `index`
 //! would, a tag's or a series' page by its address from its language's
 //! top, and a page made by `each:` by the page that made it and what it
-//! was made for. A page published nowhere is no page's translation.
+//! was made for. An author's page standing at a tag's or a series' address
+//! matches as Statac's would, unless a page in another language stands at
+//! its path. A page published nowhere is no page's translation.
 
 #[cfg(test)]
 mod tests;
@@ -33,8 +35,7 @@ enum Match {
     /// Its path below the nearest folder above it whose own page has a
     /// key, without the file's extension, with that key.
     Paired(String, String),
-    /// A tag's or a series' page Statac made, by its address from its
-    /// language's top.
+    /// A tag's or a series' page, by its address from its language's top.
     Listed(&'static str, String),
     /// A page made by `each:`: the group of the page that made it, and what
     /// it was made for.
@@ -81,7 +82,7 @@ pub(super) fn link(
         })
         .collect();
     let paired = paired_folders(site);
-    let places: Vec<Option<Match>> = site
+    let mut places: Vec<Option<Match>> = site
         .pages
         .iter()
         .map(|(_, page)| {
@@ -91,6 +92,27 @@ pub(super) fn link(
                 .flatten()
         })
         .collect();
+    // An author's page standing for a tag or a series matches by its list
+    // unless a page in another language stands at its path.
+    let mut standing: HashMap<&Match, HashSet<LanguageId>> = HashMap::new();
+    for (id, page) in site.pages.iter().filter(|(_, page)| page.lands()) {
+        if let Some(place) = &places[id.index()] {
+            standing.entry(place).or_default().insert(page.language);
+        }
+    }
+    let listed: Vec<(PageId, Match)> = site
+        .pages
+        .iter()
+        .filter(|(_, page)| several && page.place != PagePlace::Made)
+        .filter(|(id, page)| {
+            let at_place = places[id.index()].as_ref().and_then(|p| standing.get(p));
+            at_place.is_none_or(|languages| languages.iter().all(|&l| l == page.language))
+        })
+        .filter_map(|(id, page)| Some((id, listed(site, page, &tops[page.language.index()])?)))
+        .collect();
+    for (id, by) in listed {
+        places[id.index()] = Some(by);
+    }
 
     let mut groups: Vec<Group> = Vec::new();
     let mut found: HashMap<Match, usize> = HashMap::new();
@@ -199,16 +221,7 @@ fn place_of(
         PagePlace::Made => match &site.lists.get(page.speaks_for?).key {
             ListKey::Folder(folder) if folder.is_empty() => "index".to_owned(),
             ListKey::Folder(folder) => format!("{folder}/index"),
-            ListKey::Tag(_) | ListKey::Series(_) => {
-                let word = site.lists.get(page.speaks_for?).key.word();
-                let address = page.address.as_str();
-                let from_top = match address[1..].starts_with(top) {
-                    // Kept from the `/` the top's own name ends with.
-                    true => &address[top.len()..],
-                    false => address,
-                };
-                return Some(Match::Listed(word, from_top.to_owned()));
-            }
+            ListKey::Tag(_) | ListKey::Series(_) => return listed(site, page, top),
             ListKey::Declared(_) => return None,
         },
         PagePlace::Folder | PagePlace::Ordinary | PagePlace::Bundle => page.path.clone(),
@@ -237,6 +250,22 @@ fn place_of(
         folder = folder_of(folder.trim_end_matches('/'));
     }
     Some(Match::Place(stem.to_owned()))
+}
+
+/// A tag's or a series' page, by its address from `top`. None for a page
+/// speaking for no tag or series.
+fn listed(site: &Site, page: &crate::site::Page, top: &str) -> Option<Match> {
+    let key = &site.lists.get(page.speaks_for?).key;
+    if !matches!(key, ListKey::Tag(_) | ListKey::Series(_)) {
+        return None;
+    }
+    let address = page.address.as_str();
+    let from_top = match address[1..].starts_with(top) {
+        // Kept from the `/` the top's own name ends with.
+        true => &address[top.len()..],
+        false => address,
+    };
+    Some(Match::Listed(key.word(), from_top.to_owned()))
 }
 
 /// How a problem names a page: by its file, or a page Statac made by its

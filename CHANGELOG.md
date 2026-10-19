@@ -12,6 +12,13 @@ What changed in each release of Statac, the newest first.
   It was left out of the new post without a word, and could change what
   was made of the writing round it, such as a blank line put inside a
   block of HTML.
+- On a site in several languages, an author's page standing at a tag's
+  or a series' address, as `content/tags/rust.md` at `/tags/rust/`, is
+  the translation of the page Statac makes for that tag or series in
+  another language, and each names the other with `hreflang`. Neither
+  was linked to the other. Where a page in another language stands at
+  the author's page's own path, the two are still each other's
+  translations.
 
 ## 0.5.0 - 2026-10-18
 
