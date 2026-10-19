@@ -3341,3 +3341,51 @@ fn eleventy_reads_gitignore_unless_the_settings_turn_it_off() {
         );
     }
 }
+
+#[test]
+fn front_matter_holding_a_private_use_character_is_mended_as_any_other() {
+    let post = "---\ntitle: Post 1\nicon: \u{E000}\nsummary: 'One\ntwo'\n---\nWords.\n";
+    // The tool, and the files of a site with one post.
+    let tools = [
+        (
+            Tool::Hugo,
+            "hugo",
+            "hugo.toml",
+            "baseURL = \"https://example.org/\"\n",
+            "content/posts/post-1.md",
+        ),
+        (
+            Tool::Zola,
+            "zola",
+            "config.toml",
+            "base_url = \"https://example.org\"\n",
+            "content/posts/post-1.md",
+        ),
+        (
+            Tool::Jekyll,
+            "jekyll",
+            "_config.yml",
+            "title: Old\n",
+            "_posts/2026-01-01-post-1.md",
+        ),
+        (
+            Tool::Eleventy,
+            "eleventy",
+            ".eleventy.js",
+            "module.exports = function () {};\n",
+            "posts/post-1.md",
+        ),
+    ];
+    for (tool, name, settings, set, path) in tools {
+        let old = scratch(&format!("{name}-mend-private-use-old"));
+        fs::create_dir_all(old.join(path).parent().unwrap()).unwrap();
+        fs::write(old.join(settings), set).unwrap();
+        fs::write(old.join(path), post).unwrap();
+        let new = scratch(&format!("{name}-mend-private-use"));
+        let (code, said) = import(&old, &new, Some(tool));
+        assert_eq!(code, 0, "{name}: {said}");
+        let made = fs::read_to_string(new.join("content/posts/post-1.md")).unwrap();
+        assert!(made.contains("summary: One two\n"), "{name}: {made}");
+        assert!(made.contains("icon: \u{E000}\n"), "{name}: {made}");
+    }
+}

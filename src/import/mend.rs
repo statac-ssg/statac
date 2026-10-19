@@ -9,6 +9,8 @@
 //! placeholder where the change was made. Anything else leaves the front
 //! matter as it was written, for the reader to refuse.
 
+use std::collections::HashSet;
+
 use crate::origin::Style;
 use crate::problem::Kind as ProblemKind;
 use crate::source::{Sources, Span};
@@ -28,9 +30,19 @@ const LONGEST: usize = 64 * 1024;
 /// with a few walks of that length beside it: some 8 MB read.
 const TRIES: usize = 64;
 
-/// Stands in the placeholders, for what was changed: a character the
-/// reader takes as any letter, in no front matter that is mended.
-const MARK: char = '\u{e000}';
+/// The characters the placeholders may be made of, for what was changed:
+/// private use characters, which the reader takes as any letter. There
+/// are more than `LONGEST` of them, so one is missing from any front
+/// matter that is mended.
+fn marks() -> impl Iterator<Item = char> {
+    ('\u{e000}'..='\u{f8ff}').chain('\u{f0000}'..='\u{ffffd}')
+}
+
+/// A character that the front matter does not hold.
+fn mark_for(front: &str) -> Option<char> {
+    let held: HashSet<char> = front.chars().collect();
+    marks().find(|mark| !held.contains(mark))
+}
 
 /// A file's text with its front matter mended, and what was done.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -79,9 +91,10 @@ struct Quoted {
 /// out; none where the reader reads it as it is, or where no change is
 /// sure to keep every other field.
 fn mend(front: &str, controls: bool) -> Option<(String, usize)> {
-    if front.len() > LONGEST || read(front).is_ok() || front.contains(MARK) {
+    if front.len() > LONGEST || read(front).is_ok() {
         return None;
     }
+    let mark = mark_for(front)?;
     // The spaces a mend may still put in: in all, no more than the front
     // matter's own length.
     let mut room = front.len();
@@ -142,15 +155,15 @@ fn mend(front: &str, controls: bool) -> Option<(String, usize)> {
             .iter()
             .position(|q| (q.opens..=q.closes).contains(&at))
         {
-            Some(n) if quoted[n].opens == at => shadow.push_str(&placeholder(n)),
+            Some(n) if quoted[n].opens == at => shadow.push_str(&placeholder(mark, n)),
             Some(_) => {}
-            None if taken.contains(&at) => shadow.push(MARK),
+            None if taken.contains(&at) => shadow.push(mark),
             None => shadow.push(c),
         }
     }
     let shadow_node = read(&shadow).ok()?;
     let mut held: Vec<(usize, Span)> = Vec::new();
-    if !same(&shadow_node, &node, false, &mut held) || held.len() != quoted.len() {
+    if !same(mark, &shadow_node, &node, false, &mut held) || held.len() != quoted.len() {
         return None;
     }
     // The reader must have read each text from its own quote to its own.
@@ -287,8 +300,8 @@ fn deepened(
     Some(out)
 }
 
-fn placeholder(n: usize) -> String {
-    format!("\"{MARK}{n}{MARK}\"")
+fn placeholder(mark: char, n: usize) -> String {
+    format!("\"{mark}{n}{mark}\"")
 }
 
 /// Whether the reader made of the mended front matter, `now`, what it
@@ -296,12 +309,12 @@ fn placeholder(n: usize) -> String {
 /// in quotes and is noted in `held` with where the reader read it, and
 /// each mark, which stands for a character taken out. A name is never a
 /// placeholder.
-fn same(shadow: &Node, now: &Node, name: bool, held: &mut Vec<(usize, Span)>) -> bool {
+fn same(mark: char, shadow: &Node, now: &Node, name: bool, held: &mut Vec<(usize, Span)>) -> bool {
     match (&shadow.value, &now.value) {
         (Value::Scalar(was), Value::Scalar(is)) => {
             let stands_for = was
-                .strip_prefix(MARK)
-                .and_then(|rest| rest.strip_suffix(MARK))
+                .strip_prefix(mark)
+                .and_then(|rest| rest.strip_suffix(mark))
                 .and_then(|n| n.parse::<usize>().ok());
             match stands_for {
                 Some(n) => {
@@ -316,7 +329,7 @@ fn same(shadow: &Node, now: &Node, name: bool, held: &mut Vec<(usize, Span)>) ->
                 None => {
                     shadow.style == now.style
                         && shadow.tag == now.tag
-                        && was.chars().filter(|c| *c != MARK).eq(is.chars())
+                        && was.chars().filter(|c| *c != mark).eq(is.chars())
                 }
             }
         }
@@ -326,13 +339,14 @@ fn same(shadow: &Node, now: &Node, name: bool, held: &mut Vec<(usize, Span)>) ->
                 && was
                     .iter()
                     .zip(is)
-                    .all(|(was, is)| same(was, is, false, held))
+                    .all(|(was, is)| same(mark, was, is, false, held))
         }
         (Value::Mapping(was), Value::Mapping(is)) => {
             was.len() == is.len()
                 && shadow.tag == now.tag
                 && was.iter().zip(is).all(|(was, is)| {
-                    same(&was.key, &is.key, true, held) && same(&was.value, &is.value, false, held)
+                    same(mark, &was.key, &is.key, true, held)
+                        && same(mark, &was.value, &is.value, false, held)
                 })
         }
         _ => false,
@@ -579,6 +593,50 @@ mod tests {
             Some(vec![
                 named("summary", text("One two")),
                 named("draft", Read::Truth(true)),
+            ])
+        );
+    }
+
+    #[test]
+    fn a_front_matter_holding_private_use_characters_is_mended_as_any_other() {
+        // The characters a placeholder may be made of, in the field
+        // mended, in another and in a name.
+        for held in ["\u{e000}", "\u{e001}", "\u{e000}\u{e001}\u{f8ff}"] {
+            let file = format!(
+                "---\ntitle: Post 1\nicon: \"{held}\"\n{held}: {held}\nsummary: 'One {held}\ntwo'\ndraft: true\n---\n"
+            );
+            assert_eq!(
+                fields(&file, false),
+                Some(vec![
+                    named("title", text("Post 1")),
+                    named("icon", text(held)),
+                    named(held, text(held)),
+                    named("summary", text(&format!("One {held} two"))),
+                    named("draft", Read::Truth(true)),
+                ]),
+                "{held:?}"
+            );
+            let file = format!("---\nsummary: 'One{held}\u{92}\ntwo'\nicon: {held}\n---\n");
+            assert_eq!(
+                fields(&file, true),
+                Some(vec![
+                    named("summary", text(&format!("One{held} two"))),
+                    named("icon", text(held)),
+                ]),
+                "{held:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_front_matter_holding_every_private_use_character_of_the_first_plane_is_mended() {
+        let held: String = ('\u{e000}'..='\u{f8ff}').collect();
+        let file = format!("---\nicons: {held}\nsummary: 'One\ntwo'\n---\n");
+        assert_eq!(
+            fields(&file, false),
+            Some(vec![
+                named("icons", text(&held)),
+                named("summary", text("One two")),
             ])
         );
     }
