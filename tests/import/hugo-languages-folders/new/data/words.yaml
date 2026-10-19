@@ -45,6 +45,12 @@ en:
   updated: Updated
   minutes: min read
   all: See all
+  search: Search this site
+  search_needs_script: Search needs JavaScript, which is turned off in this browser.
+  found_one: 1 page found.
+  found: "{count} pages found."
+  found_some: No page holds every word.
+  found_none: No pages found.
 fr:
   skip: Skip to the content
   navigation: Site
@@ -91,3 +97,9 @@ fr:
   updated: Updated
   minutes: min read
   all: See all
+  search: Search this site
+  search_needs_script: Search needs JavaScript, which is turned off in this browser.
+  found_one: 1 page found.
+  found: "{count} pages found."
+  found_some: No page holds every word.
+  found_none: No pages found.

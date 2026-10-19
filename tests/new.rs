@@ -804,7 +804,7 @@ fn a_site_draws_cards_from_when_it_asks_until_their_description_is_removed() {
     // A card for every page but the one nothing is published at. The home
     // page's own list has one page, so no second is published or carded.
     let on = cards_of(&folder);
-    assert_eq!(on, (6, 18, 18));
+    assert_eq!(on, (6, 19, 19));
     assert!(!folder.with_extension("built").join("page").exists());
     let yours = "`templates/og.yaml` is yours and wasn't touched.\n";
     assert_eq!(ran(&folder, true, None), yours);
@@ -944,7 +944,7 @@ fn the_menu_ends_with_notes_and_photographs_and_a_note_is_called_by_its_date_and
     assert_eq!(
         names,
         [
-            "Home", "Links", "Posts", "Writing", "Notes", "Photos", "About"
+            "Home", "Links", "Posts", "Writing", "Notes", "Photos", "About", "Search"
         ]
     );
     fs::remove_dir_all(folder.join("content/links")).unwrap();
@@ -979,7 +979,7 @@ const HOME: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Site 1</title>
   <meta name="description" content="This is the home page of a new site, the file content/index.md. Write here what the site is, in place of these words.">
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Site 1">
@@ -1000,6 +1000,7 @@ const HOME: &str = r##"<!doctype html>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>
@@ -1098,7 +1099,7 @@ const POST: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>First post - Site 1</title>
   <meta name="description" content="This is the site’s first post, the file content/posts/first-post/index.md. Its picture is photo-1.jpg, kept beside it and named by its cover: line, and what a reader who can’t see the picture is told in its place is in photo-1.jpg.yaml. Change them or remove them as you like.">
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="First post">
@@ -1119,6 +1120,7 @@ const POST: &str = r##"<!doctype html>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>
@@ -1170,7 +1172,7 @@ const NOTES: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Notes - Site 1</title>
   <meta name="description" content="Short notes, with or without a title, newest first.">
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Notes">
@@ -1191,6 +1193,7 @@ const NOTES: &str = r##"<!doctype html>
         <li><a href="/notes/" aria-current="page">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>
@@ -1257,7 +1260,7 @@ const NOTE: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>6 Oct 2026, 09:12 - Site 1</title>
   <meta name="description" content="This is a note, the file content/notes/note-1.md: a few lines with a date and no title. Its front matter holds only the date.">
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="6 Oct 2026, 09:12">
@@ -1278,6 +1281,7 @@ const NOTE: &str = r##"<!doctype html>
         <li><a href="/notes/" aria-current="true">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>
@@ -1317,7 +1321,7 @@ const PHOTOS: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Photos - Site 1</title>
   <meta name="description" content="One photograph to a page, newest first.">
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Photos">
@@ -1338,6 +1342,7 @@ const PHOTOS: &str = r##"<!doctype html>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/" aria-current="page">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>
@@ -1371,7 +1376,7 @@ const PHOTO: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Photo 1 - Site 1</title>
   <meta name="description" content="This is a photograph’s page, the file content/photos/photo-1/index.md, with the picture beside it and named by its cover: line. Write about the picture here. To do without photographs, delete the folder content/photos/.">
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Photo 1">
@@ -1392,6 +1397,7 @@ const PHOTO: &str = r##"<!doctype html>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/" aria-current="true">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>
@@ -1429,7 +1435,7 @@ const TAG: &str = r##"<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tag 1 - Site 1</title>
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Tag 1">
@@ -1449,6 +1455,7 @@ const TAG: &str = r##"<!doctype html>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>
@@ -1573,6 +1580,9 @@ const SITEMAP: &str = r##"<?xml version="1.0" encoding="UTF-8"?>
     <loc>https://example.org/posts/what-a-post-can-hold/</loc>
   </url>
   <url>
+    <loc>https://example.org/search/</loc>
+  </url>
+  <url>
     <loc>https://example.org/tags/</loc>
   </url>
   <url>
@@ -1589,7 +1599,7 @@ const NOT_FOUND: &str = r##"<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Page not found - Site 1</title>
-  <link rel="stylesheet" href="/site.026cdd70.css">
+  <link rel="stylesheet" href="/site.93a9b31f.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta name="robots" content="noindex">
@@ -1605,6 +1615,7 @@ const NOT_FOUND: &str = r##"<!doctype html>
         <li><a href="/notes/">Notes</a></li>
         <li><a href="/photos/">Photos</a></li>
         <li><a href="/about/">About</a></li>
+        <li><a href="/search/">Search</a></li>
       </ul>
     </nav>
   </header>

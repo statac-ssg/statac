@@ -162,7 +162,7 @@ fn cards_finds_the_site_it_is_run_inside_and_makes_one_where_there_is_none() {
     std::fs::create_dir_all(&empty).unwrap();
     let said = run_in(&empty, &["new", "--cards", "--yes"]);
     assert!(
-        said.starts_with("Made a new site in `cards-no-site`: 92 files.\n"),
+        said.starts_with("Made a new site in `cards-no-site`: 95 files.\n"),
         "{said}"
     );
     assert!(empty.join("templates/og.yaml").is_file());

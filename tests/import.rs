@@ -265,7 +265,12 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
 
 #[test]
 fn a_site_under_a_path_keeps_its_addresses_and_links() {
-    assert_eq!(fixture("baseurl"), [NO_ZONE, "robots-beneath-path"]);
+    // The old site's own 404 page is nearest a past starter's, which lacks
+    // `search: false`.
+    assert_eq!(
+        fixture("baseurl"),
+        ["newer-starter", NO_ZONE, "robots-beneath-path"]
+    );
 }
 
 #[test]

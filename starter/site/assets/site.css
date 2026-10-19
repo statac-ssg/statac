@@ -1247,9 +1247,10 @@ math[display="block"] {
 
 /* 10. Search
 
-   Nothing here shows until the site has a search box: see /hooks/ */
+   The box the search snippet makes, and the pages it finds: see /search/ */
 
-search {
+/* The box is hidden until its script runs. */
+search:not([hidden]) {
   display: grid;
   gap: 0.5rem;
 }
@@ -1281,15 +1282,21 @@ search [role="status"]:empty {
   display: none;
 }
 
-search ul {
+search ol {
   padding: 0;
   list-style: none;
 }
 
 .writing search li {
+  display: grid;
+  gap: 0.25rem;
   margin: 0;
   padding-block: 0.75rem;
   border-block-start: 1px solid var(--rule);
+}
+
+.writing search li p {
+  margin: 0;
 }
 
 search li a {
@@ -1297,6 +1304,15 @@ search li a {
   font-size: var(--large);
   font-weight: 600;
   line-height: 1.3;
+}
+
+search li .part {
+  font-weight: 600;
+}
+
+search li time {
+  font-size: var(--small);
+  color: var(--quiet);
 }
 
 

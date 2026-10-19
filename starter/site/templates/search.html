@@ -1,0 +1,16 @@
+{# The page that searches the site. A reader without JavaScript is told that search needs it: see /search/ -#}
+{% extends "base" %}
+{% block main %}
+    {% set words = site.data.words[page.language] %}
+    <header class="top column">
+      <h1>{{ headline(page) }}</h1>
+      {% if page.summary %}
+      <p class="summary">{{ page.summary }}</p>
+      {% endif %}
+    </header>
+    <div class="writing column">
+      <noscript><p>{{ words.search_needs_script }}</p></noscript>
+      {{ search() }}
+      {{ page.content }}
+    </div>
+{% endblock %}

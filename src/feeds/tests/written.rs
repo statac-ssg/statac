@@ -672,7 +672,7 @@ const ROBOTS_TEMPLATE: (&str, &str) = (
 );
 const NOT_FOUND: (&str, &str) = (
     "content/404.md",
-    "---\ntitle: Not found\npermalink: /404.html\n---\n",
+    "---\ntitle: Not found\npermalink: /404.html\nsearch: false\n---\n",
 );
 
 fn other_files(settings: &str) -> Built {

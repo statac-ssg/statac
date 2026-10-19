@@ -1029,10 +1029,15 @@ fn files<'a>(
         };
         let page = first_page(&path, samples.is_some());
         add(path, page);
-        // Each language lists its own tags, on a page of its own.
-        if let (1.., Some(tags)) = (at, starter::file(starter::TAGS_PAGE)) {
-            let text = String::from_utf8_lossy(tags).into_owned();
-            add(format!("content/{tag}/tags.md"), text);
+        // Each language lists its own tags, and searches its own pages.
+        for path in starter::EACH_LANGUAGE.iter().filter(|_| at > 0) {
+            if let Some(bytes) = starter::file(path) {
+                let name = path.trim_start_matches("content/");
+                add(
+                    format!("content/{tag}/{name}"),
+                    String::from_utf8_lossy(bytes).into_owned(),
+                );
+            }
         }
     }
     for (path, page) in samples.map(samples::pages).unwrap_or_default() {

@@ -59,6 +59,7 @@ starter! {
     "content/posts/what-a-post-can-hold/recording-1.m4a",
     "content/posts/what-a-post-can-hold/video-1.mp4",
     "content/robots.md",
+    "content/search.md",
     "content/sitemap.md",
     "content/tags.md",
     "snippets/audio.html",
@@ -77,6 +78,7 @@ starter! {
     "snippets/pager.html",
     "snippets/picture.html",
     "snippets/quote.html",
+    "snippets/search.html",
     "snippets/short.html",
     "snippets/thumb.html",
     "snippets/video.html",
@@ -96,6 +98,7 @@ starter! {
     "templates/post.html",
     "templates/redirect.html",
     "templates/robots.txt",
+    "templates/search.html",
     "templates/sitemap.xml",
     "templates/tags.html",
 }
@@ -117,8 +120,9 @@ const SAMPLES: &[&str] = &[
     "static/favicon.ico",
 ];
 
-/// The page listing every tag, which each language of a site has.
-pub(super) const TAGS_PAGE: &str = "content/tags.md";
+/// The pages each language of a site has: the one listing every tag, and
+/// the one that searches.
+pub(super) const EACH_LANGUAGE: &[&str] = &["content/tags.md", "content/search.md"];
 
 /// The bytes of the starter's file at `path`.
 pub(super) fn file(path: &str) -> Option<&'static [u8]> {
