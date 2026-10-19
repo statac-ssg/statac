@@ -167,8 +167,10 @@ function excerpt(text, marked) {
  * as the start of longer words too, while it is being typed. Gives
  * `count`, the pages found in all; `partial`, true where no page holds
  * every word and those found hold some; and `results`, each with its
- * `url`, `title`, `heading`, `date` and `excerpt`, a list of pieces of
- * text each saying whether it is `marked` as a word asked for.
+ * `url`; `title`, what a list calls the page; `heading`; `date`, a day as
+ * `2026-10-19`; `day`, the date as the site writes it, none where the page
+ * is called by it; and `excerpt`, a list of pieces of text each saying
+ * whether it is `marked` as a word asked for.
  */
 export async function search(words, { shown = 10, typing = false } = {}) {
   try {
@@ -259,6 +261,7 @@ async function found(query, shown, typing) {
       return {
         url: id === null ? text.url : `${text.url}#${id}`,
         title: text.title,
+        day: text.day,
         heading,
         date: text.date,
         excerpt: excerpt(words, marked),

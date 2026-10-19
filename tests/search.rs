@@ -217,7 +217,7 @@ fn a_page_asking_for_a_search_box_publishes_the_index_its_files_named_by_content
     let post = text(&index, &format!("pages/{}", shown[2]));
     assert_eq!(
         post,
-        "{\"url\":\"/blog/post-1/\",\"title\":\"Post 1\",\"date\":\"2026-01-01\",\
+        "{\"url\":\"/blog/post-1/\",\"title\":\"Post 1\",\"date\":\"2026-01-01\",\"day\":\"1 January 2026\",\
          \"parts\":[[null,null,\"The first post, on running.\"],\
          [\"later\",\"Later\",\"It runs on.\"]]}"
     );
@@ -358,6 +358,19 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         "content/post-4.md",
         "---\ntitle: 日本語のブログ\ndate: 2026-01-04\n---\n日本語のブログを書く。ログを読む。\n",
     );
+    // Pages with no title, named as a list names them.
+    site.write(
+        "content/notes/index.md",
+        "---\ntitle: Notes\nlayout: page\npages.untitled: true\n---\n",
+    );
+    site.write(
+        "content/notes/note-1.md",
+        "---\ndate: 2026-01-05\n---\nAn untitled note.\n",
+    );
+    site.write(
+        "content/plain.md",
+        "An untitled page, called by its opening words.\n",
+    );
     let built = site.index();
     assert!(!built.is_empty());
     let asked: &[(&str, bool)] = &[
@@ -376,10 +389,21 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         ("ブログ", false),
         ("ログ", false),
         ("日本", true),
+        ("untitled", false),
         ("", false),
     ];
     let rust = statac_finds(&site, 0, asked);
     assert!(rust.contains("\"Running\""), "{rust}");
+    // A note called by its date isn't dated again; a titled page is.
+    assert!(
+        rust.contains("\"/blog/notes/note-1/\",\"5 January 2026\",null,"),
+        "{rust}"
+    );
+    assert!(
+        rust.contains("\"An untitled page, called by its opening words.\",null,"),
+        "{rust}"
+    );
+    assert!(rust.contains("\"Post 1\",\"1 January 2026\","), "{rust}");
     let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
         return;
     };
@@ -500,9 +524,10 @@ fn statac_finds(site: &Site, language: usize, asked: &[(&str, bool)]) -> String 
                         .map(|(text, marked)| format!("[{},{marked}]", json(text)))
                         .collect();
                     format!(
-                        "[{},{},{},[{}]]",
+                        "[{},{},{},{},[{}]]",
                         json(&format!("/blog{}", shown.address)),
-                        json_or_null(shown.title.as_deref()),
+                        json(&shown.title),
+                        json_or_null(shown.day.as_deref()),
                         json_or_null(shown.heading.as_deref()),
                         excerpt.join(",")
                     )

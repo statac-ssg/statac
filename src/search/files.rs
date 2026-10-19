@@ -16,8 +16,10 @@
 //!   UTF-16 code units, each with its stem's entry among the piece's, and
 //!   each entry's records as gaps from the last, each with its weight.
 //!   `index.js` gives the first word of each.
-//! - `pages/*.bin`: one page's address, title, date and parts, each part
-//!   its heading's id and words, none for the opening, and its text.
+//! - `pages/*.bin`: one page's address, its name as a list gives it, its
+//!   date, the date as the site writes it where the page isn't called by
+//!   it, and its parts, each its heading's id and words, none for the
+//!   opening, and its text.
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -88,14 +90,17 @@ pub fn files(renderer: &Renderer, folder: &str, index: &Index) -> Vec<File> {
             let page = site.pages.get(records[0].page);
             let mut json = String::from("{\"url\":");
             string(&format!("{base}{}", page.address.as_str()), &mut json);
+            let (title, day) = renderer.named(records[0].page);
             json.push_str(",\"title\":");
-            match &page.title {
-                Some(title) => string(&title.value, &mut json),
-                None => json.push_str("null"),
-            }
+            string(&title, &mut json);
             json.push_str(",\"date\":");
             match &page.date {
                 Some(date) => string(&date.value.iso_day(), &mut json),
+                None => json.push_str("null"),
+            }
+            json.push_str(",\"day\":");
+            match &day {
+                Some(day) => string(day, &mut json),
                 None => json.push_str("null"),
             }
             json.push_str(",\"parts\":[");

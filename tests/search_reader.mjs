@@ -1,7 +1,7 @@
 // Runs the search script a build wrote, reading the files beside it from
 // the disk, and prints what each search asked finds: for each, the pages
 // found in all, whether they hold only some of the words, and each result
-// shown as its address, title, heading and excerpt.
+// shown as its address, title, day, heading and excerpt.
 //
 //   node search_reader.mjs <site>/search/index.js '[["words", typing], ...]' [later.js]
 //
@@ -31,9 +31,10 @@ for (const [words, typing] of JSON.parse(asked)) {
   found.push([
     count,
     partial,
-    results.map(({ url, title, heading, excerpt }) => [
+    results.map(({ url, title, day, heading, excerpt }) => [
       url,
       title,
+      day,
       heading,
       excerpt.map(({ text, marked }) => [text, marked]),
     ]),

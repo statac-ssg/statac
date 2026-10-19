@@ -804,6 +804,24 @@ impl Renderer {
         self.finish(REDIRECT, context, Vec::new())
     }
 
+    /// What a list calls the page `id`, as `headline` does, and its date as
+    /// the site writes dates, where it has one it isn't already called by.
+    /// What finding the name tells of the page is left to its own build.
+    pub fn named(&self, id: PageId) -> (String, Option<String>) {
+        let shared = &self.shared;
+        frame::push(Frame::new(Arc::clone(shared), Some(id)));
+        let called = super::own::called(shared, id);
+        let page = shared.site.pages.get(id);
+        let day = |date: &crate::date::Date| super::values::written_date(shared, date, None).ok();
+        let named = match called {
+            Ok((name, Some(crate::problem::Called::Date))) => (name, None),
+            Ok((name, _)) => (name, page.date.as_ref().and_then(|date| day(&date.value))),
+            Err(_) => (shared.address_of(id), None),
+        };
+        frame::pop();
+        named
+    }
+
     /// Every page the site publishes, a list's later pages among them
     /// with their numbers, in the order of their addresses.
     pub fn every_page(&self) -> &[(PageId, usize)] {

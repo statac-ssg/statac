@@ -35,7 +35,11 @@ pub struct Options {
 /// One page found, at the part of it that matched best.
 #[derive(Debug, PartialEq)]
 pub struct Shown {
-    pub title: Option<String>,
+    /// What a list calls the page.
+    pub title: String,
+    /// The page's date as the site writes dates, where it isn't already
+    /// called by it.
+    pub day: Option<String>,
     pub heading: Option<String>,
     /// From the top of the site, with the heading's id where there is one.
     pub address: String,
@@ -170,8 +174,10 @@ fn shown(renderer: &Renderer, record: &Record, marked: &impl Fn(&str) -> bool) -
         address.push('#');
         address.push_str(id);
     }
+    let (title, day) = renderer.named(record.page);
     Shown {
-        title: page.title.as_ref().map(|title| title.value.clone()),
+        title,
+        day,
         heading: record.heading.as_ref().map(|(_, words)| words.clone()),
         address,
         excerpt: excerpt(&record.text, marked),

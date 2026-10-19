@@ -696,7 +696,7 @@ pub(super) fn headline(shared: &Arc<Shared>, id: PageId) -> Result<String, Error
 
 /// A page's name, and what it is called by where that is no name the
 /// author wrote.
-fn called(shared: &Arc<Shared>, id: PageId) -> Result<(String, Option<Called>), Error> {
+pub(super) fn called(shared: &Arc<Shared>, id: PageId) -> Result<(String, Option<Called>), Error> {
     let page = shared.site.pages.get(id);
     let field = |name: &str| frame::read(Key::Field(id, shared.name_id(name)));
     field("title");

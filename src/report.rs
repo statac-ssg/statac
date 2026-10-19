@@ -213,10 +213,9 @@ impl<'a> Report<'a> {
         let mut out = self.said(&wording::found(words, pages, found.some));
         out.push('\n');
         for found in shown.iter() {
-            let named = match (&found.title, &found.heading) {
-                (Some(title), Some(heading)) => format!("{title} \u{203a} {heading}"),
-                (Some(named), None) | (None, Some(named)) => named.clone(),
-                (None, None) => found.address.clone(),
+            let named = match &found.heading {
+                Some(heading) => format!("{} \u{203a} {heading}", found.title),
+                None => found.title.clone(),
             };
             out.push('\n');
             out.push_str(&format!("  {}\n", self.paint.paint(BOLD, &named)));
