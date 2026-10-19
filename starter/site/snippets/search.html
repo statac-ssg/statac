@@ -35,6 +35,9 @@
       }
       if (outcome.count === 0) {
         count.textContent = box.dataset.foundNone;
+        if (outcome.suggestion) {
+          count.append(" ", ...meant(outcome.suggestion));
+        }
       } else {
         const one = plurals.select(outcome.count) === "one";
         const pages = one ? box.dataset.foundOne : box.dataset.foundOther;
@@ -44,6 +47,23 @@
         }
       }
       found.replaceChildren(...outcome.results.map(result));
+    };
+
+    /** The words offered in place of `suggestion`, as a link that searches for it. */
+    const meant = (suggestion) => {
+      const link = document.createElement("a");
+      const address = new URL(location);
+      address.searchParams.set("q", suggestion);
+      link.href = address;
+      link.textContent = suggestion;
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        typed.value = suggestion;
+        typed.focus();
+        show(false);
+      });
+      const [before, after = ""] = box.dataset.meant.split("{words}");
+      return [before, link, after];
     };
 
     typed.addEventListener("input", () => show(true));
@@ -99,7 +119,7 @@
   }
 </script>
 {% endif %}
-<search id="{{ box.id }}" data-index="{{ box.index }}" data-found-one="{{ words.found_one }}" data-found-other="{{ words.found }}" data-found-some="{{ words.found_some }}" data-found-none="{{ words.found_none }}" hidden>
+<search id="{{ box.id }}" data-index="{{ box.index }}" data-found-one="{{ words.found_one }}" data-found-other="{{ words.found }}" data-found-some="{{ words.found_some }}" data-found-none="{{ words.found_none }}" data-meant="{{ words.meant }}" hidden>
   <label for="{{ box.id }}-words">{{ words.search }}</label>
   <input id="{{ box.id }}-words" type="search" autocomplete="off">
   <p role="status"></p>

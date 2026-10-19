@@ -371,6 +371,14 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         "content/plain.md",
         "An untitled page, called by its opening words.\n",
     );
+    site.write(
+        "content/post-5.md",
+        "---\ntitle: Post 5\ndate: 2026-01-06\n---\n𐌰𐌱 alpha5 card cart bard barn\n",
+    );
+    site.write(
+        "content/post-6.md",
+        "---\ntitle: Post 6\ndate: 2026-01-07\n---\ncart\n",
+    );
     let built = site.index();
     assert!(!built.is_empty());
     let asked: &[(&str, bool)] = &[
@@ -392,6 +400,20 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         ("untitled", false),
         ("another", false),
         ("", false),
+        // Words the site doesn't write, respelt as the nearest it does.
+        ("brewinf", false),
+        ("runnign", false),
+        ("brewnig slowley", false),
+        ("brewnig slowly", false),
+        ("Brewnig OK", false),
+        ("brewnig", true),
+        ("ブロゲ", false),
+        ("brewnig zzzzzz", false),
+        ("𐌰𐌲", false),
+        ("alpah 7", false),
+        ("alpah.7", false),
+        ("carx", false),
+        ("barx", false),
     ];
     let rust = statac_finds(&site, 0, asked);
     assert!(rust.contains("\"Running\""), "{rust}");
@@ -410,6 +432,27 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         rust.contains("way to brew\\n\",false],[\"another\",true],[\"\\nset in"),
         "{rust}"
     );
+    let meant: Vec<String> = (split(&rust).iter().skip(18))
+        .map(|found| split(found).pop().unwrap())
+        .collect();
+    assert_eq!(
+        meant,
+        [
+            "\"brewing\"",
+            "\"running\"",
+            "\"brewing slowly\"",
+            "null",
+            "\"brewing OK\"",
+            "\"brewing\"",
+            "null",
+            "null",
+            "null",
+            "\"alpha5 7\"",
+            "null",
+            "\"cart\"",
+            "\"bard\"",
+        ]
+    );
     let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
         return;
     };
@@ -417,6 +460,44 @@ fn the_browsers_script_finds_what_statac_search_finds() {
     {
         assert_eq!(rust, &browser, "{words}");
     }
+    assert_eq!(rust, browser);
+}
+
+#[test]
+fn a_suggestion_comes_from_the_piece_of_the_word_list_the_word_falls_in() {
+    let site = Site::new("reader-pieces");
+    // Enough words packing poorly that the word list is cut into pieces.
+    let mut state: u64 = 1;
+    let mut letter = || {
+        state =
+            (state.wrapping_mul(6_364_136_223_846_793_005)).wrapping_add(1_442_695_040_888_963_407);
+        char::from(b'a' + ((state >> 33) % 26) as u8)
+    };
+    for page in 0..30 {
+        let words: Vec<String> = (0..1000)
+            .map(|_| (0..8).map(|_| letter()).collect())
+            .collect();
+        site.write(
+            &format!("content/many-{page}.md"),
+            &format!("---\ntitle: Many\n---\n{}\n", words.join(" ")),
+        );
+    }
+    let index = site.index();
+    let script = text(&index, "index.js");
+    let named = script.lines().next().unwrap().split("[\"").skip(1);
+    let firsts: Vec<&str> = named.map(|item| &item[..item.find('"').unwrap()]).collect();
+    assert!(firsts.len() > 2, "{firsts:?}");
+    // One edit from the first word of a piece, before it, and so in the
+    // piece before, and after it, in its own.
+    let first = firsts[2];
+    let before = &first[..first.len() - 1];
+    let after = format!("{first}q");
+    let asked = &[(before, false), (after.as_str(), false)];
+    let rust = statac_finds(&site, 0, asked);
+    assert_eq!(rust, format!("[[0,true,[],null],[0,true,[],\"{first}\"]]"));
+    let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
+        return;
+    };
     assert_eq!(rust, browser);
 }
 
@@ -443,6 +524,8 @@ fn each_languages_script_finds_what_statac_search_finds_in_that_language() {
         ("ch", true),
         ("ru", true),
         ("p", true),
+        ("chanteuze", false),
+        ("artcile", false),
     ];
     let cases = [
         (0, "_site/search/index.js"),
@@ -461,6 +544,11 @@ fn each_languages_script_finds_what_statac_search_finds_in_that_language() {
     assert!(!cafe(english).contains("/fr/"), "{english}");
     assert!(cafe(french).contains("/blog/fr/article-1/"), "{french}");
     assert!(!cafe(french).contains("/blog/post-"), "{french}");
+    // Each respells from its own words.
+    let meant = |found: &str, at: usize| split(&split(found)[at]).pop().unwrap();
+    assert_eq!(meant(english, 12), "\"chanteuse\"");
+    assert_eq!(meant(english, 13), "null");
+    assert_eq!(meant(french, 13), "\"article\"");
     for ((language, _), (rust, browser)) in cases.iter().zip(&found) {
         let Some(browser) = browser else {
             return;
@@ -539,7 +627,13 @@ fn statac_finds(site: &Site, language: usize, asked: &[(&str, bool)]) -> String 
                     )
                 })
                 .collect();
-            format!("[{},{},[{}]]", results.pages, results.some, shown.join(","))
+            format!(
+                "[{},{},[{}],{}]",
+                results.pages,
+                results.some,
+                shown.join(","),
+                json_or_null(results.suggestion.as_deref())
+            )
         })
         .collect();
     format!("[{}]", found.join(","))

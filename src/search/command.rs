@@ -132,6 +132,9 @@ pub struct Results {
     pub pages: usize,
     /// Whether no page held every word, and those found hold some.
     pub some: bool,
+    /// Where no page was found, the words respelt as the nearest the
+    /// index lists, where they find some.
+    pub suggestion: Option<String>,
 }
 
 /// The pages of the site `renderer` read that `index` finds for `query`,
@@ -160,10 +163,15 @@ pub fn results(
     let shown = (best.iter().take(most))
         .map(|&record| shown(renderer, &index.records[record], &marked))
         .collect();
+    let suggestion = match best.is_empty() {
+        true => index.meant(query, typing),
+        false => None,
+    };
     Results {
         shown,
         pages: best.len(),
         some: best_matched < asked.words.len(),
+        suggestion,
     }
 }
 

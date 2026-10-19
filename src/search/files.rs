@@ -143,10 +143,16 @@ pub fn files(renderer: &Renderer, folder: &str, index: &Index) -> Vec<File> {
     let mut entry = String::from("const FILES = {\"records\":");
     string(&records.path, &mut entry);
     entry.push_str(",\"words\":[");
-    for (i, (first, piece)) in pieces.iter().enumerate() {
+    for (i, (start, piece)) in pieces.iter().enumerate() {
         if i > 0 {
             entry.push(',');
         }
+        // The first piece's first word is empty, so that it holds every
+        // word that comes before the list's first.
+        let first = match start {
+            0 => "",
+            &at => index.words[at].0.as_str(),
+        };
         entry.push('[');
         string(first, &mut entry);
         entry.push(',');
@@ -176,30 +182,31 @@ pub fn claims(files: &[File]) -> Vec<(String, Named)> {
         .collect()
 }
 
-/// The word list in pieces, each with its first word, the first piece's
-/// empty, so that every word falls in the last piece whose first word it
-/// doesn't come before. The list stays whole up to `whole` bytes packed,
-/// and is otherwise cut into pieces of about `each` packed.
-pub(super) fn pieces(index: &Index, whole: usize, each: usize) -> Vec<(String, File)> {
+/// Where each piece of the word list a reader's browser is given starts,
+/// by its first word's place in the list.
+pub(super) fn starts(index: &Index) -> Vec<usize> {
+    let pieces = pieces(index, WHOLE, PIECE).into_iter();
+    pieces.map(|(start, _)| start).collect()
+}
+
+/// The word list in pieces, each with its first word's place in the list.
+/// A word falls in the last piece whose first word it doesn't come
+/// before, or in the first. The list stays whole up to `whole` bytes
+/// packed, and is otherwise cut into pieces of about `each` packed.
+pub(super) fn pieces(index: &Index, whole: usize, each: usize) -> Vec<(usize, File)> {
     // Cut first on how far such lists usually pack, and again on how far
     // this one did where that is far out.
     let mut packs = PACKS;
     for again in [false, true] {
         let (cuts, written) = cuts(index, (each as f64 * packs) as usize);
         let ranges: Vec<std::ops::Range<usize>> = cuts.windows(2).map(|w| w[0]..w[1]).collect();
-        let pieces: Vec<(String, File)> = (ranges.into_par_iter())
-            .map(|range| {
-                let first = match range.start {
-                    0 => String::new(),
-                    at => index.words[at].0.clone(),
-                };
-                (first, packed("words.", &piece(index, range)))
-            })
+        let pieces: Vec<(usize, File)> = (ranges.into_par_iter())
+            .map(|range| (range.start, packed("words.", &piece(index, range))))
             .collect();
         let size: usize = pieces.iter().map(|(_, file)| file.bytes.len()).sum();
         if size <= whole {
             let all = piece(index, 0..index.words.len());
-            return vec![(String::new(), packed("words.", &all))];
+            return vec![(0, packed("words.", &all))];
         }
         let measured = written as f64 / size as f64;
         if again || (measured / packs - 1.0).abs() < 0.15 {

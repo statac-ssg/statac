@@ -57,4 +57,5 @@ pub(super) const WORDS: &[(&str, &str)] = &[
     ("found", "{count} pages found."),
     ("found_some", "No page holds every word."),
     ("found_none", "No pages found."),
+    ("meant", "Did you mean {words}?"),
 ];

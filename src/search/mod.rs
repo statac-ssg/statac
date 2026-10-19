@@ -4,12 +4,14 @@
 
 mod command;
 mod files;
+mod meant;
 mod words;
 
 #[cfg(test)]
 mod tests;
 
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 use rayon::prelude::*;
 
@@ -183,6 +185,9 @@ pub struct Index {
     words: Vec<(String, u32)>,
     /// Each entry's records, in order, with the stem's weight in each.
     entries: Vec<Vec<(u32, u32)>>,
+    /// Where each piece of the word list a reader's browser is given
+    /// starts, once asked for.
+    starts: OnceLock<Vec<usize>>,
 }
 
 /// A record found, and how well it matched.
@@ -250,6 +255,7 @@ impl Index {
             average,
             words,
             entries,
+            starts: OnceLock::new(),
         }
     }
 

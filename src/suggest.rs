@@ -49,7 +49,7 @@ pub(crate) fn one_slip<'a>(
 }
 
 /// Edits between two spellings, a swap of neighbours counting as one.
-fn distance(a: &str, b: &str) -> usize {
+pub(crate) fn distance(a: &str, b: &str) -> usize {
     let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();
     let width = b.len() + 1;

@@ -470,8 +470,9 @@ fn a_long_word_list_is_cut_into_pieces_each_word_in_the_one_its_first_word_says(
     let _ = std::fs::remove_dir_all(root);
     let pieces = files::pieces(&index, 0, 200);
     assert!(pieces.len() > 3, "{}", pieces.len());
-    assert_eq!(pieces[0].0, "");
-    let firsts: Vec<&str> = pieces.iter().map(|(first, _)| first.as_str()).collect();
+    assert_eq!(pieces[0].0, 0);
+    let words: Vec<&str> = index.words().collect();
+    let firsts: Vec<&str> = pieces.iter().map(|&(start, _)| words[start]).collect();
     assert!(
         firsts
             .windows(2)
@@ -497,4 +498,180 @@ fn a_long_word_list_is_cut_into_pieces_each_word_in_the_one_its_first_word_says(
     }
     // Whole where it is small enough.
     assert_eq!(files::pieces(&index, usize::MAX, 200).len(), 1);
+}
+
+#[test]
+fn a_search_finding_nothing_offers_the_nearest_words_the_site_writes() {
+    let (renderer, root) = site(
+        "meant",
+        &[
+            (
+                "content/one.md",
+                "---\ntitle: One\n---\n\
+                 swapped missing extra changed short far cart card bard barn alpha5 𐌰𐌱\n",
+            ),
+            ("content/two.md", "---\ntitle: Two\n---\ncart\n"),
+        ],
+    );
+    let index = index_of(&renderer, 0);
+    let _ = std::fs::remove_dir_all(root);
+    // The words asked for, whether the last is being typed, and the words
+    // meant.
+    let cases: &[(&str, bool, Option<&str>)] = &[
+        ("swpaped", false, Some("swapped")),
+        ("misssing", false, Some("missing")),
+        ("mising", false, Some("missing")),
+        ("chenged", false, Some("changed")),
+        // Two edits from a word of five characters or more, one from a
+        // shorter.
+        ("chngd", false, Some("changed")),
+        ("chnxd", false, None),
+        ("shrt", false, Some("short")),
+        ("shtr", false, None),
+        ("fra", false, Some("far")),
+        // Counted by code point, not by UTF-16 code unit.
+        ("𐌰𐌱𐌲", false, Some("𐌰𐌱")),
+        ("𐌰𐌲", false, None),
+        // The word held by the most records, then the first.
+        ("carx", false, Some("cart")),
+        ("barx", false, Some("bard")),
+        // A word too short, or of Chinese, Japanese or Korean, is kept.
+        ("fa", false, None),
+        ("日本語", false, None),
+        ("zz swpaped", false, Some("zz swapped")),
+        ("日本語 swpaped", false, Some("日本語 swapped")),
+        // Every other word is kept as written.
+        ("Swpaped XY", false, Some("swapped XY")),
+        ("Swpaped, Mising!", false, Some("swapped, missing!")),
+        // None where a word has no word near.
+        ("swpaped zzzzzz", false, None),
+        // None where the words respelt find nothing: here they run into
+        // one word.
+        ("alpah 7", false, Some("alpha5 7")),
+        ("alpah.7", false, None),
+        // None where some page is found.
+        ("swapped", false, None),
+        ("swpaped short", false, None),
+        ("", false, None),
+        // A word being typed is respelt only where it starts no word.
+        ("swa", true, None),
+        ("mising", true, Some("missing")),
+    ];
+    for &(words, typing, meant) in cases {
+        let results = results(&renderer, &index, words, typing, SHOWN);
+        assert_eq!(results.suggestion.as_deref(), meant, "{words} {typing}");
+    }
+}
+
+#[test]
+fn a_word_is_respelt_from_the_piece_of_the_word_list_it_falls_in() {
+    let mut state: u64 = 1;
+    let mut letter = || {
+        state =
+            (state.wrapping_mul(6_364_136_223_846_793_005)).wrapping_add(1_442_695_040_888_963_407);
+        char::from(b'a' + ((state >> 33) % 26) as u8)
+    };
+    let words: Vec<String> = (0..300)
+        .map(|_| (0..8).map(|_| letter()).collect())
+        .collect();
+    let page = format!("---\ntitle: Words\n---\n{}\n", words.join(" "));
+    let (renderer, root) = site("meant-pieces", &[("content/words.md", &page)]);
+    let index = index_of(&renderer, 0);
+    let _ = std::fs::remove_dir_all(root);
+    let starts: Vec<usize> = (files::pieces(&index, 0, 200).into_iter())
+        .map(|(start, _)| start)
+        .collect();
+    assert!(starts.len() > 3, "{starts:?}");
+    let listed: Vec<&str> = index.words().collect();
+    let first = listed[starts[2]];
+    // One edit from the first word of a piece, before it, and so in the
+    // piece before; and after it, in its own.
+    let before = &first[..first.len() - 1];
+    let after = format!("{first}q");
+    assert_eq!(index.meant_among(before, false, &starts), None);
+    assert_eq!(
+        index.meant_among(before, false, &[0]).as_deref(),
+        Some(first)
+    );
+    assert_eq!(
+        index.meant_among(&after, false, &starts).as_deref(),
+        Some(first)
+    );
+}
+
+#[test]
+fn the_command_offers_the_words_meant_where_it_finds_none() {
+    let (_, root) = site("command-meant", &[("content/zfs.md", ZFS)]);
+    let cases: &[(&str, &str)] = &[
+        (
+            "Opneing",
+            "No page holds `Opneing`.\nDid you mean `opening`?\n",
+        ),
+        (
+            "Opneing XY",
+            "No page holds `Opneing XY`.\nDid you mean `opening XY`?\n",
+        ),
+        ("nowhere", "No page holds `nowhere`.\n"),
+    ];
+    let said: Vec<String> = (cases.iter())
+        .map(|&(words, _)| said(&root, words, None).unwrap())
+        .collect();
+    let _ = std::fs::remove_dir_all(&root);
+    for (&(words, wanted), said) in cases.iter().zip(&said) {
+        assert_eq!(said, wanted, "{words}");
+    }
+}
+
+#[test]
+fn the_command_offers_the_words_the_first_language_offering_any_meant() {
+    let (_, root) = site(
+        "command-meant-languages",
+        &[
+            ("statac.yaml", "title: Site\nlanguage: [en, fr]\n"),
+            (
+                "content/fr/index.md",
+                "---\ntitle: Accueil\n---\nBienvenue.\n",
+            ),
+            ("content/one.md", "---\ntitle: One\n---\nalpha\n"),
+            ("content/fr/one.md", "---\ntitle: Un\n---\nalphe\n"),
+        ],
+    );
+    let cases: &[(&str, Option<&str>, &str)] = &[
+        (
+            "alphx",
+            None,
+            "No page holds `alphx`.\nDid you mean `alpha`?\n",
+        ),
+        (
+            "bienvenu",
+            None,
+            "No page holds `bienvenu`.\nDid you mean `bienvenue`?\n",
+        ),
+        ("bienvenu", Some("en"), "No page holds `bienvenu`.\n"),
+        (
+            "alphx",
+            Some("fr"),
+            "No page holds `alphx`.\nDid you mean `alphe`?\n",
+        ),
+        // A language finding some is shown alone, with nothing offered.
+        (
+            "alpha",
+            None,
+            "\
+en
+1 page holds `alpha`:
+
+  One
+  /one/
+  alpha
+",
+        ),
+    ];
+    let said: Vec<String> = (cases.iter())
+        .map(|&(words, language, _)| said(&root, words, language).unwrap())
+        .collect();
+    let _ = std::fs::remove_dir_all(&root);
+    for (&(words, language, wanted), said) in cases.iter().zip(&said) {
+        assert_eq!(said, wanted, "{words} {language:?}");
+    }
 }

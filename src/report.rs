@@ -188,8 +188,10 @@ impl<'a> Report<'a> {
 
     /// What `statac search` found for `words`. Of one language searched:
     /// how many pages, then each shown at the part that matched best, the
-    /// words matched in bold. Of several: that for each language that found
-    /// any, under its code.
+    /// words matched in bold, or where none, the words it may have meant.
+    /// Of several: that for each language that found any, under its code,
+    /// or where none did, the words the first language offering some may
+    /// have meant.
     pub fn found(&self, words: &str, found: &crate::search::Outcome) -> String {
         if let [(_, results)] = found.found.as_slice() {
             return self.results(words, results);
@@ -201,10 +203,15 @@ impl<'a> Report<'a> {
                 format!("{heading}\n{}", self.results(words, results))
             })
             .collect();
-        match blocks.is_empty() {
-            true => format!("{}\n", self.said(&wording::found(words, 0, false))),
-            false => blocks.join("\n"),
+        if !blocks.is_empty() {
+            return blocks.join("\n");
         }
+        let mut out = format!("{}\n", self.said(&wording::found(words, 0, false)));
+        let meant = (found.found.iter()).find_map(|(_, results)| results.suggestion.as_deref());
+        if let Some(meant) = meant {
+            out.push_str(&format!("{}\n", self.said(&wording::meant(meant))));
+        }
+        out
     }
 
     /// What one language's search found for `words`.
@@ -212,6 +219,10 @@ impl<'a> Report<'a> {
         let (shown, pages) = (&found.shown, found.pages);
         let mut out = self.said(&wording::found(words, pages, found.some));
         out.push('\n');
+        if let Some(meant) = &found.suggestion {
+            out.push_str(&self.said(&wording::meant(meant)));
+            out.push('\n');
+        }
         for found in shown.iter() {
             let named = match &found.heading {
                 Some(heading) => format!("{} \u{203a} {heading}", found.title),

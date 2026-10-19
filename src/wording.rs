@@ -1704,6 +1704,12 @@ pub(crate) fn found(words: &str, pages: usize, some: bool) -> String {
     }
 }
 
+/// The line after `found`'s where no page holds the words, offering
+/// `meant`, the words respelt as the site writes them.
+pub(crate) fn meant(meant: &str) -> String {
+    format!("Did you mean `{meant}`?")
+}
+
 /// The line after the pages `statac search` shows, where it found more.
 pub(crate) fn more_found(more: usize) -> String {
     let pages = if more == 1 { "page" } else { "pages" };

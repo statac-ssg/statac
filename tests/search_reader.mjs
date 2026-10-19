@@ -1,7 +1,8 @@
 // Runs the search script a build wrote, reading the files beside it from
 // the disk, and prints what each search asked finds: for each, the pages
-// found in all, whether they hold only some of the words, and each result
-// shown as its address, title, day, heading and excerpt.
+// found in all, whether they hold only some of the words, each result
+// shown as its address, title, day, heading and excerpt, and the words
+// suggested where none are found.
 //
 //   node search_reader.mjs <site>/search/index.js '[["words", typing], ...]' [later.js]
 //
@@ -27,7 +28,7 @@ if (later) {
 }
 const found = [];
 for (const [words, typing] of JSON.parse(asked)) {
-  const { count, partial, results } = await search(words, { shown: 100, typing });
+  const { count, partial, results, suggestion } = await search(words, { shown: 100, typing });
   found.push([
     count,
     partial,
@@ -38,6 +39,7 @@ for (const [words, typing] of JSON.parse(asked)) {
       heading,
       excerpt.map(({ text, marked }) => [text, marked]),
     ]),
+    suggestion,
   ]);
 }
 process.stdout.write(JSON.stringify(found));

@@ -10,6 +10,10 @@ const STARTING = 0.8;
 // About how many UTF-16 code units of text are shown around a match.
 const BEFORE = 60;
 const AFTER = 140;
+// The fewest characters a word respelt has, and the fewest it has to be
+// two edits from another; a shorter word may be one.
+const SHORTEST = 3;
+const TWO_EDITS = 5;
 
 const MARKS = /[̀-ͯ᪰-᫿᷀-᷿⃐-⃿︠-︯]/gu;
 // Chinese, Japanese and Korean, where one letter may start many words.
@@ -118,6 +122,81 @@ async function lookedIn(word, typing, marked) {
   return looked;
 }
 
+/** Edits between `a` and `b` by code point, a swap of neighbours counting as one. */
+function edits(a, b) {
+  const [x, y] = [[...a], [...b]];
+  let before = [];
+  let last = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i += 1) {
+    const row = [i];
+    for (let j = 1; j <= y.length; j += 1) {
+      let best = Math.min(last[j] + 1, row[j - 1] + 1, last[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && x[i - 1] === y[j - 2] && x[i - 2] === y[j - 1]) {
+        best = Math.min(best, before[j - 2] + 1);
+      }
+      row.push(best);
+    }
+    [before, last] = [last, row];
+  }
+  return last[y.length];
+}
+
+/**
+ * The word nearest `word` in the piece of the word list it falls in: the
+ * fewest edits away, then the one held by the most records, then the
+ * first. A word of fewer than five characters is near a word one edit
+ * away, a longer one two.
+ */
+async function nearest(word) {
+  const length = [...word].length;
+  const reach = length < TWO_EDITS ? 1 : 2;
+  const piece = await unpacked(FILES.words[pieceOf(word)][1]);
+  let found = null;
+  piece.words.forEach((listed, place) => {
+    if (listed === word || Math.abs([...listed].length - length) > reach) {
+      return;
+    }
+    const apart = edits(word, listed);
+    const held = piece.records[piece.stems[place]].length / 2;
+    const nearer =
+      !found || apart < found.apart || (apart === found.apart && held > found.held);
+    if (apart <= reach && nearer) {
+      found = { listed, apart, held };
+    }
+  });
+  return found?.listed ?? null;
+}
+
+/**
+ * `query` with each word of `asked` that `looked` finds in no records
+ * list respelt as the nearest word; none where some such word has none near,
+ * or `query` respelt still finds nothing. A word of fewer than three
+ * characters, or of Chinese, Japanese or Korean, is kept as written.
+ */
+async function meant(query, located, all, asked, looked) {
+  const respelt = new Map();
+  for (const [at, word] of asked.entries()) {
+    if (looked[at].length || [...word].length < SHORTEST || UNSPACED.test(word)) {
+      continue;
+    }
+    const near = await nearest(word);
+    if (near === null) {
+      return null;
+    }
+    respelt.set(word, near);
+  }
+  let written = 0;
+  let words = "";
+  located.forEach(([start, end], at) => {
+    if (respelt.has(all[at])) {
+      words += query.slice(written, start) + respelt.get(all[at]);
+      written = end;
+    }
+  });
+  words += query.slice(written);
+  return (await found(words, 0, false, false)).count ? words : null;
+}
+
 /** The text around the first word in `text` that is `marked`, or its start, cut at words. */
 function excerpt(text, marked) {
   const found = spans(text);
@@ -170,7 +249,12 @@ function excerpt(text, marked) {
  * `url`; `title`, what a list calls the page; `heading`; `date`, a day as
  * `2026-10-19`; `day`, the date as the site writes it, none where the page
  * is called by it; and `excerpt`, a list of pieces of text each saying
- * whether it is `marked` as a word asked for.
+ * whether it is `marked` as a word asked for. Gives too `suggestion`:
+ * where no page is found, the words as typed with each the index doesn't
+ * list respelt as the nearest word it does, where every such word has one
+ * near and the words respelt find some page; otherwise null. Words of
+ * fewer than three characters, or of Chinese, Japanese or Korean, are kept
+ * as typed.
  */
 export async function search(words, { shown = 10, typing = false } = {}) {
   try {
@@ -186,7 +270,7 @@ export async function search(words, { shown = 10, typing = false } = {}) {
   }
 }
 
-async function found(query, shown, typing) {
+async function found(query, shown, typing, respelling = true) {
   const located = spans(query);
   const all = located.map(([start, end]) => fold(query.slice(start, end)));
   const lastly = located[located.length - 1];
@@ -196,7 +280,7 @@ async function found(query, shown, typing) {
     typed && ([...typed].length > 1 || UNSPACED.test(typed)) ? typed : null;
   const asked = [...new Set(all)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   if (!asked.length) {
-    return { count: 0, partial: false, results: [] };
+    return { count: 0, partial: false, results: [], suggestion: null };
   }
   const marked = new Set();
   const [records, ...looked] = await Promise.all([
@@ -268,5 +352,7 @@ async function found(query, shown, typing) {
       };
     }),
   );
-  return { count: best.length, partial: most < asked.length, results };
+  const suggestion =
+    !best.length && respelling ? await meant(query, located, all, asked, looked) : null;
+  return { count: best.length, partial: most < asked.length, results, suggestion };
 }
