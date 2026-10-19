@@ -77,17 +77,16 @@ pub fn records(renderer: &Renderer, language: LanguageId) -> Vec<Record> {
     });
     let records = pages.par_iter().flat_map_iter(|&page| {
         renderer.cut_at_headings(page).into_iter().map(move |cut| {
-            let mut text = crate::markdown::words_of(&cut.html);
-            if let Some((_, heading)) = &cut.heading {
-                text = text
-                    .trim_start()
-                    .strip_prefix(heading.as_str())
-                    .map_or(text.clone(), str::to_owned);
+            let mut text = crate::markdown::lines_of(&cut.html);
+            if let Some((_, heading)) = &cut.heading
+                && let Some(rest) = text.strip_prefix(heading.as_str())
+            {
+                text = rest.trim_start().to_owned();
             }
             Record {
                 page,
                 heading: cut.heading,
-                text: closed_up(&text),
+                text,
                 described: described(&cut.html),
             }
         })

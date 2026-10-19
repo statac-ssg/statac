@@ -2673,6 +2673,26 @@ fn the_words_of_html_are_parted_where_a_reader_sees_them_apart() {
     );
 }
 
+#[test]
+fn the_lines_of_html_break_where_a_block_ends_and_nowhere_else() {
+    for (html, lines) in [
+        ("<p>a</p><p>b</p>", "a\nb"),
+        ("<p>a</p>\n\n<p>b</p>\n", "a\nb"),
+        ("<p>one\ntwo  three</p>", "one two three"),
+        ("a<br>b <em>c</em>d", "a\nb cd"),
+        (
+            "<ul>\n<li>one</li>\n<li>two\n<ul><li>in</li></ul></li>\n</ul>",
+            "one\ntwo\nin",
+        ),
+        ("<table><tr><td>a</td><td>b</td></tr></table>", "a\nb"),
+        ("<p>a <script>x</script>b</p>", "a b"),
+        ("<p>a\u{2029}b</p>", "a\nb"),
+        ("", ""),
+    ] {
+        assert_eq!(lines_of(html), lines, "{html:?}");
+    }
+}
+
 /// A page written in HTML has its excerpt and opening read out of its
 /// markup as written.
 #[test]

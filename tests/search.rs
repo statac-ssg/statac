@@ -351,7 +351,7 @@ fn the_browsers_script_finds_what_statac_search_finds() {
             "---\ntitle: Café notes\ndate: 2026-01-03\n---\n\
              A naïve start, about cafés.\n\n## Brewing {{#brewing}}\n\n\
              {long}Brewing runs best slowly. {long}\n\n## Running {{#running}}\n\n\
-             Runners run, and running is fun.\n"
+             Runners run, and running is fun.\n\n- one way to brew\n- another\n  - set in\n"
         ),
     );
     site.write(
@@ -390,6 +390,7 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         ("ログ", false),
         ("日本", true),
         ("untitled", false),
+        ("another", false),
         ("", false),
     ];
     let rust = statac_finds(&site, 0, asked);
@@ -404,6 +405,11 @@ fn the_browsers_script_finds_what_statac_search_finds() {
         "{rust}"
     );
     assert!(rust.contains("\"Post 1\",\"1 January 2026\","), "{rust}");
+    // Each item of a list stands on a line of its own.
+    assert!(
+        rust.contains("way to brew\\n\",false],[\"another\",true],[\"\\nset in"),
+        "{rust}"
+    );
     let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
         return;
     };

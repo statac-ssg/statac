@@ -75,19 +75,27 @@
     }
     if (page.excerpt.length) {
       const excerpt = document.createElement("p");
+      let before = "";
       excerpt.append(
         ...page.excerpt.map((piece) => {
+          const text = piece.text.replace(/\n/g, (_, at, whole) => parting(whole[at - 1] ?? before));
+          before = text.at(-1) ?? before;
           if (!piece.marked) {
-            return piece.text;
+            return text;
           }
           const mark = document.createElement("mark");
-          mark.textContent = piece.text;
+          mark.textContent = text;
           return mark;
         }),
       );
       item.append(excerpt);
     }
     return item;
+  }
+
+  /** What stands where one block of the text ends and the next starts, after `last`. */
+  function parting(last) {
+    return ".,:;!?…。、，：；！？".includes(last) ? " " : " · ";
   }
 </script>
 {% endif %}

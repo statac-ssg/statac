@@ -335,7 +335,7 @@ pub fn closed_up(text: &str) -> String {
 /// runs on without spaces, Chinese and Japanese, each character is one.
 pub(super) fn count_words(html: &str) -> usize {
     let mut words = 0;
-    for token in read_words(html, true).split_whitespace() {
+    for token in read_words(html, true, false).split_whitespace() {
         let mut in_a_word = false;
         for c in token.chars() {
             if runs_without_spaces(c) {
@@ -373,8 +373,33 @@ fn runs_without_spaces(c: char) -> bool {
 /// references read. A line break or a block's edge parts the words either
 /// side, though no space stands between them.
 pub fn words_of(html: &str) -> String {
-    read_words(html, false)
+    read_words(html, false, false)
 }
+
+/// [`words_of`] with a line break wherever a line break or a block's edge
+/// parts the words, and every other run of white space one space.
+pub fn lines_of(html: &str) -> String {
+    let marked = read_words(html, false, true);
+    let mut out = String::with_capacity(marked.len());
+    let mut gap: Option<char> = None;
+    for c in marked.chars() {
+        if c.is_whitespace() {
+            if c == EDGE || gap.is_none() {
+                gap = Some(if c == EDGE { '\n' } else { ' ' });
+            }
+            continue;
+        }
+        if let Some(gap) = gap.take().filter(|_| !out.is_empty()) {
+            out.push(gap);
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// What [`read_words`] marks a block's edge with, for [`lines_of`]: the
+/// paragraph separator, which is white space a text rarely holds.
+const EDGE: char = '\u{2029}';
 
 /// Elements whose text a browser reads without markup and doesn't show:
 /// `iframe`, `noembed` and `noframes` show theirs only where the browser
@@ -385,15 +410,16 @@ pub(super) const UNSEEN: &[&str] = &[
 ];
 
 /// [`words_of`], each `<pre>` element taken out where `without_code`, a
-/// space kept in its place so the words either side stay apart. What a
-/// browser doesn't show is taken out always.
-fn read_words(html: &str, without_code: bool) -> String {
+/// space kept in its place so the words either side stay apart, and each
+/// block's edge marked with [`EDGE`] where `edges`. What a browser doesn't
+/// show is taken out always.
+fn read_words(html: &str, without_code: bool, edges: bool) -> String {
     let mut out = String::with_capacity(html.len());
     let mut parted = false;
     let mut from = 0;
     let mut pieces = markup(html);
     while let Some((at, piece)) = pieces.next() {
-        text_words(&mut out, &html[from..at.start], &mut parted);
+        text_words(&mut out, &html[from..at.start], &mut parted, edges);
         from = at.end;
         let mut past_end = |name: &str| {
             pieces
@@ -415,18 +441,22 @@ fn read_words(html: &str, without_code: bool) -> String {
             Markup::Other => {}
         }
     }
-    text_words(&mut out, &html[from..], &mut parted);
+    text_words(&mut out, &html[from..], &mut parted, edges);
     out
 }
 
 /// The words of `text`, standing between tags, onto `out`: its character
-/// references read, and parted from the words before where `parted` says.
-fn text_words(out: &mut String, text: &str, parted: &mut bool) {
+/// references read, and parted from the words before where `parted` says,
+/// by [`EDGE`] where `edges`.
+fn text_words(out: &mut String, text: &str, parted: &mut bool, edges: bool) {
     if text.is_empty() {
         return;
     }
     if std::mem::take(parted) {
-        part(out, text);
+        match edges {
+            true => out.push(EDGE),
+            false => part(out, text),
+        }
     }
     let mut rest = text;
     while let Some(at) = rest.find('&') {

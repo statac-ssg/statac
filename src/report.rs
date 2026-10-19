@@ -225,7 +225,8 @@ impl<'a> Report<'a> {
                 for (text, matched) in &found.excerpt {
                     match matched {
                         true => out.push_str(&self.paint.paint(BOLD, text)),
-                        false => out.push_str(text),
+                        // Each line the text runs to is set in with the first.
+                        false => out.push_str(&text.replace('\n', "\n  ")),
                     }
                 }
                 out.push('\n');
