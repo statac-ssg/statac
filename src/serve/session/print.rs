@@ -496,6 +496,34 @@ impl Taken<'_> {
         }
     }
 
+    /// Each of `keys`, read in the reading `was`, that this reading holds
+    /// otherwise, `to` carrying `was`'s ids here. A setting or a language
+    /// prints as nothing, the whole site's fingerprint covering it, so it
+    /// is taken as changed where the file its words are in is.
+    pub fn changed(
+        &self,
+        was: &Taken<'_>,
+        to: &Translation,
+        keys: impl Iterator<Item = Key>,
+    ) -> Vec<Key> {
+        let reading = was.reading;
+        let file_changed = |path: &str| {
+            (reading.sources.iter().zip(&to.sources))
+                .any(|((held, _), now)| held == Path::new(path) && now.is_none())
+        };
+        let changed = keys.filter(|&key| match key {
+            Key::Setting(_) => file_changed(crate::config::FILE_NAME),
+            Key::Language(id) => match &reading.renderer.dates().language(id).whence {
+                crate::language::Whence::Site(path) => file_changed(path),
+                _ => false,
+            },
+            _ => to
+                .key(key)
+                .is_none_or(|carried| was.of(key) != self.of(carried)),
+        });
+        changed.collect()
+    }
+
     /// The fingerprint of what the reading holds under `key`.
     pub fn of(&self, key: Key) -> u64 {
         let reading = self.reading;

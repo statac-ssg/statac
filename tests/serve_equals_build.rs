@@ -3,13 +3,17 @@
 //! equals a fresh build's byte for byte, and the two tell the same
 //! problems.
 
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Condvar, Mutex};
 use std::time::{Duration, SystemTime};
 
 use image::{ImageFormat, Rgb, RgbImage};
 use statac::build::{self, Mode, Options, Outcome};
 use statac::new::{self, Input, Locale, Machine};
+use statac::reads::Key;
 use statac::report::Report;
 use statac::serve::session::{Round, Session};
 
@@ -47,12 +51,22 @@ const PAGE: &str = "{{ page.content }}\n\
 const FEED: &str = "<feed>{% for post in posts %}<entry>{{ post.url }} {{ post.title }} \
                     {{ post.content }}</entry>{% endfor %}</feed>\n";
 
+const LATIN: &[u8] = include_bytes!("../src/cards/fonts/test/test-latin.ttf");
+
 fn jpeg(width: u32, height: u32) -> Vec<u8> {
     let picture = RgbImage::from_fn(width, height, |x, y| {
         Rgb([(x * 3) as u8, (y * 5) as u8, 90])
     });
     let mut bytes = std::io::Cursor::new(Vec::new());
     picture.write_to(&mut bytes, ImageFormat::Jpeg).unwrap();
+    bytes.into_inner()
+}
+
+/// A picture of one grey, `width` by `height`.
+fn png(width: u32, height: u32, grey: u8) -> Vec<u8> {
+    let picture = RgbImage::from_pixel(width, height, Rgb([grey, grey, grey]));
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    picture.write_to(&mut bytes, ImageFormat::Png).unwrap();
     bytes.into_inner()
 }
 
@@ -230,6 +244,11 @@ impl Site {
                 text(fresh)
             );
         }
+        // A round that stops writes nothing, so what it built again is held
+        // to nothing here.
+        if !round.outcome.stopped() {
+            REACHED.with_borrow_mut(|reached| reached.extend(round.changed.iter().map(kind)));
+        }
     }
 }
 
@@ -271,6 +290,7 @@ fn through(site: &Site, edits: &[Edit]) -> Vec<(usize, usize)> {
         out: None,
         ..site.options()
     });
+    session.note_changes();
     assert!(!round.outcome.stopped(), "{}", site.said(&round.outcome));
     site.same(&session, &round, "the first build");
     let mut built = vec![(round.built, round.outputs)];
@@ -281,6 +301,158 @@ fn through(site: &Site, edits: &[Edit]) -> Vec<(usize, usize)> {
         built.push((round.built, round.outputs));
     }
     built
+}
+
+/// Every kind of key an output can read, by name, and the kind of a key.
+/// A kind added to `Key` fails to compile in `kind` until it is named here,
+/// and then fails the census until an edit reaches it or it is told
+/// unreachable.
+macro_rules! kinds {
+    ($($kind:ident),* $(,)?) => {
+        const KINDS: &[&str] = &[$(stringify!($kind)),*];
+
+        fn kind(key: &Key) -> &'static str {
+            match key {
+                $(Key::$kind { .. } => stringify!($kind),)*
+            }
+        }
+    };
+}
+
+kinds![
+    Field,
+    FieldOfEvery,
+    FieldOfWriters,
+    Body,
+    Neighbours,
+    Translations,
+    Card,
+    ListPage,
+    ListHead,
+    Members,
+    List,
+    Pages,
+    Folders,
+    Home,
+    Spellings,
+    Lists,
+    ListsIn,
+    Setting,
+    Language,
+    Template,
+    Data,
+    Asset,
+    Picture,
+    Pictures,
+    Beside,
+    Static,
+    Files,
+    Fetched,
+    Mentions,
+    Today,
+];
+
+type Reached = BTreeSet<&'static str>;
+
+thread_local! {
+    /// The kinds of key the edits made on this thread changed under an
+    /// output that had read one, each edit followed by a round that left
+    /// what a build leaves.
+    static REACHED: RefCell<Reached> = RefCell::default();
+}
+
+/// Where a test the census counts has got to.
+enum Run {
+    Running,
+    Done(Reached),
+    Failed,
+}
+
+/// Each test the census counts, by the test, once it has begun.
+static RUNS: Mutex<BTreeMap<usize, Run>> = Mutex::new(BTreeMap::new());
+static ENDED: Condvar = Condvar::new();
+
+/// A test being counted, which holds what it reached once it ends.
+struct Counted(usize);
+
+/// Counts `test` as it runs, unless it has run already: the test and the
+/// census each run it, and the first to begin runs it while the other
+/// waits.
+fn counted(test: fn()) -> Option<Counted> {
+    let key = test as usize;
+    let mut runs = RUNS.lock().unwrap();
+    loop {
+        match runs.get(&key) {
+            None | Some(Run::Failed) => break,
+            Some(Run::Running) => runs = ENDED.wait(runs).unwrap(),
+            Some(Run::Done(_)) => return None,
+        }
+    }
+    runs.insert(key, Run::Running);
+    REACHED.take();
+    Some(Counted(key))
+}
+
+impl Drop for Counted {
+    fn drop(&mut self) {
+        let run = match std::thread::panicking() {
+            true => Run::Failed,
+            false => Run::Done(REACHED.take()),
+        };
+        RUNS.lock().unwrap().insert(self.0, run);
+        ENDED.notify_all();
+    }
+}
+
+/// The kinds of key the edits of `test` reached.
+fn reached_by(test: fn()) -> Reached {
+    test();
+    match &RUNS.lock().unwrap()[&(test as usize)] {
+        Run::Done(reached) => reached.clone(),
+        _ => unreachable!("a test that returned is done"),
+    }
+}
+
+/// The kinds of key no edit can reach.
+const UNREACHABLE: &[&str] = &[
+    // Read only where a name reaches no file, which stops the round, so no
+    // round that read it is kept for an edit to reach.
+    "Files",
+];
+
+/// The tests whose edits, between them, reach every other kind of key.
+const CENSUS: &[fn()] = &[
+    a_sharing_card_and_what_it_is_drawn_from,
+    the_photographs_a_page_lists_follow_one_added_and_removed,
+    files_beside_a_page_and_in_static_added_changed_and_removed,
+    the_sites_own_words_for_a_language_added_edited_and_removed,
+    a_data_file_a_picture_and_what_describes_it,
+    a_template_a_snippet_and_a_stylesheet,
+    the_settings_and_a_translation,
+    a_new_day_builds_what_read_the_day,
+    a_still_fetched_and_a_still_found_absent,
+    a_mention_written_changed_and_removed_rebuilds_only_the_pages_that_read_theirs,
+    a_tag_or_a_series_found_by_a_spelling_follows_the_spellings_there_are,
+    what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them,
+    pages_chosen_from_every_page_by_a_field_follow_the_field,
+    the_starters_posts_and_tags,
+];
+
+/// A kind of key no edit reaches is one a read serve misses could hide in.
+#[test]
+fn every_kind_of_key_an_edit_can_reach_is_reached() {
+    let reached: Vec<Reached> = std::thread::scope(|scope| {
+        let tests = CENSUS
+            .iter()
+            .map(|&test| scope.spawn(move || reached_by(test)));
+        let tests: Vec<_> = tests.collect();
+        tests.into_iter().map(|test| test.join().unwrap()).collect()
+    });
+    let reached: Reached = reached.into_iter().flatten().collect();
+    let unreached: Vec<&str> = (KINDS.iter().copied())
+        .filter(|kind| !reached.contains(kind))
+        .collect();
+    assert_eq!(unreached, UNREACHABLE, "the kinds no edit reaches");
 }
 
 #[test]
@@ -515,6 +687,54 @@ fn a_file_a_page_shows_written_again_at_its_length_within_the_step_is_read_again
     );
 }
 
+#[test]
+fn files_beside_a_page_and_in_static_added_changed_and_removed() {
+    let Some(_counted) = counted(files_beside_a_page_and_in_static_added_changed_and_removed)
+    else {
+        return;
+    };
+    let site = Site::new("files");
+    site.write(
+        "templates/note.html",
+        "{{ page.file('note.txt').text }}\n{{ page.file('/note.txt').text }}\n",
+    );
+    site.write(
+        "content/notes/index.md",
+        "---\ntitle: Notes\ntype: note\n---\nNotes.\n",
+    );
+    site.write("content/notes/note.txt", "one\n");
+    site.write("static/note.txt", "one\n");
+    through(
+        &site,
+        &[
+            ("a file in static/ added", &|site| {
+                site.write("static/other.txt", "other\n")
+            }),
+            ("the file in static/ a page shows changed", &|site| {
+                site.write("static/note.txt", "three\n")
+            }),
+            ("a file in static/ removed", &|site| {
+                site.remove("static/other.txt")
+            }),
+            ("a file beside the page added", &|site| {
+                site.write("content/notes/other.txt", "other\n")
+            }),
+            ("the file beside the page it shows changed", &|site| {
+                site.write("content/notes/note.txt", "three\n")
+            }),
+            ("a file beside the page removed", &|site| {
+                site.remove("content/notes/other.txt")
+            }),
+            // A name from the top reaches `content/` before `static/`.
+            (
+                "a file beside the writing at the name in static/",
+                &|site| site.write("content/note.txt", "four\n"),
+            ),
+            ("and removed", &|site| site.remove("content/note.txt")),
+        ],
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn a_page_replaced_by_a_link_or_a_folder() {
@@ -551,6 +771,9 @@ fn a_page_replaced_by_a_link_or_a_folder() {
 
 #[test]
 fn a_template_a_snippet_and_a_stylesheet() {
+    let Some(_counted) = counted(a_template_a_snippet_and_a_stylesheet) else {
+        return;
+    };
     let site = Site::new("templates");
     through(
         &site,
@@ -654,6 +877,9 @@ fn a_rule_narrowing_pictures_is_told_of_pages_kept_as_of_pages_built() {
 
 #[test]
 fn a_data_file_a_picture_and_what_describes_it() {
+    let Some(_counted) = counted(a_data_file_a_picture_and_what_describes_it) else {
+        return;
+    };
     let site = Site::new("data");
     let built = through(
         &site,
@@ -680,6 +906,9 @@ fn a_data_file_a_picture_and_what_describes_it() {
 
 #[test]
 fn the_settings_and_a_translation() {
+    let Some(_counted) = counted(the_settings_and_a_translation) else {
+        return;
+    };
     let site = Site::new("settings");
     let translated = post("Beitrag 2", "2026-01-02", "eins", "Der zweite Beitrag.");
     through(
@@ -702,6 +931,112 @@ fn the_settings_and_a_translation() {
                     "statac.yaml",
                     &SETTINGS.replace("posts_per_page: 2", "posts_per_page: 4"),
                 )
+            }),
+        ],
+    );
+}
+
+#[test]
+fn the_sites_own_words_for_a_language_added_edited_and_removed() {
+    let Some(_counted) = counted(the_sites_own_words_for_a_language_added_edited_and_removed)
+    else {
+        return;
+    };
+    let site = Site::new("words");
+    site.write("languages/de.yaml", "quotes: „ “ ‚ ‘\n");
+    site.write(
+        "content/de/post-1.md",
+        &post("Beitrag 1", "2026-01-01", "eins", "Der \"erste\" Beitrag."),
+    );
+    site.write(
+        "content/post-1.md",
+        &post("Post 1", "2026-01-01", "one", "The \"first\" post."),
+    );
+    through(
+        &site,
+        &[
+            ("the quotes", &|site| {
+                site.write("languages/de.yaml", "quotes: » « › ‹\n")
+            }),
+            ("words for another language added", &|site| {
+                site.write("languages/en.yaml", "quotes: « » ‹ ›\n")
+            }),
+            ("and removed", &|site| site.remove("languages/en.yaml")),
+        ],
+    );
+}
+
+/// A sharing card described as the title on a background, and a layout
+/// for posts that announces it.
+const CARD: &str = "background: background.png\nfont: text.ttf\n\n\
+                    title.text: \"{{ page.og_title }}\"\ntitle.place: centre\n\
+                    title.size: up to 75\ntitle.colour: \"#F2E9D3\"\n";
+
+const ANNOUNCED: &str = "{% if page.card is defined %}\
+                         <meta property=\"og:image\" content=\"{{ page.card.url }}\">\
+                         {% endif %}\n";
+
+#[test]
+fn a_sharing_card_and_what_it_is_drawn_from() {
+    let Some(_counted) = counted(a_sharing_card_and_what_it_is_drawn_from) else {
+        return;
+    };
+    let site = Site::new("card");
+    site.write("templates/og.yaml", CARD);
+    site.put("templates/og/background.png", &png(1200, 630, 40));
+    site.put("templates/og/text.ttf", LATIN);
+    site.write("templates/page.html", &format!("{BASE}{ANNOUNCED}{PAGE}"));
+    let own = "---\ntitle: Post 2\ndate: 2026-01-02\ntags: [one]\nog_image: card.png\n---\n\
+               Post 2 says this.\n";
+    through(
+        &site,
+        &[
+            ("a title a card shows", &|site| {
+                site.write(
+                    "content/post-2.md",
+                    &post("Post 2 again", "2026-01-02", "one", "Post 2 says this."),
+                )
+            }),
+            ("a picture of the page's own for its card", &|site| {
+                site.put("content/card.png", &png(600, 315, 90));
+                site.write("content/post-2.md", own);
+            }),
+            ("that picture changed", &|site| {
+                site.put("content/card.png", &png(600, 315, 120))
+            }),
+            ("the card described otherwise", &|site| {
+                site.write("templates/og.yaml", &CARD.replace("75", "60"))
+            }),
+            ("the card's background", &|site| {
+                site.put("templates/og/background.png", &png(1200, 630, 60))
+            }),
+        ],
+    );
+}
+
+#[test]
+fn the_photographs_a_page_lists_follow_one_added_and_removed() {
+    let Some(_counted) = counted(the_photographs_a_page_lists_follow_one_added_and_removed) else {
+        return;
+    };
+    let site = Site::new("photographs");
+    site.write(
+        "templates/album.html",
+        "{% for photo in page.photos() %}{{ photo }}\n{% endfor %}",
+    );
+    site.write(
+        "content/album/index.md",
+        "---\ntitle: Album\ntype: album\n---\nPhotographs.\n",
+    );
+    site.put("content/album/photo-1.jpg", &jpeg(48, 32));
+    through(
+        &site,
+        &[
+            ("a photograph added beside the page", &|site| {
+                site.put("content/album/photo-2.jpg", &jpeg(32, 48))
+            }),
+            ("and removed", &|site| {
+                site.remove("content/album/photo-2.jpg")
             }),
         ],
     );
@@ -1858,6 +2193,9 @@ fn round_of(session: &mut Session) -> Round {
 
 #[test]
 fn a_still_fetched_and_a_still_found_absent() {
+    let Some(_counted) = counted(a_still_fetched_and_a_still_found_absent) else {
+        return;
+    };
     let site = Site::new("stills");
     site.write(
         "snippets/youtube.html",
@@ -1912,6 +2250,11 @@ fn a_still_fetched_and_a_still_found_absent() {
 
 #[test]
 fn a_mention_written_changed_and_removed_rebuilds_only_the_pages_that_read_theirs() {
+    let Some(_counted) =
+        counted(a_mention_written_changed_and_removed_rebuilds_only_the_pages_that_read_theirs)
+    else {
+        return;
+    };
     let site = Site::new("mentions");
     site.write("statac.yaml", &format!("{SETTINGS}webmentions: true\n"));
     site.write(
@@ -1977,6 +2320,9 @@ fn a_mention_written_changed_and_removed_rebuilds_only_the_pages_that_read_their
 
 #[test]
 fn a_new_day_builds_what_read_the_day() {
+    let Some(_counted) = counted(a_new_day_builds_what_read_the_day) else {
+        return;
+    };
     let site = Site::new("midnight");
     site.write(
         "content/post-5.md",
@@ -1999,6 +2345,7 @@ fn a_new_day_builds_what_read_the_day() {
         out: None,
         ..day("2026-10-04")
     });
+    session.note_changes();
     assert!(!round.outcome.stopped(), "{}", site.said(&round.outcome));
     site.same_as(&day("2026-10-04"), &session, &round, "the first day");
     let folder = session.folder().to_path_buf();
@@ -2273,6 +2620,9 @@ fn a_stamp_in_a_page_kept_as_a_link_is_told_and_left() {
 
 #[test]
 fn pages_chosen_from_every_page_by_a_field_follow_the_field() {
+    let Some(_counted) = counted(pages_chosen_from_every_page_by_a_field_follow_the_field) else {
+        return;
+    };
     let site = Site::new("chosen");
     // Each page lists the pages that ask to be in the menu, those of its
     // own language, counts those that don't and those of another layout
@@ -2567,6 +2917,9 @@ fn a_page_that_reads_fields_past_counting_follows_every_one() {
 
 #[test]
 fn the_starters_posts_and_tags() {
+    let Some(_counted) = counted(the_starters_posts_and_tags) else {
+        return;
+    };
     let site = Site::starter("starter-posts");
     let post_2 = |title: &str, tags: &str, text: &str| post(title, "2026-01-02", tags, text);
     let built = through(
@@ -2753,6 +3106,10 @@ fn the_starters_menu_folders_feed_and_languages() {
 
 #[test]
 fn what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them() {
+    let Some(_counted) = counted(what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them)
+    else {
+        return;
+    };
     let site = Site::empty("lists-shown");
     site.write(
         "statac.yaml",
@@ -2822,6 +3179,11 @@ fn what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them() {
 
 #[test]
 fn a_tag_or_a_series_found_by_a_spelling_follows_the_spellings_there_are() {
+    let Some(_counted) =
+        counted(a_tag_or_a_series_found_by_a_spelling_follows_the_spellings_there_are)
+    else {
+        return;
+    };
     let site = Site::new("spellings");
     let found = "[{{ site.tags['Cafe'] is defined }} {{ 'Cafe' in site.tags }} \
                  {{ page.tags['Cafe'] is defined }} {{ site.series['Cafe'] is defined }}]\n";

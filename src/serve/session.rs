@@ -66,6 +66,8 @@ pub struct Session {
     /// The note on newer starter files, as worked out since the last
     /// save of one of them.
     newer: Option<Option<Problem>>,
+    /// Whether each round notes the keys it found changed.
+    notes: bool,
     took: Took,
 }
 
@@ -93,6 +95,10 @@ pub struct Round {
     pub noted: Vec<Noted>,
     /// The site as the round read it, where it built.
     pub read: Option<Read>,
+    /// Every key an output of the last round read that this round found
+    /// holding something else, as the last round names it, in order;
+    /// noted only where the session was asked to note them.
+    pub changed: Vec<Key>,
 }
 
 /// A site as a round read it, to be asked about a page afterwards.
@@ -194,6 +200,7 @@ impl Session {
             sets_after: false,
             after: None,
             newer: None,
+            notes: false,
             took: Took::default(),
         };
         let mut round = session.round(None, waiting);
@@ -239,6 +246,14 @@ impl Session {
     /// How long each part of the last round took.
     pub fn took(&self) -> Took {
         self.took
+    }
+
+    /// Has each round from the next on note the keys it found changed, in
+    /// [`Round::changed`]. That takes the fingerprint of every key read,
+    /// which a round otherwise stops short of, so it is only done when
+    /// asked.
+    pub fn note_changes(&mut self) {
+        self.notes = true;
     }
 
     /// Reads the site again, writes into its own files the dates and ids
@@ -379,6 +394,10 @@ impl Session {
         let whole = taken.whole(&plan, options);
         let outputs = plan.outputs.par_iter();
         let own: Vec<u64> = outputs.map(|&output| taken.own(output)).collect();
+        let changed = match &self.last {
+            Some(last) if self.notes => changed(last, taken),
+            _ => Vec::new(),
+        };
         let kept: Vec<Option<Built>> = match &self.last {
             Some(last) if last.whole == whole => carry(last, taken, &plan, &own),
             _ => plan.outputs.iter().map(|_| None).collect(),
@@ -537,6 +556,7 @@ impl Session {
                 pages,
                 built: Arc::clone(&built),
             }),
+            changed,
         };
         match left.filter(|_| round.outcome.published.is_some()) {
             Some(mut left) => {
@@ -613,6 +633,7 @@ impl Round {
             hooked: Vec::new(),
             noted: Vec::new(),
             read: None,
+            changed: Vec::new(),
         }
     }
 }
@@ -754,6 +775,22 @@ fn write(built: &mut [Built], staging: &Staging) -> Vec<Problem> {
         None
     });
     told.collect()
+}
+
+/// Every key an output of `last` read that the reading `now` holds
+/// otherwise, each once, in order.
+fn changed(last: &Last, now: Taken<'_>) -> Vec<Key> {
+    let was = Taken {
+        reading: &last.reading,
+        at: now.at,
+        prints: &last.prints,
+    };
+    let to = last.reading.to(now.reading);
+    let keys = last.built.iter().flat_map(|built| built.reads.keys());
+    let mut keys: Vec<Key> = keys.copied().collect();
+    keys.sort_unstable();
+    keys.dedup();
+    now.changed(&was, &to, keys.into_iter())
 }
 
 /// `output` as the reading `to` leads to has it.
