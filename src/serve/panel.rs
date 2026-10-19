@@ -10,6 +10,7 @@
 
 mod page;
 mod problems;
+mod search;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -46,6 +47,8 @@ pub struct Panel {
     gone: Option<String>,
     /// The site's folder, whole; none before the first round.
     root: Option<String>,
+    /// Whether serve shows drafts and posts waiting for their day.
+    drafts: bool,
 }
 
 /// What serve knows of a round besides the round itself.
@@ -56,6 +59,8 @@ pub struct Besides<'a> {
     /// What the terminal said of how it ended.
     pub said: &'a str,
     pub gone: Option<&'a str>,
+    /// Whether serve shows drafts and posts waiting for their day.
+    pub drafts: bool,
 }
 
 struct Stopped {
@@ -82,6 +87,10 @@ struct Built {
     kinds: String,
     /// Where the pages that round built are published, once asked.
     addresses: OnceLock<Addresses>,
+    /// The path the site is published under, as `/blog`, or empty.
+    base: String,
+    /// Each language's search index, by the language, once asked.
+    indexes: OnceLock<Vec<crate::search::Index>>,
 }
 
 struct Page {
@@ -168,6 +177,7 @@ impl Panel {
             rounds,
             gone: besides.gone.map(str::to_owned),
             root: Some(shown(&whole(site))),
+            drafts: besides.drafts,
         };
         if stopped {
             let errors = (outcome.problems.iter())
@@ -196,6 +206,7 @@ impl Panel {
             at,
             site: site.to_owned(),
             kinds: problems::kinds(&outcome.problems, &outcome.quiet),
+            base: base.to_owned(),
             ..Built::default()
         };
         for noted in std::mem::take(&mut round.noted) {
@@ -271,6 +282,13 @@ impl Panel {
             "{{\"v\":2,{},\"page\":{facts},\"names\":{names}}}",
             self.parts(page),
         )
+    }
+
+    /// What a reader would find for `words`, its last word being typed
+    /// where `typing`, in the site as the last round to build it read it,
+    /// the language of the page published as `file` first, as JSON.
+    pub fn search(&self, words: &str, typing: bool, file: Option<&str>) -> String {
+        search::found(&self.built, self.drafts, words, typing, file)
     }
 
     /// The page's problems and the round's in their parts, the rounds,

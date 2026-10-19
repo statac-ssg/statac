@@ -5,6 +5,7 @@
 mod command;
 mod files;
 mod meant;
+mod why;
 mod words;
 
 #[cfg(test)]
@@ -20,8 +21,9 @@ use crate::html::{Markup, markup};
 use crate::site::{LanguageId, ListKey, Page, PageId, Site};
 use crate::templates::Renderer;
 
-pub use command::{Options, Outcome, Results, SHOWN, Shown, excerpt, results, run};
+pub use command::{Options, Outcome, Results, SHOWN, Shown, code, excerpt, results, run};
 pub use files::{File, claims, entry, folder};
+pub use why::{Counted, Stands, Why};
 pub use words::{Stemmer, fold, spans};
 
 /// How much a word counts where it stands. A page's title counts in every
@@ -133,38 +135,72 @@ fn tag_names(site: &Site, page: PageId) -> Vec<String> {
     .collect()
 }
 
-/// The words of `record`, folded, each with its weight there, and the
-/// record's length: its words counted by weight.
-fn weighed(site: &Site, record: &Record) -> (HashMap<String, u32>, u32) {
+/// Where in a record a word stands, as search weighs it.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Place {
+    Title,
+    Heading,
+    Tags,
+    Summary,
+    /// The descriptions of the pictures it shows.
+    Pictures,
+    Text,
+}
+
+impl Place {
+    pub fn name(self) -> &'static str {
+        match self {
+            Place::Title => "title",
+            Place::Heading => "heading",
+            Place::Tags => "tags",
+            Place::Summary => "summary",
+            Place::Pictures => "pictures",
+            Place::Text => "text",
+        }
+    }
+}
+
+/// Each word of `record`, folded, in turn, with where it stands and its
+/// weight there.
+fn placed(site: &Site, record: &Record, mut each: impl FnMut(String, Place, u32)) {
     let page = site.pages.get(record.page);
     // Each page's records begin with the part before its first heading.
     let opening = record.heading.is_none();
-    let mut words: HashMap<String, u32> = HashMap::new();
-    let mut length = 0;
-    let mut add = |text: &str, weight: u32| {
+    let mut add = |text: &str, place: Place, weight: u32| {
         for span in spans(text) {
-            *words.entry(fold(&text[span])).or_default() += weight;
-            length += weight;
+            each(fold(&text[span]), place, weight);
         }
     };
     if let Some(title) = &page.title {
-        add(&title.value, if opening { TITLE_OPENING } else { TITLE });
+        let weight = if opening { TITLE_OPENING } else { TITLE };
+        add(&title.value, Place::Title, weight);
     }
     if opening {
         for tag in tag_names(site, record.page) {
-            add(&tag, TAG);
+            add(&tag, Place::Tags, TAG);
         }
         if let Some(summary) = page.words.text(PageWord::Summary) {
-            add(summary.value, SUMMARY);
+            add(summary.value, Place::Summary, SUMMARY);
         }
     }
     if let Some((_, heading)) = &record.heading {
-        add(heading, HEADING);
+        add(heading, Place::Heading, HEADING);
     }
     for description in &record.described {
-        add(description, DESCRIBED);
+        add(description, Place::Pictures, DESCRIBED);
     }
-    add(&record.text, TEXT);
+    add(&record.text, Place::Text, TEXT);
+}
+
+/// The words of `record`, folded, each with its weight there, and the
+/// record's length: its words counted by weight.
+fn weighed(site: &Site, record: &Record) -> (HashMap<String, u32>, u32) {
+    let mut words: HashMap<String, u32> = HashMap::new();
+    let mut length = 0;
+    placed(site, record, |word, _, weight| {
+        *words.entry(word).or_default() += weight;
+        length += weight;
+    });
     (words, length)
 }
 
@@ -191,7 +227,7 @@ pub struct Index {
 }
 
 /// A record found, and how well it matched.
-#[derive(Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Found {
     pub record: usize,
     /// How many of the words asked for it holds.
@@ -302,21 +338,15 @@ impl Index {
     /// The records holding any word `asked`: those holding more of its
     /// words first, then the best matched, then in order.
     pub fn search(&self, asked: &Asked) -> Vec<Found> {
-        let count = self.records.len() as f64;
         let mut found: HashMap<u32, (usize, f64)> = HashMap::new();
         for entries in self.looked_in(asked) {
             let mut best: HashMap<u32, f64> = HashMap::new();
             for (entry, counts) in entries {
                 let held = &self.entries[entry as usize];
-                let holding = held.len() as f64;
-                let rarity = (1.0 + (count - holding + 0.5) / (holding + 0.5)).ln();
+                let rarity = self.rarity(held.len());
                 for &(record, weight) in held {
-                    let weight = f64::from(weight);
-                    let length = f64::from(self.lengths[record as usize]) / self.average;
-                    let score =
-                        rarity * weight * (K1 + 1.0) / (weight + K1 * (1.0 - B + B * length));
                     let kept = best.entry(record).or_default();
-                    *kept = kept.max(score * counts);
+                    *kept = kept.max(self.scored(rarity, weight, record) * counts);
                 }
             }
             for (record, score) in best {
@@ -339,6 +369,26 @@ impl Index {
                 .then(a.record.cmp(&b.record))
         });
         found
+    }
+
+    /// How rare a word held by `holding` of the records is among them.
+    fn rarity(&self, holding: usize) -> f64 {
+        let count = self.records.len() as f64;
+        let holding = holding as f64;
+        (1.0 + (count - holding + 0.5) / (holding + 0.5)).ln()
+    }
+
+    /// What a word as rare as `rarity` scores in `record`, held there at
+    /// `weight`.
+    fn scored(&self, rarity: f64, weight: u32, record: u32) -> f64 {
+        let weight = f64::from(weight);
+        let length = f64::from(self.lengths[record as usize]) / self.average;
+        rarity * weight * (K1 + 1.0) / (weight + K1 * (1.0 - B + B * length))
+    }
+
+    /// The records' average length, their words counted by weight.
+    pub fn average(&self) -> f64 {
+        self.average
     }
 
     /// Every word the records hold, folded, in the order of their UTF-16

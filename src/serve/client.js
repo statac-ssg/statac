@@ -671,6 +671,50 @@
       white-space: pre-wrap; overflow-wrap: anywhere;
     }
 
+    /* Search. */
+    .search-pane .main { display: flex; flex-direction: column; }
+    .search-status { padding: ${em(14)} ${em(18)} 0; color: var(--text-muted); }
+    .search-status:empty { display: none; }
+    .search-pane h3.language {
+      padding: ${em(14)} ${em(18)} 0; font-size: 1em; font-weight: 400; color: var(--text-muted);
+    }
+    .found { padding: ${em(8)} ${em(10)} ${em(10)}; display: flex; flex-direction: column; gap: ${em(2)}; }
+    .result button {
+      display: flex; flex-direction: column; gap: ${em(4)}; width: 100%; padding: ${em(10)} ${em(12)};
+      border: 1px solid transparent; border-radius: ${em(6)};
+    }
+    .result button:hover { background: var(--raise); }
+    .result.chosen button {
+      background: var(--selected); border-color: var(--edge-strong); box-shadow: inset 2px 0 0 var(--brand);
+    }
+    .result .title { font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+    .part { display: flex; flex-wrap: wrap; align-items: baseline; gap: ${em(2)} ${em(12)}; }
+    .result .excerpt { line-height: 1.55; overflow-wrap: anywhere; }
+    mark {
+      background: color-mix(in srgb, var(--warning) 30%, transparent); color: var(--text-strong);
+      border-radius: 2px;
+    }
+    .search-pane .more { padding: 0 ${em(22)} ${em(14)}; }
+    .why .why-title { font-size: ${em(16)}; font-weight: 650; overflow-wrap: anywhere; }
+    .why h4 {
+      font-size: ${em(13)}; font-weight: 400; color: var(--text-muted); padding-top: ${em(12)};
+      border-top: 1px solid var(--rule);
+    }
+    .why .sum {
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: ${em(4)} ${em(12)};
+      font-weight: 600; color: var(--text-strong);
+    }
+    .word {
+      display: flex; flex-direction: column; gap: ${em(8)}; padding: ${em(12)} ${em(14)};
+      border: 1px solid var(--rule); border-radius: ${em(6)}; background: var(--ground);
+    }
+    .word .top { display: flex; justify-content: space-between; align-items: baseline; gap: ${em(12)}; }
+    .word .top code { font-size: ${em(15)}; color: var(--text-strong); overflow-wrap: anywhere; }
+    .places { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    .places th, .places td { padding: ${em(4)} 0; text-align: end; font-weight: 400; }
+    .places :is(th, td):first-child { text-align: start; }
+    .places thead th { font-size: ${em(13)}; color: var(--text-muted); border-bottom: 1px solid var(--rule); }
+
     /* This page, and the site. */
     .columns { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); overflow: auto; }
     .column {
@@ -791,6 +835,9 @@
       .pane.names-pane { overflow: hidden; }
       .side-pane { width: auto; border-left: 0; border-top: 1px solid var(--rule); overflow: visible; flex: none; }
       .pane.names-pane .side-pane { max-height: 40%; overflow: auto; }
+      .pane.search-pane { overflow: hidden; }
+      .pane.search-pane .main { flex: 1; min-height: ${em(160)}; overflow: auto; }
+      .pane.search-pane .side-pane { max-height: 45%; overflow: auto; }
       .names thead { display: none; }
       .names, .names tbody { display: block; }
       .names tr.name-row { display: flex; flex-direction: column; gap: ${em(3)}; padding: ${em(8)} ${em(16)}; border-bottom: 1px solid var(--selected); }
@@ -829,7 +876,7 @@
 
     @media (forced-colors: active) {
       .tab, .bar, .summary, .card, .drawer, .settings, .problem, .list-card, .frame, .fix,
-      .find, .badge, .label, .button, .expression code, .chips code, .way pre {
+      .find, .badge, .label, .button, .expression code, .chips code, .way pre, .word {
         border: 1px solid CanvasText;
       }
       .tab { border-bottom: 0; }
@@ -841,9 +888,10 @@
       .building-line { forced-color-adjust: none; background: Highlight; }
       .tabs [role="tab"][aria-selected="true"] { border-bottom-color: Highlight; }
       .choice[aria-pressed="true"], .segments button[aria-pressed="true"],
-      .names tr.name-row.chosen, .problem.chosen {
+      .names tr.name-row.chosen, .problem.chosen, .result.chosen button {
         outline: 2px solid Highlight; outline-offset: -2px;
       }
+      mark { forced-color-adjust: none; background: Mark; color: MarkText; }
       .dot { border-color: CanvasText; }
       .dot.used { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
       .frame .at { border-left: 3px solid Highlight; }
@@ -892,6 +940,24 @@
     error: 0,
     settings: false,
     capturing: false,
+    searched: "",
+    result: null,
+  };
+  // The words searched for and the result chosen are kept for this tab
+  // alone, so following a result to its page keeps them.
+  const searchKept = "statac-live-search";
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(searchKept));
+    if (typeof stored?.words === "string") view.searched = stored.words;
+    if (typeof stored?.result === "string") view.result = stored.result;
+  } catch {}
+  const keepSearch = () => {
+    try {
+      sessionStorage.setItem(
+        searchKept,
+        JSON.stringify({ words: view.searched, result: view.result }),
+      );
+    } catch {}
   };
 
   // Where the panel is drawn and how.
@@ -1400,7 +1466,7 @@
 
   // The drawer.
 
-  const panes = ["problems", "names", "page", "site"];
+  const panes = ["problems", "names", "page", "site", "search"];
   const tabs = {};
   const sections = {};
   const handle = make("div", { class: "handle", role: "separator", tabindex: "0" });
@@ -1410,6 +1476,10 @@
     autocomplete: "off",
     spellcheck: "false",
     oninput: (event) => {
+      if (settings.tab === "search") {
+        searchFor(event.target.value, true);
+        return;
+      }
       view.query = event.target.value;
       drawSoon();
     },
@@ -1591,6 +1661,7 @@
     );
     tabs.page.textContent = told("page");
     tabs.site.textContent = told("site");
+    tabs.search.textContent = told("search");
     const halted = stopped();
     status.className = halted ? "status stopped" : "status";
     status.textContent = building
@@ -1600,10 +1671,12 @@
           ? told("statusStopped", { time: halted.at, built: panel.round.builtAt })
           : told("statusStoppedFirst", { time: halted.at })
         : told("builtAt", { time: panel.round.at });
-    find.hidden = settings.tab !== "names";
-    find.querySelector(".hidden-label").textContent = told("find");
-    search.placeholder = told("findHow");
-    if (search.value !== view.query) search.value = view.query;
+    const searching = settings.tab === "search";
+    find.hidden = settings.tab !== "names" && !searching;
+    find.querySelector(".hidden-label").textContent = told(searching ? "searchLabel" : "find");
+    search.placeholder = told(searching ? "searchHow" : "findHow");
+    const typed = searching ? view.searched : view.query;
+    if (search.value !== typed) search.value = typed;
     settingsButton.setAttribute("aria-label", told("settings"));
     refill(settingsButton, icons.settings());
     dockButton.setAttribute("aria-label", side ? told("dockBottom") : told("dockSide"));
@@ -1628,11 +1701,20 @@
         settings.hideEmpty,
         settings.onlyUsed,
         settings.editor,
+        view.searched,
+        view.result,
+        searched.drawn,
       ]),
     ].join("|");
     if (drawnFor[name] === key) return;
     drawnFor[name] = key;
-    ({ problems: drawProblems, names: drawNames, page: drawPage, site: drawSite })[name]();
+    ({
+      problems: drawProblems,
+      names: drawNames,
+      page: drawPage,
+      site: drawSite,
+      search: drawSearch,
+    })[name]();
   };
   let soon = 0;
   const drawSoon = () => {
@@ -2268,6 +2350,301 @@
     );
   };
 
+  // Search.
+
+  // What serve last answered, the words and round it answered for, and the
+  // round last asked about.
+  const searched = { drawn: 0, asked: 0, answer: null, words: "", typing: false, round: -1 };
+  const searchStatus = make("p", { class: "search-status", role: "status" });
+  const searchFound = make("div");
+  const searchMain = make("div", { class: "main" }, searchStatus, searchFound);
+  const searchWhy = make("aside", { class: "side-pane why", hidden: true });
+  const placeWords = {
+    title: "placeTitle",
+    heading: "placeHeading",
+    tags: "placeTags",
+    summary: "placeSummary",
+    pictures: "placePictures",
+    text: "placeText",
+  };
+
+  const searchFor = (words, typing) => {
+    view.searched = words;
+    if (search.value !== words) search.value = words;
+    searched.typing = typing;
+    keepSearch();
+    askSearch();
+  };
+
+  const askSearch = () => {
+    const words = view.searched;
+    const mine = ++searched.asked;
+    searched.round = version;
+    const asked = [
+      `words=${encodeURIComponent(words)}`,
+      `typing=${searched.typing ? 1 : 0}`,
+      `page=${encodeURIComponent(location.pathname)}`,
+    ];
+    fetch(new URL(`search?${asked.join("&")}`, live), { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((answer) => {
+        // A later search has begun, and its answer is the one to show.
+        if (mine !== searched.asked || !answer) return;
+        Object.assign(searched, { answer, words });
+        searched.drawn += 1;
+        if (settings.open && settings.tab === "search") drawPane();
+      })
+      .catch(() => {});
+  };
+
+  const searchResults = () =>
+    (searched.answer?.languages || []).flatMap((language) =>
+      language.results.map((result) => ({ result, language })),
+    );
+
+  const drawSearch = () => {
+    const pane = sections.search;
+    if (!pane.contains(searchMain)) refill(pane, searchMain, searchWhy);
+    searchWhy.setAttribute("aria-label", told("whyRanked"));
+    // Each round may find otherwise, so each is asked again.
+    if (searched.round !== version) askSearch();
+    const answer = searched.answer;
+    const languages = answer?.languages;
+    if (!searched.words.trim() || !languages) {
+      refill(searchStatus);
+      refill(
+        searchFound,
+        make(
+          "div",
+          { class: "empty" },
+          make("p", {}, told("searchStart")),
+          answer?.drafts ? make("p", {}, told("searchDrafts")) : null,
+        ),
+      );
+      searchWhy.hidden = true;
+      return;
+    }
+    const pages = languages.reduce((sum, language) => sum + language.pages, 0);
+    const suggestion = languages.find((language) => language.suggestion)?.suggestion;
+    if (pages) {
+      const some = languages.some((language) => language.some && language.pages);
+      refill(searchStatus, told("pagesFound", { n: pages }), some ? ` ${told("foundSome")}` : null);
+    } else {
+      const meant = make(
+        "button",
+        { class: "link", type: "button", onclick: () => searchFor(suggestion, false) },
+        suggestion,
+      );
+      refill(
+        searchStatus,
+        told("foundNone"),
+        suggestion ? [" ", woven("meant", { words: meant })] : null,
+      );
+    }
+    const found = searchResults();
+    if (!found.some(({ result }) => result.href === view.result)) {
+      view.result = found[0]?.result.href ?? null;
+      keepSearch();
+    }
+    refill(
+      searchFound,
+      languages.map((language) => {
+        if (!language.results.length) return null;
+        const more = language.pages - language.results.length;
+        return [
+          languages.length > 1
+            ? make("h3", { class: "language" }, make("code", {}, language.code))
+            : null,
+          make("ol", { class: "found" }, language.results.map(resultRow)),
+          more > 0 ? make("p", { class: "meta more" }, told("moreFound", { n: more })) : null,
+        ];
+      }),
+    );
+    drawWhy();
+  };
+
+  const leftOutLabel = (result) => {
+    const said = result.draft
+      ? told("draft")
+      : result.waiting
+        ? told("waits", { day: result.waiting })
+        : null;
+    return said ? make("span", { class: "label" }, said) : null;
+  };
+
+  // A result's excerpt, its words matched marked, with what stands between
+  // the blocks of text it runs across.
+  const excerptOf = (excerpt) => {
+    let before = "";
+    return excerpt.map((piece) => {
+      const text = piece.text.replace(/\n/g, (_, at, whole) => {
+        const last = whole[at - 1] ?? before;
+        return ".,:;!?…。、，：；！？".includes(last) ? " " : " · ";
+      });
+      before = text.at(-1) ?? before;
+      return piece.marked ? make("mark", {}, text) : text;
+    });
+  };
+
+  const resultRow = (result) => {
+    const chosen = result.href === view.result;
+    return make(
+      "li",
+      { class: chosen ? "result chosen" : "result", "data-href": result.href },
+      make(
+        "button",
+        {
+          type: "button",
+          "aria-pressed": String(chosen),
+          tabindex: chosen ? "0" : "-1",
+          onclick: () => pickResult(result.href, false),
+        },
+        make("span", { class: "title" }, result.title),
+        make(
+          "span",
+          { class: "meta part" },
+          make("span", {}, result.heading ?? told("opening")),
+          result.day ? make("span", {}, result.day) : null,
+          leftOutLabel(result),
+        ),
+        result.excerpt.length
+          ? make("span", { class: "excerpt" }, excerptOf(result.excerpt))
+          : null,
+      ),
+    );
+  };
+
+  const pickResult = (href, focus) => {
+    for (const row of sections.search.querySelectorAll("li.result")) {
+      const chosen = row.dataset.href === href;
+      row.classList.toggle("chosen", chosen);
+      const button = row.querySelector("button");
+      button.setAttribute("aria-pressed", String(chosen));
+      button.tabIndex = chosen ? 0 : -1;
+      if (chosen && focus) button.focus();
+    }
+    view.result = href;
+    keepSearch();
+    drawWhy();
+  };
+
+  // Up and down move between the results, each chosen as it is reached.
+  sections.search.addEventListener("keydown", (event) => {
+    const row = event.target.closest?.("li.result");
+    if (!row) return;
+    const rows = [...sections.search.querySelectorAll("li.result")];
+    const at = rows.indexOf(row);
+    const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: rows.length - 1 }[event.key];
+    if (to === undefined || !rows[to]) return;
+    event.preventDefault();
+    pickResult(rows[to].dataset.href, true);
+  });
+
+  const drawWhy = () => {
+    const chosen = searchResults().find(({ result }) => result.href === view.result);
+    if (!chosen) {
+      searchWhy.hidden = true;
+      return;
+    }
+    searchWhy.hidden = false;
+    const { result, language } = chosen;
+    const score = (n) => n.toFixed(2);
+    const word = (asked) =>
+      make(
+        "section",
+        { class: "word" },
+        make(
+          "div",
+          { class: "top" },
+          make("code", {}, asked.word),
+          asked.forms.length
+            ? make("span", { class: "meta" }, told("adds", { score: score(asked.score) }))
+            : null,
+        ),
+        asked.forms.length
+          ? [
+              make(
+                "p",
+                {},
+                woven("foundAs", {
+                  forms: make(
+                    "span",
+                    {},
+                    asked.forms.flatMap((form, at) => [
+                      at ? ", " : null,
+                      make("code", {}, form),
+                    ]),
+                  ),
+                }),
+              ),
+              make(
+                "table",
+                { class: "places" },
+                make(
+                  "thead",
+                  {},
+                  make(
+                    "tr",
+                    {},
+                    ["columnWhere", "columnTimes", "columnCounts"].map((name) =>
+                      make("th", { scope: "col" }, told(name)),
+                    ),
+                  ),
+                ),
+                make(
+                  "tbody",
+                  {},
+                  asked.places.map((place) =>
+                    make(
+                      "tr",
+                      {},
+                      make("th", { scope: "row" }, told(placeWords[place.place])),
+                      make("td", {}, grouped(place.times)),
+                      make("td", {}, grouped(place.counts)),
+                    ),
+                  ),
+                ),
+              ),
+              make(
+                "p",
+                { class: "meta" },
+                told("holding", { n: asked.holding, count: grouped(language.parts) }),
+              ),
+              asked.starting ? make("p", { class: "meta" }, told("starting")) : null,
+            ]
+          : make("p", { class: "muted" }, told("notHere")),
+      );
+    refill(
+      searchWhy,
+      make("h3", { class: "why-title" }, link(result.href, result.title)),
+      make(
+        "p",
+        { class: "meta part" },
+        make("span", {}, result.heading ?? told("opening")),
+        result.day ? make("span", {}, result.day) : null,
+        leftOutLabel(result),
+      ),
+      result.file ? make("p", { class: "code" }, located(result.file, null)) : null,
+      make("h4", {}, told("whyRanked")),
+      make(
+        "p",
+        { class: "sum" },
+        make("span", {}, told("wordsHeld", { n: result.matched, count: result.words.length })),
+        make("span", {}, told("score", { score: score(result.score) })),
+      ),
+      make("p", { class: "meta" }, told("rankRule")),
+      result.words.map(word),
+      make(
+        "p",
+        { class: "meta length" },
+        told("partLength", {
+          n: result.length,
+          average: grouped(Math.round(language.average)),
+        }),
+      ),
+    );
+  };
+
   // This page.
 
   const drawPage = () => {
@@ -2841,8 +3218,11 @@
       if (event.key === "Escape" && (inside || away)) {
         if (target === search && search.value) {
           search.value = "";
-          view.query = "";
-          drawSoon();
+          if (settings.tab === "search") searchFor("", false);
+          else {
+            view.query = "";
+            drawSoon();
+          }
         } else if (view.settings) showSettings(false);
         else if (settings.open) show(false, true);
         else if (!card.hidden) putAway();
@@ -2853,7 +3233,7 @@
       }
       if (event.key === "/" && settings.open && !typing(target) && (inside || away)) {
         event.preventDefault();
-        if (settings.tab !== "names") choose("names");
+        if (settings.tab !== "names" && settings.tab !== "search") choose("names");
         search.focus();
       }
     },

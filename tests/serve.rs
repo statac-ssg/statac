@@ -1103,6 +1103,109 @@ fn asked_for_no_drafts_serve_shows_what_a_build_publishes() {
     );
 }
 
+/// What the panel's search finds for `words`, as a query carries them,
+/// asked from the page at `address`.
+fn search(served: &Served, words: &str, address: &str) -> String {
+    let asked = address.replace('/', "%2F");
+    served.page(&format!(
+        "/.statac-live/search?words={words}&typing=0&page={asked}"
+    ))
+}
+
+#[test]
+fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
+    let served = served_as("search", How::Native, true, |site| {
+        site.write(
+            "content/post-2.md",
+            "---\ntitle: Post 2\ndraft: true\n---\nA draft.\n",
+        );
+        site.write(
+            "content/post-3.md",
+            "---\ntitle: Post 3\ndate: 2999-01-01\n---\nA post.\n",
+        );
+    });
+    // A draft is found, and each word says where it stands and counts.
+    let draft = search(&served, "draft", "/post-1/");
+    assert!(
+        draft.starts_with(
+            "{\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":1,\"some\":false,\
+             \"suggestion\":null,\"parts\":6,\"average\":10,\"results\":[\
+             {\"title\":\"Post 2\",\"day\":null,\"heading\":null,\"href\":\"/post-2/\",\
+             \"file\":\"content/post-2.md\",\"draft\":true,\"waiting\":null,\
+             \"excerpt\":[{\"text\":\"A \",\"marked\":false},{\"text\":\"draft\",\"marked\":true},\
+             {\"text\":\".\",\"marked\":false}],\"matched\":1,\"score\":"
+        ) && draft.contains(
+            ",\"length\":12,\"words\":[{\"word\":\"draft\",\"forms\":[\"draft\"],\
+             \"starting\":false,\"places\":[{\"place\":\"text\",\"times\":1,\"counts\":1}],\
+             \"holding\":1,\"score\":"
+        ),
+        "{draft}"
+    );
+    // A post waiting for its day is found, with the day.
+    let post = search(&served, "post", "/post-1/");
+    assert!(
+        post.contains(
+            "{\"title\":\"Post 3\",\"day\":\"1 January 2999\",\"heading\":null,\
+             \"href\":\"/post-3/\",\"file\":\"content/post-3.md\",\"draft\":false,\
+             \"waiting\":\"2999-01-01\","
+        ) && post.contains(
+            "\"places\":[{\"place\":\"title\",\"times\":1,\"counts\":5},\
+             {\"place\":\"text\",\"times\":1,\"counts\":1}],\"holding\":4,"
+        ),
+        "{post}"
+    );
+    // A space as a form writes it; a word no page holds adds nothing.
+    let some = search(&served, "draft+nowhere", "/post-1/");
+    assert!(
+        some.contains("\"pages\":1,\"some\":true,\"suggestion\":null,")
+            && some.contains(
+                "{\"word\":\"nowhere\",\"forms\":[],\"starting\":false,\"places\":[],\
+                 \"holding\":0,\"score\":0}]}"
+            ),
+        "{some}"
+    );
+    let meant = search(&served, "drafx", "/post-1/");
+    assert!(
+        meant.contains("\"pages\":0,\"some\":false,\"suggestion\":\"draft\",")
+            && meant.ends_with("\"results\":[]}]}"),
+        "{meant}"
+    );
+    let blank = search(&served, "%20%20", "/post-1/");
+    assert_eq!(
+        blank,
+        "{\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":0,\"some\":false,\
+         \"suggestion\":null,\"parts\":0,\"average\":0,\"results\":[]}]}"
+    );
+}
+
+#[test]
+fn the_panel_searches_the_language_of_the_page_it_is_on_first() {
+    let served = served_as("search-languages", How::Native, true, |site| {
+        site.write(
+            "statac.yaml",
+            "title: Site\nlanguage: [en, fr]\ntimezone: Europe/London\n",
+        );
+        site.write(
+            "content/fr/index.md",
+            "---\nlayout: page\n---\n# Accueil\n\nBienvenue.\n",
+        );
+        site.write("content/fr/post-1.md", "# Post 1\n\nUn post.\n");
+    });
+    let codes = |answer: &str| -> Vec<String> {
+        let codes = answer.split("{\"code\":\"").skip(1);
+        codes.map(|rest| rest[..2].to_owned()).collect()
+    };
+    let english = search(&served, "post", "/post-1/");
+    assert_eq!(codes(&english), ["en", "fr"], "{english}");
+    let french = search(&served, "post", "/fr/post-1/");
+    assert_eq!(codes(&french), ["fr", "en"], "{french}");
+    assert!(
+        french.contains("\"heading\":\"Post 1\",\"href\":\"/fr/post-1/#post-1\",")
+            && french.contains("\"heading\":null,\"href\":\"/post-1/\","),
+        "{french}"
+    );
+}
+
 /// A file's name is the site's own text: it reaches neither the terminal
 /// nor a page as written.
 #[cfg(unix)]

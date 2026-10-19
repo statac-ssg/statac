@@ -4164,6 +4164,57 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("ctrl", said("Ctrl")),
         ("meta", said("Meta")),
         ("keptHere", said("Kept in this browser.")),
+        // Search.
+        ("search", said("Search")),
+        ("searchLabel", said("Search the site")),
+        ("searchHow", said("Words a reader might search for")),
+        (
+            "searchStart",
+            said(
+                "Shows the pages a reader would find, best first, and why each ranks where it does.",
+            ),
+        ),
+        (
+            "searchDrafts",
+            said("Drafts and posts waiting for their day are searched too, as serve shows them."),
+        ),
+        ("pagesFound", Counted("{n} page found.", "{n} pages found.")),
+        ("foundSome", said("No page holds every word.")),
+        ("foundNone", said("No pages found.")),
+        ("meant", said("Did you mean {words}?")),
+        ("moreFound", said("And {n} more.")),
+        ("opening", said("The page's opening")),
+        ("whyRanked", said("Why it ranks here")),
+        ("wordsHeld", said("Words held: {n} of {count}")),
+        ("score", said("Score: {score}")),
+        (
+            "rankRule",
+            said("Parts holding more of the words come first, then those scoring higher."),
+        ),
+        ("foundAs", said("Found as {forms}")),
+        ("notHere", said("Not in this part.")),
+        (
+            "starting",
+            said("Matched as the start of a longer word, counting 0.8 of a whole one."),
+        ),
+        ("columnWhere", said("Where")),
+        ("columnTimes", said("Times")),
+        ("columnCounts", said("Counts")),
+        ("placeTitle", said("Title")),
+        ("placeHeading", said("Heading")),
+        ("placeTags", said("Tags")),
+        ("placeSummary", said("Summary")),
+        ("placePictures", said("Picture descriptions")),
+        ("placeText", said("Text")),
+        ("holding", said("In {n} of the site's {count} parts")),
+        ("adds", said("Adds {score}")),
+        (
+            "partLength",
+            said(
+                "Length {n}, against the site's average of {average}. A longer part counts each \
+                 word for less.",
+            ),
+        ),
     ]
 }
 

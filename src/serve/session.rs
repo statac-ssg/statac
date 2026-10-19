@@ -646,7 +646,6 @@ fn noted(
     problems: &[Problem],
 ) -> Vec<Noted> {
     let site = renderer.site();
-    let dates = renderer.dates();
     let mut placed: HashMap<crate::source::SourceId, Vec<&Problem>> = HashMap::new();
     for problem in problems {
         if let Some(place) = problem.place {
@@ -663,10 +662,7 @@ fn noted(
             _ => return None,
         };
         let page = site.pages.get(id);
-        let draft = page.words.truth(PageWord::Draft) == Some(true);
-        let waiting = page.date.as_ref().filter(|date| {
-            page.made.is_none() && !page.speaks_for_a_list() && dates.after_today(&date.value)
-        });
+        let (draft, waiting) = held_back(renderer, id);
         // What is written in a file many pages are made from is no one
         // page's.
         let own = page.source.filter(|_| page.made.is_none());
@@ -687,11 +683,27 @@ fn noted(
             address: address.as_str().to_owned(),
             title: page.title.as_ref().map(|title| title.value.clone()),
             draft,
-            waiting: waiting.map(|date| date.value.iso_day()),
+            waiting,
             problems,
         })
     });
     noted.collect()
+}
+
+/// Whether the page `id` is a draft, and the day it waits for, where that
+/// is after today: what `statac build` leaves out.
+pub(super) fn held_back(
+    renderer: &crate::templates::Renderer,
+    id: crate::site::PageId,
+) -> (bool, Option<String>) {
+    let page = renderer.site().pages.get(id);
+    let draft = page.words.truth(PageWord::Draft) == Some(true);
+    let waiting = page.date.as_ref().filter(|date| {
+        page.made.is_none()
+            && !page.speaks_for_a_list()
+            && renderer.dates().after_today(&date.value)
+    });
+    (draft, waiting.map(|date| date.value.iso_day()))
 }
 
 /// Every file of the site's own at `site`, by its path from the site's

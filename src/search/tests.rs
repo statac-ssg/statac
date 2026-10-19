@@ -675,3 +675,142 @@ en
         assert_eq!(said, wanted, "{words} {language:?}");
     }
 }
+
+const POST: &str = "\
+---
+title: Post 1 running
+tags: [tag-1]
+summary: A summary of running.
+---
+The opening runs.
+
+## Heading 1
+
+Text about running and the run.
+
+![A picture of a run](https://a.example/picture.jpg)
+
+## Heading 2
+
+Other text.
+";
+
+/// A site whose pages hold forms of `run` in every place a word stands,
+/// read and indexed.
+fn explained(name: &str) -> (Renderer, Index) {
+    let (renderer, root) = site(
+        name,
+        &[
+            ("content/post-1.md", POST),
+            ("content/post-2.md", "---\ntitle: Post 2\n---\nRun once.\n"),
+            (
+                "content/post-3.md",
+                "---\ntitle: Post 3\n---\nText.\n\n## Running\n\nRuns twice, runs.\n",
+            ),
+        ],
+    );
+    let index = index_of(&renderer, 0);
+    let _ = std::fs::remove_dir_all(root);
+    (renderer, index)
+}
+
+#[test]
+fn what_each_word_adds_to_a_part_sums_to_its_score() {
+    let (renderer, index) = explained("why-sums");
+    let site = renderer.site();
+    let queries = [
+        ("running", false),
+        ("run post", false),
+        ("post runn", true),
+        ("runs nowhere", false),
+        ("tag summary picture", false),
+        ("heading text other", false),
+    ];
+    let mut places = std::collections::BTreeSet::new();
+    for (words, typing) in queries {
+        let asked = Asked::of(words, typing);
+        let found = index.search(&asked);
+        assert!(!found.is_empty(), "{words}");
+        for found in found {
+            let why = index.why(site, found.record, &asked);
+            let stand = why.words.iter().flat_map(|counted| &counted.places);
+            places.extend(stand.map(|stands| stands.place));
+            let sum = (why.words.iter()).fold(0.0, |sum, counted| sum + counted.score);
+            assert_eq!(sum, found.score, "{words}: {why:?}");
+            let held = why.words.iter().filter(|counted| !counted.forms.is_empty());
+            assert_eq!(held.count(), found.matched, "{words}: {why:?}");
+            let asked_for: Vec<&str> = why.words.iter().map(|counted| &*counted.word).collect();
+            assert_eq!(asked_for, asked.words, "{words}");
+            assert_eq!(why.length, index.lengths[found.record], "{words}");
+            assert_eq!(why.average, index.average(), "{words}");
+        }
+    }
+    // Words were found in every place a word stands.
+    assert_eq!(places.len(), 6, "{places:?}");
+    // A word in no part adds nothing, and no part holds it.
+    let asked = Asked::of("runs nowhere", false);
+    let why = index.why(site, index.search(&asked)[0].record, &asked);
+    let nowhere = &why.words[0];
+    assert_eq!(
+        (nowhere.word.as_str(), nowhere.score, nowhere.holding),
+        ("nowhere", 0.0, 0)
+    );
+    assert!(nowhere.forms.is_empty() && nowhere.places.is_empty());
+}
+
+#[test]
+fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
+    let (renderer, index) = explained("why-forms");
+    let site = renderer.site();
+    let post = page(&renderer, "post-1.md");
+    let part = |heading: Option<&str>| {
+        let id = |record: &Record| record.heading.as_ref().map(|(id, _)| id.clone());
+        (index.records.iter())
+            .position(|record| record.page == post && id(record).as_deref() == heading)
+            .unwrap()
+    };
+    let stands = |place, times, counts| Stands {
+        place,
+        times,
+        counts,
+    };
+    // Each part of the first post holds a form of `run`, its title's if
+    // no other, and so do the second post and the third's second part.
+    let holding = 5;
+    let asked = Asked::of("running", false);
+    let opening = index.why(site, part(None), &asked);
+    assert_eq!(
+        opening.words,
+        [Counted {
+            word: "running".to_owned(),
+            forms: vec!["running".to_owned(), "runs".to_owned()],
+            starting: false,
+            places: vec![
+                stands(Place::Title, 1, 5),
+                stands(Place::Summary, 1, 2),
+                stands(Place::Text, 1, 1),
+            ],
+            holding,
+            score: opening.words[0].score,
+        }]
+    );
+    assert!(opening.words[0].score > 0.0);
+    // Typed, it is the start of a longer word.
+    let asked = Asked::of("runn", true);
+    let heading = index.why(site, part(Some("heading-1")), &asked);
+    assert_eq!(
+        heading.words,
+        [Counted {
+            word: "runn".to_owned(),
+            forms: vec!["run".to_owned(), "running".to_owned()],
+            starting: true,
+            places: vec![
+                stands(Place::Title, 1, 2),
+                stands(Place::Pictures, 1, 2),
+                stands(Place::Text, 2, 2),
+            ],
+            holding,
+            score: heading.words[0].score,
+        }]
+    );
+}

@@ -46,6 +46,9 @@ pub struct Shown {
     /// The text around the first word matched, in pieces, each saying
     /// whether it is a word matched.
     pub excerpt: Vec<(String, bool)>,
+    /// The part, by its place among the index's records, and how well it
+    /// matched.
+    pub found: super::Found,
 }
 
 pub struct Outcome {
@@ -119,7 +122,7 @@ pub fn run(options: &Options) -> Outcome {
 }
 
 /// A language's code, as the site declares it.
-fn code(language: &Language) -> &str {
+pub fn code(language: &Language) -> &str {
     language.tag.as_deref().unwrap_or(crate::language::ENGLISH)
 }
 
@@ -154,14 +157,13 @@ pub fn results(
     let mut seen: HashSet<PageId> = HashSet::new();
     let best = (found.iter())
         .take_while(|found| found.matched == best_matched)
-        .map(|found| found.record)
-        .filter(|&record| seen.insert(index.records[record].page));
-    let best: Vec<usize> = best.collect();
+        .filter(|found| seen.insert(index.records[found.record].page));
+    let best: Vec<&super::Found> = best.collect();
     // A word of the text is marked where it shares a stem with one asked.
     let matched = index.matched(&asked);
     let marked = |word: &str| (index.entry_of(&fold(word))).is_some_and(|e| matched.contains(&e));
     let shown = (best.iter().take(most))
-        .map(|&record| shown(renderer, &index.records[record], &marked))
+        .map(|&&found| shown(renderer, &index.records[found.record], found, &marked))
         .collect();
     let suggestion = match best.is_empty() {
         true => index.meant(query, typing),
@@ -175,7 +177,12 @@ pub fn results(
     }
 }
 
-fn shown(renderer: &Renderer, record: &Record, marked: &impl Fn(&str) -> bool) -> Shown {
+fn shown(
+    renderer: &Renderer,
+    record: &Record,
+    found: super::Found,
+    marked: &impl Fn(&str) -> bool,
+) -> Shown {
     let page = renderer.site().pages.get(record.page);
     let mut address = page.address.as_str().to_owned();
     if let Some((id, _)) = &record.heading {
@@ -189,6 +196,7 @@ fn shown(renderer: &Renderer, record: &Record, marked: &impl Fn(&str) -> bool) -
         heading: record.heading.as_ref().map(|(_, words)| words.clone()),
         address,
         excerpt: excerpt(&record.text, marked),
+        found,
     }
 }
 

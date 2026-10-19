@@ -241,6 +241,15 @@ fn answer(site: &Site, request: &Request<()>) -> Response<Body> {
             let problems = site.hub.panel().problems(kind.as_deref());
             respond(StatusCode::OK, "application/json", problems)
         }
+        Some("search") => {
+            // A form writes a space as `+`, and a `+` escaped.
+            let words = param(query, "words").unwrap_or("").replace('+', " ");
+            let words = String::from_utf8_lossy(&unescaped(words.as_bytes())).into_owned();
+            let typing = param(query, "typing") == Some("1");
+            let page = param(query, "page").and_then(|page| page_file(site, page));
+            let found = site.hub.panel().search(&words, typing, page.as_deref());
+            respond(StatusCode::OK, "application/json", found)
+        }
         Some("waiting") => respond(
             StatusCode::OK,
             "text/plain; charset=utf-8",
@@ -814,6 +823,11 @@ mod tests {
                 "{foreign}"
             );
             assert_eq!(from("/.statac-live/problems", foreign), 403, "{foreign}");
+            assert_eq!(
+                from("/.statac-live/search?words=a", foreign),
+                403,
+                "{foreign}"
+            );
         }
         assert_eq!(
             sent(&site, Method::GET, wait, std::slice::from_ref(&host)).status,
@@ -841,6 +855,7 @@ mod tests {
             "/.statac-live/waiting",
             "/.statac-live/panel?page=%2F",
             "/.statac-live/problems?kind=broken-link",
+            "/.statac-live/search?words=a&typing=1&page=%2F",
         ] {
             for from in ["cross-site", "same-site", "none", ""] {
                 assert_eq!(marked(target, from).status, 403, "{target} {from}");
@@ -1067,7 +1082,11 @@ mod tests {
             (head.status, head.kind.as_str(), head.body.as_str()),
             (200, "text/plain; charset=utf-8", "")
         );
-        for target in ["/.statac-live/panel?page=%2F", "/.statac-live/problems"] {
+        for target in [
+            "/.statac-live/panel?page=%2F",
+            "/.statac-live/problems",
+            "/.statac-live/search?words=a",
+        ] {
             assert_eq!(asked(&site, Method::POST, target, None).status, 405);
             let head = asked(&site, Method::HEAD, target, None);
             assert_eq!(

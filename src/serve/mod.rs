@@ -484,6 +484,7 @@ impl Serving {
             changed,
             said,
             gone: self.gone.as_deref(),
+            drafts: self.options.drafts,
         };
         let panel = Panel::after(
             round,
