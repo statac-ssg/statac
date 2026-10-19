@@ -11,10 +11,12 @@
 
 use super::Templates;
 use super::files::{Role, template_path};
+use super::render::Shared;
 use crate::content::words::PageWord;
 use crate::origin::{Arrival, Origin};
 use crate::problem::{Chooser, Kind, Problem};
-use crate::site::{Page, Site};
+use crate::reads::Key;
+use crate::site::{Page, PageId, Site};
 use crate::source::Sources;
 
 /// The template a page is built with, and where the choice came from.
@@ -24,6 +26,18 @@ pub struct Chosen {
     pub name: String,
     /// Where the name is written; a default where nothing named it.
     pub origin: Origin,
+}
+
+/// The names a page's template is chosen by. What it chooses turns on more
+/// than the page's answer to them: on which templates the site has, and
+/// on where the page stands.
+pub(crate) const CHOOSING: &[&str] = &["layout", "type"];
+
+/// Records, through `read`, reading what chooses `page`'s template.
+pub(super) fn read_choice(shared: &Shared, page: PageId, mut read: impl FnMut(Key)) {
+    for name in CHOOSING {
+        read(Key::Field(page, shared.name_id(name)));
+    }
 }
 
 /// Chooses the template for `page`, or says why it can't be had.

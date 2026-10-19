@@ -136,6 +136,36 @@ pub(crate) fn of_the_front(key: &str) -> bool {
     as_written(key) || OF_THE_FRONT.contains(&key)
 }
 
+/// What a page's answer to a name turns on, wherever it is asked: by
+/// `page`, by `where` or by a sort. Always the words and fields the page
+/// writes under the name; for some names more.
+pub(crate) struct Answering<'a> {
+    pub name: &'a str,
+    /// The word of Statac's the name is, where it is one.
+    pub word: Option<PageWord>,
+    /// Whether the page's title answers it, which may be taken from
+    /// elsewhere than the page's own front matter.
+    pub titled: bool,
+    /// Whether the page's date answers it: the date itself, or a part of
+    /// it that `where` answers for by name.
+    pub dated: bool,
+    /// Whether it chooses the page's template.
+    pub choosing: bool,
+}
+
+impl Answering<'_> {
+    pub fn of(name: &str) -> Answering<'_> {
+        let word = PageWord::named(name);
+        Answering {
+            name,
+            word,
+            titled: word == Some(PageWord::Title),
+            dated: word == Some(PageWord::Date) || crate::lists::DATE_PARTS.contains(&name),
+            choosing: super::layout::CHOOSING.contains(&name),
+        }
+    }
+}
+
 /// Whether `value` is one of Statac's own objects, which never hold a
 /// missing value and are too large to search.
 pub(super) fn opaque(value: &Value) -> bool {
@@ -1057,16 +1087,17 @@ fn feed_value(shared: &Shared, list: ListId) -> Value {
         }
     }
     frame::read(Key::List(list));
-    match shared.site.lists.get(list).page {
-        Some(page) => {
+    let known = list_known(shared, list);
+    match known.page {
+        Some((page, _)) => {
             for name in ["feed", "index_page", "url", "redirect_to"] {
                 frame::read(field_key(shared, page, name));
             }
         }
         None => frame::read(setting_key(shared, "pages.feed")),
     }
-    Value::from(shared.feed(list).map_or_else(String::new, |feed| {
-        format!("{}{}", shared.base, feed.address.as_str())
+    Value::from(known.feed.map_or_else(String::new, |address| {
+        format!("{}{}", shared.base, address.as_str())
     }))
 }
 
@@ -1091,6 +1122,28 @@ pub(super) fn list_name(shared: &Shared, id: ListId) -> String {
     }
 }
 
+/// What a list is known by but for its members, all [`Key::List`] covers.
+/// Where a list's answer turns on any of it, the answer is taken from
+/// this, so the key covers it.
+#[derive(Debug)]
+pub(crate) struct ListKnown<'a> {
+    /// The page that speaks for it, and whether that is published.
+    pub page: Option<(PageId, bool)>,
+    /// Where its feed is published.
+    pub feed: Option<&'a crate::content::address::Address>,
+    pub order: Option<Order>,
+}
+
+pub(super) fn list_known(shared: &Shared, id: ListId) -> ListKnown<'_> {
+    let site = &shared.site;
+    let list = site.lists.get(id);
+    ListKnown {
+        page: (list.page).map(|page| (page, site.pages.get(page).lands())),
+        feed: shared.feed(id).map(|feed| &feed.address),
+        order: list.order,
+    }
+}
+
 /// A list: a folder, a tag, a series or one a page declares, each
 /// answering the same names.
 #[derive(Debug)]
@@ -1111,14 +1164,17 @@ impl ListValue {
         let shared = &self.shared;
         let list = shared.site.lists.get(self.id);
         let own = Key::List(self.id);
+        let known = || {
+            frame::read(own);
+            list_known(shared, self.id)
+        };
         match key {
             "name" => {
                 frame::read(own);
                 Some(Value::from(list_name(shared, self.id)))
             }
             "title" => {
-                frame::read(own);
-                if let Some(page) = list.page {
+                if let Some((page, _)) = known().page {
                     frame::read(field_key(shared, page, "title"));
                     if let Some(title) = &shared.site.pages.get(page).title {
                         return Some(Value::from(title.value.as_str()));
@@ -1129,14 +1185,10 @@ impl ListValue {
                     false => Some(Value::from(list_name(shared, self.id))),
                 }
             }
-            "page" => {
-                frame::read(own);
-                list.page.map(|page| PageValue::value(shared, page))
-            }
+            "page" => (known().page).map(|(page, _)| PageValue::value(shared, page)),
             "url" => {
-                frame::read(own);
-                match (list.page, &list.key) {
-                    (Some(page), _) => {
+                match (known().page, &list.key) {
+                    (Some((page, _)), _) => {
                         frame::read(field_key(shared, page, "url"));
                         Some(Value::from(shared.address_of(page)))
                     }
@@ -1159,10 +1211,10 @@ impl ListValue {
                 Some(Pages::value(shared, Which::All(self.id)))
             }
             "pager" => {
-                frame::read(own);
+                let known = known();
                 read_whole(self.id);
-                Some(match list.page {
-                    Some(page) if shared.site.pages.get(page).lands() => {
+                Some(match known.page {
+                    Some((page, true)) => {
                         Pages::value(shared, Which::Pager(page, 1 + list.later.len()))
                     }
                     _ => Value::from(Vec::<Value>::new()),
@@ -1173,10 +1225,7 @@ impl ListValue {
                 true => "site",
                 false => list.key.word(),
             })),
-            "order" => {
-                frame::read(own);
-                Some(Value::from(list.order.map_or("", Order::word)))
-            }
+            "order" => Some(Value::from(known().order.map_or("", Order::word))),
             _ => None,
         }
     }

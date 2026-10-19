@@ -7,6 +7,10 @@
 //! both. Where what an output can see through a key is wider than the key
 //! says, the fingerprint is the wider thing: a page's fields are one
 //! fingerprint, and a picture's carries which pictures the site has.
+//!
+//! What a key covers beyond a value, such as what a page's answer to a
+//! name turns on or what a list is known by, is the build's to say, beside
+//! the code that reads it; the fingerprints here take it from there.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Write};
@@ -23,7 +27,7 @@ use crate::origin::{Origin, Sourced};
 use crate::reads::{Key, Translation};
 use crate::site::{Id, Item, ListId, ListKey, NameId, PageId, Site};
 use crate::source::{Place, SourceId, Sources};
-use crate::templates::Renderer;
+use crate::templates::{Answering, Renderer};
 use crate::value::Value;
 use crate::yaml::{Node, Value as Yaml};
 
@@ -175,29 +179,6 @@ impl Reading {
             statics: index(&self.statics, &later.statics),
             redirects: places(&self.redirects, &later.redirects).collect(),
             feeds: places(&self.feeds, &later.feeds).collect(),
-        }
-    }
-}
-
-/// The names a page's field is read under to choose its template, which
-/// turns on more than its answer to them.
-const CHOOSING: &[&str] = &["layout", "type"];
-
-/// A name every page is asked, and what a page answers to it by.
-struct Asking<'a> {
-    name: &'a str,
-    word: Option<PageWord>,
-    dated: bool,
-    choosing: bool,
-}
-
-impl Asking<'_> {
-    fn of(name: &str) -> Asking<'_> {
-        Asking {
-            name,
-            word: PageWord::named(name),
-            dated: name == "date" || crate::lists::DATE_PARTS.contains(&name),
-            choosing: CHOOSING.contains(&name),
         }
     }
 }
@@ -798,22 +779,15 @@ impl Taken<'_> {
         })
     }
 
-    /// What a list is known by but for its members, as a template asks
-    /// it: the page that speaks for it, where its feed is published, and
-    /// its order. Which list it is the id carries; its feed turns on its
-    /// members too, so where it is published is taken as it is worked out.
+    /// What a list is known by but for its members, as the build has it,
+    /// its page by name. Which list it is the id carries.
     fn list_own(&self, id: ListId) -> u64 {
         *self.prints.lists_own[id.index()].get_or_init(|| {
-            let renderer = &self.reading.renderer;
-            let site = renderer.site();
-            let list = site.lists.get(id);
-            let feed = renderer.feed_of(id).map(|feed| &feed.address);
-            let page = list
-                .page
-                .map(|page| (self.named(&[page]), site.pages.get(page).lands()));
+            let known = self.reading.renderer.list_known(id);
+            let page = (known.page).map(|(page, lands)| (self.named(&[page]), lands));
             Print::default()
                 .with(page)
-                .shown(&(feed, list.order))
+                .shown(&(known.feed, known.order))
                 .done()
         })
     }
@@ -871,7 +845,7 @@ impl Taken<'_> {
             if !crate::templates::of_the_front(&name) {
                 return self.every_front();
             }
-            let asking = Asking::of(&name);
+            let asking = Answering::of(&name);
             let mut print = Print::default().with(self.every_page());
             for (id, _) in renderer.site().pages.iter() {
                 print = self.answer(print, id, &asking).with(0u8);
@@ -903,7 +877,7 @@ impl Taken<'_> {
                 return self.every_front();
             }
             let site = renderer.site();
-            let asking = Asking::of(&name);
+            let asking = Answering::of(&name);
             let mut print = Print::default();
             for &(id, number) in renderer.every_page() {
                 let page = site.pages.get(id);
@@ -925,7 +899,7 @@ impl Taken<'_> {
 
     /// `print` with what page `id` answers to the name `asking`, and where
     /// it is written.
-    fn answer(&self, mut print: Print, id: PageId, asking: &Asking) -> Print {
+    fn answer(&self, mut print: Print, id: PageId, asking: &Answering) -> Print {
         let renderer = &self.reading.renderer;
         let sources = renderer.sources();
         let page = renderer.site().pages.get(id);
@@ -940,7 +914,7 @@ impl Taken<'_> {
                 .node(sources, &field.value)
                 .origin(sources, &field.origin);
         }
-        if let Some(title) = page.title.as_ref().filter(|_| asking.name == "title") {
+        if let Some(title) = page.title.as_ref().filter(|_| asking.titled) {
             print = print
                 .with((3u8, &title.value))
                 .origin(sources, &title.origin);

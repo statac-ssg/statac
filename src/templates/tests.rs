@@ -309,6 +309,15 @@ fn the_layout_is_chosen_as_written_handed_down_typed_or_by_default() {
 }
 
 #[test]
+fn the_names_said_to_choose_a_template_are_the_words_it_is_chosen_by() {
+    use crate::content::words::PageWord;
+    let words: Vec<_> = (layout::CHOOSING.iter())
+        .map(|name| PageWord::named(name))
+        .collect();
+    assert_eq!(words, [Some(PageWord::Layout), Some(PageWord::Type)]);
+}
+
+#[test]
 fn a_default_layout_the_site_lacks_is_told_at_the_page() {
     let built = site(&[("content/post-1.md", "---\ntitle: Post 1\n---\n"), BASE]);
     let rendered = built.render("post-1.md");

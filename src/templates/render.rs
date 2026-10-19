@@ -532,6 +532,11 @@ impl Renderer {
         self.shared.feed(list)
     }
 
+    /// What `list` is known by but for its members.
+    pub(crate) fn list_known(&self, list: ListId) -> super::values::ListKnown<'_> {
+        super::values::list_known(&self.shared, list)
+    }
+
     /// What a page's file alone puts on a page as HTML: its writing as
     /// Markdown makes it, so that what it shows as code or escapes is no
     /// markup, between its fields as written. A call is left as the file
@@ -646,8 +651,7 @@ impl Renderer {
             },
             _ => Vec::new(),
         };
-        frame::read(Key::Field(page, shared.name_id("layout")));
-        frame::read(Key::Field(page, shared.name_id("type")));
+        layout::read_choice(shared, page, frame::read);
         let chosen = match self.layout_of(page) {
             Ok(chosen) => chosen,
             Err(problem) => {
