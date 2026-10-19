@@ -1,12 +1,10 @@
-//! YAML read into a tree where every node keeps the place it was written,
-//! and a serde `Deserializer` over that tree.
+//! YAML read into a tree where every node keeps the place it was written.
 //!
 //! Places are offsets into the whole source, so front matter read from a
 //! Markdown file is placed in that file, not in an extracted string. The
 //! text as written is never stored twice: `Sources::spelling` recovers it.
 
 mod binary;
-mod de;
 mod front_matter;
 mod json;
 mod parser;
@@ -15,7 +13,6 @@ mod schema;
 mod tests;
 mod tree;
 
-pub use de::{Error, Unknown, from_node, from_node_noting_unknown};
 pub use front_matter::{Split, Unclosed, split};
 pub use json::JsonFault;
 pub use schema::{Resolved, keeps_characters, resolve};

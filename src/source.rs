@@ -10,6 +10,7 @@ impl SourceId {
         self.0
     }
 
+    #[cfg(test)]
     pub(crate) fn from_index(index: u32) -> Self {
         SourceId(index)
     }

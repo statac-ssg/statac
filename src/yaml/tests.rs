@@ -600,41 +600,7 @@ fn an_empty_file_is_no_value() {
     }
 }
 
-mod typed {
-    use std::collections::BTreeMap;
-
-    use serde::Deserialize;
-
-    use super::*;
-    use crate::origin::{Arrival, Sourced};
-
-    /// Line, column, spelling and style of a value, and that it arrived as written.
-    fn check<T>(
-        sources: &Sources,
-        sourced: &Sourced<T>,
-        line: usize,
-        column: usize,
-        spelling: &str,
-        style: Style,
-    ) {
-        let place = sourced.origin.place.expect("a written value has a place");
-        assert_eq!(
-            (
-                line_column(sources, place),
-                sources.spelling(place),
-                sourced.origin.style
-            ),
-            ((line, column), spelling, style)
-        );
-        assert_eq!(sourced.origin.arrival, Arrival::Written);
-    }
-
-    fn typed<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, Error> {
-        let (_, node) = read_yaml(text);
-        from_node(&node.expect("well-formed YAML"))
-    }
-
-    const POST: &str = "---
+const POST: &str = "---
 title: Post 1
 year: 1984
 draft: false
@@ -656,337 +622,82 @@ summary: >-
 Body.
 ";
 
-    #[derive(Debug, Deserialize)]
-    struct Page {
-        title: Sourced<String>,
-        year: Option<Sourced<String>>,
-        draft: Option<Sourced<bool>>,
-        weight: Option<Sourced<i64>>,
-        tags: Option<Sourced<Vec<Sourced<String>>>>,
-        book: Option<Sourced<Book>>,
-        summary: Option<Sourced<String>>,
-    }
+#[test]
+fn every_value_in_nested_front_matter_has_its_place_and_style() {
+    let (sources, id) = one("content/post-1.md", POST);
+    let (node, body) = front_matter(&sources, id).unwrap();
+    assert_eq!(&POST[body.range()], "\nBody.\n");
+    let node = node.unwrap();
 
-    #[derive(Debug, Deserialize)]
-    struct Book {
-        author: Sourced<String>,
-        isbn: Sourced<String>,
-        editions: Sourced<Vec<Sourced<Edition>>>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct Edition {
-        year: Sourced<u16>,
-        note: Sourced<String>,
-    }
-
-    #[test]
-    fn every_value_in_nested_front_matter_has_its_place_and_style() {
-        let (sources, id) = one("content/post-1.md", POST);
-        let (node, body) = front_matter(&sources, id).unwrap();
-        assert_eq!(&POST[body.range()], "\nBody.\n");
-        let node = node.unwrap();
-        let page: Page = from_node(&node).unwrap();
-        let s = &sources;
-
-        check(s, &page.title, 2, 8, "Post 1", Style::Plain);
-        assert_eq!(page.title.value, "Post 1");
-        let year = page.year.unwrap();
-        check(s, &year, 3, 7, "1984", Style::Plain);
-        assert_eq!(year.value, "1984");
-        let draft = page.draft.unwrap();
-        check(s, &draft, 4, 8, "false", Style::Plain);
-        assert!(!draft.value);
-        let weight = page.weight.unwrap();
-        check(s, &weight, 5, 9, "3", Style::Plain);
-        assert_eq!(weight.value, 3);
-
-        let tags = page.tags.unwrap();
-        check(s, &tags, 6, 7, "[Tag 1, 'Tag 2', \"Tag 3\"]", Style::None);
-        check(s, &tags.value[0], 6, 8, "Tag 1", Style::Plain);
-        check(s, &tags.value[1], 6, 15, "'Tag 2'", Style::SingleQuoted);
-        check(s, &tags.value[2], 6, 24, "\"Tag 3\"", Style::DoubleQuoted);
-        assert_eq!(tags.value[1].value, "Tag 2");
-        assert_eq!(tags.value[2].value, "Tag 3");
-
-        let book = page.book.unwrap();
-        let place = book.origin.place.unwrap();
-        assert_eq!(line_column(s, place), (8, 3));
-        assert!(sources.spelling(place).starts_with("author: Author 1\n"));
-        assert!(sources.spelling(place).ends_with("Line two."));
-        check(s, &book.value.author, 8, 11, "Author 1", Style::Plain);
-        check(
-            s,
-            &book.value.isbn,
-            9,
-            9,
-            "'0000000001'",
-            Style::SingleQuoted,
-        );
-        assert_eq!(book.value.isbn.value, "0000000001");
-        let editions = &book.value.editions;
-        assert_eq!(line_column(s, editions.origin.place.unwrap()), (11, 5));
-        let edition = &editions.value[0];
-        assert_eq!(line_column(s, edition.origin.place.unwrap()), (11, 7));
-        check(s, &edition.value.year, 11, 13, "2001", Style::Plain);
-        assert_eq!(edition.value.year.value, 2001);
-        let note = &edition.value.note;
-        check(
-            s,
-            note,
-            12,
-            13,
-            "|\n        Line one.\n        Line two.",
-            Style::Literal,
-        );
-        assert_eq!(note.value, "Line one.\nLine two.\n");
-
-        let summary = page.summary.unwrap();
-        check(s, &summary, 15, 10, ">-\n  Folded\n  text.", Style::Folded);
-        assert_eq!(summary.value, "Folded text.");
-    }
-
-    #[test]
-    fn an_alias_hands_on_its_anchors_origin() {
-        #[derive(Debug, Deserialize)]
-        struct Two {
-            a: Sourced<String>,
-            b: Sourced<String>,
-        }
-        let two: Two = typed("a: &x Post 1\nb: *x\n").unwrap();
-        assert_eq!(two.b.value, "Post 1");
-        assert_eq!(two.a.origin, two.b.origin);
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct Text {
-        v: Sourced<String>,
-    }
-
-    #[test]
-    fn a_text_value_takes_a_bare_scalar_only_where_reading_keeps_its_characters() {
-        let kept = [
-            ("1984", "1984"),
-            ("-7", "-7"),
-            ("2.5", "2.5"),
-            ("true", "true"),
-            ("Post 1", "Post 1"),
-            ("yes", "yes"),
-            ("on", "on"),
-            ("1_000", "1_000"),
-            ("2026-10-04", "2026-10-04"),
-            ("'3.10'", "3.10"),
-            ("\"0x10\"", "0x10"),
-            ("!!str 3.10", "3.10"),
-        ];
-        for (written, value) in kept {
-            let text: Text = typed(&format!("v: {written}\n")).unwrap();
-            assert_eq!(text.v.value, value, "{written}");
-        }
-        for written in [
-            "3.10", "1e3", "0x10", "0o10", "010", "+12", "1.0", ".inf", "True", "~", "null", "",
-        ] {
-            let error = typed::<Text>(&format!("v: {written}\n")).unwrap_err();
-            assert!(error.place.is_some(), "{written}");
-        }
-    }
-
-    #[test]
-    fn true_or_false_is_what_yaml_reads_as_true_or_false() {
-        #[derive(Debug, Deserialize)]
-        struct Flag {
-            v: bool,
-        }
-        for (written, value) in [
-            ("true", true),
-            ("false", false),
-            ("True", true),
-            ("FALSE", false),
-        ] {
-            assert_eq!(typed::<Flag>(&format!("v: {written}")).unwrap().v, value);
-        }
-        for written in ["yes", "on", "'true'", "1"] {
-            let (sources, node) = read_yaml(&format!("v: {written}"));
-            let error = from_node::<Flag>(&node.unwrap()).unwrap_err();
-            let place = error.place.unwrap();
-            assert_eq!(line_column(&sources, place), (1, 4), "{written}");
-            assert_eq!(sources.spelling(place), written);
-        }
-    }
-
-    #[test]
-    fn numbers_are_read_by_the_yaml_1_2_core_schema() {
-        #[derive(Debug, Deserialize)]
-        struct Whole {
-            v: i64,
-        }
-        #[derive(Debug, Deserialize)]
-        struct Number {
-            v: f64,
-        }
-        for (written, value) in [
-            ("0x10", 16),
-            ("0o10", 8),
-            ("010", 10),
-            ("+12", 12),
-            ("-3", -3),
-        ] {
-            assert_eq!(
-                typed::<Whole>(&format!("v: {written}")).unwrap().v,
-                value,
-                "{written}"
-            );
-        }
-        for written in [
-            "1_000",
-            "1e3",
-            "'12'",
-            "0b101",
-            "1:30",
-            "2.0",
-            "99999999999999999999",
-        ] {
-            assert!(
-                typed::<Whole>(&format!("v: {written}")).is_err(),
-                "{written}"
-            );
-        }
-        for (written, value) in [("3.10", 3.1), ("1e3", 1000.0), (".5", 0.5), ("7", 7.0)] {
-            assert_eq!(
-                typed::<Number>(&format!("v: {written}")).unwrap().v,
-                value,
-                "{written}"
-            );
-        }
-        assert!(typed::<Number>("v: .inf").unwrap().v.is_infinite());
-    }
-
-    #[test]
-    fn plain_fields_read_without_places() {
-        #[derive(Debug, Deserialize, PartialEq)]
-        struct Plain {
-            title: String,
-            tags: Vec<String>,
-            weight: Option<u8>,
-            draft: Option<bool>,
-        }
-        let plain: Plain = typed("title: Post 1\ntags: [Tag 1, Tag 2]\nweight: 3\n").unwrap();
+    let check = |node: &Node, line: usize, column: usize, spelling: &str, style: Style| {
         assert_eq!(
-            plain,
-            Plain {
-                title: "Post 1".into(),
-                tags: vec!["Tag 1".into(), "Tag 2".into()],
-                weight: Some(3),
-                draft: None,
-            }
+            (
+                line_column(&sources, node.place),
+                sources.spelling(node.place),
+                node.style
+            ),
+            ((line, column), spelling, style)
         );
-    }
+    };
+    let text = |node: &Node, text: &str| assert_eq!(node.value, Value::Scalar(text.into()));
 
-    #[test]
-    fn a_wrong_type_deep_inside_is_placed_at_the_value() {
-        let text = "title: Post 1\nbook:\n  author: Author 1\n  isbn: '1'\n  editions:\n    - year: soon\n      note: x\n";
-        let (sources, node) = read_yaml(text);
-        let error = from_node::<Page>(&node.unwrap()).unwrap_err();
-        let place = error.place.unwrap();
-        assert_eq!(line_column(&sources, place), (6, 13), "{error}");
-        assert_eq!(sources.spelling(place), "soon");
-    }
+    let title = node.get("title").unwrap();
+    check(title, 2, 8, "Post 1", Style::Plain);
+    text(title, "Post 1");
+    check(node.get("year").unwrap(), 3, 7, "1984", Style::Plain);
+    check(node.get("draft").unwrap(), 4, 8, "false", Style::Plain);
+    check(node.get("weight").unwrap(), 5, 9, "3", Style::Plain);
 
-    #[test]
-    fn a_missing_field_is_placed_at_its_mapping() {
-        let text = "title: Post 1\nbook:\n  author: Author 1\n  editions: []\n";
-        let (sources, node) = read_yaml(text);
-        let error = from_node::<Page>(&node.unwrap()).unwrap_err();
-        assert_eq!(error.message, "missing field `isbn`");
-        assert_eq!(line_column(&sources, error.place.unwrap()), (3, 3));
-    }
+    let tags = node.get("tags").unwrap();
+    check(tags, 6, 7, "[Tag 1, 'Tag 2', \"Tag 3\"]", Style::None);
+    let tags = items(tags);
+    check(&tags[0], 6, 8, "Tag 1", Style::Plain);
+    check(&tags[1], 6, 15, "'Tag 2'", Style::SingleQuoted);
+    check(&tags[2], 6, 24, "\"Tag 3\"", Style::DoubleQuoted);
+    text(&tags[1], "Tag 2");
+    text(&tags[2], "Tag 3");
 
-    #[test]
-    fn an_unknown_field_refused_by_its_struct_is_placed_at_its_key() {
-        #[derive(Debug, Deserialize)]
-        #[serde(deny_unknown_fields)]
-        #[allow(dead_code)]
-        struct Strict {
-            title: String,
-        }
-        let (sources, node) = read_yaml("title: Post 1\ntitel: Post 1\n");
-        let error = from_node::<Strict>(&node.unwrap()).unwrap_err();
-        assert_eq!(line_column(&sources, error.place.unwrap()), (2, 1));
-    }
+    let book = node.get("book").unwrap();
+    assert_eq!(line_column(&sources, book.place), (8, 3));
+    assert_eq!(book.style, Style::None);
+    assert!(
+        sources
+            .spelling(book.place)
+            .starts_with("author: Author 1\n")
+    );
+    assert!(sources.spelling(book.place).ends_with("Line two."));
+    check(book.get("author").unwrap(), 8, 11, "Author 1", Style::Plain);
+    let isbn = book.get("isbn").unwrap();
+    check(isbn, 9, 9, "'0000000001'", Style::SingleQuoted);
+    text(isbn, "0000000001");
+    let editions = book.get("editions").unwrap();
+    assert_eq!(line_column(&sources, editions.place), (11, 5));
+    let edition = &items(editions)[0];
+    assert_eq!(line_column(&sources, edition.place), (11, 7));
+    check(edition.get("year").unwrap(), 11, 13, "2001", Style::Plain);
+    let note = edition.get("note").unwrap();
+    check(
+        note,
+        12,
+        13,
+        "|\n        Line one.\n        Line two.",
+        Style::Literal,
+    );
+    text(note, "Line one.\nLine two.\n");
 
-    #[test]
-    fn keys_no_field_takes_are_noted_with_their_places() {
-        #[derive(Debug, Deserialize)]
-        #[allow(dead_code)]
-        struct Known {
-            title: String,
-            book: Inner,
-        }
-        #[derive(Debug, Deserialize)]
-        #[allow(dead_code)]
-        struct Inner {
-            author: String,
-        }
-        let text = "title: Post 1\ntemplate: post\nbook:\n  author: Author 1\n  isbn: [1, 2]\n";
-        let (sources, node) = read_yaml(text);
-        let node = node.unwrap();
-        let (known, unknown) = from_node_noting_unknown::<Known>(&node).unwrap();
-        assert_eq!(known.book.author, "Author 1");
-        let noted: Vec<_> = unknown
-            .iter()
-            .map(|u| {
-                (
-                    sources.spelling(u.key.place),
-                    line_column(&sources, u.key.place),
-                    sources.spelling(u.value.place),
-                )
-            })
-            .collect();
-        assert_eq!(
-            noted,
-            [("template", (2, 1), "post"), ("isbn", (5, 3), "[1, 2]")]
-        );
-    }
+    let summary = node.get("summary").unwrap();
+    check(summary, 15, 10, ">-\n  Folded\n  text.", Style::Folded);
+    text(summary, "Folded text.");
+}
 
-    #[test]
-    fn an_empty_value_is_none_for_an_option_and_refused_for_text() {
-        #[derive(Debug, Deserialize)]
-        struct T {
-            title: Option<Sourced<String>>,
-            year: Option<String>,
-        }
-        let t: T = typed("title:\nyear: ~\n").unwrap();
-        assert!(t.title.is_none() && t.year.is_none());
-        // The parser places a value written as nothing at its key's colon.
-        let (sources, node) = read_yaml("v:\n");
-        let error = from_node::<Text>(&node.unwrap()).unwrap_err();
-        assert_eq!(line_column(&sources, error.place.unwrap()), (1, 2));
-    }
-
-    #[test]
-    fn untyped_values_read_by_the_core_schema() {
-        #[derive(Debug, Deserialize, PartialEq)]
-        #[serde(untagged)]
-        enum Any {
-            Bool(bool),
-            Int(i64),
-            Float(f64),
-            Text(String),
-            List(Vec<Any>),
-            Map(BTreeMap<String, Any>),
-            Null(()),
-        }
-        let any: BTreeMap<String, Any> =
-            typed("a: 1984\nb: 3.10\nc: yes\nd: [true, ~]\ne: {f: '1'}\n").unwrap();
-        assert_eq!(any["a"], Any::Int(1984));
-        assert_eq!(any["b"], Any::Float(3.1));
-        assert_eq!(any["c"], Any::Text("yes".into()));
-        assert_eq!(any["d"], Any::List(vec![Any::Bool(true), Any::Null(())]));
-        assert_eq!(
-            any["e"],
-            Any::Map(BTreeMap::from([("f".to_string(), Any::Text("1".into()))]))
-        );
-    }
+#[test]
+fn a_value_written_as_nothing_is_placed_at_its_keys_colon() {
+    let (sources, node) = read_yaml("v:\n");
+    let node = node.unwrap();
+    let v = node.get("v").unwrap();
+    assert_eq!(line_column(&sources, v.place), (1, 2));
+    assert_eq!(v.value, Value::Scalar(String::new()));
+    assert_eq!(v.resolved(), Some(Resolved::Null));
 }
 
 #[test]

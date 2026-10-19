@@ -1562,7 +1562,6 @@ dependencies = [
  "rayon",
  "rustix",
  "rustls",
- "serde",
  "toml",
  "unicode-normalization",
  "ureq",
