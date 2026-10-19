@@ -1521,6 +1521,32 @@ fn a_snippet_handed_a_post_is_offered_the_posts_field() {
 }
 
 #[test]
+fn what_a_snippet_is_handed_is_known_however_many_snippets_hand_it_on() {
+    // Each snippet is handed a page by the layout, and a number through
+    // the snippets before it, so the last is handed something with no
+    // `title`.
+    let built = site(&[
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "templates/home.html",
+            "{{ one(x=1) }}{{ two(x=page) }}{{ three(x=page) }}{{ four(x=page) }}{{ five(x=page) }}",
+        ),
+        ("snippets/one.html", "{{ two(x=x) }}"),
+        ("snippets/two.html", "{{ three(x=x) }}"),
+        ("snippets/three.html", "{{ four(x=x) }}"),
+        ("snippets/four.html", "{{ five(x=x) }}"),
+        (
+            "snippets/five.html",
+            "{% for t in [x.title] %}{{ t }}{% endfor %}",
+        ),
+    ]);
+    assert_eq!(
+        built.template_problems(),
+        [("no-value", "snippets/five.html".into(), "x.title".into())]
+    );
+}
+
+#[test]
 fn a_value_a_snippet_reads_and_its_call_left_out_is_told_at_the_call() {
     let built = site(&[
         ("content/index.md", "---\ntitle: Home\n---\n"),

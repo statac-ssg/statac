@@ -243,16 +243,16 @@ pub(super) fn check_site(
     }
 
     // A snippet's values take the types its calls hand it. Snippets call
-    // snippets, so the types settle over a few rounds.
+    // snippets, so the types settle over rounds. The calls only gather, so
+    // a value's type changes at most twice, from unknown to the one its
+    // calls agree on and then to any, and the rounds end.
     let snippet_files: Vec<(usize, &Checked)> = files
         .iter()
         .enumerate()
         .filter(|(_, f)| matches!(f.role, Role::Snippet(_)))
         .collect();
     let mut param_types: BTreeMap<String, Vec<Ty>> = BTreeMap::new();
-    let mut rounds = 0;
     loop {
-        rounds += 1;
         let mut next: BTreeMap<String, Vec<Ty>> = BTreeMap::new();
         for (_, file) in &snippet_files {
             let Role::Snippet(name) = file.role else {
@@ -267,7 +267,6 @@ pub(super) fn check_site(
         }
         let settled = next == param_types;
         param_types = next;
-        let last = settled || rounds == 4;
         let mut more: BTreeMap<String, Vec<Vec<Ty>>> = BTreeMap::new();
         for (at, file) in &snippet_files {
             let Role::Snippet(name) = file.role else {
@@ -282,14 +281,14 @@ pub(super) fn check_site(
             let typed = params.iter().cloned().zip(types.iter().cloned()).collect();
             let mut checker = Checker::new(schema, file, sources, Some((name.clone(), typed)));
             checker.run();
-            if last {
+            if settled {
                 problems.extend(checker.problems.drain(..).map(|p| (*at, p)));
             }
             for (name, args) in checker.calls {
                 more.entry(name).or_default().push(args);
             }
         }
-        if last {
+        if settled {
             break;
         }
         for (name, calls) in more {

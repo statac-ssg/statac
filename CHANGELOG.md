@@ -41,6 +41,10 @@ What changed in each release of Statac, the newest first.
   could show in the opening or the excerpt. A `<` that opens no tag, as
   in `<p>1 < 2</p>`, hid the words up to the next `>`, and `<pre` or
   `<p>` inside an attribute was taken for the element.
+- A snippet handed a value through more than four snippets in turn is
+  checked, when the templates are read, against everything it may be
+  handed. It was checked against only what came through the first four,
+  so a mistake in it could go untold until a page was built through it.
 
 ## 0.5.0 - 2026-10-18
 
