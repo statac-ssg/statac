@@ -1547,6 +1547,75 @@ fn what_a_snippet_is_handed_is_known_however_many_snippets_hand_it_on() {
 }
 
 #[test]
+fn a_page_passed_straight_through_snippets_is_checked_at_the_last() {
+    let names = ["one", "two", "three", "four", "five", "six"];
+    for depth in 3..=names.len() {
+        let mut files: Vec<(String, String)> = vec![
+            ("content/index.md".into(), "---\ntitle: Home\n---\n".into()),
+            ("templates/home.html".into(), "{{ one(x=page) }}".into()),
+        ];
+        for (at, name) in names[..depth].iter().enumerate() {
+            let body = match names[..depth].get(at + 1) {
+                Some(next) => format!("{{{{ {next}(x=x) }}}}"),
+                None => "{{ x.titel }}".into(),
+            };
+            files.push((format!("snippets/{name}.html"), body));
+        }
+        let files: Vec<(&str, &str)> = files.iter().map(|(p, t)| (&**p, &**t)).collect();
+        let built = site(&files);
+        assert_eq!(
+            built.template_problems(),
+            [(
+                "unknown-word",
+                format!("snippets/{}.html", names[depth - 1]),
+                "x.titel".into()
+            )],
+            "{depth}"
+        );
+    }
+}
+
+#[test]
+fn what_a_snippet_no_template_calls_hands_on_is_checked() {
+    // (the snippet no template calls, what it calls)
+    let cases = [
+        ("{{ inner(x=page) }}", "{{ x.titel }}"),
+        ("{{ inner(x=page) }}", "{{ x.titel }}{{ outer() }}"),
+    ];
+    for (outer, inner) in cases {
+        let built = site(&[
+            ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("templates/home.html", "{{ page.title }}"),
+            ("snippets/outer.html", outer),
+            ("snippets/inner.html", inner),
+        ]);
+        assert_eq!(
+            built.template_problems(),
+            [(
+                "unknown-word",
+                "snippets/inner.html".into(),
+                "x.titel".into()
+            )],
+            "{inner}"
+        );
+    }
+}
+
+#[test]
+fn a_snippet_handing_itself_what_turns_on_its_own_value_is_checked() {
+    // Handed text, it hands itself any value; handed any value, text.
+    let built = site(&[
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        ("templates/home.html", "{{ one(x=\"a\") }}"),
+        (
+            "snippets/one.html",
+            "{% if false %}{{ one(x=(x | default(page)).title) }}{% endif %}",
+        ),
+    ]);
+    assert_eq!(built.template_problems(), []);
+}
+
+#[test]
 fn a_value_a_snippet_reads_and_its_call_left_out_is_told_at_the_call() {
     let built = site(&[
         ("content/index.md", "---\ntitle: Home\n---\n"),

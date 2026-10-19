@@ -68,6 +68,12 @@ What changed in each release of Statac, the newest first.
   counted it as words, and a script inside the opening paragraph showed
   in the opening. The text of a `<textarea>`, which a reader sees, is
   still counted.
+- A value a snippet passes on as it was handed, as `{{ two(x=x) }}`, is
+  checked as what it is however many snippets pass it on, so a field
+  misspelt in the third snippet a page reaches, or one further on, is
+  told when the templates are read. From the third snippet on, the
+  value was taken as anything, and the mistake went untold until a page
+  was built through it.
 
 ## 0.5.0 - 2026-10-18
 

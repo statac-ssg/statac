@@ -243,14 +243,31 @@ pub(super) fn check_site(
     }
 
     // A snippet's values take the types its calls hand it. Snippets call
-    // snippets, so the types settle over rounds. The calls only gather, so
-    // a value's type changes at most twice, from unknown to the one its
-    // calls agree on and then to any, and the rounds end.
+    // snippets, so the types settle over rounds. A snippet nothing has
+    // called yet hands nothing on, since what it would hand is worked out
+    // from values not yet known. Once the rest settle, the uncalled ones no
+    // other uncalled snippet calls are taken as handed anything, as only
+    // the writing can call them; where the uncalled only call one another,
+    // the first by name is, until it is handed something.
+    //
+    // The calls only gather, so a value's type changes at most three times:
+    // from unknown to any, where it is taken as handed anything, to the one
+    // its calls agree on, and then to any. Each round that doesn't settle
+    // changes one, and each that does takes another snippet as handed
+    // anything, or is the last, so the rounds end.
     let snippet_files: Vec<(usize, &Checked)> = files
         .iter()
         .enumerate()
         .filter(|(_, f)| matches!(f.role, Role::Snippet(_)))
         .collect();
+    let params_of = |name: &str| -> Vec<String> {
+        schema
+            .snippets
+            .get(name)
+            .map(|s| s.params.clone())
+            .unwrap_or_default()
+    };
+    let mut anything: BTreeSet<String> = BTreeSet::new();
     let mut param_types: BTreeMap<String, Vec<Ty>> = BTreeMap::new();
     loop {
         let mut next: BTreeMap<String, Vec<Ty>> = BTreeMap::new();
@@ -258,38 +275,63 @@ pub(super) fn check_site(
             let Role::Snippet(name) = file.role else {
                 continue;
             };
-            let params = schema
-                .snippets
-                .get(name)
-                .map(|s| s.params.clone())
-                .unwrap_or_default();
-            next.insert(name.clone(), settle(&params, handed.get(name)));
+            let params = params_of(name);
+            if let Some(calls) = handed.get(name) {
+                next.insert(name.clone(), settle(&params, Some(calls)));
+            } else if anything.contains(name) {
+                next.insert(name.clone(), vec![Ty::Any; params.len()]);
+            }
         }
         let settled = next == param_types;
         param_types = next;
+        let uncalled: Vec<&String> = snippet_files
+            .iter()
+            .filter_map(|(_, file)| match file.role {
+                Role::Snippet(name) if !param_types.contains_key(name) => Some(name),
+                _ => None,
+            })
+            .collect();
+        let last = settled && uncalled.is_empty();
         let mut more: BTreeMap<String, Vec<Vec<Ty>>> = BTreeMap::new();
+        let mut called_by_uncalled: BTreeSet<String> = BTreeSet::new();
         for (at, file) in &snippet_files {
             let Role::Snippet(name) = file.role else {
                 continue;
             };
-            let params = schema
-                .snippets
-                .get(name)
-                .map(|s| s.params.clone())
-                .unwrap_or_default();
-            let types = &param_types[name];
-            let typed = params.iter().cloned().zip(types.iter().cloned()).collect();
+            let types = param_types.get(name);
+            if types.is_none() && !settled {
+                continue;
+            }
+            let params = params_of(name);
+            let typed = match types {
+                Some(types) => params.iter().cloned().zip(types.iter().cloned()).collect(),
+                None => params.iter().map(|p| (p.clone(), Ty::Any)).collect(),
+            };
             let mut checker = Checker::new(schema, file, sources, Some((name.clone(), typed)));
             checker.run();
-            if settled {
+            if last {
                 problems.extend(checker.problems.drain(..).map(|p| (*at, p)));
             }
-            for (name, args) in checker.calls {
-                more.entry(name).or_default().push(args);
+            for (callee, args) in checker.calls {
+                match types {
+                    Some(_) => more.entry(callee).or_default().push(args),
+                    None => {
+                        called_by_uncalled.insert(callee);
+                    }
+                }
             }
         }
-        if settled {
+        if last {
             break;
+        }
+        if settled {
+            let mut taken: Vec<&String> = (uncalled.iter().copied())
+                .filter(|name| !called_by_uncalled.contains(*name))
+                .collect();
+            if taken.is_empty() {
+                taken.extend(uncalled.iter().min());
+            }
+            anything.extend(taken.into_iter().cloned());
         }
         for (name, calls) in more {
             let entry = handed.entry(name).or_default();
