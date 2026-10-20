@@ -21,6 +21,7 @@ use unicode_normalization::char::is_combining_mark;
 
 use super::Document;
 use super::node::{Kind, Node};
+use crate::html::{Markup, markup};
 use crate::language::{Quotes, Words};
 use crate::source::{SourceId, Sources, Span};
 
@@ -336,31 +337,15 @@ impl<'s> Reading<'s> {
     }
 }
 
-/// How many elements named one of `names` are open after the tag `html`,
-/// `open` of them before it.
+/// How many elements named one of `names`, in small letters, are open
+/// after the markup `html`, `open` of them before it. As in a browser, a
+/// `/` before a tag's `>` closes nothing.
 fn open_after(html: &str, names: &[&str], open: usize) -> usize {
-    let Some(inner) = html
-        .trim()
-        .strip_prefix('<')
-        .and_then(|tag| tag.strip_suffix('>'))
-    else {
-        return open;
-    };
-    let (closes, inner) = match inner.strip_prefix('/') {
-        Some(rest) => (true, rest),
-        None => (false, inner),
-    };
-    let name: String = inner
-        .chars()
-        .take_while(char::is_ascii_alphanumeric)
-        .collect();
-    if !names.iter().any(|named| named.eq_ignore_ascii_case(&name)) || inner.ends_with('/') {
-        return open;
-    }
-    match closes {
-        true => open.saturating_sub(1),
-        false => open + 1,
-    }
+    markup(html).fold(open, |open, (_, piece)| match piece {
+        Markup::Start(tag) if names.contains(&tag.name.as_str()) => open + 1,
+        Markup::End(tag) if names.contains(&tag.name.as_str()) => open.saturating_sub(1),
+        _ => open,
+    })
 }
 
 /// The run's text nodes as typography sets them, in order.

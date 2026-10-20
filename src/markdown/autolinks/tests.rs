@@ -377,6 +377,24 @@ fn an_address_is_never_linked_where_it_isnt_the_writing() {
     assert!(links(&document).is_empty());
 }
 
+/// A `/` before a tag's `>` closes nothing, and in an unquoted value it is
+/// the value's.
+#[test]
+fn an_address_inside_an_a_whose_tag_ends_in_a_slash_is_not_linked() {
+    for written in [
+        "See <a href=https://example.org/>https://example.org/</a> now.",
+        "See <a href=\"https://example.org/\">https://example.org/</a> now.",
+        "See <a href=\"https://example.org\"/>https://example.org/</a> now.",
+        "<a href=x/> https://example.org",
+    ] {
+        assert_eq!(line(written), written, "{written}");
+    }
+    assert_eq!(
+        line("<br/>https://example.org"),
+        r#"<br/><a href="https://example.org">https://example.org</a>"#
+    );
+}
+
 #[test]
 fn a_link_made_from_an_address_is_placed_at_the_address() {
     let text =
