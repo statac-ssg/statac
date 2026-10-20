@@ -125,7 +125,7 @@ pub(super) fn files(renderer: &Renderer, folder: &str, index: &Index, kept: &Kep
                 json.push(']');
             }
             json.push_str("]}");
-            packed("pages/", &json, kept)
+            packed("pages/", &json, TEXT, kept)
         })
         .collect();
 
@@ -140,7 +140,7 @@ pub(super) fn files(renderer: &Renderer, folder: &str, index: &Index, kept: &Kep
     json.push_str("],\"lengths\":");
     numbers(index.lengths.iter().copied(), &mut json);
     json.push('}');
-    let records = packed("records.", &json, kept);
+    let records = packed("records.", &json, TEXT, kept);
 
     let pieces = pieces(index, WHOLE, PIECE, kept);
     let mut entry = String::from("const FILES = {\"records\":");
@@ -199,39 +199,62 @@ pub(super) fn starts(index: &Index) -> Vec<usize> {
 /// packed, and is otherwise cut into pieces of about `each` packed. Each
 /// is taken from `kept` where an earlier build packed the same.
 pub(super) fn pieces(index: &Index, whole: usize, each: usize, kept: &Kept) -> Vec<(usize, File)> {
-    // Cut first on how far such lists usually pack, and again on how far
-    // this one did where that is far out.
-    let mut packs = PACKS;
-    for again in [false, true] {
-        let (cuts, written) = cuts(index, (each as f64 * packs) as usize);
-        let ranges: Vec<std::ops::Range<usize>> = cuts.windows(2).map(|w| w[0]..w[1]).collect();
-        let pieces: Vec<(usize, File)> = (ranges.into_par_iter())
-            .map(|range| (range.start, packed("words.", &piece(index, range), kept)))
-            .collect();
-        let size: usize = pieces.iter().map(|(_, file)| file.bytes.len()).sum();
-        if size <= whole {
-            let all = piece(index, 0..index.words.len());
-            return vec![(0, packed("words.", &all, kept))];
+    let pack = |range: std::ops::Range<usize>| {
+        (
+            range.start,
+            packed("words.", &piece(index, range), WORDS, kept),
+        )
+    };
+    // Cut first on how far such lists usually pack, and measure how far
+    // this one does on a few of the pieces, spread through it.
+    let (first, sizes) = cuts(index, (each as f64 * PACKS) as usize);
+    let step = sizes.len().div_ceil(SAMPLED);
+    let sampled: Vec<(usize, File)> = (first.par_windows(2).step_by(step))
+        .map(|w| pack(w[0]..w[1]))
+        .collect();
+    let counted: usize = sizes.iter().step_by(step).sum();
+    let packed_to: usize = sampled.iter().map(|(_, file)| file.bytes.len()).sum();
+    let measured = counted as f64 / packed_to.max(1) as f64;
+    let written: usize = sizes.iter().sum();
+    // Packed whole where it likely fits, and kept so where it does.
+    if written as f64 / measured <= whole as f64 * 1.25 {
+        let all = packed("words.", &piece(index, 0..index.words.len()), WORDS, kept);
+        if all.bytes.len() <= whole {
+            return vec![(0, all)];
         }
-        let measured = written as f64 / size as f64;
-        if again || (measured / packs - 1.0).abs() < 0.15 {
-            return pieces;
-        }
-        packs = measured;
     }
-    unreachable!("the second cut is kept")
+    if (measured / PACKS - 1.0).abs() < 0.15 {
+        let rest: Vec<(usize, File)> = (first.par_windows(2).enumerate())
+            .filter(|(i, _)| i % step != 0)
+            .map(|(_, w)| pack(w[0]..w[1]))
+            .collect();
+        let (mut sampled, mut rest) = (sampled.into_iter(), rest.into_iter());
+        let pieces = (0..sizes.len()).map(|i| match i % step {
+            0 => sampled.next(),
+            _ => rest.next(),
+        });
+        return pieces
+            .map(|piece| piece.expect("every piece is packed once"))
+            .collect();
+    }
+    let (again, _) = cuts(index, (each as f64 * measured) as usize);
+    (again.par_windows(2)).map(|w| pack(w[0]..w[1])).collect()
 }
 
 /// How many times smaller a word list's text, as [`cuts`] counts it,
 /// usually is packed.
-const PACKS: f64 = 3.5;
+const PACKS: f64 = 3.7;
+
+/// How many pieces of the word list are packed to measure how far it
+/// packs.
+const SAMPLED: usize = 8;
 
 /// Where to cut the word list for pieces of about `most` bytes of text,
 /// as counted here, from the first word to past the last, and how long
-/// the whole is counted.
-fn cuts(index: &Index, most: usize) -> (Vec<usize>, usize) {
+/// each piece is counted.
+fn cuts(index: &Index, most: usize) -> (Vec<usize>, Vec<usize>) {
     let mut cuts: Vec<usize> = vec![0];
-    let (mut size, mut written) = (0, 0);
+    let (mut size, mut sizes) = (0, Vec::new());
     let mut held: std::collections::HashSet<u32> = std::collections::HashSet::new();
     for (at, (word, entry)) in index.words.iter().enumerate() {
         let listed = word.len() + 10;
@@ -239,7 +262,7 @@ fn cuts(index: &Index, most: usize) -> (Vec<usize>, usize) {
         let adds = listed + if held.contains(entry) { 0 } else { records };
         if size > 0 && size + adds > most {
             cuts.push(at);
-            written += size;
+            sizes.push(size);
             size = 0;
             held.clear();
         }
@@ -249,7 +272,8 @@ fn cuts(index: &Index, most: usize) -> (Vec<usize>, usize) {
         }
     }
     cuts.push(index.words.len());
-    (cuts, written + size)
+    sizes.push(size);
+    (cuts, sizes)
 }
 
 /// About how long an entry's records are written.
@@ -299,11 +323,11 @@ fn piece(index: &Index, range: std::ops::Range<usize>) -> String {
     json
 }
 
-/// `json` packed, at `before` followed by its mark and `.bin`: as `kept`
-/// keeps it, where an earlier build packed the same.
-fn packed(before: &str, json: &str, kept: &Kept) -> File {
+/// `json` packed at `level`, at `before` followed by its mark and `.bin`:
+/// as `kept` keeps it, where an earlier build packed the same.
+fn packed(before: &str, json: &str, level: u8, kept: &Kept) -> File {
     kept.packed(before, json, || {
-        let bytes = pack(json.as_bytes());
+        let bytes = miniz_oxide::deflate::compress_to_vec_zlib(json.as_bytes(), level);
         let mark = &blake3::hash(&bytes).to_hex()[..MARK];
         File {
             path: format!("{before}{mark}.bin"),
@@ -313,10 +337,12 @@ fn packed(before: &str, json: &str, kept: &Kept) -> File {
     })
 }
 
-/// `bytes` packed with zlib.
-fn pack(bytes: &[u8]) -> Vec<u8> {
-    miniz_oxide::deflate::compress_to_vec_zlib(bytes, 6)
-}
+/// How hard zlib packs a page's text and the records, and the word list.
+/// The word list is mostly numbers, which pack within a few per cent as
+/// far for a quarter of the work, and a reader fetches it in pieces of
+/// one size however far it packs.
+const TEXT: u8 = 6;
+const WORDS: u8 = 3;
 
 /// `numbers` as a JSON array written to `out`.
 fn numbers(numbers: impl Iterator<Item = u32>, out: &mut String) {
