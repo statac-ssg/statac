@@ -8,6 +8,7 @@
 
 use std::collections::HashSet;
 
+use crate::import::common::{ends_line, opens_line};
 use crate::import::liquid::{
     code_ranges, excerpt, excerpts_inside, finding, highlight, include_snippet, quoted,
     quoted_value, raw, split_word, tag_at, within,
@@ -277,16 +278,6 @@ pub fn paired(body: &str) -> Vec<String> {
         at = start + length;
     }
     names
-}
-
-fn opens_line(text: &str, at: usize) -> bool {
-    let line = text[..at].rfind('\n').map_or(0, |i| i + 1);
-    text[line..at].trim().is_empty()
-}
-
-fn ends_line(text: &str, at: usize) -> bool {
-    let end = text[at..].find('\n').map_or(text.len(), |i| at + i);
-    text[at..end].trim().is_empty()
 }
 
 /// What a tag of the site's own left open stands for when its `end` tag

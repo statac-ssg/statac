@@ -4,6 +4,7 @@
 
 use std::path::Path;
 
+use super::super::common::{fields, text_of, texts_of};
 use super::super::{Failed, Field, Left, Value, inside, toml, yaml};
 use crate::problem::{Kind, Problem, system_reason};
 use crate::source::Sources;
@@ -254,24 +255,6 @@ fn merge_fields(held: &mut Vec<(String, Value)>, more: Vec<(String, Value)>) {
     }
 }
 
-/// A value as text, where it is a scalar.
-pub fn text_of(value: &Value) -> Option<String> {
-    match value {
-        Value::Text(text) | Value::Number(text) => Some(text.clone()),
-        Value::Truth(truth) => Some(truth.to_string()),
-        _ => None,
-    }
-}
-
-/// A value as a list of texts: a list's scalars, or one scalar.
-pub fn texts_of(value: &Value) -> Vec<String> {
-    match value {
-        Value::List(items) => items.iter().filter_map(text_of).collect(),
-        Value::Nothing => Vec::new(),
-        other => text_of(other).into_iter().collect(),
-    }
-}
-
 /// Whether a value is true, as Hugo reads one written as text too.
 pub fn truth_of(value: &Value) -> bool {
     match value {
@@ -287,14 +270,6 @@ pub fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a Value> {
         .iter()
         .find(|(n, _)| n.eq_ignore_ascii_case(name))
         .map(|(_, v)| v)
-}
-
-/// A table's fields, or none.
-pub fn fields(value: &Value) -> &[(String, Value)] {
-    match value {
-        Value::Fields(fields) => fields,
-        _ => &[],
-    }
 }
 
 /// Where each kind of page goes, by `[permalinks]`: patterns by the name

@@ -8,14 +8,16 @@
 use std::collections::HashSet;
 use std::ops::Range;
 
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 
 use super::{
     ATTRIBUTE_LINES, CODE_OPTIONS, EMOJI, FIGURE_HTML, LINK_NOWHERE, RAW_HTML, SUMMARY_CUT,
     TAG_IN_ADDRESS, TAG_IN_CODE, TAG_LEFT,
 };
+use crate::import::common::{emoji_names, ends_line, opens_line};
+use crate::import::liquid::{code_ranges, finding, options, quoted, within};
 use crate::import::writing::Marked;
-use crate::import::{Finding, FindingKind, Spot};
+use crate::import::{Finding, Spot};
 
 /// What the writing's tags are converted with.
 pub struct Context<'a> {
@@ -375,15 +377,6 @@ pub fn paired(body: &str) -> Vec<String> {
     names
 }
 
-/// The ranges of `text` Markdown reads as code.
-fn code_ranges(text: &str) -> Vec<Range<usize>> {
-    Parser::new_ext(text, options())
-        .into_offset_iter()
-        .filter(|(event, _)| matches!(event, Event::Start(Tag::CodeBlock(_)) | Event::Code(_)))
-        .map(|(_, range)| range)
-        .collect()
-}
-
 /// The ranges of `text` Markdown reads as blocks of HTML.
 fn html_ranges(text: &str) -> Vec<Range<usize>> {
     Parser::new_ext(text, options())
@@ -391,30 +384,6 @@ fn html_ranges(text: &str) -> Vec<Range<usize>> {
         .filter(|(event, _)| matches!(event, Event::Start(Tag::HtmlBlock)))
         .map(|(_, range)| range)
         .collect()
-}
-
-fn options() -> Options {
-    Options::ENABLE_TABLES
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_DEFINITION_LIST
-}
-
-fn within(ranges: &[Range<usize>], at: usize) -> bool {
-    ranges.iter().any(|range| range.contains(&at))
-}
-
-/// Whether only spaces stand between the start of `at`'s line and `at`.
-fn opens_line(text: &str, at: usize) -> bool {
-    let line = text[..at].rfind('\n').map_or(0, |i| i + 1);
-    text[line..at].trim().is_empty()
-}
-
-/// Whether only spaces stand between `at` and the end of its line.
-fn ends_line(text: &str, at: usize) -> bool {
-    let end = text[at..].find('\n').map_or(text.len(), |i| at + i);
-    text[at..end].trim().is_empty()
 }
 
 /// What a tag left open stands for when its closing tag comes.
@@ -646,19 +615,6 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
         plainer,
         valued,
     }
-}
-
-fn finding(kind: &'static FindingKind, spot: Spot) -> Finding {
-    Finding {
-        kind,
-        about: None,
-        spots: vec![spot],
-    }
-}
-
-/// `text` as a value in a snippet call, in single quotes.
-fn quoted(text: &str) -> String {
-    format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
 /// `text` made safe to stand in HTML.
@@ -1091,36 +1047,6 @@ fn markdown_forms(body: &str, cx: &Context, spot: &dyn Fn(usize, &str) -> Spot) 
         }
     }
     found
-}
-
-/// Each `:name:` in `line`, by its offset.
-fn emoji_names(line: &str) -> Vec<(usize, &str)> {
-    let mut names = Vec::new();
-    let bytes = line.as_bytes();
-    let mut at = 0;
-    while let Some(found) = line[at..].find(':') {
-        let start = at + found;
-        let after = start + 1;
-        let length = line[after..]
-            .find(|c: char| {
-                !(c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '+' | '-'))
-            })
-            .unwrap_or(line.len() - after);
-        let end = after + length;
-        let before_ok = start == 0 || !bytes[start - 1].is_ascii_alphanumeric();
-        if length > 0
-            && bytes.get(end) == Some(&b':')
-            && before_ok
-            && line[after..end]
-                .starts_with(|c: char| c.is_ascii_lowercase() || c == '+' || c == '-')
-        {
-            names.push((start, &line[start..=end]));
-            at = end + 1;
-        } else {
-            at = after;
-        }
-    }
-    names
 }
 
 #[cfg(test)]

@@ -13,6 +13,9 @@ mod writing;
 use std::collections::HashSet;
 use std::path::Path;
 
+use super::common::{
+    counted, fields, front, glob_matches, joined, last, listed, names_in, parent, text_of, texts_of,
+};
 use super::inside;
 use super::report::code;
 use super::{
@@ -23,9 +26,7 @@ use crate::content::address::{Address, name_fault};
 use crate::content::slug as statac_slug;
 use crate::date::{self, Date};
 use crate::problem::{Kind, Problem, system_reason};
-use crate::source::{Place, Sources};
-use crate::yaml::Value as Yaml;
-use settings::{Settings, Taxonomy, fields, text_of, texts_of};
+use settings::{Settings, Taxonomy};
 use slug::Strategy;
 use writing::Reading;
 
@@ -239,159 +240,6 @@ fn dated_name(name: &str) -> Option<(Date, &str)> {
     (!rest.is_empty()).then_some((date, rest))
 }
 
-/// The names in the folder `path`, A to Z.
-fn names_in(path: &Path) -> Result<Vec<String>, Box<Failed>> {
-    let mut names: Vec<String> = std::fs::read_dir(path)
-        .map_err(|error| {
-            Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
-                path: path.to_path_buf(),
-                reason: system_reason(&error),
-            }))
-        })?
-        .flatten()
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    Ok(names)
-}
-
-/// `rel` joined to `folder`, `""` for the top.
-fn joined(folder: &str, rel: &str) -> String {
-    match (folder.is_empty(), rel.is_empty()) {
-        (true, _) => rel.to_owned(),
-        (_, true) => folder.to_owned(),
-        _ => format!("{folder}/{rel}"),
-    }
-}
-
-/// The parent of a path, `""` at the top.
-fn parent(path: &str) -> &str {
-    path.rsplit_once('/').map_or("", |(parent, _)| parent)
-}
-
-/// The last name in a path.
-fn last(path: &str) -> &str {
-    path.rsplit('/').next().unwrap_or(path)
-}
-
-/// Whether `text` matches the pattern `glob`: `*` any run within one
-/// name, `**` any run at all, `?` one character, `{a,b}` either.
-fn glob_matches(glob: &str, text: &str) -> bool {
-    if let Some(open) = glob.find('{')
-        && let Some(close) = glob[open..].find('}').map(|n| open + n)
-    {
-        return glob[open + 1..close].split(',').any(|choice| {
-            glob_matches(
-                &format!("{}{choice}{}", &glob[..open], &glob[close + 1..]),
-                text,
-            )
-        });
-    }
-    let pattern: Vec<char> = glob.chars().collect();
-    let text: Vec<char> = text.chars().collect();
-    fn from(p: &[char], t: &[char]) -> bool {
-        match p.first() {
-            None => t.is_empty(),
-            Some('*') if p.get(1) == Some(&'*') => {
-                let rest = match p.get(2) {
-                    Some('/') => &p[3..],
-                    _ => &p[2..],
-                };
-                (0..=t.len()).any(|n| from(rest, &t[n..]))
-            }
-            Some('*') => (0..=t.len())
-                .take_while(|n| *n == 0 || t[n - 1] != '/')
-                .any(|n| from(&p[1..], &t[n..])),
-            Some('?') => t.first().is_some_and(|c| *c != '/') && from(&p[1..], &t[1..]),
-            Some(c) => t.first() == Some(c) && from(&p[1..], &t[1..]),
-        }
-    }
-    from(&pattern, &text)
-}
-
-/// A file read for its front matter: each field with its line, and the
-/// writing after it with the line it starts on.
-struct Front {
-    fields: Vec<Field>,
-    body: String,
-    body_line: usize,
-}
-
-/// Reads `text`'s front matter, written in TOML between `+++` or YAML
-/// between `---`; or gives the line it stopped at and that line's text.
-fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    let line_text = |line: usize| text.lines().nth(line - 1).unwrap_or_default().to_owned();
-    let line_of = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
-    let first = text.lines().next().unwrap_or_default().trim_end();
-    if first == "+++" {
-        let start = text.find('\n').map_or(text.len(), |n| n + 1);
-        let mut at = start;
-        let mut end = None;
-        for line in text[start..].split_inclusive('\n') {
-            if line.trim_end() == "+++" {
-                end = Some((at, at + line.len()));
-                break;
-            }
-            at += line.len();
-        }
-        let (end, body) = end.ok_or_else(|| (1, first.to_owned()))?;
-        let fields = super::toml::read(&text[start..end]).map_err(|stopped| {
-            let line = stopped.line + 1;
-            (line, line_text(line))
-        })?;
-        let fields = fields
-            .into_iter()
-            .map(|field| Field {
-                line: field.line.map(|line| line + 1),
-                ..field
-            })
-            .collect();
-        return Ok(Front {
-            fields,
-            body: text[body..].to_owned(),
-            body_line: line_of(body),
-        });
-    }
-    if first != "---" {
-        return Ok(Front {
-            fields: Vec::new(),
-            body: text.to_owned(),
-            body_line: 1,
-        });
-    }
-    let mut sources = Sources::default();
-    let mended = super::mend::mended(text, false).text;
-    let text = mended.as_str();
-    let source = sources.add(path, text.to_owned());
-    let split = crate::yaml::split(text).map_err(|_| (1, first.to_owned()))?;
-    let mut fields = Vec::new();
-    if let Some(span) = split.front_matter {
-        let node = crate::yaml::read_at(&sources, Place { source, span }).map_err(|problem| {
-            let line = problem.place.map_or(1, |place| {
-                sources.line_number(place.source, place.span.start as usize)
-            });
-            (line, line_text(line))
-        })?;
-        if let Yaml::Mapping(entries) = &node.value {
-            fields = entries
-                .iter()
-                .map(|entry| {
-                    let line = sources
-                        .line_number(entry.key.place.source, entry.key.place.span.start as usize);
-                    let value = super::yaml::value_of(&entry.value, &super::yaml::core);
-                    Field::new(&super::yaml::key_text(&entry.key), value, Some(line))
-                })
-                .collect();
-        }
-    }
-    Ok(Front {
-        fields,
-        body: text[split.body.range()].to_owned(),
-        body_line: line_of(split.body.start as usize),
-    })
-}
-
 /// A text field, where it isn't empty.
 fn text_field(fields: &[Field], name: &str) -> Option<String> {
     fields
@@ -400,23 +248,6 @@ fn text_field(fields: &[Field], name: &str) -> Option<String> {
         .and_then(|f| text_of(&f.value))
         .map(|t| t.trim().to_owned())
         .filter(|t| !t.is_empty())
-}
-
-/// `n` of a thing, the plural right.
-fn counted(n: usize, one: &str, many: &str) -> String {
-    match n {
-        1 => format!("1 {one}"),
-        _ => format!("{n} {many}"),
-    }
-}
-
-/// `a`, `a and b`, `a, b and c`.
-fn listed(items: &[String]) -> String {
-    match items.split_last() {
-        Some((last, [])) => last.clone(),
-        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
-        None => String::new(),
-    }
 }
 
 /// Two names compared as people read them: small letters and accents
@@ -963,7 +794,7 @@ impl Reader<'_> {
             self.left(&from, "a file that isn't UTF-8 text");
             return Ok(());
         };
-        let front = match front(&text, &from) {
+        let front = match front(&text, &from, false) {
             Ok(front) => front,
             Err((line, text)) => {
                 self.find(&FRONT_MATTER_UNREAD, &from, Some(line), &text);

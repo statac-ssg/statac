@@ -21,9 +21,10 @@ use std::ops::Range;
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
 use super::{CODE_OPTIONS, EMOJI, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE};
-use crate::import::liquid::{self, split_word};
+use crate::import::common::{emoji_names, ends_line, opens_line};
+use crate::import::liquid::{self, finding, quoted, split_word, within};
 use crate::import::writing::Marked;
-use crate::import::{Finding, FindingKind, Spot};
+use crate::import::{Finding, Spot};
 
 /// How Zola read a page's writing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -758,30 +759,6 @@ fn code_ranges(text: &str) -> Vec<Range<usize>> {
         .collect()
 }
 
-fn within(ranges: &[Range<usize>], at: usize) -> bool {
-    ranges.iter().any(|range| range.contains(&at))
-}
-
-/// Whether only spaces stand between the start of `at`'s line and `at`.
-fn opens_line(text: &str, at: usize) -> bool {
-    let line = text[..at].rfind('\n').map_or(0, |i| i + 1);
-    text[line..at].trim().is_empty()
-}
-
-/// Whether only spaces stand between `at` and the end of its line.
-fn ends_line(text: &str, at: usize) -> bool {
-    let end = text[at..].find('\n').map_or(text.len(), |i| at + i);
-    text[at..end].trim().is_empty()
-}
-
-fn finding(kind: &'static FindingKind, spot: Spot) -> Finding {
-    Finding {
-        kind,
-        about: None,
-        spots: vec![spot],
-    }
-}
-
 /// What a tag left open stands for when its `{% end %}` comes.
 enum Open {
     End,
@@ -947,11 +924,6 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
         calls,
         called: out.called,
     }
-}
-
-/// `text` as a value in a snippet call, in single quotes.
-fn quoted(text: &str) -> String {
-    format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
 /// The snippet a tag's call names: its own name, kept clear of the
@@ -1126,36 +1098,6 @@ fn emoji(body: &str, spot: &dyn Fn(usize, &str) -> Spot) -> Vec<Finding> {
         }
     }
     found
-}
-
-/// Each `:name:` in `line`, by its offset.
-fn emoji_names(line: &str) -> Vec<(usize, &str)> {
-    let mut names = Vec::new();
-    let bytes = line.as_bytes();
-    let mut at = 0;
-    while let Some(found) = line[at..].find(':') {
-        let start = at + found;
-        let after = start + 1;
-        let length = line[after..]
-            .find(|c: char| {
-                !(c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '+' | '-'))
-            })
-            .unwrap_or(line.len() - after);
-        let end = after + length;
-        let before_ok = start == 0 || !bytes[start - 1].is_ascii_alphanumeric();
-        if length > 0
-            && bytes.get(end) == Some(&b':')
-            && before_ok
-            && line[after..end]
-                .starts_with(|c: char| c.is_ascii_lowercase() || c == '+' || c == '-')
-        {
-            names.push((start, &line[start..=end]));
-            at = end + 1;
-        } else {
-            at = after;
-        }
-    }
-    names
 }
 
 #[cfg(test)]

@@ -16,6 +16,9 @@ mod writing;
 use std::collections::HashSet;
 use std::path::Path;
 
+use super::common::{
+    counted, glob_matches, joined, last, listed, mapping, names_in, parent, text_of,
+};
 use super::inside;
 use super::report::code;
 use super::{
@@ -26,7 +29,6 @@ use crate::date::{self, Date};
 use crate::platform;
 use crate::problem::{Kind, Problem, system_reason};
 use crate::source::{Place, Sources};
-use crate::yaml::Value as Yaml;
 use settings::{Folder, Settings};
 use writing::Engine;
 
@@ -391,41 +393,6 @@ struct Reader<'a> {
     controls: (usize, usize),
 }
 
-/// The names in the folder `path`, A to Z.
-fn names_in(path: &Path) -> Result<Vec<String>, Box<Failed>> {
-    let mut names: Vec<String> = std::fs::read_dir(path)
-        .map_err(|error| {
-            Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
-                path: path.to_path_buf(),
-                reason: system_reason(&error),
-            }))
-        })?
-        .flatten()
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    Ok(names)
-}
-
-/// `rel` joined to `folder`, `""` for the top.
-fn joined(folder: &str, rel: &str) -> String {
-    match (folder.is_empty(), rel.is_empty()) {
-        (true, _) => rel.to_owned(),
-        (_, true) => folder.to_owned(),
-        _ => format!("{folder}/{rel}"),
-    }
-}
-
-/// The parent of a path, `""` at the top.
-fn parent(path: &str) -> &str {
-    path.rsplit_once('/').map_or("", |(parent, _)| parent)
-}
-
-/// The last name in a path.
-fn last(path: &str) -> &str {
-    path.rsplit('/').next().unwrap_or(path)
-}
-
 /// Whether `path` is `folder` or inside it.
 fn under(path: &str, folder: &str) -> bool {
     folder.is_empty() || path == folder || path.starts_with(&format!("{folder}/"))
@@ -456,67 +423,6 @@ fn dated_path(rel: &str) -> Option<Date> {
     })
 }
 
-/// `n` of a thing, the plural right.
-fn counted(n: usize, one: &str, many: &str) -> String {
-    match n {
-        1 => format!("1 {one}"),
-        _ => format!("{n} {many}"),
-    }
-}
-
-/// `a`, `a and b`, `a, b and c`.
-fn listed(items: &[String]) -> String {
-    match items.split_last() {
-        Some((last, [])) => last.clone(),
-        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
-        None => String::new(),
-    }
-}
-
-/// Whether `text` matches the pattern `glob`: `*` any run within one
-/// name, `**` any run at all, `?` one character, `{a,b}` either.
-fn glob_matches(glob: &str, text: &str) -> bool {
-    if let Some(open) = glob.find('{')
-        && let Some(close) = glob[open..].find('}').map(|n| open + n)
-    {
-        return glob[open + 1..close].split(',').any(|choice| {
-            glob_matches(
-                &format!("{}{choice}{}", &glob[..open], &glob[close + 1..]),
-                text,
-            )
-        });
-    }
-    fn from(p: &[char], t: &[char]) -> bool {
-        match p.first() {
-            None => t.is_empty(),
-            Some('*') if p.get(1) == Some(&'*') => {
-                let rest = match p.get(2) {
-                    Some('/') => &p[3..],
-                    _ => &p[2..],
-                };
-                (0..=t.len()).any(|n| from(rest, &t[n..]))
-            }
-            Some('*') => (0..=t.len())
-                .take_while(|n| *n == 0 || t[n - 1] != '/')
-                .any(|n| from(&p[1..], &t[n..])),
-            Some('?') => t.first().is_some_and(|c| *c != '/') && from(&p[1..], &t[1..]),
-            Some(c) => t.first() == Some(c) && from(&p[1..], &t[1..]),
-        }
-    }
-    let pattern: Vec<char> = glob.chars().collect();
-    let text: Vec<char> = text.chars().collect();
-    from(&pattern, &text)
-}
-
-/// A value as text, where it is a scalar.
-fn text_of(value: &Value) -> Option<String> {
-    match value {
-        Value::Text(text) | Value::Number(text) => Some(text.clone()),
-        Value::Truth(truth) => Some(truth.to_string()),
-        _ => None,
-    }
-}
-
 /// A file read for its front matter.
 struct Front {
     fields: Vec<Field>,
@@ -528,27 +434,14 @@ struct Front {
     controls: usize,
 }
 
-/// A mapping's fields, each with its line.
-fn mapping(sources: &Sources, node: &crate::yaml::Node) -> Vec<Field> {
-    match &node.value {
-        Yaml::Mapping(entries) => entries
-            .iter()
-            .map(|entry| {
-                let line = sources
-                    .line_number(entry.key.place.source, entry.key.place.span.start as usize);
-                let value = super::yaml::value_of(&entry.value, &super::yaml::core);
-                Field::new(&super::yaml::key_text(&entry.key), value, Some(line))
-            })
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
 /// Reads `text`'s front matter, written in YAML after `---` or `---yaml`,
 /// or in JSON after `---json`, up to a line of `---`; or gives the line
 /// it stopped at and that line's text.
 fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    // Eleventy publishes a control character in front matter as nothing,
+    // so it is taken out here; the other readers leave one for Statac's
+    // reader to refuse.
     let mended = super::mend::mended(text, true);
     let (text, controls) = (mended.text.as_str(), mended.controls);
     let line_text = |line: usize| text.lines().nth(line - 1).unwrap_or_default().to_owned();

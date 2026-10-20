@@ -70,6 +70,7 @@
 //! leaves the new folder as it was found.
 
 mod addresses;
+mod common;
 mod eleventy;
 mod hugo;
 mod inside;

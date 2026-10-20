@@ -14,6 +14,7 @@ mod writing;
 use std::collections::HashSet;
 use std::path::Path;
 
+use super::common::{dated_name, front, joined, last, names_in, parent, text_of, texts_of};
 use super::inside;
 use super::report::code;
 use super::{
@@ -23,9 +24,7 @@ use super::{
 use crate::content::slug;
 use crate::date::{self, Date};
 use crate::problem::{Kind, Problem, system_reason};
-use crate::source::{Place, Sources};
-use crate::yaml::Value as Yaml;
-use settings::{Settings, get, text_of, texts_of, truth_of};
+use settings::{Settings, get, truth_of};
 use url::{Making, Pieces};
 
 /// The endings of the files Hugo reads as Markdown.
@@ -358,189 +357,12 @@ struct Reader<'a> {
     files_later: Option<String>,
 }
 
-/// The date a name opens with, `2026-10-04-`, and the rest of the name.
-fn dated_name(name: &str) -> Option<(Date, &str)> {
-    let rest = name.get(11..).filter(|rest| !rest.is_empty())?;
-    let date = date::read(name.get(..10)?).ok()?;
-    (name.as_bytes().get(10) == Some(&b'-')).then_some((date, rest))
-}
-
-/// The names in the folder `path`, A to Z.
-fn names_in(path: &Path) -> Result<Vec<String>, Box<Failed>> {
-    let mut names: Vec<String> = std::fs::read_dir(path)
-        .map_err(|error| {
-            Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
-                path: path.to_path_buf(),
-                reason: system_reason(&error),
-            }))
-        })?
-        .flatten()
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    Ok(names)
-}
-
-/// `rel` joined to `folder` as a path in the old site, `""` for its top.
-fn joined(folder: &str, rel: &str) -> String {
-    match (folder.is_empty(), rel.is_empty()) {
-        (true, _) => rel.to_owned(),
-        (_, true) => folder.to_owned(),
-        _ => format!("{folder}/{rel}"),
-    }
-}
-
-/// The parent of a path, `""` at the top.
-fn parent(path: &str) -> &str {
-    path.rsplit_once('/').map_or("", |(parent, _)| parent)
-}
-
-/// The last name in a path.
-fn last(path: &str) -> &str {
-    path.rsplit('/').next().unwrap_or(path)
-}
-
 /// A file's name split into its stem and its ending, in small letters.
 fn split_name(name: &str) -> (&str, String) {
     match name.rsplit_once('.') {
         Some((stem, ending)) if !stem.is_empty() => (stem, ending.to_ascii_lowercase()),
         _ => (name, String::new()),
     }
-}
-
-/// A file read for its front matter: each field with its line, and the
-/// writing after it with the line it starts on.
-struct Front {
-    fields: Vec<Field>,
-    body: String,
-    body_line: usize,
-}
-
-/// Reads `text`'s front matter, written in YAML between `---`, TOML
-/// between `+++`, or as a JSON object; or gives the line it stopped at
-/// and that line's text.
-fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    let line_text = |line: usize| text.lines().nth(line - 1).unwrap_or_default().to_owned();
-    let line_of = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
-    let first = text.lines().next().unwrap_or_default().trim_end();
-    if first == "+++" {
-        let start = text.find('\n').map_or(text.len(), |n| n + 1);
-        let mut at = start;
-        let mut end = None;
-        for line in text[start..].split_inclusive('\n') {
-            if line.trim_end() == "+++" {
-                end = Some((at, at + line.len()));
-                break;
-            }
-            at += line.len();
-        }
-        let (end, body) = end.ok_or_else(|| (1, first.to_owned()))?;
-        let fields = super::toml::read(&text[start..end]).map_err(|stopped| {
-            let line = stopped.line + 1;
-            (line, line_text(line))
-        })?;
-        let fields = fields
-            .into_iter()
-            .map(|field| Field {
-                line: field.line.map(|line| line + 1),
-                ..field
-            })
-            .collect();
-        return Ok(Front {
-            fields,
-            body: text[body..].to_owned(),
-            body_line: line_of(body),
-        });
-    }
-    let mut sources = Sources::default();
-    if text.starts_with('{') {
-        let end = json_end(text).ok_or_else(|| (1, first.to_owned()))?;
-        let source = sources.add(path, text[..end].to_owned());
-        let node = crate::yaml::read_json(&sources, source).map_err(|problem| {
-            let line = problem.place.map_or(1, |place| {
-                sources.line_number(place.source, place.span.start as usize)
-            });
-            (line, line_text(line))
-        })?;
-        let body = text[end..]
-            .strip_prefix("\r\n")
-            .or_else(|| text[end..].strip_prefix('\n'))
-            .unwrap_or(&text[end..]);
-        let body_start = text.len() - body.len();
-        return Ok(Front {
-            fields: mapping(&sources, &node),
-            body: body.to_owned(),
-            body_line: line_of(body_start),
-        });
-    }
-    if first != "---" {
-        return Ok(Front {
-            fields: Vec::new(),
-            body: text.to_owned(),
-            body_line: 1,
-        });
-    }
-    let mended = super::mend::mended(text, false).text;
-    let text = mended.as_str();
-    let source = sources.add(path, text.to_owned());
-    let split = crate::yaml::split(text).map_err(|_| (1, first.to_owned()))?;
-    let mut fields = Vec::new();
-    if let Some(span) = split.front_matter {
-        let node = crate::yaml::read_at(&sources, Place { source, span }).map_err(|problem| {
-            let line = problem.place.map_or(1, |place| {
-                sources.line_number(place.source, place.span.start as usize)
-            });
-            (line, line_text(line))
-        })?;
-        fields = mapping(&sources, &node);
-    }
-    Ok(Front {
-        fields,
-        body: text[split.body.range()].to_owned(),
-        body_line: line_of(split.body.start as usize),
-    })
-}
-
-/// A mapping's fields, each with its line.
-fn mapping(sources: &Sources, node: &crate::yaml::Node) -> Vec<Field> {
-    match &node.value {
-        Yaml::Mapping(entries) => entries
-            .iter()
-            .map(|entry| {
-                let line = sources
-                    .line_number(entry.key.place.source, entry.key.place.span.start as usize);
-                let value = super::yaml::value_of(&entry.value, &super::yaml::core);
-                Field::new(&super::yaml::key_text(&entry.key), value, Some(line))
-            })
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-/// Where the JSON object `text` opens with ends, just past its `}`.
-fn json_end(text: &str) -> Option<usize> {
-    let mut depth = 0;
-    let mut in_string = false;
-    let mut escaped = false;
-    for (at, c) in text.char_indices() {
-        match (in_string, c) {
-            (true, _) if escaped => escaped = false,
-            (true, '\\') => escaped = true,
-            (true, '"') => in_string = false,
-            (true, _) => {}
-            (false, '"') => in_string = true,
-            (false, '{' | '[') => depth += 1,
-            (false, '}' | ']') => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(at + 1);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
 }
 
 impl Reader<'_> {
@@ -1164,7 +986,7 @@ impl Reader<'_> {
             .or(root_language.map(str::to_owned))
             .unwrap_or_else(|| self.main.clone());
         let html = HTML.contains(&ending.as_str());
-        let front = match front(&text, &from) {
+        let front = match front(&text, &from, true) {
             Ok(front) => front,
             Err((line, text)) => {
                 self.find(&FRONT_MATTER_UNREAD, &from, Some(line), &text);
@@ -1279,7 +1101,7 @@ impl Reader<'_> {
         }
         let headless = get("headless").is_some_and(|f| truth_of(&f.value));
         let build = get("build")
-            .map(|f| settings::fields(&f.value).to_vec())
+            .map(|f| super::common::fields(&f.value).to_vec())
             .unwrap_or_default();
         let kept_out = get("build").is_some_and(|_| {
             get_text(&build, "render").is_some_and(|r| matches!(r.as_str(), "never" | "false"))
@@ -1989,7 +1811,7 @@ fn value_at(fields: &[(String, Value)], path: &str) -> Option<String> {
     };
     let value = get(fields, first)?;
     match rest {
-        Some(rest) => value_at(settings::fields(value), rest),
+        Some(rest) => value_at(super::common::fields(value), rest),
         None => text_of(value),
     }
 }
@@ -2802,15 +2624,22 @@ mod tests {
 
     #[test]
     fn front_matter_is_read_in_each_format() {
-        let yaml = front("---\nTitle: Post 1\ntags: [a]\n---\nWriting.\n", "a.md").unwrap();
+        let yaml = front(
+            "---\nTitle: Post 1\ntags: [a]\n---\nWriting.\n",
+            "a.md",
+            true,
+        )
+        .unwrap();
         let toml = front(
             "+++\nTitle = \"Post 1\"\ntags = [\"a\"]\n+++\nWriting.\n",
             "a.md",
+            true,
         )
         .unwrap();
         let json = front(
             "{\n  \"Title\": \"Post 1\",\n  \"tags\": [\"a\"]\n}\nWriting.\n",
             "a.md",
+            true,
         )
         .unwrap();
         for read in [&yaml, &toml, &json] {
@@ -2830,7 +2659,7 @@ mod tests {
             assert_eq!(read.body_line, 5);
         }
         assert_eq!(
-            front("+++\ntitle = \"Post 1\"\ndate = \n+++\n", "a.md").err(),
+            front("+++\ntitle = \"Post 1\"\ndate = \n+++\n", "a.md", true).err(),
             Some((3, "date = ".to_owned()))
         );
     }

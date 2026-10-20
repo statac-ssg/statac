@@ -4,6 +4,7 @@
 
 use std::path::Path;
 
+use super::super::common::{fields, text_of, texts_of};
 use super::super::write::shown_value;
 use super::super::{Failed, Field, Value, inside, toml};
 use super::slug::Strategy;
@@ -100,32 +101,6 @@ pub struct Settings {
     pub values: Vec<Field>,
     /// Settings Statac has no equal for, each with its line and text.
     pub left: Vec<(Option<usize>, String)>,
-}
-
-/// A value as text, where it is a scalar.
-pub fn text_of(value: &Value) -> Option<String> {
-    match value {
-        Value::Text(text) | Value::Number(text) => Some(text.clone()),
-        Value::Truth(truth) => Some(truth.to_string()),
-        _ => None,
-    }
-}
-
-/// A value as a list of texts: a list's scalars, or one scalar.
-pub fn texts_of(value: &Value) -> Vec<String> {
-    match value {
-        Value::List(items) => items.iter().filter_map(text_of).collect(),
-        Value::Nothing => Vec::new(),
-        other => text_of(other).into_iter().collect(),
-    }
-}
-
-/// A table's fields, or none.
-pub fn fields(value: &Value) -> &[(String, Value)] {
-    match value {
-        Value::Fields(fields) => fields,
-        _ => &[],
-    }
 }
 
 /// The field `name` of a table.

@@ -12,6 +12,7 @@ mod url;
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::common::{dated_name, text_of};
 use super::inside;
 use super::report::code;
 use super::{
@@ -300,15 +301,6 @@ struct Settings {
     layouts_dir: String,
     includes_dir: String,
     plugins_dir: String,
-}
-
-/// A value as text, where it is a scalar.
-fn text_of(value: &Value) -> Option<String> {
-    match value {
-        Value::Text(text) | Value::Number(text) => Some(text.clone()),
-        Value::Truth(truth) => Some(truth.to_string()),
-        _ => None,
-    }
 }
 
 /// A value as a list of texts: a list's scalars, or one text parted by
@@ -1857,13 +1849,6 @@ impl Reader<'_> {
             ties_reversed: true,
         });
     }
-}
-
-/// The date a name opens with, `2026-10-04-`, and the rest of the name.
-fn dated_name(name: &str) -> Option<(Date, &str)> {
-    let rest = name.get(11..).filter(|rest| !rest.is_empty())?;
-    let date = date::read(name.get(..10)?).ok()?;
-    (name.as_bytes().get(10) == Some(&b'-')).then_some((date, rest))
 }
 
 /// A post's title made from its name as Jekyll makes one: each word

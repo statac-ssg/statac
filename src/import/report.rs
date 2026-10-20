@@ -2,6 +2,7 @@
 //! account for the author to work through.
 
 use super::Finding;
+use super::common::counted;
 use super::write::{REPORT, Summary};
 use crate::config;
 
@@ -10,14 +11,6 @@ pub struct Shown<'a> {
     pub tool: &'a str,
     pub old: &'a str,
     pub new: &'a str,
-}
-
-/// `n` of a thing, the plural right.
-fn counted(n: usize, one: &str, many: &str) -> String {
-    match n {
-        1 => format!("1 {one}"),
-        _ => format!("{n} {many}"),
-    }
 }
 
 /// `text` as Markdown code, fenced so no backtick inside ends it, on one
