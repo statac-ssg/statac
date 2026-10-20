@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::{Asked, Index, Place, in_utf16, placed};
+use super::{Asked, Index, Place, Said, in_utf16, placed};
 use crate::site::Site;
 
 /// Why a record scores what it does.
@@ -54,7 +54,8 @@ impl Index {
         // The record's words by their entries, each where it stands.
         let mut held: HashMap<u32, Vec<(String, Place, u32)>> = HashMap::new();
         let mut length = 0;
-        placed(site, &self.records[record], |word, place, weight| {
+        let said = Said::of(site, self.records[record].page);
+        placed(&said, &self.records[record], |word, place, weight| {
             length += weight;
             if let Some(entry) = self.entry_of(&word) {
                 held.entry(entry).or_default().push((word, place, weight));

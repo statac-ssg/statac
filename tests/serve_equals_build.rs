@@ -638,6 +638,108 @@ fn the_search_index_follows_the_writing_and_the_boxes_asking_for_it() {
     );
 }
 
+/// The files of the search index `session` holds, by path.
+fn search_index(session: &Session) -> Vec<(String, Vec<u8>)> {
+    let files = files(session.folder()).into_iter();
+    files.filter(|(name, _)| name.contains("search/")).collect()
+}
+
+#[test]
+fn the_search_index_follows_everything_a_page_is_searched_by() {
+    let site = Site::starter("search-kept");
+    site.write("snippets/aside.html", "<aside>{{ text }}</aside>\n");
+    let post_2 = |front: &str, text: &str| {
+        format!("---\ntitle: Post 2\ndate: 2026-01-02\ntags: [one]\n{front}---\n{text}\n")
+    };
+    let left_out = "---\ntitle: Left out\ndate: 2026-01-05\nsearch: false\ntags: [new_york]\n---\n\
+                    Not searched.\n";
+    let edits: &[Edit] = &[
+        ("a post's writing", &|site| {
+            site.write("content/posts/post-2.md", &post_2("", "Post 2 says more."))
+        }),
+        ("a post's title", &|site| {
+            let text = post_2("", "Post 2 says more.").replace("Post 2\n", "Post 2 again\n");
+            site.write("content/posts/post-2.md", &text)
+        }),
+        ("a post's summary", &|site| {
+            let text = post_2("summary: Said in short.\n", "Post 2 says more.");
+            site.write("content/posts/post-2.md", &text)
+        }),
+        ("a post's date", &|site| {
+            let text = post_2("", "Post 2 says more.").replace("2026-01-02", "2026-01-09");
+            site.write("content/posts/post-2.md", &text)
+        }),
+        ("a snippet called in a post's writing", &|site| {
+            let text = post_2("", "Post 2 says more.\n\n@aside(text='Beside it.')");
+            site.write("content/posts/post-2.md", &text)
+        }),
+        ("the snippet edited", &|site| {
+            site.write(
+                "snippets/aside.html",
+                "<aside>{{ text }} And more.</aside>\n",
+            )
+        }),
+        // Searched by its writing all the same.
+        (
+            "a page whose layout leaves out its writing, calling the snippet",
+            &|site| {
+                site.write("templates/plain.html", "<title>{{ page.title }}</title>\n");
+                site.write(
+                    "content/plain.md",
+                    "---\ntitle: Plain\nlayout: plain\n---\nPlain.\n\n@aside(text='Beside it.')\n",
+                )
+            },
+        ),
+        ("the snippet edited again", &|site| {
+            site.write(
+                "snippets/aside.html",
+                "<aside>{{ text }} And still more.</aside>\n",
+            )
+        }),
+        ("a tag one post spells", &|site| {
+            site.write("content/posts/post-1.md", &starter_post(1, "one, New York"))
+        }),
+        // Pages that aren't searched, so only the spelling the tag is shown
+        // with on the post can change the index.
+        (
+            "pages left out of search spelling the tag as most do",
+            &|site| {
+                site.write("content/posts/left-out-1.md", left_out);
+                site.write("content/posts/left-out-2.md", left_out)
+            },
+        ),
+        ("the pages left out removed", &|site| {
+            site.remove("content/posts/left-out-1.md");
+            site.remove("content/posts/left-out-2.md")
+        }),
+        ("a post removed", &|site| {
+            site.remove("content/posts/post-3.md")
+        }),
+        ("the site moved under a path", &|site| {
+            let settings = site.read("statac.yaml");
+            let moved = settings.replace("https://example.org", "https://example.org/blog");
+            assert_ne!(moved, settings);
+            site.write("statac.yaml", &moved)
+        }),
+    ];
+    let (mut session, round) = Session::start(&Options {
+        out: None,
+        ..site.options()
+    });
+    assert!(!round.outcome.stopped(), "{}", site.said(&round.outcome));
+    site.same(&session, &round, "the first build");
+    let mut index = search_index(&session);
+    assert!(!index.is_empty());
+    for (after, edit) in edits {
+        edit(&site);
+        let round = session.rebuild();
+        site.same(&session, &round, after);
+        let now = search_index(&session);
+        assert!(now != index, "the index after {after} is as it was");
+        index = now;
+    }
+}
+
 /// Writes `text` at `path` in `site`, giving the file `modified` as the
 /// time its bytes last changed.
 fn written_at(site: &Site, path: &str, text: &str, modified: SystemTime) {

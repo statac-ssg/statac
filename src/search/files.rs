@@ -26,7 +26,7 @@ use std::fmt::Write as _;
 
 use rayon::prelude::*;
 
-use super::Index;
+use super::{Index, Kept};
 use crate::content::address::Top;
 use crate::problem::Named;
 use crate::site::{LanguageId, Site};
@@ -65,15 +65,16 @@ const PIECE: usize = 22 * 1024;
 const MARK: usize = 16;
 
 /// One file, by its path from the top of the built site.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct File {
     pub path: String,
     pub bytes: Vec<u8>,
 }
 
 /// Every file of `index`, the site `renderer` read, in `folder`, the
-/// script first.
-pub fn files(renderer: &Renderer, folder: &str, index: &Index) -> Vec<File> {
+/// script first, each taken from `kept` where an earlier build packed the
+/// same.
+pub(super) fn files(renderer: &Renderer, folder: &str, index: &Index, kept: &Kept) -> Vec<File> {
     let site = renderer.site();
     let base = renderer.settings().base();
     // Each page's records, which stand together.
@@ -122,7 +123,7 @@ pub fn files(renderer: &Renderer, folder: &str, index: &Index) -> Vec<File> {
                 json.push(']');
             }
             json.push_str("]}");
-            packed("pages/", &json)
+            packed("pages/", &json, kept)
         })
         .collect();
 
@@ -137,9 +138,9 @@ pub fn files(renderer: &Renderer, folder: &str, index: &Index) -> Vec<File> {
     json.push_str("],\"lengths\":");
     numbers(index.lengths.iter().copied(), &mut json);
     json.push('}');
-    let records = packed("records.", &json);
+    let records = packed("records.", &json, kept);
 
-    let pieces = pieces(index, WHOLE, PIECE);
+    let pieces = pieces(index, WHOLE, PIECE, kept);
     let mut entry = String::from("const FILES = {\"records\":");
     string(&records.path, &mut entry);
     entry.push_str(",\"words\":[");
@@ -185,15 +186,16 @@ pub fn claims(files: &[File]) -> Vec<(String, Named)> {
 /// Where each piece of the word list a reader's browser is given starts,
 /// by its first word's place in the list.
 pub(super) fn starts(index: &Index) -> Vec<usize> {
-    let pieces = pieces(index, WHOLE, PIECE).into_iter();
+    let pieces = pieces(index, WHOLE, PIECE, &Kept::default()).into_iter();
     pieces.map(|(start, _)| start).collect()
 }
 
 /// The word list in pieces, each with its first word's place in the list.
 /// A word falls in the last piece whose first word it doesn't come
 /// before, or in the first. The list stays whole up to `whole` bytes
-/// packed, and is otherwise cut into pieces of about `each` packed.
-pub(super) fn pieces(index: &Index, whole: usize, each: usize) -> Vec<(usize, File)> {
+/// packed, and is otherwise cut into pieces of about `each` packed. Each
+/// is taken from `kept` where an earlier build packed the same.
+pub(super) fn pieces(index: &Index, whole: usize, each: usize, kept: &Kept) -> Vec<(usize, File)> {
     // Cut first on how far such lists usually pack, and again on how far
     // this one did where that is far out.
     let mut packs = PACKS;
@@ -201,12 +203,12 @@ pub(super) fn pieces(index: &Index, whole: usize, each: usize) -> Vec<(usize, Fi
         let (cuts, written) = cuts(index, (each as f64 * packs) as usize);
         let ranges: Vec<std::ops::Range<usize>> = cuts.windows(2).map(|w| w[0]..w[1]).collect();
         let pieces: Vec<(usize, File)> = (ranges.into_par_iter())
-            .map(|range| (range.start, packed("words.", &piece(index, range))))
+            .map(|range| (range.start, packed("words.", &piece(index, range), kept)))
             .collect();
         let size: usize = pieces.iter().map(|(_, file)| file.bytes.len()).sum();
         if size <= whole {
             let all = piece(index, 0..index.words.len());
-            return vec![(0, packed("words.", &all))];
+            return vec![(0, packed("words.", &all, kept))];
         }
         let measured = written as f64 / size as f64;
         if again || (measured / packs - 1.0).abs() < 0.15 {
@@ -294,14 +296,17 @@ fn piece(index: &Index, range: std::ops::Range<usize>) -> String {
     json
 }
 
-/// `json` packed, at `before` followed by its mark and `.bin`.
-fn packed(before: &str, json: &str) -> File {
-    let bytes = pack(json.as_bytes());
-    let mark = &blake3::hash(&bytes).to_hex()[..MARK];
-    File {
-        path: format!("{before}{mark}.bin"),
-        bytes,
-    }
+/// `json` packed, at `before` followed by its mark and `.bin`: as `kept`
+/// keeps it, where an earlier build packed the same.
+fn packed(before: &str, json: &str, kept: &Kept) -> File {
+    kept.packed(before, json, || {
+        let bytes = pack(json.as_bytes());
+        let mark = &blake3::hash(&bytes).to_hex()[..MARK];
+        File {
+            path: format!("{before}{mark}.bin"),
+            bytes,
+        }
+    })
 }
 
 /// `bytes` packed with zlib.

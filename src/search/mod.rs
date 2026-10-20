@@ -4,6 +4,7 @@
 
 mod command;
 mod files;
+mod kept;
 mod meant;
 mod why;
 mod words;
@@ -12,7 +13,7 @@ mod words;
 mod tests;
 
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use rayon::prelude::*;
 
@@ -23,6 +24,7 @@ use crate::templates::Renderer;
 
 pub use command::{Options, Outcome, Results, SHOWN, Shown, code, excerpt, results, run};
 pub use files::{File, claims, entry, folder};
+pub use kept::Kept;
 pub use why::{Counted, Stands, Why};
 pub use words::{Stemmer, fold, spans};
 
@@ -56,6 +58,18 @@ pub struct Record {
     pub described: Vec<String>,
 }
 
+impl Record {
+    /// This record, of the page `page`.
+    fn of(&self, page: PageId) -> Record {
+        Record {
+            page,
+            heading: self.heading.clone(),
+            text: self.text.clone(),
+            described: self.described.clone(),
+        }
+    }
+}
+
 /// Whether `page` is searched: published as a page of the site's own,
 /// from a file, and not left out with `search: false`.
 pub fn searched(page: &Page) -> bool {
@@ -67,11 +81,20 @@ pub fn searched(page: &Page) -> bool {
         && page.words.truth(PageWord::Search) != Some(false)
 }
 
-/// The records of every searched page in `language`: the pages with no
-/// date by their paths, then the dated from the oldest, so a new post's
-/// records come last and leave every other record where it was.
+/// The records of every searched page in `language`, the pages in the
+/// order [`pages`] gives.
 pub fn records(renderer: &Renderer, language: LanguageId) -> Vec<Record> {
-    let site = renderer.site();
+    let pages = pages(renderer.site(), language);
+    let records = pages
+        .par_iter()
+        .flat_map_iter(|&page| records_of(renderer, page));
+    records.collect()
+}
+
+/// Every searched page in `language`: the pages with no date by their
+/// paths, then the dated from the oldest, so a new post's records come
+/// last and leave every other record where it was.
+fn pages(site: &Site, language: LanguageId) -> Vec<PageId> {
     let pages = (site.pages.iter()).filter(|(_, page)| page.language == language && searched(page));
     let mut pages: Vec<PageId> = pages.map(|(id, _)| id).collect();
     pages.sort_by_cached_key(|&id| {
@@ -79,34 +102,116 @@ pub fn records(renderer: &Renderer, language: LanguageId) -> Vec<Record> {
         let day = (page.date.as_ref()).map(|date| date.value.iso_day());
         (day, page.path.clone())
     });
-    let records = pages.par_iter().flat_map_iter(|&page| {
-        renderer.cut_at_headings(page).into_iter().map(move |cut| {
-            let mut text = crate::markdown::lines_of(&cut.html);
-            if let Some((_, heading)) = &cut.heading
-                && let Some(rest) = text.strip_prefix(heading.as_str())
-            {
-                text = rest.trim_start().to_owned();
-            }
-            Record {
-                page,
-                heading: cut.heading,
-                text,
-                described: described(&cut.html),
-            }
-        })
-    });
-    records.collect()
+    pages
+}
+
+/// The records of `page`, in order.
+fn records_of(renderer: &Renderer, page: PageId) -> impl Iterator<Item = Record> {
+    renderer.cut_at_headings(page).into_iter().map(move |cut| {
+        let mut text = crate::markdown::lines_of(&cut.html);
+        if let Some((_, heading)) = &cut.heading
+            && let Some(rest) = text.strip_prefix(heading.as_str())
+        {
+            text = rest.trim_start().to_owned();
+        }
+        Record {
+            page,
+            heading: cut.heading,
+            text,
+            described: described(&cut.html),
+        }
+    })
 }
 
 /// The files a reader's browser searches the site `renderer` read with,
-/// each of `languages` its own.
-pub fn files(renderer: &Renderer, languages: &[LanguageId]) -> Vec<File> {
+/// each of `languages` its own, taking from `kept` what an earlier build
+/// made from the same.
+pub fn files(renderer: &Renderer, languages: &[LanguageId], kept: &mut Kept) -> Vec<File> {
+    let standing = kept.standing();
+    let taking = &*kept;
+    let made: Vec<(Vec<File>, Vec<PageSearched>)> = (languages.par_iter())
+        .map(|&language| language_files(renderer, language, &standing, taking))
+        .collect();
+    let mut files = Vec::new();
+    let mut cut = HashMap::new();
+    for (made, pages) in made {
+        files.extend(made);
+        cut.extend((pages.into_iter()).filter_map(|page| Some((page.page, page.kept?))));
+    }
+    kept.end(cut);
+    files
+}
+
+/// One page as a build searches it.
+struct PageSearched {
+    page: PageId,
+    records: Vec<Record>,
+    weighed: Arc<[Weighed]>,
+    /// Its records, where they are kept for the next build.
+    kept: Option<Arc<[Record]>>,
+}
+
+/// The files of `language`'s index, and its pages as they were searched,
+/// taking the records of each page `standing` holds from there, and from
+/// `kept` what an earlier build made from the same.
+fn language_files(
+    renderer: &Renderer,
+    language: LanguageId,
+    standing: &HashMap<PageId, Arc<[Record]>>,
+    kept: &Kept,
+) -> (Vec<File>, Vec<PageSearched>) {
     let site = renderer.site();
-    let files = languages.par_iter().flat_map_iter(|&language| {
-        let index = Index::of(site, language, records(renderer, language));
-        files::files(renderer, &folder(site, language), &index)
-    });
-    files.collect()
+    let pages = pages(site, language);
+    let mut pages: Vec<PageSearched> = (pages.par_iter())
+        .map(|&page| page_searched(renderer, page, standing.get(&page), kept))
+        .collect();
+    let weighed: Vec<&Weighed> = pages.iter().flat_map(|page| &*page.weighed).collect();
+    let assembled = Index::assembled(site, language, &weighed);
+    let records = pages
+        .iter_mut()
+        .flat_map(|page| std::mem::take(&mut page.records));
+    let index = assembled.with(records.collect());
+    let files = files::files(renderer, &folder(site, language), &index, kept);
+    (files, pages)
+}
+
+/// `page` as a build searches it: its records as `standing` holds them,
+/// where its writing stands, or else as they are cut from it, and weighed
+/// as `kept` keeps them, where an earlier build weighed the same.
+fn page_searched(
+    renderer: &Renderer,
+    page: PageId,
+    standing: Option<&Arc<[Record]>>,
+    kept: &Kept,
+) -> PageSearched {
+    let (records, cut): (Vec<Record>, Option<Arc<[Record]>>) = match standing {
+        Some(cut) => {
+            let records = cut.iter().map(|record| record.of(page)).collect();
+            (records, Some(Arc::clone(cut)))
+        }
+        None => {
+            let records: Vec<Record> = records_of(renderer, page).collect();
+            let cut =
+                (kept.keeps()).then(|| records.iter().map(|record| record.of(page)).collect());
+            (records, cut)
+        }
+    };
+    let said = Said::of(renderer.site(), page);
+    let weighed = kept.weighed(
+        |hasher| said.hash(&records, hasher),
+        || {
+            records
+                .iter()
+                .map(|record| weighed(&said, record))
+                .collect()
+        },
+    );
+    PageSearched {
+        page,
+        records,
+        weighed,
+        kept: cut,
+    }
 }
 
 /// The descriptions of the pictures `html` shows.
@@ -123,6 +228,52 @@ fn described(html: &str) -> Vec<String> {
 /// `text` with each run of space closed up to one, and none at the ends.
 fn closed_up(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// What weighing a page's records reads of the page besides them.
+struct Said<'a> {
+    title: Option<&'a str>,
+    /// The names of its tags, as they are shown.
+    tags: Vec<String>,
+    summary: Option<&'a str>,
+}
+
+impl<'a> Said<'a> {
+    fn of(site: &'a Site, page: PageId) -> Said<'a> {
+        let held = site.pages.get(page);
+        Said {
+            title: held.title.as_ref().map(|title| title.value.as_str()),
+            tags: tag_names(site, page),
+            summary: (held.words.text(PageWord::Summary)).map(|summary| summary.value),
+        }
+    }
+
+    /// Feeds `hasher` everything weighing `records` reads, this said of
+    /// their page.
+    fn hash(&self, records: &[Record], hasher: &mut blake3::Hasher) {
+        let maybe = |hasher: &mut blake3::Hasher, text: Option<&str>| {
+            hasher.update(&[u8::from(text.is_some())]);
+            kept::hashed(hasher, text.unwrap_or_default());
+        };
+        maybe(hasher, self.title);
+        maybe(hasher, self.summary);
+        hasher.update(&(self.tags.len() as u64).to_le_bytes());
+        for tag in &self.tags {
+            kept::hashed(hasher, tag);
+        }
+        hasher.update(&(records.len() as u64).to_le_bytes());
+        for record in records {
+            maybe(
+                hasher,
+                record.heading.as_ref().map(|(_, words)| words.as_str()),
+            );
+            kept::hashed(hasher, &record.text);
+            hasher.update(&(record.described.len() as u64).to_le_bytes());
+            for description in &record.described {
+                kept::hashed(hasher, description);
+            }
+        }
+    }
 }
 
 /// The names of a page's tags, as they are shown.
@@ -160,10 +311,9 @@ impl Place {
     }
 }
 
-/// Each word of `record`, folded, in turn, with where it stands and its
-/// weight there.
-fn placed(site: &Site, record: &Record, mut each: impl FnMut(String, Place, u32)) {
-    let page = site.pages.get(record.page);
+/// Each word of `record`, of a page `said` is said of, folded, in turn,
+/// with where it stands and its weight there.
+fn placed(said: &Said, record: &Record, mut each: impl FnMut(String, Place, u32)) {
     // Each page's records begin with the part before its first heading.
     let opening = record.heading.is_none();
     let mut add = |text: &str, place: Place, weight: u32| {
@@ -171,16 +321,16 @@ fn placed(site: &Site, record: &Record, mut each: impl FnMut(String, Place, u32)
             each(fold(&text[span]), place, weight);
         }
     };
-    if let Some(title) = &page.title {
+    if let Some(title) = said.title {
         let weight = if opening { TITLE_OPENING } else { TITLE };
-        add(&title.value, Place::Title, weight);
+        add(title, Place::Title, weight);
     }
     if opening {
-        for tag in tag_names(site, record.page) {
-            add(&tag, Place::Tags, TAG);
+        for tag in &said.tags {
+            add(tag, Place::Tags, TAG);
         }
-        if let Some(summary) = page.words.text(PageWord::Summary) {
-            add(summary.value, Place::Summary, SUMMARY);
+        if let Some(summary) = said.summary {
+            add(summary, Place::Summary, SUMMARY);
         }
     }
     if let Some((_, heading)) = &record.heading {
@@ -192,16 +342,25 @@ fn placed(site: &Site, record: &Record, mut each: impl FnMut(String, Place, u32)
     add(&record.text, Place::Text, TEXT);
 }
 
-/// The words of `record`, folded, each with its weight there, and the
-/// record's length: its words counted by weight.
-fn weighed(site: &Site, record: &Record) -> (HashMap<String, u32>, u32) {
+/// A record's words, folded, each once with its weight there, and its
+/// length: its words counted by weight.
+struct Weighed {
+    words: Vec<(String, u32)>,
+    length: u32,
+}
+
+/// `record`, of a page `said` is said of, weighed.
+fn weighed(said: &Said, record: &Record) -> Weighed {
     let mut words: HashMap<String, u32> = HashMap::new();
     let mut length = 0;
-    placed(site, record, |word, _, weight| {
+    placed(said, record, |word, _, weight| {
         *words.entry(word).or_default() += weight;
         length += weight;
     });
-    (words, length)
+    Weighed {
+        words: words.into_iter().collect(),
+        length,
+    }
 }
 
 /// The records of a site's pages in one language, and which hold each
@@ -226,6 +385,28 @@ pub struct Index {
     starts: OnceLock<Vec<usize>>,
 }
 
+/// An index but for its records.
+struct Assembled {
+    lengths: Vec<u32>,
+    average: f64,
+    words: Vec<(String, u32)>,
+    entries: Vec<Vec<(u32, u32)>>,
+}
+
+impl Assembled {
+    /// The index of `records`, the records this was assembled of.
+    fn with(self, records: Vec<Record>) -> Index {
+        Index {
+            records,
+            lengths: self.lengths,
+            average: self.average,
+            words: self.words,
+            entries: self.entries,
+            starts: OnceLock::new(),
+        }
+    }
+}
+
 /// A record found, and how well it matched.
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Found {
@@ -239,15 +420,32 @@ impl Index {
     /// The index of `records`, of pages in `language`, each word cut to
     /// its stem by that language's rules.
     pub fn of(site: &Site, language: LanguageId, records: Vec<Record>) -> Index {
+        let weighed: Vec<Weighed> = (records.par_iter())
+            .map(|record| weighed(&Said::of(site, record.page), record))
+            .collect();
+        let weighed: Vec<&Weighed> = weighed.iter().collect();
+        Index::assembled(site, language, &weighed).with(records)
+    }
+
+    /// The index of the records `weighed` are, of pages in `language`, but
+    /// for the records themselves.
+    fn assembled(site: &Site, language: LanguageId, weighed: &[&Weighed]) -> Assembled {
         let stemmer = Stemmer::of(site.languages.get(language).tag.as_deref());
-        let weighed: Vec<(HashMap<String, u32>, u32)> = (records.par_iter())
-            .map(|record| weighed(site, record))
-            .collect();
-        let mut words: Vec<&str> = (weighed.iter())
-            .flat_map(|(words, _)| words.keys().map(String::as_str))
-            .collect();
+        // Each word once before sorting, as most records hold words many
+        // others hold.
+        let words = weighed.par_iter().fold(HashSet::new, |mut words, weighed| {
+            words.extend(weighed.words.iter().map(|(word, _)| word.as_str()));
+            words
+        });
+        let words = words.reduce(HashSet::new, |mut a, mut b| {
+            if a.len() < b.len() {
+                std::mem::swap(&mut a, &mut b);
+            }
+            a.extend(b);
+            a
+        });
+        let mut words: Vec<&str> = words.into_iter().collect();
         words.par_sort_unstable_by(|a, b| in_utf16(a, b));
-        words.dedup();
         let stems: Vec<String> = words.par_iter().map(|word| stemmer.stem(word)).collect();
         // Every stem numbered in its own order, each an entry, since some
         // record holds each word.
@@ -262,9 +460,9 @@ impl Index {
             .collect();
         // Each record's stems, with their weights there.
         let held: Vec<HashMap<u32, u32>> = (weighed.par_iter())
-            .map(|(words, _)| {
+            .map(|weighed| {
                 let mut held: HashMap<u32, u32> = HashMap::new();
-                for (word, weight) in words {
+                for (word, weight) in &weighed.words {
                     *held.entry(entry_of[word.as_str()]).or_default() += weight;
                 }
                 held
@@ -280,18 +478,16 @@ impl Index {
         let words: Vec<(String, u32)> = (words.iter())
             .map(|&word| (word.to_owned(), entry_of[word]))
             .collect();
-        let lengths: Vec<u32> = weighed.iter().map(|(_, length)| *length).collect();
+        let lengths: Vec<u32> = weighed.iter().map(|weighed| weighed.length).collect();
         let average = match lengths.len() {
             0 => 1.0,
             n => (lengths.iter().map(|&l| f64::from(l)).sum::<f64>() / n as f64).max(1.0),
         };
-        Index {
-            records,
+        Assembled {
             lengths,
             average,
             words,
             entries,
-            starts: OnceLock::new(),
         }
     }
 

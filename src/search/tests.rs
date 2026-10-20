@@ -468,7 +468,7 @@ fn a_long_word_list_is_cut_into_pieces_each_word_in_the_one_its_first_word_says(
     let (renderer, root) = site("pieces", &files);
     let index = index_of(&renderer, 0);
     let _ = std::fs::remove_dir_all(root);
-    let pieces = files::pieces(&index, 0, 200);
+    let pieces = files::pieces(&index, 0, 200, &Kept::default());
     assert!(pieces.len() > 3, "{}", pieces.len());
     assert_eq!(pieces[0].0, 0);
     let words: Vec<&str> = index.words().collect();
@@ -497,7 +497,10 @@ fn a_long_word_list_is_cut_into_pieces_each_word_in_the_one_its_first_word_says(
         assert_eq!(holding, [at], "{word}");
     }
     // Whole where it is small enough.
-    assert_eq!(files::pieces(&index, usize::MAX, 200).len(), 1);
+    assert_eq!(
+        files::pieces(&index, usize::MAX, 200, &Kept::default()).len(),
+        1
+    );
 }
 
 #[test]
@@ -578,7 +581,7 @@ fn a_word_is_respelt_from_the_piece_of_the_word_list_it_falls_in() {
     let (renderer, root) = site("meant-pieces", &[("content/words.md", &page)]);
     let index = index_of(&renderer, 0);
     let _ = std::fs::remove_dir_all(root);
-    let starts: Vec<usize> = (files::pieces(&index, 0, 200).into_iter())
+    let starts: Vec<usize> = (files::pieces(&index, 0, 200, &Kept::default()).into_iter())
         .map(|(start, _)| start)
         .collect();
     assert!(starts.len() > 3, "{starts:?}");

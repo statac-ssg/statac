@@ -33,6 +33,8 @@ use crate::new::update::Starter;
 use crate::problem::{Kind, Problem};
 use crate::publish::{self, Left, Occupant, Staging};
 use crate::reads::{Key, Reads, Translation};
+use crate::search::Record;
+use crate::site::PageId;
 use crate::stamp::{self, Pass};
 use print::{Prints, Reading, Taken};
 
@@ -53,6 +55,9 @@ pub struct Session {
     remembered: Remembered,
     /// The texts of the site's pages as the last round read them.
     texts: crate::content::Texts,
+    /// What search made of the site's pages in the last round that made
+    /// the search index.
+    search: crate::search::Kept,
     /// What became of the command the site runs before a build, as the
     /// session started.
     before: Before,
@@ -156,6 +161,10 @@ struct Last {
     built: Arc<Vec<Built>>,
     /// What each output is built from besides what it read.
     own: Vec<u64>,
+    /// The records search cut from the writing of each page whose output
+    /// read everything the writing read, so that where the output stands
+    /// the writing does.
+    searched: HashMap<PageId, Arc<[Record]>>,
     /// What each output's file holds, by the file.
     hashes: HashMap<String, blake3::Hash>,
     /// Every file the folder holds that is no output's.
@@ -195,6 +204,7 @@ impl Session {
             last: None,
             remembered: Remembered::default(),
             texts: crate::content::Texts::keeping(),
+            search: crate::search::Kept::keeping(),
             before: Before::Unset,
             watches: false,
             sets_after: false,
@@ -398,10 +408,34 @@ impl Session {
             Some(last) if self.notes => changed(last, taken),
             _ => Vec::new(),
         };
-        let kept: Vec<Option<Built>> = match &self.last {
-            Some(last) if last.whole == whole => carry(last, taken, &plan, &own),
+        let to = match &self.last {
+            Some(last) if last.whole == whole => Some(last.reading.to(&reading)),
+            _ => None,
+        };
+        let kept: Vec<Option<Built>> = match (&self.last, &to) {
+            (Some(last), Some(to)) => carry(last, taken, &plan, &own, to),
             _ => plan.outputs.iter().map(|_| None).collect(),
         };
+        let standing: HashMap<PageId, Arc<[Record]>> = match (&self.last, &to) {
+            (Some(last), Some(to)) => {
+                let outputs = plan.outputs.iter().zip(&kept);
+                let stands: HashSet<PageId> = (outputs)
+                    .filter_map(|(output, kept)| match (output, kept) {
+                        (Output::Page(page), Some(_)) => Some(*page),
+                        _ => None,
+                    })
+                    .collect();
+                let searched = last.searched.iter();
+                let standing = searched.filter_map(|(&page, records)| {
+                    let page = to.page(page)?;
+                    stands.contains(&page).then(|| (page, Arc::clone(records)))
+                });
+                standing.collect()
+            }
+            _ => HashMap::new(),
+        };
+        let stood: HashSet<PageId> = standing.keys().copied().collect();
+        self.search.stand(standing);
         lap(&mut took.comparing);
 
         let fresh = kept.iter().filter(|kept| kept.is_none()).count();
@@ -425,7 +459,20 @@ impl Session {
 
         let problems = std::mem::take(&mut prepared.problems);
         let remembered = Some(&self.remembered);
-        let mut concluded = build::conclude(renderer, at, &plan, &built, problems, remembered);
+        let search = &mut self.search;
+        let mut concluded =
+            build::conclude(renderer, at, &plan, &built, problems, remembered, search);
+        let pages: HashMap<PageId, usize> = (plan.outputs.iter().enumerate())
+            .filter_map(|(at, output)| match output {
+                Output::Page(page) => Some((*page, at)),
+                _ => None,
+            })
+            .collect();
+        let searched = self.search.cut().into_par_iter().filter(|(page, _)| {
+            stood.contains(page)
+                || (pages.get(page)).is_some_and(|&at| reads_writing(renderer, *page, &built[at]))
+        });
+        let searched = searched.collect();
         lap(&mut took.concluding);
 
         // An output built to the bytes the folder holds already is left
@@ -602,6 +649,7 @@ impl Session {
                     whole,
                     built,
                     own,
+                    searched,
                     hashes,
                     others,
                     left,
@@ -815,19 +863,34 @@ fn carried(output: Output, to: &Translation) -> Option<Output> {
     })
 }
 
+/// Whether `built`, the output of `page`, read everything the page's
+/// writing read, as `renderer` built it.
+fn reads_writing(renderer: &crate::templates::Renderer, page: PageId, built: &Built) -> bool {
+    let Some(writing) = renderer.writing_read(page) else {
+        return false;
+    };
+    let read: HashSet<&Key> = built.reads.keys().iter().collect();
+    writing.iter().all(|key| read.contains(key))
+}
+
 /// Each output of the reading `now` as the last round built it, where it
-/// still stands.
-fn carry(last: &Last, now: Taken<'_>, plan: &Plan, own: &[u64]) -> Vec<Option<Built>> {
+/// still stands, `to` carrying the last round's ids to `now`.
+fn carry(
+    last: &Last,
+    now: Taken<'_>,
+    plan: &Plan,
+    own: &[u64],
+    to: &Translation,
+) -> Vec<Option<Built>> {
     let renderer = &now.reading.renderer;
     let was = Taken {
         reading: &last.reading,
         at: now.at,
         prints: &last.prints,
     };
-    let to = last.reading.to(now.reading);
     let built = last.built.par_iter().enumerate();
     let stood: HashMap<Output, usize> = built
-        .filter_map(|(at, old)| Some((carried(old.output, &to)?, at)))
+        .filter_map(|(at, old)| Some((carried(old.output, to)?, at)))
         .collect();
     let stands = |at: usize, output: Output| -> Option<Built> {
         let old_at = *stood.get(&output)?;
@@ -841,12 +904,12 @@ fn carry(last: &Last, now: Taken<'_>, plan: &Plan, own: &[u64]) -> Vec<Option<Bu
             (was.of(key) == now.of(carried)).then_some(carried)
         });
         let reads: Vec<Key> = same.collect::<Option<_>>()?;
-        let asked = old.asked.carried(&to)?;
-        let problems = old.problems.iter().map(|problem| moved(problem, &to));
+        let asked = old.asked.carried(to)?;
+        let problems = old.problems.iter().map(|problem| moved(problem, to));
         let problems: Vec<Problem> = problems.collect::<Option<_>>()?;
         let links = match &old.links {
             Some(checked) => {
-                let checked = checked.moved(&to)?;
+                let checked = checked.moved(to)?;
                 if !plan.linked.holds_as(&checked) {
                     return None;
                 }

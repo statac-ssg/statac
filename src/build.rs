@@ -699,7 +699,16 @@ fn built(
     );
     prepared.problems.extend(file_problems);
     let problems = std::mem::take(&mut prepared.problems);
-    let concluded = conclude(renderer, &options.site, &plan, &built, problems, None);
+    let search = &mut crate::search::Kept::default();
+    let concluded = conclude(
+        renderer,
+        &options.site,
+        &plan,
+        &built,
+        problems,
+        None,
+        search,
+    );
     let mut record = Record::default();
     for (i, built) in built.iter_mut().enumerate() {
         record.set(OutputId::from_index(i), std::mem::take(&mut built.reads));
@@ -750,8 +759,9 @@ impl Concluded {
 /// Concludes over every output `built` of the site at `at`, in the order
 /// of `plan`, adding to the `problems` reading it: what is told once
 /// across them, what their links came to, the JavaScript they carry, and
-/// the copies and cards they ask for. Nothing a build of them left
-/// anywhere else is read.
+/// the copies and cards they ask for, and the search index, taking from
+/// `search` what an earlier build made of it from the same. Nothing a
+/// build of them left anywhere else is read.
 pub(crate) fn conclude(
     renderer: &Renderer,
     at: &Path,
@@ -759,6 +769,7 @@ pub(crate) fn conclude(
     built: &[Built],
     mut problems: Vec<Problem>,
     remembered: Option<&Remembered>,
+    search: &mut crate::search::Kept,
 ) -> Concluded {
     let site = renderer.site();
     let pictures = &site.pictures;
@@ -964,7 +975,7 @@ pub(crate) fn conclude(
     // Made only for the languages some page names it for, and only of a
     // site that builds.
     let search = match stops(&problems) {
-        false => crate::search::files(renderer, &indexed),
+        false => crate::search::files(renderer, &indexed, search),
         true => Vec::new(),
     };
     if !wanted.is_empty() || !search.is_empty() {

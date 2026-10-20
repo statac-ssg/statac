@@ -618,6 +618,12 @@ impl Renderer {
         self.shared.name_id(name)
     }
 
+    /// Everything `page`'s writing read, once it has been built.
+    pub fn writing_read(&self, page: PageId) -> Option<&[Key]> {
+        let body = self.shared.bodies[page.index()].get()?;
+        Some(body.reads.keys())
+    }
+
     /// What `page`'s writing links to and hands its snippet calls, once
     /// its writing has been built.
     pub fn writing(&self, page: PageId) -> Option<&crate::links::Writing> {
