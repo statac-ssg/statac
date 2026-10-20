@@ -1688,7 +1688,6 @@ fn unwritable(path: &str, why: &Unwritable) -> String {
     }
 }
 
-/// `1 file`, `2 files`.
 /// The line `statac search` opens what it found for `words` with: pages
 /// holding every word, or where none does, `some` pages holding some.
 pub(crate) fn found(words: &str, pages: usize, some: bool) -> String {
@@ -1716,6 +1715,7 @@ pub(crate) fn more_found(more: usize) -> String {
     format!("And {} more {pages}.", grouped(more))
 }
 
+/// `1 file`, `2 files`.
 fn how_many(n: usize, one: &str, many: &str) -> String {
     format!("{} {}", grouped(n), if n == 1 { one } else { many })
 }
