@@ -328,9 +328,9 @@ pub fn kept(
         .collect();
     files.sort_by_key(|(path, _)| (id_of(path), path.clone()));
     let mut kept = Vec::new();
-    for (path, file) in files {
+    for (path, at) in files {
         let shown = format!("{}/{path}", super::FOLDER);
-        let text = match std::fs::read_to_string(file) {
+        let text = match crate::assets::read_walked_text(&fetched.real, at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {

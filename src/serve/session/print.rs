@@ -260,13 +260,13 @@ impl Print {
         }
     }
 
-    /// With a file on disk as the reading read it: its stamp, where
-    /// `clock`, read as the reading began, settles it. Otherwise the file
-    /// may have changed since it was read, and the print is equal to no
-    /// other.
-    fn on_disk(self, path: &Path, clock: Option<&Clock>) -> Print {
+    /// With a file on disk as the reading read it, by `stamp`, its stamp
+    /// where it is there: that, where `clock`, read as the reading began,
+    /// settles it. Otherwise the file may have changed since it was read,
+    /// and the print is equal to no other.
+    fn on_disk(self, stamp: Option<Stamp>, clock: Option<&Clock>) -> Print {
         static UNSETTLED: AtomicU64 = AtomicU64::new(0);
-        match Stamp::at(path) {
+        match stamp {
             Some(stamp) if !clock.is_some_and(|clock| stamp.settled(clock)) => {
                 self.with((1u8, UNSETTLED.fetch_add(1, Ordering::Relaxed)))
             }
@@ -277,6 +277,11 @@ impl Print {
     fn done(self) -> u64 {
         self.0.finish()
     }
+}
+
+/// The stamp of the file `opened` is, where it could be opened.
+fn stamp_of(opened: std::io::Result<std::fs::File>) -> Option<Stamp> {
+    Stamp::of(&opened.ok()?.metadata().ok()?)
 }
 
 type Slots = Vec<OnceLock<u64>>;
@@ -435,7 +440,7 @@ impl Taken<'_> {
         }
         for file in renderer.card_files() {
             print = print
-                .on_disk(&crate::platform::join(self.at, &file), clock)
+                .on_disk(Stamp::at(&crate::platform::join(self.at, &file)), clock)
                 .with(file);
         }
         print
@@ -612,14 +617,16 @@ impl Taken<'_> {
                 Print::default()
                     .with((self.every_file(), &file.path, page))
                     .shown(&file.address)
-                    .on_disk(&crate::platform::join(&site.content, &file.path), clock)
+                    .on_disk(stamp_of(site.open_content(&file.path)), clock)
                     .done()
             }),
             Key::Static(at) => *prints.statics[at as usize].get_or_init(|| {
-                let file = &renderer.assets().statics()[at as usize];
+                let assets = renderer.assets();
+                let file = &assets.statics()[at as usize];
+                let opened = crate::platform::open_file(assets.real(), file.at());
                 Print::default()
                     .with((self.every_file(), &file.name))
-                    .on_disk(file.path(), clock)
+                    .on_disk(stamp_of(opened), clock)
                     .done()
             }),
             Key::Files => self.every_file(),

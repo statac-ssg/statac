@@ -277,7 +277,6 @@ impl Panel {
                 explained: &explained,
                 reads: output.map(|output| &output.reads),
                 asked: output.map(|output| &output.asked),
-                site: &built.site,
             };
             let waiting = page.and_then(|page| page.waiting.as_deref());
             facts = on.facts(page.is_some_and(|page| page.draft), waiting);

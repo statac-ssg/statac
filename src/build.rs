@@ -693,22 +693,14 @@ fn built(
                 .collect::<Vec<Built>>()
         },
         || match &staging {
-            Some(staging) => publish_files(renderer, &options.site, staging, &plan.held),
+            Some(staging) => publish_files(renderer, staging, &plan.held),
             None => (0, Vec::new()),
         },
     );
     prepared.problems.extend(file_problems);
     let problems = std::mem::take(&mut prepared.problems);
     let search = &mut crate::search::Kept::default();
-    let concluded = conclude(
-        renderer,
-        &options.site,
-        &plan,
-        &built,
-        problems,
-        None,
-        search,
-    );
+    let concluded = conclude(renderer, &plan, &built, problems, None, search);
     let mut record = Record::default();
     for (i, built) in built.iter_mut().enumerate() {
         record.set(OutputId::from_index(i), std::mem::take(&mut built.reads));
@@ -756,7 +748,7 @@ impl Concluded {
     }
 }
 
-/// Concludes over every output `built` of the site at `at`, in the order
+/// Concludes over every output `built` of the site, in the order
 /// of `plan`, adding to the `problems` reading it: what is told once
 /// across them, what their links came to, the JavaScript they carry, and
 /// the copies and cards they ask for, and the search index, taking from
@@ -764,7 +756,6 @@ impl Concluded {
 /// build of them left anywhere else is read.
 pub(crate) fn conclude(
     renderer: &Renderer,
-    at: &Path,
     plan: &Plan,
     built: &[Built],
     mut problems: Vec<Problem>,
@@ -775,7 +766,7 @@ pub(crate) fn conclude(
     let pictures = &site.pictures;
     let linked = &plan.linked;
 
-    let javascript = javascript(renderer, at, built, remembered);
+    let javascript = javascript(renderer, built, remembered);
     let reached: HashSet<&str> = built
         .iter()
         .filter_map(|built| built.links.as_ref())
@@ -1110,9 +1101,9 @@ pub(crate) fn publish(
     if let Some(staging) = &staging {
         for &at in plan.held.keys().filter(|at| !held_back.contains(at)) {
             let file = &site.files[at];
-            let from = crate::platform::join(&options.site.join("content"), &file.path);
             let named = format!("content/{}", file.path);
-            problems.extend(staging.copy(&from, &named, &file.address.file()).err());
+            let source = site.open_content(&file.path);
+            problems.extend(staging.copy(source, &named, &file.address.file()).err());
         }
     }
     files = files.saturating_sub(held_back.len());
@@ -1465,22 +1456,20 @@ fn sizes_a_picture(html: &str) -> bool {
 /// site has, those held counted.
 pub(crate) fn publish_files(
     renderer: &Renderer,
-    site: &Path,
     staging: &Staging,
     held: &HashMap<usize, PictureId>,
 ) -> (usize, Vec<Problem>) {
     let assets = renderer.assets();
     let mut problems = assets.publish(staging);
-    let content = site.join("content");
     let travelling = &renderer.site().files;
     let sent = travelling
         .par_iter()
         .enumerate()
         .filter(|(at, _)| !held.contains_key(at));
     problems.par_extend(sent.filter_map(|(_, file)| {
-        let from = crate::platform::join(&content, &file.path);
+        let source = renderer.site().open_content(&file.path);
         let shown = format!("content/{}", file.path);
-        staging.copy(&from, &shown, &file.address.file()).err()
+        staging.copy(source, &shown, &file.address.file()).err()
     }));
     let files = assets.iter().count() + assets.statics().len() + travelling.len();
     (files, problems)
@@ -1509,66 +1498,79 @@ fn never_a_document(name: &str) -> bool {
 /// text as a document, whatever the file is called, unless its name is one
 /// [`never_a_document`] knows. A file that can't be read here can't be
 /// published either, which publishing says.
-fn text_of(file: &PathOrBytes) -> Option<String> {
-    let bytes = match file {
-        PathOrBytes::Bytes(bytes) => std::borrow::Cow::Borrowed(*bytes),
-        PathOrBytes::Path(path) => {
-            let mut file = fs::File::open(path).ok()?;
-            let mut head = Vec::with_capacity(SNIFFED);
-            std::io::Read::read_to_end(
-                &mut std::io::Read::take(&mut file, SNIFFED as u64),
-                &mut head,
-            )
-            .ok()?;
-            if head.contains(&0) {
-                return None;
-            }
-            std::io::Read::read_to_end(&mut file, &mut head).ok()?;
-            std::borrow::Cow::Owned(head)
-        }
-    };
+fn text_of(bytes: &[u8]) -> Option<String> {
     if bytes[..bytes.len().min(SNIFFED)].contains(&0) {
         return None;
     }
-    Some(String::from_utf8_lossy(&bytes).into_owned())
+    Some(String::from_utf8_lossy(bytes).into_owned())
+}
+
+/// [`text_of`] what `file`, open to read, holds, read no further than
+/// its opening stretch where that is no text.
+fn text_in(mut file: fs::File) -> Option<String> {
+    let mut head = Vec::with_capacity(SNIFFED);
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(&mut file, SNIFFED as u64),
+        &mut head,
+    )
+    .ok()?;
+    if head.contains(&0) {
+        return None;
+    }
+    std::io::Read::read_to_end(&mut file, &mut head).ok()?;
+    text_of(&head)
 }
 
 /// Every file published as it is from `assets/`, `static/` or `content/`:
-/// its address, the file it comes from, and where to read it, or its bytes.
-fn published_as_is<'a>(
-    renderer: &'a Renderer,
-    site: &Path,
-) -> Vec<(String, String, PathOrBytes<'a>)> {
+/// its address, the file it comes from, and what it is.
+fn published_as_is(renderer: &Renderer) -> Vec<(String, String, AsIs<'_>)> {
     let assets = renderer.assets();
     let base = renderer.settings().base();
-    let content = site.join("content");
     let from_assets = assets.iter().map(|(_, asset)| {
         (
             format!("{base}/{}", asset.published),
             asset.source.clone(),
-            PathOrBytes::Bytes(asset.bytes()),
+            AsIs::Bytes(asset.bytes()),
         )
     });
     let from_static = assets.statics().iter().map(|file| {
         (
             format!("{base}/{}", file.name),
             format!("{}/{}", assets::STATIC, file.name),
-            PathOrBytes::Path(file.path().to_path_buf()),
+            AsIs::Static(file),
         )
     });
     let from_content = renderer.site().files.iter().map(|file| {
         (
             format!("{base}{}", file.address.as_str()),
             format!("content/{}", file.path),
-            PathOrBytes::Path(crate::platform::join(&content, &file.path)),
+            AsIs::Beside(&file.path),
         )
     });
     from_assets.chain(from_static).chain(from_content).collect()
 }
 
-enum PathOrBytes<'a> {
-    Path(PathBuf),
+/// A file published as it is.
+enum AsIs<'a> {
+    /// A file in `static/`.
+    Static(&'a assets::StaticFile),
+    /// A file beside the writing, by its path under `content/`.
+    Beside(&'a str),
+    /// What is published, already read.
     Bytes(&'a [u8]),
+}
+
+impl AsIs<'_> {
+    /// The file opened where it really is and reached through no link, or
+    /// none where it is already read.
+    fn open(&self, renderer: &Renderer) -> Option<std::io::Result<fs::File>> {
+        let assets = renderer.assets();
+        match self {
+            AsIs::Static(file) => Some(crate::platform::open_file(assets.real(), file.at())),
+            AsIs::Beside(path) => Some(renderer.site().open_content(path)),
+            AsIs::Bytes(_) => None,
+        }
+    }
 }
 
 /// What was found in the files published as they are, kept from one
@@ -1576,32 +1578,36 @@ enum PathOrBytes<'a> {
 /// file with the length and the time it had is not read a second time.
 #[derive(Default)]
 pub(crate) struct Remembered {
-    scripts: Mutex<HashMap<PathBuf, Read>>,
+    /// Each by the file it comes from, from the site's folder.
+    scripts: Mutex<HashMap<String, Read>>,
 }
 
 /// A file's length and when it was last changed, and what it held then.
 type Read = (u64, std::time::SystemTime, Vec<Finding>);
 
 impl Remembered {
-    fn found_in(&self, path: &Path, file: &PathOrBytes) -> Vec<Finding> {
-        let stamp = fs::metadata(path)
-            .ok()
+    /// What the file `from` names, opened as `opened`, writes that runs
+    /// JavaScript or may.
+    fn found_in(&self, from: &str, opened: std::io::Result<fs::File>) -> Vec<Finding> {
+        let stamp = (opened.as_ref().ok())
+            .and_then(|file| file.metadata().ok())
             .and_then(|found| Some((found.len(), found.modified().ok()?)));
         if let Some((length, changed)) = stamp
             && let Some((was, then, findings)) =
-                self.scripts.lock().expect("never poisoned").get(path)
+                self.scripts.lock().expect("never poisoned").get(from)
             && (*was, *then) == (length, changed)
         {
             return findings.clone();
         }
-        let findings = text_of(file).map_or_else(Vec::new, |text| scripts::in_html(&text));
+        let text = opened.ok().and_then(text_in);
+        let findings = text.map_or_else(Vec::new, |text| scripts::in_html(&text));
         let mut scripts = self.scripts.lock().expect("never poisoned");
         match stamp {
             Some((length, changed)) => {
-                scripts.insert(path.to_path_buf(), (length, changed, findings.clone()));
+                scripts.insert(from.to_owned(), (length, changed, findings.clone()));
             }
             None => {
-                scripts.remove(path);
+                scripts.remove(from);
             }
         }
         findings
@@ -1907,12 +1913,11 @@ impl Reader {
 /// each thing embedded that may run its own.
 fn javascript(
     renderer: &Renderer,
-    site: &Path,
     built: &[Built],
     remembered: Option<&Remembered>,
 ) -> Vec<Javascript> {
     let assets = renderer.assets();
-    let as_is = published_as_is(renderer, site);
+    let as_is = published_as_is(renderer);
     let mut published: Vec<assets::Travelled> = assets.travelled();
     published.extend(
         as_is
@@ -1928,9 +1933,15 @@ fn javascript(
         // A script is reported whole already, as the script it is.
         .filter(|(_, from, _)| !assets::is_script(from) && !never_a_document(from))
         .filter_map(|(_, from, file)| {
-            let findings = match (file, remembered) {
-                (PathOrBytes::Path(path), Some(remembered)) => remembered.found_in(path, file),
-                _ => scripts::in_html(&text_of(file)?),
+            let findings = match (file.open(renderer), remembered) {
+                (Some(opened), Some(remembered)) => remembered.found_in(from, opened),
+                (Some(opened), None) => scripts::in_html(&text_in(opened.ok()?)?),
+                (None, _) => {
+                    let AsIs::Bytes(bytes) = file else {
+                        return None;
+                    };
+                    scripts::in_html(&text_of(bytes)?)
+                }
             };
             (!findings.is_empty()).then(|| (findings, from.clone()))
         })

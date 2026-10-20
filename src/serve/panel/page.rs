@@ -3,7 +3,6 @@
 //! a template can write on it, with whether its build read each.
 
 use std::collections::BTreeSet;
-use std::path::Path;
 
 use super::pieced;
 use super::problems::lines;
@@ -25,8 +24,6 @@ pub(super) struct On<'a> {
     pub reads: Option<&'a Reads>,
     /// What its output asked for by name while it was built.
     pub asked: Option<&'a Asked>,
-    /// The site's folder.
-    pub site: &'a Path,
 }
 
 impl On<'_> {
@@ -215,15 +212,7 @@ impl On<'_> {
                 .map(|file| shown(&format!("content/{}", file.path)))
                 .collect(),
             Key::Static(at) => (renderer.assets().statics().get(at as usize).into_iter())
-                .map(|file| {
-                    let path = file.path();
-                    shown(
-                        &path
-                            .strip_prefix(self.site)
-                            .unwrap_or(path)
-                            .to_string_lossy(),
-                    )
-                })
+                .map(|file| shown(&format!("{}/{}", crate::assets::STATIC, file.name)))
                 .collect(),
             Key::Setting(_) => vec![settings()],
             // Its tag is declared in the settings, and its words are in a

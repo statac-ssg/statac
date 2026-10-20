@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::time::UNIX_EPOCH;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{Root, Seen};
 use crate::pictures::{Kind, Photograph, Size};
@@ -27,11 +27,12 @@ pub(super) struct Stamp {
 }
 
 impl Stamp {
-    /// None where the disk doesn't say when the file was changed.
-    pub fn of(metadata: &fs::Metadata) -> Option<Stamp> {
-        let changed = metadata.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
+    /// Of a file `len` long whose bytes last changed at `modified`; none
+    /// for a time before 1970.
+    pub fn new(len: u64, modified: SystemTime) -> Option<Stamp> {
+        let changed = modified.duration_since(UNIX_EPOCH).ok()?;
         Some(Stamp {
-            len: metadata.len(),
+            len,
             changed: changed.as_nanos(),
         })
     }

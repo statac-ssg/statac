@@ -165,7 +165,7 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
             folder: None,
         });
     }
-    let content = root.join("content");
+    let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
     let left_behind: HashSet<&str> = settings
         .texts("left_behind")
         .iter()
@@ -173,7 +173,7 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
         .collect();
     // A folder with no `content/` has no pages; whether it is a site at
     // all is for the command to say.
-    let folders = scan(root, &left_behind, &mut problems);
+    let (folders, found) = scan(root, &real, &left_behind, &mut problems);
     let language_folders = language_folders(&site, &settings, &folders, &mut problems);
     for (rel, id) in &language_folders {
         site.languages.get_mut(*id).folder = Some(rel.trim_end_matches('/').to_owned());
@@ -196,7 +196,7 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
         held_back: Vec::new(),
         layouts_needing_url: Vec::new(),
     };
-    reader.read_docs(&content, &mut sources, texts);
+    reader.read_docs(&real, &found, &mut sources, texts);
     reader.build(&sources, &mut site);
     let page_names = match settings.declarations.naming().next() {
         Some(_) => reader.page_names(&sources),
@@ -205,7 +205,8 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
     let languages_of: Vec<LanguageId> = (reader.docs.iter())
         .map(|doc| reader.language_of(doc.folder))
         .collect();
-    site.content.clone_from(&content);
+    site.real = real;
+    site.found = found;
     let (mut problems, drafts, waiting, included, for_posts) = (
         reader.problems,
         reader.drafts,
@@ -360,14 +361,21 @@ fn is_html(name: &str) -> bool {
 }
 
 /// The folders under `content/` and what each holds, each folder after the
-/// one it is in. The walk is the assets' own: hidden names are passed over,
-/// and a link is followed only where it stays inside the site.
-fn scan(root: &Path, left_behind: &HashSet<&str>, problems: &mut Vec<Problem>) -> Vec<Folder> {
-    let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
-    let files = crate::assets::walk(root, &real, "content", false, problems);
+/// one it is in, and where each file really is under the site's real path
+/// `real`, by its path under `content/`. The walk is the assets' own:
+/// hidden names are passed over, and a link is followed only where it
+/// stays inside the site.
+fn scan(
+    root: &Path,
+    real: &Path,
+    left_behind: &HashSet<&str>,
+    problems: &mut Vec<Problem>,
+) -> (Vec<Folder>, HashMap<String, String>) {
+    let files = crate::assets::walk(root, real, "content", false, problems);
     let mut folders = vec![Folder::new(String::new(), None)];
     let mut at_path: HashMap<String, usize> = HashMap::from([(String::new(), 0)]);
-    for (rel, _) in files {
+    let mut found = HashMap::new();
+    for (rel, at) in files {
         let pieces: Vec<&str> = rel.split('/').collect();
         if pieces.iter().any(|piece| left_behind.contains(piece)) {
             continue;
@@ -394,8 +402,9 @@ fn scan(root: &Path, left_behind: &HashSet<&str>, problems: &mut Vec<Problem>) -
             true => folders[folder].writing.push(name),
             false => folders[folder].files.push(name),
         }
+        found.insert(rel, at);
     }
-    folders
+    (folders, found)
 }
 
 /// The folders at the top of `content/` that hold a language's pages, on a
@@ -511,7 +520,14 @@ impl Reader<'_> {
 
     /// Reads every file that may be a page, in parallel, and their front
     /// matter; then settles what each folder is and reads each page's words.
-    fn read_docs(&mut self, content: &Path, sources: &mut Sources, kept: &mut Texts) {
+    /// Each is read where it really is, as `found` has it under `real`.
+    fn read_docs(
+        &mut self,
+        real: &Path,
+        found: &HashMap<String, String>,
+        sources: &mut Sources,
+        kept: &mut Texts,
+    ) {
         let wanted: Vec<(usize, String)> = self
             .folders
             .iter()
@@ -521,14 +537,14 @@ impl Reader<'_> {
         let texts: Vec<_> = wanted
             .par_iter()
             .map(|(at, name)| {
-                let path = content.join(&self.folders[*at].rel).join(name);
-                let text = kept.read(&path);
-                (path, text)
+                let rel = format!("{}{name}", self.folders[*at].rel);
+                let at = found[&rel].as_str();
+                (at, kept.read(real, at))
             })
             .collect();
         let read = texts
             .iter()
-            .filter_map(|(path, text)| Some((path.as_path(), text.as_ref().ok()?)));
+            .filter_map(|(at, text)| Some((*at, text.as_ref().ok()?)));
         kept.keep(read);
         let mut added = Vec::new();
         for ((at, name), (_, text)) in wanted.into_iter().zip(texts) {

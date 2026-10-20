@@ -5,10 +5,11 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read as _};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::disk::{Clock, Stamp};
+use crate::platform;
 
 /// Texts kept from one reading of a site for the next. The default keeps
 /// nothing, and every file is read.
@@ -18,7 +19,8 @@ pub struct Texts {
     /// What a file written as this reading began was found to be, where
     /// that could be read.
     clock: Option<Clock>,
-    kept: HashMap<PathBuf, Arc<Kept>>,
+    /// Each by where the file really is under the site's real path.
+    kept: HashMap<String, Arc<Kept>>,
 }
 
 struct Kept {
@@ -60,11 +62,13 @@ impl Texts {
         };
     }
 
-    /// The text of the file at `path`: as kept, where the file is found as
-    /// it was when kept, or else as read now.
-    pub(super) fn read(&self, path: &Path) -> io::Result<Text> {
+    /// The text of the file at `at` under the folder `real`, opened as
+    /// [`platform::open_file`] opens it: as kept, where the file opened is
+    /// found as it was when kept, or else as read now.
+    pub(super) fn read(&self, real: &Path, at: &str) -> io::Result<Text> {
+        let mut file = platform::open_file(real, at)?;
         let Some(clock) = &self.clock else {
-            let text = fs::read_to_string(path)?;
+            let text = io::read_to_string(file)?;
             let lines = crate::source::line_starts(&text);
             return Ok(Text {
                 text,
@@ -72,8 +76,11 @@ impl Texts {
                 kept: None,
             });
         };
-        if let Some(kept) = self.kept.get(path)
-            && fs::metadata(path).is_ok_and(|found| stamp_of(&found) == Some(kept.stamp))
+        // Stamped as opened, so the stamp is of the file read whatever is
+        // put at its name meanwhile.
+        let stamp = file.metadata().ok().as_ref().and_then(stamp_of);
+        if let Some(kept) = self.kept.get(at)
+            && stamp == Some(kept.stamp)
         {
             return Ok(Text {
                 text: kept.text.clone(),
@@ -81,10 +88,6 @@ impl Texts {
                 kept: Some(Arc::clone(kept)),
             });
         }
-        // Stamped as opened, so the stamp is of the file read whatever is
-        // put at `path` meanwhile.
-        let mut file = fs::File::open(path)?;
-        let stamp = file.metadata().ok().as_ref().and_then(stamp_of);
         let mut text = String::new();
         file.read_to_string(&mut text)?;
         let lines = crate::source::line_starts(&text);
@@ -98,11 +101,12 @@ impl Texts {
         Ok(Text { text, lines, kept })
     }
 
-    /// Keeps for the next reading the texts of `read`, each the file at
-    /// its path as this reading read it, in place of all kept before.
-    pub(super) fn keep<'a>(&mut self, read: impl Iterator<Item = (&'a Path, &'a Text)>) {
+    /// Keeps for the next reading the texts of `read`, each the file
+    /// where it really is as this reading read it, in place of all kept
+    /// before.
+    pub(super) fn keep<'a>(&mut self, read: impl Iterator<Item = (&'a str, &'a Text)>) {
         self.kept = read
-            .filter_map(|(path, text)| Some((path.to_path_buf(), Arc::clone(text.kept.as_ref()?))))
+            .filter_map(|(at, text)| Some((at.to_owned(), Arc::clone(text.kept.as_ref()?))))
             .collect();
     }
 }
@@ -111,6 +115,7 @@ impl Texts {
 mod tests {
     use super::*;
     use crate::testing::Scratch;
+    use std::path::PathBuf;
     use std::time::{Duration, SystemTime};
 
     const HOUR: Duration = Duration::from_secs(3600);
@@ -130,26 +135,29 @@ mod tests {
         path
     }
 
-    /// What a reading gives of each of `paths`, kept for the next.
-    fn read(texts: &mut Texts, paths: &[&Path]) -> Vec<String> {
-        let read: Vec<Text> = paths.iter().map(|path| texts.read(path).unwrap()).collect();
-        texts.keep(paths.iter().copied().zip(&read));
+    /// What a reading of the site at `site` gives of each of `names`,
+    /// kept for the next.
+    fn read(texts: &mut Texts, site: &Path, names: &[&str]) -> Vec<String> {
+        let read: Vec<Text> = (names.iter())
+            .map(|name| texts.read(site, name).unwrap())
+            .collect();
+        texts.keep(names.iter().copied().zip(&read));
         read.into_iter().map(|text| text.text).collect()
     }
 
     #[test]
     fn nothing_is_kept_where_no_clock_is_read() {
         let scratch = scratch_with_kept("unkept");
-        let path = write_dated(&scratch, "post.md", "one", SystemTime::now() - HOUR);
+        write_dated(&scratch, "post.md", "one", SystemTime::now() - HOUR);
         let mut texts = Texts::default();
         texts.begin(&scratch.0);
-        assert_eq!(read(&mut texts, &[&path]), ["one"]);
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["one"]);
         assert!(texts.kept.is_empty());
 
         let mut texts = Texts::keeping();
         texts.begin(&scratch.0.join("nowhere"));
         assert!(texts.clock.is_none());
-        assert_eq!(read(&mut texts, &[&path]), ["one"]);
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["one"]);
         assert!(texts.kept.is_empty());
     }
 
@@ -164,13 +172,13 @@ mod tests {
         // A clock its times are surely before, however coarse the disk's.
         let clock = texts.clock.expect("a clock on this disk");
         texts.clock = Some(clock.later(2 * HOUR));
-        assert_eq!(read(&mut texts, &[&path]), ["one"]);
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["one"]);
         assert_eq!(texts.kept.len(), 1);
 
         // Taken as kept, as the file is found as it was.
-        let kept = Arc::get_mut(texts.kept.get_mut(&path).unwrap()).unwrap();
+        let kept = Arc::get_mut(texts.kept.get_mut("post.md").unwrap()).unwrap();
         kept.text = "two".to_owned();
-        assert_eq!(read(&mut texts, &[&path]), ["two"]);
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["two"]);
 
         // Written again at the same length, and given its time back. The
         // clock moved on says the first writing's step is over, so the
@@ -187,12 +195,31 @@ mod tests {
             assert!(tries < 1000, "the disk's time never moved");
             std::thread::sleep(Duration::from_millis(1));
         }
-        assert_eq!(read(&mut texts, &[&path]), ["six"]);
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["six"]);
 
         // Another file, at the same length and time, put in its place.
         let other = write_dated(&scratch, "other.md", "ten", earlier);
         fs::rename(&other, &path).unwrap();
-        assert_eq!(read(&mut texts, &[&path]), ["ten"]);
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["ten"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_kept_text_is_never_taken_for_a_link_put_in_its_place() {
+        let scratch = scratch_with_kept("linked");
+        let earlier = SystemTime::now() - HOUR;
+        let path = write_dated(&scratch, "post.md", "one", earlier);
+        let mut texts = Texts::keeping();
+        texts.begin(&scratch.0);
+        let clock = texts.clock.expect("a clock on this disk");
+        texts.clock = Some(clock.later(2 * HOUR));
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["one"]);
+        assert_eq!(texts.kept.len(), 1);
+        let moved = scratch.0.join("moved.md");
+        fs::rename(&path, &moved).unwrap();
+        std::os::unix::fs::symlink(&moved, &path).unwrap();
+        let refused = texts.read(&scratch.0, "post.md").err().unwrap();
+        assert_eq!(refused.to_string(), "it is a link");
     }
 
     #[cfg(unix)]
@@ -202,11 +229,11 @@ mod tests {
         // A time the clock read now is before, as a file changed within
         // the clock's step on a disk whose times move in steps has.
         let later = SystemTime::now() + HOUR;
-        let path = write_dated(&scratch, "post.md", "one", later);
+        write_dated(&scratch, "post.md", "one", later);
         let mut texts = Texts::keeping();
         texts.begin(&scratch.0);
         assert!(texts.clock.is_some());
-        assert_eq!(read(&mut texts, &[&path]), ["one"]);
+        assert_eq!(read(&mut texts, &scratch.0, &["post.md"]), ["one"]);
         assert!(texts.kept.is_empty());
     }
 }

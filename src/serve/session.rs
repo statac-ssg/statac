@@ -460,8 +460,7 @@ impl Session {
         let problems = std::mem::take(&mut prepared.problems);
         let remembered = Some(&self.remembered);
         let search = &mut self.search;
-        let mut concluded =
-            build::conclude(renderer, at, &plan, &built, problems, remembered, search);
+        let mut concluded = build::conclude(renderer, &plan, &built, problems, remembered, search);
         let pages: HashMap<PageId, usize> = (plan.outputs.iter().enumerate())
             .filter_map(|(at, output)| match output {
                 Output::Page(page) => Some((*page, at)),
@@ -548,7 +547,7 @@ impl Session {
         if let Some(staging) = &staging {
             let (told, (held, more)) = rayon::join(
                 || write(&mut built, staging),
-                || build::publish_files(renderer, at, staging, &plan.held),
+                || build::publish_files(renderer, staging, &plan.held),
             );
             files = held;
             concluded.problems.extend(told);

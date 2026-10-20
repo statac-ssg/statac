@@ -2827,3 +2827,41 @@ fn a_site_naming_no_language_is_told_once_and_one_naming_any_is_not() {
     assert_eq!(problems(&read_site(&temp)), note);
     assert!(Kind::NoLanguage.quietenable());
 }
+
+#[cfg(unix)]
+#[test]
+fn a_file_beside_the_writing_is_read_where_its_link_led_when_read() {
+    use std::os::unix::fs::symlink;
+    let outside = TempSite::site(&[("content/notes.txt", "private\n")]);
+    let temp = TempSite::site(&[
+        ("content/post-1/index.md", "---\ntitle: Post 1\n---\n"),
+        ("content/files/notes.txt", "notes\n"),
+    ]);
+    let content = temp.root.join("content");
+    symlink(
+        content.join("files/notes.txt"),
+        content.join("post-1/notes.txt"),
+    )
+    .unwrap();
+    let read = read_site(&temp);
+    assert_eq!(read.problems, []);
+    let open = |rel: &str| std::io::read_to_string(read.site.open_content(rel)?);
+    // Pointed elsewhere since, the link isn't followed again.
+    std::fs::remove_file(content.join("post-1/notes.txt")).unwrap();
+    symlink(
+        outside.root.join("content/notes.txt"),
+        content.join("post-1/notes.txt"),
+    )
+    .unwrap();
+    assert_eq!(open("post-1/notes.txt").unwrap(), "notes\n");
+    // A link put in place of the file it led to is refused.
+    std::fs::remove_file(content.join("files/notes.txt")).unwrap();
+    symlink(
+        outside.root.join("content/notes.txt"),
+        content.join("files/notes.txt"),
+    )
+    .unwrap();
+    for rel in ["post-1/notes.txt", "files/notes.txt"] {
+        assert_eq!(open(rel).unwrap_err().to_string(), "it is a link", "{rel}");
+    }
+}

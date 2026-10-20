@@ -154,7 +154,9 @@ pub struct Picture {
     pub root: Root,
     /// Its path under its root, names parted by `/`.
     pub path: String,
-    file: PathBuf,
+    /// Where it really is: its path past every link under the site's real
+    /// path.
+    at: String,
     /// Where it is published, from the top of the site; none for a file
     /// beside a page left out of the build.
     pub address: Option<String>,
@@ -175,6 +177,12 @@ pub struct Picture {
 }
 
 impl Picture {
+    /// The file's bytes, read where it really is under the site's real
+    /// path `real`, through no link.
+    fn read(&self, real: &Path) -> std::io::Result<Vec<u8>> {
+        crate::assets::read_walked(real, &self.at)
+    }
+
     /// The file, from the site's folder, as a problem names it.
     pub fn shown(&self) -> String {
         format!("{}/{}", self.root.folder(), self.path)
@@ -238,6 +246,8 @@ pub struct Pictures {
     /// How many picture files were read, the index not knowing them.
     pub opened: usize,
     index: index::Index,
+    /// The site's real path, which each picture really is under.
+    real: PathBuf,
 }
 
 /// A picture the writing names, and the address that reaches it.
@@ -429,10 +439,11 @@ pub fn is_sidecar(name: &str) -> bool {
 }
 
 /// A picture file to read.
-struct Wanted {
+struct Wanted<'a> {
     root: Root,
     path: String,
-    file: PathBuf,
+    /// Where it really is, as [`Picture`] has it.
+    at: &'a str,
     address: Option<String>,
     travelling: Option<usize>,
 }
@@ -445,24 +456,29 @@ pub fn read(
     read: &mut content::Read,
     statics: &[crate::assets::StaticFile],
 ) -> Vec<Problem> {
-    let content = root.join("content");
+    let site = &read.site;
     let mut wanted = Vec::new();
-    for (at, file) in read.site.files.iter().enumerate() {
-        if is_picture(&file.path) {
+    for (at, file) in site.files.iter().enumerate() {
+        if is_picture(&file.path)
+            && let Some(found) = site.found.get(&file.path)
+        {
             wanted.push(Wanted {
                 root: Root::Content,
                 path: file.path.clone(),
-                file: crate::platform::join(&content, &file.path),
+                at: found,
                 address: Some(file.address.as_str().to_owned()),
                 travelling: Some(at),
             });
         }
     }
     for path in read.left_out.iter().filter(|path| is_picture(path)) {
+        let Some(found) = site.found.get(path) else {
+            continue;
+        };
         wanted.push(Wanted {
             root: Root::Content,
             path: path.clone(),
-            file: crate::platform::join(&content, path),
+            at: found,
             address: None,
             travelling: None,
         });
@@ -471,19 +487,19 @@ pub fn read(
         wanted.push(Wanted {
             root: Root::Static,
             path: file.name.clone(),
-            file: file.path().to_path_buf(),
+            at: file.at(),
             address: Some(format!("/{}", file.name)),
             travelling: None,
         });
     }
     // Its copies are published from the top of the built site as the file
     // stands under `fetched/`.
-    for (path, file) in read.site.fetched.files.iter() {
+    for (path, at) in site.fetched.files.iter() {
         if is_picture(path) {
             wanted.push(Wanted {
                 root: Root::Fetched,
                 path: path.clone(),
-                file: file.clone(),
+                at,
                 address: Some(format!("/{path}")),
                 travelling: None,
             });
@@ -494,14 +510,15 @@ pub fn read(
     let entries: Vec<Option<(index::Entry, bool)>> = wanted
         .par_iter()
         .map(|wanted| {
-            let metadata = std::fs::metadata(&wanted.file).ok()?;
-            let stamp = index::Stamp::of(&metadata);
+            let (length, modified) =
+                crate::platform::length_and_time(&site.real, wanted.at).ok()?;
+            let stamp = index::Stamp::new(length, modified);
             if let Some(entry) = known.get(wanted.root, &wanted.path)
                 && stamp.is_some_and(|stamp| stamp == entry.stamp)
             {
                 return Some((entry.clone(), false));
             }
-            let bytes = std::fs::read(&wanted.file).ok()?;
+            let bytes = crate::assets::read_walked(&site.real, wanted.at).ok()?;
             let stamp = stamp.unwrap_or_default();
             Some((index::Entry::read(stamp, wanted.root, &bytes), true))
         })
@@ -535,7 +552,7 @@ pub fn read(
         let id = gathered.all.push(Picture {
             root: wanted.root,
             path: wanted.path.clone(),
-            file: wanted.file,
+            at: wanted.at.to_owned(),
             address: wanted.address.clone(),
             seen,
             hash: entry.hash,
@@ -560,10 +577,15 @@ pub fn read(
     }
     index.changed = changed;
     gathered.index = index;
+    gathered.real.clone_from(&site.real);
 
     let mut problems = Vec::new();
     for path in std::mem::take(&mut read.sidecars) {
-        let Ok(text) = std::fs::read_to_string(crate::platform::join(&content, &path)) else {
+        let text = read
+            .site
+            .open_content(&path)
+            .and_then(std::io::read_to_string);
+        let Ok(text) = text else {
             continue;
         };
         let source = read.sources.add(format!("content/{path}"), text);

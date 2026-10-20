@@ -825,9 +825,24 @@ pub(super) struct Named {
     key: Key,
     /// From the top of the site.
     pub(super) address: String,
-    on_disk: PathBuf,
+    on_disk: OnDisk,
     /// As a problem names it.
     pub(super) shown: String,
+}
+
+/// Where a file really is: its path past every link under the site's real
+/// path.
+#[derive(Debug)]
+struct OnDisk {
+    real: PathBuf,
+    at: String,
+}
+
+impl OnDisk {
+    /// The file opened to read, through no link.
+    fn open(&self) -> std::io::Result<std::fs::File> {
+        crate::platform::open_file(&self.real, &self.at)
+    }
 }
 
 /// The file `written` names from the page `of`: a relative name from the
@@ -842,7 +857,10 @@ pub(super) fn named(shared: &Shared, of: PageId, written: &str) -> Option<Named>
         Some(Named {
             key: Key::Beside(u32::try_from(at).ok()?),
             address: site.files[at].address.as_str().to_owned(),
-            on_disk: crate::platform::join(&shared.site.content, path),
+            on_disk: OnDisk {
+                real: site.real.clone(),
+                at: site.found.get(path)?.clone(),
+            },
             shown: format!("content/{path}"),
         })
     };
@@ -863,7 +881,10 @@ pub(super) fn named(shared: &Shared, of: PageId, written: &str) -> Option<Named>
                     Some(Named {
                         key: Key::Static(u32::try_from(at).ok()?),
                         address: format!("/{path}"),
-                        on_disk: statics[at].path().to_path_buf(),
+                        on_disk: OnDisk {
+                            real: shared.assets.real().to_path_buf(),
+                            at: statics[at].at().to_owned(),
+                        },
                         shown: format!("{}/{path}", crate::assets::STATIC),
                     })
                 })
@@ -952,7 +973,7 @@ fn file(
 struct FileValue {
     url: String,
     name: String,
-    on_disk: PathBuf,
+    on_disk: OnDisk,
     shown: String,
     asking: Asking,
 }
@@ -981,13 +1002,18 @@ impl FileValue {
     /// name says. Nothing for a file too large to show or one that isn't
     /// text.
     fn code(&self) -> Value {
-        match std::fs::metadata(&self.on_disk) {
+        let mut file = match self.on_disk.open() {
+            Ok(file) => file,
+            Err(error) => return self.cant_read(&error),
+        };
+        match file.metadata() {
             Ok(found) if found.len() > LARGEST_SHOWN_AS_CODE => return Value::from(""),
             Ok(_) => {}
             Err(error) => return self.cant_read(&error),
         }
-        let text = match std::fs::read(&self.on_disk) {
-            Ok(bytes) => String::from_utf8(bytes),
+        let mut bytes = Vec::new();
+        let text = match std::io::Read::read_to_end(&mut file, &mut bytes) {
+            Ok(_) => String::from_utf8(bytes),
             Err(error) => return self.cant_read(&error),
         };
         let Ok(text) = text else {
@@ -1018,14 +1044,16 @@ impl Object for FileValue {
         match key.as_str()? {
             "url" => Some(Value::from(self.url.as_str())),
             "name" => Some(Value::from(self.name.as_str())),
-            "size" => Some(match std::fs::metadata(&self.on_disk) {
+            "size" => Some(match self.on_disk.open().and_then(|file| file.metadata()) {
                 Ok(found) => Value::from(found.len()),
                 Err(error) => self.cant_read(&error),
             }),
-            "text" => Some(match std::fs::read_to_string(&self.on_disk) {
-                Ok(text) => Value::from(text),
-                Err(error) => self.cant_read(&error),
-            }),
+            "text" => Some(
+                match self.on_disk.open().and_then(std::io::read_to_string) {
+                    Ok(text) => Value::from(text),
+                    Err(error) => self.cant_read(&error),
+                },
+            ),
             "code" => Some(self.code()),
             "language" => Some(Value::from(self.language())),
             other => {

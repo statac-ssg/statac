@@ -7,6 +7,7 @@ use std::io;
 use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 use std::path::Path;
 use std::sync::OnceLock;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rayon::prelude::*;
 use rustix::fs::{
@@ -213,6 +214,39 @@ pub(super) fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
 /// [`super::open_file`], by the folder [`holder`] opens.
 pub(super) fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
     opened(root, rel)?.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+}
+
+/// [`super::length_and_time`], by the folder [`holder`] opens.
+pub(super) fn length_and_time(root: &Path, rel: &str) -> io::Result<(u64, SystemTime)> {
+    let gone = || io::Error::from(io::ErrorKind::NotFound);
+    let (at, name) = holder(root, rel)?.ok_or_else(gone)?;
+    let found = statat(at.as_fd(), name, AtFlags::SYMLINK_NOFOLLOW)?;
+    match FileType::from_raw_mode(found.st_mode) {
+        FileType::RegularFile => {}
+        FileType::Symlink => return Err(io::Error::other("it is a link")),
+        _ => return Err(io::Error::other("it is not a file")),
+    }
+    // The fields' types differ from one kind of machine to another.
+    #[allow(
+        clippy::unnecessary_cast,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_possible_wrap
+    )]
+    let (length, seconds, nanos) = (
+        found.st_size as u64,
+        found.st_mtime as i64,
+        found.st_mtime_nsec as u32,
+    );
+    // Before 1970 the seconds count back and the nanoseconds still forward.
+    let modified = match u64::try_from(seconds) {
+        Ok(seconds) => UNIX_EPOCH + Duration::new(seconds, nanos),
+        Err(_) => {
+            UNIX_EPOCH - Duration::from_secs(seconds.unsigned_abs())
+                + Duration::from_nanos(nanos.into())
+        }
+    };
+    Ok((length, modified))
 }
 
 /// The file `rel` under `root` opened to read, by name in the folder
@@ -481,6 +515,24 @@ mod tests {
             assert_eq!(read(rel).unwrap_err().to_string(), "it is a link", "{rel}");
         }
         assert_eq!(read("missing").unwrap_err().kind(), io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn a_file_is_asked_its_length_through_no_link_and_without_reading_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let scratch = Scratch::new("times-link");
+        let kept = kept(&scratch);
+        let folder = scratch.0.join("folder");
+        fs::create_dir(&folder).unwrap();
+        fs::write(folder.join("a.txt"), "a").unwrap();
+        fs::set_permissions(folder.join("a.txt"), fs::Permissions::from_mode(0o000)).unwrap();
+        symlink(kept.join("notes.txt"), folder.join("notes.txt")).unwrap();
+        symlink(&kept, folder.join("linked")).unwrap();
+        assert_eq!(length_and_time(&folder, "a.txt").unwrap().0, 1);
+        for rel in ["notes.txt", "linked/notes.txt"] {
+            let refused = length_and_time(&folder, rel).unwrap_err();
+            assert_eq!(refused.to_string(), "it is a link", "{rel}");
+        }
     }
 
     #[test]

@@ -188,8 +188,11 @@ pub struct Fetched {
     /// The webmentions and senders the author turned away.
     pub refused: refused::List,
     /// Every file in the folder but the record and the list of refused, by its path under it with
-    /// forward slashes, with where it is on disk.
-    pub files: Vec<(String, PathBuf)>,
+    /// forward slashes, with where it really is: its path past every link
+    /// under `real`.
+    pub files: Vec<(String, String)>,
+    /// The site's real path.
+    pub real: PathBuf,
 }
 
 /// How old the stills in `fetched/stills/` and the mentions in
@@ -272,8 +275,7 @@ pub fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>) {
             RECORD => record_shown(),
             refused::NAME => refused::shown(),
             _ => {
-                let file = crate::platform::join(&site.join(FOLDER), &path);
-                fetched.files.push((path, file));
+                fetched.files.push((path, at));
                 continue;
             }
         };
@@ -298,6 +300,7 @@ pub fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>) {
             problems.extend(found);
         }
     }
+    fetched.real = real;
     (fetched, problems)
 }
 

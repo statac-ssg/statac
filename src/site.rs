@@ -430,8 +430,11 @@ impl List {
 
 #[derive(Default)]
 pub struct Site {
-    /// Its `content/` folder on disk.
-    pub content: std::path::PathBuf,
+    /// Its folder on disk, past every link.
+    pub real: std::path::PathBuf,
+    /// Where each file under `content/` really is, by its path there: its
+    /// path past every link under `real`.
+    pub found: std::collections::HashMap<String, String>,
     pub languages: Arena<LanguageId, Language>,
     pub pages: Arena<PageId, Page>,
     pub lists: Arena<ListId, List>,
@@ -461,6 +464,13 @@ pub struct Site {
 }
 
 impl Site {
+    /// The file at `rel` under `content/`, opened where it really is and
+    /// reached through no link, as [`crate::platform::open_file`] opens it.
+    pub fn open_content(&self, rel: &str) -> std::io::Result<std::fs::File> {
+        let at = (self.found.get(rel)).ok_or(std::io::ErrorKind::NotFound)?;
+        crate::platform::open_file(&self.real, at)
+    }
+
     /// The folder at the top of `language`'s pages, by its path under
     /// `content/`: its own folder, or for the main language with none,
     /// `content/` itself, the empty path.

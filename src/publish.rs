@@ -953,20 +953,9 @@ impl Staging {
             })
     }
 
-    /// Copies the file at `from` to `rel`; `shown` names `from` in a message.
-    pub fn copy(&self, from: &Path, shown: &str, rel: &str) -> Result<(), Problem> {
-        self.copy_opened(fs::File::open(from), shown, rel)
-    }
-
-    /// Copies the file `from`, a path with forward slashes under the folder
-    /// `root`, to `rel`, opened as [`platform::open_file`] opens it; `shown`
-    /// names `from` in a message.
-    pub fn copy_in(&self, root: &Path, from: &str, shown: &str, rel: &str) -> Result<(), Problem> {
-        self.copy_opened(platform::open_file(root, from), shown, rel)
-    }
-
-    /// Copies `source`, the file `shown` names, to `rel`.
-    fn copy_opened(
+    /// Copies `source`, the file `shown` names as opened to read, to
+    /// `rel`. Where it couldn't be opened, the problem says why.
+    pub fn copy(
         &self,
         source: io::Result<fs::File>,
         shown: &str,
@@ -1687,7 +1676,9 @@ mod tests {
         crate::disk::wait_until_settled(&scratch.site(), &from);
         let into = Arc::new(Mutex::new(None));
         let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
-        staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
+        staging
+            .copy(fs::File::open(&from), "file-1.txt", "file-1.txt")
+            .unwrap();
         staging.finish().unwrap();
         let left = taken(&into);
 
@@ -1702,7 +1693,9 @@ mod tests {
             &left,
             Arc::clone(&into),
         );
-        staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
+        staging
+            .copy(fs::File::open(&from), "file-1.txt", "file-1.txt")
+            .unwrap();
         staging.finish().unwrap();
         let left = taken(&into);
         assert!(left.written.is_empty());
@@ -1716,7 +1709,9 @@ mod tests {
             &left,
             Arc::clone(&into),
         );
-        staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
+        staging
+            .copy(fs::File::open(&from), "file-1.txt", "file-1.txt")
+            .unwrap();
         staging.finish().unwrap();
         assert_eq!(taken(&into).written, ["file-1.txt"]);
         assert_eq!(fs::read_to_string(&copied).unwrap(), "one and more");
@@ -1733,7 +1728,9 @@ mod tests {
         change(&from, now);
         let into = Arc::new(Mutex::new(None));
         let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
-        staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
+        staging
+            .copy(fs::File::open(&from), "file-1.txt", "file-1.txt")
+            .unwrap();
         staging.finish().unwrap();
         let left = taken(&into);
         assert!(!exists(&scratch.site().join(KEPT).join(CLOCK)));
@@ -1749,7 +1746,9 @@ mod tests {
             &left,
             Arc::clone(&into),
         );
-        staging.copy(&from, "file-1.txt", "file-1.txt").unwrap();
+        staging
+            .copy(fs::File::open(&from), "file-1.txt", "file-1.txt")
+            .unwrap();
         staging.finish().unwrap();
         assert_eq!(taken(&into).written, ["file-1.txt"]);
         let copied = scratch.out().join("file-1.txt");
@@ -2314,7 +2313,9 @@ mod tests {
             fs::write(&from, text).unwrap();
             change(&from, long_ago());
             let staging = scratch.begin();
-            staging.copy(&from, "from.txt", "to.txt").unwrap();
+            staging
+                .copy(fs::File::open(&from), "from.txt", "to.txt")
+                .unwrap();
             staging.finish().unwrap();
         };
         publish("one");

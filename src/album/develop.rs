@@ -266,7 +266,7 @@ pub fn develop(
                 };
                 Problem::placed(kind, shown.place)
             };
-            let bytes = match fs::read(&picture.file) {
+            let bytes = match picture.read(&all.real) {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     let kind = Kind::CantRead {

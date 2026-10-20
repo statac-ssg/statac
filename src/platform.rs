@@ -463,6 +463,24 @@ pub fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
     }
 }
 
+/// The length of the file `rel`, a path with forward slashes under the
+/// folder `root`, and when its bytes last changed, refused as
+/// [`open_file`] refuses. The file is asked without being opened, so one
+/// that can't be read is asked too. On Unix it is asked by name in the
+/// folder above it, already open, and never through a link.
+pub fn length_and_time(root: &Path, rel: &str) -> io::Result<(u64, std::time::SystemTime)> {
+    #[cfg(unix)]
+    {
+        unix::length_and_time(root, rel)
+    }
+    #[cfg(not(unix))]
+    {
+        no_link_to(root, rel)?;
+        let found = std::fs::metadata(join(root, rel))?;
+        Ok((found.len(), found.modified()?))
+    }
+}
+
 /// Opens the file `name` in the folder `folder` for a lock to be taken on
 /// it, making it where nothing has the name. Only a file itself is
 /// opened, never through a link, and `folder` must be no link. On Unix
@@ -956,6 +974,24 @@ mod tests {
         assert_eq!(missing.kind(), io::ErrorKind::NotFound);
         // A folder is no file to read.
         assert!(open_file(&root, "a").is_err());
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_files_length_and_time_are_as_the_system_gives_them() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-times-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("a")).unwrap();
+        std::fs::write(root.join("a").join("b.txt"), "bytes").unwrap();
+        let found = std::fs::metadata(root.join("a").join("b.txt")).unwrap();
+        assert_eq!(
+            length_and_time(&root, "a/b.txt").unwrap(),
+            (5, found.modified().unwrap())
+        );
+        let missing = length_and_time(&root, "a/c.txt").unwrap_err();
+        assert_eq!(missing.kind(), io::ErrorKind::NotFound);
+        assert!(length_and_time(&root, "a").is_err());
         remove_folder(&root).unwrap();
     }
 

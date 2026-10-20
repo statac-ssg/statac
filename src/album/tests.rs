@@ -4,7 +4,7 @@ fn plain(root: Root, path: &str, address: Option<&str>) -> Picture {
     Picture {
         root,
         path: path.to_owned(),
-        file: PathBuf::new(),
+        at: String::new(),
         address: address.map(str::to_owned),
         seen: Seen::Plain {
             kind: Kind::Gif,

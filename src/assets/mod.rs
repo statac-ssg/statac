@@ -75,15 +75,15 @@ impl Asset {
 pub struct StaticFile {
     /// Its path under `static/`, which is its path in the published site.
     pub name: String,
-    path: PathBuf,
-    /// Where it really is, as [`walk`] gives it.
     at: String,
 }
 
 impl StaticFile {
-    /// The file it is copied from.
-    pub fn path(&self) -> &Path {
-        &self.path
+    /// Where it really is: its path past every link under
+    /// [`Assets::real`], to be read by [`platform::open_file`], which
+    /// follows no link.
+    pub fn at(&self) -> &str {
+        &self.at
     }
 }
 
@@ -109,7 +109,7 @@ pub struct Assets {
     unwritten: BTreeSet<String>,
     statics: Vec<StaticFile>,
     static_names: HashSet<String>,
-    /// The site's real path, which each file in `static/` is copied from.
+    /// The site's real path, which each file in `static/` really is under.
     real: PathBuf,
     /// The warning for a rule that narrows pictures and keeps their height,
     /// true only of a site whose pages show a picture with both.
@@ -258,11 +258,7 @@ pub fn gather(
 
     let statics: Vec<StaticFile> = walk(site, &real, STATIC, true, &mut problems)
         .into_iter()
-        .map(|(name, at)| StaticFile {
-            path: platform::join(&site.join(STATIC), &name),
-            name,
-            at,
-        })
+        .map(|(name, at)| StaticFile { name, at })
         .collect();
     let outputs = claims(&assets, &statics);
     for (rel, source) in &outputs {
@@ -482,9 +478,8 @@ impl Assets {
             .filter_map(|asset| staging.write(&asset.published, &asset.bytes).err());
         let copied = self.statics.par_iter().filter_map(|file| {
             let shown = format!("{STATIC}/{}", file.name);
-            staging
-                .copy_in(&self.real, &file.at, &shown, &file.name)
-                .err()
+            let source = platform::open_file(&self.real, &file.at);
+            staging.copy(source, &shown, &file.name).err()
         });
         written.chain(copied).collect()
     }
@@ -519,6 +514,11 @@ impl Assets {
 
     pub fn statics(&self) -> &[StaticFile] {
         &self.statics
+    }
+
+    /// The site's real path, which each file in `static/` really is under.
+    pub fn real(&self) -> &Path {
+        &self.real
     }
 
     /// The warning for a stylesheet rule that narrows pictures and keeps
