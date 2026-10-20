@@ -680,7 +680,7 @@ fn the_search_index_follows_everything_a_page_is_searched_by() {
     let post_2 = |front: &str, text: &str| {
         format!("---\ntitle: Post 2\ndate: 2026-01-02\ntags: [one]\n{front}---\n{text}\n")
     };
-    let left_out = "---\ntitle: Left out\ndate: 2026-01-05\nsearch: false\ntags: [new_york]\n---\n\
+    let left_out = "---\ntitle: Left out\ndate: 2026-01-05\nsearch: false\ntags: [two_words]\n---\n\
                     Not searched.\n";
     let edits: &[Edit] = &[
         ("a post's writing", &|site| {
@@ -726,7 +726,10 @@ fn the_search_index_follows_everything_a_page_is_searched_by() {
             )
         }),
         ("a tag one post spells", &|site| {
-            site.write("content/posts/post-1.md", &starter_post(1, "one, New York"))
+            site.write(
+                "content/posts/post-1.md",
+                &starter_post(1, "one, Two Words"),
+            )
         }),
         // Pages that aren't searched, so only the spelling the tag is shown
         // with on the post can change the index.
