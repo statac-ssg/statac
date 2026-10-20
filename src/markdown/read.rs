@@ -17,7 +17,7 @@ use super::node::{Alignment, CalloutKind, Kind, Node};
 use super::typography::SETS;
 use super::unmatched::{Block, Elements, Told};
 use super::{Definition, Document, InSite, controls};
-use crate::html::comment_close;
+use crate::html::{RAW_TEXT, comment_close, end_tag};
 use crate::problem::{Kind as ProblemKind, Problem};
 use crate::source::{Place, SourceId, Span};
 
@@ -1372,7 +1372,10 @@ struct Html {
     /// Open elements whose contents are shown as typed.
     excluded: Vec<&'static str>,
     in_comment: bool,
-    /// The tag being read, and whether it closes an element.
+    /// The element whose text, up to its end tag, holds no markup.
+    in_text: Option<&'static str>,
+    /// The tag being read, by its name where that matters, and whether it
+    /// closes an element.
     in_tag: Option<(Option<&'static str>, bool)>,
     quote: Option<char>,
     /// Whether the last character read is `/`: a tag may end in a later
@@ -1385,6 +1388,11 @@ struct Html {
 type Found = (usize, Within, bool);
 
 const EXCLUDED: [&str; 4] = ["style", "script", "pre", "code"];
+
+/// Whether `name`'s text holds no markup: `plaintext`'s to the end.
+fn holds_text(name: &str) -> bool {
+    name == "script" || name == "plaintext" || RAW_TEXT.contains(&name)
+}
 
 impl Html {
     fn literal(&self) -> bool {
@@ -1417,6 +1425,21 @@ impl Html {
                 i = end;
                 continue;
             }
+            if let Some(name) = self.in_text {
+                let close = match name {
+                    "plaintext" => None,
+                    _ => end_tag(html.as_bytes(), i, name.as_bytes()),
+                };
+                let end = close.unwrap_or(html.len());
+                let literal = self.literal();
+                let calls = html[i..end].match_indices(OPEN);
+                found.extend(calls.map(|(at, _)| (i + at, Within::Html, literal)));
+                if close.is_some() {
+                    self.in_text = None;
+                }
+                i = end;
+                continue;
+            }
             let c = html[i..].chars().next().expect("a character");
             if c == OPEN {
                 let within = if self.in_tag.is_some() {
@@ -1436,8 +1459,13 @@ impl Html {
                                 if let Some(p) = self.excluded.iter().rposition(|n| *n == name) {
                                     self.excluded.truncate(p);
                                 }
-                            } else if !self.slash {
-                                self.excluded.push(name);
+                            } else {
+                                if !self.slash && EXCLUDED.contains(&name) {
+                                    self.excluded.push(name);
+                                }
+                                if holds_text(name) {
+                                    self.in_text = Some(name);
+                                }
                             }
                         }
                         self.in_tag = None;
@@ -1464,11 +1492,10 @@ impl Html {
                     .unwrap_or(html.len() - from);
                 let name = &html[from..from + len];
                 if name.starts_with(|c: char| c.is_ascii_alphabetic()) {
-                    let excluded = EXCLUDED
-                        .iter()
+                    let known = (EXCLUDED.iter().chain(RAW_TEXT).chain(&["plaintext"]))
                         .copied()
                         .find(|e| e.eq_ignore_ascii_case(name));
-                    self.in_tag = Some((excluded, closing));
+                    self.in_tag = Some((known, closing));
                     self.slash = false;
                     i = from + len;
                     continue;

@@ -3062,6 +3062,39 @@ fn an_address_after_a_comment_is_under_the_sites_path_however_the_comment_ends()
 }
 
 #[test]
+fn an_address_after_a_comment_opened_in_text_is_under_the_sites_path() {
+    let cases = [
+        "<div>\n<textarea><!-- </textarea>\n<a href=\"@url(/about/)\">about</a>\n</div>\n",
+        "<div>\n<title><!-- </title>\n<a href=\"@url(/about/)\">about</a>\n</div>\n",
+        "<div>\n<style><!-- </style>\n<a href=\"@url(/about/)\">about</a>\n</div>\n",
+        "<div>\n<TEXTAREA><!-- </TextArea\n><a href=\"@url(/about/)\">about</a>\n</div>\n",
+    ];
+    for text in cases {
+        let (_, document, written) = under_a_path(text);
+        assert!(
+            written.contains("<a href=\"/blog/about/\">about</a>"),
+            "{text:?} wrote\n{written}"
+        );
+        assert_eq!(document.in_site.len(), 1, "{text:?}");
+        assert!(document.problems.is_empty(), "{:?}", document.problems);
+    }
+}
+
+#[test]
+fn a_comment_after_an_element_holding_text_is_a_comment() {
+    let text = "<div>\n<textarea>a</textarea><!-- @url(/a/) </textarea>\n\
+                <a href=\"@url(/b/)\">b</a> -->\n<a href=\"@url(/about/)\">about</a>\n</div>\n";
+    let (_, document, written) = under_a_path(text);
+    assert!(
+        written.contains("<a href=\"/blog/about/\">about</a>"),
+        "wrote\n{written}"
+    );
+    assert!(!written.contains("/b/"), "wrote\n{written}");
+    assert_eq!(document.in_site.len(), 1);
+    assert!(document.problems.is_empty(), "{:?}", document.problems);
+}
+
+#[test]
 fn each_address_inside_the_site_is_kept_where_it_is_written() {
     let text = "[About](@url(/about/)) ![Alt](@url('/photo-1.jpg')) @url(/a/) [b][b] [b]\n\n\
                 <a href=\"@url(/c/)\">c</a>\n\n@box()\n[d](@url(/d/))\n@end\n\n[b]: @url(/b/)\n";
