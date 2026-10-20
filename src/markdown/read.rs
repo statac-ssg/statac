@@ -17,6 +17,7 @@ use super::node::{Alignment, CalloutKind, Kind, Node};
 use super::typography::SETS;
 use super::unmatched::{Block, Elements, Told};
 use super::{Definition, Document, InSite, controls};
+use crate::html::comment_close;
 use crate::problem::{Kind as ProblemKind, Problem};
 use crate::source::{Place, SourceId, Span};
 
@@ -1407,6 +1408,15 @@ impl Html {
                 }
                 _ => {}
             }
+            if self.in_comment {
+                let close = comment_close(html.as_bytes(), i);
+                let end = close.unwrap_or(html.len());
+                let calls = html[i..end].match_indices(OPEN);
+                found.extend(calls.map(|(at, _)| (i + at, Within::Html, true)));
+                self.in_comment = close.is_none();
+                i = end;
+                continue;
+            }
             let c = html[i..].chars().next().expect("a character");
             if c == OPEN {
                 let within = if self.in_tag.is_some() {
@@ -1415,12 +1425,6 @@ impl Html {
                     Within::Html
                 };
                 found.push((i, within, self.literal()));
-            } else if self.in_comment {
-                if html[i..].starts_with("-->") {
-                    self.in_comment = false;
-                    i += 3;
-                    continue;
-                }
             } else if let Some((name, closing)) = self.in_tag {
                 match (self.quote, c) {
                     (Some(q), c) if c == q => self.quote = None,
@@ -1442,8 +1446,15 @@ impl Html {
                 }
             } else if c == '<' {
                 if html[i..].starts_with("<!--") {
-                    self.in_comment = true;
-                    i += 4;
+                    // `<!-->` and `<!--->` close as they open.
+                    i = match &html.as_bytes()[i + 4..] {
+                        [b'>', ..] => i + 5,
+                        [b'-', b'>', ..] => i + 6,
+                        _ => {
+                            self.in_comment = true;
+                            i + 4
+                        }
+                    };
                     continue;
                 }
                 let closing = html[i + 1..].starts_with('/');

@@ -734,7 +734,7 @@ fn calls_are_found_only_where_they_are_calls() {
         &'static [(&'static str, Within)],
         &'static str,
     );
-    let cases: [Case; 24] = [
+    let cases: [Case; 27] = [
         (
             "A @x(1) b.\n",
             &[("@x(1)", Within::Prose)],
@@ -803,6 +803,21 @@ fn calls_are_found_only_where_they_are_calls() {
             "<div>\n<!-- @x(1) --> <p>@y(2)</p>\n</div>\n",
             &[("@y(2)", Within::Html)],
             "<div>\n <p><call y=html></p>\n</div>",
+        ),
+        (
+            "<div>\n<!-- @x(1) --!>\n<p>@y(2)</p>\n</div>\n",
+            &[("@y(2)", Within::Html)],
+            "<p><call y=html></p>",
+        ),
+        (
+            "<div>\n<!---> <p>@y(2)</p>\n</div>\n",
+            &[("@y(2)", Within::Html)],
+            "<p><call y=html></p>",
+        ),
+        (
+            "A <!--> <img src=\"@y(2)\">.\n",
+            &[("@y(2)", Within::Attribute)],
+            "<img src=\"<call y=attribute>\">",
         ),
         (
             "A <span>@x(1)</span>.\n",
@@ -2984,6 +2999,35 @@ fn an_address_inside_the_site_is_text_where_a_call_is() {
         assert_eq!(written, html, "{text:?}");
         assert!(document.in_site.is_empty(), "{text:?}");
         assert!(document.problems.is_empty(), "{:?}", document.problems);
+    }
+}
+
+#[test]
+fn an_address_after_a_comment_is_under_the_sites_path_however_the_comment_ends() {
+    let cases = [
+        (
+            "<div>\n<!-- x --!>\n<a href=\"@url(/about/)\">about</a>\n</div>\n",
+            "<a href=\"/blog/about/\">about</a>",
+        ),
+        (
+            "<div>\n<!---> <a href=\"@url(/about/)\">about</a>\n</div>\n",
+            "<a href=\"/blog/about/\">about</a>",
+        ),
+        (
+            "Text <!--> then <a href=\"@url(/about/)\">about</a> and \"quotes\".\n",
+            "<p>Text then <a href=\"/blog/about/\">about</a> and &quot;quotes&quot;.</p>",
+        ),
+    ];
+    for (text, html) in cases {
+        let (_, document, written) = under_a_path(text);
+        assert!(written.contains(html), "{text:?} wrote\n{written}");
+        assert_eq!(document.in_site.len(), 1, "{text:?}");
+        assert!(document.problems.is_empty(), "{:?}", document.problems);
+        // Words shown as typed are left out of typography.
+        let as_typed = all_nodes(&document)
+            .into_iter()
+            .any(|n| matches!(n.kind, Kind::Literal(_)));
+        assert!(!as_typed, "{text:?}");
     }
 }
 
