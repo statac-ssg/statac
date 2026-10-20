@@ -83,6 +83,9 @@ pub struct Settings {
     pub output_dir: String,
     pub ignored_content: Vec<String>,
     pub ignored_static: Vec<String>,
+    /// The files whose writing Zola 0.23 and later don't run as a
+    /// template, where the setting is there at all.
+    pub skip_content_templating: Option<Vec<String>>,
     pub smart_punctuation: bool,
     pub render_emoji: bool,
     pub target_blank: bool,
@@ -191,6 +194,7 @@ pub fn settle(entries: &[Field]) -> Settings {
         output_dir: "public".into(),
         ignored_content: Vec::new(),
         ignored_static: Vec::new(),
+        skip_content_templating: None,
         smart_punctuation: false,
         render_emoji: false,
         target_blank: false,
@@ -239,6 +243,7 @@ pub fn settle(entries: &[Field]) -> Settings {
             }
             "ignored_content" => s.ignored_content = texts_of(value),
             "ignored_static" => s.ignored_static = texts_of(value),
+            "skip_content_templating" => s.skip_content_templating = Some(texts_of(value)),
             "theme" => {
                 s.theme_line = field.line;
                 s.theme = text.filter(|t| !t.is_empty());

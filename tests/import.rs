@@ -2598,6 +2598,18 @@ fn zola_components_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(fixture("zola-components"), ["no-still", AS_TEXT]);
 }
 
+/// Zola 0.23 runs the writing as a template: `raw` is taken out, and the
+/// rest of its template code is told, inside code too, but not in a file
+/// `skip_content_templating` names. Where nothing in the old site says
+/// which version made it, the template code is told as what it may have
+/// run.
+#[test]
+fn zola_template_code_in_the_writing_is_told_by_the_version_that_ran_it() {
+    assert_eq!(fixture("zola-templated-writing"), [AS_TEXT]);
+    assert_eq!(fixture("zola-skip-templating"), [AS_TEXT]);
+    assert_eq!(fixture("zola-template-code"), [] as [&str; 0]);
+}
+
 #[test]
 fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
     let words = "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n\n\

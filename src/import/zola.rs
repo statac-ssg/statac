@@ -27,12 +27,21 @@ use crate::source::{Place, Sources};
 use crate::yaml::Value as Yaml;
 use settings::{Settings, Taxonomy, fields, text_of, texts_of};
 use slug::Strategy;
+use writing::Reading;
 
 pub static TAG_LEFT: FindingKind = FindingKind {
     heading: "Tags in the writing left as written",
     sentence: "Statac's writing runs none of Zola's tags, and these have no equal in it, so each \
                is left as written and shows on the page as it stands: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
+};
+
+pub static TEMPLATE_CODE: FindingKind = FindingKind {
+    heading: "Template code Zola may have run",
+    sentence: "Nothing in the old site says which version of Zola made it: 0.23 and later run \
+               these as template code, and earlier versions show them as written. Each is left \
+               as written and shows on the page as it stands: where the old site ran it, write \
+               by hand what it made.",
 };
 
 pub static TAG_IN_CODE: FindingKind = FindingKind {
@@ -128,6 +137,8 @@ pub fn read(
         languages: Vec::new(),
         docs: Vec::new(),
         own: Vec::new(),
+        later: false,
+        earlier: false,
         dropped: Vec::new(),
     };
     reader.import.settings_file = file;
@@ -209,6 +220,12 @@ struct Reader<'a> {
     docs: Vec<Doc>,
     /// The names of the site's own tags.
     own: Vec<String>,
+    /// Whether the templates define a component, which only Zola 0.23 and
+    /// later read.
+    later: bool,
+    /// Whether the templates hold a shortcode or a macro, which only
+    /// versions before 0.23 read.
+    earlier: bool,
     /// Zola's words taken off pages, each with the files it was on.
     dropped: Vec<(&'static str, Vec<String>)>,
 }
@@ -759,6 +776,7 @@ impl Reader<'_> {
                 Some((stem, "html" | "md")) => stem,
                 _ => continue,
             };
+            self.earlier = true;
             if !self.own.iter().any(|o| o == stem) {
                 self.own.push(stem.to_owned());
             }
@@ -766,7 +784,8 @@ impl Reader<'_> {
     }
 
     /// Learns the names of the components the templates in the folder
-    /// `dir`, and in every folder beneath it, define.
+    /// `dir`, and in every folder beneath it, define, and whether any
+    /// holds a macro.
     fn own_components(&mut self, dir: &str) {
         let Ok(names) = names_in(&self.path(dir)) else {
             return;
@@ -786,7 +805,9 @@ impl Reader<'_> {
             let Ok(template) = std::fs::read_to_string(self.path(&rel)) else {
                 continue;
             };
+            self.earlier |= writing::macros(&template);
             for component in writing::components(&template) {
+                self.later = true;
                 if !self.own.contains(&component) {
                     self.own.push(component);
                 }
@@ -1781,6 +1802,30 @@ impl Reader<'_> {
         }
     }
 
+    /// How Zola read the writing, by what the settings, the templates and
+    /// the writing show of the version that made the site. A sign of 0.23
+    /// or later is taken first, since what only it reads would have
+    /// stopped an earlier version; `raw` in the writing is the weakest,
+    /// since an earlier version shows it as written, where nobody would
+    /// have left it.
+    fn reading(&self) -> Reading {
+        let signs: Vec<writing::Signs> = (self.docs.iter())
+            .map(|doc| writing::signs(&doc.body))
+            .collect();
+        if self.s.skip_content_templating.is_some()
+            || self.later
+            || signs.iter().any(|signs| signs.component)
+        {
+            Reading::Template
+        } else if self.earlier || signs.iter().any(|signs| signs.shown) {
+            Reading::Tags
+        } else if signs.iter().any(|signs| signs.raw) {
+            Reading::Template
+        } else {
+            Reading::Unknown
+        }
+    }
+
     /// Converts each page's writing, once every page's address is known,
     /// and hands the pages, the snippets standing for tags, and the
     /// settings to the import.
@@ -1796,6 +1841,7 @@ impl Reader<'_> {
             .iter()
             .flat_map(|d| writing::paired(&d.body))
             .collect();
+        let reading = self.reading();
         let base = self
             .import
             .address
@@ -1823,7 +1869,9 @@ impl Reader<'_> {
                 _ => doc.address.clone(),
             }
         };
+        let skip = self.s.skip_content_templating.clone().unwrap_or_default();
         let cx = writing::Context {
+            reading,
             base: &base,
             refs: &refs,
             own: &self.own,
@@ -1834,6 +1882,11 @@ impl Reader<'_> {
         let mut calls = Vec::new();
         let mut written = Vec::new();
         for doc in &docs {
+            let reading = match reading {
+                Reading::Template if self.ignored(&skip, &doc.rel) => Reading::AsWritten,
+                reading => reading,
+            };
+            let cx = writing::Context { reading, ..cx };
             let converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
             self.import.findings.extend(converted.findings);
             calls.extend(converted.calls);

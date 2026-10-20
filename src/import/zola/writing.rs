@@ -8,18 +8,40 @@
 //! inside a code block or a code span is converted, but `{{/* name() */}}`,
 //! Zola's way of showing a tag as text, is the tag as text wherever it
 //! stands.
+//!
+//! Zola 0.23 and later run the whole writing as a template before reading
+//! it as Markdown: `raw` is taken out there and what it held left alone,
+//! inside code as anywhere, and every other piece of template code is
+//! told.
 
 use std::collections::HashSet;
 use std::ops::Range;
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
-use super::{CODE_OPTIONS, EMOJI, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT};
+use super::{CODE_OPTIONS, EMOJI, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE};
+use crate::import::liquid::{self, split_word};
 use crate::import::writing::Marked;
 use crate::import::{Finding, FindingKind, Spot};
 
+/// How Zola read a page's writing.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Reading {
+    /// Zola 0.23 and later: as a template, before Markdown.
+    Template,
+    /// Zola 0.23 and later, for a file `skip_content_templating` names:
+    /// nothing in it is run.
+    AsWritten,
+    /// Before 0.23: only Zola's own tags are run.
+    Tags,
+    /// As before 0.23, nothing in the old site saying which version made
+    /// it.
+    Unknown,
+}
+
 /// What the writing is converted with.
 pub struct Context<'a> {
+    pub reading: Reading,
     /// Whether the new site has the starter, whose snippets a call names
     /// or is kept clear of.
     pub starter: bool,
@@ -91,6 +113,8 @@ struct Written {
     form: Form,
     name: String,
     args: Vec<(String, Given)>,
+    /// Whether it is written as a component call.
+    component: bool,
 }
 
 /// The tag starting at `at`, where one does.
@@ -120,6 +144,7 @@ fn tag_at(text: &str, at: usize) -> Option<Written> {
             form: Form::Shown(format!("{open}{}{close}", &rest[i + 2..inner_end])),
             name: String::new(),
             args: Vec::new(),
+            component: false,
         });
     }
     skip(rest, &mut i);
@@ -133,6 +158,7 @@ fn tag_at(text: &str, at: usize) -> Option<Written> {
             form: Form::End,
             name: String::new(),
             args: Vec::new(),
+            component: false,
         });
     }
     if !rest[i..].starts_with('(') {
@@ -177,6 +203,7 @@ fn tag_at(text: &str, at: usize) -> Option<Written> {
         },
         name: name.to_owned(),
         args,
+        component: false,
     })
 }
 
@@ -197,6 +224,7 @@ fn component_at(rest: &str, at: usize, close: &str, mut i: usize) -> Option<Writ
             form: Form::End,
             name: name.to_owned(),
             args: Vec::new(),
+            component: true,
         });
     }
     let name = component_name(&rest[i..])?;
@@ -256,6 +284,7 @@ fn component_at(rest: &str, at: usize, close: &str, mut i: usize) -> Option<Writ
         },
         name: name.to_owned(),
         args,
+        component: true,
     })
 }
 
@@ -333,6 +362,136 @@ pub fn components(template: &str) -> Vec<String> {
         }
     }
     names
+}
+
+/// Whether `template` defines or loads a macro, which Zola 0.23's
+/// template reader refuses.
+pub fn macros(template: &str) -> bool {
+    let mut at = 0;
+    while let Some(found) = template[at..].find("{%") {
+        let mut i = at + found + 2;
+        at = i;
+        i += usize::from(template[i..].starts_with('-'));
+        skip(template, &mut i);
+        let word = ident(&template[i..]).unwrap_or_default();
+        if matches!(word, "macro" | "import")
+            && template[i + word.len()..].starts_with(char::is_whitespace)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// What a page's writing, outside code, shows of the version of Zola it
+/// was written for.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Signs {
+    /// A component call, which only 0.23 and later read.
+    pub component: bool,
+    /// `raw`, which only 0.23 and later take out.
+    pub raw: bool,
+    /// A tag shown as text, `{{/* name() */}}`, which only versions before
+    /// 0.23 read.
+    pub shown: bool,
+}
+
+pub fn signs(body: &str) -> Signs {
+    let code = code_ranges(body);
+    let mut signs = Signs::default();
+    let mut at = 0;
+    while let Some(found) = body[at..].find('{') {
+        let start = at + found;
+        at = start + 1;
+        if within(&code, start) {
+            continue;
+        }
+        if let Some((_, _, resume)) = raw_at(body, start) {
+            signs.raw = true;
+            at = resume;
+            continue;
+        }
+        let Some(tag) = tag_at(body, start) else {
+            continue;
+        };
+        signs.shown |= matches!(tag.form, Form::Shown(_));
+        signs.component |= tag.component;
+        at = tag.end;
+    }
+    signs
+}
+
+/// `raw` opening at `at` up to its `endraw`: where the writing before it
+/// ends, what it held, and where the writing after it starts.
+fn raw_at(body: &str, at: usize) -> Option<(usize, Range<usize>, usize)> {
+    if !body[at..].starts_with("{%") {
+        return None;
+    }
+    let (length, inner, _) = liquid::tag_at(body, at)?;
+    if split_word(&inner) != ("raw", "") {
+        return None;
+    }
+    liquid::raw(body, at, at + length, "endraw")
+}
+
+/// The length of the template code opening `text`, `{{ }}`, `{% %}` or
+/// `{# #}`, as Zola 0.23's template reader reads it, where it opens some.
+fn template_code(text: &str) -> Option<usize> {
+    let close = match text.get(..2)? {
+        "{{" => "}}",
+        "{%" => "%}",
+        "{#" => return Some(text[2..].find("#}")? + 4),
+        _ => return None,
+    };
+    let mut quote = None;
+    let mut chars = text.char_indices().skip(2);
+    while let Some((i, c)) = chars.next() {
+        match (quote, c) {
+            (Some(_), '\\') => {
+                chars.next();
+            }
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, '"' | '\'' | '`') => quote = Some(c),
+            (None, _) if text[i..].starts_with(close) => return Some(i + 2),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Whether the `{#` at `at` opens a heading's id, which Zola keeps from
+/// its template reader: the first `{#name}` on a line opening with `#` to
+/// `######` and a space.
+fn heading_id(text: &str, at: usize) -> bool {
+    let start = text[..at].rfind('\n').map_or(0, |i| i + 1);
+    let end = text[at..].find('\n').map_or(text.len(), |i| at + i);
+    let line = &text[start..end];
+    let indent = line.len() - line.trim_start_matches(' ').len();
+    let hashes = line[indent..].len() - line[indent..].trim_start_matches('#').len();
+    if indent > 3 || !(1..=6).contains(&hashes) || !line[indent + hashes..].starts_with(' ') {
+        return false;
+    }
+    let first = (indent + hashes + 1..line.len())
+        .filter(|i| line.is_char_boundary(*i))
+        .find(|i| id_at(&line[*i..]));
+    first == Some(at - start)
+}
+
+/// Whether `text` opens with `{#name}`, where the name holds no brace,
+/// and neither opens with a space or `#` nor ends with `#`.
+fn id_at(text: &str) -> bool {
+    let Some(rest) = text.strip_prefix("{#") else {
+        return false;
+    };
+    let Some(end) = rest.find(['{', '}']) else {
+        return false;
+    };
+    let name = &rest[..end];
+    rest[end..].starts_with('}')
+        && !name.starts_with(|c: char| c.is_whitespace() || c == '#')
+        && !name.ends_with('#')
+        && !name.is_empty()
 }
 
 fn skip(text: &str, at: &mut usize) {
@@ -513,10 +672,32 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
     let mut open: Vec<Open> = Vec::new();
     let mut copied = 0;
     let mut at = 0;
-    while let Some(found) = body[at..].find(['{']) {
+    while cx.reading != Reading::AsWritten
+        && let Some(found) = body[at..].find(['{'])
+    {
         let start = at + found;
+        if cx.reading == Reading::Template
+            && let Some((from, held, resume)) = raw_at(body, start)
+        {
+            out.push_str(&body[copied..from]);
+            out.push_str(&body[held]);
+            copied = resume;
+            at = resume;
+            continue;
+        }
         let Some(tag) = tag_at(body, start) else {
             at = start + 1;
+            let kind = match (cx.reading, within(&code, start)) {
+                (Reading::Template, true) => &TAG_IN_CODE,
+                (Reading::Template, false) => &TAG_LEFT,
+                (Reading::Unknown, _) => &TEMPLATE_CODE,
+                _ => continue,
+            };
+            let length = template_code(&body[start..]).filter(|_| !heading_id(body, start));
+            if let Some(length) = length {
+                findings.push(finding(kind, spot(start, &body[start..start + length])));
+                at = start + length;
+            }
             continue;
         };
         let written = &body[tag.start..tag.end];
@@ -905,6 +1086,7 @@ mod tests {
     fn private_use_characters_are_kept_and_never_taken_for_a_call() {
         let wrapping = HashSet::from(["aside".to_owned()]);
         let cx = Context {
+            reading: Reading::Tags,
             starter: true,
             base: "",
             refs: &|_| None,
@@ -948,6 +1130,129 @@ mod tests {
                 .collect();
             assert_eq!(lines, called, "{body:?}");
         }
+    }
+
+    fn converted(body: &str, reading: Reading) -> (String, Vec<(&'static str, String)>) {
+        let wrapping = HashSet::new();
+        let cx = Context {
+            reading,
+            starter: true,
+            base: "",
+            refs: &|_| None,
+            own: &[],
+            wrapping: &wrapping,
+            emoji: false,
+        };
+        let converted = convert(body, 1, "a.md", &cx);
+        let found = (converted.findings.into_iter())
+            .map(|f| (f.kind.heading, f.spots[0].text.clone()))
+            .collect();
+        (converted.writing, found)
+    }
+
+    #[test]
+    fn writing_run_as_a_template_loses_raw_and_tells_its_template_code() {
+        let body = "This is {{ page.title }}.\n\
+                    \n\
+                    {% raw %}\n\
+                    Shown: {{ x }}\n\
+                    {% endraw %}\n\
+                    \n\
+                    {% if true %}Text 1.{% endif %} {# a note #}\n\
+                    \n\
+                    ## Heading 1 {#id-1}\n\
+                    \n\
+                    `{{ \"}}\" }}` and {% raw %}{% x %}{% endraw %} as text.\n\
+                    \n\
+                    ```\n\
+                    {{ page.date }}\n\
+                    {% raw %}{{ y }}{% endraw %}\n\
+                    ```\n";
+        let (writing, found) = converted(body, Reading::Template);
+        assert_eq!(
+            writing,
+            "This is {{ page.title }}.\n\
+             \n\
+             Shown: {{ x }}\n\
+             \n\
+             {% if true %}Text 1.{% endif %} {# a note #}\n\
+             \n\
+             ## Heading 1 {#id-1}\n\
+             \n\
+             `{{ \"}}\" }}` and {% x %} as text.\n\
+             \n\
+             ```\n\
+             {{ page.date }}\n\
+             {{ y }}\n\
+             ```\n"
+        );
+        let left = TAG_LEFT.heading;
+        let in_code = TAG_IN_CODE.heading;
+        assert_eq!(
+            found,
+            [
+                (left, "{{ page.title }}".into()),
+                (left, "{% if true %}".into()),
+                (left, "{% endif %}".into()),
+                (left, "{# a note #}".into()),
+                (in_code, "{{ \"}}\" }}".into()),
+                (in_code, "{{ page.date }}".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn writing_not_run_as_a_template_keeps_raw() {
+        let body = "{% raw %}\n{{ page.title }}\n{% endraw %}\n\n{{ <youtube id=\"a\" /> }}\n";
+        // Zola before 0.23 showed both as written, and so does a file
+        // `skip_content_templating` names.
+        for reading in [Reading::Tags, Reading::AsWritten] {
+            let (writing, found) = converted(body, reading);
+            let expected = match reading {
+                Reading::Tags => body.replace("{{ <youtube id=\"a\" /> }}", "@youtube('a')"),
+                _ => body.to_owned(),
+            };
+            assert_eq!(writing, expected, "{reading:?}");
+            assert_eq!(found, [], "{reading:?}");
+        }
+        let (writing, found) = converted(body, Reading::Unknown);
+        assert_eq!(
+            writing,
+            body.replace("{{ <youtube id=\"a\" /> }}", "@youtube('a')")
+        );
+        let may = TEMPLATE_CODE.heading;
+        assert_eq!(
+            found,
+            [
+                (may, "{% raw %}".into()),
+                (may, "{{ page.title }}".into()),
+                (may, "{% endraw %}".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_heading_keeps_its_first_id_from_the_template_reader() {
+        let text = "## A {#a} {#b}\n#### {#c}\n####### {#d}\nText {#e}\n    ## {#f}\n## {# g}";
+        let ids: Vec<&str> = ["{#a}", "{#b}", "{#c}", "{#d}", "{#e}", "{#f}", "{# g}"]
+            .into_iter()
+            .filter(|id| heading_id(text, text.find(id).unwrap()))
+            .collect();
+        assert_eq!(ids, ["{#a}", "{#c}"]);
+    }
+
+    #[test]
+    fn the_writing_and_templates_show_which_zola_made_a_site() {
+        assert!(macros("{% import \"macros.html\" as m %}"));
+        assert!(macros("{%- macro a() -%}{%- endmacro -%}"));
+        assert!(!macros(
+            "{% component a() %}{% endcomponent %} {% macros %}"
+        ));
+        let later = signs("{{ <a /> }}\n\n`{{/* a() */}}`\n");
+        assert!(later.component && !later.shown && !later.raw);
+        // What `raw` holds is text whichever version read it.
+        let earlier = signs("{{/* a() */}}\n\n{% raw %}{{ <a /> }}{% endraw %}\n");
+        assert!(!earlier.component && earlier.shown && earlier.raw);
     }
 
     #[test]
