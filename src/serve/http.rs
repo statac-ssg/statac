@@ -15,6 +15,7 @@ use super::live::Hub;
 use super::server::Server;
 use super::server::model::{Body, HeaderValue, Method, Request, Response, StatusCode, header};
 use crate::content::address::on_the_wire;
+use crate::html::escaped;
 use crate::problem::{Kind, Problem, Unheard, system_reason};
 use crate::{platform, wording};
 
@@ -398,13 +399,6 @@ fn plain_page(base: &str, outside: bool) -> String {
         wording::NOT_FOUND_TITLE,
         wording::NOT_FOUND,
     )
-}
-
-fn escaped(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 /// The page with the live client in its head, or wherever it can go.

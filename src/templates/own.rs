@@ -18,6 +18,7 @@ use crate::content::words::PageWord;
 use crate::date::Date;
 use crate::dates::ShowDates;
 use crate::highlight::{self, Language};
+use crate::html::escaped;
 use crate::links::Attribute;
 use crate::lists::Filter;
 use crate::markdown::{Piece, PieceValue, closed_up, words_of};
@@ -375,7 +376,7 @@ fn webmention(shared: &Arc<Shared>, state: &State) -> Result<Value, Error> {
     Ok(Value::from_safe_string(match host {
         Some(host) => format!(
             "<link rel=\"webmention\" href=\"https://webmention.io/{}/webmention\">",
-            escape(&host)
+            escaped(&host)
         ),
         None => String::new(),
     }))
@@ -1120,7 +1121,7 @@ impl crate::markdown::Snippets for OfValue<'_> {
         _: crate::markdown::Placement,
         _: Option<&str>,
     ) -> String {
-        escape(self.sources.spelling(place))
+        escaped(self.sources.spelling(place))
     }
 
     fn writes(&self, piece: Piece) -> bool {
@@ -1168,20 +1169,6 @@ impl crate::markdown::Snippets for OfValue<'_> {
             }
         }
     }
-}
-
-fn escape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for c in text.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 /// A value's words: markup's are what a reader reads, its tags taken off

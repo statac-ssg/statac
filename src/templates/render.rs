@@ -1886,7 +1886,7 @@ impl markdown::Snippets for Prose<'_> {
             let Some(snippet) = shared.templates.snippets.get(name) else {
                 // In HTML, only a name the site has is a call.
                 if call.within != Within::Prose {
-                    return escape(shared.sources.spelling(place));
+                    return crate::html::text_escaped(shared.sources.spelling(place));
                 }
                 let nearest = crate::suggest::nearest(
                     name,
@@ -2094,19 +2094,6 @@ fn ends_in_an_extension(value: &str) -> bool {
             && (1..=5).contains(&extension.chars().count())
             && extension.chars().all(|c| c.is_ascii_alphanumeric())
     })
-}
-
-fn escape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for c in text.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 /// Builds a snippet with what a call handed it, and `page` and `site`,

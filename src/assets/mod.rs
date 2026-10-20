@@ -28,6 +28,7 @@ use std::path::{Path, PathBuf};
 use rayon::prelude::*;
 
 use crate::highlight;
+use crate::html::escaped;
 use crate::platform::{self, Alike, Unwritable};
 use crate::problem::{Hint, Kind, Named, Problem, Reach, system_reason};
 use crate::publish::Staging;
@@ -1000,20 +1001,6 @@ pub fn is_script(name: &str) -> bool {
 /// An address on another site, which a template may hand through as it is.
 fn elsewhere(name: &str) -> bool {
     name.starts_with("//") || name.contains("://")
-}
-
-fn escaped(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for c in text.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 #[cfg(test)]

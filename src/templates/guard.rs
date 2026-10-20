@@ -669,28 +669,6 @@ fn builtin_function(name: &str) -> Value {
     }
 }
 
-/// Writes text into HTML with the five characters that would be read as
-/// markup escaped, and nothing else: an address keeps its slashes.
-fn write_html(out: &mut minijinja::Output, text: &str) -> Result<(), Error> {
-    let mut rest = text;
-    while let Some(at) = rest.find(['&', '<', '>', '"', '\'']) {
-        out.write_str(&rest[..at])
-            .and_then(|()| {
-                out.write_str(match rest.as_bytes()[at] {
-                    b'&' => "&amp;",
-                    b'<' => "&lt;",
-                    b'>' => "&gt;",
-                    b'"' => "&quot;",
-                    _ => "&#x27;",
-                })
-            })
-            .map_err(|_| Error::from(ErrorKind::WriteFailure))?;
-        rest = &rest[at + 1..];
-    }
-    out.write_str(rest)
-        .map_err(|_| Error::from(ErrorKind::WriteFailure))
-}
-
 /// The escaping a template writing JSON prints with: each value written as
 /// a JSON value, markup and all.
 pub(super) const JSON: &str = "json";
@@ -737,7 +715,8 @@ pub(super) fn install(env: &mut Environment<'_>) {
                     let text = value
                         .as_str()
                         .map_or_else(|| value.to_string(), str::to_owned);
-                    write_html(out, &text)
+                    crate::html::escape_anywhere(&text, out)
+                        .map_err(|_| Error::from(ErrorKind::WriteFailure))
                 }
                 minijinja::AutoEscape::Custom(name) if name == JSON => {
                     let mut json = String::new();

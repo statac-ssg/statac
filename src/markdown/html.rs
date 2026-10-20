@@ -10,7 +10,7 @@ use super::node::{Alignment, Kind, Node};
 use super::opening::{self, Written, words_of};
 use super::pieces::{self, Piece, PieceValue};
 use crate::highlight::{self, Highlighter, Language};
-use crate::html::{Markup, PREFORMATTED, markup};
+use crate::html::{Markup, PREFORMATTED, escape, markup};
 use crate::source::{Place, Span};
 
 /// What writes a snippet call's HTML, and the pieces of the writing the
@@ -1225,22 +1225,6 @@ pub(super) fn comments_in(html: &str) -> Vec<Range<usize>> {
         .filter(|at| html[at.clone()].starts_with("<!--"))
         .take_while(|at| is_comment(&html[at.clone()]))
         .collect()
-}
-
-/// The four characters that would otherwise be read as HTML.
-pub(super) fn escape(text: &str, out: &mut String) {
-    let mut rest = text;
-    while let Some(at) = rest.find(['&', '<', '>', '"']) {
-        out.push_str(&rest[..at]);
-        out.push_str(match rest.as_bytes()[at] {
-            b'&' => "&amp;",
-            b'<' => "&lt;",
-            b'>' => "&gt;",
-            _ => "&quot;",
-        });
-        rest = &rest[at + 1..];
-    }
-    out.push_str(rest);
 }
 
 /// An address as an attribute carries it: what a URL may not hold

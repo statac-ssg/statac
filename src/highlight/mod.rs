@@ -26,6 +26,8 @@ use ferriki_textmate::{
     RawThemeSetting, RawThemeStyle, SyncRegistry, parse_raw_grammar,
 };
 
+use crate::html::escape;
+
 /// The name a template asks for the stylesheet by.
 pub const STYLESHEET: &str = "code.css";
 
@@ -650,22 +652,6 @@ pub fn plain(code: &str) -> String {
     let mut out = String::with_capacity(code.len());
     escape(code, &mut out);
     out
-}
-
-/// The four characters that would otherwise be read as HTML.
-fn escape(text: &str, out: &mut String) {
-    let mut rest = text;
-    while let Some(at) = rest.find(['&', '<', '>', '"']) {
-        out.push_str(&rest[..at]);
-        out.push_str(match rest.as_bytes()[at] {
-            b'&' => "&amp;",
-            b'<' => "&lt;",
-            b'>' => "&gt;",
-            _ => "&quot;",
-        });
-        rest = &rest[at + 1..];
-    }
-    out.push_str(rest);
 }
 
 /// The stylesheet for the style `code_style` names; none for a name that

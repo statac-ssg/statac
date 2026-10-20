@@ -1,7 +1,9 @@
 //! HTML read as a browser's tokenizer reads it, far enough to find its
 //! tags and their attributes: comments, and the text of elements such as
-//! `<script>` and `<textarea>`, hold no markup.
+//! `<script>` and `<textarea>`, hold no markup. And text escaped to stand
+//! in HTML.
 
+use std::fmt;
 use std::ops::Range;
 
 /// A start or end tag as the tokenizer reads it.
@@ -286,6 +288,49 @@ pub(crate) fn addresses(value: &str, srcset: bool, at: usize) -> Vec<(&str, usiz
     found
 }
 
+/// `text` to stand between tags, with `&`, `<` and `>` escaped.
+pub(crate) fn text_escaped(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    escape_each(text, &['&', '<', '>'], &mut out).expect("writing to a string can't fail");
+    out
+}
+
+/// Writes `text` into `out` to stand between tags or in an attribute's
+/// double quotes, with `&`, `<`, `>` and `"` escaped.
+pub(crate) fn escape(text: &str, out: &mut String) {
+    escape_each(text, &['&', '<', '>', '"'], out).expect("writing to a string can't fail");
+}
+
+/// `text` as [`escape`] writes it.
+pub(crate) fn escaped(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    escape(text, &mut out);
+    out
+}
+
+/// Writes `text` into `out` to stand between tags or in an attribute in
+/// either quotes, with `&`, `<`, `>`, `"` and `'` escaped and nothing
+/// else: an address keeps its slashes.
+pub(crate) fn escape_anywhere(text: &str, out: &mut impl fmt::Write) -> fmt::Result {
+    escape_each(text, &['&', '<', '>', '"', '\''], out)
+}
+
+fn escape_each(text: &str, marks: &[char], out: &mut impl fmt::Write) -> fmt::Result {
+    let mut rest = text;
+    while let Some(at) = rest.find(marks) {
+        out.write_str(&rest[..at])?;
+        out.write_str(match rest.as_bytes()[at] {
+            b'&' => "&amp;",
+            b'<' => "&lt;",
+            b'>' => "&gt;",
+            b'"' => "&quot;",
+            _ => "&#x27;",
+        })?;
+        rest = &rest[at + 1..];
+    }
+    out.write_str(rest)
+}
+
 /// Stands for a character reference Statac can't decode.
 pub(crate) const ANY: char = '\u{FFFF}';
 
@@ -379,4 +424,19 @@ pub(crate) fn next(b: &[u8], wanted: u8, from: usize) -> Option<usize> {
         .iter()
         .position(|&c| c == wanted)
         .map(|i| from + i)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_escaper_escapes_its_own_characters() {
+        let text = "a & b < c > d \" e ' f/g";
+        assert_eq!(text_escaped(text), "a &amp; b &lt; c &gt; d \" e ' f/g");
+        assert_eq!(escaped(text), "a &amp; b &lt; c &gt; d &quot; e ' f/g");
+        let mut out = String::new();
+        escape_anywhere(text, &mut out).unwrap();
+        assert_eq!(out, "a &amp; b &lt; c &gt; d &quot; e &#x27; f/g");
+    }
 }

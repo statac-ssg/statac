@@ -11,13 +11,13 @@ use pulldown_cmark::{
 };
 
 use super::call::{IN_SITE, Within};
-use super::html::{escape, escape_href};
+use super::html::escape_href;
 use super::mask::{self, Masked, OPEN, Piece, TokenKind, Wrapping};
 use super::node::{Alignment, CalloutKind, Kind, Node};
 use super::typography::SETS;
 use super::unmatched::{Block, Elements, Told};
 use super::{Definition, Document, InSite, controls};
-use crate::html::{RAW_TEXT, comment_close, end_tag};
+use crate::html::{RAW_TEXT, comment_close, end_tag, escape};
 use crate::problem::{Kind as ProblemKind, Problem};
 use crate::source::{Place, SourceId, Span};
 

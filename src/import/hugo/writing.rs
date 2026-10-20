@@ -14,6 +14,7 @@ use super::{
     ATTRIBUTE_LINES, CODE_OPTIONS, EMOJI, FIGURE_HTML, LINK_NOWHERE, RAW_HTML, SUMMARY_CUT,
     TAG_IN_ADDRESS, TAG_IN_CODE, TAG_LEFT,
 };
+use crate::html::escaped;
 use crate::import::common::{emoji_names, ends_line, opens_line};
 use crate::import::liquid::{code_ranges, finding, options, quoted, within};
 use crate::import::writing::Marked;
@@ -615,14 +616,6 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
         plainer,
         valued,
     }
-}
-
-/// `text` made safe to stand in HTML.
-fn escaped(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 /// What became of a `figure`.
