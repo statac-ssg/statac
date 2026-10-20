@@ -24,14 +24,19 @@ pub const LIVE: &str = "/.statac-live/";
 
 const CLIENT: &str = include_str!("client.js");
 
-/// What stands in the client for the panel's words, which serve puts in
-/// its place.
+/// What stands in the client for the panel's words, and for the ways it
+/// offers to write a name, which serve puts in their places.
 const WORDS: &str = "/* the panel's words */ {}";
+const WAYS: &str = "/* the ways to write a name */ {}";
 
-/// The client, with the panel's words in it.
+/// The client, with the panel's words and ways in it.
 fn client() -> &'static str {
     static CLIENT_WITH_WORDS: OnceLock<String> = OnceLock::new();
-    CLIENT_WITH_WORDS.get_or_init(|| CLIENT.replacen(WORDS, super::panel::words(), 1))
+    CLIENT_WITH_WORDS.get_or_init(|| {
+        CLIENT
+            .replacen(WORDS, super::panel::words(), 1)
+            .replacen(WAYS, super::panel::ways(), 1)
+    })
 }
 
 /// How long a request is held before it is answered with nothing new.
@@ -1175,11 +1180,13 @@ mod tests {
         // Nothing has been built yet for there to be anything to say.
         assert_eq!(
             answer.body,
-            "{\"v\":2,\"problems\":[],\"stopped\":null,\"explanations\":{},\"round\":null,\
+            "{\"v\":3,\"problems\":[],\"stopped\":null,\"explanations\":{},\"round\":null,\
              \"rounds\":[],\
              \"site\":{\"kinds\":[],\"gone\":null,\"drafts\":[],\"waiting\":[],\"written\":[]},\
              \"root\":null,\"page\":null,\"names\":[]}"
         );
+        let answer = get(&site, "/.statac-live/search?words=post");
+        assert_eq!(answer.body, "{\"v\":3,\"drafts\":false,\"languages\":null}");
     }
 
     #[test]
@@ -1189,6 +1196,8 @@ mod tests {
         let client = get(&site, "/.statac-live/client.js");
         assert_eq!(client.kind, "text/javascript; charset=utf-8");
         assert!(!client.body.contains(WORDS), "the words stand in its place");
+        let ways = format!("const ways = {};", super::super::panel::ways());
+        assert!(client.body.contains(&ways), "{}", client.body);
         assert!(
             client.body.contains(
                 "const words = {\"name\":[{\"text\":\"Statac\"}],\
@@ -1240,7 +1249,7 @@ mod tests {
             );
             // Nothing has been built yet for there to be any.
             assert_eq!(
-                answer.body, "{\"v\":2,\"problems\":[],\"more\":0,\"explanations\":{}}",
+                answer.body, "{\"v\":3,\"problems\":[],\"more\":0,\"explanations\":{}}",
                 "{target}"
             );
         }

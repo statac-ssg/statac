@@ -627,7 +627,7 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     let plain = panel(&served, "/post-1/");
     assert!(
         plain.starts_with(
-            "{\"v\":2,\"problems\":[],\"stopped\":null,\"explanations\":{},\
+            "{\"v\":3,\"problems\":[],\"stopped\":null,\"explanations\":{},\
              \"round\":{\"state\":\"built\",\"at\":\""
         ) && plain.contains("\"counts\":{\"error\":0,\"warning\":1,\"note\":1}}")
             && plain.contains(
@@ -656,9 +656,9 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
             "\"layout\":{\"name\":\"page\",\"file\":\"templates/page.html\",\"extends\":[],\
              \"chosenAt\":null,\"handedDown\":false}"
         ) && plain.contains(
-            "{\"name\":\"page.summary\",\"holds\":\"text\",\"value\":\"no value\",\
+            "{\"name\":\"page.summary\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"no value\",\
              \"empty\":true,\"has\":[],\"from\":null,"
-        ) && plain.contains("{\"name\":\"page.url\",\"holds\":\"text\",\"value\":\"/post-1/\","),
+        ) && plain.contains("{\"name\":\"page.url\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"/post-1/\","),
         "{plain}"
     );
     let draft = panel(&served, "/post-2/");
@@ -795,7 +795,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     for asked in ["", "?kind=broken-link"] {
         let every = served.page(&format!("/.statac-live/problems{asked}"));
         assert!(
-            every.starts_with(&format!("{{\"v\":2,\"problems\":[{link},{template}"))
+            every.starts_with(&format!("{{\"v\":3,\"problems\":[{link},{template}"))
                 && every
                     .contains("\"quietened\":true}],\"more\":0,\"explanations\":{\"broken-link\":"),
             "{asked}: {every}"
@@ -803,7 +803,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     }
     assert_eq!(
         served.page("/.statac-live/problems?kind=unknown-word"),
-        "{\"v\":2,\"problems\":[],\"more\":0,\"explanations\":{}}"
+        "{\"v\":3,\"problems\":[],\"more\":0,\"explanations\":{}}"
     );
 
     // A round that stops has every error in its parts, and the page's
@@ -969,30 +969,30 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
     // A call is written with its brackets, empty where it takes nothing.
     assert!(
         post.contains(
-            "{\"name\":\"page.audio\",\"written\":\"page.audio(\u{2026})\",\"holds\":\"call\",\
+            "{\"name\":\"page.audio\",\"written\":\"page.audio(\u{2026})\",\"kind\":\"call\",\"holds\":\"call\",\
              \"value\":\"called, not shown\","
         ) && post.contains(
-            "{\"name\":\"page.search_box\",\"written\":\"page.search_box()\",\"holds\":\"call\","
+            "{\"name\":\"page.search_box\",\"written\":\"page.search_box()\",\"kind\":\"call\",\"holds\":\"call\","
         ),
         "{post}"
     );
     // What the layout writes, and what it doesn't, with the line each
     // value is written on.
-    let title = "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Post 3\",\
+    let title = "{\"name\":\"page.title\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"Post 3\",\
         \"empty\":false,\"has\":[],\"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2,\
         \"excerpt\":[{\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Post 3\"}]}]},\
         \"used\":true}";
     assert!(
         post.contains(title)
             && post.contains(
-                "{\"name\":\"page.date\",\"holds\":\"date\",\"value\":\"3 October 2026\",\
+                "{\"name\":\"page.date\",\"kind\":\"date\",\"holds\":\"date\",\"value\":\"3 October 2026\",\
                  \"empty\":false,\"has\":[\"day\",\"month\",\"weekday\",\"year\"],\
                  \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":3,\"excerpt\":[\
                  {\"line\":3,\"text\":[{\"text\":\"date: \"},{\"mark\":\"2026-10-03\"}]}]},\
                  \"used\":false}"
             )
             && post.contains(
-                "{\"name\":\"page.summary\",\"holds\":\"text\",\"value\":\"no value\",\
+                "{\"name\":\"page.summary\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"no value\",\
                  \"empty\":true,\"has\":[],\"from\":null,\"used\":false}"
             ),
         "{post}"
@@ -1000,7 +1000,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
     // Answered from the same writing, but asked for only as itself.
     let used = |name: &str, value: &str, used: bool| {
         format!(
-            "{{\"name\":\"page.{name}\",\"holds\":\"HTML\",\"value\":\"{value}\",\
+            "{{\"name\":\"page.{name}\",\"kind\":\"html\",\"holds\":\"HTML\",\"value\":\"{value}\",\
              \"empty\":false,\"has\":[],\"from\":null,\"used\":{used}}}"
         )
     };
@@ -1042,11 +1042,11 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
              \"reads\":{\"files\":[\"assets/site.css\",\"content/posts/index.md\",\
              \"statac.yaml\",\"templates/page.html\"],\"also\":[]}}"
         ) && list.contains(
-            "{\"name\":\"page.title\",\"holds\":\"text\",\"value\":\"Posts\",\"empty\":false,\
+            "{\"name\":\"page.title\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"Posts\",\"empty\":false,\
              \"has\":[],\"from\":{\"file\":\"content/posts/index.md\",\"line\":2,\"excerpt\":[\
              {\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Posts\"}]}]},\"used\":true}"
         ) && list.contains(
-            "{\"name\":\"page.posts\",\"holds\":\"pages\",\"value\":\"3 pages\",\
+            "{\"name\":\"page.posts\",\"kind\":\"pages\",\"holds\":\"pages\",\"value\":\"3 pages\",\
              \"empty\":false,\"has\":[],\"from\":null,\"used\":false}"
         ),
         "{list}"
@@ -1136,7 +1136,7 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
     let draft = search(&served, "draft", "/post-1/");
     assert!(
         draft.starts_with(
-            "{\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":1,\"some\":false,\
+            "{\"v\":3,\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":1,\"some\":false,\
              \"suggestion\":null,\"parts\":4,\"average\":2.5,\"results\":[\
              {\"title\":\"Post 2\",\"day\":null,\"heading\":null,\"href\":\"/post-2/\",\
              \"file\":\"content/post-2.md\",\"draft\":true,\"waiting\":null,\
@@ -1181,7 +1181,7 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
     let blank = search(&served, "%20%20", "/post-1/");
     assert_eq!(
         blank,
-        "{\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":0,\"some\":false,\
+        "{\"v\":3,\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":0,\"some\":false,\
          \"suggestion\":null,\"parts\":0,\"average\":0,\"results\":[]}]}"
     );
 }

@@ -3907,6 +3907,13 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("errors", Counted("{n} error", "{n} errors")),
         ("warnings", Counted("{n} warning", "{n} warnings")),
         ("notes", Counted("{n} note", "{n} notes")),
+        // The tab, where serve answers in a way the page can't read.
+        ("serveChanged", said("Serve has changed")),
+        ("reload", said("Reload the page")),
+        (
+            "reloadLabel",
+            said("Statac: serve has changed. Reload the page"),
+        ),
         // The summary the tab shows under a pointer or focus.
         ("builtAt", said("Built at {time}")),
         ("stoppedAt", said("Build stopped at {time}")),

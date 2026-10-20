@@ -10,6 +10,9 @@
   let seen = Number(script.dataset.live);
   const channel = "BroadcastChannel" in self ? new BroadcastChannel("statac-live") : null;
   const kept = "statac-live-panel";
+  // The version of serve's answers this script reads. A page loaded from
+  // one Statac can be answered by another, once serve is started anew.
+  const understood = 3;
 
   // Every word the panel puts together itself, from serve: each the pieces
   // of a sentence, or for a count, those said of one and of many.
@@ -927,6 +930,8 @@
   let building = false;
   let hidden = false;
   let site = null;
+  // Whether serve's last answer was in a version this script doesn't read.
+  let unread = false;
   const view = {
     scope: "page",
     shown: { error: true, warning: true, note: true },
@@ -982,7 +987,7 @@
 
   const place = () => {
     if (!host.isConnected && document.body) document.body.append(host);
-    layer.hidden = hidden || !panel?.round;
+    layer.hidden = hidden || !(panel?.round || unread);
     if (layer.hidden) {
       room();
       return;
@@ -1017,6 +1022,10 @@
   // The tab.
 
   const drawTab = () => {
+    if (unread) {
+      drawUnread();
+      return;
+    }
     const parts = [mark()];
     const label = [];
     const halted = stopped();
@@ -1090,6 +1099,30 @@
     bar.hidden = corner || settings.open;
   };
 
+  // Where serve answers in a version this script doesn't read, the tab
+  // alone is shown, and reloading the page brings the script that does.
+  const drawUnread = () => {
+    card.hidden = true;
+    summary.hidden = true;
+    drawer.hidden = true;
+    const corner = settings.sits !== "bar";
+    for (const [opener, name, shown] of [
+      [tab, "tab", corner],
+      [bar, "bar", !corner],
+    ]) {
+      opener.className = `${name} stopped`;
+      refill(
+        opener,
+        mark(),
+        make("strong", {}, told("serveChanged")),
+        make("span", { class: "rule" }),
+        make("span", {}, told("reload")),
+      );
+      opener.setAttribute("aria-label", told("reloadLabel"));
+      opener.hidden = !shown;
+    }
+  };
+
   // What the tab says under a pointer or focus.
 
   const drawSummary = () => {
@@ -1143,7 +1176,8 @@
   let summaryTimer = 0;
   const showSummary = (wanted) => {
     clearTimeout(summaryTimer);
-    const able = wanted && !settings.open && card.hidden && panel?.round && settings.sits !== "bar";
+    const able =
+      wanted && !settings.open && card.hidden && panel?.round && !unread && settings.sits !== "bar";
     if (!able) {
       summaryTimer = setTimeout(() => (summary.hidden = true), wanted === false ? 120 : 0);
       return;
@@ -1756,8 +1790,9 @@
     if (wanted) tabs[settings.tab].focus();
     else visibleOpener().focus();
   };
-  tab.addEventListener("click", () => show(true, true));
-  bar.addEventListener("click", () => show(true, true));
+  const opened = () => (unread ? location.reload() : show(true, true));
+  tab.addEventListener("click", opened);
+  bar.addEventListener("click", opened);
 
   const openOn = (name) => {
     settings.tab = name;
@@ -1797,7 +1832,7 @@
     fetch(new URL("problems", live), { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then((answer) => {
-        if (asked !== version || !answer) return;
+        if (asked !== version || !answer || !readable(answer)) return;
         site = { version, answer };
         if (settings.open && settings.tab === "problems") drawPane();
       })
@@ -2034,44 +2069,12 @@
 
   // Names.
 
-  // Ways a template can write a name, by what it holds, each with what
-  // it is for. `{name}` stands for the name.
-  const ways = {
-    date: [
-      ["{{ {name} }}", "wayAsWritten"],
-      ['{{ {name} | date("2025") }}', "wayYear"],
-      ['<time datetime="{{ {name} | moment }}">{{ {name} }}</time>', "wayTime"],
-    ],
-    list: [
-      ["{% for post in {name}.posts %}\n  {{ headline(post) }}\n{% endfor %}", "wayEachPost"],
-      ['<a href="{{ {name}.url }}">{{ {name}.title }}</a>', "wayLink"],
-    ],
-    items: [["{% for item in {name} %}\n  ...\n{% endfor %}", "wayEachItem"]],
-    lists: [
-      [
-        '{% for list in {name} %}\n  <a href="{{ list.url }}">{{ list.name }}</a>\n{% endfor %}',
-        "wayEachList",
-      ],
-    ],
-    pages: [["{% for post in {name} %}\n  {{ headline(post) }}\n{% endfor %}", "wayEachPage"]],
-    page: [
-      [
-        '{% if {name} %}\n  <a href="{{ {name}.url }}">{{ headline({name}) }}</a>\n{% endif %}',
-        "wayLinkIf",
-      ],
-    ],
-    "true or false": [["{% if {name} %}\n  ...\n{% endif %}", "wayTrue"]],
-    HTML: [["{{ {name} }}", "wayHtml"]],
-    webmentions: [["{% for face in {name}.faces %}\n  ...\n{% endfor %}", "wayFaces"]],
-    "": [["{% if {name} %}{{ {name} }}{% endif %}", "wayHasOne"]],
-    text: [["{{ {name} }}", "wayAsIs"]],
-    number: [["{{ {name} }}", "wayAsIs"]],
-  };
-  const waysOf = (row) => {
-    // A Statac list answers `.posts`; any other list is of plain items.
-    const holds = row.holds === "list" && !row.has.includes("posts") ? "items" : row.holds;
-    return (ways[holds] || []).map(([code, said]) => [code.replaceAll("{name}", row.name), said]);
-  };
+  // Ways a template can write a name, by the kind of thing it holds, from
+  // serve: each the template, with `{name}` standing for the name, and the
+  // word for what it is for.
+  const ways = /* the ways to write a name */ {};
+  const waysOf = (row) =>
+    (ways[row.kind] || []).map(([code, said]) => [code.replaceAll("{name}", row.name), said]);
   const expression = (name) => `{{ ${name} }}`;
 
   const drawNames = () => {
@@ -2211,7 +2214,7 @@
     );
     const value = make(
       "td",
-      { class: row.empty || row.holds === "call" ? "value none" : "value" },
+      { class: row.empty || row.kind === "call" ? "value none" : "value" },
       row.value,
     );
     value.title = row.value;
@@ -2389,7 +2392,7 @@
       .then((response) => (response.ok ? response.json() : null))
       .then((answer) => {
         // A later search has begun, and its answer is the one to show.
-        if (mine !== searched.asked || !answer) return;
+        if (mine !== searched.asked || !answer || !readable(answer)) return;
         Object.assign(searched, { answer, words });
         searched.drawn += 1;
         if (settings.open && settings.tab === "search") drawPane();
@@ -3204,7 +3207,7 @@
   addEventListener(
     "keydown",
     (event) => {
-      if (hidden || !panel?.round || view.capturing) return;
+      if (hidden || !panel?.round || unread || view.capturing) return;
       const path = event.composedPath();
       const inside = path.includes(host);
       const target = path[0];
@@ -3242,8 +3245,20 @@
 
   // Drawing what serve said.
 
+  // An answer in a version this script doesn't read is never drawn.
+  const readable = (answer) => {
+    if (answer.v === understood) return true;
+    unread = true;
+    arrange();
+    place();
+    if (!layer.hidden) drawTab();
+    room();
+    return false;
+  };
+
   const draw = (answer) => {
     panel = answer;
+    unread = false;
     version += 1;
     if (!panel.stopped) view.error = 0;
     if (view.name && !named(view.name)) view.name = null;
@@ -3261,7 +3276,9 @@
     try {
       const page = encodeURIComponent(location.pathname);
       const response = await fetch(new URL(`panel?page=${page}`, live), { cache: "no-store" });
-      if (response.ok) draw(await response.json());
+      if (!response.ok) return;
+      const answer = await response.json();
+      if (readable(answer)) draw(answer);
     } catch {}
   };
 

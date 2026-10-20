@@ -131,8 +131,9 @@ impl On<'_> {
             _ => String::new(),
         };
         format!(
-            "{{\"name\":{}{written},\"holds\":{},\"value\":{},\"empty\":{},\"has\":[{}],\"from\":{},\"used\":{used}}}",
+            "{{\"name\":{}{written},\"kind\":\"{}\",\"holds\":{},\"value\":{},\"empty\":{},\"has\":[{}],\"from\":{},\"used\":{used}}}",
             json::string(&shown(&row.name)),
+            kind(row.holds),
             json::string(wording::panel_holds(row.holds)),
             json::string(&value(row)),
             row.held == Held::Nothing,
@@ -293,5 +294,77 @@ pub(super) fn value(row: &Row) -> String {
         Held::Call => wording::PANEL_A_CALL.to_owned(),
         Held::More(more) => wording::panel_more_fields(*more),
         Held::Nothing => wording::PANEL_NO_VALUE.to_owned(),
+    }
+}
+
+/// What a name holds, by the name the panel's script knows it by, which
+/// stays put however the words shown for it change.
+pub(super) fn kind(holds: Holds) -> &'static str {
+    match holds {
+        Holds::Text => "text",
+        Holds::Html => "html",
+        Holds::Number => "number",
+        Holds::Truth => "truth",
+        Holds::Date => "date",
+        Holds::Page => "page",
+        Holds::Pages => "pages",
+        Holds::List => "list",
+        Holds::Lists => "lists",
+        Holds::Items => "items",
+        Holds::Fields => "fields",
+        Holds::Mentions => "mentions",
+        Holds::Call => "call",
+        Holds::Unknown => "unknown",
+    }
+}
+
+/// Ways a template can write a name holding `holds`, each the template,
+/// with `{name}` standing for the name, and the panel's word for what it
+/// is for.
+pub(super) fn ways(holds: Holds) -> &'static [(&'static str, &'static str)] {
+    match holds {
+        Holds::Date => &[
+            ("{{ {name} }}", "wayAsWritten"),
+            ("{{ {name} | date(\"2025\") }}", "wayYear"),
+            (
+                "<time datetime=\"{{ {name} | moment }}\">{{ {name} }}</time>",
+                "wayTime",
+            ),
+        ],
+        Holds::List => &[
+            (
+                "{% for post in {name}.posts %}\n  {{ headline(post) }}\n{% endfor %}",
+                "wayEachPost",
+            ),
+            (
+                "<a href=\"{{ {name}.url }}\">{{ {name}.title }}</a>",
+                "wayLink",
+            ),
+        ],
+        Holds::Items => &[(
+            "{% for item in {name} %}\n  ...\n{% endfor %}",
+            "wayEachItem",
+        )],
+        Holds::Lists => &[(
+            "{% for list in {name} %}\n  <a href=\"{{ list.url }}\">{{ list.name }}</a>\n{% endfor %}",
+            "wayEachList",
+        )],
+        Holds::Pages => &[(
+            "{% for post in {name} %}\n  {{ headline(post) }}\n{% endfor %}",
+            "wayEachPage",
+        )],
+        Holds::Page => &[(
+            "{% if {name} %}\n  <a href=\"{{ {name}.url }}\">{{ headline({name}) }}</a>\n{% endif %}",
+            "wayLinkIf",
+        )],
+        Holds::Truth => &[("{% if {name} %}\n  ...\n{% endif %}", "wayTrue")],
+        Holds::Html => &[("{{ {name} }}", "wayHtml")],
+        Holds::Mentions => &[(
+            "{% for face in {name}.faces %}\n  ...\n{% endfor %}",
+            "wayFaces",
+        )],
+        Holds::Unknown => &[("{% if {name} %}{{ {name} }}{% endif %}", "wayHasOne")],
+        Holds::Text | Holds::Number => &[("{{ {name} }}", "wayAsIs")],
+        Holds::Fields | Holds::Call => &[],
     }
 }

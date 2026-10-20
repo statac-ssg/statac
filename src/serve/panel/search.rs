@@ -3,7 +3,7 @@
 
 use rayon::prelude::*;
 
-use super::Built;
+use super::{Built, VERSION};
 use crate::content::address::on_the_wire;
 use crate::json;
 use crate::report::{Report, shown};
@@ -26,7 +26,7 @@ pub(super) fn found(
     file: Option<&str>,
 ) -> String {
     let Some(read) = &built.read else {
-        return format!("{{\"drafts\":{drafts},\"languages\":null}}");
+        return format!("{{\"v\":{VERSION},\"drafts\":{drafts},\"languages\":null}}");
     };
     let site = read.renderer.site();
     let mut languages: Vec<LanguageId> = site.languages.iter().map(|(id, _)| id).collect();
@@ -50,7 +50,7 @@ pub(super) fn found(
         })
         .collect();
     format!(
-        "{{\"drafts\":{drafts},\"languages\":[{}]}}",
+        "{{\"v\":{VERSION},\"drafts\":{drafts},\"languages\":[{}]}}",
         languages.join(",")
     )
 }

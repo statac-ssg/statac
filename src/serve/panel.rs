@@ -22,6 +22,7 @@ use crate::content::address::on_the_wire;
 use crate::json;
 use crate::problem::{Code, Kind, Problem, Severity};
 use crate::report::{Piece, Quiet, Report, pieces, shown};
+use crate::templates::Holds;
 use crate::wording::{self, PanelWord};
 use problems::{Addresses, Parts};
 
@@ -29,6 +30,10 @@ use problems::{Addresses, Parts};
 const MOST: usize = 200;
 /// How many rounds the panel keeps.
 const ROUNDS: usize = 10;
+/// The version of every answer the panel's script reads. A page loaded
+/// from one Statac can be answered by another, whose answers its script
+/// may not read.
+const VERSION: u32 = 3;
 
 /// What the panel shows after one round.
 #[derive(Default)]
@@ -236,7 +241,7 @@ impl Panel {
     pub fn problems(&self, kind: Option<&str>) -> String {
         let built = &self.built;
         let Some(read) = &built.read else {
-            return "{\"v\":2,\"problems\":[],\"more\":0,\"explanations\":{}}".to_owned();
+            return format!("{{\"v\":{VERSION},\"problems\":[],\"more\":0,\"explanations\":{{}}}}");
         };
         let report = Report::new(read.renderer.sources(), &built.site, false);
         let of_kind = |problem: &&Problem| kind.is_none_or(|kind| problem.kind.name() == kind);
@@ -246,7 +251,7 @@ impl Panel {
         let parts = built.parts(&report, read);
         let problems: Vec<String> = told.iter().map(|problem| parts.of(problem)).collect();
         format!(
-            "{{\"v\":2,\"problems\":[{}],\"more\":{more},\"explanations\":{}}}",
+            "{{\"v\":{VERSION},\"problems\":[{}],\"more\":{more},\"explanations\":{}}}",
             problems.join(","),
             problems::explanations(told.iter().map(|problem| problem.kind.code())),
         )
@@ -279,7 +284,7 @@ impl Panel {
             names = on.names();
         }
         format!(
-            "{{\"v\":2,{},\"page\":{facts},\"names\":{names}}}",
+            "{{\"v\":{VERSION},{},\"page\":{facts},\"names\":{names}}}",
             self.parts(page),
         )
     }
@@ -451,4 +456,120 @@ pub fn words() -> &'static str {
             .collect();
         format!("{{{}}}", words.join(","))
     })
+}
+
+/// Every way the panel offers to write a name, as a JSON object of each
+/// kind of thing a name holds, by the kind's name, and that kind's ways:
+/// each the template and the name of the word for what it is for.
+pub fn ways() -> &'static str {
+    static WAYS: OnceLock<String> = OnceLock::new();
+    WAYS.get_or_init(|| {
+        let kinds: Vec<String> = (Holds::ALL.into_iter())
+            .map(|holds| {
+                let ways: Vec<String> = (page::ways(holds).iter())
+                    .map(|(code, word)| format!("[{},{}]", json::string(code), json::string(word)))
+                    .collect();
+                format!("\"{}\":[{}]", page::kind(holds), ways.join(","))
+            })
+            .collect();
+        format!("{{{}}}", kinds.join(","))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::templates::{Held, Renderer, Row};
+
+    const CLIENT: &str = include_str!("client.js");
+
+    #[test]
+    fn every_kind_of_name_is_named_apart_and_has_its_ways_in_the_script() {
+        let ways = ways();
+        let mut kinds = HashSet::new();
+        for holds in Holds::ALL {
+            let kind = page::kind(holds);
+            assert!(kinds.insert(kind), "{kind}");
+            assert!(ways.contains(&format!("\"{kind}\":[")), "{kind}");
+            for (_, word) in page::ways(holds) {
+                assert!(words().contains(&format!("\"{word}\":")), "{word}");
+            }
+        }
+        // Every kind the script asks after is one the panel sends.
+        let asking = "row.kind === \"";
+        assert!(CLIENT.contains(asking));
+        for (at, _) in CLIENT.match_indices(asking) {
+            let kind = &CLIENT[at + asking.len()..];
+            let kind = &kind[..kind.find('"').unwrap()];
+            assert!(kinds.contains(kind), "{kind}");
+        }
+        assert!(CLIENT.contains(&format!("const understood = {VERSION};")));
+    }
+
+    #[test]
+    fn every_way_offered_is_one_a_template_can_write() {
+        let root = std::env::temp_dir().join(format!("statac-panel-ways-{}", std::process::id()));
+        let write = |path: &str, text: &str| {
+            let path = root.join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        let _ = std::fs::remove_dir_all(&root);
+        write(
+            "statac.yaml",
+            "language: en\ntitle: Site\ntimezone: UTC\npages.feed: false\n",
+        );
+        write(
+            "content/blog/index.md",
+            "---\ntitle: Blog\npages.layout: post\n---\n",
+        );
+        write(
+            "content/blog/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-10-01\ntags: [Rust]\n---\nSome writing.\n",
+        );
+        write(
+            "content/blog/post-2.md",
+            "---\ntitle: Post 2\ndate: 2026-10-02\n---\n",
+        );
+        for name in ["home", "folder", "page", "post"] {
+            write(&format!("templates/{name}.html"), "{{ page.title }}");
+        }
+        let today = Some(crate::date::Date::day_only(2026, 10, 4));
+        let post = |renderer: &Renderer| {
+            (renderer.site().pages.iter())
+                .find(|(_, page)| page.address.as_str() == "/blog/post-1/")
+                .map(|(id, _)| id)
+                .unwrap()
+        };
+
+        // A name of each kind, one holding a value on the page where there
+        // is one, written every way the panel offers for its kind.
+        let (renderer, _) = crate::build::renderer(&root, today);
+        let explained = renderer.explained(post(&renderer), 1);
+        let rows: Vec<&Row> = (explained.groups.iter())
+            .flat_map(|group| &group.rows)
+            .collect();
+        let mut template = String::new();
+        for holds in Holds::ALL {
+            let of_kind = || rows.iter().filter(|row| row.holds == holds);
+            let row = (of_kind().find(|row| row.held != Held::Nothing))
+                .or_else(|| of_kind().next())
+                .unwrap_or_else(|| panic!("no name holds {holds:?}"));
+            for (code, _) in page::ways(holds) {
+                template.push_str(&code.replace("{name}", &row.name));
+                template.push('\n');
+            }
+        }
+        write("templates/post.html", &template);
+        let (renderer, problems) = crate::build::renderer(&root, today);
+        let rendered = renderer.render(post(&renderer));
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(problems.is_empty(), "{problems:?}\n{template}");
+        assert!(
+            rendered.problems.is_empty(),
+            "{:?}\n{template}",
+            rendered.problems
+        );
+        assert!(rendered.html.is_some());
+    }
 }

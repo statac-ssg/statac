@@ -111,13 +111,34 @@ pub enum Holds {
     Date,
     Page,
     Pages,
+    /// One of the site's lists, as a tag or a folder is.
     List,
     Lists,
+    /// Any other list of things.
     Items,
     Fields,
     Mentions,
     Call,
     Unknown,
+}
+
+impl Holds {
+    pub const ALL: [Holds; 14] = [
+        Holds::Text,
+        Holds::Html,
+        Holds::Number,
+        Holds::Truth,
+        Holds::Date,
+        Holds::Page,
+        Holds::Pages,
+        Holds::List,
+        Holds::Lists,
+        Holds::Items,
+        Holds::Fields,
+        Holds::Mentions,
+        Holds::Call,
+        Holds::Unknown,
+    ];
 }
 
 /// What a name holds on this page.
