@@ -14,6 +14,9 @@ const AFTER = 140;
 // two edits from another; a shorter word may be one.
 const SHORTEST = 3;
 const TWO_EDITS = 5;
+// The most code points a word a run of Chinese, Japanese or Korean is read
+// as has.
+const LONGEST = 16;
 
 const MARKS = /[̀-ͯ᪰-᫿᷀-᷿⃐-⃿︠-︯]/gu;
 // Chinese, Japanese and Korean, where one letter may start many words.
@@ -87,6 +90,128 @@ function from(words, word) {
     }
   }
   return low;
+}
+
+/** Whether the index lists `word`, folded. */
+async function listed(word) {
+  const piece = await unpacked(FILES.words[pieceOf(word)][1]);
+  return piece.words[from(piece.words, word)] === word;
+}
+
+/** Whether `word`, folded, starts a word the index lists. */
+async function starts(word) {
+  const at = pieceOf(word);
+  const piece = await unpacked(FILES.words[at][1]);
+  const place = from(piece.words, word);
+  // Past the piece's last word, the next listed is the next piece's first.
+  const next = place < piece.words.length ? piece.words[place] : FILES.words[at + 1]?.[0];
+  return next?.startsWith(word) ?? false;
+}
+
+/**
+ * The run of words at `located` in `text`, each next to the one before,
+ * read as the fewest words the index lists, folded, cut where the words
+ * are cut or anywhere in a word it doesn't list; between readings of as
+ * many, the one whose first word is longest, then whose second is, and so
+ * on. Where `typing`, its last word may be one that only starts a word
+ * listed. Null where no reading covers the run.
+ */
+async function readRun(text, located, typing) {
+  const whole = await Promise.all(
+    located.map(([start, end]) => listed(fold(text.slice(start, end)))),
+  );
+  const cuts = [];
+  located.forEach(([start, end], at) => {
+    cuts.push(start);
+    if (!whole[at]) {
+      let place = start;
+      for (const letter of text.slice(start, end)) {
+        if (place > start) {
+          cuts.push(place);
+        }
+        place += letter.length;
+      }
+    }
+  });
+  cuts.push(located[located.length - 1][1]);
+  const last = cuts.length - 1;
+  // For each cut some reading reaches, the cuts where a word listed that
+  // starts there ends; the cuts reached by as many words are asked about
+  // together.
+  const ends = cuts.map(() => []);
+  const reached = new Set([0]);
+  let reaching = [0];
+  while (reaching.length) {
+    const asking = [];
+    for (const cut of reaching) {
+      for (let to = cut + 1; to <= last; to += 1) {
+        const piece = text.slice(cuts[cut], cuts[to]);
+        if ([...piece].length > LONGEST) {
+          break;
+        }
+        const word = fold(piece);
+        asking.push(
+          (async () => {
+            if ((await listed(word)) || (typing && to === last && (await starts(word)))) {
+              ends[cut].push(to);
+            }
+          })(),
+        );
+      }
+    }
+    await Promise.all(asking);
+    const next = reaching.flatMap((cut) => ends[cut]).filter((to) => !reached.has(to));
+    reaching = [...new Set(next)];
+    reaching.forEach((cut) => reached.add(cut));
+  }
+  // From each cut, the fewest words reading the rest, and where the first
+  // of them ends; of as many, the one whose first word ends later.
+  const best = cuts.map(() => null);
+  best[last] = [0, last];
+  for (let cut = last - 1; cut >= 0; cut -= 1) {
+    for (const to of ends[cut]) {
+      if (!best[to]) {
+        continue;
+      }
+      const count = best[to][0] + 1;
+      if (!best[cut] || count < best[cut][0] || (count === best[cut][0] && to > best[cut][1])) {
+        best[cut] = [count, to];
+      }
+    }
+  }
+  if (!best[0]) {
+    return null;
+  }
+  const read = [];
+  for (let cut = 0; cut < last; cut = best[cut][1]) {
+    read.push(fold(text.slice(cuts[cut], cuts[best[cut][1]])));
+  }
+  return read;
+}
+
+/**
+ * The words at `located` in `query`, folded as `all` holds them, each run
+ * of words of Chinese, Japanese or Korean next to each other read as
+ * `readRun` reads it, the run ending the query typed where `typing`.
+ */
+async function wordsOf(query, located, all, typing) {
+  const unspaced = ([start, end]) => [...query.slice(start, end)].every((c) => UNSPACED.test(c));
+  // Each word, or run of words, by where it starts and ends among them.
+  const parts = [];
+  located.forEach((span, at) => {
+    const part = parts[parts.length - 1];
+    if (part?.run && unspaced(span) && located[at - 1][1] === span[0]) {
+      part.end = at + 1;
+    } else {
+      parts.push({ start: at, end: at + 1, run: unspaced(span) });
+    }
+  });
+  const read = await Promise.all(
+    parts.map(({ start, end, run }) =>
+      run ? readRun(query, located.slice(start, end), typing && end === located.length) : null,
+    ),
+  );
+  return parts.flatMap(({ start, end }, at) => read[at] ?? all.slice(start, end));
 }
 
 /**
@@ -274,11 +399,12 @@ async function found(query, shown, typing, respelling = true) {
   const located = spans(query);
   const all = located.map(([start, end]) => fold(query.slice(start, end)));
   const lastly = located[located.length - 1];
-  const typed =
-    typing && lastly && lastly[1] === query.length ? all[all.length - 1] : null;
+  const ending = Boolean(typing && lastly && lastly[1] === query.length);
+  const words = await wordsOf(query, located, all, ending);
+  const typed = ending ? words[words.length - 1] : null;
   const being =
     typed && ([...typed].length > 1 || UNSPACED.test(typed)) ? typed : null;
-  const asked = [...new Set(all)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const asked = [...new Set(words)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   if (!asked.length) {
     return { count: 0, partial: false, results: [], suggestion: null };
   }

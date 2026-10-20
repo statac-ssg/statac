@@ -1,10 +1,12 @@
 //! The words search reads in a text, and the form each is indexed by.
 //!
 //! Words are found as Unicode's word boundaries find them, Chinese, Japanese
-//! and the other languages written without spaces by dictionary, so they are
-//! the words a browser's `Intl.Segmenter` finds in what a reader types. Each
-//! is then folded, so `Café` and `cafe` are one, and cut to its stem by the
-//! rules of its page's language, so `running` and `runs` are `run`.
+//! and the other languages written without spaces by dictionary, as a
+//! browser's `Intl.Segmenter` finds them in what a reader types; its
+//! dictionary may cut such a language otherwise, so a search reads a run of
+//! its words by the words the index lists. Each is then folded, so `Café`
+//! and `cafe` are one, and cut to its stem by the rules of its page's
+//! language, so `running` and `runs` are `run`.
 
 use std::ops::Range;
 use std::sync::LazyLock;

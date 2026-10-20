@@ -7,6 +7,7 @@ pub mod elsewhere;
 mod files;
 mod kept;
 mod meant;
+mod runs;
 mod why;
 mod words;
 
@@ -14,6 +15,7 @@ mod words;
 mod tests;
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 
 use rayon::prelude::*;
@@ -506,6 +508,12 @@ impl Index {
         at.ok().map(|at| self.words[at].1)
     }
 
+    /// Whether `word`, folded, starts some word the records hold.
+    fn starts_word(&self, word: &str) -> bool {
+        let from = (self.words).partition_point(|(listed, _)| in_utf16(listed, word).is_lt());
+        (self.words.get(from)).is_some_and(|(listed, _)| listed.starts_with(word))
+    }
+
     /// The entries `asked` looks in for each of its words, each with how
     /// much a match there counts.
     fn looked_in(&self, asked: &Asked) -> Vec<Vec<(u32, f64)>> {
@@ -612,19 +620,43 @@ pub struct Asked {
 }
 
 impl Asked {
-    /// The words of `query`, its last being typed where `typing` and
-    /// nothing follows it, and it is two letters or more, or one of a
-    /// script written without spaces.
-    pub fn of(query: &str, typing: bool) -> Asked {
+    /// The words of `query`, each run of words of Chinese, Japanese or
+    /// Korean next to each other read by the words `index` lists, its last
+    /// being typed where `typing` and nothing follows it, and it is two
+    /// letters or more, or one of a script written without spaces.
+    pub fn of(query: &str, typing: bool, index: &Index) -> Asked {
         let spans: Vec<_> = spans(query).collect();
-        let typed = (spans.last())
-            .filter(|span| typing && span.end == query.len())
-            .map(|span| fold(&query[span.clone()]))
-            .filter(|word| word.chars().nth(1).is_some() || word.chars().any(unspaced));
-        let mut words: Vec<String> = spans
-            .iter()
-            .map(|span| fold(&query[span.clone()]))
-            .collect();
+        let ending = typing && spans.last().is_some_and(|span| span.end == query.len());
+        let folded = |span: &Range<usize>| fold(&query[span.clone()]);
+        let unspaced_word = |at: usize| query[spans[at].clone()].chars().all(unspaced);
+        let mut words: Vec<String> = Vec::new();
+        let mut at = 0;
+        while at < spans.len() {
+            if !unspaced_word(at) {
+                words.push(folded(&spans[at]));
+                at += 1;
+                continue;
+            }
+            let mut end = at + 1;
+            while end < spans.len() && spans[end].start == spans[end - 1].end && unspaced_word(end)
+            {
+                end += 1;
+            }
+            let run = &spans[at..end];
+            let read = runs::read(
+                query,
+                run,
+                ending && end == spans.len(),
+                |word| index.entry_of(word).is_some(),
+                |word| index.starts_word(word),
+            );
+            words.extend(read.unwrap_or_else(|| run.iter().map(folded).collect()));
+            at = end;
+        }
+        let typed = (words.last())
+            .filter(|_| ending)
+            .filter(|word| word.chars().nth(1).is_some() || word.chars().any(unspaced))
+            .cloned();
         words.sort_unstable_by(|a, b| in_utf16(a, b));
         words.dedup();
         Asked {

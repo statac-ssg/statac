@@ -39,6 +39,98 @@ fn japanese_is_split_into_words_by_dictionary() {
     assert!(!found.contains(&"ログ"), "{found:?}");
 }
 
+/// The run of `words`, each next to the one before, read where the index
+/// lists `listed`.
+fn run_read(words: &[&str], typing: bool, listed: &[&str]) -> Option<Vec<String>> {
+    let text = words.concat();
+    let mut spans = Vec::new();
+    for word in words {
+        let from = spans
+            .last()
+            .map_or(0, |span: &std::ops::Range<usize>| span.end);
+        spans.push(from..from + word.len());
+    }
+    let starts = |word: &str| listed.iter().any(|listed| listed.starts_with(word));
+    runs::read(&text, &spans, typing, |word| listed.contains(&word), starts)
+}
+
+#[test]
+fn a_run_is_read_as_the_fewest_words_the_index_lists() {
+    // Cut apart where the index holds it whole.
+    let joined = run_read(&["ビル", "ド"], false, &["ド", "ビル", "ビルド"]);
+    assert_eq!(joined.unwrap(), ["ビルド"]);
+    let joined = run_read(
+        &["ビル", "ド", "する"],
+        false,
+        &["する", "ド", "ビル", "ビルド"],
+    );
+    assert_eq!(joined.unwrap(), ["ビルド", "する"]);
+    // Kept whole where the index cut it.
+    let split = run_read(&["ビルドする"], false, &["する", "ビルド"]);
+    assert_eq!(split.unwrap(), ["ビルド", "する"]);
+    // Of as many words, the first longest.
+    let tied = run_read(&["東京都"], false, &["京都", "東", "東京", "都"]);
+    assert_eq!(tied.unwrap(), ["東京", "都"]);
+    // A word the index lists isn't cut.
+    let listed = run_read(&["東京都"], false, &["京都", "東", "東京", "東京都", "都"]);
+    assert_eq!(listed.unwrap(), ["東京都"]);
+    assert_eq!(run_read(&["ブロゲ"], false, &["ブログ", "ログ"]), None);
+    // Typed, its last word may start a word listed.
+    let typed = run_read(&["ビル", "ド"], true, &["ビル", "ビルドする"]);
+    assert_eq!(typed.unwrap(), ["ビルド"]);
+    assert_eq!(
+        run_read(&["ビル", "ド"], false, &["ビル", "ビルドする"]),
+        None
+    );
+}
+
+/// An index of no records, listing `words`.
+fn listing(words: &[&str]) -> Index {
+    let mut words: Vec<(String, u32)> = words.iter().map(|&word| (word.to_owned(), 0)).collect();
+    words.sort_unstable_by(|(a, _), (b, _)| in_utf16(a, b));
+    Index {
+        records: Vec::new(),
+        lengths: Vec::new(),
+        average: 1.0,
+        words,
+        entries: vec![Vec::new()],
+        starts: OnceLock::new(),
+    }
+}
+
+#[test]
+fn a_search_reads_each_run_of_unspaced_words_apart_from_the_rest() {
+    let index = listing(&["go", "する", "で", "ビルド", "言語"]);
+    let asked = |query: &str, typing: bool| {
+        let asked = Asked::of(query, typing, &index);
+        (asked.words, asked.typing)
+    };
+    assert_eq!(
+        asked("Go言語でビルドする", false),
+        (
+            vec![
+                "go".into(),
+                "する".into(),
+                "で".into(),
+                "ビルド".into(),
+                "言語".into()
+            ],
+            None
+        )
+    );
+    // A word of another script ends a run, so the run before it isn't the
+    // one being typed.
+    assert_eq!(
+        asked("ビルgo", true),
+        (vec!["go".into(), "ビル".into()], Some("go".into()))
+    );
+    assert_eq!(
+        asked("goビル", true),
+        (vec!["go".into(), "ビル".into()], Some("ビル".into()))
+    );
+    assert_eq!(asked("ビルド す", true).1, Some("す".into()));
+}
+
 #[test]
 fn a_word_is_folded_to_small_letters_without_its_accents() {
     assert_eq!(fold("Ｃafé"), "cafe");
@@ -161,7 +253,7 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
     let index = index_of(&renderer, 0);
     let _ = std::fs::remove_dir_all(root);
     let first = |words: &str| {
-        let found = index.search(&Asked::of(words, false));
+        let found = index.search(&Asked::of(words, false, &index));
         let record = &index.records[found[0].record];
         (
             record.page,
@@ -172,9 +264,13 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
     assert_eq!(first("zfs"), (zfs, None));
     assert_eq!(first("zfs speed"), (zfs, Some("speed".to_owned())));
     assert_eq!(first("drive"), (zfs, Some("setting-up".to_owned())));
-    assert!(index.search(&Asked::of("nowhere", false)).is_empty());
+    assert!(
+        index
+            .search(&Asked::of("nowhere", false, &index))
+            .is_empty()
+    );
     // Another form of a word the site writes finds the others.
-    let running = index.search(&Asked::of("running", false));
+    let running = index.search(&Asked::of("running", false, &index));
     let records = running.iter().map(|found| &index.records[found.record]);
     let speed = |record: &&Record| record.heading.as_ref().is_some_and(|(id, _)| id == "speed");
     assert!(
@@ -203,14 +299,24 @@ fn each_page_is_searched_in_its_own_languages_forms() {
     let _ = std::fs::remove_dir_all(root);
     let chant = page(&renderer, "chant.md");
     for words in ["cafe", "CAFÉ"] {
-        let found = index.search(&Asked::of(words, false));
+        let found = index.search(&Asked::of(words, false, &index));
         assert_eq!(index.records[found[0].record].page, chant, "{words}");
     }
     // A word the site writes somewhere finds its other forms; one it
     // never writes finds nothing, as a reader's browser holds no rules.
-    assert_eq!(index.search(&Asked::of("chanteuse", false)).len(), 2);
-    assert_eq!(index.search(&Asked::of("chanteuses", false)).len(), 2);
-    assert!(index.search(&Asked::of("chanter", false)).is_empty());
+    assert_eq!(
+        index.search(&Asked::of("chanteuse", false, &index)).len(),
+        2
+    );
+    assert_eq!(
+        index.search(&Asked::of("chanteuses", false, &index)).len(),
+        2
+    );
+    assert!(
+        index
+            .search(&Asked::of("chanter", false, &index))
+            .is_empty()
+    );
 }
 
 #[test]
@@ -337,7 +443,7 @@ fn each_language_is_searched_apart_its_words_cut_by_its_own_rules() {
     let site = renderer.site();
     let found = |at: usize, words: &str| {
         let index = index_of(&renderer, at);
-        let found = index.search(&Asked::of(words, false)).into_iter();
+        let found = index.search(&Asked::of(words, false, &index)).into_iter();
         let mut paths: Vec<&str> = found
             .map(|found| {
                 site.pages
@@ -732,7 +838,7 @@ fn what_each_word_adds_to_a_part_sums_to_its_score() {
     ];
     let mut places = std::collections::BTreeSet::new();
     for (words, typing) in queries {
-        let asked = Asked::of(words, typing);
+        let asked = Asked::of(words, typing, &index);
         let found = index.search(&asked);
         assert!(!found.is_empty(), "{words}");
         for found in found {
@@ -752,7 +858,7 @@ fn what_each_word_adds_to_a_part_sums_to_its_score() {
     // Words were found in every place a word stands.
     assert_eq!(places.len(), 6, "{places:?}");
     // A word in no part adds nothing, and no part holds it.
-    let asked = Asked::of("runs nowhere", false);
+    let asked = Asked::of("runs nowhere", false, &index);
     let why = index.why(site, index.search(&asked)[0].record, &asked);
     let nowhere = &why.words[0];
     assert_eq!(
@@ -781,7 +887,7 @@ fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
     // Each part of the first post holds a form of `run`, its title's if
     // no other, and so do the second post and the third's second part.
     let holding = 5;
-    let asked = Asked::of("running", false);
+    let asked = Asked::of("running", false, &index);
     let opening = index.why(site, part(None), &asked);
     assert_eq!(
         opening.words,
@@ -800,7 +906,7 @@ fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
     );
     assert!(opening.words[0].score > 0.0);
     // Typed, it is the start of a longer word.
-    let asked = Asked::of("runn", true);
+    let asked = Asked::of("runn", true, &index);
     let heading = index.why(site, part(Some("heading-1")), &asked);
     assert_eq!(
         heading.words,

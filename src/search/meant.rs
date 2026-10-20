@@ -33,7 +33,7 @@ impl Index {
         typing: bool,
         starts: &[usize],
     ) -> Option<String> {
-        let asked = Asked::of(query, typing);
+        let asked = Asked::of(query, typing, self);
         let looked = self.looked_in(&asked);
         let mut meant: HashMap<&str, &str> = HashMap::new();
         for (word, looked) in asked.words.iter().zip(&looked) {
@@ -52,7 +52,7 @@ impl Index {
             }
         }
         respelt.push_str(&query[written..]);
-        let finds = !self.search(&Asked::of(&respelt, false)).is_empty();
+        let finds = !self.search(&Asked::of(&respelt, false, self)).is_empty();
         finds.then_some(respelt)
     }
 

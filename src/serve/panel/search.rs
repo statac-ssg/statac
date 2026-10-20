@@ -67,7 +67,7 @@ fn in_language(
 ) -> String {
     let renderer = &read.renderer;
     let found = search::results(renderer, index, words, typing, MOST);
-    let asked = Asked::of(words, typing);
+    let asked = Asked::of(words, typing, index);
     let report = Report::new(renderer.sources(), &built.site, false);
     let results: Vec<String> = (found.shown.iter())
         .map(|shown| result(built, read, index, &report, &asked, shown))

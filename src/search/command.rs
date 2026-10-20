@@ -150,7 +150,7 @@ pub fn results(
     typing: bool,
     most: usize,
 ) -> Results {
-    let asked = Asked::of(query, typing);
+    let asked = Asked::of(query, typing, index);
     let found = index.search(&asked);
     // Records holding every word, or where none does, those holding most.
     let best_matched = found.first().map_or(0, |found| found.matched);

@@ -509,6 +509,55 @@ fn a_suggestion_comes_from_the_piece_of_the_word_list_the_word_falls_in() {
 }
 
 #[test]
+fn a_run_of_japanese_finds_the_same_pages_however_the_browser_cuts_it_into_words() {
+    let site = Site::new("reader-unspaced");
+    site.write(
+        "content/post-3.md",
+        "---\ntitle: 静的サイト\ndate: 2026-01-03\n---\n静的サイトをビルドする。ビルドは速い。\n",
+    );
+    assert!(!site.index().is_empty());
+    let asked: &[(&str, bool)] = &[
+        ("ビルド", false),
+        ("ビルドする", false),
+        ("サイトをビルド", false),
+        ("ビル", true),
+        ("ビル", false),
+    ];
+    let rust = statac_finds(&site, 0, asked);
+    for found in &split(&rust)[..4] {
+        assert!(found.starts_with("[1,false,[[\"/blog/post-3/\""), "{rust}");
+    }
+    let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
+        return;
+    };
+    for ((words, _), (rust, browser)) in asked.iter().zip(split(&rust).iter().zip(split(&browser)))
+    {
+        assert_eq!(unmarked(rust), unmarked(&browser), "{words}");
+    }
+}
+
+/// What one search found, as `statac_finds` writes it, with no word of an
+/// excerpt marked: where a browser cuts a page's text into words otherwise,
+/// it marks otherwise.
+fn unmarked(found: &str) -> String {
+    let mut found = split(found);
+    let results: Vec<String> = (split(&found[2]).iter())
+        .filter(|result| !result.is_empty())
+        .map(|result| {
+            let mut result = split(result);
+            let excerpt = result.pop().unwrap();
+            let text: Vec<String> = (split(&excerpt).iter())
+                .filter(|piece| !piece.is_empty())
+                .map(|piece| split(piece)[0].trim_matches('"').to_owned())
+                .collect();
+            format!("{},{}", result.join(","), text.concat())
+        })
+        .collect();
+    found[2] = results.join(";");
+    found.join(",")
+}
+
+#[test]
 fn each_languages_script_finds_what_statac_search_finds_in_that_language() {
     let site = Site::in_two_languages("reader-languages", "https://example.org/blog/");
     site.write(
