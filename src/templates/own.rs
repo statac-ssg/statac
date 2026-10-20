@@ -1116,12 +1116,17 @@ struct OfValue<'s> {
 impl crate::markdown::Snippets for OfValue<'_> {
     fn html(
         &self,
-        _: &crate::markdown::Call,
+        call: &crate::markdown::Call,
         place: crate::source::Place,
         _: crate::markdown::Placement,
         _: Option<&str>,
     ) -> String {
-        escaped(self.sources.spelling(place))
+        let written = self.sources.spelling(place);
+        match call.within {
+            crate::markdown::Within::Prose => escaped(written),
+            // The author's HTML, written back as it is.
+            _ => written.to_owned(),
+        }
     }
 
     fn writes(&self, piece: Piece) -> bool {

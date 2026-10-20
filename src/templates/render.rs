@@ -1884,9 +1884,10 @@ impl markdown::Snippets for Prose<'_> {
             let shared = self.shared;
             let name = &call.name.value;
             let Some(snippet) = shared.templates.snippets.get(name) else {
-                // In HTML, only a name the site has is a call.
+                // In HTML, only a name the site has is a call; anything
+                // else is the author's HTML, written back as it is.
                 if call.within != Within::Prose {
-                    return crate::html::text_escaped(shared.sources.spelling(place));
+                    return shared.sources.spelling(place).to_owned();
                 }
                 let nearest = crate::suggest::nearest(
                     name,

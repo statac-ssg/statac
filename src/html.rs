@@ -288,13 +288,6 @@ pub(crate) fn addresses(value: &str, srcset: bool, at: usize) -> Vec<(&str, usiz
     found
 }
 
-/// `text` to stand between tags, with `&`, `<` and `>` escaped.
-pub(crate) fn text_escaped(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    escape_each(text, &['&', '<', '>'], &mut out).expect("writing to a string can't fail");
-    out
-}
-
 /// Writes `text` into `out` to stand between tags or in an attribute's
 /// double quotes, with `&`, `<`, `>` and `"` escaped.
 pub(crate) fn escape(text: &str, out: &mut String) {
@@ -433,7 +426,6 @@ mod tests {
     #[test]
     fn each_escaper_escapes_its_own_characters() {
         let text = "a & b < c > d \" e ' f/g";
-        assert_eq!(text_escaped(text), "a &amp; b &lt; c &gt; d \" e ' f/g");
         assert_eq!(escaped(text), "a &amp; b &lt; c &gt; d &quot; e ' f/g");
         let mut out = String::new();
         escape_anywhere(text, &mut out).unwrap();

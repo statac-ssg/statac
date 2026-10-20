@@ -2082,6 +2082,36 @@ note  Call in HTML: `@book` is built as a snippet
 }
 
 #[test]
+fn a_name_the_site_has_no_snippet_for_in_html_is_published_as_written() {
+    let site = Site::new("no-call-in-html");
+    site.write(
+        "templates/page.html",
+        "{{ page.content }}\n{{ page.blurb | markdown }}\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n\
+         blurb: '<div title=\"@nope(&quot;a&quot;)\">@nope(a &amp; b)</div>'\n---\n\
+         <div class=\"x\">Mail @nope(a &amp; b) and @nope(<em>c</em>) \
+         <a title=\"@nope(&quot;d&quot;)\">here</a></div>\n",
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    assert!(
+        built.contains(
+            "<div class=\"x\">Mail @nope(a &amp; b) and @nope(<em>c</em>) \
+             <a title=\"@nope(&quot;d&quot;)\">here</a></div>"
+        ),
+        "{built}"
+    );
+    assert!(
+        built.contains("<div title=\"@nope(&quot;a&quot;)\">@nope(a &amp; b)</div>"),
+        "{built}"
+    );
+}
+
+#[test]
 fn every_link_on_the_built_site_is_followed_and_told_where_it_was_written() {
     let site = Site::new("links");
     site.write(
