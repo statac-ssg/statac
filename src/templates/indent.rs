@@ -15,6 +15,7 @@ use std::{fmt, io};
 
 use minijinja::{Captured, Error, Held, Output, Template, Value};
 
+use super::dedent::Head;
 use super::landing::{Deeper, Landing, Place, Placing};
 use crate::html::PREFORMATTED;
 
@@ -152,10 +153,10 @@ impl Layout {
     /// nothing, spaces before its line ending and no more, isn't written.
     fn own(&mut self, placing: Placing<'_>, mut text: &[u8]) {
         let mut from = text.as_ptr() as usize;
-        // A kept line ending is not written where nothing has been written
+        // An owed line ending is not written where nothing has been written
         // for it to end.
         if let Some(line) = placing.holding(from)
-            && line.ending == Some(from)
+            && line.owed() == Some(from)
         {
             let wrote = self.began.take().is_some_and(|len| self.out.len() > len);
             if !wrote {
@@ -180,7 +181,7 @@ impl Layout {
             }
             if !starts || !self.open() {
                 // An indent kept for a line of the output is no use inside one.
-                if line.kept {
+                if line.head == Head::AtLineStart {
                     self.put(&text[done..at]);
                     done = end;
                 }
@@ -317,12 +318,31 @@ impl Held for Body {
 }
 
 impl Layout {
-    /// Writes `text`, a value's or the template's own.
+    /// Writes `text`, a value's or the template's own, leaving out of the
+    /// template's own what [`Placing`] says the page leaves out.
     fn write(&mut self, placing: Placing<'_>, text: &[u8]) {
+        let value = LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.value));
+        if value {
+            self.run(placing, text, true);
+            return;
+        }
+        let from = text.as_ptr() as usize;
+        let mut done = 0;
+        for gap in placing.dropped(from..from + text.len()) {
+            let start = gap.start.max(from) - from;
+            if start > done {
+                self.run(placing, &text[done..start], false);
+            }
+            done = done.max(gap.end.min(from + text.len()) - from);
+        }
+        self.run(placing, &text[done..], false);
+    }
+
+    /// Writes `text`, a value's or a run of the template's own text.
+    fn run(&mut self, placing: Placing<'_>, text: &[u8], value: bool) {
         if text.is_empty() {
             return;
         }
-        let value = LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.value));
         let from = text.as_ptr() as usize;
         let last = self.last.take();
         self.track(placing, (!value).then_some(from), last);
@@ -333,9 +353,9 @@ impl Layout {
             self.own(placing, text);
             let end = from + text.len();
             // Text reaching past the indent of a line whose line ending is
-            // kept is what the line holds being written.
+            // owed is what the line holds being written.
             if let Some(line) = placing.holding(end - 1)
-                && line.ending.is_some_and(|ending| end <= ending)
+                && line.owed().is_some_and(|ending| end <= ending)
                 && end > line.at + line.indent
             {
                 self.began = Some(len);
@@ -352,7 +372,7 @@ impl Layout {
                 self.land(placing, line, None);
             }
             if let Some(line) = placing.holding(end)
-                && line.ending.is_some()
+                && line.owed().is_some()
                 && line.at + line.indent == end
             {
                 self.began = Some(self.out.len());

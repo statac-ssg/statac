@@ -1193,6 +1193,39 @@ fn a_branch_not_written_leaves_the_line_before_it_its_line_end() {
 }
 
 #[test]
+fn a_tag_takes_the_spaces_round_it_whatever_they_are_written_with() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "content/data.md",
+            "---\ntitle: Data\npermalink: /data.json\nlayout: data.json\n---\n",
+        ),
+        // Line endings of two characters, a comment, `raw`, and a
+        // no-break space before a tag.
+        (
+            "templates/home.html",
+            "<div>\r\n  {# a note #}\r\n  {% raw %}\r\n  {{ as typed }}\r\n  {% endraw %}\r\n\
+             \u{a0}{% if true %}\r\n  <p>a</p>\r\n\u{a0}{% endif %}\r\n</div>\r\n",
+        ),
+        // A file whose lines are written as typed.
+        (
+            "templates/data.json",
+            "{% set a = 1 %}\n{\n  {% if true %}\n  \"a\": {{ a }}\n  {% endif %}\n}\n",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    assert_eq!(
+        built.html("index.md"),
+        "<div>\r\n  {{ as typed }}\r\n  <p>a</p>\r\n</div>\r\n"
+    );
+    assert_eq!(built.html("data.md"), "{\n  \"a\": 1\n}\n");
+}
+
+#[test]
 fn a_template_writing_plain_text_keeps_its_bodys_indent() {
     let built = site(&[
         (

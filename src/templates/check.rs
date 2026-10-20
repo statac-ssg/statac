@@ -31,14 +31,25 @@ pub(super) fn parse_template<'s>(
     parse(source, name, reading())
 }
 
-/// How a tag's surrounding whitespace is read: a block tag takes its line's
-/// leading spaces and its own line ending with it. Rendering uses the same,
-/// so a template read back for checking lines up with what is built.
+/// How a template is read for checking: a block tag or a comment takes its
+/// line's leading spaces and its own line ending with it, as the page has
+/// them unless the template's lines say otherwise (`dedent`). Rendering
+/// reads the same tags at the same places with [`rendering`].
 pub(super) fn reading() -> SyntaxConfig {
     SyntaxConfig::builder()
         .keep_trailing_newline(true)
         .lstrip_blocks(true)
         .trim_blocks(true)
+        .build()
+        .expect("the default delimiters are valid")
+}
+
+/// How a template is rendered: the engine takes no space round a tag but
+/// those a tag written with `-` asks it to, so the writer it renders into
+/// decides each of them.
+pub(super) fn rendering() -> SyntaxConfig {
+    SyntaxConfig::builder()
+        .keep_trailing_newline(true)
         .build()
         .expect("the default delimiters are valid")
 }

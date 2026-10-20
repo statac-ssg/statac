@@ -16,18 +16,20 @@
 //! A level is the file's commonest step into an element between lines with
 //! no tag line between them.
 //!
-//! The same reading gives what `landing` needs to place each line, and the
-//! lines whose indent and line ending the engine is told to keep: a line
-//! holding more than tags keeps both, which the engine would otherwise
-//! leave out round a tag opening or closing it, the tag closing a branch,
-//! alone on its line, keeps its line ending to stand in for one the branch
-//! takes with it, and a `call` or `filter` alone on an indented line of
-//! markup keeps its indent, for what it writes to line up at. In a body
-//! the engine holds back, a tag alone on its line opening or closing a
-//! branch, after a line ending the engine writes, leaves out that line
-//! ending and keeps its own in its place. A loop's tag alone on its line
-//! keeps its line ending, for each pass to start a line, where the loop's
-//! end tag closes the last line of a body opening indented.
+//! The same reading gives what `landing` needs to place each line, and
+//! what the page leaves out of the template's text. The engine writes every
+//! space; a tag opening or closing a line takes the line's indent or its
+//! line ending with it, as Jinja's `lstrip_blocks` and `trim_blocks` would,
+//! except where the line says otherwise: a line holding more than tags
+//! keeps both, the tag closing a branch, alone on its line, keeps its line
+//! ending to stand in for one the branch takes with it, and a `call` or
+//! `filter` alone on an indented line of markup keeps its indent, for what
+//! it writes to line up at. In a body the engine holds back, a tag alone on
+//! its line opening or closing a branch, after a line ending the engine
+//! writes, takes that line ending and keeps its own in its place. A loop's
+//! tag alone on its line keeps its line ending, for each pass to start a
+//! line, where the loop's end tag closes the last line of a body opening
+//! indented.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -74,6 +76,13 @@ pub(super) fn facts(source: &str, markup: bool) -> Option<Facts> {
     Some(template.facts(markup))
 }
 
+/// What the page leaves out of a template whose lines are written as
+/// typed: the spaces its tags take with them, in order. Nothing for a
+/// template the engine can't read.
+pub(super) fn dropped(source: &str) -> Vec<Range<usize>> {
+    Read::of(source).map(|read| read.gaps).unwrap_or_default()
+}
+
 pub(super) struct Facts {
     pub(super) lines: Vec<Fact>,
     /// The `block`s, in the order they open.
@@ -81,14 +90,32 @@ pub(super) struct Facts {
     /// The lines holding `{{ super() }}` and nothing else.
     pub(super) supers: Vec<usize>,
     pub(super) calls: Vec<Recursion>,
-    /// Where a `+` takes the place of a space in a tag, so the engine
-    /// keeps the indent or the line end of a line holding more than tags,
-    /// or the indent of one holding a `call` or `filter` it lines up at.
-    pub(super) keeps: Vec<usize>,
-    /// Where a `-` takes the place of a space after `{%`, so the engine
-    /// leaves out the line ending before a tag alone on its line in a body
-    /// it holds back, the tag's own kept in its place.
-    pub(super) trims: Vec<usize>,
+    /// The template's text that the engine writes and the page leaves out,
+    /// in order: the spaces round its tags.
+    pub(super) dropped: Vec<Range<usize>>,
+}
+
+/// What is written of the spaces before a line's first tag or text.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) enum Head {
+    /// As typed, or as `cut` and where the line lands say.
+    Typed,
+    /// Nothing: a tag opening the line takes them with it.
+    Dropped,
+    /// As typed where the line starts a line of the page, and nothing
+    /// where it doesn't: a tag opens a line holding more, or a `call` or
+    /// `filter` whose body lines up at the line.
+    AtLineStart,
+}
+
+/// What is written of the line ending after a line's last tag or text.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) enum Tail {
+    Typed,
+    /// Nothing: a tag closing the line takes it with it.
+    Dropped,
+    /// The line ending, where something has been written for it to end.
+    Owed,
 }
 
 pub(super) struct Fact {
@@ -113,12 +140,10 @@ pub(super) struct Fact {
     /// a call of `caller`. Or the line holds a `call` or `filter` writing
     /// one, its indent kept.
     pub(super) held: bool,
-    /// Its indent is one the engine is told to keep, before a tag.
-    pub(super) kept: bool,
-    /// Where its line ending is, where the engine is told to keep it,
-    /// after a tag, to be left out where nothing has been written for it
-    /// to end.
-    pub(super) ending: Option<usize>,
+    pub(super) head: Head,
+    pub(super) tail: Tail,
+    /// Where its text ends and its line ending starts.
+    pub(super) end: usize,
 }
 
 pub(super) struct Named {
@@ -211,6 +236,10 @@ struct Read {
     text: Vec<Range<usize>>,
     /// Text between `raw` and `endraw`.
     raw: Vec<Range<usize>>,
+    /// The runs of whitespace the engine's own whitespace control leaves
+    /// out, as [`super::check::reading`] sets it: before a tag opening its
+    /// line and the line ending after a tag closing one.
+    gaps: Vec<Range<usize>>,
 }
 
 impl Read {
@@ -219,11 +248,25 @@ impl Read {
         let mut tokens = tokenize(source, false, super::check::reading()).peekable();
         let mut done = 0;
         let mut in_raw = false;
+        // Where the text the engine writes, or a tag, last ended, and the
+        // stretches from there to the next, which hold nothing else.
+        let mut written = 0;
+        let mut between = Vec::new();
         while let Some(token) = tokens.next() {
             let (token, span) = token.ok()?;
             let start = span.start_offset as usize;
             // Comments and `raw`'s own tags give no token.
             read.quiet(source, done..start, &mut in_raw);
+            let tagged = if let Token::TemplateData(text) = token {
+                // Its span is the raw text before the engine trims it.
+                let at = text.as_ptr() as usize - source.as_ptr() as usize;
+                between.push(written..at);
+                written = at + text.len();
+                false
+            } else {
+                between.push(written..start);
+                true
+            };
             match token {
                 Token::TemplateData(_) => {
                     let range = start..span.end_offset as usize;
@@ -320,9 +363,50 @@ impl Read {
                 }
                 _ => return None,
             }
+            if tagged {
+                written = done;
+            }
         }
         read.quiet(source, done..source.len(), &mut in_raw);
+        between.push(written..source.len());
+        for range in between {
+            read.gaps(source, range);
+        }
         Some(read)
+    }
+
+    /// Notes the runs of whitespace in `range`, a stretch between the
+    /// engine's tokens, outside the comments and `raw`'s tags in it.
+    fn gaps(&mut self, source: &str, range: Range<usize>) {
+        let mut run: Option<usize> = None;
+        let mut at = range.start;
+        while at < range.end {
+            let quiet = self
+                .tags
+                .binary_search_by_key(&at, |tag| tag.span.start)
+                .ok()
+                .map(|found| self.tags[found].span.end);
+            let c = source[at..].chars().next().expect("a character");
+            // As the engine's lexer counts whitespace.
+            let space = quiet.is_none() && c.is_whitespace();
+            match (space, run) {
+                (true, None) => run = Some(at),
+                (false, Some(start)) => {
+                    self.gaps.push(start..at);
+                    run = None;
+                }
+                _ => {}
+            }
+            // A line ending closes a run: what follows is the next line's.
+            if let (Some(start), '\n') = (run, c) {
+                self.gaps.push(start..at + 1);
+                run = None;
+            }
+            at = quiet.unwrap_or(at + c.len_utf8()).min(range.end);
+        }
+        if let Some(start) = run {
+            self.gaps.push(start..range.end);
+        }
     }
 
     /// Reads what lies between two tokens: spaces the engine leaves out,
@@ -863,6 +947,8 @@ impl<'s> Template<'s> {
                     })
             })
             .collect();
+        // Where a tag starts or ends that keeps the spaces next to it, which
+        // it would otherwise take with it.
         let mut keeps = Vec::new();
         let mut later = vec![false; self.lines.len()];
         let mut writes = false;
@@ -871,6 +957,8 @@ impl<'s> Template<'s> {
         // Where a line in a body held back would keep its line ending, if
         // the branch it closes keeps the one before.
         let mut closing = vec![None; self.lines.len()];
+        // Lines taking the line ending before them in place of their own.
+        let mut taken = vec![false; self.lines.len()];
         for number in (0..self.lines.len()).rev() {
             let line = &self.lines[number];
             let placed = blocks
@@ -887,7 +975,7 @@ impl<'s> Template<'s> {
                 && line.indent > 0
                 && matches!(bytes[first.span.start + 2], b' ' | b'\t')
             {
-                keeps.push(first.span.start + 2);
+                keeps.push(first.span.start);
                 kept[number] = true;
             }
             let last = line
@@ -914,15 +1002,15 @@ impl<'s> Template<'s> {
                 && matches!(bytes[last.span.end - 3], b' ' | b'\t')
             {
                 if first.is_some() || !inside[number] || outward == 0 {
-                    keeps.push(last.span.end - 3);
+                    keeps.push(last.span.end);
                     kept_ends[number] = true;
                 } else if outward == 1 {
-                    closing[number] = Some(last.span.end - 3);
+                    closing[number] = Some(last.span.end);
                 } else {
                     // Closing more than one branch, it can stand in for the
                     // line ending of none: it is kept, and the writer leaves
                     // it out where nothing has been written on the line.
-                    keeps.push(last.span.end - 3);
+                    keeps.push(last.span.end);
                     kept_ends[number] = true;
                 }
             }
@@ -983,7 +1071,6 @@ impl<'s> Template<'s> {
         // could see. Either way the line ending after the end tag is left
         // out where no pass was written, in a body held back as elsewhere.
         let mut closes_loop = vec![false; self.lines.len()];
-        let mut trims = Vec::new();
         for block in &self.blocks {
             let Some(end) = block.end else {
                 continue;
@@ -1001,10 +1088,10 @@ impl<'s> Template<'s> {
                     && (block.opening..=end)
                         .all(|line| !self.lines[line].shown && !self.lines[line].scripted)
                 {
-                    keeps.push(tags[block.tag].span.end - 3);
+                    keeps.push(tags[block.tag].span.end);
                 }
                 if later[end] && !kept_ends[end] {
-                    keeps.push(closer.span.end - 3);
+                    keeps.push(closer.span.end);
                     kept_ends[end] = true;
                 }
                 closes_loop[end] = kept_ends[end];
@@ -1022,8 +1109,8 @@ impl<'s> Template<'s> {
                 && let Some(tag) = lone(opening)
                 && after_ending(opening, &kept_ends)
             {
-                trims.push(tag.span.start + 2);
-                keeps.push(tag.span.end - 3);
+                taken[opening] = true;
+                keeps.push(tag.span.end);
                 kept_ends[opening] = true;
             }
             for pair in edges.windows(2) {
@@ -1038,8 +1125,8 @@ impl<'s> Template<'s> {
                     } else if let Some(tag) = lone(to)
                         && after_ending(to, &kept_ends)
                     {
-                        trims.push(tag.span.start + 2);
-                        keeps.push(tag.span.end - 3);
+                        taken[to] = true;
+                        keeps.push(tag.span.end);
                         kept_ends[to] = true;
                     }
                     continue;
@@ -1056,13 +1143,57 @@ impl<'s> Template<'s> {
                     && !tag.controlled
                     && matches!(bytes[tag.span.end - 3], b' ' | b'\t')
                 {
-                    keeps.push(tag.span.end - 3);
+                    keeps.push(tag.span.end);
                     kept_ends[to] = true;
                 }
             }
         }
         keeps.sort_unstable();
-        trims.sort_unstable();
+
+        // A tag written with `-` takes all the spaces next to it whatever
+        // the tag beyond them keeps.
+        let taking = |gap: &Range<usize>| {
+            let before = self.source[..gap.start].trim_end();
+            let after = self.source[gap.end..].trim_start();
+            ["-%}", "-}}", "-#}"]
+                .iter()
+                .any(|end| before.ends_with(end))
+                || ["{%-", "{{-", "{#-"]
+                    .iter()
+                    .any(|start| after.starts_with(start))
+        };
+        // What the page leaves out: the spaces the tags take with them,
+        // less those kept, and for a line taking the line ending before it,
+        // that line ending and its indent.
+        let mut dropped: Vec<Range<usize>> = self
+            .read
+            .gaps
+            .iter()
+            .filter(|gap| {
+                keeps.binary_search(&gap.end).is_err() && keeps.binary_search(&gap.start).is_err()
+                    || taking(gap)
+            })
+            .cloned()
+            .collect();
+        for number in (1..self.lines.len()).filter(|&number| taken[number]) {
+            let line = &self.lines[number];
+            dropped.push(ends[number - 1]..line.start + line.indent);
+        }
+        dropped.sort_unstable_by_key(|range| range.start);
+        dropped.dedup_by(|later, earlier| {
+            if later.start >= earlier.end {
+                return false;
+            }
+            earlier.end = earlier.end.max(later.end);
+            true
+        });
+        // Whether the page leaves out all of `range`.
+        let left_out = |range: Range<usize>| {
+            let at = dropped.partition_point(|gap| gap.end <= range.start);
+            dropped
+                .get(at)
+                .is_some_and(|gap| gap.start <= range.start && gap.end >= range.end)
+        };
 
         let alone = |span: &Range<usize>| {
             let number = line_of(span.start);
@@ -1153,9 +1284,24 @@ impl<'s> Template<'s> {
                     bare: line.shape == Shape::Tags,
                     valued,
                     held,
-                    kept: kept[number],
-                    ending: (kept_ends[number] && (!inside[number] || closes_loop[number]))
-                        .then_some(ends[number]),
+                    head: match line.tags.first() {
+                        _ if kept[number] => Head::AtLineStart,
+                        Some(&at)
+                            if tags[at].span.start > line.start
+                                && left_out(line.start..tags[at].span.start) =>
+                        {
+                            Head::Dropped
+                        }
+                        _ => Head::Typed,
+                    },
+                    tail: match self.lines.get(number + 1) {
+                        _ if kept_ends[number] && (!inside[number] || closes_loop[number]) => {
+                            Tail::Owed
+                        }
+                        Some(next) if left_out(ends[number]..next.start) => Tail::Dropped,
+                        _ => Tail::Typed,
+                    },
+                    end: ends[number],
                 }
             })
             .collect();
@@ -1164,8 +1310,7 @@ impl<'s> Template<'s> {
             blocks,
             supers,
             calls,
-            keeps,
-            trims,
+            dropped,
         }
     }
 
@@ -1479,15 +1624,52 @@ mod tests {
         );
     }
 
-    /// The template as the engine is handed it.
+    /// The template written as the engine's own whitespace control would
+    /// need it to leave out what the page does: `+` inside a tag's
+    /// delimiter where it keeps the spaces next to it, `-` where it takes
+    /// the line ending before it as well.
     fn kept(source: &str) -> String {
+        marked(source, true)
+    }
+
+    fn marked(source: &str, markup: bool) -> String {
         let mut out = source.as_bytes().to_vec();
-        let facts = super::facts(source, true).expect("a template");
-        for at in facts.keeps {
-            out[at] = b'+';
+        let facts = super::facts(source, markup).expect("a template");
+        let read = super::Read::of(source).expect("a template");
+        let dropped = |range: &std::ops::Range<usize>| {
+            facts
+                .dropped
+                .iter()
+                .any(|gap| gap.start <= range.start && gap.end >= range.end)
+        };
+        for gap in read.gaps.iter().filter(|gap| !dropped(gap)) {
+            // A line ending follows a tag; spaces before a line's end
+            // precede one.
+            let after = source[gap.clone()].ends_with('\n');
+            for tag in &read.tags {
+                if !after && tag.span.start == gap.end {
+                    out[tag.span.start + 2] = b'+';
+                }
+                if after && tag.span.end == gap.start {
+                    out[tag.span.end - 3] = b'+';
+                }
+            }
         }
-        for at in facts.trims {
-            out[at] = b'-';
+        for gap in &facts.dropped {
+            let lexed: usize = read
+                .gaps
+                .iter()
+                .map(|ours| {
+                    ours.end
+                        .min(gap.end)
+                        .saturating_sub(ours.start.max(gap.start))
+                })
+                .sum();
+            if lexed < gap.len()
+                && let Some(tag) = read.tags.iter().find(|tag| tag.span.start == gap.end)
+            {
+                out[tag.span.start + 2] = b'-';
+            }
         }
         String::from_utf8(out).expect("text")
     }
@@ -1602,7 +1784,7 @@ mod tests {
             // tag alone on its line taking the one before in its place.
             (
                 "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p>{% endif %}\n<p>c</p>{% if a %}\n<p>d</p>\n{% endif %}\n{% if a %}\n<p>e</p>{% endif %}\n<p>f</p>\n{% endmacro %}\n",
-                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>{% endif+%}\n<p>c</p>{% if a+%}\n<p>d</p>\n{%-endif+%}\n{%-if a+%}\n<p>e</p>{% endif+%}\n<p>f</p>\n{% endmacro %}\n",
+                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>{% endif+%}\n<p>c</p>{% if a+%}\n<p>d</p>\n{%-endif %}\n{% if a+%}\n<p>e</p>{% endif+%}\n<p>f</p>\n{% endmacro %}\n",
             ),
         ];
         for (template, handed) in cases {
@@ -1634,14 +1816,15 @@ mod tests {
                 "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>\n{%-endif+%}\n{% endmacro %}\n",
             ),
             // After a tag alone whose line ending is kept, as one branch
-            // after another or one inside another.
+            // after another or one inside another, the tag after it taking
+            // that line ending.
             (
                 "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p>\n{% endif %}\n{% if a %}\n<p>c</p>{% endif %}\n<p>d</p>\n{% endmacro %}\n",
-                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>\n{%-endif+%}\n{%-if a+%}\n<p>c</p>{% endif+%}\n<p>d</p>\n{% endmacro %}\n",
+                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>\n{%-endif %}\n{% if a+%}\n<p>c</p>{% endif+%}\n<p>d</p>\n{% endmacro %}\n",
             ),
             (
                 "{% macro m(a, b) %}\n<p>a</p>\n{% if a %}\n{% if b %}\n<p>b</p>{% endif %}\n<p>c</p>{% endif %}\n<p>d</p>\n{% endmacro %}\n",
-                "{% macro m(a, b) %}\n<p>a</p>\n{%-if a+%}\n{%-if b+%}\n<p>b</p>{% endif+%}\n<p>c</p>{% endif+%}\n<p>d</p>\n{% endmacro %}\n",
+                "{% macro m(a, b) %}\n<p>a</p>\n{%-if a %}\n{% if b+%}\n<p>b</p>{% endif+%}\n<p>c</p>{% endif+%}\n<p>d</p>\n{% endmacro %}\n",
             ),
         ];
         for (template, handed) in cases {
@@ -1693,11 +1876,9 @@ mod tests {
             assert_eq!(kept(template), handed, "{template}");
         }
         // Where the template isn't markup, as plain text.
-        let source = "{% for i in l %}\n  {{ i }}{% endfor %}\n.\n";
-        let facts = super::facts(source, false).expect("a template");
         assert_eq!(
-            facts.keeps,
-            [source.find("%}\n.").expect("its end tag") - 1]
+            marked("{% for i in l %}\n  {{ i }}{% endfor %}\n.\n", false),
+            "{% for i in l %}\n  {{ i }}{% endfor+%}\n.\n"
         );
     }
 
@@ -1718,13 +1899,8 @@ mod tests {
             // Written in place, where the writer sees to it.
             "<p>a</p>\n{% if a %}\n<p>b</p>{% endif %}\n<p>c</p>\n",
         ] {
-            assert!(
-                super::facts(template, true)
-                    .expect("a template")
-                    .trims
-                    .is_empty(),
-                "{template}"
-            );
+            let taking = |text: &str| text.matches("{%-").count();
+            assert_eq!(taking(&kept(template)), taking(template), "{template}");
         }
     }
 
@@ -1813,9 +1989,9 @@ mod tests {
         let facts = super::facts(template, true).expect("a template");
         assert!(!facts.lines[1].held);
         // Outside markup an indent may mean something.
-        let facts = super::facts("  {% filter upper %}\n    a\n  {% endfilter %}\n", false)
-            .expect("a template");
-        assert!(facts.keeps.is_empty() && !facts.lines[0].held);
+        let source = "  {% filter upper %}\n    a\n  {% endfilter %}\n";
+        let facts = super::facts(source, false).expect("a template");
+        assert!(marked(source, false) == source && !facts.lines[0].held);
     }
 
     #[test]

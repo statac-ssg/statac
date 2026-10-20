@@ -73,7 +73,7 @@ fn the_engine_writes_a_templates_own_text_from_the_text_it_holds() {
                 {{- super() -}}\n\
                 {% endblock %}\n";
     let mut env = Environment::new();
-    env.set_syntax(check::reading());
+    env.set_syntax(check::rendering());
     // Every value is written through the formatter.
     env.set_formatter(|out, state, value| {
         VALUE.set(true);

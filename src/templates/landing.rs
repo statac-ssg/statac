@@ -13,12 +13,15 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use super::dedent::{Facts, Site};
+use super::dedent::{Facts, Head, Site, Tail};
 
 /// Every line of the templates, and the overrides for each template whose
 /// chain writes a block's body in another's place.
 #[derive(Default)]
 pub(super) struct Landings {
+    /// Where in memory the templates' text lies that the engine writes and
+    /// the page leaves out, in order.
+    dropped: Vec<Range<usize>>,
     lines: Vec<Landing>,
     calls: Vec<Deeper>,
     chains: Vec<Vec<(usize, Box<str>)>>,
@@ -47,12 +50,18 @@ pub(super) struct Landing {
     /// body the engine held back, whose lines line up at the line's indent
     /// in place of the one they share.
     pub(super) held: bool,
-    /// Its indent is one the engine is told to keep, before a tag.
-    pub(super) kept: bool,
-    /// Where in memory its line ending is, where the engine is told to
-    /// keep it, after a tag, to be left out where nothing has been written
-    /// for it to end.
-    pub(super) ending: Option<usize>,
+    pub(super) head: Head,
+    tail: Tail,
+    /// Where in memory its text ends and its line ending starts.
+    end: usize,
+}
+
+impl Landing {
+    /// Where in memory its line ending is, where it is written only where
+    /// something has been written for it to end.
+    pub(super) fn owed(&self) -> Option<usize> {
+        (self.tail == Tail::Owed).then_some(self.end)
+    }
 }
 
 /// A recursive loop's call on a line of its own.
@@ -102,8 +111,9 @@ impl Landings {
                 bare: line.bare,
                 valued: line.valued,
                 held: markup && line.held,
-                kept: line.kept,
-                ending: line.ending.map(|ending| base + ending),
+                head: line.head,
+                tail: line.tail,
+                end: base + line.end,
             });
         }
         if markup {
@@ -121,8 +131,19 @@ impl Landings {
         }
     }
 
+    /// Adds what the page leaves out of a template the engine holds at
+    /// `base` in memory, `dropped` counted from there.
+    pub(super) fn leave_out(&mut self, base: usize, dropped: &[Range<usize>]) {
+        self.dropped.extend(
+            dropped
+                .iter()
+                .map(|range| base + range.start..base + range.end),
+        );
+    }
+
     /// Puts what has been added in order.
     pub(super) fn sort(&mut self) {
+        self.dropped.sort_unstable_by_key(|range| range.start);
         self.lines.sort_unstable_by_key(|line| line.at);
         self.calls.sort_unstable_by_key(|call| call.at);
     }
@@ -177,6 +198,7 @@ impl Place {
     pub(super) fn placing(&self) -> Placing<'_> {
         let landings = &*self.landings;
         Placing {
+            dropped: &landings.dropped,
             lines: &landings.lines,
             calls: &landings.calls,
             chain: self
@@ -189,6 +211,7 @@ impl Place {
 /// Where the lines of one render are written.
 #[derive(Clone, Copy)]
 pub(super) struct Placing<'a> {
+    dropped: &'a [Range<usize>],
     lines: &'a [Landing],
     calls: &'a [Deeper],
     chain: &'a [(usize, Box<str>)],
@@ -197,6 +220,7 @@ pub(super) struct Placing<'a> {
 impl<'a> Placing<'a> {
     /// Where nothing is known of any line.
     pub(super) const NONE: Placing<'static> = Placing {
+        dropped: &[],
         lines: &[],
         calls: &[],
         chain: &[],
@@ -204,6 +228,15 @@ impl<'a> Placing<'a> {
 
     pub(super) fn is_empty(&self) -> bool {
         self.lines.is_empty()
+    }
+
+    /// What the page leaves out of the template text in memory within
+    /// `range`, in order.
+    pub(super) fn dropped(&self, range: Range<usize>) -> &'a [Range<usize>] {
+        let dropped = self.dropped;
+        let first = dropped.partition_point(|gap| gap.end <= range.start);
+        let after = dropped.partition_point(|gap| gap.start < range.end);
+        &dropped[first..after.max(first)]
     }
 
     /// The lines starting in memory within `range`, in order.

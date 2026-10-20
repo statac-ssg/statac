@@ -287,7 +287,10 @@ pub fn read(
     // On by default in a debug build only, where it adds to the engine's
     // words, which are read here; off, a test runs as a release does.
     env.set_debug(false);
-    env.set_syntax(check::reading());
+    // The engine writes every space of a template's own text, and the
+    // writer every render goes through (`indent`) leaves out those the page
+    // doesn't have. A render that bypassed it would write them all.
+    env.set_syntax(check::rendering());
     guard::install(&mut env);
     own::install(&mut env);
     env.set_held(indent::held);
@@ -295,30 +298,24 @@ pub fn read(
     env.set_path_join_callback(|name, _| files::named(name).into());
     let mut by_name = HashMap::new();
     let mut facts = Vec::with_capacity(files.len());
+    let mut dropped = Vec::with_capacity(files.len());
     for (at, file) in files.iter().enumerate() {
         by_name.insert(file.name.clone(), at);
-        let mut text = sources.text(file.source).to_owned();
+        let text = sources.text(file.source);
         // A card's text is drawn, and where a JSON file's lines break
-        // doesn't matter.
+        // doesn't matter: each leaves out only the spaces its tags take.
         let read = match escaping(&file.name) {
-            AutoEscape::Html => dedent::facts(&text, true),
-            AutoEscape::None if !file.name.starts_with(card::PREFIX) => dedent::facts(&text, false),
+            AutoEscape::Html => dedent::facts(text, true),
+            AutoEscape::None if !file.name.starts_with(card::PREFIX) => dedent::facts(text, false),
             _ => None,
         };
-        if let Some(read) = &read {
-            // The same length, so every place in the text stays where it is.
-            let mut bytes = std::mem::take(&mut text).into_bytes();
-            for &at in &read.keeps {
-                bytes[at] = b'+';
-            }
-            for &at in &read.trims {
-                bytes[at] = b'-';
-            }
-            text = String::from_utf8(bytes).expect("a space written as a plus");
-        }
+        dropped.push(match &read {
+            Some(read) => read.dropped.clone(),
+            None => dedent::dropped(text),
+        });
         facts.push(read);
         // A file the engine can't read was told about when it was checked.
-        let _ = env.add_template_owned(file.name.clone(), text);
+        let _ = env.add_template_owned(file.name.clone(), text.to_owned());
     }
     for snippet in snippets.values() {
         render::register_snippet(&mut env, snippet);
@@ -336,17 +333,18 @@ pub fn read(
         steps,
         many_walked: lowered_walked(root).unwrap_or(walks::MANY),
     };
-    templates.landings = Arc::new(landings(&templates, &facts, sources));
+    templates.landings = Arc::new(landings(&templates, &facts, &dropped, sources));
     (templates, problems)
 }
 
 /// Where the lines of the site's files are written, from what is known of
-/// each. What tells an indent meant for the template from one meant for
-/// the page is the markup: elsewhere an indent may mean something, and
-/// is kept.
+/// each, and what of their text is left out. What tells an indent meant
+/// for the template from one meant for the page is the markup: elsewhere
+/// an indent may mean something, and is kept.
 fn landings(
     templates: &Templates,
     facts: &[Option<dedent::Facts>],
+    dropped: &[Vec<std::ops::Range<usize>>],
     sources: &Sources,
 ) -> landing::Landings {
     let markup = |at: usize| matches!(escaping(&templates.files[at].name), AutoEscape::Html);
@@ -360,7 +358,10 @@ fn landings(
         })
     };
     let mut landings = landing::Landings::default();
-    for at in 0..templates.files.len() {
+    for (at, file) in templates.files.iter().enumerate() {
+        if let Ok(template) = templates.env.get_template(&file.name) {
+            landings.leave_out(template.source().as_ptr() as usize, &dropped[at]);
+        }
         if let Some(held) = held(at) {
             landings.add(&held, markup(at));
         }
