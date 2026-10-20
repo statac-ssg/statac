@@ -2736,7 +2736,8 @@ fn another_tools_call_among_the_words_is_told_where_written() {
                 - An item {{%note%}}.\n\n\
                 > A quotation {% include note.html %}.\n\n\
                 ## A {{<figure>}} heading {{% note %}}\n\n\
-                Two {%raw%} and {{< b >}} on one line.\n";
+                Two {%raw%} and {{< b >}} on one line.\n\n\
+                {{ <youtube id=\"abcdefghijk\" /> }} and {{\t<ui.button_1 label=\"Name 1\"/>}}\n";
     let told = told_at(text);
     assert_eq!(
         told,
@@ -2748,6 +2749,8 @@ fn another_tools_call_among_the_words_is_told_where_written() {
             call("{{% note %}}"),
             call("{%raw%}"),
             call("{{< b >}}"),
+            call("{{ <youtube id=\"abcdefghijk\" /> }}"),
+            call("{{\t<ui.button_1 label=\"Name 1\"/>}}"),
         ]
     );
     assert_eq!(told_at(&text.replace('\n', "\r\n")), told);
@@ -2778,8 +2781,8 @@ fn another_tools_mark_on_a_line_of_its_own_is_told_where_written() {
 
 /// Another tool's call or mark written as code, in raw HTML's own code or
 /// a comment, or after a backslash, is never told; nor are doubled braces
-/// with neither bracket nor percent sign, Statac's own call, or braces
-/// closing a heading.
+/// with neither bracket nor percent sign, or with a bracket opening no
+/// tag, Statac's own call, or braces closing a heading.
 #[test]
 fn another_tools_call_kept_as_code_or_escaped_is_never_told() {
     let text = "A code span: `{{< figure >}}` and `{: .box}`.\n\n\
@@ -2789,6 +2792,7 @@ fn another_tools_call_kept_as_code_or_escaped_is_never_told() {
                 <!--\n{: .box}\n-->\n\n\
                 Escaped: \\{{< figure >}}, \\{% raw %} and\n\\{: .box}\n\n\
                 Braces alone: {{ title }} and {{ page.title | upcase }}.\n\n\
+                Not a tag: {{ <3 }}, {{ < name }} and {{ a < b }}.\n\n\
                 Statac's own: @figure(src=\"photo-1.jpg\") and \\@figure(src=\"{{< x >}}\").\n\n\
                 ## A heading {#id}\n\n## A heading {.class}\n\n## A heading {% raw %}\n";
     for text in [text.to_owned(), text.replace('\n', "\r\n")] {

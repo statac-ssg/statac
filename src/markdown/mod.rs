@@ -276,9 +276,20 @@ fn another_tools(document: &Document, text: &str, body: Span) -> Vec<Problem> {
 }
 
 /// The length of another tool's call or mark opening `line`, and which it
-/// is: `{{< name >}}`, `{{% name %}}`, `{% name %}` or `{: name}`, closed on
-/// the line and holding something.
+/// is: `{{< name >}}`, `{{ <name /> }}`, `{{% name %}}`, `{% name %}` or
+/// `{: name}`, closed on the line and holding something.
 fn another_tools_braces(line: &str) -> Option<(usize, PublishedAsText)> {
+    // Tera's component call, with space before its tag; without, it opens
+    // `{{<` as below. Doubled braces holding anything else may be words.
+    if let Some(rest) = line.strip_prefix("{{")
+        && let tag = rest.trim_start_matches([' ', '\t'])
+        && tag.len() < rest.len()
+        && let Some(name) = tag.strip_prefix('<')
+        && name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+    {
+        let inside = rest.find("}}")? + 2;
+        return Some((inside + 2, PublishedAsText::Call));
+    }
     let (open, close, why) = [
         ("{{<", ">}}", PublishedAsText::Call),
         ("{{%", "%}}", PublishedAsText::Call),
