@@ -2,6 +2,100 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.6.0 - 2026-10-20
+
+### New
+
+- Search, Statac's own. A page that reads its search box's `index`,
+  given by `page.search_box()`, has the build publish a search index
+  under `/search/`, and Statac's script for reading it, which ranks as
+  `statac search` does. A search finds the other forms of a word the
+  site holds (`running` finds `run`) in 31 languages, ignores accents,
+  reads Chinese and Japanese by word however the reader's browser
+  divides them, searches each language of a site apart, names and dates
+  each result as the site's lists do, shows the text round the words at
+  the part of the page that matched, and offers the nearest words the
+  site holds when it finds nothing.
+- A new site has a search page at `/search/`, linked from the menu,
+  and a snippet that makes the box, for the author to place elsewhere.
+  `statac new --update --missing` adds them to an existing site.
+- `statac search "words"` shows the pages a reader of the site would
+  find for the words, best first, each at the part of the page that
+  matched, with the text round the words. `--drafts` searches drafts
+  and posts waiting for their day too, and `--language` the pages in
+  one language.
+- `search: false` leaves a page out of search, and `pages.search: false`
+  a folder's pages.
+- Serve's panel has a Search tab: type some words to see the pages a
+  reader would find, best first, drafts and posts waiting for their day
+  among them, and why each ranks where it does.
+- `search_without_javascript: duckduckgo` in `statac.yaml` has the
+  starter's search page, for a reader without JavaScript, send the
+  search to DuckDuckGo limited to the site's host. Without it, the page
+  says search needs JavaScript.
+
+### Fixed
+
+- Markup in the writing after a comment ended by `--!>` is kept, where
+  it was left out of the page, and so is a comment written inside an
+  element whose text is raw, such as `<xmp>`.
+- `@url(...)`, snippet calls and typography after a comment in the
+  writing ended by `--!>`, or written `<!-->` or `<!--->`, work. They
+  were left as typed, and the address told as a broken link.
+- `@url(...)` and snippet calls after `<!--` written inside a
+  `<textarea>`, `<title>`, `<style>` or another element whose text holds
+  no markup work. They were left as typed, and the address told as a
+  broken link.
+- A link in the writing whose unquoted address ends in `/`, as
+  `<a href=https://example.org/>`, no longer gets a second link inside
+  it, round an address in its text.
+- A `<pre>` written in capitals, a `<textarea>`, `<listing>` or `<xmp>`
+  in a list item or quotation keeps its lines as written. They gained
+  the item's indentation.
+- A heading holding a `<script>` or `<style>` element keeps that
+  element's text out of its id, its entry in `page.toc` and a title
+  made from it: `## Setup <script>x()</script>` has the id `setup` and
+  the entry "Setup". The element's text was taken in. The id of such a
+  heading changes, so a link written with its old id stops landing;
+  give the heading an id in braces to keep one.
+- A broken link written in a template whose text holds U+0001 or U+0002
+  is told at the address or expression that wrote it. Such a character
+  was taken for one of the template's own tags, and the link could be
+  told at the wrong place.
+- A component call written `{{ <name /> }}` in the writing, as Zola 0.23
+  writes it, is warned of as published as text.
+- `statac import` reads a site made with Zola 0.23 or later as Zola
+  did, running its writing as a template: `{% raw %}` and
+  `{% endraw %}` are taken out and what they held kept, and the
+  writing's other template code, such as `{{ page.title }}`, is listed
+  in the report rather than passed over. A file
+  `skip_content_templating` names is left as written.
+- `statac import` converts Zola 0.23's component calls,
+  `{{ <name /> }}` and `{% <name> %}` to `{% </name> %}`, as it converts
+  shortcodes, and lists those it can't.
+- `statac import` gives a Zola 0.23 site's `{{ get_url(...) }}` the
+  address Zola gave it, and lists a call to one of Zola's other
+  functions in the report, rather than making either a call to a
+  snippet that doesn't exist.
+- `statac import` links a Zola 0.23 site's `@/` link to a file beside a
+  page, in the writing or through `get_url`, to the file where it is
+  published. It was left as written and reported as a page that didn't
+  come across.
+- `statac import` mends a post's front matter where a quoted value
+  needs it, though the front matter holds a character from Unicode's
+  private use area, as icon fonts use. Such a post was left for the
+  reader to refuse.
+
+### Changed
+
+- A site whose pages take their titles from their opening headings,
+  with no `title:` of their own, builds with about 5% less work: each
+  page's writing is read once, where it was read again for its title
+  wherever another page named it.
+- A build no longer opens each picture, recording, font and PDF
+  published as it is to look for JavaScript, which no browser runs from
+  them.
+
 ## 0.5.1 - 2026-10-19
 
 ### Fixed

@@ -1,0 +1,127 @@
+{# A box that searches the pages in the page's language and lists what it finds beneath it as the reader types, called as {{ search() }}. Without JavaScript it is hidden: see /search/ -#}
+{% set words = site.data.words[page.language] %}
+{% set box = page.search_box() %}
+{% if box.first %}
+{# The script shows the box and lists the pages found beneath it. Finding and ranking them is the work of the script `box.index` names, which Statac writes at each build. #}
+<script type="module">
+  const plurals = new Intl.PluralRules(document.documentElement.lang);
+
+  for (const box of document.querySelectorAll("search[data-index]")) {
+    const typed = box.querySelector("input");
+    const count = box.querySelector("[role=status]");
+    const found = box.querySelector(".found");
+    let asked = 0;
+
+    const show = async (typing) => {
+      const wanted = typed.value.trim();
+      const mine = ++asked;
+      const address = new URL(location);
+      if (wanted) {
+        address.searchParams.set("q", wanted);
+      } else {
+        address.searchParams.delete("q");
+      }
+      history.replaceState(history.state, "", address);
+      if (!wanted) {
+        count.textContent = "";
+        found.replaceChildren();
+        return;
+      }
+      const { search } = await import(box.dataset.index);
+      const outcome = await search(wanted, { typing });
+      // A later search has begun, and its pages are the ones to show.
+      if (mine !== asked) {
+        return;
+      }
+      if (outcome.count === 0) {
+        count.textContent = box.dataset.foundNone;
+        if (outcome.suggestion) {
+          count.append(" ", ...meant(outcome.suggestion));
+        }
+      } else {
+        const one = plurals.select(outcome.count) === "one";
+        const pages = one ? box.dataset.foundOne : box.dataset.foundOther;
+        count.textContent = pages.replace("{count}", outcome.count);
+        if (outcome.partial) {
+          count.textContent += " " + box.dataset.foundSome;
+        }
+      }
+      found.replaceChildren(...outcome.results.map(result));
+    };
+
+    /** The words offered in place of `suggestion`, as a link that searches for it. */
+    const meant = (suggestion) => {
+      const link = document.createElement("a");
+      const address = new URL(location);
+      address.searchParams.set("q", suggestion);
+      link.href = address;
+      link.textContent = suggestion;
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        typed.value = suggestion;
+        typed.focus();
+        show(false);
+      });
+      const [before, after = ""] = box.dataset.meant.split("{words}");
+      return [before, link, after];
+    };
+
+    typed.addEventListener("input", () => show(true));
+    typed.value = new URL(location).searchParams.get("q") ?? "";
+    box.hidden = false;
+    if (typed.value) {
+      show(false);
+    }
+  }
+
+  /** A page found, as an item of the list. */
+  function result(page) {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = page.url;
+    link.textContent = page.title;
+    item.append(link);
+    if (page.heading) {
+      const heading = document.createElement("p");
+      heading.className = "part";
+      heading.textContent = page.heading;
+      item.append(heading);
+    }
+    if (page.day) {
+      const date = document.createElement("time");
+      date.dateTime = page.date;
+      date.textContent = page.day;
+      item.append(date);
+    }
+    if (page.excerpt.length) {
+      const excerpt = document.createElement("p");
+      let before = "";
+      excerpt.append(
+        ...page.excerpt.map((piece) => {
+          const text = piece.text.replace(/\n/g, (_, at, whole) => parting(whole[at - 1] ?? before));
+          before = text.at(-1) ?? before;
+          if (!piece.marked) {
+            return text;
+          }
+          const mark = document.createElement("mark");
+          mark.textContent = text;
+          return mark;
+        }),
+      );
+      item.append(excerpt);
+    }
+    return item;
+  }
+
+  /** What stands where one block of the text ends and the next starts, after `last`. */
+  function parting(last) {
+    return ".,:;!?…。、，：；！？".includes(last) ? " " : " · ";
+  }
+</script>
+{% endif %}
+<search id="{{ box.id }}" data-index="{{ box.index }}" data-found-one="{{ words.found_one }}" data-found-other="{{ words.found }}" data-found-some="{{ words.found_some }}" data-found-none="{{ words.found_none }}" data-meant="{{ words.meant }}" hidden>
+  <label for="{{ box.id }}-words">{{ words.search }}</label>
+  <input id="{{ box.id }}-words" type="search" autocomplete="off">
+  <p role="status"></p>
+  <ol class="found"></ol>
+</search>

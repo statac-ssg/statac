@@ -131,4 +131,10 @@ past! {
     "0.2.0" "templates/redirect.html",
     "0.2.0" "templates/sitemap.xml",
     "0.2.0" "templates/tags.html",
+    "0.6.0" "assets/site.css",
+    "0.6.0" "content/404.md",
+    "0.6.0" "content/search.md",
+    "0.6.0" "content/tags.md",
+    "0.6.0" "snippets/search.html",
+    "0.6.0" "templates/search.html",
 }
