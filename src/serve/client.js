@@ -2427,7 +2427,7 @@
     const pages = languages.reduce((sum, language) => sum + language.pages, 0);
     const suggestion = languages.find((language) => language.suggestion)?.suggestion;
     if (pages) {
-      const some = languages.some((language) => language.some && language.pages);
+      const some = languages.some((language) => language.some);
       refill(searchStatus, told("pagesFound", { n: pages }), some ? ` ${told("foundSome")}` : null);
     } else {
       const meant = make(

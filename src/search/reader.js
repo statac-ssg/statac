@@ -512,5 +512,6 @@ async function found(query, shown, typing, respelling = true) {
   );
   const suggestion =
     !best.length && respelling ? await meant(query, located, all, asked, looked) : null;
-  return { count: best.length, partial: most < asked.length, results, suggestion };
+  const partial = best.length > 0 && most < asked.length;
+  return { count: best.length, partial, results, suggestion };
 }

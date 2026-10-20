@@ -181,7 +181,7 @@ pub fn results(
     Results {
         shown,
         pages: best.len(),
-        some: best_matched < asked.words.len(),
+        some: !best.is_empty() && best_matched < asked.words.len(),
         suggestion,
     }
 }

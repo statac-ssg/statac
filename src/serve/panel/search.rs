@@ -76,8 +76,7 @@ fn in_language(
         "{{\"code\":{code},\"pages\":{},\"some\":{},\"suggestion\":{},\"parts\":{},\
          \"average\":{},\"results\":[{}]}}",
         found.pages,
-        // Where nothing is found, no page holds some either.
-        found.some && found.pages > 0,
+        found.some,
         or_null(found.suggestion.as_deref()),
         index.records.len(),
         index.average(),

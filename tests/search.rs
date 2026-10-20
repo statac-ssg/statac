@@ -501,11 +501,40 @@ fn a_suggestion_comes_from_the_piece_of_the_word_list_the_word_falls_in() {
     let after = format!("{first}q");
     let asked = &[(before, false), (after.as_str(), false)];
     let rust = statac_finds(&site, 0, asked);
-    assert_eq!(rust, format!("[[0,true,[],null],[0,true,[],\"{first}\"]]"));
+    assert_eq!(
+        rust,
+        format!("[[0,false,[],null],[0,false,[],\"{first}\"]]")
+    );
     let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
         return;
     };
     assert_eq!(rust, browser);
+}
+
+#[test]
+fn only_pages_found_holding_some_of_the_words_are_found_in_part() {
+    let site = Site::new("reader-partial");
+    site.index();
+    // The words asked for, the pages found, whether in part, and the
+    // words meant.
+    let cases: &[(&str, usize, bool, &str)] = &[
+        ("", 0, false, "null"),
+        ("zzqxv", 0, false, "null"),
+        ("runnign", 0, false, "\"running\""),
+        ("running nowhere", 1, true, "null"),
+        ("running", 1, false, "null"),
+    ];
+    let asked: Vec<(&str, bool)> = cases.iter().map(|&(words, ..)| (words, false)).collect();
+    let rust = statac_finds(&site, 0, &asked);
+    let browser = browser_finds(&site.root.join("_site/search/index.js"), &asked, None);
+    for found in [Some(rust), browser].into_iter().flatten() {
+        for (&(words, pages, partial, meant), found) in cases.iter().zip(split(&found)) {
+            let found = split(&found);
+            assert_eq!(found[0], pages.to_string(), "{words}");
+            assert_eq!(found[1], partial.to_string(), "{words}");
+            assert_eq!(found[3], meant, "{words}");
+        }
+    }
 }
 
 #[test]
