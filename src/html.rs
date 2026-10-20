@@ -41,6 +41,9 @@ pub(crate) const RAW_TEXT: &[&str] = &[
     "style", "xmp", "iframe", "noembed", "noframes", "noscript", "title", "textarea",
 ];
 
+/// Elements whose text a browser shows with its spaces and line breaks.
+pub(crate) const PREFORMATTED: &[&str] = &["listing", "plaintext", "pre", "textarea", "xmp"];
+
 /// Calls `each` with every start tag in `html`, read as a browser reads an
 /// HTML document.
 pub(crate) fn start_tags(html: &str, mut each: impl FnMut(&Tag)) {

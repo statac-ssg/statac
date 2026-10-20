@@ -10,6 +10,7 @@ use super::node::{Alignment, Kind, Node};
 use super::opening::{self, Written, words_of};
 use super::pieces::{self, Piece, PieceValue};
 use crate::highlight::{self, Highlighter, Language};
+use crate::html::{Markup, PREFORMATTED, markup};
 use crate::source::{Place, Span};
 
 /// What writes a snippet call's HTML, and the pieces of the writing the
@@ -526,8 +527,8 @@ impl<'a> Writer<'a> {
     }
 
     /// A block of the author's own HTML, a line at a time, re-indented to
-    /// the depth it sits at except inside a `<pre>`, and without its
-    /// comments.
+    /// the depth it sits at except where the spaces would show, and without
+    /// its comments.
     fn html_block(&mut self, children: &[Node]) {
         let mut html = String::new();
         for child in children {
@@ -540,38 +541,38 @@ impl<'a> Writer<'a> {
                 _ => {}
             }
         }
-        let mut written = false;
-        let mut preformatted = false;
-        for (line, joins) in without_comments(&html) {
-            if joins && written {
-                self.out.push_str(&line);
-            } else if written {
-                self.out.push('\n');
-                if !preformatted {
-                    self.indent();
-                }
-                self.out.push_str(&line);
-            } else {
-                self.new_block();
-                self.out.push_str(&line);
-                written = true;
-            }
-            preformatted = preformatted_after(preformatted, &line);
+        let lines = without_comments(&html);
+        if lines.is_empty() {
+            return;
         }
+        let mut kept = String::new();
+        for (n, (line, joins)) in lines.iter().enumerate() {
+            if n > 0 && !joins {
+                kept.push('\n');
+            }
+            kept.push_str(line);
+        }
+        self.new_block();
+        self.at_depth(kept.split('\n'), &preformatted_lines(&kept));
     }
 
     /// HTML a snippet wrote, standing as a block at the depth it sits at.
     fn laid_out(&mut self, html: &str) {
-        let mut preformatted = false;
-        for (n, line) in html.trim().lines().enumerate() {
+        let html = html.trim();
+        self.at_depth(html.lines(), &preformatted_lines(html));
+    }
+
+    /// Lines of HTML, each after the first indented to the depth it sits at
+    /// unless it starts where `shown` says the spaces would show.
+    fn at_depth<'l>(&mut self, lines: impl Iterator<Item = &'l str>, shown: &[bool]) {
+        for (n, line) in lines.enumerate() {
             if n > 0 {
                 self.out.push('\n');
-                if !preformatted {
+                if !shown[n] {
                     self.indent();
                 }
             }
             self.out.push_str(line);
-            preformatted = preformatted_after(preformatted, line);
         }
     }
 
@@ -1133,36 +1134,55 @@ fn is_comment(html: &str) -> bool {
         && crate::html::comment_end(html.as_bytes(), "<!--".len()) == html.len()
 }
 
-/// Whether a `<pre>` is still open once `line` has been written.
-fn preformatted_after(open: bool, line: &str) -> bool {
-    let mut open = open;
-    let mut rest = line;
-    loop {
-        let opens = rest.find("<pre");
-        let closes = rest.find("</pre");
-        let (at, opening) = match (opens, closes) {
-            (Some(o), Some(c)) if o < c => (o, true),
-            (_, Some(c)) => (c, false),
-            (Some(o), None) => (o, true),
-            (None, None) => return open,
-        };
-        open = opening;
-        rest = &rest[at + if opening { 4 } else { 5 }..];
+/// Whether each line of `html`, split at `\n`, starts inside an element
+/// whose text shows its spaces, as a browser reads the markup.
+fn preformatted_lines(html: &str) -> Vec<bool> {
+    let mut stretches = Vec::new();
+    let mut open = Vec::new();
+    let mut from = 0;
+    for (at, piece) in markup(html) {
+        match piece {
+            Markup::Start(tag) => {
+                if let Some(name) = PREFORMATTED.iter().find(|name| **name == tag.name) {
+                    if open.is_empty() {
+                        from = at.end;
+                    }
+                    open.push(*name);
+                }
+            }
+            Markup::End(tag) => {
+                if let Some(inner) = open.iter().rposition(|name| *name == tag.name) {
+                    open.truncate(inner);
+                    if open.is_empty() {
+                        // Spaces before the end tag are still its text.
+                        stretches.push(from..=at.start);
+                    }
+                }
+            }
+            Markup::Other => {}
+        }
     }
+    if !open.is_empty() {
+        stretches.push(from..=html.len());
+    }
+    std::iter::once(0)
+        .chain(html.match_indices('\n').map(|(at, _)| at + 1))
+        .map(|start| stretches.iter().any(|stretch| stretch.contains(&start)))
+        .collect()
 }
 
 /// The lines of a block of HTML without its comments, each with whether it
 /// carries on the line before because a comment took the break between
-/// them. A line that held only comments is gone, unless it is inside a
-/// `<pre>`, where its break is part of what is shown.
+/// them. A line that held only comments is gone, unless it is inside an
+/// element such as `<pre>`, where its break is part of what is shown.
 fn without_comments(html: &str) -> Vec<(String, bool)> {
     let comments = comments_in(html);
+    let preformatted = preformatted_lines(html);
     let mut lines = Vec::new();
-    let mut preformatted = false;
     let mut open_written = false;
     let mut next = 0;
     let mut start = 0;
-    for line in html.split_inclusive('\n') {
+    for (n, line) in html.split_inclusive('\n').enumerate() {
         let end = start + line.len();
         while comments.get(next).is_some_and(|c| c.end <= start) {
             next += 1;
@@ -1170,7 +1190,6 @@ fn without_comments(html: &str) -> Vec<(String, bool)> {
         let touching = &comments[next..next + comments[next..].partition_point(|c| c.start < end)];
         let (Some(first), Some(last)) = (touching.first(), touching.last()) else {
             let kept = line.trim_end_matches('\n');
-            preformatted = preformatted_after(preformatted, kept);
             lines.push((kept.to_owned(), false));
             start = end;
             continue;
@@ -1183,14 +1202,13 @@ fn without_comments(html: &str) -> Vec<(String, bool)> {
         }
         kept.push_str(&html[from..end]);
         let kept = kept.trim_end_matches('\n');
-        let gone = !preformatted && kept.trim().is_empty();
+        let gone = !preformatted[n] && kept.trim().is_empty();
         if !gone {
             lines.push((kept.to_owned(), first.start < start && open_written));
         }
         if last.end > end && last.start >= start {
             open_written = !gone;
         }
-        preformatted = preformatted_after(preformatted, kept);
         start = end;
     }
     lines

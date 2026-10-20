@@ -16,6 +16,7 @@ use std::{fmt, io};
 use minijinja::{Captured, Error, Held, Output, Template, Value};
 
 use super::landing::{Deeper, Landing, Place, Placing};
+use crate::html::PREFORMATTED;
 
 /// The line a template, or a body the engine holds back, is writing.
 struct Line {
@@ -727,7 +728,7 @@ impl Reader {
             Some(name) => (true, name),
             None => (false, tag),
         };
-        if names(name, "pre") || names(name, "textarea") {
+        if PREFORMATTED.iter().any(|shown| names(name, shown)) {
             self.shown = !closes;
         }
         ["script", "style"]

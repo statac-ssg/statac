@@ -34,15 +34,14 @@ use std::ops::Range;
 
 use minijinja::machinery::{Token, tokenize};
 
+use crate::html::PREFORMATTED;
+
 /// Blocks whose body is written where the block stands, as a `block`'s
 /// is where its template is the one rendered.
 const FLOWING: [&str; 5] = ["for", "if", "with", "autoescape", "block"];
 
 /// Blocks whose body is written somewhere else, or held back.
 const PLACED: [&str; 4] = ["macro", "call", "filter", "set"];
-
-/// Elements whose lines show their spaces.
-const SHOWN: [&str; 2] = ["pre", "textarea"];
 
 /// Elements whose text is not markup.
 const SCRIPTED: [&str; 2] = ["script", "style"];
@@ -1268,7 +1267,9 @@ fn markup(lines: &mut [Line], blanked: &[u8]) {
             .map_or(blanked.len(), |next| next.start);
         let text = &blanked[start..end];
         let line = &mut lines[number];
-        line.shown = special.as_deref().is_some_and(|name| SHOWN.contains(&name));
+        line.shown = special
+            .as_deref()
+            .is_some_and(|name| PREFORMATTED.contains(&name));
         line.scripted = special
             .as_deref()
             .is_some_and(|name| SCRIPTED.contains(&name));
@@ -1308,7 +1309,9 @@ fn markup(lines: &mut [Line], blanked: &[u8]) {
                             }
                         } else if !VOID.contains(&name.as_str()) && !ended && special.is_none() {
                             line.opens += 1;
-                            if SHOWN.contains(&name.as_str()) || SCRIPTED.contains(&name.as_str()) {
+                            if PREFORMATTED.contains(&name.as_str())
+                                || SCRIPTED.contains(&name.as_str())
+                            {
                                 special = Some(name);
                             }
                         }

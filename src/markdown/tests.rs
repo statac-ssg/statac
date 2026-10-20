@@ -1533,6 +1533,36 @@ fn line_feeds_and_carriage_returns_read_alike() {
     }
 }
 
+/// The author's HTML in a list item or a quotation is indented to its
+/// depth, except where the spaces would show: inside `<pre>` or
+/// `<textarea>` in either case, but not inside an element whose name only
+/// starts the same.
+#[test]
+fn html_keeps_its_lines_where_the_spaces_would_show() {
+    let cases = [
+        (
+            "- One.\n\n  <PRE>\n  a\n    b\n  </PRE>\n",
+            "    <PRE>\na\n  b\n</PRE>\n  </li>",
+        ),
+        (
+            "> <textarea>\n> a\n>   b\n> </textarea>\n",
+            "  <textarea>\na\n  b\n</textarea>\n</blockquote>",
+        ),
+        (
+            "> <pre>\n> a <prefix>b</prefix>\n>   c\n> </pre>\n",
+            "  <pre>\na <prefix>b</prefix>\n  c\n</pre>\n</blockquote>",
+        ),
+        (
+            "- One.\n\n  <preview>\n  a\n  </preview>\n",
+            "    <preview>\n    a\n    </preview>\n  </li>",
+        ),
+    ];
+    for (text, html) in cases {
+        let written = html_of(text);
+        assert!(written.contains(html), "{text:?} wrote\n{written}");
+    }
+}
+
 #[test]
 fn documents_are_written_as_expected() {
     for name in [
