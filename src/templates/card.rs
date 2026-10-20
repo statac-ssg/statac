@@ -66,6 +66,10 @@ pub(super) struct Cards {
     picked_elsewhere: Vec<String>,
     /// The site's folder.
     root: PathBuf,
+    /// Where each file in `templates/og/` really is, as
+    /// [`cards::Cards::found`] has it under `real`.
+    found: HashMap<String, String>,
+    real: PathBuf,
 }
 
 /// Where a template stands in a description.
@@ -124,6 +128,13 @@ pub(super) fn files(cards: &Cards) -> Vec<String> {
         .collect()
 }
 
+/// The file the cards are drawn with at `path` in the site, opened where
+/// it really is and reached through no link.
+pub(super) fn open(cards: &Cards, path: &str) -> std::io::Result<std::fs::File> {
+    let at = (cards.found.get(path)).ok_or(std::io::ErrorKind::NotFound)?;
+    crate::platform::open_file(&cards.real, at)
+}
+
 /// Holds the texts of `cards` as templates among `files`, each read as a
 /// source of its own.
 pub(super) fn gather(
@@ -135,6 +146,8 @@ pub(super) fn gather(
     let mut gathered = Cards {
         root: root.to_path_buf(),
         picked_elsewhere: cards.picked_elsewhere,
+        found: cards.found,
+        real: cards.real,
         ..Cards::default()
     };
     for described in cards.described {
@@ -603,7 +616,10 @@ fn make_kit(cards: &Cards, at: usize) -> Result<Kit, Problem> {
     let card = described.card.as_ref().expect("a description read whole");
     let read = |named: &Sourced<String>| {
         let path = cards::file_named(&named.value);
-        std::fs::read(crate::platform::join(&cards.root, &path)).map_err(|error| {
+        let mut bytes = Vec::new();
+        let read = open(cards, &path)
+            .and_then(|mut file| std::io::Read::read_to_end(&mut file, &mut bytes));
+        read.map(|_| bytes).map_err(|error| {
             let kind = Kind::CantRead {
                 path: PathBuf::from(&path),
                 reason: system_reason(&error),

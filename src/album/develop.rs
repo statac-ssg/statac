@@ -14,8 +14,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use rayon::prelude::*;
 
 use super::progress::{Counted, Making};
-use super::{KEPT, Picture, Pictures, Progress, is_file_itself, keep_file, kept_in, quietly};
+use super::{KEPT, Picture, Pictures, Progress, is_file_itself, kept_in, make_kept_in, quietly};
 use crate::pictures::{self, Error, Rendition, Unreadable};
+use crate::platform;
 use crate::problem::{Kind, PictureFault, Problem, system_reason};
 use crate::publish::Staging;
 use crate::site::PictureId;
@@ -55,8 +56,9 @@ fn kept_as(copy: &Rendition) -> String {
 pub(crate) struct Kept {
     /// The folder's name in `.statac`.
     sub: &'static str,
-    /// None where nothing may be kept or taken from what is kept.
-    folder: Option<PathBuf>,
+    /// The site's `.statac`; none where nothing may be kept or taken from
+    /// what is kept.
+    kept: Option<PathBuf>,
     /// Why nothing may be, where the folder is refused.
     refused: Option<std::io::Error>,
     /// Why nothing more is kept, once a copy couldn't be.
@@ -72,13 +74,13 @@ pub(crate) struct Kept {
 impl Kept {
     /// What the site at `site` keeps in the folder `sub` of `.statac`.
     pub(crate) fn new(site: &Path, sub: &'static str) -> Kept {
-        let (folder, refused) = match kept_in(site, sub) {
-            Ok(folder) => (Some(folder), None),
+        let (kept, refused) = match kept_in(site, sub) {
+            Ok(_) => (Some(site.join(KEPT)), None),
             Err(error) => (None, Some(error)),
         };
         Kept {
             sub,
-            folder,
+            kept,
             refused,
             unwritten: Mutex::new(None),
             direct: Mutex::new(HashSet::new()),
@@ -89,18 +91,28 @@ impl Kept {
     /// Whether `name` is kept. Only a file itself is: a link standing in
     /// for one is never read, and what it stood for is made again.
     pub(crate) fn has(&self, name: &str) -> bool {
-        self.folder
+        self.kept
             .as_ref()
-            .is_some_and(|folder| is_file_itself(&folder.join(name)))
+            .is_some_and(|kept| is_file_itself(&kept.join(self.sub).join(name)))
+    }
+
+    /// `name`'s path in `.statac`.
+    fn rel(&self, name: &str) -> String {
+        format!("{}/{name}", self.sub)
+    }
+
+    /// What is kept as `name`, opened to read through no link.
+    fn open(&self, name: &str) -> std::io::Result<fs::File> {
+        let gone = || std::io::Error::from(std::io::ErrorKind::NotFound);
+        let kept = self.kept.as_ref().ok_or_else(gone)?;
+        platform::open_file(kept, &self.rel(name))
     }
 
     /// Makes the folder ready to keep something new in.
     pub(crate) fn make_ready(&self, site: &Path) {
         // Asked again once made: either may have been put there as a link.
-        let made = match (&self.folder, &self.refused) {
-            (Some(folder), _) => {
-                fs::create_dir_all(folder).and_then(|()| kept_in(site, self.sub).map(drop))
-            }
+        let made = match (&self.kept, &self.refused) {
+            (Some(_), _) => make_kept_in(site, self.sub).map(drop),
             (None, Some(error)) => Err(std::io::Error::new(error.kind(), error.to_string())),
             (None, None) => Ok(()),
         };
@@ -129,10 +141,10 @@ impl Kept {
         staging: &Staging,
     ) -> Result<(), Problem> {
         let usable = self.unwritten.lock().expect("never poisoned").is_none();
-        if let Some(folder) = self.folder.as_ref().filter(|_| usable) {
+        if let Some(kept) = self.kept.as_ref().filter(|_| usable) {
             let nth = self.fresh.fetch_add(1, Ordering::Relaxed);
             let fresh = format!("{name}.{}-{nth}", std::process::id());
-            match keep_file(folder, name, &fresh, bytes) {
+            match platform::keep_file(kept, &self.rel(name), &fresh, bytes) {
                 Ok(()) => return Ok(()),
                 Err(error) => self.gave_up(&error),
             }
@@ -153,14 +165,13 @@ impl Kept {
         wanted: Vec<(String, String)>,
         staging: &Staging,
     ) -> (usize, Vec<Problem>) {
-        let direct = self.direct.into_inner().expect("never poisoned");
+        let direct = std::mem::take(&mut *self.direct.lock().expect("never poisoned"));
         let copied: Vec<Result<(), Problem>> = wanted
             .par_iter()
             .filter(|(_, file)| !direct.contains(file))
             .map(|(name, file)| {
                 let shown = format!("{KEPT}/{}/{name}", self.sub);
-                let from = self.folder.as_ref().map(|folder| folder.join(name));
-                staging.copy_whole(&from.unwrap_or_default(), &shown, file)
+                staging.copy_whole(self.open(name), &shown, file)
             })
             .collect();
         let mut published = direct.len();
@@ -181,10 +192,10 @@ impl Kept {
     /// there is left alone, and nothing is removed where the folder is
     /// not a folder of the site's own.
     pub(crate) fn sweep(&self, wanted: &HashSet<String>, endings: &[&str]) -> usize {
-        let Some(folder) = &self.folder else {
+        let Some(kept) = &self.kept else {
             return 0;
         };
-        let Ok(entries) = fs::read_dir(folder) else {
+        let Ok(entries) = fs::read_dir(kept.join(self.sub)) else {
             return 0;
         };
         let mut removed = 0;
@@ -200,7 +211,7 @@ impl Kept {
             let ours = endings
                 .iter()
                 .any(|ending| name.rsplit_once('.').is_some_and(|(_, e)| e == *ending));
-            if fs::remove_file(folder.join(&name)).is_ok() && ours {
+            if platform::remove_file(kept, &self.rel(&name)).is_ok() && ours {
                 removed += 1;
             }
         }

@@ -550,6 +550,12 @@ impl Renderer {
         super::card::files(&self.shared.templates.cards)
     }
 
+    /// The file of [`Renderer::card_files`] at `path`, opened where it
+    /// really is and reached through no link.
+    pub(crate) fn open_card_file(&self, path: &str) -> std::io::Result<std::fs::File> {
+        super::card::open(&self.shared.templates.cards, path)
+    }
+
     /// The build's date.
     pub(crate) fn today(&self) -> crate::date::Date {
         crate::dates::ShowDates::today(&self.shared.dates)

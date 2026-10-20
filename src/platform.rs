@@ -463,6 +463,62 @@ pub fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
     }
 }
 
+/// Makes the file `rel`, a path with forward slashes under the folder
+/// `root`, hold `bytes`: written whole under the name `fresh` beside it,
+/// which nothing may have yet, and given the file's name in one step, so
+/// a file there is always whole. Refused where `root` or a folder on the
+/// way is a link, or where something other than a file with one name
+/// stands at `rel`; the file under `fresh` is removed where it fails. On
+/// Unix each is done by name in the folder above, already open, and never
+/// through a link.
+pub fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        unix::keep_file(root, rel, fresh, bytes)
+    }
+    #[cfg(not(unix))]
+    {
+        use std::io::Write;
+        let to = join(root, rel);
+        let itself = |path: &Path| {
+            std::fs::symlink_metadata(path)
+                .is_ok_and(|found| found.file_type().is_file() && named_once(&found))
+        };
+        if std::fs::symlink_metadata(&to).is_ok() && !itself(&to) {
+            return Err(io::Error::other("something else has its name"));
+        }
+        let fresh = to.with_file_name(fresh);
+        let written = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&fresh)
+            .and_then(|mut file| file.write_all(bytes))
+            .and_then(|()| rename(&fresh, &to));
+        written.inspect_err(|_| {
+            if itself(&fresh) {
+                let _ = std::fs::remove_file(&fresh);
+            }
+        })
+    }
+}
+
+/// Copies what `source`, a file open to read, holds to a new file at `to`,
+/// which nothing may have yet, given the permissions of `source`. On
+/// Apple's systems the two share their bytes where the disk can, as a copy
+/// made by the system's own copying does.
+pub fn copy_file(source: &std::fs::File, to: &Path) -> io::Result<()> {
+    #[cfg(target_vendor = "apple")]
+    if unix::clone_file(source, to)? {
+        return Ok(());
+    }
+    let mut made = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(to)?;
+    io::copy(&mut &*source, &mut made)?;
+    made.set_permissions(source.metadata()?.permissions())
+}
+
 /// The length of the file `rel`, a path with forward slashes under the
 /// folder `root`, and when its bytes last changed, refused as
 /// [`open_file`] refuses. The file is asked without being opened, so one
@@ -992,6 +1048,40 @@ mod tests {
         let missing = length_and_time(&root, "a/c.txt").unwrap_err();
         assert_eq!(missing.kind(), io::ErrorKind::NotFound);
         assert!(length_and_time(&root, "a").is_err());
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_kept_file_is_replaced_whole_and_leaves_nothing_beside_it() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-keep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("a")).unwrap();
+        keep_file(&root, "a/b.txt", "b.txt.fresh", b"one").unwrap();
+        keep_file(&root, "a/b.txt", "b.txt.fresh", b"two").unwrap();
+        assert_eq!(std::fs::read(root.join("a").join("b.txt")).unwrap(), b"two");
+        let names: Vec<_> = std::fs::read_dir(root.join("a")).unwrap().collect();
+        assert_eq!(names.len(), 1);
+        // A folder with the name is not written over.
+        std::fs::create_dir(root.join("a").join("c")).unwrap();
+        let refused = keep_file(&root, "a/c", "c.fresh", b"three").unwrap_err();
+        assert_eq!(refused.to_string(), "something else has its name");
+        assert!(!root.join("a").join("c.fresh").exists());
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_file_open_to_read_is_copied_to_a_new_file_only() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-copy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("a.txt"), "bytes").unwrap();
+        let source = std::fs::File::open(root.join("a.txt")).unwrap();
+        copy_file(&source, &root.join("b.txt")).unwrap();
+        assert_eq!(std::fs::read(root.join("b.txt")).unwrap(), b"bytes");
+        let taken = copy_file(&source, &root.join("b.txt")).unwrap_err();
+        assert_eq!(taken.kind(), io::ErrorKind::AlreadyExists);
         remove_folder(&root).unwrap();
     }
 

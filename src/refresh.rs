@@ -433,7 +433,7 @@ pub(crate) fn keep(fetched: &Path, path: &str, bytes: &[u8]) -> std::io::Result<
     // Made just now, a folder on the way may have been put there as a
     // link since.
     crate::platform::no_link_to(fetched, path)?;
-    crate::album::keep_file(folder, &name, &crate::platform::beside(&name), bytes)
+    crate::platform::keep_file(fetched, path, &crate::platform::beside(&name), bytes)
 }
 
 /// Writes `record`, without the lines of files not `standing`, where it

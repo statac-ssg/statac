@@ -28,7 +28,7 @@ use rayon::prelude::*;
 
 use super::Feed;
 use super::ids::{entry_id, is_a_feed_id, kept_id};
-use crate::album::{KEPT, escaped, keep_file, kept, unescaped};
+use crate::album::{KEPT, escaped, make_kept, unescaped};
 use crate::config::Settings;
 use crate::content::words::PageWord;
 use crate::dates::Dates;
@@ -189,14 +189,15 @@ impl Known {
 
     fn load(at: &Path) -> Known {
         let mut known = Known::default();
-        let Ok(folder) = kept(at) else {
+        // Asked what it is through the handle it is read by, so no link
+        // put in its place, or in place of `.statac`, is read.
+        let Ok(file) = crate::platform::open_file(&at.join(KEPT), FILE) else {
             return known;
         };
-        let file = folder.join(FILE);
-        if !crate::album::is_file_itself(&file) {
+        if !(file.metadata()).is_ok_and(|found| crate::platform::named_once(&found)) {
             return known;
         }
-        let Ok(text) = std::fs::read_to_string(file) else {
+        let Ok(text) = std::io::read_to_string(file) else {
             return known;
         };
         let mut lines = text.lines();
@@ -337,11 +338,9 @@ impl Known {
         if self.text.as_deref() == Some(text.as_str()) {
             return Ok(());
         }
-        std::fs::create_dir_all(kept(at)?)?;
-        // Made just now, it may have been put there as a link since.
-        let folder = kept(at)?;
+        let kept = make_kept(at)?;
         let fresh = format!("{FILE}.{}", std::process::id());
-        keep_file(&folder, FILE, &fresh, text.as_bytes())
+        crate::platform::keep_file(&kept, FILE, &fresh, text.as_bytes())
     }
 }
 

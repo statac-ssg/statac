@@ -216,6 +216,46 @@ pub(super) fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
     opened(root, rel)?.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
 }
 
+/// [`super::keep_file`], by the folder [`holder`] opens.
+pub(super) fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Result<()> {
+    use std::io::Write;
+    let gone = || io::Error::from(io::ErrorKind::NotFound);
+    let (at, name) = holder(root, rel)?.ok_or_else(gone)?;
+    let at = at.as_fd();
+    match statat(at, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Err(Errno::NOENT) => {}
+        Ok(found)
+            if FileType::from_raw_mode(found.st_mode) == FileType::RegularFile
+                && found.st_nlink == 1 => {}
+        Ok(_) => return Err(io::Error::other("something else has its name")),
+        Err(error) => return Err(error.into()),
+    }
+    // Made only where nothing has the name, a link included.
+    let made = OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    let file = openat(at, fresh, made, Mode::from_raw_mode(0o666))?;
+    let written = std::fs::File::from(file)
+        .write_all(bytes)
+        .and_then(|()| Ok(renameat(at, fresh, at, name)?));
+    if written.is_err() {
+        let _ = unlinkat(at, fresh, AtFlags::empty());
+    }
+    written
+}
+
+/// Makes `to` a copy of `source` whose bytes the disk shares with it, as
+/// [`super::copy_file`] does on Apple's systems. `Ok(false)` where the
+/// disk can't, and nothing is made.
+#[cfg(target_vendor = "apple")]
+pub(super) fn clone_file(source: &std::fs::File, to: &Path) -> io::Result<bool> {
+    use rustix::fs::{CloneFlags, fclonefileat};
+    match fclonefileat(source, CWD, to, CloneFlags::empty()) {
+        Ok(()) => Ok(true),
+        // A disk that shares no bytes between files, or another disk.
+        Err(Errno::NOTSUP | Errno::XDEV) => Ok(false),
+        Err(error) => Err(error.into()),
+    }
+}
+
 /// [`super::length_and_time`], by the folder [`holder`] opens.
 pub(super) fn length_and_time(root: &Path, rel: &str) -> io::Result<(u64, SystemTime)> {
     let gone = || io::Error::from(io::ErrorKind::NotFound);
@@ -533,6 +573,28 @@ mod tests {
             let refused = length_and_time(&folder, rel).unwrap_err();
             assert_eq!(refused.to_string(), "it is a link", "{rel}");
         }
+    }
+
+    #[test]
+    fn a_kept_file_is_never_written_through_a_link() {
+        let scratch = Scratch::new("keep-link");
+        let kept = kept(&scratch);
+        let folder = scratch.0.join("folder");
+        fs::create_dir(&folder).unwrap();
+        symlink(&kept, folder.join("linked")).unwrap();
+        symlink(kept.join("notes.txt"), folder.join("notes.txt")).unwrap();
+        fs::write(folder.join("named.txt"), "named").unwrap();
+        fs::hard_link(folder.join("named.txt"), kept.join("named.txt")).unwrap();
+        let refused = keep_file(&folder, "linked/new.txt", "new.fresh", b"new").unwrap_err();
+        assert_eq!(refused.to_string(), "it is a link");
+        for rel in ["notes.txt", "named.txt"] {
+            let refused = keep_file(&folder, rel, "fresh", b"new").unwrap_err();
+            assert_eq!(refused.to_string(), "something else has its name", "{rel}");
+        }
+        assert_eq!(names(&kept), ["drafts", "named.txt", "notes.txt"]);
+        assert_eq!(fs::read(kept.join("notes.txt")).unwrap(), b"mine");
+        assert_eq!(fs::read(kept.join("named.txt")).unwrap(), b"named");
+        assert_eq!(names(&folder), ["linked", "named.txt", "notes.txt"]);
     }
 
     #[test]

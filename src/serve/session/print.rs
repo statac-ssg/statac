@@ -440,7 +440,7 @@ impl Taken<'_> {
         }
         for file in renderer.card_files() {
             print = print
-                .on_disk(Stamp::at(&crate::platform::join(self.at, &file)), clock)
+                .on_disk(stamp_of(renderer.open_card_file(&file)), clock)
                 .with(file);
         }
         print

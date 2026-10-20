@@ -225,3 +225,51 @@ fn a_panic_caught_while_reading_a_picture_prints_nothing() {
     assert!(caught.is_err());
     assert_eq!(PRINTED.get(), 1);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_kept_folder_swapped_for_a_link_is_neither_read_nor_written() {
+    use crate::problem::Kind as Told;
+    let scratch = std::env::temp_dir().join(format!("statac-album-kept-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&scratch);
+    let (site, outside) = (scratch.join("site"), scratch.join("outside"));
+    std::fs::create_dir_all(&site).unwrap();
+    std::fs::create_dir_all(outside.join("pictures")).unwrap();
+    std::fs::write(outside.join("pictures/copy-1.avif"), "outside").unwrap();
+    let kept = Kept::new(&site, "pictures");
+    kept.make_ready(&site);
+    let staging = crate::publish::begin(&site, &scratch.join("out")).unwrap();
+    kept.keep("copy-1.avif", b"copy", "copy-1.avif", &staging)
+        .unwrap();
+    let folder = site.join(KEPT).join("pictures");
+    std::fs::rename(&folder, scratch.join("moved")).unwrap();
+    std::os::unix::fs::symlink(outside.join("pictures"), &folder).unwrap();
+    // Kept where it can't be, it is written straight into the built site.
+    kept.keep("copy-2.avif", b"copy", "copy-2.avif", &staging)
+        .unwrap();
+    let wanted = ["copy-1.avif", "copy-2.avif"].map(|name| (name.to_owned(), name.to_owned()));
+    let (published, problems) = kept.publish(wanted.into(), &staging);
+    let shown = std::path::Path::new(KEPT).join("pictures");
+    assert_eq!(published, 1);
+    assert_eq!(
+        problems,
+        [
+            Problem::nowhere(Told::CantRead {
+                path: shown.join("copy-1.avif"),
+                reason: "it is a link".into(),
+            }),
+            Problem::nowhere(Told::CacheNotWritten {
+                path: shown,
+                reason: "it is a link".into(),
+            }),
+        ]
+    );
+    let mut names: Vec<_> = std::fs::read_dir(outside.join("pictures"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["copy-1.avif"]);
+    drop(staging);
+    let _ = std::fs::remove_dir_all(&scratch);
+}

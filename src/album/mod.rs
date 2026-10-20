@@ -83,31 +83,31 @@ pub(crate) fn is_file_itself(path: &Path) -> bool {
         .is_ok_and(|found| found.file_type().is_file() && crate::platform::named_once(&found))
 }
 
-/// Writes `bytes` as `name` in `folder`, one of Statac's own: under a name
-/// nothing has first, then renamed, so a file there is always whole. A
-/// link or a folder standing at either name is never written through.
-pub(crate) fn keep_file(
-    folder: &Path,
-    name: &str,
-    fresh: &str,
-    bytes: &[u8],
-) -> std::io::Result<()> {
-    let to = folder.join(name);
-    if std::fs::symlink_metadata(&to).is_ok() && !is_file_itself(&to) {
-        return Err(std::io::Error::other("something else has its name"));
+/// Makes the site's `.statac` where it isn't there, and gives its path.
+/// Refused where it is a link or anything else than a folder.
+pub(crate) fn make_kept(site: &Path) -> std::io::Result<PathBuf> {
+    let kept = site.join(KEPT);
+    there_already(std::fs::create_dir(&kept))?;
+    // Asked again once made: it may have been put there as a link.
+    self::kept(site)?;
+    Ok(kept)
+}
+
+/// [`make_kept`], and the folder `name` in it, made by name in `.statac`
+/// opened and never through a link.
+pub(crate) fn make_kept_in(site: &Path, name: &str) -> std::io::Result<PathBuf> {
+    let kept = make_kept(site)?;
+    there_already(crate::platform::make_folder(&kept, name))?;
+    kept_in(site, name)?;
+    Ok(kept)
+}
+
+/// `made`, where it failed only for something having the name already.
+fn there_already(made: std::io::Result<()>) -> std::io::Result<()> {
+    match made {
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        made => made,
     }
-    let fresh = folder.join(fresh);
-    let written = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&fresh)
-        .and_then(|mut file| std::io::Write::write_all(&mut file, bytes))
-        .and_then(|()| crate::platform::rename(&fresh, &to));
-    written.inspect_err(|_| {
-        if is_file_itself(&fresh) {
-            let _ = std::fs::remove_file(&fresh);
-        }
-    })
 }
 
 /// The folder a picture file is under.

@@ -16,7 +16,8 @@ pub mod draw;
 pub mod keep;
 pub mod layout;
 
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::content::words::{self, key_name};
 use crate::origin::{Origin, Sourced};
@@ -49,6 +50,11 @@ pub struct Cards {
     pub described: Vec<Described>,
     /// The cards that pages left out of the build pick by name.
     pub picked_elsewhere: Vec<String>,
+    /// Where each file in `templates/og/` really is, by its path in the
+    /// site: its path past every link under `real`.
+    pub found: HashMap<String, String>,
+    /// The site's real path.
+    pub real: PathBuf,
 }
 
 impl Cards {
@@ -237,6 +243,10 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Cards, Vec<Problem>) {
         .iter()
         .filter_map(|(rel, _)| rel.strip_prefix("og/"))
         .collect();
+    cards.found = (found.iter())
+        .filter(|(rel, _)| rel.starts_with("og/"))
+        .map(|(rel, at)| (format!("templates/{rel}"), at.clone()))
+        .collect();
     for (rel, at) in &found {
         let Some(name) = description(rel) else {
             continue;
@@ -265,6 +275,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Cards, Vec<Problem>) {
         }
         cards.described.push(described);
     }
+    cards.real = real;
     (cards, problems)
 }
 

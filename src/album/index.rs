@@ -131,11 +131,9 @@ impl Index {
             text.push_str(&line);
             text.push('\n');
         }
-        fs::create_dir_all(&folder)?;
-        // Made just now, either may have been put there as a link since.
-        let folder = super::kept_folder(site)?;
+        let kept = super::make_kept_in(site, "pictures")?;
         let fresh = format!("index.{}", std::process::id());
-        super::keep_file(&folder, "index", &fresh, text.as_bytes())
+        crate::platform::keep_file(&kept, "pictures/index", &fresh, text.as_bytes())
     }
 }
 

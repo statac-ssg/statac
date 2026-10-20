@@ -992,26 +992,28 @@ impl Staging {
         Ok(())
     }
 
-    /// Copies the file at `from`, one Statac keeps under a name that says
-    /// what it holds, to `rel` as the disk copies a file, which shares its
-    /// bytes where the disk can; `shown` names `from` in a message. `from`
-    /// must be a file itself: a link is never followed.
+    /// Copies `source`, a file Statac keeps under a name that says what it
+    /// holds, opened to read, to `rel` as the disk copies a file, which
+    /// shares its bytes where the disk can; `shown` names `source` in a
+    /// message. Where it couldn't be opened, the problem says why.
     ///
-    /// The copy is given the time `from` was last changed, and one the
+    /// The copy is given the time `source` was last changed, and one the
     /// spare holds is left as it is where it is a file itself with that
-    /// time and the length of `from`, without its bytes being read.
-    pub fn copy_whole(&self, from: &Path, shown: &str, rel: &str) -> Result<(), Problem> {
-        let found = fs::symlink_metadata(from).and_then(|found| match found.file_type() {
-            kind if kind.is_file() => Ok(found),
-            kind if kind.is_symlink() => Err(io::Error::other("it is a link")),
-            _ => Err(io::Error::other("it is not a file")),
-        });
-        let found = found.map_err(|error| {
+    /// time and the length of `source`, without its bytes being read.
+    pub fn copy_whole(
+        &self,
+        source: io::Result<fs::File>,
+        shown: &str,
+        rel: &str,
+    ) -> Result<(), Problem> {
+        let cant_read = |error: io::Error| {
             Problem::nowhere(Kind::CantRead {
                 path: shown.into(),
                 reason: system_reason(&error),
             })
-        })?;
+        };
+        let source = source.map_err(cant_read)?;
+        let found = source.metadata().map_err(cant_read)?;
         let changed = found.modified().ok();
         let from_stamp = Stamp::of(&found);
         if self.stands_as_left(rel, from_stamp) {
@@ -1035,7 +1037,7 @@ impl Staging {
             let taken = io::Error::from(io::ErrorKind::AlreadyExists);
             return Err(self.cant_write(rel, &taken));
         }
-        fs::copy(from, &to).map_err(|error| self.cant_write(rel, &error))?;
+        platform::copy_file(&source, &to).map_err(|error| self.cant_write(rel, &error))?;
         self.wrote(rel);
         // Some disks copy a file's time with it and some don't. One that
         // can't be given the time is copied again by the next build.
@@ -2236,7 +2238,7 @@ mod tests {
     fn publish_copy(scratch: &Scratch, kept: &Path) {
         let staging = scratch.begin();
         staging
-            .copy_whole(kept, "kept.avif", "a/copy.avif")
+            .copy_whole(fs::File::open(kept), "kept.avif", "a/copy.avif")
             .unwrap();
         staging.finish().unwrap();
     }
