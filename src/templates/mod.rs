@@ -729,6 +729,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("data", Ty::Any),
         ("languages", Ty::Any),
         ("webmentions", Ty::Bool),
+        ("search_without_javascript", Ty::Any),
     ] {
         site_fields.insert(name.to_owned(), Field { ty, always: true });
     }

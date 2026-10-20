@@ -866,6 +866,43 @@ fn read_built(folder: &Path, path: &str) -> String {
 }
 
 #[test]
+fn the_search_page_sends_a_search_elsewhere_without_javascript_only_where_the_site_asks() {
+    let folder = scratch("search-elsewhere");
+    made(&folder, "Site 1\nhttps://example.org/blog/\nen-GB\n\n");
+    let (_, published) = built(&folder, Mode::Build);
+    assert!(published);
+    let page = read_built(&folder, "search/index.html");
+    let told = "      <noscript>\n        \
+                <p>Search needs JavaScript, which is turned off in this browser.</p>\n      \
+                </noscript>\n";
+    assert!(page.contains(told), "{page}");
+    assert!(
+        !page.contains("<form") && !page.contains("duckduckgo"),
+        "{page}"
+    );
+
+    let settings = folder.join("statac.yaml");
+    let text = fs::read_to_string(&settings).unwrap();
+    fs::write(&settings, text + "search_without_javascript: duckduckgo\n").unwrap();
+    let (_, published) = built(&folder, Mode::Build);
+    assert!(published);
+    let page = read_built(&folder, "search/index.html");
+    let form = r#"      <noscript>
+        <search>
+          <form action="https://duckduckgo.com/" method="get">
+            <label for="search-elsewhere">Search this site with DuckDuckGo</label>
+            <input id="search-elsewhere" type="search" name="q">
+            <input type="hidden" name="sites" value="example.org">
+            <button>Search</button>
+          </form>
+        </search>
+      </noscript>
+"#;
+    assert!(page.contains(form), "{page}");
+    assert!(!page.contains("Search needs JavaScript"), "{page}");
+}
+
+#[test]
 fn what_one_site_publishes_is_as_held_here() {
     let folder = scratch("held");
     made(&folder, "Site 1\nhttps://example.org\nen-GB\n\n");
@@ -979,7 +1016,7 @@ const HOME: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Site 1</title>
   <meta name="description" content="This is the home page of a new site, the file content/index.md. Write here what the site is, in place of these words.">
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Site 1">
@@ -1099,7 +1136,7 @@ const POST: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>First post - Site 1</title>
   <meta name="description" content="This is the site’s first post, the file content/posts/first-post/index.md. Its picture is photo-1.jpg, kept beside it and named by its cover: line, and what a reader who can’t see the picture is told in its place is in photo-1.jpg.yaml. Change them or remove them as you like.">
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="First post">
@@ -1172,7 +1209,7 @@ const NOTES: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Notes - Site 1</title>
   <meta name="description" content="Short notes, with or without a title, newest first.">
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Notes">
@@ -1260,7 +1297,7 @@ const NOTE: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>6 Oct 2026, 09:12 - Site 1</title>
   <meta name="description" content="This is a note, the file content/notes/note-1.md: a few lines with a date and no title. Its front matter holds only the date.">
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="6 Oct 2026, 09:12">
@@ -1321,7 +1358,7 @@ const PHOTOS: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Photos - Site 1</title>
   <meta name="description" content="One photograph to a page, newest first.">
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Photos">
@@ -1376,7 +1413,7 @@ const PHOTO: &str = r##"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Photo 1 - Site 1</title>
   <meta name="description" content="This is a photograph’s page, the file content/photos/photo-1/index.md, with the picture beside it and named by its cover: line. Write about the picture here. To do without photographs, delete the folder content/photos/.">
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Photo 1">
@@ -1435,7 +1472,7 @@ const TAG: &str = r##"<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tag 1 - Site 1</title>
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta property="og:title" content="Tag 1">
@@ -1599,7 +1636,7 @@ const NOT_FOUND: &str = r##"<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Page not found - Site 1</title>
-  <link rel="stylesheet" href="/site.93a9b31f.css">
+  <link rel="stylesheet" href="/site.e1b305c9.css">
   <link rel="stylesheet" href="/code.644d7a9d.css">
   <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="Site 1">
   <meta name="robots" content="noindex">

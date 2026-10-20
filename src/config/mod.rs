@@ -136,6 +136,11 @@ const SETTINGS: &[Setting] = &[
         Shape::Places(crate::hooks::a_place, PlaceIn::Site),
         None,
     ),
+    setting(
+        "search_without_javascript",
+        Shape::OneOf(crate::search::elsewhere::SETTING),
+        None,
+    ),
     setting("webmentions", Shape::Truth, Some(Preset::Truth(false))),
     setting("feed_key", Shape::Text, None),
     setting("feed_ids_before", Shape::Date, None),

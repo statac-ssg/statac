@@ -1247,7 +1247,8 @@ math[display="block"] {
 
 /* 10. Search
 
-   The box the search snippet makes, and the pages it finds: see /search/ */
+   The box the search snippet makes, the pages it finds, and the box the
+   search page shows instead without JavaScript: see /search/ */
 
 /* The box is hidden until its script runs. */
 search:not([hidden]) {
@@ -1268,9 +1269,36 @@ input[type="search"] {
   color: var(--ink);
 }
 
-input[type="search"]:focus-visible {
+input[type="search"]:focus-visible,
+search button:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 0;
+}
+
+/* The box that sends a search to another engine has a button beside it. */
+search form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+
+search form label {
+  grid-column: 1 / -1;
+}
+
+search button {
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--corner);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+search button:hover {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 search [role="status"] {

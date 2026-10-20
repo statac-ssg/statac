@@ -645,6 +645,35 @@ fn search_index(session: &Session) -> Vec<(String, Vec<u8>)> {
 }
 
 #[test]
+fn the_search_page_follows_the_engine_it_sends_a_search_to_without_javascript() {
+    let site = Site::starter("search-elsewhere");
+    let changed = |site: &Site, from: &str, to: &str| {
+        let settings = site.read("statac.yaml");
+        let changed = settings.replace(from, to);
+        assert_ne!(changed, settings);
+        site.write("statac.yaml", &changed)
+    };
+    through(
+        &site,
+        &[
+            ("the engine named", &|site| {
+                let settings = site.read("statac.yaml");
+                site.write(
+                    "statac.yaml",
+                    &format!("{settings}search_without_javascript: duckduckgo\n"),
+                )
+            }),
+            ("the site moved under a path", &|site| {
+                changed(site, "https://example.org", "https://example.org/blog")
+            }),
+            ("the engine no longer named", &|site| {
+                changed(site, "search_without_javascript: duckduckgo\n", "")
+            }),
+        ],
+    );
+}
+
+#[test]
 fn the_search_index_follows_everything_a_page_is_searched_by() {
     let site = Site::starter("search-kept");
     site.write("snippets/aside.html", "<aside>{{ text }}</aside>\n");

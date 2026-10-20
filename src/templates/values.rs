@@ -758,6 +758,13 @@ impl SiteValue {
                 frame::read(setting_key(shared, key));
                 Some(Value::from(shared.settings.truth(key) == Some(true)))
             }
+            "search_without_javascript" => {
+                frame::read(setting_key(shared, key));
+                if shared.settings.text(key).is_some() {
+                    frame::read(setting_key(shared, "url"));
+                }
+                Some(search_elsewhere(&shared.settings).unwrap_or(Value::from(())))
+            }
             "today" => {
                 frame::read(Key::Today);
                 Some(DateValue::value(shared, shared.dates.today()))
@@ -805,14 +812,21 @@ impl Object for SiteValue {
         ]
         .into_iter()
         .chain(
-            ["title", "url", "host", "language"]
-                .into_iter()
-                .filter(|name| match *name {
-                    "title" => settings.text_for(self.several(), name).is_some(),
-                    "language" => true,
-                    "host" => settings.text("url").is_some(),
-                    _ => settings.text(name).is_some(),
-                }),
+            [
+                "title",
+                "url",
+                "host",
+                "language",
+                "search_without_javascript",
+            ]
+            .into_iter()
+            .filter(|name| match *name {
+                "title" => settings.text_for(self.several(), name).is_some(),
+                "language" => true,
+                "host" => settings.text("url").is_some(),
+                "search_without_javascript" => search_elsewhere(settings).is_some(),
+                _ => settings.text(name).is_some(),
+            }),
         )
         .chain(["languages", "webmentions"])
         .map(Value::from)
@@ -828,6 +842,30 @@ impl Object for SiteValue {
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("site")
     }
+}
+
+/// The engine `search_without_javascript` names, as a form that sends it
+/// a search of the site is written: none where the setting is unset or
+/// the site has no address.
+fn search_elsewhere(settings: &crate::config::Settings) -> Option<Value> {
+    let engine =
+        crate::search::elsewhere::engine(settings.text("search_without_javascript")?.value)?;
+    // The engine knows the site by its own address, whatever address the
+    // run was given.
+    let site = crate::search::elsewhere::site(settings.home()?)?;
+    let field = Ordered(vec![
+        ("name".into(), Value::from(engine.site)),
+        ("value".into(), Value::from(site)),
+    ]);
+    Some(Value::from_object(Ordered(vec![
+        ("name".into(), Value::from(engine.name)),
+        ("action".into(), Value::from(engine.action)),
+        ("words".into(), Value::from(engine.words)),
+        (
+            "fields".into(),
+            Value::from(vec![Value::from_object(field)]),
+        ),
+    ])))
 }
 
 /// The host a full address names, as the URL standard writes it:

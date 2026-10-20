@@ -3,6 +3,7 @@
 //! BM25 over words weighted by where they stand.
 
 mod command;
+pub mod elsewhere;
 mod files;
 mod kept;
 mod meant;

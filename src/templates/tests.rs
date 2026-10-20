@@ -2651,6 +2651,52 @@ fn the_site_says_whether_it_takes_webmentions() {
     assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
 }
 
+#[test]
+fn the_site_names_the_engine_it_sends_a_search_to_without_javascript() {
+    const ASKS: &str = "{% set elsewhere = site.search_without_javascript %}\
+        {% if elsewhere %}{{ elsewhere.name }} {{ elsewhere.action }} {{ elsewhere.words }}\
+        {% for field in elsewhere.fields %} {{ field.name }}={{ field.value }}{% endfor %}\
+        {% else %}none{% endif %}";
+    let shown = |settings: &str| {
+        let built = site(&[
+            (
+                "statac.yaml",
+                &format!("language: en\ntimezone: UTC\npages.feed: false\n{settings}"),
+            ),
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("templates/page.html", ASKS),
+        ]);
+        let rendered = built.render("post-1.md");
+        assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
+        let read = |name| {
+            let key = Key::Setting(built.renderer.name_id(name));
+            rendered.reads.keys().contains(&key)
+        };
+        let reads = (read("search_without_javascript"), read("url"));
+        (rendered.html.expect("built"), reads)
+    };
+    assert_eq!(
+        shown("url: https://example.org/blog/\nsearch_without_javascript: duckduckgo\n"),
+        (
+            "DuckDuckGo https://duckduckgo.com/ q sites=example.org".to_owned(),
+            (true, true)
+        )
+    );
+    assert_eq!(
+        shown("url: https://example.org/\nsearch_without_javascript: duckduckgo\n").0,
+        "DuckDuckGo https://duckduckgo.com/ q sites=example.org"
+    );
+    assert_eq!(
+        shown("url: https://example.org/\n"),
+        ("none".to_owned(), (true, false))
+    );
+    // With no address there is no site to keep the search to.
+    assert_eq!(
+        shown("search_without_javascript: duckduckgo\n"),
+        ("none".to_owned(), (true, true))
+    );
+}
+
 /// A page's layout and its writing each asking for search boxes: the page
 /// has one first box and no two with one id, wherever the layout shows the
 /// writing; another page showing the writing shows it numbered from the

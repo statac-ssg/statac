@@ -390,9 +390,9 @@ fn table(out: &mut String, folder: &str, files: &[&(String, Option<String>, Stri
     }
 }
 
-/// What a word holds for the search script to put in its place: a number,
-/// or the words it offers.
-const PLACES: [&str; 2] = ["{count}", "{words}"];
+/// What a word holds for the search script or a template to put in its
+/// place: a number, the words it offers, or the name of a search engine.
+const PLACES: [&str; 3] = ["{count}", "{words}", "{engine}"];
 
 /// The page of the starter's files.
 pub fn starter_page() -> String {
@@ -451,7 +451,8 @@ pub fn starter_page() -> String {
          | Name | In English |\n|---|---|\n",
     );
     for (name, english) in statac::new::words() {
-        // A place for the search script to fill is shown as written.
+        // A place for the search script or a template to fill is shown as
+        // written.
         let plain = PLACES
             .iter()
             .fold(english.to_string(), |text, place| text.replace(place, ""));

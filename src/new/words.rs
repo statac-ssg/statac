@@ -58,4 +58,6 @@ pub(super) const WORDS: &[(&str, &str)] = &[
     ("found_some", "No page holds every word."),
     ("found_none", "No pages found."),
     ("meant", "Did you mean {words}?"),
+    ("search_with", "Search this site with {engine}"),
+    ("search_button", "Search"),
 ];

@@ -60,6 +60,7 @@ fn every_setting_the_sites_write_is_read() {
         ("tags.permalink", "/tag/{slug}/", "/tag/{slug}/"),
         ("series.permalink", "/runs/{slug}/", "/runs/{slug}/"),
         ("feed_ids_from", "jekyll", "jekyll"),
+        ("search_without_javascript", "duckduckgo", "duckduckgo"),
     ];
     for (name, written, value) in cases {
         let (sources, settings, problems) = read_settings(&format!("{name}: {written}\n"));
@@ -143,6 +144,7 @@ fn a_setting_nobody_wrote_is_defaulted() {
     assert_eq!(left, [".DS_Store", "Thumbs.db", "desktop.ini"]);
     assert!(settings.get("language").is_none());
     assert!(settings.get("url").is_none());
+    assert!(settings.get("search_without_javascript").is_none());
 }
 
 #[test]
@@ -376,6 +378,15 @@ fn settings_of_the_wrong_kind_are_refused_at_the_value() {
         (
             "code_style: dracula",
             wrong("code_style", styles(), "dracula", None),
+        ),
+        (
+            "search_without_javascript: google",
+            wrong(
+                "search_without_javascript",
+                Expected::OneOf(vec!["duckduckgo".into()]),
+                "google",
+                None,
+            ),
         ),
         (
             "posts_per_page: -1",
