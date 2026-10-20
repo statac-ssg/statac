@@ -1144,7 +1144,10 @@ pub(crate) fn publish(
     if let Some(staging) = &staging
         && !stops(&problems)
     {
-        let written = (search.par_iter()).map(|file| staging.write(&file.path, &file.bytes));
+        let written = (search.par_iter()).map(|file| match file.named {
+            true => staging.write_named(&file.path, &file.bytes),
+            false => staging.write(&file.path, &file.bytes),
+        });
         let unwritten: Vec<Problem> = written.filter_map(Result::err).collect();
         files += search.len();
         problems.extend(unwritten);

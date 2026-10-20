@@ -133,6 +133,8 @@ pub struct Left {
     /// was copied from, where a later change to that file would change
     /// its stamp.
     copied: HashMap<String, Stamp>,
+    /// Each file whose name says what it holds.
+    named: HashSet<String>,
 }
 
 #[derive(Debug)]
@@ -141,6 +143,9 @@ struct Notes {
     before: HashMap<String, Stamp>,
     written: Mutex<Vec<String>>,
     copied: Mutex<HashMap<String, Stamp>>,
+    /// The files the folder holds whose names say what they hold.
+    named_before: HashSet<String>,
+    named: Mutex<Vec<String>>,
     /// What the site's disk gave a file written as the build began. A
     /// file whose stamp it doesn't settle may be written again and keep
     /// its stamp.
@@ -707,6 +712,8 @@ pub fn resume(
             before: left.copied.clone(),
             written: Mutex::default(),
             copied: Mutex::default(),
+            named_before: left.named.clone(),
+            named: Mutex::default(),
             clock: Clock::of_site(site),
             left: into,
         }),
@@ -784,6 +791,8 @@ impl Staging {
             before: HashMap::new(),
             written: Mutex::default(),
             copied: Mutex::default(),
+            named_before: HashSet::new(),
+            named: Mutex::default(),
             clock: Clock::of_site(site),
             left: into,
         });
@@ -844,6 +853,8 @@ impl Staging {
         let notes = self.notes.as_ref()?;
         let written = notes.written.lock().expect("never poisoned").clone();
         let copied = notes.copied.lock().expect("never poisoned").clone();
+        let named = notes.named.lock().expect("never poisoned");
+        let named = named.iter().cloned().collect();
         let (mut files, mut removed) = (Vec::new(), Vec::new());
         match &self.spare {
             // A fresh folder holds what was written into it.
@@ -867,6 +878,7 @@ impl Staging {
             written,
             removed,
             copied,
+            named,
         })
     }
 
@@ -910,6 +922,35 @@ impl Staging {
         let _turn = self.makers.take();
         let mut file = self.create(rel, &to, held)?;
         io::Write::write_all(&mut file, bytes).map_err(|error| self.cant_write(rel, &error))
+    }
+
+    /// Writes `bytes` at `rel`, a name that says what they are, as
+    /// [`Staging::write`] does. One the build before left at `rel` in the
+    /// folder, written where it stands, holds them already: nothing of it
+    /// is read, written or removed.
+    pub fn write_named(&self, rel: &str, bytes: &[u8]) -> Result<(), Problem> {
+        if !self.stands_named(rel) {
+            self.write(rel, bytes)?;
+        }
+        if let Some(notes) = &self.notes {
+            let mut named = notes.named.lock().expect("never poisoned");
+            named.push(rel.to_owned());
+        }
+        Ok(())
+    }
+
+    /// Whether the folder, written where it stands, holds at `rel` a file
+    /// the build before left there under a name that says what it holds,
+    /// which is this build's from now on.
+    fn stands_named(&self, rel: &str) -> bool {
+        let (true, Some(notes), Some(spare)) = (self.in_place, &self.notes, &self.spare) else {
+            return false;
+        };
+        notes.named_before.contains(rel)
+            && spare.files.get(rel).is_some_and(|state| {
+                let asked = state.compare_exchange(0, WANTED, Ordering::Relaxed, Ordering::Relaxed);
+                asked.is_ok()
+            })
     }
 
     /// Copies the file at `from` to `rel`; `shown` names `from` in a message.
@@ -1448,6 +1489,54 @@ mod tests {
             ]
         );
         assert!(scratch.out().join(MARKER).is_file());
+    }
+
+    #[test]
+    fn a_build_resumed_leaves_a_file_named_by_what_it_holds_unread() {
+        let scratch = Scratch::new("resumed-named");
+        let into = Arc::new(Mutex::new(None));
+        let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
+        staging.write_named("search/a.bin", b"a").unwrap();
+        staging.write("search/b.bin", b"b").unwrap();
+        staging.finish().unwrap();
+        let left = taken(&into);
+        // Changed behind the builds' backs, only to show which they read.
+        for rel in ["search/a.bin", "search/b.bin"] {
+            fs::write(scratch.out().join(rel), "changed").unwrap();
+        }
+
+        let resumed = |left: &Left| {
+            let mine = left.files.iter().filter(|file| *file != MARKER).cloned();
+            let staging = resume(
+                &scratch.site(),
+                &scratch.out(),
+                mine,
+                left,
+                Arc::clone(&into),
+            );
+            staging.write_named("search/a.bin", b"a").unwrap();
+            staging.write_named("search/b.bin", b"b").unwrap();
+            staging.finish().unwrap();
+            taken(&into)
+        };
+        // Only the file the build before wrote by its name stands unread.
+        let left = resumed(&left);
+        assert_eq!(left.files, ["search/a.bin", "search/b.bin"]);
+        assert_eq!(left.written, ["search/b.bin"]);
+        assert!(left.removed.is_empty(), "{:?}", left.removed);
+        assert_eq!(
+            tree(&scratch.out().join("search")),
+            ["a.bin=changed", "b.bin=b"]
+        );
+
+        // Both are known by their names now.
+        fs::write(scratch.out().join("search/b.bin"), "changed").unwrap();
+        let left = resumed(&left);
+        assert!(left.written.is_empty(), "{:?}", left.written);
+        assert_eq!(
+            tree(&scratch.out().join("search")),
+            ["a.bin=changed", "b.bin=changed"]
+        );
     }
 
     /// A site of three pages built into the output, and what it left.

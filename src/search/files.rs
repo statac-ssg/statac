@@ -69,6 +69,8 @@ const MARK: usize = 16;
 pub struct File {
     pub path: String,
     pub bytes: Vec<u8>,
+    /// Whether its name says what it holds.
+    pub named: bool,
 }
 
 /// Every file of `index`, the site `renderer` read, in `folder`, the
@@ -166,6 +168,7 @@ pub(super) fn files(renderer: &Renderer, folder: &str, index: &Index, kept: &Kep
     let mut files = vec![File {
         path: ENTRY.to_owned(),
         bytes: entry.into_bytes(),
+        named: false,
     }];
     files.push(records);
     files.extend(pieces.into_iter().map(|(_, piece)| piece));
@@ -305,6 +308,7 @@ fn packed(before: &str, json: &str, kept: &Kept) -> File {
         File {
             path: format!("{before}{mark}.bin"),
             bytes,
+            named: true,
         }
     })
 }
