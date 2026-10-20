@@ -612,8 +612,8 @@ fn png_profile(chunk: &[u8]) -> Option<Vec<u8>> {
     // than the limit it is given.
     const BEFORE: &[u8] =
         b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR\0\0\0\x01\0\0\0\x01\x08\0\0\0\0\x3a\x7e\x9b\x55";
-    const AFTER: &[u8] =
-        b"\0\0\0\x0aIDAT\x78\x9c\x63\x60\0\0\0\x02\0\x01\x48\xaf\xa4\x71\0\0\0\0IEND\xae\x42\x60\x82";
+    const AFTER: &[u8] = b"\0\0\0\x0aIDAT\x78\x9c\x63\x60\0\0\0\x02\0\x01\x48\xaf\xa4\x71\
+                           \0\0\0\0IEND\xae\x42\x60\x82";
     if chunk.len() > PROFILE_CEILING {
         return None;
     }

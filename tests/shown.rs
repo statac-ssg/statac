@@ -464,7 +464,8 @@ fn a_picture_shown_by_the_writing_and_the_layout_is_noted_once_at_the_writing() 
         said.contains(
             "note  Picture with no description: `static/img/photo-2.jpg`\n  \
              templates/page.html, line 4\n   \
-             4 │ {{ page.photo('/img/photo-1.jpg').alt }}{{ page.photo('/img/photo-2.jpg').alt }}\n     \
+             4 │ {{ page.photo('/img/photo-1.jpg').alt }}\
+             {{ page.photo('/img/photo-2.jpg').alt }}\n     \
              │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  \
              While building: content/post-1/index.md\n  \
              And while building 1 more:\n    \
@@ -527,7 +528,8 @@ fn a_picture_a_template_shows_is_noted_where_its_description_is_read_empty() {
         said.contains(
             "note  Picture with no description: `static/img/photo-2.jpg`\n  \
              templates/page.html, line 4\n   \
-             4 │ {% set q = page.photo('/img/photo-2.jpg') %}<img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\">\n     \
+             4 │ {% set q = page.photo('/img/photo-2.jpg') %}\
+             <img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\">\n     \
              │            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
         ) && said.contains("Describe it where it is shown, or mark it decorative."),
         "{said}"
@@ -569,7 +571,8 @@ fn a_picture_handed_to_a_snippet_is_noted_only_where_its_description_is_read() {
         "snippets/image.html",
         "{# takes photo, alt #}\n\
          {% set picture = page.photo(photo) %}\n\
-         {% if alt is defined %}{{ shown(picture, alt=alt) }}{% else %}{{ shown(picture) }}{% endif %}\n",
+         {% if alt is defined %}{{ shown(picture, alt=alt) }}{% else %}\
+         {{ shown(picture) }}{% endif %}\n",
     );
     site.write(
         "content/post-1/index.md",
@@ -594,7 +597,8 @@ fn a_piece_writing_pictures_is_handed_the_picture() {
         "snippets/markdown/image.html",
         "{% if photo.avif %}<picture><source srcset=\"{{ photo.avif }}\">\
          <img src=\"{{ photo.src }}\" alt=\"{{ alt }}\"></picture>\
-         {% elif photo %}<img src=\"{{ photo.src }}\" width=\"{{ photo.width }}\" alt=\"{{ alt }}\">\
+         {% elif photo %}\
+         <img src=\"{{ photo.src }}\" width=\"{{ photo.width }}\" alt=\"{{ alt }}\">\
          {% else %}<img src=\"{{ address }}\" alt=\"{{ alt }}\" class=\"elsewhere\">{% endif %}",
     );
     site.write(
@@ -787,7 +791,8 @@ fn an_unknown_language_is_told_at_its_own_highlight_where_two_colour_worked_out_
         assert!(
             said.contains(&format!(
                 "Statac has no colours for `{word}`\n  templates/page.html, line {line}\n   \
-                 {line} │ <code>{{{{ (\"let x\" ~ \" = 1;\") | highlight(\"{word}\") }}}}</code>\n     \
+                 {line} │ \
+                 <code>{{{{ (\"let x\" ~ \" = 1;\") | highlight(\"{word}\") }}}}</code>\n     \
                  │          {}\n",
                 "^".repeat(carets)
             )),

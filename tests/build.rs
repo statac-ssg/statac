@@ -504,7 +504,8 @@ warning  Field set aside: a card has no `shadow`
   templates/og.yaml, line 3
    3 │ shadow: true
      │ ^^^^^^
-  A card reads `background`, `font` and `padding`, and `text`, `place`, `size` and `colour` for each text.
+  A card reads `background`, `font` and `padding`, \
+and `text`, `place`, `size` and `colour` for each text.
   More: https://statac.dev/e/set-aside/
 
 1 warning: 1 set-aside.
@@ -1218,12 +1219,14 @@ note  Missing words: the footnotes of 3 pages in `fr` have no words for the way 
   And while building 2 more:
     content/post-2.md
     content/post-3.md
-  Add them to `languages/fr.yaml`, translating the English line `back_to_the_text: back to the text`.
+  Add them to `languages/fr.yaml`, \
+translating the English line `back_to_the_text: back to the text`.
   More: https://statac.dev/e/missing-words/
 
 note  Missing words: the callouts of 1 page in `fr` have no names
   While building: content/post-4.md
-  Add them to `languages/fr.yaml`, translating the English line `callouts: [Note, Tip, Important, Warning, Caution]`.
+  Add them to `languages/fr.yaml`, \
+translating the English line `callouts: [Note, Tip, Important, Warning, Caution]`.
   More: https://statac.dev/e/missing-words/
 
 2 notes: 2 missing-words.
@@ -1288,7 +1291,8 @@ note  Untitled page: `content/post-2.md` is called by its opening words, `Post 2
   content/post-2.md, line 1
    1 │ ---
      │ ^^^
-  Give it a `title`, or open its writing with a `# heading`. A folder whose pages go without titles says `pages.untitled: true`.
+  Give it a `title`, or open its writing with a `# heading`. \
+A folder whose pages go without titles says `pages.untitled: true`.
   More: https://statac.dev/e/untitled-page/
 
 1 note: 1 untitled-page.
@@ -1353,7 +1357,8 @@ note  Untitled page: `content/notes/note-1.md` is called by its opening words, `
   content/notes/note-1.md, line 1
    1 │ ---
      │ ^^^
-  Give it a `title`, or open its writing with a `# heading`. A folder whose pages go without titles says `pages.untitled: true`.
+  Give it a `title`, or open its writing with a `# heading`. \
+A folder whose pages go without titles says `pages.untitled: true`.
   More: https://statac.dev/e/untitled-page/
 
 1 note: 1 untitled-page.
@@ -1909,7 +1914,8 @@ fn a_page_showing_a_script_as_code_is_not_told_as_writing_one() {
         "content/post-1.md",
         "---\ntitle: Post 1\ndate: 2026-01-01\n---\n\
          A page runs `<script>ready()</script>`, or `<a onclick=\"ready()\">`.\n\n\
-         ```\n<script>ready()</script>\n<script src=\"https://example.org/play.js\"></script>\n```\n\n    \
+         ```\n<script>ready()</script>\n<script src=\"https://example.org/play.js\"></script>\n\
+         ```\n\n    \
          <script>ready()</script>\n\n\
          Written \\<script>ready()\\</script> too, and [`<script>`](https://example.org/).\n",
     );
@@ -1964,7 +1970,8 @@ fn a_script_in_a_field_shown_on_a_page_statac_makes_is_blamed_on_its_file() {
     );
     site.write(
         "content/post-2.md",
-        "---\ntitle: Post 2\ndate: 2026-01-02\ntags: [Rust]\nsummary: <script>run()</script>\n---\n",
+        "---\ntitle: Post 2\ndate: 2026-01-02\ntags: [Rust]\nsummary: <script>run()</script>\n\
+         ---\n",
     );
     let (said, code) = site.run(&["check", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
@@ -2137,7 +2144,8 @@ fn writing_shown_on_another_page_links_where_it_does_on_its_own() {
     );
     site.write(
         "templates/feed.xml",
-        "<feed>{% for post in posts %}<content>{{ post.content | absolute }}</content>{% endfor %}</feed>\n",
+        "<feed>{% for post in posts %}<content>{{ post.content | absolute }}</content>\
+         {% endfor %}</feed>\n",
     );
     site.write(
         "content/post-2/index.md",

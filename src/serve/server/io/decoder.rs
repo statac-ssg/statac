@@ -326,10 +326,12 @@ mod tests {
     #[test]
     fn decode_request_target_absolute_form_with_host() -> Result<()> {
         let request = decode_request_headers(
-            &mut
-              b"GET http://www.example.org/pub/WWW/TheProject.html HTTP/1.1\nHost: example.com\n\n".as_slice()
-            ,
-        )?.body(()).unwrap();
+            &mut b"GET http://www.example.org/pub/WWW/TheProject.html HTTP/1.1\n\
+                   Host: example.com\n\n"
+                .as_slice(),
+        )?
+        .body(())
+        .unwrap();
         assert_eq!(
             request.uri().to_string(),
             "http://www.example.org/pub/WWW/TheProject.html"
@@ -503,7 +505,9 @@ mod tests {
 
     #[test]
     fn skip_request_unsupported_transfer_encoding() -> Result<()> {
-        let mut read = b"POST / HTTP/1.1\r\nhost: example.com\r\ncontent-length: 12\r\ntransfer-encoding: foo\r\n\r\nfoobar".as_slice();
+        let mut read = b"POST / HTTP/1.1\r\nhost: example.com\r\ncontent-length: 12\r\n\
+                         transfer-encoding: foo\r\n\r\nfoobar"
+            .as_slice();
         assert!(skip_request_body(decode_request_headers(&mut read)?, &mut read).is_err());
         Ok(())
     }
@@ -555,7 +559,9 @@ mod tests {
 
     #[test]
     fn skip_request_content_length_and_transfer_encoding() {
-        let mut read = b"POST / HTTP/1.1\r\nhost: example.com\r\ntransfer-encoding:chunked\r\ncontent-length: 222\r\n\r\n".as_slice();
+        let mut read = b"POST / HTTP/1.1\r\nhost: example.com\r\ntransfer-encoding:chunked\r\n\
+                         content-length: 222\r\n\r\n"
+            .as_slice();
         assert!(skip_request_body(decode_request_headers(&mut read).unwrap(), &mut read).is_err());
     }
 }

@@ -150,7 +150,8 @@ error  Not stamped: `date` is still `=monday 09:00`
   content/post-1.md, line 3
    3 │ date: =monday 09:00
      │       ^^^^^^^^^^^^^
-  Run `statac stamp` to write the date in its place, or `statac serve`, which writes it on every save.
+  Run `statac stamp` to write the date in its place, or `statac serve`, \
+which writes it on every save.
   More: https://statac.dev/e/not-stamped/
 ";
     for command in ["build", "check"] {

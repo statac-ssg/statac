@@ -40,7 +40,8 @@ fn every_piece_is_written_through_its_file_handed_what_the_writing_says() {
     site_files.extend([
         (
             "statac.yaml",
-            "language: en\nurl: https://example.org\nalso_at: [example.net]\ntimezone: UTC\npages.feed: false\n",
+            "language: en\nurl: https://example.org\nalso_at: [example.net]\ntimezone: UTC\n\
+             pages.feed: false\n",
         ),
         (
             "content/post-1.md",
@@ -115,7 +116,8 @@ fn a_value_read_as_markdown_is_written_through_the_pieces_that_need_no_page() {
         ),
         (
             "content/post-1.md",
-            "---\ntitle: Post 1\nsummary: \"A \\\"quoted\\\" [link](https://other.org)\"\ndeck: |\n  \
+            "---\ntitle: Post 1\nsummary: \"A \\\"quoted\\\" [link](https://other.org)\"\n\
+             deck: |\n  \
              ## A heading\n\n  \
              [In](/about/) ![A picture](a.png) `x < y`[^1]\n\n  \
              ```rust\n  let x = 1;\n  ```\n\n  \

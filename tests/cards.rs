@@ -488,7 +488,8 @@ fn a_picture_a_page_cannot_be_shared_with_stops_the_build() {
 }
 
 /// A WebP of one pixel.
-const WEBP: &[u8] = b"RIFF\x1a\x00\x00\x00WEBPVP8L\x0d\x00\x00\x00\x2f\x00\x00\x00\x10\x07\x10\x11\x11\x88\x88\xfe\x07\x00";
+const WEBP: &[u8] = b"RIFF\x1a\x00\x00\x00WEBPVP8L\x0d\x00\x00\x00\
+                      \x2f\x00\x00\x00\x10\x07\x10\x11\x11\x88\x88\xfe\x07\x00";
 
 /// A picture a page names as its own: its name, its bytes, and the width
 /// and height its file gives.
@@ -538,7 +539,8 @@ fn a_picture_of_any_kind_is_used_and_one_some_previews_may_not_show_is_warned_of
     assert!(
         said.contains(
             "  content/post-1.md, line 3\n   3 │ og_image: photo-1.png\n     \
-             │           ^^^^^^^^^^^\n  For a picture more link previews show, save it as a PNG.\n  \
+             │           ^^^^^^^^^^^\n  \
+             For a picture more link previews show, save it as a PNG.\n  \
              More: https://statac.dev/e/image-may-not-show/\n"
         ),
         "{said}"
@@ -806,7 +808,8 @@ fn pages_left_without_a_card_are_told_once_for_each_cause() {
     assert!(
         said.contains(
             "  templates/og.yaml, line 4\n   4 │ title.text: \"{{ page.og_title }}\"\n     \
-             │             ^^^^^^^^^^^^^^^^^^^^^\n  Add a font that has them to the card's `font`.\n"
+             │             ^^^^^^^^^^^^^^^^^^^^^\n  \
+             Add a font that has them to the card's `font`.\n"
         ),
         "{said}"
     );

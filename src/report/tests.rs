@@ -223,7 +223,8 @@ fn a_long_line_is_shown_as_a_window_around_the_place() {
             "
             |warning  Broken link: nothing is published at `/about-us/`
             |  content/post-1.md, line 1
-            |   1 │ …ght nine ten [about us](/about-us/) one two three four five six seven eight nine…
+            |   1 │ …ght nine ten [about us](/about-us/) one two three four five six seven \
+             eight nine…
             |     │                          ^^^^^^^^^^
             |  Did you mean `/about/`?
             |  More: https://statac.dev/e/broken-link/

@@ -1191,12 +1191,14 @@ mod tests {
         assert!(!client.body.contains(WORDS), "the words stand in its place");
         assert!(
             client.body.contains(
-                "const words = {\"name\":[{\"text\":\"Statac\"}],\"building\":[{\"text\":\"Building\"}],"
+                "const words = {\"name\":[{\"text\":\"Statac\"}],\
+                 \"building\":[{\"text\":\"Building\"}],"
             ) && client.body.contains(
-                "\"warnings\":{\"one\":[{\"text\":\"{n} warning\"}],\"many\":[{\"text\":\"{n} warnings\"}]},"
+                "\"warnings\":{\"one\":[{\"text\":\"{n} warning\"}],\
+                 \"many\":[{\"text\":\"{n} warnings\"}]},"
             ) && client.body.contains(
-                "\"layoutFrom\":[{\"text\":\"Layout \"},{\"code\":\"{name}\"},{\"text\":\", from \"},\
-                 {\"code\":\"{file}\"}],"
+                "\"layoutFrom\":[{\"text\":\"Layout \"},{\"code\":\"{name}\"},\
+                 {\"text\":\", from \"},{\"code\":\"{file}\"}],"
             ),
             "{}",
             client.body

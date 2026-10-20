@@ -688,7 +688,8 @@ fn a_site_that_cant_be_imported_is_refused_and_nothing_is_written() {
     assert!(
         said.starts_with(&format!(
             "error  Can't tell what made the site: `{}` has no settings file Statac knows\n  \
-             Say what made it with `--from=jekyll`, `--from=hugo`, `--from=zola` or `--from=eleventy`.\n",
+             Say what made it with `--from=jekyll`, `--from=hugo`, `--from=zola` or \
+             `--from=eleventy`.\n",
             nothing.display()
         )),
         "{said}"
@@ -2235,7 +2236,8 @@ fn an_include_or_a_link_named_outside_the_old_site_is_never_read() {
         old.join("_posts/2026-01-02-post-2.md"),
         "---\ntitle: Post 2\n---\n{% include ../../file-9.txt %}\n\n\
          {% include ../page-9.html a=\"1\" %}\n\n\
-         [A file]({% link ../file-9.txt %}), [a post]({% post_url ../_posts/2026-02-02-post-9 %}).\n",
+         [A file]({% link ../file-9.txt %}), \
+         [a post]({% post_url ../_posts/2026-02-02-post-9 %}).\n",
     )
     .unwrap();
     let before = files(&outside);
@@ -2843,7 +2845,10 @@ fn a_zola_folder_reached_through_a_link_is_never_read() {
     assert!(!made.contains_key("content/posts/post-2.md"));
     assert!(!made.contains_key("static/file-1.txt"));
     assert!(
-        report.contains("- `content/posts/post-2.md`: a link that leads outside the old site, which Statac doesn't follow."),
+        report.contains(
+            "- `content/posts/post-2.md`: a link that leads outside the old site, \
+             which Statac doesn't follow."
+        ),
         "{report}"
     );
 }

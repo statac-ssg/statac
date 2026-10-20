@@ -110,7 +110,8 @@ fn path_of(request: &str) -> &str {
 /// A `200` answer of `body` as `content_type`.
 fn answered(body: &str, content_type: &str) -> Vec<u8> {
     format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\
+         Connection: close\r\n\r\n{body}",
         body.len()
     )
     .into_bytes()
@@ -119,7 +120,8 @@ fn answered(body: &str, content_type: &str) -> Vec<u8> {
 /// An answer redirecting to `location` with `status`.
 fn redirected(status: u16, location: &str) -> Vec<u8> {
     format!(
-        "HTTP/1.1 {status} Elsewhere\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        "HTTP/1.1 {status} Elsewhere\r\nLocation: {location}\r\nContent-Length: 0\r\n\
+         Connection: close\r\n\r\n"
     )
     .into_bytes()
 }

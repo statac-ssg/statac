@@ -663,8 +663,9 @@ impl Reader<'_> {
                 format!(
                     "{{# Each link in the writing, one to another site opened as the old site's \
                      settings asked: see /snippets/#pieces-of-the-writing -#}}\n\
-                     <a href=\"{{{{ address }}}}\"{{% if title %}} title=\"{{{{ title }}}}\"{{% \
-                     endif %}}{{% if outside %}}{target} rel=\"{}\"{{% endif %}}>{{{{ body }}}}</a>",
+                     <a href=\"{{{{ address }}}}\"{{% if title %}} title=\"{{{{ title }}}}\"\
+                     {{% endif %}}{{% if outside %}}{target} rel=\"{}\"{{% endif %}}>\
+                     {{{{ body }}}}</a>",
                     rel.join(" ")
                 ),
             ));

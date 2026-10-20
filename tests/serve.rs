@@ -589,7 +589,8 @@ fn a_stamps_line_shows_a_name_a_terminal_would_act_on_harmless() {
     let mark = served.said.text().len();
     served.site.write(
         "content/post\u{1b}[2J\r-\n2.md",
-        "---\ntitle: Post 2\nevent:\n  \"at\\e[2J\\r\\nfirst\": =yesterday\n---\nThe second post.\n",
+        "---\ntitle: Post 2\nevent:\n  \"at\\e[2J\\r\\nfirst\": =yesterday\n---\n\
+         The second post.\n",
     );
     let stamped = "Stamped `content/post\u{241b}[2J\u{240d}-\u{240a}2.md`: \
                    `event.at\u{241b}[2J\u{240d}\u{240a}first` is `";
@@ -635,7 +636,8 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
                  \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Did you mean \"},\
                  {\"code\":\"/post-1/\"},{\"text\":\"?\"}]},\
                  {\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
-                 \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site\\u0027s address \
+                 \"count\":1,\"quietened\":0,\
+                 \"suggestion\":[{\"text\":\"Add the site\\u0027s address \
                  to \"},{\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
                  {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}],\"gone\":null,\
                  \"drafts\":[{\"text\":\"Post \\u003c2\\u003e\",\"href\":\"/post-2/\"}],\
@@ -738,14 +740,17 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     // its own as the terminal shows them.
     let built = panel(&served, "/post-2/");
     let link = "{\"severity\":\"warning\",\"kind\":\"broken-link\",\
-        \"headline\":[{\"text\":\"Broken link: nothing is published at \"},{\"code\":\"/post-9/\"}],\
+        \"headline\":[{\"text\":\"Broken link: nothing is published at \"},\
+        {\"code\":\"/post-9/\"}],\
         \"file\":\"content/post-2.md\",\"line\":3,\"column\":14,\"excerpt\":[\
         {\"line\":2,\"text\":[]},\
-        {\"line\":3,\"text\":[{\"text\":\"See [Post 9](\"},{\"mark\":\"/post-9/\"},{\"text\":\")  then.\"}]},\
+        {\"line\":3,\"text\":[{\"text\":\"See [Post 9](\"},{\"mark\":\"/post-9/\"},\
+        {\"text\":\")  then.\"}]},\
         {\"line\":4,\"text\":[]}],\
         \"related\":[],\"built\":[],\"builtMore\":0,\"printed\":null,\
         \"suggestion\":[{\"text\":\"Did you mean \"},{\"code\":\"/post-1/\"},{\"text\":\"?\"}],\
-        \"suggests\":null,\"explanation\":\"https://statac.dev/e/broken-link/\",\"quietened\":true}";
+        \"suggests\":null,\"explanation\":\"https://statac.dev/e/broken-link/\",\
+        \"quietened\":true}";
     let at = between(&built, "\"round\":{\"state\":\"built\",\"at\":\"", "\"").to_owned();
     assert!(
         built.contains(&format!(
@@ -765,8 +770,8 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
         )) && built.contains(
             "\"site\":{\"kinds\":[{\"kind\":\"broken-link\",\"severity\":\"warning\",\
              \"title\":\"Broken link\",\"count\":2,\"quietened\":2,\"suggestion\":[\
-             {\"text\":\"Did you mean \"},{\"code\":\"/post-1/\"},{\"text\":\"?\"}]}],\"gone\":null,\
-             \"drafts\":[],\"waiting\":[],\"written\":[]},\"root\":\""
+             {\"text\":\"Did you mean \"},{\"code\":\"/post-1/\"},{\"text\":\"?\"}]}],\
+             \"gone\":null,\"drafts\":[],\"waiting\":[],\"written\":[]},\"root\":\""
         ),
         "{built}"
     );
@@ -819,7 +824,8 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
              \"headline\":[{{\"text\":\"Unknown field: \"}},{{\"code\":\"page.sumary\"}}],\
              \"file\":\"templates/page.html\",\"line\":4,\"column\":11,\"excerpt\":[\
              {{\"line\":3,\"text\":[{{\"text\":\"\\u003chead\\u003e\"}}]}},\
-             {{\"line\":4,\"text\":[{{\"text\":\"\\u003ctitle\\u003e{{{{ \"}},{{\"mark\":\"page.sumary\"}},\
+             {{\"line\":4,\"text\":[{{\"text\":\"\\u003ctitle\\u003e{{{{ \"}},\
+             {{\"mark\":\"page.sumary\"}},\
              {{\"text\":\" }}}}\\u003c/title\\u003e\"}}]}},\
              {{\"line\":5,\"text\":[{{\"text\":\"{{{{ css(\\\"site.css\\\") }}}}\"}}]}}],\
              \"related\":[],\"built\":[],\"builtMore\":0,\"printed\":null,\
@@ -897,7 +903,8 @@ fn the_panel_is_handed_a_kinds_suggestion_where_each_of_its_problems_has_it() {
              \"count\":2,\"quietened\":0,\"suggestion\":null}"
         ) && site.contains(
             "{\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
-             \"count\":2,\"quietened\":0,\"suggestion\":[{\"text\":\"Add the site\\u0027s address to \"},\
+             \"count\":2,\"quietened\":0,\
+             \"suggestion\":[{\"text\":\"Add the site\\u0027s address to \"},\
              {\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
              {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}"
         ),
@@ -948,7 +955,8 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
              \"lists\":[{\"said\":[{\"text\":\"The site\\u0027s own list\"}],\"at\":2,\"of\":3,\
              \"previous\":{\"text\":\"Post 4\",\"href\":\"/posts/post-4/\"},\
              \"next\":{\"text\":\"Post 2\",\"href\":\"/posts/post-2/\"}},\
-             {\"said\":[{\"text\":\"The folder \"},{\"code\":\"content/posts/\"}],\"at\":2,\"of\":3,\
+             {\"said\":[{\"text\":\"The folder \"},{\"code\":\"content/posts/\"}],\
+             \"at\":2,\"of\":3,\
              \"previous\":{\"text\":\"Post 4\",\"href\":\"/posts/post-4/\"},\
              \"next\":{\"text\":\"Post 2\",\"href\":\"/posts/post-2/\"}}],\"feeds\":[],\
              \"reads\":{\"files\":[\"content/posts/post-2.md\",\"content/posts/post-3.md\",\
@@ -1311,7 +1319,8 @@ fn the_command_after_a_build_runs_once_and_serve_says_so() {
     assert!(
         said.contains("Ran `after_build`, which added 1 file.\n")
             && said.contains(
-                "`after_build` ran once: what it made stays as it is until serve is started again.\n"
+                "`after_build` ran once: what it made stays as it is until serve is started \
+                 again.\n"
             ),
         "{said}"
     );

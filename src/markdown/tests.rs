@@ -689,7 +689,8 @@ fn private_use_characters_are_written_where_the_author_wrote_them() {
             "Words.[^\u{E000}]\n\n[^\u{E000}]: A note \u{E001}.\n".to_owned(),
             "<p>Words.<sup class=\"footnote\"><a href=\"#note-1\" id=\"back-1\">1</a></sup></p>\n\
              <section class=\"footnotes\">\n  <ol>\n    <li id=\"note-1\">\n      \
-             <p>A note \u{E001}. <a href=\"#back-1\" class=\"back\" aria-label=\"back to the text\">\u{21a9}</a></p>\n    \
+             <p>A note \u{E001}. <a href=\"#back-1\" class=\"back\" \
+             aria-label=\"back to the text\">\u{21a9}</a></p>\n    \
              </li>\n  </ol>\n</section>"
                 .to_owned(),
         ),

@@ -297,7 +297,8 @@ fn a_picture_beside_a_post_that_is_one_file_reaches_its_page() {
     let site = Site::new("one-file");
     site.write(
         "content/posts/post-1.md",
-        "---\ntitle: Post 1\n---\n![A photograph](photo-1.jpg)\n\n![A plain picture](picture-1.gif)\n",
+        "---\ntitle: Post 1\n---\n![A photograph](photo-1.jpg)\n\n\
+         ![A plain picture](picture-1.gif)\n",
     );
     site.put("content/posts/photo-1.jpg", &jpeg(400, 200));
     site.put("content/posts/picture-1.gif", &gif(40, 30));
@@ -401,7 +402,8 @@ fn a_picture_is_found_in_static_and_from_the_top_under_the_sites_path() {
     site.write(
         "content/post-1.md",
         "---\ntitle: Post 1\n---\n![In static](/img/photo-1.jpg)\n\n\
-         ![Among the writing](/blog/shared/photo-2.jpg)\n\n![Elsewhere](https://example.com/a.jpg)\n\n\
+         ![Among the writing](/blog/shared/photo-2.jpg)\n\n\
+         ![Elsewhere](https://example.com/a.jpg)\n\n\
          ![Nowhere](photo-9.jpg)\n",
     );
     site.put("static/img/photo-1.jpg", &jpeg(900, 600));

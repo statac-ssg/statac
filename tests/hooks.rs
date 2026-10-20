@@ -315,7 +315,8 @@ fn an_after_build_naming_the_output_folder_is_warned_of_at_the_name() {
     assert!(said.contains(headline), "{said}");
     assert!(
         said.contains(
-            "   5 \u{2502} after_build: echo ./_site/made.txt\n     \u{2502}                     ^^^^^\n"
+            "   5 \u{2502} after_build: echo ./_site/made.txt\n     \
+             \u{2502}                     ^^^^^\n"
         ),
         "{said}"
     );

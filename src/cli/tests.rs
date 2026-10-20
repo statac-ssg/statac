@@ -326,7 +326,8 @@ fn the_address_for_a_run_is_a_whole_address() {
     assert_eq!(
         refused(&["build", "--url=preview.example.org/42/"]),
         "\
-error  Wrong kind of value: `--url` is a full address, such as `https://example.org`, not `preview.example.org/42/`
+error  Wrong kind of value: `--url` is a full address, such as `https://example.org`, \
+not `preview.example.org/42/`
   Write it as `https://preview.example.org/42/`.
   More: https://statac.dev/e/wrong-kind-of-value/
 "
@@ -398,7 +399,8 @@ fn every_mistake_is_said_in_order() {
     assert_eq!(
         refused(&["--sit=docs", "--out=a", "--out=b"]),
         "\
-error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, `import` or `explain`
+error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, \
+`import` or `explain`
   Run `statac --help` to see the commands.
   More: https://statac.dev/e/missing-command/
 
@@ -793,7 +795,8 @@ fn serve_shows_drafts_unasked_and_only_it_can_leave_them_out() {
         refused(&["serve", "--drafts"]),
         "\
 error  Unknown option: `statac serve` has no `--drafts`
-  `statac serve` shows drafts and posts waiting for their day already. `--no-drafts` leaves them out.
+  `statac serve` shows drafts and posts waiting for their day already. `--no-drafts` leaves them \
+out.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1214,7 +1217,8 @@ error  Missing address: `statac refuse` needs the address of a webmention or a s
     assert_eq!(
         refused(&["refuse", "a.example/post-1/"]),
         "\
-error  Not a web address: `statac refuse` takes an address starting `https://` or `http://`, not `a.example/post-1/`
+error  Not a web address: `statac refuse` takes an address starting `https://` or `http://`, \
+not `a.example/post-1/`
   Did you mean `https://a.example/post-1/`?
   More: https://statac.dev/e/not-a-web-address/
 "
@@ -1224,7 +1228,8 @@ error  Not a web address: `statac refuse` takes an address starting `https://` o
             refused(&["refuse", written]),
             format!(
                 "\
-error  Not a web address: `statac refuse` takes an address starting `https://` or `http://`, not `{written}`
+error  Not a web address: `statac refuse` takes an address starting `https://` or `http://`, \
+not `{written}`
   Give the whole address, as the browser shows it.
   More: https://statac.dev/e/not-a-web-address/
 "

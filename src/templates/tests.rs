@@ -484,11 +484,15 @@ fn what_a_call_or_filter_writes_at_an_indented_line_gives_up_the_indent_its_line
         ),
         // Its lines keep their indent one to another.
         (
-            "<div>\n  {% filter upper %}\n    <ul>\n      <li>a</li>\n    </ul>\n  {% endfilter %}\n</div>\n".to_owned(),
+            "<div>\n  {% filter upper %}\n    <ul>\n      <li>a</li>\n    </ul>\n  \
+             {% endfilter %}\n</div>\n"
+                .to_owned(),
             "<div>\n  <UL>\n    <LI>A</LI>\n  </UL>\n</div>\n",
         ),
         (
-            "<ul>\n  {% for e in [1, 2] %}\n    {% filter upper %}\n      <li>a</li>\n    {% endfilter %}\n  {% endfor %}\n</ul>\n".to_owned(),
+            "<ul>\n  {% for e in [1, 2] %}\n    {% filter upper %}\n      <li>a</li>\n    \
+             {% endfilter %}\n  {% endfor %}\n</ul>\n"
+                .to_owned(),
             "<ul>\n  <LI>A</LI>\n  <LI>A</LI>\n</ul>\n",
         ),
         (
@@ -541,62 +545,88 @@ fn a_body_held_back_is_laid_out_line_by_line_as_the_page_is() {
         // A value written inside a macro's body, at its own line.
         (
             format!(
-                "{paragraphs}{{% macro outer() %}}\n<section>\n  {{{{ inner() }}}}\n</section>\n{{% endmacro %}}\n<div>\n  {{{{ outer() }}}}\n</div>\n"
+                "{paragraphs}{{% macro outer() %}}\n<section>\n  {{{{ inner() }}}}\n</section>\n\
+                 {{% endmacro %}}\n<div>\n  {{{{ outer() }}}}\n</div>\n"
             ),
             lined.to_owned(),
         ),
         // A call's body, written by `caller()`, gives up the indent it has
         // under its tag.
         (
-            "{% macro m() %}\n<section>\n  {{ caller() }}\n</section>\n{% endmacro %}\n<div>\n  {% call m() %}\n    <p>a</p>\n    <p>b</p>\n  {% endcall %}\n</div>\n".to_owned(),
+            "{% macro m() %}\n<section>\n  {{ caller() }}\n</section>\n{% endmacro %}\n<div>\n  \
+             {% call m() %}\n    <p>a</p>\n    <p>b</p>\n  {% endcall %}\n</div>\n"
+                .to_owned(),
             lined.to_owned(),
         ),
         // A branch not taken leaves no line of spaces, in a macro's body
         // and in a set block's.
         (
-            "{% macro m(x) %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endmacro %}\n<div>\n  {{ m(true) }}\n</div>\n".to_owned(),
+            "{% macro m(x) %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n\
+             {% endmacro %}\n<div>\n  {{ m(true) }}\n</div>\n"
+                .to_owned(),
             branch(true),
         ),
         (
-            "{% macro m(x) %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endmacro %}\n<div>\n  {{ m(false) }}\n</div>\n".to_owned(),
+            "{% macro m(x) %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n\
+             {% endmacro %}\n<div>\n  {{ m(false) }}\n</div>\n"
+                .to_owned(),
             branch(false),
         ),
         (
-            "{% set x = true %}\n{% set s %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endset %}\n<div>\n  {{ s }}\n</div>\n".to_owned(),
+            "{% set x = true %}\n{% set s %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n\
+             </section>\n{% endset %}\n<div>\n  {{ s }}\n</div>\n"
+                .to_owned(),
             branch(true),
         ),
         (
-            "{% set x = false %}\n{% set s %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n</section>\n{% endset %}\n<div>\n  {{ s }}\n</div>\n".to_owned(),
+            "{% set x = false %}\n{% set s %}\n<section>\n  {% if x %}<p>b</p>{% endif %}\n\
+             </section>\n{% endset %}\n<div>\n  {{ s }}\n</div>\n"
+                .to_owned(),
             branch(false),
         ),
         // A macro called from inside a loop.
         (
             format!(
-                "{paragraphs}{{% macro item(e) %}}\n<li>\n  {{{{ inner() }}}}\n</li>\n{{% endmacro %}}\n<ul>\n  {{% for e in [1, 2] %}}\n  {{{{ item(e) }}}}\n  {{% endfor %}}\n</ul>\n"
+                "{paragraphs}{{% macro item(e) %}}\n<li>\n  {{{{ inner() }}}}\n</li>\n\
+                 {{% endmacro %}}\n<ul>\n  {{% for e in [1, 2] %}}\n  {{{{ item(e) }}}}\n  \
+                 {{% endfor %}}\n</ul>\n"
             ),
-            "<ul>\n  <li>\n    <p>a</p>\n    <p>b</p>\n  </li>\n  <li>\n    <p>a</p>\n    <p>b</p>\n  </li>\n</ul>\n".to_owned(),
+            "<ul>\n  <li>\n    <p>a</p>\n    <p>b</p>\n  </li>\n  <li>\n    <p>a</p>\n    \
+             <p>b</p>\n  </li>\n</ul>\n"
+                .to_owned(),
         ),
         // A macro calling a macro calling a macro.
         (
             format!(
-                "{paragraphs}{{% macro middle() %}}\n<div>\n  {{{{ inner() }}}}\n</div>\n{{% endmacro %}}\n{{% macro outer() %}}\n<section>\n  {{{{ middle() }}}}\n</section>\n{{% endmacro %}}\n<main>\n  {{{{ outer() }}}}\n</main>\n"
+                "{paragraphs}{{% macro middle() %}}\n<div>\n  {{{{ inner() }}}}\n</div>\n\
+                 {{% endmacro %}}\n{{% macro outer() %}}\n<section>\n  {{{{ middle() }}}}\n\
+                 </section>\n{{% endmacro %}}\n<main>\n  {{{{ outer() }}}}\n</main>\n"
             ),
-            "<main>\n  <section>\n    <div>\n      <p>a</p>\n      <p>b</p>\n    </div>\n  </section>\n</main>\n".to_owned(),
+            "<main>\n  <section>\n    <div>\n      <p>a</p>\n      <p>b</p>\n    </div>\n  \
+             </section>\n</main>\n"
+                .to_owned(),
         ),
         // Lines inside `<pre>` are left as typed.
         (
-            "{% macro m() %}\n<section>\n  <pre>one\n  two\nthree</pre>\n</section>\n{% endmacro %}\n<div>\n  {{ m() }}\n</div>\n".to_owned(),
-            "<div>\n  <section>\n    <pre>one\n  two\nthree</pre>\n  </section>\n</div>\n".to_owned(),
+            "{% macro m() %}\n<section>\n  <pre>one\n  two\nthree</pre>\n</section>\n\
+             {% endmacro %}\n<div>\n  {{ m() }}\n</div>\n"
+                .to_owned(),
+            "<div>\n  <section>\n    <pre>one\n  two\nthree</pre>\n  </section>\n\
+             </div>\n"
+                .to_owned(),
         ),
         // A value inside a filter's body, and a filter inside a macro's.
         (
             format!(
-                "{paragraphs}<div>\n  {{% filter upper %}}\n    <section>\n      {{{{ inner() }}}}\n    </section>\n  {{% endfilter %}}\n</div>\n"
+                "{paragraphs}<div>\n  {{% filter upper %}}\n    <section>\n      \
+                 {{{{ inner() }}}}\n    </section>\n  {{% endfilter %}}\n</div>\n"
             ),
             "<div>\n  <SECTION>\n    <P>A</P>\n    <P>B</P>\n  </SECTION>\n</div>\n".to_owned(),
         ),
         (
-            "{% macro m() %}\n<section>\n  {% filter upper %}\n    <p>a</p>\n    <p>b</p>\n  {% endfilter %}\n</section>\n{% endmacro %}\n<div>\n  {{ m() }}\n</div>\n".to_owned(),
+            "{% macro m() %}\n<section>\n  {% filter upper %}\n    <p>a</p>\n    <p>b</p>\n  \
+             {% endfilter %}\n</section>\n{% endmacro %}\n<div>\n  {{ m() }}\n</div>\n"
+                .to_owned(),
             "<div>\n  <section>\n    <P>A</P>\n    <P>B</P>\n  </section>\n</div>\n".to_owned(),
         ),
     ];

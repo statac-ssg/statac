@@ -127,7 +127,8 @@ pub fn document(shown: &Shown, summary: &Summary) -> String {
     match summary.starter {
         true => text.push_str(&format!(
             "It was made from `{}` by `statac import`, which changed nothing there. The templates, \
-             snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.\n\n",
+             snippets and stylesheet are Statac's starter, as `statac new` writes it: see \
+             https://statac.dev/new/.\n\n",
             shown.old
         )),
         false => {
@@ -140,7 +141,10 @@ pub fn document(shown: &Shown, summary: &Summary) -> String {
             ));
             if !summary.templates.is_empty() {
                 let templates: Vec<String> = summary.templates.iter().map(|t| code(t)).collect();
-                let feeds = summary.templates.iter().any(|t| t.starts_with("templates/feed."));
+                let feeds = summary
+                    .templates
+                    .iter()
+                    .any(|t| t.starts_with("templates/feed."));
                 text.push_str(&format!(
                     " Its pages{} need {}.",
                     if feeds { " and feeds" } else { "" },
@@ -264,7 +268,10 @@ fn came_across(text: &mut String, summary: &Summary) {
         text.push_str(line);
         text.push('\n');
     }
-    text.push_str("```\n\nand a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.\n\n");
+    text.push_str(
+        "```\n\nand a `feed_key` made fresh for the site: see \
+         https://statac.dev/feeds/#entry-ids.\n\n",
+    );
 }
 
 /// What became of the old site's lists of terms that Statac has no equal

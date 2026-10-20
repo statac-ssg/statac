@@ -851,8 +851,8 @@ impl Reader<'_> {
             }
             (_, Some(given)) => self.import.address = Some(super::under(given, &s.base)),
             (Some(url), None) => notes.push(format!(
-                "The settings' `url`, {}, isn't a web address, so the new site has no `url` yet: add \
-                 it to `statac.yaml` once it is known.",
+                "The settings' `url`, {}, isn't a web address, so the new site has no `url` yet: \
+                 add it to `statac.yaml` once it is known.",
                 code(url)
             )),
             (None, None) if !s.base.is_empty() => notes.push(format!(
@@ -986,7 +986,11 @@ impl Reader<'_> {
             if rel.is_empty() {
                 if self.settings.source.is_empty() && SETTINGS_FILES.contains(&name.as_str()) {
                     if !self.read_settings_file(&name) {
-                        self.left(&shown, "another settings file, which Jekyll reads only where the one before it isn't there");
+                        self.left(
+                            &shown,
+                            "another settings file, which Jekyll reads only where the one \
+                             before it isn't there",
+                        );
                     }
                     continue;
                 }
@@ -995,15 +999,25 @@ impl Reader<'_> {
                 let special = [
                     (
                         s.layouts_dir.as_str(),
-                        left_behind("the old site's layouts", "the starter's templates take", starter),
+                        left_behind(
+                            "the old site's layouts",
+                            "the starter's templates take",
+                            starter,
+                        ),
                     ),
                     (
                         s.includes_dir.as_str(),
-                        "the old site's includes; each one the writing calls has a snippet of its name standing for it".to_owned(),
+                        "the old site's includes; each one the writing calls has a snippet of its \
+                         name standing for it"
+                            .to_owned(),
                     ),
                     (
                         "_sass",
-                        left_behind("the old site's Sass", "the starter's `assets/site.css` takes", starter),
+                        left_behind(
+                            "the old site's Sass",
+                            "the starter's `assets/site.css` takes",
+                            starter,
+                        ),
                     ),
                     (
                         s.plugins_dir.as_str(),
@@ -1228,7 +1242,11 @@ impl Reader<'_> {
                         let from = self.from(rel);
                         self.import.feeds.push((format!("/{rel}"), from));
                     }
-                    self.left(rel, "front matter but no writing, such as a stylesheet or a feed, which Jekyll built with its templates")
+                    self.left(
+                        rel,
+                        "front matter but no writing, such as a stylesheet or a feed, which \
+                         Jekyll built with its templates",
+                    )
                 }
                 (false, Found::Page) => self.import.files.push(super::File {
                     from: self.from(rel),

@@ -816,7 +816,8 @@ impl<'a> Writer<'a> {
                 }
                 let shown = self.shown(*number);
                 self.out.push_str(&format!(
-                    "<sup class=\"footnote\"><a href=\"#note-{number}\" id=\"{back}\">{shown}</a></sup>"
+                    "<sup class=\"footnote\">\
+                     <a href=\"#note-{number}\" id=\"{back}\">{shown}</a></sup>"
                 ));
                 self.cuts.push(start..self.out.len());
             }
