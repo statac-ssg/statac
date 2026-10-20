@@ -4213,8 +4213,8 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         (
             "partLength",
             said(
-                "Length {n}, against the site's average of {average}. A longer part counts each \
-                 word for less.",
+                "Length of its text: {n}, against the site's average of {average}. Longer text \
+                 counts each word in it for less.",
             ),
         ),
     ]

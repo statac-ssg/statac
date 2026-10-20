@@ -1,6 +1,8 @@
 //! Search over a site's writing: one record for each part of a page that
 //! a heading with an id starts, and one for the part before, ranked by
-//! BM25 over words weighted by where they stand.
+//! BM25 over words weighted by where they stand. Only the length of a
+//! part's text counts against a word, so a word in its title, heading,
+//! tags or summary counts the same in a long part as in a short one.
 
 mod command;
 pub mod elsewhere;
@@ -361,25 +363,46 @@ fn placed(said: &Said, record: &Record, mut each: impl FnMut(&str, Place, u32)) 
     add(&record.text, Place::Text, TEXT);
 }
 
-/// A record's words, folded, each once with its weight there, and its
-/// length: its words counted by weight.
+/// A record's words, folded, each once with its weight in the record's
+/// text and its weight everywhere else, and the length of its text.
 struct Weighed {
-    words: Vec<(String, u32)>,
+    words: Vec<(String, Weights)>,
     length: u32,
+}
+
+/// What a word weighs in a record: in its text, which the text's length
+/// counts against, and everywhere else, which no length does.
+#[derive(Copy, Clone, Default, PartialEq, Debug)]
+struct Weights {
+    text: u32,
+    rest: u32,
+}
+
+impl Weights {
+    fn add(&mut self, place: Place, weight: u32) {
+        match place {
+            Place::Text => self.text += weight,
+            _ => self.rest += weight,
+        }
+    }
 }
 
 /// `record`, of a page `said` is said of, weighed.
 fn weighed(said: &Said, record: &Record) -> Weighed {
-    let mut words: HashMap<String, u32> = HashMap::new();
+    let mut words: HashMap<String, Weights> = HashMap::new();
     let mut length = 0;
-    placed(said, record, |word, _, weight| {
+    placed(said, record, |word, place, weight| {
         match words.get_mut(word) {
-            Some(held) => *held += weight,
+            Some(held) => held.add(place, weight),
             None => {
-                words.insert(word.to_owned(), weight);
+                let mut weights = Weights::default();
+                weights.add(place, weight);
+                words.insert(word.to_owned(), weights);
             }
         }
-        length += weight;
+        if place == Place::Text {
+            length += weight;
+        }
     });
     Weighed {
         words: words.into_iter().collect(),
@@ -396,14 +419,14 @@ fn weighed(said: &Said, record: &Record) -> Weighed {
 /// stemming: what a reader's browser does with the index files.
 pub struct Index {
     pub records: Vec<Record>,
-    /// Each record's length, its words counted by weight.
+    /// The length of each record's text, in words.
     lengths: Vec<u32>,
     average: f64,
     /// Every word the records hold, folded, in the order of their UTF-16
     /// code units, with its stem's entry.
     words: Vec<(String, u32)>,
-    /// Each entry's records, in order, with the stem's weight in each.
-    entries: Vec<Vec<(u32, u32)>>,
+    /// Each entry's records, in order, with the stem's weights in each.
+    entries: Vec<Vec<(u32, Weights)>>,
     /// Where each piece of the word list a reader's browser is given
     /// starts, once asked for.
     starts: OnceLock<Vec<usize>>,
@@ -414,7 +437,7 @@ struct Assembled {
     lengths: Vec<u32>,
     average: f64,
     words: Vec<(String, u32)>,
-    entries: Vec<Vec<(u32, u32)>>,
+    entries: Vec<Vec<(u32, Weights)>>,
 }
 
 impl Assembled {
@@ -483,20 +506,22 @@ impl Index {
             .map(|(&word, stem)| (word, numbered[stem.as_str()]))
             .collect();
         // Each record's stems, with their weights there.
-        let held: Vec<HashMap<u32, u32>> = (weighed.par_iter())
+        let held: Vec<HashMap<u32, Weights>> = (weighed.par_iter())
             .map(|weighed| {
-                let mut held: HashMap<u32, u32> = HashMap::new();
-                for (word, weight) in &weighed.words {
-                    *held.entry(entry_of[word.as_str()]).or_default() += weight;
+                let mut held: HashMap<u32, Weights> = HashMap::new();
+                for (word, weights) in &weighed.words {
+                    let kept = held.entry(entry_of[word.as_str()]).or_default();
+                    kept.text += weights.text;
+                    kept.rest += weights.rest;
                 }
                 held
             })
             .collect();
-        let mut entries: Vec<Vec<(u32, u32)>> = vec![Vec::new(); keys.len()];
+        let mut entries: Vec<Vec<(u32, Weights)>> = vec![Vec::new(); keys.len()];
         for (record, held) in held.into_iter().enumerate() {
             let record = u32::try_from(record).expect("fewer records than u32 holds");
-            for (entry, weight) in held {
-                entries[entry as usize].push((record, weight));
+            for (entry, weights) in held {
+                entries[entry as usize].push((record, weights));
             }
         }
         let words: Vec<(String, u32)> = (words.iter())
@@ -570,9 +595,9 @@ impl Index {
             for (entry, counts) in entries {
                 let held = &self.entries[entry as usize];
                 let rarity = self.rarity(held.len());
-                for &(record, weight) in held {
+                for &(record, weights) in held {
                     let kept = best.entry(record).or_default();
-                    *kept = kept.max(self.scored(rarity, weight, record) * counts);
+                    *kept = kept.max(self.scored(rarity, weights, record) * counts);
                 }
             }
             for (record, score) in best {
@@ -605,14 +630,14 @@ impl Index {
     }
 
     /// What a word as rare as `rarity` scores in `record`, held there at
-    /// `weight`.
-    fn scored(&self, rarity: f64, weight: u32, record: u32) -> f64 {
-        let weight = f64::from(weight);
+    /// `weights`: BM25F, the text's weight scaled by its length alone.
+    fn scored(&self, rarity: f64, weights: Weights, record: u32) -> f64 {
         let length = f64::from(self.lengths[record as usize]) / self.average;
-        rarity * weight * (K1 + 1.0) / (weight + K1 * (1.0 - B + B * length))
+        let weight = f64::from(weights.rest) + f64::from(weights.text) / (1.0 - B + B * length);
+        rarity * weight * (K1 + 1.0) / (weight + K1)
     }
 
-    /// The records' average length, their words counted by weight.
+    /// The average length of the records' text, in words.
     pub fn average(&self) -> f64 {
         self.average
     }

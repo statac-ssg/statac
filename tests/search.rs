@@ -205,7 +205,7 @@ fn a_page_asking_for_a_search_box_publishes_the_index_its_files_named_by_content
         text(&index, records[0]),
         format!(
             "{{\"pages\":[[\"{}\",1],[\"{}\",1],[\"{}\",2],[\"{}\",1]],\
-             \"lengths\":[8,5,15,10,13]}}",
+             \"lengths\":[3,0,5,3,3]}}",
             shown[0], shown[1], shown[2], shown[3]
         )
     );

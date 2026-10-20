@@ -11,10 +11,13 @@
 //! unpack itself.
 //!
 //! - `records.*.bin`: each page's text file and how many records it has,
-//!   the records in order, and each record's length.
+//!   the records in order, and the length of each record's text.
 //! - `words.*.bin`: a run of the language's words in the order of their
 //!   UTF-16 code units, each with its stem's entry among the piece's, and
-//!   each entry's records as gaps from the last, each with its weight.
+//!   each entry's records as gaps from the last, each with its weight in
+//!   the record's text and its weight everywhere else: the gap times four,
+//!   plus 1 where the weight in its text alone follows, 2 where the rest
+//!   alone does, or 3 where both do, the text's first.
 //!   `index.js` gives the first word of each.
 //! - `pages/*.bin`: one page's address, its name as a list gives it, its
 //!   date, the date as the site writes it where the page isn't called by
@@ -26,7 +29,7 @@ use std::fmt::Write as _;
 
 use rayon::prelude::*;
 
-use super::{Index, Kept};
+use super::{Index, Kept, Weights};
 use crate::content::address::Top;
 use crate::problem::Named;
 use crate::site::{LanguageId, Site};
@@ -277,7 +280,7 @@ fn cuts(index: &Index, most: usize) -> (Vec<usize>, Vec<usize>) {
 }
 
 /// About how long an entry's records are written.
-fn written_length(records: &[(u32, u32)]) -> usize {
+fn written_length(records: &[(u32, Weights)]) -> usize {
     records.len() * 6 + 2
 }
 
@@ -310,14 +313,21 @@ fn piece(index: &Index, range: std::ops::Range<usize>) -> String {
             json.push(',');
         }
         let mut last = 0;
-        let pairs = index.entries[entry as usize]
+        let records = index.entries[entry as usize]
             .iter()
-            .flat_map(|&(record, weight)| {
+            .flat_map(|&(record, weights)| {
                 let gap = record - last;
                 last = record;
-                [gap, weight]
+                let gap = gap
+                    .checked_mul(4)
+                    .expect("fewer records than u32 holds a quarter of");
+                match (weights.text, weights.rest) {
+                    (text, 0) => vec![gap + 1, text],
+                    (0, rest) => vec![gap + 2, rest],
+                    (text, rest) => vec![gap + 3, text, rest],
+                }
             });
-        numbers(pairs, &mut json);
+        numbers(records, &mut json);
     }
     json.push_str("]}");
     json

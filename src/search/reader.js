@@ -267,6 +267,25 @@ function edits(a, b) {
 }
 
 /**
+ * The records of an entry's list, each as its place among the records,
+ * its weight in its text and its weight everywhere else.
+ */
+function postings(list) {
+  const held = [];
+  let record = 0;
+  for (let at = 0; at < list.length; ) {
+    const step = list[at];
+    const kind = step % 4;
+    record += (step - kind) / 4;
+    const text = kind === 2 ? 0 : list[at + 1];
+    const rest = kind === 1 ? 0 : list[at + (kind === 2 ? 1 : 2)];
+    held.push([record, text, rest]);
+    at += kind === 3 ? 3 : 2;
+  }
+  return held;
+}
+
+/**
  * The word nearest `word` in the piece of the word list it falls in: the
  * fewest edits away, then the one held by the most records, then the
  * first. A word of fewer than five characters is near a word one edit
@@ -282,7 +301,7 @@ async function nearest(word) {
       return;
     }
     const apart = edits(word, listed);
-    const held = piece.records[piece.stems[place]].length / 2;
+    const held = postings(piece.records[piece.stems[place]]).length;
     const nearer =
       !found || apart < found.apart || (apart === found.apart && held > found.held);
     if (apart <= reach && nearer) {
@@ -456,14 +475,13 @@ async function found(query, shown, typing, respelling = true) {
   for (const lists of looked) {
     const best = new Map();
     for (const [list, counts] of lists) {
-      const holding = list.length / 2;
+      const held = postings(list);
+      const holding = held.length;
       const rarity = Math.log(1 + (count - holding + 0.5) / (holding + 0.5));
-      let record = 0;
-      for (let at = 0; at < list.length; at += 2) {
-        record += list[at];
-        const weight = list[at + 1];
+      for (const [record, text, rest] of held) {
         const length = lengths[record] / average;
-        const score = (rarity * weight * (K1 + 1)) / (weight + K1 * (1 - B + B * length));
+        const weight = rest + text / (1 - B + B * length);
+        const score = (rarity * weight * (K1 + 1)) / (weight + K1);
         best.set(record, Math.max(best.get(record) ?? 0, score * counts));
       }
     }

@@ -10,7 +10,7 @@ use crate::site::Site;
 /// Why a record scores what it does.
 #[derive(Debug, PartialEq)]
 pub struct Why {
-    /// Its length, its words counted by weight, and the records' average.
+    /// The length of its text, in words, and the records' average.
     pub length: u32,
     pub average: f64,
     /// What each word asked counted, in the order of the words.
@@ -56,7 +56,9 @@ impl Index {
         let mut length = 0;
         let said = Said::of(site, self.records[record].page);
         placed(&said, &self.records[record], |word, place, weight| {
-            length += weight;
+            if place == Place::Text {
+                length += weight;
+            }
             if let Some(entry) = self.entry_of(word) {
                 held.entry(entry)
                     .or_default()

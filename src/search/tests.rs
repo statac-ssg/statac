@@ -304,6 +304,45 @@ fn a_page_named_for_the_words_comes_first_and_every_word_counts_before_any() {
 }
 
 #[test]
+fn a_word_in_a_title_counts_the_same_however_long_the_text() {
+    let filler = "Other words fill the page. ".repeat(60);
+    let long = format!("---\ntitle: Feeds\n---\n{filler}\n");
+    let about = format!(
+        "---\ntitle: Feeds\nsummary: How feeds are made, and which lists have feeds.\n---\n\
+         Each list has a feed. {filler}\n"
+    );
+    let (renderer, root) = site(
+        "title-length",
+        &[
+            ("content/long.md", &long),
+            ("content/short.md", "---\ntitle: Feeds\n---\nOther words.\n"),
+            ("content/about.md", &about),
+            (
+                "content/mention.md",
+                "---\ntitle: No feed\n---\nThere is no feed.\n",
+            ),
+        ],
+    );
+    let index = index_of(&renderer, 0);
+    let _ = std::fs::remove_dir_all(root);
+    let found = index.search(&Asked::of("feeds", false, &index));
+    let score = |path: &str| {
+        let page = page(&renderer, path);
+        let found = found
+            .iter()
+            .find(|found| index.records[found.record].page == page);
+        found.unwrap().score
+    };
+    assert_eq!(score("long.md"), score("short.md"));
+    // A long page about the word, in its title and summary, comes before
+    // a short one mentioning it once.
+    assert_eq!(
+        index.records[found[0].record].page,
+        page(&renderer, "about.md")
+    );
+}
+
+#[test]
 fn each_page_is_searched_in_its_own_languages_forms() {
     let (renderer, root) = site(
         "languages",

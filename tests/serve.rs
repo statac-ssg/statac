@@ -1137,13 +1137,13 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
     assert!(
         draft.starts_with(
             "{\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":1,\"some\":false,\
-             \"suggestion\":null,\"parts\":4,\"average\":13.5,\"results\":[\
+             \"suggestion\":null,\"parts\":4,\"average\":2.5,\"results\":[\
              {\"title\":\"Post 2\",\"day\":null,\"heading\":null,\"href\":\"/post-2/\",\
              \"file\":\"content/post-2.md\",\"draft\":true,\"waiting\":null,\
              \"excerpt\":[{\"text\":\"A \",\"marked\":false},{\"text\":\"draft\",\"marked\":true},\
              {\"text\":\".\",\"marked\":false}],\"matched\":1,\"score\":"
         ) && draft.contains(
-            ",\"length\":12,\"words\":[{\"word\":\"draft\",\"forms\":[\"draft\"],\
+            ",\"length\":2,\"words\":[{\"word\":\"draft\",\"forms\":[\"draft\"],\
              \"starting\":false,\"places\":[{\"place\":\"text\",\"times\":1,\"counts\":1}],\
              \"holding\":1,\"score\":"
         ),
