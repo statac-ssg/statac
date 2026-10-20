@@ -30,6 +30,13 @@ the pages, so any of them can clash with another. A Sass file is published as th
 stylesheet it becomes, so `site.scss` and `site.css` in the same folder
 are published under the same name.
 
+The site's search index is a few files in `search/` at the top of each
+language a search box reads it in: `search/index.js` and the files it
+reads, or `fr/search/index.js` for a site's French pages, under the
+site's path where it has one. A file of yours at one of those
+addresses, such as `static/search/index.js`, clashes with it, and the
+message names "the site's search index". Rename yours, or move it.
+
 A list too long for one page continues on later pages beneath it, at the
 addresses that `later_pages` in `statac.yaml` sets. By default, they are
 at `page/2/` and onwards.
