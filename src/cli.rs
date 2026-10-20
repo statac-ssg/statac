@@ -416,7 +416,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
                 let outcome = Outcome::unread(problem);
                 said_of_build(&report, &outcome, Path::new(""), Duration::ZERO)
             }
-            Request::Stamp(_) => report.problems(&[problem]),
+            Request::Stamp(_) | Request::Search(_) => report.problems(&[problem]),
             _ => report.check(&[problem], &Quiet::default()),
         };
         say(terminal.out, &said);

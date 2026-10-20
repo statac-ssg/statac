@@ -317,6 +317,15 @@ fn a_folder_in_no_site_is_refused_and_left_as_it_was() {
                  {NO_SITE}\n1 error: 1 no-site-here.\n"
             )
         );
+        let output = statac_in(&folder, &["search", "post"]);
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            format!(
+                "error  No site here: `.` has no `content/` folder and no `statac.yaml`\n\
+                 {NO_SITE}"
+            )
+        );
     }
     assert_eq!(everything(&folder), [std::path::PathBuf::from("post-1.md")]);
 }
@@ -344,6 +353,10 @@ fn a_folder_named_is_taken_as_named_and_never_looked_above() {
     assert_eq!(refused(&["refresh", "notes"]), counted);
     assert_eq!(refused(&["refuse", "https://a.example/", "notes"]), counted);
     assert_eq!(refused(&["stamp", "notes"]), format!("{headline}{NO_SITE}"));
+    assert_eq!(
+        refused(&["search", "post", "notes"]),
+        format!("{headline}{NO_SITE}")
+    );
     assert_eq!(everything(&notes), [std::path::PathBuf::from("post-1.md")]);
     assert_eq!(
         refused(&["check", "not-there"]),

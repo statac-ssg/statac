@@ -70,6 +70,14 @@ impl Outcome {
 }
 
 pub fn run(options: &Options) -> Outcome {
+    if let Err(problem) = crate::build::a_folder(&options.site) {
+        return Outcome {
+            renderer: None,
+            errors: vec![problem],
+            mistake: None,
+            found: Vec::new(),
+        };
+    }
     let run = crate::content::Run {
         today: options.today,
         drafts: options.drafts,

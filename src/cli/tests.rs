@@ -1275,6 +1275,28 @@ error  Can't read `site-that-isnt-there`: it doesn't exist
 }
 
 #[test]
+fn a_site_to_search_that_isnt_there_is_said_to_be_missing() {
+    for args in [
+        &["search", "post", "site-that-isnt-there"][..],
+        &["search", "post", "--site=site-that-isnt-there"],
+    ] {
+        let (out, err, code) = ran(args);
+        assert_eq!(
+            (out.as_str(), err.as_str(), code),
+            (
+                "\
+error  Can't read `site-that-isnt-there`: it doesn't exist
+  More: https://statac.dev/e/cant-read/
+",
+                "",
+                1
+            ),
+            "{args:?}"
+        );
+    }
+}
+
+#[test]
 fn serve_takes_only_its_own_options() {
     assert_eq!(
         refused(&["serve", "--out=public"]),
