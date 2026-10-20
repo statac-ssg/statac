@@ -1486,16 +1486,29 @@ pub(crate) fn publish_files(
     (files, problems)
 }
 
-/// Files published as they are that a browser reads as a document, and so
-/// may run script from: HTML, XHTML and SVG.
 /// How much of a file is looked at to tell text from binary.
 const SNIFFED: usize = 8 * 1024;
 
+/// The endings of files a host sends as a picture, a recording, a font or
+/// a PDF. A browser reads a file sent so as that and never as a document,
+/// whatever it holds, so it runs no script from one. An SVG is a document.
+const NEVER_DOCUMENTS: &[&str] = &[
+    "jpg", "jpeg", "jfif", "png", "gif", "webp", "avif", "heic", "heif", "jxl", "bmp", "tif",
+    "tiff", "ico", "mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac", "mp4", "m4v", "webm",
+    "mov", "ogv", "woff", "woff2", "ttf", "otf", "eot", "pdf",
+];
+
+/// Whether the file `name` is one a browser never reads as a document.
+fn never_a_document(name: &str) -> bool {
+    let extension = Path::new(name).extension().and_then(|e| e.to_str());
+    extension.is_some_and(|e| NEVER_DOCUMENTS.contains(&e.to_ascii_lowercase().as_str()))
+}
+
 /// A published file's text, where it is text: no NUL in its opening
 /// stretch, as binary formats have and text doesn't. A browser may read any
-/// text as a document, whatever the file is called, so none is passed over
-/// by its name. A file that can't be read here can't be published either,
-/// which publishing says.
+/// text as a document, whatever the file is called, unless its name is one
+/// [`never_a_document`] knows. A file that can't be read here can't be
+/// published either, which publishing says.
 fn text_of(file: &PathOrBytes) -> Option<String> {
     let bytes = match file {
         PathOrBytes::Bytes(bytes) => std::borrow::Cow::Borrowed(*bytes),
@@ -1889,7 +1902,8 @@ impl Reader {
 /// The JavaScript the built site carries: each script it publishes, from
 /// any folder, whether or not a page loads it; each address elsewhere a
 /// page loads one from; each file that writes JavaScript into a page,
-/// pages built and every text file published as it is alike; and
+/// pages built and every text file published as it is that a browser may
+/// read as a document alike; and
 /// each thing embedded that may run its own.
 fn javascript(
     renderer: &Renderer,
@@ -1912,7 +1926,7 @@ fn javascript(
     let documents: Vec<(Vec<Finding>, String)> = as_is
         .par_iter()
         // A script is reported whole already, as the script it is.
-        .filter(|(_, from, _)| !assets::is_script(from))
+        .filter(|(_, from, _)| !assets::is_script(from) && !never_a_document(from))
         .filter_map(|(_, from, file)| {
             let findings = match (file, remembered) {
                 (PathOrBytes::Path(path), Some(remembered)) => remembered.found_in(path, file),

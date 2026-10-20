@@ -1519,6 +1519,33 @@ fn javascript_is_found_in_every_file_published_whatever_its_folder() {
     }
 }
 
+/// A file a host sends as a picture, a recording, a font or a PDF is never
+/// read as a document, so what it holds is never taken for script.
+#[test]
+fn javascript_is_never_looked_for_in_a_file_no_browser_reads_as_a_document() {
+    let site = Site::new("never-documents");
+    let paths = [
+        "static/photo-1.jpg",
+        "static/photo-2.PNG",
+        "static/recording-1.mp3",
+        "static/font-1.woff2",
+        "static/file-1.pdf",
+    ];
+    for path in paths {
+        site.write(path, "<p>Demo</p><script>run()</script>\n");
+    }
+    site.write("static/demo.txt", "<p>Demo</p><script>run()</script>\n");
+    let (said, code) = site.run(&["check", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.contains("  Written in `static/demo.txt`"), "{said}");
+    for name in ["photo-1", "photo-2", "recording-1", "font-1", "file-1"] {
+        assert!(
+            !said.contains(&format!("`static/{name}.")),
+            "{name}: {said}"
+        );
+    }
+}
+
 #[test]
 fn javascript_a_snippet_called_by_name_writes_is_not_listed_and_the_rest_is() {
     const PLAIN: &str = "<!doctype html>\n<title>{{ page.title }}</title>\n{{ page.content }}\n";
