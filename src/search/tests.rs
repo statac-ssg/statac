@@ -43,6 +43,7 @@ fn japanese_is_split_into_words_by_dictionary() {
 fn a_word_is_folded_to_small_letters_without_its_accents() {
     assert_eq!(fold("Ｃafé"), "cafe");
     assert_eq!(fold("NAÏVE"), "naive");
+    assert_eq!(fold("HTTP2_Server"), "http2_server");
     assert_eq!(fold("Ελληνικά"), "ελληνικα");
     // The kana's voicing changes the word, so it stays.
     assert_eq!(fold("ガイド"), "ガイド");

@@ -313,12 +313,14 @@ impl Place {
 
 /// Each word of `record`, of a page `said` is said of, folded, in turn,
 /// with where it stands and its weight there.
-fn placed(said: &Said, record: &Record, mut each: impl FnMut(String, Place, u32)) {
+fn placed(said: &Said, record: &Record, mut each: impl FnMut(&str, Place, u32)) {
     // Each page's records begin with the part before its first heading.
     let opening = record.heading.is_none();
+    let mut folded = String::new();
     let mut add = |text: &str, place: Place, weight: u32| {
         for span in spans(text) {
-            each(fold(&text[span]), place, weight);
+            words::fold_into(&text[span], &mut folded);
+            each(&folded, place, weight);
         }
     };
     if let Some(title) = said.title {
@@ -354,7 +356,12 @@ fn weighed(said: &Said, record: &Record) -> Weighed {
     let mut words: HashMap<String, u32> = HashMap::new();
     let mut length = 0;
     placed(said, record, |word, _, weight| {
-        *words.entry(word).or_default() += weight;
+        match words.get_mut(word) {
+            Some(held) => *held += weight,
+            None => {
+                words.insert(word.to_owned(), weight);
+            }
+        }
         length += weight;
     });
     Weighed {

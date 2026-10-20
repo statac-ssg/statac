@@ -32,8 +32,22 @@ pub fn spans(text: &str) -> impl Iterator<Item = Range<usize>> + '_ {
 /// off, in its compatibility form and small letters: `Ｃafé` is `cafe`.
 /// Marks other scripts need, such as the kana's voicing, are kept.
 pub fn fold(word: &str) -> String {
+    let mut folded = String::new();
+    fold_into(word, &mut folded);
+    folded
+}
+
+/// [`fold`], written over `folded`.
+pub(super) fn fold_into(word: &str, folded: &mut String) {
+    folded.clear();
+    // Nothing in ASCII decomposes or carries a mark.
+    if word.is_ascii() {
+        folded.push_str(word);
+        folded.make_ascii_lowercase();
+        return;
+    }
     let unmarked: String = word.nfkd().filter(|&c| !diacritic(c)).collect();
-    unmarked.nfc().collect::<String>().to_lowercase()
+    folded.push_str(&unmarked.nfc().collect::<String>().to_lowercase());
 }
 
 /// Whether `c` is a combining mark of the blocks that hold the marks of

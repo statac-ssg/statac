@@ -57,8 +57,10 @@ impl Index {
         let said = Said::of(site, self.records[record].page);
         placed(&said, &self.records[record], |word, place, weight| {
             length += weight;
-            if let Some(entry) = self.entry_of(&word) {
-                held.entry(entry).or_default().push((word, place, weight));
+            if let Some(entry) = self.entry_of(word) {
+                held.entry(entry)
+                    .or_default()
+                    .push((word.to_owned(), place, weight));
             }
         });
         let at = u32::try_from(record).expect("fewer records than u32 holds");
