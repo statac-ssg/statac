@@ -1810,11 +1810,11 @@ impl Reader<'_> {
     /// have left it.
     fn reading(&self) -> Reading {
         let signs: Vec<writing::Signs> = (self.docs.iter())
-            .map(|doc| writing::signs(&doc.body))
+            .map(|doc| writing::signs(&doc.body, &self.own))
             .collect();
         if self.s.skip_content_templating.is_some()
             || self.later
-            || signs.iter().any(|signs| signs.component)
+            || signs.iter().any(|signs| signs.component || signs.function)
         {
             Reading::Template
         } else if self.earlier || signs.iter().any(|signs| signs.shown) {
@@ -1872,6 +1872,9 @@ impl Reader<'_> {
         let skip = self.s.skip_content_templating.clone().unwrap_or_default();
         let cx = writing::Context {
             reading,
+            language: &self.s.default_language,
+            main_language: &self.s.default_language,
+            feeds: &self.s.feed_filenames,
             base: &base,
             refs: &refs,
             own: &self.own,
@@ -1886,7 +1889,11 @@ impl Reader<'_> {
                 Reading::Template if self.ignored(&skip, &doc.rel) => Reading::AsWritten,
                 reading => reading,
             };
-            let cx = writing::Context { reading, ..cx };
+            let cx = writing::Context {
+                reading,
+                language: &doc.language,
+                ..cx
+            };
             let converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
             self.import.findings.extend(converted.findings);
             calls.extend(converted.calls);

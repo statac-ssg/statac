@@ -2610,6 +2610,14 @@ fn zola_template_code_in_the_writing_is_told_by_the_version_that_ran_it() {
     assert_eq!(fixture("zola-template-code"), [] as [&str; 0]);
 }
 
+/// Zola 0.23 has no shortcodes, so a call in its writing is to one of
+/// Zola's functions: `get_url` gives the address Zola gave, and any other
+/// is told rather than made a snippet call.
+#[test]
+fn zola_functions_in_the_writing_give_their_address_or_are_told() {
+    assert_eq!(fixture("zola-functions"), [] as [&str; 0]);
+}
+
 #[test]
 fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
     let words = "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n\n\

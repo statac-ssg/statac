@@ -11,8 +11,9 @@
 //!
 //! Zola 0.23 and later run the whole writing as a template before reading
 //! it as Markdown: `raw` is taken out there and what it held left alone,
-//! inside code as anywhere, and every other piece of template code is
-//! told.
+//! inside code as anywhere, `get_url` is given the address Zola gave, and
+//! every other piece of template code is told. Having no shortcodes,
+//! 0.23 reads `{{ name(a="b") }}` as a call to one of its functions.
 
 use std::collections::HashSet;
 use std::ops::Range;
@@ -42,6 +43,11 @@ pub enum Reading {
 /// What the writing is converted with.
 pub struct Context<'a> {
     pub reading: Reading,
+    /// The page's language, and the site's main one.
+    pub language: &'a str,
+    pub main_language: &'a str,
+    /// The names the settings give the feeds.
+    pub feeds: &'a [String],
     /// Whether the new site has the starter, whose snippets a call names
     /// or is kept clear of.
     pub starter: bool,
@@ -383,12 +389,37 @@ pub fn macros(template: &str) -> bool {
     false
 }
 
+/// The functions Zola 0.23's templates have: its own, and its template
+/// reader's.
+const FUNCTIONS: [&str; 17] = [
+    "get_env",
+    "get_hash",
+    "get_image_metadata",
+    "get_page",
+    "get_random",
+    "get_section",
+    "get_taxonomy",
+    "get_taxonomy_term",
+    "get_taxonomy_url",
+    "get_url",
+    "load_data",
+    "now",
+    "range",
+    "resize_image",
+    "text_direction",
+    "throw",
+    "trans",
+];
+
 /// What a page's writing, outside code, shows of the version of Zola it
 /// was written for.
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Signs {
     /// A component call, which only 0.23 and later read.
     pub component: bool,
+    /// A call to one of Zola 0.23's functions, of a name the site has no
+    /// shortcode by, which would have stopped an earlier version.
+    pub function: bool,
     /// `raw`, which only 0.23 and later take out.
     pub raw: bool,
     /// A tag shown as text, `{{/* name() */}}`, which only versions before
@@ -396,7 +427,8 @@ pub struct Signs {
     pub shown: bool,
 }
 
-pub fn signs(body: &str) -> Signs {
+/// The [`Signs`] in `body`, on a site whose own tags are `own`.
+pub fn signs(body: &str, own: &[String]) -> Signs {
     let code = code_ranges(body);
     let mut signs = Signs::default();
     let mut at = 0;
@@ -416,9 +448,83 @@ pub fn signs(body: &str) -> Signs {
         };
         signs.shown |= matches!(tag.form, Form::Shown(_));
         signs.component |= tag.component;
+        signs.function |=
+            !tag.component && FUNCTIONS.contains(&tag.name.as_str()) && !own.contains(&tag.name);
         at = tag.end;
     }
     signs
+}
+
+/// What `{{ get_url(...) }}` wrote, as an address from the top of the
+/// host: `Err` where it names a page by its file and no page came across
+/// from there. None where it isn't a call to `get_url` whose address can
+/// be worked out here, such as one adding the hash of a file.
+fn get_url(tag: &Written, cx: &Context) -> Option<Result<String, ()>> {
+    if tag.form != Form::Alone || tag.name != "get_url" {
+        return None;
+    }
+    let (mut path, mut language, mut trailing, mut cachebust) = (None, None, false, false);
+    for (name, given) in &tag.args {
+        match (name.as_str(), given) {
+            ("path", Given::Text(text)) => path = Some(text.as_str()),
+            ("lang", Given::Text(text)) => language = Some(text.as_str()),
+            ("trailing_slash", Given::Bare(truth)) => trailing = truth.parse().ok()?,
+            ("cachebust", Given::Bare(truth)) => cachebust = truth.parse().ok()?,
+            _ => return None,
+        }
+    }
+    let path = path?;
+    // A page named by its file, in the page's own language unless `lang`
+    // says otherwise: `post.fr.md` for French.
+    if let Some(page) = path.strip_prefix("@/") {
+        let (file, anchor) = match page.split_once('#') {
+            Some((file, anchor)) => (file, format!("#{anchor}")),
+            None => (page, String::new()),
+        };
+        let language = language.unwrap_or(cx.language);
+        let file = match (language == cx.main_language, file.rsplit_once('.')) {
+            (true, _) => file.to_owned(),
+            (false, Some((stem, extension))) => format!("{stem}.{language}.{extension}"),
+            (false, None) => format!("{language}.{file}"),
+        };
+        let address = (cx.refs)(&file).ok_or(());
+        return Some(address.map(|address| format!("{}{address}{anchor}", cx.base)));
+    }
+    if cachebust {
+        return None;
+    }
+    let path = match language.filter(|language| *language != cx.main_language) {
+        Some(language) => {
+            let bare = path.strip_prefix('/').unwrap_or(path);
+            match bare == language || bare.starts_with(&format!("{language}/")) {
+                true => path.to_owned(),
+                false => format!("{language}/{}", path.trim_start_matches('/')),
+            }
+        }
+        None => path.to_owned(),
+    };
+    // Zola ends the address with a slash, unless it names a feed or a
+    // place on a page, and then takes the slash off unless asked to keep it.
+    let slash = match path.ends_with('/')
+        || path.is_empty()
+        || path.contains('#')
+        || cx.feeds.iter().any(|feed| path.ends_with(feed.as_str()))
+    {
+        true => "",
+        false => "/",
+    };
+    let mut address = match path.as_str() {
+        "/" => format!("{}/", cx.base),
+        _ if path.starts_with('/') => format!("{}{path}{slash}", cx.base),
+        _ => format!("{}/{path}{slash}", cx.base),
+    };
+    if !trailing && address.ends_with('/') {
+        address.pop();
+    }
+    if address.is_empty() {
+        address.push('/');
+    }
+    Some(Ok(address))
 }
 
 /// `raw` opening at `at` up to its `endraw`: where the writing before it
@@ -709,6 +815,21 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
         at = tag.end;
         if let Form::Shown(shown) = &tag.form {
             replace(&mut out, shown.clone().into(), tag.end);
+            continue;
+        }
+        if cx.reading == Reading::Template && !tag.component {
+            // With no shortcodes in 0.23, this calls one of Zola's
+            // functions, which it ran inside code as anywhere.
+            let kind = match get_url(&tag, cx) {
+                Some(Ok(address)) => {
+                    replace(&mut out, address.into(), tag.end);
+                    continue;
+                }
+                Some(Err(())) => &LINK_NOWHERE,
+                None if within(&code, start) => &TAG_IN_CODE,
+                None => &TAG_LEFT,
+            };
+            findings.push(finding(kind, spot(start, written)));
             continue;
         }
         if within(&code, start) {
@@ -1087,6 +1208,9 @@ mod tests {
         let wrapping = HashSet::from(["aside".to_owned()]);
         let cx = Context {
             reading: Reading::Tags,
+            language: "en",
+            main_language: "en",
+            feeds: &[],
             starter: true,
             base: "",
             refs: &|_| None,
@@ -1136,6 +1260,9 @@ mod tests {
         let wrapping = HashSet::new();
         let cx = Context {
             reading,
+            language: "en",
+            main_language: "en",
+            feeds: &[],
             starter: true,
             base: "",
             refs: &|_| None,
@@ -1232,6 +1359,145 @@ mod tests {
     }
 
     #[test]
+    fn get_url_gives_the_address_zola_gave_and_other_functions_are_told() {
+        let wrapping = HashSet::new();
+        let refs = |file: &str| match file {
+            "posts/post-1.md" => Some("/posts/post-1/".to_owned()),
+            "posts/post-1.fr.md" => Some("/fr/posts/post-1/".to_owned()),
+            _ => None,
+        };
+        let feeds = ["atom.xml".to_owned()];
+        // The call, the page's language, the site's path, and what it
+        // becomes, or None where it is left and told.
+        let cases: [(&str, &str, &str, Option<&str>); 17] = [
+            (
+                r#"get_url(path="@/posts/post-1.md")"#,
+                "en",
+                "",
+                Some("/posts/post-1/"),
+            ),
+            (
+                r#"get_url(path="@/posts/post-1.md#a")"#,
+                "en",
+                "/blog",
+                Some("/blog/posts/post-1/#a"),
+            ),
+            (
+                r#"get_url(path="@/posts/post-1.md")"#,
+                "fr",
+                "",
+                Some("/fr/posts/post-1/"),
+            ),
+            (
+                r#"get_url(path="@/posts/post-1.md", lang="en")"#,
+                "fr",
+                "",
+                Some("/posts/post-1/"),
+            ),
+            (
+                r#"get_url(path="@/posts/post-1.md", trailing_slash=false)"#,
+                "en",
+                "",
+                Some("/posts/post-1/"),
+            ),
+            (r#"get_url(path="@/posts/post-2.md")"#, "en", "", None),
+            (
+                r#"get_url(path="files/a.txt")"#,
+                "en",
+                "",
+                Some("/files/a.txt"),
+            ),
+            (
+                r#"get_url(path="/files/")"#,
+                "en",
+                "/blog",
+                Some("/blog/files"),
+            ),
+            (
+                r#"get_url(path="files", trailing_slash=true)"#,
+                "en",
+                "",
+                Some("/files/"),
+            ),
+            (
+                r#"get_url(path="atom.xml", trailing_slash=true)"#,
+                "en",
+                "",
+                Some("/atom.xml"),
+            ),
+            (
+                r#"get_url(path="/", trailing_slash=true)"#,
+                "en",
+                "/blog",
+                Some("/blog/"),
+            ),
+            (r#"get_url(path="/")"#, "en", "", Some("/")),
+            (
+                r#"get_url(path="files/a.txt", lang="fr")"#,
+                "en",
+                "",
+                Some("/fr/files/a.txt"),
+            ),
+            (
+                r#"get_url(path="fr/files/a.txt", lang="fr")"#,
+                "en",
+                "",
+                Some("/fr/files/a.txt"),
+            ),
+            (r#"get_url(path="a.css", cachebust=true)"#, "en", "", None),
+            (r#"get_url(path="a.css", other=1)"#, "en", "", None),
+            (r#"now()"#, "en", "", None),
+        ];
+        for (call, language, base, becomes) in cases {
+            let cx = Context {
+                reading: Reading::Template,
+                language,
+                main_language: "en",
+                feeds: &feeds,
+                starter: true,
+                base,
+                refs: &refs,
+                own: &[],
+                wrapping: &wrapping,
+                emoji: false,
+            };
+            let body = format!("{{{{ {call} }}}}\n");
+            let converted = convert(&body, 1, "a.md", &cx);
+            match becomes {
+                Some(address) => {
+                    assert_eq!(converted.writing, format!("{address}\n"), "{call}");
+                    assert!(converted.findings.is_empty(), "{call}");
+                }
+                None => {
+                    assert_eq!(converted.writing, body, "{call}");
+                    let kind = match call.contains("@/") {
+                        true => LINK_NOWHERE.heading,
+                        false => TAG_LEFT.heading,
+                    };
+                    let found: Vec<&str> =
+                        converted.findings.iter().map(|f| f.kind.heading).collect();
+                    assert_eq!(found, [kind], "{call}");
+                }
+            }
+            assert!(converted.calls.is_empty(), "{call}");
+        }
+    }
+
+    #[test]
+    fn a_function_called_in_code_is_run_there_too() {
+        let body = "`{{ get_url(path=\"a.txt\") }}` and `{{ now() }}`\n\n{% end %}\n";
+        let (writing, found) = converted(body, Reading::Template);
+        assert_eq!(writing, "`/a.txt` and `{{ now() }}`\n\n{% end %}\n");
+        assert_eq!(
+            found,
+            [
+                (TAG_IN_CODE.heading, "{{ now() }}".into()),
+                (TAG_LEFT.heading, "{% end %}".into()),
+            ]
+        );
+    }
+
+    #[test]
     fn a_heading_keeps_its_first_id_from_the_template_reader() {
         let text = "## A {#a} {#b}\n#### {#c}\n####### {#d}\nText {#e}\n    ## {#f}\n## {# g}";
         let ids: Vec<&str> = ["{#a}", "{#b}", "{#c}", "{#d}", "{#e}", "{#f}", "{# g}"]
@@ -1248,11 +1514,15 @@ mod tests {
         assert!(!macros(
             "{% component a() %}{% endcomponent %} {% macros %}"
         ));
-        let later = signs("{{ <a /> }}\n\n`{{/* a() */}}`\n");
-        assert!(later.component && !later.shown && !later.raw);
+        let later = signs("{{ <a /> }}\n\n`{{/* a() */}}`\n", &[]);
+        assert!(later.component && !later.function && !later.shown && !later.raw);
         // What `raw` holds is text whichever version read it.
-        let earlier = signs("{{/* a() */}}\n\n{% raw %}{{ <a /> }}{% endraw %}\n");
+        let earlier = signs("{{/* a() */}}\n\n{% raw %}{{ <a /> }}{% endraw %}\n", &[]);
         assert!(!earlier.component && earlier.shown && earlier.raw);
+        // A function's name is the site's own shortcode where it has one.
+        let call = "{{ now() }} {{ load_data(path=\"a\") }}\n";
+        assert!(signs(call, &["now".into()]).function);
+        assert!(!signs(call, &["now".into(), "load_data".into()]).function);
     }
 
     #[test]
