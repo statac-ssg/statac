@@ -1,6 +1,8 @@
 //! Zola's tags in the writing, `{{ name(a="b") }}` and `{% name(a="b") %}`
-//! up to `{% end %}`, each converted where the starter has an equal and
-//! otherwise a snippet call, or left exactly as written; links to a page
+//! up to `{% end %}`, and the components that replaced them in Zola 0.23,
+//! `{{ <name a="b" /> }}` and `{% <name a="b"> %}` up to `{% </name> %}`,
+//! each converted where the starter has an equal and otherwise a snippet
+//! call, or left exactly as written; links to a page
 //! by its file, `@/folder/page.md`, made the page's address; and the forms
 //! of Zola's Markdown that Statac's reads differently, counted. Nothing
 //! inside a code block or a code span is converted, but `{{/* name() */}}`,
@@ -63,6 +65,9 @@ enum Given {
     /// A number, `true` or `false`, as written.
     Bare(String),
     List,
+    /// What only a template can work out: an expression in braces, a
+    /// spread, or a name handing the variable of that name.
+    Worked,
 }
 
 /// What a tag is.
@@ -72,7 +77,7 @@ enum Form {
     Alone,
     /// `{% name() %}`, wrapping writing up to `{% end %}`.
     Opening,
-    /// `{% end %}`.
+    /// `{% end %}`, or `{% </name> %}`.
     End,
     /// `{{/* name() */}}`, and the text Zola showed for it.
     Shown(String),
@@ -97,6 +102,11 @@ fn tag_at(text: &str, at: usize) -> Option<Written> {
         _ => return None,
     };
     let mut i = 2;
+    let mut tag = i;
+    skip(rest, &mut tag);
+    if rest[tag..].starts_with('<') {
+        return component_at(rest, at, close, tag + 1);
+    }
     if rest[i..].starts_with("/*") {
         let inner_end = rest[i..].find("*/")? + i;
         let mut after = inner_end + 2;
@@ -168,6 +178,161 @@ fn tag_at(text: &str, at: usize) -> Option<Written> {
         name: name.to_owned(),
         args,
     })
+}
+
+/// The component call in `rest`, which starts at `at` in the writing and
+/// closes with `close`, its tag's name starting at `i`.
+fn component_at(rest: &str, at: usize, close: &str, mut i: usize) -> Option<Written> {
+    let alone = close == "}}";
+    if !alone && rest[i..].starts_with('/') {
+        i += 1;
+        let name = component_name(&rest[i..])?;
+        i += name.len();
+        skip(rest, &mut i);
+        i += rest[i..].starts_with('>').then_some(1)?;
+        skip(rest, &mut i);
+        return rest[i..].starts_with(close).then(|| Written {
+            start: at,
+            end: at + i + 2,
+            form: Form::End,
+            name: name.to_owned(),
+            args: Vec::new(),
+        });
+    }
+    let name = component_name(&rest[i..])?;
+    i += name.len();
+    let mut args = Vec::new();
+    loop {
+        let before = i;
+        skip(rest, &mut i);
+        let ends = if alone { "/>" } else { ">" };
+        if rest[i..].starts_with(ends) {
+            i += ends.len();
+            break;
+        }
+        if i == before {
+            return None;
+        }
+        if rest[i..].starts_with('{') {
+            i += braced(&rest[i..])?;
+            args.push((String::new(), Given::Worked));
+            continue;
+        }
+        let arg = attribute(&rest[i..])?;
+        i += arg.len();
+        if !rest[i..].starts_with('=') {
+            args.push((arg.to_owned(), Given::Worked));
+            continue;
+        }
+        i += 1;
+        let given = match rest[i..].chars().next()? {
+            '"' | '\'' => {
+                let (given, used) = value(&rest[i..])?;
+                i += used;
+                given
+            }
+            '{' => {
+                let used = braced(&rest[i..])?;
+                let inner = rest[i + 1..i + used - 1].trim();
+                i += used;
+                match value(inner) {
+                    Some((given @ (Given::Text(_) | Given::Bare(_)), n)) if n == inner.len() => {
+                        given
+                    }
+                    _ => Given::Worked,
+                }
+            }
+            _ => return None,
+        };
+        args.push((arg.to_owned(), given));
+    }
+    skip(rest, &mut i);
+    rest[i..].starts_with(close).then(|| Written {
+        start: at,
+        end: at + i + 2,
+        form: match alone {
+            true => Form::Alone,
+            false => Form::Opening,
+        },
+        name: name.to_owned(),
+        args,
+    })
+}
+
+/// A component's name at the start of `text`: names joined by `.`.
+fn component_name(text: &str) -> Option<&str> {
+    let mut end = ident(text)?.len();
+    while text[end..].starts_with('.')
+        && let Some(next) = ident(&text[end + 1..])
+    {
+        end += 1 + next.len();
+    }
+    Some(&text[..end])
+}
+
+/// An attribute's name at the start of `text`: a name, which may hold `-`
+/// after its first character.
+fn attribute(text: &str) -> Option<&str> {
+    ident(text)?;
+    let end = text
+        .find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '-')))
+        .unwrap_or(text.len());
+    Some(&text[..end])
+}
+
+/// The length of the braces opening `text`, with what they hold, braces
+/// within and quoted text included.
+fn braced(text: &str) -> Option<usize> {
+    let mut depth = 0;
+    let mut quote = None;
+    let mut chars = text.char_indices();
+    while let Some((i, c)) = chars.next() {
+        match (quote, c) {
+            (Some(_), '\\') => {
+                chars.next();
+            }
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, '"' | '\'' | '`') => quote = Some(c),
+            (None, '{') => depth += 1,
+            (None, '}') => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The names of the components `template` defines, each written
+/// `{% component name(...) %}`.
+pub fn components(template: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut at = 0;
+    while let Some(found) = template[at..].find("{%") {
+        let mut i = at + found + 2;
+        at = i;
+        i += usize::from(template[i..].starts_with('-'));
+        skip(template, &mut i);
+        let Some(rest) = template[i..].strip_prefix("component") else {
+            continue;
+        };
+        let mut j = 0;
+        skip(rest, &mut j);
+        if j == 0 {
+            continue;
+        }
+        if let Some(name) = component_name(&rest[j..])
+            && rest[j + name.len()..].trim_start().starts_with('(')
+            && !names.iter().any(|n| n == name)
+        {
+            names.push(name.to_owned());
+        }
+    }
+    names
 }
 
 fn skip(text: &str, at: &mut usize) {
@@ -461,6 +626,10 @@ pub fn snippet_name(tag: &str, starter: bool) -> String {
 /// A tag as a call to a snippet of its name, where its values can be
 /// handed.
 fn snippet_call(tag: &Written, cx: &Context) -> Option<(Marked, Call)> {
+    // A snippet's name holds no `.`.
+    if tag.name.contains('.') {
+        return None;
+    }
     let mut names = Vec::new();
     let mut handed = Vec::new();
     for (name, given) in &tag.args {
@@ -676,6 +845,60 @@ mod tests {
         );
         assert!(tag_at("{{ page.title }}", 0).is_none());
         assert!(tag_at("{{ a(b=\"open) }}", 0).is_none());
+    }
+
+    #[test]
+    fn a_component_call_is_read_with_its_values() {
+        let text = r#"{{ <ui.button label="a" n={2} on={ true } text={'b'} /> }}"#;
+        let tag = tag_at(text, 0).unwrap();
+        assert_eq!(tag.end, text.len());
+        assert_eq!((tag.form, tag.name.as_str()), (Form::Alone, "ui.button"));
+        assert_eq!(
+            tag.args,
+            vec![
+                ("label".into(), Given::Text("a".into())),
+                ("n".into(), Given::Bare("2".into())),
+                ("on".into(), Given::Bare("true".into())),
+                ("text".into(), Given::Text("b".into())),
+            ]
+        );
+        let tight = tag_at(r#"{{<button label="a"/>}}"#, 0).unwrap();
+        assert_eq!((tight.form, tight.args.len()), (Form::Alone, 1));
+        // What only a template can work out is read, to be told.
+        let worked = tag_at("{% <aside title {...values} n={page.n} data-x='y'> %}", 0).unwrap();
+        assert_eq!(worked.form, Form::Opening);
+        assert_eq!(
+            worked.args,
+            vec![
+                ("title".into(), Given::Worked),
+                (String::new(), Given::Worked),
+                ("n".into(), Given::Worked),
+                ("data-x".into(), Given::Text("y".into())),
+            ]
+        );
+        let end = tag_at("{% </aside> %}", 0).unwrap();
+        assert_eq!((end.form, end.name.as_str()), (Form::End, "aside"));
+        for text in [
+            "{{ <aside> }}",
+            "{% <aside /> %}",
+            "{{ </aside> }}",
+            "{% </aside %}",
+            "{{ < aside /> }}",
+            "{{ <aside a=\"b\"c=\"d\" /> }}",
+            "{{ <aside a=b /> }}",
+            "{{ <aside a={b /> }}",
+        ] {
+            assert!(tag_at(text, 0).is_none(), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_template_names_the_components_it_defines() {
+        let template = "{% component quote(author) %}{{ body }}{% endcomponent %}\n\
+                        {%- component ui.button( label ) -%}x{%- endcomponent -%}\n\
+                        {% component quote(author) %}{% endcomponent %}\n\
+                        {% components %}{% component %}{{ component(a) }}";
+        assert_eq!(components(template), ["quote", "ui.button"]);
     }
 
     #[test]

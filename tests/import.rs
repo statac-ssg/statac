@@ -2590,6 +2590,14 @@ fn zola_tags_in_the_writing_convert_or_stay_as_written() {
     );
 }
 
+/// Zola 0.23's components convert as the tags they replaced do, a
+/// component the site defines being its own; one handing what only a
+/// template can work out, or named with a `.`, stays as written.
+#[test]
+fn zola_components_in_the_writing_convert_or_stay_as_written() {
+    assert_eq!(fixture("zola-components"), ["no-still", AS_TEXT]);
+}
+
 #[test]
 fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
     let words = "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n\n\

@@ -1,0 +1,15 @@
+{% component quote(author) %}
+<blockquote>{{ body }}<p>{{ author }}</p></blockquote>
+{% endcomponent %}
+
+{% component aside(title) %}
+<aside><h2>{{ title }}</h2>{{ body }}</aside>
+{% endcomponent %}
+
+{%- component ui.button(label) -%}
+<button>{{ label }}</button>
+{%- endcomponent -%}
+
+{% component youtube(id) %}
+<iframe src="https://www.youtube-nocookie.com/embed/{{ id }}"></iframe>
+{% endcomponent %}

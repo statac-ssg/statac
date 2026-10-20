@@ -684,9 +684,11 @@ impl Reader<'_> {
             let dir = format!("themes/{theme}");
             if self.followed(&dir, "theme", &theme, self.s.theme_line) {
                 self.own_tags(&format!("{dir}/templates/shortcodes"));
+                self.own_components(&format!("{dir}/templates"));
             }
         }
         self.own_tags("templates/shortcodes");
+        self.own_components("templates");
         let output_top = self.s.output_dir.split('/').next().unwrap_or("").to_owned();
         for name in names_in(self.folder)? {
             let Ok(found) = inside::metadata(self.folder, &name) else {
@@ -759,6 +761,35 @@ impl Reader<'_> {
             };
             if !self.own.iter().any(|o| o == stem) {
                 self.own.push(stem.to_owned());
+            }
+        }
+    }
+
+    /// Learns the names of the components the templates in the folder
+    /// `dir`, and in every folder beneath it, define.
+    fn own_components(&mut self, dir: &str) {
+        let Ok(names) = names_in(&self.path(dir)) else {
+            return;
+        };
+        for name in names {
+            let rel = joined(dir, &name);
+            let Ok(found) = inside::metadata(self.folder, &rel) else {
+                continue;
+            };
+            if found.is_symlink() {
+                continue;
+            }
+            if found.is_dir() {
+                self.own_components(&rel);
+                continue;
+            }
+            let Ok(template) = std::fs::read_to_string(self.path(&rel)) else {
+                continue;
+            };
+            for component in writing::components(&template) {
+                if !self.own.contains(&component) {
+                    self.own.push(component);
+                }
             }
         }
     }
