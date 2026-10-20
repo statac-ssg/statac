@@ -5299,6 +5299,112 @@ fn bytes_that_arent_text_stop_a_template_only_where_it_shows_them() {
     assert_eq!(rendered.html, None);
 }
 
+#[test]
+fn a_data_file_holding_an_empty_value_or_bytes_is_refused_where_it_is_shown() {
+    let notes = (
+        "data/notes.yaml",
+        "clean:\n  - name: Name 1\n    tags: [Tag 1]\n\
+         empty:\n  name: Name 1\n  note:\n  items: [Item 1, ~]\n\
+         bytes:\n  name: Name 1\n  note: !!binary /w==\n  items: [Item 1, !!binary /w==]\n",
+    );
+    let items = ("data/items.yaml", "- Item 1\n- ~\n");
+    // Keys that aren't text are all named `''`, and a lookup finds the
+    // first: what the others hold is never refused.
+    let keys = (
+        "data/keys.yaml",
+        "? [a]\n: Item 1\n? [b]\n: ~\n? [c]\n: !!binary /w==\n",
+    );
+    let empty = |written: &str| format!("No value: `{written}` is empty");
+    let not_text = "Template stopped: a `!!binary` value holds bytes that aren't text";
+    let cases = [
+        (
+            "{{ site.data.notes.empty }}",
+            empty("site.data.notes.empty.note"),
+            "site.data.notes.empty",
+        ),
+        (
+            "{{ site.data.notes.empty.items }}",
+            empty("site.data.notes.empty.items[1]"),
+            "site.data.notes.empty.items",
+        ),
+        (
+            "{{ site.data.notes.empty | string }}",
+            empty("site.data.notes.empty.note"),
+            "site.data.notes.empty",
+        ),
+        (
+            "{{ site.data.notes.empty.items | join(', ') }}",
+            empty("site.data.notes.empty.items[1]"),
+            "site.data.notes.empty.items",
+        ),
+        (
+            "{{ site.data.items | join(', ') }}",
+            empty("site.data.items[1]"),
+            "site.data.items",
+        ),
+        (
+            "{{ site.data.notes | string }}",
+            not_text.to_owned(),
+            "site.data.notes | string",
+        ),
+        (
+            "{{ site.data.notes.bytes }}",
+            not_text.to_owned(),
+            "site.data.notes.bytes",
+        ),
+        (
+            "{{ site.data.notes.bytes.items }}",
+            not_text.to_owned(),
+            "site.data.notes.bytes.items",
+        ),
+        (
+            "{{ site.data.notes.bytes | json }}",
+            not_text.to_owned(),
+            "site.data.notes.bytes | json",
+        ),
+        (
+            "{{ site.data.notes.bytes.items | join(', ') }}",
+            not_text.to_owned(),
+            "site.data.notes.bytes.items | join(', ')",
+        ),
+    ];
+    for (template, headline, at) in cases {
+        let built = site(&[
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            notes,
+            items,
+            ("templates/page.html", template),
+        ]);
+        let rendered = built.render("post-1.md");
+        assert_eq!(rendered.html, None, "{template}");
+        assert_eq!(rendered.problems.len(), 1, "{template}");
+        assert_eq!(rendered.problems[0].headline(), headline, "{template}");
+        assert_eq!(built.told(&rendered.problems)[0].2, at, "{template}");
+    }
+    let built = site(&[
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        notes,
+        items,
+        keys,
+        (
+            "templates/page.html",
+            "{{ site.data.keys }} {{ site.data.keys | string }} \
+             {{ site.data.notes | length }} {{ site.data.notes.empty | length }} \
+             {{ site.data.notes.empty.items | length }} {{ site.data.items | length }} \
+             {{ site.data.notes.bytes.items | length }} {{ site.data.notes.empty | json }} \
+             {{ site.data.notes.clean[0].tags | join(', ') }} {{ site.data.notes.clean | json }} \
+             {{ site.data.notes.empty.name | upper }}",
+        ),
+    ]);
+    assert_eq!(
+        built.html("post-1.md"),
+        "{&#x27;&#x27;: &#x27;Item 1&#x27;, &#x27;&#x27;: &#x27;Item 1&#x27;, &#x27;&#x27;: &#x27;Item 1&#x27;} \
+         {&#x27;&#x27;: &#x27;Item 1&#x27;, &#x27;&#x27;: &#x27;Item 1&#x27;, &#x27;&#x27;: &#x27;Item 1&#x27;} \
+         3 3 2 2 2 {\"name\":\"Name 1\",\"note\":null,\"items\":[\"Item 1\",null]} Tag 1 \
+         [{\"name\":\"Name 1\",\"tags\":[\"Tag 1\"]}] NAME 1"
+    );
+}
+
 /// A folder of five posts, each tagged, whose page shows two at a time.
 fn paged(templates: &[(&'static str, &'static str)]) -> Built {
     let mut files = vec![

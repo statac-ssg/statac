@@ -3,6 +3,7 @@
 //! output that reaches it, and a lookup that finds nothing names the file
 //! or folder it was asked of.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
@@ -147,14 +148,16 @@ fn value(node: &Node, file: DataId, origins: &mut frame::Origins) -> Value {
             Some(Resolved::Float(f)) => Value::from(f),
             _ => text_value(text, origins),
         },
-        Yaml::Sequence(items) => Value::from(
-            items
+        Yaml::Sequence(items) => {
+            let items: Vec<Value> = items
                 .iter()
                 .map(|item| value(item, file, origins))
-                .collect::<Vec<_>>(),
-        ),
-        Yaml::Mapping(entries) => Value::from_object(MapValue {
-            entries: entries
+                .collect();
+            let holds = Holds::any(items.iter());
+            Value::from_object(SeqValue { items, holds })
+        }
+        Yaml::Mapping(entries) => {
+            let entries: Vec<(String, Value)> = entries
                 .iter()
                 .map(|entry| {
                     (
@@ -162,9 +165,85 @@ fn value(node: &Node, file: DataId, origins: &mut frame::Origins) -> Value {
                         value(&entry.value, file, origins),
                     )
                 })
-                .collect(),
-            file,
-        }),
+                .collect();
+            let holds = Holds::any(entries.iter().map(|(_, value)| value));
+            Value::from_object(MapValue {
+                entries,
+                file,
+                holds,
+            })
+        }
+    }
+}
+
+/// What a data file's list or map holds, however deep, that a guard
+/// refuses in places: an empty value, or bytes that aren't text. A data
+/// file holds no missing value, so a guard need search one only where this
+/// says. It counts the value of every key, even one a lookup never finds
+/// because a key before it has the same name.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct Holds {
+    pub empty: bool,
+    pub bytes: bool,
+}
+
+impl Holds {
+    fn any<'a>(values: impl Iterator<Item = &'a Value>) -> Holds {
+        let mut all = Holds::default();
+        for value in values {
+            let inner = holds(value).unwrap_or(Holds {
+                empty: value.is_none(),
+                bytes: value
+                    .downcast_object_ref::<super::values::BytesValue>()
+                    .is_some(),
+            });
+            all.empty |= inner.empty;
+            all.bytes |= inner.bytes;
+        }
+        all
+    }
+}
+
+/// What `value` holds, where it is a data file's list or map.
+pub(super) fn holds(value: &Value) -> Option<Holds> {
+    if let Some(map) = value.downcast_object_ref::<MapValue>() {
+        return Some(map.holds);
+    }
+    value.downcast_object_ref::<SeqValue>().map(|seq| seq.holds)
+}
+
+/// Each name in a data file's map, in order, with the value a lookup of it
+/// finds, each name once. Keys that aren't text are all named `''`, and a
+/// lookup finds the first.
+pub(super) fn entries(value: &Value) -> Option<impl Iterator<Item = (&str, &Value)>> {
+    let map = value.downcast_object_ref::<MapValue>()?;
+    let mut named = HashSet::new();
+    Some(
+        map.entries
+            .iter()
+            .filter(move |(name, _)| named.insert(name.as_str()))
+            .map(|(name, value)| (name.as_str(), value)),
+    )
+}
+
+/// A list in a data file.
+#[derive(Debug)]
+struct SeqValue {
+    items: Vec<Value>,
+    holds: Holds,
+}
+
+impl Object for SeqValue {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        self.items.get(key.as_usize()?).cloned()
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Seq(self.items.len())
     }
 }
 
@@ -173,6 +252,7 @@ fn value(node: &Node, file: DataId, origins: &mut frame::Origins) -> Value {
 struct MapValue {
     entries: Vec<(String, Value)>,
     file: DataId,
+    holds: Holds,
 }
 
 impl Object for MapValue {

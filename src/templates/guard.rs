@@ -179,8 +179,9 @@ pub(super) struct Found {
 
 /// The first missing value inside `value`, an empty path for `value`
 /// itself. Statac's own objects never hold one and may be large, so the
-/// search doesn't walk into them. Empty values count as missing where
-/// `empty` says.
+/// search doesn't walk into them, nor into a data file's list or map but
+/// for an empty value it holds. Empty values count as missing where `empty`
+/// says.
 pub(super) fn find_missing(value: &Value, empty: bool) -> Option<Found> {
     if value.is_undefined() {
         return Some(Found {
@@ -194,7 +195,9 @@ pub(super) fn find_missing(value: &Value, empty: bool) -> Option<Found> {
             empty: true,
         });
     }
-    if super::values::opaque(value) {
+    if super::values::opaque(value)
+        || super::data::holds(value).is_some_and(|holds| !(empty && holds.empty))
+    {
         return None;
     }
     let inside = |step: Step, item: &Value| {
@@ -207,6 +210,9 @@ pub(super) fn find_missing(value: &Value, empty: bool) -> Option<Found> {
         return own
             .iter()
             .find_map(|(name, item)| inside(Step::Key(name.clone()), item));
+    }
+    if let Some(mut entries) = super::data::entries(value) {
+        return entries.find_map(|(name, item)| inside(Step::Key(name.to_owned()), item));
     }
     match value.kind() {
         ValueKind::Seq | ValueKind::Iterable => value

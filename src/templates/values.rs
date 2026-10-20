@@ -1800,11 +1800,14 @@ pub(super) fn holds_bytes(value: &Value) -> bool {
     if value.downcast_object_ref::<BytesValue>().is_some() {
         return true;
     }
-    if opaque(value) {
+    if opaque(value) || super::data::holds(value).is_some_and(|holds| !holds.bytes) {
         return false;
     }
     if let Some(own) = super::media::own_fields(value) {
         return own.iter().any(|(_, item)| holds_bytes(item));
+    }
+    if let Some(mut entries) = super::data::entries(value) {
+        return entries.any(|(_, item)| holds_bytes(item));
     }
     match value.kind() {
         minijinja::value::ValueKind::Seq | minijinja::value::ValueKind::Iterable => value
