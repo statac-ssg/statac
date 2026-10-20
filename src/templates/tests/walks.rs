@@ -4,7 +4,7 @@ use super::*;
 /// and a loop noted once the pages running it reach `many` pages between
 /// them.
 fn four_posts(many: u64, template: &str) -> Built {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         (
             "statac.yaml",
             "language: en\ntimezone: UTC\npages.feed: false\n",

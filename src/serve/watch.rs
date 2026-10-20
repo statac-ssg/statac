@@ -509,37 +509,20 @@ fn walk(root: &Path, folder: &Path, into: &mut BTreeSet<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::Scratch;
 
     const HOUR: Duration = Duration::from_secs(3600);
 
-    struct Scratch(PathBuf);
-
-    impl Scratch {
-        fn new(name: &str) -> Scratch {
-            let path =
-                std::env::temp_dir().join(format!("statac-watch-{name}-{}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&path);
-            std::fs::create_dir_all(&path).unwrap();
-            Scratch(path)
-        }
-
-        fn write(&self, relative: &str) {
-            let path = platform::join(&self.0, relative);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, relative).unwrap();
-        }
-
-        fn known(&self) -> BTreeSet<String> {
-            let mut known = BTreeSet::new();
-            walk(&self.0, &self.0, &mut known);
-            known
-        }
+    /// Writes a file at `relative` holding its own path.
+    fn put(scratch: &Scratch, relative: &str) {
+        scratch.write(relative, relative);
     }
 
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
+    /// Every file in `scratch`, as a walk finds it.
+    fn known_in(scratch: &Scratch) -> BTreeSet<String> {
+        let mut known = BTreeSet::new();
+        walk(&scratch.0, &scratch.0, &mut known);
+        known
     }
 
     fn hints(paths: &[&str]) -> BTreeSet<String> {
@@ -549,7 +532,7 @@ mod tests {
     #[test]
     fn keeping_awake_leaves_no_file_behind() {
         let scratch = Scratch::new("awake");
-        scratch.write(AWAKE);
+        put(&scratch, AWAKE);
         let awake = keep_awake(&scratch.0, Duration::from_millis(10)).unwrap();
         let left = platform::join(&scratch.0, AWAKE);
         let began = Instant::now();
@@ -590,12 +573,12 @@ mod tests {
     #[test]
     fn a_folder_statac_built_is_no_part_of_the_site() {
         let scratch = Scratch::new("built");
-        scratch.write("content/post-1.md");
-        scratch.write("_site/index.html");
-        scratch.write(&format!("_site/{MARKER}"));
-        scratch.write("public/index.html");
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "_site/index.html");
+        put(&scratch, &format!("_site/{MARKER}"));
+        put(&scratch, "public/index.html");
         assert_eq!(
-            scratch.known(),
+            known_in(&scratch),
             hints(&["content/post-1.md", "public/index.html"])
         );
         assert!(in_built_folder(&scratch.0, "_site/posts/index.html"));
@@ -607,12 +590,12 @@ mod tests {
     #[test]
     fn what_is_fetched_is_watched_and_a_file_half_written_there_is_not() {
         let scratch = Scratch::new("fetched");
-        scratch.write("content/post-1.md");
-        scratch.write("fetched/record");
-        scratch.write("fetched/stills/youtube-abcdefghijk.jpg");
-        scratch.write("fetched/stills/.youtube-bcdefghijkl.jpg.1.tmp");
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "fetched/record");
+        put(&scratch, "fetched/stills/youtube-abcdefghijk.jpg");
+        put(&scratch, "fetched/stills/.youtube-bcdefghijkl.jpg.1.tmp");
         assert_eq!(
-            scratch.known(),
+            known_in(&scratch),
             hints(&[
                 "content/post-1.md",
                 "fetched/record",
@@ -624,9 +607,9 @@ mod tests {
     #[test]
     fn a_hint_is_a_change_only_as_the_disk_has_it() {
         let scratch = Scratch::new("hints");
-        scratch.write("content/post-1.md");
-        scratch.write("content/post-2.md");
-        let mut known = scratch.known();
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "content/post-2.md");
+        let mut known = known_in(&scratch);
 
         // Saved, and a file that came and went.
         let changed = look_at(
@@ -652,9 +635,9 @@ mod tests {
     #[test]
     fn a_report_of_a_file_as_it_was_when_watching_began_is_no_change() {
         let scratch = Scratch::new("as-found");
-        scratch.write("content/post-1.md");
-        scratch.write("content/post-2.md");
-        let mut known = scratch.known();
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "content/post-2.md");
+        let mut known = known_in(&scratch);
         let clock = Clock::of_site(&scratch.0).expect("a clock on this disk");
         let mut found = as_found(&scratch.0, &known, Some(&clock.later(HOUR)));
         assert_eq!(found.len(), 2);
@@ -673,9 +656,9 @@ mod tests {
     #[test]
     fn a_file_changed_within_the_step_the_clock_was_read_in_is_not_taken_as_found() {
         let scratch = Scratch::new("as-found-unsettled");
-        scratch.write("content/post-1.md");
-        scratch.write("content/post-2.md");
-        let known = scratch.known();
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "content/post-2.md");
+        let known = known_in(&scratch);
         let clock = Clock::of_site(&scratch.0).expect("a clock on this disk");
         let clock = clock.later(HOUR);
         // A time the clock is before, as a file changed within the clock's
@@ -692,9 +675,9 @@ mod tests {
     #[test]
     fn a_file_gone_and_back_as_it_was_when_watching_began_is_a_change() {
         let scratch = Scratch::new("back");
-        scratch.write("content/post-1.md");
-        scratch.write("content/post-2.md");
-        let mut known = scratch.known();
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "content/post-2.md");
+        let mut known = known_in(&scratch);
         let clock = Clock::of_site(&scratch.0).expect("a clock on this disk");
         let mut found = as_found(&scratch.0, &known, Some(&clock.later(HOUR)));
         let at = |name: &str| scratch.0.join("content").join(name);
@@ -727,11 +710,11 @@ mod tests {
     #[test]
     fn a_folder_hinted_at_gives_the_files_that_came_and_went() {
         let scratch = Scratch::new("folders");
-        scratch.write("content/post-1.md");
-        scratch.write("content/album/photo-1.txt");
-        let mut known = scratch.known();
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "content/album/photo-1.txt");
+        let mut known = known_in(&scratch);
 
-        scratch.write("content/album/photo-2.txt");
+        put(&scratch, "content/album/photo-2.txt");
         let changed = look_at(
             &scratch.0,
             hints(&["content/album"]),
@@ -757,11 +740,11 @@ mod tests {
     #[test]
     fn a_rescan_finds_what_came_and_went() {
         let scratch = Scratch::new("rescan");
-        scratch.write("content/post-1.md");
-        scratch.write("content/post-2.md");
-        let mut known = scratch.known();
+        put(&scratch, "content/post-1.md");
+        put(&scratch, "content/post-2.md");
+        let mut known = known_in(&scratch);
         std::fs::remove_file(scratch.0.join("content").join("post-1.md")).unwrap();
-        scratch.write("content/post-3.md");
+        put(&scratch, "content/post-3.md");
         assert_eq!(
             rescan_all(&scratch.0, &mut known),
             ["content/post-1.md", "content/post-3.md"]

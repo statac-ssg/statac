@@ -1,39 +1,7 @@
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use super::*;
 use crate::problem::{Expected, Found, Word, WordList};
+use crate::testing::TempSite;
 use crate::yaml::{Node, Value as Yaml};
-
-/// A site written to a fresh folder, removed when dropped.
-pub(crate) struct TempSite {
-    pub(crate) root: PathBuf,
-}
-
-impl TempSite {
-    pub(crate) fn new(files: &[(&str, &str)]) -> TempSite {
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let root = std::env::temp_dir().join(format!(
-            "statac-language-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
-        for (path, text) in files {
-            let path = root.join(path);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, text).unwrap();
-        }
-        TempSite { root }
-    }
-}
-
-impl Drop for TempSite {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.root);
-    }
-}
 
 /// Reads `text` as a language file: its words, and each problem's kind
 /// and the text it is at.

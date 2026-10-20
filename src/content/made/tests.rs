@@ -1,42 +1,9 @@
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use super::super::{Read, Run, read};
 use crate::content::words::PageWord;
 use crate::origin::Arrival;
 use crate::problem::{AddressFault, Kind};
 use crate::site::{Item, ListKey, Page};
-
-/// A site written to a fresh folder, removed when dropped.
-struct TempSite {
-    root: PathBuf,
-}
-
-impl TempSite {
-    fn new(files: &[(&str, &str)]) -> TempSite {
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let root = std::env::temp_dir().join(format!(
-            "statac-made-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("content")).unwrap();
-        std::fs::write(root.join("statac.yaml"), "language: en\n").unwrap();
-        for (path, text) in files {
-            let path = root.join(path);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, text).unwrap();
-        }
-        TempSite { root }
-    }
-}
-
-impl Drop for TempSite {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.root);
-    }
-}
+use crate::testing::TempSite;
 
 /// A site read, in a time zone unless its settings are given.
 fn site(files: &[(&str, &str)]) -> Read {
@@ -44,7 +11,7 @@ fn site(files: &[(&str, &str)]) -> Read {
     if !files.iter().any(|(path, _)| *path == "statac.yaml") {
         files.push(("statac.yaml", "language: en\ntimezone: Europe/London\n"));
     }
-    read(&TempSite::new(&files).root, &run(false))
+    read(&TempSite::site(&files).root, &run(false))
 }
 
 /// A run on 4 October 2026, with or without drafts.
@@ -169,7 +136,7 @@ fn an_item_is_held_back_as_a_written_page_is() {
             "person-1:\n  draft: true\nperson-2:\n  date: 2026-10-05\nperson-3:\n  title: Person 3\n",
         ),
     ];
-    let site = TempSite::new(&files);
+    let site = TempSite::site(&files);
     let read = super::super::read(&site.root, &run(false));
     assert_eq!(
         read.problems
@@ -442,7 +409,7 @@ fn an_index_page_set_aside_publishes_only_the_items() {
 
 #[test]
 fn two_items_at_one_address_are_told_by_name() {
-    let site = TempSite::new(&[
+    let site = TempSite::site(&[
         ("content/people.md", PEOPLE),
         (
             "data/people.yaml",
@@ -582,7 +549,7 @@ fn a_page_is_made_for_each_post_the_line_chooses() {
         }
     }
 
-    let site = TempSite::new(POSTS);
+    let site = TempSite::site(POSTS);
     let read = super::super::read(&site.root, &run(true));
     assert_eq!(made_for_posts(&read).len(), 4);
 }

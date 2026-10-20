@@ -1,4 +1,5 @@
 use super::*;
+use crate::testing::Scratch;
 
 fn read_text(text: &str) -> (Sources, Record, Vec<Problem>) {
     let mut sources = Sources::default();
@@ -159,31 +160,6 @@ fn a_record_opening_with_another_line_is_told_at_it_and_read_no_further() {
             "{text:?}"
         );
         assert!(record.is_empty());
-    }
-}
-
-/// A site in the system's temporary folder, removed when dropped.
-struct Scratch(PathBuf);
-
-impl Scratch {
-    fn new(name: &str) -> Scratch {
-        let path =
-            std::env::temp_dir().join(format!("statac-fetched-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&path);
-        std::fs::create_dir_all(&path).unwrap();
-        Scratch(path)
-    }
-
-    fn write(&self, rel: &str, bytes: &[u8]) {
-        let path = crate::platform::join(&self.0, rel);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, bytes).unwrap();
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

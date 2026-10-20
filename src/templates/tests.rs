@@ -3,7 +3,6 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::*;
 use crate::origin::Arrival;
@@ -13,37 +12,7 @@ use crate::problem::{
 };
 use crate::reads::Key;
 use crate::site::{Id, LanguageId, PageId};
-
-/// A site written to a fresh folder, removed when dropped.
-struct TempSite {
-    root: PathBuf,
-}
-
-impl TempSite {
-    fn new(files: &[(&str, &str)]) -> TempSite {
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let root = std::env::temp_dir().join(format!(
-            "statac-templates-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("content")).unwrap();
-        std::fs::write(root.join("statac.yaml"), "language: en\n").unwrap();
-        for (path, text) in files {
-            let path = root.join(path);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, text).unwrap();
-        }
-        TempSite { root }
-    }
-}
-
-impl Drop for TempSite {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.root);
-    }
-}
+use crate::testing::TempSite;
 
 /// A site read and ready to build, with the problems reading it found.
 struct Built {
@@ -55,7 +24,7 @@ struct Built {
 const NO_HOME: (&str, &str) = ("content/index.md", "---\nindex_page: false\n---\n");
 
 fn site(files: &[(&str, &str)]) -> Built {
-    let temp = TempSite::new(files);
+    let temp = TempSite::site(files);
     let today = crate::date::Date::day_only(2026, 10, 4);
     let (renderer, problems) = crate::build::renderer(&temp.root, Some(today));
     Built { renderer, problems }
@@ -87,7 +56,7 @@ pub(super) fn lowered_walked(root: &Path) -> Option<u64> {
 
 /// A site written to a fresh folder, each of its outputs allowed `steps`.
 fn site_of_steps(steps: u64, files: &[(&str, &str)]) -> TempSite {
-    let temp = TempSite::new(files);
+    let temp = TempSite::site(files);
     LOWERED.lock().unwrap().push((temp.root.clone(), steps));
     temp
 }
@@ -2096,7 +2065,7 @@ fn two_sorts_by_one_field_in_one_template_are_each_told_at_their_own() {
 
 #[test]
 fn a_sort_warning_is_told_once_for_every_page_built_through_its_template() {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         ("content/post-1.md", "---\ntitle: Post 1\nrank: 2\n---\n"),
         ("content/post-2.md", "---\ntitle: Post 2\n---\n"),
         ("content/post-3.md", "---\ntitle: Post 3\nrank: 1\n---\n"),
@@ -2881,7 +2850,7 @@ fn a_page_reading_its_search_boxs_index_asks_the_build_for_its_languages_index()
 
 #[test]
 fn a_lists_feed_is_answered_by_the_feeds_the_build_publishes() {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         (
             "statac.yaml",
             "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",

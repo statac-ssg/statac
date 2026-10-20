@@ -632,39 +632,17 @@ fn redirect(status: StatusCode, to: &str, query: &str) -> Response<Body> {
 mod tests {
     use super::*;
     use crate::serve::live::{Status, Told};
+    use crate::testing::Scratch;
 
-    struct Scratch(PathBuf);
-
-    impl Scratch {
-        fn new(name: &str) -> Scratch {
-            let path =
-                std::env::temp_dir().join(format!("statac-http-{name}-{}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&path);
-            std::fs::create_dir_all(&path).unwrap();
-            Scratch(path)
-        }
-
-        fn write(&self, relative: &str, text: &str) {
-            let path = platform::join(&self.0, relative);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, text).unwrap();
-        }
-
-        fn site(&self, base: &str) -> Site {
-            self.write("index.html", "<html><head></head><body>home</body></html>");
-            self.write("posts/post-1/index.html", "<p>post 1</p>");
-            self.write("site.1a2b3c4d.css", "body { margin: 0 }");
-            self.write("notes.txt", "0123456789");
-            let site = Site::new(self.0.clone(), Arc::new(Hub::new()), base.into());
-            site.port.store(3000, Ordering::Relaxed);
-            site
-        }
-    }
-
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
+    /// A few pages and files written to `scratch`, served under `base`.
+    fn serving(scratch: &Scratch, base: &str) -> Site {
+        scratch.write("index.html", "<html><head></head><body>home</body></html>");
+        scratch.write("posts/post-1/index.html", "<p>post 1</p>");
+        scratch.write("site.1a2b3c4d.css", "body { margin: 0 }");
+        scratch.write("notes.txt", "0123456789");
+        let site = Site::new(scratch.0.clone(), Arc::new(Hub::new()), base.into());
+        site.port.store(3000, Ordering::Relaxed);
+        site
     }
 
     struct Answer {
@@ -733,7 +711,7 @@ mod tests {
     #[test]
     fn only_a_request_for_this_machine_by_its_own_name_is_answered() {
         let scratch = Scratch::new("hosts");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let with = |target: &str, headers: &[(header::HeaderName, &str)]| {
             sent(&site, Method::GET, target, headers)
         };
@@ -787,7 +765,7 @@ mod tests {
     #[test]
     fn another_sites_page_is_told_nothing_of_the_rounds() {
         let scratch = Scratch::new("origins");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let host = (header::HOST, "localhost:3000");
         let from = |target: &str, origin: &str| {
             sent(
@@ -839,7 +817,7 @@ mod tests {
     #[test]
     fn a_request_a_browser_marks_as_another_sites_is_refused() {
         let scratch = Scratch::new("fetched");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let marked = |target: &str, from: &str| {
             let headers = [
                 (header::HOST, "localhost:3000"),
@@ -921,7 +899,7 @@ mod tests {
     #[test]
     fn a_refused_address_is_answered_400() {
         let scratch = Scratch::new("refused");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         for target in ["/%2e%2e/secret.txt", "/a%5cb", "/posts/..%2f..%2fx"] {
             let answer = get(&site, target);
             assert_eq!(answer.status, 400, "{target}");
@@ -932,7 +910,7 @@ mod tests {
     #[test]
     fn pages_are_answered_with_the_client_and_other_files_as_they_are() {
         let scratch = Scratch::new("files");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let home = get(&site, "/");
         assert_eq!(
             (home.status, home.kind.as_str()),
@@ -964,7 +942,7 @@ mod tests {
     #[test]
     fn a_folder_asked_for_without_its_slash_is_sent_to_it() {
         let scratch = Scratch::new("slash");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         scratch.write("caf\u{e9} 1/index.html", "<p>x</p>");
         let sent = get(&site, "/posts/post-1?page=2");
         assert_eq!(sent.status, 301);
@@ -981,7 +959,7 @@ mod tests {
     #[test]
     fn a_site_under_a_path_is_served_under_it() {
         let scratch = Scratch::new("under");
-        let site = scratch.site("/blog");
+        let site = serving(&scratch, "/blog");
         assert_eq!(get(&site, "/blog/posts/post-1/").status, 200);
         assert_eq!(get(&site, "/blog/site.1a2b3c4d.css").status, 200);
         let top = get(&site, "/blog");
@@ -1010,7 +988,7 @@ mod tests {
     #[test]
     fn a_miss_is_answered_with_a_plain_page_or_the_sites_own() {
         let scratch = Scratch::new("miss");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let miss = get(&site, "/posts/post-2/");
         assert_eq!(
             (miss.status, miss.kind.as_str()),
@@ -1055,7 +1033,7 @@ mod tests {
         }
 
         let scratch = Scratch::new("ranges");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let part = asked(&site, Method::GET, "/notes.txt", Some("bytes=2-5"));
         assert_eq!((part.status, part.body.as_str()), (206, "2345"));
         assert_eq!(part.content_range.as_deref(), Some("bytes 2-5/10"));
@@ -1070,7 +1048,7 @@ mod tests {
     #[test]
     fn only_reading_is_answered() {
         let scratch = Scratch::new("methods");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let post = asked(&site, Method::POST, "/", None);
         assert_eq!(
             (post.status, post.body.as_str()),
@@ -1098,7 +1076,7 @@ mod tests {
     #[test]
     fn a_wait_is_answered_with_what_happened_since() {
         let scratch = Scratch::new("wait");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let since = site.hub.generation();
         let nothing = get(
             &site,
@@ -1137,7 +1115,7 @@ mod tests {
     #[test]
     fn the_panel_is_asked_for_by_the_address_of_the_page_it_is_on() {
         let scratch = Scratch::new("panel");
-        let site = scratch.site("/blog");
+        let site = serving(&scratch, "/blog");
         scratch.write("caf\u{e9} 1/index.html", "<p>x</p>");
         for (asked, file) in [
             ("%2Fblog%2F", Some("index.html")),
@@ -1186,7 +1164,7 @@ mod tests {
     #[test]
     fn the_client_is_handed_every_word_the_panel_puts_together() {
         let scratch = Scratch::new("words");
-        let site = scratch.site("");
+        let site = serving(&scratch, "");
         let client = get(&site, "/.statac-live/client.js");
         assert_eq!(client.kind, "text/javascript; charset=utf-8");
         assert!(!client.body.contains(WORDS), "the words stand in its place");
@@ -1228,7 +1206,7 @@ mod tests {
     #[test]
     fn the_sites_problems_are_asked_for_of_one_kind_or_every_kind() {
         let scratch = Scratch::new("problems");
-        let site = scratch.site("/blog");
+        let site = serving(&scratch, "/blog");
         for target in [
             "/.statac-live/problems",
             "/.statac-live/problems?kind=broken-link",
@@ -1289,7 +1267,7 @@ mod tests {
     #[test]
     fn a_taken_port_gives_way_to_the_next() {
         let scratch = Scratch::new("ports");
-        let site = Arc::new(scratch.site(""));
+        let site = Arc::new(serving(&scratch, ""));
         let taken = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let asked = taken.local_addr().unwrap().port();
         let port = listen(&site, asked, |_| {}).unwrap();

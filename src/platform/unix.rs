@@ -386,27 +386,10 @@ pub(super) fn remote_disk(path: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::Scratch;
     use std::fs;
     use std::os::unix::fs::symlink;
     use std::path::PathBuf;
-
-    struct Scratch(PathBuf);
-
-    impl Scratch {
-        fn new(name: &str) -> Scratch {
-            let path =
-                std::env::temp_dir().join(format!("statac-unix-{name}-{}", std::process::id()));
-            let _ = fs::remove_dir_all(&path);
-            fs::create_dir_all(&path).unwrap();
-            Scratch(path)
-        }
-    }
-
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
 
     fn names(folder: &Path) -> Vec<String> {
         let mut names: Vec<String> = fs::read_dir(folder)

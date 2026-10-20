@@ -64,45 +64,35 @@ fn replaced(read: &str, edits: &[Edit]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::Scratch;
     use std::fs;
     use std::path::PathBuf;
 
-    struct Scratch(PathBuf);
-
-    impl Scratch {
-        fn new(name: &str) -> Scratch {
-            let path =
-                std::env::temp_dir().join(format!("statac-rewrite-{name}-{}", std::process::id()));
-            let _ = fs::remove_dir_all(&path);
-            fs::create_dir_all(path.join("content").join("posts")).unwrap();
-            Scratch(path)
-        }
-
-        fn content(&self) -> PathBuf {
-            self.0.join("content")
-        }
-
-        fn put(&self, rel: &str, text: &str) -> PathBuf {
-            let path = platform::join(&self.content(), rel);
-            fs::write(&path, text).unwrap();
-            path
-        }
-
-        /// The names in the folder a file of `content/posts` is in.
-        fn names(&self) -> Vec<String> {
-            let mut names: Vec<String> = fs::read_dir(self.content().join("posts"))
-                .unwrap()
-                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-                .collect();
-            names.sort();
-            names
-        }
+    /// A scratch folder holding an empty `content/posts/`.
+    fn scratch_with_posts(name: &str) -> Scratch {
+        let scratch = Scratch::new(name);
+        fs::create_dir_all(content(&scratch).join("posts")).unwrap();
+        scratch
     }
 
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
+    fn content(scratch: &Scratch) -> PathBuf {
+        scratch.0.join("content")
+    }
+
+    fn put(scratch: &Scratch, rel: &str, text: &str) -> PathBuf {
+        let path = platform::join(&content(scratch), rel);
+        fs::write(&path, text).unwrap();
+        path
+    }
+
+    /// The names in the folder a file of `content/posts` is in.
+    fn names(scratch: &Scratch) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(content(scratch).join("posts"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
     }
 
     fn edit(text: &str, written: &str, with: &str) -> Edit {
@@ -115,29 +105,33 @@ mod tests {
 
     #[test]
     fn only_the_spans_named_change() {
-        let scratch = Scratch::new("spans");
+        let scratch = scratch_with_posts("spans");
         let read =
             "\u{feff}---\r\ntitle: Post 1\r\ndate: one\r\nupdated: two\r\n---\r\nBody one.\r\n";
-        let path = scratch.put("posts/post-1.md", read);
+        let path = put(&scratch, "posts/post-1.md", read);
         // Given last first: the order they are made in is the file's.
         let edits = [
             edit(read, "two", "2026-10-05"),
             edit(read, "one", "2026-10-04"),
         ];
-        let written = rewrite(&scratch.content(), "posts/post-1.md", read, &edits).unwrap();
+        let written = rewrite(&content(&scratch), "posts/post-1.md", read, &edits).unwrap();
         let expected = "\u{feff}---\r\ntitle: Post 1\r\ndate: 2026-10-04\r\nupdated: 2026-10-05\r\n---\r\nBody one.\r\n";
         assert_eq!(fs::read_to_string(&path).unwrap(), expected);
         assert_eq!(written, expected.as_bytes());
-        assert_eq!(scratch.names(), ["post-1.md"], "nothing is left beside it");
+        assert_eq!(names(&scratch), ["post-1.md"], "nothing is left beside it");
     }
 
     #[test]
     fn a_file_changed_since_it_was_read_is_left_as_it_is() {
-        let scratch = Scratch::new("changed");
+        let scratch = scratch_with_posts("changed");
         let read = "---\ndate: one\n---\n";
-        let path = scratch.put("posts/post-1.md", "---\ndate: one\n---\nA line more.\n");
+        let path = put(
+            &scratch,
+            "posts/post-1.md",
+            "---\ndate: one\n---\nA line more.\n",
+        );
         let refused = rewrite(
-            &scratch.content(),
+            &content(&scratch),
             "posts/post-1.md",
             read,
             &[edit(read, "one", "2026-10-04")],
@@ -147,33 +141,33 @@ mod tests {
             fs::read_to_string(&path).unwrap(),
             "---\ndate: one\n---\nA line more.\n"
         );
-        assert_eq!(scratch.names(), ["post-1.md"]);
+        assert_eq!(names(&scratch), ["post-1.md"]);
     }
 
     #[test]
     fn a_file_that_has_gone_is_not_made() {
-        let scratch = Scratch::new("gone");
+        let scratch = scratch_with_posts("gone");
         let read = "---\ndate: one\n---\n";
         let refused = rewrite(
-            &scratch.content(),
+            &content(&scratch),
             "posts/post-1.md",
             read,
             &[edit(read, "one", "2026-10-04")],
         );
         assert_eq!(refused, Err("it doesn't exist".to_owned()));
-        assert!(scratch.names().is_empty());
+        assert!(names(&scratch).is_empty());
     }
 
     #[cfg(unix)]
     #[test]
     fn permissions_are_kept() {
         use std::os::unix::fs::PermissionsExt;
-        let scratch = Scratch::new("permissions");
+        let scratch = scratch_with_posts("permissions");
         let read = "---\ndate: one\n---\n";
-        let path = scratch.put("posts/post-1.md", read);
+        let path = put(&scratch, "posts/post-1.md", read);
         fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
         rewrite(
-            &scratch.content(),
+            &content(&scratch),
             "posts/post-1.md",
             read,
             &[edit(read, "one", "2026-10-04")],
@@ -186,7 +180,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn nothing_is_written_through_a_link() {
-        let scratch = Scratch::new("link");
+        let scratch = scratch_with_posts("link");
         let read = "---\ndate: one\n---\n";
         let edits = [edit(read, "one", "2026-10-04")];
         let outside = scratch.0.join("outside");
@@ -194,14 +188,14 @@ mod tests {
         fs::write(outside.join("post-2.md"), read).unwrap();
 
         // The file is a link.
-        let link = scratch.content().join("posts").join("post-2.md");
+        let link = content(&scratch).join("posts").join("post-2.md");
         std::os::unix::fs::symlink(outside.join("post-2.md"), &link).unwrap();
-        let refused = rewrite(&scratch.content(), "posts/post-2.md", read, &edits);
+        let refused = rewrite(&content(&scratch), "posts/post-2.md", read, &edits);
         assert_eq!(refused, Err("it is a link".to_owned()));
 
         // A folder on the way is one.
-        std::os::unix::fs::symlink(&outside, scratch.content().join("linked")).unwrap();
-        let refused = rewrite(&scratch.content(), "linked/post-2.md", read, &edits);
+        std::os::unix::fs::symlink(&outside, content(&scratch).join("linked")).unwrap();
+        let refused = rewrite(&content(&scratch), "linked/post-2.md", read, &edits);
         assert_eq!(refused, Err("it is a link".to_owned()));
 
         // The folder itself is one.
@@ -217,13 +211,13 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_file_with_a_second_name_is_left_as_it_is() {
-        let scratch = Scratch::new("names");
+        let scratch = scratch_with_posts("names");
         let read = "---\ndate: one\n---\n";
-        let path = scratch.put("posts/post-1.md", read);
+        let path = put(&scratch, "posts/post-1.md", read);
         let other = scratch.0.join("other.md");
         fs::hard_link(&path, &other).unwrap();
         let refused = rewrite(
-            &scratch.content(),
+            &content(&scratch),
             "posts/post-1.md",
             read,
             &[edit(read, "one", "2026-10-04")],
@@ -235,18 +229,17 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_link_where_the_new_text_would_be_written_is_never_written_through() {
-        let scratch = Scratch::new("beside");
+        let scratch = scratch_with_posts("beside");
         let read = "---\ndate: one\n---\n";
-        let path = scratch.put("posts/post-1.md", read);
+        let path = put(&scratch, "posts/post-1.md", read);
         let outside = scratch.0.join("outside.md");
         fs::write(&outside, "Outside.\n").unwrap();
-        let beside = scratch
-            .content()
+        let beside = content(&scratch)
             .join("posts")
             .join(platform::beside("post-1.md"));
         std::os::unix::fs::symlink(&outside, &beside).unwrap();
         let refused = rewrite(
-            &scratch.content(),
+            &content(&scratch),
             "posts/post-1.md",
             read,
             &[edit(read, "one", "2026-10-04")],
@@ -262,13 +255,13 @@ mod tests {
     #[test]
     fn a_folder_that_takes_no_new_file_leaves_the_file_and_nothing_beside_it() {
         use std::os::unix::fs::PermissionsExt;
-        let scratch = Scratch::new("left");
+        let scratch = scratch_with_posts("left");
         let read = "---\ndate: one\n---\n";
-        let folder = scratch.content().join("posts");
-        let path = scratch.put("posts/post-1.md", read);
+        let folder = content(&scratch).join("posts");
+        let path = put(&scratch, "posts/post-1.md", read);
         fs::set_permissions(&folder, fs::Permissions::from_mode(0o555)).unwrap();
         let refused = rewrite(
-            &scratch.content(),
+            &content(&scratch),
             "posts/post-1.md",
             read,
             &[edit(read, "one", "2026-10-04")],
@@ -276,6 +269,6 @@ mod tests {
         fs::set_permissions(&folder, fs::Permissions::from_mode(0o755)).unwrap();
         assert_eq!(refused, Err("permission denied".to_owned()));
         assert_eq!(fs::read_to_string(&path).unwrap(), read);
-        assert_eq!(scratch.names(), ["post-1.md"]);
+        assert_eq!(names(&scratch), ["post-1.md"]);
     }
 }

@@ -1,38 +1,7 @@
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use super::*;
 use crate::origin::Arrival;
 use crate::problem::{Code, Expected, Found, Named, SetAside, Word, WrongPlace};
-
-/// A site written to a fresh folder, removed when dropped.
-struct TempSite {
-    root: PathBuf,
-}
-
-impl TempSite {
-    fn new(files: &[(&str, &str)]) -> TempSite {
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let root = std::env::temp_dir().join(format!(
-            "statac-content-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("content")).unwrap();
-        std::fs::write(root.join("statac.yaml"), "language: en\n").unwrap();
-        for (path, text) in files {
-            let path = root.join(path);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, text).unwrap();
-        }
-        TempSite { root }
-    }
-
-    fn read(&self) -> Read {
-        read(&self.root, &run_on(2026, 12, 31))
-    }
-}
+use crate::testing::TempSite;
 
 /// A run on the day given, so posts dated after it wait.
 fn run_on(year: i32, month: u8, day: u8) -> Run {
@@ -43,14 +12,13 @@ fn run_on(year: i32, month: u8, day: u8) -> Run {
     }
 }
 
-impl Drop for TempSite {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.root);
-    }
+/// The site `temp` holds, read.
+fn read_site(temp: &TempSite) -> Read {
+    read(&temp.root, &run_on(2026, 12, 31))
 }
 
 fn site(files: &[(&str, &str)]) -> Read {
-    TempSite::new(files).read()
+    read_site(&TempSite::site(files))
 }
 
 fn page<'a>(read: &'a Read, path: &str) -> &'a Page {
@@ -1838,7 +1806,7 @@ fn old_addresses_are_claimed_and_refused_where_unusable() {
 
 #[test]
 fn two_claims_on_one_address_are_refused_naming_both() {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
         ("content/post-1/index.md", "---\ntitle: Post 1 again\n---\n"),
         (
@@ -1878,7 +1846,7 @@ fn two_claims_on_one_address_are_refused_naming_both() {
 
 #[test]
 fn a_claim_on_a_page_statac_makes_names_that_page() {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         (
             "statac.yaml",
             "language: en\ntimezone: UTC\nposts_per_page: 1\n",
@@ -1919,9 +1887,9 @@ fn a_claim_on_a_page_statac_makes_names_that_page() {
 
 #[test]
 fn a_file_that_isnt_text_is_refused_and_the_rest_read() {
-    let temp = TempSite::new(&[("content/post-1.md", "---\ntitle: Post 1\n---\n")]);
+    let temp = TempSite::site(&[("content/post-1.md", "---\ntitle: Post 1\n---\n")]);
     std::fs::write(temp.root.join("content/post-2.md"), [0xff, 0xfe, 0x00]).unwrap();
-    let read = temp.read();
+    let read = read_site(&temp);
     assert_eq!(
         read.problems,
         [Problem::nowhere(Kind::CantRead {
@@ -2109,8 +2077,8 @@ fn a_language_with_no_folder_is_warned_of_once_at_its_tag() {
 #[test]
 fn a_link_is_followed_only_where_it_stays_inside_content() {
     use std::os::unix::fs::symlink;
-    let outside = TempSite::new(&[("content/post-9.md", "---\ntitle: Post 9\n---\n")]);
-    let temp = TempSite::new(&[
+    let outside = TempSite::site(&[("content/post-9.md", "---\ntitle: Post 9\n---\n")]);
+    let temp = TempSite::site(&[
         ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
         ("content/drafts/post-3.md", "---\ntitle: Post 3\n---\n"),
         ("notes/post-2.md", "---\ntitle: Post 2\n---\n"),
@@ -2127,7 +2095,7 @@ fn a_link_is_followed_only_where_it_stays_inside_content() {
     symlink(temp.root.join("notes"), content.join("notes")).unwrap();
     symlink(temp.root.join("statac.yaml"), content.join("settings.md")).unwrap();
     symlink(content.join("drafts/post-3.md"), content.join("post-3.md")).unwrap();
-    let read = temp.read();
+    let read = read_site(&temp);
     let link = |path: &str| Kind::OutsideSite {
         reach: crate::problem::Reach::Link {
             path: path.into(),
@@ -2448,7 +2416,7 @@ fn a_redirect_to_an_address_nothing_stands_at_is_warned_of() {
         ("/another-address-entirely/", Some(None)),
     ];
     for (to, warned) in cases {
-        let temp = TempSite::new(&[
+        let temp = TempSite::site(&[
             ("content/index.md", "---\ntitle: Home\n---\n"),
             ("content/page-2.md", "---\ntitle: Page 2\n---\n"),
             ("content/old.md", &format!("---\nredirect_to: {to}\n---\n")),
@@ -2528,7 +2496,7 @@ fn a_page_left_out_at_an_address_already_taken_is_warned_of() {
         ),
     ];
     for (front, at, warned) in cases {
-        let temp = TempSite::new(&[
+        let temp = TempSite::site(&[
             ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
             ("content/held.md", &format!("---\n{front}\n---\n")),
             ("content/folder-1/post-3.md", "---\ntitle: Post 3\n---\n"),
@@ -2557,7 +2525,7 @@ fn a_page_left_out_at_an_address_already_taken_is_warned_of() {
 /// are told as that, not as an address taken.
 #[test]
 fn a_draft_built_at_an_address_already_taken_is_the_same_address() {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
         (
             "content/held.md",
@@ -2696,7 +2664,7 @@ fn a_redirect_to_a_redirect_sends_readers_where_following_ends() {
 /// straight to where the page does, in one step.
 #[test]
 fn an_old_address_of_a_page_sending_readers_on_sends_them_where_it_does() {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         (
             "content/post-1.md",
             "---\nredirect_from: [/old/, /older/]\nredirect_to: /post-2#part-1\n---\n",
@@ -2817,7 +2785,7 @@ fn a_ring_of_redirects_is_refused_at_each_page_in_it() {
 /// where that address is written.
 #[test]
 fn a_redirect_followed_to_nothing_is_warned_of_where_nothing_is_named() {
-    let temp = TempSite::new(&[
+    let temp = TempSite::site(&[
         ("content/post-1.md", "---\nredirect_to: /post-2/\n---\n"),
         ("content/post-2.md", "---\nredirect_to: /nothing/\n---\n"),
     ]);
@@ -2854,8 +2822,8 @@ fn a_site_naming_no_language_is_told_once_and_one_naming_any_is_not() {
     assert_eq!(told("language:\n"), [at("set-aside", "language")]);
     assert_eq!(told("language: 12\n"), [at("wrong-kind-of-value", "12")]);
 
-    let temp = TempSite::new(&[("content/post-1.md", "Text.\n")]);
+    let temp = TempSite::site(&[("content/post-1.md", "Text.\n")]);
     std::fs::remove_file(temp.root.join("statac.yaml")).unwrap();
-    assert_eq!(problems(&temp.read()), note);
+    assert_eq!(problems(&read_site(&temp)), note);
     assert!(Kind::NoLanguage.quietenable());
 }

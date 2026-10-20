@@ -40,6 +40,8 @@ pub mod source;
 pub mod stamp;
 mod suggest;
 pub mod templates;
+#[cfg(test)]
+mod testing;
 pub mod value;
 mod wording;
 pub mod yaml;

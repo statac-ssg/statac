@@ -1406,19 +1406,27 @@ pub(crate) fn lexically_normal(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::Scratch;
     use std::time::{Duration, SystemTime};
 
-    struct Scratch(PathBuf);
+    /// A scratch folder holding an empty `site/`.
+    fn scratch_with_site(name: &str) -> Scratch {
+        let scratch = Scratch::new(name);
+        fs::create_dir_all(scratch.site()).unwrap();
+        scratch
+    }
 
-    impl Scratch {
-        fn new(name: &str) -> Scratch {
-            let path =
-                std::env::temp_dir().join(format!("statac-publish-{name}-{}", std::process::id()));
-            let _ = fs::remove_dir_all(&path);
-            fs::create_dir_all(path.join("site")).unwrap();
-            Scratch(path)
-        }
+    /// A site in `site/` of a scratch folder, built into `out/`.
+    trait Publishing {
+        fn site(&self) -> PathBuf;
+        fn out(&self) -> PathBuf;
+        fn spare(&self) -> PathBuf;
+        fn begin(&self) -> Staging;
+        /// Builds a site of `files`, each a path and its text.
+        fn build(&self, files: &[(&str, &str)]);
+    }
 
+    impl Publishing for Scratch {
         fn site(&self) -> PathBuf {
             self.0.join("site")
         }
@@ -1435,19 +1443,12 @@ mod tests {
             begin(&self.site(), &self.out()).unwrap()
         }
 
-        /// Builds a site of `files`, each a path and its text.
         fn build(&self, files: &[(&str, &str)]) {
             let staging = self.begin();
             for (rel, text) in files {
                 staging.write(rel, text.as_bytes()).unwrap();
             }
             staging.finish().unwrap();
-        }
-    }
-
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
         }
     }
 
@@ -1462,7 +1463,7 @@ mod tests {
 
     #[test]
     fn a_build_resumed_where_the_last_stands_writes_only_what_differs() {
-        let scratch = Scratch::new("resumed");
+        let scratch = scratch_with_site("resumed");
         let into = Arc::new(Mutex::new(None));
         let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
         for (rel, text) in [
@@ -1510,7 +1511,7 @@ mod tests {
 
     #[test]
     fn a_build_resumed_leaves_a_file_named_by_what_it_holds_unread() {
-        let scratch = Scratch::new("resumed-named");
+        let scratch = scratch_with_site("resumed-named");
         let into = Arc::new(Mutex::new(None));
         let staging = scratch.begin().leaving(&scratch.site(), Arc::clone(&into));
         staging.write_named("search/a.bin", b"a").unwrap();
@@ -1572,7 +1573,7 @@ mod tests {
 
     #[test]
     fn a_build_resumed_writes_a_file_over_what_it_held_whatever_its_length() {
-        let scratch = Scratch::new("resumed-over");
+        let scratch = scratch_with_site("resumed-over");
         let into = Arc::new(Mutex::new(None));
         let left = three_pages(&scratch, &into);
         let mine = left.files.clone();
@@ -1609,7 +1610,7 @@ mod tests {
     #[test]
     fn a_build_resumed_writes_a_file_over_without_making_it_anew() {
         use std::os::unix::fs::MetadataExt;
-        let scratch = Scratch::new("resumed-same-file");
+        let scratch = scratch_with_site("resumed-same-file");
         let into = Arc::new(Mutex::new(None));
         let left = three_pages(&scratch, &into);
         let page = scratch.out().join("a/index.html");
@@ -1631,7 +1632,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_build_resumed_writes_through_no_second_name_of_a_file() {
-        let scratch = Scratch::new("resumed-named-twice");
+        let scratch = scratch_with_site("resumed-named-twice");
         let outside = scratch.0.join("outside.txt");
         fs::write(&outside, "mine").unwrap();
         let into = Arc::new(Mutex::new(None));
@@ -1657,7 +1658,7 @@ mod tests {
     #[test]
     fn a_build_resumed_writes_through_no_link_where_a_file_or_its_folder_was() {
         use std::os::unix::fs::symlink;
-        let scratch = Scratch::new("resumed-links");
+        let scratch = scratch_with_site("resumed-links");
         let outside = scratch.0.join("outside");
         fs::create_dir_all(outside.join("b")).unwrap();
         fs::write(outside.join("index.html"), "mine").unwrap();
@@ -1679,7 +1680,7 @@ mod tests {
 
     #[test]
     fn a_build_resumed_takes_a_copy_as_equal_by_what_it_was_copied_from() {
-        let scratch = Scratch::new("resumed-copy");
+        let scratch = scratch_with_site("resumed-copy");
         let from = scratch.site().join("file-1.txt");
         fs::write(&from, "one").unwrap();
         change(&from, long_ago());
@@ -1723,7 +1724,7 @@ mod tests {
 
     #[test]
     fn a_build_resumed_reads_a_copy_whose_file_changed_as_the_last_build_began() {
-        let scratch = Scratch::new("resumed-copy-same-step");
+        let scratch = scratch_with_site("resumed-copy-same-step");
         let from = scratch.site().join("file-1.txt");
         fs::write(&from, "one").unwrap();
         // Changed within the step the disk's times were in as the build
@@ -1802,7 +1803,7 @@ mod tests {
 
     #[test]
     fn a_file_written_again_is_told_changed_though_its_length_and_time_stay() {
-        let scratch = Scratch::new("compared");
+        let scratch = scratch_with_site("compared");
         let staging = scratch.begin();
         let at = |rel: &str| staging.root().join(rel);
         for rel in ["kept.txt", "same.txt", "rewritten.txt", "old.txt"] {
@@ -1835,7 +1836,7 @@ mod tests {
 
     #[test]
     fn a_first_build_makes_the_output_with_its_marker() {
-        let scratch = Scratch::new("first");
+        let scratch = scratch_with_site("first");
         let out = scratch.out();
         let staging = scratch.begin();
         staging.write("assets/site.css", b"body {}").unwrap();
@@ -1849,7 +1850,7 @@ mod tests {
 
     #[test]
     fn a_later_build_replaces_the_whole_output_and_keeps_the_old_as_the_spare() {
-        let scratch = Scratch::new("later");
+        let scratch = scratch_with_site("later");
         scratch.build(&[("post-1.html", "one")]);
         scratch.build(&[("post-2.html", "two")]);
         assert_eq!(tree(&scratch.out()), ["post-2.html=two"]);
@@ -1860,7 +1861,7 @@ mod tests {
 
     #[test]
     fn a_build_into_the_spare_writes_only_what_differs() {
-        let scratch = Scratch::new("differs");
+        let scratch = scratch_with_site("differs");
         let first = [("a.html", "a"), ("b/c.html", "c"), ("d/e.html", "e")];
         scratch.build(&first);
         for file in ["a.html", "b/c.html"] {
@@ -1878,7 +1879,7 @@ mod tests {
 
     #[test]
     fn an_address_written_twice_is_refused_whether_or_not_the_spare_held_it() {
-        let scratch = Scratch::new("twice");
+        let scratch = scratch_with_site("twice");
         scratch.build(&[("a.html", "a")]);
         scratch.build(&[("a.html", "a")]);
         let staging = scratch.begin();
@@ -1894,7 +1895,7 @@ mod tests {
 
     #[test]
     fn a_failed_build_leaves_the_output_untouched_and_the_spare_for_the_next() {
-        let scratch = Scratch::new("failed");
+        let scratch = scratch_with_site("failed");
         scratch.build(&[("post-1.html", "one")]);
         scratch.build(&[("post-1.html", "one")]);
         let failed = scratch.begin();
@@ -1918,7 +1919,7 @@ mod tests {
 
     #[test]
     fn a_folder_of_someone_elses_files_is_never_replaced() {
-        let scratch = Scratch::new("theirs");
+        let scratch = scratch_with_site("theirs");
         let out = scratch.0.join("docs");
         fs::create_dir_all(out.join("drafts")).unwrap();
         fs::write(out.join("post-1.md"), "one").unwrap();
@@ -1941,7 +1942,7 @@ mod tests {
 
     #[test]
     fn a_file_where_the_output_should_be_is_refused() {
-        let scratch = Scratch::new("file");
+        let scratch = scratch_with_site("file");
         let out = scratch.out();
         fs::write(&out, "notes").unwrap();
         let refused = begin(&scratch.site(), &out).unwrap_err();
@@ -1957,7 +1958,7 @@ mod tests {
 
     #[test]
     fn an_empty_folder_is_taken() {
-        let scratch = Scratch::new("empty");
+        let scratch = scratch_with_site("empty");
         let out = scratch.out();
         fs::create_dir(&out).unwrap();
         scratch.build(&[("index.html", "home")]);
@@ -1966,7 +1967,7 @@ mod tests {
 
     #[test]
     fn what_an_interrupted_build_left_is_cleared_or_put_back() {
-        let scratch = Scratch::new("interrupted");
+        let scratch = scratch_with_site("interrupted");
         let out = scratch.out();
         scratch.build(&[("post-1.html", "one")]);
         // As if a build stopped after moving the output aside.
@@ -1984,7 +1985,7 @@ mod tests {
 
     #[test]
     fn an_old_output_left_aside_becomes_the_spare() {
-        let scratch = Scratch::new("aside");
+        let scratch = scratch_with_site("aside");
         scratch.build(&[("post-1.html", "one")]);
         // As if a build stopped after moving the new output in.
         let old = scratch.0.join(".out.statac-old");
@@ -1999,7 +2000,7 @@ mod tests {
 
     #[test]
     fn a_stranger_beside_the_output_is_left_alone() {
-        let scratch = Scratch::new("stranger");
+        let scratch = scratch_with_site("stranger");
         let fresh = scratch.0.join(".out.statac-new");
         fs::create_dir(&fresh).unwrap();
         fs::write(fresh.join("notes.txt"), "mine").unwrap();
@@ -2010,7 +2011,7 @@ mod tests {
 
     #[test]
     fn failures_name_the_output_as_the_author_wrote_it() {
-        let scratch = Scratch::new("named");
+        let scratch = scratch_with_site("named");
         let staging = scratch.begin();
         // A file where a folder is needed.
         staging.write("assets", b"").unwrap();
@@ -2031,7 +2032,7 @@ mod tests {
 
     #[test]
     fn where_the_folders_cant_be_exchanged_they_are_moved() {
-        let scratch = Scratch::new("moved");
+        let scratch = scratch_with_site("moved");
         scratch.build(&[("post-1.html", "one")]);
         for (nth, text) in [(2, "two"), (3, "three")] {
             let staging = scratch.begin();
@@ -2047,7 +2048,7 @@ mod tests {
 
     #[test]
     fn an_exchange_that_fails_leaves_the_output_as_it_was() {
-        let scratch = Scratch::new("unexchanged");
+        let scratch = scratch_with_site("unexchanged");
         scratch.build(&[("post-1.html", "one")]);
         let staging = scratch.begin();
         staging.write("post-2.html", b"two").unwrap();
@@ -2059,7 +2060,7 @@ mod tests {
 
     #[test]
     fn an_output_inside_what_statac_keeps_has_its_spare_beside_it() {
-        let scratch = Scratch::new("inside");
+        let scratch = scratch_with_site("inside");
         let kept = scratch.site().join(KEPT);
         let out = kept.join("out");
         for text in ["one", "two"] {
@@ -2074,7 +2075,7 @@ mod tests {
 
     #[test]
     fn something_else_under_the_spares_name_is_left_alone_and_said() {
-        let scratch = Scratch::new("occupied");
+        let scratch = scratch_with_site("occupied");
         let spare = scratch.spare();
         fs::create_dir_all(&spare).unwrap();
         fs::write(spare.join("notes.txt"), "mine").unwrap();
@@ -2098,11 +2099,11 @@ mod tests {
     /// What `before` becomes when `after` is built into a spare holding
     /// it, and what a build of `after` with no spare gives.
     fn rebuilt(name: &str, before: &[(&str, &str)], after: &[(&str, &str)]) -> [Vec<String>; 2] {
-        let scratch = Scratch::new(name);
+        let scratch = scratch_with_site(name);
         scratch.build(before);
         scratch.build(before);
         scratch.build(after);
-        let fresh = Scratch::new(&format!("{name}-fresh"));
+        let fresh = scratch_with_site(&format!("{name}-fresh"));
         fresh.build(after);
         [tree(&scratch.out()), tree(&fresh.out())]
     }
@@ -2186,8 +2187,11 @@ mod tests {
             written.unwrap();
             staging.finish().unwrap();
         };
-        let scratch = Scratch::new("at-once");
-        let fresh = [Scratch::new("at-once-0"), Scratch::new("at-once-1")];
+        let scratch = scratch_with_site("at-once");
+        let fresh = [
+            scratch_with_site("at-once-0"),
+            scratch_with_site("at-once-1"),
+        ];
         for (kind, fresh) in fresh.iter().enumerate() {
             build(fresh, kind);
         }
@@ -2199,7 +2203,7 @@ mod tests {
 
     #[test]
     fn what_was_put_in_the_output_by_hand_is_gone_two_builds_on() {
-        let scratch = Scratch::new("by-hand");
+        let scratch = scratch_with_site("by-hand");
         let files = [("a.html", "a"), ("b/c.html", "c")];
         scratch.build(&files);
         let out = scratch.out();
@@ -2220,7 +2224,7 @@ mod tests {
     /// A scratch folder with a copy Statac keeps, built twice so the spare
     /// holds it published.
     fn with_a_copy(name: &str) -> (Scratch, PathBuf) {
-        let scratch = Scratch::new(name);
+        let scratch = scratch_with_site(name);
         let kept = scratch.0.join("kept.avif");
         fs::write(&kept, "copy").unwrap();
         change(&kept, long_ago());
@@ -2304,7 +2308,7 @@ mod tests {
 
     #[test]
     fn a_file_copied_is_compared_by_its_bytes() {
-        let scratch = Scratch::new("copied");
+        let scratch = scratch_with_site("copied");
         let from = scratch.0.join("from.txt");
         let publish = |text: &str| {
             fs::write(&from, text).unwrap();
@@ -2328,7 +2332,7 @@ mod tests {
 
     #[test]
     fn two_files_are_the_same_only_byte_for_byte() {
-        let scratch = Scratch::new("bytes");
+        let scratch = scratch_with_site("bytes");
         let long = "a".repeat(200_000);
         let other = format!("{}b", &long[1..]);
         let texts = ["", "a", "b", "ab", long.as_str(), other.as_str()];
@@ -2348,7 +2352,7 @@ mod tests {
     #[test]
     fn links_put_in_the_output_are_removed_and_what_they_lead_to_kept() {
         use std::os::unix::fs::symlink;
-        let scratch = Scratch::new("link-inside");
+        let scratch = scratch_with_site("link-inside");
         let kept = scratch.0.join("kept");
         fs::create_dir(&kept).unwrap();
         fs::write(kept.join("notes.txt"), "mine").unwrap();
@@ -2384,7 +2388,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_page_in_the_spare_that_is_another_name_for_a_file_is_not_written_through() {
-        let scratch = Scratch::new("named-twice");
+        let scratch = scratch_with_site("named-twice");
         let outside = scratch.0.join("outside.txt");
         fs::write(&outside, "mine").unwrap();
         scratch.build(&[("post-1.html", "one")]);
@@ -2402,7 +2406,7 @@ mod tests {
     fn a_link_where_the_spare_is_kept_is_never_followed() {
         use std::os::unix::fs::symlink;
         for (name, link) in [("link-spare", SPARE), ("link-kept", "")] {
-            let scratch = Scratch::new(name);
+            let scratch = scratch_with_site(name);
             let outside = scratch.0.join("outside");
             fs::create_dir(&outside).unwrap();
             fs::write(outside.join(MARKER), "").unwrap();
@@ -2438,7 +2442,7 @@ mod tests {
     #[test]
     fn an_output_that_is_a_link_is_refused_not_followed() {
         use std::os::unix::fs::symlink;
-        let scratch = Scratch::new("link-output");
+        let scratch = scratch_with_site("link-output");
         let real = scratch.0.join("real");
         let first = begin(&scratch.site(), &real).unwrap();
         first.write("post-1.html", b"one").unwrap();
@@ -2462,7 +2466,7 @@ mod tests {
     #[test]
     fn nothing_is_written_through_a_link_already_in_its_place() {
         use std::os::unix::fs::symlink;
-        let scratch = Scratch::new("link-in-place");
+        let scratch = scratch_with_site("link-in-place");
         let kept = scratch.0.join("kept.txt");
         fs::write(&kept, "mine").unwrap();
         let staging = scratch.begin();
@@ -2473,7 +2477,7 @@ mod tests {
 
     #[test]
     fn a_path_that_climbs_out_is_never_written() {
-        let scratch = Scratch::new("climb");
+        let scratch = scratch_with_site("climb");
         let staging = scratch.begin();
         for rel in [
             "../escaped.html",
@@ -2491,7 +2495,7 @@ mod tests {
 
     #[test]
     fn a_second_hold_on_a_site_says_once_that_it_waits_and_waits_for_the_first() {
-        let scratch = Scratch::new("held");
+        let scratch = scratch_with_site("held");
         let (first, unheld) = hold(&scratch.site(), || panic!("nothing holds the site"));
         assert!(unheld.is_none());
         assert_eq!(names(&scratch.site().join(KEPT)), [LOCK]);
@@ -2519,7 +2523,7 @@ mod tests {
     fn a_site_that_cant_be_held_goes_unheld_and_says_why() {
         use std::os::unix::fs::symlink;
         for (name, link) in [("link-lock", LOCK), ("link-kept-lock", "")] {
-            let scratch = Scratch::new(name);
+            let scratch = scratch_with_site(name);
             let outside = scratch.0.join("outside");
             fs::create_dir(&outside).unwrap();
             fs::write(outside.join("notes.txt"), "mine").unwrap();
@@ -2542,7 +2546,7 @@ mod tests {
             assert_eq!(names(&outside), ["notes.txt"]);
             assert_eq!(fs::read(outside.join("notes.txt")).unwrap(), b"mine");
         }
-        let scratch = Scratch::new("file-kept-lock");
+        let scratch = scratch_with_site("file-kept-lock");
         fs::write(scratch.site().join(KEPT), "").unwrap();
         let (_hold, unheld) = hold(&scratch.site(), || panic!("nothing holds the site"));
         assert_eq!(

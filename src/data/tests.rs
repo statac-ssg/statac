@@ -1,37 +1,5 @@
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use super::*;
-
-/// A site's `data/` folder written to a fresh folder, removed when dropped.
-struct TempSite {
-    root: PathBuf,
-}
-
-impl TempSite {
-    fn new(files: &[(&str, &str)]) -> TempSite {
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let root = std::env::temp_dir().join(format!(
-            "statac-data-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
-        for (path, text) in files {
-            let path = root.join(path);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, text).unwrap();
-        }
-        TempSite { root }
-    }
-}
-
-impl Drop for TempSite {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.root);
-    }
-}
+use crate::testing::TempSite;
 
 fn read_data(files: &[(&str, &str)]) -> (Sources, Data, Vec<Problem>) {
     let site = TempSite::new(files);

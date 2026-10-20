@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use super::*;
 use crate::language::Words;
-use crate::language::tests::TempSite;
 use crate::problem::{FormatFault, Piece, WordsWanted};
+use crate::testing::TempSite;
 
 fn site(settings: &str) -> (Dates, Vec<Problem>, Sources) {
     let site = TempSite::new(&[("statac.yaml", settings)]);
