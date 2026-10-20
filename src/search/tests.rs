@@ -204,12 +204,16 @@ fn a_page_is_cut_at_each_heading_with_what_it_shows() {
     let raw =
         "---\ntitle: Raw\n---\n<p>Before.</p>\n<h2 id=\"part\">Part two</h2>\n<p>Inside.</p>\n";
     let hidden = "---\ntitle: Hidden\nsearch: false\n---\nzfs\n";
+    let headed = "---\ntitle: Headed\n---\n## Part 1\n\nText 1.\n\n## Part 2\n\nText 2.\n";
+    let empty = "---\ntitle: Empty\n---\n";
     let (renderer, root) = site(
         "cut",
         &[
             ("content/zfs.md", ZFS),
             ("content/raw.html", raw),
             ("content/hidden.md", hidden),
+            ("content/headed.md", headed),
+            ("content/empty.md", empty),
         ],
     );
     let records = records(&renderer, language(0));
@@ -241,6 +245,24 @@ fn a_page_is_cut_at_each_heading_with_what_it_shows() {
         ]
     );
     assert!(of("hidden.md").is_empty());
+    // Where nothing stands before the first heading, its part opens the
+    // page; a page with no heading keeps its opening, however empty.
+    assert_eq!(
+        of("headed.md"),
+        [
+            (heading("part-1", "Part 1"), "Text 1.", vec![]),
+            (heading("part-2", "Part 2"), "Text 2.", vec![]),
+        ]
+    );
+    assert_eq!(of("empty.md"), [(None, "", vec![])]);
+    let opening = |path: &str| {
+        let page = page(&renderer, path);
+        let held = records.iter().filter(|record| record.page == page);
+        held.map(|record| record.opening).collect::<Vec<_>>()
+    };
+    assert_eq!(opening("zfs.md"), [true, false, false]);
+    assert_eq!(opening("headed.md"), [true, false]);
+    assert_eq!(opening("empty.md"), [true]);
 }
 
 #[test]

@@ -19,7 +19,7 @@
 //! - `pages/*.bin`: one page's address, its name as a list gives it, its
 //!   date, the date as the site writes it where the page isn't called by
 //!   it, and its parts, each its heading's id and words, none for the
-//!   opening, and its text.
+//!   part before the first heading, and its text.
 
 use std::collections::HashMap;
 use std::fmt::Write as _;

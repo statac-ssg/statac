@@ -55,6 +55,9 @@ pub struct Record {
     /// The heading the part starts with, by its id and its words; none for
     /// the part before the first heading.
     pub heading: Option<(String, String)>,
+    /// Whether it opens the page: the part before the first heading, or
+    /// the first heading's part where nothing stands before it.
+    pub opening: bool,
     /// Its words as a reader reads them, the heading's left out.
     pub text: String,
     /// The descriptions of the pictures it shows.
@@ -67,6 +70,7 @@ impl Record {
         Record {
             page,
             heading: self.heading.clone(),
+            opening: self.opening,
             text: self.text.clone(),
             described: self.described.clone(),
         }
@@ -108,22 +112,32 @@ fn pages(site: &Site, language: LanguageId) -> Vec<PageId> {
     pages
 }
 
-/// The records of `page`, in order.
+/// The records of `page`, in order. Where nothing stands before the
+/// first heading, the first heading's part opens the page, so that a page
+/// found by its title is shown with text.
 fn records_of(renderer: &Renderer, page: PageId) -> impl Iterator<Item = Record> {
-    renderer.cut_at_headings(page).into_iter().map(move |cut| {
-        let mut text = crate::markdown::lines_of(&cut.html);
-        if let Some((_, heading)) = &cut.heading
-            && let Some(rest) = text.strip_prefix(heading.as_str())
-        {
-            text = rest.trim_start().to_owned();
-        }
-        Record {
-            page,
-            heading: cut.heading,
-            text,
-            described: described(&cut.html),
-        }
-    })
+    let mut records: Vec<Record> = (renderer.cut_at_headings(page).into_iter())
+        .map(|cut| {
+            let mut text = crate::markdown::lines_of(&cut.html);
+            if let Some((_, heading)) = &cut.heading
+                && let Some(rest) = text.strip_prefix(heading.as_str())
+            {
+                text = rest.trim_start().to_owned();
+            }
+            Record {
+                page,
+                opening: cut.heading.is_none(),
+                heading: cut.heading,
+                text,
+                described: described(&cut.html),
+            }
+        })
+        .collect();
+    if records.len() > 1 && records[0].text.is_empty() && records[0].described.is_empty() {
+        records.remove(0);
+        records[0].opening = true;
+    }
+    records.into_iter()
 }
 
 /// The files a reader's browser searches the site `renderer` read with,
@@ -270,6 +284,7 @@ impl<'a> Said<'a> {
                 hasher,
                 record.heading.as_ref().map(|(_, words)| words.as_str()),
             );
+            hasher.update(&[u8::from(record.opening)]);
             kept::hashed(hasher, &record.text);
             hasher.update(&(record.described.len() as u64).to_le_bytes());
             for description in &record.described {
@@ -317,8 +332,7 @@ impl Place {
 /// Each word of `record`, of a page `said` is said of, folded, in turn,
 /// with where it stands and its weight there.
 fn placed(said: &Said, record: &Record, mut each: impl FnMut(&str, Place, u32)) {
-    // Each page's records begin with the part before its first heading.
-    let opening = record.heading.is_none();
+    let opening = record.opening;
     let mut folded = String::new();
     let mut add = |text: &str, place: Place, weight: u32| {
         for span in spans(text) {

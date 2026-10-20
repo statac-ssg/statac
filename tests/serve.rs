@@ -1129,7 +1129,7 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
     assert!(
         draft.starts_with(
             "{\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":1,\"some\":false,\
-             \"suggestion\":null,\"parts\":6,\"average\":10,\"results\":[\
+             \"suggestion\":null,\"parts\":4,\"average\":13.5,\"results\":[\
              {\"title\":\"Post 2\",\"day\":null,\"heading\":null,\"href\":\"/post-2/\",\
              \"file\":\"content/post-2.md\",\"draft\":true,\"waiting\":null,\
              \"excerpt\":[{\"text\":\"A \",\"marked\":false},{\"text\":\"draft\",\"marked\":true},\
@@ -1150,7 +1150,7 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
              \"waiting\":\"2999-01-01\","
         ) && post.contains(
             "\"places\":[{\"place\":\"title\",\"times\":1,\"counts\":5},\
-             {\"place\":\"text\",\"times\":1,\"counts\":1}],\"holding\":4,"
+             {\"place\":\"text\",\"times\":1,\"counts\":1}],\"holding\":3,"
         ),
         "{post}"
     );
@@ -1201,7 +1201,7 @@ fn the_panel_searches_the_language_of_the_page_it_is_on_first() {
     assert_eq!(codes(&french), ["fr", "en"], "{french}");
     assert!(
         french.contains("\"heading\":\"Post 1\",\"href\":\"/fr/post-1/#post-1\",")
-            && french.contains("\"heading\":null,\"href\":\"/post-1/\","),
+            && french.contains("\"heading\":\"Post 1\",\"href\":\"/post-1/#post-1\","),
         "{french}"
     );
 }

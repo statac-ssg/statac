@@ -537,6 +537,28 @@ fn a_run_of_japanese_finds_the_same_pages_however_the_browser_cuts_it_into_words
 }
 
 #[test]
+fn a_page_opening_with_a_heading_is_found_by_its_title_at_that_heading_with_its_text() {
+    let site = Site::new("reader-headed");
+    site.write(
+        "content/post-3.md",
+        "---\ntitle: Opens with a heading\ndate: 2026-01-03\n---\n\
+         ## Heading 1 {#heading-1}\n\nText 1.\n\n## Heading 2 {#heading-2}\n\nText 2.\n",
+    );
+    assert!(!site.index().is_empty());
+    let asked: &[(&str, bool)] = &[("opens", false)];
+    let rust = statac_finds(&site, 0, asked);
+    assert_eq!(
+        rust,
+        "[[1,false,[[\"/blog/post-3/#heading-1\",\"Opens with a heading\",\
+         \"3 January 2026\",\"Heading 1\",[[\"Text 1.\",false]]]],null]]"
+    );
+    let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
+        return;
+    };
+    assert_eq!(rust, browser);
+}
+
+#[test]
 fn each_languages_script_finds_what_statac_search_finds_in_that_language() {
     let site = Site::in_two_languages("reader-languages", "https://example.org/blog/");
     site.write(
