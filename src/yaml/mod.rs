@@ -12,6 +12,7 @@ mod schema;
 #[cfg(test)]
 mod tests;
 mod tree;
+pub mod write;
 
 pub use front_matter::{Split, Unclosed, split};
 pub use json::JsonFault;

@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use super::differ::{self, Line};
 use super::starter::{self, File, Past};
-use super::{past, quoted, words};
+use super::{past, words};
 use crate::config;
 use crate::platform;
 use crate::problem::{Kind, Problem, system_reason};
@@ -669,7 +669,7 @@ fn at_the_end(
     };
     let eol = if ending { "\r\n" } else { "\n" };
     let added: Vec<String> = (missing.iter())
-        .map(|(name, english)| format!("{indent}{name}: {}", quoted(english)))
+        .map(|(name, english)| format!("{indent}{name}: {}", yaml::write::text(english)))
         .collect();
     let with = match at == text.len() && !text.ends_with('\n') {
         true => format!("{eol}{}", added.join(eol)),

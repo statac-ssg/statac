@@ -126,7 +126,7 @@ impl Mention {
         let mut text = String::new();
         for (name, value) in fields {
             if let Some(value) = value {
-                text.push_str(&format!("{name}: {}\n", quoted(&value)));
+                text.push_str(&format!("{name}: {}\n", crate::yaml::write::quoted(&value)));
             }
         }
         text
@@ -235,32 +235,6 @@ pub fn on_site(target: &str, site: &str) -> Option<String> {
 /// folds.
 fn spelt(address: &Address) -> String {
     crate::platform::folded(address.as_str().trim_end_matches('/'))
-}
-
-/// `text` in YAML's double quotes, every character a reader would take
-/// as other than itself escaped.
-fn quoted(text: &str) -> String {
-    let mut out = String::with_capacity(text.len() + 2);
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            c if printable(c) => out.push(c),
-            c if u32::from(c) <= 0xFFFF => out.push_str(&format!("\\u{:04X}", u32::from(c))),
-            c => out.push_str(&format!("\\U{:08X}", u32::from(c))),
-        }
-    }
-    out.push('"');
-    out
-}
-
-/// Whether YAML reads `c` as itself in double quotes.
-fn printable(c: char) -> bool {
-    matches!(
-        u32::from(c),
-        0x20..=0x7E | 0xA0..=0x2027 | 0x202A..=0xD7FF | 0xE000..=0xFEFE | 0xFF00..=0xFFFD | 0x10000..
-    )
 }
 
 /// The mentions of the site's pages, each page's in the order a page

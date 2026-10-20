@@ -35,7 +35,7 @@ use crate::problem::{Kind, Maker, Problem, SiteMark, WordsFrom, system_reason};
 use crate::report::{self, Report, shown};
 use crate::source::Sources;
 use crate::wording;
-use crate::yaml::{self, Resolved, Value as Yaml};
+use crate::yaml;
 pub(crate) use starter::has_snippet;
 use update::{CARD, Starter, WORDS_FILE};
 
@@ -585,7 +585,7 @@ fn site_address(typed: &str) -> Option<String> {
         return None;
     }
     let address = typed.strip_suffix('/').unwrap_or(typed).to_owned();
-    reads_back("url", &quoted(&address)).then_some(address)
+    reads_back("url", &yaml::write::text(&address)).then_some(address)
 }
 
 /// The languages typed, parted by commas, or what to tell of the first
@@ -613,7 +613,7 @@ fn languages(typed: &str) -> Result<Vec<String>, String> {
 
 /// Whether `statac.yaml` takes `code` as a language's code.
 pub(crate) fn a_language_code(code: &str) -> bool {
-    reads_back("language", &quoted(code))
+    reads_back("language", &yaml::write::text(code))
 }
 
 /// Whether `statac.yaml` holding `name: written` reads with no problem.
@@ -887,21 +887,21 @@ const FEED_KEY_COMMENT: &str =
 /// `statac.yaml` for a site answered as `answers`.
 fn settings(answers: &Answers, timezone: Option<&str>) -> String {
     let language = match answers.languages.as_slice() {
-        [one] => quoted(one),
+        [one] => yaml::write::text(one),
         many => {
-            let codes: Vec<String> = many.iter().map(|code| quoted(code)).collect();
+            let codes: Vec<String> = many.iter().map(|code| yaml::write::text(code)).collect();
             format!("[{}]", codes.join(", "))
         }
     };
     let mut lines = vec![
-        ("title", Some(quoted(&answers.title))),
-        ("url", answers.address.as_deref().map(quoted)),
+        ("title", Some(yaml::write::text(&answers.title))),
+        ("url", answers.address.as_deref().map(yaml::write::text)),
         ("language", Some(language)),
-        ("timezone", timezone.map(quoted)),
-        ("date_format", Some(quoted(&answers.date_format))),
+        ("timezone", timezone.map(yaml::write::text)),
+        ("date_format", Some(yaml::write::text(&answers.date_format))),
     ];
     for (name, example) in shorter_dates(&answers.languages[0], &answers.date_format) {
-        lines.push((name, Some(quoted(&example))));
+        lines.push((name, Some(yaml::write::text(&example))));
     }
     lines.push(("feed_key", Some(crate::feeds::mint_key())));
     let mut text = String::new();
@@ -909,7 +909,7 @@ fn settings(answers: &Answers, timezone: Option<&str>) -> String {
         let Some(value) = value else {
             continue;
         };
-        if preset(name).is_some_and(|preset| quoted(&preset) == value) {
+        if preset(name).is_some_and(|preset| yaml::write::text(&preset) == value) {
             continue;
         }
         if name == "feed_key" {
@@ -955,37 +955,6 @@ fn preset(name: &str) -> Option<String> {
     let source = sources.add(config::FILE_NAME, String::new());
     let (settings, _) = config::read_source(&sources, source);
     settings.text(name).map(|text| text.value.to_owned())
-}
-
-/// `text` as a YAML value that reads back as the same text: as it is
-/// where it can be, and in double quotes where it can't.
-fn quoted(text: &str) -> String {
-    let mut sources = Sources::default();
-    let source = sources.add("value.yaml", format!("value: {text}\n"));
-    let plain = yaml::read(&sources, source).is_ok_and(|node| match &node.value {
-        Yaml::Mapping(entries) => match entries.as_slice() {
-            [entry] => {
-                entry.value.resolved() == Some(Resolved::Str)
-                    && matches!(&entry.value.value, Yaml::Scalar(read) if read == text)
-            }
-            _ => false,
-        },
-        _ => false,
-    });
-    if plain && !text.contains('\n') {
-        return text.to_owned();
-    }
-    let mut out = String::from("\"");
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            c if c.is_control() => out.push_str(&format!("\\u{:04X}", u32::from(c))),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
 }
 
 /// Every file of a new site `writes` asks for, by its path in the site:
@@ -1093,9 +1062,9 @@ fn words_file(languages: &[impl AsRef<str>], words: &[(&str, &str)]) -> String {
         "# The words the templates and snippets show readers, in each language: see /new/\n",
     );
     for tag in languages {
-        text.push_str(&format!("{}:\n", quoted(tag.as_ref())));
+        text.push_str(&format!("{}:\n", yaml::write::key(tag.as_ref())));
         for (name, english) in words {
-            text.push_str(&format!("  {name}: {}\n", quoted(english)));
+            text.push_str(&format!("  {name}: {}\n", yaml::write::text(english)));
         }
     }
     text
@@ -1124,10 +1093,10 @@ fn language_file() -> String {
          see /dates-and-languages/\n",
     );
     if let Some(label) = &english.back_to_the_text {
-        text.push_str(&format!("back_to_the_text: {}\n", quoted(label)));
+        text.push_str(&format!("back_to_the_text: {}\n", yaml::write::text(label)));
     }
     if let Some(names) = &english.callouts {
-        let names: Vec<String> = names.iter().map(|name| quoted(name)).collect();
+        let names: Vec<String> = names.iter().map(|name| yaml::write::text(name)).collect();
         text.push_str(&format!("callouts: [{}]\n", names.join(", ")));
     }
     text

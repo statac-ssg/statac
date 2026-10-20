@@ -122,24 +122,6 @@ fn every_name_reads_back_as_written() {
     }
 }
 
-#[test]
-fn text_is_quoted_only_where_it_must_be() {
-    let cases = [
-        ("Post 1", "Post 1"),
-        ("a:b", "a:b"),
-        ("2026-10-04", "2026-10-04"),
-        ("yes", "\"yes\""),
-        ("1984", "\"1984\""),
-        ("3.10", "\"3.10\""),
-        ("a: b", "\"a: b\""),
-        ("@name", "\"@name\""),
-        ("", "\"\""),
-    ];
-    for (given, written) in cases {
-        assert_eq!(yaml::text_value(given), written, "{given}");
-    }
-}
-
 fn scratch(label: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir()
         .join(format!("statac-import-unit-{}", std::process::id()))

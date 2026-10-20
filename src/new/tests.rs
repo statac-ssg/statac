@@ -444,7 +444,7 @@ fn yes_takes_every_default_without_asking() {
     );
     assert_eq!(code, 0, "{said}");
     assert!(said.starts_with("Made a new site in `"), "{said}");
-    assert!(read(&folder, "statac.yaml").starts_with("title: Yes\n"));
+    assert!(read(&folder, "statac.yaml").starts_with("title: \"Yes\"\n"));
 }
 
 /// What `statac new` says with `typed` read where no person is there to
@@ -733,14 +733,14 @@ fn a_name_needing_quotes_reads_back_as_written() {
         "null",
     ] {
         let mut sources = Sources::default();
-        let text = format!("title: {}\n", quoted(title));
+        let text = format!("title: {}\n", yaml::write::text(title));
         let source = sources.add(config::FILE_NAME, text.clone());
         let (settings, problems) = config::read_source(&sources, source);
         assert!(problems.is_empty(), "{text}: {problems:?}");
         assert_eq!(settings.text("title").unwrap().value, title, "{text}");
     }
-    assert_eq!(quoted("My Site"), "My Site");
-    assert_eq!(quoted("Site: 1"), "\"Site: 1\"");
+    assert_eq!(yaml::write::text("My Site"), "My Site");
+    assert_eq!(yaml::write::text("Site: 1"), "\"Site: 1\"");
 }
 
 #[test]
@@ -771,7 +771,9 @@ fn no_setting_is_written_at_statacs_own_value() {
     for line in text.lines().filter(|line| !line.starts_with('#')) {
         let (name, value) = line.split_once(": ").unwrap();
         assert_ne!(
-            preset(name).map(|preset| quoted(&preset)).as_deref(),
+            preset(name)
+                .map(|preset| yaml::write::text(&preset))
+                .as_deref(),
             Some(value)
         );
     }

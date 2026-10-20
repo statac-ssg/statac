@@ -1209,7 +1209,7 @@ impl Reader<'_> {
                         &ORDER_UNKNOWN,
                         &from,
                         line,
-                        &format!("sort_by = {}", super::yaml::text_value(&by)),
+                        &format!("sort_by = {}", crate::yaml::write::text(&by)),
                     );
                     continue;
                 }

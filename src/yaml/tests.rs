@@ -900,3 +900,52 @@ fn a_text_in_quotes_that_takes_in_a_field_or_never_closes_is_told_as_never_close
         assert_eq!(at.0, line, "{text:?}");
     }
 }
+
+#[test]
+fn text_is_quoted_only_where_it_must_be() {
+    let cases = [
+        ("Post 1", "Post 1"),
+        ("a:b", "a:b"),
+        ("2026-10-04", "2026-10-04"),
+        ("a\tb", "a\tb"),
+        ("yes", "\"yes\""),
+        ("No", "\"No\""),
+        ("1984", "\"1984\""),
+        ("3.10", "\"3.10\""),
+        ("a: b", "\"a: b\""),
+        ("@name", "\"@name\""),
+        ("", "\"\""),
+        ("a\nb", "\"a\\nb\""),
+        ("a\u{2028}b", "\"a\\u2028b\""),
+        ("a\u{2029}b", "\"a\\u2029b\""),
+        ("a\u{feff}b", "\"a\\uFEFFb\""),
+        ("a\u{85}b", "\"a\\u0085b\""),
+    ];
+    for (given, written) in cases {
+        assert_eq!(write::text(given), written, "{given:?}");
+    }
+    assert_eq!(write::key("no"), "\"no\"");
+    assert_eq!(write::key("a\u{2028}b"), "\"a\\u2028b\"");
+}
+
+#[test]
+fn text_in_quotes_reads_back_as_it_was() {
+    for given in [
+        "\"Quoted\" and \\",
+        "a\tb\nc\rd",
+        "\u{0}\u{1f}\u{7f}\u{85}\u{9f}",
+        "\u{2028}\u{2029}\u{feff}\u{fffe}\u{ffff}",
+        "\u{1f600}",
+    ] {
+        let (_, node) = read_yaml(&format!("value: {}\n", write::quoted(given)));
+        let node = node.unwrap_or_else(|problem| panic!("{given:?}: {problem:?}"));
+        let Value::Mapping(entries) = node.value else {
+            panic!("{given:?}");
+        };
+        assert_eq!(
+            entries[0].value.value,
+            Value::Scalar(given.to_owned()),
+            "{given:?}"
+        );
+    }
+}

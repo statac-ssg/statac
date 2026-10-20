@@ -4,6 +4,7 @@
 
 use crate::origin::Style;
 use crate::source::Sources;
+use crate::yaml::write::key;
 use crate::yaml::{self, Node, Resolved, Value as Yaml};
 
 /// A value in front matter or settings, as a reader found it.
@@ -18,11 +19,6 @@ pub enum Value {
     /// Fields nested beneath one, in the order written.
     Fields(Vec<(String, Value)>),
 }
-
-/// The words a plain scalar is read as true or false by YAML 1.1, which
-/// Statac reads as text and other readers don't: written in quotes, so no
-/// reader takes them for anything but text.
-const TRUTHS_ELSEWHERE: &[&str] = &["yes", "no", "on", "off", "y", "n"];
 
 /// `fields` as lines of a YAML mapping, each line ending with a line break.
 pub fn fields<'a>(fields: impl IntoIterator<Item = (&'a str, &'a Value)>) -> String {
@@ -93,66 +89,9 @@ fn scalar_text(value: &Value) -> String {
         {
             number.clone()
         }
-        Value::Number(text) | Value::Text(text) => text_value(text),
+        Value::Number(text) | Value::Text(text) => yaml::write::text(text),
         _ => String::new(),
     }
-}
-
-/// `text` as a value Statac reads back as that text.
-pub fn text_value(text: &str) -> String {
-    let elsewhere = TRUTHS_ELSEWHERE.contains(&text.to_ascii_lowercase().as_str());
-    let plain = !elsewhere
-        && !text.contains(['\n', '\r'])
-        && one_entry(&format!("value: {text}\n")).is_some_and(|(_, value)| {
-            value.resolved() == Some(Resolved::Str)
-                && matches!(&value.value, Yaml::Scalar(read) if read == text)
-        });
-    match plain {
-        true => text.to_owned(),
-        false => double_quoted(text),
-    }
-}
-
-/// A field's name, plain where Statac reads it back as written.
-fn key(name: &str) -> String {
-    let plain = !name.contains(['\n', '\r'])
-        && one_entry(&format!("{name}: x\n")).is_some_and(|(key, _)| {
-            key.style == Style::Plain && matches!(&key.value, Yaml::Scalar(read) if read == name)
-        });
-    match plain {
-        true => name.to_owned(),
-        false => double_quoted(name),
-    }
-}
-
-/// The one entry `text` holds as a mapping, where it reads as one.
-fn one_entry(text: &str) -> Option<(Node, Node)> {
-    let mut sources = Sources::default();
-    let source = sources.add("value.yaml", text.to_owned());
-    let node = yaml::read(&sources, source).ok()?;
-    match node.value {
-        Yaml::Mapping(mut entries) if entries.len() == 1 => {
-            let entry = entries.pop()?;
-            Some((entry.key, entry.value))
-        }
-        _ => None,
-    }
-}
-
-fn double_quoted(text: &str) -> String {
-    let mut out = String::from("\"");
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => out.push_str(&format!("\\u{:04X}", u32::from(c))),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
 }
 
 /// What `node` holds, each plain scalar read by `plain` and every other

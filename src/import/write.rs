@@ -1266,7 +1266,7 @@ fn fits(name: &str, value: &Value) -> bool {
 /// A value as a report quotes it: as one line of YAML.
 pub fn shown_value(value: &Value) -> String {
     match value {
-        Value::Text(text) => yaml::text_value(text),
+        Value::Text(text) => crate::yaml::write::text(text),
         Value::Number(number) => number.clone(),
         Value::Truth(truth) => truth.to_string(),
         Value::Nothing => "null".into(),
