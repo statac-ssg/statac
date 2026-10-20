@@ -2618,6 +2618,15 @@ fn zola_functions_in_the_writing_give_their_address_or_are_told() {
     assert_eq!(fixture("zola-functions"), [] as [&str; 0]);
 }
 
+/// Zola 0.23 lets an `@/` link, or `get_url`, name a file beside a page:
+/// it is the address of the page that owns the file, in the language of
+/// the page linking where it has one, then the file's path from the
+/// page's folder.
+#[test]
+fn a_zola_link_to_a_file_beside_a_page_reaches_it() {
+    assert_eq!(fixture("zola-beside"), [] as [&str; 0]);
+}
+
 #[test]
 fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
     let words = "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n\n\

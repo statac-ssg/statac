@@ -1869,6 +1869,36 @@ impl Reader<'_> {
                 _ => doc.address.clone(),
             }
         };
+        let came: HashSet<String> = (self.import.files.iter())
+            .filter_map(|file| file.from.strip_prefix("content/"))
+            .map(str::to_owned)
+            .collect();
+        // As Zola reads it: a folder's `index.md` owns every file beneath
+        // its folder, and a list's `_index.md` the files in its folder
+        // itself, the nearest first.
+        let beside = |path: &str| {
+            if !came.contains(path) {
+                return None;
+            }
+            let owns = |dir: &str, shape| {
+                docs.iter()
+                    .any(|d| d.shape == shape && parent(&d.rel) == dir)
+            };
+            let mut dir = parent(path);
+            let mut nearest = true;
+            while !dir.is_empty() {
+                let rest = path[dir.len() + 1..].to_owned();
+                if owns(dir, Shape::Bundle) {
+                    return Some((format!("{dir}/index.md"), rest));
+                }
+                if nearest && owns(dir, Shape::List) {
+                    return Some((format!("{dir}/_index.md"), rest));
+                }
+                nearest = false;
+                dir = parent(dir);
+            }
+            None
+        };
         let skip = self.s.skip_content_templating.clone().unwrap_or_default();
         let cx = writing::Context {
             reading,
@@ -1877,6 +1907,7 @@ impl Reader<'_> {
             feeds: &self.s.feed_filenames,
             base: &base,
             refs: &refs,
+            beside: &beside,
             own: &self.own,
             wrapping: &wrapping,
             emoji: self.s.render_emoji,

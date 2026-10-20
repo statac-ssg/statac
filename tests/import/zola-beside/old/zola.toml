@@ -1,0 +1,5 @@
+base_url = "https://example.org"
+title = "Files beside pages"
+
+[languages.fr]
+title = "Fichiers"

@@ -57,6 +57,10 @@ pub struct Context<'a> {
     /// The address, from the top of the site, of the page an `@/` link
     /// names by its path in `content/`, where there is one.
     pub refs: &'a dyn Fn(&str) -> Option<String>,
+    /// Where an `@/` link names a file beside a page that came across: the
+    /// page, as an `@/` link names it, and the file's path from the page's
+    /// folder.
+    pub beside: &'a dyn Fn(&str) -> Option<(String, String)>,
     /// The names of the site's own tags, from its templates.
     pub own: &'a [String],
     /// The tags some call anywhere in the site wraps writing with.
@@ -482,10 +486,14 @@ fn get_url(tag: &Written, cx: &Context) -> Option<Result<String, ()>> {
             None => (page, String::new()),
         };
         let language = language.unwrap_or(cx.language);
-        let file = match (language == cx.main_language, file.rsplit_once('.')) {
-            (true, _) => file.to_owned(),
-            (false, Some((stem, extension))) => format!("{stem}.{language}.{extension}"),
-            (false, None) => format!("{language}.{file}"),
+        // Zola looks for a file beside a page by the whole path, so never
+        // one with a `#` part.
+        if let Some(address) = beside(page, language, false, cx) {
+            return Some(address);
+        }
+        let file = match language == cx.main_language {
+            true => file.to_owned(),
+            false => in_language(file, language),
         };
         let address = (cx.refs)(&file).ok_or(());
         return Some(address.map(|address| format!("{}{address}{anchor}", cx.base)));
@@ -525,6 +533,36 @@ fn get_url(tag: &Written, cx: &Context) -> Option<Result<String, ()>> {
         address.push('/');
     }
     Some(Ok(address))
+}
+
+/// The file `file`, of the main language, in `language`: `post.fr.md`
+/// for French.
+fn in_language(file: &str, language: &str) -> String {
+    match file.rsplit_once('.') {
+        Some((stem, extension)) => format!("{stem}.{language}.{extension}"),
+        None => format!("{language}.{file}"),
+    }
+}
+
+/// The address of the file beside a page that `path`, in `content/`,
+/// names from a page in `language`: the page's address in that language,
+/// or else in the main one where `either` says, then the file's path from
+/// the page's folder. `Err` where no such page came across; None where
+/// `path` names no file beside a page.
+fn beside(path: &str, language: &str, either: bool, cx: &Context) -> Option<Result<String, ()>> {
+    let (page, rest) = (cx.beside)(path)?;
+    let own = (language != cx.main_language)
+        .then(|| (cx.refs)(&in_language(&page, language)))
+        .flatten();
+    let address = match own {
+        None if language == cx.main_language || either => (cx.refs)(&page),
+        own => own,
+    };
+    Some(
+        address
+            .map(|address| format!("{}{address}{rest}", cx.base))
+            .ok_or(()),
+    )
 }
 
 /// `raw` opening at `at` up to its `endraw`: where the writing before it
@@ -1054,10 +1092,15 @@ fn links_and_more(
             Some((path, anchor)) => (path, format!("#{anchor}")),
             None => (&written[2..], String::new()),
         };
-        match (cx.refs)(path) {
+        // A file beside a page comes first, and Zola drops any `#` part.
+        let address = match beside(path, cx.language, true, cx) {
+            Some(address) => address.ok(),
+            None => (cx.refs)(path).map(|address| format!("{}{address}{anchor}", cx.base)),
+        };
+        match address {
             Some(address) => {
                 out.push_str(&body[copied..start]);
-                out.push_str(&format!("{}{address}{anchor}", cx.base));
+                out.push_str(&address);
                 copied = end;
             }
             None => findings.push(finding(&LINK_NOWHERE, spot(start, written))),
@@ -1214,6 +1257,7 @@ mod tests {
             starter: true,
             base: "",
             refs: &|_| None,
+            beside: &|_| None,
             own: &[],
             wrapping: &wrapping,
             emoji: false,
@@ -1266,6 +1310,7 @@ mod tests {
             starter: true,
             base: "",
             refs: &|_| None,
+            beside: &|_| None,
             own: &[],
             wrapping: &wrapping,
             emoji: false,
@@ -1457,6 +1502,7 @@ mod tests {
                 starter: true,
                 base,
                 refs: &refs,
+                beside: &|_| None,
                 own: &[],
                 wrapping: &wrapping,
                 emoji: false,
