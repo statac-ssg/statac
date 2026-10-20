@@ -532,7 +532,14 @@ fn parts_words(name: &str) -> bool {
 /// characters it stands for.
 fn read_reference(written: &str) -> Option<String> {
     let name = &written[1..written.len() - 1];
-    let number = |digits: &str, radix| u32::from_str_radix(digits, radix).ok()?.try_into().ok();
+    // Digits too many to read are a number past Unicode all the same.
+    let number = |digits: &str, radix| {
+        let all = !digits.is_empty() && digits.chars().all(|c| c.is_digit(radix));
+        let read = u32::from_str_radix(digits, radix)
+            .ok()
+            .or(all.then_some(u32::MAX));
+        read.map(crate::html::numbered)
+    };
     let c = match name {
         "amp" => Some('&'),
         "lt" => Some('<'),

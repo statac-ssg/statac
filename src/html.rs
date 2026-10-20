@@ -328,20 +328,44 @@ fn escape_each(text: &str, marks: &[char], out: &mut impl fmt::Write) -> fmt::Re
 pub(crate) const ANY: char = '\u{FFFF}';
 
 /// Named character references that can spell an address's scheme or what
-/// comes before it. Others are kept as written, or with `any`, read as `ANY`.
+/// comes before it, each as HTML spells it: a name's case is part of it,
+/// `&Lt;` being `≪`. Others are kept as written, or with `any`, read as
+/// `ANY`.
 const NAMED: &[(&str, char)] = &[
     ("amp", '&'),
+    ("AMP", '&'),
     ("lt", '<'),
+    ("LT", '<'),
     ("gt", '>'),
+    ("GT", '>'),
     ("quot", '"'),
+    ("QUOT", '"'),
     ("apos", '\''),
     ("colon", ':'),
     ("semi", ';'),
     ("equals", '='),
-    ("tab", '\t'),
-    ("newline", '\n'),
+    ("Tab", '\t'),
+    ("NewLine", '\n'),
     ("nbsp", '\u{a0}'),
 ];
+
+/// The character a browser reads a numbered character reference as: none
+/// for 0, a surrogate or a number past Unicode, which stand for U+FFFD, and
+/// 128 to 159 as Windows-1252 has them, but for the five it leaves empty.
+pub(crate) fn numbered(number: u32) -> char {
+    const WINDOWS_1252: [u32; 32] = [
+        0x20ac, 0x81, 0x201a, 0x192, 0x201e, 0x2026, 0x2020, 0x2021, 0x2c6, 0x2030, 0x160, 0x2039,
+        0x152, 0x8d, 0x17d, 0x8f, 0x90, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014,
+        0x2dc, 0x2122, 0x161, 0x203a, 0x153, 0x9d, 0x17e, 0x178,
+    ];
+    let number = match number {
+        0x80..=0x9f => WINDOWS_1252[(number - 0x80) as usize],
+        n => n,
+    };
+    char::from_u32(number)
+        .filter(|&c| c != '\0')
+        .unwrap_or('\u{fffd}')
+}
 
 /// `text` with its character references decoded, as an attribute value is.
 pub(crate) fn decoded(text: &str, any: bool) -> String {
@@ -385,9 +409,7 @@ fn reference(rest: &str, any: bool) -> (Option<char>, usize) {
         }
         let number = u32::from_str_radix(&rest[from..from + digits], if hex { 16 } else { 10 })
             .unwrap_or(u32::MAX);
-        let c = char::from_u32(number)
-            .filter(|&c| c != '\0')
-            .unwrap_or('\u{fffd}');
+        let c = numbered(number);
         let used = from + digits + usize::from(b.get(from + digits) == Some(&b';'));
         return (Some(c), used);
     }
@@ -395,7 +417,7 @@ fn reference(rest: &str, any: bool) -> (Option<char>, usize) {
     if letters == 0 {
         return (None, 0);
     }
-    let name = rest[..letters].to_ascii_lowercase();
+    let name = &rest[..letters];
     let used = letters + usize::from(b.get(letters) == Some(&b';'));
     match NAMED.iter().find(|(n, _)| *n == name) {
         Some(&(_, c)) => (Some(c), used),
@@ -422,6 +444,25 @@ pub(crate) fn next(b: &[u8], wanted: u8, from: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_reference_is_read_as_a_browser_reads_it() {
+        assert_eq!(decoded("&lt;&LT;&Tab;&NewLine;&colon;", false), "<<\t\n:");
+        // A name's case is part of it.
+        assert_eq!(
+            decoded("&Lt;&Colon;&tab;&AMp;", false),
+            "&Lt;&Colon;&tab;&AMp;"
+        );
+        assert_eq!(decoded("&Lt;", true), ANY.to_string());
+        assert_eq!(
+            decoded("&#0;&#xD800;&#x110000;", false),
+            "\u{fffd}".repeat(3)
+        );
+        assert_eq!(
+            decoded("&#150;&#x9F;&#x81;", false),
+            "\u{2013}\u{178}\u{81}"
+        );
+    }
 
     #[test]
     fn each_escaper_escapes_its_own_characters() {

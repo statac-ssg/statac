@@ -2734,6 +2734,11 @@ fn the_words_of_html_are_parted_where_a_reader_sees_them_apart() {
         words_of("cr&ecirc;pe &amp; caf&#233; &mdash; &notaname; &#x41;"),
         "cr\u{ea}pe & caf\u{e9} \u{2014} &notaname; A"
     );
+    // A number is read as a browser reads it.
+    assert_eq!(
+        words_of("&#0; &#xD800; &#x110000; &#99999999999; &#150; &#x81; &#; &#12a;"),
+        "\u{fffd} \u{fffd} \u{fffd} \u{fffd} \u{2013} \u{81} &#; &#12a;"
+    );
 }
 
 #[test]
