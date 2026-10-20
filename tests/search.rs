@@ -257,15 +257,22 @@ fn a_page_edited_changes_its_own_text_and_leaves_every_other_pages() {
 
 #[test]
 fn a_file_at_an_address_of_the_index_is_told_as_a_clash() {
-    for file in ["static/search/index.js", "static/fr/search/index.js"] {
+    // The French index alone is at `fr/search`: a file there, and a
+    // folder spelt otherwise, meet it and nothing else.
+    for (file, named) in [
+        ("static/search/index.js", "static/search/index.js"),
+        ("static/fr/search/index.js", "static/fr/search/index.js"),
+        ("static/fr/search", "static/fr/search"),
+        ("static/fr/Search/notes.txt", "static/fr/Search"),
+    ] {
         let site = Site::in_two_languages("clash", "https://example.org/blog/");
         site.write(file, "\n");
         let (said, code) = site.run(&["check", "--today=2026-10-04"]);
         assert_eq!(code, 1, "{file}: {said}");
-        assert!(
-            said.contains(&format!("`{file}` and the site's search index")),
-            "{said}"
-        );
+        let told = said.lines().find(|line| line.contains("Same address"));
+        let told = told.unwrap_or_else(|| panic!("{file}: {said}"));
+        assert!(told.contains(&format!("`{named}`")), "{told}");
+        assert!(told.contains("the site's search index"), "{told}");
     }
 }
 

@@ -982,6 +982,19 @@ pub(crate) fn conclude(
         // A card's address is known only once its page is built, and the
         // search index's once every page is, so they are held to the
         // addresses already taken here.
+        // Pages sharing one card share its file.
+        let mut claimed = HashSet::new();
+        let mut new = Vec::new();
+        for card in &wanted {
+            if claimed.insert(card.file.as_str()) {
+                new.push((card.file.clone(), Named::File(card.from.to_owned())));
+            }
+        }
+        new.extend(crate::search::claims(&search));
+        // The rest were held to each other as the site was read. Two
+        // addresses meet only where they start with one folder or file.
+        let top = |rel: &str| crate::platform::folded(rel.split('/').next().unwrap_or(rel));
+        let tops: HashSet<String> = new.iter().map(|(rel, _)| top(rel)).collect();
         let mut outputs = renderer.assets().claims();
         outputs.extend(content::claims(
             site,
@@ -990,14 +1003,8 @@ pub(crate) fn conclude(
         ));
         outputs.extend(pictures.claims());
         outputs.extend(feeds::claims(renderer.feeds()));
-        // Pages sharing one card share its file.
-        let mut claimed = HashSet::new();
-        for card in &wanted {
-            if claimed.insert(card.file.as_str()) {
-                outputs.push((card.file.clone(), Named::File(card.from.to_owned())));
-            }
-        }
-        outputs.extend(crate::search::claims(&search));
+        outputs.retain(|(rel, _)| tops.contains(&top(rel)));
+        outputs.extend(new);
         let same = assets::same_address(&outputs, &renderer.settings().base());
         let new: Vec<Problem> = same
             .into_iter()
