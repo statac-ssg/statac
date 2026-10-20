@@ -5502,6 +5502,7 @@ mod building;
 mod engine;
 mod languages;
 mod lists;
+mod memory;
 mod pieces;
 mod shows;
 mod translations;

@@ -366,6 +366,13 @@ fn what_the_engine_cant_read_is_told_in_statacs_words() {
             "{% break %}",
         ),
         case(
+            "{% continue %}",
+            "Malformed template: `{% continue %}` is outside a loop",
+            None,
+            1,
+            "{% continue %}",
+        ),
+        case(
             "{% set loop = 1 %}",
             "Malformed template: `loop` can't be set",
             Some("The template language keeps this name: choose another."),
@@ -499,6 +506,20 @@ fn what_the_engine_cant_read_is_told_in_statacs_words() {
             "%}",
         ),
         case(
+            "{% with a = 1 b = 2 %}{% endwith %}",
+            "Malformed template: unexpected `b`, expected `,`",
+            None,
+            1,
+            "b",
+        ),
+        case(
+            "{% include \"base\" ignore x %}",
+            "Malformed template: unexpected `x`, expected `missing`",
+            None,
+            1,
+            "x",
+        ),
+        case(
             "{{ [1, 2 }}",
             "Malformed template: unexpected `}`, expected `,`",
             None,
@@ -563,6 +584,15 @@ fn what_the_engine_cant_read_is_told_in_statacs_words() {
         ),
     ];
     check(&cases);
+    // Deeper than the engine's reader goes.
+    let deep = format!("{{{{ {}1{} }}}}", "(".repeat(200), ")".repeat(200));
+    let (kind, line, at) = told(&deep);
+    assert_eq!(
+        crate::wording::headline(&kind),
+        "Malformed template: nested too deeply"
+    );
+    assert_eq!(crate::wording::suggestion(&kind), None);
+    assert_eq!((line, at.as_str()), (1, "("));
 }
 
 #[test]
@@ -616,6 +646,20 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             None,
             1,
             "[1] - true",
+        ),
+        case(
+            "{{ {\"a\": 1} + 1 }}",
+            "Template stopped: can't use `+` on a map and a number",
+            None,
+            1,
+            "{\"a\": 1} + 1",
+        ),
+        case(
+            "{{ range(3) + 1 }}",
+            "Template stopped: can't use `+` on a list and a number",
+            None,
+            1,
+            "range(3) + 1",
         ),
         case(
             "{{ css + 1 }}",
@@ -856,6 +900,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             "url(to=\"/about/\")",
         ),
         case(
+            "{{ range(stop=3) }}",
+            "Template stopped: `range` has no argument called `stop`",
+            None,
+            1,
+            "range(stop=3)",
+        ),
+        case(
             "{% macro m(a) %}{{ a }}{% endmacro %}{{ m(1, a=1) }}",
             "Template stopped: `a` is given to `m` twice",
             None,
@@ -889,6 +940,34 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             None,
             1,
             "page.title | indent(2, \"a\")",
+        ),
+        case(
+            "{{ range(\"a\") }}",
+            "Template stopped: `range` needs a whole number, not text",
+            None,
+            1,
+            "range(\"a\")",
+        ),
+        case(
+            "{{ page.title | split(\" \", \"a\") }}",
+            "Template stopped: `split` needs a whole number, not text",
+            None,
+            1,
+            "page.title | split(\" \", \"a\")",
+        ),
+        case(
+            "{{ 1 | int(base=\"a\") }}",
+            "Template stopped: `int` needs a whole number, not text",
+            None,
+            1,
+            "1 | int(base=\"a\")",
+        ),
+        case(
+            "{{ 1.5 | round(\"a\") }}",
+            "Template stopped: `round` needs a whole number, not text",
+            None,
+            1,
+            "1.5 | round(\"a\")",
         ),
         case(
             "{{ page.title | split(1) }}",
@@ -954,6 +1033,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             "5 | first",
         ),
         case(
+            "{{ 5 | last }}",
+            "Template stopped: `last` needs a list or text",
+            None,
+            1,
+            "5 | last",
+        ),
+        case(
             "{{ 5 | list }}",
             "Template stopped: `list` can't make a list of a number",
             None,
@@ -1010,6 +1096,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             "page.date | int",
         ),
         case(
+            "{{ [1] | float }}",
+            "Template stopped: `float` can't make a number of a list",
+            None,
+            1,
+            "[1] | float",
+        ),
+        case(
             "{{ [1] | batch(0) }}",
             "Template stopped: `batch` needs a count above 0",
             None,
@@ -1036,6 +1129,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             None,
             1,
             "[1] | map",
+        ),
+        case(
+            "{{ [1] | map(1) | list }}",
+            "Template stopped: `map` needs a filter's name in quotes",
+            None,
+            1,
+            "[1] | map(1)",
         ),
         case(
             "{{ [1] | select(1) | list }}",
@@ -1092,6 +1192,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             None,
             1,
             "\"%c\" | format(\"ab\")",
+        ),
+        case(
+            "{{ \"%c\" | format(1.5) }}",
+            "Template stopped: `%c` in `format` needs one character",
+            None,
+            1,
+            "\"%c\" | format(1.5)",
         ),
         case(
             "{{ range(100001) }}",
