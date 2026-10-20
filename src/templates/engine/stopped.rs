@@ -585,6 +585,7 @@ impl Read<'_, '_> {
             let mark = self.mark_at(offset.parse().ok()?, letter);
             return Some(match letter {
                 'c' => Stopped::FormatCharacter(mark),
+                _ if given == "float" => Stopped::FormatWhole(mark),
                 _ => Stopped::FormatNeeds {
                     mark,
                     given: shape_of(given, false)?,

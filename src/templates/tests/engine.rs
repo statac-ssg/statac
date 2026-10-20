@@ -1166,6 +1166,13 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
             "\"%d\" | format(\"a\")",
         ),
         case(
+            "{{ \"%d\" | format(1.5) }}",
+            "Template stopped: `%d` in `format` needs a whole number",
+            None,
+            1,
+            "\"%d\" | format(1.5)",
+        ),
+        case(
             "{{ \"%q\" | format(1) }}",
             "Template stopped: `format` has no `%q`",
             None,

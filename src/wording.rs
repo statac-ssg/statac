@@ -624,6 +624,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 Stopped::FormatCharacter(mark) => {
                     format!("`{mark}` in `format` needs one character")
                 }
+                Stopped::FormatWhole(mark) => format!("`{mark}` in `format` needs a whole number"),
                 Stopped::FormatHasNo(mark) => format!("`format` has no `{mark}`"),
                 Stopped::FormatTooFew => "`format` has more `%` marks than values".into(),
                 Stopped::FormatNamed(mark) => format!("`{mark}` in `format` needs named values"),
@@ -2758,6 +2759,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             | Stopped::CantNumber { .. }
             | Stopped::FormatNeeds { .. }
             | Stopped::FormatCharacter(_)
+            | Stopped::FormatWhole(_)
             | Stopped::FormatHasNo(_)
             | Stopped::FormatTooFew
             | Stopped::FormatNamed(_)

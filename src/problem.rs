@@ -1957,6 +1957,9 @@ pub enum Stopped {
         given: Shape,
     },
     FormatCharacter(String),
+    /// A `%` mark of `format`'s that writes a whole number, handed a
+    /// number with a fraction.
+    FormatWhole(String),
     /// A `%` mark `format` doesn't have.
     FormatHasNo(String),
     FormatTooFew,
