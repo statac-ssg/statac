@@ -322,9 +322,41 @@ async function meant(query, located, all, asked, looked) {
   return (await found(words, 0, false, false)).count ? words : null;
 }
 
+/**
+ * Where each word of `text` is, each run of Chinese, Japanese or Korean
+ * next to each other that together make a word in `marked` taken as that
+ * one word, the longest first: the browser may cut such text into smaller
+ * words than the index did.
+ */
+function wordsIn(text, marked) {
+  const found = spans(text);
+  const unspaced = ([start, end]) => [...text.slice(start, end)].every((c) => UNSPACED.test(c));
+  const words = [];
+  for (let at = 0; at < found.length; at += 1) {
+    let last = at;
+    if (unspaced(found[at])) {
+      for (let to = at + 1; to < found.length; to += 1) {
+        if (found[to][0] !== found[to - 1][1] || !unspaced(found[to])) {
+          break;
+        }
+        const run = text.slice(found[at][0], found[to][1]);
+        if ([...run].length > LONGEST) {
+          break;
+        }
+        if (marked.has(fold(run))) {
+          last = to;
+        }
+      }
+    }
+    words.push([found[at][0], found[last][1]]);
+    at = last;
+  }
+  return words;
+}
+
 /** The text around the first word in `text` that is `marked`, or its start, cut at words. */
 function excerpt(text, marked) {
-  const found = spans(text);
+  const found = wordsIn(text, marked);
   const isMarked = ([start, end]) => marked.has(fold(text.slice(start, end)));
   const first = Math.max(found.findIndex(isMarked), 0);
   if (!found.length) {

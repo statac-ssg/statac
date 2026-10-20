@@ -345,6 +345,35 @@ fn an_excerpt_is_cut_at_words_around_the_first_word_asked_for() {
 }
 
 #[test]
+fn an_excerpt_marks_a_word_the_text_was_cut_into_smaller_words_for() {
+    // `ビルド` cut as `ビル` and `ド`, as a browser may cut it.
+    let text = "静的サイトをビルドする。";
+    let at = |word: &str| {
+        let start = text.find(word).unwrap();
+        start..start + word.len()
+    };
+    let spans = ["静的", "サイト", "を", "ビル", "ド", "する"]
+        .map(at)
+        .to_vec();
+    let asked = ["ビルド", "ビル"];
+    let pieces = command::excerpt_of(text, spans.clone(), |word: &str| asked.contains(&word));
+    assert_eq!(
+        pieces,
+        [
+            ("静的サイトを".to_owned(), false),
+            ("ビルド".to_owned(), true),
+            ("する。".to_owned(), false),
+        ]
+    );
+    // Words of other scripts, or apart, are never joined.
+    let pieces = command::excerpt_of(text, spans, |word: &str| word == "サイトを");
+    assert!(
+        pieces.contains(&("サイトを".to_owned(), true)),
+        "{pieces:?}"
+    );
+}
+
+#[test]
 fn the_command_shows_each_page_found_once_at_its_best_part() {
     let other = "---\ntitle: Notes\n---\nZFS came up once.\n";
     let (_, root) = site(

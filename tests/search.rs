@@ -532,29 +532,8 @@ fn a_run_of_japanese_finds_the_same_pages_however_the_browser_cuts_it_into_words
     };
     for ((words, _), (rust, browser)) in asked.iter().zip(split(&rust).iter().zip(split(&browser)))
     {
-        assert_eq!(unmarked(rust), unmarked(&browser), "{words}");
+        assert_eq!(rust, &browser, "{words}");
     }
-}
-
-/// What one search found, as `statac_finds` writes it, with no word of an
-/// excerpt marked: where a browser cuts a page's text into words otherwise,
-/// it marks otherwise.
-fn unmarked(found: &str) -> String {
-    let mut found = split(found);
-    let results: Vec<String> = (split(&found[2]).iter())
-        .filter(|result| !result.is_empty())
-        .map(|result| {
-            let mut result = split(result);
-            let excerpt = result.pop().unwrap();
-            let text: Vec<String> = (split(&excerpt).iter())
-                .filter(|piece| !piece.is_empty())
-                .map(|piece| split(piece)[0].trim_matches('"').to_owned())
-                .collect();
-            format!("{},{}", result.join(","), text.concat())
-        })
-        .collect();
-    found[2] = results.join(";");
-    found.join(",")
 }
 
 #[test]

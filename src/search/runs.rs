@@ -8,7 +8,7 @@ use std::ops::Range;
 use super::fold;
 
 /// The most code points a word a run is read as has.
-const LONGEST: usize = 16;
+pub(super) const LONGEST: usize = 16;
 
 /// The run of words at `words` in `text`, each next to the one before,
 /// read as the fewest words that `listed` holds, folded, cut where the

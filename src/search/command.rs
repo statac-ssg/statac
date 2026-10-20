@@ -1,11 +1,12 @@
 //! `statac search`: what a reader of the site would find for some words.
 
 use std::collections::HashSet;
+use std::ops::Range;
 use std::path::PathBuf;
 
 use rayon::prelude::*;
 
-use super::{Asked, Index, Record, fold, records, spans};
+use super::{Asked, Index, Record, fold, records, runs, spans, unspaced};
 use crate::date::Date;
 use crate::problem::{Expected, Found, Kind, Problem, Severity};
 use crate::site::{Language, LanguageId, PageId};
@@ -204,7 +205,16 @@ fn shown(
 /// start, cut at words, in pieces saying which are marked. Lengths are
 /// counted in UTF-16 code units, as a browser counts them.
 pub fn excerpt(text: &str, marked: impl Fn(&str) -> bool) -> Vec<(String, bool)> {
-    let spans: Vec<_> = spans(text).collect();
+    excerpt_of(text, spans(text).collect(), marked)
+}
+
+/// [`excerpt`], the words of `text` being at `spans`.
+pub(super) fn excerpt_of(
+    text: &str,
+    spans: Vec<Range<usize>>,
+    marked: impl Fn(&str) -> bool,
+) -> Vec<(String, bool)> {
+    let spans = joined(text, spans, &marked);
     let matched = |span: &std::ops::Range<usize>| marked(&text[span.clone()]);
     let first = spans.iter().position(matched).unwrap_or(0);
     let Some(at) = spans.get(first) else {
@@ -247,4 +257,41 @@ pub fn excerpt(text: &str, marked: impl Fn(&str) -> bool) -> Vec<(String, bool)>
         pieces.push(("\u{2026}".to_owned(), false));
     }
     pieces
+}
+
+/// The words of `text` at `spans`, each run of Chinese, Japanese or
+/// Korean next to each other that together make a word `marked` takes
+/// taken as that one word, the longest first: a browser may cut such text
+/// into smaller words than the index did, and the excerpt it shows reads
+/// the text so too.
+fn joined(
+    text: &str,
+    spans: Vec<Range<usize>>,
+    marked: &impl Fn(&str) -> bool,
+) -> Vec<Range<usize>> {
+    let unspaced_at = |span: &Range<usize>| text[span.clone()].chars().all(unspaced);
+    let mut words = Vec::new();
+    let mut at = 0;
+    while at < spans.len() {
+        let mut last = at;
+        if unspaced_at(&spans[at]) {
+            let mut to = at + 1;
+            while to < spans.len()
+                && spans[to].start == spans[to - 1].end
+                && unspaced_at(&spans[to])
+            {
+                let run = &text[spans[at].start..spans[to].end];
+                if run.chars().nth(runs::LONGEST).is_some() {
+                    break;
+                }
+                if marked(run) {
+                    last = to;
+                }
+                to += 1;
+            }
+        }
+        words.push(spans[at].start..spans[last].end);
+        at = last + 1;
+    }
+    words
 }
