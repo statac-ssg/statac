@@ -75,6 +75,8 @@ pub struct StaticFile {
     /// Its path under `static/`, which is its path in the published site.
     pub name: String,
     path: PathBuf,
+    /// Where it really is, as [`walk`] gives it.
+    at: String,
 }
 
 impl StaticFile {
@@ -106,6 +108,8 @@ pub struct Assets {
     unwritten: BTreeSet<String>,
     statics: Vec<StaticFile>,
     static_names: HashSet<String>,
+    /// The site's real path, which each file in `static/` is copied from.
+    real: PathBuf,
     /// The warning for a rule that narrows pictures and keeps their height,
     /// true only of a site whose pages show a picture with both.
     narrowed: Option<Problem>,
@@ -130,14 +134,14 @@ pub fn gather(
     let real = fs::canonicalize(site).unwrap_or_else(|_| site.to_path_buf());
     let walked = walk(site, &real, ASSETS, false, &mut problems);
     // Sass is read as its author wrote it, the parts of a stylesheet too.
-    let written: Vec<(String, PathBuf)> = walked
+    let written: Vec<(String, String)> = walked
         .iter()
         .filter(|(rel, _)| split_extension(rel).1.eq_ignore_ascii_case("scss"))
         .cloned()
         .collect();
     let wanted: Vec<Wanted> = walked
         .into_iter()
-        .filter_map(|(rel, path)| Wanted::new(rel, path))
+        .filter_map(|(rel, at)| Wanted::new(&site.join(ASSETS), rel, at))
         .collect();
     let warnings = std::sync::Mutex::new(Vec::new());
     let read: Vec<Result<Vec<u8>, Failure>> = wanted
@@ -154,7 +158,7 @@ pub fn gather(
                     Err(error) => Err(Failure::Sass(error, compiled.refused)),
                 }
             }
-            false => fs::read(&wanted.path).map_err(Failure::Io),
+            false => read_walked(&real, &wanted.at).map_err(Failure::Io),
         })
         .collect();
 
@@ -176,7 +180,7 @@ pub fn gather(
         problems.push(sass::warned(loc, message, site, sources));
     }
 
-    let narrowed = narrowed(&wanted, &read, &written, sources);
+    let narrowed = narrowed(&wanted, &read, &real, &written, sources);
 
     let mut files = Vec::new();
     let mut claimed: HashMap<String, String> = HashMap::new();
@@ -253,7 +257,11 @@ pub fn gather(
 
     let statics: Vec<StaticFile> = walk(site, &real, STATIC, true, &mut problems)
         .into_iter()
-        .map(|(name, path)| StaticFile { name, path })
+        .map(|(name, at)| StaticFile {
+            path: platform::join(&site.join(STATIC), &name),
+            name,
+            at,
+        })
         .collect();
     let outputs = claims(&assets, &statics);
     for (rel, source) in &outputs {
@@ -278,6 +286,7 @@ pub fn gather(
         unwritten,
         statics,
         static_names,
+        real,
         narrowed,
     };
     (gathered, problems)
@@ -286,11 +295,13 @@ pub fn gather(
 /// The warning for the first rule in the site's stylesheets that gives
 /// `img` a width, where no rule says what a picture's height is. `read` is
 /// what became of each of `wanted`, and `written` the Sass files as their
-/// author wrote them.
+/// author wrote them, as [`walk`] found them under the site's real path
+/// `real`.
 fn narrowed(
     wanted: &[Wanted],
     read: &[Result<Vec<u8>, Failure>],
-    written: &[(String, PathBuf)],
+    real: &Path,
+    written: &[(String, String)],
     sources: &mut Sources,
 ) -> Option<Problem> {
     let mut compiled_narrows = false;
@@ -317,8 +328,8 @@ fn narrowed(
             false => shown.push((wanted.source.clone(), Cow::Borrowed(css), false)),
         }
     }
-    for (rel, path) in written {
-        if let Ok(text) = fs::read_to_string(path) {
+    for (rel, at) in written {
+        if let Ok(text) = read_walked_text(real, at) {
             shown.push((format!("{ASSETS}/{rel}"), Cow::Owned(text), true));
         }
     }
@@ -470,7 +481,9 @@ impl Assets {
             .filter_map(|asset| staging.write(&asset.published, &asset.bytes).err());
         let copied = self.statics.par_iter().filter_map(|file| {
             let shown = format!("{STATIC}/{}", file.name);
-            staging.copy(&file.path, &shown, &file.name).err()
+            staging
+                .copy_in(&self.real, &file.at, &shown, &file.name)
+                .err()
         });
         written.chain(copied).collect()
     }
@@ -556,14 +569,17 @@ enum Found<'a> {
 struct Wanted {
     name: String,
     source: String,
+    /// Its path in the site's folder, links and all, as Sass reads it.
     path: PathBuf,
+    /// Where it really is, as [`walk`] gives it.
+    at: String,
     sass: bool,
 }
 
 impl Wanted {
-    /// `None` for a Sass partial, which is only ever part of another
-    /// stylesheet.
-    fn new(rel: String, path: PathBuf) -> Option<Wanted> {
+    /// The file at `rel` in the folder `assets`, really at `at`. `None`
+    /// for a Sass partial, which is only ever part of another stylesheet.
+    fn new(assets: &Path, rel: String, at: String) -> Option<Wanted> {
         let (stem, extension) = split_extension(&rel);
         let sass = matches!(extension.to_ascii_lowercase().as_str(), "scss" | "sass");
         let file_name = rel.rsplit('/').next().unwrap_or(&rel);
@@ -576,7 +592,8 @@ impl Wanted {
                 false => rel.clone(),
             },
             source: format!("{ASSETS}/{rel}"),
-            path,
+            path: platform::join(assets, &rel),
+            at,
             sass,
         })
     }
@@ -826,17 +843,20 @@ pub fn same_address(outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
 }
 
 /// Every file under the site's folder `shown`, by its path under it with
-/// forward slashes, sorted. Hidden names are passed over unless `hidden`
-/// asks for them. The folder itself must be inside the site, whose real
-/// path is `real`, and a link inside it is followed only where it leads
-/// somewhere inside the folder.
+/// forward slashes, sorted, each with where it really is: its path past
+/// every link under the site's real path `real`. Hidden names are passed
+/// over unless `hidden` asks for them. The folder itself must be inside
+/// the site, and a link inside it is followed only where it leads
+/// somewhere inside the folder. Read where it really is, as
+/// [`read_walked`] reads it, a file is reached through no link, so a link
+/// put in its place or a folder's on the way after the walk is refused.
 pub(crate) fn walk(
     site: &Path,
     real: &Path,
     shown: &str,
     hidden: bool,
     problems: &mut Vec<Problem>,
-) -> Vec<(String, PathBuf)> {
+) -> Vec<(String, String)> {
     let mut found = Vec::new();
     let mut folders = vec![(String::new(), site.join(shown))];
     // A link back up the tree would otherwise be walked for ever.
@@ -865,19 +885,19 @@ pub(crate) fn walk(
         })
     };
     while let Some((rel, folder)) = folders.pop() {
-        match fs::canonicalize(&folder) {
+        let real_folder = match fs::canonicalize(&folder) {
             Ok(target) if !target.starts_with(&within) => {
                 problems.push(outside(&rel, &target));
                 continue;
             }
             Ok(target) if !seen.insert(target.clone()) => continue,
-            Ok(_) => {}
+            Ok(target) => target,
             Err(error) if rel.is_empty() && error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => {
                 problems.push(cant_read(&rel, &error));
                 continue;
             }
-        }
+        };
         let entries = match fs::read_dir(&folder).and_then(|entries| entries.collect()) {
             Ok(entries) => entries,
             Err(error) => {
@@ -913,9 +933,9 @@ pub(crate) fn walk(
             let child = joined(name);
             let path = entry.path();
             let link = entry.file_type().is_ok_and(|kind| kind.is_symlink());
-            if link {
-                match fs::canonicalize(&path) {
-                    Ok(target) if target.starts_with(&within) => {}
+            let target = match link {
+                true => match fs::canonicalize(&path) {
+                    Ok(target) if target.starts_with(&within) => target,
                     Ok(target) => {
                         problems.push(outside(&child, &target));
                         continue;
@@ -924,17 +944,40 @@ pub(crate) fn walk(
                         problems.push(cant_read(&child, &error));
                         continue;
                     }
-                }
-            }
+                },
+                false => real_folder.join(name),
+            };
             match found_as {
                 Ok(metadata) if metadata.is_dir() => folders.push((child, path)),
-                Ok(_) => found.push((child, path)),
+                Ok(_) => match platform::slashed(target.strip_prefix(real).unwrap_or(&target)) {
+                    Ok(at) => found.push((child, at)),
+                    // Only through a link: the walk refuses such a name
+                    // where it meets one.
+                    Err(lossy) => problems.push(Problem::nowhere(Kind::UnwritableName {
+                        path: lossy,
+                        why: Unwritable::NotText,
+                    })),
+                },
                 Err(error) => problems.push(cant_read(&child, &error)),
             }
         }
     }
     found.sort();
     found
+}
+
+/// The bytes of the file [`walk`] found at `at`, under the site's real
+/// path `real`.
+pub(crate) fn read_walked(real: &Path, at: &str) -> io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    io::Read::read_to_end(&mut platform::open_file(real, at)?, &mut bytes)?;
+    Ok(bytes)
+}
+
+/// The text of the file [`walk`] found at `at`, under the site's real path
+/// `real`.
+pub(crate) fn read_walked_text(real: &Path, at: &str) -> io::Result<String> {
+    io::read_to_string(platform::open_file(real, at)?)
 }
 
 /// `name` without and with its file's extension: `css/site.scss` is

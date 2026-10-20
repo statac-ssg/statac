@@ -237,7 +237,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Cards, Vec<Problem>) {
         .iter()
         .filter_map(|(rel, _)| rel.strip_prefix("og/"))
         .collect();
-    for (rel, path) in &found {
+    for (rel, at) in &found {
         let Some(name) = description(rel) else {
             continue;
         };
@@ -248,7 +248,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Cards, Vec<Problem>) {
             source: None,
             card: None,
         };
-        match std::fs::read_to_string(path) {
+        match crate::assets::read_walked_text(&real, at) {
             Ok(text) => {
                 let source = sources.add(&shown, text);
                 let mut found = Vec::new();

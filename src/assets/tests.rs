@@ -1824,3 +1824,82 @@ fn a_folder_that_is_itself_a_link_out_is_refused() {
     assert_eq!(reached_out(&problems), [&link("static", "static/")]);
     assert!(assets.statics().is_empty());
 }
+
+#[cfg(unix)]
+#[test]
+fn a_link_pointed_elsewhere_after_the_walk_is_read_where_it_led() {
+    use std::os::unix::fs::symlink;
+    let outside = Outside::new("repointed", "private\n");
+    let site = Site::new("link-repointed", &[("static/notes/a.txt", "a\n")]);
+    symlink(
+        site.0.join("static/notes/a.txt"),
+        site.0.join("static/a.txt"),
+    )
+    .unwrap();
+    let (assets, problems, _) = site.gather("");
+    assert_eq!(problems, []);
+    fs::remove_file(site.0.join("static/a.txt")).unwrap();
+    symlink(&outside.0, site.0.join("static/a.txt")).unwrap();
+    let out = site.0.join("out");
+    let staging = crate::publish::begin(&site.0, &out).unwrap();
+    assert_eq!(assets.publish(&staging), []);
+    staging.finish().unwrap();
+    assert_eq!(fs::read_to_string(out.join("a.txt")).unwrap(), "a\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_put_in_place_of_a_file_after_the_walk_is_refused() {
+    use std::os::unix::fs::symlink;
+    let outside = Outside::new("swapped", "private\n");
+    let site = Site::new(
+        "link-swapped",
+        &[("assets/site.css", "body {}\n"), ("static/a.txt", "a\n")],
+    );
+    let real = fs::canonicalize(&site.0).unwrap();
+    let walked = walk(&site.0, &real, ASSETS, false, &mut Vec::new());
+    let (assets, problems, _) = site.gather("");
+    assert_eq!(problems, []);
+    for file in ["assets/site.css", "static/a.txt"] {
+        fs::remove_file(site.0.join(file)).unwrap();
+        symlink(&outside.0, site.0.join(file)).unwrap();
+    }
+    let [(_, at)] = &walked[..] else {
+        panic!("{walked:?}")
+    };
+    let refused = read_walked(&real, at).unwrap_err();
+    assert_eq!(refused.to_string(), "it is a link");
+    let out = site.0.join("out");
+    let staging = crate::publish::begin(&site.0, &out).unwrap();
+    assert_eq!(
+        assets.publish(&staging),
+        [Problem::nowhere(Kind::CantRead {
+            path: "static/a.txt".into(),
+            reason: "it is a link".into(),
+        })]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn sass_reads_a_partial_through_a_link_within_assets() {
+    use std::os::unix::fs::symlink;
+    let site = Site::new(
+        "sass-link",
+        &[
+            (
+                "assets/site.scss",
+                "@use 'colours';\nbody { color: colours.$ink; }\n",
+            ),
+            ("assets/parts/_colours.scss", "$ink: #333;\n"),
+        ],
+    );
+    symlink(
+        site.0.join("assets/parts/_colours.scss"),
+        site.0.join("assets/_colours.scss"),
+    )
+    .unwrap();
+    let (assets, problems, _) = site.gather("");
+    assert_eq!(problems, []);
+    assert!(text(assets.get("site.css").unwrap()).contains("#333"));
+}

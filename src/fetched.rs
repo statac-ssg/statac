@@ -267,16 +267,17 @@ pub fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>) {
     let mut problems = Vec::new();
     let real = std::fs::canonicalize(site).unwrap_or_else(|_| site.to_path_buf());
     let mut fetched = Fetched::default();
-    for (path, file) in crate::assets::walk(site, &real, FOLDER, false, &mut problems) {
+    for (path, at) in crate::assets::walk(site, &real, FOLDER, false, &mut problems) {
         let shown = match path.as_str() {
             RECORD => record_shown(),
             refused::NAME => refused::shown(),
             _ => {
+                let file = crate::platform::join(&site.join(FOLDER), &path);
                 fetched.files.push((path, file));
                 continue;
             }
         };
-        let text = match std::fs::read_to_string(&file) {
+        let text = match crate::assets::read_walked_text(&real, &at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {

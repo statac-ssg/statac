@@ -130,7 +130,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Data, Vec<Problem>) {
     let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
     let found = crate::assets::walk(root, &real, FOLDER, false, &mut problems);
     let mut told = Vec::new();
-    for (rel, path) in found {
+    for (rel, at) in found {
         let shown = format!("{FOLDER}/{rel}");
         let (folders, file) = match rel.rsplit_once('/') {
             Some((folders, file)) => (folders.split('/').collect(), file),
@@ -148,7 +148,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Data, Vec<Problem>) {
             problems.push(Problem::nowhere(Kind::NotData { path: shown }));
             continue;
         }
-        let text = match std::fs::read_to_string(&path) {
+        let text = match crate::assets::read_walked_text(&real, &at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {

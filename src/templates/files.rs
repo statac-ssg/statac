@@ -134,7 +134,7 @@ pub(super) fn gather(root: &Path, sources: &mut Sources, problems: &mut Vec<Prob
     let mut files = Vec::new();
     for folder in [TEMPLATES, SNIPPETS] {
         let found = crate::assets::walk(root, &real, folder, false, problems);
-        for (rel, path) in found {
+        for (rel, at) in found {
             // A card's description and the files in `templates/og/` are
             // kept in `templates/`, and none of them is a template.
             if folder == TEMPLATES && crate::cards::owns(&rel) {
@@ -163,7 +163,7 @@ pub(super) fn gather(root: &Path, sources: &mut Sources, problems: &mut Vec<Prob
                 }
             };
             let shown = format!("{folder}/{rel}");
-            match std::fs::read_to_string(&path) {
+            match crate::assets::read_walked_text(&real, &at) {
                 Ok(text) => files.push(File {
                     name,
                     source: sources.add(shown, text),

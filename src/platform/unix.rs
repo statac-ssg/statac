@@ -202,6 +202,23 @@ pub(super) fn make_file(root: &Path, rel: &str, bytes: &[u8]) -> io::Result<()> 
 /// [`super::read_file`], by the folder [`holder`] opens.
 pub(super) fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
     use std::io::Read;
+    let Some(mut file) = opened(root, rel)? else {
+        return Ok(None);
+    };
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    Ok(Some(bytes))
+}
+
+/// [`super::open_file`], by the folder [`holder`] opens.
+pub(super) fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
+    opened(root, rel)?.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+}
+
+/// The file `rel` under `root` opened to read, by name in the folder
+/// [`holder`] opens and never through a link, or none where nothing is
+/// there.
+fn opened(root: &Path, rel: &str) -> io::Result<Option<std::fs::File>> {
     let Some((at, name)) = holder(root, rel)? else {
         return Ok(None);
     };
@@ -217,9 +234,7 @@ pub(super) fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
     if FileType::from_raw_mode(found.st_mode) != FileType::RegularFile {
         return Err(io::Error::other("it is not a file"));
     }
-    let mut bytes = Vec::new();
-    std::fs::File::from(file).read_to_end(&mut bytes)?;
-    Ok(Some(bytes))
+    Ok(Some(std::fs::File::from(file)))
 }
 
 /// [`super::lock_file`], by name in the folder, opened first and never
@@ -466,6 +481,23 @@ mod tests {
         assert!(remove_folder(&link).is_err());
         assert!(fs::symlink_metadata(&link).unwrap().is_symlink());
         assert_eq!(names(&kept), ["drafts", "notes.txt"]);
+    }
+
+    #[test]
+    fn a_file_is_never_opened_to_read_through_a_link() {
+        let scratch = Scratch::new("open-link");
+        let kept = kept(&scratch);
+        let folder = scratch.0.join("folder");
+        fs::create_dir(&folder).unwrap();
+        fs::write(folder.join("a.txt"), "a").unwrap();
+        symlink(kept.join("notes.txt"), folder.join("notes.txt")).unwrap();
+        symlink(&kept, folder.join("linked")).unwrap();
+        let read = |rel: &str| io::read_to_string(open_file(&folder, rel)?);
+        assert_eq!(read("a.txt").unwrap(), "a");
+        for rel in ["notes.txt", "linked/notes.txt"] {
+            assert_eq!(read(rel).unwrap_err().to_string(), "it is a link", "{rel}");
+        }
+        assert_eq!(read("missing").unwrap_err().kind(), io::ErrorKind::NotFound);
     }
 
     #[test]

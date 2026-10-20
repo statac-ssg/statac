@@ -70,13 +70,18 @@ impl Index {
     /// What the last build kept; nothing where it kept nothing that reads.
     pub fn load(site: &Path) -> Index {
         let mut index = Index::default();
-        let Ok(file) = super::kept_folder(site).map(|folder| folder.join("index")) else {
+        // Asked what it is through the handle it is read by, so no link
+        // put in its place, or in place of a folder on the way, is read.
+        let Ok(file) = crate::platform::open_file(&site.join(super::KEPT), "pictures/index") else {
             return index;
         };
-        if !super::is_file_itself(&file) {
+        if !file
+            .metadata()
+            .is_ok_and(|found| crate::platform::named_once(&found))
+        {
             return index;
         }
-        let Ok(text) = fs::read_to_string(file) else {
+        let Ok(text) = std::io::read_to_string(file) else {
             return index;
         };
         let mut lines = text.lines();
@@ -400,6 +405,29 @@ mod tests {
             assert!(!line.contains('\n'), "{line}");
             assert_eq!(entry_of(&line), Some((key, entry)), "{line}");
         }
+    }
+
+    #[test]
+    fn only_an_index_kept_as_a_file_itself_is_read() {
+        let site = std::env::temp_dir().join(format!("statac-index-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&site);
+        fs::create_dir_all(&site).unwrap();
+        let mut index = Index::default();
+        index.insert(Root::Static, "photo-1.jpg", entry(None));
+        index.changed = true;
+        index.save(&site).unwrap();
+        assert_eq!(Index::load(&site).len(), 1);
+        let kept = site.join(super::super::KEPT).join("pictures");
+        fs::hard_link(kept.join("index"), site.join("index")).unwrap();
+        assert_eq!(Index::load(&site).len(), usize::from(!cfg!(unix)));
+        fs::remove_file(site.join("index")).unwrap();
+        #[cfg(unix)]
+        {
+            fs::rename(&kept, site.join("pictures")).unwrap();
+            std::os::unix::fs::symlink(site.join("pictures"), &kept).unwrap();
+            assert_eq!(Index::load(&site).len(), 0);
+        }
+        let _ = fs::remove_dir_all(&site);
     }
 
     #[test]

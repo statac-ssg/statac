@@ -446,6 +446,23 @@ pub fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
     }
 }
 
+/// The file `rel`, a path with forward slashes under the folder `root`,
+/// opened to read, refused as [`read_file`] refuses. Nothing there is an
+/// error. On Unix the file is opened by name in the folder above it,
+/// already open, and never through a link, so a link put in place of the
+/// file or a folder on the way after either was looked at is refused.
+pub fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
+    #[cfg(unix)]
+    {
+        unix::open_file(root, rel)
+    }
+    #[cfg(not(unix))]
+    {
+        no_link_to(root, rel)?;
+        std::fs::File::open(join(root, rel))
+    }
+}
+
 /// Opens the file `name` in the folder `folder` for a lock to be taken on
 /// it, making it where nothing has the name. Only a file itself is
 /// opened, never through a link, and `folder` must be no link. On Unix
@@ -923,6 +940,22 @@ mod tests {
         std::fs::hard_link(root.join("a.txt"), root.join("b.txt")).unwrap();
         let twice = named_once(&std::fs::metadata(root.join("a.txt")).unwrap());
         assert_eq!(twice, !cfg!(unix));
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_file_opens_to_read_by_its_path_under_a_folder() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-open-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("a")).unwrap();
+        std::fs::write(root.join("a").join("b.txt"), "b").unwrap();
+        let opened = open_file(&root, "a/b.txt").unwrap();
+        assert_eq!(io::read_to_string(opened).unwrap(), "b");
+        let missing = open_file(&root, "a/c.txt").unwrap_err();
+        assert_eq!(missing.kind(), io::ErrorKind::NotFound);
+        // A folder is no file to read.
+        assert!(open_file(&root, "a").is_err());
         remove_folder(&root).unwrap();
     }
 

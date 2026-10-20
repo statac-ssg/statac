@@ -151,9 +151,20 @@ impl grass::Fs for Confined {
         self.inside(path).is_some_and(|real| real.is_file())
     }
 
+    /// Read at its real path through no link, so a link put in place of
+    /// the file or a folder on the way since it was asked about is refused.
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-        match self.inside(path) {
-            Some(real) => fs::read(real),
+        let at = self.inside(path).and_then(|real| {
+            let within = real.strip_prefix(&self.real).ok()?;
+            crate::platform::slashed(within).ok()
+        });
+        match at {
+            Some(at) => {
+                let mut bytes = Vec::new();
+                let mut file = crate::platform::open_file(&self.real, &at)?;
+                io::Read::read_to_end(&mut file, &mut bytes)?;
+                Ok(bytes)
+            }
             None => Err(io::ErrorKind::NotFound.into()),
         }
     }

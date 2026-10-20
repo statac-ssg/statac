@@ -955,13 +955,30 @@ impl Staging {
 
     /// Copies the file at `from` to `rel`; `shown` names `from` in a message.
     pub fn copy(&self, from: &Path, shown: &str, rel: &str) -> Result<(), Problem> {
+        self.copy_opened(fs::File::open(from), shown, rel)
+    }
+
+    /// Copies the file `from`, a path with forward slashes under the folder
+    /// `root`, to `rel`, opened as [`platform::open_file`] opens it; `shown`
+    /// names `from` in a message.
+    pub fn copy_in(&self, root: &Path, from: &str, shown: &str, rel: &str) -> Result<(), Problem> {
+        self.copy_opened(platform::open_file(root, from), shown, rel)
+    }
+
+    /// Copies `source`, the file `shown` names, to `rel`.
+    fn copy_opened(
+        &self,
+        source: io::Result<fs::File>,
+        shown: &str,
+        rel: &str,
+    ) -> Result<(), Problem> {
         let cant_read = |error: &io::Error| {
             Problem::nowhere(Kind::CantRead {
                 path: shown.into(),
                 reason: system_reason(error),
             })
         };
-        let mut source = fs::File::open(from).map_err(|error| cant_read(&error))?;
+        let mut source = source.map_err(|error| cant_read(&error))?;
         let found = self.notes.as_ref().and_then(|_| {
             let found = source.metadata().ok()?;
             Stamp::of(&found)

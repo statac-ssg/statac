@@ -193,8 +193,10 @@ impl Language {
 /// The files in a site's `languages/` folder.
 #[derive(Clone, Default, Debug)]
 pub struct Languages {
-    /// Each file's name, and where it is.
-    files: Vec<(String, PathBuf)>,
+    /// Each file's name, and where it really is under `real`.
+    files: Vec<(String, String)>,
+    /// The site's real path.
+    real: PathBuf,
 }
 
 impl Languages {
@@ -202,13 +204,13 @@ impl Languages {
     /// only where it stays inside the site.
     pub fn find(root: &Path, problems: &mut Vec<Problem>) -> Languages {
         let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
-        let mut files: Vec<(String, PathBuf)> =
+        let mut files: Vec<(String, String)> =
             crate::assets::walk(root, &real, FOLDER, false, problems)
                 .into_iter()
                 .filter(|(rel, _)| !rel.contains('/') && is_yaml(rel))
                 .collect();
         files.sort();
-        Languages { files }
+        Languages { files, real }
     }
 
     /// The language a site names by `tag`, its file read into `sources`.
@@ -224,9 +226,9 @@ impl Languages {
         };
         for wanted in broader(tag.value) {
             let found = match self.file(wanted) {
-                Some((name, path)) => {
+                Some((name, at)) => {
                     let shown = format!("{FOLDER}/{name}");
-                    match std::fs::read_to_string(path) {
+                    match crate::assets::read_walked_text(&self.real, at) {
                         Ok(text) => {
                             let id = sources.add(shown.clone(), text);
                             let statacs = broader(wanted)
@@ -271,14 +273,14 @@ impl Languages {
     }
 
     /// The file named `<tag>.yaml`, ignoring case, its own spelling first.
-    fn file(&self, tag: &str) -> Option<(&str, &Path)> {
+    fn file(&self, tag: &str) -> Option<(&str, &str)> {
         let wanted = format!("{tag}.yaml");
-        let alike = |(name, _): &&(String, PathBuf)| name.eq_ignore_ascii_case(&wanted);
+        let alike = |(name, _): &&(String, String)| name.eq_ignore_ascii_case(&wanted);
         self.files
             .iter()
             .find(|(name, _)| *name == wanted)
             .or_else(|| self.files.iter().find(alike))
-            .map(|(name, path)| (name.as_str(), path.as_path()))
+            .map(|(name, at)| (name.as_str(), at.as_str()))
     }
 }
 
