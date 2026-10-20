@@ -1126,8 +1126,11 @@ fn opens_as_block(html: &str) -> bool {
         && !PHRASING.contains(&name.as_str())
 }
 
+/// Whether HTML is one comment, closed, and nothing after it.
 fn is_comment(html: &str) -> bool {
-    html.len() >= "<!-->".len() && html.starts_with("<!--") && html.ends_with("-->")
+    html.starts_with("<!--")
+        && (html.ends_with("-->") || html.ends_with("--!>"))
+        && crate::html::comment_end(html.as_bytes(), "<!--".len()) == html.len()
 }
 
 /// Whether a `<pre>` is still open once `line` has been written.
@@ -1193,68 +1196,16 @@ fn without_comments(html: &str) -> Vec<(String, bool)> {
     lines
 }
 
-/// Every comment in a stretch of HTML, `<!--` to the first `-->`, as a
-/// browser reads one: not inside a tag, nor inside an element whose
-/// contents are raw text. One that never closes is left as written.
-pub(super) fn comments_in(html: &str) -> Vec<std::ops::Range<usize>> {
-    const RAW: [&str; 4] = ["script", "style", "textarea", "title"];
-    let lowered = html.to_ascii_lowercase();
-    let b = lowered.as_bytes();
-    let mut found = Vec::new();
-    let mut from = 0;
-    while let Some(at) = lowered[from..].find('<') {
-        let open = from + at;
-        let rest = &lowered[open + 1..];
-        if rest.starts_with("!--") {
-            // `<!-->` and `<!--->` close as they open.
-            let Some(close) = lowered[open + 2..].find("-->") else {
-                break;
-            };
-            let end = open + 2 + close + "-->".len();
-            found.push(open..end);
-            from = end;
-            continue;
-        }
-        if !rest.starts_with(|c: char| c.is_ascii_alphabetic()) {
-            from = open + 1;
-            continue;
-        }
-        let Some(closed) = tag_end(b, open + 1) else {
-            break;
-        };
-        from = closed;
-        let name = &rest[..rest
-            .find(|c: char| !c.is_ascii_alphanumeric())
-            .unwrap_or(rest.len())];
-        if RAW.contains(&name) {
-            match lowered[from..].find(&format!("</{name}")) {
-                Some(at) => from += at + "</".len(),
-                None => break,
-            }
-        }
-    }
-    found
-}
-
-/// Just past the `>` closing the tag whose name starts at `at`, quoted
-/// attribute values stepped over whole.
-fn tag_end(html: &[u8], mut at: usize) -> Option<usize> {
-    while let Some(&byte) = html.get(at) {
-        at += 1;
-        match byte {
-            b'>' => return Some(at),
-            b'=' => {
-                while html.get(at).is_some_and(u8::is_ascii_whitespace) {
-                    at += 1;
-                }
-                if let Some(&quote @ (b'"' | b'\'')) = html.get(at) {
-                    at += 1 + html[at + 1..].iter().position(|b| *b == quote)? + 1;
-                }
-            }
-            _ => {}
-        }
-    }
-    None
+/// Every comment in a stretch of HTML, as a browser reads one: not inside
+/// a tag, nor inside an element whose contents are raw text. One that
+/// never closes is left as written.
+pub(super) fn comments_in(html: &str) -> Vec<Range<usize>> {
+    crate::html::markup(html)
+        .filter(|(_, piece)| matches!(piece, crate::html::Markup::Other))
+        .map(|(at, _)| at)
+        .filter(|at| html[at.clone()].starts_with("<!--"))
+        .take_while(|at| is_comment(&html[at.clone()]))
+        .collect()
 }
 
 /// The four characters that would otherwise be read as HTML.

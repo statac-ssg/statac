@@ -1537,6 +1537,23 @@ fn documents_are_written_as_expected() {
     }
 }
 
+/// A comment in HTML ends where a browser ends it, and one written in the
+/// text of an element such as `<textarea>` is that text.
+#[test]
+fn a_comment_in_html_ends_where_a_browser_ends_it() {
+    for opened in ["<!-- a --!>", "<!-->", "<!--->"] {
+        let text = format!("<div>\n{opened}\n<p>Shown</p>\n<!-- b -->\n</div>\n");
+        assert_eq!(html_of(&text), "<div>\n<p>Shown</p>\n</div>", "{opened}");
+    }
+    let text = "One <!-- a --!> two -->.\n";
+    assert_eq!(html_of(text), "<p>One <!-- a --!> two -->.</p>");
+    for name in crate::html::RAW_TEXT.iter().chain(&["script"]) {
+        let raw = format!("<{name}><!-- a --></{name}>");
+        let text = format!("<div>\n{raw}\n</div>\n");
+        assert_eq!(html_of(&text), format!("<div>\n{raw}\n</div>"), "{name}");
+    }
+}
+
 #[test]
 fn footnotes_are_numbered_by_first_use_and_gathered_at_the_foot() {
     let (_, document) = read_text(&fixture("documents/footnotes.md"));
