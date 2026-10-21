@@ -2,6 +2,24 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.6.2 - 2026-10-21
+
+### New
+
+- A sharing card's text can be drawn in fonts of its own, such as
+  `title.font`, written as the card's `font` is: one file or a list,
+  tried in order. A text without one is drawn in the card's fonts, and
+  a card whose texts name none is drawn as before.
+
+### Fixed
+
+- Search reads a word with a typographic apostrophe, as Statac's
+  typography writes it in prose, as the same word typed with a plain
+  one: `doesn't` finds `doesn’t`, and `file` finds `file’s`.
+- While a reader types, the last word ranks pages as one word across
+  the longer words it starts, so `templ` puts a page titled Templates
+  first. A rare longer word it starts put the pages holding it first.
+
 ## 0.6.1 - 2026-10-21
 
 ### Fixed
