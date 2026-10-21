@@ -239,6 +239,38 @@ fn two_files_differing_in_capitals_are_told_once_photographs_or_not() {
 }
 
 #[test]
+fn build_times_the_copies_it_makes_of_each_photograph() {
+    let site = Site::new("timed");
+    site.write(
+        "content/post-1/index.md",
+        "---\ntitle: Post 1\n---\n![A photograph](photo-1.jpg)\n",
+    );
+    site.put("content/post-1/photo-1.jpg", &jpeg(900, 600));
+    let timed = || {
+        let (said, code) = site.run(&["build", "--timings", "--today=2026-10-04"]);
+        assert_eq!(code, 0, "{said}");
+        said
+    };
+    let said = timed();
+    let stage = said
+        .lines()
+        .find(|line| line.starts_with("  Making photograph copies"));
+    assert!(stage.is_some(), "{said}");
+    let (_, slowest) = said
+        .split_once("\nSlowest photographs (copies made this build only):\n")
+        .expect(&said);
+    let row = slowest.lines().next().unwrap();
+    assert!(row.starts_with("  content/post-1/photo-1.jpg  "), "{said}");
+    assert!(
+        row.ends_with(" ms  6 copies") || row.ends_with(" s  6 copies"),
+        "{said}"
+    );
+    // Copies kept from the build before took nothing to make.
+    let said = timed();
+    assert!(!said.contains("Slowest photographs"), "{said}");
+}
+
+#[test]
 fn a_photograph_beside_a_page_in_its_own_folder_is_published_as_copies() {
     let site = Site::new("own-folder");
     site.write(

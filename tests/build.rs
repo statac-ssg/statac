@@ -605,6 +605,128 @@ fn check_shows_every_problem_as_json_with_where_it_starts_and_ends_and_nothing_e
     );
 }
 
+/// What `build --timings` said after the build's own lines: each
+/// section's heading and rows, every time and share left out, as they
+/// differ from run to run.
+fn timings(said: &str) -> Vec<(String, Vec<String>)> {
+    let from = said.find("\n\nWhere the time went:").expect(said);
+    let is_time = |cell: &str| {
+        let number = cell.strip_suffix(" ms").or_else(|| cell.strip_suffix(" s"));
+        number.is_some_and(|n| n.parse::<f64>().is_ok())
+    };
+    let sections = said[from + 2..].trim_end().split("\n\n");
+    let sections = sections.map(|section| {
+        let mut lines = section.lines();
+        let heading = untimed(lines.next().unwrap());
+        let rows = lines.map(|line| {
+            let cells = line.split("  ").map(str::trim);
+            let cells = cells.filter(|cell| !cell.is_empty() && !cell.ends_with('%'));
+            cells
+                .filter(|cell| !is_time(cell))
+                .collect::<Vec<_>>()
+                .join(" | ")
+        });
+        (heading, rows.collect())
+    });
+    sections.collect()
+}
+
+/// `line` with each number, and the unit of each time, as `#`.
+fn untimed(line: &str) -> String {
+    let mut words = line.split(' ').peekable();
+    let mut out = Vec::new();
+    while let Some(word) = words.next() {
+        if word.parse::<f64>().is_err() {
+            out.push(word.to_owned());
+            continue;
+        }
+        let unit = words
+            .peek()
+            .map(|next| next.trim_end_matches([',', ':', ')']));
+        match unit {
+            Some("s" | "ms") => {
+                let unit = words.next().unwrap();
+                out.push(format!("#{}", unit.trim_start_matches(['m', 's'])));
+            }
+            _ => out.push("#".into()),
+        }
+    }
+    out.join(" ")
+}
+
+#[test]
+fn build_shows_where_its_time_went_when_asked() {
+    let site = Site::new("timings");
+    site.write("snippets/byline.html", "<p>{{ page.title }}</p>\n");
+    site.write(
+        "templates/page.html",
+        "<!doctype html>\n<title>{{ page.title }}</title>\n{{ byline() }}\n{{ page.content }}\n",
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(!said.contains("Where the time went"), "{said}");
+    let output = Command::new(env!("CARGO_BIN_EXE_statac"))
+        .args(["build", "--timings", "--today=2026-10-04"])
+        .arg(&site.root)
+        .env("NO_COLOR", "1")
+        .env("RAYON_NUM_THREADS", "2")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let said = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        said.contains(" seconds.\n\nWhere the time went:\n"),
+        "{said}"
+    );
+    let mut sections = timings(&said);
+    // Only the stages keep an order that doesn't turn on the times.
+    for (_, rows) in &mut sections[2..] {
+        rows.sort();
+    }
+    let rows = |rows: &[&str]| rows.iter().map(|row| row.to_string()).collect();
+    assert_eq!(
+        sections,
+        [
+            (
+                "Where the time went:".into(),
+                rows(&[
+                    "Reading the site",
+                    "Building the pages",
+                    "Concluding",
+                    "Writing the rest"
+                ])
+            ),
+            (
+                "Building the pages was # of work across # threads:".into(),
+                rows(&[
+                    "Saving files",
+                    "Markdown",
+                    "Templates",
+                    "Checking links",
+                    "The rest"
+                ])
+            ),
+            (
+                "Slowest templates, by time in the template itself:".into(),
+                rows(&[
+                    "snippets/byline.html | 1 run",
+                    "templates/home.html | 1 run",
+                    "templates/page.html | 1 run"
+                ])
+            ),
+            (
+                "Slowest writing:".into(),
+                rows(&["content/index.md", "content/post-1.md"])
+            ),
+            (
+                "Slowest pages (median #, 95th percentile #):".into(),
+                rows(&["/ | templates/home.html", "/post-1/ | templates/page.html"])
+            ),
+        ]
+    );
+    assert!(said.contains("work across 2 threads:"), "{said}");
+}
+
 #[test]
 fn a_fixed_day_builds_the_same_site_twice() {
     let site = Site::new("same");

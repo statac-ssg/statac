@@ -3313,6 +3313,58 @@ pub(crate) fn wrote(published: &Published, out: &str, seconds: f64) -> String {
     )
 }
 
+/// What `build --timings` heads the stages of a build with.
+pub(crate) const TIMINGS_STAGES: &str = "Where the time went:";
+
+/// A stage of a build, as `build --timings` names it.
+pub(crate) fn stage(stage: crate::build::Stage) -> &'static str {
+    use crate::build::Stage;
+    match stage {
+        Stage::Before => "Running before_build",
+        Stage::Reading => "Reading the site",
+        Stage::Building => "Building the pages",
+        Stage::Concluding => "Concluding",
+        Stage::Copies => "Making photograph copies",
+        Stage::Cards => "Drawing sharing cards",
+        Stage::After => "Running after_build",
+        Stage::Writing => "Writing the rest",
+    }
+}
+
+/// What `build --timings` heads the work of building the pages with.
+pub(crate) fn timings_work(took: &str, threads: usize) -> String {
+    let threads = how_many(threads, "thread", "threads");
+    format!("Building the pages was {took} of work across {threads}:")
+}
+
+/// The parts of building the pages, as `build --timings` names them.
+pub(crate) const WORK_SAVING: &str = "Saving files";
+pub(crate) const WORK_WRITING: &str = "Markdown";
+pub(crate) const WORK_TEMPLATES: &str = "Templates";
+pub(crate) const WORK_LINKS: &str = "Checking links";
+pub(crate) const WORK_REST: &str = "The rest";
+
+/// What `build --timings` heads the slowest of each kind with.
+pub(crate) const SLOWEST_TEMPLATES: &str = "Slowest templates, by time in the template itself:";
+pub(crate) const SLOWEST_WRITING: &str = "Slowest writing:";
+pub(crate) const SLOWEST_PHOTOGRAPHS: &str = "Slowest photographs (copies made this build only):";
+
+/// What `build --timings` heads the slowest pages with, given the time
+/// half of them took less than, and the time 95 in 100 took no more than.
+pub(crate) fn slowest_pages(median: &str, high: &str) -> String {
+    format!("Slowest pages (median {median}, 95th percentile {high}):")
+}
+
+/// How many times a template ran, beside its time.
+pub(crate) fn runs(n: usize) -> String {
+    how_many(n, "run", "runs")
+}
+
+/// How many copies of a photograph were made, beside their time.
+pub(crate) fn copies_made(n: usize) -> String {
+    how_many(n, "copy", "copies")
+}
+
 /// What `build` says of the copies of photographs it made.
 pub(crate) fn made_copies(copies: usize, photographs: usize) -> String {
     format!(

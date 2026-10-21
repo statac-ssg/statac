@@ -2,6 +2,7 @@
 
 mod javascript;
 mod scripts;
+mod timings;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -28,6 +29,8 @@ use scripts::{Finding, Found};
 
 pub use javascript::Javascript;
 pub(crate) use javascript::Remembered;
+pub(crate) use timings::Clock;
+pub use timings::{Stage, Timings, Work};
 
 /// Where the built site goes in the site's folder, unless the author says.
 pub const OUT: &str = "_site";
@@ -107,6 +110,8 @@ pub struct Outcome {
     pub held_back: Vec<String>,
     /// How long the build waited for another build of the site to end.
     pub waited: Duration,
+    /// Where the build spent its time.
+    pub timings: Timings,
 }
 
 /// What a build did with the sharing cards.
@@ -196,6 +201,7 @@ impl Outcome {
             fetched: crate::fetched::Ages::default(),
             held_back: Vec::new(),
             waited: Duration::ZERO,
+            timings: Timings::default(),
         }
     }
 }
@@ -411,6 +417,8 @@ pub(crate) enum Output {
 /// One output built, and everything building it adds to the build.
 pub(crate) struct Built {
     pub output: Output,
+    /// How long building it took, and what in.
+    pub timed: timings::Output,
     /// The file it is published as, from the top of the built site.
     pub file: String,
     /// Its text, where it was built whole and is held to be written later.
@@ -575,20 +583,26 @@ pub(crate) fn run_holding(options: &Options, progress: Progress, starter: &Start
         Mode::Check => (None, None),
     };
     let waited = hold.as_ref().map_or(Duration::ZERO, |hold| hold.waited);
+    let mut clock = Clock::start();
     let before = match options.mode {
         Mode::Build => match crate::hooks::before(options, progress, false) {
             Ok(before) => before,
             Err(stopped) => {
+                clock.lap(Stage::Before);
                 let (sources, problem) = *stopped;
                 let mut outcome = Outcome::stopped_at(sources, problem);
                 outcome.problems.extend(unheld);
                 outcome.waited = waited;
+                outcome.timings.stages = clock.stages();
                 return outcome;
             }
         },
         Mode::Check => crate::hooks::Before::Unset,
     };
-    let mut outcome = built(options, progress, starter, unheld);
+    if before == crate::hooks::Before::Ran {
+        clock.lap(Stage::Before);
+    }
+    let mut outcome = built(options, progress, starter, unheld, clock);
     outcome.hooks.before = before;
     outcome.waited = waited;
     if let Held::Renderer(renderer) = &outcome.held {
@@ -632,6 +646,7 @@ fn built(
     progress: Progress,
     starter: &Starter,
     unheld: Option<Problem>,
+    mut clock: Clock,
 ) -> Outcome {
     let mut prepared = prepared(&options.site, &options.run());
     let note = crate::new::update::newer_starter(&options.site, starter);
@@ -649,6 +664,7 @@ fn built(
         _ => None,
     };
     let plan = Plan::of(&prepared.renderer, &mut prepared.problems);
+    clock.lap(Stage::Reading);
     let renderer = &prepared.renderer;
     let writes = match &staging {
         Some(staging) => Writes::Into(staging),
@@ -667,9 +683,13 @@ fn built(
         },
     );
     prepared.problems.extend(file_problems);
+    clock.lap(Stage::Building);
+    let saving = staging.as_ref().map_or(Duration::ZERO, Staging::saving);
+    let timings = Timings::of_outputs(renderer, &built, saving);
     let problems = std::mem::take(&mut prepared.problems);
     let search = &mut crate::search::Kept::default();
     let concluded = conclude(renderer, &plan, &built, problems, None, search);
+    clock.lap(Stage::Concluding);
     let mut record = Record::default();
     for (i, built) in built.iter_mut().enumerate() {
         record.set(OutputId::from_index(i), std::mem::take(&mut built.reads));
@@ -687,9 +707,15 @@ fn built(
         serving: false,
         remembers: own_address,
         unheld,
+        clock,
     };
     let mut outcome = publish(options, prepared, &plan, &built, concluded, published);
     outcome.record = record;
+    outcome.timings = Timings {
+        stages: std::mem::take(&mut outcome.timings.stages),
+        photographs: std::mem::take(&mut outcome.timings.photographs),
+        ..timings
+    };
     outcome
 }
 
@@ -1026,6 +1052,8 @@ pub(crate) struct Publishing {
     pub remembers: bool,
     /// Why the build doesn't hold the site, where it doesn't.
     pub unheld: Option<Problem>,
+    /// The build's stages timed so far.
+    pub clock: Clock,
 }
 
 /// Writes what the outputs `built` asked for beside them, the pictures a
@@ -1064,6 +1092,7 @@ pub(crate) fn publish(
         serving,
         remembers,
         unheld,
+        mut clock,
     } = publishing;
     let site = renderer.site();
     let pictures = &site.pictures;
@@ -1076,6 +1105,7 @@ pub(crate) fn publish(
         }
     }
     files = files.saturating_sub(held_back.len());
+    clock.lap(Stage::Writing);
     let mut held_back: Vec<String> = (held_back.iter())
         .map(|&at| site.files[at].address.file())
         .collect();
@@ -1091,6 +1121,7 @@ pub(crate) fn publish(
 
     let mut copies = Copies::default();
     let mut cards = Cards::default();
+    let mut photographs = Vec::new();
     if let Some(staging) = &staging
         && !stops(&problems)
     {
@@ -1098,6 +1129,12 @@ pub(crate) fn publish(
         (copies.made, copies.from) = (made.made, made.from);
         files += made.published;
         problems.extend(made.problems);
+        photographs = made.timed;
+        timings::slowest_first(&mut photographs);
+        clock.lap(match developed.is_empty() {
+            true => Stage::Writing,
+            false => Stage::Copies,
+        });
     }
     if let Some(staging) = &staging
         && !stops(&problems)
@@ -1107,6 +1144,10 @@ pub(crate) fn publish(
         cards.drawn = drew.drawn;
         files += drew.published;
         problems.extend(drew.problems);
+        clock.lap(match wanted.is_empty() {
+            true => Stage::Writing,
+            false => Stage::Cards,
+        });
     }
     if let Some(staging) = &staging
         && !stops(&problems)
@@ -1134,14 +1175,22 @@ pub(crate) fn publish(
     }
     let mut hooks = crate::hooks::Ran::default();
     let published = match staging {
-        Some(staging) if !stops(&problems) => {
-            let put = match after {
+        Some(mut staging) if !stops(&problems) => {
+            clock.lap(Stage::Writing);
+            // A command that doesn't end well publishes nothing.
+            let ran = match after {
                 true => {
                     let settings = renderer.settings();
-                    crate::hooks::publish(settings, options, staging, progress, serving)
+                    let ran =
+                        crate::hooks::after(settings, options, &mut staging, progress, serving);
+                    if settings.text(crate::hooks::AFTER).is_some() {
+                        clock.lap(Stage::After);
+                    }
+                    ran
                 }
-                false => staging.finish().map(|()| (None, Vec::new())),
+                false => Ok((None, Vec::new())),
             };
+            let put = ran.and_then(|ran| staging.finish().map(|()| ran));
             match put {
                 Ok((changed, told)) => {
                     hooks.after = changed;
@@ -1208,6 +1257,7 @@ pub(crate) fn publish(
         Some(_) => crate::fetched::Ages::of(site, &renderer.today()),
         None => crate::fetched::Ages::default(),
     };
+    clock.lap(Stage::Writing);
     Outcome {
         held: Held::Renderer(renderer),
         problems,
@@ -1222,6 +1272,11 @@ pub(crate) fn publish(
         fetched,
         held_back,
         waited: Duration::ZERO,
+        timings: Timings {
+            stages: clock.stages(),
+            photographs,
+            ..Timings::default()
+        },
     }
 }
 
@@ -1302,8 +1357,10 @@ pub(crate) fn build_output(
     output: Output,
     writes: Writes<'_>,
 ) -> Built {
+    let began = std::time::Instant::now();
     let site = renderer.site();
     let feeds = renderer.feeds();
+    templates::timed::open();
     // The page shown, and which of its list's pages; none for a redirect,
     // whose one link is told where `redirect_to` is written.
     let mut shown = None;
@@ -1326,6 +1383,12 @@ pub(crate) fn build_output(
             (renderer.render_redirect(redirect), &redirect.from)
         }
         Output::Feed(at) => (renderer.render_feed(&feeds[at]), &feeds[at].address),
+    };
+    let mut timed = timings::Output {
+        address: address.as_str().to_owned(),
+        tally: templates::timed::close(),
+        layout: rendered.layout,
+        ..timings::Output::default()
     };
     let file = address.file();
     let mut problems = rendered.problems;
@@ -1360,20 +1423,28 @@ pub(crate) fn build_output(
                 own: &rendered.own,
                 snipped: &rendered.snipped,
             };
+            let checking = std::time::Instant::now();
             checked = Some(linked.check(renderer, page, &html));
+            timed.links = checking.elapsed();
             sized = sizes_a_picture(&html);
         }
         match writes {
             Writes::Nowhere => {}
-            Writes::Into(staging) => match staging.write(&file, html.as_bytes()) {
-                Ok(()) => written = true,
-                Err(problem) => problems.push(problem),
-            },
+            Writes::Into(staging) => {
+                let saving = std::time::Instant::now();
+                match staging.write(&file, html.as_bytes()) {
+                    Ok(()) => written = true,
+                    Err(problem) => problems.push(problem),
+                }
+                timed.saving = saving.elapsed();
+            }
             Writes::Later => held = Some(html),
         }
     }
+    timed.whole = began.elapsed();
     Built {
         output,
+        timed,
         file,
         html: held,
         reads: rendered.reads,

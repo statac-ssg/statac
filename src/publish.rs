@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Read, Seek};
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -108,6 +108,25 @@ pub struct Staging {
     sure: Mutex<HashSet<String>>,
     /// What the build notes for whoever asked what it leaves.
     notes: Option<Notes>,
+    /// The nanoseconds spent writing and copying files into the folder,
+    /// on every thread together.
+    saving: AtomicU64,
+}
+
+/// Adds the time from its making to its dropping to a staging's saving.
+struct Saving<'a>(&'a AtomicU64, Instant);
+
+impl Saving<'_> {
+    fn of(staging: &Staging) -> Saving<'_> {
+        Saving(&staging.saving, Instant::now())
+    }
+}
+
+impl Drop for Saving<'_> {
+    fn drop(&mut self) {
+        let took = u64::try_from(self.1.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        self.0.fetch_add(took, Ordering::Relaxed);
+    }
 }
 
 /// What a build that finished left in the folder it wrote, for a later
@@ -607,6 +626,7 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
         settled: None,
         sure: Mutex::default(),
         notes: None,
+        saving: AtomicU64::new(0),
     };
 
     // A build interrupted between moving the old output aside and moving
@@ -703,6 +723,7 @@ pub fn resume(
             clock: Clock::of_site(site),
             left: into,
         }),
+        saving: AtomicU64::new(0),
     }
 }
 
@@ -867,9 +888,16 @@ impl Staging {
         })
     }
 
+    /// The time spent so far writing and copying files into the folder,
+    /// on every thread together.
+    pub fn saving(&self) -> Duration {
+        Duration::from_nanos(self.saving.load(Ordering::Relaxed))
+    }
+
     /// Writes `bytes` at `rel`, a path with forward slashes, making the
     /// folders above it.
     pub fn write(&self, rel: &str, bytes: &[u8]) -> Result<(), Problem> {
+        let _saving = Saving::of(self);
         let held = self.claimed(rel, false)?;
         if self.in_place {
             let cant = |error: io::Error| self.cant_write(rel, &error);
@@ -946,6 +974,7 @@ impl Staging {
         shown: &str,
         rel: &str,
     ) -> Result<(), Problem> {
+        let _saving = Saving::of(self);
         let cant_read = |error: &io::Error| {
             Problem::nowhere(Kind::CantRead {
                 path: shown.into(),
@@ -996,6 +1025,7 @@ impl Staging {
         shown: &str,
         rel: &str,
     ) -> Result<(), Problem> {
+        let _saving = Saving::of(self);
         let cant_read = |error: io::Error| {
             Problem::nowhere(Kind::CantRead {
                 path: shown.into(),

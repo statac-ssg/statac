@@ -442,6 +442,7 @@ impl std::error::Error for Stop {
 /// here: a run is stopped by the engine where it alone takes them all,
 /// and by Statac where it starts with none left or ends with too many.
 pub(super) fn begin(file: usize, calling: Option<&State>) -> Result<(), minijinja::Error> {
+    super::timed::start();
     let called = calling
         .and_then(State::fuel_levels)
         .map_or(0, |(taken, _)| taken);
@@ -454,6 +455,7 @@ pub(super) fn begin(file: usize, calling: Option<&State>) -> Result<(), minijinj
     }
     let stopped = stop(file);
     with(|frame| frame.running.pop());
+    super::timed::template_ended(file);
     Err(stopped)
 }
 
@@ -464,6 +466,7 @@ pub(super) fn end(
     file: usize,
     built: Result<(Captured, String), minijinja::Error>,
 ) -> Result<Result<String, minijinja::Error>, minijinja::Error> {
+    super::timed::template_ended(file);
     let out_of_fuel = matches!(&built, Err(e) if e.kind() == minijinja::ErrorKind::OutOfFuel);
     let taken = match &built {
         Ok((captured, _)) => captured.state().fuel_levels().map_or(0, |(taken, _)| taken),

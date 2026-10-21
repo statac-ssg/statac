@@ -28,6 +28,7 @@ mod render;
 mod shows;
 #[cfg(test)]
 mod tests;
+pub(crate) mod timed;
 mod values;
 mod walks;
 

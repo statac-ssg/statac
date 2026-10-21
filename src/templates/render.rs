@@ -342,6 +342,8 @@ pub struct Rendered {
     pub snipped: Vec<crate::links::Snipped>,
     /// The languages whose search index it names.
     pub indexed: Vec<LanguageId>,
+    /// The template it is built with, by its index among the files.
+    pub layout: Option<usize>,
 }
 
 impl Rendered {
@@ -380,6 +382,7 @@ impl Rendered {
             own: Own::default(),
             snipped: frame.snipped,
             indexed: frame.indexed,
+            layout: frame.layout,
         }
     }
 }
@@ -533,6 +536,19 @@ impl Renderer {
     /// How many names reads have been recorded under so far.
     pub(crate) fn names(&self) -> usize {
         self.shared.known.len() + self.shared.later.read().expect("never poisoned").len()
+    }
+
+    /// The path in the site of the template, snippet or text of a card
+    /// at `at` among the files.
+    pub(crate) fn template_path(&self, at: usize) -> String {
+        let source = self.shared.templates.files[at].source;
+        let path = self.shared.sources.path(source).to_string_lossy();
+        path.replace('\\', "/")
+    }
+
+    /// The path in the site of the file `page` is written in.
+    pub(crate) fn page_path(&self, page: PageId) -> String {
+        format!("content/{}", self.shared.site.pages.get(page).path)
     }
 
     /// Every template, snippet and text of a card the site has, in the
@@ -1144,6 +1160,18 @@ pub(super) fn outline(shared: &Arc<Shared>, page: PageId) -> Arc<Vec<Section>> {
 /// Builds a page's writing, its search boxes numbered after
 /// `boxes_before` others, and its code without colour where `colourless`.
 fn build_body(shared: &Arc<Shared>, page: PageId, boxes_before: usize, colourless: bool) -> Body {
+    super::timed::start();
+    let body = build_body_untimed(shared, page, boxes_before, colourless);
+    super::timed::writing_ended(page);
+    body
+}
+
+fn build_body_untimed(
+    shared: &Arc<Shared>,
+    page: PageId,
+    boxes_before: usize,
+    colourless: bool,
+) -> Body {
     let p = shared.site.pages.get(page);
     frame::push(Frame {
         making: frame::Making::Writing,

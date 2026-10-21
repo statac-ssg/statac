@@ -9,7 +9,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 
@@ -32,6 +33,9 @@ pub struct Developed {
     /// The copies written into the built site.
     pub published: usize,
     pub problems: Vec<Problem>,
+    /// Each photograph whose copies were made, with how long making them
+    /// took and how many there were, in the order of their paths.
+    pub timed: Vec<(String, Duration, usize)>,
 }
 
 /// A photograph some page shows.
@@ -268,10 +272,24 @@ pub fn develop(
     }
     let counted = Counted::new(progress, Making::Copies, to_make);
     let settings = pictures::Settings::default();
-    let made: Vec<(usize, Vec<Problem>)> = jobs
+    let made: Vec<(usize, Vec<Problem>, (String, Duration))> = jobs
         .par_iter()
         .filter(|(_, _, missing)| !missing.is_empty())
         .map(|(picture, shown, missing)| {
+            // Each part is timed on its own: while this waits on its
+            // widths, made at once, its thread may make another's.
+            let took = AtomicU64::new(0);
+            let timed = |began: Instant| {
+                let nanos = u64::try_from(began.elapsed().as_nanos()).unwrap_or(u64::MAX);
+                took.fetch_add(nanos, Ordering::Relaxed);
+            };
+            let timing = || {
+                (
+                    picture.shown(),
+                    Duration::from_nanos(took.load(Ordering::Relaxed)),
+                )
+            };
+            let began = Instant::now();
             let unreadable = |fault| {
                 let kind = Kind::UnreadablePicture {
                     path: picture.shown(),
@@ -286,14 +304,19 @@ pub fn develop(
                         path: picture.shown().into(),
                         reason: Reason::of(&error),
                     };
-                    return (0, vec![Problem::nowhere(kind)]);
+                    timed(began);
+                    return (0, vec![Problem::nowhere(kind)], timing());
                 }
             };
             let opened = match quietly(|| pictures::open(&bytes)) {
                 Ok(opened) => opened,
-                Err(error) => return (0, vec![unreadable(fault(error))]),
+                Err(error) => {
+                    timed(began);
+                    return (0, vec![unreadable(fault(error))], timing());
+                }
             };
             drop(bytes);
+            timed(began);
             let mut widths: BTreeMap<u32, Vec<&Rendition>> = BTreeMap::new();
             for copy in missing {
                 widths.entry(copy.width).or_default().push(copy);
@@ -301,6 +324,7 @@ pub fn develop(
             let problems: Vec<Problem> = widths
                 .par_iter()
                 .flat_map_iter(|(&width, copies)| {
+                    let began = Instant::now();
                     let resized = opened.resize(width, &settings);
                     let mut problems = Vec::new();
                     for copy in copies {
@@ -318,10 +342,11 @@ pub fn develop(
                         }
                         counted.one_done();
                     }
+                    timed(began);
                     problems
                 })
                 .collect();
-            (missing.len(), problems)
+            (missing.len(), problems, timing())
         })
         .collect();
     counted.finish();
@@ -329,7 +354,8 @@ pub fn develop(
     let mut developed = Developed::default();
     // One photograph is told once, however many of its copies went wrong.
     let mut told: HashSet<String> = HashSet::new();
-    for (copies, problems) in made {
+    for (copies, problems, (path, took)) in made {
+        developed.timed.push((path, took, copies));
         if problems.is_empty() {
             developed.made += copies;
             developed.from += 1;
@@ -344,6 +370,7 @@ pub fn develop(
             }
         }
     }
+    developed.timed.sort_by(|a, b| a.0.cmp(&b.0));
     if !developed.problems.is_empty() {
         return developed;
     }

@@ -96,6 +96,31 @@ fn before_build_runs_before_the_site_is_read() {
 }
 
 #[test]
+fn each_command_is_timed_as_a_stage_of_its_own() {
+    let settings = "before_build: echo made> made.txt\nafter_build: echo made> made.txt\n";
+    let site = Site::new("timed", settings);
+    let (said, code) = site.run(&["build", "--timings", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let (_, stages) = said.split_once("Where the time went:\n").expect(&said);
+    let stages: Vec<&str> = (stages.lines())
+        .take_while(|line| !line.is_empty())
+        .map(|line| line.trim().split("  ").next().unwrap())
+        .collect();
+    assert_eq!(
+        stages,
+        [
+            "Running before_build",
+            "Reading the site",
+            "Building the pages",
+            "Concluding",
+            "Running after_build",
+            "Writing the rest"
+        ],
+        "{said}"
+    );
+}
+
+#[test]
 fn a_command_is_handed_where_it_is_and_what_it_is() {
     let line = format!(
         "echo {} {}> told.txt",

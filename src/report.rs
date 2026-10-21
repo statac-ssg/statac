@@ -1298,6 +1298,7 @@ impl Paint {
 }
 
 mod json;
+mod timings;
 
 #[cfg(test)]
 mod tests;

@@ -49,11 +49,17 @@ fn options(mode: Mode, site: &str, out: Option<&str>) -> Options {
 fn commands_are_read_with_their_options() {
     assert_eq!(
         parsed(&["build"]),
-        Ok(Request::Build(options(Mode::Build, UNNAMED, None)))
+        Ok(Request::Build {
+            options: options(Mode::Build, UNNAMED, None),
+            timings: false,
+        })
     );
     assert_eq!(
         parsed(&["build", "--site=docs", "--out=public"]),
-        Ok(Request::Build(options(Mode::Build, "docs", Some("public"))))
+        Ok(Request::Build {
+            options: options(Mode::Build, "docs", Some("public")),
+            timings: false,
+        })
     );
     assert_eq!(
         parsed(&["--site=docs", "check"]),
@@ -124,7 +130,7 @@ error  Unknown option: `-h`
         refused(&["build", "--publish"]),
         "\
 error  Unknown option: `--publish`
-  `statac build` takes `--site`, `--out`, `--url`, `--today` and `--drafts`.
+  `statac build` takes `--site`, `--out`, `--url`, `--today`, `--drafts` and `--timings`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -144,7 +150,13 @@ fn drafts_are_asked_for_with_no_value() {
         drafts: true,
         ..options(Mode::Build, UNNAMED, None)
     };
-    assert_eq!(parsed(&["build", "--drafts"]), Ok(Request::Build(wanted)));
+    assert_eq!(
+        parsed(&["build", "--drafts"]),
+        Ok(Request::Build {
+            options: wanted,
+            timings: false,
+        })
+    );
     let checked = Options {
         drafts: true,
         ..options(Mode::Check, "docs", None)
@@ -202,6 +214,25 @@ error  Unknown option: `statac build` has no `--json`
 }
 
 #[test]
+fn timings_are_asked_of_build_alone_with_no_value() {
+    assert_eq!(
+        parsed(&["build", "--timings", "docs"]),
+        Ok(Request::Build {
+            options: options(Mode::Build, "docs", None),
+            timings: true,
+        })
+    );
+    assert_eq!(
+        refused(&["check", "--timings"]),
+        "\
+error  Unknown option: `statac check` has no `--timings`
+  `--timings` is for `statac build`.
+  More: https://statac.dev/e/unknown-option/
+"
+    );
+}
+
+#[test]
 fn an_option_for_another_command_says_which() {
     assert_eq!(
         refused(&["check", "--out=public"]),
@@ -245,7 +276,10 @@ error  Missing value: `--site` needs a folder
 fn the_folder_after_the_command_is_the_site() {
     assert_eq!(
         parsed(&["build", "docs"]),
-        Ok(Request::Build(options(Mode::Build, "docs", None)))
+        Ok(Request::Build {
+            options: options(Mode::Build, "docs", None),
+            timings: false,
+        })
     );
     assert_eq!(
         parsed(&["check", "docs"]),
@@ -256,7 +290,10 @@ fn the_folder_after_the_command_is_the_site() {
     );
     assert_eq!(
         parsed(&["build", "docs", "--out=public"]),
-        Ok(Request::Build(options(Mode::Build, "docs", Some("public"))))
+        Ok(Request::Build {
+            options: options(Mode::Build, "docs", Some("public")),
+            timings: false,
+        })
     );
 }
 
@@ -288,7 +325,7 @@ error  Option given twice: `--site`
 #[test]
 fn today_is_a_day_written_as_iso() {
     let today = |args: &[&str]| match parsed(args) {
-        Ok(Request::Build(options) | Request::Check { options, .. }) => options.today,
+        Ok(Request::Build { options, .. } | Request::Check { options, .. }) => options.today,
         other => panic!("{other:?}"),
     };
     assert_eq!(
@@ -336,7 +373,7 @@ error  Unclear date: `04/10/2026` could be 4 October or 10 April
 #[test]
 fn the_address_for_a_run_is_a_whole_address() {
     let url = |args: &[&str]| match parsed(args) {
-        Ok(Request::Build(options) | Request::Check { options, .. }) => options.url,
+        Ok(Request::Build { options, .. } | Request::Check { options, .. }) => options.url,
         other => panic!("{other:?}"),
     };
     assert_eq!(url(&["build"]), None);
@@ -558,6 +595,8 @@ Options:
                          they were published.
   --json                 Show every problem as JSON, for an editor or another
                          program to read, and nothing else.
+  --timings              Show where statac build spent its time, once it
+                         has finished.
   --no-drafts            Leave drafts and posts dated after today out of
                          what statac serve shows, as statac build does.
   --offline              Fetch nothing as statac serve starts. Without it,
@@ -627,6 +666,8 @@ Options:
                          statac refuse, on this computer's clock.
   --drafts               Build drafts and posts dated after today as if
                          they were published.
+  --timings              Show where statac build spent its time, once it
+                         has finished.
   --help                 Show this.
   --version              Show which version of Statac this is.
 "

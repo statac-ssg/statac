@@ -193,25 +193,11 @@ fn told(setting: &str, stopped: Stopped) -> Kind {
     }
 }
 
-/// Puts the site `staging` has written in the output's place, once the
-/// site's `after_build` has run on it where the site sets one. Gives what
-/// the command changed, and anything `after_build_makes` names that it
-/// left nothing at. A command that doesn't end well publishes nothing.
-pub(crate) fn publish(
-    settings: &Settings,
-    options: &crate::build::Options,
-    mut staging: Staging,
-    progress: Progress,
-    serve: bool,
-) -> Result<(Option<Changed>, Vec<Problem>), Problem> {
-    let ran = after(settings, options, &mut staging, progress, serve)?;
-    staging.finish()?;
-    Ok(ran)
-}
-
 /// Runs the site's `after_build`, where it sets one, on the folder
-/// `staging` has written, which must hold the whole site.
-fn after(
+/// `staging` has written, which must hold the whole site. Gives what the
+/// command changed, and anything `after_build_makes` names that it left
+/// nothing at.
+pub(crate) fn after(
     settings: &Settings,
     options: &crate::build::Options,
     staging: &mut Staging,

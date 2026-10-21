@@ -565,6 +565,7 @@ impl Session {
             serving: true,
             remembers: false,
             unheld,
+            clock: build::Clock::start(),
         };
         let mut outcome = build::publish(options, prepared, &plan, &built, concluded, publishing);
         let named = crate::hooks::names_output(renderer.settings(), renderer.sources(), options);
@@ -935,6 +936,7 @@ fn carry(
         let coloured = old.coloured.iter().map(|&place| to.place(place));
         Some(Built {
             output,
+            timed: Default::default(),
             file: old.file.clone(),
             html: None,
             reads: Reads::of(reads),
