@@ -213,6 +213,31 @@ fn every_problem_is_told_at_what_was_written() {
             "text.woff",
         ),
         (
+            varied(&[("title.font", Some("title.font: [text.ttf, other.otf]"))]),
+            Kind::MissingFile {
+                path: "templates/og/other.otf".into(),
+                hint: None,
+            },
+            "other.otf",
+        ),
+        (
+            varied(&[("title.font", Some("title.font: text.woff"))]),
+            wrong("title.font", Expected::FontFile, "text.woff"),
+            "text.woff",
+        ),
+        (
+            varied(&[("title.font", Some("title.font: ../text.ttf"))]),
+            Kind::OutsideSite {
+                reach: Reach::CardFile("../text.ttf".into()),
+            },
+            "../text.ttf",
+        ),
+        (
+            varied(&[("title.fnt", Some("title.fnt: text.ttf"))]),
+            unread("title.fnt", Some("title.font")),
+            "title.fnt",
+        ),
+        (
             varied(&[("footer", Some("footer:\n  text: x"))]),
             Kind::NestedSetting {
                 key: "text".into(),
@@ -407,6 +432,66 @@ footer.colour: \"{{ page.accent | default('#B9A88F') }}\"
     assert_eq!(card.padding.value, 60);
     assert_eq!(card.padding.origin, Origin::defaulted());
     assert_eq!(card.blocks, []);
+}
+
+#[test]
+fn a_texts_fonts_are_written_as_the_cards_are() {
+    let cases: [(&str, Option<&[&str]>); 3] = [
+        ("title.font: []", None),
+        ("title.font: more.ttf", Some(&["more.ttf"])),
+        (
+            "title.font: [more.ttf, text.ttf]",
+            Some(&["more.ttf", "text.ttf"]),
+        ),
+    ];
+    for (line, fonts) in cases {
+        let text = varied(&[("title.font", Some(line))]);
+        let (sources, cards, problems) = read_site(&[("templates/og.yaml", &text)]);
+        assert_eq!(problems, [], "{text}");
+        let block = &cards.card(None).unwrap().blocks[0];
+        let read: Option<Vec<&str>> = block.fonts.as_ref().map(|fonts| {
+            let places = fonts.iter().map(|font| font.origin.place.unwrap());
+            places.map(|place| sources.spelling(place)).collect()
+        });
+        assert_eq!(read.as_deref(), fonts, "{text}");
+    }
+}
+
+#[test]
+fn each_text_is_drawn_in_its_own_fonts_or_the_cards() {
+    let text = "\
+background: background.png
+font: text.ttf
+a.text: a
+a.place: top
+a.size: 20
+a.colour: \"#000\"
+a.font: more.ttf
+b.text: b
+b.place: top
+b.size: 20
+b.colour: \"#000\"
+c.text: c
+c.place: top
+c.size: 20
+c.colour: \"#000\"
+c.font: [more.ttf, text.ttf]
+";
+    let (_, cards, problems) = read_site(&[("templates/og.yaml", text)]);
+    assert_eq!(problems, []);
+    let card = cards.card(None).unwrap();
+    let lists: Vec<Vec<&str>> = (card.font_lists().into_iter())
+        .map(|list| list.iter().map(|font| font.value.as_str()).collect())
+        .collect();
+    assert_eq!(
+        lists,
+        [
+            vec!["text.ttf"],
+            vec!["more.ttf"],
+            vec!["more.ttf", "text.ttf"]
+        ]
+    );
+    assert_eq!(card.drawn_in(), [1, 0, 2]);
 }
 
 #[test]

@@ -49,8 +49,13 @@ fn noisy() -> Vec<u8> {
     png_of(&image)
 }
 
+/// A kit whose one list of fonts is `files` in order.
+fn one_list(background: &[u8], files: &[&[u8]], padding: u32) -> Result<Kit, KitFailure> {
+    Kit::new(background, files, &[(0..files.len()).collect()], padding)
+}
+
 fn kit(fonts: &[&[u8]]) -> Kit {
-    Kit::new(&flat(), fonts, 60).unwrap()
+    one_list(&flat(), fonts, 60).unwrap()
 }
 
 fn text(placement: Placement, size: TextSize, built: &str) -> Text<'_> {
@@ -59,23 +64,24 @@ fn text(placement: Placement, size: TextSize, built: &str) -> Text<'_> {
         size,
         built,
         colour: INK,
+        fonts: 0,
     }
 }
 
 fn lines(kit: &Kit, built: &str, size: u32, width: f32) -> Vec<String> {
-    kit.measure(built, size, width).lines
+    kit.measure(built, 0, size, width).lines
 }
 
 fn width(kit: &Kit, built: &str, size: u32) -> f32 {
-    kit.measure(built, size, f32::INFINITY).width
+    kit.measure(built, 0, size, f32::INFINITY).width
 }
 
 /// Asserts that each line measured alone comes back whole, with the width
 /// it has among the others.
 fn each_line_alone_is_whole(kit: &Kit, built: &str, size: u32, within: f32) {
-    let measured = kit.measure(built, size, within);
+    let measured = kit.measure(built, 0, size, within);
     for line in &measured.lines {
-        let alone = kit.measure(line, size, within);
+        let alone = kit.measure(line, 0, size, within);
         assert_eq!(alone.lines, std::slice::from_ref(line));
         assert!(alone.width <= within, "{line:?} is {} wide", alone.width);
         assert!(alone.width <= measured.width);
@@ -91,14 +97,14 @@ fn a_kit_is_shareable_between_threads() {
 #[test]
 fn a_background_that_does_not_read_is_refused_with_the_reason() {
     assert_eq!(
-        Kit::new(b"not a picture", &[LATIN], 60).err(),
+        one_list(b"not a picture", &[LATIN], 60).err(),
         Some(KitFailure::Background(pictures::Error::Unreadable(
             pictures::Unreadable::NotAPicture
         )))
     );
     let cut = &flat()[..200];
     assert!(matches!(
-        Kit::new(cut, &[LATIN], 60).err(),
+        one_list(cut, &[LATIN], 60).err(),
         Some(KitFailure::Background(pictures::Error::Unreadable(_)))
     ));
 }
@@ -107,7 +113,7 @@ fn a_background_that_does_not_read_is_refused_with_the_reason() {
 fn a_background_of_another_size_is_refused_with_its_size() {
     let small = png_of(&RgbImage::from_pixel(1200, 600, Rgb([0, 0, 0])));
     assert_eq!(
-        Kit::new(&small, &[LATIN], 60).err(),
+        one_list(&small, &[LATIN], 60).err(),
         Some(KitFailure::BackgroundSize(pictures::Size {
             width: 1200,
             height: 600
@@ -119,11 +125,11 @@ fn a_background_of_another_size_is_refused_with_its_size() {
 fn a_font_that_does_not_read_is_named_by_its_place() {
     let junk = b"not a font at all, only words".as_slice();
     assert_eq!(
-        Kit::new(&flat(), &[LATIN, junk, KOREAN], 60).err(),
+        one_list(&flat(), &[LATIN, junk, KOREAN], 60).err(),
         Some(KitFailure::Font(1))
     );
     assert_eq!(
-        Kit::new(&flat(), &[&LATIN[..400]], 60).err(),
+        one_list(&flat(), &[&LATIN[..400]], 60).err(),
         Some(KitFailure::Font(0))
     );
 }
@@ -159,7 +165,7 @@ fn a_display_p3_background_is_converted_to_srgb() {
     segment.extend(b"ICC_PROFILE\0\x01\x01");
     segment.extend(&profile);
     jpeg.splice(2..2, segment);
-    let kit = Kit::new(&jpeg, &[LATIN], 60).unwrap();
+    let kit = one_list(&jpeg, &[LATIN], 60).unwrap();
     let pixel = kit.background.get_pixel(600, 315).0;
     assert!(close_to(pixel, [141, 0, 207], 6), "{pixel:?}");
 
@@ -169,7 +175,7 @@ fn a_display_p3_background_is_converted_to_srgb() {
     encoder
         .write_image(&flat, WIDTH, HEIGHT, ExtendedColorType::Rgb8)
         .unwrap();
-    let kit = Kit::new(&png, &[LATIN], 60).unwrap();
+    let kit = one_list(&png, &[LATIN], 60).unwrap();
     assert!(
         kit.background
             .pixels()
@@ -184,7 +190,7 @@ fn a_background_with_alpha_is_drawn_over_black() {
     PngEncoder::new(&mut png)
         .write_image(&image, WIDTH, HEIGHT, ExtendedColorType::Rgba8)
         .unwrap();
-    let kit = Kit::new(&png, &[LATIN], 60).unwrap();
+    let kit = one_list(&png, &[LATIN], 60).unwrap();
     assert!(kit.background.pixels().all(|p| p.0 == [100, 50, 25]));
 }
 
@@ -192,7 +198,7 @@ fn a_background_with_alpha_is_drawn_over_black() {
 fn a_sentence_wraps_at_spaces_within_the_width() {
     let kit = kit(&[LATIN]);
     let built = "A longer title that wraps over the lines";
-    let measured = kit.measure(built, 40, 300.0);
+    let measured = kit.measure(built, 0, 40, 300.0);
     assert!(measured.lines.len() > 1);
     assert_eq!(measured.lines.join(" "), built);
     for line in &measured.lines {
@@ -211,7 +217,7 @@ fn a_sentence_wraps_at_spaces_within_the_width() {
 fn a_word_wider_than_the_width_breaks_inside() {
     let kit = kit(&[LATIN]);
     let built = "Title Longerwordthanthewidthallows";
-    let measured = kit.measure(built, 40, 200.0);
+    let measured = kit.measure(built, 0, 40, 200.0);
     assert_eq!(measured.lines[0], "Title");
     assert!(measured.lines.len() > 2);
     assert_eq!(measured.lines[1..].concat(), "Longerwordthanthewidthallows");
@@ -233,7 +239,7 @@ fn a_line_measured_alone_comes_back_whole() {
         ("한국어 번역 상위 활동 사용자", 150.0),
     ];
     for (built, within) in texts {
-        let measured = kit.measure(built, 40, within);
+        let measured = kit.measure(built, 0, 40, within);
         assert!(measured.lines.len() > 1, "{built}");
         each_line_alone_is_whole(&kit, built, 40, within);
     }
@@ -301,7 +307,7 @@ fn presentation_selectors_are_removed() {
 
 /// Which font file draws each visible character of `text`.
 fn files(kit: &Kit, text: &str) -> Vec<(char, usize)> {
-    let mut engine = kit.engine();
+    let mut engine = kit.engine(0);
     let runs = engine.faces.runs(text);
     runs.iter()
         .flat_map(|run| {
@@ -351,7 +357,10 @@ fn digits_only_an_emoji_font_has_are_missing() {
     ];
     assert_eq!(
         kit.draw(&texts).err(),
-        Some(Failure::Missing(vec!['2', '0', '4', '3']))
+        Some(Failure::Missing {
+            text: 0,
+            characters: vec!['2', '0', '4', '3']
+        })
     );
 }
 
@@ -363,7 +372,13 @@ fn missing_characters_are_listed_once_each_in_order() {
         text(Placement::Centre, TextSize::Fixed(40), "本 Title 日 عنوان"),
     ];
     let expected = vec!['日', '本', '한', '국', '어', 'ع', 'ن', 'و', 'ا'];
-    assert_eq!(kit.draw(&texts).err(), Some(Failure::Missing(expected)));
+    assert_eq!(
+        kit.draw(&texts).err(),
+        Some(Failure::Missing {
+            text: 0,
+            characters: expected
+        })
+    );
 }
 
 #[test]
@@ -390,7 +405,10 @@ fn an_emoji_is_drawn_by_an_emoji_font_and_missing_without_one() {
     assert!(with.draw(&texts).is_ok());
     assert_eq!(
         kit(&[LATIN]).draw(&texts).err(),
-        Some(Failure::Missing(vec!['😀', '❤', '\u{20E3}']))
+        Some(Failure::Missing {
+            text: 0,
+            characters: vec!['😀', '❤', '\u{20E3}']
+        })
     );
 }
 
@@ -427,6 +445,7 @@ fn placed(kit: &Kit, texts: &[Text]) -> Vec<Placed> {
             placement: t.placement,
             size: t.size,
             built: t.built,
+            fonts: t.fonts,
         })
         .collect();
     lay_out(kit.padding, &laid, kit).unwrap()
@@ -450,7 +469,7 @@ fn between(pixel: u8, under: u8, ink: u8) -> bool {
 
 #[test]
 fn text_is_drawn_only_about_its_lines() {
-    let kit = Kit::new(&png_of(&gradient_image()), &[LATIN, ARABIC], 60).unwrap();
+    let kit = one_list(&png_of(&gradient_image()), &[LATIN, ARABIC], 60).unwrap();
     let texts = [
         text(Placement::TopLeft, TextSize::Fixed(40), "Title"),
         text(
@@ -520,7 +539,7 @@ fn the_same_kit_and_texts_draw_the_same_pixels() {
     assert!(first == kit.draw(&texts).unwrap().pixels);
     assert!(
         first
-            == Kit::new(&flat(), &[LATIN, JAPANESE], 60)
+            == one_list(&flat(), &[LATIN, JAPANESE], 60)
                 .unwrap()
                 .draw(&texts)
                 .unwrap()
@@ -589,7 +608,7 @@ fn a_flat_background_gives_pngs_and_a_noisy_one_jpegs() {
         assert_eq!(chunks(&card.bytes), ["IHDR", "IDAT", "IEND"]);
     }
 
-    let kit = Kit::new(&noisy(), &[LATIN], 60).unwrap();
+    let kit = one_list(&noisy(), &[LATIN], 60).unwrap();
     assert_eq!(kit.format(), Format::Jpeg);
     for texts in [&texts[..1], &texts] {
         let card = kit.card(texts).unwrap();
@@ -613,7 +632,8 @@ fn every_ingredient_changes_the_key() {
     let background = flat();
     let other_background = png_of(&RgbImage::from_pixel(WIDTH, HEIGHT, Rgb([20, 30, 41])));
     let make = |background: &[u8], files: &[&[u8]], padding| {
-        Kit::make(background, files, padding, Settings::default()).unwrap()
+        let lists = [(0..files.len()).collect()];
+        Kit::make(background, files, &lists, padding, Settings::default()).unwrap()
     };
     let kit = make(&background, &[LATIN, KOREAN, EMOJI], 60);
     let texts = [
@@ -677,6 +697,118 @@ fn every_ingredient_changes_the_key() {
     unique.sort_by_key(Key::hex);
     unique.dedup();
     assert_eq!(unique.len(), keys.len());
+}
+
+#[test]
+fn a_card_drawn_in_the_cards_own_fonts_keeps_its_key() {
+    // A key names a card kept and published, so a card whose texts have
+    // no fonts of their own keeps the key it has always had.
+    let kit = kit(&[LATIN, EMOJI]);
+    let texts = [
+        text(Placement::Centre, TextSize::UpTo(75), "A longer title"),
+        text(Placement::Bottom, TextSize::Fixed(36), "Title"),
+    ];
+    assert_eq!(
+        kit.key(&texts).hex(),
+        "63bce9322c6778d3a0394d9ef3b97aa697f1d6a861c60ab395787577023d0de5"
+    );
+    let other = Kit::new(&flat(), &[LATIN, EMOJI, KOREAN], &[vec![0, 1], vec![2]], 60);
+    assert_eq!(other.unwrap().key(&texts), kit.key(&texts));
+}
+
+#[test]
+fn a_texts_own_fonts_are_in_the_key() {
+    let make = |files: &[&[u8]], lists: &[Vec<usize>]| Kit::new(&flat(), files, lists, 60).unwrap();
+    let mut texts = [
+        text(Placement::Top, TextSize::Fixed(40), "Title"),
+        text(Placement::Centre, TextSize::UpTo(80), "A longer title"),
+    ];
+    texts[1].fonts = 1;
+    let key = make(&[LATIN, KOREAN], &[vec![0], vec![1]]).key(&texts);
+    // A file no list names is no part of it.
+    let unnamed = make(&[LATIN, JAPANESE, KOREAN], &[vec![0], vec![2]]);
+    assert_eq!(unnamed.key(&texts), key);
+    let mut keys = vec![key];
+    let kits = [
+        make(&[LATIN, JAPANESE], &[vec![0], vec![1]]),
+        make(&[LATIN, KOREAN], &[vec![0], vec![1, 0]]),
+        make(&[LATIN, KOREAN], &[vec![0], vec![0, 1]]),
+        make(&[LETTERS, KOREAN], &[vec![0], vec![1]]),
+    ];
+    keys.extend(kits.iter().map(|kit| kit.key(&texts)));
+    let kit = make(&[LATIN, KOREAN], &[vec![0], vec![1]]);
+    for fonts in [[0, 0], [1, 1], [1, 0]] {
+        texts[0].fonts = fonts[0];
+        texts[1].fonts = fonts[1];
+        keys.push(kit.key(&texts));
+    }
+
+    let mut unique = keys.clone();
+    unique.sort_by_key(Key::hex);
+    unique.dedup();
+    assert_eq!(unique.len(), keys.len());
+}
+
+#[test]
+fn each_text_is_drawn_in_its_own_fonts() {
+    // Either order draws each character in the same font, but a line sits
+    // by the first font of its list.
+    let (title, footer) = ("日本 Title", "Title 日本");
+    let mut own = text(Placement::Top, TextSize::Fixed(60), title);
+    own.fonts = 1;
+    let texts = [own, text(Placement::Bottom, TextSize::Fixed(60), footer)];
+    let both = Kit::new(&flat(), &[LATIN, JAPANESE], &[vec![0, 1], vec![1, 0]], 60)
+        .unwrap()
+        .draw(&texts)
+        .unwrap()
+        .pixels;
+    let alone = |fonts: &[&[u8]], top: &str, bottom: &str| {
+        let texts = [
+            text(Placement::Top, TextSize::Fixed(60), top),
+            text(Placement::Bottom, TextSize::Fixed(60), bottom),
+        ];
+        kit(fonts).draw(&texts).unwrap().pixels
+    };
+    let half = (WIDTH * HEIGHT / 2 * 3) as usize;
+    let (top, bottom) = both.as_raw().split_at(half);
+    let title_alone = alone(&[JAPANESE, LATIN], title, "");
+    assert!(top == &title_alone.as_raw()[..half]);
+    assert!(bottom == &alone(&[LATIN, JAPANESE], "", footer).as_raw()[half..]);
+    assert!(top != &alone(&[LATIN, JAPANESE], title, "").as_raw()[..half]);
+}
+
+#[test]
+fn characters_are_missing_from_the_fonts_of_the_text_needing_them() {
+    // The card's fonts have no emoji, and the second list has them.
+    let kit = Kit::new(&flat(), &[LATIN, EMOJI], &[vec![0], vec![0, 1]], 60).unwrap();
+    let lacking = |text, characters: &str| {
+        let characters = characters.chars().collect();
+        Some(Failure::Missing { text, characters })
+    };
+    let cases = [
+        ("Title 😀", 1, "Title", 0, None),
+        ("Title 😀", 0, "Title", 1, lacking(0, "😀")),
+        ("Title", 1, "Title 😀 ❤", 0, lacking(1, "😀❤")),
+        ("Title 😀", 0, "Title ❤", 0, lacking(0, "😀❤")),
+        ("Title 日", 1, "Title 本", 1, lacking(0, "日本")),
+        ("Title 日", 1, "Title 😀", 0, lacking(0, "日")),
+    ];
+    for (first, first_fonts, second, second_fonts, missing) in cases {
+        let mut texts = [
+            text(Placement::Top, TextSize::Fixed(40), first),
+            text(Placement::Bottom, TextSize::Fixed(40), second),
+        ];
+        texts[0].fonts = first_fonts;
+        texts[1].fonts = second_fonts;
+        assert_eq!(kit.draw(&texts).err(), missing, "{first}, {second}");
+    }
+}
+
+#[test]
+fn a_font_file_in_several_lists_is_read_once() {
+    let kit = Kit::new(&flat(), &[LATIN, EMOJI], &[vec![0], vec![1, 0]], 60).unwrap();
+    assert_eq!(kit.fonts.len(), 2);
+    assert_eq!(kit.lists[1].faces[1].id, kit.lists[0].faces[0].id);
 }
 
 #[test]

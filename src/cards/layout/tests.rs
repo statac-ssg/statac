@@ -1,11 +1,16 @@
 use super::*;
 
-/// Every character half its size wide, and lines broken between words.
+/// Every character half its size wide, or as wide as its size in the
+/// second list of fonts, and lines broken between words.
 struct Half;
 
 impl Measure for Half {
-    fn measure(&self, text: &str, size: u32, width: f32) -> Measured {
-        let wide = |line: &str| line.chars().count() as f32 * size as f32 / 2.0;
+    fn measure(&self, text: &str, fonts: usize, size: u32, width: f32) -> Measured {
+        let em = match fonts {
+            0 => 0.5,
+            _ => 1.0,
+        };
+        let wide = |line: &str| line.chars().count() as f32 * size as f32 * em;
         let mut lines: Vec<String> = Vec::new();
         for word in text.split(' ') {
             match lines.last_mut() {
@@ -26,6 +31,7 @@ fn text(placement: Placement, size: Size, built: &str) -> Text<'_> {
         placement,
         size,
         built,
+        fonts: 0,
     }
 }
 
@@ -89,6 +95,28 @@ fn a_text_wraps_within_the_safe_area_and_each_line_is_centred() {
     let texts = [text(Placement::Centre, Size::Fixed(40), &built)];
     assert_eq!(lay_out(60, &texts, &Half).unwrap()[0].lines.len(), 2);
     assert_eq!(lay_out(0, &texts, &Half).unwrap()[0].lines.len(), 1);
+}
+
+#[test]
+fn each_text_is_measured_in_its_own_fonts() {
+    let built = format!("{} {}", "a".repeat(20), "b".repeat(10));
+    let mut texts = [
+        text(Placement::Top, Size::Fixed(40), &built),
+        text(Placement::Bottom, Size::Fixed(40), &built),
+    ];
+    texts[1].fonts = 1;
+    let placed = lay_out(60, &texts, &Half).unwrap();
+    assert_eq!(
+        boxes(&placed),
+        [
+            (0, 40, vec![(290.0, 60.0, 620.0, 48.0)]),
+            (
+                1,
+                40,
+                vec![(200.0, 474.0, 800.0, 48.0), (400.0, 522.0, 400.0, 48.0)]
+            ),
+        ]
+    );
 }
 
 #[test]

@@ -21,9 +21,9 @@ pub const FLOOR: u32 = 45;
 
 /// Measures text set in the card's fonts.
 pub trait Measure {
-    /// The lines `text` breaks into at `size`, wrapped within `width`
-    /// pixels, and the width of the widest.
-    fn measure(&self, text: &str, size: u32, width: f32) -> Measured;
+    /// The lines `text` breaks into, set in the list of fonts `fonts` at
+    /// `size`, wrapped within `width` pixels, and the width of the widest.
+    fn measure(&self, text: &str, fonts: usize, size: u32, width: f32) -> Measured;
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -32,12 +32,14 @@ pub struct Measured {
     pub width: f32,
 }
 
-/// A text to place: where and how large, and its text once built.
+/// A text to place: where and how large, its text once built, and the
+/// list of fonts it is set in, by an index [`Measure`] knows.
 #[derive(Copy, Clone, Debug)]
 pub struct Text<'a> {
     pub placement: Placement,
     pub size: Size,
     pub built: &'a str,
+    pub fonts: usize,
 }
 
 /// A text placed, by its index among those given.
@@ -145,7 +147,9 @@ pub fn lay_out(
     let size = |text: usize, size: u32| Sized {
         text,
         size,
-        lines: measure.measure(texts[text].built, size, width).lines,
+        lines: measure
+            .measure(texts[text].built, texts[text].fonts, size, width)
+            .lines,
     };
     let shown: Vec<usize> = (0..texts.len())
         .filter(|&at| !texts[at].built.is_empty())
@@ -234,7 +238,8 @@ pub fn lay_out(
                 .iter()
                 .enumerate()
                 .map(|(n, line)| {
-                    let line_width = measure.measure(line, text.size, width).width;
+                    let fonts = texts[text.text].fonts;
+                    let line_width = measure.measure(line, fonts, text.size, width).width;
                     let x = match placement.align() {
                         Align::Left => left,
                         Align::Right => left + width - line_width,

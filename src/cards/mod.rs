@@ -4,9 +4,10 @@
 //! `templates/og.yaml` describes the site's card, and `og.<name>.yaml`
 //! beside it another, called `<name>`. A description names a background
 //! and fonts, files in `templates/og/`, and the texts drawn over the
-//! background, each a block of four flat fields: `title.text`,
-//! `title.place`, `title.size` and `title.colour`. Texts are drawn in the
-//! order their blocks are first written.
+//! background, each a block of flat fields: `title.text`, `title.place`,
+//! `title.size` and `title.colour`, and `title.font` where the text is
+//! drawn in fonts of its own rather than the card's. Texts are drawn in
+//! the order their blocks are first written.
 //!
 //! Here a description is read and checked, and [`layout`] works out where
 //! each text goes. A text and a template colour are kept as written, with
@@ -41,7 +42,7 @@ const SMALLEST: u32 = 1;
 const LARGEST: u32 = HEIGHT;
 
 const TOP_LEVEL: &[&str] = &["background", "font", "padding"];
-const FIELDS: &[&str] = &["text", "place", "size", "colour"];
+const FIELDS: &[&str] = &["text", "place", "size", "colour", "font"];
 const FONT_ENDINGS: &[&str] = &["ttf", "otf", "ttc"];
 
 /// The cards a site describes, by the files describing them.
@@ -101,6 +102,33 @@ pub struct Block {
     pub placement: Sourced<Placement>,
     pub size: Sourced<Size>,
     pub colour: Sourced<Colour>,
+    /// Names in `templates/og/`, tried in this order; none for the card's.
+    pub fonts: Option<Vec<Sourced<String>>>,
+}
+
+impl Card {
+    /// The lists of fonts the texts are drawn in: the card's first, then
+    /// each text's own, in the order of the texts.
+    pub fn font_lists(&self) -> Vec<&[Sourced<String>]> {
+        let own = self
+            .blocks
+            .iter()
+            .filter_map(|block| block.fonts.as_deref());
+        std::iter::once(self.fonts.as_slice()).chain(own).collect()
+    }
+
+    /// Which of [`Card::font_lists`] each text is drawn in.
+    pub fn drawn_in(&self) -> Vec<usize> {
+        let mut own = 0;
+        let lists = self.blocks.iter().map(|block| match block.fonts {
+            Some(_) => {
+                own += 1;
+                own
+            }
+            None => 0,
+        });
+        lists.collect()
+    }
 }
 
 /// Where on a card a text is drawn.
@@ -306,12 +334,13 @@ struct Pending {
     name: String,
     /// The key of the block's first field, of any name.
     key: Origin,
-    /// Whether any of its four fields is written.
+    /// Whether any of its fields is written.
     known: bool,
     text: Slot<String>,
     placement: Slot<Placement>,
     size: Slot<Size>,
     colour: Slot<Colour>,
+    fonts: Slot<Vec<Sourced<String>>>,
 }
 
 /// Reads a description from a source already added, given the names of
@@ -354,8 +383,7 @@ pub fn read_source(
                 background = (Slot::from(read, problems), key.place);
             }
             "font" => {
-                let read = Reader::new(sources, "font").texts(value);
-                let read = read.map(|fonts| fonts.filter(|fonts| !fonts.value.is_empty()));
+                let read = read_fonts(&Reader::new(sources, "font"), value);
                 fonts = (Slot::from(read, problems), key.place);
             }
             "padding" => {
@@ -375,6 +403,7 @@ pub fn read_source(
                                 placement: Slot::Empty,
                                 size: Slot::Empty,
                                 colour: Slot::Empty,
+                                fonts: Slot::Empty,
                             });
                             blocks.len() - 1
                         }
@@ -390,6 +419,15 @@ pub fn read_source(
                         "colour" => {
                             let read = read_colour(&reader, key, value);
                             pending.colour = Slot::from(read, problems);
+                        }
+                        "font" => {
+                            let read = read_fonts(&reader, value);
+                            pending.fonts = Slot::from(read, problems);
+                            if let Slot::Read(fonts) = &pending.fonts
+                                && !check_fonts(sources, &name, &fonts.value, in_folder, problems)
+                            {
+                                pending.fonts = Slot::Refused;
+                            }
                         }
                         "color" => {
                             pending.colour = Slot::Refused;
@@ -422,7 +460,7 @@ pub fn read_source(
     }
 
     let background = match background {
-        (Slot::Read(name), _) => match check_file(sources, &name, in_folder, false) {
+        (Slot::Read(name), _) => match check_file(sources, &name, in_folder, None) {
             Ok(()) => Some(name),
             Err(problem) => {
                 problems.push(problem);
@@ -437,14 +475,7 @@ pub fn read_source(
     };
     let fonts = match fonts {
         (Slot::Read(fonts), _) => {
-            let mut usable = true;
-            for font in &fonts.value {
-                if let Err(problem) = check_file(sources, font, in_folder, true) {
-                    problems.push(problem);
-                    usable = false;
-                }
-            }
-            usable.then_some(fonts.value)
+            check_fonts(sources, "font", &fonts.value, in_folder, problems).then_some(fonts.value)
         }
         (Slot::Empty, at) => {
             problems.push(missing("font", Requirer::Card, at));
@@ -481,6 +512,7 @@ fn finish(sources: &Sources, pending: Pending, problems: &mut Vec<Problem>) -> O
         placement,
         size,
         colour,
+        fonts,
         ..
     } = pending;
     let at = key.place.expect("a key is written");
@@ -497,6 +529,11 @@ fn finish(sources: &Sources, pending: Pending, problems: &mut Vec<Problem>) -> O
         (text, placement, size, colour)
     else {
         return None;
+    };
+    let fonts = match fonts {
+        Slot::Read(fonts) => Some(fonts.value),
+        Slot::Empty => None,
+        Slot::Refused => return None,
     };
     if placement.value.row() != Row::Middle
         && let Size::UpTo(n) = size.value
@@ -518,6 +555,7 @@ fn finish(sources: &Sources, pending: Pending, problems: &mut Vec<Problem>) -> O
         placement,
         size,
         colour,
+        fonts,
     })
 }
 
@@ -554,6 +592,33 @@ fn set_aside(name: &str, known: Vec<String>, key: &Node) -> Problem {
         },
         key.place,
     )
+}
+
+/// A font file's name, or a list of them; an empty list is none.
+fn read_fonts(
+    reader: &Reader,
+    node: &Node,
+) -> Result<Option<Sourced<Vec<Sourced<String>>>>, Problem> {
+    let read = reader.texts(node)?;
+    Ok(read.filter(|fonts| !fonts.value.is_empty()))
+}
+
+/// Whether every font file `field` names is usable, each that isn't told.
+fn check_fonts(
+    sources: &Sources,
+    field: &str,
+    fonts: &[Sourced<String>],
+    in_folder: &[&str],
+    problems: &mut Vec<Problem>,
+) -> bool {
+    let mut usable = true;
+    for font in fonts {
+        if let Err(problem) = check_file(sources, font, in_folder, Some(field)) {
+            problems.push(problem);
+            usable = false;
+        }
+    }
+    usable
 }
 
 /// A number from 0 to 314 once rounded.
@@ -754,13 +819,14 @@ pub fn is_a_font(name: &str) -> bool {
     ending.is_some_and(|ending| FONT_ENDINGS.iter().any(|f| f.eq_ignore_ascii_case(ending)))
 }
 
-/// Refuses a name reaching outside `templates/og/`, a font of a kind
-/// Statac doesn't read, and a file that isn't there, in that order.
+/// Refuses a name reaching outside `templates/og/`, a font, named by its
+/// field, of a kind Statac doesn't read, and a file that isn't there, in
+/// that order.
 fn check_file(
     sources: &Sources,
     name: &Sourced<String>,
     in_folder: &[&str],
-    font: bool,
+    font: Option<&str>,
 ) -> Result<(), Problem> {
     let place = name.origin.place.expect("a name is written");
     let written = &name.value;
@@ -774,10 +840,12 @@ fn check_file(
             place,
         ));
     }
-    if font && !is_a_font(written) {
+    if let Some(field) = font
+        && !is_a_font(written)
+    {
         return Err(Problem::at(
             Kind::WrongKind {
-                field: "font".into(),
+                field: field.into(),
                 expected: Expected::FontFile,
                 found: Found::Written(sources.spelling(place).to_owned()),
                 respelt: None,

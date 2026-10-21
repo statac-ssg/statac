@@ -8,7 +8,7 @@ these reasons:
 - a text in the middle of the card doesn't fit the space it has, even at
   the smallest size Statac tries;
 - the texts at the top and the bottom leave no space between them;
-- the page's texts contain a character that none of the card's fonts has.
+- a text contains a character that none of its fonts has.
 
 Pages left without a card for the same reason are reported together,
 with the number of pages and the first of them. Pages that need some of
@@ -40,12 +40,13 @@ If a text doesn't fit, give those pages fewer words there. A shorter
 middle of the card more space, with a smaller `padding` or smaller texts
 at the top and bottom.
 
-If no font has a character, add a font that has it to the card's `font`.
+If no font has a character, add a font that has it to the fonts the
+message names: the card's `font`, or a text's own, such as `title.font`.
 Fonts are tried in the order they are written. `statac new --cards`
 writes two: Noto Sans for text and Noto Emoji for emoji. If one of these
 has the character but isn't in `templates/og/`, the message says so. Run
 `statac new --update --missing` to write the font again, then add it to
-the card's `font`.
+those fonts.
 
 To share a page with a picture of your own instead, give that picture in
 the page's `og_image`.

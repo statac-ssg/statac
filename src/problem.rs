@@ -1448,7 +1448,7 @@ pub enum CardFileFault {
 /// `templates/og/`.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum FontWithThem {
-    /// One whose file is there, which the card's `font` doesn't name.
+    /// One whose file is there, which the list lacking them doesn't name.
     Here(String),
     /// One of the starter's that `statac new --update --missing` would
     /// write, with the path it would be written to.
@@ -1458,13 +1458,15 @@ pub enum FontWithThem {
 /// Why a page's card can't be drawn.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum NotDrawn {
-    /// Characters no font of the card has: those the most pages need
-    /// first, how many more there are than are named, and a font with
-    /// all of them, where one is known.
+    /// Characters no font of a list has: those the most pages need
+    /// first, how many more there are than are named, a font with all of
+    /// them, where one is known, and the text's own field naming the
+    /// list, such as `title.font`, or none for the card's `font`.
     NoFont {
         characters: Vec<char>,
         more: usize,
         font: Option<Box<FontWithThem>>,
+        field: Option<Box<String>>,
     },
     /// A text in the middle too tall for its room at the size tried, by
     /// its name, and whether that size is the smallest a fitted text is

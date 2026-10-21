@@ -757,6 +757,21 @@ fn files_no_card_can_be_drawn_with_stop_the_build_once() {
         said.contains("   2 │ font: [text.ttf, more.ttf]\n     │                  ^^^^^^^^\n"),
         "{said}"
     );
+    let said = unusable("own-font", &|site| {
+        site.write(
+            "templates/og.yaml",
+            &format!("{CARD}title.font: [more.ttf, text.ttf]\n"),
+        );
+        site.write("templates/og/more.ttf", "not a font");
+    });
+    assert_eq!(
+        told(&said),
+        ["error  Unusable card file: `templates/og/more.ttf` doesn't read as a font"]
+    );
+    assert!(
+        said.contains("  13 │ title.font: [more.ttf, text.ttf]\n     │              ^^^^^^^^\n"),
+        "{said}"
+    );
 }
 
 #[test]
@@ -918,6 +933,60 @@ fn a_digit_is_drawn_by_a_second_text_font_and_never_by_an_emoji_font() {
     assert_eq!(
         told(&site.check()),
         ["warning  Card not drawn: `content/post-1.md` needs `2`, `0` and `4`, which no font has"]
+    );
+}
+
+#[test]
+fn a_text_drawn_in_fonts_of_its_own_is_told_of_what_they_lack() {
+    let site = Site::new("own-fonts");
+    site.put("templates/og/letters.ttf", LETTERS);
+    site.put("templates/og/NotoEmoji.ttf", EMOJI);
+    site.write(
+        "templates/og.yaml",
+        &format!("{CARD}title.font: [letters.ttf, NotoEmoji.ttf]\n"),
+    );
+    site.write(
+        "content/post-2.md",
+        "---\ntitle: Boots \u{1f97e}\n---\nA post.\n",
+    );
+    let said = site.check();
+    assert_eq!(
+        told(&said),
+        [
+            "warning  Card not drawn: `content/post-1.md` needs `1`, which no font in `title.font` has"
+        ]
+    );
+    assert!(
+        said.contains(
+            "   4 │ title.text: \"{{ page.og_title }}\"\n     \
+             │             ^^^^^^^^^^^^^^^^^^^^^\n  \
+             Add `text.ttf`, which has it, to `title.font`.\n"
+        ),
+        "{said}"
+    );
+
+    // The site's title is in the card's fonts, which lack what the
+    // title's have.
+    site.write(
+        "templates/og.yaml",
+        &format!("{CARD}title.font: [text.ttf, NotoEmoji.ttf]\n"),
+    );
+    site.write(
+        "statac.yaml",
+        "title: Site \u{1f97e}\nurl: https://example.org\nlanguage: en\ntimezone: UTC\n\
+         pages.feed: false\n",
+    );
+    let said = site.check();
+    assert_eq!(
+        told(&said),
+        [
+            "warning  Card not drawn: 3 pages need `\u{1f97e}`, which no font has, starting \
+             with `content/index.md`"
+        ]
+    );
+    assert!(
+        said.contains("  Add `NotoEmoji.ttf`, which has it, to the card's `font`.\n"),
+        "{said}"
     );
 }
 
@@ -1216,6 +1285,30 @@ fn a_second_build_draws_nothing_and_publishes_the_same_bytes() {
     );
     assert_eq!(site.kept().len(), 2);
     assert_ne!(site.kept(), kept);
+}
+
+#[test]
+fn a_change_to_a_texts_own_fonts_draws_its_cards_again() {
+    let site = Site::new("own-fonts-kept");
+    site.write(
+        "templates/og.yaml",
+        &format!("{CARD}title.font: [title.ttf, text.ttf]\n"),
+    );
+    site.put("templates/og/title.ttf", LATIN);
+    let said = site.build();
+    assert!(said.contains("Drew 2 cards."), "{said}");
+    let first = site.cards();
+
+    // A font file no list names is no part of a card.
+    site.put("templates/og/other.ttf", LETTERS);
+    let said = site.build();
+    assert!(!said.contains("Drew"), "{said}");
+    assert_eq!(site.cards(), first);
+
+    site.put("templates/og/title.ttf", LETTERS);
+    let said = site.build();
+    assert!(said.contains("Drew 2 cards."), "{said}");
+    assert!(site.cards().iter().all(|card| !first.contains(card)));
 }
 
 #[test]

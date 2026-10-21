@@ -123,7 +123,10 @@ pub(super) fn files(cards: &Cards) -> Vec<String> {
     let described = cards.described.iter();
     described
         .filter_map(|described| described.card.as_ref())
-        .flat_map(|card| std::iter::once(&card.background).chain(&card.fonts))
+        .flat_map(|card| {
+            let fonts = card.font_lists().into_iter().flatten();
+            std::iter::once(&card.background).chain(fonts)
+        })
         .map(|named| cards::file_named(&named.value))
         .collect()
 }
@@ -393,6 +396,8 @@ struct Built {
     size: Size,
     built: String,
     colour: [u8; 3],
+    /// Its list of fonts, by its index among [`cards::Card::font_lists`].
+    fonts: usize,
 }
 
 fn texts(built: &[Built]) -> Vec<Text<'_>> {
@@ -403,6 +408,7 @@ fn texts(built: &[Built]) -> Vec<Text<'_>> {
             size: text.size,
             built: &text.built,
             colour: text.colour,
+            fonts: text.fonts,
         })
         .collect()
 }
@@ -625,9 +631,29 @@ fn make_kit(cards: &Cards, at: usize) -> Result<Kit, Problem> {
         })
     };
     let background = read(&card.background)?;
-    let fonts: Vec<Vec<u8>> = card.fonts.iter().map(read).collect::<Result<_, _>>()?;
+    // Each file is read once, however many lists name it, and told where
+    // it is first named.
+    let mut named: Vec<(String, &Sourced<String>)> = Vec::new();
+    let lists: Vec<Vec<usize>> = (card.font_lists().into_iter())
+        .map(|list| {
+            let files = list.iter().map(|font| {
+                let path = cards::file_named(&font.value);
+                match named.iter().position(|(named, _)| *named == path) {
+                    Some(at) => at,
+                    None => {
+                        named.push((path, font));
+                        named.len() - 1
+                    }
+                }
+            });
+            files.collect()
+        })
+        .collect();
+    let fonts: Vec<Vec<u8>> = (named.iter())
+        .map(|(_, font)| read(font))
+        .collect::<Result<_, _>>()?;
     let fonts: Vec<&[u8]> = fonts.iter().map(Vec::as_slice).collect();
-    let made = crate::album::quietly(|| Kit::new(&background, &fonts, card.padding.value));
+    let made = crate::album::quietly(|| Kit::new(&background, &fonts, &lists, card.padding.value));
     made.map_err(|failure| {
         let unusable = |named: &Sourced<String>, fault| {
             let kind = Kind::UnusableCardFile {
@@ -654,7 +680,7 @@ fn make_kit(cards: &Cards, at: usize) -> Result<Kit, Problem> {
                 };
                 Problem::placed(kind, card.background.origin.place)
             }
-            KitFailure::Font(font) => unusable(&card.fonts[font], CardFileFault::Font),
+            KitFailure::Font(font) => unusable(named[font].1, CardFileFault::Font),
         }
     })
 }
@@ -721,7 +747,8 @@ fn drawn(shared: &Arc<Shared>, id: PageId, at: usize) -> Outcome {
     };
     let mut built = Vec::with_capacity(card.blocks.len());
     let mut whole = true;
-    for (block, (text, colour)) in card.blocks.iter().zip(&cards.names[at]) {
+    let lists = card.drawn_in();
+    for ((block, (text, colour)), &fonts) in card.blocks.iter().zip(&cards.names[at]).zip(&lists) {
         let text = build(shared, text, id);
         let colour = match (&block.colour.value, colour) {
             (Colour::Rgb(rgb), _) => Some(*rgb),
@@ -749,6 +776,7 @@ fn drawn(shared: &Arc<Shared>, id: PageId, at: usize) -> Outcome {
                 size: block.size.value,
                 built: text,
                 colour,
+                fonts,
             }),
             _ => whole = false,
         }
@@ -765,7 +793,7 @@ fn drawn(shared: &Arc<Shared>, id: PageId, at: usize) -> Outcome {
         false => match kit.plan(&texts) {
             Ok(plan) => Some(plan),
             Err(failure) => {
-                let (why, place) = not_drawn(shared, at, &built, failure);
+                let (why, place) = not_drawn(shared, at, failure);
                 return Outcome::NotDrawn(at, why, place);
             }
         },
@@ -795,28 +823,23 @@ fn drawn(shared: &Arc<Shared>, id: PageId, at: usize) -> Outcome {
 
 /// Why a card of the description at `at` can't be drawn, and where in
 /// the description that is written.
-fn not_drawn(
-    shared: &Shared,
-    at: usize,
-    built: &[Built],
-    failure: Failure,
-) -> (NotDrawn, Option<Place>) {
+fn not_drawn(shared: &Shared, at: usize, failure: Failure) -> (NotDrawn, Option<Place>) {
     let described = &shared.templates.cards.described[at];
     let card = described.card.as_ref().expect("a description read whole");
     let head = described
         .source
         .map(|source| words::head(&shared.sources, source));
     match failure {
-        Failure::Missing(characters) => {
-            let holds = |text: &Built| text.built.contains(characters.as_slice());
-            let block = built.iter().position(holds);
-            let place = block.and_then(|block| card.blocks[block].text.origin.place);
+        Failure::Missing { text, characters } => {
+            let block = &card.blocks[text];
             let why = NotDrawn::NoFont {
                 characters,
                 more: 0,
                 font: None,
+                field: (block.fonts.as_ref())
+                    .map(|_| Box::new(format!("{}.font", block.name.value))),
             };
-            (why, place.or(head))
+            (why, block.text.origin.place.or(head))
         }
         Failure::Layout(layout::Failure::TooTall { text, size, .. }) => {
             let block = &card.blocks[text];
@@ -856,8 +879,8 @@ impl Cause<'_> {
     fn is(&self, described: usize, why: &NotDrawn, lacking: &[char]) -> bool {
         self.described == described
             && match (self.why, why) {
-                (NotDrawn::NoFont { .. }, NotDrawn::NoFont { .. }) => {
-                    self.needed.iter().any(|(c, _)| lacking.contains(c))
+                (NotDrawn::NoFont { field, .. }, NotDrawn::NoFont { field: other, .. }) => {
+                    field == other && self.needed.iter().any(|(c, _)| lacking.contains(c))
                 }
                 (this, other) => this == other,
             }
@@ -952,7 +975,7 @@ pub(super) fn told(shared: &Shared, asked: &Gathered) -> Vec<Problem> {
     }
     for mut cause in causes {
         let why = match cause.why {
-            NotDrawn::NoFont { .. } => {
+            NotDrawn::NoFont { field, .. } => {
                 cause
                     .needed
                     .sort_by_key(|&(_, pages)| std::cmp::Reverse(pages));
@@ -973,6 +996,7 @@ pub(super) fn told(shared: &Shared, asked: &Gathered) -> Vec<Problem> {
                     more: characters.len() - named,
                     characters: characters[..named].to_vec(),
                     font: font.map(Box::new),
+                    field: field.clone(),
                 }
             }
             other => other.clone(),
@@ -1066,8 +1090,8 @@ pub(super) fn told(shared: &Shared, asked: &Gathered) -> Vec<Problem> {
 
 /// A font in `templates/og/` of the site at `root` that draws every one
 /// of `characters`, by its file's name, the first by name where there are
-/// several. No font the card names draws them, so it is one the card
-/// doesn't name.
+/// several. No font of the list lacking them draws them, so it is one the
+/// list doesn't name.
 fn font_here(root: &std::path::Path, characters: &[char]) -> Option<String> {
     let folder = crate::platform::join(root, cards::FOLDER);
     let mut names: Vec<String> = std::fs::read_dir(folder)

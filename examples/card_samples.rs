@@ -37,6 +37,7 @@ fn text(placement: Placement, size: Size, built: &str, colour: [u8; 3]) -> Text<
         size,
         built,
         colour,
+        fonts: 0,
     }
 }
 
@@ -52,6 +53,7 @@ fn main() {
     let white = [255, 255, 255];
     let ink = [30, 30, 40];
     let fonts: &[&[u8]] = &[LATIN, ARABIC, JAPANESE, KOREAN, EMOJI];
+    let lists = [(0..fonts.len()).collect()];
     let centre = |built, colour| text(Placement::Centre, Size::UpTo(120), built, colour);
     let long =
         "A longer title that wraps over more than one line and has to shrink to fit the card";
@@ -73,7 +75,7 @@ fn main() {
     ];
     for (name, background, texts) in samples {
         let started = Instant::now();
-        let kit = Kit::new(background, fonts, 60).expect("the kit is made");
+        let kit = Kit::new(background, fonts, &lists, 60).expect("the kit is made");
         let card = kit.card(&texts).expect("the card is drawn");
         let file = format!(
             "{name}.{}.{}",

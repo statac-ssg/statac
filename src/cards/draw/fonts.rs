@@ -3,7 +3,7 @@
 //! The text engine would choose fonts by family, weight and its own
 //! fallback lists. Here each face is given a family name no other face
 //! has, and every run of text is told which face to use, so that the
-//! first font in the kit's order with a glyph for a character draws it.
+//! first font in the text's list with a glyph for a character draws it.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -23,7 +23,7 @@ pub(super) struct Face {
     pub weight: fontdb::Weight,
     pub style: fontdb::Style,
     pub stretch: fontdb::Stretch,
-    /// The font file it is in, by its place in the kit's list.
+    /// The font file it is in, by its index among those the kit is given.
     pub file: usize,
     /// Whether its digits, `#` and `*` are there only as the bases of
     /// keycaps.
@@ -209,7 +209,7 @@ fn keycaps_only(font: &FontRef) -> bool {
     maps(KEYCAP) && !maps('a') && !maps('A')
 }
 
-/// The faces in the kit's order, with what is known of which characters
+/// A list's faces in order, with what is known of which characters
 /// each draws.
 pub(super) struct Faces {
     pub faces: Vec<Face>,

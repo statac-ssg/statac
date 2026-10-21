@@ -1027,7 +1027,10 @@ pub(crate) fn headline(kind: &Kind) -> String {
             let one = *pages == 1;
             match why {
                 NotDrawn::NoFont {
-                    characters, more, ..
+                    characters,
+                    more,
+                    field,
+                    ..
                 } => {
                     let needed = match more {
                         0 => characters_listed(characters),
@@ -1041,8 +1044,12 @@ pub(crate) fn headline(kind: &Kind) -> String {
                             )
                         }
                     };
+                    let font = match field {
+                        Some(field) => format!("font in `{field}`"),
+                        None => "font".into(),
+                    };
                     format!(
-                        "Card not drawn: {of} {} {needed}, which no font has{starting}",
+                        "Card not drawn: {of} {} {needed}, which no {font} has{starting}",
                         if one { "needs" } else { "need" }
                     )
                 }
@@ -3111,21 +3118,26 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 characters,
                 more,
                 font,
+                field,
             } => {
                 let them = if characters.len() + more == 1 {
                     "it"
                 } else {
                     "them"
                 };
+                let list = match field {
+                    Some(field) => format!("`{field}`"),
+                    None => "the card's `font`".into(),
+                };
                 match font.as_deref() {
                     Some(FontWithThem::Here(font)) => {
-                        format!("Add `{font}`, which has {them}, to the card's `font`.")
+                        format!("Add `{font}`, which has {them}, to {list}.")
                     }
                     Some(FontWithThem::Brought { font, path }) => format!(
                         "Run `statac new --update --missing` to write `{path}`, which has \
-                         {them}, then add `{font}` to the card's `font`."
+                         {them}, then add `{font}` to {list}."
                     ),
-                    None => format!("Add a font that has {them} to the card's `font`."),
+                    None => format!("Add a font that has {them} to {list}."),
                 }
             }
             NotDrawn::TooTall { .. } => {
@@ -6664,6 +6676,7 @@ mod tests {
                         characters: vec!['→'],
                         more: 0,
                         font: None,
+                        field: None,
                     },
                     pages: 1,
                     first: Named::File("content/post-1.md".into()),
@@ -6680,6 +6693,7 @@ mod tests {
                             font: "NotoEmoji.ttf".into(),
                             path: "templates/og/NotoEmoji.ttf".into(),
                         })),
+                        field: None,
                     },
                     pages: 1,
                     first: Named::File("content/post-1.md".into()),
@@ -6697,6 +6711,7 @@ mod tests {
                         characters: vec!['😀'],
                         more: 0,
                         font: Some(Box::new(FontWithThem::Here("NotoEmoji.ttf".into()))),
+                        field: None,
                     },
                     pages: 1,
                     first: Named::File("content/post-1.md".into()),
@@ -6707,9 +6722,25 @@ mod tests {
             (
                 Kind::CardNotDrawn {
                     why: NotDrawn::NoFont {
+                        characters: vec!['😀'],
+                        more: 0,
+                        font: Some(Box::new(FontWithThem::Here("NotoEmoji.ttf".into()))),
+                        field: Some(Box::new("title.font".into())),
+                    },
+                    pages: 1,
+                    first: Named::File("content/post-1.md".into()),
+                },
+                "Card not drawn: `content/post-1.md` needs `😀`, which no font in \
+                 `title.font` has",
+                Some("Add `NotoEmoji.ttf`, which has it, to `title.font`."),
+            ),
+            (
+                Kind::CardNotDrawn {
+                    why: NotDrawn::NoFont {
                         characters: vec!['→', '✓'],
                         more: 0,
                         font: None,
+                        field: None,
                     },
                     pages: 3,
                     first: Named::File("content/post-1.md".into()),
@@ -6724,6 +6755,7 @@ mod tests {
                         characters: vec!['α', 'β', 'γ'],
                         more: 21,
                         font: None,
+                        field: None,
                     },
                     pages: 443,
                     first: Named::File("content/post-1.md".into()),
