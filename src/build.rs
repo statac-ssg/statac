@@ -1264,7 +1264,7 @@ const READ_FROM: [&str; 8] = [
 fn in_the_way(site: &Path, out: &Path) -> Option<Problem> {
     let site = fs::canonicalize(site).ok()?;
     let whole = std::path::absolute(out).ok()?;
-    let whole = crate::import::whole_to_be(&publish::lexically_normal(&whole));
+    let whole = crate::platform::whole_to_be(&publish::lexically_normal(&whole));
     let folds = crate::platform::ignores_capitals(&site);
     let same = |a: &std::ffi::OsStr, b: &std::ffi::OsStr| {
         a == b

@@ -200,6 +200,30 @@ pub fn join(root: &Path, rel: &str) -> PathBuf {
     path
 }
 
+/// `path` made whole, as far as it is there, with the rest as written.
+pub fn whole_to_be(path: &Path) -> PathBuf {
+    let mut missing = Vec::new();
+    let mut at = path.to_path_buf();
+    loop {
+        if let Ok(whole) = std::fs::canonicalize(&at) {
+            return missing
+                .iter()
+                .rev()
+                .fold(whole, |whole, piece| whole.join(piece));
+        }
+        match (at.file_name(), at.parent()) {
+            (Some(name), Some(parent)) => {
+                missing.push(name.to_os_string());
+                at = match parent.as_os_str().is_empty() {
+                    true => PathBuf::from("."),
+                    false => parent.to_path_buf(),
+                };
+            }
+            _ => return path.to_path_buf(),
+        }
+    }
+}
+
 /// A relative path written with forward slashes whatever the system, or
 /// `Err` with a lossy spelling where a piece isn't text.
 pub fn slashed(rel: &Path) -> Result<String, String> {

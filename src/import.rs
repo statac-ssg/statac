@@ -562,7 +562,7 @@ fn refusal(old: &Path, new: &Path, new_shown: &str) -> Result<(), Problem> {
         Err(error) => return Err(cant_read(Reason::of(&error))),
     }
     let whole_old = std::fs::canonicalize(old).map_err(|error| cant_read(Reason::of(&error)))?;
-    let whole_new = whole_to_be(new);
+    let whole_new = crate::platform::whole_to_be(new);
     let inside = |reason: Reason| {
         Problem::nowhere(Kind::CantWrite {
             path: new.to_path_buf(),
@@ -576,30 +576,6 @@ fn refusal(old: &Path, new: &Path, new_shown: &str) -> Result<(), Problem> {
         return Err(inside(Reason::HoldsOld(old.to_path_buf())));
     }
     crate::new::refusal(new, new_shown, Maker::Import)
-}
-
-/// `path` made whole, as far as it is there, with the rest as written.
-pub(crate) fn whole_to_be(path: &Path) -> PathBuf {
-    let mut missing = Vec::new();
-    let mut at = path.to_path_buf();
-    loop {
-        if let Ok(whole) = std::fs::canonicalize(&at) {
-            return missing
-                .iter()
-                .rev()
-                .fold(whole, |whole, piece| whole.join(piece));
-        }
-        match (at.file_name(), at.parent()) {
-            (Some(name), Some(parent)) => {
-                missing.push(name.to_os_string());
-                at = match parent.as_os_str().is_empty() {
-                    true => PathBuf::from("."),
-                    false => parent.to_path_buf(),
-                };
-            }
-            _ => return path.to_path_buf(),
-        }
-    }
 }
 
 /// The tool the author named, or the one whose files the old site has.
