@@ -1229,6 +1229,35 @@ fn a_tag_takes_the_spaces_round_it_whatever_they_are_written_with() {
 }
 
 #[test]
+fn a_body_held_back_is_indented_as_a_browser_reads_its_markup() {
+    let cases = [
+        // No spaces go inside `<pre>` after a comment closed by `--!>`.
+        (
+            "{% macro m() %}\n<!-- a --!>\n<pre>\nx\n</pre>\n<p>y</p>\n{% endmacro %}\n<div>\n  {{ m() }}\n</div>\n",
+            "<div>\n  <!-- a --!>\n  <pre>\nx\n</pre>\n  <p>y</p>\n</div>\n",
+        ),
+        // An apostrophe in an attribute's value written without quotes
+        // leaves the lines after it to take the indent.
+        (
+            "{% macro m() %}\n<p><a title=it's>a</a></p>\n<p>b</p>\n<p>c</p>\n{% endmacro %}\n<div>\n  {{ m() }}\n</div>\n",
+            "<div>\n  <p><a title=it's>a</a></p>\n  <p>b</p>\n  <p>c</p>\n</div>\n",
+        ),
+    ];
+    for (template, page) in cases {
+        let built = site(&[
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\npages.feed: false\n",
+            ),
+            ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("templates/home.html", template),
+        ]);
+        assert!(built.problems.is_empty(), "{:?}", built.problems);
+        assert_eq!(built.html("index.md"), page, "{template}");
+    }
+}
+
+#[test]
 fn a_template_writing_plain_text_keeps_its_bodys_indent() {
     let built = site(&[
         (

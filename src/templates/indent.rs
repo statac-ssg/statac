@@ -11,13 +11,14 @@
 //! lays out its own lines, and is then a value written whole.
 
 use std::cell::RefCell;
+use std::ops::Range;
 use std::{fmt, io};
 
 use minijinja::{Captured, Error, Held, Output, Template, Value};
 
 use super::dedent::Head;
 use super::landing::{Deeper, Landing, Place, Placing};
-use crate::html::PREFORMATTED;
+use crate::html::{Markup, PREFORMATTED};
 
 /// The line a template, or a body the engine holds back, is writing.
 struct Line {
@@ -593,13 +594,10 @@ pub(super) fn write(out: &mut Output, markup: &str) -> Option<Result<(), Error>>
 /// The spaces and tabs that every line of `markup` holding more opens
 /// with, of the lines [`indented`] would indent.
 fn shared(markup: &str) -> &str {
-    let mut reader = Reader {
-        escaped: !markup.contains('<'),
-        ..Reader::default()
-    };
+    let kept = kept_as_written(markup);
     let mut shared: Option<&str> = None;
-    for line in markup.split_inclusive('\n') {
-        if reader.takes_indent() && !line.trim().is_empty() {
+    for (number, line) in markup.split_inclusive('\n').enumerate() {
+        if !kept[number] && !line.trim().is_empty() {
             let opening = &line[..blank(line.as_bytes())];
             let len = shared.map_or(opening.len(), |shared| {
                 shared
@@ -613,7 +611,6 @@ fn shared(markup: &str) -> &str {
             }
             shared = Some(&opening[..len]);
         }
-        reader.read(line);
     }
     shared.unwrap_or("")
 }
@@ -624,12 +621,9 @@ fn shared(markup: &str) -> &str {
 /// they would show, or inside an attribute's value.
 fn indented(markup: &str, shared: &str, indent: &str) -> String {
     let mut out = String::with_capacity(markup.len() + markup.len() / 8);
-    let mut reader = Reader {
-        escaped: !markup.contains('<'),
-        ..Reader::default()
-    };
+    let kept = kept_as_written(markup);
     for (number, line) in markup.split_inclusive('\n').enumerate() {
-        let takes = reader.takes_indent();
+        let takes = !kept[number];
         let rest = match line.strip_prefix(shared) {
             Some(rest) if takes => rest,
             None if takes && line.trim().is_empty() => line.trim_start_matches([' ', '\t']),
@@ -639,132 +633,58 @@ fn indented(markup: &str, shared: &str, indent: &str) -> String {
             out.push_str(indent);
         }
         out.push_str(rest);
-        reader.read(line);
     }
     out
 }
 
-/// Where in the markup a line starts, as far as it decides whether spaces
-/// before the line change anything. It reads markup as an author writes it,
-/// or markup escaped whole to be carried as text, as a feed carries a post;
-/// what it can't follow it takes for text.
-#[derive(Default)]
-struct Reader {
-    /// Whether the markup is escaped whole. In markup as written, an
-    /// escaped tag is words about one, such as `<pre>` named in a sentence.
-    escaped: bool,
-    within: Within,
-    /// Inside `<pre>` or `<textarea>`.
-    shown: bool,
-    /// The `<script>` or `<style>` whose opening tag is being read.
-    opening: Option<&'static str>,
-}
-
-#[derive(Default, Clone, Copy)]
-enum Within {
-    #[default]
-    Text,
-    Tag,
-    /// An attribute's value, with the quote that closes it.
-    Value(u8),
-    Comment,
-    /// A script or a stylesheet, which ends only at its own closing tag.
-    Raw(&'static str),
-}
-
-impl Reader {
-    fn takes_indent(&self) -> bool {
-        !self.shown && !matches!(self.within, Within::Value(_))
-    }
-
-    fn read(&mut self, line: &str) {
-        let bytes = line.as_bytes();
-        let mut at = 0;
-        while at < bytes.len() {
-            let rest = &line[at..];
-            match self.within {
-                Within::Text => {
-                    let Some(found) = rest.find(['<', '&']) else {
-                        return;
-                    };
-                    let rest = &rest[found..];
-                    at += found + 1;
-                    if let Some(escaped) = rest.strip_prefix("&lt;") {
-                        if self.escaped {
-                            self.element(escaped);
-                        }
-                    } else if rest.starts_with("<!--") {
-                        self.within = Within::Comment;
-                    } else if let Some(tag) = rest.strip_prefix('<')
-                        && tag.starts_with(|c: char| c == '/' || c.is_ascii_alphabetic())
-                    {
-                        self.opening = self.element(tag);
-                        self.within = Within::Tag;
+/// For each line of `markup`, whether spaces before it would change it:
+/// it starts inside `<pre>`, `<textarea>` or the like, where they would
+/// show, or inside an attribute's value. Markup escaped whole, as a feed
+/// carries a post, is read as the markup it shows; in markup as written,
+/// an escaped tag is words about one, such as `<pre>` named in a sentence.
+fn kept_as_written(markup: &str) -> Vec<bool> {
+    let unescaped;
+    let text = if markup.contains('<') {
+        markup
+    } else {
+        // As long as what it stands for, so every line starts where it did.
+        unescaped = markup.replace("&lt;", "   <").replace("&gt;", ">   ");
+        &unescaped
+    };
+    // Where a line starting is kept as written.
+    let mut kept: Vec<Range<usize>> = Vec::new();
+    // The element whose spaces show being read, and where its name starts.
+    let mut shown: Option<(String, usize)> = None;
+    for (range, piece) in crate::html::markup_where_closed(text) {
+        match piece {
+            Markup::Start(tag) => {
+                for attribute in &tag.attributes {
+                    if text[attribute.at.clone()].contains('\n') {
+                        kept.push(attribute.at.start + 1..attribute.at.end + 1);
                     }
                 }
-                Within::Tag => {
-                    let Some(found) = rest.find(['"', '\'', '>']) else {
-                        return;
-                    };
-                    at += found + 1;
-                    self.within = match rest.as_bytes()[found] {
-                        b'>' => self.opening.take().map_or(Within::Text, Within::Raw),
-                        quote => Within::Value(quote),
-                    };
-                }
-                Within::Value(quote) => {
-                    let Some(found) = rest.find(char::from(quote)) else {
-                        return;
-                    };
-                    at += found + 1;
-                    self.within = Within::Tag;
-                }
-                Within::Comment => {
-                    let Some(found) = rest.find("-->") else {
-                        return;
-                    };
-                    at += found + 3;
-                    self.within = Within::Text;
-                }
-                Within::Raw(name) => {
-                    let closes = rest
-                        .match_indices("</")
-                        .find(|(found, _)| names(&rest[found + 2..], name));
-                    let Some((found, _)) = closes else {
-                        return;
-                    };
-                    at += found + 2;
-                    self.within = Within::Tag;
+                if shown.is_none() && PREFORMATTED.contains(&tag.name.as_str()) {
+                    shown = Some((tag.name, range.start + 1));
                 }
             }
+            Markup::End(tag) => {
+                if let Some((name, from)) = &shown
+                    && *name == tag.name
+                {
+                    kept.push(*from..range.start + 1);
+                    shown = None;
+                }
+            }
+            Markup::Other => {}
         }
     }
-
-    /// Reads the name a tag opens with, `tag` being what follows its `<`:
-    /// notes entering or leaving an element that shows its spaces, and gives
-    /// the name of a script or stylesheet being opened.
-    fn element(&mut self, tag: &str) -> Option<&'static str> {
-        let (closes, name) = match tag.strip_prefix('/') {
-            Some(name) => (true, name),
-            None => (false, tag),
-        };
-        if PREFORMATTED.iter().any(|shown| names(name, shown)) {
-            self.shown = !closes;
-        }
-        ["script", "style"]
-            .into_iter()
-            .find(|raw| !closes && names(name, raw))
+    if let Some((_, from)) = shown {
+        kept.push(from..usize::MAX);
     }
-}
-
-/// Whether `text` opens with the element name `name`, in either case.
-fn names(text: &str, name: &str) -> bool {
-    let text = text.as_bytes();
-    text.len() >= name.len()
-        && text[..name.len()].eq_ignore_ascii_case(name.as_bytes())
-        && !text
-            .get(name.len())
-            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+    std::iter::once(0)
+        .chain(text.match_indices('\n').map(|(at, _)| at + 1))
+        .map(|start| kept.iter().any(|range| range.contains(&start)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -895,6 +815,31 @@ mod tests {
                 "  "
             ),
             "&lt;p&gt;a&lt;/p&gt;\n  &lt;pre&gt;one\n  two&lt;/pre&gt;\n  &lt;p&gt;b"
+        );
+    }
+
+    #[test]
+    fn the_markup_is_read_as_a_browser_reads_it() {
+        // A comment closed by `--!>` hides nothing after it.
+        assert_eq!(
+            indented("<!-- a --!>\n<pre>\nx\n</pre>\n<p>y</p>", "", "  "),
+            "<!-- a --!>\n  <pre>\nx\n</pre>\n  <p>y</p>"
+        );
+        // An apostrophe in an attribute's value written without quotes
+        // opens no quotation.
+        assert_eq!(
+            indented("<p><a title=it's>a</a></p>\n<p>b</p>\n<p>c</p>", "", "  "),
+            "<p><a title=it's>a</a></p>\n  <p>b</p>\n  <p>c</p>"
+        );
+        // An `<iframe>` named in the words and never closed is taken to
+        // hold nothing, where a browser would read the rest as its text.
+        assert_eq!(
+            indented(
+                "<code><iframe></code>\n<pre>\nx\n</pre>\n<p>y</p>",
+                "",
+                "  "
+            ),
+            "<code><iframe></code>\n  <pre>\nx\n</pre>\n  <p>y</p>"
         );
     }
 }
