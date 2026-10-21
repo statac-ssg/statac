@@ -2,12 +2,13 @@
 //! name is only ever looked up in a folder already open, and a link put in
 //! place of a folder fails to open rather than being followed.
 
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::io;
 use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
-use std::path::Path;
-use std::sync::OnceLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, UNIX_EPOCH};
 
 use rayon::prelude::*;
 use rustix::fs::{
@@ -157,10 +158,16 @@ pub(super) fn no_link_to(root: &Path, rel: &str) -> io::Result<()> {
 
 /// [`super::remove_file`], by the folder [`holder`] opens.
 pub(super) fn remove_file(root: &Path, rel: &str) -> io::Result<()> {
-    let Some((at, name)) = holder(root, rel)? else {
-        return Ok(());
-    };
-    match statat(at.as_fd(), name, AtFlags::SYMLINK_NOFOLLOW) {
+    match holder(root, rel)? {
+        Some((at, name)) => remove_file_at(at.as_fd(), name),
+        None => Ok(()),
+    }
+}
+
+/// Removes the file `name` in the open folder `at`, refusing a link or
+/// anything else than a file; nothing there is no error.
+fn remove_file_at(at: BorrowedFd<'_>, name: &Path) -> io::Result<()> {
+    match statat(at, name, AtFlags::SYMLINK_NOFOLLOW) {
         Err(Errno::NOENT) => return Ok(()),
         Err(error) => return Err(error.into()),
         Ok(found) => match FileType::from_raw_mode(found.st_mode) {
@@ -169,7 +176,7 @@ pub(super) fn remove_file(root: &Path, rel: &str) -> io::Result<()> {
             _ => return Err(io::Error::other("it is not a file")),
         },
     }
-    match unlinkat(at.as_fd(), name, AtFlags::empty()) {
+    match unlinkat(at, name, AtFlags::empty()) {
         Err(Errno::NOENT) => Ok(()),
         done => Ok(done?),
     }
@@ -242,25 +249,294 @@ pub(super) fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io
     written
 }
 
-/// Makes `to` a copy of `source` whose bytes the disk shares with it, as
-/// [`super::copy_file`] does on Apple's systems. `Ok(false)` where the
-/// disk can't, and nothing is made.
-#[cfg(target_vendor = "apple")]
-pub(super) fn clone_file(source: &std::fs::File, to: &Path) -> io::Result<bool> {
-    use rustix::fs::{CloneFlags, fclonefileat};
-    match fclonefileat(source, CWD, to, CloneFlags::empty()) {
-        Ok(()) => Ok(true),
-        // A disk that shares no bytes between files, or another disk.
-        Err(Errno::NOTSUP | Errno::XDEV) => Ok(false),
-        Err(error) => Err(error.into()),
+/// [`super::Folders`]: the folders under `root` opened so far, each kept
+/// by its path there until [`OPEN_AT_MOST`] are, when the one least
+/// lately asked for is let go.
+#[derive(Debug)]
+pub(super) struct Folders {
+    root: PathBuf,
+    open: Mutex<Open>,
+}
+
+#[derive(Debug, Default)]
+struct Open {
+    /// Each folder, with when it was last asked for.
+    by_path: HashMap<String, (Arc<OwnedFd>, u64)>,
+    asked: u64,
+}
+
+/// How many folders [`Folders`] keeps open at most: those near the top,
+/// which nearly every file is under, and those the files being written
+/// now are in, well short of the 256 files a process on macOS may have
+/// open unless it asks for more.
+const OPEN_AT_MOST: usize = 64;
+
+impl Open {
+    fn get(&mut self, rel: &str) -> Option<Arc<OwnedFd>> {
+        self.asked += 1;
+        let asked = self.asked;
+        let (folder, last) = self.by_path.get_mut(rel)?;
+        *last = asked;
+        Some(Arc::clone(folder))
+    }
+
+    fn keep(&mut self, rel: &str, folder: &Arc<OwnedFd>) {
+        if self.by_path.len() >= OPEN_AT_MOST {
+            let least = (self.by_path.iter()).min_by_key(|(_, (_, last))| *last);
+            if let Some(least) = least.map(|(rel, _)| rel.clone()) {
+                self.by_path.remove(&least);
+            }
+        }
+        self.asked += 1;
+        let kept = (Arc::clone(folder), self.asked);
+        self.by_path.insert(rel.to_owned(), kept);
     }
 }
 
-/// [`super::length_and_time`], by the folder [`holder`] opens.
-pub(super) fn length_and_time(root: &Path, rel: &str) -> io::Result<(u64, SystemTime)> {
+impl Folders {
+    pub(super) fn new(root: &Path) -> Folders {
+        Folders {
+            root: root.to_path_buf(),
+            open: Mutex::default(),
+        }
+    }
+
+    /// The folder `rel`, the top itself where it is empty: opened by name
+    /// in the nearest folder above it already open, and never through a
+    /// link. A folder on the way that isn't there is made where `making`;
+    /// none otherwise.
+    fn folder(&self, rel: &str, making: bool) -> io::Result<Option<Arc<OwnedFd>>> {
+        let kept = {
+            let mut open = self.open.lock().expect("never poisoned");
+            let mut end = rel.len();
+            loop {
+                if let Some(folder) = open.get(&rel[..end]) {
+                    break Some((folder, end));
+                }
+                if end == 0 {
+                    break None;
+                }
+                end = rel[..end].rfind('/').unwrap_or(0);
+            }
+        };
+        let (mut at, done) = match kept {
+            Some(kept) => kept,
+            None => {
+                let top = open_folder(CWD, &self.root);
+                let top = Arc::new(top.map_err(|error| refusal(CWD, &self.root, error))?);
+                self.open.lock().expect("never poisoned").keep("", &top);
+                (top, 0)
+            }
+        };
+        let mut end = done;
+        for piece in rel[done..].split('/').filter(|piece| !piece.is_empty()) {
+            end = rel[end..]
+                .find(piece)
+                .map_or(rel.len(), |at| end + at + piece.len());
+            let name = Path::new(piece);
+            let opened = match open_folder(at.as_fd(), name) {
+                Err(Errno::NOENT) if !making => return Ok(None),
+                Err(Errno::NOENT) => {
+                    match rustix::fs::mkdirat(at.as_fd(), name, Mode::from_raw_mode(0o777)) {
+                        // Made by another meanwhile.
+                        Ok(()) | Err(Errno::EXIST) => open_folder(at.as_fd(), name),
+                        Err(error) => Err(error),
+                    }
+                }
+                opened => opened,
+            };
+            at = Arc::new(opened.map_err(|error| refusal(at.as_fd(), name, error))?);
+            let mut open = self.open.lock().expect("never poisoned");
+            open.keep(&rel[..end], &at);
+        }
+        Ok(Some(at))
+    }
+
+    /// The folder holding `rel`, as [`Folders::folder`] opens it, and the
+    /// last name in `rel`; none where a folder on the way isn't there.
+    fn holder<'a>(&self, rel: &'a str) -> io::Result<Option<(Arc<OwnedFd>, &'a Path)>> {
+        let (above, name) = rel.rsplit_once('/').unwrap_or(("", rel));
+        Ok(self.folder(above, false)?.map(|at| (at, Path::new(name))))
+    }
+
+    /// [`Folders::holder`], for `rel` whose folders must be there.
+    fn holder_there<'a>(&self, rel: &'a str) -> io::Result<(Arc<OwnedFd>, &'a Path)> {
+        self.holder(rel)?
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+    }
+
+    /// Lets go of every folder kept open, once one is removed or renamed:
+    /// another may stand at its path now.
+    fn forget(&self) {
+        self.open.lock().expect("never poisoned").by_path.clear();
+    }
+
+    pub(super) fn make_folders(&self, rel: &str) -> io::Result<()> {
+        self.folder(rel, true).map(drop)
+    }
+
+    pub(super) fn make_new_file(&self, rel: &str, replacing: bool) -> io::Result<std::fs::File> {
+        let (at, name) = self.holder_there(rel)?;
+        cleared(at.as_fd(), name, replacing)?;
+        let file = openat(at.as_fd(), name, MADE, Mode::from_raw_mode(0o666))?;
+        Ok(std::fs::File::from(file))
+    }
+
+    pub(super) fn copy_file(
+        &self,
+        source: &std::fs::File,
+        rel: &str,
+        replacing: bool,
+    ) -> io::Result<Option<std::fs::File>> {
+        let (at, name) = self.holder_there(rel)?;
+        let at = at.as_fd();
+        cleared(at, name, replacing)?;
+        #[cfg(target_vendor = "apple")]
+        {
+            use rustix::fs::{CloneFlags, fclonefileat};
+            match fclonefileat(source, at, name, CloneFlags::empty()) {
+                Ok(()) => {
+                    let opened = OFlags::WRONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+                    let made = openat(at, name, opened, Mode::empty()).ok();
+                    return Ok(made.map(std::fs::File::from));
+                }
+                // A disk that shares no bytes between files, or another disk.
+                Err(Errno::NOTSUP | Errno::XDEV) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        let made = openat(at, name, MADE, Mode::from_raw_mode(0o666))?;
+        let mut made = std::fs::File::from(made);
+        io::copy(&mut &*source, &mut made)?;
+        made.set_permissions(source.metadata()?.permissions())?;
+        Ok(Some(made))
+    }
+
+    pub(super) fn open_file(&self, rel: &str) -> io::Result<std::fs::File> {
+        let opened = match self.holder(rel)? {
+            Some((at, name)) => opened_at(at.as_fd(), name)?,
+            None => None,
+        };
+        opened.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+    }
+
+    pub(super) fn measure(&self, rel: &str) -> io::Result<super::Measure> {
+        let (at, name) = self.holder_there(rel)?;
+        measure_at(at.as_fd(), name)
+    }
+
+    pub(super) fn remove(&self, rel: &str, alone: bool) -> io::Result<()> {
+        let Some((at, name)) = self.holder(rel)? else {
+            return Ok(());
+        };
+        let at = at.as_fd();
+        let found = match statat(at, name, AtFlags::SYMLINK_NOFOLLOW) {
+            Ok(found) => found,
+            Err(Errno::NOENT) => return Ok(()),
+            Err(error) => return Err(error.into()),
+        };
+        if FileType::from_raw_mode(found.st_mode) == FileType::Directory {
+            self.forget();
+            match open_folder(at, name) {
+                Ok(folder) => {
+                    match alone {
+                        true => empty_alone(folder)?,
+                        false => removing(|| empty(folder))?,
+                    }
+                    return Ok(unlinkat(at, name, AtFlags::REMOVEDIR)?);
+                }
+                // A link, or no longer a folder: removed as what it is.
+                Err(Errno::LOOP | Errno::NOTDIR) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        match unlinkat(at, name, AtFlags::empty()) {
+            Ok(()) | Err(Errno::NOENT) => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    pub(super) fn remove_file(&self, rel: &str) -> io::Result<()> {
+        match self.holder(rel)? {
+            Some((at, name)) => remove_file_at(at.as_fd(), name),
+            None => Ok(()),
+        }
+    }
+
+    pub(super) fn remove_empty_folder(&self, rel: &str) -> io::Result<()> {
+        let (at, name) = self.holder_there(rel)?;
+        self.forget();
+        Ok(unlinkat(at.as_fd(), name, AtFlags::REMOVEDIR)?)
+    }
+
+    pub(super) fn rename_in(&self, folder: &str, from: &str, to: &str) -> io::Result<()> {
+        let gone = || io::Error::from(io::ErrorKind::NotFound);
+        let at = self.folder(folder, false)?.ok_or_else(gone)?;
+        self.forget();
+        Ok(renameat(at.as_fd(), from, at.as_fd(), to)?)
+    }
+}
+
+/// Removes what stands at `name` in `at`, where `replacing`, as a link
+/// itself where it is one; nothing there is no error.
+fn cleared(at: BorrowedFd<'_>, name: &Path, replacing: bool) -> io::Result<()> {
+    match replacing {
+        true => match unlinkat(at, name, AtFlags::empty()) {
+            Ok(()) | Err(Errno::NOENT) => Ok(()),
+            Err(error) => Err(error.into()),
+        },
+        false => Ok(()),
+    }
+}
+
+/// Made only where nothing has the name, a link included.
+const MADE: OFlags = OFlags::WRONLY
+    .union(OFlags::CREATE)
+    .union(OFlags::EXCL)
+    .union(OFlags::NOFOLLOW)
+    .union(OFlags::CLOEXEC);
+
+/// Removes everything in the open folder `folder`, one entry at a time on
+/// the calling thread.
+fn empty_alone(folder: OwnedFd) -> io::Result<()> {
+    let mut listing = Dir::new(folder)?;
+    let mut entries = Vec::new();
+    while let Some(entry) = listing.read() {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name != c"." && name != c".." {
+            entries.push((CString::from(name), entry.file_type()));
+        }
+    }
+    let at = listing.fd()?;
+    for (name, kind) in entries {
+        if matches!(kind, FileType::Directory | FileType::Unknown) {
+            match open_folder(at, name.as_c_str()) {
+                Ok(inner) => {
+                    empty_alone(inner)?;
+                    unlinkat(at, name.as_c_str(), AtFlags::REMOVEDIR)?;
+                    continue;
+                }
+                Err(Errno::LOOP | Errno::NOTDIR) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        unlinkat(at, name.as_c_str(), AtFlags::empty())?;
+    }
+    Ok(())
+}
+
+/// [`super::measure`], by the folder [`holder`] opens.
+pub(super) fn measure(root: &Path, rel: &str) -> io::Result<super::Measure> {
     let gone = || io::Error::from(io::ErrorKind::NotFound);
     let (at, name) = holder(root, rel)?.ok_or_else(gone)?;
-    let found = statat(at.as_fd(), name, AtFlags::SYMLINK_NOFOLLOW)?;
+    measure_at(at.as_fd(), name)
+}
+
+/// What the file `name` in the open folder `at` is found to be, refusing
+/// a link or anything else than a file.
+fn measure_at(at: BorrowedFd<'_>, name: &Path) -> io::Result<super::Measure> {
+    let found = statat(at, name, AtFlags::SYMLINK_NOFOLLOW)?;
     match FileType::from_raw_mode(found.st_mode) {
         FileType::RegularFile => {}
         FileType::Symlink => return Err(io::Error::other("it is a link")),
@@ -286,17 +562,26 @@ pub(super) fn length_and_time(root: &Path, rel: &str) -> io::Result<(u64, System
                 + Duration::from_nanos(nanos.into())
         }
     };
-    Ok((length, modified))
+    Ok(super::Measure {
+        length,
+        modified,
+        named_once: found.st_nlink == 1,
+    })
 }
 
 /// The file `rel` under `root` opened to read, by name in the folder
 /// [`holder`] opens and never through a link, or none where nothing is
 /// there.
 fn opened(root: &Path, rel: &str) -> io::Result<Option<std::fs::File>> {
-    let Some((at, name)) = holder(root, rel)? else {
-        return Ok(None);
-    };
-    let at = at.as_fd();
+    match holder(root, rel)? {
+        Some((at, name)) => opened_at(at.as_fd(), name),
+        None => Ok(None),
+    }
+}
+
+/// The file `name` in the open folder `at`, opened to read and never
+/// through a link, or none where nothing is there.
+fn opened_at(at: BorrowedFd<'_>, name: &Path) -> io::Result<Option<std::fs::File>> {
     // Not waiting for a writer, where a pipe stands at the name.
     let opened = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
     let file = match openat(at, name, opened, Mode::empty()) {
@@ -558,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    fn a_file_is_asked_its_length_through_no_link_and_without_reading_it() {
+    fn a_file_is_measured_through_no_link_and_without_reading_it() {
         use std::os::unix::fs::PermissionsExt;
         let scratch = Scratch::new("times-link");
         let kept = kept(&scratch);
@@ -568,9 +853,9 @@ mod tests {
         fs::set_permissions(folder.join("a.txt"), fs::Permissions::from_mode(0o000)).unwrap();
         symlink(kept.join("notes.txt"), folder.join("notes.txt")).unwrap();
         symlink(&kept, folder.join("linked")).unwrap();
-        assert_eq!(length_and_time(&folder, "a.txt").unwrap().0, 1);
+        assert_eq!(measure(&folder, "a.txt").unwrap().length, 1);
         for rel in ["notes.txt", "linked/notes.txt"] {
-            let refused = length_and_time(&folder, rel).unwrap_err();
+            let refused = measure(&folder, rel).unwrap_err();
             assert_eq!(refused.to_string(), "it is a link", "{rel}");
         }
     }
@@ -595,6 +880,39 @@ mod tests {
         assert_eq!(fs::read(kept.join("notes.txt")).unwrap(), b"mine");
         assert_eq!(fs::read(kept.join("named.txt")).unwrap(), b"named");
         assert_eq!(names(&folder), ["linked", "named.txt", "notes.txt"]);
+    }
+
+    #[test]
+    fn a_folder_kept_open_is_never_a_link_put_in_its_place() {
+        let scratch = Scratch::new("folders");
+        let kept = kept(&scratch);
+        let top = scratch.0.join("top");
+        fs::create_dir_all(top.join("a")).unwrap();
+        fs::create_dir_all(top.join("b")).unwrap();
+        let folders = Folders::new(&top);
+        folders.make_new_file("a/1.txt", false).unwrap();
+        // Kept open, it is written into wherever it is moved.
+        fs::rename(top.join("a"), scratch.0.join("moved")).unwrap();
+        symlink(&kept, top.join("a")).unwrap();
+        folders.make_new_file("a/2.txt", false).unwrap();
+        assert_eq!(names(&scratch.0.join("moved")), ["1.txt", "2.txt"]);
+        // Never opened, it is refused.
+        fs::rename(top.join("b"), scratch.0.join("b")).unwrap();
+        symlink(&kept, top.join("b")).unwrap();
+        let refused = folders.make_new_file("b/1.txt", false).unwrap_err();
+        assert_eq!(refused.to_string(), "it is a link");
+        assert_eq!(names(&kept), ["drafts", "notes.txt"]);
+        // Far more folders than are kept open, and one removed and made
+        // again under its path.
+        for nth in 0..OPEN_AT_MOST * 3 {
+            folders.make_folders(&format!("c/{nth}")).unwrap();
+            folders.make_new_file(&format!("c/{nth}/x"), false).unwrap();
+        }
+        assert_eq!(names(&top.join("c")).len(), OPEN_AT_MOST * 3);
+        folders.remove("c", false).unwrap();
+        folders.make_folders("c/0").unwrap();
+        folders.make_new_file("c/0/x", false).unwrap();
+        assert_eq!(names(&top.join("c")), ["0"]);
     }
 
     #[test]

@@ -510,9 +510,8 @@ pub fn read(
     let entries: Vec<Option<(index::Entry, bool)>> = wanted
         .par_iter()
         .map(|wanted| {
-            let (length, modified) =
-                crate::platform::length_and_time(&site.real, wanted.at).ok()?;
-            let stamp = index::Stamp::new(length, modified);
+            let measure = crate::platform::measure(&site.real, wanted.at).ok()?;
+            let stamp = index::Stamp::new(measure.length, measure.modified);
             if let Some(entry) = known.get(wanted.root, &wanted.path)
                 && stamp.is_some_and(|stamp| stamp == entry.stamp)
             {

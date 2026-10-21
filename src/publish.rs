@@ -94,6 +94,8 @@ pub struct Staging {
     out: PathBuf,
     /// The folder written into: the spare, or a fresh one beside the output.
     fresh: PathBuf,
+    /// The folders opened in `fresh`, kept open while the build writes.
+    folders: platform::Folders,
     /// Where the output waits for the moment the two can't be exchanged
     /// in one step.
     aside: PathBuf,
@@ -274,19 +276,8 @@ impl Held {
 
 /// Removes what stands at `path`, whatever it is, following no link.
 fn remove(path: &Path) -> io::Result<()> {
-    remove_by(path, platform::remove_folder)
-}
-
-/// [`remove`] on the calling thread alone. A thread waiting on others to
-/// remove a folder takes up other work meanwhile, which may ask for a
-/// lock it holds.
-fn remove_alone(path: &Path) -> io::Result<()> {
-    remove_by(path, |folder| fs::remove_dir_all(folder))
-}
-
-fn remove_by(path: &Path, remove_folder: impl Fn(&Path) -> io::Result<()>) -> io::Result<()> {
     match fs::symlink_metadata(path) {
-        Ok(found) if found.is_dir() => remove_folder(path),
+        Ok(found) if found.is_dir() => platform::remove_folder(path),
         // A link to a folder is removed as a folder on Windows.
         Ok(_) => fs::remove_file(path).or_else(|_| fs::remove_dir(path)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
@@ -343,7 +334,7 @@ impl Spare {
     /// the name, a folder it held under the name, and a file it held
     /// where a folder above `rel` goes. A disk that ignores capitals holds
     /// each of those in the new file's way.
-    fn make_room(&self, root: &Path, rel: &str) -> io::Result<()> {
+    fn make_room(&self, root: &platform::Folders, rel: &str) -> io::Result<()> {
         if self.files.is_empty() && self.folders.is_empty() {
             return Ok(());
         }
@@ -365,7 +356,7 @@ impl Spare {
             let unasked =
                 self.files[file].compare_exchange(0, GONE, Ordering::Relaxed, Ordering::Relaxed);
             if unasked.is_ok() {
-                remove_alone(&platform::join(root, file))?;
+                root.remove(file, true)?;
             }
         }
         let mut gone = self.gone.lock().expect("never poisoned");
@@ -379,7 +370,7 @@ impl Spare {
                     state.store(GONE, Ordering::Relaxed);
                 }
             }
-            remove_alone(&platform::join(root, folder))?;
+            root.remove(folder, true)?;
             gone.push(folder.clone());
         }
         Ok(())
@@ -392,7 +383,7 @@ impl Spare {
     /// Only a file itself is removed, reached through no link: a link or
     /// a folder found where a file was written, or on the way to it,
     /// stops the removal there.
-    fn clear(self, root: &Path) -> io::Result<()> {
+    fn clear(self, root: &platform::Folders) -> io::Result<()> {
         for (file, state) in &self.files {
             if state.load(Ordering::Relaxed) != 0 {
                 continue;
@@ -400,14 +391,10 @@ impl Spare {
             if !platform::stays_inside(file) {
                 return Err(io::Error::other("it is outside the built site"));
             }
-            platform::no_link_to(root, file)?;
-            match fs::remove_file(platform::join(root, file)) {
-                Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
-                _ => {}
-            }
+            root.remove_file(file)?;
             for folder in above(file) {
                 // One still holding something stays, as do those above it.
-                if fs::remove_dir(platform::join(root, folder)).is_err() {
+                if root.remove_empty_folder(folder).is_err() {
                     break;
                 }
             }
@@ -417,7 +404,7 @@ impl Spare {
 
     /// Removes from the folder at `root` everything this build didn't ask
     /// for, files and folders, so it holds the new site and nothing else.
-    fn settle(self, root: &Path, makers: &Turns) -> io::Result<()> {
+    fn settle(self, top: &Path, root: &platform::Folders, makers: &Turns) -> io::Result<()> {
         let added = self.added.into_inner().expect("never poisoned");
         let kept = || {
             let held = self.files.iter();
@@ -439,7 +426,7 @@ impl Spare {
                 .iter()
                 .map(|&folder| (platform::folded(folder), folder))
                 .collect();
-            return tidy(root, "", &files, &wanted, &spelt);
+            return tidy(top, root, "", &files, &wanted, &spelt);
         }
         let stands = |rel: &str| {
             above(rel)
@@ -450,43 +437,48 @@ impl Spare {
         let folders = self.folders.par_iter().filter(|folder| {
             !wanted.contains(folder.as_str()) && stands(folder) && !gone.contains(folder)
         });
-        folders.try_for_each(|folder| remove(&platform::join(root, folder)))?;
+        folders.try_for_each(|folder| root.remove(folder, false))?;
         let files = self
             .files
             .par_iter()
             .filter(|(file, state)| state.load(Ordering::Relaxed) == 0 && stands(file));
         files.try_for_each(|(file, _)| {
             let _turn = makers.take();
-            remove(&platform::join(root, file))
+            root.remove(file, false)
         })
     }
 }
 
-/// Makes the folder at `folder`, which is `rel` in the spare, hold the
+/// Makes the folder `rel` in the spare at `top`, open as `root`, hold the
 /// `files` and `folders` wanted and nothing else, by what the disk says
-/// it holds now. A folder held under another spelling of a wanted name
-/// is given the wanted one; `spelt` has each wanted folder by its folded
+/// it holds now. A folder held under another spelling of a wanted name is
+/// given the wanted one; `spelt` has each wanted folder by its folded
 /// path.
 fn tidy(
-    folder: &Path,
+    top: &Path,
+    root: &platform::Folders,
     rel: &str,
     files: &HashSet<&str>,
     folders: &HashSet<&str>,
     spelt: &HashMap<String, &str>,
 ) -> io::Result<()> {
-    let (held, below, others) = list(folder)?;
+    let (held, below, others) = list(&platform::join(top, rel))?;
     for other in others {
-        remove(&other)?;
+        match other.file_name().and_then(|name| name.to_str()) {
+            Some(name) => root.remove(&joined(rel, name), false)?,
+            None => remove(&other)?,
+        }
     }
     for name in held {
-        if !files.contains(joined(rel, &name).as_str()) {
-            remove(&folder.join(name))?;
+        let at = joined(rel, &name);
+        if !files.contains(at.as_str()) {
+            root.remove(&at, false)?;
         }
     }
     for name in &below {
         let at = joined(rel, name);
         if folders.contains(at.as_str()) {
-            tidy(&folder.join(name), &at, files, folders, spelt)?;
+            tidy(top, root, &at, files, folders, spelt)?;
             continue;
         }
         let respelt = spelt.get(&platform::folded(&at)).and_then(|wanted| {
@@ -498,10 +490,10 @@ fn tidy(
         });
         match respelt {
             Some((wanted, last)) => {
-                platform::rename(&folder.join(name), &folder.join(last))?;
-                tidy(&folder.join(last), wanted, files, folders, spelt)?;
+                root.rename_in(rel, name, last)?;
+                tidy(top, root, wanted, files, folders, spelt)?;
             }
-            None => remove(&folder.join(name))?,
+            None => root.remove(&at, false)?,
         }
     }
     Ok(())
@@ -615,6 +607,7 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
         shown: out.to_path_buf(),
         out: absolute.clone(),
         fresh: new.clone(),
+        folders: platform::Folders::new(&new),
         aside: beside(".statac-old"),
         spare: None,
         keeps: false,
@@ -661,7 +654,10 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
     });
     staging.clear(&staging.aside)?;
     match spare {
-        Ok((place, held)) => (staging.fresh, staging.spare, staging.keeps) = (place, held, true),
+        Ok((place, held)) => {
+            staging.folders = platform::Folders::new(&place);
+            (staging.fresh, staging.spare, staging.keeps) = (place, held, true);
+        }
         Err(error) => {
             staging.unkept = Some(Problem::nowhere(Kind::CacheNotWritten {
                 path: named,
@@ -699,6 +695,7 @@ pub fn resume(
         shown: folder.to_path_buf(),
         out: folder.to_path_buf(),
         fresh: folder.to_path_buf(),
+        folders: platform::Folders::new(folder),
         aside: folder.to_path_buf(),
         spare: Some(spare),
         keeps: true,
@@ -754,10 +751,9 @@ fn spare_place(
     }
 }
 
-/// Whether `a` and the file at `b` hold the same bytes. `a` is left
-/// wherever the comparison stopped.
-fn same_bytes(a: &mut fs::File, b: &Path) -> io::Result<bool> {
-    let mut b = fs::File::open(b)?;
+/// Whether `a` and `b`, files open to read, hold the same bytes. `a` is
+/// left wherever the comparison stopped.
+fn same_bytes(a: &mut fs::File, mut b: fs::File) -> io::Result<bool> {
     if a.metadata()?.len() != b.metadata()?.len() {
         return Ok(false);
     }
@@ -885,7 +881,7 @@ impl Staging {
     /// Writes `bytes` at `rel`, a path with forward slashes, making the
     /// folders above it.
     pub fn write(&self, rel: &str, bytes: &[u8]) -> Result<(), Problem> {
-        let (to, held) = self.claimed(rel, false)?;
+        let held = self.claimed(rel, false)?;
         if self.in_place {
             let cant = |error: io::Error| self.cant_write(rel, &error);
             // A file held is written over where it stands: making it anew
@@ -910,7 +906,7 @@ impl Staging {
             self.no_link_to(rel).map_err(cant)?;
         }
         if held {
-            let same = fs::File::open(&to).and_then(|mut file| {
+            let same = self.folders.open_file(rel).and_then(|mut file| {
                 let mut there = Vec::new();
                 let same = file.metadata()?.len() == bytes.len() as u64;
                 Ok(same && file.read_to_end(&mut there)? == bytes.len() && there == bytes)
@@ -920,7 +916,7 @@ impl Staging {
             }
         }
         let _turn = self.makers.take();
-        let mut file = self.create(rel, &to, held)?;
+        let mut file = self.create(rel, held)?;
         io::Write::write_all(&mut file, bytes).map_err(|error| self.cant_write(rel, &error))
     }
 
@@ -975,18 +971,23 @@ impl Staging {
         if self.stands_as_left(rel, found) {
             return Ok(());
         }
-        let (to, held) = self.claim(rel)?;
+        let held = self.claim(rel)?;
         if held {
             let before = self.notes.as_ref().and_then(|notes| notes.before.get(rel));
             let as_copied = found.is_some() && before == found.as_ref();
-            if as_copied || same_bytes(&mut source, &to).unwrap_or(false) {
+            let there = || self.folders.open_file(rel);
+            if as_copied
+                || there()
+                    .and_then(|b| same_bytes(&mut source, b))
+                    .unwrap_or(false)
+            {
                 self.copied(rel, found);
                 return Ok(());
             }
             source.rewind().map_err(|error| cant_read(&error))?;
         }
         let _turn = self.makers.take();
-        let mut file = self.create(rel, &to, held)?;
+        let mut file = self.create(rel, held)?;
         io::copy(&mut source, &mut file).map_err(|error| self.cant_write(rel, &error))?;
         self.copied(rel, found);
         Ok(())
@@ -1019,31 +1020,27 @@ impl Staging {
         if self.stands_as_left(rel, from_stamp) {
             return Ok(());
         }
-        let (to, held) = self.claim(rel)?;
-        let as_copied = |there: fs::Metadata| {
-            there.is_file()
-                && platform::named_once(&there)
-                && there.len() == found.len()
-                && changed.is_some()
-                && there.modified().ok() == changed
+        let held = self.claim(rel)?;
+        let as_copied = |there: platform::Measure| {
+            there.named_once && there.length == found.len() && Some(there.modified) == changed
         };
-        if held && fs::symlink_metadata(&to).is_ok_and(as_copied) {
+        if held && self.folders.measure(rel).is_ok_and(as_copied) {
             self.copied(rel, from_stamp);
             return Ok(());
         }
         let _turn = self.makers.take();
-        self.clear_for(rel, &to, held)?;
-        if exists(&to) {
-            let taken = io::Error::from(io::ErrorKind::AlreadyExists);
-            return Err(self.cant_write(rel, &taken));
-        }
-        platform::copy_file(&source, &to).map_err(|error| self.cant_write(rel, &error))?;
+        self.make_folders_for(rel, held)?;
+        let made = self
+            .folders
+            .copy_file(&source, rel, held)
+            .map_err(|error| self.cant_write(rel, &error))?;
         self.wrote(rel);
         // Some disks copy a file's time with it and some don't. One that
         // can't be given the time is copied again by the next build.
-        if let Some(changed) = changed
-            && fs::symlink_metadata(&to).is_ok_and(|made| made.modified().ok() != Some(changed))
-            && let Ok(made) = fs::OpenOptions::new().write(true).open(&to)
+        if let (Some(changed), Some(made)) = (changed, made)
+            && made
+                .metadata()
+                .is_ok_and(|made| made.modified().ok() != Some(changed))
         {
             let _ = made.set_modified(changed);
         }
@@ -1077,17 +1074,16 @@ impl Staging {
     /// Where `rel` goes in the folder written into, and whether the spare
     /// held a file there, which is this build's from now on. Room is made
     /// for a name the spare didn't hold.
-    fn claim(&self, rel: &str) -> Result<(PathBuf, bool), Problem> {
+    fn claim(&self, rel: &str) -> Result<bool, Problem> {
         self.claimed(rel, true)
     }
 
     /// [`Staging::claim`], which `asks` whether the way to `rel` goes
     /// through a link; the caller does where it doesn't.
-    fn claimed(&self, rel: &str, asks: bool) -> Result<(PathBuf, bool), Problem> {
+    fn claimed(&self, rel: &str, asks: bool) -> Result<bool, Problem> {
         if !platform::stays_inside(rel) {
             return Err(self.cant_write(rel, &io::Error::other("it is outside the built site")));
         }
-        let to = platform::join(&self.fresh, rel);
         // A folder written where it stands is not listed first, as a
         // spare is, so nothing in it is known to be no link until asked.
         if self.in_place && asks {
@@ -1095,15 +1091,15 @@ impl Staging {
                 .map_err(|error| self.cant_write(rel, &error))?;
         }
         let Some(spare) = &self.spare else {
-            return Ok((to, false));
+            return Ok(false);
         };
         match spare
             .files
             .get(rel)
             .map(|state| state.swap(WANTED, Ordering::Relaxed))
         {
-            Some(0) => Ok((to, true)),
-            Some(GONE) => Ok((to, false)),
+            Some(0) => Ok(true),
+            Some(GONE) => Ok(false),
             Some(_) => {
                 let taken = io::Error::from(io::ErrorKind::AlreadyExists);
                 Err(self.cant_write(rel, &taken))
@@ -1114,46 +1110,38 @@ impl Staging {
                 // another's fails to be made, and says so.
                 if !self.in_place {
                     spare
-                        .make_room(&self.fresh, rel)
+                        .make_room(&self.folders, rel)
                         .map_err(|error| self.cant_write(rel, &error))?;
                 }
                 let mut added = spare.added.lock().expect("never poisoned");
                 added.push(rel.to_owned());
-                Ok((to, false))
+                Ok(false)
             }
         }
     }
 
-    /// Leaves nothing at `to`, which is `rel`: removes the spare's file
-    /// where it `held` one, and makes the folders above it where not.
-    fn clear_for(&self, rel: &str, to: &Path, held: bool) -> Result<(), Problem> {
-        if held {
-            return match fs::remove_file(to) {
-                Err(error) if error.kind() != io::ErrorKind::NotFound => {
-                    Err(self.cant_write(rel, &error))
-                }
-                _ => Ok(()),
-            };
-        }
-        match to.parent() {
-            Some(folder) => fs::create_dir_all(folder).map_err(|error| {
-                let above = rel.rsplit_once('/').map_or("", |(above, _)| above);
-                self.cant_write(above, &error)
-            }),
-            None => Ok(()),
+    /// Makes the folders above `rel`, where the spare didn't hold a file
+    /// there.
+    fn make_folders_for(&self, rel: &str, held: bool) -> Result<(), Problem> {
+        match (held, rel.rsplit_once('/')) {
+            (false, Some((above, _))) => self
+                .folders
+                .make_folders(above)
+                .map_err(|error| self.cant_write(above, &error)),
+            _ => Ok(()),
         }
     }
 
-    /// Makes the file at `to`, which is `rel`, anew: nothing already in
-    /// its place, a link included, is ever written through.
-    fn create(&self, rel: &str, to: &Path, held: bool) -> Result<fs::File, Problem> {
-        self.clear_for(rel, to, held)?;
+    /// Makes the file `rel` anew, as [`platform::Folders::make_new_file`]
+    /// makes it, removing the spare's file there first where it `held`
+    /// one: nothing already in its place, or in place of a folder on the
+    /// way, a link included, is ever written through.
+    fn create(&self, rel: &str, held: bool) -> Result<fs::File, Problem> {
+        self.make_folders_for(rel, held)?;
+        let made = self.folders.make_new_file(rel, held);
+        let made = made.map_err(|error| self.cant_write(rel, &error))?;
         self.wrote(rel);
-        fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(to)
-            .map_err(|error| self.cant_write(rel, &error))
+        Ok(made)
     }
 
     /// Leaves the folder written into holding what this build wrote and
@@ -1168,7 +1156,7 @@ impl Staging {
         }
         match self.spare.take() {
             Some(spare) => spare
-                .settle(&self.fresh, &self.makers)
+                .settle(&self.fresh, &self.folders, &self.makers)
                 .map_err(|error| self.cant_write("", &error)),
             None => Ok(()),
         }
@@ -1244,7 +1232,7 @@ impl Staging {
         if self.in_place {
             let spare = self.spare.take().unwrap_or_default();
             return spare
-                .clear(&self.fresh)
+                .clear(&self.folders)
                 .map_err(|error| self.cant_write("", &error));
         }
         self.settle()?;
@@ -2345,7 +2333,8 @@ mod tests {
         for (a, left) in texts.iter().enumerate() {
             for (b, right) in texts.iter().enumerate() {
                 let mut file = fs::File::open(scratch.0.join(a.to_string())).unwrap();
-                let same = same_bytes(&mut file, &scratch.0.join(b.to_string())).unwrap();
+                let other = fs::File::open(scratch.0.join(b.to_string())).unwrap();
+                let same = same_bytes(&mut file, other).unwrap();
                 assert_eq!(same, left == right, "{a} {b}");
             }
         }
@@ -2438,6 +2427,40 @@ mod tests {
                 assert_eq!(names(&scratch.0), ["out", "outside", "site"]);
                 assert_eq!(names(&outside), [MARKER, "notes.txt"]);
             }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_folder_of_the_spare_swapped_for_a_link_after_listing_is_never_gone_through() {
+        let scratch = scratch_with_site("spare-swapped");
+        let files = [("a/b.html", "b"), ("a/c.html", "c")];
+        scratch.build(&files);
+        scratch.build(&files);
+        let outside = scratch.0.join("outside");
+        fs::create_dir(&outside).unwrap();
+        for name in ["b.html", "c.html"] {
+            fs::write(outside.join(name), "mine").unwrap();
+        }
+        let staging = scratch.begin();
+        let folder = scratch.spare().join("a");
+        fs::rename(&folder, scratch.0.join("moved")).unwrap();
+        std::os::unix::fs::symlink(&outside, &folder).unwrap();
+        let refused = |at: &str| {
+            Problem::nowhere(Kind::CantWrite {
+                path: scratch.out().join(at),
+                reason: "it is a link".into(),
+            })
+        };
+        let written = staging.write("a/b.html", b"new");
+        assert_eq!(written, Err(refused("a/b.html")));
+        let written = staging.write("a/d.html", b"new");
+        assert_eq!(written, Err(refused("a")));
+        // What the build didn't ask for is removed as it settles.
+        assert_eq!(staging.finish(), Err(refused("")));
+        assert_eq!(names(&outside), ["b.html", "c.html"]);
+        for name in ["b.html", "c.html"] {
+            assert_eq!(fs::read(outside.join(name)).unwrap(), b"mine");
         }
     }
 

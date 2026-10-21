@@ -502,38 +502,215 @@ pub fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Resul
     }
 }
 
-/// Copies what `source`, a file open to read, holds to a new file at `to`,
-/// which nothing may have yet, given the permissions of `source`. On
-/// Apple's systems the two share their bytes where the disk can, as a copy
-/// made by the system's own copying does.
-pub fn copy_file(source: &std::fs::File, to: &Path) -> io::Result<()> {
-    #[cfg(target_vendor = "apple")]
-    if unix::clone_file(source, to)? {
-        return Ok(());
-    }
-    let mut made = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(to)?;
-    io::copy(&mut &*source, &mut made)?;
-    made.set_permissions(source.metadata()?.permissions())
+/// A folder written into, which keeps open each folder under it it opens,
+/// up to a few dozen, for the work that follows: a file written is
+/// reached from the nearest folder above it already open rather than from
+/// the top. Each path given is a path with forward slashes under the
+/// folder. On Unix each folder is opened by name in the folder above it,
+/// already open, and never through a link, so a folder swapped for a link
+/// once looked at is refused rather than gone through; one kept open stays
+/// the folder it was, wherever it is moved. Elsewhere each is reached by
+/// its path.
+#[derive(Debug)]
+pub struct Folders {
+    #[cfg(unix)]
+    open: unix::Folders,
+    #[cfg(not(unix))]
+    root: PathBuf,
 }
 
-/// The length of the file `rel`, a path with forward slashes under the
-/// folder `root`, and when its bytes last changed, refused as
-/// [`open_file`] refuses. The file is asked without being opened, so one
-/// that can't be read is asked too. On Unix it is asked by name in the
-/// folder above it, already open, and never through a link.
-pub fn length_and_time(root: &Path, rel: &str) -> io::Result<(u64, std::time::SystemTime)> {
+impl Folders {
+    /// The folder at `root`, nothing in it open yet.
+    pub fn new(root: &Path) -> Folders {
+        Folders {
+            #[cfg(unix)]
+            open: unix::Folders::new(root),
+            #[cfg(not(unix))]
+            root: root.to_path_buf(),
+        }
+    }
+
+    /// Makes the folder `rel`, and each folder on the way to it, where
+    /// they aren't there.
+    pub fn make_folders(&self, rel: &str) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            self.open.make_folders(rel)
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::create_dir_all(join(&self.root, rel))
+        }
+    }
+
+    /// Makes the file `rel` anew, and gives it open to write. Where
+    /// `replacing`, what stands at `rel` is removed first, a link as a
+    /// link; nothing else already there is ever written through. The
+    /// folders on the way must be there already.
+    pub fn make_new_file(&self, rel: &str, replacing: bool) -> io::Result<std::fs::File> {
+        #[cfg(unix)]
+        {
+            self.open.make_new_file(rel, replacing)
+        }
+        #[cfg(not(unix))]
+        {
+            let to = join(&self.root, rel);
+            if replacing {
+                match std::fs::remove_file(&to) {
+                    Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+                    _ => {}
+                }
+            }
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(to)
+        }
+    }
+
+    /// Copies what `source`, a file open to read, holds to the file `rel`,
+    /// made anew as [`Folders::make_new_file`] makes it, and given the
+    /// permissions of `source`. On Apple's systems the two share their
+    /// bytes where the disk can, as a copy made by the system's own
+    /// copying does. Gives the copy open to write where it can be opened
+    /// so, for its time to be set.
+    pub fn copy_file(
+        &self,
+        source: &std::fs::File,
+        rel: &str,
+        replacing: bool,
+    ) -> io::Result<Option<std::fs::File>> {
+        #[cfg(unix)]
+        {
+            self.open.copy_file(source, rel, replacing)
+        }
+        #[cfg(not(unix))]
+        {
+            let mut made = self.make_new_file(rel, replacing)?;
+            io::copy(&mut &*source, &mut made)?;
+            made.set_permissions(source.metadata()?.permissions())?;
+            Ok(Some(made))
+        }
+    }
+
+    /// The file `rel` opened to read, as [`open_file`] opens it.
+    pub fn open_file(&self, rel: &str) -> io::Result<std::fs::File> {
+        #[cfg(unix)]
+        {
+            self.open.open_file(rel)
+        }
+        #[cfg(not(unix))]
+        {
+            open_file(&self.root, rel)
+        }
+    }
+
+    /// What the file `rel` is found to be, as [`measure`] finds it.
+    pub fn measure(&self, rel: &str) -> io::Result<Measure> {
+        #[cfg(unix)]
+        {
+            self.open.measure(rel)
+        }
+        #[cfg(not(unix))]
+        {
+            measure(&self.root, rel)
+        }
+    }
+
+    /// Removes what stands at `rel`, whatever it is: a folder with
+    /// everything in it, a file, or a link as a link. Nothing there is no
+    /// error. `alone` keeps the work on the calling thread: one waiting on
+    /// others takes up other work meanwhile, which may ask for a lock it
+    /// holds.
+    pub fn remove(&self, rel: &str, alone: bool) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            self.open.remove(rel, alone)
+        }
+        #[cfg(not(unix))]
+        {
+            let path = join(&self.root, rel);
+            match std::fs::symlink_metadata(&path) {
+                Ok(found) if found.is_dir() => match alone {
+                    true => std::fs::remove_dir_all(&path),
+                    false => remove_folder(&path),
+                },
+                // A link to a folder is removed as a folder on Windows.
+                Ok(_) => std::fs::remove_file(&path).or_else(|_| std::fs::remove_dir(&path)),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(error),
+            }
+        }
+    }
+
+    /// Removes the file `rel` as [`remove_file`] does.
+    pub fn remove_file(&self, rel: &str) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            self.open.remove_file(rel)
+        }
+        #[cfg(not(unix))]
+        {
+            remove_file(&self.root, rel)
+        }
+    }
+
+    /// Removes the folder `rel` where it is empty, and fails where it
+    /// isn't.
+    pub fn remove_empty_folder(&self, rel: &str) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            self.open.remove_empty_folder(rel)
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::remove_dir(join(&self.root, rel))
+        }
+    }
+
+    /// Gives the entry `from` in the folder `folder` the name `to` there.
+    pub fn rename_in(&self, folder: &str, from: &str, to: &str) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            self.open.rename_in(folder, from, to)
+        }
+        #[cfg(not(unix))]
+        {
+            let folder = join(&self.root, folder);
+            rename(&folder.join(from), &folder.join(to))
+        }
+    }
+}
+
+/// What [`measure`] finds of a file.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct Measure {
+    pub length: u64,
+    /// When its bytes last changed.
+    pub modified: std::time::SystemTime,
+    /// Whether it has one name only, as [`named_once`] says.
+    pub named_once: bool,
+}
+
+/// What the file `rel`, a path with forward slashes under the folder
+/// `root`, is found to be, refused as [`open_file`] refuses. The file is
+/// asked without being opened, so one that can't be read is asked too. On
+/// Unix it is asked by name in the folder above it, already open, and
+/// never through a link.
+pub fn measure(root: &Path, rel: &str) -> io::Result<Measure> {
     #[cfg(unix)]
     {
-        unix::length_and_time(root, rel)
+        unix::measure(root, rel)
     }
     #[cfg(not(unix))]
     {
         no_link_to(root, rel)?;
         let found = std::fs::metadata(join(root, rel))?;
-        Ok((found.len(), found.modified()?))
+        Ok(Measure {
+            length: found.len(),
+            modified: found.modified()?,
+            named_once: named_once(&found),
+        })
     }
 }
 
@@ -1034,7 +1211,7 @@ mod tests {
     }
 
     #[test]
-    fn a_files_length_and_time_are_as_the_system_gives_them() {
+    fn a_file_is_measured_as_the_system_gives_it() {
         let root =
             std::env::temp_dir().join(format!("statac-platform-times-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -1042,12 +1219,16 @@ mod tests {
         std::fs::write(root.join("a").join("b.txt"), "bytes").unwrap();
         let found = std::fs::metadata(root.join("a").join("b.txt")).unwrap();
         assert_eq!(
-            length_and_time(&root, "a/b.txt").unwrap(),
-            (5, found.modified().unwrap())
+            measure(&root, "a/b.txt").unwrap(),
+            Measure {
+                length: 5,
+                modified: found.modified().unwrap(),
+                named_once: true,
+            }
         );
-        let missing = length_and_time(&root, "a/c.txt").unwrap_err();
+        let missing = measure(&root, "a/c.txt").unwrap_err();
         assert_eq!(missing.kind(), io::ErrorKind::NotFound);
-        assert!(length_and_time(&root, "a").is_err());
+        assert!(measure(&root, "a").is_err());
         remove_folder(&root).unwrap();
     }
 
@@ -1071,17 +1252,24 @@ mod tests {
     }
 
     #[test]
-    fn a_file_open_to_read_is_copied_to_a_new_file_only() {
+    fn a_file_open_to_read_is_copied_to_a_file_made_anew() {
         let root =
             std::env::temp_dir().join(format!("statac-platform-copy-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("a.txt"), "bytes").unwrap();
         let source = std::fs::File::open(root.join("a.txt")).unwrap();
-        copy_file(&source, &root.join("b.txt")).unwrap();
-        assert_eq!(std::fs::read(root.join("b.txt")).unwrap(), b"bytes");
-        let taken = copy_file(&source, &root.join("b.txt")).unwrap_err();
+        let folders = Folders::new(&root);
+        folders.make_folders("c/d").unwrap();
+        folders.copy_file(&source, "c/d/b.txt", false).unwrap();
+        let copied = root.join("c").join("d").join("b.txt");
+        assert_eq!(std::fs::read(&copied).unwrap(), b"bytes");
+        let taken = folders.copy_file(&source, "c/d/b.txt", false).unwrap_err();
         assert_eq!(taken.kind(), io::ErrorKind::AlreadyExists);
+        std::fs::write(&copied, "other").unwrap();
+        folders.copy_file(&source, "c/d/b.txt", true).unwrap();
+        assert_eq!(std::fs::read(&copied).unwrap(), b"bytes");
+        drop(folders);
         remove_folder(&root).unwrap();
     }
 
