@@ -1,6 +1,6 @@
 use super::*;
 use crate::origin::Arrival;
-use crate::problem::{Code, Expected, Found, Named, SetAside, Word, WrongPlace};
+use crate::problem::{Code, Expected, Found, Named, Reason, SetAside, Word, WrongPlace};
 use crate::testing::TempSite;
 
 /// A run on the day given, so posts dated after it wait.
@@ -1894,7 +1894,7 @@ fn a_file_that_isnt_text_is_refused_and_the_rest_read() {
         read.problems,
         [Problem::nowhere(Kind::CantRead {
             path: "content/post-2.md".into(),
-            reason: "it isn't UTF-8 text".into(),
+            reason: Reason::NotUtf8,
         })]
     );
     let pages = read.site.pages.iter();
@@ -2862,6 +2862,6 @@ fn a_file_beside_the_writing_is_read_where_its_link_led_when_read() {
     )
     .unwrap();
     for rel in ["post-1/notes.txt", "files/notes.txt"] {
-        assert_eq!(open(rel).unwrap_err().to_string(), "it is a link", "{rel}");
+        assert_eq!(Reason::of(&open(rel).unwrap_err()), Reason::Link, "{rel}");
     }
 }

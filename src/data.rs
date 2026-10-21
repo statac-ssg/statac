@@ -153,7 +153,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Data, Vec<Problem>) {
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {
                     path: shown.into(),
-                    reason: crate::problem::system_reason(&error),
+                    reason: crate::problem::Reason::of(&error),
                 }));
                 continue;
             }

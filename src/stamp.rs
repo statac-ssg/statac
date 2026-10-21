@@ -529,7 +529,7 @@ fn written(site: &Path, prepared: &build::Prepared, fixed: bool, part: Part) -> 
                     Some(edit) => due.entry(source).or_default().id = Some(edit),
                     None => pass.refused.push(Problem::nowhere(Kind::CantWrite {
                         path: sources.path(source).to_path_buf(),
-                        reason: crate::wording::NO_LINE_FOR_AN_ID.into(),
+                        reason: crate::problem::Reason::NoPlaceForId,
                     })),
                 }
             }

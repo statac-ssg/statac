@@ -14,8 +14,8 @@ use crate::problem::{
     AddressFault, ArgumentFault, Awaited, Braced, Called, CardFileFault, Chooser, Ended, Expected,
     FontWithThem, FormatFault, Found, Held, Hint, Instead, Kind, Lack, ListFault, Maker, Missing,
     MoreAt, Named, NamedIn, Needed, NotDrawn, Opener, OptionHint, Own, PictureFault, Piece,
-    PublishedAsText, Reach, RecordFault, Relation, Requirer, Rewrite, Root, SetAside, Severity,
-    Shape, ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault,
+    PublishedAsText, Reach, Reason, RecordFault, Relation, Requirer, Rewrite, Root, SetAside,
+    Severity, Shape, ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault,
     TemplateFault, Translated, Unheard, Unmatched, Unquietenable, Unsupported, Unwritten, Waiting,
     Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
@@ -1686,6 +1686,45 @@ fn unwritable(path: &str, why: &Unwritable) -> String {
             format!("Unwritable name: Windows drops the space ending a name in `{path}`")
         }
         Unwritable::NotText => format!("Unwritable name: `{path}` isn't text"),
+    }
+}
+
+/// Why a file or folder couldn't be read, written or removed, to follow a
+/// colon.
+pub(crate) fn reason(reason: &Reason) -> String {
+    match reason {
+        Reason::Link => "it is a link".into(),
+        Reason::LinkOutside => "it is a link that leads outside the old site".into(),
+        Reason::NotAFile => "it is not a file".into(),
+        Reason::NotAFolder => "it isn't a folder".into(),
+        Reason::NotASite => "it has no `statac.yaml`, so it isn't a site".into(),
+        Reason::OutsideBuilt => "it is outside the built site".into(),
+        Reason::OutsideNew => "it is outside the new site".into(),
+        Reason::InsideOld(old) => {
+            format!("it is inside the site being imported, `{}`", old.display())
+        }
+        Reason::HoldsOld(old) => {
+            format!("the site being imported, `{}`, is inside it", old.display())
+        }
+        Reason::TopOfDisk => "it is the top of the disk".into(),
+        Reason::Taken => "something else has its name".into(),
+        Reason::Changed => "it changed while Statac was reading the site".into(),
+        Reason::NamedTwice => "the same file has another name somewhere".into(),
+        Reason::NamesNoFolder => "it names no folder".into(),
+        Reason::NoPlaceForId => "its front matter has no place for an `id:` line".into(),
+        Reason::Address(fault) => address_fault(fault),
+        Reason::NotToml => "this line doesn't read as TOML".into(),
+        Reason::NotText => "it isn't text".into(),
+        Reason::NotForSass => "Sass couldn't read it".into(),
+        Reason::WatchLimit => "the system is watching as many files as it allows".into(),
+        Reason::Denied => "permission denied".into(),
+        Reason::FolderNamed => "a folder already has that name".into(),
+        Reason::FileInTheWay => "a file is in the way of a folder".into(),
+        Reason::DiskFull => "the disk is full".into(),
+        Reason::Missing => "it doesn't exist".into(),
+        Reason::ReadOnly => "the disk is read-only".into(),
+        Reason::NotUtf8 => "it isn't UTF-8 text".into(),
+        Reason::Said(said) => said.clone(),
     }
 }
 
@@ -3400,23 +3439,11 @@ pub(crate) fn wrote_id(file: &str) -> String {
 pub(crate) const IDS_NOT_WRITTEN: &str =
     "Wrote no feed ids: they start once `statac build` has published the site.";
 
-/// Why a post isn't given an `id:` line: nowhere in its front matter
-/// would the line be read as a field of the page.
-pub(crate) const NO_LINE_FOR_AN_ID: &str = "its front matter has no place for an `id:` line";
-
 /// What `stamp` says where no stamp waits.
 pub(crate) const NOTHING_TO_STAMP: &str = "Nothing to stamp.";
 
 /// What `stamp` and `serve` say of stamps they left as they were.
 pub(crate) const NOT_STAMPED: &str = "Didn't stamp: `statac.yaml` has an error.";
-
-/// Why a file of the author's isn't written into: it no longer holds what
-/// was read.
-pub(crate) const CHANGED_SINCE_READ: &str = "it changed while Statac was reading the site";
-
-/// Why a file of the author's isn't written into: writing it would part
-/// it from its other name.
-pub(crate) const NAMED_TWICE: &str = "the same file has another name somewhere";
 
 /// Why a fetch of `address` brought nothing back, to follow a colon: the
 /// same words whatever was being fetched.
@@ -3721,7 +3748,7 @@ pub(crate) fn port_moved(asked: u16, port: u16) -> String {
 
 /// What `serve` says where the system kept it from answering the browser,
 /// once for each run of such faults.
-pub(crate) fn cant_answer(reason: &str) -> String {
+pub(crate) fn cant_answer(reason: &Reason) -> String {
     format!("Can't answer the browser: {reason}.")
 }
 
@@ -4359,9 +4386,6 @@ pub(crate) fn next_steps(folder: Option<&str>, starter: bool) -> String {
     }
 }
 
-/// Why `statac new --update` can't bring a folder up to date.
-pub(crate) const NOT_A_SITE: &str = "it has no `statac.yaml`, so it isn't a site";
-
 pub(crate) fn updated_file(path: &str) -> String {
     format!("Updated `{path}`.")
 }
@@ -4508,7 +4532,7 @@ mod tests {
             },
             Kind::CantWrite {
                 path: "out/index.html".into(),
-                reason: "a folder already has that name".into(),
+                reason: Reason::FolderNamed,
             },
         ]
         .into_iter()
@@ -4824,6 +4848,70 @@ mod tests {
         }
         assert_eq!(NOT_A_PICTURE, "the answer isn't a picture");
         assert_eq!(NO_PICTURE_NAMED, "the video site named no picture");
+    }
+
+    #[test]
+    fn every_reason_reads_as_written() {
+        let cases = [
+            (Reason::Link, "it is a link"),
+            (
+                Reason::LinkOutside,
+                "it is a link that leads outside the old site",
+            ),
+            (Reason::NotAFile, "it is not a file"),
+            (Reason::NotAFolder, "it isn't a folder"),
+            (
+                Reason::NotASite,
+                "it has no `statac.yaml`, so it isn't a site",
+            ),
+            (Reason::OutsideBuilt, "it is outside the built site"),
+            (Reason::OutsideNew, "it is outside the new site"),
+            (
+                Reason::InsideOld("old".into()),
+                "it is inside the site being imported, `old`",
+            ),
+            (
+                Reason::HoldsOld("old".into()),
+                "the site being imported, `old`, is inside it",
+            ),
+            (Reason::TopOfDisk, "it is the top of the disk"),
+            (Reason::Taken, "something else has its name"),
+            (
+                Reason::Changed,
+                "it changed while Statac was reading the site",
+            ),
+            (
+                Reason::NamedTwice,
+                "the same file has another name somewhere",
+            ),
+            (Reason::NamesNoFolder, "it names no folder"),
+            (
+                Reason::NoPlaceForId,
+                "its front matter has no place for an `id:` line",
+            ),
+            (
+                Reason::Address(Box::new(AddressFault::Unclosed)),
+                "`{` is never closed",
+            ),
+            (Reason::NotToml, "this line doesn't read as TOML"),
+            (Reason::NotText, "it isn't text"),
+            (Reason::NotForSass, "Sass couldn't read it"),
+            (
+                Reason::WatchLimit,
+                "the system is watching as many files as it allows",
+            ),
+            (Reason::Denied, "permission denied"),
+            (Reason::FolderNamed, "a folder already has that name"),
+            (Reason::FileInTheWay, "a file is in the way of a folder"),
+            (Reason::DiskFull, "the disk is full"),
+            (Reason::Missing, "it doesn't exist"),
+            (Reason::ReadOnly, "the disk is read-only"),
+            (Reason::NotUtf8, "it isn't UTF-8 text"),
+            (Reason::Said("file exists".into()), "file exists"),
+        ];
+        for (given, words) in cases {
+            assert_eq!(reason(&given), words, "{given:?}");
+        }
     }
 
     #[test]
@@ -6280,7 +6368,7 @@ mod tests {
             (
                 Kind::CantRead {
                     path: "assets/site.css".into(),
-                    reason: "permission denied".into(),
+                    reason: Reason::Denied,
                 },
                 "Can't read `assets/site.css`: permission denied",
                 None,
@@ -6373,7 +6461,7 @@ mod tests {
             (
                 Kind::CacheNotWritten {
                     path: ".statac/pictures".into(),
-                    reason: "permission denied".into(),
+                    reason: Reason::Denied,
                 },
                 "Cache not written: can't write `.statac/pictures`: permission denied",
                 None,
@@ -6693,7 +6781,7 @@ mod tests {
             (
                 Kind::CantRemove {
                     path: "._site.statac-old".into(),
-                    reason: "permission denied".into(),
+                    reason: Reason::Denied,
                 },
                 "Can't remove `._site.statac-old`: permission denied",
                 None,
@@ -6720,7 +6808,7 @@ mod tests {
                 Kind::CantListen {
                     port: 80,
                     last: 80,
-                    why: Unheard::System("permission denied".into()),
+                    why: Unheard::System(Reason::Denied),
                 },
                 "Can't listen on port 80: permission denied",
                 Some("Choose another port with `--port=<number>`."),
@@ -7334,7 +7422,7 @@ mod tests {
             (
                 Kind::CantRead {
                     path: "content/post-1.md".into(),
-                    reason: "it isn't UTF-8 text".into(),
+                    reason: Reason::NotUtf8,
                 },
                 "Can't read `content/post-1.md`: it isn't UTF-8 text",
                 None,
@@ -8016,7 +8104,7 @@ mod tests {
             (
                 Kind::HookStopped {
                     hook: "before_build".into(),
-                    ended: Ended::NotStarted("permission denied".into()),
+                    ended: Ended::NotStarted(Reason::Denied),
                     said: String::new(),
                 },
                 "Hook stopped: can't start a shell for `before_build`: permission denied",
@@ -8775,7 +8863,7 @@ mod tests {
         assert_eq!(lines[0], "line 1161");
         assert_eq!(lines[39], "line 1200");
         // A shell that never started ran nothing that could print.
-        let unstarted = Ended::NotStarted("permission denied".into());
+        let unstarted = Ended::NotStarted(Reason::Denied);
         assert_eq!(printed(&stopped("", unstarted)), None);
         assert_eq!(printed(&Kind::NoTimeZone), None);
         assert_eq!(ran_hook("before_build"), "Ran `before_build`.");

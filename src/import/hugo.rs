@@ -23,7 +23,7 @@ use super::{
 };
 use crate::content::slug;
 use crate::date::{self, Date};
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use settings::{Settings, get, truth_of};
 use url::{Making, Pieces};
 
@@ -972,7 +972,7 @@ impl Reader<'_> {
         let bytes = std::fs::read(self.path(&from)).map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                 path: self.path(&from),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         })?;
         let Ok(text) = String::from_utf8(bytes) else {

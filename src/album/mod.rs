@@ -62,7 +62,7 @@ fn kept_at(site: &Path, names: &[&str]) -> std::io::Result<PathBuf> {
         folder.push(name);
         match std::fs::symlink_metadata(&folder) {
             Ok(found) if found.file_type().is_symlink() => {
-                return Err(std::io::Error::other("it is a link"));
+                return Err(std::io::Error::from(crate::problem::Reason::Link));
             }
             Ok(found) if !found.is_dir() => {
                 return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory));

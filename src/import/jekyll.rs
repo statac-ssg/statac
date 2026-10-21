@@ -21,7 +21,7 @@ use super::{
 };
 use crate::date::{self, Date};
 use crate::origin::Style as Written;
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use crate::source::{Place, Sources};
 use crate::yaml::{Node, Value as Yaml};
 use url::{Moment, Style};
@@ -639,7 +639,7 @@ impl Reader<'_> {
         let text = std::fs::read_to_string(self.root(name)).map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                 path: self.folder.join(name),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         })?;
         let entries = match name.ends_with(".toml") {
@@ -945,7 +945,7 @@ impl Reader<'_> {
             Err(error) => {
                 return Err(Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                     path: self.path(rel),
-                    reason: system_reason(&error),
+                    reason: Reason::of(&error),
                 })));
             }
         };
@@ -1200,7 +1200,7 @@ impl Reader<'_> {
         let bytes = std::fs::read(self.path(rel)).map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                 path: self.path(rel),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         })?;
         let name = rel.rsplit('/').next().unwrap_or(rel);

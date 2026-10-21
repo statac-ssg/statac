@@ -219,7 +219,10 @@ mod tests {
         fs::rename(&path, &moved).unwrap();
         std::os::unix::fs::symlink(&moved, &path).unwrap();
         let refused = texts.read(&scratch.0, "post.md").err().unwrap();
-        assert_eq!(refused.to_string(), "it is a link");
+        assert_eq!(
+            crate::problem::Reason::of(&refused),
+            crate::problem::Reason::Link
+        );
     }
 
     #[cfg(unix)]

@@ -27,7 +27,7 @@ use super::{
 };
 use crate::date::{self, Date};
 use crate::platform;
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use crate::source::{Place, Sources};
 use settings::{Folder, Settings};
 use writing::Engine;
@@ -263,7 +263,7 @@ pub fn read(
         Some(name) => settings::read(folder, name).map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                 path: folder.join(name),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         })?,
         None => Settings::default(),
@@ -1219,7 +1219,7 @@ impl Reader<'_> {
         let text = std::fs::read_to_string(self.path(path)).map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                 path: self.path(path),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         })?;
         let mut sources = Sources::default();
@@ -1379,7 +1379,7 @@ impl Reader<'_> {
         let bytes = std::fs::read(self.path(path)).map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                 path: self.path(path),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         })?;
         let Ok(text) = String::from_utf8(bytes) else {

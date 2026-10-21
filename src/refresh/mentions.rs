@@ -427,7 +427,7 @@ fn face(
         .and_then(|bytes| {
             keep(kept.folder, &path, &bytes).map_err(|error| {
                 asked.failed = true;
-                crate::problem::system_reason(&error)
+                crate::problem::Reason::of(&error).to_string()
             })?;
             Ok(bytes)
         });

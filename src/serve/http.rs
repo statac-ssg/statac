@@ -16,7 +16,7 @@ use super::server::Server;
 use super::server::model::{Body, HeaderValue, Method, Request, Response, StatusCode, header};
 use crate::content::address::on_the_wire;
 use crate::html::escaped;
-use crate::problem::{Kind, Problem, Unheard, system_reason};
+use crate::problem::{Kind, Problem, Reason, Unheard};
 use crate::{platform, wording};
 
 /// Where the server's own answers are, which no built file can be: Statac
@@ -90,7 +90,7 @@ pub fn listen(
     let unanswered: Arc<Unanswered> = Arc::new(unanswered);
     let cant = |port, last, why| Problem::nowhere(Kind::CantListen { port, last, why });
     let first = match port {
-        0 => free_port().map_err(|error| cant(0, 0, Unheard::System(system_reason(&error))))?,
+        0 => free_port().map_err(|error| cant(0, 0, Unheard::System(Reason::of(&error))))?,
         port => port,
     };
     let last = first.saturating_add(NEXT_PORTS);
@@ -101,7 +101,7 @@ pub fn listen(
             Err(Refused::InUse) if trying < last => trying += 1,
             Err(Refused::InUse) => return Err(cant(first, last, Unheard::InUse)),
             Err(Refused::System(error)) => {
-                return Err(cant(trying, trying, Unheard::System(system_reason(&error))));
+                return Err(cant(trying, trying, Unheard::System(Reason::of(&error))));
             }
         }
     }

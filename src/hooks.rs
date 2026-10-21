@@ -67,7 +67,7 @@ impl Hook<'_> {
     /// Runs the command and waits for it.
     pub fn run(&self) -> Result<(), Stopped> {
         let not_started = |error: std::io::Error| Stopped {
-            ended: Ended::NotStarted(crate::problem::system_reason(&error)),
+            ended: Ended::NotStarted(crate::problem::Reason::of(&error)),
             said: String::new(),
         };
         // One pipe for both streams, so what was printed is read in the

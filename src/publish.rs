@@ -33,7 +33,7 @@ use rayon::prelude::*;
 use crate::album::{KEPT, kept, kept_in};
 use crate::disk::{CLOCK, Clock, Inventory, Stamp};
 use crate::platform::{self, Over};
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 
 thread_local! {
     /// Whether a build on this thread has put its site in the output's
@@ -389,7 +389,7 @@ impl Spare {
                 continue;
             }
             if !platform::stays_inside(file) {
-                return Err(io::Error::other("it is outside the built site"));
+                return Err(io::Error::from(Reason::OutsideBuilt));
             }
             root.remove_file(file)?;
             for folder in above(file) {
@@ -520,7 +520,7 @@ pub fn hold(site: &Path, waiting: impl FnOnce()) -> (Hold, Option<Problem>) {
     let unheld = locked.as_ref().err().map(|error| {
         Problem::nowhere(Kind::CacheNotWritten {
             path: Path::new(KEPT).join(LOCK),
-            reason: system_reason(error),
+            reason: Reason::of(error),
         })
     });
     let hold = Hold {
@@ -588,13 +588,13 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
     let cant_write = |error: &io::Error| {
         Problem::nowhere(Kind::CantWrite {
             path: out.to_path_buf(),
-            reason: system_reason(error),
+            reason: Reason::of(error),
         })
     };
     let absolute = std::path::absolute(out).map_err(|error| cant_write(&error))?;
     let absolute = lexically_normal(&absolute);
     let (Some(parent), Some(name)) = (absolute.parent(), absolute.file_name()) else {
-        return Err(cant_write(&io::Error::other("it is the top of the disk")));
+        return Err(cant_write(&io::Error::from(Reason::TopOfDisk)));
     };
     let beside = |what: &str| {
         let mut named = std::ffi::OsString::from(".");
@@ -649,7 +649,7 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
         // `.statac` nothing else has a name of Statac's own.
         match occupant(&place)? {
             None => Spare::of(Held::under(&place, "")?).map(|held| (place, Some(held))),
-            Some(_) => Err(io::Error::other("something else has its name")),
+            Some(_) => Err(io::Error::from(Reason::Taken)),
         }
     });
     staging.clear(&staging.aside)?;
@@ -661,7 +661,7 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
         Err(error) => {
             staging.unkept = Some(Problem::nowhere(Kind::CacheNotWritten {
                 path: named,
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }));
             fs::create_dir(&staging.fresh).map_err(|error| cant_write(&error))?;
             staging.owns_fresh = true;
@@ -960,7 +960,7 @@ impl Staging {
         let cant_read = |error: &io::Error| {
             Problem::nowhere(Kind::CantRead {
                 path: shown.into(),
-                reason: system_reason(error),
+                reason: Reason::of(error),
             })
         };
         let mut source = source.map_err(|error| cant_read(&error))?;
@@ -1010,7 +1010,7 @@ impl Staging {
         let cant_read = |error: io::Error| {
             Problem::nowhere(Kind::CantRead {
                 path: shown.into(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })
         };
         let source = source.map_err(cant_read)?;
@@ -1082,7 +1082,7 @@ impl Staging {
     /// through a link; the caller does where it doesn't.
     fn claimed(&self, rel: &str, asks: bool) -> Result<bool, Problem> {
         if !platform::stays_inside(rel) {
-            return Err(self.cant_write(rel, &io::Error::other("it is outside the built site")));
+            return Err(self.cant_write(rel, &io::Error::from(Reason::OutsideBuilt)));
         }
         // A folder written where it stands is not listed first, as a
         // spare is, so nothing in it is known to be no link until asked.
@@ -1188,7 +1188,7 @@ impl Staging {
         let held = Held::under(&self.fresh, "").map_err(|error| {
             Problem::nowhere(Kind::CantRead {
                 path: self.shown.clone(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })
         })?;
         Ok(held.files)
@@ -1267,7 +1267,7 @@ impl Staging {
         platform::remove_folder(&self.aside).map_err(|error| {
             Problem::nowhere(Kind::CantRemove {
                 path: self.aside.clone(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })
         })
     }
@@ -1281,7 +1281,7 @@ impl Staging {
             })),
             Err(error) => Err(Problem::nowhere(Kind::CantRead {
                 path: self.shown.clone(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })),
         }
     }
@@ -1301,14 +1301,14 @@ impl Staging {
             Err(error) => {
                 return Err(Problem::nowhere(Kind::CantRead {
                     path: leftover.to_path_buf(),
-                    reason: system_reason(&error),
+                    reason: Reason::of(&error),
                 }));
             }
         }
         platform::remove_folder(leftover).map_err(|error| {
             Problem::nowhere(Kind::CantRemove {
                 path: leftover.to_path_buf(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })
         })
     }
@@ -1317,7 +1317,7 @@ impl Staging {
     fn cant_write(&self, rel: &str, error: &io::Error) -> Problem {
         Problem::nowhere(Kind::CantWrite {
             path: platform::join(&self.shown, rel),
-            reason: system_reason(error),
+            reason: Reason::of(error),
         })
     }
 }
@@ -2074,7 +2074,7 @@ mod tests {
                 staging.unkept().map(|problem| problem.kind),
                 Some(Kind::CacheNotWritten {
                     path: Path::new(KEPT).join(SPARE),
-                    reason: "something else has its name".into(),
+                    reason: Reason::Taken,
                 })
             );
             staging.write("post-1.html", b"one").unwrap();
@@ -2417,7 +2417,7 @@ mod tests {
                     staging.unkept().map(|problem| problem.kind),
                     Some(Kind::CacheNotWritten {
                         path: Path::new(KEPT).join(SPARE),
-                        reason: "it is a link".into(),
+                        reason: Reason::Link,
                     })
                 );
                 let text = nth.to_string();
@@ -2449,7 +2449,7 @@ mod tests {
         let refused = |at: &str| {
             Problem::nowhere(Kind::CantWrite {
                 path: scratch.out().join(at),
-                reason: "it is a link".into(),
+                reason: Reason::Link,
             })
         };
         let written = staging.write("a/b.html", b"new");
@@ -2566,7 +2566,7 @@ mod tests {
                 unheld.map(|problem| problem.kind),
                 Some(Kind::CacheNotWritten {
                     path: Path::new(KEPT).join(LOCK),
-                    reason: "it is a link".into(),
+                    reason: Reason::Link,
                 })
             );
             assert_eq!(names(&outside), ["notes.txt"]);
@@ -2579,7 +2579,7 @@ mod tests {
             unheld.map(|problem| problem.kind),
             Some(Kind::CacheNotWritten {
                 path: Path::new(KEPT).join(LOCK),
-                reason: "a file is in the way of a folder".into(),
+                reason: Reason::FileInTheWay,
             })
         );
     }

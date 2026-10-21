@@ -9,7 +9,7 @@ use ::toml::Spanned;
 use ::toml::de::{DeTable, DeValue};
 
 use super::{Failed, Field, Value};
-use crate::problem::{Kind, Problem};
+use crate::problem::{Kind, Problem, Reason};
 use crate::source::{Place, Sources, Span};
 
 /// Where a file stopped being TOML that reads.
@@ -52,7 +52,7 @@ pub fn failed(path: &Path, text: String, stopped: &Stopped) -> Box<Failed> {
     let problem = Problem::at(
         Kind::CantRead {
             path: path.to_path_buf(),
-            reason: "this line doesn't read as TOML".into(),
+            reason: Reason::NotToml,
         },
         Place {
             source,

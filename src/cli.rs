@@ -607,7 +607,7 @@ fn find_site(site: &mut PathBuf) -> Result<(), Problem> {
     let cant_read = |path: PathBuf, error: &std::io::Error| {
         Problem::nowhere(Kind::CantRead {
             path,
-            reason: crate::problem::system_reason(error),
+            reason: crate::problem::Reason::of(error),
         })
     };
     let here = std::env::current_dir().map_err(|error| cant_read(PathBuf::from("."), &error))?;

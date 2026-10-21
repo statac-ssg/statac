@@ -8,7 +8,7 @@ use super::super::common::{fields, text_of, texts_of};
 use super::super::write::shown_value;
 use super::super::{Failed, Field, Value, inside, toml};
 use super::slug::Strategy;
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 
 /// The settings files Zola reads at the top of a site, the first found.
 pub const FILES: &[&str] = &["zola.toml", "config.toml"];
@@ -35,13 +35,13 @@ pub fn found(folder: &Path) -> Result<(String, Vec<Field>), Box<Failed>> {
     if !inside::reached(folder, name) {
         return Err(Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
             path,
-            reason: "it is a link that leads outside the old site".to_owned(),
+            reason: Reason::LinkOutside,
         })));
     }
     let text = std::fs::read_to_string(inside::path(folder, name)).map_err(|error| {
         Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
             path: path.clone(),
-            reason: system_reason(&error),
+            reason: Reason::of(&error),
         }))
     })?;
     let fields = toml::read(&text).map_err(|stopped| toml::failed(&path, text, &stopped))?;

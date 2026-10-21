@@ -17,7 +17,7 @@ use super::progress::{Counted, Making};
 use super::{KEPT, Picture, Pictures, Progress, is_file_itself, kept_in, make_kept_in, quietly};
 use crate::pictures::{self, Error, Rendition, Unreadable};
 use crate::platform;
-use crate::problem::{Kind, PictureFault, Problem, system_reason};
+use crate::problem::{Kind, PictureFault, Problem, Reason};
 use crate::publish::Staging;
 use crate::site::PictureId;
 use crate::source::Place;
@@ -60,7 +60,7 @@ pub(crate) struct Kept {
     /// what is kept.
     kept: Option<PathBuf>,
     /// Why nothing may be, where the folder is refused.
-    refused: Option<std::io::Error>,
+    refused: Option<Reason>,
     /// Why nothing more is kept, once a copy couldn't be.
     unwritten: Mutex<Option<Problem>>,
     /// The copies written straight into the built site instead, each by
@@ -76,7 +76,7 @@ impl Kept {
     pub(crate) fn new(site: &Path, sub: &'static str) -> Kept {
         let (kept, refused) = match kept_in(site, sub) {
             Ok(_) => (Some(site.join(KEPT)), None),
-            Err(error) => (None, Some(error)),
+            Err(error) => (None, Some(Reason::of(&error))),
         };
         Kept {
             sub,
@@ -112,21 +112,23 @@ impl Kept {
     pub(crate) fn make_ready(&self, site: &Path) {
         // Asked again once made: either may have been put there as a link.
         let made = match (&self.kept, &self.refused) {
-            (Some(_), _) => make_kept_in(site, self.sub).map(drop),
-            (None, Some(error)) => Err(std::io::Error::new(error.kind(), error.to_string())),
+            (Some(_), _) => make_kept_in(site, self.sub)
+                .map(drop)
+                .map_err(|error| Reason::of(&error)),
+            (None, Some(reason)) => Err(reason.clone()),
             (None, None) => Ok(()),
         };
-        if let Err(error) = made {
-            self.gave_up(&error);
+        if let Err(reason) = made {
+            self.gave_up(reason);
         }
     }
 
-    fn gave_up(&self, error: &std::io::Error) {
+    fn gave_up(&self, reason: Reason) {
         let mut unwritten = self.unwritten.lock().expect("never poisoned");
         unwritten.get_or_insert_with(|| {
             Problem::nowhere(Kind::CacheNotWritten {
                 path: PathBuf::from(KEPT).join(self.sub),
-                reason: system_reason(error),
+                reason,
             })
         });
     }
@@ -146,7 +148,7 @@ impl Kept {
             let fresh = format!("{name}.{}-{nth}", std::process::id());
             match platform::keep_file(kept, &self.rel(name), &fresh, bytes) {
                 Ok(()) => return Ok(()),
-                Err(error) => self.gave_up(&error),
+                Err(error) => self.gave_up(Reason::of(&error)),
             }
         }
         staging.write(file, bytes)?;
@@ -282,7 +284,7 @@ pub fn develop(
                 Err(error) => {
                     let kind = Kind::CantRead {
                         path: picture.shown().into(),
-                        reason: system_reason(&error),
+                        reason: Reason::of(&error),
                     };
                     return (0, vec![Problem::nowhere(kind)]);
                 }

@@ -11,7 +11,7 @@ use std::path::{Component, Path, PathBuf};
 
 use codemap::SpanLoc;
 
-use crate::problem::{Kind, Problem, Reach, system_reason};
+use crate::problem::{Kind, Problem, Reach, Reason};
 use crate::source::{Place, Sources, Span};
 
 pub use fault::{SassFault, SassType};
@@ -214,15 +214,15 @@ pub(super) fn stopped(
         }
         grass::ErrorKind::IoError(error) => Problem::nowhere(Kind::CantRead {
             path: shown(path),
-            reason: system_reason(&error),
+            reason: Reason::of(&error),
         }),
         grass::ErrorKind::FromUtf8Error(_) => Problem::nowhere(Kind::CantRead {
             path: shown(path),
-            reason: "it isn't text".into(),
+            reason: Reason::NotText,
         }),
         _ => Problem::nowhere(Kind::CantRead {
             path: shown(path),
-            reason: "Sass couldn't read it".into(),
+            reason: Reason::NotForSass,
         }),
     }
 }

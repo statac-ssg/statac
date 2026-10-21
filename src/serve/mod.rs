@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 use crate::build::{self, Mode};
 use crate::content::address::on_the_wire;
 use crate::date::Date;
-use crate::problem::{Kind, Problem, Severity, system_reason};
+use crate::problem::{Kind, Problem, Reason, Severity};
 use crate::refresh::{self, Fetch, Token};
 use crate::report::{Report, shown};
 use crate::source::Sources;
@@ -198,7 +198,7 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
     let unanswered = {
         let tell = tell.clone();
         move |error: &std::io::Error| {
-            let line = wording::cant_answer(&system_reason(error));
+            let line = wording::cant_answer(&Reason::of(error));
             let _ = tell.send(Heard::Said(format!("{line}\n")));
         }
     };

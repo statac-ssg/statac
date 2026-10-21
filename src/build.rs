@@ -16,7 +16,7 @@ use crate::date::Date;
 use crate::feeds;
 use crate::links;
 use crate::new::update::Starter;
-use crate::problem::{Code, Kind, Named, Problem, Severity, system_reason};
+use crate::problem::{Code, Kind, Named, Problem, Reason, Severity};
 use crate::publish::{self, Staging};
 use crate::reads::{Asked, Key, Reads, Record};
 use crate::report::Quiet;
@@ -1209,7 +1209,7 @@ pub(crate) fn publish(
         {
             problems.push(Problem::nowhere(Kind::CacheNotWritten {
                 path: Path::new(crate::album::KEPT).join("pictures"),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }));
         }
         let kept = match remembers {
@@ -1230,7 +1230,7 @@ pub(crate) fn publish(
         {
             problems.push(Problem::nowhere(Kind::CacheNotWritten {
                 path: feeds::known::shown(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }));
         }
     }
@@ -1264,7 +1264,7 @@ pub(crate) fn stops(problems: &[Problem]) -> bool {
 
 /// Whether `site` is a folder that can be read, or the problem with it.
 pub(crate) fn a_folder(site: &Path) -> Result<(), Problem> {
-    let cant_read = |reason: String| {
+    let cant_read = |reason: Reason| {
         Problem::nowhere(Kind::CantRead {
             path: site.to_path_buf(),
             reason,
@@ -1272,10 +1272,8 @@ pub(crate) fn a_folder(site: &Path) -> Result<(), Problem> {
     };
     match fs::metadata(site) {
         Ok(metadata) if metadata.is_dir() => Ok(()),
-        Ok(_) => Err(cant_read(system_reason(&std::io::Error::from(
-            std::io::ErrorKind::NotADirectory,
-        )))),
-        Err(error) => Err(cant_read(system_reason(&error))),
+        Ok(_) => Err(cant_read(Reason::FileInTheWay)),
+        Err(error) => Err(cant_read(Reason::of(&error))),
     }
 }
 

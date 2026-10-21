@@ -6,7 +6,7 @@ use std::path::Path;
 
 use super::{Failed, Field, Value};
 use crate::date::{self, Date};
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use crate::source::{Place, Sources};
 use crate::yaml::Value as Yaml;
 
@@ -16,7 +16,7 @@ pub fn names_in(path: &Path) -> Result<Vec<String>, Box<Failed>> {
         .map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
                 path: path.to_path_buf(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         })?
         .flatten()

@@ -16,7 +16,7 @@ use notify::{Config, Event, EventKind, PollWatcher, RecommendedWatcher, Recursiv
 
 use crate::disk::{Clock, Stamp};
 use crate::platform;
-use crate::problem::system_reason;
+use crate::problem::Reason;
 use crate::publish::MARKER;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -67,7 +67,7 @@ pub enum Because {
     /// The folder is on a disk of this kind, which may not report changes.
     Remote(String),
     /// The system's reports couldn't be had, for this reason.
-    NoReports(String),
+    NoReports(Reason),
 }
 
 /// The watcher in use. Watching ends when this is dropped.
@@ -119,8 +119,8 @@ pub fn start(
     how: How,
     settle: Settle,
     batches: mpsc::Sender<Batch>,
-) -> Result<Watching, String> {
-    let io = |error: io::Error| system_reason(&error);
+) -> Result<Watching, Reason> {
+    let io = |error: io::Error| Reason::of(&error);
     let root = std::path::absolute(root).map_err(io)?;
     // Reports name files by the folder's real path, which a link in the
     // path as given makes another.
@@ -197,14 +197,12 @@ fn open(
     }
 }
 
-fn reason(error: &notify::Error) -> String {
+fn reason(error: &notify::Error) -> Reason {
     match &error.kind {
-        notify::ErrorKind::Io(error) => system_reason(error),
-        notify::ErrorKind::PathNotFound => "it doesn't exist".into(),
-        notify::ErrorKind::MaxFilesWatch => {
-            "the system is watching as many files as it allows".into()
-        }
-        _ => system_reason(&io::Error::other(error.to_string())),
+        notify::ErrorKind::Io(error) => Reason::of(error),
+        notify::ErrorKind::PathNotFound => Reason::Missing,
+        notify::ErrorKind::MaxFilesWatch => Reason::WatchLimit,
+        _ => Reason::Said(crate::problem::system_words(&error.to_string())),
     }
 }
 

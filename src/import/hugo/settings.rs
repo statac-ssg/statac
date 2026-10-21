@@ -6,7 +6,7 @@ use std::path::Path;
 
 use super::super::common::{fields, text_of, texts_of};
 use super::super::{Failed, Field, Left, Value, inside, toml, yaml};
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use crate::source::Sources;
 use crate::yaml::Value as Yaml;
 
@@ -53,7 +53,7 @@ pub fn fields_of(folder: &Path, rel: &str) -> Result<Vec<Field>, Box<Failed>> {
     let text = std::fs::read_to_string(&path).map_err(|error| {
         Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
             path: folder.join(rel),
-            reason: system_reason(&error),
+            reason: Reason::of(&error),
         }))
     })?;
     if rel.ends_with(".toml") {

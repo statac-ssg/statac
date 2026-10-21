@@ -6,9 +6,8 @@
 use std::path::Path;
 
 use crate::platform::{self, Unwritten};
-use crate::problem::system_reason;
+use crate::problem::Reason;
 use crate::source::Span;
-use crate::wording;
 
 /// One span of a file and what is written in its place.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -26,7 +25,7 @@ pub struct Edit {
 /// holds `read`, where `root`, a folder on the way or the file is a link,
 /// or where the file has a second name somewhere, as
 /// [`platform::rewrite`] has it.
-pub fn rewrite(root: &Path, rel: &str, read: &str, edits: &[Edit]) -> Result<Vec<u8>, String> {
+pub fn rewrite(root: &Path, rel: &str, read: &str, edits: &[Edit]) -> Result<Vec<u8>, Reason> {
     let text = replaced(read, edits);
     replace(root, rel, read.as_bytes(), text.as_bytes())?;
     Ok(text.into_bytes())
@@ -34,12 +33,12 @@ pub fn rewrite(root: &Path, rel: &str, read: &str, edits: &[Edit]) -> Result<Vec
 
 /// Puts `with` in place of the whole file at `rel`, refused as
 /// [`rewrite`] is. Where it is refused or fails, the file is as it was.
-pub fn replace(root: &Path, rel: &str, read: &[u8], with: &[u8]) -> Result<(), String> {
+pub fn replace(root: &Path, rel: &str, read: &[u8], with: &[u8]) -> Result<(), Reason> {
     match platform::rewrite(root, rel, read, with) {
         Ok(()) => Ok(()),
-        Err(Unwritten::Changed) => Err(wording::CHANGED_SINCE_READ.into()),
-        Err(Unwritten::NamedTwice) => Err(wording::NAMED_TWICE.into()),
-        Err(Unwritten::Io(error)) => Err(system_reason(&error)),
+        Err(Unwritten::Changed) => Err(Reason::Changed),
+        Err(Unwritten::NamedTwice) => Err(Reason::NamedTwice),
+        Err(Unwritten::Io(error)) => Err(Reason::of(&error)),
     }
 }
 
@@ -136,7 +135,7 @@ mod tests {
             read,
             &[edit(read, "one", "2026-10-04")],
         );
-        assert_eq!(refused, Err(wording::CHANGED_SINCE_READ.to_owned()));
+        assert_eq!(refused, Err(Reason::Changed));
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
             "---\ndate: one\n---\nA line more.\n"
@@ -154,7 +153,7 @@ mod tests {
             read,
             &[edit(read, "one", "2026-10-04")],
         );
-        assert_eq!(refused, Err("it doesn't exist".to_owned()));
+        assert_eq!(refused, Err(Reason::Missing));
         assert!(names(&scratch).is_empty());
     }
 
@@ -191,18 +190,18 @@ mod tests {
         let link = content(&scratch).join("posts").join("post-2.md");
         std::os::unix::fs::symlink(outside.join("post-2.md"), &link).unwrap();
         let refused = rewrite(&content(&scratch), "posts/post-2.md", read, &edits);
-        assert_eq!(refused, Err("it is a link".to_owned()));
+        assert_eq!(refused, Err(Reason::Link));
 
         // A folder on the way is one.
         std::os::unix::fs::symlink(&outside, content(&scratch).join("linked")).unwrap();
         let refused = rewrite(&content(&scratch), "linked/post-2.md", read, &edits);
-        assert_eq!(refused, Err("it is a link".to_owned()));
+        assert_eq!(refused, Err(Reason::Link));
 
         // The folder itself is one.
         let root = scratch.0.join("root");
         std::os::unix::fs::symlink(&outside, &root).unwrap();
         let refused = rewrite(&root, "post-2.md", read, &edits);
-        assert_eq!(refused, Err("it is a link".to_owned()));
+        assert_eq!(refused, Err(Reason::Link));
 
         assert_eq!(fs::read_to_string(outside.join("post-2.md")).unwrap(), read);
         assert!(fs::symlink_metadata(&link).unwrap().is_symlink());
@@ -222,7 +221,7 @@ mod tests {
             read,
             &[edit(read, "one", "2026-10-04")],
         );
-        assert_eq!(refused, Err(wording::NAMED_TWICE.to_owned()));
+        assert_eq!(refused, Err(Reason::NamedTwice));
         assert_eq!(fs::read_to_string(&other).unwrap(), read);
     }
 
@@ -244,7 +243,7 @@ mod tests {
             read,
             &[edit(read, "one", "2026-10-04")],
         );
-        assert_eq!(refused, Err("file exists".to_owned()));
+        assert_eq!(refused, Err(Reason::Said("file exists".into())));
         assert_eq!(fs::read_to_string(&outside).unwrap(), "Outside.\n");
         assert_eq!(fs::read_to_string(&path).unwrap(), read);
         // What was there is not this run's to remove.
@@ -267,7 +266,7 @@ mod tests {
             &[edit(read, "one", "2026-10-04")],
         );
         fs::set_permissions(&folder, fs::Permissions::from_mode(0o755)).unwrap();
-        assert_eq!(refused, Err("permission denied".to_owned()));
+        assert_eq!(refused, Err(Reason::Denied));
         assert_eq!(fs::read_to_string(&path).unwrap(), read);
         assert_eq!(names(&scratch), ["post-1.md"]);
     }

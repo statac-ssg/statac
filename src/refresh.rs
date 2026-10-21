@@ -23,7 +23,7 @@ use crate::date::Date;
 use crate::fetch::{Fetched, Refusal};
 use crate::fetched::stills::{self, Host};
 use crate::fetched::{self as kept, Held, Line, Record};
-use crate::problem::{Kind, Problem, Severity, system_reason};
+use crate::problem::{Kind, Problem, Reason, Severity};
 use crate::reads::Key;
 use crate::report::{Report, shown};
 use crate::wording;
@@ -71,13 +71,12 @@ pub fn token(site: &Path, variable: Option<String>) -> (Option<Token>, Option<St
             });
             return match linked {
                 Some(rel) => unused(&wording::token_file_linked(rel)),
-                None => unused(&system_reason(&error)),
+                None => unused(&Reason::of(&error).to_string()),
             };
         }
     };
     let Ok(text) = String::from_utf8(bytes) else {
-        let error = std::io::Error::from(std::io::ErrorKind::InvalidData);
-        return unused(&system_reason(&error));
+        return unused(&Reason::NotUtf8.to_string());
     };
     let text = text.trim();
     if text.is_empty() {
@@ -339,7 +338,7 @@ fn refresh(
 pub(crate) fn unwritten(report: &Report, file: &str, error: &std::io::Error) -> String {
     report.problem(&Problem::nowhere(Kind::CantWrite {
         path: file.into(),
-        reason: system_reason(error),
+        reason: Reason::of(error),
     }))
 }
 

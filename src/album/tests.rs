@@ -230,6 +230,7 @@ fn a_panic_caught_while_reading_a_picture_prints_nothing() {
 #[test]
 fn a_kept_folder_swapped_for_a_link_is_neither_read_nor_written() {
     use crate::problem::Kind as Told;
+    use crate::problem::Reason;
     let scratch = std::env::temp_dir().join(format!("statac-album-kept-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&scratch);
     let (site, outside) = (scratch.join("site"), scratch.join("outside"));
@@ -256,11 +257,11 @@ fn a_kept_folder_swapped_for_a_link_is_neither_read_nor_written() {
         [
             Problem::nowhere(Told::CantRead {
                 path: shown.join("copy-1.avif"),
-                reason: "it is a link".into(),
+                reason: Reason::Link,
             }),
             Problem::nowhere(Told::CacheNotWritten {
                 path: shown,
-                reason: "it is a link".into(),
+                reason: Reason::Link,
             }),
         ]
     );

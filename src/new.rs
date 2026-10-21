@@ -31,7 +31,7 @@ use crate::dates::format::{self, DateWords, Format};
 use crate::language::Languages;
 use crate::origin::{Origin, Sourced};
 use crate::platform;
-use crate::problem::{Kind, Maker, Problem, SiteMark, WordsFrom, system_reason};
+use crate::problem::{Kind, Maker, Problem, Reason, SiteMark, WordsFrom};
 use crate::report::{self, Report, shown};
 use crate::source::Sources;
 use crate::wording;
@@ -282,7 +282,7 @@ fn cards_on(folder: &Path, starter: &Starter, out: &mut dyn Write, colour: bool)
             let _ = out.write_all(
                 problem(Kind::CantRead {
                     path: folder.to_path_buf(),
-                    reason: system_reason(&error),
+                    reason: Reason::of(&error),
                 })
                 .as_bytes(),
             );
@@ -335,7 +335,7 @@ fn cards_on(folder: &Path, starter: &Starter, out: &mut dyn Write, colour: bool)
                     failed = true;
                     said.push_str(&problem(Kind::CantWrite {
                         path: path.into(),
-                        reason: system_reason(&error),
+                        reason: Reason::of(&error),
                     }));
                     break;
                 }
@@ -681,7 +681,7 @@ pub(crate) fn refusal(folder: &Path, shown_as: &str, by: Maker) -> Result<(), Pr
     let cant_write = |error: &io::Error| {
         Problem::nowhere(Kind::CantWrite {
             path: folder.to_path_buf(),
-            reason: system_reason(error),
+            reason: Reason::of(error),
         })
     };
     let found = match std::fs::symlink_metadata(folder) {
@@ -690,7 +690,7 @@ pub(crate) fn refusal(folder: &Path, shown_as: &str, by: Maker) -> Result<(), Pr
         Err(error) => return Err(cant_write(&error)),
     };
     if found.is_symlink() {
-        return Err(cant_write(&io::Error::other("it is a link")));
+        return Err(cant_write(&io::Error::from(Reason::Link)));
     }
     if !found.is_dir() {
         return Err(cant_write(&io::Error::from(io::ErrorKind::NotADirectory)));
@@ -809,7 +809,7 @@ fn make_with(
             made.undo(folder);
             Err(Problem::nowhere(Kind::CantWrite {
                 path,
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             }))
         }
     }

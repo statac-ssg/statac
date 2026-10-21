@@ -91,7 +91,7 @@ use std::path::{Path, PathBuf};
 
 use crate::date::Date;
 use crate::new::{Asking, Input};
-use crate::problem::{Kind, Maker, Problem, system_reason};
+use crate::problem::{Kind, Maker, Problem, Reason};
 use crate::report::Report;
 use crate::source::Sources;
 use crate::wording;
@@ -550,7 +550,7 @@ fn beside(old: &Path) -> PathBuf {
 
 /// Why nothing can be imported from `old` into `new`, if nothing can.
 fn refusal(old: &Path, new: &Path, new_shown: &str) -> Result<(), Problem> {
-    let cant_read = |reason: String| {
+    let cant_read = |reason: Reason| {
         Problem::nowhere(Kind::CantRead {
             path: old.to_path_buf(),
             reason,
@@ -558,28 +558,22 @@ fn refusal(old: &Path, new: &Path, new_shown: &str) -> Result<(), Problem> {
     };
     match std::fs::metadata(old) {
         Ok(found) if found.is_dir() => {}
-        Ok(_) => return Err(cant_read("it isn't a folder".into())),
-        Err(error) => return Err(cant_read(system_reason(&error))),
+        Ok(_) => return Err(cant_read(Reason::NotAFolder)),
+        Err(error) => return Err(cant_read(Reason::of(&error))),
     }
-    let whole_old = std::fs::canonicalize(old).map_err(|error| cant_read(system_reason(&error)))?;
+    let whole_old = std::fs::canonicalize(old).map_err(|error| cant_read(Reason::of(&error)))?;
     let whole_new = whole_to_be(new);
-    let inside = |reason: String| {
+    let inside = |reason: Reason| {
         Problem::nowhere(Kind::CantWrite {
             path: new.to_path_buf(),
             reason,
         })
     };
     if whole_new.starts_with(&whole_old) {
-        return Err(inside(format!(
-            "it is inside the site being imported, `{}`",
-            old.display()
-        )));
+        return Err(inside(Reason::InsideOld(old.to_path_buf())));
     }
     if whole_old.starts_with(&whole_new) {
-        return Err(inside(format!(
-            "the site being imported, `{}`, is inside it",
-            old.display()
-        )));
+        return Err(inside(Reason::HoldsOld(old.to_path_buf())));
     }
     crate::new::refusal(new, new_shown, Maker::Import)
 }

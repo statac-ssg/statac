@@ -16,7 +16,7 @@ use crate::date::Date;
 use crate::fetched::mentions::{self, Mention};
 use crate::fetched::refused::{self, Entry, Reach, Spot};
 use crate::fetched::{self as kept, Held, Line};
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use crate::refresh::{keep, unwritten};
 use crate::report::{Quiet, Report, shown};
 use crate::source::Sources;
@@ -189,7 +189,7 @@ pub fn run(options: &Options, out: &mut dyn Write, colour: bool) -> u8 {
 fn unremoved(path: &str, error: &std::io::Error) -> Problem {
     Problem::nowhere(Kind::CantRemove {
         path: format!("{}/{path}", kept::FOLDER).into(),
-        reason: system_reason(error),
+        reason: Reason::of(error),
     })
 }
 

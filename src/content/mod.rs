@@ -554,7 +554,7 @@ impl Reader<'_> {
                 Err(error) => {
                     self.problems.push(Problem::nowhere(Kind::CantRead {
                         path: path.into(),
-                        reason: crate::problem::system_reason(&error),
+                        reason: crate::problem::Reason::of(&error),
                     }));
                     continue;
                 }
@@ -1119,7 +1119,7 @@ impl Reader<'_> {
                     }),
                     Err((fault, _)) => problems.push(Problem::nowhere(Kind::CantWrite {
                         path: Path::new("content").join(&path),
-                        reason: crate::wording::address_fault(&fault),
+                        reason: crate::problem::Reason::Address(Box::new(fault)),
                     })),
                 }
             }

@@ -30,7 +30,7 @@ use rayon::prelude::*;
 use crate::highlight;
 use crate::html::escaped;
 use crate::platform::{self, Alike, Unwritable};
-use crate::problem::{Hint, Kind, Named, Problem, Reach, system_reason};
+use crate::problem::{Hint, Kind, Named, Problem, Reach, Reason};
 use crate::publish::Staging;
 use crate::reads::{Key, Reads};
 use crate::site::{Arena, AssetId};
@@ -210,7 +210,7 @@ pub fn gather(
             }
             Err(Failure::Io(error)) => problems.push(Problem::nowhere(Kind::CantRead {
                 path: wanted.source.into(),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })),
             Err(Failure::Sass(error, refused)) => {
                 problems.push(sass::stopped(*error, refused, &wanted.path, site, sources));
@@ -869,7 +869,7 @@ pub(crate) fn walk(
     let cant_read = |rel: &str, error: &io::Error| {
         Problem::nowhere(Kind::CantRead {
             path: PathBuf::from(shown_as(rel)),
-            reason: system_reason(error),
+            reason: Reason::of(error),
         })
     };
     // Every link must stay within the folder where it sits in the site: a

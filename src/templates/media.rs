@@ -22,7 +22,7 @@ use crate::fetched::stills::{self, Host};
 use crate::highlight::{self, Language};
 use crate::origin::Sourced;
 use crate::pictures::{Format, Kind as PictureKind};
-use crate::problem::{ArgumentFault, Hint, Kind, Needed, Problem, ShownBy, Sort, system_reason};
+use crate::problem::{ArgumentFault, Hint, Kind, Needed, Problem, Reason, ShownBy, Sort};
 use crate::reads::Key;
 use crate::site::{PageId, PictureId};
 use crate::source::Place;
@@ -979,7 +979,7 @@ impl FileValue {
     fn cant_read(&self, error: &std::io::Error) -> Value {
         Value::from(frame::raise(Kind::CantRead {
             path: self.shown.clone().into(),
-            reason: system_reason(error),
+            reason: Reason::of(error),
         }))
     }
 

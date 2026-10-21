@@ -18,7 +18,7 @@ use crate::content::words::{self, OTHER_SPELLINGS, STATAC_FILLS};
 use crate::date::Date;
 use crate::new::{self, Answers};
 use crate::platform;
-use crate::problem::{Kind, Maker, Problem, Word, system_reason};
+use crate::problem::{Kind, Maker, Problem, Reason, Word};
 
 /// The file the report is written to, at the top of the new site.
 pub const REPORT: &str = "IMPORT.md";
@@ -409,11 +409,11 @@ impl Out<'_> {
         let cant = |error: io::Error, path: PathBuf| {
             Problem::nowhere(Kind::CantWrite {
                 path,
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })
         };
         if !platform::stays_inside(path) {
-            return Err(cant(io::Error::other("it is outside the new site"), at()));
+            return Err(cant(io::Error::from(Reason::OutsideNew), at()));
         }
         if let Some((above, _)) = path.rsplit_once('/') {
             let mut end = 0;
@@ -440,7 +440,7 @@ impl Out<'_> {
         platform::remove_file(self.folder, path).map_err(|error| {
             Problem::nowhere(Kind::CantWrite {
                 path: self.folder.join(path),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })
         })
     }
@@ -682,7 +682,7 @@ pub fn write<'a>(
         let bytes = std::fs::read(super::inside::path(old, &file.from)).map_err(|error| {
             Problem::nowhere(Kind::CantRead {
                 path: old.join(&file.from),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             })
         })?;
         out.put(&file.to, &bytes)?;

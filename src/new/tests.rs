@@ -921,7 +921,7 @@ fn a_write_that_fails_part_way_leaves_the_folder_as_found() {
             )
             .unwrap_err();
             assert!(
-                matches!(&problem.kind, Kind::CantWrite { reason, .. } if reason == "the disk is full"),
+                matches!(&problem.kind, Kind::CantWrite { reason, .. } if *reason == Reason::DiskFull),
                 "{problem:?}"
             );
             assert_eq!(written, failing);

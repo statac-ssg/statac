@@ -365,7 +365,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Settings, Vec<Problem>) {
         Err(error) => {
             problems.push(Problem::nowhere(Kind::CantRead {
                 path: FILE_NAME.into(),
-                reason: crate::problem::system_reason(&error),
+                reason: crate::problem::Reason::of(&error),
             }));
             let mut settings = Settings::default();
             settings.defaults();

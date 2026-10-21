@@ -19,7 +19,7 @@ use super::starter::{self, File, Past};
 use super::{past, words};
 use crate::config;
 use crate::platform;
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use crate::report::{Report, shown};
 use crate::rewrite::{self, Edit};
 use crate::source::{Sources, Span};
@@ -114,7 +114,7 @@ pub(super) enum Is {
     /// A link stands at the path, or on the way to it: the link's path.
     Linked(String),
     /// The file couldn't be read, for this reason.
-    Unread(String),
+    Unread(Reason),
 }
 
 /// Every version of a starter file.
@@ -158,7 +158,7 @@ pub(super) fn survey(root: &Path, starter: &Starter) -> Vec<Found> {
                 },
                 Err(error) => match link_on_the_way(root, path) {
                     Some(link) => Is::Linked(link),
-                    None => Is::Unread(system_reason(&error)),
+                    None => Is::Unread(Reason::of(&error)),
                 },
             };
             Found { path, is }
@@ -401,7 +401,7 @@ pub(super) fn run_holding(
                         failed = true;
                         say(problem(Kind::CantWrite {
                             path: WORDS_FILE.into(),
-                            reason: system_reason(&error),
+                            reason: Reason::of(&error),
                         })
                         .trim_end());
                     }
@@ -417,7 +417,7 @@ pub(super) fn run_holding(
                         failed = true;
                         say(problem(Kind::CantWrite {
                             path: (*path).into(),
-                            reason: system_reason(&error),
+                            reason: Reason::of(&error),
                         })
                         .trim_end());
                     }
@@ -470,7 +470,7 @@ pub(super) fn run_holding(
 /// The folder a site is in, as found by its whole path, or why `folder`
 /// isn't one.
 fn a_site(folder: &Path) -> Result<PathBuf, Problem> {
-    let cant_read = |reason: String| {
+    let cant_read = |reason: Reason| {
         Problem::nowhere(Kind::CantRead {
             path: folder.to_path_buf(),
             reason,
@@ -478,16 +478,13 @@ fn a_site(folder: &Path) -> Result<PathBuf, Problem> {
     };
     match std::fs::metadata(folder) {
         Ok(found) if found.is_dir() => {}
-        Ok(_) => {
-            let error = std::io::Error::from(std::io::ErrorKind::NotADirectory);
-            return Err(cant_read(system_reason(&error)));
-        }
-        Err(error) => return Err(cant_read(system_reason(&error))),
+        Ok(_) => return Err(cant_read(Reason::FileInTheWay)),
+        Err(error) => return Err(cant_read(Reason::of(&error))),
     }
     if !folder.join(config::FILE_NAME).is_file() {
-        return Err(cant_read(wording::NOT_A_SITE.into()));
+        return Err(cant_read(Reason::NotASite));
     }
-    std::fs::canonicalize(folder).map_err(|error| cant_read(system_reason(&error)))
+    std::fs::canonicalize(folder).map_err(|error| cant_read(Reason::of(&error)))
 }
 
 /// The change from `nearest` to `current`, as the lines that left and
@@ -572,13 +569,12 @@ fn add_words(root: &Path, languages: &[&str], words: &[(&str, &str)]) -> Words {
         Err(error) => {
             return match link_on_the_way(root, WORDS_FILE) {
                 Some(link) => told(shown(&wording::left_for_a_link(WORDS_FILE, &link))),
-                None => cant_read(system_reason(&error)),
+                None => cant_read(Reason::of(&error)),
             };
         }
     };
     let Ok(text) = String::from_utf8(bytes) else {
-        let error = std::io::Error::from(std::io::ErrorKind::InvalidData);
-        return cant_read(system_reason(&error));
+        return cant_read(Reason::NotUtf8);
     };
     let Some((edits, lines)) = words_added(&text, languages, words) else {
         return told(wording::WORDS_UNREADABLE.into());

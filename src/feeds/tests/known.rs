@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::build::{self, Mode, Options, Outcome};
-use crate::problem::Kind;
+use crate::problem::{Kind, Reason};
 use crate::serve::session::Session;
 
 /// A site in a folder of its own, removed when dropped.
@@ -442,7 +442,7 @@ fn what_cannot_be_kept_is_said_once_and_the_site_is_published() {
         [(
             Kind::CacheNotWritten {
                 path: PathBuf::from(".statac").join("feeds"),
-                reason: "something else has its name".into(),
+                reason: Reason::Taken,
             },
             None
         )]

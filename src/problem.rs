@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use crate::assets::SassFault;
 use crate::markdown;
-use crate::platform::{Alike, Unwritable};
+use crate::platform::{Alike, Refused, Unwritable};
 use crate::publish::Occupant;
 use crate::source::Place;
 use crate::wording;
@@ -561,7 +561,7 @@ pub enum Kind {
     /// A problem in no file names what Statac was doing.
     CantWrite {
         path: PathBuf,
-        reason: String,
+        reason: Reason,
     },
     /// YAML that can't be read, placed where the author would fix it.
     MalformedYaml {
@@ -742,11 +742,11 @@ pub enum Kind {
     },
     CantRead {
         path: PathBuf,
-        reason: String,
+        reason: Reason,
     },
     CantRemove {
         path: PathBuf,
-        reason: String,
+        reason: Reason,
     },
     /// No port for serve to answer on, from `port` to `last`.
     CantListen {
@@ -1283,7 +1283,7 @@ pub enum Kind {
     /// kept, and the system's reason.
     CacheNotWritten {
         path: PathBuf,
-        reason: String,
+        reason: Reason,
     },
     /// A picture a page shows with nothing said of it for a reader who
     /// can't see it: the picture as it is named where it is shown, and how
@@ -1780,7 +1780,7 @@ pub enum Ended {
     /// By something else, before it finished.
     Cut,
     /// Never begun, for the system's reason.
-    NotStarted(String),
+    NotStarted(Reason),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -2318,7 +2318,7 @@ pub enum Unheard {
     /// Another program has it.
     InUse,
     /// The system's own reason.
-    System(String),
+    System(Reason),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -3007,17 +3007,103 @@ pub(crate) fn unanchored(heading: &str) -> &str {
         .map_or(heading, |(heading, _)| heading)
 }
 
-/// The system's reason in plain words, without the error number.
-pub fn system_reason(error: &io::Error) -> String {
-    match error.kind() {
-        io::ErrorKind::PermissionDenied => "permission denied".into(),
-        io::ErrorKind::IsADirectory => "a folder already has that name".into(),
-        io::ErrorKind::NotADirectory => "a file is in the way of a folder".into(),
-        io::ErrorKind::StorageFull => "the disk is full".into(),
-        io::ErrorKind::NotFound => "it doesn't exist".into(),
-        io::ErrorKind::ReadOnlyFilesystem => "the disk is read-only".into(),
-        io::ErrorKind::InvalidData => "it isn't UTF-8 text".into(),
-        _ => system_words(&error.to_string()),
+/// Why a file or folder couldn't be read, written or removed, or the
+/// system couldn't do what was asked: Statac's own reason, the system's
+/// by its kind, or what was said. Statac's own travel inside an
+/// `io::Error` as its source.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Reason {
+    /// It is a link, never followed there.
+    Link,
+    /// It is a link that leads outside the old site.
+    LinkOutside,
+    /// It is a folder or something else, not a file.
+    NotAFile,
+    /// It is a file, not a folder.
+    NotAFolder,
+    /// A folder with no `statac.yaml`.
+    NotASite,
+    /// A path outside the built site.
+    OutsideBuilt,
+    /// A path outside the new site.
+    OutsideNew,
+    /// The new site's folder is inside the old one, given here.
+    InsideOld(PathBuf),
+    /// The old site, given here, is inside the new site's folder.
+    HoldsOld(PathBuf),
+    /// The top of the disk, which is never removed.
+    TopOfDisk,
+    /// Something other than what is wanted there has its name.
+    Taken,
+    /// A file of the author's that no longer holds what was read.
+    Changed,
+    /// A file of the author's with a second name, which writing it would
+    /// part it from.
+    NamedTwice,
+    /// A path that ends in no folder's name.
+    NamesNoFolder,
+    /// A post whose front matter has no place an `id:` line would be read.
+    NoPlaceForId,
+    /// A file's address that can't be made, for this fault.
+    Address(Box<AddressFault>),
+    /// A line of a settings file that doesn't read as TOML.
+    NotToml,
+    /// A file Sass found not to be text.
+    NotText,
+    /// A file Sass couldn't read, saying no more.
+    NotForSass,
+    /// The system is watching as many files as it allows.
+    WatchLimit,
+    // The system's, by kind.
+    Denied,
+    FolderNamed,
+    FileInTheWay,
+    DiskFull,
+    Missing,
+    ReadOnly,
+    NotUtf8,
+    /// What the system or a library said, ready to follow a colon.
+    Said(String),
+}
+
+impl Reason {
+    /// The reason `error` gives: Statac's own where it carries one, else
+    /// the system's.
+    pub fn of(error: &io::Error) -> Reason {
+        if let Some(reason) = error.get_ref().and_then(|inner| inner.downcast_ref()) {
+            return Reason::clone(reason);
+        }
+        match Refused::of(error) {
+            Some(Refused::Link) => return Reason::Link,
+            Some(Refused::NotAFile) => return Reason::NotAFile,
+            Some(Refused::Taken) => return Reason::Taken,
+            Some(Refused::NamesNoFolder) => return Reason::NamesNoFolder,
+            None => {}
+        }
+        match error.kind() {
+            io::ErrorKind::PermissionDenied => Reason::Denied,
+            io::ErrorKind::IsADirectory => Reason::FolderNamed,
+            io::ErrorKind::NotADirectory => Reason::FileInTheWay,
+            io::ErrorKind::StorageFull => Reason::DiskFull,
+            io::ErrorKind::NotFound => Reason::Missing,
+            io::ErrorKind::ReadOnlyFilesystem => Reason::ReadOnly,
+            io::ErrorKind::InvalidData => Reason::NotUtf8,
+            _ => Reason::Said(system_words(&error.to_string())),
+        }
+    }
+}
+
+impl std::fmt::Display for Reason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&wording::reason(self))
+    }
+}
+
+impl std::error::Error for Reason {}
+
+impl From<Reason> for io::Error {
+    fn from(reason: Reason) -> io::Error {
+        io::Error::other(reason)
     }
 }
 
@@ -3171,8 +3257,14 @@ mod tests {
     #[test]
     fn system_reasons_lose_their_error_numbers() {
         let error = io::Error::from(io::ErrorKind::PermissionDenied);
-        assert_eq!(system_reason(&error), "permission denied");
+        assert_eq!(Reason::of(&error), Reason::Denied);
         let error = io::Error::other("Something odd (os error 99)");
-        assert_eq!(system_reason(&error), "something odd");
+        assert_eq!(Reason::of(&error), Reason::Said("something odd".into()));
+    }
+
+    #[test]
+    fn statacs_own_reason_comes_back_out_of_an_error() {
+        let error = io::Error::from(Reason::InsideOld("old".into()));
+        assert_eq!(Reason::of(&error), Reason::InsideOld("old".into()));
     }
 }

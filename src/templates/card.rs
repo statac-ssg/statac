@@ -31,8 +31,8 @@ use crate::content::words::{self, PageWord};
 use crate::origin::{Arrival, Sourced};
 use crate::pictures::{self, Kind as PictureKind};
 use crate::problem::{
-    CardFileFault, Expected, FontWithThem, Found, Kind, NotDrawn, Problem, SetAside, Stopped,
-    Waiting, Word, system_reason,
+    CardFileFault, Expected, FontWithThem, Found, Kind, NotDrawn, Problem, Reason, SetAside,
+    Stopped, Waiting, Word,
 };
 use crate::reads::{Key, Reads};
 use crate::site::{Id, PageId, PictureId, Site};
@@ -619,7 +619,7 @@ fn make_kit(cards: &Cards, at: usize) -> Result<Kit, Problem> {
         read.map(|_| bytes).map_err(|error| {
             let kind = Kind::CantRead {
                 path: PathBuf::from(&path),
-                reason: system_reason(&error),
+                reason: Reason::of(&error),
             };
             Problem::placed(kind, named.origin.place)
         })

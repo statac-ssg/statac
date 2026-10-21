@@ -12,7 +12,7 @@ use rayon::prelude::*;
 
 use super::draw::{Failure, Format, Key, Kit, Plan, Text};
 use crate::album::{Counted, KEPT, Kept, Making, Progress};
-use crate::problem::{Kind, Problem, system_reason};
+use crate::problem::{Kind, Problem, Reason};
 use crate::publish::Staging;
 
 /// The folder of `.statac` cards are kept in.
@@ -107,13 +107,13 @@ pub fn publish(site: &Path, wanted: &[Wanted], staging: &Staging, progress: Prog
                     .filter(|(nth, _)| *nth == 0 || !kept.has(name))
                     .filter_map(|(_, wanted)| kept.keep(name, &bytes, &wanted.file, staging).err())
                     .collect(),
-                Err(Failure::Encode(reason)) => vec![Problem::nowhere(Kind::CantWrite {
+                Err(Failure::Encode(said)) => vec![Problem::nowhere(Kind::CantWrite {
                     path: PathBuf::from(&first.file),
-                    reason,
+                    reason: Reason::Said(said),
                 })],
                 Err(_) => vec![Problem::nowhere(Kind::CantRead {
                     path: PathBuf::from(KEPT).join(CARDS).join(name),
-                    reason: system_reason(&std::io::Error::from(std::io::ErrorKind::NotFound)),
+                    reason: Reason::Missing,
                 })],
             };
             counted.one_done();

@@ -1868,14 +1868,14 @@ fn a_link_put_in_place_of_a_file_after_the_walk_is_refused() {
         panic!("{walked:?}")
     };
     let refused = read_walked(&real, at).unwrap_err();
-    assert_eq!(refused.to_string(), "it is a link");
+    assert_eq!(Reason::of(&refused), Reason::Link);
     let out = site.0.join("out");
     let staging = crate::publish::begin(&site.0, &out).unwrap();
     assert_eq!(
         assets.publish(&staging),
         [Problem::nowhere(Kind::CantRead {
             path: "static/a.txt".into(),
-            reason: "it is a link".into(),
+            reason: Reason::Link,
         })]
     );
 }

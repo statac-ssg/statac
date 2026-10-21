@@ -2,7 +2,7 @@ use std::path::Path;
 
 use super::*;
 use crate::origin::{Origin, Style};
-use crate::problem::OptionHint;
+use crate::problem::{OptionHint, Reason};
 use crate::source::Span;
 use crate::yaml::Malformed;
 
@@ -304,7 +304,7 @@ fn line_numbers_share_one_gutter() {
 fn a_problem_in_no_file_has_no_place_drawn() {
     let problem = Problem::nowhere(Kind::CantWrite {
         path: "out/index.html".into(),
-        reason: "a folder already has that name".into(),
+        reason: Reason::FolderNamed,
     });
     assert_eq!(
         drawn(&Sources::default(), &problem),

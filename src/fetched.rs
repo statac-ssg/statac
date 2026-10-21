@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::date::Date;
-use crate::problem::{Kind, Problem, RecordFault, system_reason};
+use crate::problem::{Kind, Problem, Reason, RecordFault};
 use crate::source::{Place, SourceId, Sources, Span};
 
 /// The folder at the top of the site.
@@ -284,7 +284,7 @@ pub fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>) {
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {
                     path: shown.into(),
-                    reason: system_reason(&error),
+                    reason: Reason::of(&error),
                 }));
                 continue;
             }

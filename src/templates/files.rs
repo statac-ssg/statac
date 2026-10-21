@@ -171,7 +171,7 @@ pub(super) fn gather(root: &Path, sources: &mut Sources, problems: &mut Vec<Prob
                 }),
                 Err(error) => problems.push(Problem::nowhere(Kind::CantRead {
                     path: shown.into(),
-                    reason: crate::problem::system_reason(&error),
+                    reason: crate::problem::Reason::of(&error),
                 })),
             }
         }

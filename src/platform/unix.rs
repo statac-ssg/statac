@@ -15,7 +15,7 @@ use rustix::fs::{
     AtFlags, CWD, Dir, FileType, Mode, OFlags, fchmod, fstat, openat, renameat, statat, unlinkat,
 };
 
-use super::{Over, Unwritten};
+use super::{Over, Refused, Unwritten};
 use rustix::io::Errno;
 
 /// How many threads remove files at once. A disk removes them no faster
@@ -54,7 +54,7 @@ pub(super) fn exchange(a: &Path, b: &Path) -> io::Result<bool> {
 pub(super) fn remove_folder(path: &Path) -> io::Result<()> {
     let name = path
         .file_name()
-        .ok_or_else(|| io::Error::other("it names no folder"))?;
+        .ok_or_else(|| io::Error::from(Refused::NamesNoFolder))?;
     let parent = match path.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => Some(openat(
             CWD,
@@ -108,7 +108,7 @@ fn remove_entry(at: BorrowedFd<'_>, name: &CStr, kind: FileType) -> io::Result<(
 fn refusal(at: BorrowedFd<'_>, name: &Path, error: Errno) -> io::Error {
     match statat(at, name, AtFlags::SYMLINK_NOFOLLOW) {
         Ok(found) if FileType::from_raw_mode(found.st_mode) == FileType::Symlink => {
-            io::Error::other("it is a link")
+            io::Error::from(Refused::Link)
         }
         _ => error.into(),
     }
@@ -150,8 +150,8 @@ pub(super) fn no_link_to(root: &Path, rel: &str) -> io::Result<()> {
         Err(error) => Err(error.into()),
         Ok(found) => match FileType::from_raw_mode(found.st_mode) {
             FileType::RegularFile => Ok(()),
-            FileType::Symlink => Err(io::Error::other("it is a link")),
-            _ => Err(io::Error::other("it is not a file")),
+            FileType::Symlink => Err(io::Error::from(Refused::Link)),
+            _ => Err(io::Error::from(Refused::NotAFile)),
         },
     }
 }
@@ -172,8 +172,8 @@ fn remove_file_at(at: BorrowedFd<'_>, name: &Path) -> io::Result<()> {
         Err(error) => return Err(error.into()),
         Ok(found) => match FileType::from_raw_mode(found.st_mode) {
             FileType::RegularFile => {}
-            FileType::Symlink => return Err(io::Error::other("it is a link")),
-            _ => return Err(io::Error::other("it is not a file")),
+            FileType::Symlink => return Err(io::Error::from(Refused::Link)),
+            _ => return Err(io::Error::from(Refused::NotAFile)),
         },
     }
     match unlinkat(at, name, AtFlags::empty()) {
@@ -234,7 +234,7 @@ pub(super) fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io
         Ok(found)
             if FileType::from_raw_mode(found.st_mode) == FileType::RegularFile
                 && found.st_nlink == 1 => {}
-        Ok(_) => return Err(io::Error::other("something else has its name")),
+        Ok(_) => return Err(io::Error::from(Refused::Taken)),
         Err(error) => return Err(error.into()),
     }
     // Made only where nothing has the name, a link included.
@@ -539,8 +539,8 @@ fn measure_at(at: BorrowedFd<'_>, name: &Path) -> io::Result<super::Measure> {
     let found = statat(at, name, AtFlags::SYMLINK_NOFOLLOW)?;
     match FileType::from_raw_mode(found.st_mode) {
         FileType::RegularFile => {}
-        FileType::Symlink => return Err(io::Error::other("it is a link")),
-        _ => return Err(io::Error::other("it is not a file")),
+        FileType::Symlink => return Err(io::Error::from(Refused::Link)),
+        _ => return Err(io::Error::from(Refused::NotAFile)),
     }
     // The fields' types differ from one kind of machine to another.
     #[allow(
@@ -591,7 +591,7 @@ fn opened_at(at: BorrowedFd<'_>, name: &Path) -> io::Result<Option<std::fs::File
     };
     let found = fstat(&file).map_err(io::Error::from)?;
     if FileType::from_raw_mode(found.st_mode) != FileType::RegularFile {
-        return Err(io::Error::other("it is not a file"));
+        return Err(io::Error::from(Refused::NotAFile));
     }
     Ok(Some(std::fs::File::from(file)))
 }
@@ -622,7 +622,7 @@ pub(super) fn lock_file(folder: &Path, name: &str) -> io::Result<std::fs::File> 
     };
     let found = fstat(&file).map_err(io::Error::from)?;
     if FileType::from_raw_mode(found.st_mode) != FileType::RegularFile {
-        return Err(io::Error::other("it is not a file"));
+        return Err(io::Error::from(Refused::NotAFile));
     }
     Ok(std::fs::File::from(file))
 }
@@ -640,7 +640,7 @@ pub(super) fn rewrite(root: &Path, rel: &str, read: &[u8], text: &[u8]) -> Resul
     let file = openat(at, name, opened, Mode::empty()).map_err(|error| refusal(at, name, error))?;
     let found = fstat(&file).map_err(io::Error::from)?;
     if FileType::from_raw_mode(found.st_mode) != FileType::RegularFile {
-        return Err(io::Error::other("it is not a file").into());
+        return Err(io::Error::from(Refused::NotAFile).into());
     }
     if found.st_nlink != 1 {
         return Err(Unwritten::NamedTwice);
@@ -837,7 +837,11 @@ mod tests {
         let read = |rel: &str| io::read_to_string(open_file(&folder, rel)?);
         assert_eq!(read("a.txt").unwrap(), "a");
         for rel in ["notes.txt", "linked/notes.txt"] {
-            assert_eq!(read(rel).unwrap_err().to_string(), "it is a link", "{rel}");
+            assert_eq!(
+                Refused::of(&read(rel).unwrap_err()),
+                Some(Refused::Link),
+                "{rel}"
+            );
         }
         assert_eq!(read("missing").unwrap_err().kind(), io::ErrorKind::NotFound);
     }
@@ -856,7 +860,7 @@ mod tests {
         assert_eq!(measure(&folder, "a.txt").unwrap().length, 1);
         for rel in ["notes.txt", "linked/notes.txt"] {
             let refused = measure(&folder, rel).unwrap_err();
-            assert_eq!(refused.to_string(), "it is a link", "{rel}");
+            assert_eq!(Refused::of(&refused), Some(Refused::Link), "{rel}");
         }
     }
 
@@ -871,10 +875,10 @@ mod tests {
         fs::write(folder.join("named.txt"), "named").unwrap();
         fs::hard_link(folder.join("named.txt"), kept.join("named.txt")).unwrap();
         let refused = keep_file(&folder, "linked/new.txt", "new.fresh", b"new").unwrap_err();
-        assert_eq!(refused.to_string(), "it is a link");
+        assert_eq!(Refused::of(&refused), Some(Refused::Link));
         for rel in ["notes.txt", "named.txt"] {
             let refused = keep_file(&folder, rel, "fresh", b"new").unwrap_err();
-            assert_eq!(refused.to_string(), "something else has its name", "{rel}");
+            assert_eq!(Refused::of(&refused), Some(Refused::Taken), "{rel}");
         }
         assert_eq!(names(&kept), ["drafts", "named.txt", "notes.txt"]);
         assert_eq!(fs::read(kept.join("notes.txt")).unwrap(), b"mine");
@@ -900,7 +904,7 @@ mod tests {
         fs::rename(top.join("b"), scratch.0.join("b")).unwrap();
         symlink(&kept, top.join("b")).unwrap();
         let refused = folders.make_new_file("b/1.txt", false).unwrap_err();
-        assert_eq!(refused.to_string(), "it is a link");
+        assert_eq!(Refused::of(&refused), Some(Refused::Link));
         assert_eq!(names(&kept), ["drafts", "notes.txt"]);
         // Far more folders than are kept open, and one removed and made
         // again under its path.
@@ -925,11 +929,11 @@ mod tests {
         symlink(kept.join("absent"), folder.join("dangling")).unwrap();
         for name in ["lock", "dangling"] {
             let refused = lock_file(&folder, name).unwrap_err();
-            assert_eq!(refused.to_string(), "it is a link", "{name}");
+            assert_eq!(Refused::of(&refused), Some(Refused::Link), "{name}");
         }
         symlink(&kept, scratch.0.join("linked")).unwrap();
         let refused = lock_file(&scratch.0.join("linked"), "lock").unwrap_err();
-        assert_eq!(refused.to_string(), "it is a link");
+        assert_eq!(Refused::of(&refused), Some(Refused::Link));
         assert_eq!(names(&kept), ["drafts", "notes.txt"]);
         assert_eq!(fs::read(kept.join("notes.txt")).unwrap(), b"mine");
     }

@@ -28,6 +28,41 @@ pub enum Unwritable {
     NotText,
 }
 
+/// Why a file or folder is refused here rather than by the system. It
+/// travels inside an `io::Error` and is worded as a `problem::Reason`.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Refused {
+    /// It is a link, never followed.
+    Link,
+    /// It is a folder or something else, not a file.
+    NotAFile,
+    /// Something other than what is wanted there has its name.
+    Taken,
+    /// A path that ends in no folder's name.
+    NamesNoFolder,
+}
+
+impl Refused {
+    /// The refusal `error` carries, where it is one.
+    pub fn of(error: &io::Error) -> Option<Refused> {
+        error.get_ref()?.downcast_ref().copied()
+    }
+}
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
+
+impl std::error::Error for Refused {}
+
+impl From<Refused> for io::Error {
+    fn from(refused: Refused) -> io::Error {
+        io::Error::other(refused)
+    }
+}
+
 /// The digits Windows reads in a device name include three superscripts.
 const DEVICES: &[&str] = &[
     "CON",
@@ -334,7 +369,7 @@ pub fn no_link_to(root: &Path, rel: &str) -> io::Result<()> {
     }
     #[cfg(not(unix))]
     {
-        let link = || io::Error::other("it is a link");
+        let link = || io::Error::from(Refused::Link);
         let mut at = root.to_path_buf();
         match std::fs::symlink_metadata(&at) {
             Ok(found) if found.is_symlink() => return Err(link()),
@@ -357,7 +392,7 @@ pub fn no_link_to(root: &Path, rel: &str) -> io::Result<()> {
                     return Err(io::Error::from(io::ErrorKind::NotADirectory));
                 }
                 (false, true) if !found.is_file() => {
-                    return Err(io::Error::other("it is not a file"));
+                    return Err(io::Error::from(Refused::NotAFile));
                 }
                 _ => {}
             }
@@ -485,7 +520,7 @@ pub fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Resul
                 .is_ok_and(|found| found.file_type().is_file() && named_once(&found))
         };
         if std::fs::symlink_metadata(&to).is_ok() && !itself(&to) {
-            return Err(io::Error::other("something else has its name"));
+            return Err(io::Error::from(Refused::Taken));
         }
         let fresh = to.with_file_name(fresh);
         let written = std::fs::OpenOptions::new()
@@ -754,7 +789,7 @@ fn no_link_on_the_way(root: &Path, rel: &str) -> io::Result<()> {
     for folder in folders {
         let found = std::fs::symlink_metadata(&folder)?;
         if found.is_symlink() {
-            return Err(io::Error::other("it is a link"));
+            return Err(io::Error::from(Refused::Link));
         }
         if !found.is_dir() {
             return Err(io::Error::from(io::ErrorKind::NotADirectory));
@@ -834,7 +869,7 @@ pub fn stays_inside(rel: &str) -> bool {
 /// a link inside is removed as a link, even one put there while it runs.
 pub fn remove_folder(path: &Path) -> io::Result<()> {
     if std::fs::symlink_metadata(path)?.is_symlink() {
-        return Err(io::Error::other("it is a link"));
+        return Err(io::Error::from(Refused::Link));
     }
     #[cfg(unix)]
     {
@@ -1246,7 +1281,7 @@ mod tests {
         // A folder with the name is not written over.
         std::fs::create_dir(root.join("a").join("c")).unwrap();
         let refused = keep_file(&root, "a/c", "c.fresh", b"three").unwrap_err();
-        assert_eq!(refused.to_string(), "something else has its name");
+        assert_eq!(Refused::of(&refused), Some(Refused::Taken));
         assert!(!root.join("a").join("c.fresh").exists());
         remove_folder(&root).unwrap();
     }
