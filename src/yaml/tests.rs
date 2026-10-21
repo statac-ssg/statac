@@ -950,3 +950,237 @@ fn text_in_quotes_reads_back_as_it_was() {
         );
     }
 }
+
+/// A tree as written: each scalar by its spelling at its place, `~` where
+/// it is written as nothing.
+fn as_written(sources: &Sources, node: &Node) -> String {
+    match &node.value {
+        Value::Scalar(_) => match sources.spelling(node.place) {
+            "" => "~".to_owned(),
+            spelling => spelling.to_owned(),
+        },
+        Value::Sequence(items) => {
+            let items: Vec<String> = items.iter().map(|item| as_written(sources, item)).collect();
+            format!("[{}]", items.join(", "))
+        }
+        Value::Mapping(entries) => {
+            let entries: Vec<String> = entries
+                .iter()
+                .map(|entry| {
+                    let key = as_written(sources, &entry.key);
+                    format!("{key}: {}", as_written(sources, &entry.value))
+                })
+                .collect();
+            format!("{{{}}}", entries.join(", "))
+        }
+    }
+}
+
+fn read_partly(text: &str) -> (String, Vec<(Kind, String)>) {
+    let (sources, id) = one("statac.yaml", text);
+    let place = Place {
+        source: id,
+        span: Span::new(0, text.len()),
+    };
+    let partial = read_partial(&sources, place);
+    let problems = partial
+        .problems
+        .into_iter()
+        .map(|problem| {
+            let place = problem.place.expect("a problem in a file has a place");
+            (problem.kind, sources.spelling(place).to_owned())
+        })
+        .collect();
+    (as_written(&sources, &partial.node), problems)
+}
+
+#[test]
+fn yaml_part_way_through_being_typed_is_read_past_each_fault() {
+    use Malformed::*;
+    let malformed = |found| Kind::MalformedYaml { found };
+    let cases = [
+        // A list being typed is closed after what it holds.
+        (
+            "title: Post 1\ntags: [Ta\n",
+            "{title: Post 1, tags: [Ta]}",
+            vec![(malformed(UnclosedBracket('[')), "[")],
+        ),
+        (
+            "title: Post 1\ntags: [Tag 1,\n  Ta\n",
+            "{title: Post 1, tags: [Tag 1, Ta]}",
+            vec![(malformed(UnclosedBracket('[')), "[")],
+        ),
+        (
+            "tags: []\nbook: {authors: [\n",
+            "{tags: [], book: {authors: []}}",
+            vec![(malformed(UnclosedBracket('[')), "[")],
+        ),
+        // A line no deeper than the one a bracket opens on is outside it.
+        (
+            "title: Post 1\ntags: [Tag 1, Ta\ndate: 2026-01-01\n",
+            "{title: Post 1, tags: [Tag 1, Ta], date: 2026-01-01}",
+            vec![(malformed(Unexpected(":".into())), ":")],
+        ),
+        // A key being typed is left out, and what follows it read.
+        (
+            "title: Post 1\nda\ndraft: true\n",
+            "{title: Post 1, draft: true}",
+            vec![(malformed(Unexpected("da".into())), "da")],
+        ),
+        (
+            "book:\n  author: Author 1\n  is\n  isbn: 1\ntitle: Post 1\n",
+            "{book: {author: Author 1, isbn: 1}, title: Post 1}",
+            vec![(malformed(Unexpected("is".into())), "is")],
+        ),
+        (
+            "tags:\n  - Tag 1\n  Ta\ntitle: Post 1\n",
+            "{tags: [Tag 1], title: Post 1}",
+            vec![(malformed(Unexpected("Ta".into())), "Ta")],
+        ),
+        // A key whose value is still to come.
+        (
+            "title: Post 1\nlayout:\n",
+            "{title: Post 1, layout: ~}",
+            vec![],
+        ),
+        // A quote being typed is closed after what it holds.
+        (
+            "title: \"Post 1\ndate: 2026-01-01\n",
+            "{title: \"Post 1, date: 2026-01-01}",
+            vec![(malformed(UnclosedQuote('"')), "\"")],
+        ),
+        (
+            "title: \"Caf\u{e9} 1\ndate: 2026-01-01\n",
+            "{title: \"Caf\u{e9} 1, date: 2026-01-01}",
+            vec![(malformed(UnclosedQuote('"')), "\"")],
+        ),
+        (
+            "tags: [Tag 1, \"Ta\n",
+            "{tags: [Tag 1, \"Ta]}",
+            vec![
+                (malformed(UnclosedQuote('"')), "\""),
+                (malformed(UnclosedBracket('[')), "["),
+            ],
+        ),
+        // The lines deeper than a line left out go with it.
+        (
+            "title: Post 1\nbook\n  author: Author 1\ndraft: true\n",
+            "{title: Post 1, draft: true}",
+            vec![(malformed(Unexpected("book".into())), "book")],
+        ),
+        (
+            "title: Post 1\n\tdate: 2026-01-01\ndraft: true\n",
+            "{title: Post 1, draft: true}",
+            vec![(malformed(Tab), "\t")],
+        ),
+        // A fault the tree finds, not the parser.
+        (
+            "title: Post 1\ntitle: Post 2\ndraft: true\n",
+            "{title: Post 1, draft: true}",
+            vec![(
+                Kind::DuplicateKey {
+                    key: "title".into(),
+                    first: Place {
+                        source: one("statac.yaml", "").1,
+                        span: Span::new(0, 5),
+                    },
+                },
+                "title",
+            )],
+        ),
+        (
+            "title: !x Post 1\ndraft: true\n",
+            "{title: ~, draft: true}",
+            vec![(Kind::UnknownYamlTag { tag: "!x".into() }, "!x")],
+        ),
+        // Nothing left to read.
+        ("", "~", vec![]),
+        ("[", "[]", vec![(malformed(UnclosedBracket('[')), "[")]),
+        ("]", "~", vec![(malformed(Unexpected("]".into())), "]")]),
+    ];
+    for (text, tree, problems) in cases {
+        let problems: Vec<(Kind, String)> = problems
+            .into_iter()
+            .map(|(kind, spelling)| (kind, spelling.to_owned()))
+            .collect();
+        assert_eq!(read_partly(text), (tree.to_owned(), problems), "{text:?}");
+    }
+}
+
+/// Front matter using every kind of node, each written as an author
+/// might, to be typed one character at a time.
+const TYPED: &str = "title: \"Post 1: a caf\u{e9}\"\ndate: 2026-01-01\ntags: [Tag 1, 'Tag 2']\nbook:\n  authors:\n    - Author 1\n    - {name: Author 2, role: editor}\n  isbn: &isbn 1\nsummary: |\n  Line 1\n  Line 2\nsame: *isbn\nnote: \"one\n  two\"\nempty:\n";
+
+#[test]
+fn yaml_read_whole_is_read_partly_the_same_with_no_problems() {
+    for text in [
+        TYPED,
+        "",
+        "title: Post 1\r\ntags:\r\n  - Tag 1\r\n",
+        "- Post 1\n- [a, {b: c}]\n",
+        "title: \"one\n two\"\n",
+        "book:\n  author: \"Author 1\n   of 2\"\n",
+    ] {
+        let (sources, id) = one("statac.yaml", text);
+        let whole = read(&sources, id).unwrap_or_else(|problem| panic!("{text:?}: {problem:?}"));
+        let place = Place {
+            source: id,
+            span: Span::new(0, text.len()),
+        };
+        let partial = read_partial(&sources, place);
+        assert_eq!(partial.node, whole, "{text:?}");
+        assert_eq!(partial.problems, [], "{text:?}");
+    }
+}
+
+#[test]
+fn yaml_typed_a_character_at_a_time_is_read_partly_at_every_step() {
+    for (end, _) in TYPED.char_indices().chain([(TYPED.len(), ' ')]) {
+        let text = &TYPED[..end];
+        let (sources, id) = one("statac.yaml", text);
+        let place = Place {
+            source: id,
+            span: Span::new(0, text.len()),
+        };
+        let partial = read_partial(&sources, place);
+        // Every node lies in the text, at characters.
+        as_written(&sources, &partial.node);
+        assert_eq!(
+            partial.problems.first(),
+            read(&sources, id).err().as_ref(),
+            "{text:?}"
+        );
+    }
+}
+
+#[test]
+fn front_matter_part_way_through_being_typed_is_read_partly() {
+    let read = |markdown: &str| {
+        let (sources, id) = one("content/post-1.md", markdown);
+        front_matter_partial(&sources, id).map(|partial| {
+            let problems: Vec<Kind> = partial.problems.into_iter().map(|p| p.kind).collect();
+            (as_written(&sources, &partial.node), problems)
+        })
+    };
+    let unexpected = |found: &str| Kind::MalformedYaml {
+        found: Malformed::Unexpected(found.into()),
+    };
+    assert_eq!(read("Body.\n"), None);
+    assert_eq!(read("+++\ntitle = \"Post 1\"\n+++\n"), None);
+    assert_eq!(
+        read("---\ntitle: Post 1\nda\n---\nBody.\n"),
+        Some(("{title: Post 1}".into(), vec![unexpected("da")]))
+    );
+    // A new page, its front matter not yet closed.
+    assert_eq!(
+        read("---\ntitle: Post 1\nda"),
+        Some((
+            "{title: Post 1}".into(),
+            vec![Kind::UnclosedFrontMatter, unexpected("da")]
+        ))
+    );
+    assert_eq!(
+        read("---\n"),
+        Some(("~".into(), vec![Kind::UnclosedFrontMatter]))
+    );
+}

@@ -18,6 +18,8 @@ pub struct Split {
 pub struct Unclosed {
     /// The opening `---`.
     pub opening: Span,
+    /// The lines after the opening one, to the end of the file.
+    pub rest: Span,
 }
 
 pub fn split(text: &str) -> Result<Split, Unclosed> {
@@ -51,6 +53,7 @@ pub fn split(text: &str) -> Result<Split, Unclosed> {
     }
     Err(Unclosed {
         opening: Span::new(start, start + 3),
+        rest: Span::new(yaml_start, text.len()),
     })
 }
 

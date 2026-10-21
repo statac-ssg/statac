@@ -16,7 +16,7 @@ pub mod write;
 
 pub use front_matter::{Split, Unclosed, split};
 pub use schema::{Resolved, keeps_characters, resolve};
-pub use tree::{ALIAS_LIMIT, ALIAS_TEXT_LIMIT, Entry, Node, Tag, Value};
+pub use tree::{ALIAS_LIMIT, ALIAS_TEXT_LIMIT, Entry, Node, Partial, Tag, Value};
 
 use crate::problem::{Kind, Problem, Word};
 use crate::source::{Place, SourceId, Sources, Span};
@@ -61,6 +61,40 @@ pub fn read_json(sources: &Sources, source: SourceId) -> Result<Node, Problem> {
 /// whole source.
 pub fn read_at(sources: &Sources, place: Place) -> Result<Node, Problem> {
     tree::build(sources, place)
+}
+
+/// Reads the YAML at `place` as an editor holds it while the author
+/// types, reading on past each fault rather than stopping at the first.
+pub fn read_partial(sources: &Sources, place: Place) -> Partial {
+    tree::build_partial(sources, place)
+}
+
+/// Reads a Markdown file's front matter as an editor holds it while the
+/// author types: front matter not yet closed runs to the end of the file.
+/// None where the file has none.
+pub fn front_matter_partial(sources: &Sources, source: SourceId) -> Option<Partial> {
+    let (span, unclosed) = match split(sources.text(source)) {
+        Ok(Split {
+            front_matter: Some(span),
+            ..
+        }) => (span, None),
+        Ok(_) => return None,
+        Err(unclosed) => {
+            let opening = Place {
+                source,
+                span: unclosed.opening,
+            };
+            (
+                unclosed.rest,
+                Some(Problem::at(Kind::UnclosedFrontMatter, opening)),
+            )
+        }
+    };
+    let mut partial = read_partial(sources, Place { source, span });
+    if let Some(problem) = unclosed {
+        partial.problems.insert(0, problem);
+    }
+    Some(partial)
 }
 
 /// Reads a Markdown file's front matter, if it has any, and gives the span

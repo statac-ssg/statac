@@ -69,6 +69,17 @@ impl<'a> Events<'a> {
         }
     }
 
+    /// Where each list or mapping still open that a bracket opened
+    /// stands, outermost first.
+    pub(super) fn open_brackets(&self) -> impl Iterator<Item = usize> + '_ {
+        self.open
+            .iter()
+            .filter(|&&(flow, start)| {
+                flow && matches!(self.text.as_bytes().get(start), Some(b'[' | b'{'))
+            })
+            .map(|&(_, start)| start)
+    }
+
     fn convert(
         &mut self,
         event: Granit<'_>,

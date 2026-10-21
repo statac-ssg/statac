@@ -1,7 +1,7 @@
 //! The YAML tree: every node, every mapping key included, with the place it
 //! was written.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
 
 use super::parser::{Event, Events, Fault};
@@ -113,83 +113,281 @@ const READ_AGAIN: usize = 16 * 1024 * 1024;
 
 pub(super) fn build(sources: &Sources, at: Place) -> Result<Node, Problem> {
     let written = &sources.text(at.source)[at.span.range()];
-    // The reader asks a later line of a text in quotes for one space more
-    // than YAML does. Where it stops at such a line the text is read
-    // again with a space before the line, and a line still refused then
-    // is one YAML refuses too. `deepened` is where each line given a
-    // space starts, as written.
-    let mut deepened: BTreeSet<usize> = BTreeSet::new();
+    let mut mends = Mends::default();
     let mut read_again = 0;
     loop {
-        let (text, spaces) = with_spaces(written, &deepened);
-        let stopped = match read(at, text.as_deref().unwrap_or(written), &spaces) {
+        let stopped = match mends.read(at, written) {
             Ok(node) => return Ok(node),
             Err(stopped) => stopped,
         };
-        let (problem, lines) = match *stopped {
-            Stopped::Shallow { problem, lines } => (problem, lines),
-            Stopped::Other(problem) => return Err(problem),
+        read_again += written.len();
+        if read_again > READ_AGAIN || !mends.deepen(&stopped.why) {
+            return Err(stopped.problem);
+        }
+    }
+}
+
+/// What could be read of YAML an author may be part way through typing.
+#[derive(Clone, PartialEq, Debug)]
+pub struct Partial {
+    /// Every node read, placed as written: each quote and bracket left
+    /// open is closed after what it holds, and each other stretch the
+    /// reader stopped at is left out, with the lines after it deeper than
+    /// its own.
+    pub node: Node,
+    /// The problem at each quote or bracket closed and each stretch left
+    /// out, in the order the reader met them.
+    pub problems: Vec<Problem>,
+}
+
+pub(super) fn build_partial(sources: &Sources, at: Place) -> Partial {
+    let written = &sources.text(at.source)[at.span.range()];
+    let mut mends = Mends::default();
+    let mut problems = Vec::new();
+    let mut read_again = 0;
+    loop {
+        let stopped = match mends.read(at, written) {
+            Ok(node) => return Partial { node, problems },
+            Err(stopped) => *stopped,
         };
         read_again += written.len();
-        // The line the reader stopped at is the first of them.
-        if read_again > READ_AGAIN || lines.first().is_none_or(|line| deepened.contains(line)) {
-            return Err(problem);
+        if read_again <= READ_AGAIN && mends.deepen(&stopped.why) {
+            continue;
         }
-        deepened.extend(lines);
+        let base = at.span.range().start;
+        let from = stopped
+            .problem
+            .place
+            .map_or(written.len(), |place| place.span.range().start - base);
+        problems.push(stopped.problem);
+        if read_again > READ_AGAIN || !mends.step_past(written, from, &stopped.why) {
+            return Partial {
+                node: stopped.read,
+                problems,
+            };
+        }
     }
 }
 
-/// `written` with a space before each line starting at one of `lines`,
-/// in order, and where each space stands in it; none where there are no
-/// lines.
-fn with_spaces(written: &str, lines: &BTreeSet<usize>) -> (Option<String>, Vec<usize>) {
-    if lines.is_empty() {
-        return (None, Vec::new());
-    }
-    let mut text = String::with_capacity(written.len() + lines.len());
-    let mut spaces = Vec::with_capacity(lines.len());
-    let mut from = 0;
-    for &line in lines {
-        text.push_str(&written[from..line]);
-        spaces.push(text.len());
-        text.push(' ');
-        from = line;
-    }
-    text.push_str(&written[from..]);
-    (Some(text), spaces)
+/// What is changed in the text as written before it is read again.
+#[derive(Default)]
+struct Mends {
+    /// The reader asks a later line of a text in quotes for one space
+    /// more than YAML does. Where it stops at such a line the text is
+    /// read again with a space before the line, and a line still refused
+    /// then is one YAML refuses too. This is where each line given a
+    /// space starts, as written.
+    deepened: BTreeSet<usize>,
+    /// The quotes and brackets put in to close what was left open, by
+    /// where they go as written.
+    closers: BTreeMap<usize, String>,
+    /// Where each quote or bracket closed so stands, as written.
+    closed: BTreeSet<usize>,
+    /// The text as written with each stretch stepped past made spaces,
+    /// once there is one.
+    blanked: Option<String>,
 }
 
-/// Why a text wasn't read.
-enum Stopped {
+impl Mends {
+    fn read(&self, at: Place, written: &str) -> Result<Node, Box<Stopped>> {
+        let written = self.blanked.as_deref().unwrap_or(written);
+        let (text, added) = self.apply(written);
+        read(at, text.as_deref().unwrap_or(written), &added)
+    }
+
+    /// `written` with each byte put in, and where each stands in it; none
+    /// where nothing is put in.
+    fn apply(&self, written: &str) -> (Option<String>, Vec<usize>) {
+        if self.deepened.is_empty() && self.closers.is_empty() {
+            return (None, Vec::new());
+        }
+        let mut puts: Vec<(usize, &str)> = self
+            .closers
+            .iter()
+            .map(|(&at, closers)| (at, closers.as_str()))
+            .chain(self.deepened.iter().map(|&line| (line, " ")))
+            .collect();
+        puts.sort_by_key(|&(at, _)| at);
+        let mut text = String::with_capacity(written.len() + puts.len());
+        let mut added = Vec::with_capacity(puts.len());
+        let mut from = 0;
+        for (at, put) in puts {
+            text.push_str(&written[from..at]);
+            added.extend(text.len()..text.len() + put.len());
+            text.push_str(put);
+            from = at;
+        }
+        text.push_str(&written[from..]);
+        (Some(text), added)
+    }
+
+    /// Gives a space to the lines of a text in quotes the reader stopped
+    /// at, where they haven't one already.
+    fn deepen(&mut self, why: &Why) -> bool {
+        let Why::Shallow(lines) = why else {
+            return false;
+        };
+        // The line the reader stopped at is the first of them.
+        if lines
+            .first()
+            .is_none_or(|line| self.deepened.contains(line))
+        {
+            return false;
+        }
+        self.deepened.extend(lines);
+        true
+    }
+
+    /// Mends the text so that reading it again gets past where the reader
+    /// stopped, at `from` as written: closes a quote or the brackets left
+    /// open after what they hold, or else makes spaces of the stretch from
+    /// there. False where nothing is left to mend.
+    fn step_past(&mut self, written: &str, from: usize, why: &Why) -> bool {
+        let text = self.blanked.as_deref().unwrap_or(written);
+        if let Why::Other { open, unclosed } = why {
+            let quote = unclosed.and_then(|at| match text.as_bytes()[at] {
+                quote @ (b'"' | b'\'') => Some((at, char::from(quote))),
+                _ => None,
+            });
+            if let Some((at, quote)) = quote
+                && self.closed.insert(at)
+            {
+                let after = after_held(text, at);
+                self.closers.entry(after).or_default().push(quote);
+                return true;
+            }
+            if let (Some(&outer), Some(&inner)) = (open.first(), open.last()) {
+                // A later line no deeper than the one the brackets open on
+                // can't be inside them.
+                let outside = stretch_end(text, outer);
+                let unclosed = unclosed.is_some_and(|at| open.contains(&at));
+                let new: Vec<usize> = open
+                    .iter()
+                    .copied()
+                    .filter(|open| !self.closed.contains(open))
+                    .collect();
+                if (unclosed || from >= outside) && inner < outside && !new.is_empty() {
+                    self.closed.extend(&new);
+                    let closers: String = new
+                        .iter()
+                        .rev()
+                        .map(|&open| match text.as_bytes()[open] {
+                            b'[' => ']',
+                            _ => '}',
+                        })
+                        .collect();
+                    let after = after_held(text, outer);
+                    self.closers.entry(after).or_default().push_str(&closers);
+                    return true;
+                }
+            }
+        }
+        let end = stretch_end(text, from);
+        let (from, end) = if text[from..end].contains(|c| !is_space(c)) {
+            (from, end)
+        } else {
+            // Nothing is left there to mend: the last line before it with
+            // something on it.
+            let Some(last) = text[..from].rfind(|c| !is_space(c)) else {
+                return false;
+            };
+            let line = text[..last].rfind('\n').map_or(0, |n| n + 1);
+            let start = line + depth(&text[line..]);
+            (start, stretch_end(text, start))
+        };
+        let mut blanked = String::with_capacity(text.len());
+        blanked.push_str(&text[..from]);
+        for c in text[from..end].chars() {
+            match c {
+                '\n' | '\r' => blanked.push(c),
+                _ => blanked.extend(std::iter::repeat_n(' ', c.len_utf8())),
+            }
+        }
+        blanked.push_str(&text[end..]);
+        self.blanked = Some(blanked);
+        // A quote or bracket put in to close what is now spaces would
+        // stand alone.
+        self.closers.retain(|&at, _| at < from || at > end);
+        true
+    }
+}
+
+/// Where the last of what is opened at `opens` ends, in the stretch of
+/// its line and the lines after it deeper than its own.
+fn after_held(text: &str, opens: usize) -> usize {
+    opens + 1 + text[opens + 1..stretch_end(text, opens)].trim_end().len()
+}
+
+fn is_space(c: char) -> bool {
+    matches!(c, ' ' | '\r' | '\n')
+}
+
+/// The spaces a line opens with.
+fn depth(line: &str) -> usize {
+    line.len() - line.trim_start_matches(' ').len()
+}
+
+/// The end of the stretch made of the line holding `at` and the lines
+/// after it deeper than it: the start of the first later line with
+/// something on it that stands no deeper, or the end of the text.
+fn stretch_end(text: &str, at: usize) -> usize {
+    let start = text[..at].rfind('\n').map_or(0, |n| n + 1);
+    let deepest = depth(&text[start..]);
+    let mut line = text[at..].find('\n').map_or(text.len(), |n| at + n + 1);
+    for written in text[line..].split_inclusive('\n') {
+        if written.contains(|c| !is_space(c)) && depth(written) <= deepest {
+            return line;
+        }
+        line += written.len();
+    }
+    text.len()
+}
+
+/// Why a text wasn't read, and what was read before.
+struct Stopped {
+    problem: Problem,
+    why: Why,
+    /// Each node read before the reader stopped, each list and mapping
+    /// still open closed after the last.
+    read: Node,
+}
+
+enum Why {
     /// At a later line of a text in quotes: the lines of the text, by
     /// where each starts as written, that a space more might mend, the
     /// one stopped at first.
-    Shallow {
-        problem: Problem,
-        lines: Vec<usize>,
+    Shallow(Vec<usize>),
+    Other {
+        /// Where each bracket left open stands as written, outermost first.
+        open: Vec<usize>,
+        /// Where the quote or bracket stands, as written, that the reader
+        /// found never closed, where that is what stopped it.
+        unclosed: Option<usize>,
     },
-    Other(Problem),
 }
 
-/// Reads `text`, which is the text at `at` with a space put in at each of
-/// `spaces`. Every place is one in the text as written.
-fn read(at: Place, text: &str, spaces: &[usize]) -> Result<Node, Box<Stopped>> {
+/// Reads `text`, which is the text at `at` with a byte put in at each of
+/// `added`. Every place is one in the text as written.
+fn read(at: Place, text: &str, added: &[usize]) -> Result<Node, Box<Stopped>> {
     let mut builder = Builder {
         at,
         text,
-        spaces,
+        added,
         stack: Vec::new(),
         anchors: HashMap::new(),
         repeated: 0,
         repeated_bytes: 0,
         documents: 0,
         root: None,
+        last_end: 0,
     };
-    for event in Events::new(text) {
-        match event {
-            Ok(event) => builder
-                .event(event)
-                .map_err(|problem| Box::new(Stopped::Other(problem)))?,
+    let mut events = Events::new(text);
+    while let Some(event) = events.next() {
+        let (problem, why) = match event {
+            Ok(event) => match builder.event(event) {
+                Ok(()) => continue,
+                Err(problem) => (problem, builder.other(&events, None)),
+            },
             Err(Fault::Malformed(
                 Malformed::ShallowLine {
                     quote,
@@ -209,27 +407,36 @@ fn read(at: Place, text: &str, spaces: &[usize]) -> Result<Node, Box<Stopped>> {
                     spaces,
                 };
                 let problem = builder.problem(Kind::MalformedYaml { found }, range);
-                return Err(Box::new(Stopped::Shallow { problem, lines }));
+                (problem, Why::Shallow(lines))
             }
             Err(Fault::Malformed(found, range)) => {
-                let problem = builder.problem(Kind::MalformedYaml { found }, range);
-                return Err(Box::new(Stopped::Other(problem)));
+                let unclosed = matches!(
+                    found,
+                    Malformed::UnclosedBracket(_) | Malformed::UnclosedQuote(_)
+                )
+                .then(|| builder.written(range.start));
+                let mut why = builder.other(&events, unclosed);
+                // The bracket the reader found never closed may be one it
+                // hadn't yet opened.
+                if let Why::Other { open, .. } = &mut why
+                    && let Malformed::UnclosedBracket(_) = found
+                    && let Some(bracket) = unclosed
+                    && !open.contains(&bracket)
+                {
+                    open.push(bracket);
+                    open.sort_unstable();
+                }
+                (builder.problem(Kind::MalformedYaml { found }, range), why)
             }
-            Err(Fault::UnknownTag(tag, range)) => {
-                let problem = builder.problem(Kind::UnknownYamlTag { tag }, range);
-                return Err(Box::new(Stopped::Other(problem)));
-            }
-        }
+            Err(Fault::UnknownTag(tag, range)) => (
+                builder.problem(Kind::UnknownYamlTag { tag }, range),
+                builder.other(&events, None),
+            ),
+        };
+        let read = builder.into_read();
+        return Err(Box::new(Stopped { problem, why, read }));
     }
-    Ok(match builder.root {
-        Some(node) => node,
-        None => Node {
-            place: builder.place(0..0),
-            style: Style::Plain,
-            tag: None,
-            value: Value::Scalar(String::new()),
-        },
-    })
+    Ok(builder.into_read())
 }
 
 struct Frame {
@@ -248,8 +455,8 @@ struct Frame {
 struct Builder<'a> {
     at: Place,
     text: &'a str,
-    /// Where each space put into `text` stands, in order.
-    spaces: &'a [usize],
+    /// Where each byte put into `text` stands, in order.
+    added: &'a [usize],
     stack: Vec<Frame>,
     /// Each anchor's node, how many nodes it holds (itself included) and
     /// how many bytes of scalar text.
@@ -258,6 +465,8 @@ struct Builder<'a> {
     repeated_bytes: usize,
     documents: usize,
     root: Option<Node>,
+    /// Where the last node read ends.
+    last_end: usize,
 }
 
 impl Builder<'_> {
@@ -291,6 +500,7 @@ impl Builder<'_> {
                     }
                 }
                 let bytes = text.len();
+                self.last_end = span.end;
                 let node = Node {
                     place: self.place(span),
                     style,
@@ -319,6 +529,7 @@ impl Builder<'_> {
                     return Err(self.problem(Kind::AliasLimit { alias, limit }, span));
                 }
                 let node = self.anchors[&anchor].0.clone();
+                self.last_end = span.end;
                 self.add(node, size, bytes)?;
             }
             Event::SequenceStart { tag, start, .. } | Event::MappingStart { tag, start, .. }
@@ -335,6 +546,7 @@ impl Builder<'_> {
             }
             Event::End { end } => {
                 let frame = self.stack.pop().expect("the parser balances its events");
+                self.last_end = end;
                 let node = Node {
                     place: self.place(frame.start..end),
                     style: Style::None,
@@ -406,7 +618,7 @@ impl Builder<'_> {
     /// A range of the text being read, placed in its whole source.
     /// Where the byte `at` of `text` stands in the text as written.
     fn written(&self, at: usize) -> usize {
-        at - self.spaces.partition_point(|space| *space < at)
+        at - self.added.partition_point(|added| *added < at)
     }
 
     fn place(&self, range: Range<usize>) -> Place {
@@ -420,5 +632,46 @@ impl Builder<'_> {
 
     fn problem(&self, kind: Kind, range: Range<usize>) -> Problem {
         Problem::at(kind, self.place(range))
+    }
+
+    fn other(&self, events: &Events, unclosed: Option<usize>) -> Why {
+        let open = events.open_brackets().map(|at| self.written(at)).collect();
+        Why::Other { open, unclosed }
+    }
+
+    /// The tree read so far: each list and mapping still open closed after
+    /// the last node read, and a key with no value yet given an empty one
+    /// there.
+    fn into_read(mut self) -> Node {
+        while let Some(mut frame) = self.stack.pop() {
+            let end = self.last_end.max(frame.start);
+            if let (Value::Mapping(entries), Some(key)) = (&mut frame.value, frame.key.take()) {
+                let value = Node {
+                    place: self.place(end..end),
+                    style: Style::Plain,
+                    tag: None,
+                    value: Value::Scalar(String::new()),
+                };
+                entries.push(Entry { key, value });
+            }
+            let node = Node {
+                place: self.place(frame.start..end),
+                style: Style::None,
+                tag: frame.tag,
+                value: frame.value,
+            };
+            self.last_end = end;
+            self.add(node, frame.size + 1, frame.bytes)
+                .expect("only a scalar key can be one given twice");
+        }
+        match self.root {
+            Some(node) => node,
+            None => Node {
+                place: self.place(0..0),
+                style: Style::Plain,
+                tag: None,
+                value: Value::Scalar(String::new()),
+            },
+        }
     }
 }
