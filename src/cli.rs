@@ -49,13 +49,16 @@ pub enum Request {
     Import(import::Options),
     Search(search::Options),
     Explain(Code),
+    /// A language server for an editor, on standard input and output.
+    Lsp,
     /// The usage screen, for the command named before `--help`, or whole.
     Help(Option<&'static str>),
     Version,
 }
 
-const COMMANDS: [&str; 10] = [
+const COMMANDS: [&str; 11] = [
     "build", "check", "serve", "stamp", "refresh", "refuse", "new", "import", "search", "explain",
+    "lsp",
 ];
 
 /// The options that take a value, and the commands that take each.
@@ -115,7 +118,7 @@ const OTHER_SPELLINGS: [(&str, &str); 7] = [
 const INTRO: &str = "Statac builds a website from a folder of writing.\n";
 
 /// Each command's entry on the usage screen, as the screen sets it.
-const USAGE: [(&str, &str); 12] = [
+const USAGE: [(&str, &str); 13] = [
     (
         "build",
         "  statac build [folder]  Read the site and write it out, ready to publish.\n",
@@ -198,6 +201,12 @@ const USAGE: [(&str, &str); 12] = [
         "explain",
         "  statac explain <name>  Explain a kind of problem. Its name is the last part
                          of the problem's More: link.
+",
+    ),
+    (
+        "lsp",
+        "  statac lsp             Tell an editor the site's problems as its files are
+                         opened and saved. The editor starts it.
 ",
     ),
 ];
@@ -381,7 +390,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>, terminal: &mut Terminal) ->
         }
     };
     let command = match &request {
-        Request::Help(_) | Request::Version | Request::Explain(_) => None,
+        Request::Help(_) | Request::Version | Request::Explain(_) | Request::Lsp => None,
         Request::Build { .. } => Some("build"),
         Request::Check { .. } => Some("check"),
         Request::Stamp(_) => Some("stamp"),
@@ -456,6 +465,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             &format!("Statac {}\n", env!("CARGO_PKG_VERSION")),
         ),
         Request::Explain(code) => say(terminal.out, &code.explained()),
+        Request::Lsp => return crate::lsp::run(&mut std::io::stdin().lock(), terminal.out),
         Request::Build { options, .. } | Request::Check { options, .. } => {
             let started = Instant::now();
             let outcome = build::run_saying(&options, terminal.progress);
@@ -622,6 +632,7 @@ fn site_of(request: &mut Request) -> Option<&mut PathBuf> {
         Request::New(_)
         | Request::Import(_)
         | Request::Explain(_)
+        | Request::Lsp
         | Request::Help(_)
         | Request::Version => None,
     }
@@ -1130,6 +1141,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             address: address.expect("checked above").to_owned(),
             today,
         }),
+        Some("lsp") => Request::Lsp,
         _ => Request::Explain(name.and_then(Code::from_name).expect("checked above")),
     })
 }

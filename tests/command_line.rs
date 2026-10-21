@@ -529,3 +529,34 @@ fn serve_says_nothing_of_a_connection_closed_before_its_answer() {
         .unwrap();
     assert_eq!(said, "");
 }
+
+#[test]
+fn lsp_speaks_only_the_protocol_on_standard_output() {
+    use std::io::Write;
+    let messages = [
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"shutdown"}"#,
+        r#"{"jsonrpc":"2.0","method":"exit"}"#,
+    ];
+    let mut child = Command::new(env!("CARGO_BIN_EXE_statac"))
+        .arg("lsp")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut input = child.stdin.take().unwrap();
+    for message in messages {
+        write!(input, "Content-Length: {}\r\n\r\n{message}", message.len()).unwrap();
+    }
+    drop(input);
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let said = String::from_utf8(output.stdout).unwrap();
+    let answers: Vec<&str> = said.split("Content-Length: ").skip(1).collect();
+    assert_eq!(answers.len(), 2, "{said}");
+    assert!(said.starts_with("Content-Length: "), "{said}");
+    assert!(
+        answers[1].ends_with(r#"{"jsonrpc":"2.0","id":2,"result":null}"#),
+        "{said}"
+    );
+}

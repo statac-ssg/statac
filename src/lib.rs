@@ -23,6 +23,7 @@ mod json;
 mod language;
 mod links;
 mod lists;
+mod lsp;
 pub mod markdown;
 pub mod new;
 mod origin;
