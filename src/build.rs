@@ -1,5 +1,6 @@
 //! Reading a site and building it.
 
+pub(crate) mod incremental;
 mod javascript;
 mod scripts;
 mod timings;

@@ -32,7 +32,7 @@ use crate::value::Value;
 use crate::yaml::{Node, Value as Yaml};
 
 /// One reading of a site, and what each of its ids names.
-pub(super) struct Reading {
+pub(crate) struct Reading {
     pub renderer: Renderer,
     pages: Vec<String>,
     lists: Vec<String>,

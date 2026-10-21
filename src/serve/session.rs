@@ -1,21 +1,9 @@
 //! A site kept built while its author works on it.
 //!
-//! A session holds its last round: every output with what it added to the
-//! build. Each round reads the site whole, as a build does, and asks of
-//! everything an output of the last round read whether the site read now
-//! holds the same thing, saying the same, written in the same place. An
-//! output is kept only where every answer is yes; every other output is
-//! built by the code a build uses, and the round is concluded over all of
-//! them by the code a build uses, so the folder a session leaves is the
-//! folder a build of the same files leaves.
-//!
-//! An id is an index into one reading's arenas, so nothing is compared by
-//! id: each thing read is known by what it names, and a kept output's ids
-//! and places are carried over to the new reading by those names. Whatever
-//! can't be carried over, or the session has no way to account for, is
-//! built again.
-
-mod print;
+//! A session holds its last round, and each round builds again only what
+//! changed since, as [`crate::build::incremental`] has it, then writes
+//! what it built into the session's folder, so the folder a session leaves
+//! is the folder a build of the same files leaves.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -25,6 +13,7 @@ use std::time::{Duration, Instant};
 use rayon::prelude::*;
 
 use crate::album::{KEPT, Progress};
+use crate::build::incremental::{self, Kept, Reading, Rebuilding, Rebuilt};
 use crate::build::{self, Built, Mode, Options, Output, Plan, Publishing, Remembered, Writes};
 use crate::content::words::PageWord;
 use crate::disk::{Clock, Inventory};
@@ -33,11 +22,8 @@ use crate::new::update::Starter;
 use crate::problem::Occupant;
 use crate::problem::{Kind, Problem};
 use crate::publish::{self, Left, Staging};
-use crate::reads::{Key, Reads, Translation};
-use crate::search::Record;
-use crate::site::PageId;
+use crate::reads::Key;
 use crate::stamp::{self, Pass};
-use print::{Prints, Reading, Taken};
 
 /// The session's folder in the site's `.statac`, where no other session
 /// of the site holds it.
@@ -152,20 +138,7 @@ pub struct Took {
 
 /// A round that built the site, as the next round finds it.
 struct Last {
-    reading: Reading,
-    /// The fingerprint of everything an output read, and of what each is
-    /// built from besides, as taken that round.
-    prints: Prints,
-    /// What the session can't account for output by output: where this
-    /// differs, every output is built.
-    whole: u64,
-    built: Arc<Vec<Built>>,
-    /// What each output is built from besides what it read.
-    own: Vec<u64>,
-    /// The records search cut from the writing of each page whose output
-    /// read everything the writing read, so that where the output stands
-    /// the writing does.
-    searched: HashMap<PageId, Arc<[Record]>>,
+    kept: Kept,
     /// What each output's file holds, by the file.
     hashes: HashMap<String, blake3::Hash>,
     /// Every file the folder holds that is no output's.
@@ -365,11 +338,7 @@ impl Session {
             before,
             ..Took::default()
         };
-        let mut clock = Instant::now();
-        let mut lap = |part: &mut Duration| {
-            *part = clock.elapsed();
-            clock = Instant::now();
-        };
+        let began = Instant::now();
         // Read before the round reads any file of the site, so that a
         // stamp it settles is of the file as the round read it.
         let disk = Clock::of_site(at);
@@ -381,11 +350,9 @@ impl Session {
         let fixed = options.today.is_some();
         let (stamps, mut prepared) = stamp::write(at, &options.run(), prepared, fixed, texts);
         let plan = Plan::of(&prepared.renderer, &mut prepared.problems).noting();
-        lap(&mut took.reading);
+        took.reading = began.elapsed();
 
-        let reading = Reading::of(prepared.renderer.share());
-        let renderer = &reading.renderer;
-        let settings = renderer.settings();
+        let settings = prepared.renderer.settings();
         let after = settings.text(crate::hooks::AFTER);
         let after = after.map(|line| line.value.to_owned());
         self.sets_after = after.is_some();
@@ -396,89 +363,37 @@ impl Session {
         if after != self.after && !build::stops(&prepared.problems) {
             self.last = None;
         }
-        let prints = Prints::new(&reading, disk);
-        let taken = Taken {
-            reading: &reading,
-            at,
-            prints: &prints,
+        let rebuilding = Rebuilding {
+            options,
+            prepared,
+            plan,
+            disk,
+            writes: Writes::Later,
+            remembered: Some(&self.remembered),
+            notes: self.notes,
         };
-        let whole = taken.whole(&plan, options);
-        let outputs = plan.outputs.par_iter();
-        let own: Vec<u64> = outputs.map(|&output| taken.own(output)).collect();
-        let changed = match &self.last {
-            Some(last) if self.notes => changed(last, taken),
-            _ => Vec::new(),
-        };
-        let to = match &self.last {
-            Some(last) if last.whole == whole => Some(last.reading.to(&reading)),
-            _ => None,
-        };
-        let kept: Vec<Option<Built>> = match (&self.last, &to) {
-            (Some(last), Some(to)) => carry(last, taken, &plan, &own, to),
-            _ => plan.outputs.iter().map(|_| None).collect(),
-        };
-        let standing: HashMap<PageId, Arc<[Record]>> = match (&self.last, &to) {
-            (Some(last), Some(to)) => {
-                let outputs = plan.outputs.iter().zip(&kept);
-                let stands: HashSet<PageId> = (outputs)
-                    .filter_map(|(output, kept)| match (output, kept) {
-                        (Output::Page(page), Some(_)) => Some(*page),
-                        _ => None,
-                    })
-                    .collect();
-                let searched = last.searched.iter();
-                let standing = searched.filter_map(|(&page, records)| {
-                    let page = to.page(page)?;
-                    stands.contains(&page).then(|| (page, Arc::clone(records)))
-                });
-                standing.collect()
-            }
-            _ => HashMap::new(),
-        };
-        let stood: HashSet<PageId> = standing.keys().copied().collect();
-        self.search.stand(standing);
-        lap(&mut took.comparing);
-
-        let fresh = kept.iter().filter(|kept| kept.is_none()).count();
-        let mut built: Vec<Built> = plan
-            .outputs
-            .par_iter()
-            .zip(kept)
-            .map(|(&output, kept)| match kept {
-                Some(kept) => kept,
-                None => {
-                    let built = build::build_output(renderer, &plan.linked, output, Writes::Later);
-                    // Taken now, as what the output was built from.
-                    for &key in built.reads.keys() {
-                        taken.of(key);
-                    }
-                    built
-                }
-            })
-            .collect();
-        lap(&mut took.building);
-
-        let problems = std::mem::take(&mut prepared.problems);
-        let remembered = Some(&self.remembered);
-        let search = &mut self.search;
-        let mut concluded = build::conclude(renderer, &plan, &built, problems, remembered, search);
-        let pages: HashMap<PageId, usize> = (plan.outputs.iter().enumerate())
-            .filter_map(|(at, output)| match output {
-                Output::Page(page) => Some((*page, at)),
-                _ => None,
-            })
-            .collect();
-        let searched = self.search.cut().into_par_iter().filter(|(page, _)| {
-            stood.contains(page)
-                || (pages.get(page)).is_some_and(|&at| reads_writing(renderer, *page, &built[at]))
-        });
-        let searched = searched.collect();
-        lap(&mut took.concluding);
+        let last = self.last.as_ref().map(|last| &last.kept);
+        let Rebuilt {
+            reading,
+            prepared,
+            plan,
+            mut built,
+            mut concluded,
+            fresh,
+            changed,
+            took: rebuilt,
+            keep,
+        } = incremental::rebuild(last, rebuilding, &mut self.search);
+        took.comparing = rebuilt.comparing;
+        took.building = rebuilt.building;
+        took.concluding = rebuilt.concluding;
+        let renderer = &reading.renderer;
+        let writing = Instant::now();
 
         // An output built to the bytes the folder holds already is left
         // where it is, as one kept is.
         let renamed = match &self.last {
-            Some(last) => renamed_styles(&last.reading, &reading),
+            Some(last) => renamed_styles(last.kept.reading(), &reading),
             None => Vec::new(),
         };
         let held = self.last.as_ref().map(|last| &last.hashes);
@@ -511,7 +426,7 @@ impl Session {
                 .filter(|built| built.html.is_none() && built.written)
                 .map(|built| built.file.as_str())
                 .collect();
-            let outputs = last.built.iter().map(|built| &built.file);
+            let outputs = last.kept.built().iter().map(|built| &built.file);
             let outputs = outputs.filter(|file| !stay.contains(file.as_str()));
             last.others.iter().chain(outputs).cloned().collect()
         });
@@ -645,12 +560,7 @@ impl Session {
                 let others = others.filter(|file| !outputs.contains(file.as_str()));
                 let others = others.collect();
                 self.last = Some(Last {
-                    reading,
-                    prints,
-                    whole,
-                    built,
-                    own,
-                    searched,
+                    kept: Kept::new(reading, built, keep),
                     hashes,
                     others,
                     left,
@@ -662,7 +572,7 @@ impl Session {
             None if in_place => self.last = None,
             None => {}
         }
-        lap(&mut took.writing);
+        took.writing = writing.elapsed();
         self.took = took;
         round
     }
@@ -836,143 +746,4 @@ fn write(built: &mut [Built], staging: &Staging) -> Vec<Problem> {
         None
     });
     told.collect()
-}
-
-/// Every key an output of `last` read that the reading `now` holds
-/// otherwise, each once, in order.
-fn changed(last: &Last, now: Taken<'_>) -> Vec<Key> {
-    let was = Taken {
-        reading: &last.reading,
-        at: now.at,
-        prints: &last.prints,
-    };
-    let to = last.reading.to(now.reading);
-    let keys = last.built.iter().flat_map(|built| built.reads.keys());
-    let mut keys: Vec<Key> = keys.copied().collect();
-    keys.sort_unstable();
-    keys.dedup();
-    now.changed(&was, &to, keys.into_iter())
-}
-
-/// `output` as the reading `to` leads to has it.
-fn carried(output: Output, to: &Translation) -> Option<Output> {
-    Some(match output {
-        Output::Page(page) => Output::Page(to.page(page)?),
-        Output::Later(list, number) => Output::Later(to.list(list)?, number),
-        Output::Redirect(at) => Output::Redirect((*to.redirects.get(at)?)?),
-        Output::Feed(at) => Output::Feed((*to.feeds.get(at)?)?),
-    })
-}
-
-/// Whether `built`, the output of `page`, read everything the page's
-/// writing read, as `renderer` built it.
-fn reads_writing(renderer: &crate::templates::Renderer, page: PageId, built: &Built) -> bool {
-    let Some(writing) = renderer.writing_read(page) else {
-        return false;
-    };
-    let read: HashSet<&Key> = built.reads.keys().iter().collect();
-    writing.iter().all(|key| read.contains(key))
-}
-
-/// Each output of the reading `now` as the last round built it, where it
-/// still stands, `to` carrying the last round's ids to `now`.
-fn carry(
-    last: &Last,
-    now: Taken<'_>,
-    plan: &Plan,
-    own: &[u64],
-    to: &Translation,
-) -> Vec<Option<Built>> {
-    let renderer = &now.reading.renderer;
-    let was = Taken {
-        reading: &last.reading,
-        at: now.at,
-        prints: &last.prints,
-    };
-    let built = last.built.par_iter().enumerate();
-    let stood: HashMap<Output, usize> = built
-        .filter_map(|(at, old)| Some((carried(old.output, to)?, at)))
-        .collect();
-    let stands = |at: usize, output: Output| -> Option<Built> {
-        let old_at = *stood.get(&output)?;
-        let old = &last.built[old_at];
-        if last.own[old_at] != own[at] || !old.written || old.file != output.file(renderer) {
-            return None;
-        }
-        let keys = old.reads.keys().iter();
-        let same = keys.map(|&key| {
-            let carried = to.key(key)?;
-            (was.of(key) == now.of(carried)).then_some(carried)
-        });
-        let reads: Vec<Key> = same.collect::<Option<_>>()?;
-        let asked = old.asked.carried(to)?;
-        let problems = old.problems.iter().map(|problem| moved(problem, to));
-        let problems: Vec<Problem> = problems.collect::<Option<_>>()?;
-        let links = match &old.links {
-            Some(checked) => {
-                let checked = checked.moved(to)?;
-                if !plan.linked.holds_as(&checked) {
-                    return None;
-                }
-                Some(checked)
-            }
-            None => None,
-        };
-        let developed = old.developed.iter().map(|shown| {
-            Some(crate::album::Shown {
-                id: to.picture(shown.id)?,
-                place: match shown.place {
-                    Some(place) => Some(to.place(place)?),
-                    None => None,
-                },
-                full: shown.full,
-            })
-        });
-        let cards = old.cards.iter().map(|asked| {
-            // Worked out again from the site as it is read now, which
-            // gives what was asked for wherever what it read is the same.
-            Some(renderer.card_asked(to.page(asked.page())?))
-        });
-        let coloured = old.coloured.iter().map(|&place| to.place(place));
-        Some(Built {
-            output,
-            timed: Default::default(),
-            file: old.file.clone(),
-            html: None,
-            reads: Reads::of(reads),
-            asked,
-            problems,
-            scripts: old.scripts.clone(),
-            pieces: old.pieces.clone(),
-            links,
-            developed: developed.collect::<Option<_>>()?,
-            cards: cards.collect::<Option<_>>()?,
-            sized: old.sized,
-            coloured: coloured.collect::<Option<_>>()?,
-            walked: old.walked,
-            written: true,
-            indexed: old.indexed.clone(),
-        })
-    };
-    let outputs = plan.outputs.par_iter().enumerate();
-    outputs.map(|(at, &output)| stands(at, output)).collect()
-}
-
-/// `problem` as the reading `to` leads to places it; none where a place
-/// it holds is in a file that reading holds changed, or not at all.
-fn moved(problem: &Problem, to: &Translation) -> Option<Problem> {
-    // Places inside what is told are not carried over.
-    if !problem.kind.related().is_empty() {
-        return None;
-    }
-    let mut places = problem.context.iter().map(|(_, place)| *place);
-    let carried = |place| match place {
-        Some(place) => to.place(place).is_some(),
-        None => true,
-    };
-    if !carried(problem.place) || !places.all(carried) {
-        return None;
-    }
-    let to = |place| to.place(place).expect("carried over, as found above");
-    Some(problem.clone().moved(to))
 }
