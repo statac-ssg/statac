@@ -32,7 +32,7 @@ use crate::source::{Place, Sources};
 use settings::{Folder, Settings};
 use writing::Engine;
 
-pub static TEMPLATE_PAGE: FindingKind = FindingKind {
+pub(super) static TEMPLATE_PAGE: FindingKind = FindingKind {
     heading: "Pages made by templates",
     sentence: "Each of these was the old site's templates at work, a page written in a template \
                language such as Nunjucks or one listing the old site's pages, so Statac didn't \
@@ -40,7 +40,7 @@ pub static TEMPLATE_PAGE: FindingKind = FindingKind {
                and each tag itself, as https://statac.dev/lists/ describes.",
 };
 
-pub static PARTS: FindingKind = FindingKind {
+pub(super) static PARTS: FindingKind = FindingKind {
     heading: "Files that were parts of other pages",
     sentence: "Eleventy made no page of a file with `permalink: false`, and these had no title \
                and filled whole folders: writing a template showed inside other pages, as \
@@ -50,93 +50,93 @@ pub static PARTS: FindingKind = FindingKind {
                https://statac.dev/data/.",
 };
 
-pub static HTML_WRITING: FindingKind = FindingKind {
+pub(super) static HTML_WRITING: FindingKind = FindingKind {
     heading: "Pages written in HTML",
     sentence: "Each of these was written in HTML and came across as a Markdown file holding that \
                HTML, which Statac publishes as it is: read each, since Markdown reads a line \
                indented by four spaces after a blank line as code.",
 };
 
-pub static TAG_LEFT: FindingKind = FindingKind {
+pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Template tags left as written",
     sentence: "Statac's writing runs no template tags and these have no equal in it, so each is \
                left as written and shows on the page as it stands: write by hand what it made, \
                or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
-pub static TAG_IN_CODE: FindingKind = FindingKind {
+pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
     heading: "Template tags inside code",
     sentence: "Eleventy ran these even inside code, and Statac shows code exactly as written, so \
                each now shows as it stands: write by hand what it made, where that was meant.",
 };
 
-pub static INCLUDE: FindingKind = FindingKind {
+pub(super) static INCLUDE: FindingKind = FindingKind {
     heading: "Includes now snippet calls",
     sentence: "Each include is now a call to a snippet of its name, and the snippet holds only a \
                comment saying it wasn't converted: write the snippet, as \
                https://statac.dev/snippets/ describes, or take the calls out.",
 };
 
-pub static SNIPPET_CALLS: FindingKind = FindingKind {
+pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
     heading: "Tags now snippet calls",
     sentence: "Each of these tags of the old site's own is now a call to a snippet of its name, \
                and the snippet holds only a comment saying it wasn't converted: write the \
                snippet, as https://statac.dev/snippets/ describes, or take the calls out.",
 };
 
-pub static EXCERPT_LEFT: FindingKind = FindingKind {
+pub(super) static EXCERPT_LEFT: FindingKind = FindingKind {
     heading: "Excerpt markers inside a line",
     sentence: "Statac ends an excerpt only at `<!--more-->` on a line of its own, so each of \
                these was left as written: put it on a line of its own, as `<!--more-->`.",
 };
 
-pub static ATTRIBUTES: FindingKind = FindingKind {
+pub(super) static ATTRIBUTES: FindingKind = FindingKind {
     heading: "Attributes in braces",
     sentence: "The old site's Markdown read each of these as attributes of what stands before \
                it, and Statac reads them only at the end of a heading, so each shows as written: \
                take it out, or write the HTML it stood for.",
 };
 
-pub static LINK_NOT_MADE: FindingKind = FindingKind {
+pub(super) static LINK_NOT_MADE: FindingKind = FindingKind {
     heading: "Addresses no longer linked",
     sentence: "The old site's Markdown linked each of these, written without `www.` or `http`, \
                and Statac doesn't, so each shows as words: write it as a link, as \
                `<https://example.org>`, where one is meant.",
 };
 
-pub static HTML_SHOWN: FindingKind = FindingKind {
+pub(super) static HTML_SHOWN: FindingKind = FindingKind {
     heading: "HTML the old site showed as text",
     sentence: "The old site's Markdown had HTML turned off and showed each of these as text, and \
                Statac publishes HTML in the writing as it is: write each as you mean it, or put a \
                backslash before its `<` to show it as text.",
 };
 
-pub static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
+pub(super) static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
     heading: "Front matter Statac can't read",
     sentence: "Statac's reader stopped at this line in the front matter of each of these, so the \
                page didn't come across: put it right and import again.",
 };
 
-pub static FRONT_MATTER_PROGRAM: FindingKind = FindingKind {
+pub(super) static FRONT_MATTER_PROGRAM: FindingKind = FindingKind {
     heading: "Front matter written as a program",
     sentence: "Eleventy ran the front matter of each of these as JavaScript, and Statac runs none, \
                so the page came across with none: write its fields in YAML between `---` lines.",
 };
 
-pub static DATE_FROM_FILE: FindingKind = FindingKind {
+pub(super) static DATE_FROM_FILE: FindingKind = FindingKind {
     heading: "Dates Eleventy took from the file",
     sentence: "Eleventy dated each of these pages by its file, as the words say, and Statac can't \
                know that day, so `date` was taken off and the page is dated by its name or not at \
                all: write the day it was published, as `2026-10-04`.",
 };
 
-pub static ELEVENTYS_WORD: FindingKind = FindingKind {
+pub(super) static ELEVENTYS_WORD: FindingKind = FindingKind {
     heading: "Eleventy's words kept as fields",
     sentence: "Statac has no equal for each of these words of Eleventy's own, so each came across \
                as a field of your own and does nothing: take it out, or show it from a template.",
 };
 
-pub static ADDRESS_PROGRAM: FindingKind = FindingKind {
+pub(super) static ADDRESS_PROGRAM: FindingKind = FindingKind {
     heading: "Addresses a program gave",
     sentence: "Each of these data files is a program that names `permalink`, so it may have given \
                pages their addresses, and Statac runs none: for those pages it took the address \
@@ -145,33 +145,33 @@ pub static ADDRESS_PROGRAM: FindingKind = FindingKind {
                that differs its old address as a `permalink`.",
 };
 
-pub static DATA_PROGRAM: FindingKind = FindingKind {
+pub(super) static DATA_PROGRAM: FindingKind = FindingKind {
     heading: "Data written as a program",
     sentence: "Eleventy ran each of these JavaScript files for data, and Statac runs none, so what \
                it gave didn't come across: write it as JSON or YAML, in `data/` for the whole \
                site, or in the front matter of the pages it was for.",
 };
 
-pub static DATA_UNREAD: FindingKind = FindingKind {
+pub(super) static DATA_UNREAD: FindingKind = FindingKind {
     heading: "Data Statac can't read",
     sentence: "Statac's reader stopped at this line of each of these, so what it gave didn't come \
                across: put it right and import again.",
 };
 
-pub static DATA_LEFT: FindingKind = FindingKind {
+pub(super) static DATA_LEFT: FindingKind = FindingKind {
     heading: "Data files left behind",
     sentence: "Statac reads data files written in YAML or JSON only, so these weren't copied: \
                write each as YAML or JSON in `data/`.",
 };
 
-pub static ADDRESS_UNKNOWN: FindingKind = FindingKind {
+pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
     heading: "Addresses Statac couldn't work out",
     sentence: "Each of these pages has a `permalink` holding a template tag Statac can't work out, \
                so its old address wasn't kept and the page is at Statac's own: give it a \
                `permalink` of the address the old site published it at.",
 };
 
-pub static ADDRESS_A_FILE: FindingKind = FindingKind {
+pub(super) static ADDRESS_A_FILE: FindingKind = FindingKind {
     heading: "Addresses with no ending",
     sentence: "Eleventy wrote each of these pages as a file of exactly that name, and Statac \
                publishes a page whose address has no ending in a folder of that name, as \
@@ -179,14 +179,14 @@ pub static ADDRESS_A_FILE: FindingKind = FindingKind {
                check that yours does.",
 };
 
-pub static REDIRECT_LEFT: FindingKind = FindingKind {
+pub(super) static REDIRECT_LEFT: FindingKind = FindingKind {
     heading: "Lines of `_redirects` not kept",
     sentence: "Each of these lines sends readers to an address no page of the old site has, holds \
                a pattern, or does more than send them on, so it isn't kept: keep it with your \
                host, or add its first address to the `redirect_from` of the page it meant.",
 };
 
-pub static COPY_UNREAD: FindingKind = FindingKind {
+pub(super) static COPY_UNREAD: FindingKind = FindingKind {
     heading: "Copies Statac doesn't make",
     sentence: "Each of these names a file or folder outside the old site's own folder, one \
                reached through a link that leads outside it, or one that isn't there, or a \
@@ -195,7 +195,7 @@ pub static COPY_UNREAD: FindingKind = FindingKind {
                wanted.",
 };
 
-pub static SETTINGS_UNREAD: FindingKind = FindingKind {
+pub(super) static SETTINGS_UNREAD: FindingKind = FindingKind {
     heading: "Settings Statac didn't read",
     sentence: "Eleventy's settings file is a program, and Statac ran none of it, so it doesn't \
                know what each of these did: read each, and write what the new site needs of it, \
@@ -203,7 +203,7 @@ pub static SETTINGS_UNREAD: FindingKind = FindingKind {
 };
 
 /// Whether `folder` holds an Eleventy site.
-pub fn owns(folder: &Path) -> bool {
+pub(super) fn owns(folder: &Path) -> bool {
     settings::owns(folder)
 }
 
@@ -250,7 +250,7 @@ const DATES_FROM_FILE: &[&str] = &[
 
 /// Reads the site in `folder`, for a new site with the starter where
 /// `starter` says.
-pub fn read(
+pub(super) fn read(
     folder: &Path,
     _today: Date,
     given: Option<&str>,

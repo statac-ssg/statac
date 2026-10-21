@@ -28,7 +28,7 @@ use crate::import::{Finding, Spot};
 
 /// How Zola read a page's writing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Reading {
+pub(super) enum Reading {
     /// Zola 0.23 and later: as a template, before Markdown.
     Template,
     /// Zola 0.23 and later, for a file `skip_content_templating` names:
@@ -42,7 +42,7 @@ pub enum Reading {
 }
 
 /// What the writing is converted with.
-pub struct Context<'a> {
+pub(super) struct Context<'a> {
     pub reading: Reading,
     /// The page's language, and the site's main one.
     pub language: &'a str,
@@ -71,7 +71,7 @@ pub struct Context<'a> {
 
 /// A snippet call put in place of a tag.
 #[derive(Clone, Debug)]
-pub struct Call {
+pub(super) struct Call {
     pub snippet: String,
     /// The tag's name, as written.
     pub tag: String,
@@ -82,7 +82,7 @@ pub struct Call {
 }
 
 /// The writing converted, with what didn't convert.
-pub struct Converted {
+pub(super) struct Converted {
     pub writing: String,
     pub findings: Vec<Finding>,
     pub calls: Vec<Call>,
@@ -349,7 +349,7 @@ fn braced(text: &str) -> Option<usize> {
 
 /// The names of the components `template` defines, each written
 /// `{% component name(...) %}`.
-pub fn components(template: &str) -> Vec<String> {
+pub(super) fn components(template: &str) -> Vec<String> {
     let mut names = Vec::new();
     let mut at = 0;
     while let Some(found) = template[at..].find("{%") {
@@ -377,7 +377,7 @@ pub fn components(template: &str) -> Vec<String> {
 
 /// Whether `template` defines or loads a macro, which Zola 0.23's
 /// template reader refuses.
-pub fn macros(template: &str) -> bool {
+pub(super) fn macros(template: &str) -> bool {
     let mut at = 0;
     while let Some(found) = template[at..].find("{%") {
         let mut i = at + found + 2;
@@ -419,7 +419,7 @@ const FUNCTIONS: [&str; 17] = [
 /// What a page's writing, outside code, shows of the version of Zola it
 /// was written for.
 #[derive(Clone, Copy, Default, Debug)]
-pub struct Signs {
+pub(super) struct Signs {
     /// A component call, which only 0.23 and later read.
     pub component: bool,
     /// A call to one of Zola 0.23's functions, of a name the site has no
@@ -433,7 +433,7 @@ pub struct Signs {
 }
 
 /// The [`Signs`] in `body`, on a site whose own tags are `own`.
-pub fn signs(body: &str, own: &[String]) -> Signs {
+pub(super) fn signs(body: &str, own: &[String]) -> Signs {
     let code = code_ranges(body);
     let mut signs = Signs::default();
     let mut at = 0;
@@ -724,7 +724,7 @@ fn end_of(text: &str, from: usize) -> Option<Written> {
 }
 
 /// The names of the tags in `body` that wrap writing.
-pub fn paired(body: &str) -> Vec<String> {
+pub(super) fn paired(body: &str) -> Vec<String> {
     let mut names = Vec::new();
     let mut at = 0;
     while let Some(found) = body[at..].find("{%") {
@@ -767,7 +767,7 @@ enum Open {
 
 /// Converts the writing of `file`, whose first line is line `first_line`
 /// of the file.
-pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
+pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
     // Each step keeps every line where it was, so a place is told by
     // counting the lines of the writing the step is given.
     let spotter = |text: &str| {
@@ -928,7 +928,7 @@ pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Conve
 
 /// The snippet a tag's call names: its own name, kept clear of the
 /// starter's where the new site has it.
-pub fn snippet_name(tag: &str, starter: bool) -> String {
+pub(super) fn snippet_name(tag: &str, starter: bool) -> String {
     match (starter && crate::new::has_snippet(tag)) || tag.starts_with('_') {
         true => format!("old_{tag}"),
         false => tag.to_owned(),

@@ -31,7 +31,7 @@ mod tests;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-pub use filter::{DATE_PARTS, Filter, in_site_order, related, tags_of};
+pub(crate) use filter::{DATE_PARTS, Filter, in_site_order, related, tags_of};
 
 use crate::config::Settings;
 use crate::content::address::{Address, Top};
@@ -114,7 +114,7 @@ impl Named {
 
 /// Fills and orders every list of the site, and makes the pages of the
 /// tags and series no page speaks for.
-pub fn build(
+pub(crate) fn build(
     site: &mut Site,
     settings: &Settings,
     dates: &Dates,
@@ -533,7 +533,7 @@ fn run(site: &mut Site, sources: &Sources, id: ListId, problems: &mut Vec<Proble
 /// The posts a line `page` writes chooses from its language's own list, in
 /// its order, once lists are filled; or the problem with the line, placed
 /// in it.
-pub fn chosen(
+pub(crate) fn chosen(
     site: &Site,
     sources: &Sources,
     page: &Page,
@@ -551,7 +551,7 @@ pub fn chosen(
 
 /// The name a page goes by in a folder: its file's, or its folder's where
 /// the folder is the page.
-pub fn file_name(page: &Page) -> &str {
+pub(crate) fn file_name(page: &Page) -> &str {
     let mut names = page.path.rsplit('/');
     let last = names.next().unwrap_or_default();
     match page.place {
@@ -562,7 +562,7 @@ pub fn file_name(page: &Page) -> &str {
 
 /// The number a name opens with, as `03-day-one` does, with the rest of the
 /// name. A name opening with a date opens with no number.
-pub fn numbered(name: &str) -> Option<(u64, &str)> {
+pub(crate) fn numbered(name: &str) -> Option<(u64, &str)> {
     let digits = name.len() - name.trim_start_matches(|c: char| c.is_ascii_digit()).len();
     let rest = name[digits..].strip_prefix('-')?;
     if digits == 0 || rest.is_empty() || crate::date::in_name(name).is_some() {
@@ -573,13 +573,13 @@ pub fn numbered(name: &str) -> Option<(u64, &str)> {
 
 /// Two pages A to Z by name, capitals aside until they are all that tells
 /// them apart.
-pub fn by_name(a: &Page, b: &Page) -> Ordering {
+pub(crate) fn by_name(a: &Page, b: &Page) -> Ordering {
     a_to_z(file_name(a), file_name(b)).then_with(|| a.path.cmp(&b.path))
 }
 
 /// Two names A to Z, capitals aside until they are all that tells them
 /// apart.
-pub fn a_to_z(a: &str, b: &str) -> Ordering {
+pub(crate) fn a_to_z(a: &str, b: &str) -> Ordering {
     a.to_lowercase()
         .cmp(&b.to_lowercase())
         .then_with(|| a.cmp(b))
@@ -588,7 +588,7 @@ pub fn a_to_z(a: &str, b: &str) -> Ordering {
 /// Two posts in `order` by the moments their dates name, each given with
 /// its moment in seconds; posts of one moment A to Z by name. A page with
 /// no date goes after every page with one.
-pub fn by_moment(
+pub(crate) fn by_moment(
     order: Order,
     (a, at): (&Page, Option<i64>),
     (b, bt): (&Page, Option<i64>),
@@ -606,7 +606,7 @@ pub fn by_moment(
 }
 
 /// The moment a page's date names, in seconds.
-pub fn moment(dates: &Dates, page: &Page) -> Option<i64> {
+pub(crate) fn moment(dates: &Dates, page: &Page) -> Option<i64> {
     page.date.as_ref().map(|date| dates.instant(&date.value))
 }
 

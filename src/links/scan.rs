@@ -7,7 +7,7 @@ use crate::source::{Place, SourceId, Sources, Span};
 
 /// The attribute a link is written in.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Attribute {
+pub(crate) enum Attribute {
     Href,
     Src,
     /// One of the addresses a `srcset` lists.
@@ -17,7 +17,7 @@ pub enum Attribute {
 
 impl Attribute {
     /// Every attribute read as addresses, by its name.
-    pub const NAMED: [(&'static str, Attribute); 4] = [
+    pub(crate) const NAMED: [(&'static str, Attribute); 4] = [
         ("href", Attribute::Href),
         ("src", Attribute::Src),
         ("srcset", Attribute::Srcset),
@@ -33,7 +33,7 @@ impl Attribute {
 /// An address a built page links to, the tag it is in, and the tag before
 /// that.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Found {
+pub(super) struct Found {
     pub tag: Tagged,
     pub attribute: Attribute,
     /// As written in the HTML, its character references undecoded.
@@ -46,21 +46,21 @@ pub struct Found {
 /// A start tag on a built page: its name, and each attribute's name and
 /// value as written.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Tagged {
+pub(super) struct Tagged {
     pub name: String,
     pub attributes: Vec<(String, String)>,
 }
 
 impl Found {
     /// The address a browser follows: its character references decoded.
-    pub fn address(&self) -> String {
+    pub(super) fn address(&self) -> String {
         decoded(&self.raw, false)
     }
 }
 
 /// What a built page links to, and the ids a link can land on in it.
 #[derive(Default, Debug)]
-pub struct Scanned {
+pub(super) struct Scanned {
     pub links: Vec<Found>,
     /// Sorted, each once.
     pub ids: Vec<String>,
@@ -69,7 +69,7 @@ pub struct Scanned {
 }
 
 /// Every link on a built page and every id on it.
-pub fn scan(html: &str) -> Scanned {
+pub(super) fn scan(html: &str) -> Scanned {
     let mut scanned = Scanned::default();
     let mut before: Option<Tagged> = None;
     start_tags(html, |tag| {
@@ -129,7 +129,7 @@ pub struct Linked {
 /// by label; and each in the writing's own HTML, at the attribute's value.
 /// One written as `@url(...)` is the address it stands for, placed at the
 /// call.
-pub fn written(document: &Document, sources: &Sources) -> Vec<Linked> {
+pub(crate) fn written(document: &Document, sources: &Sources) -> Vec<Linked> {
     let mut found = Vec::new();
     for top in std::iter::once(&document.root).chain(&document.notes) {
         written_in_node(top, document, sources, &mut found);
@@ -190,7 +190,7 @@ fn written_in_node(node: &Node, document: &Document, sources: &Sources, out: &mu
 
 /// Every address the HTML at `span` in `source` links to, placed at the
 /// address in its attribute.
-pub fn written_in_html(sources: &Sources, source: SourceId, span: Span) -> Vec<Linked> {
+pub(crate) fn written_in_html(sources: &Sources, source: SourceId, span: Span) -> Vec<Linked> {
     in_html(sources, source, span, &[])
 }
 
@@ -242,7 +242,7 @@ fn in_html(sources: &Sources, source: SourceId, span: Span, in_site: &[InSite]) 
 
 /// Every value handed to a snippet call in the writing, which the snippet
 /// may write as an address, placed at the value.
-pub fn handed(document: &Document) -> Vec<Linked> {
+pub(crate) fn handed(document: &Document) -> Vec<Linked> {
     let mut found = Vec::new();
     for top in std::iter::once(&document.root).chain(&document.notes) {
         top.walk(&mut |node| {

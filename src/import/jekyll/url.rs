@@ -6,7 +6,7 @@ use crate::date::Date;
 
 /// The settings' `permalink`, as Jekyll reads it.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Style {
+pub(super) enum Style {
     /// One of Jekyll's named styles: `date`, `pretty`, `ordinal`,
     /// `weekdate` or `none`.
     Named(&'static str),
@@ -15,7 +15,7 @@ pub enum Style {
 
 impl Style {
     /// The style a setting names; `date` where there is none.
-    pub fn of(setting: Option<&str>) -> Style {
+    pub(super) fn of(setting: Option<&str>) -> Style {
         match setting.unwrap_or("date") {
             "date" => Style::Named("date"),
             "pretty" => Style::Named("pretty"),
@@ -27,7 +27,7 @@ impl Style {
     }
 
     /// The template a post's address is filled in from.
-    pub fn post_template(&self) -> String {
+    pub(super) fn post_template(&self) -> String {
         match self {
             Style::Named("pretty") => "/:categories/:year/:month/:day/:title/".into(),
             Style::Named("ordinal") => "/:categories/:year/:y_day/:title:output_ext".into(),
@@ -43,7 +43,7 @@ impl Style {
     /// `template` with what the style ends an address with: a `/` for
     /// `pretty` or a pattern ending in one, the extension for the other
     /// named styles or a pattern ending in `:output_ext`.
-    pub fn suffixed(&self, template: &str) -> String {
+    pub(super) fn suffixed(&self, template: &str) -> String {
         match self {
             Style::Named("pretty") => format!("{template}/"),
             Style::Named(_) => format!("{template}:output_ext"),
@@ -59,7 +59,10 @@ impl Style {
 /// `template` filled in from `value`, which gives a placeholder's value
 /// by its name, then tidied: `//` made one and the address opened with
 /// `/`. The unknown placeholder where `value` has none.
-pub fn fill(template: &str, value: &dyn Fn(&str) -> Option<String>) -> Result<String, String> {
+pub(super) fn fill(
+    template: &str,
+    value: &dyn Fn(&str) -> Option<String>,
+) -> Result<String, String> {
     let mut out = String::with_capacity(template.len());
     let mut rest = template;
     while let Some(colon) = rest.find(':') {
@@ -99,7 +102,7 @@ pub fn fill(template: &str, value: &dyn Fn(&str) -> Option<String>) -> Result<St
 /// run of characters other than letters and figures, and in its `pretty`
 /// mode also `._~!$&'()+,;=@`, made one hyphen, with none at either end,
 /// and in small letters unless `cased`.
-pub fn slugify(text: &str, pretty: bool, cased: bool) -> String {
+pub(super) fn slugify(text: &str, pretty: bool, cased: bool) -> String {
     let kept = |c: char| c.is_alphanumeric() || (pretty && "._~!$&'()+,;=@".contains(c));
     let mut out = String::with_capacity(text.len());
     let mut gap = false;
@@ -122,7 +125,7 @@ pub fn slugify(text: &str, pretty: bool, cased: bool) -> String {
 
 /// A moment's pieces as Jekyll writes them into an address.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Moment {
+pub(super) struct Moment {
     date: jiff::civil::Date,
     hour: i8,
     minute: i8,
@@ -158,7 +161,7 @@ impl Moment {
     /// The moment `date` names, on the clock of `zone` where the date has
     /// an offset and the site a zone, as Jekyll reads it there; else as
     /// written.
-    pub fn of(date: &Date, zone: Option<&str>) -> Option<Moment> {
+    pub(super) fn of(date: &Date, zone: Option<&str>) -> Option<Moment> {
         let time = date.time;
         let (hour, minute, second) = match time {
             Some(time) => (time.hour, time.minute, time.second.unwrap_or(0)),
@@ -192,7 +195,7 @@ impl Moment {
     }
 
     /// The value of one of Jekyll's date placeholders, by its name.
-    pub fn piece(&self, name: &str) -> Option<String> {
+    pub(super) fn piece(&self, name: &str) -> Option<String> {
         let d = self.date;
         let month = MONTHS[usize::try_from(d.month() - 1).ok()?];
         let weekday = DAYS[usize::try_from(d.weekday().to_monday_zero_offset()).ok()?];

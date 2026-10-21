@@ -161,7 +161,7 @@ pub(super) struct Wrapped {
 impl Wrapped {
     /// The lines from `from` up to the line starting at `to`, below the
     /// call at `at`.
-    pub fn new(text: &str, at: usize, from: usize, to: usize) -> Wrapped {
+    pub(super) fn new(text: &str, at: usize, from: usize, to: usize) -> Wrapped {
         let b = text.as_bytes();
         let margin = Margin::of(b, line_start(b, at), at);
         let mut wrapped = Wrapped {
@@ -205,7 +205,7 @@ impl Wrapped {
     }
 
     /// Places what was read from the wrapped writing in the file.
-    pub fn place(&self, nodes: &mut [Node], problems: &mut [Problem]) {
+    pub(super) fn place(&self, nodes: &mut [Node], problems: &mut [Problem]) {
         for node in nodes {
             node.walk_mut(&mut |node| {
                 self.span(&mut node.place.span);

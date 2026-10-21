@@ -16,7 +16,7 @@ use std::str::FromStr;
 const DEFAULT_SIZE: usize = 1024;
 const MAX_HEADER_SIZE: u64 = 8 * 1024;
 
-pub fn decode_request_headers(reader: &mut impl BufRead) -> Result<RequestBuilder> {
+pub(crate) fn decode_request_headers(reader: &mut impl BufRead) -> Result<RequestBuilder> {
     // Let's read the headers
     let buffer = read_header_bytes(reader)?;
     let mut headers = [httparse::EMPTY_HEADER; DEFAULT_SIZE];
@@ -83,7 +83,7 @@ pub fn decode_request_headers(reader: &mut impl BufRead) -> Result<RequestBuilde
 
 /// Reads past the request's body, which nothing answering reads, leaving
 /// `reader` where the connection's next request begins.
-pub fn skip_request_body(
+pub(crate) fn skip_request_body(
     request: RequestBuilder,
     reader: &mut impl BufRead,
 ) -> Result<Request<()>> {

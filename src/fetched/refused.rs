@@ -14,7 +14,7 @@ use crate::problem::{Kind, Problem, RecordFault};
 use crate::source::{Place, SourceId, Sources, Span};
 
 /// The list's name in `fetched/`.
-pub const NAME: &str = "refused";
+pub(crate) const NAME: &str = "refused";
 
 const OPENING: &str = "statac refused 1";
 
@@ -103,7 +103,7 @@ impl Spot {
 }
 
 /// Whether `address` is at or under `over`, each an address as written.
-pub fn at_or_under(address: &str, over: &Spot) -> bool {
+pub(crate) fn at_or_under(address: &str, over: &Spot) -> bool {
     Spot::of(address).is_some_and(|spot| spot.at_or_under(over))
 }
 
@@ -236,7 +236,7 @@ impl List {
 }
 
 /// The list as a problem names it, from the site's folder.
-pub fn shown() -> String {
+pub(crate) fn shown() -> String {
     format!("{}/{NAME}", super::FOLDER)
 }
 

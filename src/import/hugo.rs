@@ -89,40 +89,40 @@ const DATE_NAMES: &[&str] = &[
     "unpublishdate",
 ];
 
-pub static TAG_LEFT: FindingKind = FindingKind {
+pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Tags in the writing left as written",
     sentence: "Statac's writing runs none of Hugo's tags, and these have no equal in it, so each \
                is left as written and shows on the page as it stands: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
-pub static TAG_IN_CODE: FindingKind = FindingKind {
+pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
     heading: "Tags inside code",
     sentence: "Hugo ran these even inside code, and Statac shows code exactly as written, so each \
                now shows as it stands: write by hand what it made, where that was meant.",
 };
 
-pub static TAG_IN_ADDRESS: FindingKind = FindingKind {
+pub(super) static TAG_IN_ADDRESS: FindingKind = FindingKind {
     heading: "Tags inside an address",
     sentence: "Each of these tags stands inside a link's address, where Statac runs no snippet, \
                so it is left as written and the link leads nowhere: write the address the tag \
                made in its place.",
 };
 
-pub static LINK_NOWHERE: FindingKind = FindingKind {
+pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page Statac couldn't find in the old site, so it is left as \
                written: link to the page's address instead.",
 };
 
-pub static SNIPPET_CALLS: FindingKind = FindingKind {
+pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
     heading: "Tags now snippet calls",
     sentence: "Each of these tags is now a call to a snippet of its name, and the snippet holds \
                only a comment saying it wasn't converted: write the snippet, as \
                https://statac.dev/snippets/ describes, or take the calls out.",
 };
 
-pub static FIGURE_HTML: FindingKind = FindingKind {
+pub(super) static FIGURE_HTML: FindingKind = FindingKind {
     heading: "Figures written as HTML",
     sentence: "Each of these figures shows a picture kept elsewhere or one the starter's `figure` \
                snippet can't show, such as a GIF, stands inside HTML, or asks for what the \
@@ -130,49 +130,49 @@ pub static FIGURE_HTML: FindingKind = FindingKind {
                it.",
 };
 
-pub static CODE_OPTIONS: FindingKind = FindingKind {
+pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
     heading: "Options on code taken off",
     sentence: "Statac reads the rest of a code block's first line as its caption, so options such \
                as `{linenos=true}`, and those handed to `highlight`, were taken off each of these: \
                the code is shown without them.",
 };
 
-pub static RAW_HTML: FindingKind = FindingKind {
+pub(super) static RAW_HTML: FindingKind = FindingKind {
     heading: "HTML Hugo left out",
     sentence: "Hugo's settings left HTML written in the writing out of the page, and Statac \
                publishes it as it is, so each of these now shows: read each page that has one, \
                and take out what wasn't meant to show.",
 };
 
-pub static EMOJI: FindingKind = FindingKind {
+pub(super) static EMOJI: FindingKind = FindingKind {
     heading: "Emoji written by name",
     sentence: "Hugo showed each of these names as its emoji where it knew one by the name, as the \
                settings' `enableEmoji` asked, and Statac shows the name as written: write the \
                emoji itself in its place, wherever it stands.",
 };
 
-pub static ATTRIBUTE_LINES: FindingKind = FindingKind {
+pub(super) static ATTRIBUTE_LINES: FindingKind = FindingKind {
     heading: "Attribute lists",
     sentence: "Hugo's settings read `{.class}` below a block as the block's own, and Statac's \
                Markdown reads it as words, so each shows on the page as written: read each page \
                that has one, and take it out or write the HTML it stood for.",
 };
 
-pub static SUMMARY_CUT: FindingKind = FindingKind {
+pub(super) static SUMMARY_CUT: FindingKind = FindingKind {
     heading: "Summaries Hugo cut by length",
     sentence: "Hugo summed up each of these pages with its opening paragraphs, as many as made \
                its `summaryLength` of words, and Statac takes the first paragraph alone: read \
                each, and put `<!--more-->` where its summary should end.",
 };
 
-pub static PUBLISH_DATE: FindingKind = FindingKind {
+pub(super) static PUBLISH_DATE: FindingKind = FindingKind {
     heading: "Pages published on a day of their own",
     sentence: "Hugo published each of these pages from its `publishDate`, a day other than its \
                `date`, and Statac publishes a page on its `date`, so the line was taken off: \
                where the page should wait, write that day as its `date`.",
 };
 
-pub static EXPIRY_DATE: FindingKind = FindingKind {
+pub(super) static EXPIRY_DATE: FindingKind = FindingKind {
     heading: "Pages published until a day",
     sentence: "Hugo stopped publishing each of these pages after its `expiryDate`, which Statac \
                has no equal for, so the line was taken off: those already past that day came \
@@ -180,47 +180,47 @@ pub static EXPIRY_DATE: FindingKind = FindingKind {
                the same.",
 };
 
-pub static DATE_ELSEWHERE: FindingKind = FindingKind {
+pub(super) static DATE_ELSEWHERE: FindingKind = FindingKind {
     heading: "Dates Hugo took from the file or from Git",
     sentence: "Hugo's settings took the date of each of these pages from the time its file was \
                saved or from Git, which Statac doesn't read, so none was written: write its \
                `date`.",
 };
 
-pub static UNPUBLISHED: FindingKind = FindingKind {
+pub(super) static UNPUBLISHED: FindingKind = FindingKind {
     heading: "Pages Hugo didn't publish",
     sentence: "Each of these pages was `headless`, or its `build` kept it from being published, \
                so it came across with `draft: true`: take that line out of each you want \
                published.",
 };
 
-pub static ADDRESS_UNKNOWN: FindingKind = FindingKind {
+pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
     heading: "Addresses Statac couldn't work out",
     sentence: "Each of these pages is published by a pattern in `[permalinks]` holding a \
                placeholder Statac doesn't know, so its old address wasn't worked out or kept: \
                give the page a `permalink` of the address the old site published it at.",
 };
 
-pub static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
+pub(super) static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
     heading: "Front matter Statac can't read",
     sentence: "Statac's reader stopped at this line in the front matter of each of these, so the \
                page didn't come across: put it right and import again.",
 };
 
-pub static DATA_LEFT: FindingKind = FindingKind {
+pub(super) static DATA_LEFT: FindingKind = FindingKind {
     heading: "Data files left behind",
     sentence: "Statac reads data files written in YAML or JSON, and writes those in TOML as YAML, \
                so these weren't copied: each is in another format, or its TOML stops reading at \
                the line given. Write each as YAML or JSON in `data/`.",
 };
 
-pub static SETTINGS_LEFT: FindingKind = FindingKind {
+pub(super) static SETTINGS_LEFT: FindingKind = FindingKind {
     heading: "Settings with no equal",
     sentence: "Statac has no equal for each of these settings, so nothing came across for them: \
                https://statac.dev/settings/ says what Statac offers.",
 };
 
-pub static FORMAT_LEFT: FindingKind = FindingKind {
+pub(super) static FORMAT_LEFT: FindingKind = FindingKind {
     heading: "Pages in formats Statac doesn't read",
     sentence: "Hugo read each of these pages in a format other than Markdown or HTML, such as \
                AsciiDoc or Org, which Statac doesn't, so it didn't come across: write it in \
@@ -228,13 +228,13 @@ pub static FORMAT_LEFT: FindingKind = FindingKind {
 };
 
 /// Whether `folder` holds a Hugo site.
-pub fn owns(folder: &Path) -> bool {
+pub(super) fn owns(folder: &Path) -> bool {
     settings::owns(folder)
 }
 
 /// Reads the site in `folder`, for a new site with the starter where
 /// `starter` says.
-pub fn read(
+pub(super) fn read(
     folder: &Path,
     today: Date,
     given: Option<&str>,

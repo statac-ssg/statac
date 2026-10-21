@@ -276,7 +276,7 @@ pub(super) enum Input {
 }
 
 impl Input {
-    pub fn of_filter(name: &str) -> Input {
+    pub(super) fn of_filter(name: &str) -> Input {
         match name {
             "default" | "d" => Input::MayBeMissing,
             "select" | "reject" | "selectattr" | "rejectattr" => Input::Itself,
@@ -284,7 +284,7 @@ impl Input {
         }
     }
 
-    pub fn of_test(name: &str) -> Input {
+    pub(super) fn of_test(name: &str) -> Input {
         match name {
             "defined" | "undefined" => Input::MayBeMissing,
             _ => Input::Whole,

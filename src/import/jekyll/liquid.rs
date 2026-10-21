@@ -20,7 +20,7 @@ use crate::import::liquid::{
 use crate::import::{Finding, Spot};
 
 /// What the writing's tags are converted with.
-pub struct Context<'a> {
+pub(super) struct Context<'a> {
     /// Whether the new site has the starter, whose snippets a call names
     /// or is kept clear of.
     pub starter: bool,
@@ -42,7 +42,7 @@ pub struct Context<'a> {
 
 /// A snippet call put in place of an include.
 #[derive(Clone, Debug)]
-pub struct Call {
+pub(super) struct Call {
     pub snippet: String,
     /// The include's file, as the tag names it.
     pub include: String,
@@ -52,7 +52,7 @@ pub struct Call {
 }
 
 /// The writing converted, with what didn't convert.
-pub struct Converted {
+pub(super) struct Converted {
     pub writing: String,
     pub findings: Vec<Finding>,
     pub calls: Vec<Call>,
@@ -68,7 +68,7 @@ pub struct Converted {
 
 /// Converts the writing of `file`, whose first line is line `first_line`
 /// of the file.
-pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
+pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
     let code = code_ranges(body);
     let line_of = |at: usize| first_line + body[..at].matches('\n').count();
     let spot = |at: usize, text: &str| Spot {

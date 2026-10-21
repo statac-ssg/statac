@@ -6,7 +6,7 @@
 //! it can't take or answer is handed to its owner to tell.
 
 mod io;
-pub mod model;
+pub(super) mod model;
 mod utils;
 
 use io::{BUFFER_CAPACITY, decode_request_headers, encode_response, skip_request_body};
@@ -27,7 +27,7 @@ type OnFault = dyn Fn(&Error) + Send + Sync + 'static;
 ///
 /// It uses a very simple threading mechanism: a new thread is started on each connection and closed when the client connection is closed.
 /// To avoid crashes it is possible to set an upper bound to the number of concurrent connections using the [`Server::with_max_concurrent_connections`] function.
-pub struct Server {
+pub(super) struct Server {
     on_request: Arc<OnRequest>,
     on_fault: Arc<OnFault>,
     socket_addrs: Vec<SocketAddr>,
@@ -42,7 +42,7 @@ impl Server {
     /// answered: the first of each run of such faults, since one that
     /// lasts recurs with every connection.
     #[inline]
-    pub fn new(
+    pub(super) fn new(
         on_request: impl Fn(&Request<()>) -> Response<Body> + Send + Sync + 'static,
         on_fault: impl Fn(&Error) + Send + Sync + 'static,
     ) -> Self {
@@ -56,7 +56,7 @@ impl Server {
     }
 
     /// Ask the server to listen to a given socket when spawned.
-    pub fn bind(mut self, addr: impl Into<SocketAddr>) -> Self {
+    pub(super) fn bind(mut self, addr: impl Into<SocketAddr>) -> Self {
         let addr = addr.into();
         if !self.socket_addrs.contains(&addr) {
             self.socket_addrs.push(addr);
@@ -66,14 +66,14 @@ impl Server {
 
     /// Sets the global timeout value (applies to both read and write).
     #[inline]
-    pub fn with_global_timeout(mut self, timeout: Duration) -> Self {
+    pub(super) fn with_global_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
     /// Sets the number maximum number of threads this server can spawn.
     #[inline]
-    pub fn with_max_concurrent_connections(mut self, max_num_thread: usize) -> Self {
+    pub(super) fn with_max_concurrent_connections(mut self, max_num_thread: usize) -> Self {
         self.max_num_thread = Some(max_num_thread);
         self
     }
@@ -81,7 +81,7 @@ impl Server {
     /// Spawns the server by listening to the given addresses.
     ///
     /// Note that this is not blocking: the listening threads go on until the process ends.
-    pub fn spawn(self) -> Result<()> {
+    pub(super) fn spawn(self) -> Result<()> {
         let timeout = self.timeout;
         let thread_limit = self.max_num_thread.map(Semaphore::new);
         let faults = Faults {

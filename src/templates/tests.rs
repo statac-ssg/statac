@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use super::render::Rendered;
 use super::*;
 use crate::origin::Arrival;
 use crate::problem::{

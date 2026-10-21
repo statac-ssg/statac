@@ -63,7 +63,7 @@ struct Said {
 }
 
 impl Counted {
-    pub fn new(how: Progress, what: Making, of: usize) -> Counted {
+    pub(crate) fn new(how: Progress, what: Making, of: usize) -> Counted {
         Counted {
             how,
             what,
@@ -76,7 +76,7 @@ impl Counted {
         }
     }
 
-    pub fn one_done(&self) {
+    pub(crate) fn one_done(&self) {
         let done = self.done.fetch_add(1, Ordering::Relaxed) + 1;
         if self.how == Progress::Silent {
             return;
@@ -105,7 +105,7 @@ impl Counted {
     }
 
     /// Takes away the line a terminal was shown.
-    pub fn finish(&self) {
+    pub(crate) fn finish(&self) {
         let said = self.said.lock().expect("never poisoned");
         if said.drawn {
             let mut err = std::io::stderr().lock();

@@ -29,7 +29,7 @@ pub(super) struct On<'a> {
 impl On<'_> {
     /// What builds the page and holds it, and what its build read, as
     /// JSON; `waiting` is the day it waits for, where it does.
-    pub fn facts(&self, draft: bool, waiting: Option<&str>) -> String {
+    pub(super) fn facts(&self, draft: bool, waiting: Option<&str>) -> String {
         let explained = self.explained;
         let report = self.report;
         let title = explained.title.as_deref().map(shown);
@@ -91,7 +91,7 @@ impl On<'_> {
 
     /// Every name a template can write on the page, a group for `page`,
     /// `site` and `site.data`, as JSON.
-    pub fn names(&self) -> String {
+    pub(super) fn names(&self) -> String {
         let groups: Vec<String> = (self.explained.groups.iter())
             .map(|group| {
                 let held = |row: &&Row| row.held != Held::Nothing;

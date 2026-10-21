@@ -65,7 +65,7 @@ impl Value {
 }
 
 /// Reads values for the field or setting named `field`.
-pub struct Reader<'a> {
+pub(crate) struct Reader<'a> {
     pub sources: &'a Sources,
     pub field: &'a str,
     /// Whether the value is a secret, never to be quoted back.
@@ -75,7 +75,7 @@ pub struct Reader<'a> {
 type Read<T> = Result<Option<Sourced<T>>, Problem>;
 
 impl<'a> Reader<'a> {
-    pub fn new(sources: &'a Sources, field: &'a str) -> Self {
+    pub(crate) fn new(sources: &'a Sources, field: &'a str) -> Self {
         Reader {
             sources,
             field,
@@ -85,7 +85,7 @@ impl<'a> Reader<'a> {
 
     /// Reads a value that holds a secret: a problem with it names the field
     /// and never quotes the value.
-    pub fn secret(sources: &'a Sources, field: &'a str) -> Self {
+    pub(crate) fn secret(sources: &'a Sources, field: &'a str) -> Self {
         Reader {
             secret: true,
             ..Reader::new(sources, field)
@@ -101,7 +101,12 @@ impl<'a> Reader<'a> {
         }
     }
 
-    pub fn wrong(&self, node: &Node, expected: Expected, respelt: Option<String>) -> Problem {
+    pub(crate) fn wrong(
+        &self,
+        node: &Node,
+        expected: Expected,
+        respelt: Option<String>,
+    ) -> Problem {
         Problem::at(
             Kind::WrongKind {
                 field: self.field.to_owned(),
@@ -118,7 +123,7 @@ impl<'a> Reader<'a> {
     }
 
     /// Text by the rule above. No value is no text.
-    pub fn text(&self, node: &Node) -> Read<String> {
+    pub(crate) fn text(&self, node: &Node) -> Read<String> {
         let Yaml::Scalar(text) = &node.value else {
             return Err(self.wrong(node, Expected::Text, None));
         };
@@ -142,7 +147,7 @@ impl<'a> Reader<'a> {
 
     /// `true` or `false`, as YAML reads them. `yes` and its kind are another
     /// spelling, refused with Statac's.
-    pub fn truth(&self, node: &Node) -> Read<bool> {
+    pub(crate) fn truth(&self, node: &Node) -> Read<bool> {
         match node.resolved() {
             Some(Resolved::Null) => Ok(None),
             Some(Resolved::Bool(b)) => Ok(Some(Self::sourced(node, b))),
@@ -150,7 +155,7 @@ impl<'a> Reader<'a> {
         }
     }
 
-    pub fn whole(&self, node: &Node, from: u64) -> Read<u64> {
+    pub(crate) fn whole(&self, node: &Node, from: u64) -> Read<u64> {
         let expected = Expected::WholeNumber { from };
         match node.resolved() {
             Some(Resolved::Null) => Ok(None),
@@ -169,7 +174,7 @@ impl<'a> Reader<'a> {
     }
 
     /// A list of text, or one text standing for a list of one.
-    pub fn texts(&self, node: &Node) -> Read<Vec<Sourced<String>>> {
+    pub(crate) fn texts(&self, node: &Node) -> Read<Vec<Sourced<String>>> {
         match &node.value {
             Yaml::Sequence(items) => {
                 let mut texts = Vec::with_capacity(items.len());
@@ -188,7 +193,7 @@ impl<'a> Reader<'a> {
         }
     }
 
-    pub fn date(&self, node: &Node) -> Read<Date> {
+    pub(crate) fn date(&self, node: &Node) -> Read<Date> {
         let Some(text) = self.date_text(node, Expected::Date)? else {
             return Ok(None);
         };
@@ -197,7 +202,7 @@ impl<'a> Reader<'a> {
             .map_err(|fault| self.date_fault(node, text, fault, Expected::Date))
     }
 
-    pub fn when(&self, node: &Node) -> Read<When> {
+    pub(crate) fn when(&self, node: &Node) -> Read<When> {
         let Some(text) = self.date_text(node, Expected::When)? else {
             return Ok(None);
         };
@@ -247,7 +252,7 @@ impl<'a> Reader<'a> {
     }
 
     /// Text that must be one of `words`.
-    pub fn one_of(&self, node: &Node, words: &[&str]) -> Read<String> {
+    pub(crate) fn one_of(&self, node: &Node, words: &[&str]) -> Read<String> {
         let expected = || Expected::OneOf(words.iter().map(|w| (*w).to_owned()).collect());
         let text = match self.text(node) {
             Ok(text) => text,
@@ -263,7 +268,7 @@ impl<'a> Reader<'a> {
 
     /// One of `words` where `false` is taken too, so a problem lists it
     /// last, and offers it for `no` and its kind, in quotes or not.
-    pub fn one_of_or_false(&self, node: &Node, words: &[&str]) -> Read<String> {
+    pub(crate) fn one_of_or_false(&self, node: &Node, words: &[&str]) -> Read<String> {
         let expected = || {
             let words = words.iter().copied().chain(["false"]);
             Expected::OneOf(words.map(str::to_owned).collect())
@@ -280,7 +285,7 @@ impl<'a> Reader<'a> {
     }
 
     /// An address on the web, or one in the site.
-    pub fn address(&self, node: &Node) -> Read<String> {
+    pub(crate) fn address(&self, node: &Node) -> Read<String> {
         match self.text(node)? {
             Some(text) if !address_shaped(&text.value) => {
                 Err(self.wrong(node, Expected::Address, None))
@@ -290,7 +295,7 @@ impl<'a> Reader<'a> {
     }
 
     /// A whole number or a fraction.
-    pub fn number(&self, node: &Node) -> Result<(), Problem> {
+    pub(crate) fn number(&self, node: &Node) -> Result<(), Problem> {
         match node.resolved() {
             Some(Resolved::Null | Resolved::Int(Some(_)) | Resolved::Float(_)) => Ok(()),
             Some(Resolved::Str) => {
@@ -303,7 +308,7 @@ impl<'a> Reader<'a> {
         }
     }
 
-    pub fn list(&self, node: &Node) -> Result<(), Problem> {
+    pub(crate) fn list(&self, node: &Node) -> Result<(), Problem> {
         match (&node.value, node.resolved()) {
             (Yaml::Sequence(_), _) | (_, Some(Resolved::Null)) => Ok(()),
             _ => Err(self.wrong(node, Expected::List, None)),
@@ -348,7 +353,7 @@ fn reading(resolved: Resolved) -> String {
 
 /// An address on the web, `https://` and a host with a dot, or one in the
 /// site, from `/`.
-pub fn address_shaped(text: &str) -> bool {
+pub(crate) fn address_shaped(text: &str) -> bool {
     if text.contains(char::is_control) {
         return false;
     }
@@ -368,7 +373,12 @@ pub fn address_shaped(text: &str) -> bool {
 /// A place inside a written value: `range` of the value's text, placed in
 /// the source where the value is written plainly or in simple quotes, and
 /// the whole value otherwise.
-pub fn place_within(sources: &Sources, origin: &Origin, value: &str, range: Span) -> Option<Place> {
+pub(crate) fn place_within(
+    sources: &Sources,
+    origin: &Origin,
+    value: &str,
+    range: Span,
+) -> Option<Place> {
     let place = origin.place?;
     let spelling = sources.spelling(place);
     let quote = match origin.style {

@@ -46,7 +46,7 @@ pub(super) fn paragraphs(text: &str) -> Vec<String> {
 }
 
 impl Engine {
-    pub fn new(system: FontSystem, faces: Faces) -> Engine {
+    pub(super) fn new(system: FontSystem, faces: Faces) -> Engine {
         Engine {
             system,
             faces,
@@ -55,7 +55,7 @@ impl Engine {
         }
     }
 
-    pub fn shape(&mut self, text: &str) -> &ShapeLine {
+    pub(super) fn shape(&mut self, text: &str) -> &ShapeLine {
         if !self.shaped.contains_key(text) {
             let attrs = self.faces.attrs(text);
             let line = ShapeLine::new(&mut self.system, text, &attrs, Shaping::Advanced, 4);
@@ -65,13 +65,13 @@ impl Engine {
     }
 
     /// `text` set on one line at `size`, unless it is empty.
-    pub fn set(&mut self, text: &str, size: f32) -> Option<LayoutLine> {
+    pub(super) fn set(&mut self, text: &str, size: f32) -> Option<LayoutLine> {
         let shaped = self.shape(text);
         let lines = shaped.layout(size, None, Wrap::None, None, None, Hinting::Disabled);
         lines.into_iter().next()
     }
 
-    pub fn width(&mut self, text: &str, size: f32) -> f32 {
+    pub(super) fn width(&mut self, text: &str, size: f32) -> f32 {
         self.set(text, size).map_or(0.0, |line| line.w)
     }
 
@@ -101,7 +101,7 @@ impl Engine {
     }
 
     /// The lines `text` breaks into at `size` within `width`.
-    pub fn lines(&mut self, text: &str, size: f32, width: f32) -> Vec<String> {
+    pub(super) fn lines(&mut self, text: &str, size: f32, width: f32) -> Vec<String> {
         let mut lines = Vec::new();
         for paragraph in paragraphs(text) {
             let ranges = self.wrap(&paragraph, size, width);

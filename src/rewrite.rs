@@ -11,7 +11,7 @@ use crate::source::Span;
 
 /// One span of a file and what is written in its place.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Edit {
+pub(crate) struct Edit {
     pub span: Span,
     pub with: String,
 }
@@ -25,7 +25,12 @@ pub struct Edit {
 /// holds `read`, where `root`, a folder on the way or the file is a link,
 /// or where the file has a second name somewhere, as
 /// [`platform::rewrite`] has it.
-pub fn rewrite(root: &Path, rel: &str, read: &str, edits: &[Edit]) -> Result<Vec<u8>, Reason> {
+pub(crate) fn rewrite(
+    root: &Path,
+    rel: &str,
+    read: &str,
+    edits: &[Edit],
+) -> Result<Vec<u8>, Reason> {
     let text = replaced(read, edits);
     replace(root, rel, read.as_bytes(), text.as_bytes())?;
     Ok(text.into_bytes())
@@ -33,7 +38,7 @@ pub fn rewrite(root: &Path, rel: &str, read: &str, edits: &[Edit]) -> Result<Vec
 
 /// Puts `with` in place of the whole file at `rel`, refused as
 /// [`rewrite`] is. Where it is refused or fails, the file is as it was.
-pub fn replace(root: &Path, rel: &str, read: &[u8], with: &[u8]) -> Result<(), Reason> {
+pub(crate) fn replace(root: &Path, rel: &str, read: &[u8], with: &[u8]) -> Result<(), Reason> {
     match platform::rewrite(root, rel, read, with) {
         Ok(()) => Ok(()),
         Err(Unwritten::Changed) => Err(Reason::Changed),

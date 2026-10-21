@@ -30,7 +30,7 @@ pub(crate) struct Attribute {
 
 impl Tag {
     /// The value of the attribute `name`, as written.
-    pub fn get(&self, name: &str) -> Option<&str> {
+    pub(crate) fn get(&self, name: &str) -> Option<&str> {
         self.attributes
             .iter()
             .find(|attribute| attribute.name == name)

@@ -3,7 +3,7 @@
 //! `fetched/stills/` and named after the video.
 
 /// The folder under `fetched/` stills are kept in.
-pub const FOLDER: &str = "stills";
+pub(crate) const FOLDER: &str = "stills";
 
 /// A site that keeps videos.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -36,6 +36,6 @@ impl Host {
 }
 
 /// The still of the video `id` on `host`, by its path under `fetched/`.
-pub fn path(host: Host, id: &str) -> String {
+pub(crate) fn path(host: Host, id: &str) -> String {
     format!("{FOLDER}/{}", host.still(id))
 }

@@ -138,7 +138,7 @@ pub(super) enum InData {
 }
 
 impl Frame {
-    pub fn new(shared: Arc<Shared>, page: Option<PageId>) -> Frame {
+    pub(super) fn new(shared: Arc<Shared>, page: Option<PageId>) -> Frame {
         let language = page.map_or(LanguageId::from_index(0), |page| {
             shared.site.pages.get(page).language
         });
@@ -184,13 +184,13 @@ impl Frame {
 
     /// The page whose own address what is built is published at: none for
     /// a feed, a list's later page or the page left at an old address.
-    pub fn home(&self) -> Option<PageId> {
+    pub(super) fn home(&self) -> Option<PageId> {
         self.page
             .filter(|_| self.number == 1 && self.feed.is_none() && !self.redirect)
     }
 
     /// Records that what is built names `language`'s search index.
-    pub fn names_index(&mut self, language: LanguageId) {
+    pub(super) fn names_index(&mut self, language: LanguageId) {
         if !self.indexed.contains(&language) {
             self.indexed.push(language);
         }
@@ -404,12 +404,12 @@ pub(super) enum Stop {
 
 impl Stop {
     /// An error of `kind`, with no words of its own, carrying this.
-    pub fn into_error(self, kind: minijinja::ErrorKind) -> minijinja::Error {
+    pub(super) fn into_error(self, kind: minijinja::ErrorKind) -> minijinja::Error {
         minijinja::Error::from(kind).with_source(self)
     }
 
     /// What `error` carries of Statac's own, where it carries anything.
-    pub fn of(error: &minijinja::Error) -> Option<&Stop> {
+    pub(super) fn of(error: &minijinja::Error) -> Option<&Stop> {
         std::error::Error::source(error)?.downcast_ref()
     }
 }

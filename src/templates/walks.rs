@@ -20,7 +20,7 @@ use crate::source::{Place, Span};
 /// How many pages of lists of the whole site the outputs running one loop
 /// reach between them before it is noted: about what a site of 2,000 pages
 /// reaches with one loop over them all on every page.
-pub const MANY: u64 = 5_000_000;
+pub(super) const MANY: u64 = 5_000_000;
 
 /// How many pages of such lists one output reaches before it counts as
 /// running a loop over one: a menu of a few pages chosen from them all,

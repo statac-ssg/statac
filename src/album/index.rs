@@ -29,7 +29,7 @@ pub(super) struct Stamp {
 impl Stamp {
     /// Of a file `len` long whose bytes last changed at `modified`; none
     /// for a time before 1970.
-    pub fn new(len: u64, modified: SystemTime) -> Option<Stamp> {
+    pub(super) fn new(len: u64, modified: SystemTime) -> Option<Stamp> {
         let changed = modified.duration_since(UNIX_EPOCH).ok()?;
         Some(Stamp {
             len,
@@ -50,7 +50,7 @@ pub(super) struct Entry {
 }
 
 impl Entry {
-    pub fn read(stamp: Stamp, root: Root, bytes: &[u8]) -> Entry {
+    pub(super) fn read(stamp: Stamp, root: Root, bytes: &[u8]) -> Entry {
         Entry {
             stamp,
             hash: blake3::hash(bytes),
@@ -69,7 +69,7 @@ pub(super) struct Index {
 
 impl Index {
     /// What the last build kept; nothing where it kept nothing that reads.
-    pub fn load(site: &Path) -> Index {
+    pub(super) fn load(site: &Path) -> Index {
         let mut index = Index::default();
         // Asked what it is through the handle it is read by, so no link
         // put in its place, or in place of a folder on the way, is read.
@@ -97,22 +97,22 @@ impl Index {
         index
     }
 
-    pub fn get(&self, root: Root, path: &str) -> Option<&Entry> {
+    pub(super) fn get(&self, root: Root, path: &str) -> Option<&Entry> {
         // Borrowed keys would need a key type of their own; a path is short.
         self.entries.get(&(root, path.to_owned()))
     }
 
-    pub fn insert(&mut self, root: Root, path: &str, entry: Entry) {
+    pub(super) fn insert(&mut self, root: Root, path: &str, entry: Entry) {
         self.entries.insert((root, path.to_owned()), entry);
     }
 
-    pub fn len(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Writes the index where it has changed, under another name first so
     /// a build stopped halfway leaves the last one whole.
-    pub fn save(&self, site: &Path) -> std::io::Result<()> {
+    pub(super) fn save(&self, site: &Path) -> std::io::Result<()> {
         if !self.changed {
             return Ok(());
         }

@@ -12,15 +12,15 @@ use crate::value::Value;
 use crate::yaml::{Node, Value as Yaml};
 
 /// The filters a `posts:` line can use, and how many values each takes.
-pub const CHAINABLE: &[(&str, usize)] = &[("tagged", 1), ("in", 1), ("where", 2)];
+pub(super) const CHAINABLE: &[(&str, usize)] = &[("tagged", 1), ("in", 1), ("where", 2)];
 
 /// The parts of a page's date `where` answers for by name, where no page
 /// writes a field of its own by that name.
-pub const DATE_PARTS: &[&str] = &["year", "month", "day"];
+pub(crate) const DATE_PARTS: &[&str] = &["year", "month", "day"];
 
 /// One filter, its values read against the site: which posts it keeps.
 #[derive(Debug)]
-pub enum Filter {
+pub(crate) enum Filter {
     /// The pages carrying a tag, however it is spelt.
     Tagged(ListId),
     /// The pages filed in a folder, however deeply, by the folder's list,
@@ -32,7 +32,7 @@ pub enum Filter {
 
 impl Filter {
     /// `tagged(name)`: the tag's list, or the problem with the name.
-    pub fn tagged(site: &Site, language: LanguageId, name: &str) -> Result<Filter, Kind> {
+    pub(crate) fn tagged(site: &Site, language: LanguageId, name: &str) -> Result<Filter, Kind> {
         let exact = site.spelt(language, &ListKey::Tag(name.to_owned()));
         let found = exact.or_else(|| {
             site.spellings
@@ -59,7 +59,7 @@ impl Filter {
 
     /// `in(folder)`: one of a language's folders, by its path under its
     /// top or under `content/`, or by its own name.
-    pub fn in_folder(site: &Site, language: LanguageId, name: &str) -> Result<Filter, Kind> {
+    pub(crate) fn in_folder(site: &Site, language: LanguageId, name: &str) -> Result<Filter, Kind> {
         let wanted = name.trim_matches('/');
         let top = site.top(language);
         let below = |path: &str| match top {
@@ -104,7 +104,7 @@ impl Filter {
 
     /// `where(field, value)`: a field some page writes, or a part of a
     /// page's date.
-    pub fn where_field(site: &Site, field: &str, wanted: &str) -> Result<Filter, Kind> {
+    pub(crate) fn where_field(site: &Site, field: &str, wanted: &str) -> Result<Filter, Kind> {
         let written = |page: &Page| match PageWord::named(field) {
             Some(PageWord::Title) => page.title.is_some(),
             Some(PageWord::Date) => page.date.is_some(),
@@ -131,7 +131,7 @@ impl Filter {
     }
 
     /// The field a page is read for when this filter asks of it.
-    pub fn reads(&self) -> Option<&str> {
+    pub(crate) fn reads(&self) -> Option<&str> {
         match self {
             Filter::Tagged(_) => Some("tags"),
             Filter::In(..) => None,
@@ -140,7 +140,7 @@ impl Filter {
     }
 
     /// Whether the filter keeps `page`.
-    pub fn keeps(&self, site: &Site, page: PageId) -> bool {
+    pub(crate) fn keeps(&self, site: &Site, page: PageId) -> bool {
         let p = site.pages.get(page);
         match self {
             Filter::Tagged(list) => p
@@ -162,7 +162,7 @@ impl Filter {
 }
 
 /// The tags a page carries, each once, however it spells them.
-pub fn tags_of(site: &Site, page: PageId) -> Vec<ListId> {
+pub(crate) fn tags_of(site: &Site, page: PageId) -> Vec<ListId> {
     let p = site.pages.get(page);
     let mut lists = Vec::new();
     for tag in p
@@ -193,7 +193,7 @@ thread_local! {
 /// The posts of a tag grow with the site, so this is counted without
 /// hashing or sorting, and the groups left in no order for whoever reads
 /// only the first few posts.
-pub fn related(site: &Site, page: PageId) -> Vec<Vec<PageId>> {
+pub(crate) fn related(site: &Site, page: PageId) -> Vec<Vec<PageId>> {
     SHARED.with_borrow_mut(|shared| {
         shared.resize(site.pages.len(), 0);
         let mut sharing = Vec::new();
@@ -220,7 +220,7 @@ pub fn related(site: &Site, page: PageId) -> Vec<Vec<PageId>> {
 }
 
 /// Posts put in the site's order, those in none after the rest.
-pub fn in_site_order(site: &Site, posts: &mut [PageId]) {
+pub(crate) fn in_site_order(site: &Site, posts: &mut [PageId]) {
     posts.sort_unstable_by_key(|&post| {
         let place = site.places.get(post.index()).copied().flatten();
         (place.unwrap_or(usize::MAX), post)

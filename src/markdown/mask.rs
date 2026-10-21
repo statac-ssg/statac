@@ -86,7 +86,7 @@ pub(super) struct Masked {
 
 impl Masked {
     /// Whether a call wraps writing, which is then read apart.
-    pub fn wraps_writing(&self) -> bool {
+    pub(super) fn wraps_writing(&self) -> bool {
         self.tokens.iter().any(|token| {
             matches!(
                 token.kind,
@@ -99,7 +99,7 @@ impl Masked {
     }
 
     /// The piece whose placeholder starts `s`, and the placeholder's length.
-    pub fn piece_at(&self, s: &str) -> Option<(&Piece, usize)> {
+    pub(super) fn piece_at(&self, s: &str) -> Option<(&Piece, usize)> {
         let mut chars = s.char_indices();
         if chars.next()?.1 != OPEN {
             return None;
@@ -125,7 +125,7 @@ pub(super) struct OffsetMap {
 }
 
 impl OffsetMap {
-    pub fn offset(&self, masked: usize) -> usize {
+    pub(super) fn offset(&self, masked: usize) -> usize {
         let i = self.segments.partition_point(|s| s.0 <= masked);
         if i == 0 {
             return self.base + masked;
@@ -140,7 +140,7 @@ impl OffsetMap {
         }
     }
 
-    pub fn span(&self, range: std::ops::Range<usize>) -> Span {
+    pub(super) fn span(&self, range: std::ops::Range<usize>) -> Span {
         Span::new(self.offset(range.start), self.offset(range.end))
     }
 }

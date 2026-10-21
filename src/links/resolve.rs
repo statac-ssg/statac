@@ -10,7 +10,7 @@ use crate::content::address;
 
 /// What the built site holds, and what counts as the site, for following
 /// links.
-pub struct Site {
+pub(crate) struct Site {
     /// The path the site is published under, such as `/blog`; empty at the
     /// top of its domain.
     base: String,
@@ -75,7 +75,7 @@ pub(super) struct Arrival {
 impl Site {
     /// The site `settings` describe, publishing `files`, each a path from
     /// the top of the built site.
-    pub fn new(settings: &Settings, files: impl IntoIterator<Item = String>) -> Site {
+    pub(crate) fn new(settings: &Settings, files: impl IntoIterator<Item = String>) -> Site {
         let top = settings
             .text("url")
             .and_then(|url| Url::parse(url.value).ok())
@@ -120,14 +120,14 @@ impl Site {
 
     /// The same site, with `files` the lists' own pages, each a path from
     /// the top of the built site.
-    pub fn listing(mut self, files: impl IntoIterator<Item = String>) -> Site {
+    pub(crate) fn listing(mut self, files: impl IntoIterator<Item = String>) -> Site {
         self.lists = files.into_iter().collect();
         self
     }
 
     /// The same site, noting each page that links one of `files`, each a
     /// path from the top of the built site.
-    pub fn watching(mut self, files: impl IntoIterator<Item = String>) -> Site {
+    pub(crate) fn watching(mut self, files: impl IntoIterator<Item = String>) -> Site {
         self.watched = files.into_iter().collect();
         self.watched_names = self
             .watched
@@ -163,7 +163,7 @@ impl Site {
     /// The same site, noting on each page checked what its links asked
     /// the site for, so the page can later be held to another building of
     /// the site.
-    pub fn noting(mut self) -> Site {
+    pub(crate) fn noting(mut self) -> Site {
         self.notes = true;
         self
     }
@@ -173,7 +173,7 @@ impl Site {
     }
 
     /// The files published only where a page links them, sorted.
-    pub fn watches(&self) -> Vec<&str> {
+    pub(crate) fn watches(&self) -> Vec<&str> {
         let mut watched: Vec<&str> = self.watched.iter().map(String::as_str).collect();
         watched.sort_unstable();
         watched

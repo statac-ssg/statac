@@ -14,7 +14,7 @@ use crate::platform;
 /// Texts kept from one reading of a site for the next. The default keeps
 /// nothing, and every file is read.
 #[derive(Default)]
-pub struct Texts {
+pub(crate) struct Texts {
     keeps: bool,
     /// What a file written as this reading began was found to be, where
     /// that could be read.
@@ -46,7 +46,7 @@ fn stamp_of(found: &fs::Metadata) -> Option<Stamp> {
 
 impl Texts {
     /// Texts that keep what each reading read for the next.
-    pub fn keeping() -> Texts {
+    pub(crate) fn keeping() -> Texts {
         Texts {
             keeps: true,
             ..Texts::default()

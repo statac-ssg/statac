@@ -30,7 +30,7 @@ pub(crate) const CLOCK: &str = ".statac-clock";
 /// taken, or another file put in its place, is found as another stamp,
 /// where the stamp is [`Stamp::settled`] and [`Stamp::placed`].
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Stamp {
+pub(crate) struct Stamp {
     len: u64,
     modified: SystemTime,
     placed: Option<Placed>,
@@ -46,7 +46,7 @@ struct Placed {
 impl Stamp {
     /// The stamp of what `found` describes, where the disk keeps the time
     /// its bytes last changed.
-    pub fn of(found: &fs::Metadata) -> Option<Stamp> {
+    pub(crate) fn of(found: &fs::Metadata) -> Option<Stamp> {
         let placed = platform::changed_and_placed(found);
         Some(Stamp {
             len: found.len(),
@@ -61,7 +61,7 @@ impl Stamp {
 
     /// The stamp of the file at `path`, a link followed, where it is
     /// there.
-    pub fn at(path: &Path) -> Option<Stamp> {
+    pub(crate) fn at(path: &Path) -> Option<Stamp> {
         Stamp::of(&fs::metadata(path).ok()?)
     }
 
@@ -69,7 +69,7 @@ impl Stamp {
     /// which file it is. Without them, a file written again and given back
     /// its time, or another put in its place, may be found as the same.
     /// The system gives neither off Unix.
-    pub fn placed(&self) -> bool {
+    pub(crate) fn placed(&self) -> bool {
         self.placed.is_some()
     }
 
@@ -77,7 +77,7 @@ impl Stamp {
     /// read, was last changed before then: it is as it was when the clock
     /// was read, and any change to it since gives another stamp. A change
     /// after the clock was read takes a time no earlier than the clock's.
-    pub fn settled(&self, clock: &Clock) -> bool {
+    pub(crate) fn settled(&self, clock: &Clock) -> bool {
         let placed = match (self.placed, clock.0.placed) {
             (Some(placed), Some(now)) => placed.disk == now.disk && placed.changed < now.changed,
             (None, None) => true,
@@ -225,7 +225,7 @@ impl Inventory {
 }
 
 /// The hash of the bytes of the file at `path`, where it can be read.
-pub fn hashed(path: &Path) -> Option<blake3::Hash> {
+pub(crate) fn hashed(path: &Path) -> Option<blake3::Hash> {
     let mut hasher = blake3::Hasher::new();
     hasher.update_reader(fs::File::open(path).ok()?).ok()?;
     Some(hasher.finalize())

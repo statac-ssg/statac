@@ -30,14 +30,14 @@ use settings::{Settings, Taxonomy};
 use slug::Strategy;
 use writing::Reading;
 
-pub static TAG_LEFT: FindingKind = FindingKind {
+pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Tags in the writing left as written",
     sentence: "Statac's writing runs none of Zola's tags, and these have no equal in it, so each \
                is left as written and shows on the page as it stands: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
-pub static TEMPLATE_CODE: FindingKind = FindingKind {
+pub(super) static TEMPLATE_CODE: FindingKind = FindingKind {
     heading: "Template code Zola may have run",
     sentence: "Nothing in the old site says which version of Zola made it: 0.23 and later run \
                these as template code, and earlier versions show them as written. Each is left \
@@ -45,53 +45,53 @@ pub static TEMPLATE_CODE: FindingKind = FindingKind {
                by hand what it made.",
 };
 
-pub static TAG_IN_CODE: FindingKind = FindingKind {
+pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
     heading: "Tags inside code",
     sentence: "Zola ran these even inside code, and Statac shows code exactly as written, so each \
                now shows as it stands: write by hand what it made, where that was meant.",
 };
 
-pub static LINK_NOWHERE: FindingKind = FindingKind {
+pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page by its file, and Statac couldn't find that file in the \
                old site, or Zola didn't publish it, so it is left as written: link to the page's \
                address instead.",
 };
 
-pub static SNIPPET_CALLS: FindingKind = FindingKind {
+pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
     heading: "Tags now snippet calls",
     sentence: "Each of these tags is now a call to a snippet of its name, and the snippet holds \
                only a comment saying it wasn't converted: write the snippet, as \
                https://statac.dev/snippets/ describes, or take the calls out.",
 };
 
-pub static CODE_OPTIONS: FindingKind = FindingKind {
+pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
     heading: "Options on code taken off",
     sentence: "Statac reads the rest of a code block's first line as its caption, so Zola's \
                options after a comma, such as `,linenos`, were taken off each of these: the code \
                is shown without them.",
 };
 
-pub static EMOJI: FindingKind = FindingKind {
+pub(super) static EMOJI: FindingKind = FindingKind {
     heading: "Emoji written by name",
     sentence: "Zola showed each of these as its emoji, as the settings' `render_emoji` asked, and \
                Statac shows the name as written: read each page that has one, and write the \
                emoji itself in its place.",
 };
 
-pub static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
+pub(super) static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
     heading: "Front matter Statac can't read",
     sentence: "Statac's reader stopped at this line in the front matter of each of these, so the \
                page didn't come across: put it right and import again.",
 };
 
-pub static SETTINGS_LEFT: FindingKind = FindingKind {
+pub(super) static SETTINGS_LEFT: FindingKind = FindingKind {
     heading: "Settings with no equal",
     sentence: "Statac has no equal for each of these settings, so nothing came across for them: \
                https://statac.dev/settings/ says what Statac offers.",
 };
 
-pub static ADDRESS_UNKNOWN: FindingKind = FindingKind {
+pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
     heading: "Addresses Statac couldn't work out",
     sentence: "Zola wrote each of these names in ASCII for its address, and Statac doesn't know \
                how it writes a letter of this script, so the page's old address wasn't worked \
@@ -99,14 +99,14 @@ pub static ADDRESS_UNKNOWN: FindingKind = FindingKind {
                at.",
 };
 
-pub static ADDRESS_UNUSABLE: FindingKind = FindingKind {
+pub(super) static ADDRESS_UNUSABLE: FindingKind = FindingKind {
     heading: "Addresses Statac can't publish at",
     sentence: "Zola published each of these pages at an address holding a character Statac's \
                addresses can't hold, such as `%` or `?`, so the page is at Statac's own address, \
                and the old one isn't kept.",
 };
 
-pub static ORDER_UNKNOWN: FindingKind = FindingKind {
+pub(super) static ORDER_UNKNOWN: FindingKind = FindingKind {
     heading: "Orders Statac doesn't know",
     sentence: "Zola ordered the pages of each of these lists by a `sort_by` Statac doesn't know, \
                so the list is newest first: write the order you want as `order:`, as \
@@ -114,13 +114,13 @@ pub static ORDER_UNKNOWN: FindingKind = FindingKind {
 };
 
 /// Whether `folder` holds a Zola site.
-pub fn owns(folder: &Path) -> bool {
+pub(super) fn owns(folder: &Path) -> bool {
     settings::owns(folder)
 }
 
 /// Reads the site in `folder`, for a new site with the starter where
 /// `starter` says.
-pub fn read(
+pub(super) fn read(
     folder: &Path,
     today: Date,
     given: Option<&str>,

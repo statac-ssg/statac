@@ -21,13 +21,13 @@ use crate::value::Reader;
 use crate::yaml::{self, Value as Yaml};
 
 /// The folder under `fetched/` mentions are kept in.
-pub const FOLDER: &str = "mentions";
+pub(crate) const FOLDER: &str = "mentions";
 
 /// The folder under `fetched/` the senders' faces are kept in.
-pub const FACES: &str = "faces";
+pub(crate) const FACES: &str = "faces";
 
 /// The most characters of a mention's words kept, its ellipsis counted.
-pub const LONGEST_WORDS: usize = 2_000;
+pub(crate) const LONGEST_WORDS: usize = 2_000;
 
 /// What another site's page did with one of the site's pages.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -134,18 +134,18 @@ impl Mention {
 }
 
 /// The mention `id`, by its path under `fetched/`.
-pub fn path(id: u64) -> String {
+pub(crate) fn path(id: u64) -> String {
     format!("{FOLDER}/{id}.yaml")
 }
 
 /// The id of the mention at `path` under `fetched/`, where it is one.
-pub fn id_of(path: &str) -> Option<u64> {
+pub(crate) fn id_of(path: &str) -> Option<u64> {
     let name = path.strip_prefix(FOLDER)?.strip_prefix('/')?;
     whole_id(name.strip_suffix(".yaml")?)
 }
 
 /// `text` as a relay's id: a whole number above nought, in digits alone.
-pub fn whole_id(text: &str) -> Option<u64> {
+pub(crate) fn whole_id(text: &str) -> Option<u64> {
     if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
@@ -153,7 +153,7 @@ pub fn whole_id(text: &str) -> Option<u64> {
 }
 
 /// The name a face fetched from `address` is kept under.
-pub fn face_name(address: &str) -> String {
+pub(crate) fn face_name(address: &str) -> String {
     format!("{}.jpg", &blake3::hash(address.as_bytes()).to_hex()[..16])
 }
 
@@ -166,7 +166,7 @@ fn a_face_name(name: &str) -> bool {
 
 /// A stranger's text as it is kept: without its control characters, its
 /// line breaks spaces where `breaks` says so, and trimmed.
-pub fn clean(text: &str, breaks: bool) -> String {
+pub(crate) fn clean(text: &str, breaks: bool) -> String {
     let text = text.replace("\r\n", "\n");
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
@@ -190,7 +190,7 @@ fn bidirectional(c: char) -> bool {
 
 /// A mention's words as they are kept: cleaned, at most [`LONGEST_WORDS`]
 /// characters, cut with an ellipsis; none where nothing is left.
-pub fn words(text: &str) -> Option<String> {
+pub(crate) fn words(text: &str) -> Option<String> {
     let cleaned = clean(text, true);
     if cleaned.chars().count() <= LONGEST_WORDS {
         return (!cleaned.is_empty()).then_some(cleaned);
@@ -200,7 +200,7 @@ pub fn words(text: &str) -> Option<String> {
 }
 
 /// Whether `text` is an address on the web: `http` or `https`, and a host.
-pub fn web_address(text: &str) -> bool {
+pub(crate) fn web_address(text: &str) -> bool {
     url::Url::parse(text)
         .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.host_str().is_some())
 }
@@ -209,7 +209,7 @@ pub fn web_address(text: &str) -> bool {
 /// top of the site: the scheme and a leading `www.` aside, the host in any
 /// capitals, and the site's path at a boundary. None for an address
 /// elsewhere.
-pub fn on_site(target: &str, site: &str) -> Option<String> {
+pub(crate) fn on_site(target: &str, site: &str) -> Option<String> {
     let (target, site) = (url::Url::parse(target).ok()?, url::Url::parse(site).ok()?);
     let host = |url: &url::Url| {
         let host = url.host_str()?.to_ascii_lowercase();
@@ -270,7 +270,11 @@ pub(crate) fn mention_file(path: &str) -> bool {
 /// Reads every mention in `fetched/mentions/` into its page, telling each
 /// value that doesn't read as Statac writes it, and each mention of an
 /// address no page stands at. A site without a `url` reads none.
-pub fn read(site: &Site, settings: &Settings, sources: &mut Sources) -> (Mentions, Vec<Problem>) {
+pub(crate) fn read(
+    site: &Site,
+    settings: &Settings,
+    sources: &mut Sources,
+) -> (Mentions, Vec<Problem>) {
     let mut problems = Vec::new();
     let mut mentions = Mentions::default();
     if !read_at_all(site, settings) {
@@ -315,7 +319,7 @@ pub fn read(site: &Site, settings: &Settings, sources: &mut Sources) -> (Mention
 /// Every mention in `fetched/mentions/` that reads, by its path under
 /// `fetched/`, in order of id, with where its `target` is written; each
 /// value that doesn't read as Statac writes it is told.
-pub fn kept(
+pub(crate) fn kept(
     fetched: &super::Fetched,
     sources: &mut Sources,
     problems: &mut Vec<Problem>,

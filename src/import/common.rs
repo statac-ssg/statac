@@ -11,7 +11,7 @@ use crate::source::{Place, Sources};
 use crate::yaml::Value as Yaml;
 
 /// The names in the folder `path`, A to Z.
-pub fn names_in(path: &Path) -> Result<Vec<String>, Box<Failed>> {
+pub(super) fn names_in(path: &Path) -> Result<Vec<String>, Box<Failed>> {
     let mut names: Vec<String> = std::fs::read_dir(path)
         .map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
@@ -27,7 +27,7 @@ pub fn names_in(path: &Path) -> Result<Vec<String>, Box<Failed>> {
 }
 
 /// `rel` joined to `folder` as a path in the old site, `""` for its top.
-pub fn joined(folder: &str, rel: &str) -> String {
+pub(super) fn joined(folder: &str, rel: &str) -> String {
     match (folder.is_empty(), rel.is_empty()) {
         (true, _) => rel.to_owned(),
         (_, true) => folder.to_owned(),
@@ -36,17 +36,17 @@ pub fn joined(folder: &str, rel: &str) -> String {
 }
 
 /// The parent of a path, `""` at the top.
-pub fn parent(path: &str) -> &str {
+pub(super) fn parent(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(parent, _)| parent)
 }
 
 /// The last name in a path.
-pub fn last(path: &str) -> &str {
+pub(super) fn last(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
 /// The date a name opens with, `2026-10-04-`, and the rest of the name.
-pub fn dated_name(name: &str) -> Option<(Date, &str)> {
+pub(super) fn dated_name(name: &str) -> Option<(Date, &str)> {
     let rest = name.get(11..).filter(|rest| !rest.is_empty())?;
     let date = date::read(name.get(..10)?).ok()?;
     (name.as_bytes().get(10) == Some(&b'-')).then_some((date, rest))
@@ -54,7 +54,7 @@ pub fn dated_name(name: &str) -> Option<(Date, &str)> {
 
 /// Whether `text` matches the pattern `glob`: `*` any run within one
 /// name, `**` any run at all, `?` one character, `{a,b}` either.
-pub fn glob_matches(glob: &str, text: &str) -> bool {
+pub(super) fn glob_matches(glob: &str, text: &str) -> bool {
     if let Some(open) = glob.find('{')
         && let Some(close) = glob[open..].find('}').map(|n| open + n)
     {
@@ -89,7 +89,7 @@ pub fn glob_matches(glob: &str, text: &str) -> bool {
 
 /// A file read for its front matter: each field with its line, and the
 /// writing after it with the line it starts on.
-pub struct Front {
+pub(super) struct Front {
     pub fields: Vec<Field>,
     pub body: String,
     pub body_line: usize,
@@ -98,7 +98,7 @@ pub struct Front {
 /// Reads `text`'s front matter, written in YAML between `---`, TOML
 /// between `+++`, or where `json` says as a JSON object; or gives the
 /// line it stopped at and that line's text.
-pub fn front(text: &str, path: &str, json: bool) -> Result<Front, (usize, String)> {
+pub(super) fn front(text: &str, path: &str, json: bool) -> Result<Front, (usize, String)> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let line_text = |line: usize| text.lines().nth(line - 1).unwrap_or_default().to_owned();
     let line_of = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
@@ -207,7 +207,7 @@ fn json_end(text: &str) -> Option<usize> {
 }
 
 /// A mapping's fields, each with its line.
-pub fn mapping(sources: &Sources, node: &crate::yaml::Node) -> Vec<Field> {
+pub(super) fn mapping(sources: &Sources, node: &crate::yaml::Node) -> Vec<Field> {
     match &node.value {
         Yaml::Mapping(entries) => entries
             .iter()
@@ -223,7 +223,7 @@ pub fn mapping(sources: &Sources, node: &crate::yaml::Node) -> Vec<Field> {
 }
 
 /// A value as text, where it is a scalar.
-pub fn text_of(value: &Value) -> Option<String> {
+pub(super) fn text_of(value: &Value) -> Option<String> {
     match value {
         Value::Text(text) | Value::Number(text) => Some(text.clone()),
         Value::Truth(truth) => Some(truth.to_string()),
@@ -232,7 +232,7 @@ pub fn text_of(value: &Value) -> Option<String> {
 }
 
 /// A value as a list of texts: a list's scalars, or one scalar.
-pub fn texts_of(value: &Value) -> Vec<String> {
+pub(super) fn texts_of(value: &Value) -> Vec<String> {
     match value {
         Value::List(items) => items.iter().filter_map(text_of).collect(),
         Value::Nothing => Vec::new(),
@@ -241,7 +241,7 @@ pub fn texts_of(value: &Value) -> Vec<String> {
 }
 
 /// A table's fields, or none.
-pub fn fields(value: &Value) -> &[(String, Value)] {
+pub(super) fn fields(value: &Value) -> &[(String, Value)] {
     match value {
         Value::Fields(fields) => fields,
         _ => &[],
@@ -249,19 +249,19 @@ pub fn fields(value: &Value) -> &[(String, Value)] {
 }
 
 /// Whether only spaces stand between the start of `at`'s line and `at`.
-pub fn opens_line(text: &str, at: usize) -> bool {
+pub(super) fn opens_line(text: &str, at: usize) -> bool {
     let line = text[..at].rfind('\n').map_or(0, |i| i + 1);
     text[line..at].trim().is_empty()
 }
 
 /// Whether only spaces stand between `at` and the end of its line.
-pub fn ends_line(text: &str, at: usize) -> bool {
+pub(super) fn ends_line(text: &str, at: usize) -> bool {
     let end = text[at..].find('\n').map_or(text.len(), |i| at + i);
     text[at..end].trim().is_empty()
 }
 
 /// Each `:name:` in `line`, by its offset.
-pub fn emoji_names(line: &str) -> Vec<(usize, &str)> {
+pub(super) fn emoji_names(line: &str) -> Vec<(usize, &str)> {
     let mut names = Vec::new();
     let bytes = line.as_bytes();
     let mut at = 0;
@@ -291,7 +291,7 @@ pub fn emoji_names(line: &str) -> Vec<(usize, &str)> {
 }
 
 /// `n` of a thing, the plural right.
-pub fn counted(n: usize, one: &str, many: &str) -> String {
+pub(super) fn counted(n: usize, one: &str, many: &str) -> String {
     match n {
         1 => format!("1 {one}"),
         _ => format!("{n} {many}"),
@@ -299,7 +299,7 @@ pub fn counted(n: usize, one: &str, many: &str) -> String {
 }
 
 /// `a`, `a and b`, `a, b and c`.
-pub fn listed(items: &[String]) -> String {
+pub(super) fn listed(items: &[String]) -> String {
     match items.split_last() {
         Some((last, [])) => last.clone(),
         Some((last, rest)) => format!("{} and {last}", rest.join(", ")),

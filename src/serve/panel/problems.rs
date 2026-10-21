@@ -27,7 +27,7 @@ pub(super) struct Parts<'a> {
 
 impl Parts<'_> {
     /// One problem, as JSON.
-    pub fn of(&self, problem: &Problem) -> String {
+    pub(super) fn of(&self, problem: &Problem) -> String {
         let report = self.report;
         let kind = &problem.kind;
         let null = || "null".to_owned();
@@ -180,7 +180,7 @@ fn suggests(kind: &Kind) -> Option<&str> {
 pub(super) struct Addresses(HashMap<(Option<Named>, Option<Place>), Option<String>>);
 
 impl Addresses {
-    pub fn of(read: &Read) -> Addresses {
+    pub(super) fn of(read: &Read) -> Addresses {
         let renderer = &read.renderer;
         let (site, sources) = (renderer.site(), renderer.sources());
         let base = renderer.settings().base();

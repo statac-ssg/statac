@@ -6,7 +6,7 @@ use unicode_normalization::char::is_combining_mark;
 
 /// One of `[slugify]`'s ways.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Strategy {
+pub(super) enum Strategy {
     /// Small ASCII letters and figures, each run of anything else one
     /// hyphen, none at either end; a letter outside ASCII written in ASCII
     /// first.
@@ -19,7 +19,7 @@ pub enum Strategy {
 }
 
 impl Strategy {
-    pub fn named(name: &str) -> Option<Strategy> {
+    pub(super) fn named(name: &str) -> Option<Strategy> {
         match name {
             "on" => Some(Strategy::On),
             "safe" => Some(Strategy::Safe),
@@ -31,7 +31,7 @@ impl Strategy {
     /// `text` made ready, or none where Statac can't tell what Zola
     /// made of it: a letter outside ASCII, under `on`, that Statac can't
     /// write in ASCII as Zola does.
-    pub fn made(self, text: &str) -> Option<String> {
+    pub(super) fn made(self, text: &str) -> Option<String> {
         match self {
             Strategy::On => on(text),
             Strategy::Safe => Some(

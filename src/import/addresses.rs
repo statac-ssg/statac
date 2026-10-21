@@ -20,7 +20,7 @@ use crate::site::{ListKey, PageId, PagePlace};
 
 /// How the old addresses were kept.
 #[derive(Default, Debug)]
-pub struct Kept {
+pub(super) struct Kept {
     /// Each folder given a pattern, by its path under `content/`, the
     /// pattern, and how many pages land at their old address by it.
     pub patterns: Vec<(String, String, usize)>,
@@ -64,7 +64,7 @@ pub struct Kept {
 impl Kept {
     /// How many old addresses nothing answers, the photographs published
     /// only as copies apart: they are told of on their own.
-    pub fn lost(&self) -> usize {
+    pub(super) fn lost(&self) -> usize {
         self.unanswered.len() + self.unworked.len() + self.files.len() + self.lists.len()
     }
 }
@@ -84,7 +84,7 @@ const SAMPLED: usize = 8;
 /// `others` are the site's languages but its main one, each of which has
 /// a folder at the top of `content/`: Statac reads a `permalink` on a page
 /// there from the folder's own address, so one is written without it.
-pub fn keep(
+pub(super) fn keep(
     out: &mut Out,
     pages: &mut [Page],
     today: Date,
@@ -289,7 +289,7 @@ fn published(folder: &Path, today: Date, starter: bool) -> HashMap<String, Strin
 /// navigation. So each old address gets a page of its own at the top of
 /// `content/`, holding its `permalink` and `redirect_to` and nothing
 /// else, which is in no list.
-pub fn send_on_to_tags_and_series(
+pub(super) fn send_on_to_tags_and_series(
     out: &mut Out,
     today: Date,
     known: &[(Word, String, String)],
@@ -451,7 +451,7 @@ fn send_on(
 ///
 /// A list's later pages are no files, so none can carry `redirect_from`;
 /// each old address gets a page of its own, as [`send_on_to_tags_and_series`] writes.
-pub fn send_on_to_later_pages(
+pub(super) fn send_on_to_later_pages(
     out: &mut Out,
     today: Date,
     pages: &[Page],
@@ -537,7 +537,7 @@ pub fn send_on_to_later_pages(
 
 /// What [`send_on_to_later_pages`] did.
 #[derive(Default, Debug)]
-pub struct LaterPages {
+pub(super) struct LaterPages {
     /// Each old address now answered by the page holding the same posts,
     /// with the file written for it.
     pub pages: Vec<(String, String)>,
@@ -563,7 +563,7 @@ pub struct LaterPages {
 ///
 /// A list's later pages are no files, nor is a tag's page, so each old
 /// address gets a page of its own, as [`send_on_to_tags_and_series`] writes.
-pub fn send_on_to_list_pages(
+pub(super) fn send_on_to_list_pages(
     out: &mut Out,
     today: Date,
     built: &Path,
@@ -666,7 +666,7 @@ pub fn send_on_to_list_pages(
 
 /// What [`send_on_to_tags_and_series`] did and found.
 #[derive(Default)]
-pub struct SentOn {
+pub(super) struct SentOn {
     /// Each old address now answered, with the file written for it.
     pub pages: Vec<(String, String)>,
     /// Each old address now answered, with the tag's page it sends
@@ -950,7 +950,7 @@ fn pages_in(folder: &Path) -> Vec<String> {
 }
 
 /// What reading the new site as a build does found.
-pub struct Checked {
+pub(super) struct Checked {
     pub answered: usize,
     pub unanswered: Vec<(String, String)>,
     /// The old feeds' addresses the new site publishes nothing at, each
@@ -979,7 +979,7 @@ pub struct Checked {
 /// sends on from, and checks it as `statac check` does. Without the
 /// `starter` the site has no templates yet, so a missing one is told of
 /// in [`Checked::templates`] and not among the errors.
-pub fn check(
+pub(super) fn check(
     folder: &Path,
     today: Date,
     old: &[(String, String)],

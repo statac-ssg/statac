@@ -13,7 +13,7 @@ use crate::html::{ANY, Tag, decoded, end_tag, ends_name, is_space, start_tags, t
 
 /// Something on a page that runs JavaScript, or may.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Found {
+pub(crate) enum Found {
     /// A script loaded from this address, as written.
     Loaded(String),
     /// JavaScript written into the page: a script's text, an event handler
@@ -25,7 +25,7 @@ pub enum Found {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Finding {
+pub(crate) struct Finding {
     pub found: Found,
     /// Whether a browser reading the page as HTML runs it; where not, it
     /// was found only by the wider reading.
@@ -33,7 +33,7 @@ pub struct Finding {
 }
 
 /// Everything in `html` that runs JavaScript or may, the sure first.
-pub fn in_html(html: &str) -> Vec<Finding> {
+pub(super) fn in_html(html: &str) -> Vec<Finding> {
     let mut sure = Vec::new();
     faithful(html, &mut sure);
     let mut maybe = Vec::new();
@@ -58,11 +58,11 @@ pub fn in_html(html: &str) -> Vec<Finding> {
 /// script's text or an attribute's value, and that text as written. Two
 /// are equal only where both are. A script's lines count without their
 /// indent, which a snippet's take from the line it is called on.
-pub type Print = [u8; 16];
+pub(super) type Print = [u8; 16];
 
 /// A piece of JavaScript a text writes in.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Piece {
+pub(super) struct Piece {
     pub print: Print,
     /// Whether a template fills some of it in as a page is built, so that
     /// what a page holds is not what the file holds.
@@ -71,7 +71,7 @@ pub struct Piece {
 
 /// Every piece of JavaScript `html` writes in where a browser runs it: one
 /// for each [`Found::Written`] that [`in_html`] finds sure.
-pub fn written(html: &str) -> Vec<Piece> {
+pub(super) fn written(html: &str) -> Vec<Piece> {
     let mut out = Vec::new();
     start_tags(html, |tag| {
         if writes_script(tag) {

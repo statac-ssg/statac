@@ -33,11 +33,11 @@ pub(super) struct Face {
 }
 
 impl Face {
-    pub fn font(&self) -> FontRef<'_> {
+    pub(super) fn font(&self) -> FontRef<'_> {
         FontRef::from_index(&self.data, self.index).expect("read when the kit was made")
     }
 
-    pub fn attrs(&self) -> Attrs<'_> {
+    pub(super) fn attrs(&self) -> Attrs<'_> {
         Attrs::new()
             .family(Family::Name(&self.name))
             .weight(self.weight)
@@ -223,7 +223,7 @@ pub(super) struct Run {
 }
 
 impl Faces {
-    pub fn new(faces: Vec<Face>) -> Faces {
+    pub(super) fn new(faces: Vec<Face>) -> Faces {
         Faces {
             faces,
             known: HashMap::new(),
@@ -256,7 +256,7 @@ impl Faces {
 
     /// Adds to `found` the characters of `text` no face draws, each once.
     /// An ignorable character is never missing.
-    pub fn missing(&mut self, text: &str, found: &mut Vec<char>) {
+    pub(super) fn missing(&mut self, text: &str, found: &mut Vec<char>) {
         for cluster in clusters(text) {
             let cluster = &text[cluster];
             let keycap = cluster.contains(KEYCAP);
@@ -272,7 +272,7 @@ impl Faces {
 
     /// `text` in runs of one face each. A cluster no face has is given the
     /// first face, and one with nothing to draw the face before it.
-    pub fn runs(&mut self, text: &str) -> Vec<Run> {
+    pub(super) fn runs(&mut self, text: &str) -> Vec<Run> {
         let mut runs: Vec<Run> = Vec::new();
         for cluster in clusters(text) {
             let chosen = self.choose(&text[cluster.clone()]);
@@ -289,7 +289,7 @@ impl Faces {
     }
 
     /// The text engine's attributes for `text` set in [`Faces::runs`].
-    pub fn attrs(&mut self, text: &str) -> AttrsList {
+    pub(super) fn attrs(&mut self, text: &str) -> AttrsList {
         let runs = self.runs(text);
         let mut list = AttrsList::new(&self.faces[0].attrs());
         for run in runs {

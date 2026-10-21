@@ -10,7 +10,7 @@ use pulldown_cmark::{Event, Options, Parser, Tag};
 
 use super::{Finding, FindingKind, Spot};
 
-pub fn options() -> Options {
+pub(super) fn options() -> Options {
     Options::ENABLE_TABLES
         | Options::ENABLE_FOOTNOTES
         | Options::ENABLE_STRIKETHROUGH
@@ -20,7 +20,7 @@ pub fn options() -> Options {
 
 /// The ranges of `text` Markdown reads as code: code blocks, fenced or
 /// indented, and code spans.
-pub fn code_ranges(text: &str) -> Vec<Range<usize>> {
+pub(super) fn code_ranges(text: &str) -> Vec<Range<usize>> {
     let mut ranges = Vec::new();
     for (event, range) in Parser::new_ext(text, options()).into_offset_iter() {
         match event {
@@ -31,11 +31,11 @@ pub fn code_ranges(text: &str) -> Vec<Range<usize>> {
     ranges
 }
 
-pub fn within(ranges: &[Range<usize>], at: usize) -> bool {
+pub(super) fn within(ranges: &[Range<usize>], at: usize) -> bool {
     ranges.iter().any(|range| range.contains(&at))
 }
 
-pub fn finding(kind: &'static FindingKind, spot: Spot) -> Finding {
+pub(super) fn finding(kind: &'static FindingKind, spot: Spot) -> Finding {
     Finding {
         kind,
         about: None,
@@ -45,7 +45,7 @@ pub fn finding(kind: &'static FindingKind, spot: Spot) -> Finding {
 
 /// The tag starting at `at`, `{%` or `{{`, as far as its end: its whole
 /// length and what is inside, without the marks of whitespace control.
-pub fn tag_at(text: &str, at: usize) -> Option<(usize, String, bool)> {
+pub(super) fn tag_at(text: &str, at: usize) -> Option<(usize, String, bool)> {
     let statement = text[at..].starts_with("{%");
     let close = if statement { "%}" } else { "}}" };
     let end = text[at + 2..].find(close)? + at + 2;
@@ -58,7 +58,7 @@ pub fn tag_at(text: &str, at: usize) -> Option<(usize, String, bool)> {
 }
 
 /// The first word of a statement and the rest.
-pub fn split_word(inner: &str) -> (&str, &str) {
+pub(super) fn split_word(inner: &str) -> (&str, &str) {
     match inner.split_once(char::is_whitespace) {
         Some((word, rest)) => (word, rest.trim()),
         None => (inner, ""),
@@ -67,7 +67,7 @@ pub fn split_word(inner: &str) -> (&str, &str) {
 
 /// Where the statement named `name` next stands from `from`: its start
 /// and its length.
-pub fn find_statement(text: &str, from: usize, name: &str) -> Option<(usize, usize)> {
+pub(super) fn find_statement(text: &str, from: usize, name: &str) -> Option<(usize, usize)> {
     let mut at = from;
     while let Some(found) = text[at..].find("{%") {
         let start = at + found;
@@ -86,7 +86,7 @@ pub fn find_statement(text: &str, from: usize, name: &str) -> Option<(usize, usi
 /// The whole line of the tag at `start..end`, its line ending with it,
 /// where the tag stands alone on its line, so taking it out leaves no
 /// empty line; else the tag alone.
-pub fn whole_line(body: &str, start: usize, end: usize) -> (usize, usize) {
+pub(super) fn whole_line(body: &str, start: usize, end: usize) -> (usize, usize) {
     let line = body[..start].rfind('\n').map_or(0, |i| i + 1);
     let next = body[end..].find('\n').map_or(body.len(), |i| end + i + 1);
     match body[line..start].trim().is_empty() && body[end..next].trim().is_empty() {
@@ -98,7 +98,7 @@ pub fn whole_line(body: &str, start: usize, end: usize) -> (usize, usize) {
 /// `raw` at `start..end`, up to its `close` statement, taken out and what
 /// it held kept: where the writing before it ends, what it held, and where
 /// the writing after it starts. None where it is never closed.
-pub fn raw(
+pub(super) fn raw(
     body: &str,
     start: usize,
     end: usize,
@@ -113,7 +113,12 @@ pub fn raw(
 /// `{% highlight lang %}` to its `{% endhighlight %}` as a fenced code
 /// block, `linenos` dropped. None where it opens no line, holds another
 /// option, or is never closed.
-pub fn highlight(body: &str, start: usize, end: usize, rest: &str) -> Option<(String, usize)> {
+pub(super) fn highlight(
+    body: &str,
+    start: usize,
+    end: usize,
+    rest: &str,
+) -> Option<(String, usize)> {
     let mut words = rest.split_whitespace();
     let language = words.next().unwrap_or_default();
     if words.any(|word| word != "linenos") {
@@ -148,7 +153,7 @@ pub fn highlight(body: &str, start: usize, end: usize, rest: &str) -> Option<(St
 /// The snippet standing for the include `file`: its name with each
 /// character a snippet's name can't hold as `_`, kept clear of the
 /// starter's where the new site has it.
-pub fn include_snippet(file: &str, starter: bool) -> String {
+pub(super) fn include_snippet(file: &str, starter: bool) -> String {
     let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem);
     let mut snippet: String = stem
         .chars()
@@ -164,14 +169,14 @@ pub fn include_snippet(file: &str, starter: bool) -> String {
 }
 
 /// `text` as a value in a snippet call, in single quotes.
-pub fn quoted(text: &str) -> String {
+pub(super) fn quoted(text: &str) -> String {
     format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
 /// A value in quotes at the start of `text`, `"` or `'`, with a backslash
 /// keeping the character after it: the value and what follows it. None
 /// where it isn't closed on its line.
-pub fn quoted_value(text: &str) -> Option<(String, &str)> {
+pub(super) fn quoted_value(text: &str) -> Option<(String, &str)> {
     let quote = text.chars().next().filter(|c| matches!(c, '"' | '\''))?;
     let mut value = String::new();
     let mut chars = text[1..].char_indices();
@@ -193,7 +198,7 @@ pub fn quoted_value(text: &str) -> Option<(String, &str)> {
 /// An include as a snippet call: the snippet's name, the names handed,
 /// and the call. None where a value is a variable, or a name can't be one
 /// of a call's.
-pub fn include(rest: &str, starter: bool) -> Option<(String, Vec<String>, String)> {
+pub(super) fn include(rest: &str, starter: bool) -> Option<(String, Vec<String>, String)> {
     let (file, mut params) = match rest.split_once(char::is_whitespace) {
         Some((file, params)) => (file, params.trim()),
         None => (rest, ""),
@@ -229,7 +234,7 @@ pub fn include(rest: &str, starter: bool) -> Option<(String, Vec<String>, String
 /// The text of a snippet standing for `what`, such as ``include
 /// `note.html` ``, that shows each of `names` in a comment saying it
 /// wasn't converted, and with `values` the values handed without names.
-pub fn stand_in(what: &str, names: &[String], values: bool) -> String {
+pub(super) fn stand_in(what: &str, names: &[String], values: bool) -> String {
     let what = what.replace("--", "- -").replace(['{', '}'], "");
     let mut shown: String = names
         .iter()
@@ -250,7 +255,7 @@ pub fn stand_in(what: &str, names: &[String], values: bool) -> String {
 /// The writing with each line that holds the excerpt separator and
 /// nothing else holding `<!--more-->`, outside code blocks. Each of
 /// `marks`, offsets into the text in order, is moved with what it marks.
-pub fn excerpt(text: &str, separator: &str, mut marks: [&mut [usize]; 2]) -> String {
+pub(super) fn excerpt(text: &str, separator: &str, mut marks: [&mut [usize]; 2]) -> String {
     let code = code_ranges(text);
     let mut out = String::with_capacity(text.len());
     let mut at = 0;
@@ -276,7 +281,7 @@ pub fn excerpt(text: &str, separator: &str, mut marks: [&mut [usize]; 2]) -> Str
 
 /// Where `separator` stands in `body` outside code with other writing on
 /// its line, so it isn't made `<!--more-->`.
-pub fn excerpts_inside(body: &str, separator: &str) -> Vec<usize> {
+pub(super) fn excerpts_inside(body: &str, separator: &str) -> Vec<usize> {
     let code = code_ranges(body);
     let mut found = Vec::new();
     let mut from = 0;

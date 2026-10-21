@@ -123,7 +123,7 @@ pub(super) struct Schema {
 }
 
 impl Schema {
-    pub fn new() -> Schema {
+    pub(super) fn new() -> Schema {
         let fields = |rows: &[(&str, Ty, bool)]| -> BTreeMap<String, Field> {
             rows.iter()
                 .map(|(name, ty, always)| ((*name).to_owned(), Field::of(ty.clone(), *always)))
@@ -186,7 +186,7 @@ impl Schema {
         }
     }
 
-    pub fn record(&self, rec: Rec) -> &BTreeMap<String, Field> {
+    pub(super) fn record(&self, rec: Rec) -> &BTreeMap<String, Field> {
         match rec {
             Rec::Page => &self.page,
             Rec::Site => &self.site,

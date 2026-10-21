@@ -22,7 +22,12 @@ use crate::site::{Page, PageId, PagePlace, Site};
 
 /// The id of `page` in a feed, or of the feed a list's page speaks for.
 /// None where the site has no `feed_key`.
-pub fn entry_id(site: &Site, settings: &Settings, dates: &Dates, page: PageId) -> Option<String> {
+pub(crate) fn entry_id(
+    site: &Site,
+    settings: &Settings,
+    dates: &Dates,
+    page: PageId,
+) -> Option<String> {
     let key = settings.text("feed_key")?.value;
     if let Some(kept) = kept_id(site, settings, dates, page) {
         return Some(kept);
@@ -115,7 +120,7 @@ fn uuid_shaped(bytes: &[u8]) -> String {
 
 /// A fresh key for a site that has none, offered in the problem that asks
 /// for one. Made from the moment and the process, so no two runs agree.
-pub fn mint_key() -> String {
+pub(crate) fn mint_key() -> String {
     let mut hasher = blake3::Hasher::new();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

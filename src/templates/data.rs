@@ -24,7 +24,7 @@ pub(super) struct FolderValue {
 }
 
 impl FolderValue {
-    pub fn top(shared: &Arc<Shared>) -> Value {
+    pub(super) fn top(shared: &Arc<Shared>) -> Value {
         Value::from_object(FolderValue {
             shared: Arc::clone(shared),
             names: Vec::new(),
@@ -43,14 +43,14 @@ impl FolderValue {
     }
 
     /// Every file in the folder, however deep.
-    pub fn files(&self) -> Vec<DataId> {
+    pub(super) fn files(&self) -> Vec<DataId> {
         let mut files = Vec::new();
         files_in(self.folder(), &mut files);
         files
     }
 
     /// The files `name` in the folder is: itself, or every file in it.
-    pub fn files_of(&self, name: &str) -> Vec<DataId> {
+    pub(super) fn files_of(&self, name: &str) -> Vec<DataId> {
         let mut files = Vec::new();
         match self.folder().entries.get(name) {
             Some(Entry::File(id)) => files.push(*id),

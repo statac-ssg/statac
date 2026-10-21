@@ -21,7 +21,7 @@ use crate::import::writing::Marked;
 use crate::import::{Finding, Spot};
 
 /// What the writing's tags are converted with.
-pub struct Context<'a> {
+pub(super) struct Context<'a> {
     /// Whether the new site has the starter, whose snippets a call names
     /// or is kept clear of.
     pub starter: bool,
@@ -56,7 +56,7 @@ pub struct Context<'a> {
 
 /// One of the site's values, as a tag of the site's own shows it.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum SiteValue {
+pub(super) enum SiteValue {
     /// The site's address, written as the path the site is under.
     Base,
     Text(String),
@@ -66,7 +66,7 @@ pub enum SiteValue {
 /// action showing one site value and nothing else: `{{ .Site.BaseURL }}`,
 /// `{{ site.Title }}`, `{{ .Site.Params.name | safeURL }}`. `param`
 /// gives one of the site's own values by its name.
-pub fn site_value(
+pub(super) fn site_value(
     file: &str,
     title: Option<&str>,
     param: &dyn Fn(&str) -> Option<String>,
@@ -160,7 +160,7 @@ fn in_address(body: &str, at: usize) -> bool {
 
 /// A snippet call put in place of a tag.
 #[derive(Clone, Debug)]
-pub struct Call {
+pub(super) struct Call {
     pub snippet: String,
     /// The tag's name, as written.
     pub tag: String,
@@ -171,7 +171,7 @@ pub struct Call {
 }
 
 /// The writing converted, with what didn't convert.
-pub struct Converted {
+pub(super) struct Converted {
     pub writing: String,
     pub findings: Vec<Finding>,
     pub calls: Vec<Call>,
@@ -360,7 +360,7 @@ fn closing_of(text: &str, from: usize, name: &str) -> Option<Written> {
 }
 
 /// The names of the tags closed somewhere in `body`, so wrapping writing.
-pub fn paired(body: &str) -> Vec<String> {
+pub(super) fn paired(body: &str) -> Vec<String> {
     let mut names = Vec::new();
     let mut at = 0;
     while let Some(found) = body[at..].find("{{") {
@@ -396,7 +396,7 @@ enum Open {
 
 /// Converts the writing of `file`, whose first line is line `first_line`
 /// of the file.
-pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
+pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
     let line_of = |at: usize| first_line + body[..at].matches('\n').count();
     let spot = |at: usize, text: &str| Spot {
         file: file.to_owned(),
@@ -827,7 +827,7 @@ fn details(tag: &Written) -> Option<String> {
 
 /// The snippet a tag's call names: its own name, made one a call can
 /// name, and kept clear of the starter's where the new site has it.
-pub fn snippet_name(tag: &str, starter: bool) -> String {
+pub(super) fn snippet_name(tag: &str, starter: bool) -> String {
     let mut name: String = tag
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })

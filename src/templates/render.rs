@@ -109,7 +109,7 @@ pub(super) type SomePages = Arc<Vec<(PageId, usize)>>;
 impl Shared {
     /// Every page the site publishes, a list's later pages among them
     /// with their numbers, in the order of their addresses.
-    pub fn every_page(&self) -> &[(PageId, usize)] {
+    pub(super) fn every_page(&self) -> &[(PageId, usize)] {
         self.every_page.get_or_init(|| {
             let site = &self.site;
             let mut pages: Vec<(&str, PageId, usize)> = site
@@ -137,7 +137,7 @@ impl Shared {
 
     /// The place in `site.files` of the file at `path`, the first where
     /// two share it.
-    pub fn file_at(&self, path: &str) -> Option<usize> {
+    pub(super) fn file_at(&self, path: &str) -> Option<usize> {
         let files = self.files_by_path.get_or_init(|| {
             let mut files = HashMap::with_capacity(self.site.files.len());
             for (at, file) in self.site.files.iter().enumerate() {
@@ -150,7 +150,7 @@ impl Shared {
 
     /// The place among the assets' statics of the static file called
     /// `name`, the first where two share it.
-    pub fn static_at(&self, name: &str) -> Option<usize> {
+    pub(super) fn static_at(&self, name: &str) -> Option<usize> {
         let statics = self.statics_by_name.get_or_init(|| {
             let mut statics = HashMap::new();
             for (at, file) in self.assets.statics().iter().enumerate() {
@@ -162,7 +162,7 @@ impl Shared {
     }
 
     /// The photographs beside `page`, in the order of their paths.
-    pub fn photographs_beside(&self, page: PageId) -> &[PictureId] {
+    pub(super) fn photographs_beside(&self, page: PageId) -> &[PictureId] {
         let photographs = self.photographs.get_or_init(|| {
             let site = &self.site;
             let mut beside: Vec<(&str, PictureId, PageId)> = site
@@ -187,7 +187,7 @@ impl Shared {
     }
 
     /// The id a field or setting is recorded by.
-    pub fn name_id(&self, name: &str) -> NameId {
+    pub(super) fn name_id(&self, name: &str) -> NameId {
         if let Some(id) = self.known.get(name) {
             return id;
         }
@@ -199,14 +199,14 @@ impl Shared {
     }
 
     /// The feed `list` publishes, where it publishes one.
-    pub fn feed(&self, list: ListId) -> Option<&crate::feeds::Feed> {
+    pub(super) fn feed(&self, list: ListId) -> Option<&crate::feeds::Feed> {
         self.feed_of[list.index()].map(|at| &self.feeds[at])
     }
 
     /// The page published at `address`, or the page whose list's later
     /// page is published there. Which page stands where is known from the
     /// site's pages, which is recorded as read.
-    pub fn standing_at(&self, address: &crate::content::address::Address) -> Option<PageId> {
+    pub(super) fn standing_at(&self, address: &crate::content::address::Address) -> Option<PageId> {
         frame::read(Key::Pages);
         let standing = self.standing.get_or_init(|| {
             let mut standing = HashMap::new();
@@ -224,7 +224,7 @@ impl Shared {
     }
 
     /// The name a field or setting is recorded under as `id`.
-    pub fn name_of(&self, id: NameId) -> String {
+    pub(super) fn name_of(&self, id: NameId) -> String {
         match id.index().checked_sub(self.known.len()) {
             None => self.known.name(id).to_owned(),
             Some(later) => {
@@ -235,7 +235,7 @@ impl Shared {
     }
 
     /// The page's address, the site's own path included.
-    pub fn address_of(&self, page: PageId) -> String {
+    pub(super) fn address_of(&self, page: PageId) -> String {
         format!(
             "{}{}",
             self.base,
@@ -387,7 +387,9 @@ impl Rendered {
 /// The photographs `shown` on any output, each once in the order of their
 /// ids: with the first place in the writing naming it, and whether its
 /// copy at its own width is named anywhere.
-pub fn developed(shown: impl IntoIterator<Item = crate::album::Shown>) -> Vec<crate::album::Shown> {
+pub(crate) fn developed(
+    shown: impl IntoIterator<Item = crate::album::Shown>,
+) -> Vec<crate::album::Shown> {
     let mut developed: BTreeMap<PictureId, (Option<Place>, bool)> = BTreeMap::new();
     for shown in shown {
         let (first, fuller) = developed
@@ -933,7 +935,7 @@ impl Renderer {
 }
 
 /// The template that builds the page left at an old address.
-pub const REDIRECT: &str = "redirect";
+pub(crate) const REDIRECT: &str = "redirect";
 
 /// Every name a build can be told before it starts that a page or the site
 /// may be asked for: Statac's own words and settings, and every field the

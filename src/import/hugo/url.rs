@@ -9,7 +9,7 @@ use crate::date::Date;
 
 /// How the settings have Hugo make a name ready for an address.
 #[derive(Copy, Clone, Debug)]
-pub struct Making {
+pub(super) struct Making {
     /// Small letters, unless `disablePathToLower`.
     pub lower: bool,
     /// Accents taken off, as `removePathAccents` asks.
@@ -21,7 +21,7 @@ impl Making {
     /// and marks of any script kept, as are `. / \ _ # + ~ - @`, and `%`
     /// before two hex digits; a run of spaces between them one hyphen, and
     /// everything else dropped.
-    pub fn made(&self, text: &str) -> String {
+    pub(super) fn made(&self, text: &str) -> String {
         let text: String = match self.accents_removed {
             true => text
                 .nfd()
@@ -61,7 +61,7 @@ impl Making {
 
     /// A path made ready, as a whole: each piece as [`Making::made`], the
     /// slashes between them kept, none doubled.
-    pub fn path(&self, path: &str) -> String {
+    pub(super) fn path(&self, path: &str) -> String {
         let made = self.made(path);
         let mut tidy = format!("/{made}");
         while tidy.contains("//") {
@@ -73,7 +73,7 @@ impl Making {
 
 /// The address of a page whose path, made ready, is `path`: as a folder,
 /// or as its own `.html` file where the settings ask for that.
-pub fn finished(path: &str, ugly: bool) -> String {
+pub(super) fn finished(path: &str, ugly: bool) -> String {
     let bare = path.trim_end_matches('/');
     match (ugly, bare.is_empty()) {
         (_, true) => "/".to_owned(),
@@ -83,7 +83,7 @@ pub fn finished(path: &str, ugly: bool) -> String {
 }
 
 /// What a page gives a `[permalinks]` pattern.
-pub struct Pieces<'a> {
+pub(super) struct Pieces<'a> {
     pub date: Option<&'a Date>,
     pub title: &'a str,
     pub slug: Option<&'a str>,
@@ -121,7 +121,7 @@ const DAYS: [&str; 7] = [
 
 /// `pattern` filled in from `pieces`, then made ready as a whole. The
 /// placeholder Statac doesn't know where it holds one.
-pub fn expand(pattern: &str, pieces: &Pieces, making: &Making) -> Result<String, String> {
+pub(super) fn expand(pattern: &str, pieces: &Pieces, making: &Making) -> Result<String, String> {
     let mut out = String::with_capacity(pattern.len());
     let mut rest = pattern;
     while let Some(colon) = rest.find(':') {

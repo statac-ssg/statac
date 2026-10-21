@@ -6,5 +6,5 @@
 //! The main entry points are [`Request`] and [`Response`].
 mod body;
 
-pub use body::Body;
-pub use http::*;
+pub(crate) use body::Body;
+pub(crate) use http::*;

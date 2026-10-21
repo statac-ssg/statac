@@ -37,7 +37,7 @@ use crate::site::{Item, Made, Page, PageId, SentTo, Site};
 use crate::source::Sources;
 
 /// The file's name in what Statac keeps.
-pub const FILE: &str = "feeds";
+pub(crate) const FILE: &str = "feeds";
 
 const OPENING: &str = "statac feeds 1";
 
@@ -79,7 +79,7 @@ impl Line {
 
 /// What the last build to publish kept, held to the site as it is now.
 #[derive(Default, Debug)]
-pub struct Known {
+pub(crate) struct Known {
     /// The file as it was read, so one saying the same is left alone.
     text: Option<String>,
     /// Whether a file was read that a build kept.
@@ -153,7 +153,7 @@ impl Known {
     /// Reads what the site at `at` keeps, and says of each post it knows
     /// at another address what feed readers will make of it. Nothing is
     /// read for a site with no feed.
-    pub fn read(
+    pub(crate) fn read(
         at: &Path,
         site: &Site,
         settings: &Settings,
@@ -297,7 +297,7 @@ impl Known {
     /// them, for the build that has just published the site read. Nothing
     /// is written where the file says the same already, and what is kept
     /// is left alone while the site has no feed.
-    pub fn keep(
+    pub(crate) fn keep(
         &self,
         at: &Path,
         site: &Site,
@@ -345,13 +345,13 @@ impl Known {
 }
 
 /// The file [`Known::keep`] writes, as a problem names it.
-pub fn shown() -> std::path::PathBuf {
+pub(crate) fn shown() -> std::path::PathBuf {
     Path::new(KEPT).join(FILE)
 }
 
 /// What `write_feed_ids` asks for.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum IdsToWrite {
+pub(crate) enum IdsToWrite {
     /// Each post to give an `id:` line, in the order of their files, with
     /// the line.
     Lines(Vec<(PageId, String)>),
@@ -366,7 +366,12 @@ pub enum IdsToWrite {
 /// another address, given the id it had there. A post made from an item
 /// is given none, its line written in its record by hand. None on a site
 /// that leaves the setting off.
-pub fn ids_to_write(known: &Known, site: &Site, settings: &Settings, dates: &Dates) -> IdsToWrite {
+pub(crate) fn ids_to_write(
+    known: &Known,
+    site: &Site,
+    settings: &Settings,
+    dates: &Dates,
+) -> IdsToWrite {
     if settings.truth("write_feed_ids") != Some(true) {
         return IdsToWrite::Lines(Vec::new());
     }

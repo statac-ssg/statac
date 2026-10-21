@@ -7,7 +7,7 @@ use super::write::{REPORT, Summary};
 use crate::config;
 
 /// The names the report gives the tool and the two folders.
-pub struct Shown<'a> {
+pub(super) struct Shown<'a> {
     pub tool: &'a str,
     pub old: &'a str,
     pub new: &'a str,
@@ -15,7 +15,7 @@ pub struct Shown<'a> {
 
 /// `text` as Markdown code, fenced so no backtick inside ends it, on one
 /// line.
-pub fn code(text: &str) -> String {
+pub(super) fn code(text: &str) -> String {
     let text = text.replace(['\n', '\r'], " ");
     let mut longest = 0;
     let mut run = 0;
@@ -46,7 +46,7 @@ fn converted(summary: &Summary) -> Vec<String> {
 }
 
 /// What is printed once the site is made.
-pub fn said(shown: &Shown, summary: &Summary) -> String {
+pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
     let mut text = format!(
         "Imported the {} site `{}` into `{}`. This is a best effort: read `{}/{REPORT}` before \
          you publish.\n\n",
@@ -106,7 +106,7 @@ pub fn said(shown: &Shown, summary: &Summary) -> String {
 }
 
 /// `IMPORT.md`.
-pub fn document(shown: &Shown, summary: &Summary) -> String {
+pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
     let mut text = format!(
         "This site was imported from {} {tool} site, as well as Statac can. It is a best effort: \
          the writing, its settings and its addresses came across, the old site's templates and \

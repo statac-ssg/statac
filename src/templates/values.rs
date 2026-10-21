@@ -154,7 +154,7 @@ pub(crate) struct Answering<'a> {
 }
 
 impl Answering<'_> {
-    pub fn of(name: &str) -> Answering<'_> {
+    pub(crate) fn of(name: &str) -> Answering<'_> {
         let word = PageWord::named(name);
         Answering {
             name,
@@ -222,11 +222,11 @@ pub(super) struct PageValue {
 }
 
 impl PageValue {
-    pub fn value(shared: &Arc<Shared>, id: PageId) -> Value {
+    pub(super) fn value(shared: &Arc<Shared>, id: PageId) -> Value {
         PageValue::numbered(shared, id, 1)
     }
 
-    pub fn numbered(shared: &Arc<Shared>, id: PageId, number: usize) -> Value {
+    pub(super) fn numbered(shared: &Arc<Shared>, id: PageId, number: usize) -> Value {
         Value::from_object(PageValue {
             shared: Arc::clone(shared),
             id,
@@ -235,7 +235,7 @@ impl PageValue {
     }
 
     /// How a problem names the page.
-    pub fn named(&self) -> crate::problem::Named {
+    pub(super) fn named(&self) -> crate::problem::Named {
         let shared = &self.shared;
         match self.number {
             1 => shared.site.named(self.id, &shared.sources),
@@ -686,7 +686,7 @@ pub(super) struct SiteValue {
 }
 
 impl SiteValue {
-    pub fn value(shared: &Arc<Shared>, language: LanguageId) -> Value {
+    pub(super) fn value(shared: &Arc<Shared>, language: LanguageId) -> Value {
         Value::from_object(SiteValue {
             shared: Arc::clone(shared),
             language,
@@ -932,7 +932,7 @@ pub(super) enum Over {
 
 impl Over {
     /// Records reading what each page chosen from answers to `name`.
-    pub fn read_field(self, name: NameId) {
+    pub(super) fn read_field(self, name: NameId) {
         frame::read(match self {
             Over::Writing(writing, wanted) => Key::FieldOfWriters(writing, wanted, name),
             Over::List | Over::Every => Key::FieldOfEvery(name),
@@ -948,7 +948,7 @@ pub(super) struct Group {
 }
 
 impl Group {
-    pub fn of(posts: Vec<PageId>) -> Group {
+    pub(super) fn of(posts: Vec<PageId>) -> Group {
         Group {
             posts,
             ordered: std::sync::OnceLock::new(),
@@ -961,7 +961,7 @@ impl Group {
 pub(super) type Asked = (String, Vec<Value>);
 
 impl Pages {
-    pub fn value(shared: &Arc<Shared>, which: Which) -> Value {
+    pub(super) fn value(shared: &Arc<Shared>, which: Which) -> Value {
         Value::from_object(Pages {
             shared: Arc::clone(shared),
             which,
@@ -970,7 +970,7 @@ impl Pages {
 
     /// What a choice from these pages is known by, where they are the
     /// same whichever page asks.
-    pub fn known_by(&self) -> Option<Asked> {
+    pub(super) fn known_by(&self) -> Option<Asked> {
         let of = |word: &str, list: &ListId| (format!("{word} {}", list.index()), Vec::new());
         match &self.which {
             Which::Every => Some(("every".to_owned(), Vec::new())),
@@ -983,7 +983,7 @@ impl Pages {
 
     /// What these pages are chosen from, where they are the same
     /// whichever page asks.
-    pub fn over(&self) -> Over {
+    pub(super) fn over(&self) -> Over {
         match &self.which {
             Which::Every => Over::Every,
             Which::Chosen(_, _, over) => *over,
@@ -992,7 +992,7 @@ impl Pages {
     }
 
     /// Each page, with which of its list's pages it is.
-    pub fn each(&self) -> impl Iterator<Item = (PageId, usize)> + '_ {
+    pub(super) fn each(&self) -> impl Iterator<Item = (PageId, usize)> + '_ {
         (0..self.len()).filter_map(|at| self.at(at))
     }
 
@@ -1001,7 +1001,7 @@ impl Pages {
     /// nothing it reads recorded, so the page asking records what the
     /// choice turns on itself, save which pages the site publishes. Pages
     /// asking the same at once wait for the first.
-    pub fn once(
+    pub(super) fn once(
         &self,
         asked: Asked,
         over: Over,
@@ -1231,7 +1231,7 @@ pub(super) struct ListValue {
 }
 
 impl ListValue {
-    pub fn value(shared: &Arc<Shared>, id: ListId) -> Value {
+    pub(super) fn value(shared: &Arc<Shared>, id: ListId) -> Value {
         Value::from_object(ListValue {
             shared: Arc::clone(shared),
             id,
@@ -1398,7 +1398,7 @@ pub(super) struct Lists {
 }
 
 impl Lists {
-    pub fn value(shared: &Arc<Shared>, lists: Vec<ListId>) -> Value {
+    pub(super) fn value(shared: &Arc<Shared>, lists: Vec<ListId>) -> Value {
         Value::from_object(Lists {
             shared: Arc::clone(shared),
             lists,
@@ -1470,7 +1470,7 @@ pub(super) struct DateValue {
 }
 
 impl DateValue {
-    pub fn value(shared: &Arc<Shared>, date: Date) -> Value {
+    pub(super) fn value(shared: &Arc<Shared>, date: Date) -> Value {
         Value::from_object(DateValue {
             shared: Arc::clone(shared),
             date,
@@ -1479,7 +1479,7 @@ impl DateValue {
     }
 
     /// A date written as `when`, a whole date or a part of one.
-    pub fn when(shared: &Arc<Shared>, when: When) -> Value {
+    pub(super) fn when(shared: &Arc<Shared>, when: When) -> Value {
         let date = match when {
             When::Date(date) => return DateValue::value(shared, date),
             When::Year(year) => Date::day_only(year, 1, 1),
@@ -1494,7 +1494,7 @@ impl DateValue {
     }
 
     /// The date as printed, for a part of one.
-    pub fn part_printed(&self) -> Option<String> {
+    pub(super) fn part_printed(&self) -> Option<String> {
         let (when, language) = self.part.as_ref()?;
         Some(self.shared.dates.when(*language, when))
     }

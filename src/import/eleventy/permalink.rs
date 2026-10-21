@@ -9,7 +9,7 @@ use unicode_normalization::char::is_combining_mark;
 use crate::date::Date;
 
 /// What a page gives its `permalink`.
-pub struct Facts<'a> {
+pub(super) struct Facts<'a> {
     /// The file's name without its ending or the date it opens with, or
     /// its folder's name where the file is `index`.
     pub file_slug: &'a str,
@@ -23,7 +23,7 @@ pub struct Facts<'a> {
 
 /// `permalink` with each `{{ }}` worked out; or, where one can't be, that
 /// tag as written.
-pub fn fill(permalink: &str, facts: &Facts) -> Result<String, String> {
+pub(super) fn fill(permalink: &str, facts: &Facts) -> Result<String, String> {
     let mut out = String::with_capacity(permalink.len());
     let mut rest = permalink;
     loop {
@@ -199,7 +199,7 @@ fn plain_letters(text: &str) -> String {
 /// Eleventy's `slugify` filter: accents off, `&` as `and`, apostrophes
 /// dropped, small letters, and every other run of characters but letters
 /// and figures one hyphen.
-pub fn slugify(text: &str) -> String {
+pub(super) fn slugify(text: &str) -> String {
     let text = plain_letters(text)
         .replace('&', " and ")
         .replace(['\'', '’'], "");
@@ -222,7 +222,7 @@ pub fn slugify(text: &str) -> String {
 /// Eleventy's older `slug` filter: accents off, `&` as `and`, every
 /// character but ASCII letters, figures, spaces and `$*_+~.()'"!-:@`
 /// dropped, runs of spaces and hyphens one hyphen, and small letters.
-pub fn slug(text: &str) -> String {
+pub(super) fn slug(text: &str) -> String {
     let kept: String = plain_letters(text)
         .replace('&', "and")
         .chars()

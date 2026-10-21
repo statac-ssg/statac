@@ -6,7 +6,7 @@ use std::io::{Cursor, Read, Result};
 /// A response's [body](https://httpwg.org/http-core/draft-ietf-httpbis-messaging-latest.html#message.body).
 ///
 /// It implements the [`Read`] API.
-pub struct Body(BodyAlt);
+pub(crate) struct Body(BodyAlt);
 
 enum BodyAlt {
     SimpleOwned(Cursor<Vec<u8>>),
@@ -16,13 +16,13 @@ enum BodyAlt {
 impl Body {
     /// The empty body
     #[inline]
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self(BodyAlt::SimpleBorrowed(b""))
     }
 
     /// The number of bytes in the body.
     #[inline]
-    pub fn len(&self) -> u64 {
+    pub(crate) fn len(&self) -> u64 {
         match &self.0 {
             BodyAlt::SimpleOwned(d) => d.get_ref().len().try_into().unwrap(),
             BodyAlt::SimpleBorrowed(d) => d.len().try_into().unwrap(),
@@ -35,7 +35,7 @@ impl Body {
         clippy::wrong_self_convention,
         reason = "the name the tests of the answers read a body by"
     )]
-    pub fn to_string(mut self) -> Result<String> {
+    pub(crate) fn to_string(mut self) -> Result<String> {
         let mut buf = String::new();
         self.read_to_string(&mut buf)?;
         Ok(buf)

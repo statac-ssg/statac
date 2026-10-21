@@ -494,7 +494,7 @@ pub(crate) struct Plan {
 impl Output {
     /// The file the output is published as, from the top of the built
     /// site.
-    pub fn file(self, renderer: &Renderer) -> String {
+    pub(crate) fn file(self, renderer: &Renderer) -> String {
         let site = renderer.site();
         match self {
             Output::Page(page) => site.pages.get(page).address.file(),
@@ -513,7 +513,7 @@ impl Output {
 impl Plan {
     /// The same plan, each page checked noting what its links ask the
     /// site for.
-    pub fn noting(self) -> Plan {
+    pub(crate) fn noting(self) -> Plan {
         Plan {
             linked: self.linked.noting(),
             ..self
@@ -522,7 +522,7 @@ impl Plan {
 
     /// Every output of the site `renderer` holds, adding to `problems`
     /// what leaves any out.
-    pub fn of(renderer: &Renderer, problems: &mut Vec<Problem>) -> Plan {
+    pub(crate) fn of(renderer: &Renderer, problems: &mut Vec<Problem>) -> Plan {
         let site = renderer.site();
         let mut outputs: Vec<Output> = site
             .pages
@@ -743,7 +743,7 @@ pub(crate) struct Concluded {
 
 impl Concluded {
     /// Whether any problem stops the build.
-    pub fn stopped(&self) -> bool {
+    pub(crate) fn stopped(&self) -> bool {
         stops(&self.problems)
     }
 }

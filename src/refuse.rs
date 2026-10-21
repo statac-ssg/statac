@@ -39,7 +39,7 @@ pub struct Options {
 /// Gives the exit code: 0 where it refused, or had refused already; 1
 /// where `fetched/` has an error, nothing kept is from the address, or
 /// something couldn't be written or removed.
-pub fn run(options: &Options, out: &mut dyn Write, colour: bool) -> u8 {
+pub(crate) fn run(options: &Options, out: &mut dyn Write, colour: bool) -> u8 {
     let mut say = |line: &str| {
         let _ = out.write_all(line.as_bytes());
         let _ = out.flush();

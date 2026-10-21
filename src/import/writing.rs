@@ -23,7 +23,7 @@ const ENDS_AT_ITS_TAG: [&str; 4] = ["pre", "script", "style", "textarea"];
 
 /// What was changed in writing, by how many places.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub struct Settled {
+pub(super) struct Settled {
     /// The tags inside other HTML given a blank line before them.
     pub tags: usize,
     /// The code fences inside HTML given a blank line before them.
@@ -48,7 +48,7 @@ pub struct Maths {
 }
 
 impl Settled {
-    pub fn add(&mut self, other: &Settled) {
+    pub(super) fn add(&mut self, other: &Settled) {
         self.tags += other.tags;
         self.fences += other.fences;
         self.escaped += other.escaped;
@@ -62,7 +62,7 @@ impl Settled {
 /// and each code fence written into it starts, kept beside the text so
 /// nothing the author wrote can be taken for one.
 #[derive(Default, Debug)]
-pub struct Marked {
+pub(super) struct Marked {
     pub text: String,
     pub called: Vec<usize>,
     pub fences: Vec<usize>,
@@ -70,7 +70,7 @@ pub struct Marked {
 
 impl Marked {
     /// `call`, a snippet call or an `@end`.
-    pub fn call(call: impl Into<String>) -> Marked {
+    pub(super) fn call(call: impl Into<String>) -> Marked {
         Marked {
             text: call.into(),
             called: vec![0],
@@ -79,7 +79,7 @@ impl Marked {
     }
 
     /// `fence`, a fenced code block.
-    pub fn fence(fence: impl Into<String>) -> Marked {
+    pub(super) fn fence(fence: impl Into<String>) -> Marked {
         Marked {
             text: fence.into(),
             called: Vec::new(),
@@ -87,12 +87,12 @@ impl Marked {
         }
     }
 
-    pub fn push_str(&mut self, text: &str) {
+    pub(super) fn push_str(&mut self, text: &str) {
         self.text.push_str(text);
     }
 
     /// Writes `other` here, with what it marks.
-    pub fn push(&mut self, other: Marked) {
+    pub(super) fn push(&mut self, other: Marked) {
         let at = self.text.len();
         self.called
             .extend(other.called.iter().map(|mark| at + mark));
@@ -123,7 +123,7 @@ const PASSES: usize = 24;
 /// `fences` and `calls` are where a reader wrote a code fence or a
 /// snippet call, and are moved with the writing. `maths` says what the
 /// old site read as maths.
-pub fn settle(
+pub(super) fn settle(
     writing: &mut String,
     fences: &mut [usize],
     calls: &mut [usize],

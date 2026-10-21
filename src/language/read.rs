@@ -10,7 +10,7 @@ use crate::yaml::{Node, Resolved, Value as Yaml};
 use super::{Direction, Quotes, Words};
 
 /// Every key a language file reads.
-pub const KEYS: &[&str] = &[
+pub(crate) const KEYS: &[&str] = &[
     "months",
     "months_alone",
     "months_short",
@@ -31,7 +31,7 @@ pub const KEYS: &[&str] = &[
 
 /// Reads the language file `source`. A key whose value can't be read is
 /// left out of the words, with the problem said.
-pub fn read(sources: &Sources, source: SourceId) -> (Words, Vec<Problem>) {
+pub(crate) fn read(sources: &Sources, source: SourceId) -> (Words, Vec<Problem>) {
     read_onto(sources, source, Words::default())
 }
 
@@ -39,7 +39,11 @@ pub fn read(sources: &Sources, source: SourceId) -> (Words, Vec<Problem>) {
 /// the place of theirs, with nothing after its colon as much as with a
 /// value, and a key it leaves out, or whose value can't be read, keeps
 /// theirs.
-pub fn read_onto(sources: &Sources, source: SourceId, mut words: Words) -> (Words, Vec<Problem>) {
+pub(crate) fn read_onto(
+    sources: &Sources,
+    source: SourceId,
+    mut words: Words,
+) -> (Words, Vec<Problem>) {
     let mut problems = Vec::new();
     let node = match crate::yaml::read(sources, source) {
         Ok(node) => node,

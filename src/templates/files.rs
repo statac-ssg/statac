@@ -79,7 +79,7 @@ pub(super) struct Snippet {
 impl Snippet {
     /// What a call that hands the snippet everything it reads holds,
     /// written as the call would be: `post`, or `photo=photo, alt=alt`.
-    pub fn call_arguments(&self) -> String {
+    pub(super) fn call_arguments(&self) -> String {
         let unnamed = match &self.takes {
             Some(Takes::InOrder(names)) => names.clone(),
             None if self.params.len() == 1 => self.params.clone(),

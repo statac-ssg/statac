@@ -11,7 +11,7 @@ use crate::source::Sources;
 use crate::yaml::Value as Yaml;
 
 /// The settings files Hugo reads at the top of a site, the first found.
-pub const FILES: &[&str] = &[
+pub(super) const FILES: &[&str] = &[
     "hugo.toml",
     "hugo.yaml",
     "hugo.yml",
@@ -26,10 +26,10 @@ pub const FILES: &[&str] = &[
 const HUGOS_OWN_FILES: &[&str] = &["hugo.toml", "hugo.yaml", "hugo.yml", "hugo.json"];
 
 /// The folder of settings every environment starts from.
-pub const DEFAULT_FOLDER: &str = "config/_default";
+pub(super) const DEFAULT_FOLDER: &str = "config/_default";
 
 /// Whether `folder` holds a Hugo site, by its settings.
-pub fn owns(folder: &Path) -> bool {
+pub(super) fn owns(folder: &Path) -> bool {
     HUGOS_OWN_FILES
         .iter()
         .any(|n| inside::a_settings_file(folder, n))
@@ -48,7 +48,7 @@ pub fn owns(folder: &Path) -> bool {
 
 /// The fields of the settings or data file `rel` of `folder`, by its
 /// ending: TOML, YAML or JSON.
-pub fn fields_of(folder: &Path, rel: &str) -> Result<Vec<Field>, Box<Failed>> {
+pub(super) fn fields_of(folder: &Path, rel: &str) -> Result<Vec<Field>, Box<Failed>> {
     let path = inside::path(folder, rel);
     let text = std::fs::read_to_string(&path).map_err(|error| {
         Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
@@ -86,21 +86,21 @@ pub fn fields_of(folder: &Path, rel: &str) -> Result<Vec<Field>, Box<Failed>> {
 /// A setting as found: its name, its value, and the file and line it is
 /// written at.
 #[derive(Clone, Debug)]
-pub struct Entry {
+pub(super) struct Entry {
     pub field: Field,
     pub file: String,
 }
 
 /// Every setting of the site, the main file's first, and the files and
 /// folders of settings Hugo doesn't read for the site as built.
-pub struct Found {
+pub(super) struct Found {
     pub entries: Vec<Entry>,
     pub file: String,
     pub left: Vec<Left>,
 }
 
 /// Reads every settings file Hugo reads in `folder`.
-pub fn found(folder: &Path) -> Result<Found, Box<Failed>> {
+pub(super) fn found(folder: &Path) -> Result<Found, Box<Failed>> {
     let mut entries: Vec<Entry> = Vec::new();
     let mut left = Vec::new();
     let mut main = None;
@@ -256,7 +256,7 @@ fn merge_fields(held: &mut Vec<(String, Value)>, more: Vec<(String, Value)>) {
 }
 
 /// Whether a value is true, as Hugo reads one written as text too.
-pub fn truth_of(value: &Value) -> bool {
+pub(super) fn truth_of(value: &Value) -> bool {
     match value {
         Value::Truth(truth) => *truth,
         Value::Text(text) => text.eq_ignore_ascii_case("true"),
@@ -265,7 +265,7 @@ pub fn truth_of(value: &Value) -> bool {
 }
 
 /// The field `name` of a table, in any capitals.
-pub fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a Value> {
+pub(super) fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a Value> {
     fields
         .iter()
         .find(|(n, _)| n.eq_ignore_ascii_case(name))
@@ -275,7 +275,7 @@ pub fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a Value> {
 /// Where each kind of page goes, by `[permalinks]`: patterns by the name
 /// of a folder or a list of terms.
 #[derive(Default, Debug)]
-pub struct Permalinks {
+pub(super) struct Permalinks {
     /// Written straight under `[permalinks]`, for a folder's pages or a
     /// list of terms.
     pub any: Vec<(String, String)>,
@@ -286,17 +286,17 @@ pub struct Permalinks {
 
 impl Permalinks {
     /// The pattern for a page in the folder `section`.
-    pub fn page(&self, section: &str) -> Option<&str> {
+    pub(super) fn page(&self, section: &str) -> Option<&str> {
         find(&self.page, section).or_else(|| find(&self.any, section))
     }
 
     /// The pattern for a folder's own page.
-    pub fn section(&self, section: &str) -> Option<&str> {
+    pub(super) fn section(&self, section: &str) -> Option<&str> {
         find(&self.section, section)
     }
 
     /// The pattern for a term of the list `plural`.
-    pub fn term(&self, plural: &str) -> Option<&str> {
+    pub(super) fn term(&self, plural: &str) -> Option<&str> {
         find(&self.term, plural).or_else(|| find(&self.any, plural))
     }
 }
@@ -310,7 +310,7 @@ fn find<'a>(patterns: &'a [(String, String)], name: &str) -> Option<&'a str> {
 
 /// A language the settings declare.
 #[derive(Clone, Debug)]
-pub struct Language {
+pub(super) struct Language {
     /// Its name among the settings, which its folder and addresses use.
     pub key: String,
     pub title: Option<String>,
@@ -320,13 +320,13 @@ pub struct Language {
 
 /// Which pages Hugo published as their own file rather than a folder.
 #[derive(Default, Debug)]
-pub struct Ugly {
+pub(super) struct Ugly {
     pub all: bool,
     pub folders: Vec<(String, bool)>,
 }
 
 impl Ugly {
-    pub fn of(&self, section: &str) -> bool {
+    pub(super) fn of(&self, section: &str) -> bool {
         self.folders
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case(section))
@@ -336,7 +336,7 @@ impl Ugly {
 
 /// What the settings say.
 #[derive(Debug)]
-pub struct Settings {
+pub(super) struct Settings {
     pub base_url: Option<String>,
     pub title: Option<String>,
     pub language_code: Option<String>,
@@ -389,7 +389,7 @@ pub struct Settings {
 }
 
 /// Hugo's lists of where each date is found, unless the settings say.
-pub const DEFAULT_DATES: &[(&str, &[&str])] = &[
+pub(super) const DEFAULT_DATES: &[(&str, &[&str])] = &[
     (
         "date",
         &[
@@ -422,7 +422,7 @@ pub const DEFAULT_DATES: &[(&str, &[&str])] = &[
 
 impl Settings {
     /// Where the date `name` is found, in order.
-    pub fn date_sources(&self, name: &str) -> Vec<String> {
+    pub(super) fn date_sources(&self, name: &str) -> Vec<String> {
         let default: Vec<String> = DEFAULT_DATES
             .iter()
             .find(|(n, _)| *n == name)
@@ -441,13 +441,13 @@ impl Settings {
     }
 
     /// The plural names of the lists of terms.
-    pub fn plurals(&self) -> Vec<&str> {
+    pub(super) fn plurals(&self) -> Vec<&str> {
         self.taxonomies.iter().map(|(_, p)| p.as_str()).collect()
     }
 }
 
 /// What `entries` say.
-pub fn settle(folder: &Path, entries: &[Entry]) -> Settings {
+pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
     let mut s = Settings {
         base_url: None,
         title: None,

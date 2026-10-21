@@ -16,7 +16,7 @@ use crate::source::{SourceId, Sources};
 use crate::yaml::{Node, Value as Yaml};
 
 /// The folder data files are read from.
-pub const FOLDER: &str = "data";
+pub(crate) const FOLDER: &str = "data";
 
 /// One data file read.
 pub struct DataFile {
@@ -118,7 +118,7 @@ impl Data {
 }
 
 /// Reads every data file of the site at `root`.
-pub fn read(root: &Path, sources: &mut Sources) -> (Data, Vec<Problem>) {
+pub(crate) fn read(root: &Path, sources: &mut Sources) -> (Data, Vec<Problem>) {
     let mut problems = Vec::new();
     let mut data = Data {
         files: Arena::default(),

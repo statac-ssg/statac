@@ -31,8 +31,8 @@ mod tests;
 
 use std::collections::{HashMap, HashSet};
 
-pub use resolve::Site;
-pub use scan::{Attribute, Linked, handed, written, written_in_html};
+pub(crate) use resolve::Site;
+pub(crate) use scan::{Attribute, Linked, handed, written, written_in_html};
 
 use crate::content::address::{self, Address};
 use crate::content::slug;
@@ -66,7 +66,7 @@ pub struct Snipped {
 /// Each link in `html`, what a snippet wrote, in a tag of a template's own
 /// text. `written_at` gives the template the byte at an offset of `html`
 /// is the own text of, and where in it; none for a byte of a value's.
-pub fn snipped(
+pub(crate) fn snipped(
     html: &str,
     written_at: impl Fn(usize) -> Option<(TemplateId, usize)>,
 ) -> Vec<Snipped> {
@@ -86,7 +86,7 @@ pub fn snipped(
 }
 
 /// One built page, as the check reads it.
-pub struct Page<'a> {
+pub(crate) struct Page<'a> {
     pub id: PageId,
     /// Which of its list's pages it is, counted from 1.
     pub number: usize,
@@ -103,7 +103,7 @@ pub struct Page<'a> {
 
 /// What a built page's links came to, found as it was built.
 #[derive(Clone, Debug)]
-pub struct Checked {
+pub(crate) struct Checked {
     page: PageId,
     number: usize,
     /// The file it is published as, from the top of the built site.
@@ -127,7 +127,7 @@ pub struct Checked {
 impl Checked {
     /// The files the page links that are published only where a page
     /// links them.
-    pub fn reached(&self) -> &[String] {
+    pub(crate) fn reached(&self) -> &[String] {
         &self.reached
     }
 }
@@ -136,7 +136,7 @@ impl Checked {
     /// The same findings as another reading of the site has them, the
     /// page, the templates and each place as `to` gives them there; none
     /// where that reading has no such page, template or place.
-    pub fn moved(&self, to: &Translation) -> Option<Checked> {
+    pub(crate) fn moved(&self, to: &Translation) -> Option<Checked> {
         let moved = |misses: &[Miss]| {
             let misses = misses.iter().map(|miss| {
                 let blame = match &miss.blame {
@@ -207,7 +207,7 @@ struct Shown<'a> {
 impl Site {
     /// Follows every link on `page`, built as `html`: what lands nowhere
     /// now, and what waits to be held to another page's ids.
-    pub fn check(&self, renderer: &Renderer, page: Page<'_>, html: &str) -> Checked {
+    pub(crate) fn check(&self, renderer: &Renderer, page: Page<'_>, html: &str) -> Checked {
         let site = renderer.site();
         let scanned = scan(html);
         let published = format!("{}{}", self.base(), page.address.as_str());
@@ -383,7 +383,7 @@ impl Site {
 
     /// Whether the site still holds, at each path a link of the page led
     /// to, what it held when the page was checked.
-    pub fn holds_as(&self, checked: &Checked) -> bool {
+    pub(crate) fn holds_as(&self, checked: &Checked) -> bool {
         let own = |file: &str| checked.cards.iter().any(|card| card == file);
         let mut asked = checked.asked.iter();
         asked.all(|(path, file)| self.file_among(path, own) == *file)
@@ -438,7 +438,7 @@ impl Site {
     /// where it was written. `made` are files known only once the pages
     /// are built, which a link from any page lands on: the pages' sharing
     /// cards, and the scripts reading the search index.
-    pub fn told<'a>(
+    pub(crate) fn told<'a>(
         &self,
         renderer: &Renderer,
         checked: impl IntoIterator<Item = &'a Checked>,

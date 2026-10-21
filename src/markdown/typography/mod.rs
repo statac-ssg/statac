@@ -117,7 +117,7 @@ pub fn set_words(text: &str, typography: &Typography<'_>) -> String {
 
 /// The words of a link's or picture's title, which reach the page in an
 /// attribute rather than among the words, set as words of their own.
-pub fn tidied(words: &str, typography: &Typography<'_>) -> String {
+pub(super) fn tidied(words: &str, typography: &Typography<'_>) -> String {
     let mut glyphs = vec![Glyph::edge(LINE, Is::Parting)];
     glyphs.extend(words.chars().map(|c| Glyph {
         c,

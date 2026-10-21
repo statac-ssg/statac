@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use super::FindingKind;
 use crate::platform;
 
-pub static FOLDER_UNREAD: FindingKind = FindingKind {
+pub(super) static FOLDER_UNREAD: FindingKind = FindingKind {
     heading: "Settings naming a folder Statac doesn't read",
     sentence: "Each of these settings names a folder outside the old site's own folder, or one \
                reached through a link that leads outside it. Statac reads nothing outside the \
@@ -46,7 +46,7 @@ const FOLLOWED: usize = 64;
 
 /// Why a link isn't followed, as the end of a sentence about it.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Refused {
+pub(super) enum Refused {
     Outside,
     Back,
     Missing,
@@ -55,7 +55,7 @@ pub enum Refused {
 }
 
 impl Refused {
-    pub fn what(self) -> &'static str {
+    pub(super) fn what(self) -> &'static str {
         match self {
             Refused::Outside => {
                 "a link that leads outside the old site, which Statac doesn't follow"
@@ -75,7 +75,7 @@ impl Refused {
 
 /// Whether `what` says a file or folder left behind is a link that wasn't
 /// followed.
-pub fn is_link(what: &str) -> bool {
+pub(super) fn is_link(what: &str) -> bool {
     [
         Refused::Outside,
         Refused::Back,
@@ -116,7 +116,7 @@ thread_local! {
 
 /// Begins an import into `new`: the old site is first read with no link
 /// followed but one a setting names.
-pub fn begin(new: &Path) {
+pub(super) fn begin(new: &Path) {
     IMPORT.with(|import| {
         *import.borrow_mut() = Import {
             new: std::fs::canonicalize(new).ok(),
@@ -127,14 +127,14 @@ pub fn begin(new: &Path) {
 
 /// Whether the reading so far met a link that leads inside the old site
 /// and would be followed if what it leads to was published.
-pub fn waiting() -> bool {
+pub(super) fn waiting() -> bool {
     IMPORT.with(|import| import.borrow().waiting)
 }
 
 /// Ends the first reading: `published` is each file of the old folder
 /// it brought across to be published. From here a link is followed where
 /// it leads to one of them, or to a folder holding one.
-pub fn read_once(folder: &Path, published: &[&str]) {
+pub(super) fn read_once(folder: &Path, published: &[&str]) {
     let Ok(top) = std::fs::canonicalize(folder) else {
         return;
     };
@@ -162,14 +162,14 @@ pub fn read_once(folder: &Path, published: &[&str]) {
 /// Tells the guard that `path`, in the old folder, lies outside the
 /// folder the tool reads and is left out by no other rule of the tool's:
 /// the old tool read such a place where a link led to it.
-pub fn beyond(folder: &Path, path: &str) {
+pub(super) fn beyond(folder: &Path, path: &str) {
     if let Ok(real) = real(folder, path, false) {
         IMPORT.with(|import| import.borrow_mut().beyond.push(real));
     }
 }
 
 /// The links followed, each by its path in the old folder, in order.
-pub fn followed() -> Vec<String> {
+pub(super) fn followed() -> Vec<String> {
     IMPORT.with(|import| {
         let mut met = import.borrow().met.clone();
         met.sort();
@@ -310,7 +310,7 @@ fn real(folder: &Path, path: &str, named: bool) -> Result<PathBuf, Stopped> {
 /// The path to open for `path`, in the old folder: the real file or
 /// folder it leads to. Where a link on the way isn't followed, a path
 /// nothing can be opened at.
-pub fn path(folder: &Path, path: &str) -> PathBuf {
+pub(super) fn path(folder: &Path, path: &str) -> PathBuf {
     match real(folder, path, false) {
         Ok(real) | Err(Stopped::Gone(real)) => real,
         Err(_) => PathBuf::new(),
@@ -320,7 +320,7 @@ pub fn path(folder: &Path, path: &str) -> PathBuf {
 /// What stands at `path`, in the old folder: the file or folder it leads
 /// to where it is one, or a link followed. A link that isn't followed is
 /// given as the link itself, for the reader to tell of with [`why`].
-pub fn metadata(folder: &Path, path: &str) -> std::io::Result<std::fs::Metadata> {
+pub(super) fn metadata(folder: &Path, path: &str) -> std::io::Result<std::fs::Metadata> {
     match real(folder, path, false) {
         Ok(real) => std::fs::symlink_metadata(real),
         Err(Stopped::Link(link, _)) if link == path.trim_matches('/') => {
@@ -333,7 +333,7 @@ pub fn metadata(folder: &Path, path: &str) -> std::io::Result<std::fs::Metadata>
 }
 
 /// What to say of the link at `path` that isn't followed.
-pub fn why(folder: &Path, path: &str) -> &'static str {
+pub(super) fn why(folder: &Path, path: &str) -> &'static str {
     match real(folder, path, false) {
         Err(Stopped::Link(_, refused)) => refused.what(),
         _ => Refused::Missing.what(),
@@ -343,13 +343,13 @@ pub fn why(folder: &Path, path: &str) -> &'static str {
 /// Whether `path`, a settings file or a file among the settings by its
 /// path in the old folder, is reached through no link that isn't
 /// followed.
-pub fn reached(folder: &Path, path: &str) -> bool {
+pub(super) fn reached(folder: &Path, path: &str) -> bool {
     !matches!(real(folder, path, true), Err(Stopped::Link(..)))
 }
 
 /// Where `path`, in the old folder, really stands, by its path there:
 /// another place than `path` where a link was followed on the way.
-pub fn stands_at(folder: &Path, path: &str) -> Option<String> {
+pub(super) fn stands_at(folder: &Path, path: &str) -> Option<String> {
     let top = std::fs::canonicalize(folder).ok()?;
     let real = real(folder, path, false).ok()?;
     let within = real.strip_prefix(&top).ok()?;
@@ -361,25 +361,25 @@ pub fn stands_at(folder: &Path, path: &str) -> Option<String> {
 
 /// Whether `path`, in the old folder, is a file, or leads to one the old
 /// site published.
-pub fn a_file(folder: &Path, path: &str) -> bool {
+pub(super) fn a_file(folder: &Path, path: &str) -> bool {
     real(folder, path, false).is_ok_and(|real| real.is_file())
 }
 
 /// Whether `path`, in the old folder, is a folder, or leads to one
 /// holding what the old site published.
-pub fn a_folder(folder: &Path, path: &str) -> bool {
+pub(super) fn a_folder(folder: &Path, path: &str) -> bool {
     real(folder, path, false).is_ok_and(|real| real.is_dir())
 }
 
 /// Whether `path`, a settings file by its fixed name in the old folder,
 /// is a file, or leads to one inside the old folder.
-pub fn a_settings_file(folder: &Path, path: &str) -> bool {
+pub(super) fn a_settings_file(folder: &Path, path: &str) -> bool {
     real(folder, path, true).is_ok_and(|real| real.is_file())
 }
 
 /// Whether `path`, a folder of settings by its fixed name in the old
 /// folder, is a folder, or leads to one inside the old folder.
-pub fn a_settings_folder(folder: &Path, path: &str) -> bool {
+pub(super) fn a_settings_folder(folder: &Path, path: &str) -> bool {
     real(folder, path, true).is_ok_and(|real| real.is_dir())
 }
 
@@ -387,7 +387,7 @@ pub fn a_settings_folder(folder: &Path, path: &str) -> bool {
 /// the old folder itself. None where it isn't inside the old folder as
 /// written, or is reached through a link that isn't followed: the setting
 /// is then read as not set, and told of under [`FOLDER_UNREAD`].
-pub fn named_folder(folder: &Path, written: &str) -> Option<String> {
+pub(super) fn named_folder(folder: &Path, written: &str) -> Option<String> {
     let inside = written.strip_prefix("./").unwrap_or(written);
     let inside = match inside.trim_end_matches('/') {
         "." => "",

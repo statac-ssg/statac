@@ -16,7 +16,7 @@
 //! feed's address is published in its place.
 
 mod ids;
-pub mod known;
+pub(crate) mod known;
 #[cfg(test)]
 mod tests;
 
@@ -31,13 +31,13 @@ use crate::site::{ListId, ListKey, Page, PageId, Site};
 use crate::source::{Place, Sources, Span};
 use crate::value::Value;
 
-pub use ids::{entry_id, mint_key};
-pub use known::{IdsToWrite, Known, ids_to_write};
+pub(crate) use ids::{entry_id, mint_key};
+pub(crate) use known::{IdsToWrite, Known, ids_to_write};
 
-pub const FILE_NAME: &str = "feed.xml";
+pub(crate) const FILE_NAME: &str = "feed.xml";
 
 /// The settings every feed needs.
-pub const NEEDS: &[&str] = &["url", "feed_key", "title"];
+pub(crate) const NEEDS: &[&str] = &["url", "feed_key", "title"];
 
 /// A feed the build writes.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -94,7 +94,7 @@ fn standing(site: &Site, list: ListId, page: Option<&Page>) -> Option<Address> {
 /// Where `list`'s feed would be published were the site to have everything
 /// a feed needs: from the top of the site and without the site's own path.
 /// None where the list has no feed, or its `feed:` gives no address.
-pub fn wanted(site: &Site, settings: &Settings, list: ListId) -> Option<Address> {
+pub(crate) fn wanted(site: &Site, settings: &Settings, list: ListId) -> Option<Address> {
     let asked = asked(site, settings, list)?;
     let lands = asked.page.is_none_or(Page::lands);
     let (fed, written) = match asked.words.get(PageWord::Feed).map(|feed| &feed.value) {
@@ -140,7 +140,7 @@ fn lacks(site: &Site, settings: &Settings, list: ListId) -> Option<&'static str>
 /// Where `list`'s feed is published, from the top of the site and without
 /// the site's own path; none where the list has no feed, or the site lacks
 /// something every feed needs.
-pub fn address(site: &Site, settings: &Settings, list: ListId) -> Option<Address> {
+pub(crate) fn address(site: &Site, settings: &Settings, list: ListId) -> Option<Address> {
     if lacks(site, settings, list).is_some() {
         return None;
     }
@@ -209,7 +209,7 @@ fn as_a_file(written: &str) -> String {
 
 /// Each `feed:` value a list goes by that names no file a feed can be
 /// published at, told once where it is written.
-pub fn unusable(site: &Site, settings: &Settings, sources: &Sources) -> Vec<Problem> {
+pub(crate) fn unusable(site: &Site, settings: &Settings, sources: &Sources) -> Vec<Problem> {
     let mut told = Vec::new();
     let mut problems = Vec::new();
     for (list, _) in site.lists.iter() {
@@ -242,7 +242,7 @@ pub fn unusable(site: &Site, settings: &Settings, sources: &Sources) -> Vec<Prob
 
 /// Each `feed:` line asking for a feed of a list with nothing dated, which
 /// has none, told once where it is written for the first such list.
-pub fn undated(site: &Site, settings: &Settings, sources: &Sources) -> Vec<Problem> {
+pub(crate) fn undated(site: &Site, settings: &Settings, sources: &Sources) -> Vec<Problem> {
     let mut told = Vec::new();
     let mut problems = Vec::new();
     for (list, _) in site.lists.iter() {
@@ -288,7 +288,7 @@ pub fn undated(site: &Site, settings: &Settings, sources: &Sources) -> Vec<Probl
 /// extension, as `feed.json`, where the site has it, or else `feed.xml`.
 /// None where the site has neither. `has` says whether the site has a
 /// template of a name.
-pub fn template(address: &Address, has: &dyn Fn(&str) -> bool) -> Option<String> {
+pub(crate) fn template(address: &Address, has: &dyn Fn(&str) -> bool) -> Option<String> {
     let last = address.as_str().rsplit('/').next().unwrap_or_default();
     let own = last
         .rsplit_once('.')
@@ -304,7 +304,7 @@ pub fn template(address: &Address, has: &dyn Fn(&str) -> bool) -> Option<String>
 /// said of each feed a list asks for that isn't: once for the site where
 /// the site lacks what every feed needs, or the template; once for each
 /// feed a page of the author's stands in the way of.
-pub fn plan(
+pub(crate) fn plan(
     site: &Site,
     settings: &Settings,
     sources: &Sources,
@@ -388,7 +388,7 @@ fn not_written(site: &Site, sources: &Sources, lists: &[ListId], why: Unwritten)
 /// A list as a problem names it: a folder by its path, the site's own
 /// where that is empty, a tag or a series by its name, a list a page
 /// chooses by that page's file.
-pub fn described(site: &Site, sources: &Sources, list: ListId) -> (Word, String) {
+pub(crate) fn described(site: &Site, sources: &Sources, list: ListId) -> (Word, String) {
     match &site.lists.get(list).key {
         ListKey::Folder(path) => (Word::Folder, path.clone()),
         ListKey::Tag(name) => (Word::Tag, name.clone()),
@@ -405,7 +405,7 @@ pub fn described(site: &Site, sources: &Sources, list: ListId) -> (Word, String)
 
 /// The claims each feed makes on an address, for finding two things
 /// published at one: the file it writes, and the template it comes from.
-pub fn claims(feeds: &[Feed]) -> Vec<(String, Named)> {
+pub(crate) fn claims(feeds: &[Feed]) -> Vec<(String, Named)> {
     feeds
         .iter()
         .map(|feed| {
@@ -417,7 +417,7 @@ pub fn claims(feeds: &[Feed]) -> Vec<(String, Named)> {
 
 /// The posts a feed carries, newest first: the list's dated posts, put in
 /// order by the moments their dates name, whatever order the list keeps.
-pub fn entries(site: &Site, dates: &crate::dates::Dates, list: ListId) -> Vec<PageId> {
+pub(crate) fn entries(site: &Site, dates: &crate::dates::Dates, list: ListId) -> Vec<PageId> {
     let mut posts: Vec<(PageId, Option<i64>)> = site
         .lists
         .get(list)

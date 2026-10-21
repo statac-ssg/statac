@@ -8,7 +8,7 @@ use crate::serve::server::model::{Body, HeaderMap, HeaderName, Response, StatusC
 use crate::serve::server::utils::invalid_input_error;
 use std::io::{Result, Write, copy};
 
-pub fn encode_response<W: Write>(response: &mut Response<Body>, mut writer: W) -> Result<W> {
+pub(crate) fn encode_response<W: Write>(response: &mut Response<Body>, mut writer: W) -> Result<W> {
     let status = response.status();
     let version_str = serialize_version(response.version())?;
     write!(&mut writer, "{version_str} {status}\r\n")?;

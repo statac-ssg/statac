@@ -47,7 +47,7 @@ pub(super) struct Definitions {
 impl Definitions {
     /// The definitions in the masked writing `masked` of `text`, and in the
     /// writing each of its calls wraps.
-    pub fn gather(text: &str, masked: &Masked, base: &str) -> Definitions {
+    pub(super) fn gather(text: &str, masked: &Masked, base: &str) -> Definitions {
         let mut definitions = Definitions::default();
         definitions.add(text, masked, base);
         definitions

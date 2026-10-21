@@ -46,7 +46,7 @@ fn mark_for(front: &str) -> Option<char> {
 
 /// A file's text with its front matter mended, and what was done.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Mended {
+pub(super) struct Mended {
     pub text: String,
     /// The control characters taken out.
     pub controls: usize,
@@ -55,7 +55,7 @@ pub struct Mended {
 /// `text` with its front matter mended where that is safe, and else as
 /// it is. Each line stays the line it was. A control character is taken
 /// out only where `controls` is true.
-pub fn mended(text: &str, controls: bool) -> Mended {
+pub(super) fn mended(text: &str, controls: bool) -> Mended {
     let unchanged = || Mended {
         text: text.to_owned(),
         controls: 0,

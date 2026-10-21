@@ -21,7 +21,7 @@ use crate::platform;
 use crate::problem::{Kind, Maker, Problem, Reason, Word};
 
 /// The file the report is written to, at the top of the new site.
-pub const REPORT: &str = "IMPORT.md";
+pub(super) const REPORT: &str = "IMPORT.md";
 
 /// Statac's words that mean on a page what the same word means to the
 /// tools a site comes from, so a field of that name is kept as it is.
@@ -47,27 +47,27 @@ const STARTER_PAGES: &[(&str, &str)] = &[
     ("tags.md", "/tags/"),
 ];
 
-pub static FIELD_RENAMED: FindingKind = FindingKind {
+pub(super) static FIELD_RENAMED: FindingKind = FindingKind {
     heading: "Fields renamed",
     sentence: "Each of these fields has the name of one of Statac's own words, which means \
                something else there or holds another kind of value, so Statac put `old_` before \
                its name: show it from a template under that name, or take it out.",
 };
 
-pub static DATE_LEFT: FindingKind = FindingKind {
+pub(super) static DATE_LEFT: FindingKind = FindingKind {
     heading: "Dates left as written",
     sentence: "Statac couldn't be sure which moment each of these dates means, so it left it as \
                written, and the page won't build until it is written year first, as \
                `2026-10-04` or `2026-10-04T09:30+01:00`.",
 };
 
-pub static NAME_TAKEN: FindingKind = FindingKind {
+pub(super) static NAME_TAKEN: FindingKind = FindingKind {
     heading: "Pages given another name",
     sentence: "Two pages of the old site would have had the same file in the new one, so the \
                later has a number after its name; its address is kept all the same.",
 };
 
-pub static FILE_RENAMED: FindingKind = FindingKind {
+pub(super) static FILE_RENAMED: FindingKind = FindingKind {
     heading: "Files given another name",
     sentence: "Statac can't publish a file under the name each of these had, so each has one it \
                can: a `%` and the two figures after it became the character they spell, as a \
@@ -77,7 +77,7 @@ pub static FILE_RENAMED: FindingKind = FindingKind {
                can't send readers on.",
 };
 
-pub static MORE_OUT: FindingKind = FindingKind {
+pub(super) static MORE_OUT: FindingKind = FindingKind {
     heading: "Summary markers taken out",
     sentence: "Statac ends a summary only at `<!--more-->` on a line of its own between two \
                blocks of the writing, and one anywhere else stops the build. Each of these stood \
@@ -86,7 +86,7 @@ pub static MORE_OUT: FindingKind = FindingKind {
                own where the summary should end.",
 };
 
-pub static LINKS: FindingKind = FindingKind {
+pub(super) static LINKS: FindingKind = FindingKind {
     heading: "Links Statac didn't follow",
     sentence: "Statac follows a link in the old site only to something inside it that the old \
                site published. Each of these it didn't follow, for the reason beside it, so \
@@ -94,7 +94,7 @@ pub static LINKS: FindingKind = FindingKind {
                itself where the link is, in a copy of the old site, and import again.",
 };
 
-pub static NOT_IN_BUILT: FindingKind = FindingKind {
+pub(super) static NOT_IN_BUILT: FindingKind = FindingKind {
     heading: "Addresses the old built site doesn't have",
     sentence: "Statac worked these addresses out by the old tool's rules, but the old site's built \
                output has nothing there, so the rule was wrong for the page or the output is \
@@ -102,7 +102,7 @@ pub static NOT_IN_BUILT: FindingKind = FindingKind {
                address to the page's `redirect_from`.",
 };
 
-pub static FEED_LEFT: FindingKind = FindingKind {
+pub(super) static FEED_LEFT: FindingKind = FindingKind {
     heading: "Feeds made by templates",
     sentence: "Readers subscribed to the old site's feed at each of these addresses, and the \
                template that made it didn't come across, so nothing is there now. A list's \
@@ -111,7 +111,7 @@ pub static FEED_LEFT: FindingKind = FindingKind {
                https://statac.dev/feeds/.",
 };
 
-pub static FEED_LEFT_NO_STARTER: FindingKind = FindingKind {
+pub(super) static FEED_LEFT_NO_STARTER: FindingKind = FindingKind {
     heading: "Feeds made by templates",
     sentence: "Readers subscribed to the old site's feed at each of these addresses, and the \
                template that made it didn't come across, so nothing is there now. A list's \
@@ -119,7 +119,7 @@ pub static FEED_LEFT_NO_STARTER: FindingKind = FindingKind {
                /index.rss`: see https://statac.dev/feeds/.",
 };
 
-pub static NEW_SITE_ERRORS: FindingKind = FindingKind {
+pub(super) static NEW_SITE_ERRORS: FindingKind = FindingKind {
     heading: "Errors in the new site",
     sentence: "Statac found these when it read the new site, and each stops it building: \
                `statac check` shows each one with what to do.",
@@ -128,7 +128,7 @@ pub static NEW_SITE_ERRORS: FindingKind = FindingKind {
 /// The lists of terms the old site kept that Statac has no equal for,
 /// each name of which is now a tag with the list's name before it.
 #[derive(Default, Debug)]
-pub struct Terms {
+pub(super) struct Terms {
     /// Each list by its name, with each of its names in the order met and
     /// the tag it became.
     pub lists: Vec<(String, Vec<(String, String)>)>,
@@ -264,7 +264,7 @@ impl Terms {
 
 /// What was written, for the report.
 #[derive(Default, Debug)]
-pub struct Summary {
+pub(super) struct Summary {
     pub posts: usize,
     pub drafts: usize,
     pub pages: usize,
@@ -301,7 +301,7 @@ pub struct Summary {
 
 impl Summary {
     /// How many things of how many kinds are left for the author.
-    pub fn left_for_you(&self) -> (usize, usize) {
+    pub(super) fn left_for_you(&self) -> (usize, usize) {
         let mut kinds: Vec<&FindingKind> = Vec::new();
         for finding in &self.findings {
             if !kinds.iter().any(|kind| std::ptr::eq(*kind, finding.kind)) {
@@ -315,7 +315,7 @@ impl Summary {
 /// Writes the site `import` describes into `folder`, which must be empty
 /// or not there, and the report, with the starter where `starter` asks.
 /// Where anything stops it, the folder is left as it was found.
-pub fn site(
+pub(super) fn site(
     old: &Path,
     folder: &Path,
     import: Import,
@@ -340,17 +340,17 @@ pub fn site(
 }
 
 /// Writes a file of the new site, by its path in it.
-pub type Writer<'a> = dyn FnMut(&Path, &str, &[u8]) -> io::Result<()> + 'a;
+pub(super) type Writer<'a> = dyn FnMut(&Path, &str, &[u8]) -> io::Result<()> + 'a;
 
 /// What a run will have to undo: whether the folder was there, and the
 /// folders above it that weren't, outermost first.
-pub struct Undo {
+pub(super) struct Undo {
     there: bool,
     outer: Vec<PathBuf>,
 }
 
 impl Undo {
-    pub fn before(folder: &Path) -> Undo {
+    pub(super) fn before(folder: &Path) -> Undo {
         let mut outer = Vec::new();
         let mut at = Some(folder);
         while let Some(path) = at.filter(|path| !path.as_os_str().is_empty()) {
@@ -369,7 +369,7 @@ impl Undo {
 
     /// Removes everything in `folder`, which held nothing before, and the
     /// folders made on the way to it.
-    pub fn undo(&self, folder: &Path) {
+    pub(super) fn undo(&self, folder: &Path) {
         match self.there {
             true => {
                 let Ok(entries) = std::fs::read_dir(folder) else {
@@ -395,7 +395,7 @@ impl Undo {
 
 /// The new site's folder, written into a file at a time. Everything in it
 /// is the import's own, so a file is written over by removing it first.
-pub struct Out<'a> {
+pub(super) struct Out<'a> {
     pub folder: &'a Path,
     /// Whether the starter was written into it.
     pub starter: bool,
@@ -404,7 +404,7 @@ pub struct Out<'a> {
 }
 
 impl Out<'_> {
-    pub fn put(&mut self, path: &str, bytes: &[u8]) -> Result<(), Problem> {
+    pub(super) fn put(&mut self, path: &str, bytes: &[u8]) -> Result<(), Problem> {
         let at = || self.folder.join(path);
         let cant = |error: io::Error, path: PathBuf| {
             Problem::nowhere(Kind::CantWrite {
@@ -436,7 +436,7 @@ impl Out<'_> {
         (self.write)(self.folder, path, bytes).map_err(|error| cant(error, at()))
     }
 
-    pub fn remove(&mut self, path: &str) -> Result<(), Problem> {
+    pub(super) fn remove(&mut self, path: &str) -> Result<(), Problem> {
         platform::remove_file(self.folder, path).map_err(|error| {
             Problem::nowhere(Kind::CantWrite {
                 path: self.folder.join(path),
@@ -446,13 +446,13 @@ impl Out<'_> {
     }
 
     /// The text of a file of the new site, where it is there.
-    pub fn text(&self, path: &str) -> Option<String> {
+    pub(super) fn text(&self, path: &str) -> Option<String> {
         std::fs::read_to_string(platform::join(self.folder, path)).ok()
     }
 }
 
 /// [`site`], writing each file with `write`, and not undoing.
-pub fn write<'a>(
+pub(super) fn write<'a>(
     old: &Path,
     folder: &'a Path,
     import: Import,
@@ -1170,7 +1170,7 @@ fn with_word(text: &str, field: &Field) -> String {
 }
 
 /// A page's file: its front matter, where it has any, then its writing.
-pub fn page_text(page: &Page) -> String {
+pub(super) fn page_text(page: &Page) -> String {
     if page.front.is_empty() {
         return page.writing.clone();
     }
@@ -1227,7 +1227,7 @@ fn shared_front(page: &Page, findings: &mut Vec<Finding>) -> Vec<Field> {
 
 /// The moment a date means as a tool wrote it: ISO 8601, or with its day
 /// in English words. None where it has no one reading.
-pub fn date_of(written: &str) -> Option<Date> {
+pub(super) fn date_of(written: &str) -> Option<Date> {
     crate::date::read(written)
         .ok()
         .or_else(|| crate::date::read_words(written))
@@ -1235,7 +1235,7 @@ pub fn date_of(written: &str) -> Option<Date> {
 
 /// Whether a field named `name` holding `value` would mean something else
 /// to Statac than it meant to the author.
-pub fn collides(name: &str, value: &Value) -> bool {
+pub(super) fn collides(name: &str, value: &Value) -> bool {
     let words_of_statacs = words::is_statacs(name) && !SAME_MEANING.contains(&name);
     let other_tools = OTHER_SPELLINGS.iter().any(|(other, _)| *other == name);
     let placed = name == "pages"
@@ -1264,7 +1264,7 @@ fn fits(name: &str, value: &Value) -> bool {
 }
 
 /// A value as a report quotes it: as one line of YAML.
-pub fn shown_value(value: &Value) -> String {
+pub(super) fn shown_value(value: &Value) -> String {
     match value {
         Value::Text(text) => crate::yaml::write::text(text),
         Value::Number(number) => number.clone(),

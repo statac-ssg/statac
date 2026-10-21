@@ -30,13 +30,13 @@ const PER_ASK: usize = 100;
 const ASKS: usize = 50;
 
 /// The most bytes one answer of the relay may hold.
-pub const LIMIT: u64 = 5_000_000;
+pub(super) const LIMIT: u64 = 5_000_000;
 
 /// The most bytes a face fetched may hold.
-pub const FACE_LIMIT: u64 = 10_000_000;
+pub(super) const FACE_LIMIT: u64 = 10_000_000;
 
 /// The widest a face is kept.
-pub const FACE_WIDTH: u32 = 96;
+pub(super) const FACE_WIDTH: u32 = 96;
 
 /// How large a face may be for its pixels to be read at all.
 const FACE_BOUNDS: Bounds = Bounds {

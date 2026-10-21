@@ -17,15 +17,15 @@ use crate::problem::{Ended, Hint, Kind, Named, Problem, Severity, WrongPlace};
 use crate::publish::Staging;
 use crate::source::Sources;
 
-pub const BEFORE: &str = "before_build";
-pub const AFTER: &str = "after_build";
+pub(crate) const BEFORE: &str = "before_build";
+pub(crate) const AFTER: &str = "after_build";
 /// The setting naming what `after_build` makes in the built site.
-pub const MAKES: &str = "after_build_makes";
+pub(crate) const MAKES: &str = "after_build_makes";
 /// The setting naming what `before_build` is run again for.
-pub const WATCHES: &str = "before_build_watches";
+pub(crate) const WATCHES: &str = "before_build_watches";
 
 /// One of the site's commands, and what it is handed.
-pub struct Hook<'a> {
+pub(crate) struct Hook<'a> {
     /// The setting it is written in.
     pub setting: &'static str,
     pub line: &'a str,
@@ -40,7 +40,7 @@ pub struct Hook<'a> {
 
 /// A command that didn't end well: how it ended, and what it printed.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Stopped {
+pub(crate) struct Stopped {
     pub ended: Ended,
     pub said: String,
 }
@@ -49,7 +49,7 @@ impl Hook<'_> {
     /// [`Hook::run`], with a terminal shown that the command is running
     /// for as long as it is: what the command prints is kept back, and a
     /// long one would otherwise look like a build that has stopped.
-    pub fn run_saying(&self, progress: Progress) -> Result<(), Stopped> {
+    pub(crate) fn run_saying(&self, progress: Progress) -> Result<(), Stopped> {
         if progress != Progress::Line {
             return self.run();
         }
@@ -65,7 +65,7 @@ impl Hook<'_> {
     }
 
     /// Runs the command and waits for it.
-    pub fn run(&self) -> Result<(), Stopped> {
+    pub(crate) fn run(&self) -> Result<(), Stopped> {
         let not_started = |error: std::io::Error| Stopped {
             ended: Ended::NotStarted(crate::problem::Reason::of(&error)),
             said: String::new(),
@@ -143,7 +143,7 @@ pub struct Ran {
 /// command isn't run where the settings have an error, which the build
 /// goes on to tell. `Err` holds a command that didn't end well, and the
 /// settings it is placed in.
-pub fn before(
+pub(crate) fn before(
     options: &crate::build::Options,
     progress: Progress,
     serve: bool,
@@ -197,7 +197,7 @@ fn told(setting: &str, stopped: Stopped) -> Kind {
 /// site's `after_build` has run on it where the site sets one. Gives what
 /// the command changed, and anything `after_build_makes` names that it
 /// left nothing at. A command that doesn't end well publishes nothing.
-pub fn publish(
+pub(crate) fn publish(
     settings: &Settings,
     options: &crate::build::Options,
     mut staging: Staging,
@@ -265,7 +265,7 @@ fn unmade(settings: &Settings, held: impl Fn(&str, bool) -> bool) -> Vec<Problem
 
 /// Each place `after_build_makes` names that the built site in `folder`
 /// has nothing at, where the command ran on an earlier build of it.
-pub fn still_unmade(settings: &Settings, folder: &Path) -> Vec<Problem> {
+pub(crate) fn still_unmade(settings: &Settings, folder: &Path) -> Vec<Problem> {
     unmade(settings, |rel, as_folder| {
         let at = platform::join(folder, rel);
         match std::fs::symlink_metadata(&at) {
@@ -291,7 +291,7 @@ fn holds_a_file(folder: &Path) -> bool {
 /// Whether any of `changed`, files of the site by their paths from its
 /// folder with forward slashes, is one `before_build_watches` names or
 /// lies in a folder it names.
-pub fn watched(settings: &Settings, changed: &[String]) -> bool {
+pub(crate) fn watched(settings: &Settings, changed: &[String]) -> bool {
     settings.texts(WATCHES).iter().any(|watched| {
         let named = platform::folded(watched.value.trim_end_matches('/'));
         changed.iter().any(|file| {
@@ -319,7 +319,7 @@ fn within(file: &str, folder: &str) -> bool {
 
 /// Whether `written` reads as a file or a folder below some folder: no
 /// piece of it empty, climbing out, or naming a drive or a root.
-pub fn a_place(written: &str) -> bool {
+pub(crate) fn a_place(written: &str) -> bool {
     let rel = written.strip_suffix('/').unwrap_or(written);
     !rel.is_empty() && platform::stays_inside(rel) && !rel.split('/').any(str::is_empty)
 }
@@ -327,7 +327,7 @@ pub fn a_place(written: &str) -> bool {
 /// Whether `written` names a file or a folder in the built site, as an
 /// entry of `after_build_makes` does: from its top, with or without the
 /// `/` an address opens with.
-pub fn a_built_place(written: &str) -> bool {
+pub(crate) fn a_built_place(written: &str) -> bool {
     a_place(written.strip_prefix('/').unwrap_or(written))
 }
 
@@ -335,7 +335,7 @@ pub fn a_built_place(written: &str) -> bool {
 /// together, for the site at `site`: one describing a command the site
 /// doesn't set, and something `before_build_watches` names that the site
 /// doesn't have.
-pub fn check(site: &Path, settings: &Settings) -> Vec<Problem> {
+pub(crate) fn check(site: &Path, settings: &Settings) -> Vec<Problem> {
     let mut problems = Vec::new();
     for (about, command) in [(MAKES, AFTER), (WATCHES, BEFORE)] {
         if settings.text(command).is_none()
@@ -368,7 +368,11 @@ pub fn check(site: &Path, settings: &Settings) -> Vec<Problem> {
 /// Each of `outputs`, a path in the built site and what is published
 /// there, that stands where `after_build_makes` says the command makes
 /// something. `base` is the path the site is published under.
-pub fn claimed(settings: &Settings, outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
+pub(crate) fn claimed(
+    settings: &Settings,
+    outputs: &[(String, Named)],
+    base: &str,
+) -> Vec<Problem> {
     let mut problems = Vec::new();
     for place in settings.texts(MAKES) {
         let (rel, _) = made(&place.value);
@@ -456,7 +460,7 @@ fn rewritten(line: &str, named: &[(usize, usize, usize)]) -> String {
 /// The warning for an `after_build` that names the folder the site is
 /// published in, as the build was asked for it: the command runs before
 /// the built site is put there. Placed at the folder's name.
-pub fn names_output(
+pub(crate) fn names_output(
     settings: &Settings,
     sources: &Sources,
     options: &crate::build::Options,
@@ -496,7 +500,7 @@ pub fn names_output(
 
 /// The note that `check` runs none of the commands the site sets, placed
 /// at the first of them.
-pub fn unrun_by_check(settings: &Settings) -> Option<Problem> {
+pub(crate) fn unrun_by_check(settings: &Settings) -> Option<Problem> {
     let set: Vec<_> = [BEFORE, AFTER]
         .into_iter()
         .filter_map(|hook| Some((hook, settings.text(hook)?)))

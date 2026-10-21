@@ -108,7 +108,7 @@ const LISTING: &[&str] = &[
     "site.static_files",
 ];
 
-pub static TEMPLATE_PAGE: FindingKind = FindingKind {
+pub(super) static TEMPLATE_PAGE: FindingKind = FindingKind {
     heading: "Pages made by templates",
     sentence: "Each of these pages was mostly the old site's templates at work, such as a home \
                page or an archive listing the posts, so Statac didn't bring it across: Statac \
@@ -116,132 +116,132 @@ pub static TEMPLATE_PAGE: FindingKind = FindingKind {
                https://statac.dev/lists/ describes.",
 };
 
-pub static HTML_WRITING: FindingKind = FindingKind {
+pub(super) static HTML_WRITING: FindingKind = FindingKind {
     heading: "Pages written in HTML",
     sentence: "Each of these was written in HTML and came across as a Markdown file holding that \
                HTML, which Statac publishes as it is: read each, since Markdown reads a line \
                indented by four spaces after a blank line as code.",
 };
 
-pub static TAG_LEFT: FindingKind = FindingKind {
+pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Template tags left as written",
     sentence: "Statac's writing runs no template tags and these have no equal in it, so each is \
                left as written and shows on the page as it stands: write by hand what it made, \
                or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
-pub static TAG_IN_CODE: FindingKind = FindingKind {
+pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
     heading: "Template tags inside code",
     sentence: "Jekyll filled these in even inside code, and Statac shows code exactly as written, \
                so each now shows as it stands: write by hand what it made, where that was meant.",
 };
 
-pub static LINK_NOWHERE: FindingKind = FindingKind {
+pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page Statac couldn't find in the old site, or one Jekyll \
                didn't publish, so it is left as written: link to the page's address instead.",
 };
 
-pub static INCLUDE: FindingKind = FindingKind {
+pub(super) static INCLUDE: FindingKind = FindingKind {
     heading: "Includes now snippet calls",
     sentence: "Each include is now a call to a snippet of its name, and the snippet holds only a \
                comment saying it wasn't converted: write the snippet, as \
                https://statac.dev/snippets/ describes, or take the calls out.",
 };
 
-pub static EXCERPT_LEFT: FindingKind = FindingKind {
+pub(super) static EXCERPT_LEFT: FindingKind = FindingKind {
     heading: "Excerpt markers inside a line",
     sentence: "Statac ends an excerpt only at `<!--more-->` on a line of its own, so each of \
                these was left as written: put it on a line of its own, as `<!--more-->`.",
 };
 
-pub static ATTRIBUTE_LINES: FindingKind = FindingKind {
+pub(super) static ATTRIBUTE_LINES: FindingKind = FindingKind {
     heading: "Attribute lists",
     sentence: "Statac's Markdown reads `{: ...}` as words, so each shows on the page as written: \
                read each page that has one, and take it out or write the HTML it stood for.",
 };
 
-pub static TOC: FindingKind = FindingKind {
+pub(super) static TOC: FindingKind = FindingKind {
     heading: "Tables of contents written in the writing",
     sentence: "Statac's Markdown reads `{:toc}` as words: take it and the list above it out, and \
                write `contents: true` in the page's front matter, which the starter's post \
                template reads to show a table of contents.",
 };
 
-pub static TOC_NO_STARTER: FindingKind = FindingKind {
+pub(super) static TOC_NO_STARTER: FindingKind = FindingKind {
     heading: "Tables of contents written in the writing",
     sentence: "Statac's Markdown reads `{:toc}` as words: take it and the list above it out. A \
                template can show the page's headings from `page.toc`, as \
                https://statac.dev/templates/#what-a-template-sees describes.",
 };
 
-pub static EXTENSIONS: FindingKind = FindingKind {
+pub(super) static EXTENSIONS: FindingKind = FindingKind {
     heading: "Extension blocks",
     sentence: "Statac's Markdown reads `{::name}` as words, so each shows on the page as written: \
                read each page that has one, and take it out or write what it stood for, such \
                as an HTML comment for `{::comment}`.",
 };
 
-pub static ABBREVIATIONS: FindingKind = FindingKind {
+pub(super) static ABBREVIATIONS: FindingKind = FindingKind {
     heading: "Abbreviations",
     sentence: "Statac's Markdown has no abbreviations, so each of these lines shows on the page \
                as words: take it out, or write each abbreviation as an `<abbr>`.",
 };
 
-pub static MARKDOWN_IN_HTML: FindingKind = FindingKind {
+pub(super) static MARKDOWN_IN_HTML: FindingKind = FindingKind {
     heading: "Markdown inside HTML",
     sentence: "Jekyll read the Markdown inside each of these tags, as `markdown=\"1\"` asks, and \
                Statac's Markdown leaves what is inside HTML as it is, so the Markdown there shows \
                as written: take off the HTML round it, or write what is inside as HTML.",
 };
 
-pub static INLINE_MATHS: FindingKind = FindingKind {
+pub(super) static INLINE_MATHS: FindingKind = FindingKind {
     heading: "Maths between two dollar signs inside a line",
     sentence: "Jekyll set these inside the line, and Statac sets maths between `$$` apart on a \
                line of its own: read each page that has one, and write the maths with one `$` \
                either side to keep it inside the line.",
 };
 
-pub static NOT_A_POST: FindingKind = FindingKind {
+pub(super) static NOT_A_POST: FindingKind = FindingKind {
     heading: "Files in `_posts` that aren't posts",
     sentence: "Jekyll publishes a post only from a file with front matter named as \
                `2026-10-04-title.md`, so it didn't publish these, and Statac left them: bring \
                each across by hand if it is wanted.",
 };
 
-pub static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
+pub(super) static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
     heading: "Front matter Statac can't read",
     sentence: "Statac's YAML reader stopped in the front matter of each of these, so the page \
                didn't come across: put the YAML right and import again.",
 };
 
-pub static DATA_LEFT: FindingKind = FindingKind {
+pub(super) static DATA_LEFT: FindingKind = FindingKind {
     heading: "Data files left behind",
     sentence: "Statac reads data files written in YAML or JSON only, so these weren't copied: \
                write each as YAML or JSON in `data/`.",
 };
 
-pub static SETTINGS_LEFT: FindingKind = FindingKind {
+pub(super) static SETTINGS_LEFT: FindingKind = FindingKind {
     heading: "Settings with no equal",
     sentence: "Statac has no equal for each of these settings or plugins, so nothing came across \
                for them: https://statac.dev/settings/ says what Statac offers.",
 };
 
-pub static UNPUBLISHED: FindingKind = FindingKind {
+pub(super) static UNPUBLISHED: FindingKind = FindingKind {
     heading: "Pages Jekyll didn't publish",
     sentence: "Each of these is in a folder of pages Jekyll's settings kept from being published, \
                so it came across with `draft: true`: take that line out of each you want \
                published.",
 };
 
-pub static NUMBER_LEFT: FindingKind = FindingKind {
+pub(super) static NUMBER_LEFT: FindingKind = FindingKind {
     heading: "Values Jekyll read as numbers",
     sentence: "Jekyll read each of these as a number other than its figures say, as an older \
                reading of YAML does, and Statac kept it as the text it is: write the number you \
                mean.",
 };
 
-pub static ADDRESS_UNKNOWN: FindingKind = FindingKind {
+pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
     heading: "Addresses Statac couldn't work out",
     sentence: "Each of these pages has a `permalink` holding a placeholder Statac doesn't know, so \
                its old address wasn't worked out or kept: give the page a `permalink` of the \
@@ -250,7 +250,7 @@ pub static ADDRESS_UNKNOWN: FindingKind = FindingKind {
 
 /// Whether `folder` holds a Jekyll site: a settings file Jekyll reads at
 /// its top.
-pub fn owns(folder: &Path) -> bool {
+pub(super) fn owns(folder: &Path) -> bool {
     SETTINGS_FILES
         .iter()
         .any(|name| inside::a_settings_file(folder, name))
@@ -491,7 +491,7 @@ fn has_front_matter(bytes: &[u8]) -> bool {
 
 /// Reads the site in `folder`, for a new site with the starter where
 /// `starter` says.
-pub fn read(
+pub(super) fn read(
     folder: &Path,
     today: Date,
     given: Option<&str>,

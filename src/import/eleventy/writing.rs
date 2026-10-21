@@ -21,7 +21,7 @@ use super::{ATTRIBUTES, EXCERPT_LEFT, HTML_SHOWN, LINK_NOT_MADE, TAG_IN_CODE, TA
 
 /// The language a page's tags are written in.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Engine {
+pub(super) enum Engine {
     Liquid,
     Nunjucks,
     /// None ran, or one whose tags Statac doesn't read.
@@ -29,7 +29,7 @@ pub enum Engine {
 }
 
 /// What the writing is converted with.
-pub struct Context<'a> {
+pub(super) struct Context<'a> {
     /// Whether the new site has the starter, whose snippets a call names
     /// or is kept clear of.
     pub starter: bool,
@@ -51,7 +51,7 @@ pub struct Context<'a> {
 
 /// A snippet call put in place of an include or a tag of the site's own.
 #[derive(Clone, Debug)]
-pub struct Call {
+pub(super) struct Call {
     pub snippet: String,
     /// What it stands for, as the snippet's comment says it: ``include
     /// `note.html` `` or ``tag `image` ``.
@@ -66,7 +66,7 @@ pub struct Call {
 }
 
 /// The writing converted, with what didn't convert.
-pub struct Converted {
+pub(super) struct Converted {
     pub writing: String,
     pub findings: Vec<Finding>,
     pub calls: Vec<Call>,
@@ -259,7 +259,7 @@ fn own_name(name: &str) -> bool {
 
 /// The names of the tags of the site's own in `body` that wrap writing:
 /// each with its `end` tag after it.
-pub fn paired(body: &str) -> Vec<String> {
+pub(super) fn paired(body: &str) -> Vec<String> {
     let mut names = Vec::new();
     let mut at = 0;
     while let Some(found) = body[at..].find("{%") {
@@ -289,7 +289,7 @@ enum Open {
 
 /// Converts the writing of `file`, whose first line is line `first_line`
 /// of the file.
-pub fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
+pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
     let line_of = |at: usize| first_line + body[..at].matches('\n').count();
     let spot = |at: usize, text: &str| Spot {
         file: file.to_owned(),

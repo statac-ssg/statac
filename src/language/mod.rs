@@ -22,10 +22,10 @@ use crate::origin::Sourced;
 use crate::problem::{Kind, Problem};
 use crate::source::Sources;
 
-pub use read::{KEYS, read, read_onto};
+pub(crate) use read::{read, read_onto};
 
 /// Where a site keeps its languages.
-pub const FOLDER: &str = "languages";
+pub(crate) const FOLDER: &str = "languages";
 
 /// Which way a language's lines run.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
@@ -88,7 +88,7 @@ pub struct Words {
 }
 
 /// The kinds of callout, in the order a language file gives their words.
-pub const CALLOUTS: [&str; 5] = ["note", "tip", "important", "warning", "caution"];
+pub(crate) const CALLOUTS: [&str; 5] = ["note", "tip", "important", "warning", "caution"];
 
 impl Words {
     /// No words, on lines running the way the language `tag` is written.
@@ -132,7 +132,7 @@ const BUNDLED: &[(&str, &str)] = &[
 ];
 
 /// Statac's own words for `tag`, matched whole and ignoring case.
-pub fn bundled(tag: &str) -> Option<(&'static str, Arc<Words>)> {
+pub(crate) fn bundled(tag: &str) -> Option<(&'static str, Arc<Words>)> {
     static READ: OnceLock<Vec<Arc<Words>>> = OnceLock::new();
     let read = READ.get_or_init(|| {
         BUNDLED
@@ -153,10 +153,10 @@ pub fn bundled(tag: &str) -> Option<(&'static str, Arc<Words>)> {
 }
 
 /// The code of English, the language of a site naming none.
-pub const ENGLISH: &str = "en";
+pub(crate) const ENGLISH: &str = "en";
 
 /// English, the words a site naming no language is written in.
-pub fn english() -> Arc<Words> {
+pub(crate) fn english() -> Arc<Words> {
     bundled(ENGLISH).expect("English is bundled").1
 }
 
@@ -192,7 +192,7 @@ impl Language {
 
 /// The files in a site's `languages/` folder.
 #[derive(Clone, Default, Debug)]
-pub struct Languages {
+pub(crate) struct Languages {
     /// Each file's name, and where it really is under `real`.
     files: Vec<(String, String)>,
     /// The site's real path.
@@ -202,7 +202,7 @@ pub struct Languages {
 impl Languages {
     /// Lists the language files of the site at `root`. A link is followed
     /// only where it stays inside the site.
-    pub fn find(root: &Path, problems: &mut Vec<Problem>) -> Languages {
+    pub(crate) fn find(root: &Path, problems: &mut Vec<Problem>) -> Languages {
         let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
         let mut files: Vec<(String, String)> =
             crate::assets::walk(root, &real, FOLDER, false, problems)
@@ -215,7 +215,7 @@ impl Languages {
 
     /// The language a site names by `tag`, its file read into `sources`.
     /// A tag with no words at all is said once, at the tag.
-    pub fn language(
+    pub(crate) fn language(
         &self,
         tag: Option<Sourced<&str>>,
         sources: &mut Sources,

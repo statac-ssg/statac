@@ -73,7 +73,7 @@ fn page_name(site: &Site, id: PageId) -> String {
 }
 
 impl Reading {
-    pub fn of(renderer: Renderer) -> Reading {
+    pub(super) fn of(renderer: Renderer) -> Reading {
         let site = renderer.site();
         let pages: Vec<String> = (site.pages.iter())
             .map(|(id, _)| page_name(site, id))
@@ -133,7 +133,7 @@ impl Reading {
     }
 
     /// The ids of this reading as `later` has them.
-    pub fn to(&self, later: &Reading) -> Translation {
+    pub(super) fn to(&self, later: &Reading) -> Translation {
         /// Where each of `was` is among `now`, by name; none for a name
         /// `now` gives to two.
         fn places(was: &[String], now: &[String]) -> impl Iterator<Item = Option<usize>> {
@@ -338,7 +338,7 @@ pub(super) struct Prints {
 
 impl Prints {
     /// The prints of `reading`, which began once `clock` was read.
-    pub fn new(reading: &Reading, clock: Option<Clock>) -> Prints {
+    pub(super) fn new(reading: &Reading, clock: Option<Clock>) -> Prints {
         let (pages, lists) = (reading.pages.len(), reading.lists.len());
         let languages = reading.renderer.site().languages.len();
         Prints {
@@ -415,7 +415,7 @@ impl Taken<'_> {
     /// settings, its languages and its cards; which templates, data
     /// files, assets and languages the site has; what its cards are drawn
     /// with; which files a link publishes; and how it is asked to build.
-    pub fn whole(&self, plan: &Plan, options: &Options) -> u64 {
+    pub(super) fn whole(&self, plan: &Plan, options: &Options) -> u64 {
         let reading = self.reading;
         let renderer = &reading.renderer;
         let sources = renderer.sources();
@@ -450,7 +450,7 @@ impl Taken<'_> {
     }
 
     /// What `output` is built from besides what it reads.
-    pub fn own(&self, output: Output) -> u64 {
+    pub(super) fn own(&self, output: Output) -> u64 {
         let renderer = &self.reading.renderer;
         let site = renderer.site();
         let sources = renderer.sources();
@@ -486,7 +486,7 @@ impl Taken<'_> {
     /// otherwise, `to` carrying `was`'s ids here. A setting or a language
     /// prints as nothing, the whole site's fingerprint covering it, so it
     /// is taken as changed where the file its words are in is.
-    pub fn changed(
+    pub(super) fn changed(
         &self,
         was: &Taken<'_>,
         to: &Translation,
@@ -511,7 +511,7 @@ impl Taken<'_> {
     }
 
     /// The fingerprint of what the reading holds under `key`.
-    pub fn of(&self, key: Key) -> u64 {
+    pub(super) fn of(&self, key: Key) -> u64 {
         let reading = self.reading;
         let prints = self.prints;
         let renderer = &reading.renderer;

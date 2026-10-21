@@ -57,7 +57,7 @@ pub fn split(text: &str) -> Result<Split, Unclosed> {
 /// The opening `+++` line of a file whose front matter is written
 /// between `+++` lines, as another tool writes it, after any byte-order
 /// mark.
-pub fn plus_opening(text: &str) -> Option<Span> {
+pub(super) fn plus_opening(text: &str) -> Option<Span> {
     let start = if text.starts_with('\u{feff}') {
         '\u{feff}'.len_utf8()
     } else {

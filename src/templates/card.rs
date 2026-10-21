@@ -243,7 +243,7 @@ pub(super) struct Room {
 }
 
 impl Room {
-    pub fn new(cards: &Cards, pages: usize) -> Room {
+    pub(super) fn new(cards: &Cards, pages: usize) -> Room {
         Room {
             kits: std::iter::repeat_with(OnceLock::new)
                 .take(cards.described.len())

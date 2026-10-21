@@ -3,7 +3,7 @@
 //! lines.
 
 /// The bytes `text` spells, or none where it isn't base64.
-pub fn decode(text: &str) -> Option<Vec<u8>> {
+pub(super) fn decode(text: &str) -> Option<Vec<u8>> {
     let digits: Vec<u8> = text
         .bytes()
         .filter(|b| !matches!(b, b' ' | b'\t' | b'\r' | b'\n'))

@@ -10,7 +10,7 @@ use crate::source::Sources;
 use crate::yaml::Value as Yaml;
 
 /// The settings files Eleventy reads, the first found.
-pub const FILES: [&str; 4] = [
+pub(super) const FILES: [&str; 4] = [
     ".eleventy.js",
     "eleventy.config.js",
     "eleventy.config.mjs",
@@ -19,7 +19,7 @@ pub const FILES: [&str; 4] = [
 
 /// Whether `folder` holds an Eleventy site: a settings file, or a
 /// `package.json` that names Eleventy among what it needs.
-pub fn owns(folder: &Path) -> bool {
+pub(super) fn owns(folder: &Path) -> bool {
     FILES
         .iter()
         .any(|name| inside::a_settings_file(folder, name))
@@ -35,7 +35,7 @@ fn needs_eleventy(folder: &Path) -> bool {
 /// Whether the folder's `package.json` names among its dependencies what
 /// sets maths written between dollar signs: a package with KaTeX,
 /// MathJax or TeX maths in its name.
-pub fn sets_maths(folder: &Path) -> bool {
+pub(super) fn sets_maths(folder: &Path) -> bool {
     needs(folder, &|name| {
         let name = name.to_ascii_lowercase();
         ["katex", "mathjax", "texmath", "markdown-it-math"]
@@ -191,14 +191,14 @@ fn pieces(text: &str) -> Vec<Piece> {
 
 /// A value the settings give, with the line it is on.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Given<T> {
+pub(super) struct Given<T> {
     pub value: T,
     pub line: usize,
 }
 
 /// One of `dir`'s folders.
 #[derive(Clone, PartialEq, Debug)]
-pub enum Folder {
+pub(super) enum Folder {
     /// Written in quotes.
     Plain(Given<String>),
     /// Written some other way, such as by a name.
@@ -208,7 +208,7 @@ pub enum Folder {
 /// A file or folder `addPassthroughCopy` names, and where it goes in the
 /// built site where the settings say.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Copy {
+pub(super) struct Copy {
     pub from: String,
     pub to: Option<String>,
     pub line: usize,
@@ -218,7 +218,7 @@ pub struct Copy {
 
 /// What the settings' text shows.
 #[derive(Default, Debug)]
-pub struct Settings {
+pub(super) struct Settings {
     /// The settings file read, where there is one.
     pub file: Option<String>,
     /// Whether a `dir` was found at all.
@@ -259,7 +259,7 @@ pub struct Settings {
 impl Settings {
     /// The path the old site was published under, from `pathPrefix`, as
     /// `/blog`; empty at the top of its host.
-    pub fn base(&self) -> String {
+    pub(super) fn base(&self) -> String {
         let written = self.path_prefix.as_ref().map(|given| given.value.trim());
         match written.map(|written| written.trim_matches('/')) {
             Some(path) if !path.is_empty() => format!("/{path}"),
@@ -290,7 +290,7 @@ const OTHER_SETTINGS: &[&str] = &[
 
 /// Reads the settings file `name` of `folder`, already found to be a file
 /// reached through no link that leads outside the old site.
-pub fn read(folder: &Path, name: &str) -> std::io::Result<Settings> {
+pub(super) fn read(folder: &Path, name: &str) -> std::io::Result<Settings> {
     let text = std::fs::read_to_string(inside::path(folder, name))?;
     let mut settings = scan(&text);
     settings.file = Some(name.to_owned());

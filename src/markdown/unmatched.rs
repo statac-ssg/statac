@@ -278,7 +278,7 @@ pub(super) struct Elements {
 
 impl Elements {
     /// Reads on through `html`, which starts at `at` in the masked text.
-    pub fn read(&mut self, html: &str, at: usize) {
+    pub(super) fn read(&mut self, html: &str, at: usize) {
         let joined;
         let (text, carried, from) = match self.partial.take() {
             Some((partial, from)) => {
@@ -358,7 +358,7 @@ impl Elements {
     }
 
     /// Reads a tag a block of HTML ended inside as ending there.
-    pub fn settle(&mut self) {
+    pub(super) fn settle(&mut self) {
         let Some((text, from)) = self.partial.take() else {
             return;
         };
@@ -371,7 +371,7 @@ impl Elements {
 
     /// Opens `block`, `level` deep in the writing. Every block Markdown
     /// writes closes a paragraph open round it, as a `<div>` does.
-    pub fn enclose(&mut self, block: Block, level: usize) {
+    pub(super) fn enclose(&mut self, block: Block, level: usize) {
         self.close_paragraph();
         self.stack.push(Opened {
             name: String::new(),
@@ -384,7 +384,7 @@ impl Elements {
     /// Closes the block `level` deep in the writing, and what is opened
     /// inside it, unless an element open inside it keeps its end tag from
     /// reaching it.
-    pub fn unenclose(&mut self, level: usize) {
+    pub(super) fn unenclose(&mut self, level: usize) {
         let found = (self.stack.iter()).rposition(|opened| match opened.holds {
             Holds::Block(_, at) => at == level,
             _ => false,
@@ -413,7 +413,7 @@ impl Elements {
     /// The innermost element the raw HTML holds open, by its name as
     /// written, other than one a browser closes by itself; none inside a
     /// comment or a text element, which takes in what follows.
-    pub fn holding(&self) -> Option<&str> {
+    pub(super) fn holding(&self) -> Option<&str> {
         if self.stack.last().is_some_and(Opened::swallows) {
             return None;
         }
@@ -425,7 +425,7 @@ impl Elements {
     /// Every tag told, at its place in the masked text; and what a
     /// paragraph at the top of the writing left open and closed for it,
     /// which reaches past a value shown as that paragraph's words alone.
-    pub fn finish(mut self) -> (Vec<Told>, Vec<Told>) {
+    pub(super) fn finish(mut self) -> (Vec<Told>, Vec<Told>) {
         self.settle();
         // A comment or a text element left open takes in everything after
         // it: the end tags of what is open below it too.

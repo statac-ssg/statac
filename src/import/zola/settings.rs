@@ -11,11 +11,11 @@ use super::slug::Strategy;
 use crate::problem::{Kind, Problem, Reason};
 
 /// The settings files Zola reads at the top of a site, the first found.
-pub const FILES: &[&str] = &["zola.toml", "config.toml"];
+pub(super) const FILES: &[&str] = &["zola.toml", "config.toml"];
 
 /// Whether `folder` holds a Zola site, by its settings: a `zola.toml`, or
 /// a `config.toml` that sets `base_url`, which Zola can't do without.
-pub fn owns(folder: &Path) -> bool {
+pub(super) fn owns(folder: &Path) -> bool {
     inside::a_settings_file(folder, "zola.toml")
         || inside::a_settings_file(folder, "config.toml")
             .then(|| std::fs::read_to_string(inside::path(folder, "config.toml")).ok())
@@ -25,7 +25,7 @@ pub fn owns(folder: &Path) -> bool {
 }
 
 /// The settings file Zola reads in `folder`, with its fields.
-pub fn found(folder: &Path) -> Result<(String, Vec<Field>), Box<Failed>> {
+pub(super) fn found(folder: &Path) -> Result<(String, Vec<Field>), Box<Failed>> {
     let name = FILES
         .iter()
         .find(|name| inside::a_settings_file(folder, name))
@@ -50,7 +50,7 @@ pub fn found(folder: &Path) -> Result<(String, Vec<Field>), Box<Failed>> {
 
 /// A list of terms the settings declare.
 #[derive(Clone, Debug)]
-pub struct Taxonomy {
+pub(super) struct Taxonomy {
     pub name: String,
     pub paginate_by: Option<u64>,
     pub feed: bool,
@@ -59,7 +59,7 @@ pub struct Taxonomy {
 
 /// A language the settings declare besides the main one.
 #[derive(Clone, Debug)]
-pub struct Language {
+pub(super) struct Language {
     pub code: String,
     pub title: Option<String>,
     pub feeds: Option<bool>,
@@ -69,7 +69,7 @@ pub struct Language {
 
 /// What the settings say.
 #[derive(Debug)]
-pub struct Settings {
+pub(super) struct Settings {
     pub base_url: Option<String>,
     pub title: Option<String>,
     pub default_language: String,
@@ -104,7 +104,7 @@ pub struct Settings {
 }
 
 /// The field `name` of a table.
-pub fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a Value> {
+pub(super) fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a Value> {
     fields.iter().find(|(n, _)| n == name).map(|(_, v)| v)
 }
 
@@ -153,7 +153,7 @@ fn generate_feeds(table: &[(String, Value)]) -> Option<bool> {
 }
 
 /// What `entries` say.
-pub fn settle(entries: &[Field]) -> Settings {
+pub(super) fn settle(entries: &[Field]) -> Settings {
     let mut s = Settings {
         base_url: None,
         title: None,

@@ -46,11 +46,11 @@ use files::{File, Role, Snippet};
 pub(crate) use files::{SNIPPETS, TEMPLATES};
 pub(crate) use values::{Answering, SEARCH_BOX, of_the_front, writes};
 
-pub use card::{Asked, Gathered};
-pub use indent::Own;
-pub use layout::Chosen;
-pub use render::{Cut, REDIRECT, Rendered, Renderer, developed};
-pub use shows::{Explained, Group, Held, Holds, Member, Neighbour, Reached, Row};
+pub(crate) use card::{Asked, Gathered};
+pub(crate) use indent::Own;
+pub(crate) use layout::Chosen;
+pub(crate) use render::{Renderer, developed};
+pub(crate) use shows::{Explained, Held, Holds, Neighbour, Reached, Row};
 
 /// The site's templates and snippets, read and checked, ready to build
 /// pages with.
@@ -149,7 +149,7 @@ impl Templates {
 /// Reads the templates and snippets of the site at `root`, checks them
 /// and the texts of `cards` against what the site has, and makes them
 /// ready to build with.
-pub fn read(
+pub(crate) fn read(
     root: &Path,
     sources: &mut Sources,
     site: &Site,
@@ -381,7 +381,7 @@ fn landings(
 /// How many of the engine's steps building one output may take: enough
 /// for any site, and few enough that a loop that never ends is stopped
 /// in seconds.
-pub const STEPS: u64 = 100_000_000;
+pub(crate) const STEPS: u64 = 100_000_000;
 
 /// The steps a test lowers [`STEPS`] to for the site at a root.
 #[cfg(not(test))]

@@ -12,9 +12,9 @@
 //! line is the author's own; a line whose file has gone is dropped the
 //! next time the record is written.
 
-pub mod mentions;
-pub mod refused;
-pub mod stills;
+pub(crate) mod mentions;
+pub(crate) mod refused;
+pub(crate) mod stills;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -24,10 +24,10 @@ use crate::problem::{Kind, Problem, Reason, RecordFault};
 use crate::source::{Place, SourceId, Sources, Span};
 
 /// The folder at the top of the site.
-pub const FOLDER: &str = "fetched";
+pub(crate) const FOLDER: &str = "fetched";
 
 /// The record's name in the folder.
-pub const RECORD: &str = "record";
+pub(crate) const RECORD: &str = "record";
 
 const OPENING: &str = "statac fetched 1";
 
@@ -58,13 +58,13 @@ pub struct Record {
 }
 
 /// What the record keeps of `bytes`.
-pub fn hash_of(bytes: &[u8]) -> String {
+pub(crate) fn hash_of(bytes: &[u8]) -> String {
     blake3::hash(bytes).to_hex()[..HASHED].to_owned()
 }
 
 /// A file under `fetched/` as a build's record of reads knows it, by its
 /// path there.
-pub fn key(path: &str) -> u64 {
+pub(crate) fn key(path: &str) -> u64 {
     let hash = blake3::hash(path.as_bytes());
     let mut opening = [0; 8];
     opening.copy_from_slice(&hash.as_bytes()[..8]);
@@ -259,14 +259,14 @@ fn days_between(from: &Date, to: &Date) -> Option<i64> {
 }
 
 /// The record as a problem names it, from the site's folder.
-pub fn record_shown() -> String {
+pub(crate) fn record_shown() -> String {
     format!("{FOLDER}/{RECORD}")
 }
 
 /// Reads the site's `fetched/` as `content/` is read: only what is inside
 /// it, a link followed only where it stays inside. A site with none has
 /// nothing fetched, and nothing is said of it.
-pub fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>) {
+pub(crate) fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>) {
     let mut problems = Vec::new();
     let real = std::fs::canonicalize(site).unwrap_or_else(|_| site.to_path_buf());
     let mut fetched = Fetched::default();
