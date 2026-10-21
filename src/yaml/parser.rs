@@ -6,9 +6,9 @@ use std::ops::Range;
 
 use granit_parser::{ErrorKind, Event as Granit, Parser, ScalarStyle, ScanError, StrInput};
 
-use super::Malformed;
 use super::tree::Tag;
 use crate::origin::Style;
+use crate::problem::Malformed;
 
 /// Spans are byte ranges in the text handed to `Events::new`.
 pub(super) enum Event {

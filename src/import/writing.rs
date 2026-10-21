@@ -14,7 +14,8 @@
 //! code, and meant nothing to the tool the writing came from. Each one a
 //! reader didn't write itself is escaped, `\@name(`, and shows as it did.
 
-use crate::markdown::{self, Document, Kind, Malformed, Node};
+use crate::markdown::{self, Document, Kind, Node};
+use crate::problem::CallFault;
 use crate::problem::{Kind as ProblemKind, MoreAt, WrongPlace};
 use crate::source::{Sources, Span};
 
@@ -439,7 +440,7 @@ fn calls_read(document: &Document, writing: &str, own: &[usize]) -> Vec<usize> {
         match fault {
             // Placed at the quote, inside the call it is the nearest `@`
             // before.
-            Malformed::UnclosedQuote(_) | Malformed::TextAfterQuote => {
+            CallFault::UnclosedQuote(_) | CallFault::TextAfterQuote => {
                 found.extend(writing[..at].rfind('@'));
             }
             _ => found.push(at),

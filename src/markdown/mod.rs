@@ -42,65 +42,11 @@ pub use node::{Alignment, CalloutKind, Kind, Node};
 pub use opening::{Written, as_written, closed_up, lines_of, references_read, words_of};
 pub use pieces::{Piece, PieceValue, language_word};
 pub use questions::{Heading, Link, has_callout, headings, links, plain_text, uses_maths};
-pub use read::DEEPEST_NESTING;
 pub use typography::{Typography, set_typography, set_words};
 
+use crate::problem::CallFault;
 use crate::problem::{Kind as ProblemKind, Problem, PublishedAsText};
 use crate::source::{Place, SourceId, Sources, Span};
-
-/// A snippet call Statac can't read, placed at the exact text.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Malformed {
-    /// `@name(` with no `)` before the paragraph ends, as written.
-    Unclosed(String),
-    /// A quote opening a value that doesn't close on its line.
-    UnclosedQuote(char),
-    TextAfterQuote,
-    /// A name in letters a snippet's name can't hold, as written.
-    Name(String),
-    /// A call on a line of its own to a snippet that wraps writing, with no
-    /// `@end` after it, by the snippet's name.
-    NoEnd(String),
-    /// An `@end` with no call open for it to close.
-    StrayEnd,
-    /// A call to a snippet that wraps writing, somewhere other than on a
-    /// line of its own, by the snippet's name.
-    WrapsNothing(String),
-    /// An `@url(...)` handed anything but one address from the top of the
-    /// site.
-    NotOneAddress,
-}
-
-/// Maths Statac can't make MathML of, placed at the exact text. What is
-/// quoted is as written.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum MathsFault {
-    UnknownCommand(String),
-    UnknownEnvironment(String),
-    UnknownColour(String),
-    /// What opens a group the maths never closes, `{` or `\begin{cases}`,
-    /// and what would close it. None where the opening can't be found.
-    Unclosed {
-        opening: Option<String>,
-        closing: String,
-    },
-    /// A `}`, `\end{...}` or `\right` with nothing open for it to close.
-    ClosesNothing(String),
-    /// An `\end{...}` closing another environment, and the one it should be.
-    Mismatched {
-        written: String,
-        expected: String,
-    },
-    /// A command short of what it takes, found at what comes next: a `}`,
-    /// an `\end{...}`, or the closing dollars.
-    MissingBefore(String),
-    /// A second `^` or `_` on one thing.
-    Twice(char),
-    /// An `\eqref` to a label no equation on the page has.
-    NoSuchLabel(String),
-    /// Anything else, by what stands where Statac stopped.
-    Unreadable(String),
-}
 
 /// What each snippet does with the writing a call stands above: `Some(true)`
 /// for one that wraps it up to an `@end`, `Some(false)` for one that
@@ -184,7 +130,7 @@ const TOLD_OF_A_VALUE: &[crate::problem::Code] = &[
 /// the wrong thing is told.
 pub fn told_of_a_value(kind: &ProblemKind) -> bool {
     let not_one_address = ProblemKind::MalformedCall {
-        found: Malformed::NotOneAddress,
+        found: CallFault::NotOneAddress,
     };
     TOLD_OF_A_VALUE.contains(&kind.code()) || *kind == not_one_address
 }

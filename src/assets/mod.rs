@@ -14,8 +14,6 @@ mod js;
 mod proportion;
 mod sass;
 
-pub use sass::{SassFault, SassType};
-
 use std::borrow::Cow;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};

@@ -414,7 +414,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
         let said = match request {
             Request::Build(_) | Request::Serve { .. } => {
                 let outcome = Outcome::unread(problem);
-                said_of_build(&report, &outcome, Path::new(""), Duration::ZERO)
+                report.of_build(&outcome, Path::new(""), Duration::ZERO)
             }
             Request::Stamp(_) | Request::Search(_) => report.problems(&[problem]),
             _ => report.check(&[problem], &Quiet::default()),
@@ -437,7 +437,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             let said = match options.mode {
                 Mode::Build => {
                     let took = started.elapsed().saturating_sub(outcome.waited);
-                    said_of_build(&report, &outcome, &options.out(), took)
+                    report.of_build(&outcome, &options.out(), took)
                 }
                 Mode::Check => {
                     // A stopped run leaves pages out, so what it carries is unknown.
@@ -626,31 +626,6 @@ fn find_site(site: &mut PathBuf) -> Result<(), Problem> {
         }
     }
     Err(no_site(".".into()))
-}
-
-/// What `build` says of a build into `out` that took `took`: its errors
-/// in full, the rest counted, and what it wrote.
-pub(crate) fn said_of_build(
-    report: &Report,
-    outcome: &Outcome,
-    out: &Path,
-    took: Duration,
-) -> String {
-    let problems = &outcome.problems;
-    let mut said = report.build(problems, &outcome.quiet);
-    let wrote = report.wrote(problems, outcome.published, out, took);
-    let part = format!(
-        "{}{}{}{}{wrote}",
-        report.copies(outcome.copies),
-        report.cards(outcome.cards),
-        report.hooks(outcome.hooks),
-        report.fetched(outcome.fetched)
-    );
-    if !said.is_empty() && !part.is_empty() {
-        said.push('\n');
-    }
-    said.push_str(&part);
-    said
 }
 
 /// The relay's token for the site at `site`, from the environment or the

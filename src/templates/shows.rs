@@ -18,6 +18,7 @@ use super::values::{self, Lists, PageValue, SiteValue};
 use super::{Chosen, Renderer};
 use crate::content::words::PageWord;
 use crate::language::Direction;
+use crate::problem::Holds;
 use crate::site::{DataId, NameId, PageId};
 use crate::source::{Place, SourceId};
 
@@ -99,27 +100,6 @@ pub enum Reached {
     Site(NameId),
     /// Any of these files under `data/`.
     Data(Vec<DataId>),
-}
-
-/// The kind of thing a name holds.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Holds {
-    Text,
-    Html,
-    Number,
-    Truth,
-    Date,
-    Page,
-    Pages,
-    /// One of the site's lists, as a tag or a folder is.
-    List,
-    Lists,
-    /// Any other list of things.
-    Items,
-    Fields,
-    Mentions,
-    Call,
-    Unknown,
 }
 
 impl Holds {

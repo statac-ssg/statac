@@ -1930,7 +1930,7 @@ impl markdown::Snippets for Prose<'_> {
                 frame::with(|frame| {
                     frame.problems.push(Problem::at(
                         Kind::MalformedCall {
-                            found: markdown::Malformed::WrapsNothing(name.clone()),
+                            found: crate::problem::CallFault::WrapsNothing(name.clone()),
                         },
                         place,
                     ))

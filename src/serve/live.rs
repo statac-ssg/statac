@@ -12,16 +12,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::panel::Panel;
 use crate::json;
-
-/// What one round asks of the pages already open.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Told {
-    /// No built file changed.
-    Nothing,
-    /// Only stylesheets changed: the address each was at, and is at now.
-    Styles(Vec<(String, String)>),
-    Reload,
-}
+use crate::problem::Told;
 
 /// How the site stands after a round, for the page to show.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]

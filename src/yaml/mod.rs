@@ -15,50 +15,11 @@ mod tree;
 pub mod write;
 
 pub use front_matter::{Split, Unclosed, split};
-pub use json::JsonFault;
 pub use schema::{Resolved, keeps_characters, resolve};
-pub use tree::{ALIAS_LIMIT, ALIAS_TEXT_LIMIT, Entry, Node, Repeated, Tag, Value};
+pub use tree::{ALIAS_LIMIT, ALIAS_TEXT_LIMIT, Entry, Node, Tag, Value};
 
 use crate::problem::{Kind, Problem, Word};
 use crate::source::{Place, SourceId, Sources, Span};
-
-/// What the parser found where the YAML stops making sense.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Malformed {
-    /// Placed at the opening quote, not where the parser gave up.
-    UnclosedQuote(char),
-    /// A later line of a text in quotes that does close, standing too far
-    /// left for the reader to take as more of the text. Placed at the
-    /// line: the quote opens `back` bytes before it, and `spaces` before
-    /// each later line are enough.
-    ShallowLine {
-        quote: char,
-        back: usize,
-        spaces: usize,
-    },
-    UnclosedBracket(char),
-    MismatchedBracket {
-        open: char,
-        close: char,
-    },
-    /// An escape in double quotes YAML doesn't define, as written (`\q`).
-    UnknownEscape(String),
-    TextAfterQuote,
-    Indentation,
-    Tab,
-    /// An alias to no anchor, as written (`*name`).
-    UnknownAnchor(String),
-    SecondDocument,
-    TooDeep,
-    EndsEarly,
-    /// A character YAML allows nowhere, such as a C1 control left by text
-    /// saved in an old encoding.
-    ControlCharacter(char),
-    /// Text the parser couldn't place, as written.
-    Unexpected(String),
-    /// A value tagged `!!binary` that isn't base64.
-    NotBase64,
-}
 
 /// Whether a later line of a text in quotes, `line` after its `spaces`,
 /// standing no deeper than the line the text opens on, is surely more of

@@ -2,15 +2,10 @@
 //! video's place until a reader presses play, fetched once into
 //! `fetched/stills/` and named after the video.
 
+use crate::problem::Host;
+
 /// The folder under `fetched/` stills are kept in.
 pub(crate) const FOLDER: &str = "stills";
-
-/// A site that keeps videos.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub enum Host {
-    YouTube,
-    Vimeo,
-}
 
 impl Host {
     pub fn site(self) -> &'static str {

@@ -1443,14 +1443,14 @@ fn a_call_that_wraps_writing_hands_it_to_the_snippet_as_body() {
     assert_eq!(
         rendered.problems[0].kind,
         Kind::MalformedCall {
-            found: crate::markdown::Malformed::WrapsNothing("box".into())
+            found: crate::problem::CallFault::WrapsNothing("box".into())
         }
     );
     let rendered = built.render("post-3.md");
     assert_eq!(
         rendered.problems[0].kind,
         Kind::MalformedCall {
-            found: crate::markdown::Malformed::NoEnd("box".into())
+            found: crate::problem::CallFault::NoEnd("box".into())
         }
     );
     assert_eq!(rendered.html, None);
@@ -5826,7 +5826,7 @@ fn an_address_inside_the_site_handed_something_else_is_told() {
     ]);
     assert!(built.problems.is_empty(), "{:?}", built.problems);
     let rendered = built.render("post-1.md");
-    let found = crate::markdown::Malformed::NotOneAddress;
+    let found = crate::problem::CallFault::NotOneAddress;
     for problem in &rendered.problems {
         assert_eq!(
             problem.kind,

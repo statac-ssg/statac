@@ -1,4 +1,5 @@
 use super::*;
+use crate::problem::SassFault;
 
 /// A site folder in the system's temporary folder, removed when dropped.
 struct Site(PathBuf);

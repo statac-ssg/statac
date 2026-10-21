@@ -8,37 +8,12 @@ use std::ops::Range;
 
 use super::tree::{Entry, Node, Value};
 use crate::origin::Style;
+use crate::problem::JsonFault;
 use crate::problem::{Kind, Problem};
 use crate::source::{Place, Span};
 
 /// How deeply lists and objects may nest, as YAML's reader allows.
 const DEPTH: usize = 256;
-
-/// What is wrong with some JSON, where the reader stops.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum JsonFault {
-    /// Placed at the opening quote.
-    UnclosedString,
-    UnclosedBracket(char),
-    MismatchedBracket {
-        open: char,
-        close: char,
-    },
-    /// An escape JSON doesn't define, as written (`\q`).
-    UnknownEscape(String),
-    /// Half of a pair of `\u` escapes, as written (`\ud83d`).
-    HalfCharacter(String),
-    /// A character below U+0020 written as itself in a string.
-    ControlCharacter(char),
-    /// A number JSON doesn't write that way, as written (`01`, `.5`).
-    NotANumber(String),
-    /// A comma with no value after it, before `]` or `}`.
-    TrailingComma,
-    TooDeep,
-    EndsEarly,
-    /// Text the reader couldn't place, as written.
-    Unexpected(String),
-}
 
 /// Reads `text`, the whole of the source `at` places, as one JSON value.
 pub(super) fn read(text: &str, at: Place) -> Result<Node, Problem> {

@@ -1,7 +1,7 @@
 use super::*;
 use crate::highlight::Highlighter;
 use crate::origin::Style;
-use crate::problem::{Kind as ProblemKind, Unmatched};
+use crate::problem::{CallFault, Kind as ProblemKind, MathsFault, Unmatched};
 use crate::source::{LineColumn, Place};
 
 /// Writes every call as an empty element naming it and saying where it sits.
@@ -1210,38 +1210,38 @@ fn a_colon_names_an_argument_with_a_warning() {
 
 #[test]
 fn malformed_calls_are_placed_at_the_exact_text() {
-    let cases: [(&str, Malformed, &str); 9] = [
+    let cases: [(&str, CallFault, &str); 9] = [
         (
             "A @image('a.jpg' and on.\n",
-            Malformed::Unclosed("@image(".into()),
+            CallFault::Unclosed("@image(".into()),
             "@image(",
         ),
         (
             "@image(a.jpg\n\nAfter.\n",
-            Malformed::Unclosed("@image(".into()),
+            CallFault::Unclosed("@image(".into()),
             "@image(",
         ),
         (
             "A @image(a `b` c) d.\n",
-            Malformed::Unclosed("@image(".into()),
+            CallFault::Unclosed("@image(".into()),
             "@image(",
         ),
         (
             "> @image(a,\n>\n> b)\n",
-            Malformed::Unclosed("@image(".into()),
+            CallFault::Unclosed("@image(".into()),
             "@image(",
         ),
         (
             "@image(\n",
-            Malformed::Unclosed("@image(".into()),
+            CallFault::Unclosed("@image(".into()),
             "@image(",
         ),
-        ("@image('a.jpg)\n", Malformed::UnclosedQuote('\''), "'"),
-        ("@image(\"a,\nb\")\n", Malformed::UnclosedQuote('"'), "\""),
-        ("@image('a.jpg' b, c)\n", Malformed::TextAfterQuote, "b"),
+        ("@image('a.jpg)\n", CallFault::UnclosedQuote('\''), "'"),
+        ("@image(\"a,\nb\")\n", CallFault::UnclosedQuote('"'), "\""),
+        ("@image('a.jpg' b, c)\n", CallFault::TextAfterQuote, "b"),
         (
             "Une @café(a) ici.\n",
-            Malformed::Name("café".into()),
+            CallFault::Name("café".into()),
             "@café",
         ),
     ];
@@ -2300,7 +2300,7 @@ fn definitions_are_the_pages_wherever_they_are_written() {
 
 #[test]
 fn a_call_that_wraps_writing_is_told_where_its_end_is_missing() {
-    let told = |text: &str| -> Vec<(Malformed, String)> {
+    let told = |text: &str| -> Vec<(CallFault, String)> {
         let (sources, document) = read_text(text);
         document
             .problems
@@ -2315,16 +2315,16 @@ fn a_call_that_wraps_writing_is_told_where_its_end_is_missing() {
     };
     assert_eq!(
         told("Text.\n\n@box('a')\nText.\n"),
-        [(Malformed::NoEnd("box".into()), "@box('a')".into())]
+        [(CallFault::NoEnd("box".into()), "@box('a')".into())]
     );
     assert_eq!(
         told("Text.\n\n> @end\n"),
-        [(Malformed::StrayEnd, "@end".into())]
+        [(CallFault::StrayEnd, "@end".into())]
     );
     // The inner call is told where it is, inside the writing it is in.
     assert_eq!(
         told("> @box()\n> A @x( never closed.\n> @end\n"),
-        [(Malformed::Unclosed("@x(".into()), "@x(".into())]
+        [(CallFault::Unclosed("@x(".into()), "@x(".into())]
     );
     for quiet in [
         // Told when the page is built: no snippet of that name, and a call
@@ -3154,7 +3154,7 @@ fn an_address_inside_the_site_handed_anything_else_is_told() {
             .iter()
             .map(|problem| (&problem.kind, sources.spelling(problem.place.unwrap())))
             .collect();
-        let found = Malformed::NotOneAddress;
+        let found = CallFault::NotOneAddress;
         assert_eq!(
             told,
             [(&ProblemKind::MalformedCall { found }, spelling)],
@@ -3174,7 +3174,7 @@ fn an_address_inside_the_site_handed_anything_else_is_told() {
         .iter()
         .map(|problem| (&problem.kind, sources.spelling(problem.place.unwrap())))
         .collect();
-    let found = Malformed::StrayEnd;
+    let found = CallFault::StrayEnd;
     assert_eq!(told, [(&ProblemKind::MalformedCall { found }, "@end")]);
 }
 

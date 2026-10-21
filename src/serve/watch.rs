@@ -16,6 +16,7 @@ use notify::{Config, Event, EventKind, PollWatcher, RecommendedWatcher, Recursiv
 
 use crate::disk::{Clock, Stamp};
 use crate::platform;
+use crate::problem::Because;
 use crate::problem::Reason;
 use crate::publish::MARKER;
 
@@ -59,15 +60,6 @@ pub struct Batch {
     pub rescan: bool,
     pub first_event: Instant,
     pub settled: Instant,
-}
-
-/// Why a folder is polled when polling wasn't asked for.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Because {
-    /// The folder is on a disk of this kind, which may not report changes.
-    Remote(String),
-    /// The system's reports couldn't be had, for this reason.
-    NoReports(Reason),
 }
 
 /// The watcher in use. Watching ends when this is dropped.

@@ -962,8 +962,12 @@ pub(super) fn told(shared: &Shared, asked: &Gathered) -> Vec<Problem> {
                 let font = font_here(&cards.root, &characters)
                     .map(FontWithThem::Here)
                     .or_else(|| {
-                        crate::new::update::font_to_bring(&cards.root, starter, &characters)
-                            .map(|font| FontWithThem::Brought(font.to_owned()))
+                        crate::new::update::font_to_bring(&cards.root, starter, &characters).map(
+                            |font| FontWithThem::Brought {
+                                font: font.to_owned(),
+                                path: format!("{}/{font}", crate::cards::FOLDER),
+                            },
+                        )
                     });
                 NotDrawn::NoFont {
                     more: characters.len() - named,

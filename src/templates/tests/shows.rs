@@ -3,7 +3,8 @@
 
 use super::*;
 use crate::origin::Arrival;
-use crate::templates::{Held, Holds, Reached, Row};
+use crate::problem::Holds;
+use crate::templates::{Held, Reached, Row};
 
 fn explained_site() -> Built {
     site(&[

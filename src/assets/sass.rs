@@ -14,8 +14,6 @@ use codemap::SpanLoc;
 use crate::problem::{Kind, Problem, Reach, Reason};
 use crate::source::{Place, Sources, Span};
 
-pub use fault::{SassFault, SassType};
-
 pub(super) struct Compiled {
     pub(super) css: Result<String, Box<grass::Error>>,
     /// Whether Sass reached for a file outside `assets/`.

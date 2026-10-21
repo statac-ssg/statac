@@ -33,6 +33,7 @@ use rayon::prelude::*;
 use crate::album::{KEPT, kept, kept_in};
 use crate::disk::{CLOCK, Clock, Inventory, Stamp};
 use crate::platform::{self, Over};
+use crate::problem::Occupant;
 use crate::problem::{Kind, Problem, Reason};
 
 thread_local! {
@@ -71,18 +72,6 @@ const LOCK: &str = "lock";
 /// How many threads make files at once. A disk makes them no faster for
 /// more asking; the rest would only spin while they wait.
 const MAKERS: usize = 4;
-
-/// What stands where an output folder should be, when it isn't Statac's.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Occupant {
-    File,
-    Link,
-    /// A folder without the marker, holding this much at its top.
-    Entries {
-        files: usize,
-        folders: usize,
-    },
-}
 
 /// A build in progress: a folder written into until [`Staging::finish`]
 /// puts it in the output's place. Dropped unfinished, it leaves the output

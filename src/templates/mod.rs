@@ -50,7 +50,7 @@ pub(crate) use card::{Asked, Gathered};
 pub(crate) use indent::Own;
 pub(crate) use layout::Chosen;
 pub(crate) use render::{Renderer, developed};
-pub(crate) use shows::{Explained, Held, Holds, Neighbour, Reached, Row};
+pub(crate) use shows::{Explained, Held, Neighbour, Reached, Row};
 
 /// The site's templates and snippets, read and checked, ready to build
 /// pages with.

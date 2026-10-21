@@ -13,8 +13,9 @@ use std::collections::HashSet;
 
 use crate::origin::Style;
 use crate::problem::Kind as ProblemKind;
+use crate::problem::Malformed;
 use crate::source::{Sources, Span};
-use crate::yaml::{self, Malformed, Node, Value};
+use crate::yaml::{self, Node, Value};
 
 /// The longest front matter that is mended, in bytes: many times what a
 /// page's fields come to, and small enough that reading it again each

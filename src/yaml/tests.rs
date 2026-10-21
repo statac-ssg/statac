@@ -1,5 +1,6 @@
 use super::*;
 use crate::origin::Style;
+use crate::problem::{JsonFault, Malformed, Repeated};
 use crate::source::LineColumn;
 
 fn one(path: &str, text: &str) -> (Sources, SourceId) {

@@ -20,9 +20,9 @@ use super::session::{Read, Round, Took};
 use crate::build::Outcome;
 use crate::content::address::on_the_wire;
 use crate::json;
+use crate::problem::Holds;
 use crate::problem::{Code, Kind, Problem, Severity};
 use crate::report::{Piece, Quiet, Report, pieces, shown};
-use crate::templates::Holds;
 use crate::wording::{self, PanelWord};
 use problems::{Addresses, Parts};
 

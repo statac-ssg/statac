@@ -207,7 +207,7 @@ fn a_json_file_takes_controls_in_its_strings() {
     assert_eq!(
         problems[0].kind,
         Kind::MalformedYaml {
-            found: crate::yaml::Malformed::ControlCharacter('\u{92}')
+            found: crate::problem::Malformed::ControlCharacter('\u{92}')
         }
     );
     let Some(Reached::Value { node, .. }) = data.reach(&["comments", "a"]) else {

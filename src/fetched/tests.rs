@@ -240,7 +240,8 @@ fn a_link_out_of_the_folder_is_refused() {
 
 #[test]
 fn a_still_is_named_after_its_video() {
-    use stills::{Host, path};
+    use crate::problem::Host;
+    use stills::path;
     assert_eq!(
         path(Host::YouTube, "abcdefghijk"),
         "stills/youtube-abcdefghijk.jpg"

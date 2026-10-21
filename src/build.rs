@@ -16,6 +16,7 @@ use crate::date::Date;
 use crate::feeds;
 use crate::links;
 use crate::new::update::Starter;
+use crate::problem::{Carried, Published};
 use crate::problem::{Code, Kind, Named, Problem, Reason, Severity};
 use crate::publish::{self, Staging};
 use crate::reads::{Asked, Key, Reads, Record};
@@ -197,17 +198,6 @@ impl Outcome {
     }
 }
 
-/// What a build wrote.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Published {
-    pub pages: usize,
-    /// The pages left at old addresses, sending readers on.
-    pub redirects: usize,
-    pub feeds: usize,
-    /// Everything else: assets, static files and the files beside the writing.
-    pub files: usize,
-}
-
 /// One kind of JavaScript the built pages carry, and on how many pages.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Javascript {
@@ -216,19 +206,6 @@ pub struct Javascript {
     /// or may not run it, such as a comment, and counted all the same.
     pub sure: bool,
     pub pages: usize,
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum Carried {
-    /// A script the site publishes, at its address, from its file.
-    Published { address: String, from: String },
-    /// A script loaded from an address the site doesn't publish.
-    Loaded(String),
-    /// JavaScript written into pages by this file.
-    Written(String),
-    /// Something embedded from this address, empty where it has none,
-    /// which may run scripts of its own.
-    Embedded(String),
 }
 
 /// Reads the site at `site`: its settings, its content and its assets,

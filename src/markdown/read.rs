@@ -18,6 +18,7 @@ use super::typography::SETS;
 use super::unmatched::{Block, Elements, Told};
 use super::{Definition, Document, InSite, controls};
 use crate::html::{RAW_TEXT, comment_close, end_tag, escape};
+use crate::problem::DEEPEST_NESTING;
 use crate::problem::{Kind as ProblemKind, Problem};
 use crate::source::{Place, SourceId, Span};
 
@@ -90,10 +91,6 @@ fn matched(label: &str) -> String {
         .join(" ")
         .to_lowercase()
 }
-
-/// The most levels of writing, quotations, lists, emphasis and the like,
-/// one inside another, that are read.
-pub const DEEPEST_NESTING: usize = 200;
 
 /// Whether `kind` is a level of nesting. A list and its items are one
 /// level, counted at the list.
@@ -1251,7 +1248,7 @@ impl<'a> Builder<'a> {
     fn in_site(&mut self, span: Span, address: Option<&str>) -> Option<String> {
         let place = self.place(span);
         let Some(address) = address else {
-            let found = super::Malformed::NotOneAddress;
+            let found = super::CallFault::NotOneAddress;
             let problem = Problem::at(ProblemKind::MalformedCall { found }, place);
             if !self.problems.contains(&problem) {
                 self.problems.push(problem);

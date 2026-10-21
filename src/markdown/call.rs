@@ -4,8 +4,8 @@
 //! A call is read from the text exactly as typed, before Markdown sees it,
 //! so nothing in its arguments is ever read as emphasis, a link or HTML.
 
-use super::Malformed;
 use crate::origin::{Origin, Sourced, Style};
+use crate::problem::CallFault;
 use crate::problem::{Kind, Problem};
 use crate::source::{Place, SourceId, Span};
 
@@ -104,7 +104,7 @@ pub(super) struct Read {
 }
 
 /// Where a call can't be read: the place to point at and what is wrong.
-pub(super) type Fault = (Span, Malformed);
+pub(super) type Fault = (Span, CallFault);
 
 /// Reads the call whose `@` is at `at`. None where the text there is no
 /// call at all: `@` with no name, or a name with no `(` after it.
@@ -127,7 +127,7 @@ pub(super) fn read(
         let name = &after[..word];
         return Some(Err((
             Span::new(at, name_start + word),
-            Malformed::Name(name.to_owned()),
+            CallFault::Name(name.to_owned()),
         )));
     }
     if !b.get(name_start).is_some_and(u8::is_ascii_alphabetic) {
@@ -154,7 +154,7 @@ pub(super) fn read(
     let unclosed = || {
         (
             Span::new(at, name_end + 1),
-            Malformed::Unclosed(text[at..=name_end].to_owned()),
+            CallFault::Unclosed(text[at..=name_end].to_owned()),
         )
     };
     let arguments = match reader.arguments() {
@@ -284,7 +284,7 @@ impl Reader<'_> {
                 None | Some(b'\n' | b'\r') => {
                     return Err(Stop::Fault((
                         Span::new(open, open + 1),
-                        Malformed::UnclosedQuote(char::from(quote)),
+                        CallFault::UnclosedQuote(char::from(quote)),
                     )));
                 }
                 Some(b'\\') if !matches!(b.get(k + 1), None | Some(b'\n' | b'\r')) => {
@@ -315,7 +315,7 @@ impl Reader<'_> {
             let end = self.text[..self.i].trim_end().len();
             return Err(Stop::Fault((
                 Span::new(tail, end.max(tail)),
-                Malformed::TextAfterQuote,
+                CallFault::TextAfterQuote,
             )));
         }
         Ok(sourced)

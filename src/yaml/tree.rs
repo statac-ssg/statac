@@ -4,10 +4,11 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
 
-use super::Malformed;
 use super::parser::{Event, Events, Fault};
 use super::schema::{Resolved, resolve};
 use crate::origin::{Origin, Style};
+use crate::problem::Malformed;
+use crate::problem::Repeated;
 use crate::problem::{Kind, Problem};
 use crate::source::{Place, Sources, Span};
 
@@ -17,13 +18,6 @@ pub const ALIAS_LIMIT: usize = 10_000;
 /// The most scalar text, in bytes, aliases may repeat in one document: a
 /// few aliases of one long scalar would otherwise stay under the node limit.
 pub const ALIAS_TEXT_LIMIT: usize = 1_000_000;
-
-/// Which of the two alias limits was passed.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Repeated {
-    Values(usize),
-    TextBytes(usize),
-}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Node {

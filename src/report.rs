@@ -8,12 +8,12 @@ use std::io::IsTerminal;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::build::{Cards, Copies, Javascript, Published};
+use crate::build::{Cards, Copies, Javascript, Outcome};
 use crate::content::Included;
 use crate::fetched::Ages;
 use crate::hooks::{Before, Ran};
 use crate::origin::Sourced;
-use crate::problem::{Code, Kind, Problem, Severity, Unquietenable};
+use crate::problem::{Code, Kind, Problem, Published, Severity, Unquietenable};
 use crate::source::{Place, SourceId, Sources};
 use crate::stamp::Pass;
 use crate::{suggest, wording};
@@ -352,6 +352,26 @@ impl<'a> Report<'a> {
             true => String::new(),
             false => format!("{}\n", wording::fetched_ages(&parts)),
         }
+    }
+
+    /// What `build` says of a build into `out` that took `took`: its errors
+    /// in full, the rest counted, and what it wrote.
+    pub fn of_build(&self, outcome: &Outcome, out: &Path, took: Duration) -> String {
+        let problems = &outcome.problems;
+        let mut said = self.build(problems, &outcome.quiet);
+        let wrote = self.wrote(problems, outcome.published, out, took);
+        let part = format!(
+            "{}{}{}{}{wrote}",
+            self.copies(outcome.copies),
+            self.cards(outcome.cards),
+            self.hooks(outcome.hooks),
+            self.fetched(outcome.fetched)
+        );
+        if !said.is_empty() && !part.is_empty() {
+            said.push('\n');
+        }
+        said.push_str(&part);
+        said
     }
 
     /// `build`'s last line: what it wrote and where, and how long it took,

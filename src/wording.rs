@@ -1,29 +1,26 @@
 //! Every sentence Statac says about a problem, and the words problems are
 //! drawn and counted with.
 //!
+//! It words only what `problem` and the modules below it hold, so any
+//! module can use it.
+//!
 //! A headline leads with what happened, as a short label and the specifics,
 //! with no full stop. A suggestion is a full sentence, offered only when there
 //! is a good one.
 
-use crate::assets::{SassFault, SassType};
-use crate::build::{Carried, Published};
 use crate::fetch::Refusal;
-use crate::markdown;
 use crate::platform::{Alike, Unwritable};
 use crate::problem::{
-    AddressFault, ArgumentFault, Awaited, Braced, Called, CardFileFault, Chooser, Ended, Expected,
-    FontWithThem, FormatFault, Found, Held, Hint, Instead, Kind, Lack, ListFault, Maker, Missing,
-    MoreAt, Named, NamedIn, Needed, NotDrawn, Opener, OptionHint, Own, PictureFault, Piece,
-    PublishedAsText, Reach, Reason, RecordFault, Relation, Requirer, Rewrite, Root, SetAside,
-    Severity, Shape, ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault,
-    TemplateFault, Translated, Unheard, Unmatched, Unquietenable, Unsupported, Unwritten, Waiting,
-    Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
+    AddressFault, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
+    Carried, Chooser, Ended, Expected, FontWithThem, FormatFault, Found, Held, Hint, Holds,
+    Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing, MoreAt,
+    Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault, Piece,
+    Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation, Repeated,
+    Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy, ShownWords,
+    SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told, Translated,
+    Unheard, Unmatched, Unquietenable, Unsupported, Unwritten, Waiting, Wanted, Word, WordList,
+    WordsFrom, WordsWanted, WrongPlace,
 };
-use crate::publish::Occupant;
-use crate::serve::live::Told;
-use crate::serve::watch::Because;
-use crate::templates::Holds;
-use crate::yaml::{JsonFault, Malformed, Repeated};
 
 const EXPLANATIONS: &str = "https://statac.dev/e/";
 const MONTHS: [&str; 12] = [
@@ -69,7 +66,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         ),
         Kind::NestedTooDeep => format!(
             "Nested too deep: the writing here is nested more than {} deep",
-            crate::markdown::DEEPEST_NESTING
+            crate::problem::DEEPEST_NESTING
         ),
         Kind::UnknownYamlTag { tag } => format!("Unknown YAML tag: `{tag}`"),
         Kind::NotData { path } => format!("Not data: `{path}` isn't YAML or JSON"),
@@ -1617,25 +1614,22 @@ fn quoted(items: &[String]) -> Vec<String> {
     items.iter().map(|item| format!("`{item}`")).collect()
 }
 
-fn malformed_call(found: &markdown::Malformed) -> String {
+fn malformed_call(found: &CallFault) -> String {
     match found {
-        markdown::Malformed::Unclosed(opening) => format!("`{opening}` is never closed"),
-        markdown::Malformed::UnclosedQuote(quote) => format!("`{quote}` is never closed"),
-        markdown::Malformed::TextAfterQuote => "text after the closing quote".into(),
-        markdown::Malformed::Name(name) => format!("a snippet can't be called `{name}`"),
-        markdown::Malformed::NoEnd(name) => format!("`@{name}` has no `@end`"),
-        markdown::Malformed::StrayEnd => "`@end` closes nothing".into(),
-        markdown::Malformed::WrapsNothing(name) => {
+        CallFault::Unclosed(opening) => format!("`{opening}` is never closed"),
+        CallFault::UnclosedQuote(quote) => format!("`{quote}` is never closed"),
+        CallFault::TextAfterQuote => "text after the closing quote".into(),
+        CallFault::Name(name) => format!("a snippet can't be called `{name}`"),
+        CallFault::NoEnd(name) => format!("`@{name}` has no `@end`"),
+        CallFault::StrayEnd => "`@end` closes nothing".into(),
+        CallFault::WrapsNothing(name) => {
             format!("`@{name}` isn't on a line of its own")
         }
-        markdown::Malformed::NotOneAddress => {
-            "`@url` takes one address from the top of the site".into()
-        }
+        CallFault::NotOneAddress => "`@url` takes one address from the top of the site".into(),
     }
 }
 
-fn malformed_maths(found: &markdown::MathsFault) -> String {
-    use markdown::MathsFault;
+fn malformed_maths(found: &MathsFault) -> String {
     match found {
         MathsFault::UnknownCommand(command) => format!("Statac doesn't know `{command}`"),
         MathsFault::UnknownEnvironment(name) => {
@@ -1686,6 +1680,39 @@ fn unwritable(path: &str, why: &Unwritable) -> String {
             format!("Unwritable name: Windows drops the space ending a name in `{path}`")
         }
         Unwritable::NotText => format!("Unwritable name: `{path}` isn't text"),
+    }
+}
+
+impl Problem {
+    pub fn headline(&self) -> String {
+        headline(&self.kind)
+    }
+
+    pub fn suggestion(&self) -> Option<String> {
+        suggestion(&self.kind)
+    }
+
+    pub fn explanation_link(&self) -> String {
+        explanation_link(self.kind.name())
+    }
+
+    pub fn related(&self) -> Vec<Related> {
+        let met = self.context.iter().cloned();
+        self.kind
+            .related()
+            .into_iter()
+            .chain(met.filter(|(relation, _)| !matches!(relation, Relation::Building(_))))
+            .map(|(how, place)| Related {
+                label: relation(&how),
+                place,
+            })
+            .collect()
+    }
+}
+
+impl std::fmt::Display for Reason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&reason(self))
     }
 }
 
@@ -2334,67 +2361,62 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         | Kind::CantRemove { .. } => None,
         Kind::CantListen { .. } => Some("Choose another port with `--port=<number>`.".into()),
         Kind::MalformedCall { found } => Some(match found {
-            markdown::Malformed::Unclosed(_) => "Close it with `)`.".into(),
-            markdown::Malformed::UnclosedQuote(quote) => {
+            CallFault::Unclosed(_) => "Close it with `)`.".into(),
+            CallFault::UnclosedQuote(quote) => {
                 format!("End the value with another `{quote}` on the same line.")
             }
-            markdown::Malformed::TextAfterQuote => "Put the whole value inside the quotes.".into(),
-            markdown::Malformed::Name(_) => {
+            CallFault::TextAfterQuote => "Put the whole value inside the quotes.".into(),
+            CallFault::Name(_) => {
                 "Name the snippet with the letters a to z, digits and `_`, or write `\\@` to show \
                  this as text."
                     .into()
             }
-            markdown::Malformed::NoEnd(_) => {
+            CallFault::NoEnd(_) => {
                 "Put `@end` on a line of its own where the writing it wraps ends.".into()
             }
-            markdown::Malformed::StrayEnd => {
+            CallFault::StrayEnd => {
                 "Take the line out: only a call to a snippet that shows `body` wraps the writing \
                  up to an `@end`."
                     .into()
             }
-            markdown::Malformed::WrapsNothing(_) => {
+            CallFault::WrapsNothing(_) => {
                 "Write the call on a line of its own, the writing it wraps below it, and `@end` \
                  on a line after that."
                     .into()
             }
-            markdown::Malformed::NotOneAddress => "Write it as `@url(/about/)`.".into(),
+            CallFault::NotOneAddress => "Write it as `@url(/about/)`.".into(),
         }),
-        Kind::MalformedMaths { found } => {
-            use markdown::MathsFault;
-            match found {
-                MathsFault::Unclosed {
-                    opening: Some(_),
-                    closing,
-                } => Some(format!("Close it with `{closing}`.")),
-                MathsFault::ClosesNothing(written) => Some(format!(
-                    "Take it out, or open it with `{}` where it starts.",
-                    opener_of(written)
-                )),
-                MathsFault::Mismatched { expected, .. } => {
-                    Some(format!("Did you mean `{expected}`?"))
-                }
-                MathsFault::MissingBefore(_) => Some(
-                    r"Give the command before it everything it takes, as in `\frac{1}{2}`.".into(),
-                ),
-                MathsFault::Twice(bound) => {
-                    let example = match bound {
-                        '_' => "x_{i_j}",
-                        _ => "x^{a^b}",
-                    };
-                    Some(format!(
-                        "Put braces round what goes together, as in `{example}`."
-                    ))
-                }
-                MathsFault::NoSuchLabel(label) => Some(format!(
-                    "Write `\\label{{{label}}}` in the equation it points to."
-                )),
-                MathsFault::UnknownCommand(_)
-                | MathsFault::UnknownEnvironment(_)
-                | MathsFault::UnknownColour(_)
-                | MathsFault::Unclosed { opening: None, .. }
-                | MathsFault::Unreadable(_) => None,
+        Kind::MalformedMaths { found } => match found {
+            MathsFault::Unclosed {
+                opening: Some(_),
+                closing,
+            } => Some(format!("Close it with `{closing}`.")),
+            MathsFault::ClosesNothing(written) => Some(format!(
+                "Take it out, or open it with `{}` where it starts.",
+                opener_of(written)
+            )),
+            MathsFault::Mismatched { expected, .. } => Some(format!("Did you mean `{expected}`?")),
+            MathsFault::MissingBefore(_) => {
+                Some(r"Give the command before it everything it takes, as in `\frac{1}{2}`.".into())
             }
-        }
+            MathsFault::Twice(bound) => {
+                let example = match bound {
+                    '_' => "x_{i_j}",
+                    _ => "x^{a^b}",
+                };
+                Some(format!(
+                    "Put braces round what goes together, as in `{example}`."
+                ))
+            }
+            MathsFault::NoSuchLabel(label) => Some(format!(
+                "Write `\\label{{{label}}}` in the equation it points to."
+            )),
+            MathsFault::UnknownCommand(_)
+            | MathsFault::UnknownEnvironment(_)
+            | MathsFault::UnknownColour(_)
+            | MathsFault::Unclosed { opening: None, .. }
+            | MathsFault::Unreadable(_) => None,
+        },
         Kind::ColonInCall { name } => Some(format!("Write `{name}=` instead.")),
         Kind::PublishedAsText { why, .. } => Some(
             match why {
@@ -3099,10 +3121,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                     Some(FontWithThem::Here(font)) => {
                         format!("Add `{font}`, which has {them}, to the card's `font`.")
                     }
-                    Some(FontWithThem::Brought(font)) => format!(
-                        "Run `statac new --update --missing` to write `{}/{font}`, which has \
-                         {them}, then add `{font}` to the card's `font`.",
-                        crate::cards::FOLDER
+                    Some(FontWithThem::Brought { font, path }) => format!(
+                        "Run `statac new --update --missing` to write `{path}`, which has \
+                         {them}, then add `{font}` to the card's `font`."
                     ),
                     None => format!("Add a font that has {them} to the card's `font`."),
                 }
@@ -4516,7 +4537,7 @@ fn option_name(written: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markdown::MathsFault;
+    use crate::problem::Host;
 
     fn kinds() -> Vec<Kind> {
         vec![
@@ -4552,7 +4573,6 @@ mod tests {
     }
 
     fn fetched() -> Vec<(Kind, &'static str, Option<&'static str>)> {
-        use crate::fetched::stills::Host;
         let no_still = |host, absent| Kind::NoStill {
             host,
             id: "abcdefghijk".into(),
@@ -6656,7 +6676,10 @@ mod tests {
                     why: NotDrawn::NoFont {
                         characters: vec!['😀'],
                         more: 0,
-                        font: Some(Box::new(FontWithThem::Brought("NotoEmoji.ttf".into()))),
+                        font: Some(Box::new(FontWithThem::Brought {
+                            font: "NotoEmoji.ttf".into(),
+                            path: "templates/og/NotoEmoji.ttf".into(),
+                        })),
                     },
                     pages: 1,
                     first: Named::File("content/post-1.md".into()),
@@ -6846,22 +6869,22 @@ mod tests {
         let maths = |found| Kind::MalformedMaths { found };
         vec![
             (
-                call(markdown::Malformed::Unclosed("@image(".into())),
+                call(CallFault::Unclosed("@image(".into())),
                 "Malformed call: `@image(` is never closed",
                 Some("Close it with `)`."),
             ),
             (
-                call(markdown::Malformed::UnclosedQuote('\'')),
+                call(CallFault::UnclosedQuote('\'')),
                 "Malformed call: `'` is never closed",
                 Some("End the value with another `'` on the same line."),
             ),
             (
-                call(markdown::Malformed::TextAfterQuote),
+                call(CallFault::TextAfterQuote),
                 "Malformed call: text after the closing quote",
                 Some("Put the whole value inside the quotes."),
             ),
             (
-                call(markdown::Malformed::Name("café".into())),
+                call(CallFault::Name("café".into())),
                 "Malformed call: a snippet can't be called `café`",
                 Some(
                     "Name the snippet with the letters a to z, digits and `_`, or write `\\@` to \
@@ -6869,12 +6892,12 @@ mod tests {
                 ),
             ),
             (
-                call(markdown::Malformed::NoEnd("note".into())),
+                call(CallFault::NoEnd("note".into())),
                 "Malformed call: `@note` has no `@end`",
                 Some("Put `@end` on a line of its own where the writing it wraps ends."),
             ),
             (
-                call(markdown::Malformed::StrayEnd),
+                call(CallFault::StrayEnd),
                 "Malformed call: `@end` closes nothing",
                 Some(
                     "Take the line out: only a call to a snippet that shows `body` wraps the \
@@ -6882,7 +6905,7 @@ mod tests {
                 ),
             ),
             (
-                call(markdown::Malformed::WrapsNothing("note".into())),
+                call(CallFault::WrapsNothing("note".into())),
                 "Malformed call: `@note` isn't on a line of its own",
                 Some(
                     "Write the call on a line of its own, the writing it wraps below it, and \
@@ -6890,7 +6913,7 @@ mod tests {
                 ),
             ),
             (
-                call(markdown::Malformed::NotOneAddress),
+                call(CallFault::NotOneAddress),
                 "Malformed call: `@url` takes one address from the top of the site",
                 Some("Write it as `@url(/about/)`."),
             ),

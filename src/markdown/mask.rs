@@ -23,7 +23,8 @@
 use std::borrow::Cow;
 
 use super::call::{self, Call, Fault, Value};
-use super::{Malformed, Wraps, block, controls};
+use super::{Wraps, block, controls};
+use crate::problem::CallFault;
 use crate::problem::Problem;
 use crate::source::{SourceId, Span};
 
@@ -255,7 +256,7 @@ pub(super) fn mask(
                             Some(head) => {
                                 ended.remove(head);
                             }
-                            None => unread.push((end, Malformed::StrayEnd)),
+                            None => unread.push((end, CallFault::StrayEnd)),
                         }
                     }
                     None => {}
@@ -275,7 +276,7 @@ pub(super) fn mask(
                         if wrapping && alone {
                             let Some(end) = block::end_of(text, source, read.end, wraps) else {
                                 let name = name.to_owned();
-                                unread.push((head, Malformed::NoEnd(name)));
+                                unread.push((head, CallFault::NoEnd(name)));
                                 continue;
                             };
                             let from = block::next_line(b, read.end).unwrap_or(end);

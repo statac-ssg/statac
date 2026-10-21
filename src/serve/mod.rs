@@ -19,12 +19,13 @@ use std::time::{Duration, Instant};
 use crate::build::{self, Mode};
 use crate::content::address::on_the_wire;
 use crate::date::Date;
+use crate::problem::Told;
 use crate::problem::{Kind, Problem, Reason, Severity};
 use crate::refresh::{self, Fetch, Token};
 use crate::report::{Report, shown};
 use crate::source::Sources;
-use crate::{cli, config, wording};
-use live::{Hub, Status, Told};
+use crate::{config, wording};
+use live::{Hub, Status};
 use panel::{Besides, Panel};
 use session::{Round, Session};
 use watch::{Batch, How, Settle, Watching};
@@ -155,7 +156,7 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
     let took = started.elapsed().saturating_sub(round.outcome.waited);
     say(
         out,
-        &cli::said_of_build(&report, &round.outcome, session.folder(), took),
+        &report.of_build(&round.outcome, session.folder(), took),
     );
     // What the terminal was told of how the round ended.
     let ended = match round.outcome.published {

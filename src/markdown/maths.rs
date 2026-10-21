@@ -8,9 +8,10 @@ use std::sync::LazyLock;
 
 use math_core::{LatexError, LatexToMathML, MathCoreConfig, MathDisplay};
 
+use super::Document;
 use super::controls;
 use super::node::{Kind, Node};
-use super::{Document, MathsFault};
+use crate::problem::MathsFault;
 use crate::problem::{Kind as ProblemKind, Problem};
 use crate::source::{Place, Span};
 

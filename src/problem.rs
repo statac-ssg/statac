@@ -1,16 +1,14 @@
-//! Problems are found here and worded in `wording`, so detection never
-//! builds a sentence and every sentence lives in one catalogue.
+//! What Statac finds, as data: problems with the details they carry, and
+//! the other things it tells, such as what a build wrote. All of it is
+//! worded in `wording`, so detection never builds a sentence and every
+//! sentence lives in one catalogue. It uses no module that reports
+//! problems, so any module can use it.
 
 use std::io;
 use std::path::PathBuf;
 
-use crate::assets::SassFault;
-use crate::markdown;
 use crate::platform::{Alike, Refused, Unwritable};
-use crate::publish::Occupant;
 use crate::source::Place;
-use crate::wording;
-use crate::yaml::{JsonFault, Malformed, Repeated};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum Severity {
@@ -765,11 +763,11 @@ pub enum Kind {
     },
     /// A snippet call that can't be read, placed at the exact text.
     MalformedCall {
-        found: markdown::Malformed,
+        found: CallFault,
     },
     /// Maths that can't be made MathML, placed at the exact text.
     MalformedMaths {
-        found: markdown::MathsFault,
+        found: MathsFault,
     },
     /// A control character in the writing, left out of the page.
     ControlCharacter {
@@ -1337,7 +1335,7 @@ pub enum Kind {
     /// the site keeping it, its id, and whether the record says the site
     /// answered it has none.
     NoStill {
-        host: crate::fetched::stills::Host,
+        host: Host,
         id: String,
         absent: bool,
     },
@@ -1453,8 +1451,8 @@ pub enum FontWithThem {
     /// One whose file is there, which the card's `font` doesn't name.
     Here(String),
     /// One of the starter's that `statac new --update --missing` would
-    /// write.
-    Brought(String),
+    /// write, with the path it would be written to.
+    Brought { font: String, path: String },
 }
 
 /// Why a page's card can't be drawn.
@@ -2971,31 +2969,6 @@ impl Problem {
             }
         }
     }
-
-    pub fn headline(&self) -> String {
-        wording::headline(&self.kind)
-    }
-
-    pub fn suggestion(&self) -> Option<String> {
-        wording::suggestion(&self.kind)
-    }
-
-    pub fn explanation_link(&self) -> String {
-        wording::explanation_link(self.kind.name())
-    }
-
-    pub fn related(&self) -> Vec<Related> {
-        let met = self.context.iter().cloned();
-        self.kind
-            .related()
-            .into_iter()
-            .chain(met.filter(|(relation, _)| !matches!(relation, Relation::Building(_))))
-            .map(|(relation, place)| Related {
-                label: wording::relation(&relation),
-                place,
-            })
-            .collect()
-    }
 }
 
 /// A heading of an explanation without its `{#id}`, which only a page can
@@ -3093,12 +3066,6 @@ impl Reason {
     }
 }
 
-impl std::fmt::Display for Reason {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&wording::reason(self))
-    }
-}
-
 impl std::error::Error for Reason {}
 
 impl From<Reason> for io::Error {
@@ -3120,6 +3087,347 @@ pub fn system_words(text: &str) -> String {
         None => String::new(),
     }
 }
+
+/// Why Sass stopped compiling a stylesheet. Names are as the author
+/// wrote them.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum SassFault {
+    /// What an `@error` rule said, without the quotes of a string.
+    Raised(String),
+    NoVariable(String),
+    NoMixin(String),
+    NoFunction(String),
+    /// A character Sass needed where it stopped.
+    Missing(char),
+    /// Where Sass needed a `{`, text that reads as a declaration with its
+    /// colon left out, written as it should be.
+    ReadsAsDeclaration(String),
+    /// An opening never closed: a bracket, `#{`, a quote or `/*`.
+    Unclosed(&'static str),
+    ClosesNothing,
+    NoValue,
+    NoName,
+    NoQuotedText,
+    EndsEarly,
+    /// A flag Sass took for a misspelt `!important`.
+    UnknownFlag(String),
+    /// An operator in a calculation without a space on each side.
+    Unspaced(String),
+    TopLevelParent,
+    /// An at-rule where it can't be used.
+    NotHere(String),
+    ReturnOutsideFunction,
+    /// `@use` or `@forward` after other rules.
+    LoadAfterRules(String),
+    ContentOutsideMixin,
+    ExtendOutsideRule,
+    /// What a function holds that it can't, in Sass's words.
+    InFunction(String),
+    /// A mixin handed a content block it doesn't take.
+    NoContentBlock(String),
+    NoReturn(String),
+    MissingArgument {
+        callable: String,
+        argument: String,
+    },
+    TooManyArguments {
+        callable: String,
+        takes: usize,
+        given: usize,
+    },
+    NoArgument {
+        callable: String,
+        argument: String,
+    },
+    /// A stylesheet loaded by a name no file has, and the nearest name
+    /// one in its folder has.
+    NoStylesheet {
+        written: String,
+        nearest: Option<String>,
+    },
+    /// A `sass:` module Sass doesn't have.
+    NoBuiltInModule(String),
+    /// A namespace no `@use` gives, and whether Sass has a module of that
+    /// name to give it.
+    NoNamespace {
+        name: String,
+        built_in: bool,
+    },
+    TwoModules(String),
+    Private(String),
+    NotDefault(String),
+    LoadsItself,
+    /// Units that can't be combined, in the order written where the text
+    /// shows them.
+    Units(String, String),
+    /// An operation Sass can't carry out.
+    Operation(String),
+    /// A value, as Sass shows it, that CSS has no way to write, and
+    /// whether Sass said where: met as it writes the stylesheet out, it
+    /// gives no place.
+    NotCss {
+        value: String,
+        placed: bool,
+    },
+    /// An argument handed the wrong kind of value, shown as Sass shows it.
+    WrongType {
+        argument: String,
+        wanted: SassType,
+        value: String,
+    },
+    HasUnits {
+        argument: String,
+        value: String,
+    },
+    OutOfRange {
+        argument: String,
+        index: String,
+        items: usize,
+    },
+    RepeatedKey(String),
+    ForUnits {
+        from: String,
+        to: String,
+    },
+    /// `@extend` of a compound selector, and the rule that extends each
+    /// of its parts.
+    CompoundExtend(Option<String>),
+    IndentedSemicolon,
+    /// Indentation of the kind a `.sass` file doesn't use: a tab where it
+    /// indents with spaces, or a space where it indents with tabs.
+    MixedIndent {
+        tab: bool,
+    },
+    FirstLineIndented,
+    /// grass's own words for anything else, their first line.
+    Other(String),
+}
+
+/// The kind of value an argument needs.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum SassType {
+    Number,
+    Colour,
+    Map,
+    String,
+    Function,
+    Arguments,
+    Calculation,
+    WholeNumber,
+}
+
+/// What stands where an output folder should be, when it isn't Statac's.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Occupant {
+    File,
+    Link,
+    /// A folder without the marker, holding this much at its top.
+    Entries {
+        files: usize,
+        folders: usize,
+    },
+}
+
+/// What the parser found where the YAML stops making sense.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Malformed {
+    /// Placed at the opening quote, not where the parser gave up.
+    UnclosedQuote(char),
+    /// A later line of a text in quotes that does close, standing too far
+    /// left for the reader to take as more of the text. Placed at the
+    /// line: the quote opens `back` bytes before it, and `spaces` before
+    /// each later line are enough.
+    ShallowLine {
+        quote: char,
+        back: usize,
+        spaces: usize,
+    },
+    UnclosedBracket(char),
+    MismatchedBracket {
+        open: char,
+        close: char,
+    },
+    /// An escape in double quotes YAML doesn't define, as written (`\q`).
+    UnknownEscape(String),
+    TextAfterQuote,
+    Indentation,
+    Tab,
+    /// An alias to no anchor, as written (`*name`).
+    UnknownAnchor(String),
+    SecondDocument,
+    TooDeep,
+    EndsEarly,
+    /// A character YAML allows nowhere, such as a C1 control left by text
+    /// saved in an old encoding.
+    ControlCharacter(char),
+    /// Text the parser couldn't place, as written.
+    Unexpected(String),
+    /// A value tagged `!!binary` that isn't base64.
+    NotBase64,
+}
+
+/// What is wrong with some JSON, where the reader stops.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum JsonFault {
+    /// Placed at the opening quote.
+    UnclosedString,
+    UnclosedBracket(char),
+    MismatchedBracket {
+        open: char,
+        close: char,
+    },
+    /// An escape JSON doesn't define, as written (`\q`).
+    UnknownEscape(String),
+    /// Half of a pair of `\u` escapes, as written (`\ud83d`).
+    HalfCharacter(String),
+    /// A character below U+0020 written as itself in a string.
+    ControlCharacter(char),
+    /// A number JSON doesn't write that way, as written (`01`, `.5`).
+    NotANumber(String),
+    /// A comma with no value after it, before `]` or `}`.
+    TrailingComma,
+    TooDeep,
+    EndsEarly,
+    /// Text the reader couldn't place, as written.
+    Unexpected(String),
+}
+
+/// Which of the two alias limits was passed.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Repeated {
+    Values(usize),
+    TextBytes(usize),
+}
+
+/// A snippet call Statac can't read, placed at the exact text.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum CallFault {
+    /// `@name(` with no `)` before the paragraph ends, as written.
+    Unclosed(String),
+    /// A quote opening a value that doesn't close on its line.
+    UnclosedQuote(char),
+    TextAfterQuote,
+    /// A name in letters a snippet's name can't hold, as written.
+    Name(String),
+    /// A call on a line of its own to a snippet that wraps writing, with no
+    /// `@end` after it, by the snippet's name.
+    NoEnd(String),
+    /// An `@end` with no call open for it to close.
+    StrayEnd,
+    /// A call to a snippet that wraps writing, somewhere other than on a
+    /// line of its own, by the snippet's name.
+    WrapsNothing(String),
+    /// An `@url(...)` handed anything but one address from the top of the
+    /// site.
+    NotOneAddress,
+}
+
+/// Maths Statac can't make MathML of, placed at the exact text. What is
+/// quoted is as written.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum MathsFault {
+    UnknownCommand(String),
+    UnknownEnvironment(String),
+    UnknownColour(String),
+    /// What opens a group the maths never closes, `{` or `\begin{cases}`,
+    /// and what would close it. None where the opening can't be found.
+    Unclosed {
+        opening: Option<String>,
+        closing: String,
+    },
+    /// A `}`, `\end{...}` or `\right` with nothing open for it to close.
+    ClosesNothing(String),
+    /// An `\end{...}` closing another environment, and the one it should be.
+    Mismatched {
+        written: String,
+        expected: String,
+    },
+    /// A command short of what it takes, found at what comes next: a `}`,
+    /// an `\end{...}`, or the closing dollars.
+    MissingBefore(String),
+    /// A second `^` or `_` on one thing.
+    Twice(char),
+    /// An `\eqref` to a label no equation on the page has.
+    NoSuchLabel(String),
+    /// Anything else, by what stands where Statac stopped.
+    Unreadable(String),
+}
+
+/// A site that keeps videos.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+pub enum Host {
+    YouTube,
+    Vimeo,
+}
+
+/// What a build wrote.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct Published {
+    pub pages: usize,
+    /// The pages left at old addresses, sending readers on.
+    pub redirects: usize,
+    pub feeds: usize,
+    /// Everything else: assets, static files and the files beside the writing.
+    pub files: usize,
+}
+
+/// Where JavaScript the built pages carry comes from.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Carried {
+    /// A script the site publishes, at its address, from its file.
+    Published { address: String, from: String },
+    /// A script loaded from an address the site doesn't publish.
+    Loaded(String),
+    /// JavaScript written into pages by this file.
+    Written(String),
+    /// Something embedded from this address, empty where it has none,
+    /// which may run scripts of its own.
+    Embedded(String),
+}
+
+/// What one round asks of the pages already open.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Told {
+    /// No built file changed.
+    Nothing,
+    /// Only stylesheets changed: the address each was at, and is at now.
+    Styles(Vec<(String, String)>),
+    Reload,
+}
+
+/// Why a folder is polled when polling wasn't asked for.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Because {
+    /// The folder is on a disk of this kind, which may not report changes.
+    Remote(String),
+    /// The system's reports couldn't be had, for this reason.
+    NoReports(Reason),
+}
+
+/// The kind of thing a name holds.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Holds {
+    Text,
+    Html,
+    Number,
+    Truth,
+    Date,
+    Page,
+    Pages,
+    /// One of the site's lists, as a tag or a folder is.
+    List,
+    Lists,
+    /// Any other list of things.
+    Items,
+    Fields,
+    Mentions,
+    Call,
+    Unknown,
+}
+
+/// The most levels of writing, quotations, lists, emphasis and the like,
+/// one inside another, that are read.
+pub const DEEPEST_NESTING: usize = 200;
 
 #[cfg(test)]
 mod tests {

@@ -2,9 +2,9 @@ use std::path::Path;
 
 use super::*;
 use crate::origin::{Origin, Style};
+use crate::problem::Malformed;
 use crate::problem::{OptionHint, Reason};
 use crate::source::Span;
-use crate::yaml::Malformed;
 
 const SITE: &str = "site";
 
@@ -612,7 +612,7 @@ fn check_lists_the_javascript_between_the_problems_and_the_count() {
     let (sources, problems) = several();
     let report = Report::new(&sources, Path::new(SITE), false);
     let javascript = [crate::build::Javascript {
-        carried: crate::build::Carried::Written("templates/page.html".to_owned()),
+        carried: crate::problem::Carried::Written("templates/page.html".to_owned()),
         sure: true,
         pages: 2,
     }];

@@ -631,7 +631,8 @@ fn redirect(status: StatusCode, to: &str, query: &str) -> Response<Body> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::serve::live::{Status, Told};
+    use crate::problem::Told;
+    use crate::serve::live::Status;
     use crate::testing::Scratch;
 
     /// A few pages and files written to `scratch`, served under `base`.

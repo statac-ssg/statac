@@ -9,10 +9,11 @@ use super::problems::lines;
 use crate::content::address::on_the_wire;
 use crate::json;
 use crate::origin::Arrival;
+use crate::problem::Holds;
 use crate::reads::{Asked, Key, Reads};
 use crate::report::{Report, shown};
 use crate::source::Place;
-use crate::templates::{Explained, Held, Holds, Neighbour, Reached, Renderer, Row, SEARCH_BOX};
+use crate::templates::{Explained, Held, Neighbour, Reached, Renderer, Row, SEARCH_BOX};
 use crate::wording;
 
 /// The page as the last round to build it left it.
