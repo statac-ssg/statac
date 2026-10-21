@@ -2091,13 +2091,13 @@ fn a_call_written_as_text_in_a_value_reads_its_references_as_the_rest_does() {
     site.write(
         "content/post-1.md",
         "---\ntitle: Post 1\ndate: 2026-01-01\n\
-         blurb: 'Tea &amp; cake @nope(a &amp; b &lt;c&gt; &mdash; &#0;)'\n---\nText.\n",
+         blurb: 'A &amp; B @nope(a &amp; b &lt;c&gt; &mdash; &#0;)'\n---\nText.\n",
     );
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
     let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
     assert!(
-        built.contains("Tea &amp; cake @nope(a &amp; b &lt;c&gt; \u{2014} \u{fffd})"),
+        built.contains("A &amp; B @nope(a &amp; b &lt;c&gt; \u{2014} \u{fffd})"),
         "{built}"
     );
 }
