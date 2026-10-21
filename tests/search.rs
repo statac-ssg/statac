@@ -588,6 +588,42 @@ fn a_page_opening_with_a_heading_is_found_by_its_title_at_that_heading_with_its_
 }
 
 #[test]
+fn a_word_with_a_typographic_apostrophe_is_found_as_typed_with_a_plain_one() {
+    let site = Site::new("reader-apostrophe");
+    site.write(
+        "content/post-3.md",
+        "---\ntitle: Post 3\ndate: 2026-01-03\n---\nIt doesn't change the file's name.\n",
+    );
+    site.write(
+        "content/post-4.md",
+        "---\ntitle: Post 4\ndate: 2026-01-04\n---\nA file, and `doesn't` as code.\n",
+    );
+    assert!(!site.index().is_empty());
+    let asked: &[(&str, bool)] = &[
+        ("doesn't", false),
+        ("doesn\u{2019}t", false),
+        ("file", false),
+        ("doesn", true),
+    ];
+    let rust = statac_finds(&site, 0, asked);
+    let found: Vec<Vec<&str>> = split(&rust)
+        .iter()
+        .map(|one| {
+            ["/blog/post-3/", "/blog/post-4/"]
+                .into_iter()
+                .filter(|url| one.contains(&format!("\"{url}\"")))
+                .collect()
+        })
+        .collect();
+    let both = vec!["/blog/post-3/", "/blog/post-4/"];
+    assert_eq!(found, [both.clone(), both.clone(), both.clone(), both]);
+    let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
+        return;
+    };
+    assert_eq!(rust, browser);
+}
+
+#[test]
 fn each_languages_script_finds_what_statac_search_finds_in_that_language() {
     let site = Site::in_two_languages("reader-languages", "https://example.org/blog/");
     site.write(

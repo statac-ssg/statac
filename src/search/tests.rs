@@ -137,6 +137,7 @@ fn a_word_is_folded_to_small_letters_without_its_accents() {
     assert_eq!(fold("NAÏVE"), "naive");
     assert_eq!(fold("HTTP2_Server"), "http2_server");
     assert_eq!(fold("Ελληνικά"), "ελληνικα");
+    assert_eq!(fold("Doesn\u{2019}t"), "doesn't");
     // The kana's voicing changes the word, so it stays.
     assert_eq!(fold("ガイド"), "ガイド");
 }

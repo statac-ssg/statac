@@ -32,7 +32,8 @@ pub fn spans(text: &str) -> impl Iterator<Item = Range<usize>> + '_ {
 
 /// `word` with the marks Latin, Greek and Cyrillic letters carry taken
 /// off, in its compatibility form and small letters: `Ｃafé` is `cafe`.
-/// Marks other scripts need, such as the kana's voicing, are kept.
+/// Marks other scripts need, such as the kana's voicing, are kept. A
+/// typographic apostrophe is the plain one, so `don’t` is `don't`.
 pub fn fold(word: &str) -> String {
     let mut folded = String::new();
     fold_into(word, &mut folded);
@@ -48,7 +49,10 @@ pub(super) fn fold_into(word: &str, folded: &mut String) {
         folded.make_ascii_lowercase();
         return;
     }
-    let unmarked: String = word.nfkd().filter(|&c| !diacritic(c)).collect();
+    let unmarked: String = (word.nfkd())
+        .filter(|&c| !diacritic(c))
+        .map(|c| if c == '\u{2019}' { '\'' } else { c })
+        .collect();
     folded.push_str(&unmarked.nfc().collect::<String>().to_lowercase());
 }
 

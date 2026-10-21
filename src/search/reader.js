@@ -38,9 +38,17 @@ function spans(text) {
   return words.map((found) => [found.index, found.index + found[0].length]);
 }
 
-/** `word` in small letters, without the marks Latin, Greek and Cyrillic carry. */
+/**
+ * `word` in small letters, without the marks Latin, Greek and Cyrillic
+ * carry, and with a typographic apostrophe as the plain one.
+ */
 function fold(word) {
-  return word.normalize("NFKD").replace(MARKS, "").normalize("NFC").toLowerCase();
+  return word
+    .normalize("NFKD")
+    .replace(MARKS, "")
+    .replaceAll("\u2019", "'")
+    .normalize("NFC")
+    .toLowerCase();
 }
 
 const read = new Map();
