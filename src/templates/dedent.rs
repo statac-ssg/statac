@@ -717,9 +717,10 @@ impl<'s> Template<'s> {
     }
 
     /// The column a line is written at once the blocks round it have
-    /// given up what they give, none taking it left of its own tag. A body
-    /// the engine holds back is written where it is called, so the blocks
-    /// round the one holding it back give it nothing.
+    /// given up what they give, none taking it left of its own tag, and a
+    /// line left of the tag already, as a blank one may be, staying where
+    /// it is. A body the engine holds back is written where it is called,
+    /// so the blocks round the one holding it back give it nothing.
     fn column(&self, line: usize) -> usize {
         let mut column = self.lines[line].column;
         if self.lines[line].shown {
@@ -737,7 +738,9 @@ impl<'s> Template<'s> {
         for &block in chain.iter().rev() {
             let block = &self.blocks[block];
             if block.cut > 0 {
-                column = column.saturating_sub(block.cut).max(block.floor);
+                column = column
+                    .saturating_sub(block.cut)
+                    .max(block.floor.min(column));
             }
         }
         column
@@ -1392,6 +1395,16 @@ mod tests {
             (
                 "<ul>\n\t{% for e in x %}\n\t\t<li>{{ e }}</li>\n\t{% endfor %}\n</ul>\n",
                 "<ul>\n\t{% for e in x %}\n\t<li>{{ e }}</li>\n\t{% endfor %}\n</ul>\n",
+            ),
+            // A blank line left of its block's tag, before a block inside
+            // it, with spaces and with tabs.
+            (
+                "<main>\n  {% if a %}\n    <p>a</p>\n\n    {% if b %}\n      <p>b</p>\n    {% endif %}\n  {% endif %}\n</main>\n",
+                "<main>\n  {% if a %}\n  <p>a</p>\n\n    {% if b %}\n  <p>b</p>\n    {% endif %}\n  {% endif %}\n</main>\n",
+            ),
+            (
+                "<main>\n\t{% if a %}\n\t\t<p>a</p>\n\n\t\t{% if b %}\n\t\t\t<p>b</p>\n\t\t{% endif %}\n\t{% endif %}\n</main>\n",
+                "<main>\n\t{% if a %}\n\t<p>a</p>\n\n\t\t{% if b %}\n\t<p>b</p>\n\t\t{% endif %}\n\t{% endif %}\n</main>\n",
             ),
         ];
         for (template, built) in cases {

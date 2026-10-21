@@ -66,6 +66,31 @@ fn a_bodys_indent_for_the_templates_sake_is_left_out_of_the_page() {
 }
 
 #[test]
+fn a_blank_line_left_of_its_blocks_tag_stays_blank_with_tabs_or_spaces() {
+    for (indent, step) in [("      ", "  "), ("\t\t", "\t")] {
+        let template = format!(
+            "<main>\n{indent}{{% if true %}}\n{indent}{step}<p>a</p>\n\n\
+             {indent}{step}{{% if true %}}\n{indent}{step}{step}<p>b</p>\n\
+             {indent}{step}{{% endif %}}\n{indent}{{% endif %}}\n</main>\n"
+        );
+        let built = site(&[
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\npages.feed: false\n",
+            ),
+            ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("templates/home.html", &template),
+        ]);
+        assert!(built.problems.is_empty(), "{:?}", built.problems);
+        assert_eq!(
+            built.html("index.md"),
+            format!("<main>\n{indent}<p>a</p>\n\n{indent}<p>b</p>\n</main>\n"),
+            "{template:?}"
+        );
+    }
+}
+
+#[test]
 fn a_body_written_at_an_indented_call_gives_up_the_indent_its_lines_share() {
     let cases = [
         (
