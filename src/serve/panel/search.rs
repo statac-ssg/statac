@@ -42,7 +42,7 @@ pub(super) fn found(
             if blank {
                 return format!(
                     "{{\"code\":{code},\"pages\":0,\"some\":false,\"suggestion\":null,\
-                     \"parts\":0,\"average\":0,\"results\":[]}}"
+                     \"parts\":0,\"average\":0,\"titleAverage\":0,\"results\":[]}}"
                 );
             }
             let index = &built.indexes(read)[language.index()];
@@ -74,12 +74,13 @@ fn in_language(
         .collect();
     format!(
         "{{\"code\":{code},\"pages\":{},\"some\":{},\"suggestion\":{},\"parts\":{},\
-         \"average\":{},\"results\":[{}]}}",
+         \"average\":{},\"titleAverage\":{},\"results\":[{}]}}",
         found.pages,
         found.some,
         or_null(found.suggestion.as_deref()),
         index.records.len(),
         index.average(),
+        index.title_average(),
         results.join(","),
     )
 }
@@ -116,10 +117,10 @@ fn result(
             let places: Vec<String> = (counted.places.iter())
                 .map(|stands| {
                     format!(
-                        "{{\"place\":\"{}\",\"times\":{},\"counts\":{}}}",
+                        "{{\"place\":\"{}\",\"times\":{},\"adds\":{}}}",
                         stands.place.name(),
                         stands.times,
-                        stands.counts,
+                        stands.adds,
                     )
                 })
                 .collect();
@@ -138,7 +139,7 @@ fn result(
     format!(
         "{{\"title\":{},\"day\":{},\"heading\":{},\"href\":{},\"file\":{},\"draft\":{draft},\
          \"waiting\":{},\"excerpt\":[{}],\"matched\":{},\"score\":{},\"length\":{},\
-         \"words\":[{}]}}",
+         \"titleLength\":{},\"words\":[{}]}}",
         json::string(&shown(&found.title)),
         or_null(found.day.as_deref().map(shown).as_deref()),
         or_null(found.heading.as_deref().map(shown).as_deref()),
@@ -149,6 +150,7 @@ fn result(
         found.found.matched,
         found.found.score,
         why.length,
+        why.title,
         words.join(","),
     )
 }

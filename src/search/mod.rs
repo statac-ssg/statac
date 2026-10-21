@@ -1,8 +1,12 @@
 //! Search over a site's writing: one record for each part of a page that
 //! a heading with an id starts, and one for the part before, ranked by
-//! BM25 over words weighted by where they stand. Only the length of a
-//! part's text counts against a word, so a word in its title, heading,
-//! tags or summary counts the same in a long part as in a short one.
+//! BM25 in each place a word stands: the page's title, the part's heading,
+//! the page's tags and summary, the part's picture descriptions and its
+//! text. How often a word stands in a place counts for less each time,
+//! and the place's weight scales what that comes to, so a part holding a
+//! word often in its text gains little on one holding it in its title or
+//! heading. The title's length counts against a word in it, and the
+//! text's against a word there.
 
 mod command;
 pub mod elsewhere;
@@ -33,8 +37,8 @@ pub use kept::Kept;
 pub use why::{Counted, Stands, Why};
 pub use words::{Stemmer, fold, spans};
 
-/// How much a word counts where it stands. A page's title counts in every
-/// part of the page, most in its opening.
+/// How much a word counts where it stands, at most. A page's title counts
+/// in every part of the page, most in its opening.
 const TITLE_OPENING: u32 = 5;
 const TITLE: u32 = 2;
 const HEADING: u32 = 3;
@@ -319,6 +323,29 @@ pub enum Place {
 }
 
 impl Place {
+    /// Every place, in order.
+    const ALL: [Place; 6] = [
+        Place::Title,
+        Place::Heading,
+        Place::Tags,
+        Place::Summary,
+        Place::Pictures,
+        Place::Text,
+    ];
+
+    /// How much a word here counts at most, in an opening record or not.
+    fn weight(self, opening: bool) -> u32 {
+        match self {
+            Place::Title if opening => TITLE_OPENING,
+            Place::Title => TITLE,
+            Place::Heading => HEADING,
+            Place::Tags => TAG,
+            Place::Summary => SUMMARY,
+            Place::Pictures => DESCRIBED,
+            Place::Text => TEXT,
+        }
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             Place::Title => "title",
@@ -332,81 +359,91 @@ impl Place {
 }
 
 /// Each word of `record`, of a page `said` is said of, folded, in turn,
-/// with where it stands and its weight there.
-fn placed(said: &Said, record: &Record, mut each: impl FnMut(&str, Place, u32)) {
-    let opening = record.opening;
+/// with where it stands.
+fn placed(said: &Said, record: &Record, mut each: impl FnMut(&str, Place)) {
     let mut folded = String::new();
-    let mut add = |text: &str, place: Place, weight: u32| {
+    let mut add = |text: &str, place: Place| {
         for span in spans(text) {
             words::fold_into(&text[span], &mut folded);
-            each(&folded, place, weight);
+            each(&folded, place);
         }
     };
     if let Some(title) = said.title {
-        let weight = if opening { TITLE_OPENING } else { TITLE };
-        add(title, Place::Title, weight);
+        add(title, Place::Title);
     }
-    if opening {
+    if record.opening {
         for tag in &said.tags {
-            add(tag, Place::Tags, TAG);
+            add(tag, Place::Tags);
         }
         if let Some(summary) = said.summary {
-            add(summary, Place::Summary, SUMMARY);
+            add(summary, Place::Summary);
         }
     }
     if let Some((_, heading)) = &record.heading {
-        add(heading, Place::Heading, HEADING);
+        add(heading, Place::Heading);
     }
     for description in &record.described {
-        add(description, Place::Pictures, DESCRIBED);
+        add(description, Place::Pictures);
     }
-    add(&record.text, Place::Text, TEXT);
+    add(&record.text, Place::Text);
 }
 
-/// A record's words, folded, each once with its weight in the record's
-/// text and its weight everywhere else, and the length of its text.
+/// A record's words, folded, each once with how many times it stands in
+/// each place, and the length of its text and of its page's title, in
+/// words.
 struct Weighed {
-    words: Vec<(String, Weights)>,
+    words: Vec<(String, Times)>,
     length: u32,
+    titled: u32,
 }
 
-/// What a word weighs in a record: in its text, which the text's length
-/// counts against, and everywhere else, which no length does.
+/// How many times a word stands in each place in a record, by the place.
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
-struct Weights {
-    text: u32,
-    rest: u32,
-}
+struct Times([u32; Place::ALL.len()]);
 
-impl Weights {
-    fn add(&mut self, place: Place, weight: u32) {
-        match place {
-            Place::Text => self.text += weight,
-            _ => self.rest += weight,
+impl Times {
+    /// A word standing `times` in a record's text and nowhere else.
+    fn of_text(times: u32) -> Times {
+        let mut held = Times::default();
+        held.0[Place::Text as usize] = times;
+        held
+    }
+
+    fn of(self, place: Place) -> u32 {
+        self.0[place as usize]
+    }
+
+    fn add(&mut self, other: Times) {
+        for (times, more) in self.0.iter_mut().zip(other.0) {
+            *times += more;
         }
     }
 }
 
 /// `record`, of a page `said` is said of, weighed.
 fn weighed(said: &Said, record: &Record) -> Weighed {
-    let mut words: HashMap<String, Weights> = HashMap::new();
+    let mut words: HashMap<String, Times> = HashMap::new();
     let mut length = 0;
-    placed(said, record, |word, place, weight| {
+    let mut titled = 0;
+    placed(said, record, |word, place| {
+        let mut once = Times::default();
+        once.0[place as usize] = 1;
         match words.get_mut(word) {
-            Some(held) => held.add(place, weight),
+            Some(times) => times.add(once),
             None => {
-                let mut weights = Weights::default();
-                weights.add(place, weight);
-                words.insert(word.to_owned(), weights);
+                words.insert(word.to_owned(), once);
             }
         }
-        if place == Place::Text {
-            length += weight;
+        match place {
+            Place::Text => length += 1,
+            Place::Title => titled += 1,
+            _ => {}
         }
     });
     Weighed {
         words: words.into_iter().collect(),
         length,
+        titled,
     }
 }
 
@@ -422,11 +459,16 @@ pub struct Index {
     /// The length of each record's text, in words.
     lengths: Vec<u32>,
     average: f64,
+    /// The length of each record's page's title, in words, and the
+    /// average of those with a title.
+    titles: Vec<u32>,
+    title_average: f64,
     /// Every word the records hold, folded, in the order of their UTF-16
     /// code units, with its stem's entry.
     words: Vec<(String, u32)>,
-    /// Each entry's records, in order, with the stem's weights in each.
-    entries: Vec<Vec<(u32, Weights)>>,
+    /// Each entry's records, in order, with how many times the stem
+    /// stands in each place there.
+    entries: Vec<Vec<(u32, Times)>>,
     /// Where each piece of the word list a reader's browser is given
     /// starts, once asked for.
     starts: OnceLock<Vec<usize>>,
@@ -436,8 +478,10 @@ pub struct Index {
 struct Assembled {
     lengths: Vec<u32>,
     average: f64,
+    titles: Vec<u32>,
+    title_average: f64,
     words: Vec<(String, u32)>,
-    entries: Vec<Vec<(u32, Weights)>>,
+    entries: Vec<Vec<(u32, Times)>>,
 }
 
 impl Assembled {
@@ -447,6 +491,8 @@ impl Assembled {
             records,
             lengths: self.lengths,
             average: self.average,
+            titles: self.titles,
+            title_average: self.title_average,
             words: self.words,
             entries: self.entries,
             starts: OnceLock::new(),
@@ -505,36 +551,35 @@ impl Index {
         let entry_of: HashMap<&str, u32> = (words.iter().zip(&stems))
             .map(|(&word, stem)| (word, numbered[stem.as_str()]))
             .collect();
-        // Each record's stems, with their weights there.
-        let held: Vec<HashMap<u32, Weights>> = (weighed.par_iter())
+        // Each record's stems, with how many times each stands where.
+        let held: Vec<HashMap<u32, Times>> = (weighed.par_iter())
             .map(|weighed| {
-                let mut held: HashMap<u32, Weights> = HashMap::new();
-                for (word, weights) in &weighed.words {
-                    let kept = held.entry(entry_of[word.as_str()]).or_default();
-                    kept.text += weights.text;
-                    kept.rest += weights.rest;
+                let mut held: HashMap<u32, Times> = HashMap::new();
+                for (word, times) in &weighed.words {
+                    held.entry(entry_of[word.as_str()]).or_default().add(*times);
                 }
                 held
             })
             .collect();
-        let mut entries: Vec<Vec<(u32, Weights)>> = vec![Vec::new(); keys.len()];
+        let mut entries: Vec<Vec<(u32, Times)>> = vec![Vec::new(); keys.len()];
         for (record, held) in held.into_iter().enumerate() {
             let record = u32::try_from(record).expect("fewer records than u32 holds");
-            for (entry, weights) in held {
-                entries[entry as usize].push((record, weights));
+            for (entry, times) in held {
+                entries[entry as usize].push((record, times));
             }
         }
         let words: Vec<(String, u32)> = (words.iter())
             .map(|&word| (word.to_owned(), entry_of[word]))
             .collect();
         let lengths: Vec<u32> = weighed.iter().map(|weighed| weighed.length).collect();
-        let average = match lengths.len() {
-            0 => 1.0,
-            n => (lengths.iter().map(|&l| f64::from(l)).sum::<f64>() / n as f64).max(1.0),
-        };
+        let titles: Vec<u32> = weighed.iter().map(|weighed| weighed.titled).collect();
+        let average = mean(lengths.iter().copied());
+        let title_average = mean(titles.iter().copied().filter(|&length| length > 0));
         Assembled {
             lengths,
             average,
+            titles,
+            title_average,
             words,
             entries,
         }
@@ -596,9 +641,9 @@ impl Index {
             let rarity = self.rarity(self.holding(&entries));
             let mut best: HashMap<u32, f64> = HashMap::new();
             for (entry, counts) in entries {
-                for &(record, weights) in &self.entries[entry as usize] {
+                for &(record, times) in &self.entries[entry as usize] {
                     let kept = best.entry(record).or_default();
-                    *kept = kept.max(self.scored(rarity, weights, record) * counts);
+                    *kept = kept.max(self.scored(rarity, times, record) * counts);
                 }
             }
             for (record, score) in best {
@@ -642,12 +687,27 @@ impl Index {
         (1.0 + (count - holding + 0.5) / (holding + 0.5)).ln()
     }
 
-    /// What a word as rare as `rarity` scores in `record`, held there at
-    /// `weights`: BM25F, the text's weight scaled by its length alone.
-    fn scored(&self, rarity: f64, weights: Weights, record: u32) -> f64 {
-        let length = f64::from(self.lengths[record as usize]) / self.average;
-        let weight = f64::from(weights.rest) + f64::from(weights.text) / (1.0 - B + B * length);
-        rarity * weight * (K1 + 1.0) / (weight + K1)
+    /// What a word as rare as `rarity` scores in `record`, standing there
+    /// `times` in each place: BM25 in each place, by the place's weight,
+    /// added.
+    fn scored(&self, rarity: f64, times: Times, record: u32) -> f64 {
+        let places = Place::ALL.iter();
+        rarity * places.fold(0.0, |sum, &place| sum + self.counted(times, record, place))
+    }
+
+    /// What a word standing `times` in each place in `record` counts in
+    /// `place`, as rare words go: as BM25 counts how often a word stands in
+    /// it, the text's and the title's times scaled by their length, by the
+    /// place's weight.
+    fn counted(&self, times: Times, record: u32, place: Place) -> f64 {
+        let at = record as usize;
+        let held = times.of(place);
+        let held = match place {
+            Place::Text => scaled(held, self.lengths[at], self.average),
+            Place::Title => scaled(held, self.titles[at], self.title_average),
+            _ => f64::from(held),
+        };
+        f64::from(place.weight(self.records[at].opening)) * saturated(held)
     }
 
     /// The average length of the records' text, in words.
@@ -655,11 +715,41 @@ impl Index {
         self.average
     }
 
+    /// The average length of the titles of the records' pages, in words,
+    /// of the records whose page has one.
+    pub fn title_average(&self) -> f64 {
+        self.title_average
+    }
+
     /// Every word the records hold, folded, in the order of their UTF-16
     /// code units.
     pub fn words(&self) -> impl Iterator<Item = &str> {
         self.words.iter().map(|(word, _)| word.as_str())
     }
+}
+
+/// The average of `lengths`, at least 1.
+fn mean(lengths: impl Iterator<Item = u32>) -> f64 {
+    let (total, n) = lengths.fold((0.0, 0), |(total, n), length| {
+        (total + f64::from(length), n + 1)
+    });
+    match n {
+        0 => 1.0,
+        n => (total / f64::from(n)).max(1.0),
+    }
+}
+
+/// `times` a word stands in something `length` long where `average` is
+/// the usual, scaled as BM25 scales it.
+fn scaled(times: u32, length: u32, average: f64) -> f64 {
+    let length = f64::from(length) / average;
+    f64::from(times) / (1.0 - B + B * length)
+}
+
+/// What a word standing `times` counts, each time more counting for less:
+/// 1 for once where the length is the usual, never `K1 + 1`.
+fn saturated(times: f64) -> f64 {
+    times * (K1 + 1.0) / (times + K1)
 }
 
 /// What a search asks for: its words, folded, each once, in the order of

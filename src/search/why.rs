@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use super::{Asked, Index, Place, Said, in_utf16, placed};
+use super::{Asked, Index, Place, Said, Times, in_utf16, placed};
 use crate::site::Site;
 
 /// Why a record scores what it does.
@@ -13,6 +13,10 @@ pub struct Why {
     /// The length of its text, in words, and the records' average.
     pub length: u32,
     pub average: f64,
+    /// The length of its page's title, in words, and the average of the
+    /// records whose page has one.
+    pub title: u32,
+    pub title_average: f64,
     /// What each word asked counted, in the order of the words.
     pub words: Vec<Counted>,
 }
@@ -36,13 +40,12 @@ pub struct Counted {
 }
 
 /// How many times a word's forms stand in one place in a record, and what
-/// they count there.
+/// they add to its score there.
 #[derive(Debug, PartialEq)]
 pub struct Stands {
     pub place: Place,
     pub times: u32,
-    /// The times by the place's weight.
-    pub counts: u32,
+    pub adds: f64,
 }
 
 impl Index {
@@ -51,17 +54,20 @@ impl Index {
     /// its score.
     pub fn why(&self, site: &Site, record: usize, asked: &Asked) -> Why {
         // The record's words by their entries, each where it stands.
-        let mut held: HashMap<u32, Vec<(String, Place, u32)>> = HashMap::new();
+        let mut held: HashMap<u32, Vec<(String, Place)>> = HashMap::new();
         let mut length = 0;
+        let mut title = 0;
         let said = Said::of(site, self.records[record].page);
-        placed(&said, &self.records[record], |word, place, weight| {
-            if place == Place::Text {
-                length += weight;
+        placed(&said, &self.records[record], |word, place| {
+            match place {
+                Place::Text => length += 1,
+                Place::Title => title += 1,
+                _ => {}
             }
             if let Some(entry) = self.entry_of(word) {
                 held.entry(entry)
                     .or_default()
-                    .push((word.to_owned(), place, weight));
+                    .push((word.to_owned(), place));
             }
         });
         let at = u32::try_from(record).expect("fewer records than u32 holds");
@@ -71,18 +77,19 @@ impl Index {
                 let holding = self.holding(&looked);
                 let rarity = self.rarity(holding);
                 // The entry scoring most here, as search keeps it.
-                let mut best: Option<(u32, f64, f64)> = None;
+                let mut best: Option<(u32, Times, f64, f64)> = None;
                 for &(entry, counts) in &looked {
                     let records = &self.entries[entry as usize];
                     let Ok(found) = records.binary_search_by_key(&at, |&(record, _)| record) else {
                         continue;
                     };
-                    let score = self.scored(rarity, records[found].1, at) * counts;
-                    if best.is_none_or(|(_, _, kept)| score > kept) {
-                        best = Some((entry, counts, score));
+                    let times = records[found].1;
+                    let score = self.scored(rarity, times, at) * counts;
+                    if best.is_none_or(|(.., kept)| score > kept) {
+                        best = Some((entry, times, counts, score));
                     }
                 }
-                let Some((entry, counts, score)) = best else {
+                let Some((entry, times, counts, score)) = best else {
                     return Counted {
                         word: word.clone(),
                         forms: Vec::new(),
@@ -97,21 +104,19 @@ impl Index {
                     standing.iter().map(|(form, ..)| form.clone()).collect();
                 forms.sort_unstable_by(|a, b| in_utf16(a, b));
                 forms.dedup();
-                let mut places: BTreeMap<Place, (u32, u32)> = BTreeMap::new();
-                for &(_, place, weight) in standing {
-                    let (times, counted) = places.entry(place).or_default();
-                    *times += 1;
-                    *counted += weight;
+                let mut places: BTreeMap<Place, u32> = BTreeMap::new();
+                for &(_, place) in standing {
+                    *places.entry(place).or_default() += 1;
                 }
                 Counted {
                     word: word.clone(),
                     forms,
                     starting: counts < 1.0,
                     places: (places.into_iter())
-                        .map(|(place, (times, counts))| Stands {
+                        .map(|(place, held)| Stands {
                             place,
-                            times,
-                            counts,
+                            times: held,
+                            adds: rarity * self.counted(times, at, place) * counts,
                         })
                         .collect(),
                     holding,
@@ -122,6 +127,8 @@ impl Index {
         Why {
             length,
             average: self.average,
+            title,
+            title_average: self.title_average,
             words,
         }
     }

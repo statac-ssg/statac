@@ -10,14 +10,17 @@
 //! not `.gz`, which some hosts send marked as packed for the browser to
 //! unpack itself.
 //!
-//! - `records.*.bin`: each page's text file and how many records it has,
-//!   the records in order, and the length of each record's text.
+//! - `records.*.bin`: each page's text file, how many records it has and
+//!   the length of its title, the records in order, and the length of
+//!   each record's text.
 //! - `words.*.bin`: a run of the language's words in the order of their
 //!   UTF-16 code units, each with its stem's entry among the piece's, and
-//!   each entry's records as gaps from the last, each with its weight in
-//!   the record's text and its weight everywhere else: the gap times four,
-//!   plus 1 where the weight in its text alone follows, 2 where the rest
-//!   alone does, or 3 where both do, the text's first.
+//!   each entry's records as gaps from the last, each with how many times
+//!   the stem stands in each place there: the gap times two, then the
+//!   times in its text where it stands nowhere else; or the gap times two
+//!   plus one, then which places it stands in, one bit for each in the
+//!   order of [`Place`], the title's lowest, then its times in each of
+//!   them in that order.
 //!   `index.js` gives the first word of each.
 //! - `pages/*.bin`: one page's address, its name as a list gives it, its
 //!   date, the date as the site writes it where the page isn't called by
@@ -29,7 +32,7 @@ use std::fmt::Write as _;
 
 use rayon::prelude::*;
 
-use super::{Index, Kept, Weights};
+use super::{Index, Kept, Place, Times};
 use crate::content::address::Top;
 use crate::problem::Named;
 use crate::site::{LanguageId, Site};
@@ -133,12 +136,13 @@ pub(super) fn files(renderer: &Renderer, folder: &str, index: &Index, kept: &Kep
         .collect();
 
     let mut json = String::from("{\"pages\":[");
-    for (i, (text, &(_, count))) in texts.iter().zip(&pages).enumerate() {
+    for (i, (text, &(first, count))) in texts.iter().zip(&pages).enumerate() {
         if i > 0 {
             json.push(',');
         }
         let name = text.path.rsplit('/').next().unwrap_or_default();
-        write!(json, "[\"{name}\",{count}]").expect("writing to a string can't fail");
+        let title = index.titles[first];
+        write!(json, "[\"{name}\",{count},{title}]").expect("writing to a string can't fail");
     }
     json.push_str("],\"lengths\":");
     numbers(index.lengths.iter().copied(), &mut json);
@@ -280,7 +284,7 @@ fn cuts(index: &Index, most: usize) -> (Vec<usize>, Vec<usize>) {
 }
 
 /// About how long an entry's records are written.
-fn written_length(records: &[(u32, Weights)]) -> usize {
+fn written_length(records: &[(u32, Times)]) -> usize {
     records.len() * 6 + 2
 }
 
@@ -315,17 +319,23 @@ fn piece(index: &Index, range: std::ops::Range<usize>) -> String {
         let mut last = 0;
         let records = index.entries[entry as usize]
             .iter()
-            .flat_map(|&(record, weights)| {
+            .flat_map(|&(record, times)| {
                 let gap = record - last;
                 last = record;
                 let gap = gap
-                    .checked_mul(4)
-                    .expect("fewer records than u32 holds a quarter of");
-                match (weights.text, weights.rest) {
-                    (text, 0) => vec![gap + 1, text],
-                    (0, rest) => vec![gap + 2, rest],
-                    (text, rest) => vec![gap + 3, text, rest],
+                    .checked_mul(2)
+                    .expect("fewer records than u32 holds half of");
+                let text = times.of(Place::Text);
+                if times == Times::of_text(text) {
+                    return vec![gap, text];
                 }
+                let held: Vec<(usize, u32)> = (times.0.into_iter().enumerate())
+                    .filter(|&(_, n)| n > 0)
+                    .collect();
+                let places = held.iter().fold(0, |places, &(at, _)| places | 1 << at);
+                let mut written = vec![gap + 1, places];
+                written.extend(held.into_iter().map(|(_, n)| n));
+                written
             });
         numbers(records, &mut json);
     }

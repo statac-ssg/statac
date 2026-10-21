@@ -627,7 +627,7 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     let plain = panel(&served, "/post-1/");
     assert!(
         plain.starts_with(
-            "{\"v\":3,\"problems\":[],\"stopped\":null,\"explanations\":{},\
+            "{\"v\":4,\"problems\":[],\"stopped\":null,\"explanations\":{},\
              \"round\":{\"state\":\"built\",\"at\":\""
         ) && plain.contains("\"counts\":{\"error\":0,\"warning\":1,\"note\":1}}")
             && plain.contains(
@@ -795,7 +795,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     for asked in ["", "?kind=broken-link"] {
         let every = served.page(&format!("/.statac-live/problems{asked}"));
         assert!(
-            every.starts_with(&format!("{{\"v\":3,\"problems\":[{link},{template}"))
+            every.starts_with(&format!("{{\"v\":4,\"problems\":[{link},{template}"))
                 && every
                     .contains("\"quietened\":true}],\"more\":0,\"explanations\":{\"broken-link\":"),
             "{asked}: {every}"
@@ -803,7 +803,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
     }
     assert_eq!(
         served.page("/.statac-live/problems?kind=unknown-word"),
-        "{\"v\":3,\"problems\":[],\"more\":0,\"explanations\":{}}"
+        "{\"v\":4,\"problems\":[],\"more\":0,\"explanations\":{}}"
     );
 
     // A round that stops has every error in its parts, and the page's
@@ -1136,16 +1136,16 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
     let draft = search(&served, "draft", "/post-1/");
     assert!(
         draft.starts_with(
-            "{\"v\":3,\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":1,\"some\":false,\
-             \"suggestion\":null,\"parts\":4,\"average\":2.5,\"results\":[\
-             {\"title\":\"Post 2\",\"day\":null,\"heading\":null,\"href\":\"/post-2/\",\
+            "{\"v\":4,\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":1,\"some\":false,\
+             \"suggestion\":null,\"parts\":4,\"average\":2.5,\"titleAverage\":1.75,\
+             \"results\":[{\"title\":\"Post 2\",\"day\":null,\"heading\":null,\"href\":\"/post-2/\",\
              \"file\":\"content/post-2.md\",\"draft\":true,\"waiting\":null,\
              \"excerpt\":[{\"text\":\"A \",\"marked\":false},{\"text\":\"draft\",\"marked\":true},\
              {\"text\":\".\",\"marked\":false}],\"matched\":1,\"score\":"
         ) && draft.contains(
-            ",\"length\":2,\"words\":[{\"word\":\"draft\",\"forms\":[\"draft\"],\
-             \"starting\":false,\"places\":[{\"place\":\"text\",\"times\":1,\"counts\":1}],\
-             \"holding\":1,\"score\":"
+            ",\"length\":2,\"titleLength\":2,\"words\":[{\"word\":\"draft\",\
+             \"forms\":[\"draft\"],\"starting\":false,\"places\":[{\"place\":\"text\",\
+             \"times\":1,\"adds\":"
         ),
         "{draft}"
     );
@@ -1156,10 +1156,9 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
             "{\"title\":\"Post 3\",\"day\":\"1 January 2999\",\"heading\":null,\
              \"href\":\"/post-3/\",\"file\":\"content/post-3.md\",\"draft\":false,\
              \"waiting\":\"2999-01-01\","
-        ) && post.contains(
-            "\"places\":[{\"place\":\"title\",\"times\":1,\"counts\":5},\
-             {\"place\":\"text\",\"times\":1,\"counts\":1}],\"holding\":3,"
-        ),
+        ) && post.contains("\"places\":[{\"place\":\"title\",\"times\":1,\"adds\":")
+            && post.contains("},{\"place\":\"text\",\"times\":1,\"adds\":")
+            && post.contains("}],\"holding\":3,"),
         "{post}"
     );
     // A space as a form writes it; a word no page holds adds nothing.
@@ -1181,8 +1180,8 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
     let blank = search(&served, "%20%20", "/post-1/");
     assert_eq!(
         blank,
-        "{\"v\":3,\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":0,\"some\":false,\
-         \"suggestion\":null,\"parts\":0,\"average\":0,\"results\":[]}]}"
+        "{\"v\":4,\"drafts\":true,\"languages\":[{\"code\":\"en\",\"pages\":0,\"some\":false,\
+         \"suggestion\":null,\"parts\":0,\"average\":0,\"titleAverage\":0,\"results\":[]}]}"
     );
 }
 

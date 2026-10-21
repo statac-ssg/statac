@@ -4268,7 +4268,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ),
         ("columnWhere", said("Where")),
         ("columnTimes", said("Times")),
-        ("columnCounts", said("Counts")),
+        ("columnAdds", said("Adds")),
         ("placeTitle", said("Title")),
         ("placeHeading", said("Heading")),
         ("placeTags", said("Tags")),
@@ -4282,6 +4282,13 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
             said(
                 "Length of its text: {n}, against the site's average of {average}. Longer text \
                  counts each word in it for less.",
+            ),
+        ),
+        (
+            "titleLength",
+            said(
+                "Length of the page's title: {n}, against the site's average of {average}. A \
+                 longer title counts each word in it for less.",
             ),
         ),
     ]

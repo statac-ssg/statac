@@ -33,7 +33,7 @@ const ROUNDS: usize = 10;
 /// The version of every answer the panel's script reads. A page loaded
 /// from one Statac can be answered by another, whose answers its script
 /// may not read.
-const VERSION: u32 = 3;
+const VERSION: u32 = 4;
 
 /// What the panel shows after one round.
 #[derive(Default)]

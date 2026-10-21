@@ -12,7 +12,7 @@
   const kept = "statac-live-panel";
   // The version of serve's answers this script reads. A page loaded from
   // one Statac can be answered by another, once serve is started anew.
-  const understood = 3;
+  const understood = 4;
 
   // Every word the panel puts together itself, from serve: each the pieces
   // of a sentence, or for a count, those said of one and of many.
@@ -2589,7 +2589,7 @@
                   make(
                     "tr",
                     {},
-                    ["columnWhere", "columnTimes", "columnCounts"].map((name) =>
+                    ["columnWhere", "columnTimes", "columnAdds"].map((name) =>
                       make("th", { scope: "col" }, told(name)),
                     ),
                   ),
@@ -2603,7 +2603,7 @@
                       {},
                       make("th", { scope: "row" }, told(placeWords[place.place])),
                       make("td", {}, grouped(place.times)),
-                      make("td", {}, grouped(place.counts)),
+                      make("td", {}, score(place.adds)),
                     ),
                   ),
                 ),
@@ -2645,6 +2645,16 @@
           average: grouped(Math.round(language.average)),
         }),
       ),
+      result.titleLength
+        ? make(
+            "p",
+            { class: "meta length" },
+            told("titleLength", {
+              n: result.titleLength,
+              average: grouped(Math.round(language.titleAverage)),
+            }),
+          )
+        : null,
     );
   };
 

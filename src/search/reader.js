@@ -5,6 +5,13 @@
 
 const K1 = 1.2;
 const B = 0.75;
+// How much a word counts at most in each place it stands, in the order of
+// the word files' places: the title, in a page's opening and elsewhere,
+// the heading, tags, summary, picture descriptions and text.
+const TITLE_OPENING = 5;
+const WEIGHTS = [2, 3, 3, 2, 2, 1];
+const TITLE = 0;
+const TEXT = 5;
 // How much a word being typed counts in a longer word it starts.
 const STARTING = 0.8;
 // About how many UTF-16 code units of text are shown around a match.
@@ -275,22 +282,52 @@ function edits(a, b) {
 }
 
 /**
- * The records of an entry's list, each as its place among the records,
- * its weight in its text and its weight everywhere else.
+ * The records of an entry's list, each as its place among the records and
+ * how many times the stem stands in each place there.
  */
 function postings(list) {
   const held = [];
   let record = 0;
   for (let at = 0; at < list.length; ) {
     const step = list[at];
-    const kind = step % 4;
-    record += (step - kind) / 4;
-    const text = kind === 2 ? 0 : list[at + 1];
-    const rest = kind === 1 ? 0 : list[at + (kind === 2 ? 1 : 2)];
-    held.push([record, text, rest]);
-    at += kind === 3 ? 3 : 2;
+    const placed = step % 2;
+    record += (step - placed) / 2;
+    const times = [0, 0, 0, 0, 0, 0];
+    if (placed) {
+      const places = list[at + 1];
+      at += 2;
+      for (let place = 0; place < times.length; place += 1) {
+        if (places & (1 << place)) {
+          times[place] = list[at];
+          at += 1;
+        }
+      }
+    } else {
+      times[TEXT] = list[at + 1];
+      at += 2;
+    }
+    held.push([record, times]);
   }
   return held;
+}
+
+/** `times` a word stands in something `length` long where `average` is the usual. */
+function scaled(times, length, average) {
+  return times / (1 - B + B * (length / average));
+}
+
+/** What a word standing `times` counts, each time more counting for less. */
+function saturated(times) {
+  return (times * (K1 + 1)) / (times + K1);
+}
+
+/** The average of `lengths`, at least 1. */
+function averageOf(lengths) {
+  let total = 0;
+  for (const length of lengths) {
+    total += length;
+  }
+  return lengths.length ? Math.max(total / lengths.length, 1) : 1;
 }
 
 /**
@@ -474,11 +511,30 @@ async function found(query, shown, typing, respelling = true) {
   ]);
   const lengths = records.lengths;
   const count = lengths.length;
-  let total = 0;
-  for (const length of lengths) {
-    total += length;
-  }
-  const average = count ? Math.max(total / count, 1) : 1;
+  const average = averageOf(lengths);
+  // Each record's page's title's length, and the average of those with one,
+  // and whether the record opens its page, as each page's first does.
+  const titles = records.pages.flatMap(([, parts, title]) => Array(parts).fill(title));
+  const titleAverage = averageOf(titles.filter((title) => title > 0));
+  const opening = records.pages.flatMap(([, parts]) =>
+    Array.from({ length: parts }, (_, part) => part === 0),
+  );
+  // What a word standing `times` in each place in `record` scores, as rare
+  // words go.
+  const scored = (times, record) => {
+    let sum = 0;
+    for (let place = 0; place < times.length; place += 1) {
+      let held = times[place];
+      if (place === TEXT) {
+        held = scaled(held, lengths[record], average);
+      } else if (place === TITLE) {
+        held = scaled(held, titles[record], titleAverage);
+      }
+      const weight = place === TITLE && opening[record] ? TITLE_OPENING : WEIGHTS[place];
+      sum += weight * saturated(held);
+    }
+    return sum;
+  };
   const held = new Map();
   for (const lists of looked) {
     // A word being typed counts as one word across the words it starts, as
@@ -493,10 +549,8 @@ async function found(query, shown, typing, respelling = true) {
     const holding = best.size;
     const rarity = Math.log(1 + (count - holding + 0.5) / (holding + 0.5));
     for (const [held, counts] of entries) {
-      for (const [record, text, rest] of held) {
-        const length = lengths[record] / average;
-        const weight = rest + text / (1 - B + B * length);
-        const score = (rarity * weight * (K1 + 1)) / (weight + K1);
+      for (const [record, times] of held) {
+        const score = rarity * scored(times, record);
         best.set(record, Math.max(best.get(record) ?? 0, score * counts));
       }
     }

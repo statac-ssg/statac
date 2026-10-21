@@ -92,6 +92,8 @@ fn listing(words: &[&str]) -> Index {
         records: Vec::new(),
         lengths: Vec::new(),
         average: 1.0,
+        titles: Vec::new(),
+        title_average: 1.0,
         words,
         entries: vec![Vec::new()],
         starts: OnceLock::new(),
@@ -341,6 +343,55 @@ fn a_word_in_a_title_counts_the_same_however_long_the_text() {
         index.records[found[0].record].page,
         page(&renderer, "about.md")
     );
+}
+
+#[test]
+fn a_word_often_in_a_short_parts_text_comes_after_it_in_a_heading_or_a_title_of_its_own() {
+    let (renderer, root) = site(
+        "places",
+        &[
+            (
+                "content/guide.md",
+                &format!(
+                    "---\ntitle: Guide\n---\n{}\n\n## Import a site\n\n\
+                     The command reads the old site and writes a new one beside it.\n",
+                    "Other words fill the opening. ".repeat(20)
+                ),
+            ),
+            (
+                "content/example.md",
+                "---\ntitle: Missing folder\n---\nOpening.\n\n## Example\n\n\
+                 import old\n\nimport old new\n\nimport\n",
+            ),
+            (
+                "content/pictures.md",
+                "---\ntitle: Pictures\n---\nHow pages show them.\n",
+            ),
+            (
+                "content/undescribed.md",
+                "---\ntitle: Describes no picture\n---\nA picture with no description: \
+                 picture.\n",
+            ),
+        ],
+    );
+    let index = index_of(&renderer, 0);
+    let _ = std::fs::remove_dir_all(root);
+    let first = |words: &str| {
+        let found = index.search(&Asked::of(words, false, &index));
+        let record = &index.records[found[0].record];
+        (
+            record.page,
+            record.heading.as_ref().map(|(id, _)| id.clone()),
+        )
+    };
+    assert_eq!(
+        first("import"),
+        (
+            page(&renderer, "guide.md"),
+            Some("import-a-site".to_owned())
+        )
+    );
+    assert_eq!(first("pictures"), (page(&renderer, "pictures.md"), None));
 }
 
 #[test]
@@ -944,6 +995,8 @@ fn what_each_word_adds_to_a_part_sums_to_its_score() {
             assert_eq!(asked_for, asked.words, "{words}");
             assert_eq!(why.length, index.lengths[found.record], "{words}");
             assert_eq!(why.average, index.average(), "{words}");
+            assert_eq!(why.title, index.titles[found.record], "{words}");
+            assert_eq!(why.title_average, index.title_average(), "{words}");
         }
     }
     // Words were found in every place a word stands.
@@ -970,16 +1023,31 @@ fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
             .position(|record| record.page == post && id(record).as_deref() == heading)
             .unwrap()
     };
-    let stands = |place, times, counts| Stands {
+    // What each place adds, which sums to the word's score, kept back.
+    let added = |counted: &mut Counted| {
+        let adds: Vec<f64> = counted
+            .places
+            .iter_mut()
+            .map(|stands| std::mem::take(&mut stands.adds))
+            .collect();
+        assert!(adds.iter().all(|&adds| adds > 0.0), "{adds:?}");
+        let sum: f64 = adds.iter().sum();
+        assert!(
+            (sum - counted.score).abs() < 1e-9 * counted.score,
+            "{adds:?}: {counted:?}"
+        );
+    };
+    let stands = |place, times| Stands {
         place,
         times,
-        counts,
+        adds: 0.0,
     };
     // Each part of the first post holds a form of `run`, its title's if
     // no other, and so do the second post and the third's second part.
     let holding = 5;
     let asked = Asked::of("running", false, &index);
-    let opening = index.why(site, part(None), &asked);
+    let mut opening = index.why(site, part(None), &asked);
+    added(&mut opening.words[0]);
     assert_eq!(
         opening.words,
         [Counted {
@@ -987,9 +1055,9 @@ fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
             forms: vec!["running".to_owned(), "runs".to_owned()],
             starting: false,
             places: vec![
-                stands(Place::Title, 1, 5),
-                stands(Place::Summary, 1, 2),
-                stands(Place::Text, 1, 1),
+                stands(Place::Title, 1),
+                stands(Place::Summary, 1),
+                stands(Place::Text, 1),
             ],
             holding,
             score: opening.words[0].score,
@@ -998,7 +1066,8 @@ fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
     assert!(opening.words[0].score > 0.0);
     // Typed, it is the start of a longer word.
     let asked = Asked::of("runn", true, &index);
-    let heading = index.why(site, part(Some("heading-1")), &asked);
+    let mut heading = index.why(site, part(Some("heading-1")), &asked);
+    added(&mut heading.words[0]);
     assert_eq!(
         heading.words,
         [Counted {
@@ -1006,9 +1075,9 @@ fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
             forms: vec!["run".to_owned(), "running".to_owned()],
             starting: true,
             places: vec![
-                stands(Place::Title, 1, 2),
-                stands(Place::Pictures, 1, 2),
-                stands(Place::Text, 2, 2),
+                stands(Place::Title, 1),
+                stands(Place::Pictures, 1),
+                stands(Place::Text, 2),
             ],
             holding,
             score: heading.words[0].score,
