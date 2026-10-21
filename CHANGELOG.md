@@ -2,6 +2,55 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.6.1 - 2026-10-21
+
+### Fixed
+
+- Search ranks a page whose title or headings hold the words above a
+  shorter page that only mentions them. Only the length of a part's
+  text counts against a word now; a short part won by being short.
+- A named pipe or other special file in `content/`, `assets/`,
+  `static/`, `data/` or `templates/` is refused as not a file. The
+  build waited on it.
+- A link swapped in while a build runs is refused, never followed: in
+  the site's folders, in what Statac keeps in `.statac/` between
+  builds, and in the spare copy of the built site there. Reads, writes
+  and removals followed it, and in the spare copy could reach outside
+  the site.
+- A name in raw HTML that the site has no snippet for, such as
+  `@nope(a &amp; b)`, is published as it was written. Its `&` and tags
+  were escaped again and shown as text.
+- A value shown through `markdown` shows the character references in a
+  call to a name the site has no snippet for as the characters they
+  stand for, as it shows the rest of the value.
+- A page's opening words and word count read `&#0;`, a surrogate or a
+  number past Unicode as a replacement character, and `&#128;` to
+  `&#159;` as the characters a browser shows for them, and tell
+  `&AMP;` from `&Amp;` as a browser does.
+- A macro, `set` block, `call` or `filter` keeps a line its body has
+  apart from the next where a branch not taken stood between them, as a
+  page's own lines do.
+- A template's lines, and a macro's or `set` block's body where it is
+  written, are indented by their markup read as a browser reads it. A
+  comment closed by `--!>` had spaces added inside a `<pre>` after it,
+  and an apostrophe in an attribute's value written without quotes, as
+  `title=it's`, or a `<command>`, left the lines after it indented
+  wrongly.
+- A template that made two values Statac refused and then used the
+  first is told the first's problem. It could be told the second's.
+- A template giving a number with a fraction to `format`'s `%d` is told
+  the mark needs a whole number. It was told it needed a number.
+- `statac new` and `statac import` quote a value such as `yes` or `no`,
+  so that other tools reading the site's YAML don't take it as true or
+  false, and escape U+FFFE and U+FFFF, which a site's own settings
+  couldn't be read back with.
+
+### Changed
+
+- A template reading a long data file on every page, such as
+  `site.data.links | length`, no longer reads through the whole file
+  each time, so such a build no longer slows as the file grows.
+
 ## 0.6.0 - 2026-10-20
 
 ### New
