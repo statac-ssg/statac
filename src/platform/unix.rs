@@ -407,7 +407,7 @@ impl Folders {
         }
         let made = openat(at, name, MADE, Mode::from_raw_mode(0o666))?;
         let mut made = std::fs::File::from(made);
-        io::copy(&mut &*source, &mut made)?;
+        super::copy_whole(source, &mut made)?;
         made.set_permissions(source.metadata()?.permissions())?;
         Ok(Some(made))
     }

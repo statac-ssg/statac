@@ -603,9 +603,10 @@ impl Folders {
         }
     }
 
-    /// Copies what `source`, a file open to read, holds to the file `rel`,
-    /// made anew as [`Folders::make_new_file`] makes it, and given the
-    /// permissions of `source`. On Apple's systems the two share their
+    /// Copies all `source`, a file open to read, holds, wherever it was
+    /// last read to, to the file `rel`, made anew as
+    /// [`Folders::make_new_file`] makes it, and given the permissions of
+    /// `source`. On Apple's systems the two share their
     /// bytes where the disk can, as a copy made by the system's own
     /// copying does. Gives the copy open to write where it can be opened
     /// so, for its time to be set.
@@ -622,7 +623,7 @@ impl Folders {
         #[cfg(not(unix))]
         {
             let mut made = self.make_new_file(rel, replacing)?;
-            io::copy(&mut &*source, &mut made)?;
+            copy_whole(source, &mut made)?;
             made.set_permissions(source.metadata()?.permissions())?;
             Ok(Some(made))
         }
@@ -986,6 +987,14 @@ pub fn command_not_found(code: i32) -> bool {
     code == if cfg!(windows) { 9009 } else { 127 }
 }
 
+/// Copies all `source` holds to `to`, from its start, as a clone does.
+fn copy_whole(source: &std::fs::File, to: &mut std::fs::File) -> io::Result<u64> {
+    use std::io::Seek;
+    let mut from = source;
+    from.rewind()?;
+    io::copy(&mut from, to)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1284,6 +1293,22 @@ mod tests {
         assert_eq!(Refused::of(&refused), Some(Refused::Taken));
         assert!(!root.join("a").join("c.fresh").exists());
         remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_file_read_to_its_end_is_copied_whole() {
+        use std::io::Read;
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-whole-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("a.txt"), "bytes").unwrap();
+        let mut source = std::fs::File::open(root.join("a.txt")).unwrap();
+        source.read_to_end(&mut Vec::new()).unwrap();
+        let mut made = std::fs::File::create(root.join("b.txt")).unwrap();
+        copy_whole(&source, &mut made).unwrap();
+        assert_eq!(std::fs::read(root.join("b.txt")).unwrap(), b"bytes");
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
