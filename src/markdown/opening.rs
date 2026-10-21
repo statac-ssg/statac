@@ -458,6 +458,18 @@ fn text_words(out: &mut String, text: &str, parted: &mut bool, edges: bool) {
             false => part(out, text),
         }
     }
+    references_read_into(out, text);
+}
+
+/// `text` with its character references read as the characters they
+/// stand for.
+pub fn references_read(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    references_read_into(&mut out, text);
+    out
+}
+
+fn references_read_into(out: &mut String, text: &str) {
     let mut rest = text;
     while let Some(at) = rest.find('&') {
         out.push_str(&rest[..at]);

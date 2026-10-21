@@ -1123,7 +1123,9 @@ impl crate::markdown::Snippets for OfValue<'_> {
     ) -> String {
         let written = self.sources.spelling(place);
         match call.within {
-            crate::markdown::Within::Prose => escaped(written),
+            // As Markdown reads text, its references as the characters
+            // they stand for.
+            crate::markdown::Within::Prose => escaped(&crate::markdown::references_read(written)),
             // The author's HTML, written back as it is.
             _ => written.to_owned(),
         }

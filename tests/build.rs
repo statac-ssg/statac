@@ -2082,6 +2082,27 @@ note  Call in HTML: `@book` is built as a snippet
 }
 
 #[test]
+fn a_call_written_as_text_in_a_value_reads_its_references_as_the_rest_does() {
+    let site = Site::new("call-as-text");
+    site.write(
+        "templates/page.html",
+        "{{ page.content }}\n{{ page.blurb | markdown }}\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n\
+         blurb: 'Tea &amp; cake @nope(a &amp; b &lt;c&gt; &mdash; &#0;)'\n---\nText.\n",
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    assert!(
+        built.contains("Tea &amp; cake @nope(a &amp; b &lt;c&gt; \u{2014} \u{fffd})"),
+        "{built}"
+    );
+}
+
+#[test]
 fn a_name_the_site_has_no_snippet_for_in_html_is_published_as_written() {
     let site = Site::new("no-call-in-html");
     site.write(
