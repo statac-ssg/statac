@@ -662,10 +662,16 @@ impl Renderer {
         let shared = &self.shared;
         let body = kept_body(shared, page);
         let written = &body.written;
-        let outline = shared.outlines.lock().expect("never poisoned");
-        let outline = outline.get(&page);
+        let outline = shared
+            .outlines
+            .lock()
+            .expect("never poisoned")
+            .get(&page)
+            .map(Arc::clone);
         let words_of = |id: &str, html: &str| {
-            let section = outline.and_then(|sections| sections.iter().find(|s| s.id == id));
+            let section = outline
+                .as_ref()
+                .and_then(|sections| sections.iter().find(|s| s.id == id));
             match section {
                 Some(section) => section.text.clone(),
                 None => heading_words(html),

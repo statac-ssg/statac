@@ -70,6 +70,9 @@ pub struct Templates {
     cards: card::Cards,
     /// Where the files' lines are written.
     landings: Arc<landing::Landings>,
+    /// Where each file's text lies in memory as the engine holds it, as
+    /// its start, length and file, in order of start.
+    texts: Vec<(usize, usize, usize)>,
     /// How many of the engine's steps building one output may take.
     steps: u64,
     /// How many pages of lists of the whole site the outputs running one
@@ -120,11 +123,10 @@ impl Templates {
     /// The file whose text, as the engine holds it, has `address` in
     /// memory inside it, and how far into the text that is.
     fn holds(&self, address: usize) -> Option<(usize, usize)> {
-        self.files.iter().enumerate().find_map(|(at, file)| {
-            let template = self.env.get_template(&file.name).ok()?;
-            let offset = address.checked_sub(template.source().as_ptr() as usize)?;
-            (offset < template.source().len()).then_some((at, offset))
-        })
+        let after = self.texts.partition_point(|&(start, ..)| start <= address);
+        let &(start, len, at) = self.texts.get(after.checked_sub(1)?)?;
+        let offset = address - start;
+        (offset < len).then_some((at, offset))
     }
 
     fn id(at: usize) -> TemplateId {
@@ -331,11 +333,31 @@ pub(crate) fn read(
         extends,
         cards,
         landings: Arc::default(),
+        texts: Vec::new(),
         steps,
         many_walked: lowered_walked(root).unwrap_or(walks::MANY),
     };
     templates.landings = Arc::new(landings(&templates, &facts, &dropped, sources));
+    templates.texts = texts(&templates);
     (templates, problems)
+}
+
+/// Where each file's text lies in memory as the engine holds it. The
+/// engine keeps a file's text where it was put until the file is removed,
+/// and nothing is added or removed once the files are read.
+fn texts(templates: &Templates) -> Vec<(usize, usize, usize)> {
+    let mut texts: Vec<_> = templates
+        .files
+        .iter()
+        .enumerate()
+        .filter_map(|(at, file)| {
+            let template = templates.env.get_template(&file.name).ok()?;
+            let source = template.source();
+            (!source.is_empty()).then_some((source.as_ptr() as usize, source.len(), at))
+        })
+        .collect();
+    texts.sort_unstable();
+    texts
 }
 
 /// Where the lines of the site's files are written, from what is known of
