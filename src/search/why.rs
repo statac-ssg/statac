@@ -2,7 +2,7 @@
 //! the forms of it the record holds, where they stand and what each
 //! counts there, and how rare the word is among the records.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use super::{Asked, Index, Place, Said, in_utf16, placed};
 use crate::site::Site;
@@ -29,8 +29,7 @@ pub struct Counted {
     pub starting: bool,
     /// Where the forms stand, in the order of the places.
     pub places: Vec<Stands>,
-    /// How many records hold the forms matched; where the record holds
-    /// none, how many hold any form the word finds.
+    /// How many records hold any form the word finds.
     pub holding: usize,
     /// What it adds to the record's score.
     pub score: f64,
@@ -69,6 +68,8 @@ impl Index {
         let looked = self.looked_in(asked);
         let words = (asked.words.iter().zip(looked))
             .map(|(word, looked)| {
+                let holding = self.holding(&looked);
+                let rarity = self.rarity(holding);
                 // The entry scoring most here, as search keeps it.
                 let mut best: Option<(u32, f64, f64)> = None;
                 for &(entry, counts) in &looked {
@@ -76,23 +77,18 @@ impl Index {
                     let Ok(found) = records.binary_search_by_key(&at, |&(record, _)| record) else {
                         continue;
                     };
-                    let rarity = self.rarity(records.len());
                     let score = self.scored(rarity, records[found].1, at) * counts;
                     if best.is_none_or(|(_, _, kept)| score > kept) {
                         best = Some((entry, counts, score));
                     }
                 }
                 let Some((entry, counts, score)) = best else {
-                    let holding: HashSet<u32> = (looked.iter())
-                        .flat_map(|&(entry, _)| &self.entries[entry as usize])
-                        .map(|&(record, _)| record)
-                        .collect();
                     return Counted {
                         word: word.clone(),
                         forms: Vec::new(),
                         starting: false,
                         places: Vec::new(),
-                        holding: holding.len(),
+                        holding,
                         score: 0.0,
                     };
                 };
@@ -118,7 +114,7 @@ impl Index {
                             counts,
                         })
                         .collect(),
-                    holding: self.entries[entry as usize].len(),
+                    holding,
                     score,
                 }
             })

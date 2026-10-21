@@ -587,15 +587,16 @@ impl Index {
     }
 
     /// The records holding any word `asked`: those holding more of its
-    /// words first, then the best matched, then in order.
+    /// words first, then the best matched, then in order. A word being
+    /// typed counts as one word across the words it starts, as rare as
+    /// the records holding any of them, in each at the best of them.
     pub fn search(&self, asked: &Asked) -> Vec<Found> {
         let mut found: HashMap<u32, (usize, f64)> = HashMap::new();
         for entries in self.looked_in(asked) {
+            let rarity = self.rarity(self.holding(&entries));
             let mut best: HashMap<u32, f64> = HashMap::new();
             for (entry, counts) in entries {
-                let held = &self.entries[entry as usize];
-                let rarity = self.rarity(held.len());
-                for &(record, weights) in held {
+                for &(record, weights) in &self.entries[entry as usize] {
                     let kept = best.entry(record).or_default();
                     *kept = kept.max(self.scored(rarity, weights, record) * counts);
                 }
@@ -620,6 +621,18 @@ impl Index {
                 .then(a.record.cmp(&b.record))
         });
         found
+    }
+
+    /// How many records hold a word of any of the entries `looked`.
+    fn holding(&self, looked: &[(u32, f64)]) -> usize {
+        match looked {
+            [(entry, _)] => self.entries[*entry as usize].len(),
+            _ => {
+                let held = (looked.iter()).flat_map(|&(entry, _)| &self.entries[entry as usize]);
+                let records: HashSet<u32> = held.map(|&(record, _)| record).collect();
+                records.len()
+            }
+        }
     }
 
     /// How rare a word held by `holding` of the records is among them.

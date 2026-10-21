@@ -1015,3 +1015,27 @@ fn a_word_is_explained_by_the_forms_of_its_stem_the_part_holds_and_where() {
         }]
     );
 }
+
+#[test]
+fn a_word_being_typed_is_as_rare_as_the_parts_holding_any_word_it_starts() {
+    let (renderer, root) = site(
+        "typing-rarity",
+        &[
+            ("content/words.md", "---\ntitle: Words\n---\nText.\n"),
+            ("content/word.md", "---\ntitle: Text\n---\nA word.\n"),
+            ("content/wordless.md", "---\ntitle: Text\n---\nWordless.\n"),
+        ],
+    );
+    let index = index_of(&renderer, 0);
+    let _ = std::fs::remove_dir_all(root);
+    let asked = Asked::of("wor", true, &index);
+    let found = index.search(&asked);
+    assert_eq!(found.len(), 3);
+    let first = index.records[found[0].record].page;
+    assert_eq!(first, page(&renderer, "words.md"));
+    for found in found {
+        let why = index.why(renderer.site(), found.record, &asked);
+        assert_eq!(why.words[0].holding, 3);
+        assert_eq!(why.words[0].score, found.score);
+    }
+}

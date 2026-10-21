@@ -624,6 +624,33 @@ fn a_word_with_a_typographic_apostrophe_is_found_as_typed_with_a_plain_one() {
 }
 
 #[test]
+fn a_word_being_typed_finds_the_page_named_for_it_before_one_holding_a_rarer_longer_word() {
+    let site = Site::new("reader-typing");
+    site.write("content/words.md", "---\ntitle: Words\n---\nText.\n");
+    for page in 3..6 {
+        site.write(
+            &format!("content/post-{page}.md"),
+            &format!("---\ntitle: Post {page}\ndate: 2026-01-0{page}\n---\nA word.\n"),
+        );
+    }
+    site.write(
+        "content/post-6.md",
+        "---\ntitle: Post 6\ndate: 2026-01-06\n---\nWordless.\n",
+    );
+    assert!(!site.index().is_empty());
+    let asked: &[(&str, bool)] = &[("wor", true), ("word", true)];
+    let rust = statac_finds(&site, 0, asked);
+    for found in split(&rust) {
+        let first = split(&split(&found)[2]).swap_remove(0);
+        assert!(first.starts_with("[\"/blog/words/\""), "{rust}");
+    }
+    let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
+        return;
+    };
+    assert_eq!(rust, browser);
+}
+
+#[test]
 fn each_languages_script_finds_what_statac_search_finds_in_that_language() {
     let site = Site::in_two_languages("reader-languages", "https://example.org/blog/");
     site.write(

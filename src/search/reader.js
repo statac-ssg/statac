@@ -481,11 +481,18 @@ async function found(query, shown, typing, respelling = true) {
   const average = count ? Math.max(total / count, 1) : 1;
   const held = new Map();
   for (const lists of looked) {
+    // A word being typed counts as one word across the words it starts, as
+    // rare as the records holding any of them, in each at the best of them.
+    const entries = lists.map(([list, counts]) => [postings(list), counts]);
     const best = new Map();
-    for (const [list, counts] of lists) {
-      const held = postings(list);
-      const holding = held.length;
-      const rarity = Math.log(1 + (count - holding + 0.5) / (holding + 0.5));
+    for (const [held] of entries) {
+      for (const [record] of held) {
+        best.set(record, 0);
+      }
+    }
+    const holding = best.size;
+    const rarity = Math.log(1 + (count - holding + 0.5) / (holding + 0.5));
+    for (const [held, counts] of entries) {
       for (const [record, text, rest] of held) {
         const length = lengths[record] / average;
         const weight = rest + text / (1 - B + B * length);
