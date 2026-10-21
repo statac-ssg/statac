@@ -5,6 +5,9 @@
 //! same after as before, and the new one passes `statac check` with no
 //! error.
 
+mod scratch;
+
+use scratch::Scratch;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,12 +23,9 @@ fn today() -> Date {
     Date::day_only(2026, 10, 6)
 }
 
-fn scratch(label: &str) -> PathBuf {
-    let tests = std::env::temp_dir().join(format!("statac-import-{}", std::process::id()));
-    let path = tests.join(label);
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&tests).unwrap();
-    path
+/// A folder of its own for each test, named `label`, with nothing there.
+fn scratch(label: &str) -> Scratch {
+    Scratch::new("import", label)
 }
 
 /// Every file under `folder`, by its path in it, with its bytes.
@@ -136,6 +136,11 @@ fn with_key(mut made: BTreeMap<String, Vec<u8>>) -> BTreeMap<String, Vec<u8>> {
 /// Imports the fixture `name`, compares what it wrote with what is kept,
 /// and gives the names of what `check` finds in it.
 fn fixture(name: &str) -> Vec<String> {
+    imported(name).1
+}
+
+/// [`fixture`], giving the new site's folder too.
+fn imported(name: &str) -> (Scratch, Vec<String>) {
     let old = PathBuf::from(format!("tests/import/{name}/old"));
     let wanted = Path::new("tests/import").join(name).join("new");
     let before = files(&old);
@@ -168,7 +173,8 @@ fn fixture(name: &str) -> Vec<String> {
     assert_eq!(sample, None, "{name}: a sample page's file was written");
     let card = made.keys().find(|path| path.starts_with("templates/og"));
     assert_eq!(card, None, "{name}: a sharing card's file was written");
-    checked(&new)
+    let found = checked(&new);
+    (new, found)
 }
 
 const NO_ADDRESS: &str = "no-site-address";
@@ -192,12 +198,12 @@ fn each_permalink_style_keeps_every_address() {
 
 #[test]
 fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts() {
-    assert_eq!(fixture("home-pages"), &[] as &[&str]);
+    let (new, found) = imported("home-pages");
+    assert_eq!(found, &[] as &[&str]);
     let out = scratch("home-pages-built");
-    let new = out.with_file_name("home-pages");
     let outcome = build::run(&Options {
         mode: Mode::Build,
-        site: new.clone(),
+        site: new.to_path_buf(),
         out: Some(out.clone()),
         today: Some(today()),
         drafts: false,
@@ -228,12 +234,12 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
         ("zola-home-pages", &[][..], false),
         ("eleventy-home-pages", &[NO_ADDRESS][..], true),
     ] {
-        assert_eq!(fixture(name), found, "{name}");
+        let (new, problems) = imported(name);
+        assert_eq!(problems, found, "{name}");
         let out = scratch(&format!("{name}-built"));
-        let new = out.with_file_name(name);
         let outcome = build::run(&Options {
             mode: Mode::Build,
-            site: new.clone(),
+            site: new.to_path_buf(),
             out: Some(out.clone()),
             today: Some(today()),
             drafts: false,
@@ -1663,9 +1669,10 @@ const OUTSIDE: &str = "kept outside the old site";
 
 /// An old site at `outside/old` under a new folder for `label`, with one
 /// post, and files in `outside/` and `outside/inner/` that are no part of
-/// it. Gives the old site's folder and `outside/`.
-fn beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
-    let outside = scratch(label).join("outside");
+/// it. Gives the new folder, the old site's folder and `outside/`.
+fn beside_files_of_others(label: &str) -> (Scratch, PathBuf, PathBuf) {
+    let outside_in = scratch(label);
+    let outside = outside_in.join("outside");
     let old = outside.join("old");
     fs::create_dir_all(old.join("_posts")).unwrap();
     fs::write(
@@ -1689,7 +1696,7 @@ fn beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
         )
         .unwrap();
     }
-    (old, outside)
+    (outside_in, old, outside)
 }
 
 /// Imports `old`, whose settings are `settings`, and gives the report,
@@ -1739,7 +1746,7 @@ fn page_at(old: &Path, path: &str, title: &str) {
 #[test]
 fn a_link_that_leads_inside_the_old_site_is_followed_where_it_stands() {
     use std::os::unix::fs::symlink;
-    let (old, _) = beside_files_of_others("links-inside");
+    let (_folder, old, _) = beside_files_of_others("links-inside");
     page_at(&old, "store/page-2.md", "Page 2");
     symlink("store", old.join("linked")).unwrap();
     symlink("store/page-2.md", old.join("page-3.md")).unwrap();
@@ -1771,7 +1778,7 @@ fn a_link_that_leads_inside_the_old_site_is_followed_where_it_stands() {
 #[test]
 fn a_link_that_leads_outside_back_or_nowhere_is_never_followed() {
     use std::os::unix::fs::symlink;
-    let (old, outside) = beside_files_of_others("links-refused");
+    let (_folder, old, outside) = beside_files_of_others("links-refused");
     // A folder beside the old one whose name begins with its name.
     let beside = outside.join("old-2");
     fs::create_dir_all(&beside).unwrap();
@@ -1820,7 +1827,7 @@ fn a_link_that_leads_outside_back_or_nowhere_is_never_followed() {
 #[test]
 fn a_folder_the_settings_name_is_read_through_a_link_that_leads_inside() {
     use std::os::unix::fs::symlink;
-    let (old, _) = beside_files_of_others("links-setting");
+    let (_folder, old, _) = beside_files_of_others("links-setting");
     fs::create_dir_all(old.join("kept")).unwrap();
     fs::rename(old.join("_posts"), old.join("kept/_posts")).unwrap();
     symlink("kept", old.join("linked")).unwrap();
@@ -2101,7 +2108,7 @@ fn an_eleventy_folder_outside_the_input_folder_is_read_through_a_link_into_it() 
 #[test]
 fn only_so_many_links_are_followed_in_one_import() {
     use std::os::unix::fs::symlink;
-    let (old, _) = beside_files_of_others("links-many");
+    let (_folder, old, _) = beside_files_of_others("links-many");
     page_at(&old, "store/page-2.md", "Page 2");
     for n in 0..70 {
         symlink("store", old.join(format!("linked-{n:02}"))).unwrap();
@@ -2123,7 +2130,7 @@ fn only_so_many_links_are_followed_in_one_import() {
 #[test]
 fn an_old_site_given_as_a_link_is_read() {
     use std::os::unix::fs::symlink;
-    let (old, outside) = beside_files_of_others("links-old");
+    let (_folder, old, outside) = beside_files_of_others("links-old");
     let linked = outside.parent().unwrap().join("old-linked");
     symlink(&old, &linked).unwrap();
     fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
@@ -2155,7 +2162,7 @@ const FOLDER_SETTINGS: [&str; 7] = [
 
 #[test]
 fn a_folder_the_settings_name_outside_the_old_site_is_never_read() {
-    let (old, outside) = beside_files_of_others("outside");
+    let (_folder, old, outside) = beside_files_of_others("outside");
     fs::create_dir_all(old.join("a")).unwrap();
     let absolute = outside.to_string_lossy().replace('\\', "/");
     for setting in FOLDER_SETTINGS {
@@ -2172,7 +2179,7 @@ fn a_folder_the_settings_name_outside_the_old_site_is_never_read() {
 #[test]
 fn a_folder_the_settings_name_through_a_link_is_never_read() {
     use std::os::unix::fs::symlink;
-    let (old, outside) = beside_files_of_others("linked");
+    let (_folder, old, outside) = beside_files_of_others("linked");
     symlink(&outside, old.join("linked")).unwrap();
     for setting in FOLDER_SETTINGS {
         for folder in ["linked", "linked/inner", "./linked/"] {
@@ -2211,7 +2218,7 @@ fn a_folder_the_settings_name_through_a_link_is_never_read() {
 #[test]
 fn a_settings_file_that_is_a_link_isnt_read() {
     use std::os::unix::fs::symlink;
-    let (old, outside) = beside_files_of_others("linked-settings");
+    let (_folder, old, outside) = beside_files_of_others("linked-settings");
     fs::write(
         outside.join("settings-9.yml"),
         format!("title: {OUTSIDE}\n"),
@@ -2230,7 +2237,7 @@ fn a_settings_file_that_is_a_link_isnt_read() {
 
 #[test]
 fn an_include_or_a_link_named_outside_the_old_site_is_never_read() {
-    let (old, outside) = beside_files_of_others("include");
+    let (_folder, old, outside) = beside_files_of_others("include");
     fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
     fs::write(
         old.join("_posts/2026-01-02-post-2.md"),
@@ -2306,8 +2313,8 @@ const HUGO_FOLDER_SETTINGS: [&str; 10] = [
 
 /// A Hugo site with one post, beside files that are no part of it, as
 /// [`beside_files_of_others`] makes them.
-fn hugo_beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
-    let (old, outside) = beside_files_of_others(label);
+fn hugo_beside_files_of_others(label: &str) -> (Scratch, PathBuf, PathBuf) {
+    let (folder, old, outside) = beside_files_of_others(label);
     fs::remove_dir_all(old.join("_posts")).unwrap();
     fs::create_dir_all(old.join("content/posts")).unwrap();
     fs::write(
@@ -2315,12 +2322,12 @@ fn hugo_beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
         "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post of the old site's own.\n",
     )
     .unwrap();
-    (old, outside)
+    (folder, old, outside)
 }
 
 #[test]
 fn hugo_folders_the_settings_name_outside_the_old_site_are_never_read() {
-    let (old, outside) = hugo_beside_files_of_others("hugo-outside");
+    let (_folder, old, outside) = hugo_beside_files_of_others("hugo-outside");
     fs::create_dir_all(old.join("a")).unwrap();
     let absolute = outside.to_string_lossy().replace('\\', "/");
     let base = "baseURL: https://example.org/\n";
@@ -2342,7 +2349,7 @@ fn hugo_folders_the_settings_name_outside_the_old_site_are_never_read() {
 #[test]
 fn hugo_folders_the_settings_name_through_a_link_are_never_read() {
     use std::os::unix::fs::symlink;
-    let (old, outside) = hugo_beside_files_of_others("hugo-linked");
+    let (_folder, old, outside) = hugo_beside_files_of_others("hugo-linked");
     symlink(&outside, old.join("linked")).unwrap();
     let base = "baseURL: https://example.org/\n";
     for setting in HUGO_FOLDER_SETTINGS {
@@ -2421,7 +2428,7 @@ fn a_hugo_figure_is_a_call_where_its_file_holds_a_photograph_whatever_its_ending
 
 #[test]
 fn a_picture_a_hugo_tag_names_outside_the_old_site_is_never_looked_for() {
-    let (old, outside) = hugo_beside_files_of_others("hugo-figure");
+    let (_folder, old, outside) = hugo_beside_files_of_others("hugo-figure");
     fs::write(outside.join("photo-9.jpg"), OUTSIDE).unwrap();
     fs::write(old.join("hugo.yaml"), "baseURL: https://example.org/\n").unwrap();
     fs::write(
@@ -3037,10 +3044,14 @@ fn the_sites_address_is_asked_for_of_any_tool_and_only_where_the_settings_give_n
     )
     .unwrap();
     fs::write(zola.join("content/post-1.md"), post).unwrap();
-    let jekyll = PathBuf::from("tests/import/permalink-pretty/old");
-    for (label, old) in [("hugo", hugo), ("zola", zola), ("jekyll", jekyll)] {
+    let jekyll = Path::new("tests/import/permalink-pretty/old");
+    for (label, old) in [
+        ("hugo", hugo.as_ref()),
+        ("zola", zola.as_ref()),
+        ("jekyll", jekyll),
+    ] {
         let new = scratch(&format!("address-{label}"));
-        let (code, said) = import_answering(&old, &new, "https://example.org/\n", true);
+        let (code, said) = import_answering(old, &new, "https://example.org/\n", true);
         assert_eq!(code, 0, "{said}");
         assert!(said.starts_with("What is the site's address?\n"), "{said}");
         let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
@@ -3188,8 +3199,8 @@ fn an_eleventy_site_is_told_by_its_settings_or_its_package() {
 
 /// An Eleventy site with one post beside files that are no part of it, as
 /// [`beside_files_of_others`] makes them.
-fn eleventy_beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
-    let (old, outside) = beside_files_of_others(label);
+fn eleventy_beside_files_of_others(label: &str) -> (Scratch, PathBuf, PathBuf) {
+    let (folder, old, outside) = beside_files_of_others(label);
     fs::remove_dir_all(old.join("_posts")).unwrap();
     fs::create_dir_all(old.join("posts")).unwrap();
     fs::write(
@@ -3197,7 +3208,7 @@ fn eleventy_beside_files_of_others(label: &str) -> (PathBuf, PathBuf) {
         "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post of the old site's own.\n",
     )
     .unwrap();
-    (old, outside)
+    (folder, old, outside)
 }
 
 const COPY_UNREAD: &str = "### Copies Statac doesn't make\n";
@@ -3232,7 +3243,7 @@ fn eleventy_settings(line: &str) -> String {
 
 #[test]
 fn an_eleventy_folder_or_copy_named_outside_the_old_site_is_never_read() {
-    let (old, outside) = eleventy_beside_files_of_others("eleventy-outside");
+    let (_folder, old, outside) = eleventy_beside_files_of_others("eleventy-outside");
     fs::create_dir_all(old.join("a")).unwrap();
     let absolute = outside.to_string_lossy().replace('\\', "/");
     for setting in ["input", "output", "includes", "data", "layouts"] {
@@ -3276,7 +3287,7 @@ fn an_eleventy_folder_or_copy_named_outside_the_old_site_is_never_read() {
 #[test]
 fn an_eleventy_folder_or_copy_reached_through_a_link_is_never_read() {
     use std::os::unix::fs::symlink;
-    let (old, outside) = eleventy_beside_files_of_others("eleventy-linked");
+    let (_folder, old, outside) = eleventy_beside_files_of_others("eleventy-linked");
     symlink(&outside, old.join("linked")).unwrap();
     for setting in ["input", "output", "includes", "data", "layouts"] {
         for folder in ["linked", "linked/inner", "./linked/"] {
@@ -3329,7 +3340,7 @@ fn an_eleventy_folder_or_copy_reached_through_a_link_is_never_read() {
 #[test]
 fn an_eleventy_settings_file_that_is_a_link_isnt_read() {
     use std::os::unix::fs::symlink;
-    let (old, outside) = eleventy_beside_files_of_others("eleventy-linked-settings");
+    let (_folder, old, outside) = eleventy_beside_files_of_others("eleventy-linked-settings");
     fs::write(
         outside.join("settings-9.js"),
         format!("module.exports = () => ({{ dir: {{ input: \"..\" }} }}); // {OUTSIDE}\n"),

@@ -23,11 +23,8 @@ fn vimeo_names_its_still_in_a_list_of_one() {
 }
 
 /// A site holding `token` as its `.statac/token`, where it is given.
-fn site_with_token(label: &str, token: Option<&[u8]>) -> std::path::PathBuf {
-    let folder = std::env::temp_dir()
-        .join(format!("statac-token-{}", std::process::id()))
-        .join(label);
-    let _ = std::fs::remove_dir_all(&folder);
+fn site_with_token(label: &str, token: Option<&[u8]>) -> crate::testing::Scratch {
+    let folder = crate::testing::Scratch::new(&format!("token-{label}"));
     std::fs::create_dir_all(folder.join(".statac")).unwrap();
     if let Some(token) = token {
         std::fs::write(folder.join(TOKEN_FILE), token).unwrap();

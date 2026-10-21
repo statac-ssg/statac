@@ -1,16 +1,12 @@
 use super::*;
+use crate::testing::Scratch;
 
 use std::path::Path;
 
 /// A folder of its own for each test, named `label`, in the system's
 /// temporary folder, with nothing there yet.
-fn scratch(label: &str) -> PathBuf {
-    let tests = std::env::temp_dir().join(format!("statac-new-{}", std::process::id()));
-    let path = tests.join(label);
-    let _ = std::fs::remove_dir_all(&path);
-    let _ = std::fs::remove_file(&path);
-    std::fs::create_dir_all(&tests).unwrap();
-    path
+fn scratch(label: &str) -> Scratch {
+    Scratch::named("new", label)
 }
 
 /// The starter, with no sharing card.
@@ -86,7 +82,7 @@ fn cards(folder: &Path) -> (String, u8) {
 }
 
 /// A site made with every default, and no sharing card.
-fn site(label: &str) -> PathBuf {
+fn site(label: &str) -> Scratch {
     let folder = scratch(label);
     let (said, code) = run_with(&folder, "", false, true, Locale::default(), None);
     assert_eq!(code, 0, "{said}");
@@ -799,7 +795,7 @@ fn a_folder_that_isnt_there_is_made_with_the_folders_above_it() {
 }
 
 /// A folder holding `names`, each an empty file.
-fn holding(label: &str, names: &[&str]) -> PathBuf {
+fn holding(label: &str, names: &[&str]) -> Scratch {
     let folder = scratch(label);
     std::fs::create_dir_all(&folder).unwrap();
     for name in names {
@@ -896,7 +892,8 @@ fn a_write_that_fails_part_way_leaves_the_folder_as_found() {
     let answers = answers(&["fr", "en"], None);
     let empty = scratch("fails-empty");
     std::fs::create_dir_all(&empty).unwrap();
-    let missing = scratch("fails-missing").join("site-1");
+    let missing_in = scratch("fails-missing");
+    let missing = missing_in.join("site-1");
     for folder in [&empty, &missing] {
         for failing in [0, 1, 20, 35] {
             let mut written = 0;
@@ -925,7 +922,7 @@ fn a_write_that_fails_part_way_leaves_the_folder_as_found() {
                 "{problem:?}"
             );
             assert_eq!(written, failing);
-            match folder == &empty {
+            match folder == &*empty {
                 true => assert!(listed(folder).is_empty(), "{failing}"),
                 false => assert!(!folder.parent().unwrap().exists(), "{failing}"),
             }

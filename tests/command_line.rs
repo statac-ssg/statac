@@ -1,3 +1,6 @@
+mod scratch;
+
+use scratch::Scratch;
 use std::process::Command;
 
 fn statac(args: &[&str]) -> std::process::Output {
@@ -83,12 +86,8 @@ fn colour_is_never_written_into_a_pipe() {
 }
 
 /// A folder of its own for each test, named `label`, with nothing there.
-fn scratch(label: &str) -> std::path::PathBuf {
-    let tests = std::env::temp_dir().join(format!("statac-command-line-{}", std::process::id()));
-    let path = tests.join(label);
-    let _ = std::fs::remove_dir_all(&path);
-    std::fs::create_dir_all(&tests).unwrap();
-    path
+fn scratch(label: &str) -> Scratch {
+    Scratch::new("command-line", label)
 }
 
 /// A new site made in `folder` with every default.

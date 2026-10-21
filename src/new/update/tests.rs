@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use crate::album::Progress;
 use crate::build::{self, Mode, Options};
 use crate::report::Report;
+use crate::testing::Scratch;
 
 const BASE_1: &[u8] =
     b"<!doctype html>\n<title>{{ page.title }}</title>\n<main>\n{{ body }}\n</main>\n";
@@ -118,12 +119,8 @@ const WORDS_ONLY: Starter = Starter {
 
 /// A folder of its own for each test, named `label`, in the system's
 /// temporary folder, with nothing there yet.
-fn scratch(label: &str) -> PathBuf {
-    let tests = std::env::temp_dir().join(format!("statac-update-{}", std::process::id()));
-    let path = tests.join(label);
-    let _ = std::fs::remove_dir_all(&path);
-    std::fs::create_dir_all(&path).unwrap();
-    path
+fn scratch(label: &str) -> Scratch {
+    Scratch::new(&format!("update-{label}"))
 }
 
 fn put(folder: &Path, path: &str, bytes: &[u8]) {
@@ -137,7 +134,7 @@ fn read(folder: &Path, path: &str) -> Vec<u8> {
 }
 
 /// A site in English holding `files`, by their paths.
-fn site(label: &str, files: &[(&str, &[u8])]) -> PathBuf {
+fn site(label: &str, files: &[(&str, &[u8])]) -> Scratch {
     let folder = scratch(label);
     put(&folder, "statac.yaml", b"language: en\n");
     for (path, bytes) in files {
@@ -148,7 +145,7 @@ fn site(label: &str, files: &[(&str, &[u8])]) -> PathBuf {
 
 /// A site made by [`STARTER`]'s newest files, with every word, and with
 /// `files` in place of the newest where they say.
-fn made_site(label: &str, files: &[(&str, &[u8])]) -> PathBuf {
+fn made_site(label: &str, files: &[(&str, &[u8])]) -> Scratch {
     let folder = site(
         label,
         &[
@@ -393,7 +390,8 @@ fn a_sample_pages_file_is_never_missed_where_it_isnt_here() {
         );
     }
 
-    let folder = scratch("no-photos").join("site-1");
+    let folder_in = scratch("no-photos");
+    let folder = folder_in.join("site-1");
     let answers = super::super::Answers {
         title: "Site 1".into(),
         address: Some("https://example.org".into()),
@@ -733,7 +731,8 @@ fn a_folder_that_isnt_a_site_is_refused() {
 #[test]
 fn a_file_with_a_second_name_isnt_replaced_and_the_run_exits_with_1() {
     let folder = made_site("second-name", &[("templates/base.html", BASE_2)]);
-    let other = scratch("second-name-other").join("base.html");
+    let other_in = scratch("second-name-other");
+    let other = other_in.join("base.html");
     std::fs::hard_link(folder.join("templates/base.html"), &other).unwrap();
     let (said, code) = updated(&folder, Update::default());
     assert_eq!(code, 1, "{said}");
@@ -975,7 +974,7 @@ const STYLED: Starter = Starter {
 };
 
 /// A site that builds with no problem, its stylesheet the first version.
-fn styled_site(label: &str, settings: &str) -> PathBuf {
+fn styled_site(label: &str, settings: &str) -> Scratch {
     site(
         label,
         &[
@@ -994,7 +993,7 @@ fn options(folder: &Path, mode: Mode) -> Options {
     Options {
         mode,
         site: folder.to_path_buf(),
-        out: Some(folder.with_extension("built")),
+        out: None,
         today: Some(crate::date::Date::day_only(2026, 10, 6)),
         drafts: false,
         url: None,
@@ -1056,7 +1055,8 @@ fn held(folder: &Path) -> Vec<(PathBuf, Vec<u8>)> {
 
 #[test]
 fn with_no_past_versions_a_new_site_builds_and_says_what_it_did_before() {
-    let made = scratch("made").join("site-1");
+    let made_in = scratch("made");
+    let made = made_in.join("site-1");
     let answers = super::super::Answers {
         title: "Site 1".into(),
         address: Some("https://example.org".into()),

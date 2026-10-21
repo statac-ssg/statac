@@ -2669,7 +2669,7 @@ mod tests {
     /// spoken of instead.
     #[test]
     fn the_later_pages_of_a_tag_are_looked_for_where_statac_publishes_them() {
-        let top = std::env::temp_dir().join(format!("statac-hugo-{}", std::process::id()));
+        let top = crate::testing::Scratch::new("hugo");
         // The settings, and whether a tag's second page is looked for.
         for (at, (settings, looked_for)) in [("", true), ("uglyURLs = true\n", false)]
             .into_iter()

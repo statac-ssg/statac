@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A folder of a test's own in the system's temporary folder, empty when
 /// made and removed when dropped.
-pub(crate) struct Scratch(pub(crate) PathBuf);
+pub(crate) struct Scratch(pub(crate) PathBuf, Option<PathBuf>);
 
 impl Scratch {
     /// A folder named for `name`, apart from every other one made.
@@ -18,7 +18,18 @@ impl Scratch {
         ));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).unwrap();
-        Scratch(path)
+        Scratch(path, None)
+    }
+
+    /// A path named `label`, not yet made, in a folder of the run's own
+    /// for `suite`, which goes once the last such path in it has.
+    pub(crate) fn named(suite: &str, label: &str) -> Scratch {
+        let run = std::env::temp_dir().join(format!("statac-{suite}-{}", std::process::id()));
+        let path = run.join(label);
+        let _ = std::fs::remove_dir_all(&path);
+        let _ = std::fs::remove_file(&path);
+        std::fs::create_dir_all(&run).unwrap();
+        Scratch(path, Some(run))
     }
 
     /// Writes `bytes` to `rel`, with the folders above it, and gives its
@@ -31,9 +42,27 @@ impl Scratch {
     }
 }
 
+impl std::ops::Deref for Scratch {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
+impl AsRef<std::path::Path> for Scratch {
+    fn as_ref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
 impl Drop for Scratch {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
+        let _ = std::fs::remove_file(&self.0);
+        if let Some(run) = &self.1 {
+            let _ = std::fs::remove_dir(run);
+        }
     }
 }
 

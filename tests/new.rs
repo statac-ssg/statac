@@ -4,8 +4,11 @@
 //! its sites in the system's temporary folder, with the machine's locale,
 //! zone and day given; none touches the network.
 
+mod scratch;
+
+use scratch::Scratch;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use statac::build::{self, Mode, Options};
 use statac::date::Date;
@@ -14,12 +17,9 @@ use statac::report::Report;
 
 const KEY: &str = "0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20";
 
-fn scratch(label: &str) -> PathBuf {
-    let tests = std::env::temp_dir().join(format!("statac-new-sites-{}", std::process::id()));
-    let path = tests.join(label);
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&tests).unwrap();
-    path
+/// A folder of its own for each test, named `label`, with nothing there.
+fn scratch(label: &str) -> Scratch {
+    Scratch::new("new-sites", label)
 }
 
 fn day() -> Date {

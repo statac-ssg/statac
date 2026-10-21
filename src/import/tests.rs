@@ -122,13 +122,8 @@ fn every_name_reads_back_as_written() {
     }
 }
 
-fn scratch(label: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir()
-        .join(format!("statac-import-unit-{}", std::process::id()))
-        .join(label);
-    let _ = std::fs::remove_dir_all(&path);
-    std::fs::create_dir_all(&path).unwrap();
-    path
+fn scratch(label: &str) -> crate::testing::Scratch {
+    crate::testing::Scratch::new(&format!("import-unit-{label}"))
 }
 
 fn a_site() -> Import {
