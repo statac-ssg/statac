@@ -11,16 +11,17 @@
 <p align="center">
   <a href="https://github.com/statac-ssg/statac/releases/latest"><img alt="The latest release" src="https://img.shields.io/github/v/release/statac-ssg/statac?label=release&color=CC4E00"></a>
   <a href="https://github.com/statac-ssg/statac/actions/workflows/release.yml"><img alt="The build of the latest release's packages" src="https://img.shields.io/github/actions/workflow/status/statac-ssg/statac/release.yml?label=release%20packages"></a>
-  <a href="https://statac.dev/install/"><img alt="Runs on macOS, Linux and Windows" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-191918"></a>
-  <a href="#licence"><img alt="Licence: MIT or Apache-2.0" src="https://img.shields.io/badge/licence-MIT%20or%20Apache--2.0-191918"></a>
+  <a href="https://statac.dev/install/"><img alt="Runs on macOS, Linux and Windows" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-191919"></a>
+  <a href="#licence"><img alt="Licence: MIT or Apache-2.0" src="https://img.shields.io/badge/licence-MIT%20or%20Apache--2.0-191919"></a>
 </p>
 
 <p align="center"><b><a href="https://statac.dev/getting-started/">Get started</a> · <a href="https://statac.dev/install/">Install</a> · <a href="https://statac.dev">Documentation</a> · <a href="https://statac.dev/e/">Problems explained</a> · <a href="CHANGELOG.md">Changes</a></b></p>
 
 Statac makes a website from a folder of writing. You write pages in
 Markdown, choose how they look with templates, and run `statac build`. It
-writes a site of plain files, ready to put on any web host, with nothing
-for a reader's browser to run unless you put it there.
+writes a site of plain files, ready to put on any web host. Statac adds
+no JavaScript to a page unless you ask it to: in a new site, only the
+search page has any.
 
 It is one program in one file, with no plugins and nothing else to
 install beside it.
@@ -44,6 +45,11 @@ stopped, and links to a page about that kind of problem.
 - **Photographs handled.** Write an ordinary Markdown
   [picture](https://statac.dev/pictures/). Readers get it in several
   sizes, as AVIF with a JPEG fallback.
+- **Search built in.** A new site has a
+  [search page](https://statac.dev/search/) that finds pages as the
+  reader types, from an index Statac writes at each build, with nothing
+  outside your site needed. `statac search` gives the same results in
+  the terminal.
 - **Sharing cards.** After `statac new --cards`, Statac draws a
   [link preview](https://statac.dev/sharing-cards/) for every page, from
   a layout you set.
@@ -74,7 +80,14 @@ On Linux:
 curl -fsSL https://get.statac.dev | sh
 ```
 
-For Windows, or another way to install, each
+On Windows, with [Scoop](https://scoop.sh):
+
+```powershell
+scoop bucket add statac https://github.com/statac-ssg/scoop-statac
+scoop install statac
+```
+
+For another way to install, each
 [release](https://github.com/statac-ssg/statac/releases) has a package
 for each kind of machine. [Installing](https://statac.dev/install/)
 says which to take and how to check it.
@@ -92,7 +105,7 @@ statac serve
 it again on every save.
 
 <p align="center">
-  <img src=".github/readme/starter.webp" alt="The home page of a new site, headed Hello., with Home, Posts, Notes, Photos and About in its menu and a list of posts beneath" width="860">
+  <img src=".github/readme/starter.webp" alt="The home page of a new site, headed Hello., with Home, Posts, Notes, Photos, About and Search in its menu and a list of posts beneath" width="860">
 </p>
 
 ## Documentation
