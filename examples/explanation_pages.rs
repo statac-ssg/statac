@@ -369,7 +369,8 @@ fn folder_id(folder: &str) -> String {
 }
 
 /// A table of files, each named by its path beneath `folder`, the folder
-/// the heading above the table names.
+/// the heading above the table names, given the class the docs lay out
+/// a reference by.
 fn table(out: &mut String, folder: &str, files: &[&(String, Option<String>, String)]) {
     out.push_str("| File | What it is | Described in |\n|---|---|---|\n");
     for (path, takes, said) in files {
@@ -388,6 +389,7 @@ fn table(out: &mut String, folder: &str, files: &[&(String, Option<String>, Stri
         let name = path.strip_prefix(folder).unwrap_or(path);
         out.push_str(&format!("| `{name}` | {about} | {} |\n", links.join(", ")));
     }
+    out.push_str("{.ref}\n");
 }
 
 /// What a word holds for the search script or a template to put in its

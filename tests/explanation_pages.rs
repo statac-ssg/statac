@@ -98,6 +98,14 @@ fn the_starter_page_names_every_file_of_a_new_site() {
     for (name, _) in statac::new::words() {
         assert!(with_cards.contains(&format!("| `{name}` |")), "{name}");
     }
+    let tables: Vec<&str> = page
+        .split("| File | What it is | Described in |\n")
+        .collect();
+    assert!(tables.len() > 10);
+    for table in &tables[1..] {
+        let (rows, _) = table.split_once("\n\n").unwrap_or((table, ""));
+        assert!(rows.ends_with("\n{.ref}"), "{rows}");
+    }
 }
 
 #[test]
