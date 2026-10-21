@@ -1,6 +1,8 @@
 //! The text of each file that may be a page as one reading of a site
 //! found it, kept for the next reading to take in place of reading the
-//! file again, where the file is found as it was then.
+//! file again, where the file is found as it was then; and the text an
+//! editor holds unsaved for any file of the site, which every reading
+//! takes in place of the file.
 
 use std::collections::HashMap;
 use std::fs;
@@ -10,6 +12,7 @@ use std::sync::Arc;
 
 use crate::disk::{Clock, Stamp};
 use crate::platform;
+use crate::unsaved::Unsaved;
 
 /// Texts kept from one reading of a site for the next. The default keeps
 /// nothing, and every file is read.
@@ -21,6 +24,7 @@ pub(crate) struct Texts {
     clock: Option<Clock>,
     /// Each by where the file really is under the site's real path.
     kept: HashMap<String, Arc<Kept>>,
+    unsaved: Unsaved,
 }
 
 struct Kept {
@@ -53,6 +57,17 @@ impl Texts {
         }
     }
 
+    /// Has every reading from the next on take `unsaved` in place of the
+    /// files it holds.
+    pub(crate) fn set_unsaved(&mut self, unsaved: Unsaved) {
+        self.unsaved = unsaved;
+    }
+
+    /// What files are read as.
+    pub(super) fn unsaved(&self) -> &Unsaved {
+        &self.unsaved
+    }
+
     /// Begins a reading of the site at `site`, before any file that may
     /// be a page is read.
     pub(super) fn begin(&mut self, site: &Path) {
@@ -63,10 +78,20 @@ impl Texts {
     }
 
     /// The text of the file at `at` under the folder `real`, opened as
-    /// [`platform::open_file`] opens it: as kept, where the file opened is
-    /// found as it was when kept, or else as read now.
+    /// [`platform::open_file`] opens it: the editor's, where it holds one;
+    /// as kept, where the file opened is found as it was when kept; or
+    /// else as read now.
     pub(super) fn read(&self, real: &Path, at: &str) -> io::Result<Text> {
         let mut file = platform::open_file(real, at)?;
+        if let Some(held) = self.unsaved.held(real, at) {
+            let text = held.to_owned();
+            let lines = crate::source::line_starts(&text);
+            return Ok(Text {
+                text,
+                lines,
+                kept: None,
+            });
+        }
         let Some(clock) = &self.clock else {
             let text = io::read_to_string(file)?;
             let lines = crate::source::line_starts(&text);

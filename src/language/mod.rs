@@ -228,7 +228,7 @@ impl Languages {
             let found = match self.file(wanted) {
                 Some((name, at)) => {
                     let shown = format!("{FOLDER}/{name}");
-                    match crate::assets::read_walked_text(&self.real, at) {
+                    match sources.unsaved().read(&self.real, at) {
                         Ok(text) => {
                             let id = sources.add(shown.clone(), text);
                             let statacs = broader(wanted)

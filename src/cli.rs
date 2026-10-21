@@ -205,8 +205,8 @@ const USAGE: [(&str, &str); 13] = [
     ),
     (
         "lsp",
-        "  statac lsp             Tell an editor the site's problems as its files are
-                         opened and saved. The editor starts it.
+        "  statac lsp             Tell an editor the site's problems as you type. The
+                         editor starts it.
 ",
     ),
 ];
@@ -465,7 +465,10 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             &format!("Statac {}\n", env!("CARGO_PKG_VERSION")),
         ),
         Request::Explain(code) => say(terminal.out, &code.explained()),
-        Request::Lsp => return crate::lsp::run(&mut std::io::stdin().lock(), terminal.out),
+        Request::Lsp => {
+            let input = std::io::BufReader::new(std::io::stdin());
+            return crate::lsp::run(input, terminal.out);
+        }
         Request::Build { options, .. } | Request::Check { options, .. } => {
             let started = Instant::now();
             let outcome = build::run_saying(&options, terminal.progress);

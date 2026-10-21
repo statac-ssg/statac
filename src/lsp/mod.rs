@@ -1,7 +1,11 @@
 //! `statac lsp`: a language server an editor starts, speaking the Language
-//! Server Protocol on standard input and output. Each time a file of a
-//! site is opened or saved, it checks the site as `statac check` does and
-//! tells the editor every problem at the place it is written.
+//! Server Protocol on standard input and output. It keeps each site the
+//! editor opens a file of checked as `statac check` checks it, reading the
+//! text the editor holds for each file it has open in place of the file,
+//! and tells the editor every problem at the place it is written: as the
+//! site is first opened, once typing pauses, and as files of the site
+//! change on disk. Each check builds again only what changed since the
+//! last.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
@@ -11,15 +15,21 @@ mod diagnostics;
 mod tests;
 mod wire;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::time::{Duration, Instant};
 
 use diagnostics::Encoding;
 
-use crate::build::{self, Mode, Options};
+use crate::build::incremental::Checking;
+use crate::build::{Mode, Options};
 use crate::json;
+use crate::serve::watch::{self, How, Settle, Watching};
 use crate::source::Sources;
+use crate::unsaved::Unsaved;
 use crate::yaml::{Node, Value};
 
 /// The protocol's codes for a request it can't answer.
@@ -27,31 +37,70 @@ const PARSE_ERROR: i32 = -32700;
 const METHOD_NOT_FOUND: i32 = -32601;
 const NOT_INITIALISED: i32 = -32002;
 
+/// How long typing pauses before the site is checked.
+const PAUSE: Duration = Duration::from_millis(330);
+
+/// The protocol's word for the editor sending a file's whole text with
+/// each change.
+const WHOLE_TEXT: u8 = 1;
+
 /// Answers the editor's messages on `input` with its own on `output` until
 /// the editor says to stop, and gives the exit code: 0 where it asked to
 /// shut down first, as the protocol has it, and 1 otherwise.
-pub(crate) fn run(input: &mut dyn BufRead, output: &mut dyn Write) -> u8 {
+pub(crate) fn run(input: impl BufRead + Send + 'static, output: &mut dyn Write) -> u8 {
+    run_with(input, output, PAUSE, How::Auto)
+}
+
+/// [`run`], checking a site once typing pauses for `pause`, and watching
+/// each site's folder as `watching` says.
+fn run_with(
+    mut input: impl BufRead + Send + 'static,
+    output: &mut dyn Write,
+    pause: Duration,
+    watching: How,
+) -> u8 {
+    let (events, heard) = mpsc::channel();
+    let reading = events.clone();
+    // Never joined: once the editor says to stop, the server ends whether
+    // or not its input has.
+    let read = std::thread::Builder::new().name("lsp-input".into());
+    let read = read.spawn(move || {
+        loop {
+            let event = match wire::read(&mut input) {
+                Ok(Some(text)) => Event::Message(text),
+                Ok(None) | Err(_) => Event::Ended,
+            };
+            let ended = matches!(event, Event::Ended);
+            if reading.send(event).is_err() || ended {
+                return;
+            }
+        }
+    });
+    if read.is_err() {
+        return 1;
+    }
     let mut server = Server {
         output,
         encoding: Encoding::Utf16,
         initialised: false,
         shut_down: false,
+        pause,
+        watching,
+        events,
+        open: HashMap::new(),
         sites: HashMap::new(),
     };
-    loop {
-        let Ok(Some(text)) = wire::read(input) else {
-            return 1;
-        };
-        let answered = match Message::read(text) {
-            Some(message) => server.answer(&message),
-            None => server.fail("null", PARSE_ERROR, "The message isn't JSON."),
-        };
-        match answered {
-            Ok(None) => {}
-            Ok(Some(code)) => return code,
-            Err(_) => return 1,
-        }
-    }
+    server.serve(&heard)
+}
+
+/// What the server hears, from the editor and from each site's folder.
+enum Event {
+    /// A message from the editor.
+    Message(String),
+    /// The editor's messages ended, or could no longer be read.
+    Ended,
+    /// Files of the site in this folder changed on disk.
+    Changed(PathBuf),
 }
 
 struct Server<'a> {
@@ -59,9 +108,28 @@ struct Server<'a> {
     encoding: Encoding,
     initialised: bool,
     shut_down: bool,
-    /// Each site checked, by its folder, with the files its last check
-    /// told the editor of a problem in.
-    sites: HashMap<PathBuf, BTreeSet<PathBuf>>,
+    pause: Duration,
+    watching: How,
+    /// Where each site's folder sends word of its changes.
+    events: Sender<Event>,
+    /// The text the editor holds for each file it has open, by the file's
+    /// real path.
+    open: HashMap<PathBuf, Arc<str>>,
+    /// Each site a file was opened in, by its folder.
+    sites: HashMap<PathBuf, Site>,
+}
+
+/// A site kept checked.
+struct Site {
+    checking: Checking,
+    /// Where a problem in no file is told.
+    nowhere: PathBuf,
+    /// The diagnostics the editor was last sent for each file.
+    told: BTreeMap<PathBuf, Vec<String>>,
+    /// When the site is to be checked next, where it is to be.
+    due: Option<Instant>,
+    /// Held while the site's folder is watched.
+    _watching: Option<Watching>,
 }
 
 /// What answering one message came to: the exit code where the editor
@@ -69,6 +137,66 @@ struct Server<'a> {
 type Answered = std::io::Result<Option<u8>>;
 
 impl Server<'_> {
+    /// Hears the editor and each site's folder until the editor says to
+    /// stop, checking each site as it falls due.
+    fn serve(&mut self, heard: &Receiver<Event>) -> u8 {
+        loop {
+            let waited = match self.next_due() {
+                Some(due) => heard.recv_timeout(due.saturating_duration_since(Instant::now())),
+                None => heard.recv().map_err(|_| RecvTimeoutError::Disconnected),
+            };
+            match waited {
+                Ok(event) => {
+                    if let Some(code) = ended(self.hear(event)) {
+                        return code;
+                    }
+                }
+                Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => return 1,
+            }
+            if self.next_due().is_none_or(|due| due > Instant::now()) {
+                continue;
+            }
+            // What arrived meanwhile is heard first, so a check reads the
+            // latest text, and a site whose typing goes on waits.
+            while let Ok(event) = heard.try_recv() {
+                if let Some(code) = ended(self.hear(event)) {
+                    return code;
+                }
+            }
+            let now = Instant::now();
+            let mut due: Vec<PathBuf> = (self.sites.iter())
+                .filter(|(_, site)| site.due.is_some_and(|due| due <= now))
+                .map(|(folder, _)| folder.clone())
+                .collect();
+            due.sort();
+            for folder in due {
+                if self.check(&folder).is_err() {
+                    return 1;
+                }
+            }
+        }
+    }
+
+    /// When the next site is due to be checked, where one is.
+    fn next_due(&self) -> Option<Instant> {
+        self.sites.values().filter_map(|site| site.due).min()
+    }
+
+    fn hear(&mut self, event: Event) -> Answered {
+        match event {
+            Event::Message(text) => match Message::read(text) {
+                Some(message) => self.answer(&message),
+                None => self.fail("null", PARSE_ERROR, "The message isn't JSON."),
+            },
+            Event::Ended => Ok(Some(1)),
+            Event::Changed(folder) => {
+                self.put_off(&folder);
+                Ok(None)
+            }
+        }
+    }
+
     fn answer(&mut self, message: &Message) -> Answered {
         let id = message.id();
         let method = message.text(&["method"]).unwrap_or_default();
@@ -88,7 +216,7 @@ impl Server<'_> {
                 }
                 let result = format!(
                     "{{\"capabilities\":{{\"positionEncoding\":\"{}\",\
-                     \"textDocumentSync\":{{\"openClose\":true,\"change\":0,\
+                     \"textDocumentSync\":{{\"openClose\":true,\"change\":{WHOLE_TEXT},\
                      \"save\":{{\"includeText\":false}}}}}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
@@ -101,19 +229,34 @@ impl Server<'_> {
                 self.respond(id.unwrap_or("null"), "null")
             }
             "exit" => Ok(Some(u8::from(!self.shut_down))),
-            "textDocument/didOpen" | "textDocument/didSave" => {
-                let uri = message.text(&["params", "textDocument", "uri"]);
-                let Some(file) = uri.and_then(uri::path) else {
+            "textDocument/didOpen" | "textDocument/didChange" => {
+                let text = match method {
+                    "textDocument/didOpen" => message.text(&["params", "textDocument", "text"]),
+                    _ => message.last_text(&["params", "contentChanges"]),
+                };
+                let Some((file, folder)) = self.file_and_site(message) else {
                     return Ok(None);
                 };
-                let Some(site) = site_of(&file) else {
-                    return Ok(None);
-                };
-                // A site already checked is checked again only when saved.
-                if method == "textDocument/didOpen" && self.sites.contains_key(&site) {
-                    return Ok(None);
+                if let Some(text) = text {
+                    self.open.insert(real(&file), Arc::from(text));
                 }
-                self.check(&site, &file)
+                match self.sites.contains_key(&folder) {
+                    true => self.put_off(&folder),
+                    false => self.begin(folder, file),
+                }
+                Ok(None)
+            }
+            "textDocument/didSave" | "textDocument/didClose" => {
+                let Some((file, folder)) = self.file_and_site(message) else {
+                    return Ok(None);
+                };
+                if method == "textDocument/didClose" {
+                    self.open.remove(&real(&file));
+                }
+                if self.sites.contains_key(&folder) {
+                    self.put_off(&folder);
+                }
+                Ok(None)
             }
             _ => match id {
                 Some(id) => self.fail(id, METHOD_NOT_FOUND, "Statac doesn't answer this."),
@@ -122,44 +265,104 @@ impl Server<'_> {
         }
     }
 
-    /// Checks the site at `site` and tells the editor every problem found,
-    /// and that a file told of a problem before now has none.
-    fn check(&mut self, site: &Path, file: &Path) -> Answered {
+    /// The file a message is about, and the folder of the site it is in,
+    /// where it is in one.
+    fn file_and_site(&self, message: &Message) -> Option<(PathBuf, PathBuf)> {
+        let uri = message.text(&["params", "textDocument", "uri"]);
+        let file = uri.and_then(uri::path)?;
+        let site = site_of(&file)?;
+        Some((file, site))
+    }
+
+    /// Begins keeping the site at `folder` checked, `file` being the one
+    /// opened in it: checked at once, and watched.
+    fn begin(&mut self, folder: PathBuf, file: PathBuf) {
+        let settings = folder.join(crate::config::FILE_NAME);
+        let nowhere = match settings.is_file() {
+            true => settings,
+            false => file,
+        };
+        let (batches, changes) = mpsc::channel();
+        // A folder that can't be watched even by polling can't be read,
+        // which the check says.
+        let watching = watch::start(&folder, self.watching, Settle::default(), batches).ok();
+        if watching.is_some() {
+            let events = self.events.clone();
+            let changed = folder.clone();
+            // Ends once watching does, or the server has.
+            let forward = std::thread::Builder::new().name("lsp-watch".into());
+            let _ = forward.spawn(move || {
+                for _ in changes {
+                    if events.send(Event::Changed(changed.clone())).is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+        let site = Site {
+            checking: Checking::new(),
+            nowhere,
+            told: BTreeMap::new(),
+            due: Some(Instant::now()),
+            _watching: watching,
+        };
+        self.sites.insert(folder, site);
+    }
+
+    /// Puts off checking the site at `folder` until typing has paused.
+    fn put_off(&mut self, folder: &Path) {
+        if let Some(site) = self.sites.get_mut(folder) {
+            site.due = Some(Instant::now() + self.pause);
+        }
+    }
+
+    /// Checks the site at `folder` and tells the editor of each file whose
+    /// problems differ from what it was last told.
+    fn check(&mut self, folder: &Path) -> std::io::Result<()> {
+        let encoding = self.encoding;
+        let Some(site) = self.sites.get_mut(folder) else {
+            return Ok(());
+        };
+        site.due = None;
+        site.checking.set_unsaved(Unsaved::new(self.open.clone()));
         let options = Options {
             mode: Mode::Check,
-            site: site.to_path_buf(),
+            site: folder.to_path_buf(),
             out: None,
             today: None,
             drafts: false,
             url: None,
         };
-        let checked = std::panic::catch_unwind(|| build::run(&options));
+        let checking = &mut site.checking;
+        let checked =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| checking.check(&options)));
         let Ok(outcome) = checked else {
+            // What a check that stopped part way kept may be anything.
+            site.checking = Checking::new();
             let params = format!(
                 "{{\"type\":1,\"message\":{}}}",
                 json::string(crate::wording::CHECK_STOPPED)
             );
-            return self.notify("window/showMessage", &params);
+            return self.notify("window/showMessage", &params).map(|_| ());
         };
-        let settings = site.join(crate::config::FILE_NAME);
-        let nowhere = match settings.is_file() {
-            true => settings,
-            false => file.to_path_buf(),
-        };
-        let found = diagnostics::by_file(&outcome, site, &nowhere, self.encoding);
-        let before = self
-            .sites
-            .insert(site.to_path_buf(), found.keys().cloned().collect());
-        for gone in before
-            .unwrap_or_default()
-            .difference(&found.keys().cloned().collect())
-        {
-            self.publish(gone, &[])?;
+        let found = diagnostics::by_file(&outcome, folder, &site.nowhere, encoding);
+        let before = std::mem::replace(&mut site.told, found);
+        let found = &self.sites[folder].told;
+        let gone: Vec<PathBuf> = (before.keys())
+            .filter(|file| !found.contains_key(*file))
+            .cloned()
+            .collect();
+        let changed: Vec<(PathBuf, Vec<String>)> = (found.iter())
+            .filter(|(file, told)| before.get(*file) != Some(told))
+            .map(|(file, told)| (file.clone(), told.clone()))
+            .collect();
+        for file in gone {
+            self.publish(&file, &[])?;
         }
-        for (file, told) in &found {
-            self.publish(file, told)?;
+        for (file, told) in changed {
+            self.publish(&file, &told)?;
         }
-        Ok(None)
+        Ok(())
     }
 
     fn publish(&mut self, file: &Path, diagnostics: &[String]) -> Answered {
@@ -191,6 +394,15 @@ impl Server<'_> {
     }
 }
 
+/// The exit code where `answered` ends the server: where the editor said
+/// to stop, or can no longer be written to.
+fn ended(answered: Answered) -> Option<u8> {
+    match answered {
+        Ok(code) => code,
+        Err(_) => Some(1),
+    }
+}
+
 /// The folder of the site `file` is in: the nearest folder above it that
 /// is a site, as `statac check` finds one.
 fn site_of(file: &Path) -> Option<PathBuf> {
@@ -198,6 +410,12 @@ fn site_of(file: &Path) -> Option<PathBuf> {
         .skip(1)
         .find(|folder| matches!(crate::new::site_mark(folder), Ok(Some(_))))
         .map(Path::to_path_buf)
+}
+
+/// Where `file` really is, past every link, as a reading of a site knows
+/// it; as it is named, where it isn't there.
+fn real(file: &Path) -> PathBuf {
+    std::fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf())
 }
 
 /// One message from the editor, read as JSON.
@@ -228,6 +446,17 @@ impl Message {
     /// The text at `path`, where it is a string.
     fn text(&self, path: &[&str]) -> Option<&str> {
         match &self.at(path)?.value {
+            Value::Scalar(text) => Some(text),
+            _ => None,
+        }
+    }
+
+    /// The `text` of the last item of the list at `path`.
+    fn last_text(&self, path: &[&str]) -> Option<&str> {
+        let Value::Sequence(items) = &self.at(path)?.value else {
+            return None;
+        };
+        match &items.last()?.get("text")?.value {
             Value::Scalar(text) => Some(text),
             _ => None,
         }

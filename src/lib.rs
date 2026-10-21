@@ -45,6 +45,7 @@ mod suggest;
 mod templates;
 #[cfg(test)]
 mod testing;
+mod unsaved;
 mod value;
 mod wording;
 pub mod yaml;

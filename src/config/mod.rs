@@ -355,7 +355,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Settings, Vec<Problem>) {
         }
     }
     let path = root.join(FILE_NAME);
-    let text = match std::fs::read_to_string(&path) {
+    let text = match sources.unsaved().read_path(&path) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let mut settings = Settings::default();

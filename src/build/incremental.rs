@@ -23,12 +23,19 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 
-use crate::build::{self, Built, Concluded, Options, Output, Plan, Prepared, Remembered, Writes};
+use crate::album::Progress;
+use crate::build::{
+    self, Built, Concluded, Mode, Options, Outcome, Output, Plan, Prepared, Publishing, Remembered,
+    Writes,
+};
+use crate::content::Texts;
 use crate::disk::Clock;
+use crate::new::update::Starter;
 use crate::problem::Problem;
 use crate::reads::{Key, Reads, Translation};
 use crate::search::Record;
 use crate::site::PageId;
+use crate::unsaved::Unsaved;
 use print::{Prints, Taken};
 
 pub(crate) use print::Reading;
@@ -71,6 +78,101 @@ impl Kept {
 
     pub(crate) fn built(&self) -> &[Built] {
         &self.built
+    }
+}
+
+/// A site checked again and again as `statac check` checks it, each
+/// check building again only what changed since the last.
+pub struct Checking {
+    texts: Texts,
+    search: crate::search::Kept,
+    last: Option<Kept>,
+    /// How many outputs the last check built, and how many the site has.
+    built: (usize, usize),
+}
+
+impl Default for Checking {
+    fn default() -> Self {
+        Checking::new()
+    }
+}
+
+impl Checking {
+    pub fn new() -> Checking {
+        Checking {
+            texts: Texts::keeping(),
+            search: crate::search::Kept::keeping(),
+            last: None,
+            built: (0, 0),
+        }
+    }
+
+    /// How many outputs the last check built, and how many the site has.
+    pub fn built(&self) -> (usize, usize) {
+        self.built
+    }
+
+    /// Has each check from the next on read `unsaved` in place of the
+    /// files it holds.
+    pub(crate) fn set_unsaved(&mut self, unsaved: Unsaved) {
+        self.texts.set_unsaved(unsaved);
+    }
+
+    /// Checks the site as `options` has it, finding what [`build::run`]
+    /// finds checking it.
+    pub fn check(&mut self, options: &Options) -> Outcome {
+        let options = &Options {
+            mode: Mode::Check,
+            ..options.clone()
+        };
+        let at = options.site.as_path();
+        if let Err(problem) = build::a_folder(at) {
+            self.last = None;
+            self.built = (0, 0);
+            return Outcome::unread(problem);
+        }
+        // Read before the check reads any file of the site, so that a
+        // stamp it settles is of the file as the check read it.
+        let disk = Clock::of_site(at);
+        let mut prepared = build::prepared_with(at, &options.run(), &mut self.texts);
+        let newer = crate::new::update::newer_starter(at, &Starter::OWN);
+        prepared.problems.extend(newer);
+        let plan = Plan::of(&prepared.renderer, &mut prepared.problems).noting();
+        let rebuilding = Rebuilding {
+            options,
+            prepared,
+            plan,
+            disk,
+            writes: Writes::Nowhere,
+            remembered: None,
+            notes: false,
+        };
+        let rebuilt = rebuild(self.last.as_ref(), rebuilding, &mut self.search);
+        let publishing = Publishing {
+            staging: None,
+            files: 0,
+            progress: Progress::Silent,
+            tidies: false,
+            after: false,
+            serving: false,
+            remembers: false,
+            unheld: None,
+            clock: build::Clock::start(),
+        };
+        let (prepared, plan, concluded) = (rebuilt.prepared, rebuilt.plan, rebuilt.concluded);
+        let mut outcome = build::publish(
+            options,
+            prepared,
+            &plan,
+            &rebuilt.built,
+            concluded,
+            publishing,
+        );
+        build::told_once_built(&mut outcome, options);
+        self.built = (rebuilt.fresh, rebuilt.built.len());
+        let built = Arc::new(rebuilt.built);
+        self.last = Some(Kept::new(rebuilt.reading, built, rebuilt.keep));
+        outcome
     }
 }
 
@@ -397,4 +499,101 @@ fn moved(problem: &Problem, to: &Translation) -> Option<Problem> {
     }
     let to = |place| to.place(place).expect("carried over, as found above");
     Some(problem.clone().moved(to))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::Report;
+    use crate::testing::TempSite;
+    use std::path::Path;
+
+    /// Every problem drawn in full.
+    fn said(outcome: &Outcome, root: &Path) -> String {
+        let report = Report::new(outcome.sources(), root, false);
+        report.check(&outcome.problems, &outcome.quiet)
+    }
+
+    fn options(root: &Path) -> Options {
+        Options {
+            mode: Mode::Check,
+            site: root.to_path_buf(),
+            out: None,
+            today: crate::date::read("2026-10-04").ok(),
+            drafts: false,
+            url: None,
+        }
+    }
+
+    /// A photograph of one colour, as a JPEG.
+    fn jpeg() -> Vec<u8> {
+        let picture = image::RgbImage::from_pixel(8, 8, image::Rgb([90, 90, 90]));
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        picture
+            .write_to(&mut bytes, image::ImageFormat::Jpeg)
+            .unwrap();
+        bytes.into_inner()
+    }
+
+    #[test]
+    fn text_an_editor_holds_is_checked_as_if_it_were_saved() {
+        let page = "{{ page.content }}\n{{ css('site.css') }}{{ css('plain.css') }}\n";
+        let files = [
+            ("statac.yaml", "language: en\ntitle: Site\n"),
+            ("templates/home.html", page),
+            ("templates/page.html", page),
+            ("snippets/aside.html", "<aside>{{ text }}</aside>\n"),
+            ("data/people.yaml", "- name: Person 1\n"),
+            (
+                "languages/en.yaml",
+                "months_short: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]\n",
+            ),
+            ("assets/site.scss", "@use 'part';\nbody { margin: 0; }\n"),
+            ("assets/_part.scss", "p { margin: 0; }\n"),
+            ("assets/plain.css", "p { margin: 0; }\n"),
+            (
+                "content/index.md",
+                "---\ntitle: Home\n---\nThe home page.\n",
+            ),
+            (
+                "content/post-1/index.md",
+                "---\ntitle: Post 1\n---\n@aside(text='A.')\n\n![A photograph.](photo-1.jpg)\n",
+            ),
+            ("content/post-1/photo-1.jpg.yaml", "decorative: false\n"),
+        ];
+        // Each file, and what the editor holds for it.
+        let typed = [
+            ("statac.yaml", "language: en\ntitel: Site\n"),
+            ("templates/page.html", "{{ page.content }\n"),
+            ("snippets/aside.html", "<aside>{{ text }</aside>\n"),
+            ("data/people.yaml", "- name: [Person 1\n"),
+            ("languages/en.yaml", "months_short: [J\n"),
+            ("assets/site.scss", "@use 'part';\nbody { margin: 0 }}\n"),
+            ("assets/_part.scss", "p { margin: 0 }}\n"),
+            ("assets/plain.css", "img { width: 50%; }\n"),
+            (
+                "content/post-1/index.md",
+                "---\ntitle: Post 1\ndate: 3/4/2026\n---\n",
+            ),
+            ("content/post-1/photo-1.jpg.yaml", "decorative: [false\n"),
+        ];
+        for (path, text) in typed {
+            let site = TempSite::site(&files);
+            let root = &site.root;
+            std::fs::write(root.join("content/post-1/photo-1.jpg"), jpeg()).unwrap();
+            let options = options(root);
+            let mut checking = Checking::new();
+            let before = checking.check(&options);
+            assert!(!before.stopped(), "{}", said(&before, root));
+            let before = said(&before, root);
+            let file = std::fs::canonicalize(root.join(path)).unwrap();
+            let held = [(file, Arc::from(text))].into_iter().collect();
+            checking.set_unsaved(Unsaved::new(held));
+            let checked = said(&checking.check(&options), root);
+            std::fs::write(root.join(path), text).unwrap();
+            let saved = said(&crate::build::run(&options), root);
+            assert_ne!(checked, before, "{path} as typed");
+            assert_eq!(checked, saved, "{path} as typed");
+        }
+    }
 }

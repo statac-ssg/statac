@@ -334,7 +334,7 @@ pub(crate) fn kept(
     let mut kept = Vec::new();
     for (path, at) in files {
         let shown = format!("{}/{path}", super::FOLDER);
-        let text = match crate::assets::read_walked_text(&fetched.real, at) {
+        let text = match sources.unsaved().read(&fetched.real, at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {

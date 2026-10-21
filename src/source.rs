@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::unsaved::Unsaved;
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct SourceId(u32);
 
@@ -66,13 +68,29 @@ pub fn line_starts(text: &str) -> Vec<usize> {
         .collect()
 }
 
-/// Every source the build has read, kept whole so any place can be shown later.
+/// Every source the build has read, kept whole so any place can be shown
+/// later, and the text an editor holds unsaved for any file, read in
+/// place of the file.
 #[derive(Default)]
 pub struct Sources {
     sources: Vec<Source>,
+    unsaved: Unsaved,
 }
 
 impl Sources {
+    /// Sources to be read with `unsaved` in place of the files it holds.
+    pub(crate) fn over(unsaved: Unsaved) -> Sources {
+        Sources {
+            sources: Vec::new(),
+            unsaved,
+        }
+    }
+
+    /// What files are read as.
+    pub(crate) fn unsaved(&self) -> &Unsaved {
+        &self.unsaved
+    }
+
     pub fn add(&mut self, path: impl Into<PathBuf>, text: String) -> SourceId {
         let lines = line_starts(&text);
         self.add_with_lines(path, text, lines)

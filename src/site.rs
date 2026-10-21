@@ -471,6 +471,18 @@ impl Site {
         crate::platform::open_file(&self.real, at)
     }
 
+    /// The text of the file at `rel` under `content/`, opened as
+    /// [`Site::open_content`] opens it: the editor's, where `unsaved` holds
+    /// one.
+    pub(crate) fn read_content(
+        &self,
+        rel: &str,
+        unsaved: &crate::unsaved::Unsaved,
+    ) -> std::io::Result<String> {
+        let at = (self.found.get(rel)).ok_or(std::io::ErrorKind::NotFound)?;
+        unsaved.read(&self.real, at)
+    }
+
     /// The folder at the top of `language`'s pages, by its path under
     /// `content/`: its own folder, or for the main language with none,
     /// `content/` itself, the empty path.

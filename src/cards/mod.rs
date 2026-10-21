@@ -286,7 +286,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Cards, Vec<Problem>) {
             source: None,
             card: None,
         };
-        match crate::assets::read_walked_text(&real, at) {
+        match sources.unsaved().read(&real, at) {
             Ok(text) => {
                 let source = sources.add(&shown, text);
                 let mut found = Vec::new();

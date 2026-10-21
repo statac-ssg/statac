@@ -13,6 +13,7 @@ use codemap::SpanLoc;
 
 use crate::problem::{Kind, Problem, Reach, Reason};
 use crate::source::{Place, Sources, Span};
+use crate::unsaved::Unsaved;
 
 pub(super) struct Compiled {
     pub(super) css: Result<String, Box<grass::Error>>,
@@ -23,9 +24,10 @@ pub(super) struct Compiled {
     pub(super) warnings: Vec<(SpanLoc, String)>,
 }
 
-/// The CSS `path` compiles to, reading nothing outside `assets`.
-pub(super) fn compile(path: &Path, assets: &Path) -> Compiled {
-    let files = Confined::new(assets);
+/// The CSS `path` compiles to, reading nothing outside `assets`, and
+/// each file as `unsaved` has it.
+pub(super) fn compile(path: &Path, assets: &Path, unsaved: &Unsaved) -> Compiled {
+    let files = Confined::new(assets, unsaved);
     let heard = Heard::default();
     let options = grass::Options::default().fs(&files).logger(&heard);
     let css = grass::from_path(path, &options);
@@ -107,19 +109,21 @@ fn shown(file: &Path, site: &Path) -> PathBuf {
 /// The files Sass may read: those whose real path, past every link, is
 /// inside `assets/`. Anything else Sass is told isn't there.
 #[derive(Debug)]
-struct Confined {
+struct Confined<'a> {
     written: PathBuf,
     real: PathBuf,
     refused: Cell<bool>,
+    unsaved: &'a Unsaved,
 }
 
-impl Confined {
-    fn new(assets: &Path) -> Confined {
+impl<'a> Confined<'a> {
+    fn new(assets: &Path, unsaved: &'a Unsaved) -> Confined<'a> {
         let written = std::path::absolute(assets).unwrap_or_else(|_| assets.to_path_buf());
         Confined {
             real: fs::canonicalize(&written).unwrap_or_else(|_| written.clone()),
             written: lexically_normal(&written),
             refused: Cell::new(false),
+            unsaved,
         }
     }
 
@@ -140,7 +144,7 @@ impl Confined {
     }
 }
 
-impl grass::Fs for Confined {
+impl grass::Fs for Confined<'_> {
     fn is_dir(&self, path: &Path) -> bool {
         self.inside(path).is_some_and(|real| real.is_dir())
     }
@@ -157,12 +161,7 @@ impl grass::Fs for Confined {
             crate::platform::slashed(within).ok()
         });
         match at {
-            Some(at) => {
-                let mut bytes = Vec::new();
-                let mut file = crate::platform::open_file(&self.real, &at)?;
-                io::Read::read_to_end(&mut file, &mut bytes)?;
-                Ok(bytes)
-            }
+            Some(at) => self.unsaved.read_bytes(&self.real, &at),
             None => Err(io::ErrorKind::NotFound.into()),
         }
     }

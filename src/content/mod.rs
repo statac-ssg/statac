@@ -141,7 +141,7 @@ pub fn read(root: &Path, run: &Run) -> Read {
 /// what this reading read.
 pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
     texts.begin(root);
-    let mut sources = Sources::default();
+    let mut sources = Sources::over(texts.unsaved().clone());
     let (mut settings, mut problems) = config::read(root, &mut sources);
     if let Some(address) = &run.url {
         settings.at(address);

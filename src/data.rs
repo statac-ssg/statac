@@ -148,7 +148,7 @@ pub(crate) fn read(root: &Path, sources: &mut Sources) -> (Data, Vec<Problem>) {
             problems.push(Problem::nowhere(Kind::NotData { path: shown }));
             continue;
         }
-        let text = match crate::assets::read_walked_text(&real, &at) {
+        let text = match sources.unsaved().read(&real, &at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {

@@ -163,7 +163,7 @@ pub(super) fn gather(root: &Path, sources: &mut Sources, problems: &mut Vec<Prob
                 }
             };
             let shown = format!("{folder}/{rel}");
-            match crate::assets::read_walked_text(&real, &at) {
+            match sources.unsaved().read(&real, &at) {
                 Ok(text) => files.push(File {
                     name,
                     source: sources.add(shown, text),

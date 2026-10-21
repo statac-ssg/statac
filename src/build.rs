@@ -1,6 +1,6 @@
 //! Reading a site and building it.
 
-pub(crate) mod incremental;
+pub mod incremental;
 mod javascript;
 mod scripts;
 mod timings;
@@ -606,20 +606,28 @@ pub(crate) fn run_holding(options: &Options, progress: Progress, starter: &Start
     let mut outcome = built(options, progress, starter, unheld, clock);
     outcome.hooks.before = before;
     outcome.waited = waited;
-    if let Held::Renderer(renderer) = &outcome.held {
-        let named = crate::hooks::names_output(renderer.settings(), renderer.sources(), options);
-        outcome.problems.extend(named);
-        if options.mode == Mode::Check {
-            let unrun = crate::hooks::unrun_by_check(renderer.settings());
-            outcome.problems.extend(unrun);
-            // What is held back is only known of a site that could be built.
-            if !stops(&outcome.problems) {
-                let located = locations_published(renderer.site(), &outcome.held_back);
-                outcome.problems.extend(located);
-            }
+    told_once_built(&mut outcome, options);
+    outcome
+}
+
+/// Adds to `outcome` what is told once the site is built as `options`
+/// asks: of the site's own commands, and in a check, of the pictures
+/// published with where they were taken.
+pub(crate) fn told_once_built(outcome: &mut Outcome, options: &Options) {
+    let Held::Renderer(renderer) = &outcome.held else {
+        return;
+    };
+    let named = crate::hooks::names_output(renderer.settings(), renderer.sources(), options);
+    outcome.problems.extend(named);
+    if options.mode == Mode::Check {
+        let unrun = crate::hooks::unrun_by_check(renderer.settings());
+        outcome.problems.extend(unrun);
+        // What is held back is only known of a site that could be built.
+        if !stops(&outcome.problems) {
+            let located = locations_published(renderer.site(), &outcome.held_back);
+            outcome.problems.extend(located);
         }
     }
-    outcome
 }
 
 /// The note `check` gives of each picture beside the writing that holds

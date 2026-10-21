@@ -580,10 +580,7 @@ pub fn read(
 
     let mut problems = Vec::new();
     for path in std::mem::take(&mut read.sidecars) {
-        let text = read
-            .site
-            .open_content(&path)
-            .and_then(std::io::read_to_string);
+        let text = read.site.read_content(&path, read.sources.unsaved());
         let Ok(text) = text else {
             continue;
         };

@@ -142,12 +142,13 @@ pub fn gather(
         .into_iter()
         .filter_map(|(rel, at)| Wanted::new(&site.join(ASSETS), rel, at))
         .collect();
+    let unsaved = sources.unsaved();
     let warnings = std::sync::Mutex::new(Vec::new());
     let read: Vec<Result<Vec<u8>, Failure>> = wanted
         .par_iter()
         .map(|wanted| match wanted.sass {
             true => {
-                let compiled = sass::compile(&wanted.path, &site.join(ASSETS));
+                let compiled = sass::compile(&wanted.path, &site.join(ASSETS), unsaved);
                 warnings
                     .lock()
                     .expect("no compile panics holding it")
@@ -157,7 +158,7 @@ pub fn gather(
                     Err(error) => Err(Failure::Sass(error, compiled.refused)),
                 }
             }
-            false => read_walked(&real, &wanted.at).map_err(Failure::Io),
+            false => unsaved.read_bytes(&real, &wanted.at).map_err(Failure::Io),
         })
         .collect();
 
@@ -324,7 +325,7 @@ fn narrowed(
         }
     }
     for (rel, at) in written {
-        if let Ok(text) = read_walked_text(real, at) {
+        if let Ok(text) = sources.unsaved().read(real, at) {
             shown.push((format!("{ASSETS}/{rel}"), Cow::Owned(text), true));
         }
     }
@@ -971,12 +972,6 @@ pub(crate) fn read_walked(real: &Path, at: &str) -> io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     io::Read::read_to_end(&mut platform::open_file(real, at)?, &mut bytes)?;
     Ok(bytes)
-}
-
-/// The text of the file [`walk`] found at `at`, under the site's real path
-/// `real`.
-pub(crate) fn read_walked_text(real: &Path, at: &str) -> io::Result<String> {
-    io::read_to_string(platform::open_file(real, at)?)
 }
 
 /// `name` without and with its file's extension: `css/site.scss` is

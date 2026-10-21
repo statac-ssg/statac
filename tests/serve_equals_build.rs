@@ -11,15 +11,18 @@ use std::sync::{Condvar, Mutex};
 use std::time::{Duration, SystemTime};
 
 use image::{ImageFormat, Rgb, RgbImage};
+use statac::build::incremental::Checking;
 use statac::build::{self, Mode, Options, Outcome};
 use statac::new::{self, Input, Locale, Machine};
 use statac::reads::Key;
 use statac::report::Report;
 use statac::serve::session::{Round, Session};
 
-/// A site in a folder of its own, removed with it.
+/// A site in a folder of its own, removed with it, and the site checked
+/// again each time a session's round is held to a build.
 struct Site {
     top: PathBuf,
+    checking: RefCell<Checking>,
 }
 
 const TODAY: &str = "2026-10-04";
@@ -84,7 +87,10 @@ impl Site {
     fn empty(name: &str) -> Site {
         let top = std::env::temp_dir().join(format!("statac-serve-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&top);
-        Site { top }
+        Site {
+            top,
+            checking: RefCell::new(Checking::new()),
+        }
     }
 
     /// A site in two languages with paged lists, tags, a feed, a snippet, a
@@ -226,10 +232,20 @@ impl Site {
         self.same_as(&self.options(), session, round, after);
     }
 
-    /// [`Site::same`], the build being asked as `options` has it.
+    /// [`Site::same`], the build being asked as `options` has it. The site
+    /// checked again is held to a fresh check asked the same.
     fn same_as(&self, options: &Options, session: &Session, round: &Round, after: &str) {
         let (fresh, said) = self.fresh(options);
         assert_eq!(self.said(&round.outcome), said, "after {after}");
+        let options = &Options {
+            mode: Mode::Check,
+            out: None,
+            ..options.clone()
+        };
+        let checked = self.checking.borrow_mut().check(options);
+        let fresh_check = build::run(options);
+        let checked = self.said(&checked);
+        assert_eq!(checked, self.said(&fresh_check), "checked after {after}");
         let held = files(session.folder());
         let names = |files: &[(String, Vec<u8>)]| -> Vec<String> {
             files.iter().map(|(name, _)| name.clone()).collect()
@@ -294,10 +310,22 @@ fn through(site: &Site, edits: &[Edit]) -> Vec<(usize, usize)> {
     assert!(!round.outcome.stopped(), "{}", site.said(&round.outcome));
     site.same(&session, &round, "the first build");
     let mut built = vec![(round.built, round.outputs)];
+    let mut stopped = false;
     for (after, edit) in edits {
         edit(site);
         let round = session.rebuild();
         site.same(&session, &round, after);
+        // A session builds on the last round that wrote the site, and a
+        // check on the last check, whether or not it stopped.
+        if !stopped {
+            let checked = site.checking.borrow().built();
+            assert_eq!(
+                checked,
+                (round.built, round.outputs),
+                "checked after {after}"
+            );
+        }
+        stopped = round.outcome.stopped();
         built.push((round.built, round.outputs));
     }
     built

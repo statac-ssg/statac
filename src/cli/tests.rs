@@ -577,8 +577,8 @@ Usage:
                          apart on a site in several.
   statac explain <name>  Explain a kind of problem. Its name is the last part
                          of the problem's More: link.
-  statac lsp             Tell an editor the site's problems as its files are
-                         opened and saved. The editor starts it.
+  statac lsp             Tell an editor the site's problems as you type. The
+                         editor starts it.
 
 Options:
   --site=<folder>        The site's folder, as the folder after the command

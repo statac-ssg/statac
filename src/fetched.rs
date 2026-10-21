@@ -279,7 +279,7 @@ pub(crate) fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>
                 continue;
             }
         };
-        let text = match crate::assets::read_walked_text(&real, &at) {
+        let text = match sources.unsaved().read(&real, &at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {
