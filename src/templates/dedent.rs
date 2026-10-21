@@ -24,12 +24,10 @@
 //! keeps both, the tag closing a branch, alone on its line, keeps its line
 //! ending to stand in for one the branch takes with it, and a `call` or
 //! `filter` alone on an indented line of markup keeps its indent, for what
-//! it writes to line up at. In a body the engine holds back, a tag alone on
-//! its line opening or closing a branch, after a line ending the engine
-//! writes, takes that line ending and keeps its own in its place. A loop's
-//! tag alone on its line keeps its line ending, for each pass to start a
-//! line, where the loop's end tag closes the last line of a body opening
-//! indented.
+//! it writes to line up at. A loop's tag alone on its line keeps its line
+//! ending, for each pass to start a line, where the loop's end tag closes
+//! the last line of a body opening indented. A body the engine holds back,
+//! such as a macro's, is read as any other.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -913,19 +911,6 @@ impl<'s> Template<'s> {
             });
         }
 
-        // In a body the engine holds back, such as a macro's, the line
-        // endings round a branch are settled here, so the writer leaves out
-        // no kept line ending there where nothing has been written for it to
-        // end.
-        let inside: Vec<bool> = (0..self.lines.len())
-            .map(|number| {
-                self.blocks.iter().any(|block| {
-                    block.kind == Kind::Placed
-                        && block.opening <= number
-                        && block.end.is_some_and(|end| end > number)
-                })
-            })
-            .collect();
         // A `call` or `filter` whose tags stand alone on an indented line
         // of markup writes a body held back where that line stands, so the
         // engine keeps the indent for the body to line up at.
@@ -954,11 +939,6 @@ impl<'s> Template<'s> {
         let mut writes = false;
         let mut kept = vec![false; self.lines.len()];
         let mut kept_ends = vec![false; self.lines.len()];
-        // Where a line in a body held back would keep its line ending, if
-        // the branch it closes keeps the one before.
-        let mut closing = vec![None; self.lines.len()];
-        // Lines taking the line ending before them in place of their own.
-        let mut taken = vec![false; self.lines.len()];
         for number in (0..self.lines.len()).rev() {
             let line = &self.lines[number];
             let placed = blocks
@@ -983,36 +963,14 @@ impl<'s> Template<'s> {
                 .last()
                 .map(|&at| &tags[at])
                 .filter(|tag| tag.span.end == ends[number] && !tag.raw && !tag.controlled);
-            // The tags closing or dividing a block opened before it, after
-            // which its line ending is written where what comes before isn't.
-            let mut depth = 0;
-            let mut outward = 0;
-            for &at in &line.tags {
-                match tags[at].role {
-                    Role::Opens(_) => depth += 1,
-                    Role::Middle | Role::Ends if depth == 0 => outward += 1,
-                    Role::Ends => depth -= 1,
-                    Role::Middle | Role::Writes | Role::Quiet => {}
-                }
-            }
             later[number] = writes;
             if more
                 && writes
                 && let Some(last) = last
                 && matches!(bytes[last.span.end - 3], b' ' | b'\t')
             {
-                if first.is_some() || !inside[number] || outward == 0 {
-                    keeps.push(last.span.end);
-                    kept_ends[number] = true;
-                } else if outward == 1 {
-                    closing[number] = Some(last.span.end);
-                } else {
-                    // Closing more than one branch, it can stand in for the
-                    // line ending of none: it is kept, and the writer leaves
-                    // it out where nothing has been written on the line.
-                    keeps.push(last.span.end);
-                    kept_ends[number] = true;
-                }
+                keeps.push(last.span.end);
+                kept_ends[number] = true;
             }
             // Tags, comments among them, write nothing after it.
             writes |= more;
@@ -1033,32 +991,10 @@ impl<'s> Template<'s> {
                 && matches!(bytes[tag.span.end - 3], b' ' | b'\t'))
             .then_some(tag)
         };
-        // The line before ends with a line ending the engine writes: it
-        // writes something and ends it with neither a tag nor spaces, or it
-        // is a tag alone whose line ending is kept. That line ending and the
-        // indent are all that lie between.
-        let after_ending = |number: usize, kept_ends: &[bool]| {
-            let Some(before) = number.checked_sub(1) else {
-                return false;
-            };
-            let line = &self.lines[before];
-            let content = line.shape == Shape::Content
-                && !self.source[line.start..ends[before]].ends_with(char::is_whitespace)
-                && line
-                    .tags
-                    .last()
-                    .is_none_or(|&at| tags[at].span.end != ends[before]);
-            content || kept_ends[before] && lone(before).is_some()
-        };
         // A line ending kept on a block's opening or middle line goes with
         // the branch. Where the branch isn't written, the line ending after
         // the tag closing it stands in: kept for a line of tags alone, the
-        // writer leaving it out where nothing was written for it to end. In
-        // a body held back nothing is left out, so there it is kept for a
-        // line holding more, which ends what the branch wrote, and for tags
-        // alone only where the tag also leaves out the line ending written
-        // before it. The blocks are in the order they open, so a line
-        // ending kept on the line before is known by then.
+        // writer leaving it out where nothing was written for it to end.
         //
         // A loop whose tag stands alone on its line and whose end tag
         // closes the last line of its body writes no line ending between
@@ -1069,8 +1005,7 @@ impl<'s> Template<'s> {
         // where spaces show or aren't markup, the passes run together as
         // typed, a line ending between them being something a reader
         // could see. Either way the line ending after the end tag is left
-        // out where no pass was written, in a body held back as elsewhere.
-        let mut closes_loop = vec![false; self.lines.len()];
+        // out where no pass was written.
         for block in &self.blocks {
             let Some(end) = block.end else {
                 continue;
@@ -1094,41 +1029,14 @@ impl<'s> Template<'s> {
                     keeps.push(closer.span.end);
                     kept_ends[end] = true;
                 }
-                closes_loop[end] = kept_ends[end];
                 continue;
             }
             let mut edges = vec![block.opening];
             edges.extend(&block.middles);
             edges.push(end);
-            // In a body held back, a branch opening on a line of its own
-            // takes the line ending before it, where the tag closing it can
-            // keep its own in its place.
-            let opening = block.opening;
-            if inside[opening]
-                && closing[edges[1]].is_some()
-                && let Some(tag) = lone(opening)
-                && after_ending(opening, &kept_ends)
-            {
-                taken[opening] = true;
-                keeps.push(tag.span.end);
-                kept_ends[opening] = true;
-            }
             for pair in edges.windows(2) {
                 let (from, to) = (pair[0], pair[1]);
                 if to == from || !kept_ends[from] {
-                    continue;
-                }
-                if inside[to] {
-                    if let Some(at) = closing[to] {
-                        keeps.push(at);
-                        kept_ends[to] = true;
-                    } else if let Some(tag) = lone(to)
-                        && after_ending(to, &kept_ends)
-                    {
-                        taken[to] = true;
-                        keeps.push(tag.span.end);
-                        kept_ends[to] = true;
-                    }
                     continue;
                 }
                 let line = &self.lines[to];
@@ -1163,9 +1071,8 @@ impl<'s> Template<'s> {
                     .any(|start| after.starts_with(start))
         };
         // What the page leaves out: the spaces the tags take with them,
-        // less those kept, and for a line taking the line ending before it,
-        // that line ending and its indent.
-        let mut dropped: Vec<Range<usize>> = self
+        // less those kept.
+        let dropped: Vec<Range<usize>> = self
             .read
             .gaps
             .iter()
@@ -1175,18 +1082,6 @@ impl<'s> Template<'s> {
             })
             .cloned()
             .collect();
-        for number in (1..self.lines.len()).filter(|&number| taken[number]) {
-            let line = &self.lines[number];
-            dropped.push(ends[number - 1]..line.start + line.indent);
-        }
-        dropped.sort_unstable_by_key(|range| range.start);
-        dropped.dedup_by(|later, earlier| {
-            if later.start >= earlier.end {
-                return false;
-            }
-            earlier.end = earlier.end.max(later.end);
-            true
-        });
         // Whether the page leaves out all of `range`.
         let left_out = |range: Range<usize>| {
             let at = dropped.partition_point(|gap| gap.end <= range.start);
@@ -1295,9 +1190,7 @@ impl<'s> Template<'s> {
                         _ => Head::Typed,
                     },
                     tail: match self.lines.get(number + 1) {
-                        _ if kept_ends[number] && (!inside[number] || closes_loop[number]) => {
-                            Tail::Owed
-                        }
+                        _ if kept_ends[number] => Tail::Owed,
                         Some(next) if left_out(ends[number]..next.start) => Tail::Dropped,
                         _ => Tail::Typed,
                     },
@@ -1780,11 +1673,10 @@ mod tests {
                 "<p>a</p>{% if a %}\n<p>b</p>\n{% endif %}\n",
                 "<p>a</p>{% if a+%}\n<p>b</p>\n{% endif %}\n",
             ),
-            // In a body the engine holds back, after a kept line ending, a
-            // tag alone on its line taking the one before in its place.
+            // In a body the engine holds back as in the page.
             (
                 "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p>{% endif %}\n<p>c</p>{% if a %}\n<p>d</p>\n{% endif %}\n{% if a %}\n<p>e</p>{% endif %}\n<p>f</p>\n{% endmacro %}\n",
-                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>{% endif+%}\n<p>c</p>{% if a+%}\n<p>d</p>\n{%-endif %}\n{% if a+%}\n<p>e</p>{% endif+%}\n<p>f</p>\n{% endmacro %}\n",
+                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>{% endif+%}\n<p>c</p>{% if a+%}\n<p>d</p>\n{% endif+%}\n{% if a %}\n<p>e</p>{% endif+%}\n<p>f</p>\n{% endmacro %}\n",
             ),
         ];
         for (template, handed) in cases {
@@ -1793,42 +1685,30 @@ mod tests {
     }
 
     #[test]
-    fn in_a_body_held_back_a_tag_alone_after_a_line_takes_its_line_end() {
-        let cases = [
-            // The branch's end tag.
-            (
-                "{% macro m(a) %}\n  <p>a</p>{% if a %}\n  <p>b</p>\n  {% endif %}\n  <p>c</p>\n{% endmacro %}\n",
-                "{% macro m(a) %}\n  <p>a</p>{% if a+%}\n  <p>b</p>\n  {%-endif+%}\n  <p>c</p>\n{% endmacro %}\n",
-            ),
-            // Each tag in turn.
-            (
-                "{% set s %}\n<p>a</p>{% if a %}\n<p>b</p>\n{% elif b %}\n<p>c</p>\n{% else %}\n<p>d</p>\n{% endif %}\n<p>e</p>\n{% endset %}\n",
-                "{% set s %}\n<p>a</p>{% if a+%}\n<p>b</p>\n{%-elif b+%}\n<p>c</p>\n{%-else+%}\n<p>d</p>\n{%-endif+%}\n<p>e</p>\n{% endset %}\n",
-            ),
-            // The branch's opening tag.
-            (
-                "{% macro m(a) %}\n  <p>a</p>\n  {% if a %}\n  <p>b</p>{% else %}\n  <p>c</p>{% endif %}\n  <p>d</p>\n{% endmacro %}\n",
-                "{% macro m(a) %}\n  <p>a</p>\n  {%-if a+%}\n  <p>b</p>{% else+%}\n  <p>c</p>{% endif+%}\n  <p>d</p>\n{% endmacro %}\n",
-            ),
-            // At the body's end.
-            (
-                "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p>\n{% endif %}\n{% endmacro %}\n",
-                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>\n{%-endif+%}\n{% endmacro %}\n",
-            ),
-            // After a tag alone whose line ending is kept, as one branch
-            // after another or one inside another, the tag after it taking
-            // that line ending.
-            (
-                "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p>\n{% endif %}\n{% if a %}\n<p>c</p>{% endif %}\n<p>d</p>\n{% endmacro %}\n",
-                "{% macro m(a) %}\n<p>a</p>{% if a+%}\n<p>b</p>\n{%-endif %}\n{% if a+%}\n<p>c</p>{% endif+%}\n<p>d</p>\n{% endmacro %}\n",
-            ),
-            (
-                "{% macro m(a, b) %}\n<p>a</p>\n{% if a %}\n{% if b %}\n<p>b</p>{% endif %}\n<p>c</p>{% endif %}\n<p>d</p>\n{% endmacro %}\n",
-                "{% macro m(a, b) %}\n<p>a</p>\n{%-if a %}\n{% if b+%}\n<p>b</p>{% endif+%}\n<p>c</p>{% endif+%}\n<p>d</p>\n{% endmacro %}\n",
-            ),
-        ];
-        for (template, handed) in cases {
-            assert_eq!(kept(template), handed, "{template}");
+    fn in_a_body_held_back_the_tags_round_a_branch_are_read_as_in_the_page() {
+        for body in [
+            "  <p>a</p>{% if a %}\n  <p>b</p>\n  {% endif %}\n  <p>c</p>\n",
+            "<p>a</p>{% if a %}\n<p>b</p>\n{% elif b %}\n<p>c</p>\n{% else %}\n<p>d</p>\n{% endif %}\n<p>e</p>\n",
+            "  <p>a</p>\n  {% if a %}\n  <p>b</p>{% else %}\n  <p>c</p>{% endif %}\n  <p>d</p>\n",
+            "<p>a</p>{% if a %}\n<p>b</p>\n{% endif %}\n",
+            "<p>a</p>{% if a %}\n<p>b</p>\n{% endif %}\n{% if a %}\n<p>c</p>{% endif %}\n<p>d</p>\n",
+            "<p>a</p>\n{% if a %}\n{% if b %}\n<p>b</p>{% endif %}\n<p>c</p>{% endif %}\n<p>d</p>\n",
+            "<div>\n  {% if a %}\n  {% if b %}\n  <p>x</p>{% endif %}{% endif %}\n</div>\n",
+            // A blank line, a comment or spaces before the tag closing it.
+            "<p>a</p>{% if a %}\n<p>b</p>\n\n{% endif %}\n<p>c</p>\n",
+            "<p>a</p>{% if a %}\n<p>b</p>{# b #}\n{% endif %}\n<p>c</p>\n",
+            "<p>a</p>{% if a %}\n<p>b</p> \n{% endif %}\n<p>c</p>\n",
+        ] {
+            for (open, close) in [
+                ("{% macro m(a, b) %}\n", "{% endmacro %}\n"),
+                ("{% set s %}\n", "{% endset %}\n"),
+            ] {
+                assert_eq!(
+                    kept(&format!("{open}{body}{close}")),
+                    format!("{open}{}{close}", kept(body)),
+                    "{body}"
+                );
+            }
         }
     }
 
@@ -1839,7 +1719,7 @@ mod tests {
                 "<div>\n  {% for i in l %}\n  <p>{{ i }}</p>{% endfor %}\n</div>\n",
                 "<div>\n  {% for i in l+%}\n  <p>{{ i }}</p>{% endfor+%}\n</div>\n",
             ),
-            // In a body held back the same, nothing taken from before it.
+            // In a body held back the same.
             (
                 "{% set s %}\n<div>\n  {% for i in l %}\n  <p>{{ i }}</p>{% endfor %}\n</div>\n{% endset %}\n",
                 "{% set s %}\n<div>\n  {% for i in l+%}\n  <p>{{ i }}</p>{% endfor+%}\n</div>\n{% endset %}\n",
@@ -1880,28 +1760,6 @@ mod tests {
             marked("{% for i in l %}\n  {{ i }}{% endfor %}\n.\n", false),
             "{% for i in l %}\n  {{ i }}{% endfor+%}\n.\n"
         );
-    }
-
-    #[test]
-    fn in_a_body_held_back_a_tag_after_a_line_that_cant_be_told_is_left() {
-        for template in [
-            // A blank line before it.
-            "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p>\n\n{% endif %}\n<p>c</p>\n{% endmacro %}\n",
-            "{% macro m(a) %}\n<p>a</p>\n\n{% if a %}\n<p>b</p>{% endif %}\n<p>c</p>\n{% endmacro %}\n",
-            // The line before ending with a tag, or with spaces.
-            "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p>{# b #}\n{% endif %}\n<p>c</p>\n{% endmacro %}\n",
-            "{% macro m(a) %}\n<p>a</p>{% set b = 1 %}\n{% if a %}\n<p>b</p>{% endif %}\n<p>c</p>\n{% endmacro %}\n",
-            "{% macro m(a) %}\n<p>a</p>{% if a %}\n<p>b</p> \n{% endif %}\n<p>c</p>\n{% endmacro %}\n",
-            // The tag saying what becomes of the spaces.
-            "{% macro m(a) %}\n<p>a</p>\n{%- if a %}\n<p>b</p>{% endif %}\n<p>c</p>\n{% endmacro %}\n",
-            // Tags and a branch on one line.
-            "{% macro m(a) %}\n<p>a</p>\n  {% if a %}<p>b</p>{% endif %}\n<p>c</p>\n{% endmacro %}\n",
-            // Written in place, where the writer sees to it.
-            "<p>a</p>\n{% if a %}\n<p>b</p>{% endif %}\n<p>c</p>\n",
-        ] {
-            let taking = |text: &str| text.matches("{%-").count();
-            assert_eq!(taking(&kept(template)), taking(template), "{template}");
-        }
     }
 
     #[test]

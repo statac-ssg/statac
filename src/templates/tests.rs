@@ -726,13 +726,17 @@ fn a_loop_closing_its_bodys_last_line_writes_each_pass_on_lines_of_its_own_where
 }
 
 #[test]
-fn a_line_closing_two_branches_keeps_the_lines_round_it_apart_in_a_body_held_back() {
+fn a_body_held_back_keeps_the_lines_round_a_branch_as_the_page_does() {
     let templates = [
         "<div>\n  {% if a %}\n  {% if b %}\n  <p>x</p>{% endif %}{% endif %}\n</div>\n",
         // After a line whose line ending goes with the outer branch.
         "<div>\n  <p>w</p>{% if a %}\n  {% if b %}\n  <p>x</p>{% endif %}{% endif %}\n  <p>y</p>\n</div>\n",
         // Closing one branch and dividing another.
         "<div>\n  {% if a %}\n  <p>w</p>\n  {% if b %}\n  <p>x</p>{% endif %}{% else %}\n  <p>y</p>{% endif %}\n</div>\n",
+        // A blank line, or a line ending with a comment, before the tag
+        // closing a branch.
+        "<div>\n  <p>w</p>{% if a %}\n  <p>x</p>\n\n  {% endif %}\n  <p>y</p>\n</div>\n",
+        "<div>\n  <p>w</p>{% if b %}\n  <p>x</p>{# x #}\n  {% endif %}\n  <p>y</p>\n</div>\n",
     ];
     for template in templates {
         for (a, b) in [(true, true), (true, false), (false, true), (false, false)] {
@@ -1129,20 +1133,19 @@ fn a_branch_not_written_leaves_the_line_before_it_its_line_end() {
                 ("false", "[]", "<p>a</p>\n<p>z</p>\n"),
             ],
         ),
-        // Where Statac can't tell, after a blank line or a line ending with
-        // a tag, the engine is handed the template as typed.
+        // After a blank line or a line ending with a tag, as in the page.
         (
             "{% macro m(x) %}\n<p>a</p>{% if x %}\n<p>b</p>\n\n{% endif %}\n<p>c</p>\n{% endmacro %}\n{{ m(@x) }}\n",
             &[
                 ("true", "[]", "<p>a</p>\n<p>b</p>\n\n<p>c</p>\n"),
-                ("false", "[]", "<p>a</p><p>c</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>c</p>\n"),
             ],
         ),
         (
             "{% macro m(x) %}\n<p>a</p>{% if x %}\n<p>b</p>{# b #}\n{% endif %}\n<p>c</p>\n{% endmacro %}\n{{ m(@x) }}\n",
             &[
                 ("true", "[]", "<p>a</p>\n<p>b</p>\n<p>c</p>\n"),
-                ("false", "[]", "<p>a</p><p>c</p>\n"),
+                ("false", "[]", "<p>a</p>\n<p>c</p>\n"),
             ],
         ),
         (
