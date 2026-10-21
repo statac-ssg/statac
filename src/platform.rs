@@ -1005,6 +1005,20 @@ pub fn shell(line: &str) -> std::process::Command {
     }
 }
 
+/// How the system's shell spells the folder a command is to act on.
+pub const SHELL_OUT: &str = match cfg!(windows) {
+    true => "%STATAC_OUT%",
+    false => "$STATAC_OUT",
+};
+
+/// Whether the console Statac writes to shows escape codes as colour.
+/// Older Windows consoles print them as text unless a program asks them
+/// not to, which takes a system call Statac doesn't make.
+pub fn console_reads_escapes() -> bool {
+    let set = |name| std::env::var_os(name).is_some_and(|value| !value.is_empty());
+    !cfg!(windows) || set("WT_SESSION") || set("TERM")
+}
+
 /// Whether `code` is the exit code the system's shell gives for a command
 /// it couldn't find.
 pub fn command_not_found(code: i32) -> bool {

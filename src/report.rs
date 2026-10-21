@@ -40,10 +40,7 @@ pub fn colour_for(stream: &impl IsTerminal) -> bool {
         return true;
     }
     let dumb = std::env::var_os("TERM").is_some_and(|term| term == "dumb");
-    // Older Windows consoles print escape codes as text unless a program
-    // asks them not to, which takes a system call Statac doesn't make.
-    let understood = !cfg!(windows) || set("WT_SESSION") || set("TERM");
-    stream.is_terminal() && !dumb && understood
+    stream.is_terminal() && !dumb && crate::platform::console_reads_escapes()
 }
 
 /// What opens a run on a terminal that takes colour: Statac's name as a

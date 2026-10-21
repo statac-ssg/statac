@@ -12,7 +12,7 @@ use std::process::Stdio;
 
 use crate::album::Progress;
 use crate::config::Settings;
-use crate::platform;
+use crate::platform::{self, SHELL_OUT};
 use crate::problem::{Ended, Hint, Kind, Named, Problem, Severity, WrongPlace};
 use crate::publish::Staging;
 use crate::source::Sources;
@@ -396,12 +396,6 @@ pub(crate) fn claimed(
     problems
 }
 
-/// How the system's shell spells the folder a command is to act on.
-const HANDED: &str = match cfg!(windows) {
-    true => "%STATAC_OUT%",
-    false => "$STATAC_OUT",
-};
-
 /// Spellings of the site's own folder before a name, which leave the name
 /// a path in the site's folder.
 const FROM_THE_SITE: &[&str] = &[
@@ -448,8 +442,8 @@ fn rewritten(line: &str, named: &[(usize, usize, usize)]) -> String {
     for &(from, _, end) in named {
         out.push_str(&line[done..from]);
         match line[..from].matches('"').count() % 2 {
-            0 => out.push_str(&format!("\"{HANDED}\"")),
-            _ => out.push_str(HANDED),
+            0 => out.push_str(&format!("\"{SHELL_OUT}\"")),
+            _ => out.push_str(SHELL_OUT),
         }
         done = end;
     }
@@ -642,11 +636,11 @@ mod tests {
         let offered = |line: &str| rewritten(line, &naming(line, "_site"));
         assert_eq!(
             offered("index --site ./_site && gzip -r \"_site/a\""),
-            format!("index --site \"{HANDED}\" && gzip -r \"{HANDED}/a\"")
+            format!("index --site \"{SHELL_OUT}\" && gzip -r \"{SHELL_OUT}/a\"")
         );
         assert_eq!(
             offered("rsync -a _site/ host:www/"),
-            format!("rsync -a \"{HANDED}\"/ host:www/")
+            format!("rsync -a \"{SHELL_OUT}\"/ host:www/")
         );
     }
 
