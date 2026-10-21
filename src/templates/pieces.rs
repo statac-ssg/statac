@@ -59,12 +59,6 @@ pub(super) fn build(
     }
     context.insert("page", PageValue::value(shared, page));
     context.insert("site", SiteValue::value(shared, frame::language()));
-    // What an earlier piece or call was handed is no part of this one.
-    frame::with(|frame| {
-        frame.handed = None;
-        frame.refusal = None;
-        frame.raised = None;
-    });
     // The line ending a file closes with would otherwise stand inside the
     // sentence a link or picture sits in.
     let built = templates

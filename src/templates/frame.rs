@@ -45,16 +45,9 @@ pub(super) struct Frame {
     pub problems: Vec<Problem>,
     /// Lookups that found nothing, most recent last.
     pub misses: Vec<Miss>,
-    /// What the last guard to refuse a value found.
-    pub refusal: Option<Refusal>,
     /// The innermost of the engine's own filters, tests and functions to
     /// stop, and what it was handed.
     pub failed: Option<Failed>,
-    /// A problem Statac's own code raised, to be told in place of the
-    /// engine's error it stopped the template with.
-    pub raised: Option<Kind>,
-    /// What the innermost snippet that failed was handed.
-    pub handed: Option<Handed>,
     /// The snippets being built, outermost first.
     pub snippets: Vec<String>,
     pub scripts: PageScripts,
@@ -161,10 +154,7 @@ impl Frame {
             asked: Asked::default(),
             problems: Vec::new(),
             misses: Vec::new(),
-            refusal: None,
             failed: None,
-            raised: None,
-            handed: None,
             snippets: Vec::new(),
             scripts: PageScripts::default(),
             origins: HashMap::new(),
@@ -388,19 +378,60 @@ pub(super) fn language() -> LanguageId {
 /// no words of its own, and the problem told is `kind`, placed where the
 /// engine says the template stopped.
 pub(super) fn raise(kind: Kind) -> minijinja::Error {
-    with(|frame| frame.raised = Some(kind));
-    minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, RAISED)
+    Stop::Raised(kind).into_error(minijinja::ErrorKind::InvalidOperation)
 }
 
-/// The words of an error Statac raised itself.
-pub(super) const RAISED: &str = "raised by Statac";
-
-/// The words of an error for a problem already told, when a template was
+/// Stops the template for a problem already told, when a template was
 /// read, which is not told again for every page.
-pub(super) const TOLD: &str = "told already";
-
 pub(super) fn told() -> minijinja::Error {
-    minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, TOLD)
+    Stop::Told.into_error(minijinja::ErrorKind::InvalidOperation)
+}
+
+/// Why Statac's own code stopped a template, carried inside the error the
+/// engine is handed as its source.
+#[derive(Debug)]
+pub(super) enum Stop {
+    /// A problem to be told in place of the engine's error.
+    Raised(Kind),
+    /// A problem told already.
+    Told,
+    /// What a guard found refusing a value.
+    Refused(Refusal),
+    /// A snippet's failure, and what its call handed it: the failure is
+    /// wrapped so the engine places the wrapping at the call.
+    InSnippet(Handed, minijinja::Error),
+}
+
+impl Stop {
+    /// An error of `kind`, with no words of its own, carrying this.
+    pub fn into_error(self, kind: minijinja::ErrorKind) -> minijinja::Error {
+        minijinja::Error::from(kind).with_source(self)
+    }
+
+    /// What `error` carries of Statac's own, where it carries anything.
+    pub fn of(error: &minijinja::Error) -> Option<&Stop> {
+        std::error::Error::source(error)?.downcast_ref()
+    }
+}
+
+impl std::fmt::Display for Stop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Stop::Raised(kind) => write!(f, "{}", kind.name()),
+            Stop::Told => f.write_str("told already"),
+            Stop::Refused(refusal) => write!(f, "{} refused a missing value", refusal.callee),
+            Stop::InSnippet(handed, _) => write!(f, "in the snippet {}", handed.snippet),
+        }
+    }
+}
+
+impl std::error::Error for Stop {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Stop::InSnippet(_, error) => Some(error),
+            _ => None,
+        }
+    }
 }
 
 /// Starts a run of the template `file` for the output being built, called

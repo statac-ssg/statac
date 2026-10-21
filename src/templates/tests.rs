@@ -4338,6 +4338,55 @@ fn a_snippet_a_snippet_calls_is_stopped_where_it_runs_on() {
 }
 
 #[test]
+fn a_problem_raised_in_a_snippet_called_from_a_macro_is_told_where_raised() {
+    let built = site(&[
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        (
+            "snippets/figure.html",
+            "{% macro picture(name) %}{{ page.photo(name) }}{% endmacro %}{{ picture(file) }}",
+        ),
+        (
+            "templates/home.html",
+            "{% macro show(name) %}<figure>{{ figure(file=name) }}</figure>{% endmacro %}\
+             {{ show(\"nowhere.jpg\") }}",
+        ),
+    ]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    let rendered = built.render("index.md");
+    assert_eq!(rendered.html, None);
+    assert_eq!(
+        rendered.problems[0].kind,
+        Kind::MissingFile {
+            path: "content/nowhere.jpg".into(),
+            hint: None,
+        }
+    );
+    assert_eq!(
+        built.told(&rendered.problems),
+        [(
+            "missing-file",
+            "snippets/figure.html".into(),
+            "page.photo(name)".into()
+        )]
+    );
+    assert_eq!(
+        built.context(&rendered.problems[0]),
+        [
+            (
+                Relation::CalledFrom,
+                "templates/home.html".into(),
+                "figure(file=name)".into()
+            ),
+            (
+                Relation::Building(None),
+                "content/index.md".into(),
+                "---".into()
+            ),
+        ]
+    );
+}
+
+#[test]
 fn a_piece_of_the_writing_that_runs_on_is_stopped() {
     let built = site_taking(
         10_000,

@@ -1129,6 +1129,43 @@ fn a_card_is_answered_in_a_layout_and_nowhere_else() {
 }
 
 #[test]
+fn a_problem_raised_in_a_text_or_a_snippet_it_calls_is_told_where_raised() {
+    let site = Site::new("raised");
+    site.write("snippets/where.html", "{{ url(to) }}");
+    site.write(
+        "templates/og.yaml",
+        &CARD
+            .replace("page.og_title", "where(to=\\\"nowhere\\\")")
+            .replace("site.title", "page.card.alt"),
+    );
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(code, 1, "{said}");
+    assert_eq!(
+        told(&said),
+        [
+            "error  Template stopped: `url` needs an address from the top of the site",
+            "error  Template stopped: `page.card` isn't answered in a card's own text",
+        ]
+    );
+    assert!(
+        said.contains(
+            "  snippets/where.html, line 1\n   1 │ {{ url(to) }}\n     │    ^^^^^^^\n  \
+             Called here: templates/og.yaml, line 4\n   4 │ title.text: \"{{ where(to=\\\"nowhere\\\") \
+             }}\"\n     │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  \
+             While building: content/index.md\n  Write it as `url(\"/about/\")`.\n"
+        ),
+        "{said}"
+    );
+    assert!(
+        said.contains(
+            "  templates/og.yaml, line 9\n   9 │ footer.text: \"{{ page.card.alt }}\"\n     \
+             │                  ^^^^^^^^^\n  While building: content/index.md\n"
+        ),
+        "{said}"
+    );
+}
+
+#[test]
 fn a_link_to_a_card_lands_on_it() {
     let site = Site::new("linked");
     site.write(

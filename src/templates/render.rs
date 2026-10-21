@@ -11,7 +11,7 @@ use minijinja::{Environment, Error, State};
 
 use super::card::Gathered;
 use super::files::{Snippet, Unnamed, unnamed_fills};
-use super::frame::{self, Frame, Handed};
+use super::frame::{self, Frame, Handed, Stop};
 use super::indent::Own;
 use super::layout::{self, Chosen};
 use super::values::{ListValue, PageValue, SiteValue};
@@ -2033,15 +2033,7 @@ impl markdown::Snippets for Prose<'_> {
             ));
             let page = PageValue::value(shared, self.page);
             let site = SiteValue::value(shared, frame::language());
-            // Each call is told on its own; what an earlier call handed is no
-            // part of this one.
-            let before = frame::with(|frame| {
-                frame.handed = None;
-                frame.refusal = None;
-                frame.raised = None;
-                frame.calling.replace(place)
-            })
-            .flatten();
+            let before = frame::with(|frame| frame.calling.replace(place)).flatten();
             let standalone = placement == Placement::Standalone;
             let built = build_snippet(shared, snippet, handed, page, site, None, standalone);
             frame::with(|frame| frame.calling = before);
@@ -2159,13 +2151,12 @@ fn build_snippet(
     frame::with(|frame| frame.snippets.pop());
     let built = frame::end(snippet.file, built)?;
     built.map_err(|inner| {
-        frame::with(|frame| {
-            frame.handed.get_or_insert(Handed {
-                snippet: snippet.name.clone(),
-                values: handed,
-            });
-        });
-        Error::new(inner.kind(), explain::IN_SNIPPET).with_source(inner)
+        let kind = inner.kind();
+        let handed = Handed {
+            snippet: snippet.name.clone(),
+            values: handed,
+        };
+        Stop::InSnippet(handed, inner).into_error(kind)
     })
 }
 

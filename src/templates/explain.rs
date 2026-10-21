@@ -17,8 +17,8 @@ use minijinja::{Error, ErrorKind};
 use super::check::{full_span, parse_template, visit_exprs};
 use super::engine::{Site, missing_operand, read_stopped};
 use super::files::Role;
-use super::frame::{Frame, InData, Miss, RAISED, TOLD};
-use super::guard::{Callee, Failed, REFUSED, Refusal, Role as Held, Step};
+use super::frame::{Frame, Handed, InData, Miss, Stop};
+use super::guard::{Callee, Failed, Refusal, Role as Held, Step};
 use super::render::{Shared, building, met_building};
 use super::values::PageValue;
 use crate::problem::{
@@ -26,26 +26,30 @@ use crate::problem::{
 };
 use crate::source::{Place, SourceId, Span, line_starts};
 
-/// The words of the error a snippet's failure is wrapped in, so the
-/// engine places the wrapping at the call.
-pub(super) const IN_SNIPPET: &str = "in a snippet";
-
 /// The problem `error` comes to, with `callers` the places outside any
 /// template that led to it, innermost first. Nothing for a problem told
 /// already.
 pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Vec<Problem> {
     let shared = Arc::clone(&frame.shared);
     let mut chain: Vec<&Error> = vec![error];
+    // What the innermost snippet that failed was handed.
+    let mut handed = None;
     let mut next = std::error::Error::source(error);
     while let Some(inner) = next {
-        match inner.downcast_ref::<Error>() {
-            Some(e) => chain.push(e),
-            None => break,
+        if let Some(e) = inner.downcast_ref::<Error>() {
+            chain.push(e);
+        } else if let Some(Stop::InSnippet(given, _)) = inner.downcast_ref() {
+            handed = Some(given);
+        } else {
+            break;
         }
         next = inner.source();
     }
     let stopped = frame.failed.take();
-    if chain.iter().any(|e| e.detail() == Some(TOLD)) {
+    if chain
+        .iter()
+        .any(|e| matches!(Stop::of(e), Some(Stop::Told)))
+    {
         return Vec::new();
     }
     // A template whose problem was told when it was read is none of the
@@ -81,8 +85,8 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
             let kind = super::frame::ran_on(frame, layout);
             return vec![met_building(Problem::at(kind, head), frame)];
         }
-        let kind = match frame.raised.take() {
-            Some(kind) if error.detail() == Some(RAISED) => kind,
+        let kind = match Stop::of(error) {
+            Some(Stop::Raised(kind)) => kind.clone(),
             _ => engine(error, None, stopped.as_ref(), &shared).0,
         };
         // With no template to place it in, it is placed in the page's own
@@ -113,12 +117,10 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
 
     let (kind, at) = if failed.kind() == ErrorKind::OutOfFuel {
         (super::frame::ran_on(frame, file), widen(name, text, &range))
-    } else if failed.detail() == Some(RAISED)
-        && let Some(kind) = frame.raised.take()
-    {
+    } else if let Some(Stop::Raised(kind)) = Stop::of(failed) {
         let span = widen(name, text, &range);
         let written = &text[span.clone()];
-        let kind = match kind {
+        let kind = match kind.clone() {
             Kind::NotSupported {
                 what: Unsupported::NotYet(what),
             } if written.ends_with(what.rsplit('.').next().unwrap_or_default())
@@ -142,7 +144,7 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
             } => {
                 if !empty
                     && let Some(snippet) = snippet
-                    && let Some(given) = not_given(&written, snippet, frame)
+                    && let Some(given) = not_given(&written, snippet, handed)
                 {
                     // The writing a call wraps, line by line, which the
                     // writing can't hand a snippet yet.
@@ -160,7 +162,7 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
                 let lack = lack_of(&shared, miss.as_ref(), empty);
                 let instead = match empty {
                     true => Instead::Default(super::check::defaulted(&written)),
-                    false => instead(&written, frame, snippet.is_some(), miss.as_ref()),
+                    false => instead(&written, frame, snippet.and(handed), miss.as_ref()),
                 };
                 (
                     Kind::NoValue {
@@ -219,7 +221,7 @@ fn engine(
     failed: Option<&Failed>,
     shared: &Shared,
 ) -> (Kind, Option<Range<usize>>) {
-    if matches!(error.detail(), Some(RAISED | REFUSED | IN_SNIPPET)) {
+    if Stop::of(error).is_some() {
         let reason = Stopped::Engine(error.kind().to_string());
         return (Kind::TemplateStopped { reason }, None);
     }
@@ -325,25 +327,21 @@ enum Missing {
 /// template's text.
 fn missing(
     failed: &Error,
-    frame: &mut Frame,
+    frame: &Frame,
     name: &str,
     text: &str,
     range: &Range<usize>,
 ) -> Option<Missing> {
-    // A guard's refusal may reach the engine through a filter of its own,
-    // as `map("upper")` hands each item to a filter, which keeps the kind of
-    // error and not its words.
-    let refusal =
-        match failed.detail() == Some(REFUSED) || failed.kind() == ErrorKind::UndefinedError {
-            true => frame.refusal.take(),
-            false => None,
-        };
+    let refusal = match Stop::of(failed) {
+        Some(Stop::Refused(refusal)) => Some(refusal),
+        _ => None,
+    };
     if let Some(refusal) = refusal
-        && let found = culprit_of_refusal(name, text, range, &refusal)
+        && let found = culprit_of_refusal(name, text, range, refusal)
         && (found.is_some() || refusal.by_field.is_some())
     {
         if let Some((field, item)) = &refusal.by_field {
-            let (kind, span) = by_field(name, text, range, &refusal, field, item);
+            let (kind, span) = by_field(name, text, range, refusal, field, item);
             return Some(Missing::Found(kind, span));
         }
         let (span, rest) = found?;
@@ -414,11 +412,11 @@ fn lack_of(shared: &Shared, miss: Option<&Miss>, empty: bool) -> Lack {
 
 /// What a missing value's suggestion offers: in a snippet handed a page,
 /// that page's own field where `page`'s is missing; for the `title` of a
-/// page Statac made, which never has one, its headline.
-fn instead(written: &str, frame: &Frame, in_snippet: bool, miss: Option<&Miss>) -> Instead {
-    if in_snippet
-        && let Some(field) = written.strip_prefix("page.")
-        && let Some(handed) = &frame.handed
+/// page Statac made, which never has one, its headline. `handed` is what
+/// the snippet missing it was handed.
+fn instead(written: &str, frame: &Frame, handed: Option<&Handed>, miss: Option<&Miss>) -> Instead {
+    if let Some(field) = written.strip_prefix("page.")
+        && let Some(handed) = handed
     {
         let field = field.split(['.', '[']).next().unwrap_or(field);
         let offered = handed.values.iter().find_map(|(param, value)| {
@@ -451,13 +449,17 @@ fn instead(written: &str, frame: &Frame, in_snippet: bool, miss: Option<&Miss>) 
 
 /// The name a snippet reads that its call didn't hand it, where that is
 /// what was missing.
-fn not_given(written: &str, snippet: &super::files::Snippet, frame: &Frame) -> Option<String> {
+fn not_given(
+    written: &str,
+    snippet: &super::files::Snippet,
+    handed: Option<&Handed>,
+) -> Option<String> {
     let root = written
         .split(['.', '[', ' ', '|'])
         .next()
         .unwrap_or(written)
         .trim();
-    let handed = frame.handed.as_ref()?;
+    let handed = handed?;
     if handed.snippet != snippet.name {
         return None;
     }

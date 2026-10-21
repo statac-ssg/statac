@@ -511,10 +511,7 @@ fn title(shared: &Arc<Shared>, id: PageId) -> String {
     frame::read(Key::Field(id, shared.name_id("og_title")));
     match shared.site.pages.get(id).words.text(PageWord::OgTitle) {
         Some(title) => title.value.to_owned(),
-        None => super::own::headline(shared, id).unwrap_or_else(|_| {
-            frame::with(|frame| frame.raised = None);
-            String::new()
-        }),
+        None => super::own::headline(shared, id).unwrap_or_default(),
     }
 }
 
@@ -675,13 +672,6 @@ fn build(shared: &Arc<Shared>, name: &str, id: PageId) -> Option<String> {
         page => PageValue::value(shared, id),
         site => SiteValue::value(shared, frame::language()),
     };
-    // Each text is told on its own; what an earlier one met is no part
-    // of this one.
-    frame::with(|frame| {
-        frame.handed = None;
-        frame.refusal = None;
-        frame.raised = None;
-    });
     frame::with(|frame| frame.layout = Some(at));
     let built = templates.env.get_template(name).and_then(|template| {
         frame::begin(at, None)?;

@@ -425,18 +425,18 @@ fn missing<'a>(
     of: PageId,
     written: &str,
     beside: impl Iterator<Item = &'a str>,
-) -> Error {
+) -> Kind {
     let name = crate::content::address::decoded(written);
     let folder = folder_of(shared, of).filter(|_| !name.starts_with('/'));
     let near = folder.and_then(|_| crate::suggest::nearest(&name, beside));
     let hint = near.map(|near| Hint::Closest(near.to_owned()));
-    frame::raise(Kind::MissingFile {
+    Kind::MissingFile {
         path: match folder {
             Some(folder) => format!("content/{folder}{name}"),
             None => name,
         },
         hint,
-    })
+    }
 }
 
 /// The problem with a picture `written` names from the page `of` that
@@ -446,12 +446,7 @@ pub(super) fn missing_picture(shared: &Shared, of: PageId, written: &str) -> Kin
     let paths = pictures
         .filter(|(_, picture)| picture.root == Root::Content)
         .map(|(_, picture)| picture.path.as_str());
-    let beside = names_in(folder_of(shared, of), paths);
-    // Raised for its kind alone: nothing is stopped by it here.
-    let _ = missing(shared, of, written, beside);
-    frame::with(|frame| frame.raised.take())
-        .flatten()
-        .expect("raised just now")
+    missing(shared, of, written, names_in(folder_of(shared, of), paths))
 }
 
 /// The names of the files under `content/` directly in `folder`, among
@@ -482,12 +477,12 @@ fn photo(
         let paths = pictures
             .filter(|(_, picture)| picture.root == Root::Content)
             .map(|(_, picture)| picture.path.as_str());
-        return Err(missing(
+        return Err(frame::raise(missing(
             shared,
             of,
             written,
             names_in(folder_of(shared, of), paths),
-        ));
+        )));
     };
     shown(shared, id, options, asking)
 }
@@ -534,11 +529,10 @@ fn photos(
 pub(super) fn for_piece(shared: &Arc<Shared>, of: PageId, address: &str, template: &str) -> Value {
     let asking = Asking::new("photo", template);
     match found(shared, of, address) {
-        Some(id) => shown(shared, id, &Options::default(), &asking).unwrap_or_else(|_| {
-            // Told where the writing shows the picture.
-            frame::with(|frame| frame.raised = None);
-            Value::from(())
-        }),
+        // Told where the writing shows the picture.
+        Some(id) => {
+            shown(shared, id, &Options::default(), &asking).unwrap_or_else(|_| Value::from(()))
+        }
         None => Value::from(()),
     }
 }
@@ -932,12 +926,12 @@ fn file(
     }
     let Some(found) = named(shared, of, written) else {
         let paths = shared.site.files.iter().map(|file| file.path.as_str());
-        return Err(missing(
+        return Err(frame::raise(missing(
             shared,
             of,
             written,
             names_in(folder_of(shared, of), paths),
-        ));
+        )));
     };
     let name = found
         .shown

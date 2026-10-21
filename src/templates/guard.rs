@@ -24,7 +24,7 @@
 use minijinja::value::{Rest, Value, ValueKind, ValueOrKwargs};
 use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior};
 
-use super::frame;
+use super::frame::{self, Stop};
 use crate::problem::{Kind, Stopped, Wanted};
 
 /// Every filter the engine ships, by the name templates use. A filter not
@@ -155,8 +155,8 @@ pub(super) enum Callee {
     Print,
 }
 
-/// What the last guard to refuse a value found, read once the error comes
-/// back from the engine, to point at the value in the template.
+/// What a guard found refusing a value, read once the error carrying it
+/// comes back from the engine, to point at the value in the template.
 #[derive(Debug, Clone)]
 pub(super) struct Refusal {
     pub callee: String,
@@ -230,21 +230,16 @@ pub(super) fn find_missing(value: &Value, empty: bool) -> Option<Found> {
 }
 
 pub(super) fn refuse(callee: &str, kind: Callee, role: Role, found: Found) -> Error {
-    frame::with(|frame| {
-        frame.refusal = Some(Refusal {
-            callee: callee.to_owned(),
-            kind,
-            role,
-            path: found.path,
-            empty: found.empty,
-            by_field: None,
-        })
-    });
-    Error::new(ErrorKind::UndefinedError, REFUSED)
+    Stop::Refused(Refusal {
+        callee: callee.to_owned(),
+        kind,
+        role,
+        path: found.path,
+        empty: found.empty,
+        by_field: None,
+    })
+    .into_error(ErrorKind::UndefinedError)
 }
-
-/// The words of an error a guard raised.
-pub(super) const REFUSED: &str = "refused a missing value";
 
 /// One of the engine's own filters, tests or functions that stopped, and
 /// what it was handed, the input first.
@@ -431,21 +426,15 @@ fn check_by_field(callee: &str, args: &[Value]) -> Result<(), Error> {
         if !field_of(&item, &field).is_undefined() {
             continue;
         }
-        let error = refuse(
-            callee,
-            Callee::Filter,
-            Role::Input,
-            Found {
-                path: vec![Step::Index(i)],
-                empty: false,
-            },
-        );
-        frame::with(|frame| {
-            if let Some(refusal) = &mut frame.refusal {
-                refusal.by_field = Some((field.clone(), item.clone()));
-            }
-        });
-        return Err(error);
+        return Err(Stop::Refused(Refusal {
+            callee: callee.to_owned(),
+            kind: Callee::Filter,
+            role: Role::Input,
+            path: vec![Step::Index(i)],
+            empty: false,
+            by_field: Some((field, item)),
+        })
+        .into_error(ErrorKind::UndefinedError));
     }
     Ok(())
 }
