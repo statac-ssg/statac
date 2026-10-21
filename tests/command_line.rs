@@ -317,6 +317,21 @@ fn a_folder_in_no_site_is_refused_and_left_as_it_was() {
                  {NO_SITE}\n1 error: 1 no-site-here.\n"
             )
         );
+        let output = statac_in(&folder, &["check", "--json"]);
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            format!(
+                "{{\"statac\":\"{}\",\"format\":1,\"site\":null,\"problems\":[\
+                 {{\"severity\":\"error\",\"kind\":\"no-site-here\",\
+                 \"message\":\"No site here: `.` has no `content/` folder and no `statac.yaml`\",\
+                 \"file\":null,\"start\":null,\"end\":null,\
+                 \"suggestion\":\"Run it in a site\\u0027s folder, or make one with `statac new`.\",\
+                 \"explanation\":\"https://statac.dev/e/no-site-here/\",\"quietened\":false,\
+                 \"related\":[],\"pages\":[]}}]}}\n",
+                env!("CARGO_PKG_VERSION")
+            )
+        );
         let output = statac_in(&folder, &["search", "post"]);
         assert_eq!(output.status.code(), Some(1), "{output:?}");
         assert_eq!(

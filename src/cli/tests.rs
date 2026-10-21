@@ -57,7 +57,10 @@ fn commands_are_read_with_their_options() {
     );
     assert_eq!(
         parsed(&["--site=docs", "check"]),
-        Ok(Request::Check(options(Mode::Check, "docs", None)))
+        Ok(Request::Check {
+            options: options(Mode::Check, "docs", None),
+            json: false,
+        })
     );
     assert_eq!(
         parsed(&["explain", "duplicate-key"]),
@@ -148,7 +151,10 @@ fn drafts_are_asked_for_with_no_value() {
     };
     assert_eq!(
         parsed(&["--drafts", "check", "docs"]),
-        Ok(Request::Check(checked))
+        Ok(Request::Check {
+            options: checked,
+            json: false,
+        })
     );
     assert_eq!(
         refused(&["build", "--drafts=yes"]),
@@ -171,6 +177,25 @@ error  Option given twice: `--drafts`
         "\
 error  Unknown option: `statac explain` has no `--drafts`
   `--drafts` is for `statac build`, `statac check` and `statac search`.
+  More: https://statac.dev/e/unknown-option/
+"
+    );
+}
+
+#[test]
+fn json_is_asked_of_check_alone_with_no_value() {
+    assert_eq!(
+        parsed(&["check", "--json", "docs"]),
+        Ok(Request::Check {
+            options: options(Mode::Check, "docs", None),
+            json: true,
+        })
+    );
+    assert_eq!(
+        refused(&["build", "--json"]),
+        "\
+error  Unknown option: `statac build` has no `--json`
+  `--json` is for `statac check`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -224,7 +249,10 @@ fn the_folder_after_the_command_is_the_site() {
     );
     assert_eq!(
         parsed(&["check", "docs"]),
-        Ok(Request::Check(options(Mode::Check, "docs", None)))
+        Ok(Request::Check {
+            options: options(Mode::Check, "docs", None),
+            json: false,
+        })
     );
     assert_eq!(
         parsed(&["build", "docs", "--out=public"]),
@@ -260,7 +288,7 @@ error  Option given twice: `--site`
 #[test]
 fn today_is_a_day_written_as_iso() {
     let today = |args: &[&str]| match parsed(args) {
-        Ok(Request::Build(options) | Request::Check(options)) => options.today,
+        Ok(Request::Build(options) | Request::Check { options, .. }) => options.today,
         other => panic!("{other:?}"),
     };
     assert_eq!(
@@ -308,7 +336,7 @@ error  Unclear date: `04/10/2026` could be 4 October or 10 April
 #[test]
 fn the_address_for_a_run_is_a_whole_address() {
     let url = |args: &[&str]| match parsed(args) {
-        Ok(Request::Build(options) | Request::Check(options)) => options.url,
+        Ok(Request::Build(options) | Request::Check { options, .. }) => options.url,
         other => panic!("{other:?}"),
     };
     assert_eq!(url(&["build"]), None);
@@ -528,6 +556,8 @@ Options:
                          statac refuse, on this computer's clock.
   --drafts               Build drafts and posts dated after today as if
                          they were published.
+  --json                 Show every problem as JSON, for an editor or another
+                         program to read, and nothing else.
   --no-drafts            Leave drafts and posts dated after today out of
                          what statac serve shows, as statac build does.
   --offline              Fetch nothing as statac serve starts. Without it,

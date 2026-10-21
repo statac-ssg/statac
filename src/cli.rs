@@ -28,7 +28,11 @@ use crate::wording;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Request {
     Build(Options),
-    Check(Options),
+    Check {
+        options: Options,
+        /// Whether the problems are shown as JSON, and nothing else.
+        json: bool,
+    },
     Serve {
         options: serve::Options,
         /// Whether nothing is to be fetched.
@@ -76,8 +80,9 @@ const OPTIONS: [(&str, &[&str]); 8] = [
 const WAYS: [&str; 3] = ["auto", "native", "poll"];
 
 /// Options that take no value, and the commands that take each.
-const FLAGS: [(&str, &[&str]); 8] = [
+const FLAGS: [(&str, &[&str]); 9] = [
     ("--drafts", &["build", "check", "search"]),
+    ("--json", &["check"]),
     ("--no-drafts", &["serve"]),
     ("--offline", &["serve"]),
     ("--yes", &["new"]),
@@ -193,7 +198,7 @@ const USAGE: [(&str, &str); 12] = [
 ];
 
 /// Each option's entry on the usage screen, as the screen sets it.
-const OPTION_LINES: [(&str, &str); 16] = [
+const OPTION_LINES: [(&str, &str); 17] = [
     (
         "--site",
         "  --site=<folder>        The site's folder, as the folder after the command
@@ -226,6 +231,12 @@ const OPTION_LINES: [(&str, &str); 16] = [
         "--drafts",
         "  --drafts               Build drafts and posts dated after today as if
                          they were published.
+",
+    ),
+    (
+        "--json",
+        "  --json                 Show every problem as JSON, for an editor or another
+                         program to read, and nothing else.
 ",
     ),
     (
@@ -361,7 +372,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>, terminal: &mut Terminal) ->
     let command = match &request {
         Request::Help(_) | Request::Version | Request::Explain(_) => None,
         Request::Build(_) => Some("build"),
-        Request::Check(_) => Some("check"),
+        Request::Check { .. } => Some("check"),
         Request::Stamp(_) => Some("stamp"),
         Request::Refresh(_) => Some("refresh"),
         Request::Refuse(_) => Some("refuse"),
@@ -401,7 +412,10 @@ fn guarded(
 
 /// Does what `request` asks.
 fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> u8 {
-    if let Some(command) = command {
+    let json = matches!(request, Request::Check { json: true, .. });
+    if let Some(command) = command
+        && !json
+    {
         let badge = crate::report::badge(terminal.colour_out, command);
         say(terminal.out, &badge);
     }
@@ -417,6 +431,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
                 report.of_build(&outcome, Path::new(""), Duration::ZERO)
             }
             Request::Stamp(_) | Request::Search(_) => report.problems(&[problem]),
+            _ if json => report.check_json(&[problem], &Quiet::default()),
             _ => report.check(&[problem], &Quiet::default()),
         };
         say(terminal.out, &said);
@@ -429,11 +444,15 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             &format!("Statac {}\n", env!("CARGO_PKG_VERSION")),
         ),
         Request::Explain(code) => say(terminal.out, &code.explained()),
-        Request::Build(options) | Request::Check(options) => {
+        Request::Build(options) | Request::Check { options, .. } => {
             let started = Instant::now();
             let outcome = build::run_saying(&options, terminal.progress);
             let problems = &outcome.problems;
             let report = Report::new(outcome.sources(), &options.site, terminal.colour_out);
+            if json {
+                say(terminal.out, &report.check_json(problems, &outcome.quiet));
+                return u8::from(outcome.stopped());
+            }
             let said = match options.mode {
                 Mode::Build => {
                     let took = started.elapsed().saturating_sub(outcome.waited);
@@ -576,7 +595,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
 /// The site's folder of a request that works on a site.
 fn site_of(request: &mut Request) -> Option<&mut PathBuf> {
     match request {
-        Request::Build(options) | Request::Check(options) => Some(&mut options.site),
+        Request::Build(options) | Request::Check { options, .. } => Some(&mut options.site),
         Request::Serve { options, .. } => Some(&mut options.site),
         Request::Stamp(options) => Some(&mut options.site),
         Request::Refresh(options) => Some(&mut options.site),
@@ -693,6 +712,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     let mut url = None;
     let mut today = None;
     let mut drafts = false;
+    let mut json = false;
     let mut no_drafts = false;
     let mut offline = false;
     let mut yes = false;
@@ -824,6 +844,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             } else {
                 let given = match flag {
                     "--drafts" => &mut drafts,
+                    "--json" => &mut json,
                     "--no-drafts" => &mut no_drafts,
                     "--yes" => &mut yes,
                     "--update" => &mut update,
@@ -1034,7 +1055,10 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     };
     Ok(match known {
         Some("build") => Request::Build(options(Mode::Build)),
-        Some("check") => Request::Check(options(Mode::Check)),
+        Some("check") => Request::Check {
+            options: options(Mode::Check),
+            json,
+        },
         Some("serve") => Request::Serve {
             options: serve::Options {
                 site: site.unwrap_or_default(),

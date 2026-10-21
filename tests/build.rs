@@ -547,6 +547,65 @@ fn quietened_kinds_are_counted_and_not_drawn() {
 }
 
 #[test]
+fn check_shows_every_problem_as_json_with_where_it_starts_and_ends_and_nothing_else() {
+    let site = Site::new("json");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nquiet: [dates-disagree]\n",
+    );
+    site.write(
+        "content/2026-01-01-post-2.md",
+        "---\ntitle: Post 2\ndate: 2026-01-02\n---\nThe second post.\n",
+    );
+    site.write(
+        "content/ete.md",
+        "---\ntitle: Été\n---\nUn café, ![](https://a.example/b.jpg), [x](/nope/).\n",
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_statac"))
+        .args(["check", "--json", "--today=2026-10-04"])
+        .arg(&site.root)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+    let said = String::from_utf8(output.stdout).unwrap();
+    let root = site.root.display().to_string().replace('\\', "\\\\");
+    // A column counts characters and an offset bytes, so `é` is one of
+    // the first and two of the second. A quietened problem is there,
+    // marked.
+    assert_eq!(
+        said,
+        format!(
+            "{{\"statac\":\"{}\",\"format\":1,\"site\":\"{root}\",\"problems\":[\
+             {{\"severity\":\"warning\",\"kind\":\"dates-disagree\",\
+             \"message\":\"Dates disagree: `date` is `2026-01-02`, the file name `2026-01-01`\",\
+             \"file\":\"content/2026-01-01-post-2.md\",\
+             \"start\":{{\"line\":3,\"column\":7,\"offset\":24}},\
+             \"end\":{{\"line\":3,\"column\":17,\"offset\":34}},\
+             \"suggestion\":\"Change one so they match; Statac uses the `date` line.\",\
+             \"explanation\":\"https://statac.dev/e/dates-disagree/\",\"quietened\":true,\
+             \"related\":[],\"pages\":[]}},\
+             {{\"severity\":\"note\",\"kind\":\"undescribed-picture\",\
+             \"message\":\"Picture with no description: `https://a.example/b.jpg`\",\
+             \"file\":\"content/ete.md\",\
+             \"start\":{{\"line\":4,\"column\":14,\"offset\":35}},\
+             \"end\":{{\"line\":4,\"column\":37,\"offset\":58}},\
+             \"suggestion\":\"Describe it in the brackets.\",\
+             \"explanation\":\"https://statac.dev/e/undescribed-picture/\",\"quietened\":false,\
+             \"related\":[],\"pages\":[]}},\
+             {{\"severity\":\"warning\",\"kind\":\"broken-link\",\
+             \"message\":\"Broken link: nothing is published at `/nope/`\",\
+             \"file\":\"content/ete.md\",\
+             \"start\":{{\"line\":4,\"column\":44,\"offset\":65}},\
+             \"end\":{{\"line\":4,\"column\":50,\"offset\":71}},\
+             \"suggestion\":null,\"explanation\":\"https://statac.dev/e/broken-link/\",\
+             \"quietened\":false,\"related\":[],\"pages\":[]}}]}}\n",
+            env!("CARGO_PKG_VERSION")
+        )
+    );
+}
+
+#[test]
 fn a_fixed_day_builds_the_same_site_twice() {
     let site = Site::new("same");
     let out = |name: &str| site.root.join(name).display().to_string();

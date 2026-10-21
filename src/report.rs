@@ -1297,5 +1297,7 @@ impl Paint {
     }
 }
 
+mod json;
+
 #[cfg(test)]
 mod tests;
