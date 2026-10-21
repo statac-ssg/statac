@@ -244,6 +244,7 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
         &page_names,
         written,
     ));
+    site.page_names = page_names;
     problems.extend(translations::link(&mut site, &sources, &keys_left_out));
     let on_pages = site.pages.iter().flat_map(|(_, page)| {
         let written = page.words.words.iter().map(|(_, value)| &value.value);

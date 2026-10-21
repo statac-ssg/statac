@@ -185,6 +185,16 @@ pub fn setting_names() -> impl Iterator<Item = &'static str> {
     SETTINGS.iter().map(|s| s.name)
 }
 
+/// The values the setting `name` takes where they are a few words to
+/// choose from.
+pub fn choices(name: &str) -> Vec<&'static str> {
+    match SETTINGS.iter().find(|s| s.name == name).map(|s| s.shape) {
+        Some(Shape::Truth) => vec!["true", "false"],
+        Some(Shape::OneOf(words)) => words.to_vec(),
+        _ => Vec::new(),
+    }
+}
+
 /// Whether `name` is one of Statac's own site settings.
 pub fn is_setting(name: &str) -> bool {
     SETTINGS.iter().any(|s| s.name == name)

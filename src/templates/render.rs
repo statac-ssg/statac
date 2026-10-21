@@ -562,6 +562,19 @@ impl Renderer {
         })
     }
 
+    /// Every template a page can be built with: the name `layout:` gives
+    /// it by, and the path of its file in the site.
+    pub(crate) fn layouts(&self) -> Vec<(String, String)> {
+        let templates = &self.shared.templates;
+        (templates.files.iter())
+            .filter(|file| file.role == super::files::Role::Template)
+            .map(|file| {
+                let path = self.shared.sources.path(file.source).to_string_lossy();
+                (file.name.clone(), path.replace('\\', "/"))
+            })
+            .collect()
+    }
+
     /// The files the site's cards are drawn with, each by its path in the
     /// site.
     pub(crate) fn card_files(&self) -> Vec<String> {

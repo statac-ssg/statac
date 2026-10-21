@@ -270,6 +270,28 @@ fn a_position_counts_characters_as_the_editor_asked() {
 }
 
 #[test]
+fn a_position_the_editor_gives_is_found_in_the_text_and_given_back() {
+    let text = "\u{feff}é😀x\nb";
+    let x = "\u{feff}é😀".len();
+    for (encoding, character) in [(Encoding::Utf8, 6), (Encoding::Utf16, 3)] {
+        assert_eq!(
+            diagnostics::offset_in(text, 0, character, encoding),
+            Some(x)
+        );
+        assert_eq!(diagnostics::position_in(text, x, encoding), (0, character));
+    }
+    let b = "\u{feff}é😀x\n".len();
+    assert_eq!(diagnostics::offset_in(text, 1, 0, Encoding::Utf16), Some(b));
+    assert_eq!(diagnostics::position_in(text, b, Encoding::Utf16), (1, 0));
+    assert_eq!(
+        diagnostics::offset_in(text, 0, 99, Encoding::Utf16),
+        Some(b - 1),
+        "past the end of its line"
+    );
+    assert_eq!(diagnostics::offset_in(text, 2, 0, Encoding::Utf16), None);
+}
+
+#[test]
 fn opening_a_file_tells_every_problem_in_the_site_where_it_is_written() {
     let site = site();
     let page = site.root.join("content/post-1.md");
@@ -432,4 +454,96 @@ fn input_that_ends_ends_the_server() {
     let input = Cursor::new(framed(&initialize("\"utf-16\"")).into_bytes());
     let mut output = Vec::new();
     assert_eq!(run(input, &mut output), 1);
+}
+
+fn completion(id: u32, file: &Path, line: usize, character: usize) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"textDocument/completion\",\
+         \"params\":{{\"textDocument\":{{\"uri\":{}}},\
+         \"position\":{{\"line\":{line},\"character\":{character}}}}}}}",
+        json::string(&uri::of(file))
+    )
+}
+
+/// The completions an answer gives, each as its label, the characters its
+/// edit starts and ends at on their line, and what it writes.
+fn completions(answer: &Message) -> Vec<(String, String, String, String)> {
+    let Some(Value::Sequence(items)) = answer.at(&["result", "items"]).map(|n| &n.value) else {
+        return Vec::new();
+    };
+    let text = |node: &Node, path: &[&str]| {
+        let found = path.iter().try_fold(node, |node, key| node.get(key));
+        match found.map(|node| &node.value) {
+            Some(Value::Scalar(text)) => text.clone(),
+            _ => String::new(),
+        }
+    };
+    let edit = ["textEdit", "range"];
+    (items.iter())
+        .map(|item| {
+            (
+                text(item, &["label"]),
+                text(item, &[edit[0], edit[1], "start", "character"]),
+                text(item, &[edit[0], edit[1], "end", "character"]),
+                text(item, &["textEdit", "newText"]),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn completion_offers_what_the_site_holds_where_the_cursor_stands_in_unsaved_text() {
+    let site = TempSite::site(&[
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ntags: [rust]\n---\n",
+        ),
+        ("content/post-2.md", "---\ntitle: Post 2\n---\n"),
+    ]);
+    let page = site.root.join("content/post-2.md");
+    let typed = "tags: [\"😀\", r";
+    let text = format!("---\ntitle: Post 2\n{typed}\n---\n");
+    let mut editor = Editor::start();
+    editor.send(&initialize("\"utf-16\""));
+    // Asked before the site has been read.
+    let mark = editor.mark();
+    editor.send_all(&[
+        &opened(&page),
+        &changed(&page, &text),
+        &completion(2, &page, 2, typed.encode_utf16().count()),
+        &completion(3, &page, 1, 2),
+        &completion(4, &page, 4, 0),
+    ]);
+    let mut answers = Vec::new();
+    for id in ["2", "3", "4"] {
+        let at = editor.until(mark, |message| message.id() == Some(id));
+        answers.push(at);
+    }
+    let (sent, code) = editor.end(true);
+    assert_eq!(code, 0);
+    let end = typed.encode_utf16().count().to_string();
+    let start = (typed.encode_utf16().count() - 1).to_string();
+    assert_eq!(
+        completions(&sent[answers[0]]),
+        [("rust".into(), start, end, "rust".into())]
+    );
+    // In the name `title`, typed as far as `ti`.
+    let names = completions(&sent[answers[1]]);
+    let tags = names.iter().find(|(label, ..)| label == "tags");
+    assert_eq!(tags, None, "written already");
+    let date = names.iter().find(|(label, ..)| label == "date").unwrap();
+    assert_eq!(
+        date,
+        &("date".into(), "0".into(), "2".into(), "date".into())
+    );
+    let nothing = &sent[answers[2]];
+    let result = nothing.at(&["result"]).unwrap();
+    assert_eq!(
+        nothing.sources.spelling(result.place),
+        "null",
+        "nothing offered in the writing"
+    );
+    let triggers = sent[0].at(&["result", "capabilities", "completionProvider"]);
+    assert!(triggers.is_some());
 }

@@ -42,7 +42,7 @@ pub enum Names {
 }
 
 /// The kinds as the author writes them.
-const KIND_WORDS: &[&str] = &[
+pub const KIND_WORDS: &[&str] = &[
     "text",
     "number",
     "true/false",
@@ -74,6 +74,11 @@ pub struct Declarations {
 impl Declarations {
     pub fn kind(&self, field: &str) -> Option<&FieldKind> {
         self.fields.get(field).map(|declared| &declared.kind)
+    }
+
+    /// How the field `name` is declared, where it is.
+    pub fn declared(&self, field: &str) -> Option<&Declared> {
+        self.fields.get(field)
     }
 
     /// Every field declared, by name.

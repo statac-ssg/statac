@@ -122,6 +122,56 @@ fn range(sources: &Sources, place: Place, encoding: Encoding) -> String {
     format!("{{\"start\":{start},\"end\":{{\"line\":{line},\"character\":{character}}}}}")
 }
 
+/// The line and character of `offset` in `text`, both counted from 0, the
+/// character as `encoding` counts it.
+pub(super) fn position_in(text: &str, offset: usize, encoding: Encoding) -> (usize, usize) {
+    let offset = text.floor_char_boundary(offset.min(text.len()));
+    let mut start = text[..offset].rfind('\n').map_or(0, |at| at + 1);
+    let line = text[..start].matches('\n').count();
+    // A byte-order mark is no character the editor shows.
+    if start == 0 && text.starts_with('\u{feff}') && offset >= '\u{feff}'.len_utf8() {
+        start = '\u{feff}'.len_utf8();
+    }
+    (line, count(&text[start..offset], encoding))
+}
+
+/// Where the protocol's `line` and `character` stand in `text`, in bytes:
+/// at the end of the line where the character is past it, and none where
+/// the text has no such line.
+pub(super) fn offset_in(
+    text: &str,
+    line: usize,
+    character: usize,
+    encoding: Encoding,
+) -> Option<usize> {
+    let mut start = 0;
+    for _ in 0..line {
+        start += text[start..].find('\n')? + 1;
+    }
+    if start == 0 && text.starts_with('\u{feff}') {
+        start = '\u{feff}'.len_utf8();
+    }
+    let end = text[start..].find('\n').map_or(text.len(), |at| start + at);
+    let mut counted = 0;
+    for (at, c) in text[start..end].char_indices() {
+        if counted >= character {
+            return Some(start + at);
+        }
+        counted += match encoding {
+            Encoding::Utf8 => c.len_utf8(),
+            Encoding::Utf16 => c.len_utf16(),
+        };
+    }
+    Some(end)
+}
+
+fn count(text: &str, encoding: Encoding) -> usize {
+    match encoding {
+        Encoding::Utf8 => text.len(),
+        Encoding::Utf16 => text.encode_utf16().count(),
+    }
+}
+
 /// The line and character of `offset` in a source, both counted from 0,
 /// the character as `encoding` counts it.
 pub(super) fn position(
@@ -139,10 +189,5 @@ pub(super) fn position(
     if line == 1 && text.starts_with('\u{feff}') && offset >= mark {
         start = mark;
     }
-    let before = &text[start..offset];
-    let character = match encoding {
-        Encoding::Utf8 => before.len(),
-        Encoding::Utf16 => before.encode_utf16().count(),
-    };
-    (line - 1, character)
+    (line - 1, count(&text[start..offset], encoding))
 }

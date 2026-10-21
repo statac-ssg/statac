@@ -3498,6 +3498,28 @@ pub(crate) const BUILD_STOPPED: &str = "Build stopped: Statac met a fault of its
 /// Statac's own.
 pub(crate) const CHECK_STOPPED: &str = "Check stopped: Statac met a fault of its own.";
 
+/// What an editor's completion says beside one of Statac's settings.
+pub(crate) const OFFERED_SETTING: &str = "setting";
+
+/// What an editor's completion says beside one of Statac's own fields.
+pub(crate) const OFFERED_FIELD: &str = "field";
+
+/// What an editor's completion says beside a `pages.` field.
+pub(crate) const OFFERED_HANDED: &str = "handed down";
+
+/// What an editor's completion says beside a type the site declares.
+pub(crate) const OFFERED_TYPE: &str = "type";
+
+/// What an editor's completion says beside one of the site's tags.
+pub(crate) fn offered_tag(pages: usize) -> String {
+    format!("tag, {}", how_many(pages, "page", "pages"))
+}
+
+/// What an editor's completion says beside one of the site's series.
+pub(crate) fn offered_series(pages: usize) -> String {
+    format!("series, {}", how_many(pages, "page", "pages"))
+}
+
 /// What `build` says after a fault of Statac's own that came before the
 /// site was put in place.
 pub(crate) const WROTE_NOTHING: &str = "Wrote nothing.";

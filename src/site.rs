@@ -454,6 +454,10 @@ pub struct Site {
     pub held_back: Vec<HeldBack>,
     /// The `layout:` of each page left out until the site has an address.
     pub layouts_needing_url: Vec<String>,
+    /// The names of the pages in each folder, by its path under `content/`
+    /// with its closing slash, kept where a field is declared one of a
+    /// folder's pages.
+    pub page_names: std::collections::HashMap<String, Vec<String>>,
     /// Each page's previous and next page, by page, in the run it walks.
     pub neighbours: Vec<[Option<PageId>; 2]>,
     /// Each post's place in its language's own list, by page.

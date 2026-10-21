@@ -5,11 +5,13 @@
 //! and tells the editor every problem at the place it is written: as the
 //! site is first opened, once typing pauses, and as files of the site
 //! change on disk. Each check builds again only what changed since the
-//! last.
+//! last. It completes what is typed in the site's settings and in front
+//! matter from what Statac takes there and what the site holds.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
 
+mod complete;
 mod diagnostics;
 #[cfg(test)]
 mod tests;
@@ -43,6 +45,11 @@ const PAUSE: Duration = Duration::from_millis(330);
 /// The protocol's word for the editor sending a file's whole text with
 /// each change.
 const WHOLE_TEXT: u8 = 1;
+
+/// What, typed, has the editor ask what may follow, besides the letters
+/// of a word: a value's space after its colon, and a list's bracket and
+/// comma.
+const TRIGGERS: &str = "[\" \",\"[\",\",\"]";
 
 /// Answers the editor's messages on `input` with its own on `output` until
 /// the editor says to stop, and gives the exit code: 0 where it asked to
@@ -217,11 +224,16 @@ impl Server<'_> {
                 let result = format!(
                     "{{\"capabilities\":{{\"positionEncoding\":\"{}\",\
                      \"textDocumentSync\":{{\"openClose\":true,\"change\":{WHOLE_TEXT},\
-                     \"save\":{{\"includeText\":false}}}}}},\
+                     \"save\":{{\"includeText\":false}}}},\
+                     \"completionProvider\":{{\"triggerCharacters\":{TRIGGERS}}}}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
                     json::string(env!("CARGO_PKG_VERSION")),
                 );
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "textDocument/completion" => {
+                let result = self.complete(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
             "shutdown" => {
@@ -307,6 +319,70 @@ impl Server<'_> {
             _watching: watching,
         };
         self.sites.insert(folder, site);
+    }
+
+    /// What may be written where the cursor stands, as the protocol's
+    /// list of completions, or `null` where nothing is offered there.
+    fn complete(&mut self, message: &Message) -> std::io::Result<String> {
+        let at = |name| message.text(&["params", "position", name])?.parse().ok();
+        let uri = message.text(&["params", "textDocument", "uri"]);
+        let (Some(file), Some(line), Some(character)) =
+            (uri.and_then(uri::path), at("line"), at("character"))
+        else {
+            return Ok("null".to_owned());
+        };
+        let text = match self.open.get(&real(&file)) {
+            Some(text) => Arc::clone(text),
+            None => match std::fs::read_to_string(&file) {
+                Ok(text) => Arc::from(text),
+                Err(_) => return Ok("null".to_owned()),
+            },
+        };
+        let (Some(folder), Some(offset)) = (
+            site_of(&file),
+            diagnostics::offset_in(&text, line, character, self.encoding),
+        ) else {
+            return Ok("null".to_owned());
+        };
+        // What the site holds is offered once it has been read.
+        let unread = (self.sites.get(&folder))
+            .is_some_and(|site| site.checking.renderer().is_none() && site.due.is_some());
+        if unread {
+            self.check(&folder)?;
+        }
+        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let Some(completion) = complete::complete(&folder, &file, &text, offset, known) else {
+            return Ok("null".to_owned());
+        };
+        let position = |offset| {
+            let (line, character) = diagnostics::position_in(&text, offset, self.encoding);
+            format!("{{\"line\":{line},\"character\":{character}}}")
+        };
+        let range = format!(
+            "{{\"start\":{},\"end\":{}}}",
+            position(completion.typed.start),
+            position(completion.typed.end)
+        );
+        let items: Vec<String> = (completion.items.iter())
+            .map(|item| {
+                let detail = match &item.detail {
+                    Some(detail) => format!(",\"detail\":{}", json::string(detail)),
+                    None => String::new(),
+                };
+                format!(
+                    "{{\"label\":{},\"kind\":{}{detail},\"sortText\":{},\
+                     \"textEdit\":{{\"range\":{range},\"newText\":{}}}}}",
+                    json::string(&item.label),
+                    item.kind.number(),
+                    json::string(&format!("{}{}", item.group, item.label)),
+                    json::string(&item.insert),
+                )
+            })
+            .collect();
+        Ok(format!(
+            "{{\"isIncomplete\":false,\"items\":[{}]}}",
+            items.join(",")
+        ))
     }
 
     /// Puts off checking the site at `folder` until typing has paused.

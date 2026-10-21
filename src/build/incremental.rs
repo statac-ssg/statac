@@ -112,6 +112,11 @@ impl Checking {
         self.built
     }
 
+    /// The site as the last check read it, where one has.
+    pub(crate) fn renderer(&self) -> Option<&crate::templates::Renderer> {
+        self.last.as_ref().map(|kept| &kept.reading().renderer)
+    }
+
     /// Has each check from the next on read `unsaved` in place of the
     /// files it holds.
     pub(crate) fn set_unsaved(&mut self, unsaved: Unsaved) {

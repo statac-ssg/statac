@@ -223,6 +223,17 @@ impl PageWord {
     pub fn all() -> impl Iterator<Item = PageWord> {
         WORDS.iter().map(|spec| spec.word)
     }
+
+    /// The values it takes where they are a few words to choose from.
+    pub fn choices(self) -> Vec<&'static str> {
+        match self.spec().shape {
+            Shape::Truth | Shape::Feed => vec!["true", "false"],
+            Shape::OneOf(words) => words.to_vec(),
+            Shape::OneOfOrFalse(words) => [words, &["false"]].concat(),
+            Shape::Order => ORDERS.to_vec(),
+            _ => Vec::new(),
+        }
+    }
 }
 
 /// Whether `name` is a word Statac gives a meaning to on a page.
