@@ -12,17 +12,11 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use crate::html::{self, RAW_TEXT, comment_close, next};
+use crate::html::{self, RAW_TEXT, VOID, comment_close, next};
 use crate::problem::Unmatched;
 
 /// What is told, at its place in the masked text.
 pub(super) type Told = (Unmatched, Range<usize>);
-
-/// Elements that hold nothing, so are never left open.
-const VOID: &[&str] = &[
-    "area", "base", "basefont", "bgsound", "br", "col", "embed", "frame", "hr", "image", "img",
-    "input", "keygen", "link", "meta", "param", "source", "track", "wbr",
-];
 
 /// Elements a browser closes by itself, never told open or closing nothing.
 const CLOSED_BY_ITSELF: &[&str] = &[

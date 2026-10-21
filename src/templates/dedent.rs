@@ -34,7 +34,7 @@ use std::ops::Range;
 
 use minijinja::machinery::{Token, tokenize};
 
-use crate::html::PREFORMATTED;
+use crate::html::{Markup, PREFORMATTED, VOID};
 
 /// Blocks whose body is written where the block stands, as a `block`'s
 /// is where its template is the one rendered.
@@ -45,12 +45,6 @@ const PLACED: [&str; 4] = ["macro", "call", "filter", "set"];
 
 /// Elements whose text is not markup.
 const SCRIPTED: [&str; 2] = ["script", "style"];
-
-/// Elements with no end tag.
-const VOID: [&str; 16] = [
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
-    "wbr", "param", "keygen", "command",
-];
 
 /// Where `source` has lines that give up indentation they have only for
 /// the template's sake: each such line's start, with how many bytes of its
@@ -1281,142 +1275,83 @@ fn width(indent: &str, tabs: bool) -> usize {
     })
 }
 
-/// A start or end tag being read.
-struct Open {
-    name: String,
-    closing: bool,
-    /// The line it began on.
-    began: usize,
-    /// The quote an attribute's value is inside.
-    quote: Option<u8>,
-}
-
-/// Reads the markup of each line, the template's own tags blanked out:
-/// the elements it opens and closes, and whether it starts inside one that
-/// isn't markup.
+/// Reads the markup of each line, the template's own tags blanked out, as
+/// a browser reads it: the elements it opens and closes, and whether it
+/// starts inside one that isn't markup. Inside `<pre>` and the like only
+/// the element's own end tag counts.
 fn markup(lines: &mut [Line], blanked: &[u8]) {
-    let mut tag: Option<Open> = None;
-    let mut special: Option<String> = None;
-    let mut comment = false;
-    for number in 0..lines.len() {
-        let start = lines[number].start;
-        let end = lines
-            .get(number + 1)
-            .map_or(blanked.len(), |next| next.start);
-        let text = &blanked[start..end];
-        let line = &mut lines[number];
-        line.shown = special
-            .as_deref()
-            .is_some_and(|name| PREFORMATTED.contains(&name));
-        line.scripted = special
-            .as_deref()
-            .is_some_and(|name| SCRIPTED.contains(&name));
-        let mut seen = false;
-        let mut at = 0;
-        while at < text.len() {
-            if comment {
-                match find(&text[at..], b"-->") {
-                    Some(found) => {
-                        comment = false;
-                        at += found + 3;
-                    }
-                    None => break,
-                }
+    // Blanking replaces whole tokens, so whole characters.
+    let Ok(text) = std::str::from_utf8(blanked) else {
+        return;
+    };
+    let starts: Vec<usize> = lines.iter().map(|line| line.start).collect();
+    let line_of = |at: usize| starts.partition_point(|&start| start <= at) - 1;
+    // Where the lines starting inside an element that isn't markup lie.
+    let mut shown = Vec::new();
+    let mut scripted = Vec::new();
+    // The element whose text isn't markup being read, and where its text
+    // starts.
+    let mut inside: Option<(String, usize)> = None;
+    // Where the last piece of markup ended.
+    let mut after = 0;
+    for (range, piece) in crate::html::markup_where_closed(text) {
+        let (tag, closing) = match &piece {
+            Markup::Start(tag) => (tag, false),
+            Markup::End(tag) => (tag, true),
+            Markup::Other => {
+                after = range.end;
                 continue;
             }
-            if let Some(open) = &mut tag {
-                let byte = text[at];
-                at += 1;
-                match (open.quote, byte) {
-                    (Some(quote), byte) if byte == quote => open.quote = None,
-                    (None, b'"' | b'\'') => open.quote = Some(byte),
-                    (None, b'>') => {
-                        let ended = at >= 2 && text[at - 2] == b'/';
-                        let Open {
-                            name,
-                            closing,
-                            began,
-                            ..
-                        } = tag.take().expect("a tag being read");
-                        if closing {
-                            if special.as_deref() == Some(name.as_str()) {
-                                special = None;
-                                line.opens -= 1;
-                            } else if special.is_none() {
-                                line.opens -= 1;
-                            }
-                        } else if !VOID.contains(&name.as_str()) && !ended && special.is_none() {
-                            line.opens += 1;
-                            if PREFORMATTED.contains(&name.as_str())
-                                || SCRIPTED.contains(&name.as_str())
-                            {
-                                special = Some(name);
-                            }
-                        }
-                        if began != number {
-                            line.began = Some(began);
-                        }
-                    }
-                    _ => {}
-                }
+        };
+        let name = tag.name.as_str();
+        if let Some((open, from)) = &inside {
+            if !closing || name != open {
+                after = range.end;
                 continue;
             }
-            let rest = &text[at..];
-            if rest.starts_with(b"<!--") {
-                comment = true;
-                seen = true;
-                at += 4;
-                continue;
+            if PREFORMATTED.contains(&name) {
+                shown.push(*from..range.end);
+            } else if SCRIPTED.contains(&name) {
+                scripted.push(*from..range.end);
             }
-            if let Some((closing, name)) = element(rest)
-                && (special.is_none() || closing && special.as_deref() == Some(name.as_str()))
+            inside = None;
+        }
+        let began = line_of(range.start);
+        let ended = line_of(range.end - 1);
+        if closing {
+            // Only spaces, or what is left of a tag begun on a line before,
+            // come before it on its line.
+            let from = after.max(starts[began]);
+            if blanked[from..range.start]
+                .iter()
+                .all(u8::is_ascii_whitespace)
             {
-                if !seen && closing {
-                    line.closes_first = true;
-                }
-                seen = true;
-                at += 1 + usize::from(closing) + name.len();
-                tag = Some(Open {
-                    name,
-                    closing,
-                    began: number,
-                    quote: None,
-                });
-                continue;
+                lines[began].closes_first = true;
             }
-            if !text[at].is_ascii_whitespace() {
-                seen = true;
+            lines[ended].opens -= 1;
+        } else if !VOID.contains(&name) && blanked[range.end - 2] != b'/' {
+            lines[ended].opens += 1;
+            let raw = name == "script" || crate::html::RAW_TEXT.contains(&name);
+            if raw || PREFORMATTED.contains(&name) {
+                inside = Some((tag.name.clone(), range.end));
             }
-            at += 1;
+        }
+        if began != ended {
+            lines[ended].began = Some(began);
+        }
+        after = range.end;
+    }
+    if let Some((name, from)) = inside {
+        if PREFORMATTED.contains(&name.as_str()) {
+            shown.push(from..usize::MAX);
+        } else if SCRIPTED.contains(&name.as_str()) {
+            scripted.push(from..usize::MAX);
         }
     }
-}
-
-/// The element a tag starting `text` names, in lower case, and whether it
-/// is an end tag.
-fn element(text: &[u8]) -> Option<(bool, String)> {
-    let rest = text.strip_prefix(b"<")?;
-    let (closing, rest) = match rest.strip_prefix(b"/") {
-        Some(rest) => (true, rest),
-        None => (false, rest),
-    };
-    if !rest.first()?.is_ascii_alphabetic() {
-        return None;
+    for line in lines.iter_mut() {
+        line.shown = shown.iter().any(|text| text.contains(&line.start));
+        line.scripted = scripted.iter().any(|text| text.contains(&line.start));
     }
-    let len = rest
-        .iter()
-        .take_while(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b':' | b'-'))
-        .count();
-    Some((
-        closing,
-        String::from_utf8_lossy(&rest[..len]).to_ascii_lowercase(),
-    ))
-}
-
-fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|window| window == needle)
 }
 
 #[cfg(test)]
@@ -1855,5 +1790,25 @@ mod tests {
     #[test]
     fn a_template_the_engine_cant_read_is_left() {
         assert!(super::cuts("<ul>\n  {% for e in x %}\n      <li>{{ e </li>\n").is_empty());
+    }
+
+    #[test]
+    fn the_markup_is_read_as_a_browser_reads_it() {
+        // An apostrophe in an attribute's value written without quotes
+        // opens no quotation.
+        assert_eq!(
+            cut(
+                "<ul>\n  <li><a title=it's>a</a></li>\n  {% for e in x %}\n      <li>{{ e }}</li>\n  {% endfor %}\n</ul>\n"
+            ),
+            "<ul>\n  <li><a title=it's>a</a></li>\n  {% for e in x %}\n  <li>{{ e }}</li>\n  {% endfor %}\n</ul>\n",
+        );
+        // `<command>` has an end tag, so the line before leaves it open
+        // and the body sits neither level with it nor a step inside.
+        let open = "<menu>\n  <command label=\"a\">\n  {% for e in x %}\n      <li>{{ e }}</li>\n  {% endfor %}\n</menu>\n";
+        assert_eq!(cut(open), open);
+        // A comment closed by `--!>` hides nothing after it: the `<li>`
+        // opens an element, as `<command>` does.
+        let open = "<ul>\n  <!-- a --!><li>\n  {% for e in x %}\n      <li>{{ e }}</li>\n  {% endfor %}\n  </li>\n</ul>\n";
+        assert_eq!(cut(open), open);
     }
 }

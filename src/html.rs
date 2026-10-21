@@ -46,6 +46,12 @@ pub(crate) const RAW_TEXT: &[&str] = &[
 /// Elements whose text a browser shows with its spaces and line breaks.
 pub(crate) const PREFORMATTED: &[&str] = &["listing", "plaintext", "pre", "textarea", "xmp"];
 
+/// Elements that hold nothing, so are never left open.
+pub(crate) const VOID: &[&str] = &[
+    "area", "base", "basefont", "bgsound", "br", "col", "embed", "frame", "hr", "image", "img",
+    "input", "keygen", "link", "meta", "param", "source", "track", "wbr",
+];
+
 /// Calls `each` with every start tag in `html`, read as a browser reads an
 /// HTML document.
 pub(crate) fn start_tags(html: &str, mut each: impl FnMut(&Tag)) {
@@ -67,6 +73,19 @@ pub(crate) enum Markup {
 /// Each piece of markup in `html` with where it is written, read as a
 /// browser reads an HTML document. What stands between them is text.
 pub(crate) fn markup(html: &str) -> impl Iterator<Item = (Range<usize>, Markup)> + '_ {
+    pieces(html, false)
+}
+
+/// Each piece of markup in `html` as [`markup`] reads it, except that an
+/// element of raw text, such as `<iframe>`, whose end tag never comes is
+/// read as holding markup. A browser reads the rest of the document as its
+/// text; where that decides spaces, an author's `<iframe>` named in the
+/// words is likelier than one meant to swallow the page.
+pub(crate) fn markup_where_closed(html: &str) -> impl Iterator<Item = (Range<usize>, Markup)> + '_ {
+    pieces(html, true)
+}
+
+fn pieces(html: &str, closed: bool) -> impl Iterator<Item = (Range<usize>, Markup)> + '_ {
     let b = html.as_bytes();
     let mut at = 0;
     std::iter::from_fn(move || {
@@ -96,7 +115,8 @@ pub(crate) fn markup(html: &str) -> impl Iterator<Item = (Range<usize>, Markup)>
                 at = match tag.name.as_str() {
                     "plaintext" => b.len(),
                     name if name == "script" || RAW_TEXT.contains(&name) => {
-                        end_tag(b, end, name.as_bytes()).unwrap_or(b.len())
+                        let unclosed = if closed { end } else { b.len() };
+                        end_tag(b, end, name.as_bytes()).unwrap_or(unclosed)
                     }
                     _ => end,
                 };
@@ -471,5 +491,24 @@ mod tests {
         let mut out = String::new();
         escape_anywhere(text, &mut out).unwrap();
         assert_eq!(out, "a &amp; b &lt; c &gt; d &quot; e &#x27; f/g");
+    }
+
+    fn starts(pieces: impl Iterator<Item = (std::ops::Range<usize>, Markup)>) -> Vec<String> {
+        pieces
+            .filter_map(|(_, piece)| match piece {
+                Markup::Start(tag) => Some(tag.name),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn raw_text_whose_end_tag_never_comes_is_read_as_markup_where_asked() {
+        let html = "<code><iframe></code>\n<pre>\nx\n</pre>";
+        assert_eq!(starts(markup(html)), ["code", "iframe"]);
+        assert_eq!(starts(markup_where_closed(html)), ["code", "iframe", "pre"]);
+        // Closed, its text is raw either way.
+        let html = "<iframe><pre></iframe><p>";
+        assert_eq!(starts(markup_where_closed(html)), ["iframe", "p"]);
     }
 }
