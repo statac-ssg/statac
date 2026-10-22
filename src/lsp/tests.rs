@@ -730,3 +730,92 @@ fn going_to_a_definition_opens_the_file_and_place_what_is_under_the_cursor_names
     let none = sent[at].at(&["result"]).unwrap();
     assert_eq!(sent[at].sources.spelling(none.place), "null");
 }
+
+/// The `initialize` request of an editor that does, or doesn't, show a
+/// page's headings each beneath the one above it.
+fn initialize_outlining(nested: bool) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\
+         \"params\":{{\"capabilities\":{{\"textDocument\":{{\"documentSymbol\":\
+         {{\"hierarchicalDocumentSymbolSupport\":{nested}}}}}}}}}}}"
+    )
+}
+
+#[test]
+fn a_pages_headings_are_listed_as_the_editor_shows_them_and_the_site_is_searched_by_name() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\n# One\n\n## Two\n\n# Three\n",
+        ),
+    ]);
+    let page = site.root.join("content/post-1.md");
+    let outline = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/documentSymbol\",\
+         \"params\":{{\"textDocument\":{{\"uri\":{}}}}}}}",
+        json::string(&uri::of(&page))
+    );
+    let search = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"workspace/symbol\",\
+                  \"params\":{\"query\":\"post\"}}";
+    for nested in [true, false] {
+        let mut editor = Editor::start();
+        editor.send(&initialize_outlining(nested));
+        let mark = editor.mark();
+        editor.send_all(&[&opened(&page), &outline, search]);
+        editor.until(mark, |message| message.id() == Some("3"));
+        let (sent, _) = editor.end(true);
+        for offered in ["documentSymbolProvider", "workspaceSymbolProvider"] {
+            let offered = sent[0].at(&["result", "capabilities", offered]).unwrap();
+            assert_eq!(sent[0].sources.spelling(offered.place), "true");
+        }
+        let answer = |id| {
+            (sent.iter())
+                .find(|message| message.id() == Some(id))
+                .expect("an answer")
+        };
+        let outline = answer("2");
+        let shown = outline
+            .sources
+            .spelling(outline.at(&["result"]).unwrap().place);
+        let at = json::string(&uri::of(&page));
+        let range = |line: usize, start: usize, end_line: usize, end: usize| {
+            format!(
+                "{{\"start\":{{\"line\":{line},\"character\":{start}}},\
+                 \"end\":{{\"line\":{end_line},\"character\":{end}}}}}"
+            )
+        };
+        let wanted = match nested {
+            true => format!(
+                "[{{\"name\":\"One\",\"kind\":15,\"range\":{},\"selectionRange\":{},\
+                 \"children\":[{{\"name\":\"Two\",\"kind\":15,\"range\":{},\
+                 \"selectionRange\":{},\"children\":[]}}]}},\
+                 {{\"name\":\"Three\",\"kind\":15,\"range\":{},\"selectionRange\":{},\
+                 \"children\":[]}}]",
+                range(3, 0, 7, 0),
+                range(3, 0, 3, 5),
+                range(5, 0, 7, 0),
+                range(5, 0, 5, 6),
+                range(7, 0, 8, 0),
+                range(7, 0, 7, 7),
+            ),
+            false => format!(
+                "[{{\"name\":\"One\",\"kind\":15,\"location\":{{\"uri\":{at},\"range\":{}}}}},\
+                 {{\"name\":\"Two\",\"kind\":15,\"location\":{{\"uri\":{at},\"range\":{}}}}},\
+                 {{\"name\":\"Three\",\"kind\":15,\"location\":{{\"uri\":{at},\"range\":{}}}}}]",
+                range(3, 0, 3, 5),
+                range(5, 0, 5, 6),
+                range(7, 0, 7, 7),
+            ),
+        };
+        assert_eq!(shown, wanted);
+        let found = answer("3");
+        let found = found.sources.spelling(found.at(&["result"]).unwrap().place);
+        let wanted = format!(
+            "[{{\"name\":\"Post 1\",\"kind\":1,\"location\":{{\"uri\":{at},\"range\":{}}}}}]",
+            range(0, 0, 0, 0)
+        );
+        assert_eq!(found, wanted);
+    }
+}

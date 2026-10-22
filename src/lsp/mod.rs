@@ -9,7 +9,9 @@
 //! matter, in the writing and in templates from what Statac takes there
 //! and what the site holds, and says what the word under the pointer is
 //! in the site's settings, in front matter, in the writing and in
-//! templates, and goes to where what it names is written.
+//! templates, and goes to where what it names is written. It lists a
+//! page's headings, and finds the site's pages by title and its snippets
+//! and templates by name.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
@@ -17,12 +19,14 @@
 mod complete;
 mod diagnostics;
 mod hover;
+mod symbols;
 #[cfg(test)]
 mod tests;
 mod wire;
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, Write};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -46,6 +50,10 @@ const NOT_INITIALISED: i32 = -32002;
 
 /// How long typing pauses before the site is checked.
 const PAUSE: Duration = Duration::from_millis(330);
+
+/// The protocol's kind of symbol a heading is told as: a string, as
+/// editors' own Markdown support tells one.
+const HEADING: u8 = 15;
 
 /// The protocol's word for the editor sending a file's whole text with
 /// each change.
@@ -98,6 +106,7 @@ fn run_with(
         encoding: Encoding::Utf16,
         snippets: false,
         markdown: false,
+        nested: false,
         initialised: false,
         shut_down: false,
         pause,
@@ -126,6 +135,9 @@ struct Server<'a> {
     snippets: bool,
     /// Whether the editor reads Markdown in what a hover says.
     markdown: bool,
+    /// Whether the editor shows a page's headings each beneath the one
+    /// above it.
+    nested: bool,
     initialised: bool,
     shut_down: bool,
     pause: Duration,
@@ -248,12 +260,16 @@ impl Server<'_> {
                 let hover = ["params", "capabilities", "textDocument", "hover"];
                 let formats = message.texts(&[&hover[..], &["contentFormat"]].concat());
                 self.markdown = formats.contains(&"markdown");
+                let symbols = ["params", "capabilities", "textDocument", "documentSymbol"];
+                self.nested =
+                    message.truth(&[&symbols[..], &["hierarchicalDocumentSymbolSupport"]].concat());
                 let result = format!(
                     "{{\"capabilities\":{{\"positionEncoding\":\"{}\",\
                      \"textDocumentSync\":{{\"openClose\":true,\"change\":{WHOLE_TEXT},\
                      \"save\":{{\"includeText\":false}}}},\
                      \"completionProvider\":{{\"triggerCharacters\":{TRIGGERS}}},\
-                     \"hoverProvider\":true,\"definitionProvider\":true}},\
+                     \"hoverProvider\":true,\"definitionProvider\":true,\
+                     \"documentSymbolProvider\":true,\"workspaceSymbolProvider\":true}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
                     json::string(env!("CARGO_PKG_VERSION")),
@@ -270,6 +286,14 @@ impl Server<'_> {
             }
             "textDocument/definition" => {
                 let result = self.definition(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "textDocument/documentSymbol" => {
+                let result = self.outline(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "workspace/symbol" => {
+                let result = self.symbols(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
             "shutdown" => {
@@ -363,10 +387,31 @@ impl Server<'_> {
     /// any can't be found.
     fn placed(&mut self, message: &Message) -> std::io::Result<Option<Placed>> {
         let at = |name| message.text(&["params", "position", name])?.parse().ok();
-        let uri = message.text(&["params", "textDocument", "uri"]);
-        let (Some(file), Some(line), Some(character)) =
-            (uri.and_then(uri::path), at("line"), at("character"))
+        let (Some((folder, file, text)), Some(line), Some(character)) =
+            (self.named(message)?, at("line"), at("character"))
         else {
+            return Ok(None);
+        };
+        let Some(offset) = diagnostics::offset_in(&text, line, character, self.encoding) else {
+            return Ok(None);
+        };
+        Ok(Some(Placed {
+            folder,
+            file,
+            text,
+            offset,
+        }))
+    }
+
+    /// The folder of the site of the file a request names, the file, and
+    /// its text as the editor holds it, the site read first where it is
+    /// yet to be; none where any can't be found.
+    fn named(
+        &mut self,
+        message: &Message,
+    ) -> std::io::Result<Option<(PathBuf, PathBuf, Arc<str>)>> {
+        let uri = message.text(&["params", "textDocument", "uri"]);
+        let Some(file) = uri.and_then(uri::path) else {
             return Ok(None);
         };
         let text = match self.open.get(&real(&file)) {
@@ -376,24 +421,22 @@ impl Server<'_> {
                 Err(_) => return Ok(None),
             },
         };
-        let (Some(folder), Some(offset)) = (
-            site_of(&file),
-            diagnostics::offset_in(&text, line, character, self.encoding),
-        ) else {
+        let Some(folder) = site_of(&file) else {
             return Ok(None);
         };
-        // What the site holds is known once it has been read.
-        let unread = (self.sites.get(&folder))
+        self.read_if_unread(&folder)?;
+        Ok(Some((folder, file, text)))
+    }
+
+    /// Reads the site at `folder` where it is kept but yet to be read, so
+    /// that what it holds is known.
+    fn read_if_unread(&mut self, folder: &Path) -> std::io::Result<()> {
+        let unread = (self.sites.get(folder))
             .is_some_and(|site| site.checking.renderer().is_none() && site.due.is_some());
-        if unread {
-            self.check(&folder)?;
+        match unread {
+            true => self.check(folder),
+            false => Ok(()),
         }
-        Ok(Some(Placed {
-            folder,
-            file,
-            text,
-            offset,
-        }))
     }
 
     /// What may be written where the cursor stands, as the protocol's
@@ -527,6 +570,77 @@ impl Server<'_> {
         ))
     }
 
+    /// The headings of the page a request names, as the protocol's
+    /// symbols: each beneath the one above it where the editor shows them
+    /// so, and in a list otherwise; `null` for a file that is no page's.
+    fn outline(&mut self, message: &Message) -> std::io::Result<String> {
+        let Some((folder, file, text)) = self.named(message)? else {
+            return Ok("null".to_owned());
+        };
+        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let Some(headings) = symbols::headings(&folder, &file, &text, known) else {
+            return Ok("null".to_owned());
+        };
+        let range = |at: &Range<usize>| {
+            let position = |offset| {
+                let (line, character) = diagnostics::position_in(&text, offset, self.encoding);
+                format!("{{\"line\":{line},\"character\":{character}}}")
+            };
+            format!(
+                "{{\"start\":{},\"end\":{}}}",
+                position(at.start),
+                position(at.end)
+            )
+        };
+        let told = match self.nested {
+            true => nested_symbols(&headings, &range),
+            false => {
+                let at = json::string(&uri::of(&file));
+                let mut told = Vec::new();
+                let mut left: Vec<&symbols::Heading> = headings.iter().rev().collect();
+                while let Some(heading) = left.pop() {
+                    told.push(format!(
+                        "{{\"name\":{},\"kind\":{HEADING},\
+                         \"location\":{{\"uri\":{at},\"range\":{}}}}}",
+                        json::string(&heading.words),
+                        range(&heading.at),
+                    ));
+                    left.extend(heading.within.iter().rev());
+                }
+                told
+            }
+        };
+        Ok(format!("[{}]", told.join(",")))
+    }
+
+    /// The pages, snippets and templates of every site kept whose names
+    /// match the request's query, as the protocol's symbols.
+    fn symbols(&mut self, message: &Message) -> std::io::Result<String> {
+        let query = message.text(&["params", "query"]).unwrap_or_default();
+        let mut folders: Vec<PathBuf> = self.sites.keys().cloned().collect();
+        folders.sort();
+        let mut told = Vec::new();
+        for folder in folders {
+            self.read_if_unread(&folder)?;
+            let Some(renderer) =
+                (self.sites.get(&folder)).and_then(|site| site.checking.renderer())
+            else {
+                continue;
+            };
+            for found in symbols::found(renderer, query) {
+                told.push(format!(
+                    "{{\"name\":{},\"kind\":{},\
+                     \"location\":{{\"uri\":{},\"range\":{}}}}}",
+                    json::string(&found.name),
+                    found.sort.number(),
+                    json::string(&uri::of(&folder.join(&found.path))),
+                    diagnostics::START,
+                ));
+            }
+        }
+        Ok(format!("[{}]", told.join(",")))
+    }
+
     /// Puts off checking the site at `folder` until typing has paused.
     fn put_off(&mut self, folder: &Path) {
         if let Some(site) = self.sites.get_mut(folder) {
@@ -619,6 +733,26 @@ fn ended(answered: Answered) -> Option<u8> {
         Ok(code) => code,
         Err(_) => Some(1),
     }
+}
+
+/// `headings` as the protocol's symbols, each holding those beneath it,
+/// placed in the page's text by `range`.
+fn nested_symbols(
+    headings: &[symbols::Heading],
+    range: &dyn Fn(&Range<usize>) -> String,
+) -> Vec<String> {
+    (headings.iter())
+        .map(|heading| {
+            format!(
+                "{{\"name\":{},\"kind\":{HEADING},\"range\":{},\
+                 \"selectionRange\":{},\"children\":[{}]}}",
+                json::string(&heading.words),
+                range(&heading.section),
+                range(&heading.at),
+                nested_symbols(&heading.within, range).join(","),
+            )
+        })
+        .collect()
 }
 
 /// The folder of the site `file` is in: the nearest folder above it that
