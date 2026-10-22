@@ -547,3 +547,51 @@ fn completion_offers_what_the_site_holds_where_the_cursor_stands_in_unsaved_text
     let triggers = sent[0].at(&["result", "capabilities", "completionProvider"]);
     assert!(triggers.is_some());
 }
+
+/// The `initialize` request of an editor that fills in places in what a
+/// completion writes, or one that doesn't.
+fn initialize_filling(fills: bool) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\
+         \"params\":{{\"capabilities\":{{\"textDocument\":{{\"completion\":\
+         {{\"completionItem\":{{\"snippetSupport\":{fills}}}}}}}}}}}}}"
+    )
+}
+
+#[test]
+fn a_call_is_written_with_places_to_fill_only_for_an_editor_that_fills_them() {
+    let site = TempSite::site(&[
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "snippets/figure.html",
+            "{# takes photo #}\n{{ page.photo(photo).alt }}\n",
+        ),
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n@fi\n"),
+    ]);
+    let page = site.root.join("content/post-1.md");
+    for (fills, written, format) in [(true, "figure(\"$1\")", "2"), (false, "figure(", "")] {
+        let mut editor = Editor::start();
+        editor.send(&initialize_filling(fills));
+        let mark = editor.mark();
+        editor.send_all(&[&opened(&page), &completion(2, &page, 3, 3)]);
+        let at = editor.until(mark, |message| message.id() == Some("2"));
+        let (sent, _) = editor.end(true);
+        let Some(Value::Sequence(items)) = sent[at].at(&["result", "items"]).map(|n| &n.value)
+        else {
+            panic!("no items");
+        };
+        let figure = (items.iter())
+            .find(|item| {
+                item.get("filterText").map(|n| &n.value) == Some(&Value::Scalar("figure".into()))
+            })
+            .expect("the snippet");
+        let said = |key: &str| sent[at].sources.spelling(figure.get(key).unwrap().place);
+        assert_eq!(said("label"), "\"figure(photo)\"");
+        let edit = figure.get("textEdit").unwrap().get("newText").unwrap();
+        assert_eq!(edit.value, Value::Scalar(written.into()), "{fills}");
+        let given = figure
+            .get("insertTextFormat")
+            .map(|n| sent[at].sources.spelling(n.place));
+        assert_eq!(given.unwrap_or_default(), format, "{fills}");
+    }
+}

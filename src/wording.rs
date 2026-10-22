@@ -3510,6 +3510,13 @@ pub(crate) const OFFERED_HANDED: &str = "handed down";
 /// What an editor's completion says beside a type the site declares.
 pub(crate) const OFFERED_TYPE: &str = "type";
 
+/// What an editor's completion says beside `@url(...)` in the writing.
+pub(crate) const OFFERED_IN_SITE: &str = "address in the site";
+
+/// What an editor's completion says beside a name a snippet call may
+/// give a value by.
+pub(crate) const OFFERED_VALUE: &str = "value";
+
 /// What an editor's completion says beside one of the site's tags.
 pub(crate) fn offered_tag(pages: usize) -> String {
     format!("tag, {}", how_many(pages, "page", "pages"))

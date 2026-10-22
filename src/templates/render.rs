@@ -575,6 +575,37 @@ impl Renderer {
             .collect()
     }
 
+    /// Every snippet a call can name, with the path of its file in the
+    /// site.
+    pub(crate) fn snippets(&self) -> Vec<(&super::Snippet, String)> {
+        (self.shared.templates.snippets.values())
+            .map(|snippet| (snippet, self.template_path(snippet.file)))
+            .collect()
+    }
+
+    /// Whether the site's snippet `name` wraps the writing below a call to
+    /// it, as the writing is read.
+    pub(crate) fn wraps(&self, name: &str) -> Option<bool> {
+        wraps(&self.shared, name)
+    }
+
+    /// The headings of `page`'s writing, each with its id and its words,
+    /// in the order written.
+    pub(crate) fn headings(&self, page: PageId) -> Vec<(String, String)> {
+        let kept = self.shared.outlines.lock().expect("never poisoned");
+        let sections = match kept.get(&page) {
+            Some(kept) => Arc::clone(kept),
+            None => {
+                drop(kept);
+                Arc::new(writing(&self.shared, page).map_or_else(Vec::new, |d| sections(&d)))
+            }
+        };
+        (sections.iter())
+            .filter(|section| !section.id.is_empty())
+            .map(|section| (section.id.clone(), section.text.clone()))
+            .collect()
+    }
+
     /// The files the site's cards are drawn with, each by its path in the
     /// site.
     pub(crate) fn card_files(&self) -> Vec<String> {

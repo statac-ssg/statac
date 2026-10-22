@@ -43,13 +43,14 @@ use crate::problem::{Problem, Severity};
 use crate::site::{Site, TemplateId};
 use crate::source::Sources;
 use check::{Checked, Field, Rec, Schema, Ty};
-use files::{File, Role, Snippet};
-pub(crate) use files::{SNIPPETS, TEMPLATES};
+use files::{File, Role};
+pub(crate) use files::{SNIPPETS, Snippet, TEMPLATES, Takes};
 pub(crate) use values::{Answering, SEARCH_BOX, of_the_front, writes};
 
 pub(crate) use card::{Asked, Gathered};
 pub(crate) use indent::Own;
 pub(crate) use layout::Chosen;
+pub(crate) use media::fits;
 pub(crate) use render::{Renderer, developed};
 pub(crate) use shows::{Explained, Held, Neighbour, Reached, Row};
 
@@ -226,6 +227,12 @@ pub(crate) fn read(
                 usable.then_some(line.takes)
             }
         };
+        let files = (ast.as_ref())
+            .map(|ast| files::files_named(ast, &params))
+            .unwrap_or_default();
+        let records = (ast.as_ref())
+            .map(|ast| files::records(ast, &params))
+            .unwrap_or_default();
         snippets.insert(
             name.clone(),
             Snippet {
@@ -234,6 +241,8 @@ pub(crate) fn read(
                 params,
                 wrapped,
                 takes,
+                files,
+                records,
                 readable: ast.is_some(),
             },
         );

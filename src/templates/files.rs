@@ -16,8 +16,10 @@
 
 use std::path::Path;
 
+use minijinja::machinery::ast::{CallArg, Expr, Stmt};
+
 use crate::markdown::Piece;
-use crate::problem::{Kind, Problem, TakesFault, TemplateFault, Word};
+use crate::problem::{Kind, Problem, Sort, TakesFault, TemplateFault, Word};
 use crate::source::{Place, SourceId, Sources, Span};
 
 pub(crate) const TEMPLATES: &str = "templates";
@@ -53,7 +55,7 @@ pub(super) struct File {
 
 /// What a call's values without names fill.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(super) enum Takes {
+pub(crate) enum Takes {
     /// One or two names, filled in the order the values are written.
     InOrder(Vec<String>),
     /// Every value is one of these, handed over as a list.
@@ -61,7 +63,7 @@ pub(super) enum Takes {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(super) struct Snippet {
+pub(crate) struct Snippet {
     pub name: String,
     /// The file's index among the site's template files.
     pub file: usize,
@@ -71,6 +73,13 @@ pub(super) struct Snippet {
     /// which a call in a template hands by name.
     pub wrapped: Vec<String>,
     pub takes: Option<Takes>,
+    /// The names it hands a page to find a file beside it by, as
+    /// `page.photo(photo)` does, each with the sort of file found.
+    pub files: Vec<(String, Sort)>,
+    /// The names it reads fields of, as `post.title`, which a call in the
+    /// writing, handing only text, numbers and `true` or `false`, can't
+    /// give.
+    pub records: Vec<String>,
     /// Whether the engine could read the file. Where it couldn't, what the
     /// snippet reads is unknown, and no call is held to it.
     pub readable: bool,
@@ -94,6 +103,79 @@ impl Snippet {
             .collect::<Vec<_>>()
             .join(", ")
     }
+}
+
+/// The names among `params` that the template at `ast` hands a page to
+/// find a file by: the first value of `page.photo(...)`, `page.photos`,
+/// `page.file`, `page.video` or `page.audio`, as it is, chosen between
+/// by `if`, or given a default. A name handed on some other way, as
+/// through a loop, is not followed.
+pub(super) fn files_named(ast: &Stmt<'_>, params: &[String]) -> Vec<(String, Sort)> {
+    fn names<'a>(expr: &Expr<'a>, found: &mut Vec<&'a str>) {
+        match expr {
+            Expr::Var(var) => found.push(var.id),
+            Expr::IfExpr(choice) => {
+                names(&choice.true_expr, found);
+                if let Some(other) = &choice.false_expr {
+                    names(other, found);
+                }
+            }
+            Expr::Filter(filter) => {
+                if let Some(expr) = &filter.expr {
+                    names(expr, found);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut files: Vec<(String, Sort)> = Vec::new();
+    super::check::visit_exprs(ast, &mut |expr| {
+        let Expr::Call(call) = expr else {
+            return;
+        };
+        let Expr::GetAttr(method) = &call.expr else {
+            return;
+        };
+        let sort = match method.name {
+            "photo" | "photos" => Sort::Picture,
+            "file" => Sort::File,
+            "video" => Sort::Video,
+            "audio" => Sort::Recording,
+            _ => return,
+        };
+        let on_page = matches!(&method.expr, Expr::Var(var) if var.id == "page");
+        let Some(CallArg::Pos(first)) = call.args.first().filter(|_| on_page) else {
+            return;
+        };
+        let mut found = Vec::new();
+        names(first, &mut found);
+        for name in found {
+            let new = !files.iter().any(|(known, _)| known == name);
+            if new && params.iter().any(|param| param == name) {
+                files.push((name.to_owned(), sort));
+            }
+        }
+    });
+    files
+}
+
+/// The names among `params` whose fields the template at `ast` reads.
+pub(super) fn records(ast: &Stmt<'_>, params: &[String]) -> Vec<String> {
+    let mut records: Vec<String> = Vec::new();
+    super::check::visit_exprs(ast, &mut |expr| {
+        let read = match expr {
+            Expr::GetAttr(attr) => &attr.expr,
+            Expr::GetItem(item) => &item.expr,
+            _ => return,
+        };
+        if let Expr::Var(var) = read
+            && params.iter().any(|param| param == var.id)
+            && !records.iter().any(|known| known == var.id)
+        {
+            records.push(var.id.to_owned());
+        }
+    });
+    records
 }
 
 /// The file a template's name stands for, as the author would find it.

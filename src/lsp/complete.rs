@@ -1,10 +1,11 @@
 //! Completion: what may be written where the cursor stands in the site's
-//! settings or a page's front matter, from what Statac takes there and
-//! what the site holds.
+//! settings or a page's front matter or writing, from what Statac takes
+//! there and what the site holds.
 
 mod spot;
 #[cfg(test)]
 mod tests;
+mod writing;
 
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -15,7 +16,7 @@ use spot::Spot;
 use crate::config::declarations::{Declarations, FieldKind, KIND_WORDS, Names};
 use crate::content::words::{Holder, PageWord};
 use crate::problem::Code;
-use crate::site::{LanguageId, ListKey, PagePlace};
+use crate::site::{LanguageId, ListKey, PageId, PagePlace};
 use crate::source::{Place, Sources, Span};
 use crate::templates::Renderer;
 use crate::wording;
@@ -26,6 +27,19 @@ pub(super) struct Completion {
     /// What is typed so far, as offsets in the file's text.
     pub typed: Range<usize>,
     pub items: Vec<Item>,
+    /// Whether the items are a part of what may be written there, so the
+    /// editor asks again as more is typed.
+    pub incomplete: bool,
+}
+
+impl Completion {
+    fn of(typed: Range<usize>, items: Vec<Item>) -> Completion {
+        Completion {
+            typed,
+            items,
+            incomplete: false,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -42,12 +56,20 @@ pub(super) struct Item {
     /// Whether it is text of the site's, written to read back as that text,
     /// rather than one of Statac's own words, written as it is.
     pub text: bool,
+    /// What the editor matches what is typed against, where it isn't the
+    /// label.
+    pub filter: Option<String>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(super) enum ItemKind {
     Field,
     Value,
+    /// A call, written with places the editor fills in where it can.
+    Snippet,
+    File,
+    /// An address or a heading.
+    Reference,
 }
 
 impl ItemKind {
@@ -56,6 +78,9 @@ impl ItemKind {
         match self {
             ItemKind::Field => 10,
             ItemKind::Value => 12,
+            ItemKind::Snippet => 15,
+            ItemKind::File => 17,
+            ItemKind::Reference => 18,
         }
     }
 }
@@ -68,13 +93,15 @@ enum Holds {
 
 /// What may be written at `offset` in `text`, the text of `file` in the
 /// site at `site`; none where nothing Statac knows of is written there.
-/// `known` is the site as it was last read, where it has been.
+/// `known` is the site as it was last read, where it has been, and
+/// `snippets` whether the editor fills in places in what it writes.
 pub(super) fn complete(
     site: &Path,
     file: &Path,
     text: &str,
     offset: usize,
     known: Option<&Renderer>,
+    snippets: bool,
 ) -> Option<Completion> {
     let rel = file.strip_prefix(site).ok()?;
     let rel = rel.to_string_lossy().replace('\\', "/");
@@ -85,14 +112,32 @@ pub(super) fn complete(
     };
     let mut sources = Sources::default();
     let source = sources.add(rel.as_str(), text.to_owned());
+    let offset = text.floor_char_boundary(offset.min(text.len()));
     let span = match holds {
         Holds::Settings => Span::new(0, text.len()),
         Holds::FrontMatter => match crate::yaml::split(text) {
+            Ok(split)
+                if split
+                    .front_matter
+                    .is_none_or(|yaml| offset > yaml.end as usize) =>
+            {
+                let spot = writing::find(text, split.body, offset)?;
+                let site = Known::of(known, &rel);
+                let folder = rel.strip_prefix("content/").unwrap_or(&rel);
+                let offer = writing::Offer {
+                    text,
+                    body: split.body,
+                    renderer: known,
+                    page: site.page,
+                    folder: folder.rfind('/').map_or("", |at| &folder[..=at]),
+                    snippets,
+                };
+                return offer.complete(spot, offset);
+            }
             Ok(split) => split.front_matter?,
             Err(unclosed) => unclosed.rest,
         },
     };
-    let offset = text.floor_char_boundary(offset.min(text.len()));
     let spot = spot::find(&sources, Place { source, span }, offset)?;
     let site = Known::of(known, &rel);
     let (typed, items) = match spot {
@@ -134,7 +179,7 @@ pub(super) fn complete(
             (typed, items)
         }
     };
-    Some(Completion { typed, items })
+    Some(Completion::of(typed, items))
 }
 
 /// Names offered for a field's name, but those `written` already, each
@@ -180,6 +225,8 @@ fn value_written(value: &str, text: bool, flow: bool, quote: Option<char>, space
 /// What the site holds, as completion offers it.
 struct Known<'a> {
     renderer: Option<&'a Renderer>,
+    /// The page being written, where the site as last read holds it.
+    page: Option<PageId>,
     /// The language of the page being written, where the site as last
     /// read tells it.
     language: Option<LanguageId>,
@@ -189,13 +236,14 @@ struct Known<'a> {
 
 impl<'a> Known<'a> {
     fn of(renderer: Option<&'a Renderer>, rel: &str) -> Known<'a> {
-        let page = renderer.and_then(|renderer| {
+        let found = renderer.and_then(|renderer| {
             let (sources, site) = (renderer.sources(), renderer.site());
-            (site.pages.iter()).find_map(|(_, page)| {
+            (site.pages.iter()).find_map(|(id, page)| {
                 let source = page.source.filter(|_| page.made.is_none())?;
-                (sources.path(source) == Path::new(rel)).then_some(page)
+                (sources.path(source) == Path::new(rel)).then_some((id, page))
             })
         });
+        let page = found.map(|(_, page)| page);
         // A page whose front matter can't be read as it is typed is left
         // out of the site, but its folder is a list where it holds others.
         let folder = rel.strip_prefix("content/").unwrap_or(rel);
@@ -219,6 +267,7 @@ impl<'a> Known<'a> {
         let language = page.map(|page| page.language);
         Known {
             renderer,
+            page: found.map(|(id, _)| id),
             language: language.or(list.map(|list| list.language)),
             holder,
         }
@@ -296,6 +345,7 @@ impl<'a> Known<'a> {
             insert: name,
             group: 1,
             text: false,
+            filter: None,
         }));
         names
     }
@@ -314,6 +364,7 @@ impl<'a> Known<'a> {
                 insert: String::new(),
                 group: 1,
                 text: false,
+                filter: None,
             })
             .collect()
     }
@@ -563,6 +614,7 @@ fn own_field(name: &str, detail: &str) -> Item {
         insert: String::new(),
         group: 0,
         text: false,
+        filter: None,
     }
 }
 
@@ -575,5 +627,6 @@ fn own_value(value: &str) -> Item {
         insert: String::new(),
         group: 0,
         text: false,
+        filter: None,
     }
 }

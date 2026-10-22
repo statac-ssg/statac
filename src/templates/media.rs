@@ -896,6 +896,16 @@ pub(super) fn named(shared: &Shared, of: PageId, written: &str) -> Option<Named>
     found
 }
 
+/// Whether a file named `name` may be found as a file of `sort`, by the
+/// ending of its name.
+pub(crate) fn fits(sort: Sort, name: &str) -> bool {
+    match sort {
+        Sort::File => true,
+        Sort::Picture => crate::album::is_picture(name),
+        Sort::Video | Sort::Recording => media_type(sort, name).is_some(),
+    }
+}
+
 /// What a browser calls a video or a recording, by the ending of its
 /// name.
 fn media_type(sort: Sort, name: &str) -> Option<&'static str> {

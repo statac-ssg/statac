@@ -5,8 +5,9 @@
 //! and tells the editor every problem at the place it is written: as the
 //! site is first opened, once typing pauses, and as files of the site
 //! change on disk. Each check builds again only what changed since the
-//! last. It completes what is typed in the site's settings and in front
-//! matter from what Statac takes there and what the site holds.
+//! last. It completes what is typed in the site's settings, in front
+//! matter and in the writing from what Statac takes there and what the
+//! site holds.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
@@ -48,8 +49,9 @@ const WHOLE_TEXT: u8 = 1;
 
 /// What, typed, has the editor ask what may follow, besides the letters
 /// of a word: a value's space after its colon, and a list's bracket and
-/// comma.
-const TRIGGERS: &str = "[\" \",\"[\",\",\"]";
+/// comma; in the writing, a call's `@`, a bracket or quote opening a
+/// value or an address, and the `#` and `/` within an address.
+const TRIGGERS: &str = "[\" \",\"[\",\",\",\"@\",\"(\",\"\\\"\",\"'\",\"#\",\"/\"]";
 
 /// Answers the editor's messages on `input` with its own on `output` until
 /// the editor says to stop, and gives the exit code: 0 where it asked to
@@ -89,6 +91,7 @@ fn run_with(
     let mut server = Server {
         output,
         encoding: Encoding::Utf16,
+        snippets: false,
         initialised: false,
         shut_down: false,
         pause,
@@ -113,6 +116,8 @@ enum Event {
 struct Server<'a> {
     output: &'a mut dyn Write,
     encoding: Encoding,
+    /// Whether the editor fills in places in what a completion writes.
+    snippets: bool,
     initialised: bool,
     shut_down: bool,
     pause: Duration,
@@ -221,6 +226,9 @@ impl Server<'_> {
                 if offered.contains(&"utf-8") {
                     self.encoding = Encoding::Utf8;
                 }
+                let item = ["params", "capabilities", "textDocument", "completion"];
+                let item = [&item[..], &["completionItem", "snippetSupport"]].concat();
+                self.snippets = message.truth(&item);
                 let result = format!(
                     "{{\"capabilities\":{{\"positionEncoding\":\"{}\",\
                      \"textDocumentSync\":{{\"openClose\":true,\"change\":{WHOLE_TEXT},\
@@ -351,7 +359,8 @@ impl Server<'_> {
             self.check(&folder)?;
         }
         let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
-        let Some(completion) = complete::complete(&folder, &file, &text, offset, known) else {
+        let completion = complete::complete(&folder, &file, &text, offset, known, self.snippets);
+        let Some(completion) = completion else {
             return Ok("null".to_owned());
         };
         let position = |offset| {
@@ -369,8 +378,16 @@ impl Server<'_> {
                     Some(detail) => format!(",\"detail\":{}", json::string(detail)),
                     None => String::new(),
                 };
+                let filter = match &item.filter {
+                    Some(filter) => format!(",\"filterText\":{}", json::string(filter)),
+                    None => String::new(),
+                };
+                let format = match item.kind == complete::ItemKind::Snippet && self.snippets {
+                    true => ",\"insertTextFormat\":2",
+                    false => "",
+                };
                 format!(
-                    "{{\"label\":{},\"kind\":{}{detail},\"sortText\":{},\
+                    "{{\"label\":{},\"kind\":{}{detail}{filter}{format},\"sortText\":{},\
                      \"textEdit\":{{\"range\":{range},\"newText\":{}}}}}",
                     json::string(&item.label),
                     item.kind.number(),
@@ -380,7 +397,8 @@ impl Server<'_> {
             })
             .collect();
         Ok(format!(
-            "{{\"isIncomplete\":false,\"items\":[{}]}}",
+            "{{\"isIncomplete\":{},\"items\":[{}]}}",
+            completion.incomplete,
             items.join(",")
         ))
     }
@@ -536,6 +554,14 @@ impl Message {
             Value::Scalar(text) => Some(text),
             _ => None,
         }
+    }
+
+    /// Whether the value at `path` is `true`.
+    fn truth(&self, path: &[&str]) -> bool {
+        let Some(node) = self.at(path) else {
+            return false;
+        };
+        matches!(node.value, Value::Scalar(_)) && self.sources.spelling(node.place) == "true"
     }
 
     /// The texts in the list at `path`.

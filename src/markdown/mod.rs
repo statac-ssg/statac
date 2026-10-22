@@ -31,6 +31,7 @@ mod questions;
 mod read;
 #[cfg(test)]
 mod tests;
+mod typing;
 mod typography;
 mod unmatched;
 
@@ -42,6 +43,7 @@ pub use node::{Alignment, CalloutKind, Kind, Node};
 pub use opening::{Written, as_written, closed_up, lines_of, references_read, words_of};
 pub use pieces::{Piece, PieceValue, language_word};
 pub use questions::{Heading, Link, has_callout, headings, links, plain_text, uses_maths};
+pub use typing::{in_a_definition, reads_a_call, reads_a_link};
 pub use typography::{Typography, set_typography, set_words};
 
 use crate::problem::CallFault;

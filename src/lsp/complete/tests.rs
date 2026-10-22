@@ -137,7 +137,7 @@ fn offered(site: &TempSite, rel: &str, text: &str) -> Option<Vec<(String, String
     let offset = text.find('|').expect("a cursor");
     let text = text.replacen('|', "", 1);
     let file = site.root.join(rel);
-    let completion = complete(&site.root, &file, &text, offset, checking.renderer())?;
+    let completion = complete(&site.root, &file, &text, offset, checking.renderer(), true)?;
     let items = completion.items.into_iter().map(|item| {
         let detail = item.detail.unwrap_or_default();
         (item.label, detail, item.insert)
@@ -330,10 +330,10 @@ fn nothing_but_statacs_own_is_offered_before_the_site_is_read() {
     let site = site();
     let file = site.root.join("content/posts/post-3.md");
     let text = "---\ntags: [\n---\n";
-    let completion = complete(&site.root, &file, text, 11, None).unwrap();
+    let completion = complete(&site.root, &file, text, 11, None, true).unwrap();
     assert!(completion.items.is_empty());
     let text = "---\nta\n---\n";
-    let completion = complete(&site.root, &file, text, 6, None).unwrap();
+    let completion = complete(&site.root, &file, text, 6, None, true).unwrap();
     assert!(completion.items.iter().any(|item| item.label == "tags"));
     assert_eq!(completion.typed, 4..6);
 }
