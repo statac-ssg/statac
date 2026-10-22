@@ -1,3 +1,4 @@
+use super::Goes;
 use crate::build::incremental::Checking;
 use crate::build::{Mode, Options};
 use crate::testing::TempSite;
@@ -494,5 +495,144 @@ fn nothing_is_said_in_a_template_of_what_isnt_read_there() {
     ];
     for text in cases {
         assert_eq!(said(&site, "templates/page.html", text), None, "{text:?}");
+    }
+}
+
+/// Where what the character after the cursor, written `|`, in `text` as
+/// the text of the site's file at `path` names is written, once the site
+/// is read: the path of its file, and the text it is at where it is at a
+/// place in it.
+fn goes(site: &TempSite, path: &str, text: &str) -> Option<String> {
+    let mut checking = Checking::new();
+    let options = Options {
+        mode: Mode::Check,
+        site: site.root.clone(),
+        out: None,
+        today: None,
+        drafts: false,
+        url: None,
+    };
+    checking.check(&options);
+    let offset = text.find('|').expect("a cursor");
+    let text = text.replacen('|', "", 1);
+    let file = site.root.join(path);
+    let renderer = checking.renderer();
+    let hover = super::hover(&site.root, &file, &text, offset, renderer)?;
+    let sources = renderer?.sources();
+    Some(match hover.to? {
+        Goes::File(path) => path,
+        Goes::At(place) => format!(
+            "{} at `{}`",
+            sources
+                .path(place.source)
+                .to_string_lossy()
+                .replace('\\', "/"),
+            sources.spelling(place)
+        ),
+    })
+}
+
+#[test]
+fn a_link_call_or_name_in_the_writing_goes_to_what_it_names() {
+    let site = writing_site();
+    let page = "content/posts/post-1/index.md";
+    let goes = |writing: &str| {
+        let text = format!("---\ntitle: Post 1\n---\n## First\n\n{writing}\n");
+        goes(&site, page, &text)
+    };
+    let cases = [
+        ("[About](/blog/ab|out/)", Some("content/about.md")),
+        (
+            "[The team](/blog/about/#the-t|eam)",
+            Some("content/about.md at `## The team`"),
+        ),
+        (
+            "[First](#fi|rst)",
+            Some("content/posts/post-1/index.md at `## First`"),
+        ),
+        (
+            "[A note](../../no|tes/note-1/)",
+            Some("content/notes/note-1.md"),
+        ),
+        (
+            "[A note]\n\n[a note]: /blog/notes/no|te-1/",
+            Some("content/notes/note-1.md"),
+        ),
+        ("@url(/abo|ut/)", Some("content/about.md")),
+        (
+            "@fig|ure(photo-1.jpg, alt=\"\")",
+            Some("snippets/figure.html"),
+        ),
+        (
+            "@figure(photo-1.j|pg, alt=\"\")",
+            Some("content/posts/post-1/photo-1.jpg"),
+        ),
+        (
+            "![A photo](photo-1|.jpg)",
+            Some("content/posts/post-1/photo-1.jpg"),
+        ),
+        ("@no|te()\nA note.\n@end", Some("snippets/note.html")),
+        ("[Elsewhere](https://example.com/|)", None),
+        ("[Nowhere](/blog/nowh|ere/)", None),
+        ("Plain wo|rds.", None),
+    ];
+    for (writing, wanted) in cases {
+        assert_eq!(goes(writing).as_deref(), wanted, "{writing}");
+    }
+}
+
+#[test]
+fn a_front_matter_value_or_field_goes_to_what_it_names() {
+    let site = site();
+    let post = |text: &str| {
+        let text = format!("---\n{text}\n---\nA post.\n");
+        goes(&site, "content/posts/post-1.md", &text)
+    };
+    assert_eq!(
+        post("layout: po|st").as_deref(),
+        Some("templates/post.html")
+    );
+    assert_eq!(
+        post("is|bn: 0-000-00000-0").as_deref(),
+        Some("statac.yaml at `required text`")
+    );
+    assert_eq!(post("ti|tle: Post 1"), None);
+    // The tag's page is one Statac makes, written in no file.
+    assert_eq!(post("tags: [Ru|st]"), None);
+    let settings = goes(&site, "statac.yaml", "pages.is|bn: 0-000-00000-0\n");
+    assert_eq!(settings.as_deref(), Some("statac.yaml at `required text`"));
+}
+
+#[test]
+fn a_tag_with_a_page_of_the_authors_own_goes_to_it() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "content/tags/rust.md",
+            "---\ntitle: Rust\n---\nAbout Rust.\n",
+        ),
+        (
+            "content/posts/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-02\ntags: [rust]\n---\n",
+        ),
+    ]);
+    let text = "---\ntitle: Post 1\ndate: 2026-01-02\ntags: [ru|st]\n---\n";
+    let goes = goes(&site, "content/posts/post-1.md", text);
+    assert_eq!(goes.as_deref(), Some("content/tags/rust.md"));
+}
+
+#[test]
+fn a_template_goes_to_what_it_calls_extends_and_names() {
+    let site = template_site();
+    let page = "templates/page.html";
+    let cases = [
+        ("{% extends \"ba|se\" %}", Some("templates/base.html")),
+        ("{{ ca|rd(page) }}", Some("snippets/card.html")),
+        ("{{ url(\"/abo|ut/\") }}", Some("content/about.md")),
+        ("{{ page.ti|tle }}", None),
+    ];
+    for (text, wanted) in cases {
+        assert_eq!(goes(&site, page, text).as_deref(), wanted, "{text}");
     }
 }

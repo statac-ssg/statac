@@ -30,7 +30,8 @@ impl Encoding {
 }
 
 /// The start of a file, where a problem with the whole file is told.
-const START: &str = "{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":0}}";
+pub(super) const START: &str =
+    "{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":0}}";
 
 /// Every problem `outcome` holds that isn't quietened, as diagnostics by
 /// the file each is told in. A problem in no file is told at the start of
@@ -114,7 +115,8 @@ fn path(sources: &Sources, site: &Path, id: SourceId) -> PathBuf {
     site.join(sources.path(id))
 }
 
-fn range(sources: &Sources, place: Place, encoding: Encoding) -> String {
+/// Where `place` is, as the protocol's range.
+pub(super) fn range(sources: &Sources, place: Place, encoding: Encoding) -> String {
     let (line, character) = position(sources, place.source, place.span.start as usize, encoding);
     let start = format!("{{\"line\":{line},\"character\":{character}}}");
     let end = (place.span.end as usize).max(place.span.start as usize);

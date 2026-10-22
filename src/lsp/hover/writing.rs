@@ -5,7 +5,7 @@
 
 use std::ops::Range;
 
-use super::Said;
+use super::{Goes, Said};
 use crate::lsp::complete::Known;
 use crate::lsp::complete::writing::{takes_written, unnamed};
 use crate::markdown::{self, Call, Document, Kind, Node};
@@ -96,6 +96,7 @@ pub(super) fn snippet_said(snippet: &Snippet, path: &str, wraps: bool) -> Said {
         head: wording::hover_snippet(&head),
         body,
         more: None,
+        to: Some(Goes::File(path.to_owned())),
     }
 }
 
@@ -154,10 +155,12 @@ impl Reading<'_> {
             return None;
         }
         let picture = sort == Sort::Picture || crate::templates::fits(Sort::Picture, name);
+        let path = format!("content/{path}");
         Some(Said {
             head: wording::hover_beside(name, picture),
-            body: vec![wording::its_file(&format!("content/{path}"))],
+            body: vec![wording::its_file(&path)],
             more: None,
+            to: Some(Goes::File(path)),
         })
     }
 
@@ -186,16 +189,16 @@ impl Reading<'_> {
         let file = held.source.map(|_| self.renderer.page_path(page));
         let Some(heading) = heading else {
             let mut body = vec![wording::titled(&title)];
-            body.extend(file.map(|file| wording::its_file(&file)));
+            body.extend(file.as_ref().map(|file| wording::its_file(file)));
             return Some(Said {
                 head: wording::hover_page(written),
                 body,
                 more: None,
+                to: file.map(Goes::File),
             });
         };
-        let (_, words) =
-            (self.renderer.headings(page).into_iter()).find(|(id, _)| id == heading)?;
-        let mut body = vec![wording::heading_words(&words)];
+        let heading = (self.renderer.headings(page).into_iter()).find(|h| h.id == heading)?;
+        let mut body = vec![wording::heading_words(&heading.words)];
         if Some(page) != self.page
             && let Some(file) = file
         {
@@ -205,6 +208,7 @@ impl Reading<'_> {
             head: wording::hover_heading(written),
             body,
             more: None,
+            to: Some(Goes::At(heading.place)),
         })
     }
 

@@ -4,8 +4,8 @@
 
 use std::ops::Range;
 
-use super::Said;
 use super::writing::{Reading, snippet_said};
+use super::{Goes, Said};
 use crate::lsp::complete::template::{Pointed, pointed};
 use crate::templates::Renderer;
 use crate::wording;
@@ -28,6 +28,7 @@ pub(super) fn said(
                 head: wording::hover_holds(&written, holds)?,
                 body: Vec::new(),
                 more: None,
+                to: None,
             };
             Some((range, said))
         }
@@ -53,6 +54,7 @@ pub(super) fn said(
                 head: wording::hover_template(&name),
                 body: vec![wording::its_file(&path)],
                 more: None,
+                to: Some(Goes::File(path)),
             };
             Some((range, said))
         }

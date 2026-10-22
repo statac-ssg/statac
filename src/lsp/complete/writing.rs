@@ -528,11 +528,11 @@ pub(super) fn addresses(
         };
         let items = (page.into_iter())
             .flat_map(|page| renderer.headings(page))
-            .map(|(id, words)| Item {
-                label: id.clone(),
-                detail: Some(words),
+            .map(|heading| Item {
+                label: heading.id.clone(),
+                detail: Some(heading.words),
                 kind: ItemKind::Reference,
-                insert: in_quote(&id, quote),
+                insert: in_quote(&heading.id, quote),
                 group: 1,
                 text: false,
                 filter: None,

@@ -9,7 +9,7 @@
 //! matter, in the writing and in templates from what Statac takes there
 //! and what the site holds, and says what the word under the pointer is
 //! in the site's settings, in front matter, in the writing and in
-//! templates.
+//! templates, and goes to where what it names is written.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
@@ -29,6 +29,7 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
 use diagnostics::Encoding;
+use hover::Goes;
 
 use crate::build::incremental::Checking;
 use crate::build::{Mode, Options};
@@ -252,7 +253,7 @@ impl Server<'_> {
                      \"textDocumentSync\":{{\"openClose\":true,\"change\":{WHOLE_TEXT},\
                      \"save\":{{\"includeText\":false}}}},\
                      \"completionProvider\":{{\"triggerCharacters\":{TRIGGERS}}},\
-                     \"hoverProvider\":true}},\
+                     \"hoverProvider\":true,\"definitionProvider\":true}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
                     json::string(env!("CARGO_PKG_VERSION")),
@@ -265,6 +266,10 @@ impl Server<'_> {
             }
             "textDocument/hover" => {
                 let result = self.hover(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "textDocument/definition" => {
+                let result = self.definition(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
             "shutdown" => {
@@ -489,6 +494,36 @@ impl Server<'_> {
             json::string(&said.join("\n\n")),
             position(hover.range.start),
             position(hover.range.end),
+        ))
+    }
+
+    /// Where what the word under the pointer names is written, as the
+    /// protocol's location, or `null` where it names nothing written in
+    /// the site.
+    fn definition(&mut self, message: &Message) -> std::io::Result<String> {
+        let Some(Placed {
+            folder,
+            file,
+            text,
+            offset,
+        }) = self.placed(message)?
+        else {
+            return Ok("null".to_owned());
+        };
+        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let to = hover::hover(&folder, &file, &text, offset, known).and_then(|hover| hover.to);
+        let (path, range) = match (to, known) {
+            (Some(Goes::File(path)), _) => (folder.join(path), diagnostics::START.to_owned()),
+            (Some(Goes::At(place)), Some(known)) => {
+                let sources = known.sources();
+                let range = diagnostics::range(sources, place, self.encoding);
+                (folder.join(sources.path(place.source)), range)
+            }
+            _ => return Ok("null".to_owned()),
+        };
+        Ok(format!(
+            "{{\"uri\":{},\"range\":{range}}}",
+            json::string(&uri::of(&path))
         ))
     }
 

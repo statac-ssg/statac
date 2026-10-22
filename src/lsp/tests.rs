@@ -621,8 +621,14 @@ fn initialize_hovering(formats: &str) -> String {
 }
 
 fn hover(id: u32, file: &Path, line: usize, character: usize) -> String {
+    at_position("textDocument/hover", id, file, line, character)
+}
+
+/// A request by `method` about the place at `line` and `character` in
+/// `file`.
+fn at_position(method: &str, id: u32, file: &Path, line: usize, character: usize) -> String {
     format!(
-        "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"textDocument/hover\",\
+        "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"{method}\",\
          \"params\":{{\"textDocument\":{{\"uri\":{}}},\
          \"position\":{{\"line\":{line},\"character\":{character}}}}}}}",
         json::string(&uri::of(file))
@@ -679,4 +685,48 @@ fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
             "null"
         );
     }
+}
+
+#[test]
+fn going_to_a_definition_opens_the_file_and_place_what_is_under_the_cursor_names() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "content/about.md",
+            "---\ntitle: About\n---\nA page.\n\n## The team\n",
+        ),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\nSee [the team](/about/#the-team).\n",
+        ),
+    ]);
+    let page = site.root.join("content/post-1.md");
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    let mark = editor.mark();
+    editor.send_all(&[
+        &opened(&page),
+        &at_position("textDocument/definition", 2, &page, 3, 6),
+        &at_position("textDocument/definition", 3, &page, 3, 1),
+    ]);
+    let at = editor.until(mark, |message| message.id() == Some("3"));
+    let (sent, _) = editor.end(true);
+    let offered = sent[0].at(&["result", "capabilities", "definitionProvider"]);
+    assert_eq!(sent[0].sources.spelling(offered.unwrap().place), "true");
+    let answer = (sent.iter())
+        .find(|message| message.id() == Some("2"))
+        .expect("the definition");
+    let about = uri::of(&site.root.join("content/about.md"));
+    assert_eq!(answer.text(&["result", "uri"]), Some(about.as_str()));
+    let start = |name| {
+        let node = answer.at(&["result", "range", "start", name]).unwrap();
+        answer.sources.spelling(node.place).to_owned()
+    };
+    assert_eq!(
+        (start("line"), start("character")),
+        ("5".into(), "0".into())
+    );
+    let none = sent[at].at(&["result"]).unwrap();
+    assert_eq!(sent[at].sources.spelling(none.place), "null");
 }

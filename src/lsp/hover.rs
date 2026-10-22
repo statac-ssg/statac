@@ -1,4 +1,5 @@
-//! Hover: what the word under the editor's pointer is. In the site's
+//! Hover: what the word under the editor's pointer is, and where what it
+//! names is written, to go to. In the site's
 //! settings and in a page's front matter: what each of Statac's words
 //! does, what a value of the author's own is, and what the site holds of
 //! a tag, a series or a template a page names. In the writing: the page
@@ -35,6 +36,17 @@ pub(super) struct Hover {
     pub body: Vec<String>,
     /// Where the docs say more.
     pub more: Option<String>,
+    /// Where what it names is written.
+    pub to: Option<Goes>,
+}
+
+/// Where a file of the site holds what the pointer is over.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(super) enum Goes {
+    /// The file at this path in the site, as a whole.
+    File(String),
+    /// This place among the files the site was last read from.
+    At(Place),
 }
 
 /// What a hover says, before it is placed.
@@ -42,6 +54,7 @@ struct Said {
     head: String,
     body: Vec<String>,
     more: Option<String>,
+    to: Option<Goes>,
 }
 
 impl Said {
@@ -50,6 +63,7 @@ impl Said {
             head,
             body: vec![described.text.to_owned()],
             more: Some(described.more.to_owned()),
+            to: None,
         }
     }
 
@@ -59,6 +73,7 @@ impl Said {
             head: self.head,
             body: self.body,
             more: self.more,
+            to: self.to,
         }
     }
 }
@@ -162,6 +177,7 @@ fn setting(site: &Known, name: &str) -> Option<Said> {
                 described.text.to_owned(),
             ],
             more: Some(wording::FOR_ONE_LANGUAGE.to_owned()),
+            to: None,
         });
     }
     let top = name.split('.').next().unwrap_or(name);
@@ -173,6 +189,7 @@ fn setting(site: &Known, name: &str) -> Option<Said> {
         head: wording::hover_own_value(name),
         body: vec![wording::shown_as(&format!("site.{name}"))],
         more: Some(wording::OWN_VALUE.to_owned()),
+        to: None,
     })
 }
 
@@ -211,6 +228,7 @@ fn handed(site: &Known, field: &str, in_folder: bool) -> Option<Said> {
             head,
             body: vec![hands, described.text.to_owned()],
             more: Some(wording::HANDING_DOWN.to_owned()),
+            to: None,
         });
     }
     let top = field.split('.').next().unwrap_or(field);
@@ -238,16 +256,19 @@ fn own_field(site: &Known, name: &str, head: String, written: OwnField) -> Said 
         }
     };
     body.push(wording::shown_as(&format!("page.{name}")));
+    let mut to = None;
     if let Some(renderer) = site.renderer
         && let Some(declared) = renderer.settings().declarations.declared(name)
     {
         let kind = renderer.sources().spelling(declared.place);
         body.push(wording::declared_as(kind.trim_matches(['"', '\''])));
+        to = Some(Goes::At(declared.place));
     }
     Said {
         head,
         body,
         more: Some(more.to_owned()),
+        to,
     }
 }
 
@@ -264,6 +285,7 @@ fn value(site: &Known, name: &str, text: &str) -> Option<Said> {
                 head: wording::hover_template(text),
                 body: vec![wording::its_file(&path)],
                 more: None,
+                to: Some(Goes::File(path)),
             })
         }
         _ => None,
@@ -290,12 +312,17 @@ fn list(
     let pages = list.members.len() + list.undated.len();
     let base = renderer.settings().base();
     let page = (list.page).map(|page| held.pages.get(page).address.as_str());
+    // Only a page of the author's own has a file to go to.
+    let file = (list.page)
+        .filter(|page| held.pages.get(*page).source.is_some())
+        .map(|page| Goes::File(renderer.page_path(page)));
     Some(Said {
         head: head(name, pages),
         body: (page.into_iter())
             .map(|address| wording::list_page_at(&format!("{base}{address}")))
             .collect(),
         more: None,
+        to: file,
     })
 }
 
@@ -327,5 +354,6 @@ fn kind_of_problem(name: &str) -> Option<Said> {
         head: wording::hover_kind(name, code.severity()),
         body: vec![opening],
         more: Some(wording::explanation_link(name)),
+        to: None,
     })
 }

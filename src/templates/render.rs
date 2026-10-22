@@ -589,9 +589,9 @@ impl Renderer {
         wraps(&self.shared, name)
     }
 
-    /// The headings of `page`'s writing, each with its id and its words,
-    /// in the order written.
-    pub(crate) fn headings(&self, page: PageId) -> Vec<(String, String)> {
+    /// The headings of `page`'s writing that have an id, in the order
+    /// written.
+    pub(crate) fn headings(&self, page: PageId) -> Vec<Headed> {
         let kept = self.shared.outlines.lock().expect("never poisoned");
         let sections = match kept.get(&page) {
             Some(kept) => Arc::clone(kept),
@@ -602,7 +602,11 @@ impl Renderer {
         };
         (sections.iter())
             .filter(|section| !section.id.is_empty())
-            .map(|section| (section.id.clone(), section.text.clone()))
+            .map(|section| Headed {
+                id: section.id.clone(),
+                words: section.text.clone(),
+                place: section.place,
+            })
             .collect()
     }
 
@@ -1160,6 +1164,18 @@ pub(super) struct Section {
     pub level: u8,
     pub id: String,
     pub text: String,
+    pub place: Place,
+}
+
+/// A heading of a page's writing.
+#[derive(Debug)]
+pub(crate) struct Headed {
+    /// What an address names it by after `#`.
+    pub id: String,
+    /// Its words, as plain text.
+    pub words: String,
+    /// Where it is written.
+    pub place: Place,
 }
 
 fn sections(document: &markdown::Document) -> Vec<Section> {
@@ -1169,6 +1185,7 @@ fn sections(document: &markdown::Document) -> Vec<Section> {
             level: heading.level,
             id: heading.id.unwrap_or_default().to_owned(),
             text: heading.text,
+            place: heading.place,
         })
         .collect()
 }
