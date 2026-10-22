@@ -1,8 +1,9 @@
 //! Completion: what may be written where the cursor stands in the site's
-//! settings or a page's front matter or writing, from what Statac takes
-//! there and what the site holds.
+//! settings, a page's front matter or writing, or a template, from what
+//! Statac takes there and what the site holds.
 
 mod spot;
+mod template;
 #[cfg(test)]
 mod tests;
 mod writing;
@@ -18,7 +19,7 @@ use crate::content::words::{Holder, PageWord};
 use crate::problem::Code;
 use crate::site::{LanguageId, ListKey, PageId, PagePlace};
 use crate::source::{Place, Sources, Span};
-use crate::templates::Renderer;
+use crate::templates::{Renderer, SNIPPETS, TEMPLATES};
 use crate::wording;
 
 /// What may be written in place of what is typed.
@@ -65,23 +66,39 @@ pub(super) struct Item {
 pub(super) enum ItemKind {
     Field,
     Value,
-    /// A call, written with places the editor fills in where it can.
+    /// A call to a snippet, written with places the editor fills in where
+    /// it can.
     Snippet,
     File,
-    /// An address or a heading.
+    /// An address, a heading or a block.
     Reference,
+    /// A name a template reads.
+    Variable,
+    /// A function, filter or test; a call to a function is written with
+    /// places to fill in, as a snippet's is.
+    Function,
+    /// A word opening a template's statement.
+    Keyword,
 }
 
 impl ItemKind {
     /// The protocol's number for the kind.
     pub(super) fn number(self) -> u8 {
         match self {
+            ItemKind::Function => 3,
+            ItemKind::Variable => 6,
             ItemKind::Field => 10,
             ItemKind::Value => 12,
+            ItemKind::Keyword => 14,
             ItemKind::Snippet => 15,
             ItemKind::File => 17,
             ItemKind::Reference => 18,
         }
+    }
+
+    /// Whether what it writes may hold places the editor fills in.
+    pub(super) fn fills(self) -> bool {
+        matches!(self, ItemKind::Snippet | ItemKind::Function)
     }
 }
 
@@ -108,6 +125,13 @@ pub(super) fn complete(
     let holds = match rel.as_str() {
         crate::config::FILE_NAME => Holds::Settings,
         _ if rel.starts_with("content/") && rel.ends_with(".md") => Holds::FrontMatter,
+        _ if [TEMPLATES, SNIPPETS]
+            .iter()
+            .any(|top| (rel.strip_prefix(top)).is_some_and(|rest| rest.starts_with('/'))) =>
+        {
+            let offset = text.floor_char_boundary(offset.min(text.len()));
+            return template::complete(text, offset, &rel, known, snippets);
+        }
         _ => return None,
     };
     let mut sources = Sources::default();

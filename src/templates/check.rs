@@ -216,6 +216,25 @@ pub(super) fn declared_ty(kind: Option<&crate::config::declarations::FieldKind>)
     }
 }
 
+/// The type of each value a snippet takes, by the snippet's name.
+pub(super) type Taken = BTreeMap<String, Vec<Ty>>;
+
+/// The name written where an editor's cursor stands, to ask what a
+/// template may read there; no template reads it.
+pub(crate) const TYPED: &str = "statac_typed_";
+
+/// What a template may read where [`TYPED`] is written.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum Answer {
+    /// It stands as a name: every name readable there, with what each
+    /// holds.
+    Names(Vec<(String, Ty)>),
+    /// It stands as a field of a value: what that value holds, and the
+    /// names that lead to it from the value they begin with, with what
+    /// that holds, as `book` from a page for `page.book`.
+    Fields { ty: Ty, root: Ty, path: Vec<String> },
+}
+
 /// One file to check.
 pub(super) struct Checked<'a> {
     pub name: &'a str,
@@ -224,7 +243,8 @@ pub(super) struct Checked<'a> {
 }
 
 /// Checks every template and snippet of a site, and gives the problems
-/// with the index of the file each is in.
+/// with the index of the file each is in, and the type of each value a
+/// snippet takes, by the snippet's name.
 ///
 /// Each template named in `with_url` is checked against the schema beside
 /// it, in place of `schema`.
@@ -233,7 +253,7 @@ pub(super) fn check_site(
     with_url: Option<(&Schema, &BTreeSet<String>)>,
     files: &[Checked],
     sources: &Sources,
-) -> Vec<(usize, Problem)> {
+) -> (Vec<(usize, Problem)>, Taken) {
     let mut problems = Vec::new();
     let mut handed: BTreeMap<String, Vec<Vec<Ty>>> = BTreeMap::new();
 
@@ -353,7 +373,34 @@ pub(super) fn check_site(
             }
         }
     }
-    problems
+    (problems, param_types)
+}
+
+/// What a template may read where [`TYPED`] is written in `file`, a
+/// snippet being handed values of the types `taken`; none where the file
+/// can't be read or it isn't written where a name or field is read.
+pub(super) fn asked(
+    schema: &Schema,
+    file: &Checked,
+    sources: &Sources,
+    taken: Option<&[Ty]>,
+) -> Option<Answer> {
+    let snippet = match file.role {
+        Role::Snippet(name) => {
+            let params = schema.snippets.get(name).map(|s| s.params.clone());
+            let typed = (params.unwrap_or_default().into_iter().enumerate())
+                .map(|(at, param)| {
+                    let ty = taken.and_then(|taken| taken.get(at)).cloned();
+                    (param, ty.unwrap_or(Ty::Any))
+                })
+                .collect();
+            Some((name.clone(), typed))
+        }
+        _ => None,
+    };
+    let mut checker = Checker::new(schema, file, sources, snippet);
+    checker.run();
+    checker.answer
 }
 
 /// What a piece's file is handed besides `page` and `site`, typed. A
@@ -466,6 +513,8 @@ struct Checker<'a> {
     calls: Vec<(String, Vec<Ty>)>,
     /// `page.<field>` lookups whose value is printed, with their spans.
     printed_page_fields: Vec<(String, Span)>,
+    /// What may be read where [`TYPED`] is written, once it is met.
+    answer: Option<Answer>,
 }
 
 impl<'a> Checker<'a> {
@@ -501,6 +550,7 @@ impl<'a> Checker<'a> {
             problems: Vec::new(),
             calls: Vec::new(),
             printed_page_fields: Vec::new(),
+            answer: None,
         }
     }
 
@@ -564,6 +614,43 @@ impl<'a> Checker<'a> {
         names.push("page".into());
         names.push("site".into());
         names
+    }
+
+    /// Every name readable here, with what each holds, a name bound
+    /// nearer hiding one further out.
+    fn readable(&self) -> Vec<(String, Ty)> {
+        let mut names: BTreeMap<String, Ty> = BTreeMap::new();
+        for scope in &self.scopes {
+            for (name, info) in scope {
+                names.insert(name.clone(), info.ty.clone());
+            }
+        }
+        let mut global = |name: &str, ty: Ty| {
+            names.entry(name.to_owned()).or_insert(ty);
+        };
+        if let Some((_, params)) = &self.snippet {
+            for (param, ty) in params {
+                global(param, ty.clone());
+            }
+            for name in super::files::SUPPLIED.iter().chain(super::files::WRAPPED) {
+                global(name, Ty::Any);
+            }
+        }
+        for (name, ty) in &self.extra {
+            global(name, ty.clone());
+        }
+        global("page", Ty::Record(Rec::Page));
+        global("site", Ty::Record(Rec::Site));
+        let callables = (self.schema.snippets.keys().map(String::as_str))
+            .chain(guard::FUNCTIONS.iter().copied())
+            .chain(own::FUNCTIONS.iter().copied());
+        for name in callables {
+            global(name, Ty::Callable);
+        }
+        names.remove(TYPED);
+        (names.into_iter())
+            .filter(|(name, _)| !self.imported.contains(name))
+            .collect()
     }
 
     fn lookup_var(&self, name: &str) -> Option<Info> {
@@ -915,6 +1002,29 @@ impl<'a> Checker<'a> {
 
     fn expr(&mut self, expr: &Expr<'_>, seen: Seen) -> Info {
         match expr {
+            Expr::Var(var) if var.id == TYPED => {
+                if self.answer.is_none() {
+                    self.answer = Some(Answer::Names(self.readable()));
+                }
+                Info::unknown()
+            }
+            Expr::GetAttr(attr) if attr.name == TYPED => {
+                let base = self.expr(&attr.expr, Seen::Unseen);
+                let mut path = Vec::new();
+                let mut root = &attr.expr;
+                while let Expr::GetAttr(attr) = root {
+                    path.push(attr.name.to_owned());
+                    root = &attr.expr;
+                }
+                path.reverse();
+                let root = match path.is_empty() {
+                    true => base.ty.clone(),
+                    false => self.expr(root, Seen::Unseen).ty,
+                };
+                let ty = base.ty;
+                self.answer.get_or_insert(Answer::Fields { ty, root, path });
+                Info::unknown()
+            }
             Expr::Var(var) => {
                 if self.imported.contains(var.id) {
                     return Info::told();

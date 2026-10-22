@@ -562,6 +562,7 @@ fn initialize_filling(fills: bool) -> String {
 fn a_call_is_written_with_places_to_fill_only_for_an_editor_that_fills_them() {
     let site = TempSite::site(&[
         ("templates/page.html", "{{ page.content }}\n"),
+        ("templates/list.html", "{{ ur }}\n"),
         (
             "snippets/figure.html",
             "{# takes photo #}\n{{ page.photo(photo).alt }}\n",
@@ -569,29 +570,43 @@ fn a_call_is_written_with_places_to_fill_only_for_an_editor_that_fills_them() {
         ("content/post-1.md", "---\ntitle: Post 1\n---\n@fi\n"),
     ]);
     let page = site.root.join("content/post-1.md");
-    for (fills, written, format) in [(true, "figure(\"$1\")", "2"), (false, "figure(", "")] {
-        let mut editor = Editor::start();
-        editor.send(&initialize_filling(fills));
-        let mark = editor.mark();
-        editor.send_all(&[&opened(&page), &completion(2, &page, 3, 3)]);
-        let at = editor.until(mark, |message| message.id() == Some("2"));
-        let (sent, _) = editor.end(true);
-        let Some(Value::Sequence(items)) = sent[at].at(&["result", "items"]).map(|n| &n.value)
-        else {
-            panic!("no items");
-        };
-        let figure = (items.iter())
-            .find(|item| {
-                item.get("filterText").map(|n| &n.value) == Some(&Value::Scalar("figure".into()))
-            })
-            .expect("the snippet");
-        let said = |key: &str| sent[at].sources.spelling(figure.get(key).unwrap().place);
-        assert_eq!(said("label"), "\"figure(photo)\"");
-        let edit = figure.get("textEdit").unwrap().get("newText").unwrap();
-        assert_eq!(edit.value, Value::Scalar(written.into()), "{fills}");
-        let given = figure
-            .get("insertTextFormat")
-            .map(|n| sent[at].sources.spelling(n.place));
-        assert_eq!(given.unwrap_or_default(), format, "{fills}");
+    let template = site.root.join("templates/list.html");
+    let asked = [
+        (
+            &page,
+            (3, 3),
+            "figure",
+            "\"figure(photo)\"",
+            ["figure(\"$1\")", "figure("],
+        ),
+        (&template, (0, 5), "url", "\"url\"", ["url($1)", "url("]),
+    ];
+    for (file, (line, character), name, label, written) in asked {
+        for (fills, written, format) in [(true, written[0], "2"), (false, written[1], "")] {
+            let mut editor = Editor::start();
+            editor.send(&initialize_filling(fills));
+            let mark = editor.mark();
+            editor.send_all(&[&opened(file), &completion(2, file, line, character)]);
+            let at = editor.until(mark, |message| message.id() == Some("2"));
+            let (sent, _) = editor.end(true);
+            let Some(Value::Sequence(items)) = sent[at].at(&["result", "items"]).map(|n| &n.value)
+            else {
+                panic!("no items");
+            };
+            let call = (items.iter())
+                .find(|item| {
+                    let filter = item.get("filterText").or_else(|| item.get("label"));
+                    filter.map(|n| &n.value) == Some(&Value::Scalar(name.into()))
+                })
+                .expect("the call");
+            let said = |key: &str| sent[at].sources.spelling(call.get(key).unwrap().place);
+            assert_eq!(said("label"), label);
+            let edit = call.get("textEdit").unwrap().get("newText").unwrap();
+            assert_eq!(edit.value, Value::Scalar(written.into()), "{name} {fills}");
+            let given = call
+                .get("insertTextFormat")
+                .map(|n| sent[at].sources.spelling(n.place));
+            assert_eq!(given.unwrap_or_default(), format, "{name} {fills}");
+        }
     }
 }

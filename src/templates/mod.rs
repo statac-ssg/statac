@@ -29,6 +29,7 @@ mod shows;
 #[cfg(test)]
 mod tests;
 pub(crate) mod timed;
+mod typing;
 mod values;
 mod walks;
 
@@ -53,6 +54,7 @@ pub(crate) use layout::Chosen;
 pub(crate) use media::fits;
 pub(crate) use render::{Renderer, developed};
 pub(crate) use shows::{Explained, Held, Neighbour, Reached, Row};
+pub(crate) use typing::{Name, Readable, TYPED, filter_names, test_names};
 
 /// The site's templates and snippets, read and checked, ready to build
 /// pages with.
@@ -67,6 +69,10 @@ pub struct Templates {
     unusable: BTreeSet<usize>,
     /// The template each file extends, where it names one.
     extends: Vec<Option<String>>,
+    /// The blocks each file has, where the engine could read it.
+    blocks: Vec<Option<Blocks>>,
+    /// The type of each value a snippet takes.
+    taken: check::Taken,
     /// The cards the site describes, their texts among the files.
     cards: card::Cards,
     /// Where the files' lines are written.
@@ -282,7 +288,8 @@ pub(crate) fn read(
         (with_url, waiting)
     });
     let with_url = with_url.as_ref().map(|(schema, waiting)| (schema, waiting));
-    told.extend(check::check_site(&schema, with_url, &checked, sources));
+    let (checked, taken) = check::check_site(&schema, with_url, &checked, sources);
+    told.extend(checked);
 
     let mut unusable = BTreeSet::new();
     for (at, problem) in told {
@@ -340,6 +347,8 @@ pub(crate) fn read(
         pieces,
         unusable,
         extends,
+        blocks,
+        taken,
         cards,
         landings: Arc::default(),
         texts: Vec::new(),

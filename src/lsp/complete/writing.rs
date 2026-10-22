@@ -305,7 +305,8 @@ impl Offer<'_> {
                     return None;
                 }
                 if name == IN_SITE {
-                    return Some(self.addresses(typed, "", quote));
+                    let page = self.page;
+                    return Some(addresses(renderer, page, text, typed, "", quote));
                 }
                 let snippet = renderer?
                     .snippets()
@@ -341,7 +342,7 @@ impl Offer<'_> {
                     return Some(Completion::of(typed, items));
                 }
                 let base = renderer.map(|r| r.settings().base()).unwrap_or_default();
-                Some(self.addresses(typed, &base, None))
+                Some(addresses(renderer, self.page, text, typed, &base, None))
             }
         }
     }
@@ -410,84 +411,6 @@ impl Offer<'_> {
         }
     }
 
-    /// The site's pages by their addresses under `base`, or, after a `#`
-    /// in what is typed, the headings of the page it names; `typed` is
-    /// moved past the `#`. In `quote`, an address is written to read back
-    /// as itself.
-    fn addresses(&self, typed: Range<usize>, base: &str, quote: Option<char>) -> Completion {
-        let Some(renderer) = self.renderer else {
-            return Completion {
-                typed,
-                items: Vec::new(),
-                incomplete: false,
-            };
-        };
-        let site = renderer.site();
-        let written = &self.text[typed.clone()];
-        if let Some(hash) = written.find('#') {
-            let address = &written[..hash];
-            let page = match address {
-                "" => self.page,
-                address => (site.pages.iter())
-                    .find(|(_, page)| format!("{base}{}", page.address.as_str()) == address)
-                    .map(|(id, _)| id),
-            };
-            let items = (page.into_iter())
-                .flat_map(|page| renderer.headings(page))
-                .map(|(id, words)| Item {
-                    label: id.clone(),
-                    detail: Some(words),
-                    kind: ItemKind::Reference,
-                    insert: in_quote(&id, quote),
-                    group: 1,
-                    text: false,
-                    filter: None,
-                })
-                .collect();
-            return Completion {
-                typed: typed.start + hash + 1..typed.end,
-                items,
-                incomplete: false,
-            };
-        }
-        let mut pages: Vec<(String, PageId)> = (site.pages.iter())
-            .filter(|(_, page)| page.lands())
-            .map(|(id, page)| (format!("{base}{}", page.address.as_str()), id))
-            .collect();
-        pages.sort();
-        pages.dedup_by(|a, b| a.0 == b.0);
-        // A large site's pages are sent a part at a time, those whose
-        // address begins with what is typed, the editor asking again as
-        // more is typed.
-        let incomplete = pages.len() > MOST_ADDRESSES;
-        if incomplete {
-            pages.retain(|(address, _)| address.starts_with(written));
-            pages.truncate(MOST_ADDRESSES);
-        }
-        let items = (pages.into_iter())
-            .map(|(address, id)| {
-                let title = match &site.pages.get(id).title {
-                    Some(title) => title.value.clone(),
-                    None => renderer.named(id).0,
-                };
-                Item {
-                    label: address.clone(),
-                    detail: Some(title),
-                    kind: ItemKind::Reference,
-                    insert: in_quote(&address, quote),
-                    group: 1,
-                    text: false,
-                    filter: None,
-                }
-            })
-            .collect();
-        Completion {
-            typed,
-            items,
-            incomplete,
-        }
-    }
-
     /// The files beside the page of `sort`, by name, written in `quote`,
     /// or in quotes where there is none unless the name is `bare`, as a
     /// picture's address is.
@@ -532,7 +455,7 @@ fn unnamed(snippet: &Snippet, place: usize) -> Option<String> {
 
 /// What a snippet takes, as its call is shown in the list: the names its
 /// `takes` line gives, or the one name it reads.
-fn takes_written(snippet: &Snippet) -> String {
+pub(super) fn takes_written(snippet: &Snippet) -> String {
     match &snippet.takes {
         Some(Takes::InOrder(names)) => names.join(", "),
         Some(Takes::AnyNumberOf(name)) => format!("{name}..."),
@@ -544,7 +467,7 @@ fn takes_written(snippet: &Snippet) -> String {
 /// The names the snippet reads that a call has given no value yet, after
 /// `place` values without names, and by the names `given`, each written
 /// with its `=`.
-fn names_left(snippet: &Snippet, place: usize, given: &[String]) -> Vec<Item> {
+pub(super) fn names_left(snippet: &Snippet, place: usize, given: &[String]) -> Vec<Item> {
     let filled: Vec<String> = (0..place).filter_map(|at| unnamed(snippet, at)).collect();
     let any_number = matches!(snippet.takes, Some(Takes::AnyNumberOf(_)));
     (snippet.params.iter())
@@ -564,11 +487,97 @@ fn names_left(snippet: &Snippet, place: usize, given: &[String]) -> Vec<Item> {
 
 /// `value` written inside a call's `quote`, which a backslash keeps
 /// from closing it; as it is where there is none.
-fn in_quote(value: &str, quote: Option<char>) -> String {
+pub(super) fn in_quote(value: &str, quote: Option<char>) -> String {
     match quote {
         Some(quote) => value
             .replace('\\', "\\\\")
             .replace(quote, &format!("\\{quote}")),
         None => value.to_owned(),
+    }
+}
+
+/// The site's pages by their addresses under `base`, or, after a `#`
+/// in what is typed, the headings of `page` or the page it names, `text`
+/// being what `typed` is in; `typed` is
+/// moved past the `#`. In `quote`, an address is written to read back
+/// as itself.
+pub(super) fn addresses(
+    renderer: Option<&Renderer>,
+    page: Option<PageId>,
+    text: &str,
+    typed: Range<usize>,
+    base: &str,
+    quote: Option<char>,
+) -> Completion {
+    let Some(renderer) = renderer else {
+        return Completion {
+            typed,
+            items: Vec::new(),
+            incomplete: false,
+        };
+    };
+    let site = renderer.site();
+    let written = &text[typed.clone()];
+    if let Some(hash) = written.find('#') {
+        let address = &written[..hash];
+        let page = match address {
+            "" => page,
+            address => (site.pages.iter())
+                .find(|(_, page)| format!("{base}{}", page.address.as_str()) == address)
+                .map(|(id, _)| id),
+        };
+        let items = (page.into_iter())
+            .flat_map(|page| renderer.headings(page))
+            .map(|(id, words)| Item {
+                label: id.clone(),
+                detail: Some(words),
+                kind: ItemKind::Reference,
+                insert: in_quote(&id, quote),
+                group: 1,
+                text: false,
+                filter: None,
+            })
+            .collect();
+        return Completion {
+            typed: typed.start + hash + 1..typed.end,
+            items,
+            incomplete: false,
+        };
+    }
+    let mut pages: Vec<(String, PageId)> = (site.pages.iter())
+        .filter(|(_, page)| page.lands())
+        .map(|(id, page)| (format!("{base}{}", page.address.as_str()), id))
+        .collect();
+    pages.sort();
+    pages.dedup_by(|a, b| a.0 == b.0);
+    // A large site's pages are sent a part at a time, those whose
+    // address begins with what is typed, the editor asking again as
+    // more is typed.
+    let incomplete = pages.len() > MOST_ADDRESSES;
+    if incomplete {
+        pages.retain(|(address, _)| address.starts_with(written));
+        pages.truncate(MOST_ADDRESSES);
+    }
+    let items = (pages.into_iter())
+        .map(|(address, id)| {
+            let title = match &site.pages.get(id).title {
+                Some(title) => title.value.clone(),
+                None => renderer.named(id).0,
+            };
+            Item {
+                label: address.clone(),
+                detail: Some(title),
+                kind: ItemKind::Reference,
+                insert: in_quote(&address, quote),
+                group: 1,
+                text: false,
+                filter: None,
+            }
+        })
+        .collect();
+    Completion {
+        typed,
+        items,
+        incomplete,
     }
 }

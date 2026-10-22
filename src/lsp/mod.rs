@@ -6,8 +6,8 @@
 //! site is first opened, once typing pauses, and as files of the site
 //! change on disk. Each check builds again only what changed since the
 //! last. It completes what is typed in the site's settings, in front
-//! matter and in the writing from what Statac takes there and what the
-//! site holds.
+//! matter, in the writing and in templates from what Statac takes there
+//! and what the site holds.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
@@ -50,8 +50,9 @@ const WHOLE_TEXT: u8 = 1;
 /// What, typed, has the editor ask what may follow, besides the letters
 /// of a word: a value's space after its colon, and a list's bracket and
 /// comma; in the writing, a call's `@`, a bracket or quote opening a
-/// value or an address, and the `#` and `/` within an address.
-const TRIGGERS: &str = "[\" \",\"[\",\",\",\"@\",\"(\",\"\\\"\",\"'\",\"#\",\"/\"]";
+/// value or an address, and the `#` and `/` within an address; in a
+/// template, the dot before a field and the bar before a filter.
+const TRIGGERS: &str = "[\" \",\"[\",\",\",\"@\",\"(\",\"\\\"\",\"'\",\"#\",\"/\",\".\",\"|\"]";
 
 /// Answers the editor's messages on `input` with its own on `output` until
 /// the editor says to stop, and gives the exit code: 0 where it asked to
@@ -382,7 +383,7 @@ impl Server<'_> {
                     Some(filter) => format!(",\"filterText\":{}", json::string(filter)),
                     None => String::new(),
                 };
-                let format = match item.kind == complete::ItemKind::Snippet && self.snippets {
+                let format = match item.kind.fills() && self.snippets {
                     true => ",\"insertTextFormat\":2",
                     false => "",
                 };

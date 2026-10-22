@@ -401,7 +401,7 @@ fn nothing(value: &Value) -> bool {
 
 /// What a name holds, by what templates are checked against, or where
 /// that doesn't say, by the value itself.
-fn holds(ty: &Ty, value: Option<&Value>) -> Holds {
+pub(super) fn holds(ty: &Ty, value: Option<&Value>) -> Holds {
     match ty {
         Ty::Text => Holds::Text,
         Ty::Html => Holds::Html,

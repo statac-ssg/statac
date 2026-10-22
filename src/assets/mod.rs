@@ -507,6 +507,11 @@ impl Assets {
         self.names.get(name).copied()
     }
 
+    /// The name of every asset, as a template asks for it.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.names.keys().map(String::as_str)
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (AssetId, &Asset)> {
         self.assets.iter()
     }
