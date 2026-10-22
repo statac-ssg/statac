@@ -19,6 +19,7 @@
 mod complete;
 mod diagnostics;
 mod hover;
+mod references;
 mod symbols;
 #[cfg(test)]
 mod tests;
@@ -34,6 +35,7 @@ use std::time::{Duration, Instant};
 
 use diagnostics::Encoding;
 use hover::Goes;
+use references::Written;
 
 use crate::build::incremental::Checking;
 use crate::build::{Mode, Options};
@@ -269,7 +271,8 @@ impl Server<'_> {
                      \"save\":{{\"includeText\":false}}}},\
                      \"completionProvider\":{{\"triggerCharacters\":{TRIGGERS}}},\
                      \"hoverProvider\":true,\"definitionProvider\":true,\
-                     \"documentSymbolProvider\":true,\"workspaceSymbolProvider\":true}},\
+                     \"referencesProvider\":true,\"documentSymbolProvider\":true,\
+                     \"workspaceSymbolProvider\":true}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
                     json::string(env!("CARGO_PKG_VERSION")),
@@ -286,6 +289,10 @@ impl Server<'_> {
             }
             "textDocument/definition" => {
                 let result = self.definition(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "textDocument/references" => {
+                let result = self.references(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
             "textDocument/documentSymbol" => {
@@ -568,6 +575,51 @@ impl Server<'_> {
             "{{\"uri\":{},\"range\":{range}}}",
             json::string(&uri::of(&path))
         ))
+    }
+
+    /// Every link in the site to the page or heading the word under the
+    /// pointer names, or the cursor is in, as the protocol's locations;
+    /// `null` where it is neither.
+    fn references(&mut self, message: &Message) -> std::io::Result<String> {
+        let Some(Placed {
+            folder,
+            file,
+            text,
+            offset,
+        }) = self.placed(message)?
+        else {
+            return Ok("null".to_owned());
+        };
+        let Some(known) = (self.sites.get(&folder)).and_then(|site| site.checking.renderer())
+        else {
+            return Ok("null".to_owned());
+        };
+        let to = hover::hover(&folder, &file, &text, offset, Some(known)).and_then(|h| h.to);
+        let Some(rel) = file.strip_prefix(&folder).ok() else {
+            return Ok("null".to_owned());
+        };
+        let rel = rel.to_string_lossy().replace('\\', "/");
+        let declaration = message.truth(&["params", "context", "includeDeclaration"]);
+        let Some(found) = references::found(known, &rel, offset, to, declaration) else {
+            return Ok("null".to_owned());
+        };
+        let sources = known.sources();
+        let told: Vec<String> = (found.into_iter())
+            .map(|written| {
+                let (path, range) = match written {
+                    Written::At(place) => (
+                        folder.join(sources.path(place.source)),
+                        diagnostics::range(sources, place, self.encoding),
+                    ),
+                    Written::File(path) => (folder.join(path), diagnostics::START.to_owned()),
+                };
+                format!(
+                    "{{\"uri\":{},\"range\":{range}}}",
+                    json::string(&uri::of(&path))
+                )
+            })
+            .collect();
+        Ok(format!("[{}]", told.join(",")))
     }
 
     /// The headings of the page a request names, as the protocol's

@@ -85,6 +85,37 @@ pub(crate) fn snipped(
         .collect()
 }
 
+/// Each link in `text`, a template's own text, whose address the template
+/// writes whole, from the top of the host or with its host, so that it
+/// leads to the same place from every page: the address as a browser
+/// follows it, and where in `text` its value is.
+pub(crate) fn fixed(text: &str) -> Vec<(String, std::ops::Range<usize>)> {
+    (scan(text).links.into_iter())
+        .filter(|link| {
+            let raw = link.raw.trim_start();
+            !(raw.contains("{{") || raw.contains("{%"))
+                && (raw.starts_with('/') || raw.contains("://"))
+        })
+        .map(|link| (link.address(), link.at..link.at + link.raw.len()))
+        .collect()
+}
+
+impl Site {
+    /// The file the site publishes that `written`, a link on the page
+    /// published at `from`, its path from the top of its host with the
+    /// site's own path, lands on, and what follows its `#`; none where it
+    /// leads off the site or to nothing published.
+    pub(crate) fn lands_on(&self, written: &str, from: &str) -> Option<(String, Option<String>)> {
+        let Leads::Here(arrival) = self.leads(written, from) else {
+            return None;
+        };
+        if arrival.outside {
+            return None;
+        }
+        Some((self.file_at(&arrival.path)?, arrival.fragment))
+    }
+}
+
 /// One built page, as the check reads it.
 pub(crate) struct Page<'a> {
     pub id: PageId,

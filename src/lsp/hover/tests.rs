@@ -273,7 +273,10 @@ fn writing_site() -> TempSite {
              {{ shown.alt }}{{ alt if alt is defined }}\n",
         ),
         ("snippets/note.html", "<aside>{{ body }}</aside>\n"),
-        ("content/about.md", "---\ntitle: About\n---\n## The team\n"),
+        (
+            "content/about.md",
+            "---\ntitle: About\nredirect_from: [/old-about/]\n---\n## The team\n",
+        ),
         (
             "content/notes/note-1.md",
             "---\ntitle: Note 1\n---\nA note.\n",
@@ -542,6 +545,7 @@ fn a_link_call_or_name_in_the_writing_goes_to_what_it_names() {
     };
     let cases = [
         ("[About](/blog/ab|out/)", Some("content/about.md")),
+        ("[About](/blog/old-ab|out/)", Some("content/about.md")),
         (
             "[The team](/blog/about/#the-t|eam)",
             Some("content/about.md at `## The team`"),

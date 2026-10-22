@@ -6,11 +6,12 @@
 use std::ops::Range;
 
 use super::{Goes, Said};
+use crate::content::address::Address;
 use crate::lsp::complete::Known;
 use crate::lsp::complete::writing::{takes_written, unnamed};
 use crate::markdown::{self, Call, Document, Kind, Node};
 use crate::problem::Sort;
-use crate::site::PageId;
+use crate::site::{PageId, SentTo};
 use crate::source::{Sources, Span};
 use crate::templates::{Renderer, Snippet};
 use crate::wording;
@@ -165,8 +166,8 @@ impl Reading<'_> {
     }
 
     /// What is said of `address`, as a link in the writing leads to it: the
-    /// page, or the heading of a page, the site publishes there, named as
-    /// `written`.
+    /// page, or the heading of a page, the site publishes there or sends
+    /// readers on to from there, named as `written`.
     pub(super) fn address(&self, address: &str, written: &str) -> Option<Said> {
         let site = self.renderer.site();
         let (path, heading) = match address.split_once('#') {
@@ -175,10 +176,7 @@ impl Reading<'_> {
         };
         let page = match path {
             "" => self.page?,
-            path if markdown::from_the_top(path) => (site.pages.iter())
-                .filter(|(_, page)| page.lands())
-                .find(|(_, page)| format!("{}{}", self.base, page.address.as_str()) == path)
-                .map(|(id, _)| id)?,
+            path if markdown::from_the_top(path) => self.landing(path)?,
             path => self.relative(path)?,
         };
         let held = site.pages.get(page);
@@ -226,9 +224,28 @@ impl Reading<'_> {
             .ok()?
             .join(path)
             .ok()?;
-        (site.pages.iter())
-            .filter(|(_, page)| page.lands())
-            .find(|(_, page)| format!("{}{}", self.base, page.address.as_str()) == reached.path())
-            .map(|(id, _)| id)
+        self.landing(reached.path())
+    }
+
+    /// The page published at `path`, from the top of the host, or the one
+    /// readers are sent on to from there.
+    fn landing(&self, path: &str) -> Option<PageId> {
+        let site = self.renderer.site();
+        let mut at = path.to_owned();
+        // However many redirects lead on, short of a ring.
+        for _ in 0..=site.redirects.len() {
+            let here = |address: &Address| format!("{}{}", self.base, address.as_str()) == at;
+            let landed = (site.pages.iter()).find(|(_, page)| page.lands() && here(&page.address));
+            if let Some((id, _)) = landed {
+                return Some(id);
+            }
+            let redirect = (site.redirects.iter()).find(|redirect| here(&redirect.from))?;
+            at = match &redirect.to {
+                SentTo::Page => return Some(redirect.page),
+                SentTo::Site { address, .. } => format!("{}{}", self.base, address.as_str()),
+                SentTo::Elsewhere(_) => return None,
+            };
+        }
+        None
     }
 }

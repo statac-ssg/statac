@@ -411,7 +411,7 @@ fn a_file_changed_on_disk_is_told_and_a_file_whose_problems_are_the_same_is_not_
 
 #[test]
 fn what_the_server_cant_answer_is_answered_with_the_protocols_error() {
-    let unknown = "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"textDocument/references\"}";
+    let unknown = "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"textDocument/formatting\"}";
     let mut editor = Editor::start();
     editor.send(unknown);
     editor.send("{not json");
@@ -818,4 +818,56 @@ fn a_pages_headings_are_listed_as_the_editor_shows_them_and_the_site_is_searched
         );
         assert_eq!(found, wanted);
     }
+}
+
+#[test]
+fn finding_references_lists_every_link_to_the_page_the_cursor_is_in() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "content/about.md",
+            "---\ntitle: About\n---\nA page.\n\n## The team\n",
+        ),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\nSee [the team](/about/#the-team) and [about](/about/).\n",
+        ),
+    ]);
+    let about = site.root.join("content/about.md");
+    let post = site.root.join("content/post-1.md");
+    let references = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/references\",\
+         \"params\":{{\"textDocument\":{{\"uri\":{}}},\
+         \"position\":{{\"line\":3,\"character\":2}},\
+         \"context\":{{\"includeDeclaration\":true}}}}}}",
+        json::string(&uri::of(&about))
+    );
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    let mark = editor.mark();
+    editor.send_all(&[&opened(&about), &references]);
+    editor.until(mark, |message| message.id() == Some("2"));
+    let (sent, _) = editor.end(true);
+    let offered = sent[0].at(&["result", "capabilities", "referencesProvider"]);
+    assert_eq!(sent[0].sources.spelling(offered.unwrap().place), "true");
+    let answer = (sent.iter())
+        .find(|message| message.id() == Some("2"))
+        .expect("the references");
+    let found = answer
+        .sources
+        .spelling(answer.at(&["result"]).unwrap().place);
+    let location = |file: &Path, line: usize, start: usize, end: usize| {
+        format!(
+            "{{\"uri\":{},\"range\":{{\"start\":{{\"line\":{line},\"character\":{start}}},\
+             \"end\":{{\"line\":{line},\"character\":{end}}}}}}}",
+            json::string(&uri::of(file))
+        )
+    };
+    let wanted = [
+        location(&about, 0, 0, 0),
+        location(&post, 3, 15, 31),
+        location(&post, 3, 45, 52),
+    ];
+    assert_eq!(found, format!("[{}]", wanted.join(",")));
 }
