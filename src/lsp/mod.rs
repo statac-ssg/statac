@@ -7,13 +7,15 @@
 //! change on disk. Each check builds again only what changed since the
 //! last. It completes what is typed in the site's settings, in front
 //! matter, in the writing and in templates from what Statac takes there
-//! and what the site holds.
+//! and what the site holds, and says what the word under the pointer is
+//! in the site's settings and in front matter.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
 
 mod complete;
 mod diagnostics;
+mod hover;
 #[cfg(test)]
 mod tests;
 mod wire;
@@ -93,6 +95,7 @@ fn run_with(
         output,
         encoding: Encoding::Utf16,
         snippets: false,
+        markdown: false,
         initialised: false,
         shut_down: false,
         pause,
@@ -119,6 +122,8 @@ struct Server<'a> {
     encoding: Encoding,
     /// Whether the editor fills in places in what a completion writes.
     snippets: bool,
+    /// Whether the editor reads Markdown in what a hover says.
+    markdown: bool,
     initialised: bool,
     shut_down: bool,
     pause: Duration,
@@ -143,6 +148,14 @@ struct Site {
     due: Option<Instant>,
     /// Held while the site's folder is watched.
     _watching: Option<Watching>,
+}
+
+/// Where a request about a place in a file stands.
+struct Placed {
+    folder: PathBuf,
+    file: PathBuf,
+    text: Arc<str>,
+    offset: usize,
 }
 
 /// What answering one message came to: the exit code where the editor
@@ -230,11 +243,15 @@ impl Server<'_> {
                 let item = ["params", "capabilities", "textDocument", "completion"];
                 let item = [&item[..], &["completionItem", "snippetSupport"]].concat();
                 self.snippets = message.truth(&item);
+                let hover = ["params", "capabilities", "textDocument", "hover"];
+                let formats = message.texts(&[&hover[..], &["contentFormat"]].concat());
+                self.markdown = formats.contains(&"markdown");
                 let result = format!(
                     "{{\"capabilities\":{{\"positionEncoding\":\"{}\",\
                      \"textDocumentSync\":{{\"openClose\":true,\"change\":{WHOLE_TEXT},\
                      \"save\":{{\"includeText\":false}}}},\
-                     \"completionProvider\":{{\"triggerCharacters\":{TRIGGERS}}}}},\
+                     \"completionProvider\":{{\"triggerCharacters\":{TRIGGERS}}},\
+                     \"hoverProvider\":true}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
                     json::string(env!("CARGO_PKG_VERSION")),
@@ -243,6 +260,10 @@ impl Server<'_> {
             }
             "textDocument/completion" => {
                 let result = self.complete(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "textDocument/hover" => {
+                let result = self.hover(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
             "shutdown" => {
@@ -330,35 +351,57 @@ impl Server<'_> {
         self.sites.insert(folder, site);
     }
 
-    /// What may be written where the cursor stands, as the protocol's
-    /// list of completions, or `null` where nothing is offered there.
-    fn complete(&mut self, message: &Message) -> std::io::Result<String> {
+    /// The file a request about a place in a file names, the folder of its
+    /// site, its text as the editor holds it, and the place as an offset
+    /// in that text, the site read first where it is yet to be; none where
+    /// any can't be found.
+    fn placed(&mut self, message: &Message) -> std::io::Result<Option<Placed>> {
         let at = |name| message.text(&["params", "position", name])?.parse().ok();
         let uri = message.text(&["params", "textDocument", "uri"]);
         let (Some(file), Some(line), Some(character)) =
             (uri.and_then(uri::path), at("line"), at("character"))
         else {
-            return Ok("null".to_owned());
+            return Ok(None);
         };
         let text = match self.open.get(&real(&file)) {
             Some(text) => Arc::clone(text),
             None => match std::fs::read_to_string(&file) {
                 Ok(text) => Arc::from(text),
-                Err(_) => return Ok("null".to_owned()),
+                Err(_) => return Ok(None),
             },
         };
         let (Some(folder), Some(offset)) = (
             site_of(&file),
             diagnostics::offset_in(&text, line, character, self.encoding),
         ) else {
-            return Ok("null".to_owned());
+            return Ok(None);
         };
-        // What the site holds is offered once it has been read.
+        // What the site holds is known once it has been read.
         let unread = (self.sites.get(&folder))
             .is_some_and(|site| site.checking.renderer().is_none() && site.due.is_some());
         if unread {
             self.check(&folder)?;
         }
+        Ok(Some(Placed {
+            folder,
+            file,
+            text,
+            offset,
+        }))
+    }
+
+    /// What may be written where the cursor stands, as the protocol's
+    /// list of completions, or `null` where nothing is offered there.
+    fn complete(&mut self, message: &Message) -> std::io::Result<String> {
+        let Some(Placed {
+            folder,
+            file,
+            text,
+            offset,
+        }) = self.placed(message)?
+        else {
+            return Ok("null".to_owned());
+        };
         let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
         let completion = complete::complete(&folder, &file, &text, offset, known, self.snippets);
         let Some(completion) = completion else {
@@ -401,6 +444,50 @@ impl Server<'_> {
             "{{\"isIncomplete\":{},\"items\":[{}]}}",
             completion.incomplete,
             items.join(",")
+        ))
+    }
+
+    /// What the word under the pointer is, as the protocol's hover, or
+    /// `null` where nothing is said of it.
+    fn hover(&mut self, message: &Message) -> std::io::Result<String> {
+        let Some(Placed {
+            folder,
+            file,
+            text,
+            offset,
+        }) = self.placed(message)?
+        else {
+            return Ok("null".to_owned());
+        };
+        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let Some(hover) = hover::hover(&folder, &file, &text, offset, known) else {
+            return Ok("null".to_owned());
+        };
+        let position = |offset| {
+            let (line, character) = diagnostics::position_in(&text, offset, self.encoding);
+            format!("{{\"line\":{line},\"character\":{character}}}")
+        };
+        let mut said = vec![hover.head];
+        said.extend(hover.body);
+        let (kind, more) = match self.markdown {
+            true => (
+                "markdown",
+                hover
+                    .more
+                    .map(|more| format!("[{}]({more})", crate::wording::HOVER_MORE)),
+            ),
+            false => (
+                "plaintext",
+                hover.more.map(|more| crate::wording::more(&more)),
+            ),
+        };
+        said.extend(more);
+        Ok(format!(
+            "{{\"contents\":{{\"kind\":\"{kind}\",\"value\":{}}},\
+             \"range\":{{\"start\":{},\"end\":{}}}}}",
+            json::string(&said.join("\n\n")),
+            position(hover.range.start),
+            position(hover.range.end),
         ))
     }
 

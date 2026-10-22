@@ -411,7 +411,7 @@ fn a_file_changed_on_disk_is_told_and_a_file_whose_problems_are_the_same_is_not_
 
 #[test]
 fn what_the_server_cant_answer_is_answered_with_the_protocols_error() {
-    let unknown = "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"textDocument/hover\"}";
+    let unknown = "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"textDocument/references\"}";
     let mut editor = Editor::start();
     editor.send(unknown);
     editor.send("{not json");
@@ -608,5 +608,75 @@ fn a_call_is_written_with_places_to_fill_only_for_an_editor_that_fills_them() {
                 .map(|n| sent[at].sources.spelling(n.place));
             assert_eq!(given.unwrap_or_default(), format, "{name} {fills}");
         }
+    }
+}
+
+/// The `initialize` request of an editor that reads hovers in `formats`.
+fn initialize_hovering(formats: &str) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\
+         \"params\":{{\"capabilities\":{{\"textDocument\":{{\"hover\":\
+         {{\"contentFormat\":[{formats}]}}}}}}}}}}"
+    )
+}
+
+fn hover(id: u32, file: &Path, line: usize, character: usize) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"textDocument/hover\",\
+         \"params\":{{\"textDocument\":{{\"uri\":{}}},\
+         \"position\":{{\"line\":{line},\"character\":{character}}}}}}}",
+        json::string(&uri::of(file))
+    )
+}
+
+#[test]
+fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\ncode_style: ocean\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        ("content/post-1.md", "---\ntitle: Post 1\n---\nA post.\n"),
+    ]);
+    let settings = site.root.join("statac.yaml");
+    let page = site.root.join("content/post-1.md");
+    let link = "https://statac.dev/settings/#writing-and-code";
+    let more = [
+        (
+            "\"markdown\",\"plaintext\"",
+            "markdown",
+            format!("[More on statac.dev]({link})"),
+        ),
+        ("\"plaintext\"", "plaintext", format!("More: {link}")),
+    ];
+    for (formats, kind, more) in more {
+        let mut editor = Editor::start();
+        editor.send(&initialize_hovering(formats));
+        let mark = editor.mark();
+        editor.send_all(&[
+            &opened(&settings),
+            &hover(2, &settings, 1, 3),
+            &hover(3, &page, 3, 2),
+        ]);
+        let at = editor.until(mark, |message| message.id() == Some("3"));
+        let (sent, _) = editor.end(true);
+        let offered = sent[0].at(&["result", "capabilities", "hoverProvider"]);
+        assert_eq!(sent[0].sources.spelling(offered.unwrap().place), "true");
+        let answer = (sent.iter())
+            .find(|message| message.id() == Some("2"))
+            .expect("the hover");
+        assert_eq!(answer.text(&["result", "contents", "kind"]), Some(kind));
+        let value = answer.text(&["result", "contents", "value"]).unwrap();
+        let first = "`code_style`, a setting\n\nThe colours of code in the writing:";
+        assert!(value.starts_with(first), "{value}");
+        assert!(value.ends_with(&format!(".\n\n{more}")), "{value}");
+        let range = ["result", "range"];
+        let end = [&range[..], &["end", "character"]].concat();
+        let end = answer.at(&end).unwrap();
+        assert_eq!(answer.sources.spelling(end.place), "10");
+        assert_eq!(
+            sent[at]
+                .sources
+                .spelling(sent[at].at(&["result"]).unwrap().place),
+            "null"
+        );
     }
 }

@@ -22,6 +22,13 @@ use crate::problem::{
     WordsFrom, WordsWanted, WrongPlace,
 };
 
+mod described;
+
+pub(crate) use described::{
+    Described, FOR_ONE_LANGUAGE, HANDING_DOWN, OWN_FIELD, OWN_VALUE, field as described_field,
+    setting as described_setting,
+};
+
 const EXPLANATIONS: &str = "https://statac.dev/e/";
 const MONTHS: [&str; 12] = [
     "January",
@@ -3525,6 +3532,99 @@ pub(crate) fn offered_tag(pages: usize) -> String {
 /// What an editor's completion says beside one of the site's series.
 pub(crate) fn offered_series(pages: usize) -> String {
     format!("series, {}", how_many(pages, "page", "pages"))
+}
+
+/// What an editor's hover links to the docs with.
+pub(crate) const HOVER_MORE: &str = "More on statac.dev";
+
+/// What an editor's hover says one of Statac's settings is.
+pub(crate) fn hover_setting(name: &str) -> String {
+    format!("`{name}`, a setting")
+}
+
+/// What an editor's hover says a setting for one language is.
+pub(crate) fn hover_for_a_language(name: &str) -> String {
+    format!("`{name}`, a setting for one language")
+}
+
+/// What an editor's hover says a setting for one language does.
+pub(crate) fn for_a_language(setting: &str, tag: &str) -> String {
+    format!("`{setting}` for the pages in `{tag}`.")
+}
+
+/// What an editor's hover says one of Statac's front matter words is.
+pub(crate) fn hover_field(name: &str) -> String {
+    format!("`{name}`, a field")
+}
+
+/// What an editor's hover says a `pages.` line is.
+pub(crate) fn hover_handed(name: &str) -> String {
+    format!("`{name}`, handed down")
+}
+
+/// What an editor's hover says a `pages.` line does, in `statac.yaml` or
+/// in a folder's page.
+pub(crate) fn hands_down(field: &str, in_folder: bool) -> String {
+    match in_folder {
+        false => format!("Hands `{field}` down to every page."),
+        true => {
+            format!("Hands `{field}` down to every page in this folder and the folders inside it.")
+        }
+    }
+}
+
+/// What an editor's hover says a value of the site's own is.
+pub(crate) fn hover_own_value(name: &str) -> String {
+    format!("`{name}`, a value of your own")
+}
+
+/// What an editor's hover says a field of the author's own is.
+pub(crate) fn hover_own_field(name: &str) -> String {
+    format!("`{name}`, a field of your own")
+}
+
+/// How an editor's hover says a template reaches a value, as `site.author`.
+pub(crate) fn shown_as(reached: &str) -> String {
+    format!("Templates show it as `{reached}`.")
+}
+
+/// How an editor's hover says a field of the author's own is declared.
+pub(crate) fn declared_as(kind: &str) -> String {
+    format!("Declared in `statac.yaml` as `{kind}`.")
+}
+
+/// What an editor's hover says a kind of problem is.
+pub(crate) fn hover_kind(name: &str, of: Severity) -> String {
+    let article = match of {
+        Severity::Error => "an",
+        Severity::Warning | Severity::Note => "a",
+    };
+    format!("`{name}`, {article} {}", severity(of))
+}
+
+/// What an editor's hover says one of the site's tags is.
+pub(crate) fn hover_tag(name: &str, pages: usize) -> String {
+    format!("`{name}`, a tag on {}", how_many(pages, "page", "pages"))
+}
+
+/// What an editor's hover says one of the site's series is.
+pub(crate) fn hover_series(name: &str, pages: usize) -> String {
+    format!("`{name}`, a series of {}", how_many(pages, "page", "pages"))
+}
+
+/// Where an editor's hover says a tag's or a series' page is.
+pub(crate) fn list_page_at(address: &str) -> String {
+    format!("Its page is `{address}`.")
+}
+
+/// What an editor's hover says one of the site's templates is.
+pub(crate) fn hover_template(name: &str) -> String {
+    format!("`{name}`, a template")
+}
+
+/// Where an editor's hover says a template's file is.
+pub(crate) fn template_file(path: &str) -> String {
+    format!("Its file is `{path}`.")
 }
 
 /// What `build` says after a fault of Statac's own that came before the

@@ -2,7 +2,7 @@
 //! settings, a page's front matter or writing, or a template, from what
 //! Statac takes there and what the site holds.
 
-mod spot;
+pub(super) mod spot;
 mod template;
 #[cfg(test)]
 mod tests;
@@ -247,19 +247,19 @@ fn value_written(value: &str, text: bool, flow: bool, quote: Option<char>, space
 }
 
 /// What the site holds, as completion offers it.
-struct Known<'a> {
-    renderer: Option<&'a Renderer>,
+pub(super) struct Known<'a> {
+    pub renderer: Option<&'a Renderer>,
     /// The page being written, where the site as last read holds it.
     page: Option<PageId>,
     /// The language of the page being written, where the site as last
     /// read tells it.
-    language: Option<LanguageId>,
+    pub language: Option<LanguageId>,
     /// What holds the front matter being written.
-    holder: Holder,
+    pub holder: Holder,
 }
 
 impl<'a> Known<'a> {
-    fn of(renderer: Option<&'a Renderer>, rel: &str) -> Known<'a> {
+    pub(super) fn of(renderer: Option<&'a Renderer>, rel: &str) -> Known<'a> {
         let found = renderer.and_then(|renderer| {
             let (sources, site) = (renderer.sources(), renderer.site());
             (site.pages.iter()).find_map(|(id, page)| {

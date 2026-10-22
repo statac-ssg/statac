@@ -38,6 +38,67 @@ pub(super) enum Spot {
     },
 }
 
+/// What the cursor stands on in YAML, as a hover reads it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(in crate::lsp) enum Under {
+    /// A field's name, `path` naming it and the fields it is under.
+    Name {
+        path: Vec<String>,
+        span: Range<usize>,
+    },
+    /// A value of the field `path` names, or an item of its list.
+    Value {
+        path: Vec<String>,
+        span: Range<usize>,
+        text: String,
+    },
+}
+
+/// What the character at `offset` is part of in the YAML at `at`: a
+/// field's name or a value the tree holds; none where it is neither.
+pub(in crate::lsp) fn under(sources: &Sources, at: Place, offset: usize) -> Option<Under> {
+    if !at.span.range().contains(&offset) {
+        return None;
+    }
+    let root = crate::yaml::read_partial(sources, at).node;
+    under_node(&root, offset, &mut Vec::new())
+}
+
+fn under_node(node: &Node, offset: usize, path: &mut Vec<String>) -> Option<Under> {
+    match &node.value {
+        Value::Mapping(entries) => entries.iter().find_map(|entry| {
+            let key = entry.key.place.span.range();
+            let within = |node: &Node| node.place.span.range().contains(&offset);
+            if !within(&entry.key) && !within(&entry.value) {
+                return None;
+            }
+            path.push(key_name(&entry.key));
+            match key.contains(&offset) {
+                true => Some(Under::Name {
+                    path: path.clone(),
+                    span: key,
+                }),
+                false => under_value(&entry.value, offset, path),
+            }
+        }),
+        Value::Sequence(items) => (items.iter())
+            .find(|item| item.place.span.range().contains(&offset))
+            .and_then(|item| under_value(item, offset, path)),
+        Value::Scalar(_) => None,
+    }
+}
+
+fn under_value(node: &Node, offset: usize, path: &mut Vec<String>) -> Option<Under> {
+    match &node.value {
+        Value::Scalar(text) => Some(Under::Value {
+            path: path.clone(),
+            span: node.place.span.range(),
+            text: text.clone(),
+        }),
+        _ => under_node(node, offset, path),
+    }
+}
+
 /// Where `offset` stands in the YAML at `at`, or none where it is outside
 /// it or in a comment.
 pub(super) fn find(sources: &Sources, at: Place, offset: usize) -> Option<Spot> {
