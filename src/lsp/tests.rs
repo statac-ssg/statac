@@ -871,3 +871,116 @@ fn finding_references_lists_every_link_to_the_page_the_cursor_is_in() {
     ];
     assert_eq!(found, format!("[{}]", wanted.join(",")));
 }
+
+fn actions(id: u32, file: &Path, line: usize, character: usize, only: &str) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"textDocument/codeAction\",\
+         \"params\":{{\"textDocument\":{{\"uri\":{}}},\
+         \"range\":{{\"start\":{{\"line\":{line},\"character\":{character}}},\
+         \"end\":{{\"line\":{line},\"character\":{character}}}}},\
+         \"context\":{{\"diagnostics\":[]{only}}}}}}}",
+        json::string(&uri::of(file))
+    )
+}
+
+#[test]
+fn a_problem_with_one_exact_answer_is_fixed_by_the_edit_while_its_text_stands() {
+    let site = site();
+    let post = site.root.join("content/post-1.md");
+    let initialize = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\
+                      \"params\":{\"capabilities\":{\"textDocument\":{\"codeAction\":\
+                      {\"codeActionLiteralSupport\":{\"codeActionKind\":\
+                      {\"valueSet\":[\"quickfix\"]}}}}}}}";
+    let mut editor = Editor::start();
+    editor.send(initialize);
+    let mark = editor.mark();
+    editor.send(&opened(&post));
+    editor.told_until(mark, &post, |told| has(told, "unclear-date"));
+    let typed = DATED.replace("A post.", "A post, typed on.");
+    let moved = DATED.replace("---\ntitle", "---\n\ntitle");
+    editor.send_all(&[
+        &actions(2, &post, 2, 8, ""),
+        &actions(3, &post, 2, 0, ""),
+        &actions(4, &post, 2, 8, ",\"only\":[\"refactor\"]"),
+        &changed(&post, &typed),
+        &actions(5, &post, 2, 14, ""),
+        &changed(&post, &moved),
+        &actions(6, &post, 2, 8, ""),
+        &actions(7, &post, 3, 8, ""),
+    ]);
+    editor.until(mark, |message| message.id() == Some("7"));
+    let (sent, _) = editor.end(true);
+    let offered = sent[0].at(&["result", "capabilities", "codeActionProvider"]);
+    assert_eq!(
+        sent[0].sources.spelling(offered.unwrap().place),
+        "{\"codeActionKinds\":[\"quickfix\"]}"
+    );
+    // Each fix as its title, its kind, the problem it fixes, whether it is
+    // preferred, and its edit's file, place and text.
+    let fixes = |id: &str| -> Vec<[String; 7]> {
+        let answer = (sent.iter())
+            .find(|message| message.id() == Some(id))
+            .expect("an answer");
+        let Some(Value::Sequence(fixes)) = answer.at(&["result"]).map(|n| &n.value) else {
+            panic!("no list of fixes");
+        };
+        let text = |node: &Node, path: &[&str]| {
+            let found = path.iter().try_fold(node, |node, key| node.get(key));
+            answer
+                .sources
+                .spelling(found.expect("there").place)
+                .to_owned()
+        };
+        (fixes.iter())
+            .map(|fix| {
+                let Some(Value::Sequence(problems)) = fix.get("diagnostics").map(|n| &n.value)
+                else {
+                    panic!("no problems");
+                };
+                let Some(Value::Mapping(changes)) = fix
+                    .get("edit")
+                    .and_then(|edit| edit.get("changes"))
+                    .map(|n| &n.value)
+                else {
+                    panic!("no changes");
+                };
+                let entry = changes.first().expect("a file");
+                let Value::Sequence(edits) = &entry.value.value else {
+                    panic!("no edits");
+                };
+                [
+                    text(fix, &["title"]),
+                    text(fix, &["kind"]),
+                    text(&problems[0], &["code"]),
+                    text(fix, &["isPreferred"]),
+                    answer.sources.spelling(entry.key.place).to_owned(),
+                    text(&edits[0], &["range"]),
+                    text(&edits[0], &["newText"]),
+                ]
+            })
+            .collect()
+    };
+    let at = "{\"start\":{\"line\":2,\"character\":6},\"end\":{\"line\":2,\"character\":14}}";
+    let fix = |date: &str| {
+        [
+            format!("\"Write it as `{date}`\""),
+            "\"quickfix\"".to_owned(),
+            "\"unclear-date\"".to_owned(),
+            "false".to_owned(),
+            json::string(&uri::of(&post)),
+            at.to_owned(),
+            format!("\"{date}\""),
+        ]
+    };
+    // Two readings, so two fixes, neither preferred.
+    assert_eq!(fixes("2"), [fix("2026-04-03"), fix("2026-03-04")]);
+    // Off the problem, or asked for other kinds of action, nothing is
+    // offered.
+    assert!(fixes("3").is_empty());
+    assert!(fixes("4").is_empty());
+    // Typed on elsewhere, the date stands where it was.
+    assert_eq!(fixes("5"), [fix("2026-04-03"), fix("2026-03-04")]);
+    // Moved before the site is checked again, it is no longer there.
+    assert!(fixes("6").is_empty());
+    assert!(fixes("7").is_empty());
+}

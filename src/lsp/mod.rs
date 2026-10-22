@@ -4,12 +4,13 @@
 //! text the editor holds for each file it has open in place of the file,
 //! and tells the editor every problem at the place it is written: as the
 //! site is first opened, once typing pauses, and as files of the site
-//! change on disk. Each check builds again only what changed since the
-//! last. It completes what is typed in the site's settings, in front
-//! matter, in the writing and in templates from what Statac takes there
-//! and what the site holds, and says what the word under the pointer is
-//! in the site's settings, in front matter, in the writing and in
-//! templates, and goes to where what it names is written. It lists a
+//! change on disk, with the edit that fixes it where Statac's suggestion
+//! is exact. Each check builds again only what changed since the last. It
+//! completes what is typed in the site's settings, in front matter, in
+//! the writing and in templates from what Statac takes there and what the
+//! site holds, and says what the word under the pointer is in the site's
+//! settings, in front matter, in the writing and in templates, and goes
+//! to where what it names is written. It lists a
 //! page's headings, and finds the site's pages by title and its snippets
 //! and templates by name.
 //!
@@ -18,6 +19,7 @@
 
 mod complete;
 mod diagnostics;
+mod fixes;
 mod hover;
 mod references;
 mod symbols;
@@ -33,7 +35,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
-use diagnostics::Encoding;
+use diagnostics::{Encoding, Told};
 use hover::Goes;
 use references::Written;
 
@@ -109,6 +111,7 @@ fn run_with(
         snippets: false,
         markdown: false,
         nested: false,
+        actions: false,
         initialised: false,
         shut_down: false,
         pause,
@@ -140,6 +143,8 @@ struct Server<'a> {
     /// Whether the editor shows a page's headings each beneath the one
     /// above it.
     nested: bool,
+    /// Whether the editor takes a fix as the edit it makes.
+    actions: bool,
     initialised: bool,
     shut_down: bool,
     pause: Duration,
@@ -158,8 +163,8 @@ struct Site {
     checking: Checking,
     /// Where a problem in no file is told.
     nowhere: PathBuf,
-    /// The diagnostics the editor was last sent for each file.
-    told: BTreeMap<PathBuf, Vec<String>>,
+    /// The problems the editor was last told of in each file.
+    told: BTreeMap<PathBuf, Vec<Told>>,
     /// When the site is to be checked next, where it is to be.
     due: Option<Instant>,
     /// Held while the site's folder is watched.
@@ -265,6 +270,10 @@ impl Server<'_> {
                 let symbols = ["params", "capabilities", "textDocument", "documentSymbol"];
                 self.nested =
                     message.truth(&[&symbols[..], &["hierarchicalDocumentSymbolSupport"]].concat());
+                let actions = ["params", "capabilities", "textDocument", "codeAction"];
+                self.actions = message
+                    .at(&[&actions[..], &["codeActionLiteralSupport"]].concat())
+                    .is_some();
                 let result = format!(
                     "{{\"capabilities\":{{\"positionEncoding\":\"{}\",\
                      \"textDocumentSync\":{{\"openClose\":true,\"change\":{WHOLE_TEXT},\
@@ -272,7 +281,8 @@ impl Server<'_> {
                      \"completionProvider\":{{\"triggerCharacters\":{TRIGGERS}}},\
                      \"hoverProvider\":true,\"definitionProvider\":true,\
                      \"referencesProvider\":true,\"documentSymbolProvider\":true,\
-                     \"workspaceSymbolProvider\":true}},\
+                     \"workspaceSymbolProvider\":true,\
+                     \"codeActionProvider\":{{\"codeActionKinds\":[\"quickfix\"]}}}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
                     json::string(env!("CARGO_PKG_VERSION")),
@@ -293,6 +303,10 @@ impl Server<'_> {
             }
             "textDocument/references" => {
                 let result = self.references(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "textDocument/codeAction" => {
+                let result = self.actions(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
             "textDocument/documentSymbol" => {
@@ -622,6 +636,55 @@ impl Server<'_> {
         Ok(format!("[{}]", told.join(",")))
     }
 
+    /// The fixes for the problems the editor was last told of in the range
+    /// a request names, as the protocol's code actions, each an edit to
+    /// the file. A fix is offered only while the text it replaces is still
+    /// where it was.
+    fn actions(&mut self, message: &Message) -> std::io::Result<String> {
+        let only = message.texts(&["params", "context", "only"]);
+        let wanted =
+            only.is_empty() || (only.iter()).any(|kind| *kind == "quickfix" || kind.is_empty());
+        let Some((folder, file, text)) = self.named(message)?.filter(|_| self.actions && wanted)
+        else {
+            return Ok("[]".to_owned());
+        };
+        let at = |end: &str| -> Option<diagnostics::Position> {
+            let read = |name| message.text(&["params", "range", end, name])?.parse().ok();
+            Some((read("line")?, read("character")?))
+        };
+        let (Some(start), Some(end)) = (at("start"), at("end")) else {
+            return Ok("[]".to_owned());
+        };
+        let told = (self.sites.get(&folder)).and_then(|site| site.told.get(&file));
+        let uri = json::string(&uri::of(&file));
+        let mut offered = Vec::new();
+        for told in told.into_iter().flatten() {
+            if told.from > end || start > told.to {
+                continue;
+            }
+            let standing = (told.fixes.iter()).filter(|fix| {
+                let from = diagnostics::offset_in(&text, fix.from.0, fix.from.1, self.encoding);
+                let to = diagnostics::offset_in(&text, fix.to.0, fix.to.1, self.encoding);
+                let was = from.zip(to).and_then(|(from, to)| text.get(from..to));
+                was == Some(fix.was.as_str())
+            });
+            let standing: Vec<_> = standing.collect();
+            for fix in &standing {
+                offered.push(format!(
+                    "{{\"title\":{},\"kind\":\"quickfix\",\"diagnostics\":[{}],\
+                     \"isPreferred\":{},\"edit\":{{\"changes\":{{{uri}:[\
+                     {{\"range\":{},\"newText\":{}}}]}}}}}}",
+                    json::string(&fix.title),
+                    told.diagnostic,
+                    standing.len() == 1,
+                    diagnostics::ranged(fix.from, fix.to),
+                    json::string(&fix.text),
+                ));
+            }
+        }
+        Ok(format!("[{}]", offered.join(",")))
+    }
+
     /// The headings of the page a request names, as the protocol's
     /// symbols: each beneath the one above it where the editor shows them
     /// so, and in a list otherwise; `null` for a file that is no page's.
@@ -736,9 +799,15 @@ impl Server<'_> {
             .filter(|file| !found.contains_key(*file))
             .cloned()
             .collect();
+        let same = |was: &[Told], told: &[Told]| {
+            (was.iter().map(|was| &was.diagnostic)).eq(told.iter().map(|told| &told.diagnostic))
+        };
         let changed: Vec<(PathBuf, Vec<String>)> = (found.iter())
-            .filter(|(file, told)| before.get(*file) != Some(told))
-            .map(|(file, told)| (file.clone(), told.clone()))
+            .filter(|(file, told)| (before.get(*file)).is_none_or(|was| !same(was, told)))
+            .map(|(file, told)| {
+                let told = told.iter().map(|told| told.diagnostic.clone());
+                (file.clone(), told.collect())
+            })
             .collect();
         for file in gone {
             self.publish(&file, &[])?;

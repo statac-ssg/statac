@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use super::uri;
+use super::{fixes, uri};
 use crate::build::Outcome;
 use crate::json;
 use crate::problem::{Problem, Severity};
@@ -33,6 +33,31 @@ impl Encoding {
 pub(super) const START: &str =
     "{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":0}}";
 
+/// A line and a character in it, both counted from 0, as the protocol
+/// has them.
+pub(super) type Position = (usize, usize);
+
+/// A problem as the editor is told it, with where it is and its fixes.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(super) struct Told {
+    /// The protocol's diagnostic.
+    pub diagnostic: String,
+    pub from: Position,
+    pub to: Position,
+    pub fixes: Vec<Offered>,
+}
+
+/// A fix as it is offered: `text` in place of `was`, written from `from`
+/// to `to` in the file the problem is told in.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(super) struct Offered {
+    pub title: String,
+    pub from: Position,
+    pub to: Position,
+    pub was: String,
+    pub text: String,
+}
+
 /// Every problem `outcome` holds that isn't quietened, as diagnostics by
 /// the file each is told in. A problem in no file is told at the start of
 /// `nowhere`.
@@ -41,27 +66,60 @@ pub(super) fn by_file(
     site: &Path,
     nowhere: &Path,
     encoding: Encoding,
-) -> BTreeMap<PathBuf, Vec<String>> {
+) -> BTreeMap<PathBuf, Vec<Told>> {
     let sources = outcome.sources();
-    let mut found: BTreeMap<PathBuf, Vec<String>> = BTreeMap::new();
+    let base = outcome
+        .settings()
+        .map(|settings| settings.base())
+        .unwrap_or_default();
+    let ends = |place: Place| {
+        let from = position(sources, place.source, place.span.start as usize, encoding);
+        let end = (place.span.end as usize).max(place.span.start as usize);
+        (from, position(sources, place.source, end, encoding))
+    };
+    let mut found: BTreeMap<PathBuf, Vec<Told>> = BTreeMap::new();
     for problem in &outcome.problems {
         if outcome.quiet.quietens(&problem.kind) {
             continue;
         }
-        let (file, range) = match problem.place {
+        let (file, (from, to)) = match problem.place {
             Some(place) if problem.kind.of_a_whole_file() => {
-                (path(sources, site, place.source), START.to_owned())
+                (path(sources, site, place.source), ((0, 0), (0, 0)))
             }
-            Some(place) => (
-                path(sources, site, place.source),
-                range(sources, place, encoding),
-            ),
-            None => (nowhere.to_path_buf(), START.to_owned()),
+            Some(place) => (path(sources, site, place.source), ends(place)),
+            None => (nowhere.to_path_buf(), ((0, 0), (0, 0))),
         };
-        let told = diagnostic(problem, &range, sources, site, encoding);
-        found.entry(file).or_default().push(told);
+        let fixes = (fixes::fixes(problem, sources, &base).into_iter())
+            .map(|fix| {
+                let (from, to) = ends(fix.place);
+                let was = sources.text(fix.place.source)[fix.place.span.range()].to_owned();
+                Offered {
+                    title: shown(&fix.title),
+                    from,
+                    to,
+                    was,
+                    text: fix.text,
+                }
+            })
+            .collect();
+        let diagnostic = diagnostic(problem, &ranged(from, to), sources, site, encoding);
+        found.entry(file).or_default().push(Told {
+            diagnostic,
+            from,
+            to,
+            fixes,
+        });
     }
     found
+}
+
+/// The protocol's range from `from` to `to`.
+pub(super) fn ranged(from: Position, to: Position) -> String {
+    format!(
+        "{{\"start\":{{\"line\":{},\"character\":{}}},\
+         \"end\":{{\"line\":{},\"character\":{}}}}}",
+        from.0, from.1, to.0, to.1
+    )
 }
 
 fn diagnostic(

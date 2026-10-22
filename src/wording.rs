@@ -2189,6 +2189,17 @@ fn grouped(n: impl std::fmt::Display) -> String {
     out
 }
 
+/// `written` in double quotes, so YAML keeps it as written.
+pub(crate) fn kept_quoted(written: &str) -> String {
+    format!("\"{}\"", written.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// What a fix that writes `text` in place of what the problem is placed at
+/// is offered as.
+pub(crate) fn fix_written(text: &str) -> String {
+    format!("Write it as `{text}`")
+}
+
 pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
     match kind {
         Kind::BrokenLink {
@@ -2510,8 +2521,8 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             "Give each item a name with its fields beneath, or declare the field as `text`.".into(),
         ),
         Kind::NeedsQuotes { written, .. } => Some(format!(
-            "Write it as `\"{}\"` to keep it as written.",
-            written.replace('\\', "\\\\").replace('"', "\\\"")
+            "Write it as `{}` to keep it as written.",
+            kept_quoted(written)
         )),
         Kind::OneTagNotTwo { key, parts, .. } => Some(format!(
             "For {} tags, write `{key}: [{}]`.",
