@@ -6,7 +6,9 @@
 #[cfg(test)]
 mod tests;
 
-use crate::problem::{Chooser, Kind, Problem, Word};
+use crate::problem::{
+    AddressFault, ArgumentFault, Chooser, Hint, Instead, Kind, Problem, Stopped, Word,
+};
 use crate::source::{Place, Sources, Span};
 use crate::wording;
 
@@ -28,8 +30,8 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
     if problem.kind.of_a_whole_file() {
         return Vec::new();
     }
-    let whole = sources.text(place.source);
-    let Some(at) = whole.get(place.span.range()) else {
+    let file = sources.text(place.source);
+    let Some(at) = file.get(place.span.range()) else {
         return Vec::new();
     };
     // `written` where it stands once in what the problem is placed at, and
@@ -41,7 +43,7 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
             return None;
         }
         let start = place.span.start as usize + start;
-        if taken(whole, start, start + written.len(), text) {
+        if taken(file, start, start + written.len(), text) {
             return None;
         }
         Some(Fix {
@@ -53,29 +55,166 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
             text: text.to_owned(),
         })
     };
-    match &problem.kind {
+    // All that the problem is placed at, where that is `written`.
+    let whole = |written: &str, text: &str| {
+        let trimmed = at.trim();
+        if trimmed != written || trimmed.is_empty() || trimmed.contains('\n') {
+            return None;
+        }
+        let start = place.span.start as usize + (at.len() - at.trim_start().len());
+        Some(Fix {
+            title: wording::fix_written(text),
+            place: Place {
+                source: place.source,
+                span: Span::new(start, start + trimmed.len()),
+            },
+            text: text.to_owned(),
+        })
+    };
+    let fix = match &problem.kind {
         Kind::UnknownWord {
             written,
             nearest: Some(nearest),
             ..
-        } => respelt(written, nearest).into_iter().collect(),
-        Kind::ReadAsYourOwn {
+        }
+        | Kind::NamesNothing {
+            written,
+            nearest: Some(nearest),
+            ..
+        }
+        | Kind::UnknownCodeLanguage {
+            written,
+            nearest: Some(nearest),
+        }
+        | Kind::MissingDefinition {
+            written,
+            nearest: Some(nearest),
+        }
+        | Kind::UnknownProblemName {
+            written,
+            suggestion: Some(nearest),
+        }
+        | Kind::UnusableAddress {
+            fault:
+                AddressFault::UnknownPiece {
+                    written,
+                    nearest: Some(nearest),
+                },
+        }
+        | Kind::TextNeverShown {
+            block: written,
+            nearest: Some(nearest),
+            ..
+        }
+        | Kind::MissingData {
+            table: written,
+            nearest: Some(nearest),
+            ..
+        }
+        | Kind::WrongArgument {
+            fault:
+                ArgumentFault::NoSuchName {
+                    given: written,
+                    nearest: Some(nearest),
+                },
+            ..
+        }
+        | Kind::TemplateStopped {
+            reason:
+                Stopped::NoSuchArgument {
+                    name: written,
+                    nearest: Some(nearest),
+                    ..
+                },
+        }
+        | Kind::PageInSnippet {
+            written,
+            handed: nearest,
+            ..
+        }
+        | Kind::ReadAsYourOwn {
             written, nearest, ..
-        } => respelt(written, nearest).into_iter().collect(),
+        } => respelt(written, nearest),
+        Kind::NoValue {
+            written,
+            instead:
+                Instead::Handed(instead) | Instead::Default(instead) | Instead::Headline(instead),
+            ..
+        } => respelt(written, instead),
+        Kind::AlwaysFalse { name, meant } => {
+            let on = meant.rsplit_once('.').map_or("", |(on, _)| on);
+            respelt(&format!("{on}.{name}"), meant)
+        }
+        Kind::MissingContentFolder {
+            folder,
+            nearest: Some(nearest),
+            ..
+        } => {
+            let folder = folder.strip_prefix("content/").unwrap_or(folder);
+            respelt(&format!("folder.{}", folder.trim_end_matches('/')), nearest)
+        }
+        Kind::MissingAnchor {
+            id,
+            suggestion: Some(suggestion),
+            ..
+        } => respelt(&format!("#{id}"), suggestion),
+        Kind::FootnoteNeverShown {
+            label,
+            nearest: Some(nearest),
+        } => respelt(&format!("[^{label}]"), &format!("[^{nearest}]")),
+        // The spaces after the colon go with it, as `=` is written.
+        Kind::ColonInCall { name } => {
+            respelt(&format!("{name}:"), &format!("{name}=")).map(|mut fix| {
+                let end = fix.place.span.end as usize;
+                let after = &file[end..];
+                let spaces = after.len() - after.trim_start_matches([' ', '\t']).len();
+                fix.place.span = Span::new(fix.place.span.start as usize, end + spaces);
+                fix
+            })
+        }
+        Kind::CallInHtml { name } => respelt(&format!("@{name}"), &format!("\\@{name}")),
+        Kind::MissingFile {
+            path,
+            hint: Some(Hint::Closest(name)),
+        } => {
+            // The path as far up as the name gives one.
+            let parts = name.split('/').count();
+            let from = (path.rmatch_indices('/').nth(parts - 1)).map_or(0, |(at, _)| at + 1);
+            respelt(&path[from..], name)
+        }
         // Front matter in TOML is rewritten, not respelt.
         Kind::OtherSpelling {
             word: Word::Marker,
             written,
             ..
-        } if written == "+++" => Vec::new(),
-        Kind::OtherSpelling { written, ours, .. } => respelt(written, ours).into_iter().collect(),
-        Kind::NeedsQuotes { written, .. } => {
-            let quoted = wording::kept_quoted(written);
-            respelt(written, &quoted).into_iter().collect()
+        } if written == "+++" => None,
+        Kind::OtherSpelling { written, ours, .. } => respelt(written, ours),
+        Kind::NeedsQuotes { written, .. } => respelt(written, &wording::kept_quoted(written)),
+        Kind::UnclearDate { written, readings } => {
+            return (readings.iter())
+                .filter_map(|(iso, _)| respelt(written, iso))
+                .collect();
         }
-        Kind::UnclearDate { written, readings } => (readings.iter())
-            .filter_map(|(iso, _)| respelt(written, iso))
-            .collect(),
+        Kind::WrongKind {
+            respelt: Some(respelt),
+            ..
+        } => whole(at.trim(), respelt),
+        Kind::OneTagNotTwo { tag, parts, .. } => whole(tag, &format!("[{}]", parts.join(", "))),
+        Kind::TemplateStopped {
+            reason:
+                Stopped::NoMethod {
+                    name,
+                    filter: Some(filter),
+                    ..
+                },
+        } => {
+            // The method as written, its receiver and what it was handed
+            // being as the filter has them, where a filter handed nothing
+            // goes without brackets.
+            let (receiver, handed) = filter.rsplit_once(&format!(" | {name}")).unzip();
+            let handed = handed.filter(|handed| !handed.is_empty()).unwrap_or("()");
+            receiver.and_then(|receiver| whole(&format!("{receiver}.{name}{handed}"), filter))
+        }
         Kind::MissingTemplate {
             path,
             chosen: Chooser::Written,
@@ -84,25 +223,18 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
             let name = path.strip_prefix("templates/").unwrap_or(path);
             let name = name.strip_suffix(".html").unwrap_or(name);
             let nearest = nearest.strip_suffix(".html").unwrap_or(nearest);
-            respelt(name, nearest).into_iter().collect()
+            respelt(name, nearest)
         }
         Kind::BrokenLink {
             target,
             suggestion: Some(suggestion),
             ..
         } if writes(at.trim(), base).as_deref() == Some(target.trim()) => {
-            let start = place.span.start as usize + (at.len() - at.trim_start().len());
-            vec![Fix {
-                title: wording::fix_written(suggestion),
-                place: Place {
-                    source: place.source,
-                    span: Span::new(start, start + at.trim().len()),
-                },
-                text: suggestion.clone(),
-            }]
+            whole(at.trim(), suggestion)
         }
-        _ => Vec::new(),
-    }
+        _ => None,
+    };
+    fix.into_iter().collect()
 }
 
 /// The address `at` links to, where it is written whole: as an address,
