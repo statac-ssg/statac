@@ -1,7 +1,14 @@
 //! What the unit tests share: folders of their own to write into.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
+
+/// How many paths [`Scratch::named`] has handed out in each run's folder
+/// that are still held. The folder stays while any is: a test making its
+/// path, or the folders above it, mustn't find it gone.
+static HELD: Mutex<BTreeMap<PathBuf, usize>> = Mutex::new(BTreeMap::new());
 
 /// A folder of a test's own in the system's temporary folder, empty when
 /// made and removed when dropped.
@@ -26,9 +33,13 @@ impl Scratch {
     pub(crate) fn named(suite: &str, label: &str) -> Scratch {
         let run = std::env::temp_dir().join(format!("statac-{suite}-{}", std::process::id()));
         let path = run.join(label);
+        {
+            let mut held = HELD.lock().unwrap_or_else(PoisonError::into_inner);
+            std::fs::create_dir_all(&run).unwrap();
+            *held.entry(run.clone()).or_default() += 1;
+        }
         let _ = std::fs::remove_dir_all(&path);
         let _ = std::fs::remove_file(&path);
-        std::fs::create_dir_all(&run).unwrap();
         Scratch(path, Some(run))
     }
 
@@ -61,7 +72,15 @@ impl Drop for Scratch {
         let _ = std::fs::remove_dir_all(&self.0);
         let _ = std::fs::remove_file(&self.0);
         if let Some(run) = &self.1 {
-            let _ = std::fs::remove_dir(run);
+            let mut held = HELD.lock().unwrap_or_else(PoisonError::into_inner);
+            let Some(count) = held.get_mut(run) else {
+                return;
+            };
+            *count -= 1;
+            if *count == 0 {
+                held.remove(run);
+                let _ = std::fs::remove_dir(run);
+            }
         }
     }
 }
@@ -96,4 +115,16 @@ impl TempSite {
         }
         site
     }
+}
+
+#[test]
+fn a_runs_folder_stays_while_a_path_in_it_is_held() {
+    let run = std::env::temp_dir().join(format!("statac-held-{}", std::process::id()));
+    let first = Scratch::named("held", "first");
+    let second = Scratch::named("held", "second");
+    drop(first);
+    assert!(run.is_dir());
+    std::fs::create_dir(&*second).unwrap();
+    drop(second);
+    assert!(!run.exists());
 }
