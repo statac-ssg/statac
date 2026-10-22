@@ -20,6 +20,7 @@ fn run(drafts: bool) -> Run {
         today: Some(crate::date::Date::day_only(2026, 10, 4)),
         drafts,
         url: None,
+        renamed: Vec::new(),
     }
 }
 

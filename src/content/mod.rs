@@ -50,6 +50,9 @@ pub struct Run {
     /// The site's address for this run, in place of `url`, where one was
     /// given.
     pub url: Option<String>,
+    /// Files and folders under `content/` read as if renamed, each from its
+    /// path there to the path it is read at.
+    pub renamed: Vec<(String, String)>,
 }
 
 /// What reading a site found.
@@ -173,7 +176,7 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
         .collect();
     // A folder with no `content/` has no pages; whether it is a site at
     // all is for the command to say.
-    let (folders, found) = scan(root, &real, &left_behind, &mut problems);
+    let (folders, found) = scan(root, &real, &left_behind, &run.renamed, &mut problems);
     let language_folders = language_folders(&site, &settings, &folders, &mut problems);
     for (rel, id) in &language_folders {
         site.languages.get_mut(*id).folder = Some(rel.trim_end_matches('/').to_owned());
@@ -370,6 +373,7 @@ fn scan(
     root: &Path,
     real: &Path,
     left_behind: &HashSet<&str>,
+    renamed: &[(String, String)],
     problems: &mut Vec<Problem>,
 ) -> (Vec<Folder>, HashMap<String, String>) {
     let files = crate::assets::walk(root, real, "content", false, problems);
@@ -377,6 +381,7 @@ fn scan(
     let mut at_path: HashMap<String, usize> = HashMap::from([(String::new(), 0)]);
     let mut found = HashMap::new();
     for (rel, at) in files {
+        let rel = renamed_to(rel, renamed);
         let pieces: Vec<&str> = rel.split('/').collect();
         if pieces.iter().any(|piece| left_behind.contains(piece)) {
             continue;
@@ -406,6 +411,22 @@ fn scan(
         found.insert(rel, at);
     }
     (folders, found)
+}
+
+/// The path under `content/` the file at `rel` there is read at: as
+/// `renamed` has it, where it names the file or a folder it is in.
+pub(crate) fn renamed_to(rel: String, renamed: &[(String, String)]) -> String {
+    for (from, to) in renamed {
+        if rel == *from {
+            return to.clone();
+        }
+        if let Some(rest) = rel.strip_prefix(from.as_str())
+            && rest.starts_with('/')
+        {
+            return format!("{to}{rest}");
+        }
+    }
+    rel
 }
 
 /// The folders at the top of `content/` that hold a language's pages, on a

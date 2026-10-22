@@ -12,6 +12,7 @@ fn site_with(files: &[(&str, &str)], drafts: bool) -> Read {
         today: Some(crate::date::Date::day_only(2026, 10, 4)),
         drafts,
         url: None,
+        renamed: Vec::new(),
     };
     read(&TempSite::site(files).root, &run)
 }

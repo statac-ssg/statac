@@ -12,7 +12,9 @@
 //! settings, in front matter, in the writing and in templates, and goes
 //! to where what it names is written. It lists a
 //! page's headings, and finds the site's pages by title and its snippets
-//! and templates by name.
+//! and templates by name. Renaming a page's file, or a folder of pages,
+//! it keeps every link to the pages moved leading to them, and sends
+//! readers on from the addresses they leave.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
@@ -22,6 +24,7 @@ mod diagnostics;
 mod fixes;
 mod hover;
 mod references;
+mod rename;
 mod symbols;
 #[cfg(test)]
 mod tests;
@@ -282,7 +285,9 @@ impl Server<'_> {
                      \"hoverProvider\":true,\"definitionProvider\":true,\
                      \"referencesProvider\":true,\"documentSymbolProvider\":true,\
                      \"workspaceSymbolProvider\":true,\
-                     \"codeActionProvider\":{{\"codeActionKinds\":[\"quickfix\"]}}}},\
+                     \"codeActionProvider\":{{\"codeActionKinds\":[\"quickfix\"]}},\
+                     \"workspace\":{{\"fileOperations\":{{\"willRename\":{{\"filters\":[\
+                     {{\"scheme\":\"file\",\"pattern\":{{\"glob\":\"**/content/**\"}}}}]}}}}}}}},\
                      \"serverInfo\":{{\"name\":\"statac\",\"version\":{}}}}}",
                     self.encoding.name(),
                     json::string(env!("CARGO_PKG_VERSION")),
@@ -307,6 +312,10 @@ impl Server<'_> {
             }
             "textDocument/codeAction" => {
                 let result = self.actions(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
+            "workspace/willRenameFiles" => {
+                let result = self.will_rename(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
             "textDocument/documentSymbol" => {
@@ -683,6 +692,70 @@ impl Server<'_> {
             }
         }
         Ok(format!("[{}]", offered.join(",")))
+    }
+
+    /// The edits that keep every link in a site leading to the pages that
+    /// renaming the request's files and folders moves, and send readers on
+    /// from the addresses they leave, as the protocol's edit to the files
+    /// as they are before the renaming; `null` where there are none.
+    fn will_rename(&mut self, message: &Message) -> std::io::Result<String> {
+        let Some(Value::Sequence(files)) = message.at(&["params", "files"]).map(|n| &n.value)
+        else {
+            return Ok("null".to_owned());
+        };
+        let mut moves: BTreeMap<PathBuf, Vec<(String, String)>> = BTreeMap::new();
+        for file in files {
+            let path = |key| match file.get(key).map(|node| &node.value) {
+                Some(Value::Scalar(at)) => uri::path(at),
+                _ => None,
+            };
+            let (Some(from), Some(to)) = (path("oldUri"), path("newUri")) else {
+                continue;
+            };
+            let Some(folder) = site_of(&from) else {
+                continue;
+            };
+            let (Ok(old), Ok(new)) = (from.strip_prefix(&folder), to.strip_prefix(&folder)) else {
+                continue;
+            };
+            let slashed = |path: &Path| path.to_string_lossy().replace('\\', "/");
+            moves
+                .entry(folder)
+                .or_default()
+                .push((slashed(old), slashed(new)));
+        }
+        let mut changes: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (folder, moves) in moves {
+            let Some(site) = self.sites.get(&folder) else {
+                continue;
+            };
+            // Renamed as the site stands, with all that is typed.
+            if site.due.is_some() {
+                self.check(&folder)?;
+            }
+            let Some(renderer) =
+                (self.sites.get(&folder)).and_then(|site| site.checking.renderer())
+            else {
+                continue;
+            };
+            let unsaved = Unsaved::new(self.open.clone());
+            let sources = renderer.sources();
+            for (place, text) in rename::renamed(renderer, &folder, unsaved, &moves) {
+                let file = folder.join(sources.path(place.source));
+                changes.entry(uri::of(&file)).or_default().push(format!(
+                    "{{\"range\":{},\"newText\":{}}}",
+                    diagnostics::range(sources, place, self.encoding),
+                    json::string(&text)
+                ));
+            }
+        }
+        if changes.is_empty() {
+            return Ok("null".to_owned());
+        }
+        let changes: Vec<String> = (changes.iter())
+            .map(|(uri, edits)| format!("{}:[{}]", json::string(uri), edits.join(",")))
+            .collect();
+        Ok(format!("{{\"changes\":{{{}}}}}", changes.join(",")))
     }
 
     /// The headings of the page a request names, as the protocol's

@@ -984,3 +984,57 @@ fn a_problem_with_one_exact_answer_is_fixed_by_the_edit_while_its_text_stands() 
     assert!(fixes("6").is_empty());
     assert!(fixes("7").is_empty());
 }
+
+#[test]
+fn renaming_a_pages_file_answers_with_the_edits_that_keep_its_links() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        ("content/about.md", "---\ntitle: About\n---\nA page.\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\nSee [about](/about/).\n",
+        ),
+    ]);
+    let about = site.root.join("content/about.md");
+    let post = site.root.join("content/post-1.md");
+    let rename = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"workspace/willRenameFiles\",\
+         \"params\":{{\"files\":[{{\"oldUri\":{},\"newUri\":{}}}]}}}}",
+        json::string(&uri::of(&about)),
+        json::string(&uri::of(&site.root.join("content/about-us.md")))
+    );
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    let mark = editor.mark();
+    editor.send_all(&[&opened(&post), &rename]);
+    editor.until(mark, |message| message.id() == Some("2"));
+    let (sent, _) = editor.end(true);
+    let offered = sent[0].at(&["result", "capabilities", "workspace", "fileOperations"]);
+    assert_eq!(
+        sent[0].sources.spelling(offered.unwrap().place),
+        "{\"willRename\":{\"filters\":[{\"scheme\":\"file\",\"pattern\":{\"glob\":\"**/content/**\"}}]}}"
+    );
+    let answer = (sent.iter())
+        .find(|message| message.id() == Some("2"))
+        .expect("the edits");
+    let edits = answer
+        .sources
+        .spelling(answer.at(&["result"]).unwrap().place);
+    let edit = |file: &Path, line: usize, start: usize, end: usize, text: &str| {
+        format!(
+            "{}:[{{\"range\":{{\"start\":{{\"line\":{line},\"character\":{start}}},\
+             \"end\":{{\"line\":{line},\"character\":{end}}}}},\"newText\":{}}}]",
+            json::string(&uri::of(file)),
+            json::string(text)
+        )
+    };
+    assert_eq!(
+        edits,
+        format!(
+            "{{\"changes\":{{{},{}}}}}",
+            edit(&about, 2, 0, 0, "redirect_from: [/about/]\n"),
+            edit(&post, 3, 12, 19, "/about-us/"),
+        )
+    );
+}

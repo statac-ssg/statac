@@ -1972,6 +1972,7 @@ fn a_lists_feed_is_answered_by_the_feeds_the_build_publishes() {
         today: Some(crate::date::Date::day_only(2026, 10, 4)),
         drafts: false,
         url: None,
+        renamed: Vec::new(),
     };
     let home = |published: bool| {
         let (mut site, assets, feeds) = crate::build::read(&temp.root, &run);

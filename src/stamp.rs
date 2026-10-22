@@ -702,6 +702,7 @@ pub fn run(options: &Options) -> Outcome {
         today: options.today,
         drafts: false,
         url: None,
+        renamed: Vec::new(),
     };
     let prepared = build::prepared(&options.site, &run);
     let fixed = options.today.is_some();

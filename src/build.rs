@@ -79,6 +79,7 @@ impl Options {
             today: self.today,
             drafts: self.drafts,
             url: self.url.clone(),
+            renamed: Vec::new(),
         }
     }
 }
@@ -317,6 +318,7 @@ pub fn renderer(site: &Path, today: Option<Date>) -> (Renderer, Vec<Problem>) {
         today,
         drafts: false,
         url: None,
+        renamed: Vec::new(),
     };
     let prepared = prepared(site, &run);
     (prepared.renderer, prepared.problems)

@@ -82,6 +82,7 @@ pub fn run(options: &Options) -> Outcome {
         today: options.today,
         drafts: options.drafts,
         url: None,
+        renamed: Vec::new(),
     };
     let prepared = crate::build::prepared(&options.site, &run);
     let errors: Vec<Problem> = (prepared.problems.into_iter())

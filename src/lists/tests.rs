@@ -29,6 +29,7 @@ fn read_on(files: &[(&str, &str)], today: Date, drafts: bool) -> Read {
             today: Some(today),
             drafts,
             url: None,
+            renamed: Vec::new(),
         },
     );
     let _ = std::fs::remove_dir_all(&root);

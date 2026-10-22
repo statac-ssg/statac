@@ -25,6 +25,97 @@ pub(super) enum Written {
     File(String),
 }
 
+/// A link to what is sought, as it is written.
+pub(super) struct Link {
+    pub place: Place,
+    /// The page it is written in; none in a template.
+    pub from: Option<PageId>,
+    /// Whether it is handed an address from the top of the site, without
+    /// the path the site is published under, as `@url(...)` and `url(...)`
+    /// are.
+    pub helper: bool,
+}
+
+/// Every link in the site's writing and templates that leads to one of
+/// `files`, the files the site publishes, and where `id` is given, to the
+/// heading with that id.
+pub(super) fn links(renderer: &Renderer, files: Vec<String>, id: Option<&str>) -> Vec<Link> {
+    let site = renderer.site();
+    let follow = links::Site::new(renderer.settings(), files);
+    let leads = |written: &str, from: &str| {
+        let Some((_, fragment)) = follow.lands_on(written, from) else {
+            return false;
+        };
+        match (id, fragment) {
+            (None, _) => true,
+            (Some(id), Some(fragment)) => fragment == id || address::decoded(&fragment) == id,
+            (Some(_), None) => false,
+        }
+    };
+    let sources = renderer.sources();
+    let mut found = Vec::new();
+    let base = renderer.settings().base();
+    for (other, held) in site.pages.iter() {
+        let Some(writing) = renderer.writing(other) else {
+            continue;
+        };
+        let from = format!("{base}{}", held.address.as_str());
+        // Any text can be handed to a call; one that isn't written as an
+        // address is taken as something else.
+        let handed = (writing.handed.iter())
+            .filter(|linked| linked.address.contains('/') || linked.address.starts_with('#'));
+        for linked in writing.written.iter().chain(handed) {
+            if leads(&linked.address, &from) {
+                found.push(Link {
+                    place: linked.place,
+                    from: Some(other),
+                    helper: sources.spelling(linked.place).starts_with("@url("),
+                });
+            }
+        }
+    }
+    let top = format!("{base}/");
+    for (_, source, _) in renderer.templates() {
+        let text = sources.text(source);
+        let path = sources.path(source).to_string_lossy().replace('\\', "/");
+        for (address, at) in links::fixed(text) {
+            if leads(&address, &top) {
+                let span = Span::new(at.start, at.end);
+                found.push(Link {
+                    place: Place { source, span },
+                    from: None,
+                    helper: false,
+                });
+            }
+        }
+        let mut from = 0;
+        while let Some(at) = text[from..].find("url(") {
+            from += at + "url(".len();
+            let Some(quote) = text[from..].find(|c: char| !c.is_whitespace()) else {
+                break;
+            };
+            let quote = from + quote;
+            if !text[quote..].starts_with(['"', '\'']) {
+                continue;
+            }
+            let Some(Pointed::Address { range, address }) =
+                pointed(text, quote + 1, &path, renderer)
+            else {
+                continue;
+            };
+            if leads(&format!("{base}{address}"), &top) {
+                let span = Span::new(range.start, range.end);
+                found.push(Link {
+                    place: Place { source, span },
+                    from: None,
+                    helper: true,
+                });
+            }
+        }
+    }
+    found
+}
+
 /// What links are sought to.
 enum Sought {
     Page(PageId),
@@ -49,73 +140,16 @@ pub(super) fn found(
         Sought::Page(page) => (*page, None),
         Sought::Heading(page, id, _) => (*page, Some(id.as_str())),
     };
-    let site = renderer.site();
-    let follow = links::Site::new(renderer.settings(), files(renderer, page));
-    let leads = |written: &str, from: &str| {
-        let Some((_, fragment)) = follow.lands_on(written, from) else {
-            return false;
-        };
-        match (id, fragment) {
-            (None, _) => true,
-            (Some(id), Some(fragment)) => fragment == id || address::decoded(&fragment) == id,
-            (Some(_), None) => false,
-        }
-    };
     let mut found = Vec::new();
     if declaration {
-        found.push(match sought {
-            Sought::Page(page) => Written::File(renderer.page_path(page)),
-            Sought::Heading(_, _, place) => Written::At(place),
+        found.push(match &sought {
+            Sought::Page(page) => Written::File(renderer.page_path(*page)),
+            Sought::Heading(_, _, place) => Written::At(*place),
         });
     }
-    let base = renderer.settings().base();
-    for (other, held) in site.pages.iter() {
-        let Some(writing) = renderer.writing(other) else {
-            continue;
-        };
-        let from = format!("{base}{}", held.address.as_str());
-        // Any text can be handed to a call; one that isn't written as an
-        // address is taken as something else.
-        let handed = (writing.handed.iter())
-            .filter(|linked| linked.address.contains('/') || linked.address.starts_with('#'));
-        for linked in writing.written.iter().chain(handed) {
-            if leads(&linked.address, &from) {
-                found.push(Written::At(linked.place));
-            }
-        }
-    }
-    let top = format!("{base}/");
+    let linked = links(renderer, files(renderer, page), id);
+    found.extend(linked.into_iter().map(|link| Written::At(link.place)));
     let sources = renderer.sources();
-    for (_, source, _) in renderer.templates() {
-        let text = sources.text(source);
-        let path = sources.path(source).to_string_lossy().replace('\\', "/");
-        for (address, at) in links::fixed(text) {
-            if leads(&address, &top) {
-                let span = Span::new(at.start, at.end);
-                found.push(Written::At(Place { source, span }));
-            }
-        }
-        let mut from = 0;
-        while let Some(at) = text[from..].find("url(") {
-            from += at + "url(".len();
-            let Some(quote) = text[from..].find(|c: char| !c.is_whitespace()) else {
-                break;
-            };
-            let quote = from + quote;
-            if !text[quote..].starts_with(['"', '\'']) {
-                continue;
-            }
-            let Some(Pointed::Address { range, address }) =
-                pointed(text, quote + 1, &path, renderer)
-            else {
-                continue;
-            };
-            if leads(&format!("{base}{address}"), &top) {
-                let span = Span::new(range.start, range.end);
-                found.push(Written::At(Place { source, span }));
-            }
-        }
-    }
     let key = |written: &Written| match written {
         Written::At(place) => (sources.path(place.source).to_path_buf(), place.span.start),
         Written::File(path) => (path.into(), 0),

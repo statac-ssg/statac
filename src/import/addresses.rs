@@ -257,6 +257,7 @@ fn published(folder: &Path, today: Date, starter: bool) -> HashMap<String, Strin
             today: Some(today),
             drafts: true,
             url: None,
+            renamed: Vec::new(),
         },
         starter,
     );
@@ -307,6 +308,7 @@ pub(super) fn send_on_to_tags_and_series(
             today: Some(today),
             drafts: true,
             url: None,
+            renamed: Vec::new(),
         },
         out.starter,
     );
@@ -467,6 +469,7 @@ pub(super) fn send_on_to_later_pages(
             today: Some(today),
             drafts: false,
             url: None,
+            renamed: Vec::new(),
         },
         out.starter,
     );
@@ -577,6 +580,7 @@ pub(super) fn send_on_to_list_pages(
             today: Some(today),
             drafts: false,
             url: None,
+            renamed: Vec::new(),
         },
         out.starter,
     );
@@ -721,6 +725,7 @@ fn landing(folder: &Path, today: Date) -> Landed {
             today: Some(today),
             drafts: true,
             url: None,
+            renamed: Vec::new(),
         },
     );
     read.site
@@ -746,6 +751,7 @@ fn folders_own(folder: &Path, today: Date) -> HashSet<String> {
             today: Some(today),
             drafts: true,
             url: None,
+            renamed: Vec::new(),
         },
     );
     read.site
@@ -994,6 +1000,7 @@ pub(super) fn check(
             today: Some(today),
             drafts: false,
             url: None,
+            renamed: Vec::new(),
         },
         starter,
     );

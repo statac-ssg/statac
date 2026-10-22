@@ -40,6 +40,7 @@ fn feeds_of(settings: &str, files: &[(&str, &str)], folder: &str) -> Feeds {
         today: Some(crate::date::Date::day_only(2026, 10, 4)),
         drafts: false,
         url: None,
+        renamed: Vec::new(),
     };
     let read = crate::content::read(&root, &run);
     let _ = std::fs::remove_dir_all(&root);

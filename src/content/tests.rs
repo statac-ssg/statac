@@ -9,6 +9,7 @@ fn run_on(year: i32, month: u8, day: u8) -> Run {
         today: Some(Date::day_only(year, month, day)),
         drafts: false,
         url: None,
+        renamed: Vec::new(),
     }
 }
 
