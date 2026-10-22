@@ -3622,9 +3622,55 @@ pub(crate) fn hover_template(name: &str) -> String {
     format!("`{name}`, a template")
 }
 
-/// Where an editor's hover says a template's file is.
-pub(crate) fn template_file(path: &str) -> String {
+/// Where an editor's hover says the file of a template, a page or a
+/// snippet is.
+pub(crate) fn its_file(path: &str) -> String {
     format!("Its file is `{path}`.")
+}
+
+/// What an editor's hover says a page of the site is.
+pub(crate) fn hover_page(address: &str) -> String {
+    format!("`{address}`, a page")
+}
+
+/// What an editor's hover says a page's title is.
+pub(crate) fn titled(title: &str) -> String {
+    format!("Its title is `{title}`.")
+}
+
+/// What an editor's hover says a heading of a page is.
+pub(crate) fn hover_heading(address: &str) -> String {
+    format!("`{address}`, a heading")
+}
+
+/// What an editor's hover says a heading's words are.
+pub(crate) fn heading_words(words: &str) -> String {
+    format!("Its words are `{words}`.")
+}
+
+/// Which page an editor's hover says a heading is on, by its title and
+/// the path of its file.
+pub(crate) fn heading_on(title: &str, path: &str) -> String {
+    format!("It is on the page `{title}`, in `{path}`.")
+}
+
+/// What an editor's hover says one of the site's snippets is, as a call
+/// to it is written: `figure(photo, alt)`.
+pub(crate) fn hover_snippet(call: &str) -> String {
+    format!("`{call}`, a snippet")
+}
+
+/// What an editor's hover says of a snippet that wraps the writing below
+/// a call to it.
+pub(crate) const WRAPS_WRITING: &str = "It wraps the writing below the call, up to `@end`.";
+
+/// What an editor's hover says a file beside the page is: a picture, or
+/// any other file.
+pub(crate) fn hover_beside(name: &str, picture: bool) -> String {
+    match picture {
+        true => format!("`{name}`, a picture beside the page"),
+        false => format!("`{name}`, a file beside the page"),
+    }
 }
 
 /// What `build` says after a fault of Statac's own that came before the

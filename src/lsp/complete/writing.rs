@@ -444,7 +444,7 @@ impl Offer<'_> {
 
 /// The name a call's value without a name at `place` is given, as the
 /// snippet's `takes` line has it, or as the one name it reads.
-fn unnamed(snippet: &Snippet, place: usize) -> Option<String> {
+pub(in crate::lsp) fn unnamed(snippet: &Snippet, place: usize) -> Option<String> {
     match &snippet.takes {
         Some(Takes::InOrder(names)) => names.get(place).cloned(),
         Some(Takes::AnyNumberOf(name)) => Some(name.clone()),
@@ -455,7 +455,7 @@ fn unnamed(snippet: &Snippet, place: usize) -> Option<String> {
 
 /// What a snippet takes, as its call is shown in the list: the names its
 /// `takes` line gives, or the one name it reads.
-pub(super) fn takes_written(snippet: &Snippet) -> String {
+pub(in crate::lsp) fn takes_written(snippet: &Snippet) -> String {
     match &snippet.takes {
         Some(Takes::InOrder(names)) => names.join(", "),
         Some(Takes::AnyNumberOf(name)) => format!("{name}..."),

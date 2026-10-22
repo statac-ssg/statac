@@ -6,7 +6,7 @@ pub(super) mod spot;
 mod template;
 #[cfg(test)]
 mod tests;
-mod writing;
+pub(super) mod writing;
 
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -250,7 +250,7 @@ fn value_written(value: &str, text: bool, flow: bool, quote: Option<char>, space
 pub(super) struct Known<'a> {
     pub renderer: Option<&'a Renderer>,
     /// The page being written, where the site as last read holds it.
-    page: Option<PageId>,
+    pub page: Option<PageId>,
     /// The language of the page being written, where the site as last
     /// read tells it.
     pub language: Option<LanguageId>,

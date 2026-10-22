@@ -1,10 +1,13 @@
-//! Hover: what the word under the editor's pointer is, in the site's
+//! Hover: what the word under the editor's pointer is. In the site's
 //! settings and in a page's front matter: what each of Statac's words
 //! does, what a value of the author's own is, and what the site holds of
-//! a tag, a series or a template a page names.
+//! a tag, a series or a template a page names. In the writing: the page
+//! a link leads to, the snippet a call names and the file beside the page
+//! a picture or a call's value names.
 
 #[cfg(test)]
 mod tests;
+mod writing;
 
 use std::ops::Range;
 use std::path::Path;
@@ -46,6 +49,15 @@ impl Said {
             more: Some(described.more.to_owned()),
         }
     }
+
+    fn placed(self, range: Range<usize>) -> Hover {
+        Hover {
+            range,
+            head: self.head,
+            body: self.body,
+            more: self.more,
+        }
+    }
 }
 
 /// What the file being read holds.
@@ -68,10 +80,19 @@ pub(super) fn hover(
     let rel = file.strip_prefix(site).ok()?;
     let rel = rel.to_string_lossy().replace('\\', "/");
     let offset = text.floor_char_boundary(offset.min(text.len()));
+    let site = Known::of(known, &rel);
     let (holds, span) = match rel.as_str() {
         crate::config::FILE_NAME => (Holds::Settings, Span::new(0, text.len())),
         _ if rel.starts_with("content/") && rel.ends_with(".md") => {
             let yaml = match crate::yaml::split(text) {
+                Ok(split)
+                    if split
+                        .front_matter
+                        .is_none_or(|yaml| offset >= yaml.end as usize) =>
+                {
+                    let (range, said) = writing::said(&site, &rel, text, split.body, offset)?;
+                    return Some(said.placed(range));
+                }
                 Ok(split) => split.front_matter?,
                 Err(unclosed) => unclosed.rest,
             };
@@ -82,7 +103,6 @@ pub(super) fn hover(
     let mut sources = Sources::default();
     let source = sources.add(rel.as_str(), text.to_owned());
     let under = spot::under(&sources, Place { source, span }, offset)?;
-    let site = Known::of(known, &rel);
     let (range, said) = match under {
         Under::Name { path, span } => {
             let name = path.join(".");
@@ -107,12 +127,7 @@ pub(super) fn hover(
             (span, said?)
         }
     };
-    Some(Hover {
-        range,
-        head: said.head,
-        body: said.body,
-        more: said.more,
-    })
+    Some(said.placed(range))
 }
 
 /// What is said of `name` as a line of the site's settings.
@@ -237,7 +252,7 @@ fn value(site: &Known, name: &str, text: &str) -> Option<Said> {
             let (_, path) = (renderer.layouts().into_iter()).find(|(layout, _)| layout == text)?;
             Some(Said {
                 head: wording::hover_template(text),
-                body: vec![wording::template_file(&path)],
+                body: vec![wording::its_file(&path)],
                 more: None,
             })
         }

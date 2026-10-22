@@ -259,3 +259,126 @@ fn a_setting_for_one_language_says_what_it_is() {
         "https://statac.dev/dates-and-languages/#settings-for-one-language"
     );
 }
+
+fn writing_site() -> TempSite {
+    TempSite::site(&[
+        (
+            "statac.yaml",
+            "title: Site 1\nurl: https://example.org/blog/\n",
+        ),
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "snippets/figure.html",
+            "{# takes photo, alt #}\n{% set shown = page.photo(photo) %}\
+             {{ shown.alt }}{{ alt if alt is defined }}\n",
+        ),
+        ("snippets/note.html", "<aside>{{ body }}</aside>\n"),
+        ("content/about.md", "---\ntitle: About\n---\n## The team\n"),
+        (
+            "content/notes/note-1.md",
+            "---\ntitle: Note 1\n---\nA note.\n",
+        ),
+        (
+            "content/posts/post-1/index.md",
+            "---\ntitle: Post 1\n---\n## First\n",
+        ),
+        ("content/posts/post-1/photo-1.jpg", "not read"),
+        ("content/posts/post-1/notes.txt", "A file.\n"),
+    ])
+}
+
+/// What is said of the character after the cursor, written `|`, in
+/// `writing` as the writing of `content/posts/post-1/index.md`.
+fn in_writing(site: &TempSite, writing: &str) -> Option<(Vec<String>, Option<String>, String)> {
+    let text = format!("---\ntitle: Post 1\n---\n## First\n\n{writing}\n");
+    said(site, "content/posts/post-1/index.md", &text)
+}
+
+#[test]
+fn a_link_says_what_it_leads_to() {
+    let site = writing_site();
+    let about = [
+        "`/blog/about/`, a page",
+        "Its title is `About`.",
+        "Its file is `content/about.md`.",
+    ];
+    let (lines, more, over) = in_writing(&site, "Read [about us](/blog/ab|out/).").unwrap();
+    assert_eq!(lines, about);
+    assert_eq!(over, "[about us](/blog/about/)");
+    assert_eq!(more, None);
+    let (lines, _, over) = in_writing(&site, "[about]: /blog/ab|out/").unwrap();
+    assert_eq!(lines, about);
+    assert_eq!(over, "[about]: /blog/about/");
+    let (lines, _, over) = in_writing(&site, "Read [about us](@url(/ab|out/)).").unwrap();
+    assert_eq!(over, "@url(/about/)");
+    assert_eq!(lines[0], "`/about/`, a page", "as written");
+    assert_eq!(lines[1..], about[1..]);
+    let (lines, ..) = in_writing(&site, "[A note](../../no|tes/note-1/)").unwrap();
+    assert_eq!(lines[0], "`../../notes/note-1/`, a page");
+    assert_eq!(lines[1], "Its title is `Note 1`.");
+    let (lines, ..) = in_writing(&site, "[The team](/blog/about/#the-te|am)").unwrap();
+    assert_eq!(
+        lines,
+        [
+            "`/blog/about/#the-team`, a heading",
+            "Its words are `The team`.",
+            "It is on the page `About`, in `content/about.md`.",
+        ]
+    );
+    let (lines, ..) = in_writing(&site, "[Up](#fi|rst)").unwrap();
+    assert_eq!(lines, ["`#first`, a heading", "Its words are `First`."]);
+}
+
+#[test]
+fn a_call_says_what_its_snippet_is_and_a_name_the_file_it_names() {
+    let site = writing_site();
+    let (lines, _, over) = in_writing(&site, "@fig|ure(\"photo-1.jpg\", alt=\"A\")").unwrap();
+    assert_eq!(over, "@figure(\"photo-1.jpg\", alt=\"A\")");
+    assert_eq!(
+        lines,
+        [
+            "`figure(photo, alt)`, a snippet",
+            "Its file is `snippets/figure.html`."
+        ]
+    );
+    let (lines, _, over) = in_writing(&site, "@figure(\"pho|to-1.jpg\", alt=\"A\")").unwrap();
+    assert_eq!(over, "\"photo-1.jpg\"");
+    assert_eq!(
+        lines,
+        [
+            "`photo-1.jpg`, a picture beside the page",
+            "Its file is `content/posts/post-1/photo-1.jpg`.",
+        ]
+    );
+    let (lines, _, over) = in_writing(&site, "![A photo](pho|to-1.jpg)").unwrap();
+    assert_eq!(over, "![A photo](photo-1.jpg)");
+    assert_eq!(lines[0], "`photo-1.jpg`, a picture beside the page");
+    let (lines, _, over) = in_writing(&site, "@no|te()\nA note.\n@end").unwrap();
+    assert_eq!(over, "@note()");
+    assert_eq!(
+        lines,
+        [
+            "`note()`, a snippet",
+            "Its file is `snippets/note.html`.",
+            "It wraps the writing below the call, up to `@end`.",
+        ]
+    );
+}
+
+#[test]
+fn nothing_is_said_where_the_writing_leads_nowhere_statac_knows() {
+    let site = writing_site();
+    let cases = [
+        "Some wo|rds.",
+        "`[About](/blog/ab|out/)`",
+        "[Another site](https://example.org/ot|her/)",
+        "[Gone](/blog/mis|sing/)",
+        "[About](/ab|out/)",
+        "@figure(\"pho|to-2.jpg\")",
+        "@fig|ures(\"photo-1.jpg\")",
+        "@note()\nA no|te.\n@end",
+    ];
+    for writing in cases {
+        assert_eq!(in_writing(&site, writing), None, "{writing:?}");
+    }
+}

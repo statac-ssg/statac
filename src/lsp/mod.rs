@@ -8,7 +8,7 @@
 //! last. It completes what is typed in the site's settings, in front
 //! matter, in the writing and in templates from what Statac takes there
 //! and what the site holds, and says what the word under the pointer is
-//! in the site's settings and in front matter.
+//! in the site's settings, in front matter and in the writing.
 //!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
