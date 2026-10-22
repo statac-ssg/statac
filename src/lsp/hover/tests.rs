@@ -226,7 +226,6 @@ fn nothing_is_said_of_what_statac_knows_nothing_of() {
             "content/posts/post-1.md",
             "---\ntitle: Post 1\npages.lay|out: post\n---\n",
         ),
-        ("templates/page.html", "{{ page.ti|tle }}\n"),
     ];
     for (path, text) in cases {
         assert_eq!(said(&site, path, text), None, "{path}: {text:?}");
@@ -380,5 +379,120 @@ fn nothing_is_said_where_the_writing_leads_nowhere_statac_knows() {
     ];
     for writing in cases {
         assert_eq!(in_writing(&site, writing), None, "{writing:?}");
+    }
+}
+
+fn template_site() -> TempSite {
+    TempSite::site(&[
+        (
+            "statac.yaml",
+            "title: Site 1\nurl: https://example.org/blog/\n",
+        ),
+        (
+            "templates/base.html",
+            "<title>{% block title %}{% endblock %}</title>\n{% block main %}{% endblock %}\n",
+        ),
+        (
+            "templates/page.html",
+            "{% extends \"base\" %}{% block main %}{{ page.content }}\
+             {% for post in site.posts %}{{ card(post) }}{% endfor %}{% endblock %}\n",
+        ),
+        ("snippets/card.html", "{# takes post #}\n{{ post.title }}\n"),
+        ("content/about.md", "---\ntitle: About\n---\nA page.\n"),
+        (
+            "content/posts/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-02\n---\nA post.\n",
+        ),
+    ])
+}
+
+#[test]
+fn a_name_or_field_in_a_template_says_what_it_holds() {
+    let site = template_site();
+    let page = "templates/page.html";
+    let cases = [
+        ("{{ pa|ge.title }}", "`page` holds a page", "page"),
+        ("{{ page.ti|tle }}", "`page.title` holds text", "title"),
+        ("{{ page.da|te.year }}", "`page.date` holds a date", "date"),
+        (
+            "{{ page.date.ye|ar }}",
+            "`page.date.year` holds a number",
+            "year",
+        ),
+        ("{{ site.po|sts }}", "`site.posts` holds pages", "posts"),
+        (
+            "{% set first = site.posts[0] %}{% set shown = fir|st %}",
+            "`first` holds a page",
+            "first",
+        ),
+        (
+            "{% for post in site.posts %}{{ po|st.title }}{% endfor %}",
+            "`post` holds a page",
+            "post",
+        ),
+        (
+            "{% for post in site.posts %}{% if lo|op.first %}{% endif %}{% endfor %}",
+            "`loop` holds fields",
+            "loop",
+        ),
+    ];
+    for (text, head, over) in cases {
+        let (lines, more, said_of) = said(&site, page, text).unwrap();
+        assert_eq!(lines, [head], "{text:?}");
+        assert_eq!((more, said_of.as_str()), (None, over), "{text:?}");
+    }
+    let (lines, ..) = said(&site, "snippets/card.html", "{{ po|st.title }}").unwrap();
+    assert_eq!(lines, ["`post` holds a page"], "as its calls hand it");
+}
+
+#[test]
+fn a_template_says_what_it_calls_and_names() {
+    let site = template_site();
+    let page = "templates/page.html";
+    let (lines, _, over) = said(&site, page, "{{ ca|rd(page) }}").unwrap();
+    assert_eq!(over, "card");
+    assert_eq!(
+        lines,
+        [
+            "`card(post)`, a snippet",
+            "Its file is `snippets/card.html`."
+        ]
+    );
+    let (lines, _, over) = said(&site, page, "<a href=\"{{ url(\"/ab|out/\") }}\">").unwrap();
+    assert_eq!(over, "\"/about/\"");
+    assert_eq!(
+        lines,
+        [
+            "`/about/`, a page",
+            "Its title is `About`.",
+            "Its file is `content/about.md`."
+        ]
+    );
+    let (lines, _, over) = said(&site, page, "{% extends \"ba|se\" %}").unwrap();
+    assert_eq!(over, "\"base\"");
+    assert_eq!(
+        lines,
+        ["`base`, a template", "Its file is `templates/base.html`."]
+    );
+}
+
+#[test]
+fn nothing_is_said_in_a_template_of_what_isnt_read_there() {
+    let site = template_site();
+    let cases = [
+        "<p>pa|ge</p>",
+        "{# {{ pa|ge }} #}",
+        "{% raw %}{{ pa|ge }}{% endraw %}",
+        "{{ page.title | up|per }}",
+        "{% i|f page.title %}{% endif %}",
+        "{% if page.title is def|ined %}{% endif %}",
+        "{{ ur|l('/about/') }}",
+        "{{ url(\"/mis|sing/\") }}",
+        "{{ page.title.up|per() }}",
+        "{{ nothi|ng }}",
+        "{% block ma|in %}{% endblock %}",
+    ];
+    for text in cases {
+        assert_eq!(said(&site, "templates/page.html", text), None, "{text:?}");
     }
 }

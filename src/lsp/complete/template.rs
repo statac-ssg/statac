@@ -133,6 +133,113 @@ pub(super) fn complete(
     Some(Completion::of(typed, items))
 }
 
+/// What the word or quoted text a hover points at in a template is.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(in crate::lsp) enum Pointed {
+    /// A name or a field the template reads, as written up to the word,
+    /// `post.title`, and what it holds.
+    Value {
+        range: Range<usize>,
+        written: String,
+        holds: Holds,
+    },
+    /// A call to the site's snippet `name`.
+    Snippet { range: Range<usize>, name: String },
+    /// The address `url(...)` is handed.
+    Address {
+        range: Range<usize>,
+        address: String,
+    },
+    /// The template `extends` names.
+    Extended { range: Range<usize>, name: String },
+}
+
+/// What the character at `offset` in `text`, the text of the site's
+/// template or snippet at `path`, is part of: a name or field the
+/// template reads where it stands, a snippet it calls, or an address or
+/// a template it names; none where it is anything else.
+pub(in crate::lsp) fn pointed(
+    text: &str,
+    offset: usize,
+    path: &str,
+    renderer: &Renderer,
+) -> Option<Pointed> {
+    let before = before(text, offset)?;
+    let close = if before.statement { "%}" } else { "}}" };
+    let end = closed(text, before.inner..text.len(), close).unwrap_or(text.len());
+    let tokens = lex(text, before.inner..end);
+    let at = (tokens.iter()).position(|lexed| lexed.span.contains(&offset))?;
+    let (ahead, lexed) = (&tokens[..at], &tokens[at]);
+    let range = lexed.span.clone();
+    let words: Vec<Token> = ahead.iter().map(|lexed| lexed.token).collect();
+    let word = match lexed.token {
+        Token::Text {
+            start,
+            closed: true,
+            ..
+        } => {
+            let named = text[start..range.end - 1].to_owned();
+            return match words.as_slice() {
+                [Token::Name("extends")] if before.statement => {
+                    Some(Pointed::Extended { range, name: named })
+                }
+                [.., Token::Mark("."), Token::Name("url"), Token::Mark("(")] => None,
+                [.., Token::Name("url"), Token::Mark("(")] => Some(Pointed::Address {
+                    range,
+                    address: named,
+                }),
+                _ => None,
+            };
+        }
+        Token::Name(word) => word,
+        _ => return None,
+    };
+    match words.as_slice() {
+        [] if before.statement => return None,
+        [.., Token::Mark("|") | Token::Name("is" | "not")] => return None,
+        [Token::Name("filter" | "block" | "extends" | "macro")] if before.statement => {
+            return None;
+        }
+        _ => {}
+    }
+    let offer = Offer {
+        text,
+        path,
+        renderer: Some(renderer),
+        snippets: false,
+    };
+    let start = range.start;
+    let found = match offer.readable(&before, ahead, start)? {
+        Readable::Fields(fields) if words.last() == Some(&Token::Mark(".")) => fields,
+        Readable::Names(names) if words.last() != Some(&Token::Mark(".")) => names,
+        _ => return None,
+    };
+    let Name { holds, .. } = found.into_iter().find(|name| name.name == word)?;
+    if holds == Holds::Call {
+        let snippets = renderer.snippets();
+        let called = (snippets.iter()).any(|(snippet, _)| snippet.name == word);
+        let ours = words.last() != Some(&Token::Mark("."));
+        return (called && ours).then(|| Pointed::Snippet {
+            range,
+            name: word.to_owned(),
+        });
+    }
+    // The fields leading to the word, back to the name they start from.
+    let mut from = at;
+    while from >= 2
+        && ahead[from - 1].token == Token::Mark(".")
+        && matches!(ahead[from - 2].token, Token::Name(_))
+    {
+        from -= 2;
+    }
+    let written = text[tokens[from].span.start..range.end].to_owned();
+    (holds != Holds::Unknown).then_some(Pointed::Value {
+        range,
+        written,
+        holds,
+    })
+}
+
 /// Whether a bracket follows the name `offset` is in.
 fn opened(text: &str, offset: usize) -> bool {
     text[offset..]
@@ -453,7 +560,7 @@ impl Offer<'_> {
             probe.push_str(" %}");
             if let Some(Token::Name(word)) = rest.first().map(|lexed| lexed.token)
                 && BLOCKS.contains(&word)
-                && !(word == "set" && in_rest(rest, "="))
+                && !(word == "set" && rest.iter().any(|lexed| lexed.token == Token::Mark("=")))
             {
                 open.push(word.to_owned());
             }

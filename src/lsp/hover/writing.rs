@@ -12,7 +12,7 @@ use crate::markdown::{self, Call, Document, Kind, Node};
 use crate::problem::Sort;
 use crate::site::PageId;
 use crate::source::{Sources, Span};
-use crate::templates::Renderer;
+use crate::templates::{Renderer, Snippet};
 use crate::wording;
 
 /// What is said of the character at `offset` in the writing at `body` of
@@ -83,16 +83,32 @@ fn innermost(document: &Document, offset: usize) -> Option<&Node> {
     found
 }
 
+/// What is said of the snippet `snippet`, whose file is at `path`, as a
+/// call to it is written: `wraps` where the call wraps the writing below
+/// it.
+pub(super) fn snippet_said(snippet: &Snippet, path: &str, wraps: bool) -> Said {
+    let mut body = vec![wording::its_file(path)];
+    if wraps {
+        body.push(wording::WRAPS_WRITING.to_owned());
+    }
+    let head = format!("{}({})", snippet.name, takes_written(snippet));
+    Said {
+        head: wording::hover_snippet(&head),
+        body,
+        more: None,
+    }
+}
+
 /// What the page's writing is read against.
-struct Reading<'a> {
-    renderer: &'a Renderer,
+pub(super) struct Reading<'a> {
+    pub renderer: &'a Renderer,
     /// The page being written, where the site as last read holds it.
-    page: Option<PageId>,
+    pub page: Option<PageId>,
     /// The folder under `content/` the page's file is in, ending with
     /// `/`, or empty at the top.
-    folder: &'a str,
+    pub folder: &'a str,
     /// The path the site is published under.
-    base: &'a str,
+    pub base: &'a str,
 }
 
 impl Reading<'_> {
@@ -125,18 +141,8 @@ impl Reading<'_> {
             };
             return Some((at.span.range(), self.beside(name, sort)?));
         }
-        let mut body = vec![wording::its_file(path)];
-        if call.wraps() {
-            body.push(wording::WRAPS_WRITING.to_owned());
-        }
-        let head = format!("{}({})", snippet.name, takes_written(snippet));
         let span = call.head.unwrap_or(node.place.span);
-        let said = Said {
-            head: wording::hover_snippet(&head),
-            body,
-            more: None,
-        };
-        Some((span.range(), said))
+        Some((span.range(), snippet_said(snippet, path, call.wraps())))
     }
 
     /// What is said of `name`, written as the address of a file beside the
@@ -158,7 +164,7 @@ impl Reading<'_> {
     /// What is said of `address`, as a link in the writing leads to it: the
     /// page, or the heading of a page, the site publishes there, named as
     /// `written`.
-    fn address(&self, address: &str, written: &str) -> Option<Said> {
+    pub(super) fn address(&self, address: &str, written: &str) -> Option<Said> {
         let site = self.renderer.site();
         let (path, heading) = match address.split_once('#') {
             Some((path, heading)) => (path, Some(heading)),

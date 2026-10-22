@@ -3628,6 +3628,27 @@ pub(crate) fn its_file(path: &str) -> String {
     format!("Its file is `{path}`.")
 }
 
+/// What an editor's hover says a name or field a template reads holds,
+/// `written` as the template writes it: `post.title`; none where that
+/// isn't known.
+pub(crate) fn hover_holds(written: &str, holds: Holds) -> Option<String> {
+    let held = match holds {
+        Holds::Text => "text",
+        Holds::Html => "HTML",
+        Holds::Number => "a number",
+        Holds::Truth => "true or false",
+        Holds::Date => "a date",
+        Holds::Page => "a page",
+        Holds::Pages => "pages",
+        Holds::List | Holds::Items => "a list",
+        Holds::Lists => "lists",
+        Holds::Fields => "fields",
+        Holds::Mentions => "webmentions",
+        Holds::Call | Holds::Unknown => return None,
+    };
+    Some(format!("`{written}` holds {held}"))
+}
+
 /// What an editor's hover says a page of the site is.
 pub(crate) fn hover_page(address: &str) -> String {
     format!("`{address}`, a page")

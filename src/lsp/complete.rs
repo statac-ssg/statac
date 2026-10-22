@@ -3,7 +3,7 @@
 //! Statac takes there and what the site holds.
 
 pub(super) mod spot;
-mod template;
+pub(super) mod template;
 #[cfg(test)]
 mod tests;
 pub(super) mod writing;

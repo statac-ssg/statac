@@ -112,6 +112,8 @@ fn a_name_offers_what_the_template_may_read_there() {
     assert_eq!(item(&looping, "loop").1, "fields");
     let set = in_page(&site, "{% set greeting = 'Hello' %}{% if gr|").unwrap();
     assert_eq!(item(&set, "greeting").1, "text");
+    let setting = in_page(&site, "{% set greeting = pa|").unwrap();
+    assert_eq!(item(&setting, "page").1, "page", "what a name is set to");
     let heading = offered(&site, "snippets/markdown/heading.html", "{{ le| }}").unwrap();
     assert_eq!(
         item(&heading, "level").1,

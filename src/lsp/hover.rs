@@ -3,8 +3,11 @@
 //! does, what a value of the author's own is, and what the site holds of
 //! a tag, a series or a template a page names. In the writing: the page
 //! a link leads to, the snippet a call names and the file beside the page
-//! a picture or a call's value names.
+//! a picture or a call's value names. In a template or a snippet: what a
+//! name or field holds where it is read, the snippet a call names, and
+//! the page or template a string names.
 
+mod template;
 #[cfg(test)]
 mod tests;
 mod writing;
@@ -18,7 +21,7 @@ use crate::content::words::{Holder, PageWord, is_statacs};
 use crate::problem::Code;
 use crate::site::ListKey;
 use crate::source::{Place, Sources, Span};
-use crate::templates::Renderer;
+use crate::templates::{Renderer, SNIPPETS, TEMPLATES};
 use crate::wording::{self, Described};
 
 /// What is said of what the pointer is over.
@@ -97,6 +100,13 @@ pub(super) fn hover(
                 Err(unclosed) => unclosed.rest,
             };
             (Holds::FrontMatter, yaml)
+        }
+        _ if [TEMPLATES, SNIPPETS]
+            .iter()
+            .any(|top| (rel.strip_prefix(top)).is_some_and(|rest| rest.starts_with('/'))) =>
+        {
+            let (range, said) = template::said(known?, &rel, text, offset)?;
+            return Some(said.placed(range));
         }
         _ => return None,
     };
