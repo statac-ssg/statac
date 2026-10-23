@@ -1179,6 +1179,36 @@ pub(crate) fn named(named: &Named) -> String {
         Named::Item(item) => item.clone(),
         Named::MadeAfter(place) => format!("what `after_build` makes at `{place}`"),
         Named::Search => "the site's search index".into(),
+        Named::Redirect { page, .. } => format!("a redirect in {}", self::named(page)),
+        Named::Permalink { page, .. } => self::named(page),
+    }
+}
+
+/// What to do about two things at one address: take the address out of a
+/// `redirect_from` that names it, or else change a `permalink` that gives
+/// it, or else rename one of them; to follow a comma, opening with a
+/// letter of ASCII.
+fn same_address_help(first: &Named, second: &Named) -> String {
+    let page = |side: &Named| match side {
+        Named::Redirect { page, .. } | Named::Permalink { page, .. } => named(page),
+        _ => String::new(),
+    };
+    match (first, second) {
+        (Named::Redirect { .. }, Named::Redirect { .. }) => {
+            "take it out of the `redirect_from` of one of them.".into()
+        }
+        (Named::Redirect { .. }, _) => {
+            format!("take it out of `redirect_from` in {}.", page(first))
+        }
+        (_, Named::Redirect { .. }) => {
+            format!("take it out of `redirect_from` in {}.", page(second))
+        }
+        (Named::Permalink { .. }, Named::Permalink { .. }) => {
+            "change the `permalink` of one of them.".into()
+        }
+        (Named::Permalink { .. }, _) => format!("change the `permalink` of {}.", page(first)),
+        (_, Named::Permalink { .. }) => format!("change the `permalink` of {}.", page(second)),
+        _ => "rename one of them.".into(),
     }
 }
 
@@ -2346,12 +2376,24 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
              their own names."
                 .into(),
         ),
-        Kind::SameAddress { alike, .. } => Some(match alike {
-            Alike::Exactly => "Rename one of them.".into(),
-            Alike::ByCase | Alike::ByNormalisation => {
-                "Most disks hold them as one file, so rename one of them.".into()
-            }
-        }),
+        Kind::SameAddress {
+            first,
+            second,
+            alike,
+            ..
+        } => {
+            let help = same_address_help(first, second);
+            Some(match alike {
+                Alike::Exactly => {
+                    let mut help = help;
+                    help[..1].make_ascii_uppercase();
+                    help
+                }
+                Alike::ByCase | Alike::ByNormalisation => {
+                    format!("Most disks hold them as one file, so {help}")
+                }
+            })
+        }
         Kind::LaterPageTaken { page, .. } => Some(format!(
             "Give {} another address, or put later pages elsewhere with `later_pages` \
              in `statac.yaml`.",
@@ -6454,6 +6496,25 @@ mod tests {
             alike,
             address: "/logo.png".into(),
         };
+        let at = crate::source::Place {
+            source: crate::source::SourceId::from_index(0),
+            span: crate::source::Span::new(0, 1),
+        };
+        let page = |path: &str| Named::File(path.into());
+        let redirect = |path: &str| Named::Redirect {
+            page: path.into(),
+            at,
+        };
+        let permalink = |path: &str| Named::Permalink {
+            page: path.into(),
+            at,
+        };
+        let clash = |first, second, alike| Kind::SameAddress {
+            first: Box::new(first),
+            second: Box::new(second),
+            alike,
+            address: "/a/index.html".into(),
+        };
         let unwritable = |why| Kind::UnwritableName {
             path: "static/con.txt".into(),
             why,
@@ -6584,6 +6645,69 @@ mod tests {
                 "Same address: `static/Logo.png` and `static/logo.png` differ only in how an \
                  accent is stored",
                 Some("Most disks hold them as one file, so rename one of them."),
+            ),
+            (
+                clash(
+                    page("content/a.md"),
+                    redirect("content/b.md"),
+                    Alike::Exactly,
+                ),
+                "Same address: `content/a.md` and a redirect in `content/b.md` are both \
+                 published at `/a/index.html`",
+                Some("Take it out of `redirect_from` in `content/b.md`."),
+            ),
+            (
+                clash(
+                    redirect("content/a.md"),
+                    redirect("content/b.md"),
+                    Alike::Exactly,
+                ),
+                "Same address: a redirect in `content/a.md` and a redirect in `content/b.md` \
+                 are both published at `/a/index.html`",
+                Some("Take it out of the `redirect_from` of one of them."),
+            ),
+            (
+                clash(
+                    permalink("content/a.md"),
+                    redirect("content/b.md"),
+                    Alike::ByCase,
+                ),
+                "Same address: `content/a.md` and a redirect in `content/b.md` differ only in \
+                 capitals",
+                Some(
+                    "Most disks hold them as one file, so take it out of `redirect_from` in \
+                     `content/b.md`.",
+                ),
+            ),
+            (
+                clash(
+                    permalink("content/a.md"),
+                    page("content/b.md"),
+                    Alike::Exactly,
+                ),
+                "Same address: `content/a.md` and `content/b.md` are both published at \
+                 `/a/index.html`",
+                Some("Change the `permalink` of `content/a.md`."),
+            ),
+            (
+                clash(
+                    page("static/a.html"),
+                    permalink("content/b.md"),
+                    Alike::Exactly,
+                ),
+                "Same address: `static/a.html` and `content/b.md` are both published at \
+                 `/a/index.html`",
+                Some("Change the `permalink` of `content/b.md`."),
+            ),
+            (
+                clash(
+                    permalink("content/a.md"),
+                    permalink("content/b.md"),
+                    Alike::Exactly,
+                ),
+                "Same address: `content/a.md` and `content/b.md` are both published at \
+                 `/a/index.html`",
+                Some("Change the `permalink` of one of them."),
             ),
             (
                 unwritable(Unwritable::Device("con".into())),

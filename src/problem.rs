@@ -2588,9 +2588,24 @@ pub enum Named {
     MadeAfter(String),
     /// The files a reader's browser searches the site with.
     Search,
+    /// An old address a page's `redirect_from` names: the page, and where
+    /// the address is written.
+    Redirect { page: Box<Named>, at: Place },
+    /// A page whose address its own `permalink` gives: the page, and
+    /// where the `permalink` is written.
+    Permalink { page: Box<Named>, at: Place },
 }
 
 impl Named {
+    /// Where what gives this its address is written, where a problem with
+    /// the address is best told.
+    pub fn given_at(&self) -> Option<Place> {
+        match self {
+            Named::Redirect { at, .. } | Named::Permalink { at, .. } => Some(*at),
+            _ => None,
+        }
+    }
+
     /// A list's page `number`, counted from 2, by where its first stands.
     pub fn later(number: usize, list: String) -> Named {
         Named::Later {

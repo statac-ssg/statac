@@ -104,9 +104,34 @@ pub fn claims(site: &Site, sources: &Sources, settings: &Settings) -> Vec<(Strin
         .pages
         .iter()
         .filter(|(_, page)| page.lands())
-        .map(|(id, page)| (page.address.file(), site.named(id, sources)));
+        .map(|(id, page)| {
+            let named = site.named(id, sources);
+            // Only a page's own `permalink`: one its folder gives all its
+            // pages is changed for them all.
+            let own = (page.words.get(PageWord::Permalink))
+                .filter(|permalink| permalink.origin.arrival == Arrival::Written)
+                .and_then(|permalink| permalink.origin.place)
+                .filter(|at| Some(at.source) == page.source);
+            let named = match own {
+                Some(at) => Named::Permalink {
+                    page: Box::new(named),
+                    at,
+                },
+                None => named,
+            };
+            (page.address.file(), named)
+        });
     let redirects = site.redirects.iter().map(|redirect| {
         let named = site.named(redirect.page, sources);
+        // A page sending readers on stands at its own address; any other
+        // is one of its old ones.
+        let named = match redirect.from == site.pages.get(redirect.page).address {
+            true => named,
+            false => Named::Redirect {
+                page: Box::new(named),
+                at: redirect.place,
+            },
+        };
         (redirect.from.file(), named)
     });
     // A page of the author's standing where a later page goes is told

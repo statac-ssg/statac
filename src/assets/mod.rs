@@ -775,12 +775,14 @@ pub fn same_address(outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
         if !told.contains(&(second.clone(), first.clone()))
             && told.insert((first.clone(), second.clone()))
         {
-            problems.push(Problem::nowhere(Kind::SameAddress {
+            let at = second.given_at().or(first.given_at());
+            let kind = Kind::SameAddress {
                 first: Box::new(first.clone()),
                 second: Box::new(second.clone()),
                 alike,
                 address: format!("{base}/{rel}"),
-            }));
+            };
+            problems.push(Problem::placed(kind, at));
         }
     };
     let mut files: BTreeMap<String, usize> = BTreeMap::new();

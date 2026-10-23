@@ -1822,25 +1822,41 @@ fn two_claims_on_one_address_are_refused_naming_both() {
         ("static/logo.png", "png"),
     ]);
     let (read, ..) = crate::build::read(&temp.root, &run_on(2026, 12, 31));
-    let mut same: Vec<(String, String)> = read
-        .problems
-        .iter()
+    fn told(named: &Named) -> String {
+        match named {
+            Named::File(path) => path.clone(),
+            Named::Redirect { page, .. } => format!("a redirect in {}", told(page)),
+            Named::Permalink { page, .. } => format!("{} by its permalink", told(page)),
+            other => panic!("{other:?}"),
+        }
+    }
+    // (each side, and the text the problem is told at)
+    let mut same: Vec<(String, String, &str)> = (read.problems.iter())
         .filter_map(|p| match &p.kind {
-            Kind::SameAddress { first, second, .. } => match (&**first, &**second) {
-                (Named::File(first), Named::File(second)) => Some((first.clone(), second.clone())),
-                _ => None,
-            },
+            Kind::SameAddress { first, second, .. } => Some((
+                told(first),
+                told(second),
+                p.place.map_or("", |at| read.sources.spelling(at)),
+            )),
             _ => None,
         })
         .collect();
     same.sort();
-    let s = |a: &str, b: &str| (a.to_owned(), b.to_owned());
+    let s = |a: &str, b: &str, at| (a.to_owned(), b.to_owned(), at);
     assert_eq!(
         same,
         [
-            s("content/Post-2.md", "content/post-3.md"),
-            s("content/post-1.md", "content/post-1/index.md"),
-            s("static/logo.png", "content/a.md"),
+            s(
+                "content/Post-2.md by its permalink",
+                "a redirect in content/post-3.md",
+                "/POST-2/"
+            ),
+            s("content/post-1.md", "content/post-1/index.md", ""),
+            s(
+                "static/logo.png",
+                "content/a.md by its permalink",
+                "/logo.png"
+            ),
         ]
     );
 }
