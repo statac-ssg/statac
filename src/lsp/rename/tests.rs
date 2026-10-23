@@ -193,6 +193,86 @@ fn the_old_address_joins_a_redirect_from_as_it_is_written() {
 }
 
 #[test]
+fn a_page_moved_back_where_it_was_takes_that_address_out_of_its_redirect_from() {
+    let there = changed(
+        &files(ABOUT),
+        &[("content/about.md", "content/about-us.md")],
+    );
+    let moved: Vec<(&str, String)> = vec![
+        files(ABOUT)[0].clone(),
+        ("templates/page.html", there["templates/page.html"].clone()),
+        files(ABOUT)[2].clone(),
+        ("content/about-us.md", there["content/about.md"].clone()),
+        (
+            "content/notes/note-1.md",
+            there["content/notes/note-1.md"].clone(),
+        ),
+    ];
+    let back = changed(&moved, &[("content/about-us.md", "content/about.md")]);
+    assert_eq!(
+        back,
+        BTreeMap::from([
+            (
+                "content/about-us.md".to_owned(),
+                ABOUT.replace(
+                    "title: About\n",
+                    "title: About\nredirect_from: [/about-us/]\n"
+                )
+            ),
+            ("content/notes/note-1.md".to_owned(), NOTE.to_owned()),
+            ("templates/page.html".to_owned(), files(ABOUT)[1].1.clone()),
+        ])
+    );
+}
+
+#[test]
+fn the_address_a_page_moves_to_is_taken_out_of_its_redirect_from_as_it_is_written() {
+    let cases = [
+        (
+            "redirect_from: [/about-us/]\n",
+            "redirect_from: [/about/]\n",
+        ),
+        (
+            "redirect_from: [/old/, /about-us]\n",
+            "redirect_from: [/old/, /about/]\n",
+        ),
+        ("redirect_from: /about-us/\n", "redirect_from: /about/\n"),
+        (
+            "redirect_from:\n  - /about-us/\n  - /old/\n",
+            "redirect_from:\n  - /about/\n  - /old/\n",
+        ),
+        (
+            "redirect_from: [/about/, /about-us/]\n",
+            "redirect_from: [/about/]\n",
+        ),
+        (
+            "redirect_from: [/about-us/, /about/]\n",
+            "redirect_from: [/about/]\n",
+        ),
+        (
+            "redirect_from: [/about-us/, /old/, /about-us/, /about-us/]\n",
+            "redirect_from: [/about/, /old/]\n",
+        ),
+        (
+            "redirect_from:\n  - /about/\n  - /about-us/\n",
+            "redirect_from:\n  - /about/\n",
+        ),
+    ];
+    for (written, wanted) in cases {
+        let about = ABOUT.replace("title: About\n", &format!("title: About\n{written}"));
+        let found = changed(
+            &files(&about),
+            &[("content/about.md", "content/about-us.md")],
+        );
+        assert_eq!(
+            found["content/about.md"],
+            ABOUT.replace("title: About\n", &format!("title: About\n{wanted}")),
+            "{written}"
+        );
+    }
+}
+
+#[test]
 fn a_page_whose_address_stays_is_left_as_it_is() {
     let about = ABOUT.replace("title: About\n", "title: About\npermalink: /about/\n");
     assert!(

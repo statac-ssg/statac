@@ -13,13 +13,13 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use super::references;
-use crate::content::address::is_full;
+use crate::content::address::{Address, is_full};
 use crate::content::words::PageWord;
 use crate::content::{self, Run, Texts};
 use crate::links;
-use crate::origin::Arrival;
+use crate::origin::{Arrival, Sourced};
 use crate::site::PageId;
-use crate::source::{Place, Span};
+use crate::source::{Place, SourceId, Span};
 use crate::templates::Renderer;
 use crate::unsaved::Unsaved;
 
@@ -54,7 +54,7 @@ pub(super) fn renamed(
     let read = content::read_with(root, &run, &mut texts);
     let site = renderer.site();
     let own = |page: &crate::site::Page| page.source.is_some() && page.made.is_none();
-    let mut moved: HashMap<PageId, String> = HashMap::new();
+    let mut moved: HashMap<PageId, Address> = HashMap::new();
     for (id, page) in site.pages.iter().filter(|(_, page)| own(page)) {
         let to = content::renamed_to(page.path.clone(), &renamed);
         if to == page.path {
@@ -64,7 +64,7 @@ pub(super) fn renamed(
         if let Some((_, after)) = after
             && after.address != page.address
         {
-            moved.insert(id, after.address.as_str().to_owned());
+            moved.insert(id, after.address.clone());
         }
     }
     let base = renderer.settings().base();
@@ -90,7 +90,7 @@ pub(super) fn renamed(
                 edits.push((link.place, text));
             }
         }
-        edits.extend(redirect(renderer, page, before.as_str()));
+        edits.extend(redirect(renderer, page, before, &moved[&page]));
     }
     // A moved page's links to a page that stays, written from where the
     // page was, are written again from where it goes.
@@ -204,15 +204,24 @@ fn relative(from: &str, to: &str) -> String {
     }
 }
 
-/// The edit adding `old`, an address `page` leaves, to its
-/// `redirect_from`: to the list it writes, or as a line of its own.
-fn redirect(renderer: &Renderer, page: PageId, old: &str) -> Option<(Place, String)> {
+/// The edits that send readers on to `page` from `old`, an address it
+/// leaves for `new`, in its `redirect_from`: `old` written in place of
+/// `new`, which can't be both its address and an old one, or else added
+/// to the list it writes, or as a line of its own.
+fn redirect(
+    renderer: &Renderer,
+    page: PageId,
+    old: &Address,
+    new: &Address,
+) -> Vec<(Place, String)> {
     let held = renderer.site().pages.get(page);
-    let source = held.source?;
+    let Some(source) = held.source else {
+        return Vec::new();
+    };
     let text = renderer.sources().text(source);
     let at = |start: usize, text: String| {
         let span = Span::new(start, start);
-        Some((Place { source, span }, text))
+        vec![(Place { source, span }, text)]
     };
     let written = (held.words.get(PageWord::RedirectFrom))
         .filter(|from| from.origin.arrival == Arrival::Written)
@@ -220,14 +229,36 @@ fn redirect(renderer: &Renderer, page: PageId, old: &str) -> Option<(Place, Stri
         .filter(|(_, place)| place.source == source);
     if let Some((from, place)) = written {
         let listed = from.value.as_texts().unwrap_or_default();
-        if listed.iter().any(|item| item.value == old) {
-            return None;
+        let names = |item: &Sourced<String>, address: &Address| {
+            Address::read(&item.value).is_ok_and(|read| read.key() == address.key())
+        };
+        let kept = !listed.iter().any(|item| names(item, old));
+        let at_new: Vec<usize> = (0..listed.len())
+            .filter(|&n| names(&listed[n], new))
+            .collect();
+        if !at_new.is_empty() {
+            let spans: Option<Vec<Span>> = (listed.iter())
+                .map(|item| Some(item.origin.place.filter(|at| at.source == source)?.span))
+                .collect();
+            let Some(spans) = spans else {
+                return Vec::new();
+            };
+            let value = &text[place.span.range()];
+            let old = kept.then_some(old.as_str());
+            return taken_out(text, source, value.starts_with('['), &spans, &at_new, old);
         }
+        if !kept {
+            return Vec::new();
+        }
+        let old = old.as_str();
         let value = &text[place.span.range()];
         let start = place.span.start as usize;
         let end = start + value.trim_end().len();
         if value.starts_with('[') {
-            let close = start + value.rfind(']')?;
+            let Some(close) = value.rfind(']') else {
+                return Vec::new();
+            };
+            let close = start + close;
             let last = start + text[start + 1..close].trim_end().len() + 1;
             let comma = match last == start + 1 {
                 true => "",
@@ -242,8 +273,9 @@ fn redirect(renderer: &Renderer, page: PageId, old: &str) -> Option<(Place, Stri
         }
         let span = Span::new(start, end);
         let list = format!("[{}, {old}]", &text[start..end]);
-        return Some((Place { source, span }, list));
+        return vec![(Place { source, span }, list)];
     }
+    let old = old.as_str();
     let opened = text.trim_start_matches('\u{feff}');
     let mark = text.len() - opened.len();
     if !opened.starts_with("---") {
@@ -252,7 +284,56 @@ fn redirect(renderer: &Renderer, page: PageId, old: &str) -> Option<(Place, Stri
     let head = text[..held.body.start as usize].trim_end_matches(['\n', '\r']);
     let closing = head.rfind('\n').map_or(0, |at| at + 1);
     if !head[closing..].starts_with("---") || closing <= mark {
-        return None;
+        return Vec::new();
     }
     at(closing, format!("redirect_from: [{old}]\n"))
+}
+
+/// The edits that take the items at `taking` out of a `redirect_from`
+/// whose items are at `spans` in `text`, `flow` where it is written in
+/// brackets, with `old` written in place of the first where given.
+fn taken_out(
+    text: &str,
+    source: SourceId,
+    flow: bool,
+    spans: &[Span],
+    taking: &[usize],
+    old: Option<&str>,
+) -> Vec<(Place, String)> {
+    let edit = |start: usize, end: usize, text: &str| {
+        let span = Span::new(start, end);
+        (Place { source, span }, text.to_owned())
+    };
+    let mut edits = Vec::new();
+    let mut gone = taking;
+    if let Some(old) = old {
+        let span = spans[taking[0]];
+        edits.push((Place { source, span }, old.to_owned()));
+        gone = &taking[1..];
+    }
+    if !flow {
+        // Each on a line of its own.
+        for &n in gone {
+            let (start, end) = (spans[n].start as usize, spans[n].end as usize);
+            let line = text[..start].rfind('\n').map_or(0, |at| at + 1);
+            let after = text[end..].find('\n').map_or(text.len(), |at| end + at + 1);
+            edits.push(edit(line, after, ""));
+        }
+        return edits;
+    }
+    // Each run of neighbours goes with the commas that part it from the rest.
+    let mut gone = gone.iter().copied().peekable();
+    while let Some(first) = gone.next() {
+        let mut last = first;
+        while gone.next_if(|&n| n == last + 1).is_some() {
+            last += 1;
+        }
+        let (start, end) = match (spans.get(last + 1), first.checked_sub(1)) {
+            (Some(next), _) => (spans[first].start, next.start),
+            (None, Some(before)) => (spans[before].end, spans[last].end),
+            (None, None) => (spans[first].start, spans[last].end),
+        };
+        edits.push(edit(start as usize, end as usize, ""));
+    }
+    edits
 }
