@@ -794,6 +794,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::RedirectToItself { written } => {
             format!("Redirect to itself: `{written}` is this page's own address")
         }
+        Kind::RedirectFromItself { written } => {
+            format!("Redirect to itself: `{written}` is this page's own address")
+        }
         Kind::RedirectedBack { written } => {
             format!("Redirect to itself: `{written}` sends readers back to this page")
         }
@@ -2946,6 +2949,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::RedirectToItself { .. } => {
             Some("Point `redirect_to` at the address readers should reach.".into())
         }
+        Kind::RedirectFromItself { .. } => Some("Take it out of `redirect_from`.".into()),
         Kind::RedirectedBack { .. } => None,
         Kind::WritingNotPublished { .. } => Some(
             "Move it to where readers are sent, or take out `redirect_to` to publish it.".into(),
@@ -6088,6 +6092,13 @@ mod tests {
                 },
                 "Redirect to itself: `/post-1/` is this page's own address",
                 Some("Point `redirect_to` at the address readers should reach."),
+            ),
+            (
+                Kind::RedirectFromItself {
+                    written: "/post-1/".into(),
+                },
+                "Redirect to itself: `/post-1/` is this page's own address",
+                Some("Take it out of `redirect_from`."),
             ),
             (
                 Kind::RedirectedBack {

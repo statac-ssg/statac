@@ -2328,6 +2328,32 @@ fn a_page_sending_readers_to_itself_or_nowhere_usable_is_refused() {
     }
 }
 
+#[test]
+fn an_old_address_that_is_the_page_s_own_is_refused_and_sends_no_one_on() {
+    // (front matter, the text the problem is at, the old addresses kept)
+    let cases = [
+        ("redirect_from: [/post-1/]", "/post-1/", vec![]),
+        ("redirect_from: [/old/, /POST-1]", "/POST-1", vec!["/old/"]),
+        ("permalink: /new/\nredirect_from: /new/", "/new/", vec![]),
+    ];
+    for (front, at, kept) in cases {
+        let read = site(&[("content/post-1.md", &format!("---\n{front}\n---\n"))]);
+        assert_eq!(
+            problems(&read),
+            [(
+                "redirect-to-itself",
+                "content/post-1.md".to_owned(),
+                at.to_owned()
+            )],
+            "{front}"
+        );
+        let from: Vec<&str> = (read.site.redirects.iter())
+            .map(|redirect| redirect.from.as_str())
+            .collect();
+        assert_eq!(from, kept, "{front}");
+    }
+}
+
 /// What a page sending readers on writes, times what is said of it: the
 /// words it reads pass, each other word of Statac's it writes is set
 /// aside, and its writing is told at its first line.

@@ -1157,6 +1157,11 @@ pub enum Kind {
     RedirectToItself {
         written: String,
     },
+    /// An old address in `redirect_from` that is the page's own, as
+    /// written.
+    RedirectFromItself {
+        written: String,
+    },
     /// A `redirect_to`, as written, that following the redirects on the
     /// site brings back to its own page.
     RedirectedBack {
@@ -2761,7 +2766,9 @@ impl Kind {
             Kind::NoSiteAddress { .. } => Code::NoSiteAddress,
             Kind::NoLanguage => Code::NoLanguage,
             Kind::RobotsBeneathPath { .. } => Code::RobotsBeneathPath,
-            Kind::RedirectToItself { .. } | Kind::RedirectedBack { .. } => Code::RedirectToItself,
+            Kind::RedirectToItself { .. }
+            | Kind::RedirectFromItself { .. }
+            | Kind::RedirectedBack { .. } => Code::RedirectToItself,
             Kind::WritingNotPublished { .. } => Code::WritingNotPublished,
             Kind::SortedLast { .. } => Code::SortedLast,
             Kind::LoopOverEveryPage { .. } => Code::LoopOverEveryPage,

@@ -1195,6 +1195,14 @@ impl Reader<'_> {
             for written in old {
                 let place = written.origin.place.unwrap_or(head);
                 match Address::read(&written.value) {
+                    Ok(address) if address.key() == page.address.key() => {
+                        problems.push(Problem::at(
+                            Kind::RedirectFromItself {
+                                written: written.value.clone(),
+                            },
+                            place,
+                        ));
+                    }
                     Ok(address) => {
                         if seen.insert(address.key()) {
                             site.redirects.push(Redirect {
