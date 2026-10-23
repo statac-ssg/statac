@@ -703,6 +703,16 @@ impl Renderer {
         Some(&body.writing)
     }
 
+    /// What `page`'s writing links to and hands its snippet calls, its
+    /// writing built now where no output has built it, as where a round
+    /// kept the page's output from the round before.
+    pub fn writing_built(&self, page: PageId) -> &crate::links::Writing {
+        kept_body(&self.shared, page);
+        &(self.shared.bodies[page.index()].get())
+            .expect("kept just now")
+            .writing
+    }
+
     /// `page`'s writing as built, cut where each heading with an id
     /// starts: the part before the first heading, then each heading's
     /// part. Built now where no output has built it.

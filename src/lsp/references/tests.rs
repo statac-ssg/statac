@@ -38,15 +38,28 @@ fn site() -> TempSite {
 /// `text` as the text of the site's file at `path` names, once the site is
 /// read: each by its file, and the text it is at where it is at a place.
 fn references(site: &TempSite, path: &str, text: &str, declaration: bool) -> Option<Vec<String>> {
+    references_after(1, site, path, text, declaration)
+}
+
+/// [`references`], once the site has been checked `rounds` times.
+fn references_after(
+    rounds: usize,
+    site: &TempSite,
+    path: &str,
+    text: &str,
+    declaration: bool,
+) -> Option<Vec<String>> {
     let mut checking = Checking::new();
-    checking.check(&Options {
-        mode: Mode::Check,
-        site: site.root.clone(),
-        out: None,
-        today: None,
-        drafts: false,
-        url: None,
-    });
+    for _ in 0..rounds {
+        checking.check(&Options {
+            mode: Mode::Check,
+            site: site.root.clone(),
+            out: None,
+            today: None,
+            drafts: false,
+            url: None,
+        });
+    }
     let renderer = checking.renderer().unwrap();
     let offset = text.find('|').expect("a cursor");
     let text = text.replacen('|', "", 1);
@@ -112,6 +125,16 @@ fn a_page_is_linked_from_the_writing_and_templates_at_any_of_its_addresses() {
     assert_eq!(
         references(&site, "content/about.md", &about, true).unwrap(),
         declared
+    );
+}
+
+#[test]
+fn a_page_whose_output_a_check_kept_from_the_one_before_has_its_links_found() {
+    let site = site();
+    let about = ABOUT.replacen("See", "S|ee", 1);
+    assert_eq!(
+        references_after(2, &site, "content/about.md", &about, false).unwrap(),
+        TO_ABOUT
     );
 }
 

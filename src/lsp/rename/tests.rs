@@ -38,17 +38,28 @@ fn files(about: &str) -> Vec<(&'static str, String)> {
 /// Each file of the site at `files` that renaming it by `moves` changes,
 /// by its path before the renaming, with its text once changed.
 fn changed(files: &[(&str, String)], moves: &[(&str, &str)]) -> BTreeMap<String, String> {
+    changed_after(1, files, moves)
+}
+
+/// [`changed`], once the site has been checked `rounds` times.
+fn changed_after(
+    rounds: usize,
+    files: &[(&str, String)],
+    moves: &[(&str, &str)],
+) -> BTreeMap<String, String> {
     let files: Vec<(&str, &str)> = files.iter().map(|(path, text)| (*path, &**text)).collect();
     let site = TempSite::site(&files);
     let mut checking = Checking::new();
-    checking.check(&Options {
-        mode: Mode::Check,
-        site: site.root.clone(),
-        out: None,
-        today: None,
-        drafts: false,
-        url: None,
-    });
+    for _ in 0..rounds {
+        checking.check(&Options {
+            mode: Mode::Check,
+            site: site.root.clone(),
+            out: None,
+            today: None,
+            drafts: false,
+            url: None,
+        });
+    }
     let renderer = checking.renderer().unwrap();
     let moves: Vec<(String, String)> = (moves.iter())
         .map(|(from, to)| ((*from).to_owned(), (*to).to_owned()))
@@ -112,6 +123,15 @@ fn a_page_moved_to_another_folder_has_the_links_it_writes_from_where_it_was_writ
     let note = &found["content/notes/note-1.md"];
     assert!(note.contains("[Team](../about/#the-team)"), "{note}");
     assert!(note.contains("[About](/blog/notes/about/)"), "{note}");
+}
+
+#[test]
+fn pages_whose_output_a_check_kept_from_the_one_before_have_their_links_written_anew() {
+    let moves = [("content/about.md", "content/notes/about.md")];
+    assert_eq!(
+        changed_after(2, &files(ABOUT), &moves),
+        changed(&files(ABOUT), &moves)
+    );
 }
 
 #[test]

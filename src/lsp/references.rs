@@ -9,6 +9,8 @@
 #[cfg(test)]
 mod tests;
 
+use rayon::prelude::*;
+
 use super::complete::template::{Pointed, pointed};
 use super::hover::Goes;
 use crate::content::address;
@@ -55,10 +57,17 @@ pub(super) fn links(renderer: &Renderer, files: Vec<String>, id: Option<&str>) -
     let sources = renderer.sources();
     let mut found = Vec::new();
     let base = renderer.settings().base();
-    for (other, held) in site.pages.iter() {
-        let Some(writing) = renderer.writing(other) else {
-            continue;
-        };
+    let written: Vec<PageId> = (site.pages.iter())
+        .filter(|(_, held)| held.source.is_some())
+        .map(|(page, _)| page)
+        .collect();
+    // Built together first, as a round that kept a page's output from the
+    // round before leaves its writing unbuilt.
+    written.par_iter().for_each(|&page| {
+        renderer.writing_built(page);
+    });
+    for other in written {
+        let (writing, held) = (renderer.writing_built(other), site.pages.get(other));
         let from = format!("{base}{}", held.address.as_str());
         // Any text can be handed to a call; one that isn't written as an
         // address is taken as something else.
@@ -181,9 +190,8 @@ fn sought(renderer: &Renderer, rel: &str, offset: usize, to: Option<Goes>) -> Op
             let page = page_at(rel)?;
             let under = |at: Place| at.span.range().contains(&offset);
             // A link that leads nowhere known names no page.
-            let linked = renderer
-                .writing(page)
-                .is_some_and(|writing| (writing.written.iter()).any(|linked| under(linked.place)));
+            let linked =
+                (renderer.writing_built(page).written.iter()).any(|linked| under(linked.place));
             if linked {
                 return None;
             }
