@@ -4,7 +4,9 @@ Two files would be published at the same address. Either their addresses
 are exactly the same, or their names differ only in ways that most disks
 ignore: capitals, or how an accented letter is stored. The message names
 both files. If one of them is a later page of a list, such as
-`/blog/page/2/`, the message names the list.
+`/blog/page/2/`, the message names the list. If one of them is an old
+address in a page's `redirect_from`, the message calls it a redirect,
+and it is shown at that address.
 
 ## What you'll see {#what-youll-see}
 
@@ -37,6 +39,17 @@ site's path where it has one. A file of yours at one of those
 addresses, such as `static/search/index.js`, clashes with it, and the
 message names "the site's search index". Rename yours, or move it.
 
+An old address in a page's `redirect_from` publishes a redirect there,
+so it clashes with anything else at that address, and the message names
+it as "a redirect in" the page. This often happens after a page is
+renamed: its old address is kept as a redirect, and a new page later
+given the old name lands on it. Take the address out of `redirect_from`
+if the new page should have it, or give the new page another name.
+
+A page's own `permalink` sets its address whatever its file is called,
+so renaming the file won't help. Change the `permalink`; the message is
+shown at it.
+
 A list too long for one page continues on later pages beneath it, at the
 addresses that `later_pages` in `statac.yaml` sets. By default, they are
 at `page/2/` and onwards.
@@ -50,3 +63,13 @@ capitals, keep one of them, and point every link at its name.
 
 If page 2 of `/blog/` and `content/blog/page/2.md` are both published at
 `/blog/page/2/`, move `content/blog/page/2.md`, or set `later_pages`.
+
+If `content/about.md` was renamed to `content/about-us.md`, which then
+gained `redirect_from: [/about/]`, a new `content/about.md` clashes with
+that redirect:
+
+```text
+error  Same address: `content/about.md` and a redirect in `content/about-us.md` are both published at `/about/index.html`
+  Take it out of `redirect_from` in `content/about-us.md`.
+  More: https://statac.dev/e/same-address/
+```
