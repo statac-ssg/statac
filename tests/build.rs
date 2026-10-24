@@ -2817,6 +2817,162 @@ warning  Broken link: nothing is published at `/post-5/`
     );
 }
 
+/// A link in markup a field or a data file holds, printed whole, is told
+/// once where the file writes it, and a link a template makes and prints
+/// whole is told at the print.
+#[test]
+fn a_link_printed_in_markup_is_told_where_the_markup_is_written() {
+    let site = Site::new("printed-markup");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write("data/links.yaml", "nav: <a href=\"/abot/\">About</a>\n");
+    site.write(
+        "templates/page.html",
+        "<a href=\"/{{ page.language }}/\">Home</a>\n\
+         {{ site.data.links.nav | safe }}\n\
+         {{ page.summary | safe }}\n\
+         {{ ('<a href=\"/post-' ~ 2 ~ '/\">') | safe }}Next</a>\n\
+         {{ page.content }}\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\nsummary: '<a href=\"/gone/\">Gone</a>'\n---\n",
+    );
+    site.write(
+        "content/post-3.md",
+        "---\ntitle: Post 3\ndate: 2026-01-03\nsummary: Three.\n---\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/gone/`
+  content/post-1.md, line 4
+   4 │ summary: '<a href=\"/gone/\">Gone</a>'
+     │                    ^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/abot/`
+  data/links.yaml, line 1
+   1 │ nav: <a href=\"/abot/\">About</a>
+     │               ^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/en/`
+  templates/page.html, line 1
+   1 │ <a href=\"/{{ page.language }}/\">Home</a>
+     │          ^^^^^^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-2/`
+  templates/page.html, line 4
+   4 │ {{ ('<a href=\"/post-' ~ 2 ~ '/\">') | safe }}Next</a>
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  Did you mean `/post-1/`?
+  More: https://statac.dev/e/broken-link/
+
+4 warnings: 4 broken-link.
+"
+    );
+}
+
+/// A link a macro writes is told inside the macro: in its own text, or
+/// at its print where it prints the link whole, wherever it is called.
+#[test]
+fn a_link_a_macro_writes_is_told_inside_the_macro() {
+    let site = Site::new("macro-link");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write(
+        "templates/page.html",
+        "{% macro nav(to) %}\n\
+         <a href=\"{{ to }}\">Next</a>\n\
+         <p>{{ ('<a href=\"' ~ to ~ 'x/\">') | safe }}More</a></p>\n\
+         {% endmacro %}\n\
+         <nav>\n  {{ nav(\"/post-2/\") }}\n</nav>\n\
+         {{ page.content }}\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/post-2/`
+  templates/page.html, line 2
+   2 │ <a href=\"{{ to }}\">Next</a>
+     │          ^^^^^^^^
+  While building: content/post-1.md
+  Did you mean `/post-1/`?
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-2/x/`
+  templates/page.html, line 3
+   3 │ <p>{{ ('<a href=\"' ~ to ~ 'x/\">') | safe }}More</a></p>
+     │    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  Did you mean `/post-1/`?
+  More: https://statac.dev/e/broken-link/
+
+2 warnings: 2 broken-link.
+"
+    );
+}
+
+/// A link a template writes in its own text, to where the page's writing
+/// also links, is told at the template, and the writing's at the writing,
+/// each once.
+#[test]
+fn a_templates_link_and_the_writings_to_one_address_are_each_told_where_written() {
+    let site = Site::new("one-address-twice");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
+         url: https://example.org/blog/\n",
+    );
+    site.write(
+        "templates/page.html",
+        "<a href=\"{{ url('/abot/') }}\">a</a>\n{{ page.content }}\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n[1](/blog/abot/)\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/blog/abot/`
+  content/post-1.md, line 5
+   5 │ [1](/blog/abot/)
+     │     ^^^^^^^^^^^
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/blog/abot/`
+  templates/page.html, line 1
+   1 │ <a href=\"{{ url('/abot/') }}\">a</a>
+     │          ^^^^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+2 warnings: 2 broken-link.
+"
+    );
+}
+
 /// A link a snippet writes from a value is told at the snippet's line,
 /// whether the snippet is called in the writing or by a template, and told
 /// once where that writing is also shown on another page.
@@ -3351,11 +3507,14 @@ fn a_link_in_a_template_holding_control_characters_is_told_where_it_was_written(
         );
         site.write(
             "content/post-1.md",
-            "---\ntitle: Post 1\ndate: 2026-01-01\nsummary: '<a href=\"/gone/\">x</a>'\n---\n",
+            "---\ntitle: Post 1\ndate: 2026-01-01\n---\n",
         );
         site.write(
             "templates/page.html",
-            &format!("{lead}{{{{ page.summary | safe }}}}\n{{{{ page.content }}}}\n"),
+            &format!(
+                "{{% set link = '<a href=\"/gone/\">x</a>' %}}\n\
+                 {lead}{{{{ link | safe }}}}\n{{{{ page.content }}}}\n"
+            ),
         );
         let (said, code) = site.check_without_javascript(&[]);
         assert_eq!(code, 0, "{said}");
@@ -3369,9 +3528,9 @@ fn a_link_in_a_template_holding_control_characters_is_told_where_it_was_written(
             format!(
                 "\
 warning  Broken link: nothing is published at `/gone/`
-  templates/page.html, line 1
-   1 \u{2502} {shown}{{{{ page.summary | safe }}}}
-     \u{2502} {margin}^^^^^^^^^^^^^^^^^^^^^^^^^
+  templates/page.html, line 2
+   2 \u{2502} {shown}{{{{ link | safe }}}}
+     \u{2502} {margin}^^^^^^^^^^^^^^^^^
   While building: content/post-1.md
   More: https://statac.dev/e/broken-link/
 

@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: a capture is begun with the environment, which may supply its writer; the state is told which instruction makes each call.
+// Changed from MiniJinja 3.0.1 for Statac: a capture is begun with the environment, which may supply its writer; the state is told which instruction makes each call, and each print.
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 #[cfg(feature = "macros")]
@@ -400,7 +400,10 @@ impl<'env> Executor<'env> {
                         }
                         ctx_ok!(write_escaped(out, &state.auto_escape, &value));
                     } else {
-                        ctx_ok!(state.env().format(&value, state, out));
+                        state.printing = Some(pc);
+                        let formatted = state.env().format(&value, state, out);
+                        state.printing = None;
+                        ctx_ok!(formatted);
                     }
                 }
                 Instruction::StoreLocal(name) => {

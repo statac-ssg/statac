@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: each call is given its own span, whatever line its arguments end on.
+// Changed from MiniJinja 3.0.1 for Statac: each call, and each print, is given its own span, whatever line its arguments end on.
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::mem;
@@ -590,7 +590,7 @@ impl<'source> CodeGenerator<'source> {
         }
         self.push_span(expr.expr.span());
         self.compile_expr(&expr.expr);
-        self.add(Instruction::Emit);
+        self.add_with_span(Instruction::Emit, expr.expr.span());
         self.pop_span();
     }
 

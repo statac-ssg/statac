@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: a held-back body may be written into a writer the environment supplies.
+// Changed from MiniJinja 3.0.1 for Statac: a held-back body may be written into a writer the environment supplies, which makes its value.
 use std::ptr::addr_of_mut;
 use std::{fmt, io};
 
@@ -25,8 +25,9 @@ pub enum CaptureMode {
 /// made by the function given to
 /// [`set_held`](crate::Environment::set_held).
 pub trait Held: fmt::Write {
-    /// Gives the text the body's value is made from.
-    fn finish(self: Box<Self>) -> String;
+    /// Gives the body's value, made from its text: marked safe where
+    /// `safe`.
+    fn finish(self: Box<Self>, safe: bool) -> Value;
 }
 
 /// Where a held-back body is written.
@@ -44,11 +45,12 @@ impl Capture {
         }
     }
 
-    /// Gives the text written.
-    pub(crate) fn finish(self) -> String {
+    /// Gives the value made of the text written: marked safe where `safe`.
+    pub(crate) fn finish(self, safe: bool) -> Value {
         match self {
-            Capture::Text(text) => text,
-            Capture::Held(held) => held.finish(),
+            Capture::Text(text) if safe => Value::from_safe_string(text),
+            Capture::Text(text) => Value::from(text),
+            Capture::Held(held) => held.finish(safe),
         }
     }
 }
@@ -109,12 +111,7 @@ impl<'a> Output<'a> {
     /// Ends capturing and returns the captured string as value.
     pub(crate) fn end_capture(&mut self, auto_escape: &AutoEscape) -> Value {
         let rv = if let Some(captured) = self.capture_stack.pop().unwrap() {
-            let captured = captured.finish();
-            if !matches!(auto_escape, AutoEscape::None) {
-                Value::from_safe_string(captured)
-            } else {
-                Value::from(captured)
-            }
+            captured.finish(!matches!(auto_escape, AutoEscape::None))
         } else {
             Value::UNDEFINED
         };

@@ -12,6 +12,7 @@
 
 use std::cell::RefCell;
 use std::ops::Range;
+use std::sync::Arc;
 use std::{fmt, io};
 
 use minijinja::{Captured, Error, Held, Output, Template, Value};
@@ -19,6 +20,7 @@ use minijinja::{Captured, Error, Held, Output, Template, Value};
 use super::dedent::Head;
 use super::landing::{Deeper, Landing, Place, Placing};
 use crate::html::{Markup, PREFORMATTED};
+use crate::source::Place as SourcePlace;
 
 /// The line a template, or a body the engine holds back, is writing.
 struct Line {
@@ -39,6 +41,8 @@ struct Line {
     /// on an indented line of the template outside `<pre>` and
     /// `<textarea>`, so that its lines line up at the line.
     placed: bool,
+    /// Where the value being written was written, where that is known.
+    printing: Option<Printing>,
 }
 
 thread_local! {
@@ -61,23 +65,80 @@ struct Run {
     len: usize,
 }
 
-/// Where what a template wrote is its own text, in the order written.
+/// A run of what a template wrote as a value: where it lies in the output,
+/// where the value was written, and where in the value's text the run
+/// starts, where it is that text's and not an indent put before a line.
+#[derive(Clone, Debug)]
+struct Print {
+    at: usize,
+    len: usize,
+    within: Option<usize>,
+    from: Printed,
+}
+
+/// Where a value a template printed was written.
+#[derive(Clone, Debug)]
+pub(crate) enum Printed {
+    /// Markup a file of the site holds, as a field or data does: the text
+    /// written at this place.
+    Text(SourcePlace),
+    /// What the template made of anything else, printed at this place:
+    /// what `{{ ... }}` holds; with where its text was written, where a
+    /// body the engine held back or a snippet wrote it.
+    Made(SourcePlace, Option<Arc<Own>>),
+}
+
+/// Where a byte of an output was written.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum Origin {
+    /// A template's own text, written from this address in memory.
+    Own(usize),
+    /// Markup a file of the site holds, written at this place, with where
+    /// in its text the byte is, where that is known.
+    Text(SourcePlace, Option<usize>),
+    /// What a template made, printed at this place.
+    Made(SourcePlace),
+}
+
+/// Where what a template wrote is its own text, and where each value it
+/// printed was written, in the order written.
 #[derive(Default, Debug)]
-pub struct Own(Vec<Run>);
+pub struct Own {
+    runs: Vec<Run>,
+    prints: Vec<Print>,
+}
 
 impl Own {
     /// Where in memory the byte at `at` of the output was written from;
     /// none for a byte of a value's.
     pub(super) fn written_from(&self, at: usize) -> Option<usize> {
-        let after = self.0.partition_point(|run| run.at <= at);
-        let run = self.0[..after].last()?;
+        let after = self.runs.partition_point(|run| run.at <= at);
+        let run = self.runs[..after].last()?;
         (at - run.at < run.len).then(|| run.from + (at - run.at))
+    }
+
+    /// Where the byte at `at` of the output was written: the template's own
+    /// text, or else the value it is part of, followed into the text of a
+    /// body or snippet that wrote that value where it can be.
+    pub(super) fn origin(&self, at: usize) -> Option<Origin> {
+        if let Some(from) = self.written_from(at) {
+            return Some(Origin::Own(from));
+        }
+        let after = self.prints.partition_point(|print| print.at <= at);
+        let print = (self.prints[..after].last()).filter(|print| at - print.at < print.len)?;
+        let within = print.within.map(|within| within + (at - print.at));
+        Some(match &print.from {
+            Printed::Text(place) => Origin::Text(*place, within),
+            Printed::Made(place, inner) => (inner.as_ref().zip(within))
+                .and_then(|(inner, within)| inner.origin(within))
+                .unwrap_or(Origin::Made(*place)),
+        })
     }
 
     /// Forgets what was written from `len` on, which the output no longer
     /// holds.
     fn truncate(&mut self, len: usize) {
-        while let Some(run) = self.0.last_mut() {
+        while let Some(run) = self.runs.last_mut() {
             if run.at + run.len <= len {
                 break;
             }
@@ -85,9 +146,31 @@ impl Own {
                 run.len = len - run.at;
                 break;
             }
-            self.0.pop();
+            self.runs.pop();
+        }
+        while let Some(print) = self.prints.last_mut() {
+            if print.at + print.len <= len {
+                break;
+            }
+            if print.at < len {
+                print.len = len - print.at;
+                break;
+            }
+            self.prints.pop();
         }
     }
+
+    /// Whether nothing is known of where any of the output was written.
+    pub(super) fn is_empty(&self) -> bool {
+        self.runs.is_empty() && self.prints.is_empty()
+    }
+}
+
+/// A value being written: where it was written, and where its text is in
+/// memory, by address and length.
+struct Printing {
+    from: Printed,
+    text: (usize, usize),
 }
 
 /// What one template writes, or one body the engine holds back as it
@@ -127,6 +210,7 @@ impl Sink {
                 ended: false,
                 value: false,
                 placed: false,
+                printing: None,
             });
         });
         Self {
@@ -312,9 +396,10 @@ impl fmt::Write for Body {
 }
 
 impl Held for Body {
-    fn finish(mut self: Box<Self>) -> String {
+    fn finish(mut self: Box<Self>, safe: bool) -> Value {
         let out = std::mem::take(&mut self.0.layout.out);
-        String::from_utf8(out).expect("templates write text")
+        let text = String::from_utf8(out).expect("templates write text");
+        super::frame::made(text, std::mem::take(&mut self.0.layout.own), safe)
     }
 }
 
@@ -430,12 +515,26 @@ impl Layout {
                     line.emptied = false;
                 }
             }
-            if !line.value && !text.is_empty() {
-                self.own.0.push(Run {
-                    at: self.out.len(),
-                    from: text.as_ptr() as usize,
-                    len: text.len(),
-                });
+            if !text.is_empty() {
+                let from = text.as_ptr() as usize;
+                match (line.value, &line.printing) {
+                    (false, _) => self.own.runs.push(Run {
+                        at: self.out.len(),
+                        from,
+                        len: text.len(),
+                    }),
+                    (true, Some(printing)) => {
+                        let (start, len) = printing.text;
+                        let inside = from >= start && from + text.len() <= start + len;
+                        self.own.prints.push(Print {
+                            at: self.out.len(),
+                            len: text.len(),
+                            within: inside.then(|| from - start),
+                            from: printing.from.clone(),
+                        });
+                    }
+                    (true, None) => {}
+                }
             }
             self.out.extend_from_slice(text);
             let tail = match text.iter().rposition(|&byte| byte == b'\n') {
@@ -526,19 +625,29 @@ pub(super) fn at_line_start() -> bool {
     LINES.with_borrow(|lines| lines.last().is_some_and(|line| line.open))
 }
 
-/// Runs `write`, which writes a value, so that the line endings it writes
-/// are known for the value's.
-pub(super) fn value<T>(write: impl FnOnce() -> T) -> T {
-    let set = |value| {
+/// Runs `write`, which writes a value, of `text` where it is text, written
+/// at `printed`, so that the line endings it writes are known for the
+/// value's.
+pub(super) fn value<T>(
+    printed: Option<Printed>,
+    text: Option<&str>,
+    write: impl FnOnce() -> T,
+) -> T {
+    let printing = printed.map(|from| Printing {
+        from,
+        text: text.map_or((0, 0), |text| (text.as_ptr() as usize, text.len())),
+    });
+    let set = |value, printing| {
         LINES.with_borrow_mut(|lines| {
             if let Some(line) = lines.last_mut() {
                 line.value = value;
+                line.printing = printing;
             }
         });
     };
-    set(true);
+    set(true, printing);
     let written = write();
-    set(false);
+    set(false, None);
     written
 }
 
@@ -585,8 +694,10 @@ pub(super) fn write(out: &mut Output, markup: &str) -> Option<Result<(), Error>>
         return None;
     }
     let shared = if placed { shared(markup) } else { "" };
+    // Written a piece at a time, so each line is written from the
+    // markup's own text and found there.
     Some(
-        out.write_str(&indented(markup, shared, &indent))
+        indent_into(markup, shared, &indent, |piece| out.write_str(piece))
             .map_err(|_| Error::from(minijinja::ErrorKind::WriteFailure)),
     )
 }
@@ -615,12 +726,28 @@ fn shared(markup: &str) -> &str {
     shared.unwrap_or("")
 }
 
-/// `markup` with `indent` before each line after its first, in place of
-/// `shared` before each line. An empty line stays empty, and so does a
-/// line the spaces would change: one inside `<pre>` or `<textarea>`, where
-/// they would show, or inside an attribute's value.
+/// What [`indent_into`] puts, as one text.
+#[cfg(test)]
 fn indented(markup: &str, shared: &str, indent: &str) -> String {
     let mut out = String::with_capacity(markup.len() + markup.len() / 8);
+    let _ = indent_into(markup, shared, indent, |piece| {
+        out.push_str(piece);
+        Ok(())
+    });
+    out
+}
+
+/// Puts `markup` with `indent` before each line after its first, in place
+/// of `shared` before each line, a piece at a time, each piece the indent
+/// or part of `markup` itself. An empty line stays empty, and so does a
+/// line the spaces would change: one inside `<pre>` or `<textarea>`, where
+/// they would show, or inside an attribute's value.
+fn indent_into(
+    markup: &str,
+    shared: &str,
+    indent: &str,
+    mut put: impl FnMut(&str) -> fmt::Result,
+) -> fmt::Result {
     let kept = kept_as_written(markup);
     for (number, line) in markup.split_inclusive('\n').enumerate() {
         let takes = !kept[number];
@@ -630,11 +757,11 @@ fn indented(markup: &str, shared: &str, indent: &str) -> String {
             _ => line,
         };
         if number > 0 && takes && !matches!(rest, "\n" | "\r\n") {
-            out.push_str(indent);
+            put(indent)?;
         }
-        out.push_str(rest);
+        put(rest)?;
     }
-    out
+    Ok(())
 }
 
 /// For each line of `markup`, whether spaces before it would change it:
@@ -694,7 +821,10 @@ mod tests {
     #[test]
     fn a_templates_own_text_is_found_where_it_was_written_from() {
         let run = |at, from, len| Run { at, from, len };
-        let mut own = Own(vec![run(0, 100, 4), run(6, 110, 3), run(9, 200, 5)]);
+        let mut own = Own {
+            runs: vec![run(0, 100, 4), run(6, 110, 3), run(9, 200, 5)],
+            prints: Vec::new(),
+        };
         assert_eq!(own.written_from(0), Some(100));
         assert_eq!(own.written_from(3), Some(103));
         // Between two runs a value was written.

@@ -12,7 +12,7 @@ use minijinja::{Environment, Error, State};
 use super::card::Gathered;
 use super::files::{Snippet, Unnamed, unnamed_fills};
 use super::frame::{self, Frame, Handed, Stop};
-use super::indent::Own;
+use super::indent::{Origin, Own};
 use super::layout::{self, Chosen};
 use super::values::{ListValue, PageValue, SiteValue};
 use super::{Templates, explain};
@@ -30,7 +30,7 @@ use crate::reads::{Asked, Key, Reads};
 use crate::site::{
     Id, LanguageId, ListId, NameId, Names, PageId, PictureId, Redirect, SentTo, Site, TemplateId,
 };
-use crate::source::{Place, SourceId, Sources};
+use crate::source::{Place, SourceId, Sources, Span};
 
 /// Everything a page is built from, shared by every page built.
 pub(super) struct Shared {
@@ -667,8 +667,61 @@ impl Renderer {
     /// where in that template it is written; none for a byte of a value's,
     /// or of a snippet's.
     pub fn written_at(&self, own: &Own, at: usize) -> Option<(TemplateId, usize)> {
-        let (file, offset) = self.shared.templates.holds(own.written_from(at)?)?;
+        let Origin::Own(from) = own.origin(at)? else {
+            return None;
+        };
+        let (file, offset) = self.shared.templates.holds(from)?;
         Some((Templates::id(file), offset))
+    }
+
+    /// Where the value holding bytes `at..at + len` of an output was
+    /// written: in a file of the site holding it as markup, those bytes
+    /// where the file spells them as the output has them, at the same
+    /// place in the text or the only place they are, else the whole text;
+    /// for what a template made, the `{{ ... }}` printing it. None for the
+    /// template's own text, or a value printed nowhere known.
+    pub fn printed_at(&self, own: &Own, html: &str, at: usize, len: usize) -> Option<Place> {
+        let sources = &self.shared.sources;
+        match own.origin(at)? {
+            Origin::Own(_) => None,
+            Origin::Text(place, within) => {
+                let spelling = sources.spelling(place);
+                let wanted = html.get(at..at + len)?;
+                let mut found = spelling.match_indices(wanted).map(|(at, _)| at);
+                let first = found.next();
+                let same = |within: &usize| spelling.get(*within..*within + len) == Some(wanted);
+                let within = within
+                    .filter(same)
+                    .or_else(|| first.filter(|_| found.next().is_none()));
+                Some(match within {
+                    Some(within) => {
+                        let start = place.span.start as usize + within;
+                        Place {
+                            source: place.source,
+                            span: Span::new(start, start + len),
+                        }
+                    }
+                    None => place,
+                })
+            }
+            Origin::Made(place) => {
+                let text = sources.text(place.source);
+                let (start, end) = (place.span.start as usize, place.span.end as usize);
+                let opens = text[..start].rfind("{{")?;
+                let closes = end + text[end..].find("}}")? + 2;
+                Some(Place {
+                    source: place.source,
+                    span: Span::new(opens, closes),
+                })
+            }
+        }
+    }
+
+    /// The template or snippet read from `source`, where it is one.
+    pub fn template_of(&self, source: SourceId) -> Option<TemplateId> {
+        let files = &self.shared.templates.files;
+        let at = files.iter().position(|file| file.source == source)?;
+        Some(Templates::id(at))
     }
 
     /// The file a template or snippet is read from.
@@ -2142,7 +2195,8 @@ impl markdown::Snippets for Prose<'_> {
             let site = SiteValue::value(shared, frame::language());
             let before = frame::with(|frame| frame.calling.replace(place)).flatten();
             let standalone = placement == Placement::Standalone;
-            let built = build_snippet(shared, snippet, handed, page, site, None, standalone);
+            let built = build_snippet(shared, snippet, handed, page, site, None, standalone)
+                .map(|(html, _)| html);
             frame::with(|frame| frame.calling = before);
             match built {
                 Ok(html) => html,
@@ -2213,7 +2267,7 @@ fn build_snippet(
     site: Value,
     calling: Option<&State>,
     begins: bool,
-) -> Result<String, Error> {
+) -> Result<(String, Own), Error> {
     let templates = &shared.templates;
     frame::read(Key::Template(Templates::id(snippet.file)));
     if templates.unusable.contains(&snippet.file) {
@@ -2229,6 +2283,7 @@ fn build_snippet(
     context.insert("page".into(), page);
     context.insert("site".into(), site);
     let name = &templates.files[snippet.file].name;
+    let mut written = Own::default();
     frame::begin(snippet.file, calling)?;
     frame::with(|frame| frame.snippets.push(snippet.name.clone()));
     let built = templates
@@ -2253,11 +2308,12 @@ fn build_snippet(
                 Some((Templates::id(file), offset))
             });
             frame::with(|frame| frame.snipped.extend(snipped));
+            written = own;
             (captured, text)
         });
     frame::with(|frame| frame.snippets.pop());
     let built = frame::end(snippet.file, built)?;
-    built.map_err(|inner| {
+    built.map(|html| (html, written)).map_err(|inner| {
         let kind = inner.kind();
         let handed = Handed {
             snippet: snippet.name.clone(),
@@ -2345,7 +2401,7 @@ pub(super) fn register_snippet(env: &mut Environment<'static>, snippet: &Snippet
         let site = state.lookup("site").unwrap_or_default();
         let begins = super::indent::at_line_start();
         build_snippet(&shared, &snippet, handed, page, site, Some(state), begins)
-            .map(Value::from_safe_string)
+            .map(|(html, own)| frame::made(html, own, true))
     });
 }
 

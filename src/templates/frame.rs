@@ -11,6 +11,7 @@ use std::sync::Arc;
 use minijinja::{Captured, State, Value};
 
 use super::guard::{Failed, Refusal};
+use super::indent::Own;
 use super::render::Shared;
 use crate::assets::PageScripts;
 use crate::problem::{Kind, Problem, Stopped};
@@ -54,6 +55,10 @@ pub(super) struct Frame {
     /// Where each text the output was handed is written, by its bytes'
     /// address and length, the text kept so no other takes its address.
     pub origins: HashMap<(usize, usize), (Value, Place)>,
+    /// Where what each text a body the engine held back or a snippet made
+    /// was written, by the text's address and length, the text kept so no
+    /// other takes its address.
+    pub made: HashMap<(usize, usize), (Value, Arc<Own>)>,
     /// Where the writing makes the call, or shows the picture, whose
     /// snippet or piece is being built.
     pub calling: Option<Place>,
@@ -158,6 +163,7 @@ impl Frame {
             snippets: Vec::new(),
             scripts: PageScripts::default(),
             origins: HashMap::new(),
+            made: HashMap::new(),
             calling: None,
             undescribed: Vec::new(),
             search_boxes: 0,
@@ -333,6 +339,44 @@ pub(super) fn sourced(text: &str, place: Place) -> Value {
             .insert(address(&value), (value.clone(), place))
     });
     value
+}
+
+/// `made`, a copy of `text`, as a value that remembers where `text` was
+/// written, where that is known.
+pub(super) fn copied(text: &Value, made: Value) -> Value {
+    if !made.as_str().is_some_and(|made| !made.is_empty()) {
+        return made;
+    }
+    if let Some(place) = origin(text) {
+        with(|frame| frame.origins.insert(address(&made), (made.clone(), place)));
+    } else if let Some(own) = written(text) {
+        with(|frame| frame.made.insert(address(&made), (made.clone(), own)));
+    }
+    made
+}
+
+/// `text`, which a body the engine held back or a snippet wrote, as a
+/// value that remembers where what it holds was written: marked safe where
+/// `safe`.
+pub(super) fn made(text: String, own: Own, safe: bool) -> Value {
+    let value = match safe {
+        true => Value::from_safe_string(text),
+        false => Value::from(text),
+    };
+    if !own.is_empty() && value.as_str().is_some_and(|text| !text.is_empty()) {
+        let kept = (value.clone(), Arc::new(own));
+        with(|frame| frame.made.insert(address(&value), kept));
+    }
+    value
+}
+
+/// Where what a text holds was written, where a body the engine held back
+/// or a snippet made it, as [`made`] keeps it.
+pub(super) fn written(value: &Value) -> Option<Arc<Own>> {
+    let key = value.as_str().map(|_| address(value))?;
+    FRAMES.with_borrow(|frames| {
+        (frames.iter().rev()).find_map(|frame| frame.made.get(&key).map(|(_, own)| own.clone()))
+    })
 }
 
 /// Where a text was written, where it is one handed out by [`sourced`] or

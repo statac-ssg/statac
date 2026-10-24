@@ -17,9 +17,10 @@ warning  Broken link: nothing is published at `/about-us/`
 Statac knows every address it publishes. Once the site is built, it
 follows every link on every page that points to this site, as a browser
 would, and tells you if a link leads to an address with nothing published
-at it. If the link is in your writing, the warning shows its line. If a
-template or snippet wrote the link, the warning shows the line that wrote
-it, and the page the link is on. Statac still publishes the page, with the
+at it. If the link is in your writing, or in markup a field or data file
+holds that a template prints, the warning shows its line. If a template
+or snippet wrote the link, the warning shows the line that wrote it, and
+the page the link is on. Statac still publishes the page, with the
 link as you wrote it, because the link may point at something you are
 about to add. It publishes a redirect the same way. Statac doesn't check
 links to other sites, because a build never fetches anything.

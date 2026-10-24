@@ -25,6 +25,7 @@ use minijinja::value::{Rest, Value, ValueKind, ValueOrKwargs};
 use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 use super::frame::{self, Stop};
+use super::indent::Printed;
 use crate::problem::{Kind, Stopped, Wanted};
 
 /// Every filter the engine ships, by the name templates use. A filter not
@@ -667,12 +668,29 @@ pub(super) fn writes_json(state: &State) -> bool {
     matches!(state.auto_escape(), minijinja::AutoEscape::Custom(name) if name == JSON)
 }
 
+/// Where `value`, which the template `state` renders is printing, was
+/// written: where a file of the site holds it, for markup printed whole,
+/// or else the print.
+fn printed(state: &State, value: &Value) -> Option<Printed> {
+    if value.is_safe()
+        && let Some(place) = frame::origin(value)
+    {
+        return Some(Printed::Text(place));
+    }
+    let span = state.printing_span()?;
+    let shared = frame::shared()?;
+    let &at = shared.templates.by_name.get(state.name())?;
+    let source = shared.templates.files[at].source;
+    let place = super::check::place(source, span);
+    Some(Printed::Made(place, frame::written(value)))
+}
+
 /// Sets semi-strict undefined, and replaces the formatter and every
 /// built-in filter, test and function with its guarded form.
 pub(super) fn install(env: &mut Environment<'_>) {
     env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
     env.set_formatter(|out, state, value| {
-        super::indent::value(|| {
+        super::indent::value(printed(state, value), value.as_str(), || {
             if let Some(found) = find_missing(value, true) {
                 return Err(refuse("", Callee::Print, Role::Input, found));
             }
@@ -725,11 +743,16 @@ pub(super) fn install(env: &mut Environment<'_>) {
             let args = args.into_values();
             check_args(name, Callee::Filter, &args, input)?;
             check_by_field(name, &args)?;
-            match selects {
+            let made = match selects {
                 true => select_or_reject(state, name, &args),
                 false => inner.call(state, &args),
             }
-            .map_err(|error| failed(name, &args, error))
+            .map_err(|error| failed(name, &args, error))?;
+            // Markup a file holds, marked safe, is still found there.
+            Ok::<Value, Error>(match (name, args.first()) {
+                ("safe", Some(text)) => frame::copied(text, made),
+                _ => made,
+            })
         });
     }
     for &name in TESTS {

@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: `calling_span` says where the call running now is written.
+// Changed from MiniJinja 3.0.1 for Statac: `calling_span` says where the call running now is written, and `printing_span` the print.
 use std::any::{Any, TypeId};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -51,6 +51,9 @@ pub struct State<'template, 'env> {
     /// The instruction calling the filter, test, function or method
     /// running now, in `instructions`.
     pub(crate) calling: Option<u32>,
+    /// The instruction printing the value being formatted, in
+    /// `instructions`.
+    pub(crate) printing: Option<u32>,
     pub(crate) temps: BTreeMap<Box<str>, Value>,
     pub(crate) extensions: BTreeMap<TypeId, Box<dyn Any + Send>>,
     #[cfg(feature = "multi_template")]
@@ -116,6 +119,7 @@ impl<'template, 'env> State<'template, 'env> {
             auto_escape,
             instructions,
             calling: None,
+            printing: None,
             #[cfg(feature = "multi_template")]
             blocks,
             temps: Default::default(),
@@ -166,6 +170,13 @@ impl<'template, 'env> State<'template, 'env> {
         self.instructions.get_span(self.calling?)
     }
 
+    /// Returns where in the current template the value being formatted is
+    /// printed: the span of the expression in `{{ ... }}`. Only in debug
+    /// mode, and only while the formatter runs.
+    pub fn printing_span(&self) -> Option<Span> {
+        self.instructions.get_span(self.printing?)
+    }
+
     /// Returns the current value of the auto escape flag.
     #[inline(always)]
     pub fn auto_escape(&self) -> &AutoEscape {
@@ -189,6 +200,7 @@ impl<'template, 'env> State<'template, 'env> {
         };
         let old_instructions = std::mem::replace(&mut self.instructions, instructions);
         let old_calling = self.calling.take();
+        let old_printing = self.printing.take();
         let old_auto_escape = std::mem::replace(&mut self.auto_escape, auto_escape);
         #[cfg(feature = "multi_template")]
         let old_current_block = std::mem::replace(&mut self.current_block, current_block);
@@ -221,6 +233,7 @@ impl<'template, 'env> State<'template, 'env> {
         }
         self.instructions = old_instructions;
         self.calling = old_calling;
+        self.printing = old_printing;
         self.auto_escape = old_auto_escape;
         #[cfg(feature = "multi_template")]
         {

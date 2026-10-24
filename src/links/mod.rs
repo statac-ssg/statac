@@ -174,8 +174,13 @@ impl Checked {
                     Blame::Writing(place, handed) => Blame::Writing(to.place(*place)?, *handed),
                     Blame::Shown(place, handed) => Blame::Shown(to.place(*place)?, *handed),
                     Blame::Template(found, placed) => {
-                        let placed = match *placed {
-                            Some((template, at)) => Some((to.template(template)?, at)),
+                        let placed = match placed {
+                            Some(Placed::Attribute(template, at)) => {
+                                Some(Placed::Attribute(to.template(*template)?, *at))
+                            }
+                            Some(Placed::Printed(place)) => {
+                                Some(Placed::Printed(to.place(*place)?))
+                            }
                             None => None,
                         };
                         Blame::Template(found.clone(), placed)
@@ -219,10 +224,19 @@ enum Blame {
     /// Another page's writing, at this place, shown on the page, and
     /// whether as a value handed to a snippet call.
     Shown(Place, bool),
-    /// A template or snippet, writing this link in its tag: where the
-    /// tag is a template's own text, the template and where in it the
+    /// A template or snippet, writing this link in its tag, placed where
+    /// that is known.
+    Template(Box<Found>, Option<Placed>),
+}
+
+/// Where a link a template or snippet wrote was written.
+#[derive(Clone, Debug)]
+enum Placed {
+    /// The tag is a template's own text: the template, and where in it the
     /// attribute's value starts.
-    Template(Box<Found>, Option<(TemplateId, usize)>),
+    Attribute(TemplateId, usize),
+    /// The tag is in a value the template printed, written here.
+    Printed(Place),
 }
 
 /// Another page's writing shown on the page being checked, with each
@@ -325,28 +339,41 @@ impl Site {
                 }
                 checked.reached.extend(file);
             }
+            // What opens the value, a quote or the `=`, is the template's
+            // own where the template wrote the attribute: no writing's.
+            let mut placed = link
+                .at
+                .checked_sub(1)
+                .and_then(|opens| renderer.written_at(page.own, opens))
+                .map(|(template, opens)| Placed::Attribute(template, opens + 1));
             let key = address::decoded(&written);
-            if let Some(count) = left.get_mut(&key).filter(|count| **count > 0) {
+            if placed.is_none()
+                && let Some(count) = left.get_mut(&key).filter(|count| **count > 0)
+            {
                 *count -= 1;
                 continue;
             }
             let same = |w: &&Linked| address::decoded(&w.address) == key;
-            if let Some(handed) = own.and_then(|own| own.handed.iter().find(same)) {
+            if placed.is_none()
+                && let Some(handed) = own.and_then(|own| own.handed.iter().find(same))
+            {
                 let blame = Blame::Writing(handed.place, handed.handed);
                 self.follow(&written, &from, blame, &mut checked);
                 continue;
             }
-            let other = shown.iter().find_map(|shown| {
-                let writing = shown.writing;
-                let (w, _) = writing
-                    .written
-                    .iter()
-                    .chain(&writing.handed)
-                    .zip(&shown.linked)
-                    .find(|(w, moved)| same(w) || moved.as_deref() == Some(key.as_str()))?;
-                Some((shown.page, w))
+            let other = placed.is_none().then(|| {
+                shown.iter().find_map(|shown| {
+                    let writing = shown.writing;
+                    let (w, _) = writing
+                        .written
+                        .iter()
+                        .chain(&writing.handed)
+                        .zip(&shown.linked)
+                        .find(|(w, moved)| same(w) || moved.as_deref() == Some(key.as_str()))?;
+                    Some((shown.page, w))
+                })
             });
-            if let Some((other, w)) = other {
+            if let Some((other, w)) = other.flatten() {
                 let here = self.leads(&written, &from);
                 let there = site.pages.get(other);
                 // Where it leads the same from its own page, it is told
@@ -361,13 +388,6 @@ impl Site {
                 }
                 continue;
             }
-            // What opens the value, a quote or the `=`, is the template's
-            // own where the template wrote the attribute.
-            let mut placed = link
-                .at
-                .checked_sub(1)
-                .and_then(|opens| renderer.written_at(page.own, opens))
-                .map(|(template, opens)| (template, opens + 1));
             // Else a snippet wrote it in its own text: each of a snippet's
             // links with the same address is taken once, in order.
             if placed.is_none() {
@@ -379,7 +399,7 @@ impl Site {
                     .or(same.first());
                 if let Some(&at) = at {
                     placed_at.insert(at);
-                    placed = Some((snipped[at].template, snipped[at].at));
+                    placed = Some(Placed::Attribute(snipped[at].template, snipped[at].at));
                 }
             }
             // Or a snippet in another page's writing shown here, which is
@@ -401,8 +421,13 @@ impl Site {
                     {
                         continue;
                     }
-                    placed = Some((s.template, s.at));
+                    placed = Some(Placed::Attribute(s.template, s.at));
                 }
+            }
+            // Else it is in a value a template printed.
+            if placed.is_none() {
+                placed = (renderer.printed_at(page.own, html, link.at, link.raw.len()))
+                    .map(Placed::Printed);
             }
             let blame = Blame::Template(Box::new(link.clone()), placed);
             self.follow(&written, &from, blame, &mut checked);
@@ -529,6 +554,16 @@ impl Site {
                     let kind = self.kind(miss, page, there, wrote, named(*place), false);
                     building(renderer, page, Problem::at(kind, *place))
                 }
+                Blame::Template(_, Some(Placed::Printed(place)))
+                    if renderer.template_of(place.source).is_none() =>
+                {
+                    let wrote = Wrote {
+                        helper: None,
+                        used: false,
+                    };
+                    let kind = self.kind(miss, page, there, wrote, None, false);
+                    building(renderer, page, Problem::at(kind, *place))
+                }
                 Blame::Template(found, placed) => {
                     for &template in &page.templates {
                         templates.entry(template).or_insert_with(|| {
@@ -540,9 +575,15 @@ impl Site {
                         .templates
                         .iter()
                         .map(|template| (*template, &templates[template]));
-                    let placed = placed.and_then(|(template, at)| {
-                        let at = templates.get(&template)?.written_at(at)?;
-                        Some((template, at))
+                    let placed = placed.as_ref().and_then(|placed| match *placed {
+                        Placed::Attribute(template, at) => {
+                            Some((template, templates.get(&template)?.written_at(at)?))
+                        }
+                        Placed::Printed(place) => {
+                            let template = renderer.template_of(place.source)?;
+                            let at = place.span.start as usize..place.span.end as usize;
+                            Some((template, at))
+                        }
                     });
                     let best = placed.or_else(|| blame::best(candidates, found));
                     let wrote = match &best {

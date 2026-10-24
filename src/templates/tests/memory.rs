@@ -54,8 +54,11 @@ impl fmt::Write for Body {
 }
 
 impl Held for Body {
-    fn finish(self: Box<Self>) -> String {
-        self.0
+    fn finish(self: Box<Self>, safe: bool) -> Value {
+        match safe {
+            true => Value::from_safe_string(self.0),
+            false => Value::from(self.0),
+        }
     }
 }
 
@@ -131,9 +134,12 @@ impl fmt::Write for Shouting {
 }
 
 impl Held for Shouting {
-    fn finish(self: Box<Self>) -> String {
+    fn finish(self: Box<Self>, safe: bool) -> Value {
         self.seen.lock().unwrap().push(self.text.clone());
-        self.text.to_uppercase()
+        match safe {
+            true => Value::from_safe_string(self.text.to_uppercase()),
+            false => Value::from(self.text.to_uppercase()),
+        }
     }
 }
 

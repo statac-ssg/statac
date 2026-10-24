@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: a macro's body is written into the writer the environment may supply.
+// Changed from MiniJinja 3.0.1 for Statac: a macro's body is written into the writer the environment may supply, which makes its value.
 use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
@@ -133,13 +133,7 @@ impl Object for Macro {
             caller,
             arg_values
         ));
-        let rv = rv.finish();
-
-        Ok(if !matches!(state.auto_escape(), AutoEscape::None) {
-            Value::from_safe_string(rv)
-        } else {
-            Value::from(rv)
-        })
+        Ok(rv.finish(!matches!(state.auto_escape(), AutoEscape::None)))
     }
 
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
