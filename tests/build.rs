@@ -3069,6 +3069,42 @@ warning  Broken link: nothing is published at `/abot/`
     );
 }
 
+/// Each address a `srcset` lists is told where it was written, not where
+/// the first was.
+#[test]
+fn each_address_a_srcset_lists_is_told_where_written() {
+    let site = Site::new("links-srcset-fields");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write(
+        "templates/home.html",
+        "<title>{{ page.title }}</title>\n<img src=\"{{ page.small }}\" \
+         srcset=\"{{ page.small }} 1x, {{ page.large }} 2x\" alt=\"\">\n",
+    );
+    site.write(
+        "content/index.md",
+        "---\ntitle: Home\nsmall: /small.jpg\nlarge: /large.jpg\n---\n",
+    );
+    site.write("static/small.jpg", "");
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/large.jpg`
+  content/index.md, line 4
+   4 │ large: /large.jpg
+     │        ^^^^^^^^^^
+  While building: content/index.md
+  More: https://statac.dev/e/broken-link/
+
+1 warning: 1 broken-link.
+"
+    );
+}
+
 /// A link in a field or data made into HTML by `markdown` is told where
 /// the field or data writes it, and one in writing a snippet changes with
 /// `replace`, in the writing.

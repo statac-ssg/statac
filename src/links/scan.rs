@@ -39,8 +39,10 @@ pub(super) struct Found {
     /// As written in the HTML, its character references undecoded.
     pub raw: String,
     pub before: Option<Tagged>,
-    /// Where the attribute's value starts on the page.
+    /// Where it starts on the page.
     pub at: usize,
+    /// Where the attribute's value starts on the page.
+    pub value: usize,
 }
 
 /// A start tag on a built page: its name, and each attribute's name and
@@ -92,13 +94,15 @@ pub(super) fn scan(html: &str) -> Scanned {
                     let Some(kind) = Attribute::of(name) else {
                         continue;
                     };
-                    for (raw, _) in addresses(&attribute.value, kind == Attribute::Srcset, 0) {
+                    let value = attribute.at.start;
+                    for (raw, at) in addresses(&attribute.value, kind == Attribute::Srcset, value) {
                         scanned.links.push(Found {
                             tag: this.clone(),
                             attribute: kind,
                             raw: raw.to_owned(),
                             before: before.clone(),
-                            at: attribute.at.start,
+                            at,
+                            value,
                         });
                     }
                 }

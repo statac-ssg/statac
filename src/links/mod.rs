@@ -75,7 +75,7 @@ pub(crate) fn snipped(
         .filter_map(|link| {
             // What opens the value, a quote or the `=`, is the template's
             // own where the template wrote the attribute.
-            let (template, opens) = written_at(link.at.checked_sub(1)?)?;
+            let (template, opens) = written_at(link.value.checked_sub(1)?)?;
             Some(Snipped {
                 address: link.address(),
                 template,
@@ -348,7 +348,7 @@ impl Site {
             // Else what opens the value, a quote or the `=`, is a template's
             // own where the template wrote the attribute.
             let mut placed = (in_file.is_none())
-                .then(|| renderer.written_at(page.own, link.at.checked_sub(1)?))
+                .then(|| renderer.written_at(page.own, link.value.checked_sub(1)?))
                 .flatten()
                 .map(|(template, opens)| Placed::Attribute(template, opens + 1));
             // A template's link in another page's writing shown here, as a

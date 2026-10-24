@@ -289,6 +289,12 @@ fn a_page_is_read_for_its_links_and_ids_as_a_browser_reads_it() {
         ("class".into(), "next".into())
     );
     assert_eq!(scanned.links[0].before.as_ref().unwrap().name, "p");
+    // Each where it is on the page, a candidate of a `srcset` too.
+    for link in &scanned.links {
+        assert_eq!(&html[link.at..link.at + link.raw.len()], link.raw);
+    }
+    let srcset = html.find("srcset=\"").unwrap() + "srcset=\"".len();
+    assert!(scanned.links[2..5].iter().all(|link| link.value == srcset));
 }
 
 /// The attribute each link on a built page is placed at, of the template's.
