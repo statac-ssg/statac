@@ -359,12 +359,18 @@ pub(super) fn copied(text: &Value, made: Value) -> Value {
 /// value that remembers where what it holds was written: marked safe where
 /// `safe`.
 pub(super) fn made(text: String, own: Own, safe: bool) -> Value {
+    kept(text, Arc::new(own), safe)
+}
+
+/// `text` as [`made`] gives it, with `own` saying where what it holds was
+/// written.
+pub(super) fn kept(text: String, own: Arc<Own>, safe: bool) -> Value {
     let value = match safe {
         true => Value::from_safe_string(text),
         false => Value::from(text),
     };
     if !own.is_empty() && value.as_str().is_some_and(|text| !text.is_empty()) {
-        let kept = (value.clone(), Arc::new(own));
+        let kept = (value.clone(), own);
         with(|frame| frame.made.insert(address(&value), kept));
     }
     value

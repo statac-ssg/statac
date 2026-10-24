@@ -248,6 +248,8 @@ impl Shared {
 #[derive(Debug)]
 pub(super) struct Body {
     written: markdown::Written,
+    /// Where each part of `written`'s HTML is written in the page's file.
+    traced: Arc<Own>,
     reads: Reads,
     /// Those of `reads` reading the writing as Markdown read, which its
     /// headings turn on.
@@ -1321,7 +1323,16 @@ fn build_body_untimed(
             Some(source) => {
                 undescribed_in_html(shared, page, source, p.body);
                 links.written = crate::links::written_in_html(&shared.sources, source, p.body);
-                markdown::as_written(&shared.sources.text(source)[p.body.range()])
+                let mut written =
+                    markdown::as_written(&shared.sources.text(source)[p.body.range()]);
+                written.traced = vec![(
+                    0..written.html.len(),
+                    Place {
+                        source,
+                        span: p.body,
+                    },
+                )];
+                written
             }
             None => markdown::Written::default(),
         },
@@ -1416,8 +1427,14 @@ fn build_body_untimed(
     problems.append(&mut frame.problems);
     let wordless = wordless.into_iter().map(Problem::nowhere);
     problems.extend(wordless.map(|problem| met_building(problem, &frame)));
+    let traced = Arc::new(Own::of_writing(
+        &written.traced,
+        &written.html,
+        &shared.sources,
+    ));
     Body {
         written,
+        traced,
         undescribed: frame.undescribed,
         reads: frame.reads,
         reading,
@@ -1757,10 +1774,12 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         let counted = matches!(part, Part::Content)
             && body.search_boxes > 0
             && making == Some(frame::Making::Output);
-        return Some(Value::from_safe_string(match counted {
-            true => among_the_pages_boxes(shared, page, &body),
-            false => own.clone(),
-        }));
+        // Only the writing as built is known where each part is written.
+        return Some(match (counted, part) {
+            (true, _) => Value::from_safe_string(among_the_pages_boxes(shared, page, &body)),
+            (false, Part::Content) => frame::kept(own.clone(), Arc::clone(&body.traced), true),
+            (false, Part::Excerpt) => Value::from_safe_string(own.clone()),
+        });
     }
     frame::read(Key::Field(page, shared.name_id("url")));
     let elsewhere = body.elsewhere.get_or_init(|| {

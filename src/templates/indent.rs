@@ -164,6 +164,66 @@ impl Own {
     pub(super) fn is_empty(&self) -> bool {
         self.runs.is_empty() && self.prints.is_empty()
     }
+
+    /// Where a page's writing, `html`, is written, from where each part of
+    /// it is in `html`, nested, and where in the page's file that part is:
+    /// each byte the innermost part's, and known within the part where the
+    /// file spells the part as `html` has it.
+    pub(super) fn of_writing(
+        traced: &[(Range<usize>, SourcePlace)],
+        html: &str,
+        sources: &crate::source::Sources,
+    ) -> Own {
+        let mut order: Vec<usize> = (0..traced.len()).collect();
+        order.sort_by_key(|&at| (traced[at].0.start, std::cmp::Reverse(traced[at].0.end)));
+        let mut spelt: Vec<Option<bool>> = vec![None; traced.len()];
+        let mut prints = Vec::new();
+        let mut put = |from: usize, to: usize, part: usize| {
+            if from >= to {
+                return;
+            }
+            let (range, place) = &traced[part];
+            let same = *spelt[part]
+                .get_or_insert_with(|| html.get(range.clone()) == Some(sources.spelling(*place)));
+            prints.push(Print {
+                at: from,
+                len: to - from,
+                within: same.then(|| from - range.start),
+                from: Printed::Text(*place),
+            });
+        };
+        // The parts open around the byte reached, innermost last, each with
+        // where it ends.
+        let mut open: Vec<(usize, usize)> = Vec::new();
+        let mut reached = 0;
+        for at in order {
+            let range = &traced[at].0;
+            while let Some(&(end, part)) = open.last() {
+                if end > range.start {
+                    break;
+                }
+                put(reached, end, part);
+                reached = reached.max(end);
+                open.pop();
+            }
+            if let Some(&(_, part)) = open.last() {
+                put(reached, range.start, part);
+            }
+            reached = reached.max(range.start);
+            let end = open
+                .last()
+                .map_or(range.end, |&(end, _)| range.end.min(end));
+            open.push((end, at));
+        }
+        while let Some((end, part)) = open.pop() {
+            put(reached, end, part);
+            reached = reached.max(end);
+        }
+        Own {
+            runs: Vec::new(),
+            prints,
+        }
+    }
 }
 
 /// A value being written: where it was written, and where its text is in
@@ -816,7 +876,47 @@ fn kept_as_written(markup: &str) -> Vec<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Own, Run, indented, shared};
+    use super::{Origin, Own, Run, indented, shared};
+    use crate::source::{Place, Sources, Span};
+
+    #[test]
+    fn each_byte_of_the_writing_is_the_innermost_parts_known_within_it_where_spelt_alike() {
+        let mut sources = Sources::default();
+        let text = "See [a](/a/) and <b>this</b>.";
+        let source = sources.add("content/post-1.md", text.to_owned());
+        let at = |start, end| Place {
+            source,
+            span: Span::new(start, end),
+        };
+        let html = "<p>See <a href=\"/a/\">a</a> and <b>this</b>.</p>";
+        let link = html.find("<a").unwrap()..html.find(" and").unwrap();
+        let tag = html.find("<b>").unwrap()..html.find("<b>").unwrap() + 3;
+        let traced = [
+            (link.clone(), at(4, 12)),
+            (tag.clone(), at(17, 20)),
+            (0..html.len(), at(0, text.len())),
+        ];
+        let own = Own::of_writing(&traced, html, &sources);
+        assert_eq!(own.origin(0), Some(Origin::Text(at(0, text.len()), None)));
+        assert_eq!(
+            own.origin(link.start + 9),
+            Some(Origin::Text(at(4, 12), None))
+        );
+        assert_eq!(
+            own.origin(link.end),
+            Some(Origin::Text(at(0, text.len()), None))
+        );
+        // The tag is written as typed, so each byte is known in it.
+        assert_eq!(
+            own.origin(tag.start + 1),
+            Some(Origin::Text(at(17, 20), Some(1)))
+        );
+        assert_eq!(
+            own.origin(html.len() - 1),
+            Some(Origin::Text(at(0, text.len()), None))
+        );
+        assert_eq!(own.origin(html.len()), None);
+    }
 
     #[test]
     fn a_templates_own_text_is_found_where_it_was_written_from() {

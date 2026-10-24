@@ -34,6 +34,10 @@ pub struct Written {
     /// order: where the part of the writing it heads begins. Footnotes
     /// written at the end fall in the last part.
     pub headings: Vec<(usize, String)>,
+    /// Where in `html` each part of the writing is written, with where it
+    /// is written in the page's file: nested, a part inside the part
+    /// holding it.
+    pub traced: Vec<(Range<usize>, Place)>,
 }
 
 /// Which of the writing's blocks holds the more marker that ends the
@@ -282,6 +286,7 @@ pub fn as_written(html: &str) -> Written {
         words: count_words(html),
         maths: false,
         headings: headings_in_html(html),
+        traced: Vec::new(),
     }
 }
 

@@ -171,6 +171,7 @@ pub fn write(document: &Document, options: &Options<'_>) -> Written {
         words,
         maths: super::uses_maths(document),
         headings: writer.headings,
+        traced: writer.traced,
         html: writer.out,
     }
 }
@@ -226,6 +227,8 @@ struct Writer<'a> {
     /// Where each heading with an id starts in `out`, with the id; only
     /// where this writes the page's own writing.
     headings: Vec<(usize, String)>,
+    /// Where in `out` each node is written, with where the node is.
+    traced: Vec<(Range<usize>, Place)>,
 }
 
 impl<'a> Writer<'a> {
@@ -240,6 +243,7 @@ impl<'a> Writer<'a> {
             frames,
             after_comment: None,
             headings: Vec::new(),
+            traced: Vec::new(),
         }
     }
 
@@ -250,6 +254,20 @@ impl<'a> Writer<'a> {
     }
 
     fn block(&mut self, node: &Node) {
+        let start = self.out.len();
+        self.block_untraced(node);
+        self.trace(start, node);
+    }
+
+    /// Notes that what was written from `start` on is `node`'s.
+    fn trace(&mut self, start: usize, node: &Node) {
+        let end = self.out.len();
+        if start < end {
+            self.traced.push((start..end, node.place));
+        }
+    }
+
+    fn block_untraced(&mut self, node: &Node) {
         match &node.kind {
             Kind::Document => self.blocks(&node.children),
             Kind::Paragraph { tight: true } => self.line(&node.children),
@@ -641,6 +659,14 @@ impl<'a> Writer<'a> {
                     .iter()
                     .map(|cut| cut.start + shift..cut.end + shift),
             );
+            let kept = self.out.len()
+                ..self.out.len() + written.strip_suffix("</p>").unwrap_or(written).len();
+            self.traced
+                .extend((inside.traced.iter()).filter_map(|(at, place)| {
+                    let start = (at.start + shift).max(kept.start);
+                    let end = (at.end + shift).min(kept.end);
+                    (start < end).then_some((start..end, *place))
+                }));
             let body = written.strip_suffix("</p>");
             self.out.push_str(body.unwrap_or(written));
             self.cuts.push(self.out.len()..self.out.len() + back.len());
@@ -669,6 +695,12 @@ impl<'a> Writer<'a> {
     }
 
     fn inline(&mut self, node: &Node) {
+        let start = self.out.len();
+        self.inline_untraced(node);
+        self.trace(start, node);
+    }
+
+    fn inline_untraced(&mut self, node: &Node) {
         if self.after_comment.take() == Some(self.out.len()) {
             match &node.kind {
                 Kind::Text(text) | Kind::Literal(text) if text.starts_with(' ') => {

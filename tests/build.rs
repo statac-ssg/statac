@@ -2973,6 +2973,48 @@ warning  Broken link: nothing is published at `/blog/abot/`
     );
 }
 
+/// A link in the writing, and one in markup a data file holds printed
+/// before the writing, to one address, are each told once where written:
+/// the data file's isn't taken for the writing's.
+#[test]
+fn a_writings_link_and_a_data_files_to_one_address_are_each_told_where_written() {
+    let site = Site::new("writing-and-data");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write("data/links.yaml", "nav: <a href=\"/abot/\">About</a>\n");
+    site.write(
+        "templates/page.html",
+        "{{ site.data.links.nav | safe }}\n{{ page.content }}\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\nSee [about](/abot/).\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/abot/`
+  content/post-1.md, line 5
+   5 │ See [about](/abot/).
+     │             ^^^^^^
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/abot/`
+  data/links.yaml, line 1
+   1 │ nav: <a href=\"/abot/\">About</a>
+     │               ^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+2 warnings: 2 broken-link.
+"
+    );
+}
+
 /// A link a snippet writes from a value is told at the snippet's line,
 /// whether the snippet is called in the writing or by a template, and told
 /// once where that writing is also shown on another page.

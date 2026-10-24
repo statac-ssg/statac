@@ -347,21 +347,63 @@ impl Site {
                 .and_then(|opens| renderer.written_at(page.own, opens))
                 .map(|(template, opens)| Placed::Attribute(template, opens + 1));
             let key = address::decoded(&written);
-            if placed.is_none()
-                && let Some(count) = left.get_mut(&key).filter(|count| **count > 0)
-            {
+            let same = |w: &&Linked| address::decoded(&w.address) == key;
+            // Else where its address was written, where that is known: a
+            // file of the site's, or what a template made.
+            let printed = (placed.is_none())
+                .then(|| renderer.printed_at(page.own, html, link.at, link.raw.len()))
+                .flatten();
+            let in_file = printed.filter(|at| renderer.template_of(at.source).is_none());
+            // In the writing of the page, or of another page shown here, it
+            // is that writing's link at that place, or else of that address.
+            let writer = in_file.and_then(|at| {
+                let own = own.filter(|_| site.pages.get(page.id).source == Some(at.source));
+                let own = own.map(|own| (page.id, own));
+                own.or_else(|| {
+                    let other =
+                        |shown: &&Shown| site.pages.get(shown.page).source == Some(at.source);
+                    shown
+                        .iter()
+                        .find(other)
+                        .map(|shown| (shown.page, shown.writing))
+                })
+            });
+            if let (Some(at), Some((writer, writing))) = (in_file, writer) {
+                let there = |w: &&Linked| {
+                    let (a, b) = (w.place.span, at.span);
+                    same(w) && w.place.source == at.source && a.start < b.end && b.start < a.end
+                };
+                let found = (writing.written.iter().find(there).map(|w| (w, false)))
+                    .or_else(|| writing.handed.iter().find(there).map(|w| (w, true)))
+                    .or_else(|| writing.written.iter().find(same).map(|w| (w, false)));
+                match found {
+                    // The writing's own links were followed above.
+                    Some((_, false)) if writer == page.id => continue,
+                    Some((w, true)) if writer == page.id => {
+                        let blame = Blame::Writing(w.place, w.handed);
+                        self.follow(&written, &from, blame, &mut checked);
+                        continue;
+                    }
+                    Some((w, _)) => {
+                        self.shown(site, writer, w, &written, &from, &mut checked);
+                        continue;
+                    }
+                    None => {}
+                }
+            }
+            // Where nothing says where it was written, a link of the
+            // writing's own is one with its address, each taken once.
+            let unknown = placed.is_none() && in_file.is_none();
+            if unknown && let Some(count) = left.get_mut(&key).filter(|count| **count > 0) {
                 *count -= 1;
                 continue;
             }
-            let same = |w: &&Linked| address::decoded(&w.address) == key;
-            if placed.is_none()
-                && let Some(handed) = own.and_then(|own| own.handed.iter().find(same))
-            {
+            if unknown && let Some(handed) = own.and_then(|own| own.handed.iter().find(same)) {
                 let blame = Blame::Writing(handed.place, handed.handed);
                 self.follow(&written, &from, blame, &mut checked);
                 continue;
             }
-            let other = placed.is_none().then(|| {
+            let other = unknown.then(|| {
                 shown.iter().find_map(|shown| {
                     let writing = shown.writing;
                     let (w, _) = writing
@@ -374,18 +416,7 @@ impl Site {
                 })
             });
             if let Some((other, w)) = other.flatten() {
-                let here = self.leads(&written, &from);
-                let there = site.pages.get(other);
-                // Where it leads the same from its own page, it is told
-                // there.
-                let at_home = format!("{}{}", self.base(), there.address.as_str());
-                if there.lands() && self.leads(&written, &at_home) == here {
-                    continue;
-                }
-                if let Leads::Here(arrival) = here {
-                    let blame = Blame::Shown(w.place, w.handed);
-                    self.arrive(arrival, &written, blame, &mut checked);
-                }
+                self.shown(site, other, w, &written, &from, &mut checked);
                 continue;
             }
             // Else a snippet wrote it in its own text: each of a snippet's
@@ -404,7 +435,7 @@ impl Site {
             }
             // Or a snippet in another page's writing shown here, which is
             // told on that page where it leads the same from there.
-            if placed.is_none() {
+            if unknown {
                 let other = shown.iter().find_map(|shown| {
                     let snipped = shown.writing.snipped.iter().zip(&shown.snipped);
                     let (s, _) = snipped.into_iter().find(|(s, moved)| {
@@ -426,8 +457,7 @@ impl Site {
             }
             // Else it is in a value a template printed.
             if placed.is_none() {
-                placed = (renderer.printed_at(page.own, html, link.at, link.raw.len()))
-                    .map(Placed::Printed);
+                placed = printed.map(Placed::Printed);
             }
             let blame = Blame::Template(Box::new(link.clone()), placed);
             self.follow(&written, &from, blame, &mut checked);
@@ -435,6 +465,30 @@ impl Site {
         checked.asked.sort_unstable();
         checked.asked.dedup();
         checked
+    }
+
+    /// Follows `w`, a link in the writing of `other`, shown on the page
+    /// being checked as `written`: told there only where it leads elsewhere
+    /// than from its own page.
+    fn shown(
+        &self,
+        site: &crate::site::Site,
+        other: PageId,
+        w: &Linked,
+        written: &str,
+        from: &str,
+        checked: &mut Checked,
+    ) {
+        let here = self.leads(written, from);
+        let there = site.pages.get(other);
+        let at_home = format!("{}{}", self.base(), there.address.as_str());
+        if there.lands() && self.leads(written, &at_home) == here {
+            return;
+        }
+        if let Leads::Here(arrival) = here {
+            let blame = Blame::Shown(w.place, w.handed);
+            self.arrive(arrival, written, blame, checked);
+        }
     }
 
     /// Whether the site still holds, at each path a link of the page led
