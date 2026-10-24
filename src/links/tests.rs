@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::Helper;
-use super::blame;
 use super::resolve::{Arrival, Leads, Site};
 use super::scan::{Attribute, scan};
 use crate::config::Settings;
@@ -284,61 +283,12 @@ fn a_page_is_read_for_its_links_and_ids_as_a_browser_reads_it() {
             link(Attribute::Poster, "d.jpg", "d.jpg"),
         ]
     );
-    assert_eq!(
-        scanned.links[0].tag.attributes[1],
-        ("class".into(), "next".into())
-    );
-    assert_eq!(scanned.links[0].before.as_ref().unwrap().name, "p");
     // Each where it is on the page, a candidate of a `srcset` too.
     for link in &scanned.links {
         assert_eq!(&html[link.at..link.at + link.raw.len()], link.raw);
     }
     let srcset = html.find("srcset=\"").unwrap() + "srcset=\"".len();
     assert!(scanned.links[2..5].iter().all(|link| link.value == srcset));
-}
-
-/// The attribute each link on a built page is placed at, of the template's.
-fn placed(template: &str, page: &str) -> Vec<String> {
-    let read = blame::read(template);
-    scan(page)
-        .links
-        .iter()
-        .map(|found| match blame::best([(0, &read)], found) {
-            Some((_, at)) => {
-                let line = template[..at.start].matches('\n').count() + 1;
-                format!("{line}: {}", &template[at])
-            }
-            None => "nowhere".to_owned(),
-        })
-        .collect()
-}
-
-#[test]
-fn a_link_a_template_wrote_is_placed_at_the_attribute_that_wrote_it() {
-    let template = "<nav><a href=\"/about-us/\">About</a>\n\
-        <a class=\"crumb\" href=\"{{ path }}\">{{ name }}</a>\n\
-        <a href=\"{{ site.url }}/tags/{{ tag }}/\">{{ tag }}</a></nav>\n\
-        <li class=\"comment\"><a href=\"{{ author.site }}\">{{ author.name }}</a></li>\n\
-        <img src=\"{{ photo }}\"{% if wide %} class=\"wide\"{% endif %} alt=\"{{ alt }}\">\n\
-        <a href=\"{{ other }}\">{# not this one #}</a>\n\
-        <div>{{ comment.body | markdown }}</div>\n";
-    let page = "<nav><a href=\"/about-us/\">About</a>\
-        <a class=\"crumb\" href=\"/one/two/\">Two</a>\
-        <a href=\"https://example.org/tags/rust/\">rust</a></nav>\
-        <li class=\"comment\"><a href=\"example.org\">Someone</a></li>\
-        <img src=\"/photo-1.jpg\" class=\"wide\" alt=\"A\">\
-        <div><p><a href=\"/printed/\" rel=\"nofollow\">printed</a></p></div>";
-    assert_eq!(
-        placed(template, page),
-        [
-            "1: /about-us/",
-            "2: {{ path }}",
-            "3: {{ site.url }}/tags/{{ tag }}/",
-            "4: {{ author.site }}",
-            "5: {{ photo }}",
-            "7: {{ comment.body | markdown }}",
-        ]
-    );
 }
 
 #[test]
@@ -349,27 +299,5 @@ fn an_address_inside_the_site_is_spelled_as_what_stands_for_it_takes_it() {
     assert_eq!(
         Helper::Function.spelled("/about/"),
         "{{ url(\"/about/\") }}"
-    );
-}
-
-/// A template may hold the characters blame fills the places of `{{ }}`
-/// and `{% %}` with, in its text and in its addresses.
-#[test]
-fn a_template_holding_control_characters_is_read_by_where_it_has_tags() {
-    let template = "<p>\u{1}\u{2}{{ body | markdown }}</p>\n\
-        <a href=\"/a\u{1}b/\">a</a>\n\
-        <a href=\"/c\u{2}d/{{ id }}\">c</a>\n";
-    let page = "<p><a href=\"/printed/\">p</a></p>\
-        <a href=\"/a/x/b/\">a</a>\
-        <a href=\"/a\u{1}b/\">a</a>\
-        <a href=\"/c\u{2}d/1/\">c</a>";
-    assert_eq!(
-        placed(template, page),
-        [
-            "1: {{ body | markdown }}",
-            "1: {{ body | markdown }}",
-            "2: /a\u{1}b/",
-            "3: /c\u{2}d/{{ id }}",
-        ]
     );
 }

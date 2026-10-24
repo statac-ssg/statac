@@ -16,16 +16,18 @@
 //! writing; where only another page showing the writing breaks it, it is
 //! told at the link, naming that page. One a template or a snippet wrote
 //! is told at the attribute in that file, once, naming the first page it
-//! breaks on.
+//! breaks on; where the template printed the address from a field or
+//! data, it is told where that is written. Each is known by where the
+//! build recorded each byte of the page as written.
 //!
 //! An address is offered back as the link was written: one written with
 //! `@url(...)`, or with a template's `url(...)`, as another of the same.
 //! On a site published under a path, a link from the top of the domain
 //! that the site would publish under its own path is offered as one.
 
-mod blame;
 mod resolve;
 mod scan;
+mod template;
 #[cfg(test)]
 mod tests;
 
@@ -42,47 +44,13 @@ use crate::site::{PageId, TemplateId};
 use crate::source::Place;
 use crate::templates::{Own, Renderer};
 use resolve::{Arrival, Leads};
-use scan::{Found, scan};
+use scan::scan;
 
-/// What a page's writing links to, what it hands its snippet calls, and
-/// what the snippets it calls write.
+/// What a page's writing links to, and what it hands its snippet calls.
 #[derive(Default, Debug)]
 pub struct Writing {
     pub written: Vec<Linked>,
     pub handed: Vec<Linked>,
-    pub snipped: Vec<Snipped>,
-}
-
-/// A link a snippet wrote in a tag of its own text: its address as a
-/// browser follows it, and the snippet and where in it the attribute's
-/// value starts.
-#[derive(Clone, Debug)]
-pub struct Snipped {
-    pub address: String,
-    pub template: TemplateId,
-    pub at: usize,
-}
-
-/// Each link in `html`, what a snippet wrote, in a tag of a template's own
-/// text. `written_at` gives the template the byte at an offset of `html`
-/// is the own text of, and where in it; none for a byte of a value's.
-pub(crate) fn snipped(
-    html: &str,
-    written_at: impl Fn(usize) -> Option<(TemplateId, usize)>,
-) -> Vec<Snipped> {
-    let scanned = scan(html);
-    (scanned.links.iter())
-        .filter_map(|link| {
-            // What opens the value, a quote or the `=`, is the template's
-            // own where the template wrote the attribute.
-            let (template, opens) = written_at(link.value.checked_sub(1)?)?;
-            Some(Snipped {
-                address: link.address(),
-                template,
-                at: opens + 1,
-            })
-        })
-        .collect()
 }
 
 /// Each link in `text`, a template's own text, whose address the template
@@ -126,10 +94,8 @@ pub(crate) struct Page<'a> {
     /// The files its own sharing cards are published as, from the top of
     /// the built site, which the site holds once the page is built.
     pub cards: Vec<String>,
-    /// Where its HTML is the own text of the templates it is built with.
+    /// Where each part of its HTML was written.
     pub own: &'a Own,
-    /// What the snippets its templates call write.
-    pub snipped: &'a [Snipped],
 }
 
 /// What a built page's links came to, found as it was built.
@@ -144,8 +110,6 @@ pub(crate) struct Checked {
     misses: Vec<Miss>,
     /// Links to an id on another page, held until every page is built.
     anchors: Vec<Miss>,
-    /// The templates and snippets that built it, in the order read.
-    templates: Vec<TemplateId>,
     /// The files it links that are published only where a page links them.
     reached: Vec<String>,
     /// The files its own sharing cards are published as.
@@ -165,7 +129,7 @@ impl Checked {
 
 impl Checked {
     /// The same findings as another reading of the site has them, the
-    /// page, the templates and each place as `to` gives them there; none
+    /// page and each template and place as `to` gives them there; none
     /// where that reading has no such page, template or place.
     pub(crate) fn moved(&self, to: &Translation) -> Option<Checked> {
         let moved = |misses: &[Miss]| {
@@ -173,18 +137,13 @@ impl Checked {
                 let blame = match &miss.blame {
                     Blame::Writing(place, handed) => Blame::Writing(to.place(*place)?, *handed),
                     Blame::Shown(place, handed) => Blame::Shown(to.place(*place)?, *handed),
-                    Blame::Template(found, placed) => {
-                        let placed = match placed {
-                            Some(Placed::Attribute(template, at)) => {
-                                Some(Placed::Attribute(to.template(*template)?, *at))
-                            }
-                            Some(Placed::Printed(place)) => {
-                                Some(Placed::Printed(to.place(*place)?))
-                            }
-                            None => None,
-                        };
-                        Blame::Template(found.clone(), placed)
-                    }
+                    Blame::Template(placed) => Blame::Template(match placed {
+                        Some(Placed::Attribute(template, at)) => {
+                            Some(Placed::Attribute(to.template(*template)?, *at))
+                        }
+                        Some(Placed::Printed(place)) => Some(Placed::Printed(to.place(*place)?)),
+                        None => None,
+                    }),
                 };
                 Some(Miss {
                     blame,
@@ -193,12 +152,10 @@ impl Checked {
             });
             misses.collect::<Option<Vec<Miss>>>()
         };
-        let templates = self.templates.iter().map(|&id| to.template(id));
         Some(Checked {
             page: to.page(self.page)?,
             misses: moved(&self.misses)?,
             anchors: moved(&self.anchors)?,
-            templates: templates.collect::<Option<_>>()?,
             ..self.clone()
         })
     }
@@ -224,9 +181,9 @@ enum Blame {
     /// Another page's writing, at this place, shown on the page, and
     /// whether as a value handed to a snippet call.
     Shown(Place, bool),
-    /// A template or snippet, writing this link in its tag, placed where
-    /// that is known.
-    Template(Box<Found>, Option<Placed>),
+    /// A template or snippet, writing this link, placed where that is
+    /// known.
+    Template(Option<Placed>),
 }
 
 /// Where a link a template or snippet wrote was written.
@@ -239,14 +196,10 @@ enum Placed {
     Printed(Place),
 }
 
-/// Another page's writing shown on the page being checked, with each
-/// address it links to and each its snippets wrote, as spelled from the
-/// top of the site where that differs, in order.
+/// Another page's writing shown on the page being checked.
 struct Shown<'a> {
     page: PageId,
     writing: &'a Writing,
-    linked: Vec<Option<String>>,
-    snipped: Vec<Option<String>>,
 }
 
 impl Site {
@@ -264,11 +217,9 @@ impl Site {
             Some(Leads::Here(base)) => format!("{}{}", self.base(), base.path),
             _ => published,
         };
-        let mut templates = Vec::new();
         let mut shown = Vec::new();
         for key in page.reads.keys() {
             match *key {
-                Key::Template(id) if !templates.contains(&id) => templates.push(id),
                 Key::Body(other)
                     if (other != page.id || page.number > 1) && !shown.contains(&other) =>
                 {
@@ -284,7 +235,6 @@ impl Site {
             ids: scanned.ids,
             misses: Vec::new(),
             anchors: Vec::new(),
-            templates,
             reached: Vec::new(),
             cards: page.cards,
             asked: Vec::new(),
@@ -294,41 +244,16 @@ impl Site {
             .flatten();
         // The writing's own links, each once, and the same links on the
         // page passed over.
-        let mut left: HashMap<String, usize> = HashMap::new();
         for written in own.iter().flat_map(|own| &own.written) {
-            *left.entry(address::decoded(&written.address)).or_default() += 1;
             let blame = Blame::Writing(written.place, written.handed);
             self.follow(&written.address, &from, blame, &mut checked);
         }
-        // Shown here, the writing's addresses read from its own page are
-        // spelled from the top of the site.
-        let shown: Vec<Shown> = shown
-            .into_iter()
-            .filter_map(|other| {
-                let writing = renderer.writing(other)?;
-                let home = format!("{}{}", self.base(), site.pages.get(other).address.as_str());
-                let moved = |address: &str| {
-                    crate::elsewhere::address(address, &home).map(|moved| address::decoded(&moved))
-                };
-                let linked = (writing.written.iter())
-                    .chain(&writing.handed)
-                    .map(|w| moved(&w.address))
-                    .collect();
-                let snipped = writing.snipped.iter().map(|s| moved(&s.address)).collect();
-                Some(Shown {
-                    page: other,
-                    writing,
-                    linked,
-                    snipped,
-                })
+        let shown: Vec<Shown> = (shown.into_iter())
+            .filter_map(|page| {
+                let writing = renderer.writing(page)?;
+                Some(Shown { page, writing })
             })
             .collect();
-        // What the snippets built for the page and for its writing wrote,
-        // and which of those links on the page have been placed.
-        let snipped: Vec<&Snipped> = (page.snipped.iter())
-            .chain(own.iter().flat_map(|own| &own.snipped))
-            .collect();
-        let mut placed_at: HashSet<usize> = HashSet::new();
         for link in &scanned.links {
             let written = link.address();
             if let Some((path, file)) = self.watched(&written, &from) {
@@ -347,7 +272,7 @@ impl Site {
             let in_file = printed.filter(|at| renderer.template_of(at.source).is_none());
             // Else what opens the value, a quote or the `=`, is a template's
             // own where the template wrote the attribute.
-            let mut placed = (in_file.is_none())
+            let attribute = (in_file.is_none())
                 .then(|| renderer.written_at(page.own, link.value.checked_sub(1)?))
                 .flatten()
                 .map(|(template, opens)| Placed::Attribute(template, opens + 1));
@@ -419,79 +344,12 @@ impl Site {
                     None => {}
                 }
             }
-            // Written in a file, it is told there.
-            if let Some(at) = in_file {
-                placed = Some(Placed::Printed(at));
-            }
-            // Where nothing says where it was written, a link of the
-            // writing's own is one with its address, each taken once.
-            let unknown = placed.is_none();
-            if unknown && let Some(count) = left.get_mut(&key).filter(|count| **count > 0) {
-                *count -= 1;
-                continue;
-            }
-            if unknown && let Some(handed) = own.and_then(|own| own.handed.iter().find(same)) {
-                let blame = Blame::Writing(handed.place, handed.handed);
-                self.follow(&written, &from, blame, &mut checked);
-                continue;
-            }
-            let other = unknown.then(|| {
-                shown.iter().find_map(|shown| {
-                    let writing = shown.writing;
-                    let (w, _) = writing
-                        .written
-                        .iter()
-                        .chain(&writing.handed)
-                        .zip(&shown.linked)
-                        .find(|(w, moved)| same(w) || moved.as_deref() == Some(key.as_str()))?;
-                    Some((shown.page, w))
-                })
-            });
-            if let Some((other, w)) = other.flatten() {
-                self.shown(site, other, w, &written, &from, &mut checked);
-                continue;
-            }
-            // Else a snippet wrote it in its own text: each of a snippet's
-            // links with the same address is taken once, in order.
-            if placed.is_none() {
-                let same: Vec<usize> = (0..snipped.len())
-                    .filter(|&at| address::decoded(&snipped[at].address) == key)
-                    .collect();
-                let at = (same.iter())
-                    .find(|at| !placed_at.contains(at))
-                    .or(same.first());
-                if let Some(&at) = at {
-                    placed_at.insert(at);
-                    placed = Some(Placed::Attribute(snipped[at].template, snipped[at].at));
-                }
-            }
-            // Or a snippet in another page's writing shown here, which is
-            // told on that page where it leads the same from there.
-            if unknown {
-                let other = shown.iter().find_map(|shown| {
-                    let snipped = shown.writing.snipped.iter().zip(&shown.snipped);
-                    let (s, _) = snipped.into_iter().find(|(s, moved)| {
-                        address::decoded(&s.address) == key
-                            || moved.as_deref() == Some(key.as_str())
-                    })?;
-                    Some((shown.page, s))
-                });
-                if let Some((other, s)) = other {
-                    let there = site.pages.get(other);
-                    let at_home = format!("{}{}", self.base(), there.address.as_str());
-                    if there.lands()
-                        && self.leads(&written, &at_home) == self.leads(&written, &from)
-                    {
-                        continue;
-                    }
-                    placed = Some(Placed::Attribute(s.template, s.at));
-                }
-            }
-            // Else it is in a value a template printed.
-            if placed.is_none() {
-                placed = printed.map(Placed::Printed);
-            }
-            let blame = Blame::Template(Box::new(link.clone()), placed);
+            // Written in a file, it is told there; else at the attribute,
+            // or in a value a template printed.
+            let placed = (in_file.map(Placed::Printed))
+                .or(attribute)
+                .or(printed.map(Placed::Printed));
+            let blame = Blame::Template(placed);
             self.follow(&written, &from, blame, &mut checked);
         }
         checked.asked.sort_unstable();
@@ -591,7 +449,6 @@ impl Site {
             .iter()
             .map(|page| (page.file.as_str(), page.ids.as_slice()))
             .collect();
-        let mut templates: HashMap<TemplateId, blame::Read> = HashMap::new();
         let mut misses: Vec<(&Checked, &Miss)> = Vec::new();
         for page in &checked {
             let anchors = page.anchors.iter().filter(|miss| {
@@ -640,7 +497,7 @@ impl Site {
                     let kind = self.kind(miss, page, there, wrote, named(*place), false);
                     building(renderer, page, Problem::at(kind, *place))
                 }
-                Blame::Template(_, Some(Placed::Printed(place)))
+                Blame::Template(Some(Placed::Printed(place)))
                     if renderer.template_of(place.source).is_none() =>
                 {
                     let wrote = Wrote {
@@ -650,20 +507,12 @@ impl Site {
                     let kind = self.kind(miss, page, there, wrote, None, false);
                     building(renderer, page, Problem::at(kind, *place))
                 }
-                Blame::Template(found, placed) => {
-                    for &template in &page.templates {
-                        templates.entry(template).or_insert_with(|| {
-                            let source = renderer.template_source(template);
-                            blame::read(renderer.sources().text(source))
-                        });
-                    }
-                    let candidates = page
-                        .templates
-                        .iter()
-                        .map(|template| (*template, &templates[template]));
+                Blame::Template(placed) => {
+                    let text =
+                        |template: TemplateId| sources.text(renderer.template_source(template));
                     let placed = placed.as_ref().and_then(|placed| match *placed {
                         Placed::Attribute(template, at) => {
-                            Some((template, templates.get(&template)?.written_at(at)?))
+                            Some((template, at..template::value_end(text(template), at)))
                         }
                         Placed::Printed(place) => {
                             let template = renderer.template_of(place.source)?;
@@ -671,14 +520,12 @@ impl Site {
                             Some((template, at))
                         }
                     });
-                    let best = placed.or_else(|| blame::best(candidates, found));
-                    let wrote = match &best {
+                    let wrote = match &placed {
                         Some((template, at)) => {
-                            let source = renderer.template_source(*template);
-                            let written = &sources.text(source)[at.clone()];
+                            let written = &text(*template)[at.clone()];
                             // HTML printed whole is the writing's only
                             // where it was read as Markdown.
-                            let helper = match templates[template].prints(at) {
+                            let helper = match template::prints_whole(text(*template), at) {
                                 false => Some(Helper::Function),
                                 true if written.contains("markdown") => Some(Helper::Call),
                                 true => None,
@@ -697,7 +544,7 @@ impl Site {
                         },
                     };
                     let kind = self.kind(miss, page, there, wrote, None, false);
-                    let place = best.map(|(template, at)| Place {
+                    let place = placed.map(|(template, at)| Place {
                         source: renderer.template_source(template),
                         span: crate::source::Span::new(at.start, at.end),
                     });

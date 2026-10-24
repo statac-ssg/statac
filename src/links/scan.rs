@@ -30,27 +30,16 @@ impl Attribute {
     }
 }
 
-/// An address a built page links to, the tag it is in, and the tag before
-/// that.
+/// An address a built page links to.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Found {
-    pub tag: Tagged,
     pub attribute: Attribute,
     /// As written in the HTML, its character references undecoded.
     pub raw: String,
-    pub before: Option<Tagged>,
     /// Where it starts on the page.
     pub at: usize,
     /// Where the attribute's value starts on the page.
     pub value: usize,
-}
-
-/// A start tag on a built page: its name, and each attribute's name and
-/// value as written.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(super) struct Tagged {
-    pub name: String,
-    pub attributes: Vec<(String, String)>,
 }
 
 impl Found {
@@ -73,16 +62,7 @@ pub(super) struct Scanned {
 /// Every link on a built page and every id on it.
 pub(super) fn scan(html: &str) -> Scanned {
     let mut scanned = Scanned::default();
-    let mut before: Option<Tagged> = None;
     start_tags(html, |tag| {
-        let this = Tagged {
-            name: tag.name.clone(),
-            attributes: tag
-                .attributes
-                .iter()
-                .map(|attribute| (attribute.name.clone(), attribute.value.clone()))
-                .collect(),
-        };
         for attribute in &tag.attributes {
             match attribute.name.as_str() {
                 "id" => scanned.ids.push(decoded(&attribute.value, false)),
@@ -97,10 +77,8 @@ pub(super) fn scan(html: &str) -> Scanned {
                     let value = attribute.at.start;
                     for (raw, at) in addresses(&attribute.value, kind == Attribute::Srcset, value) {
                         scanned.links.push(Found {
-                            tag: this.clone(),
                             attribute: kind,
                             raw: raw.to_owned(),
-                            before: before.clone(),
                             at,
                             value,
                         });
@@ -108,7 +86,6 @@ pub(super) fn scan(html: &str) -> Scanned {
                 }
             }
         }
-        before = Some(this);
     });
     scanned.ids.sort_unstable();
     scanned.ids.dedup();
