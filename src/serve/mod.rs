@@ -240,6 +240,7 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
     };
     serving.last = serving.identities(&round);
     serving.left.extend(round.hooked.iter().cloned());
+    serving.left.extend(round.written_by_serve());
     serving.hub.set_status(serving.status(&round, None));
 
     let mut said = serving.stamps(&round);
@@ -349,6 +350,7 @@ impl Serving {
         });
         let took = started.elapsed().saturating_sub(round.outcome.waited);
         self.left.extend(round.hooked.iter().cloned());
+        self.left.extend(round.written_by_serve());
         // The names are the site's own, shown as any text of its is.
         let changed: Vec<String> = batch.changed.iter().map(|file| shown(file)).collect();
 
@@ -366,6 +368,9 @@ impl Serving {
         let mut more =
             Report::new(&sources, &self.options.site, self.colour).hooks(round.outcome.hooks);
         more.push_str(&self.stamps(&round));
+        more.push_str(
+            &Report::new(&sources, &self.options.site, self.colour).kept(round.outcome.kept),
+        );
         more.push_str(&self.differences(&round));
         more.push_str(&self.fetch(&round));
         // The system lost reports and no file came or went, which serve's

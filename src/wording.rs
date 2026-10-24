@@ -2421,7 +2421,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }
         Kind::AddressGone { written, .. } => Some(format!(
             "Send readers on with `redirect_from: [{written}]` in the page that took its place, \
-             or take this line out if it is gone for good."
+             or take it out of `published.txt` if it is gone for good."
         )),
         Kind::NotStatacsFolder { .. } => Some(
             "Statac replaces only folders it built, so build into a new folder or empty this \
@@ -6697,7 +6697,7 @@ mod tests {
                 "Address gone: `/about/` was published before, and nothing answers there now",
                 Some(
                     "Send readers on with `redirect_from: [/about/]` in the page that took its \
-                     place, or take this line out if it is gone for good.",
+                     place, or take it out of `published.txt` if it is gone for good.",
                 ),
             ),
             (
@@ -6708,7 +6708,7 @@ mod tests {
                 "Address gone: `/blog/about/` was published before, and nothing answers there now",
                 Some(
                     "Send readers on with `redirect_from: [/about/]` in the page that took its \
-                     place, or take this line out if it is gone for good.",
+                     place, or take it out of `published.txt` if it is gone for good.",
                 ),
             ),
             (

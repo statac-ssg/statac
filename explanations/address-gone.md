@@ -8,17 +8,22 @@ there.
 
 ```text
 warning  Address gone: `/about/` was published before, and nothing answers there now
-  Send readers on with `redirect_from: [/about/]` in the page that took its place, or take this line out if it is gone for good.
+  Send readers on with `redirect_from: [/about/]` in the page that took its place, or take it out of `published.txt` if it is gone for good.
   More: https://statac.dev/e/address-gone/
 ```
 
 ## Why Statac warns
 
-Each time it builds the site, Statac adds every address it published to
-`published.txt` at the top of the site: each page from a file, each old
-address in a `redirect_from`, each feed, and each file published as it
-is. Commit the file with the site, so a build on any machine knows the
-same addresses.
+Each time it builds the site, and as `statac serve` runs, Statac adds
+every address it published to `published.txt` at the top of the site:
+each page from a file, each old address in a `redirect_from`, each feed,
+and each file published as it is. Drafts and posts waiting for their day
+aren't added until they are published. Commit the file with the site, so
+a build on any machine knows the same addresses.
+
+An address that first appears while `statac serve` runs, and goes again
+before it stops, such as a page renamed while you were still writing
+it, is taken out of the file with nothing said.
 
 When a page is renamed, moved, or given another `permalink`, its old
 address stops answering, and nothing else would tell you. Statac builds

@@ -1296,12 +1296,16 @@ pub(crate) fn publish(
                 &options.site,
                 site,
                 renderer.sources(),
+                renderer.dates(),
                 renderer.assets(),
                 renderer.feeds(),
                 &held_back,
             );
-            match site.published.keep(&options.site, &now) {
-                Ok(added) => kept_published = added,
+            match site.published.keep(&options.site, &now, None) {
+                Ok(written) => {
+                    written.re_place(&mut problems, renderer.sources());
+                    kept_published = written.kept;
+                }
                 Err(error) => problems.push(Problem::nowhere(Kind::CantWrite {
                     path: crate::published::FILE.into(),
                     reason: Reason::of(&error),

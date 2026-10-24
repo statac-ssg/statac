@@ -99,7 +99,7 @@ fn a_build_adds_only_the_addresses_the_file_lacks_sorted_and_writes_nothing_wher
     };
     let kept = |scratch: &Scratch, now: &[&str]| {
         let (record, _) = Record::read(scratch, &mut Sources::default());
-        record.keep(scratch, &addresses(now)).unwrap()
+        record.keep(scratch, &addresses(now), None).unwrap().kept
     };
     let text = |scratch: &Scratch| std::fs::read_to_string(scratch.join(FILE)).unwrap();
     assert_eq!(
@@ -125,4 +125,90 @@ fn a_build_adds_only_the_addresses_the_file_lacks_sorted_and_writes_nothing_wher
     assert_eq!(text(&scratch), "/notes/\n");
     assert_eq!(kept(&scratch, &["/about/"]).added, 1);
     assert_eq!(text(&scratch), format!("{ABOUT}/about/\n/notes/\n"));
+}
+
+#[test]
+fn serve_keeps_what_it_publishes_and_lets_go_quietly_of_what_came_and_went_while_it_ran() {
+    let site = TempSite::site(&[
+        ("templates/page.html", "{{ page.content }}\n"),
+        ("templates/home.html", "{{ page.content }}\n"),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
+        ("content/about.md", "---\ntitle: About\n---\n"),
+        (
+            "content/draft-1.md",
+            "---\ntitle: Draft 1\ndraft: true\n---\n",
+        ),
+    ]);
+    let options = crate::build::Options {
+        mode: crate::build::Mode::Build,
+        site: site.root.clone(),
+        out: None,
+        today: None,
+        drafts: true,
+        url: None,
+    };
+    let kept = || {
+        let text = std::fs::read_to_string(site.root.join(FILE)).unwrap();
+        text.lines()
+            .filter(|line| !line.starts_with('#'))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    let gone = |round: &crate::serve::session::Round| {
+        (round.outcome.problems.iter())
+            .filter(|p| p.kind.code() == Code::AddressGone)
+            .count()
+    };
+    let (mut session, round) = crate::serve::session::Session::start(&options);
+    assert!(round.outcome.kept.started, "{:?}", round.outcome.kept);
+    // The draft is built, and is no address of the site's yet.
+    assert_eq!(kept(), ["/", "/about/"]);
+    assert!(round.recorded.is_some());
+
+    std::fs::write(site.root.join("content/untitld.md"), "---\ntitle: A\n---\n").unwrap();
+    assert_eq!(session.rebuild().outcome.kept.added, 1);
+    assert_eq!(kept(), ["/", "/about/", "/untitld/"]);
+    std::fs::rename(
+        site.root.join("content/untitld.md"),
+        site.root.join("content/untitled.md"),
+    )
+    .unwrap();
+    std::fs::remove_file(site.root.join("content/about.md")).unwrap();
+    let round = session.rebuild();
+    // Only what the session didn't add itself is told.
+    assert_eq!(gone(&round), 1);
+    assert_eq!(kept(), ["/", "/about/", "/untitled/"]);
+    drop(session);
+
+    // A later session takes nothing out.
+    std::fs::remove_file(site.root.join("content/untitled.md")).unwrap();
+    let (_, round) = crate::serve::session::Session::start(&options);
+    assert_eq!(gone(&round), 2);
+    assert_eq!(kept(), ["/", "/about/", "/untitled/"]);
+}
+
+#[test]
+fn a_warning_keeps_its_line_only_where_the_file_as_written_has_the_address_there() {
+    let line = |problems: &[Problem], sources: &Sources| -> Vec<Option<usize>> {
+        (problems.iter())
+            .filter(|p| p.kind.code() == Code::AddressGone)
+            .map(|p| (p.place).map(|at| sources.line_number(at.source, at.span.start as usize)))
+            .collect()
+    };
+    for (now, wanted) in [(&["/b/"][..], None), (&["/d/"][..], Some(5))] {
+        let site = TempSite::site(&[
+            ("templates/page.html", "{{ page.content }}\n"),
+            ("content/a.md", "---\ntitle: A\n---\n"),
+            (FILE, &format!("{ABOUT}/a/\n/c/\n")),
+        ]);
+        let prepared = crate::build::prepared(&site.root, &run());
+        let sources = prepared.renderer.sources();
+        let mut problems = prepared.problems.clone();
+        assert_eq!(line(&problems, sources), [Some(5)]);
+        let now: Vec<Address> = now.iter().map(|a| Address::read(a).unwrap()).collect();
+        let record = &prepared.renderer.site().published;
+        let written = record.keep(&site.root, &now, None).unwrap();
+        written.re_place(&mut problems, sources);
+        assert_eq!(line(&problems, sources), [wanted], "{now:?}");
+    }
 }

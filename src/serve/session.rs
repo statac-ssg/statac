@@ -60,6 +60,9 @@ pub struct Session {
     newer: Option<Option<Problem>>,
     /// Whether each round notes the keys it found changed.
     notes: bool,
+    /// The addresses serve added to `published.txt` since its first round
+    /// published, as the file writes them; none before one has.
+    ours: Option<std::collections::BTreeSet<String>>,
     took: Took,
 }
 
@@ -83,6 +86,8 @@ pub struct Round {
     /// Each file of the site's own that the command it runs before a
     /// build wrote or removed this round, with what it now holds.
     pub hooked: Vec<(String, Option<blake3::Hash>)>,
+    /// What the round wrote into `published.txt`, where it wrote it.
+    pub recorded: Option<blake3::Hash>,
     /// The pages there is something to say of.
     pub noted: Vec<Noted>,
     /// The site as the round read it, where it built.
@@ -185,6 +190,7 @@ impl Session {
             after: None,
             newer: None,
             notes: false,
+            ours: None,
             took: Took::default(),
         };
         let mut round = session.round(None, waiting);
@@ -513,6 +519,7 @@ impl Session {
             restyled,
             stamps,
             hooked: Vec::new(),
+            recorded: None,
             noted,
             read: Some(Read {
                 renderer: renderer.clone(),
@@ -572,13 +579,71 @@ impl Session {
             None if in_place => self.last = None,
             None => {}
         }
+        self.keep_published(&mut round);
         took.writing = writing.elapsed();
         self.took = took;
         round
     }
+
+    /// Adds to `published.txt` what `round` published, where it published
+    /// the site at its own address, and takes out each address that came
+    /// since the session's first round and has gone, and the warning that
+    /// it is gone.
+    fn keep_published(&mut self, round: &mut Round) {
+        let (Some(read), Some(_)) = (&round.read, round.outcome.published) else {
+            return;
+        };
+        if self.options.url.is_some() {
+            return;
+        }
+        let at = self.options.site.as_path();
+        let renderer = &read.renderer;
+        let site = renderer.site();
+        let now = crate::published::now(
+            at,
+            site,
+            renderer.sources(),
+            renderer.dates(),
+            renderer.assets(),
+            renderer.feeds(),
+            &round.outcome.held_back,
+        );
+        // What stood as the session began may have been published
+        // anywhere.
+        let first = self.ours.is_none();
+        let ours = self.ours.get_or_insert_default();
+        match site.published.keep(at, &now, (!first).then_some(ours)) {
+            Ok(written) => {
+                round
+                    .outcome
+                    .problems
+                    .retain(|problem| match &problem.kind {
+                        Kind::AddressGone { written: gone, .. } => !written.dropped.contains(gone),
+                        _ => true,
+                    });
+                written.re_place(&mut round.outcome.problems, renderer.sources());
+                round.outcome.kept = written.kept;
+                round.recorded = written.hash;
+            }
+            Err(error) => round
+                .outcome
+                .problems
+                .push(Problem::nowhere(Kind::CantWrite {
+                    path: crate::published::FILE.into(),
+                    reason: crate::problem::Reason::of(&error),
+                })),
+        }
+    }
 }
 
 impl Round {
+    /// Each file of the site's own the round wrote itself, besides the
+    /// stamps, with what it now holds.
+    pub(crate) fn written_by_serve(&self) -> Option<(String, Option<blake3::Hash>)> {
+        let hash = self.recorded?;
+        Some((crate::published::FILE.to_owned(), Some(hash)))
+    }
+
     /// A round that built nothing, for what `outcome` tells.
     fn of_nothing(outcome: build::Outcome) -> Round {
         Round {
@@ -590,6 +655,7 @@ impl Round {
             restyled: false,
             stamps: Pass::default(),
             hooked: Vec::new(),
+            recorded: None,
             noted: Vec::new(),
             read: None,
             changed: Vec::new(),

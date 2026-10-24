@@ -305,7 +305,9 @@ fn serve_says_where_the_site_is() {
         assert!(said.contains(&wanted), "{way}:\n{said}");
         assert!(
             said.starts_with(&format!(
-                "Wrote 2 pages and 2 other files to `{}` in ",
+                "Started `published.txt` with the 2 addresses this site publishes, so a later \
+                 build can say when one stops answering. Commit it with the site.\n\
+                 Wrote 2 pages and 2 other files to `{}` in ",
                 folder.display()
             )),
             "{way}:\n{said}"
@@ -1353,7 +1355,6 @@ fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
     let first = std::fs::read_to_string(served.site.path("content/post-1.md")).unwrap();
     assert!(!first.contains("id:"), "{first}");
 
-    let mark_built = served.said.text().len();
     let built = statac::build::run(&statac::build::Options {
         mode: statac::build::Mode::Build,
         site: served.site.0.clone(),
@@ -1363,10 +1364,6 @@ fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
         url: None,
     });
     assert!(built.published.is_some());
-    // The build started `published.txt`, which serve reads again first.
-    served
-        .said
-        .after(mark_built, "`published.txt` changed. Built ");
     let before = served.hub.generation();
     let mark = served.said.text().len();
     served.site.write(
@@ -1618,6 +1615,7 @@ fn a_still_is_fetched_after_the_first_round_and_built_as_a_build_would() {
         "\
 1 warning: 1 no-still. Run `statac check` to see it.
 
+Started `published.txt` with the 3 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
 Wrote 3 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Fetching what's new from other sites. `--offline` turns this off.
@@ -1674,6 +1672,7 @@ fn a_webmention_and_its_face_are_fetched_in_one_round_and_built_as_a_build_would
     assert_eq!(
         steady(&served, &opened),
         "\
+Started `published.txt` with the 2 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
 Wrote 2 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Fetching what's new from other sites. `--offline` turns this off.
@@ -1790,6 +1789,7 @@ fn offline_nothing_is_fetched_and_serve_says_so() {
         "\
 1 warning: 1 no-still. Run `statac check` to see it.
 
+Started `published.txt` with the 3 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
 Wrote 3 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Offline: nothing is fetched from other sites.
@@ -1813,6 +1813,7 @@ fn a_site_with_nothing_to_fetch_is_served_as_it_was_without_fetching() {
     assert_eq!(
         steady(&fetching, &opened),
         "\
+Started `published.txt` with the 2 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
 Wrote 2 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Press Ctrl+C to stop.

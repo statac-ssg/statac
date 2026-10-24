@@ -213,14 +213,20 @@ impl Site {
         (files(&options.out()), self.said(&outcome))
     }
 
-    /// Every problem drawn in full, the JavaScript carried and what was
-    /// published.
+    /// Every problem drawn in full but an address gone, the JavaScript
+    /// carried and what was published. A round adds to `published.txt`
+    /// after reading it, so a build after the round reads another file
+    /// than the round did, and is told of it otherwise.
     fn said(&self, outcome: &Outcome) -> String {
         let root = self.root();
         let report = Report::new(outcome.sources(), &root, false);
+        let problems: Vec<_> = (outcome.problems.iter())
+            .filter(|problem| problem.kind.code().name() != "address-gone")
+            .cloned()
+            .collect();
         format!(
             "{}{}{:?}",
-            report.check(&outcome.problems, &outcome.quiet),
+            report.check(&problems, &outcome.quiet),
             report.javascript(&outcome.javascript),
             outcome.published,
         )
