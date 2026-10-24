@@ -113,6 +113,8 @@ pub struct Outcome {
     /// links, so only their copies are published and not the files
     /// themselves: each by where its own file would be published.
     pub held_back: Vec<String>,
+    /// What the build added to `published.txt`.
+    pub kept: crate::published::Kept,
     /// How long the build waited for another build of the site to end.
     pub waited: Duration,
     /// Where the build spent its time.
@@ -206,6 +208,7 @@ impl Outcome {
             hooks: crate::hooks::Ran::default(),
             fetched: crate::fetched::Ages::default(),
             held_back: Vec::new(),
+            kept: crate::published::Kept::default(),
             waited: Duration::ZERO,
             timings: Timings::default(),
         }
@@ -253,10 +256,7 @@ pub(crate) fn read_with(
         crate::fetched::mentions::read(&read.site, &read.settings, &mut read.sources);
     read.site.mentions = mentions;
     read.problems.extend(found);
-    let mut outputs = assets.claims();
-    outputs.extend(read.claims());
-    outputs.extend(read.site.pictures.claims());
-    outputs.extend(feeds::claims(&feeds));
+    let outputs = claims(&read, &assets, &feeds);
     read.problems.extend(assets::same_address(&outputs, &base));
     read.problems
         .extend(crate::hooks::claimed(&read.settings, &outputs, &base));
@@ -265,6 +265,16 @@ pub(crate) fn read_with(
     read.problems
         .extend(content::taken(&read.site, &outputs, &base));
     (read, assets, feeds)
+}
+
+/// Every file the site publishes from what is read, by its path from the
+/// top of the built site, with what it comes from.
+fn claims(read: &content::Read, assets: &Assets, feeds: &[feeds::Feed]) -> Vec<(String, Named)> {
+    let mut outputs = assets.claims();
+    outputs.extend(read.claims());
+    outputs.extend(read.site.pictures.claims());
+    outputs.extend(feeds::claims(feeds));
+    outputs
 }
 
 /// The names of the templates at the top of the site's `templates/`, as
@@ -378,6 +388,14 @@ pub(crate) fn prepared_with(
         .collect();
     let (templates, told) =
         templates::read(site, &mut read.sources, &read.site, &read.settings, cards);
+    // Read last, so whether the site has the file moves no other file's
+    // place among those read.
+    let (published, unread) = crate::published::Record::read(site, &mut read.sources);
+    read.problems.extend(unread);
+    let outputs = claims(&read, &assets, &feeds);
+    read.problems
+        .extend(published.gone(&outputs, &read.settings));
+    read.site.published = published;
     let (known, moved) = feeds::Known::read(
         site,
         &read.site,
@@ -1067,7 +1085,7 @@ pub(crate) struct Publishing {
     /// is told.
     pub serving: bool,
     /// Whether the posts published are kept as what feed readers now
-    /// know.
+    /// know, and the addresses published added to `published.txt`.
     pub remembers: bool,
     /// Why the build doesn't hold the site, where it doesn't.
     pub unheld: Option<Problem>,
@@ -1194,6 +1212,7 @@ pub(crate) fn publish(
         }
     }
     let mut hooks = crate::hooks::Ran::default();
+    let mut kept_published = crate::published::Kept::default();
     let published = match staging {
         Some(mut staging) if !stops(&problems) => {
             clock.lap(Stage::Writing);
@@ -1271,6 +1290,24 @@ pub(crate) fn publish(
                 reason: Reason::of(&error),
             }));
         }
+        // A run with the drafts in publishes them only to be looked at.
+        if remembers && !options.drafts {
+            let now = crate::published::now(
+                &options.site,
+                site,
+                renderer.sources(),
+                renderer.assets(),
+                renderer.feeds(),
+                &held_back,
+            );
+            match site.published.keep(&options.site, &now) {
+                Ok(added) => kept_published = added,
+                Err(error) => problems.push(Problem::nowhere(Kind::CantWrite {
+                    path: crate::published::FILE.into(),
+                    reason: Reason::of(&error),
+                })),
+            }
+        }
     }
     drop(asked);
     let fetched = match published {
@@ -1292,6 +1329,7 @@ pub(crate) fn publish(
         hooks,
         fetched,
         held_back,
+        kept: kept_published,
         waited: Duration::ZERO,
         timings: Timings {
             stages: clock.stages(),

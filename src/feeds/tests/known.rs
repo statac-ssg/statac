@@ -116,9 +116,12 @@ impl Drop for Kept {
 }
 
 /// Each problem's kind and the text it is placed at.
+/// Each problem `outcome` holds but an address gone, which moving a post
+/// makes as well, with the text it is placed at.
 fn told(outcome: &Outcome) -> Vec<(Kind, Option<String>)> {
     let sources = outcome.sources();
     (outcome.problems.iter())
+        .filter(|p| !matches!(p.kind, Kind::AddressGone { .. }))
         .map(|p| {
             let at = p.place.map(|place| sources.spelling(place).to_owned());
             (p.kind.clone(), at)

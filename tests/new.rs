@@ -987,6 +987,10 @@ fn the_menu_ends_with_notes_and_photographs_and_a_note_is_called_by_its_date_and
     fs::remove_dir_all(folder.join("content/links")).unwrap();
     fs::remove_dir_all(folder.join("content/writing")).unwrap();
     let (found, _) = built(&folder, Mode::Build);
+    // The pages taken away were published by the build before.
+    let found: Vec<_> = (found.iter())
+        .filter(|(code, _)| *code != "address-gone")
+        .collect();
     assert!(found.is_empty(), "{found:?}");
     let home = read_built(&folder, "index.html");
     let menu = "<li><a href=\"/\" aria-current=\"page\">Home</a></li>\n\

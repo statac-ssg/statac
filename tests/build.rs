@@ -324,7 +324,10 @@ warning  Dates disagree: `date` is `2026-01-02`, the file name `2026-01-01`
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
     assert!(
-        said.starts_with("1 warning: 1 dates-disagree. Run `statac check` to see it.\n\nWrote"),
+        said.starts_with(
+            "1 warning: 1 dates-disagree. Run `statac check` to see it.\n\n\
+             Started `published.txt`"
+        ),
         "{said}"
     );
     assert!(site.out().join("post-2/index.html").exists());
@@ -543,7 +546,10 @@ fn quietened_kinds_are_counted_and_not_drawn() {
     assert_eq!((said.as_str(), code), ("1 warning, quietened.\n", 0));
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
-    assert!(said.starts_with("1 warning, quietened.\n\nWrote"), "{said}");
+    assert!(
+        said.starts_with("1 warning, quietened.\n\nStarted `published.txt`"),
+        "{said}"
+    );
 }
 
 #[test]
@@ -2354,6 +2360,51 @@ fn every_link_on_the_built_site_is_followed_and_told_where_it_was_written() {
     }
     // The template's link is told once, though both posts have it.
     assert_eq!(said.matches("`/about-us/`").count(), 1, "{said}");
+}
+
+/// A build keeps every address of the author's it publishes in
+/// `published.txt`, and one kept that nothing answers at is told there.
+/// A run published elsewhere, or with the drafts in, keeps nothing.
+#[test]
+fn an_address_published_before_that_stops_answering_is_told() {
+    let site = Site::new("published");
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(
+        said.contains(
+            "Started `published.txt` with the 2 addresses this site publishes, so a later \
+             build can say when one stops answering. Commit it with the site.\n"
+        ),
+        "{said}"
+    );
+    let kept = || fs::read_to_string(site.root.join("published.txt")).unwrap();
+    assert!(kept().ends_with("\n/\n/post-1/\n"), "{}", kept());
+    fs::rename(
+        site.root.join("content/post-1.md"),
+        site.root.join("content/post-one.md"),
+    )
+    .unwrap();
+    for args in [
+        &["build", "--url=https://preview.example.org"][..],
+        &["build", "--drafts"],
+    ] {
+        let (said, code) = site.run(args);
+        assert_eq!(code, 0, "{said}");
+        assert!(!kept().contains("post-one"), "{args:?}: {}", kept());
+    }
+    let (said, _) = site.check_without_javascript(&[]);
+    assert!(
+        said.contains(
+            "warning  Address gone: `/post-1/` was published before, and nothing answers there \
+             now\n  published.txt, line 5\n"
+        ),
+        "{said}"
+    );
+    let (said, _) = site.run(&["build", "--today=2026-10-04"]);
+    assert!(
+        said.contains("Added 1 address to `published.txt`.\n"),
+        "{said}"
+    );
 }
 
 /// A template's link is offered the nearest address the site publishes,

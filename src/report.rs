@@ -294,6 +294,15 @@ impl<'a> Report<'a> {
         out
     }
 
+    /// What `build` added to `published.txt`; nothing where it added
+    /// nothing.
+    pub fn kept(&self, kept: crate::published::Kept) -> String {
+        match kept.added > 0 || kept.started {
+            true => format!("{}\n", shown(&wording::kept_published(kept))),
+            false => String::new(),
+        }
+    }
+
     /// What `build` did with the sharing cards: those it drew, and those
     /// it removed; nothing where it did neither.
     pub fn cards(&self, cards: Cards) -> String {
@@ -358,11 +367,12 @@ impl<'a> Report<'a> {
         let mut said = self.build(problems, &outcome.quiet);
         let wrote = self.wrote(problems, outcome.published, out, took);
         let part = format!(
-            "{}{}{}{}{wrote}",
+            "{}{}{}{}{}{wrote}",
             self.copies(outcome.copies),
             self.cards(outcome.cards),
             self.hooks(outcome.hooks),
-            self.fetched(outcome.fetched)
+            self.fetched(outcome.fetched),
+            self.kept(outcome.kept)
         );
         if !said.is_empty() && !part.is_empty() {
             said.push('\n');

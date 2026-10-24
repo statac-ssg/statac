@@ -131,6 +131,43 @@ impl Versions {
     }
 }
 
+/// Whether `bytes` at `path`, from the top of a site, are what `statac
+/// new` writes there, in this release or one before, the sharing card's
+/// files among them, or a sample page as it wrote it: nothing in them is
+/// the author's.
+pub(crate) fn untouched(path: &str, bytes: &[u8]) -> bool {
+    let path = each_languages(path).unwrap_or(path);
+    let starter = Starter::OWN;
+    let mut written = (starter.files.iter().chain(starter.cards))
+        .map(|file| (file.path, file.bytes))
+        .chain(starter.past.iter().map(|past| (past.path, past.bytes)));
+    written.any(|(at, was)| at == path && was == bytes)
+        || std::str::from_utf8(bytes).is_ok_and(|text| super::samples::untouched(path, text))
+}
+
+/// Whether `path`, from the top of a site, is where `statac new` writes a
+/// file, a sample page among them.
+pub(crate) fn writes(path: &str) -> bool {
+    let path = each_languages(path).unwrap_or(path);
+    let starter = Starter::OWN;
+    (starter.files.iter().chain(starter.cards)).any(|file| file.path == path)
+        || starter.past.iter().any(|past| past.path == path)
+        || super::samples::writes(path)
+}
+
+/// The starter's page that `path` is a language's copy of, where it is
+/// one: `content/fr/tags.md` of `content/tags.md`.
+fn each_languages(path: &str) -> Option<&'static str> {
+    let (folder, name) = path.strip_prefix("content/")?.split_once('/')?;
+    (!folder.is_empty() && !name.contains('/'))
+        .then(|| {
+            (super::starter::EACH_LANGUAGE.iter())
+                .find(|page| page.strip_prefix("content/") == Some(name))
+                .copied()
+        })
+        .flatten()
+}
+
 /// Every starter file's versions, the sharing card's among them, by its
 /// path in a site.
 fn versions(starter: &Starter) -> BTreeMap<&'static str, Versions> {

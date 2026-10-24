@@ -325,6 +325,40 @@ A gradient from rust to rose.
     ),
 ];
 
+/// Whether `text` at `path` in a site is a sample page as `statac new`
+/// wrote it, dated from whatever day.
+pub(super) fn untouched(path: &str, text: &str) -> bool {
+    let Some((_, _, written)) = PAGES.iter().find(|(at, ..)| *at == path) else {
+        return false;
+    };
+    let mut rest = text;
+    let mut parts = written.split("{day}").peekable();
+    while let Some(part) = parts.next() {
+        let Some(after) = rest.strip_prefix(part) else {
+            return false;
+        };
+        rest = after;
+        if parts.peek().is_some() {
+            let day = rest.get(..10).filter(|day| {
+                day.bytes().enumerate().all(|(at, b)| match at {
+                    4 | 7 => b == b'-',
+                    _ => b.is_ascii_digit(),
+                })
+            });
+            let Some(day) = day else {
+                return false;
+            };
+            rest = &rest[day.len()..];
+        }
+    }
+    rest.is_empty()
+}
+
+/// Whether `path` in a site is where `statac new` writes a sample page.
+pub(super) fn writes(path: &str) -> bool {
+    PAGES.iter().any(|(at, ..)| *at == path)
+}
+
 /// Every sample page, by its path in the site, dated from `today`.
 pub(super) fn pages(today: Date) -> Vec<(String, String)> {
     PAGES

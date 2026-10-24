@@ -82,6 +82,7 @@ codes! {
     WorkerOutsideImportMap "worker-outside-import-map",
     SameAddress "same-address",
     AddressTaken "address-taken",
+    AddressGone "address-gone",
     UnwritableName "unwritable-name",
     NotStatacsFolder "not-statacs-folder",
     OutputInTheWay "output-in-the-way",
@@ -229,6 +230,7 @@ impl Code {
             Code::BrokenLink
             | Code::WorkerOutsideImportMap
             | Code::AddressTaken
+            | Code::AddressGone
             | Code::SassWarning
             | Code::ColonInCall
             | Code::PublishedAsText
@@ -380,6 +382,7 @@ impl Code {
             Code::BrokenLink
             | Code::WorkerOutsideImportMap
             | Code::AddressTaken
+            | Code::AddressGone
             | Code::SassWarning
             | Code::ColonInCall
             | Code::PublishedAsText
@@ -719,6 +722,13 @@ pub enum Kind {
         held: Held,
         address: String,
         taken: Box<Named>,
+    },
+    /// An address the site published before that nothing answers at any
+    /// more: with the site's own path, and as `published.txt` and
+    /// `redirect_from` write it, without.
+    AddressGone {
+        address: String,
+        written: String,
     },
     /// A name some common disk can't hold.
     UnwritableName {
@@ -1436,6 +1446,9 @@ pub enum RecordFault {
     Reach(String),
     /// What is written in `fetched/refused` where the address goes.
     Address(String),
+    /// A line of `published.txt` that is no address from the top of the
+    /// site, as written.
+    NotAnAddress(String),
 }
 
 /// What is wrong with a file a card's description names.
@@ -2708,6 +2721,7 @@ impl Kind {
             Kind::WorkerOutsideImportMap { .. } => Code::WorkerOutsideImportMap,
             Kind::SameAddress { .. } | Kind::LaterPageTaken { .. } => Code::SameAddress,
             Kind::AddressTaken { .. } => Code::AddressTaken,
+            Kind::AddressGone { .. } => Code::AddressGone,
             Kind::UnwritableName { .. } => Code::UnwritableName,
             Kind::NotStatacsFolder { .. } => Code::NotStatacsFolder,
             Kind::OutputInTheWay { .. } => Code::OutputInTheWay,

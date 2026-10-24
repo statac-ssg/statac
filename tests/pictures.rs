@@ -281,10 +281,8 @@ fn a_photograph_beside_a_page_in_its_own_folder_is_published_as_copies() {
     site.put("content/post-1/photo-1.jpg", &jpeg(900, 600));
     site.put("content/post-1/picture-1.gif", &gif(40, 30));
     let said = site.build();
-    assert!(
-        said.contains("Made 6 copies of 1 photograph.\nWrote 2 pages and 8 other files"),
-        "{said}"
-    );
+    assert!(said.contains("Made 6 copies of 1 photograph.\n"), "{said}");
+    assert!(said.contains("\nWrote 2 pages and 8 other files"), "{said}");
     let sizes = "(max-width: 46rem) 100vw, 46rem";
     assert_eq!(
         line_with(&site.html("post-1/index.html"), "<picture>"),

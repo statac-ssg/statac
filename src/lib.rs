@@ -31,6 +31,7 @@ pub mod pictures;
 pub mod platform;
 pub mod problem;
 pub mod publish;
+mod published;
 pub mod reads;
 pub mod refresh;
 mod refuse;

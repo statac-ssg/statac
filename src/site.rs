@@ -450,6 +450,8 @@ pub struct Site {
     pub fetched: crate::fetched::Fetched,
     /// The mentions of each page kept in `fetched/mentions/`.
     pub mentions: crate::fetched::mentions::Mentions,
+    /// The addresses the site published before, kept in `published.txt`.
+    pub published: crate::published::Record,
     /// Where each page left out as a draft or until its day would stand.
     pub held_back: Vec<HeldBack>,
     /// The `layout:` of each page left out until the site has an address.

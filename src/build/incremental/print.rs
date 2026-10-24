@@ -427,7 +427,12 @@ impl Taken<'_> {
         for id in sources.ids() {
             let path = sources.path(id);
             let keyed = ["content", "data", "assets", crate::fetched::FOLDER];
-            if !templates.contains(&id) && !keyed.iter().any(|folder| path.starts_with(folder)) {
+            // No output reads what the site published before.
+            let unread = path == Path::new(crate::published::FILE);
+            if !templates.contains(&id)
+                && !unread
+                && !keyed.iter().any(|folder| path.starts_with(folder))
+            {
                 print = self.file(print, id);
             }
         }

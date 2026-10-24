@@ -189,6 +189,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 named(taken)
             )
         }
+        Kind::AddressGone { address, .. } => {
+            format!("Address gone: `{address}` was published before, and nothing answers there now")
+        }
         Kind::UnwritableName { path, why } => unwritable(&visible(path), why),
         Kind::NotStatacsFolder { path, found } => {
             let path = path.display();
@@ -960,6 +963,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
                     format!("`{reach}` is neither `mention` nor `sender`")
                 }
                 RecordFault::Address(address) => format!("`{address}` isn't a web address"),
+                RecordFault::NotAnAddress(written) => {
+                    format!("`{written}` isn't an address from the top of the site")
+                }
             }
         ),
         Kind::TokenInSettings => {
@@ -2413,6 +2419,10 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 _ => format!("Give one of them another `permalink` {when}."),
             })
         }
+        Kind::AddressGone { written, .. } => Some(format!(
+            "Send readers on with `redirect_from: [{written}]` in the page that took its place, \
+             or take this line out if it is gone for good."
+        )),
         Kind::NotStatacsFolder { .. } => Some(
             "Statac replaces only folders it built, so build into a new folder or empty this \
              one first."
@@ -3132,6 +3142,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             RecordFault::Address(_) => {
                 Some("Write the address in full, starting `https://` or `http://`.".into())
             }
+            RecordFault::NotAnAddress(_) => Some(
+                "Write it from the top of the site, as `/about/`, or take the line out.".into(),
+            ),
         },
         Kind::TokenInSettings => Some(
             "Remove the line, add `webmentions: true`, and put the token in \
@@ -3437,6 +3450,19 @@ pub(crate) fn runs(n: usize) -> String {
 /// How many copies of a photograph were made, beside their time.
 pub(crate) fn copies_made(n: usize) -> String {
     how_many(n, "copy", "copies")
+}
+
+/// What `build` says of the addresses it added to `published.txt`, or
+/// of starting the file.
+pub(crate) fn kept_published(kept: crate::published::Kept) -> String {
+    let addresses = how_many(kept.added, "address", "addresses");
+    match kept.started {
+        true => format!(
+            "Started `published.txt` with the {addresses} this site publishes, so a later \
+             build can say when one stops answering. Commit it with the site."
+        ),
+        false => format!("Added {addresses} to `published.txt`."),
+    }
 }
 
 /// What `build` says of the copies of photographs it made.
@@ -4983,6 +5009,11 @@ mod tests {
                 record(RecordFault::Address("a.example".into())),
                 "Malformed record: `a.example` isn't a web address",
                 Some("Write the address in full, starting `https://` or `http://`."),
+            ),
+            (
+                record(RecordFault::NotAnAddress("about/".into())),
+                "Malformed record: `about/` isn't an address from the top of the site",
+                Some("Write it from the top of the site, as `/about/`, or take the line out."),
             ),
             (
                 Kind::UnreadablePicture {
@@ -6656,6 +6687,28 @@ mod tests {
                 Some(
                     "Take it out of `redirect_from` in `content/post-2.md`, or give this draft \
                      a `permalink`, before it is published.",
+                ),
+            ),
+            (
+                Kind::AddressGone {
+                    address: "/about/".into(),
+                    written: "/about/".into(),
+                },
+                "Address gone: `/about/` was published before, and nothing answers there now",
+                Some(
+                    "Send readers on with `redirect_from: [/about/]` in the page that took its \
+                     place, or take this line out if it is gone for good.",
+                ),
+            ),
+            (
+                Kind::AddressGone {
+                    address: "/blog/about/".into(),
+                    written: "/about/".into(),
+                },
+                "Address gone: `/blog/about/` was published before, and nothing answers there now",
+                Some(
+                    "Send readers on with `redirect_from: [/about/]` in the page that took its \
+                     place, or take this line out if it is gone for good.",
                 ),
             ),
             (

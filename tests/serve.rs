@@ -1353,6 +1353,7 @@ fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
     let first = std::fs::read_to_string(served.site.path("content/post-1.md")).unwrap();
     assert!(!first.contains("id:"), "{first}");
 
+    let mark_built = served.said.text().len();
     let built = statac::build::run(&statac::build::Options {
         mode: statac::build::Mode::Build,
         site: served.site.0.clone(),
@@ -1362,6 +1363,10 @@ fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
         url: None,
     });
     assert!(built.published.is_some());
+    // The build started `published.txt`, which serve reads again first.
+    served
+        .said
+        .after(mark_built, "`published.txt` changed. Built ");
     let before = served.hub.generation();
     let mark = served.said.text().len();
     served.site.write(

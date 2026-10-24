@@ -621,8 +621,12 @@ fn a_site_with_nothing_fetched_builds_as_it_did() {
     site.write("content/post-1.md", "---\ntitle: Post 1\n---\nNo video.\n");
     let (said, code) = site.run("build", "2026-10-06");
     assert_eq!(code, Some(0));
+    // Besides starting the record of what it published.
+    let lines: Vec<&str> = (said.lines())
+        .filter(|line| !line.starts_with("Started `published.txt`"))
+        .collect();
     assert!(
-        said.starts_with("Wrote 2 pages and 1 other file to `SITE") && said.lines().count() == 1,
+        lines.len() == 1 && lines[0].starts_with("Wrote 2 pages and 1 other file to `SITE"),
         "{said}"
     );
     assert!(!site.holds("fetched"));
