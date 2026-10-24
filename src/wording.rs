@@ -2399,10 +2399,20 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
              in `statac.yaml`.",
             named(page)
         )),
-        Kind::AddressTaken { held, .. } => Some(match held {
-            Held::Draft => "Give one of them another `permalink` before it is published.".into(),
-            Held::Waiting => "Give one of them another `permalink` before its day comes.".into(),
-        }),
+        Kind::AddressTaken { held, taken, .. } => {
+            let (what, when) = match held {
+                Held::Draft => ("draft", "before it is published"),
+                Held::Waiting => ("post", "before its day comes"),
+            };
+            Some(match &**taken {
+                Named::Redirect { page, .. } => format!(
+                    "Take it out of `redirect_from` in {}, or give this {what} a `permalink`, \
+                     {when}.",
+                    named(page)
+                ),
+                _ => format!("Give one of them another `permalink` {when}."),
+            })
+        }
         Kind::NotStatacsFolder { .. } => Some(
             "Statac replaces only folders it built, so build into a new folder or empty this \
              one first."
@@ -6634,6 +6644,19 @@ mod tests {
                 "Address taken: this post would be published at `/post-1/`, as \
                  `content/post-2.md` is",
                 Some("Give one of them another `permalink` before its day comes."),
+            ),
+            (
+                Kind::AddressTaken {
+                    held: Held::Draft,
+                    address: "/post-1/".into(),
+                    taken: Box::new(redirect("content/post-2.md")),
+                },
+                "Address taken: this draft would be published at `/post-1/`, as a redirect in \
+                 `content/post-2.md` is",
+                Some(
+                    "Take it out of `redirect_from` in `content/post-2.md`, or give this draft \
+                     a `permalink`, before it is published.",
+                ),
             ),
             (
                 same(Alike::ByCase),

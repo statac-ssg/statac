@@ -27,6 +27,13 @@ Give one of the two a different address with `permalink`, or move or
 rename its file. If the page that is left out is meant to replace the
 other, remove the other on the day it is published.
 
+Where the address is taken by a redirect, an old address listed in
+another page's `redirect_from`, the message says so and names that
+page. Often the page was renamed and the old address kept so readers
+are sent on, and the draft now wants it back. Take the address out of
+that `redirect_from` if the draft is to answer there, or give the
+draft a `permalink` of its own if the redirect should stay.
+
 Once you have understood the warning, you can quieten it by name.
 
 ## Example
