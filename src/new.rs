@@ -725,9 +725,19 @@ pub(crate) fn refusal(folder: &Path, shown_as: &str, by: Maker) -> Result<(), Pr
 /// What makes `folder` a site, if anything does: a `statac.yaml`, or a
 /// `content` folder.
 pub(crate) fn site_mark(folder: &Path) -> io::Result<Option<SiteMark>> {
-    for entry in std::fs::read_dir(folder)? {
-        if entry?.file_name() == config::FILE_NAME {
-            return Ok(Some(SiteMark::Settings));
+    // Looked for by name first, so a folder is listed only where the file
+    // may be there: a disk that ignores case finds `Statac.yaml` by that
+    // name too, and only the listing gives its spelling.
+    let maybe = match std::fs::symlink_metadata(folder.join(config::FILE_NAME)) {
+        Ok(_) => true,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+        Err(error) => return Err(error),
+    };
+    if maybe {
+        for entry in std::fs::read_dir(folder)? {
+            if entry?.file_name() == config::FILE_NAME {
+                return Ok(Some(SiteMark::Settings));
+            }
         }
     }
     let content = std::fs::symlink_metadata(folder.join("content"));

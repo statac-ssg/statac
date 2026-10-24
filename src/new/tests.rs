@@ -836,6 +836,20 @@ fn a_folder_holding_anything_is_refused_naming_the_first_four() {
 }
 
 #[test]
+fn a_folder_is_a_site_by_its_settings_spelt_as_statac_spells_them_or_by_its_writing() {
+    let mark = |folder: &Scratch| site_mark(folder).unwrap();
+    let settings = holding("mark-settings", &["a.txt", "statac.yaml"]);
+    assert_eq!(mark(&settings), Some(SiteMark::Settings));
+    // Found by that name too where the disk ignores case, but not the file.
+    let capitals = holding("mark-capitals", &["Statac.yaml"]);
+    assert_eq!(mark(&capitals), None);
+    let writing = holding("mark-writing", &["Statac.yaml"]);
+    std::fs::create_dir(writing.join("content")).unwrap();
+    assert_eq!(mark(&writing), Some(SiteMark::Content));
+    assert_eq!(mark(&holding("mark-none", &["a.txt"])), None);
+}
+
+#[test]
 fn a_site_is_refused_by_its_settings_or_its_writing() {
     let folder = holding("settings", &["statac.yaml", "a.txt"]);
     let shown = folder.to_string_lossy().into_owned();
