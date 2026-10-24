@@ -232,9 +232,41 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
         } if writes(at.trim(), base).as_deref() == Some(target.trim()) => {
             whole(at.trim(), suggestion)
         }
+        Kind::AddressGone { written, .. } if at.trim() == written.as_str() => {
+            let (start, end) = lines(file, place.span);
+            Some(Fix {
+                title: wording::fix_forget(written),
+                place: Place {
+                    source: place.source,
+                    span: Span::new(start, end),
+                },
+                text: String::new(),
+            })
+        }
+        Kind::AddressesGone { under, gone, .. } => {
+            let (start, end) = lines(file, place.span);
+            let (taken, kept): (Vec<&str>, Vec<&str>) = (file[start..end].split_inclusive('\n'))
+                .partition(|line| gone.iter().any(|address| line.trim() == address));
+            (taken.len() == gone.len()).then(|| Fix {
+                title: wording::fix_forget_all(gone.len(), under),
+                place: Place {
+                    source: place.source,
+                    span: Span::new(start, end),
+                },
+                text: kept.concat(),
+            })
+        }
         _ => None,
     };
     fix.into_iter().collect()
+}
+
+/// The whole lines `span` of `file` is on, each with its ending.
+fn lines(file: &str, span: Span) -> (usize, usize) {
+    let (from, to) = (span.start as usize, span.end as usize);
+    let start = file[..from].rfind('\n').map_or(0, |at| at + 1);
+    let end = file[to..].find('\n').map_or(file.len(), |at| to + at + 1);
+    (start, end)
 }
 
 /// The address `at` links to, where it is written whole: as an address,

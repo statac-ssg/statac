@@ -192,6 +192,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::AddressGone { address, .. } => {
             format!("Address gone: `{address}` was published before, and nothing answers there now")
         }
+        Kind::AddressesGone { under, gone, .. } => format!(
+            "Addresses gone: the {} under `{under}` were published before, and nothing answers \
+             at any of them now",
+            how_many(gone.len(), "address", "addresses")
+        ),
         Kind::UnwritableName { path, why } => unwritable(&visible(path), why),
         Kind::NotStatacsFolder { path, found } => {
             let path = path.display();
@@ -2239,6 +2244,18 @@ pub(crate) fn fix_written(text: &str) -> String {
     format!("Write it as `{text}`")
 }
 
+/// The fix taking an address gone out of `published.txt`.
+pub(crate) fn fix_forget(written: &str) -> String {
+    format!("Take `{written}` out of `published.txt`")
+}
+
+/// The fix taking every address gone under a folder out of
+/// `published.txt`.
+pub(crate) fn fix_forget_all(count: usize, under: &str) -> String {
+    let addresses = how_many(count, "address", "addresses");
+    format!("Take the {addresses} under `{under}` out of `published.txt`")
+}
+
 pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
     match kind {
         Kind::BrokenLink {
@@ -2419,6 +2436,11 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 _ => format!("Give one of them another `permalink` {when}."),
             })
         }
+        Kind::AddressesGone { .. } => Some(
+            "Send readers on with `redirect_from` in the pages that took their places, or take \
+             them out of `published.txt` if they are gone for good."
+                .into(),
+        ),
         Kind::AddressGone { written, .. } => Some(format!(
             "Send readers on with `redirect_from: [{written}]` in the page that took its place, \
              or take it out of `published.txt` if it is gone for good."
@@ -6698,6 +6720,19 @@ mod tests {
                 Some(
                     "Send readers on with `redirect_from: [/about/]` in the page that took its \
                      place, or take it out of `published.txt` if it is gone for good.",
+                ),
+            ),
+            (
+                Kind::AddressesGone {
+                    under: "/blog/notes/".into(),
+                    written: "/notes/".into(),
+                    gone: vec!["/notes/".into(), "/notes/note-1/".into()],
+                },
+                "Addresses gone: the 2 addresses under `/blog/notes/` were published before, and \
+                 nothing answers at any of them now",
+                Some(
+                    "Send readers on with `redirect_from` in the pages that took their places, or \
+                     take them out of `published.txt` if they are gone for good.",
                 ),
             ),
             (

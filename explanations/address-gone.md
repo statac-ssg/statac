@@ -40,7 +40,13 @@ If the page moved, add its old address to the `redirect_from` of the
 page as it is now, and readers are sent on to it.
 
 If it is gone for good, take its line out of `published.txt`, and
-Statac stops warning about it.
+Statac stops warning about it. In an editor with Statac's extension,
+the warning offers to do that for you.
+
+Where every address Statac kept under a folder is gone, as when a whole
+part of the site is taken away, they are one warning, under the
+outermost folder they share, and the editor offers to take all their
+lines out at once.
 
 Once you have understood the warning, you can quieten it by name.
 

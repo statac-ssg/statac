@@ -347,3 +347,30 @@ fn a_template_reading_near_what_it_is_handed_reads_that() {
         ]
     );
 }
+
+#[test]
+fn an_address_gone_is_taken_out_of_the_record_alone_or_with_every_one_gone_under_its_folder() {
+    let found = fixed(&[
+        ("templates/page.html", "{{ page.content }}\n"),
+        ("content/about.md", "---\ntitle: About\n---\n"),
+        ("content/notes/note-1.md", "---\ntitle: Note 1\n---\n"),
+        (
+            "published.txt",
+            "# The record.\n/about/\n/blog/\n/blog/feed.xml\n/blog/post-1/\n\
+             /notes/note-1/\n/notes/note-2/\n",
+        ),
+    ]);
+    let found: Vec<&String> = found
+        .iter()
+        .filter(|f| f.contains("address-gone"))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "address-gone in published.txt: `/blog/\n/blog/feed.xml\n/blog/post-1/\n` as ``, \
+             offered as Take the 3 addresses under `/blog/` out of `published.txt`",
+            "address-gone in published.txt: `/notes/note-2/\n` as ``, offered as Take \
+             `/notes/note-2/` out of `published.txt`",
+        ]
+    );
+}

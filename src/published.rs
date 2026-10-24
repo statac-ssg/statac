@@ -12,7 +12,7 @@
 //! else is a file. They are sorted, so two people adding pages at once
 //! seldom touch the same line.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io;
 use std::path::Path;
 
@@ -108,7 +108,10 @@ impl Record {
 
     /// A warning at the line of each address it holds that nothing in
     /// `outputs`, each published file's path from the top of the built
-    /// site, stands at, nor anything the site says answers there.
+    /// site, stands at, nor anything the site says answers there. Where
+    /// every address it holds under a folder is gone, two or more, they are
+    /// one warning across their lines, under the outermost such folder: a
+    /// part of the site taken away whole.
     pub(crate) fn gone(&self, outputs: &[(String, Named)], settings: &Settings) -> Vec<Problem> {
         let published: BTreeSet<&str> = outputs.iter().map(|(file, _)| file.as_str()).collect();
         let base = settings.base();
@@ -133,16 +136,54 @@ impl Record {
             });
             published.contains(file.as_str()) || made || elsewhere
         };
-        (self.addresses.iter())
+        let gone: Vec<&(Address, Place)> = (self.addresses.iter())
             .filter(|(address, _)| !answered(address))
-            .map(|(address, place)| {
+            .collect();
+        let lost: HashSet<&str> = gone.iter().map(|(address, _)| address.as_str()).collect();
+        let mut held: HashMap<&str, (usize, usize)> = HashMap::new();
+        for (address, _) in &self.addresses {
+            let lost = lost.contains(address.as_str());
+            for folder in folders(address.as_str()) {
+                let (all, lost_here) = held.entry(folder).or_default();
+                *all += 1;
+                *lost_here += usize::from(lost);
+            }
+        }
+        let mut groups: BTreeMap<&str, Vec<&(Address, Place)>> = BTreeMap::new();
+        for each in &gone {
+            if let Some(folder) = whole(each.0.as_str(), &held) {
+                groups.entry(folder).or_default().push(each);
+            }
+        }
+        let mut told = Vec::new();
+        for each @ (address, place) in &gone {
+            let Some(folder) = whole(address.as_str(), &held) else {
                 let kind = Kind::AddressGone {
                     address: format!("{base}{}", address.as_str()),
                     written: address.as_str().to_owned(),
                 };
-                Problem::at(kind, *place)
-            })
-            .collect()
+                told.push(Problem::at(kind, *place));
+                continue;
+            };
+            let group = &groups[folder];
+            // Told once, where the first of them is.
+            if !std::ptr::eq(group[0], *each) {
+                continue;
+            }
+            let start = group.iter().map(|(_, at)| at.span.start).min().unwrap_or(0);
+            let end = group.iter().map(|(_, at)| at.span.end).max().unwrap_or(0);
+            let kind = Kind::AddressesGone {
+                under: format!("{base}{folder}"),
+                written: folder.to_owned(),
+                gone: group.iter().map(|(a, _)| a.as_str().to_owned()).collect(),
+            };
+            let place = Place {
+                source: place.source,
+                span: Span::new(start as usize, end as usize),
+            };
+            told.push(Problem::at(kind, place));
+        }
+        told
     }
 
     /// Writes the file under the site at `site` with every address it
@@ -199,6 +240,22 @@ impl Record {
     }
 }
 
+/// The outermost folder `address` is in, or is, under which `held` has
+/// two addresses or more kept, all of them gone, by how many it keeps
+/// and how many are gone.
+fn whole<'a>(address: &'a str, held: &HashMap<&str, (usize, usize)>) -> Option<&'a str> {
+    folders(address).find(|folder| {
+        let (all, lost) = held[folder];
+        all >= 2 && lost == all
+    })
+}
+
+/// Each folder `address` is in, or is, from the outermost: `/blog/` and
+/// `/blog/2026/` of `/blog/2026/post-1/`. None for a file at the top.
+fn folders(address: &str) -> impl Iterator<Item = &str> {
+    (address.match_indices('/').skip(1)).map(move |(at, _)| &address[..=at])
+}
+
 /// What a build added to the file.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 pub struct Kept {
@@ -230,15 +287,43 @@ impl Written {
             return;
         }
         for problem in problems {
-            let (Kind::AddressGone { written, .. }, Some(place)) = (&problem.kind, problem.place)
-            else {
+            let Some(place) = problem.place else {
                 continue;
             };
-            let read_at = sources.line_number(place.source, place.span.start as usize);
-            if self.lines.get(written) != Some(&read_at) {
+            let (first, last) = match &problem.kind {
+                Kind::AddressGone { written, .. } => (written, written),
+                Kind::AddressesGone { gone, .. } => match (gone.first(), gone.last()) {
+                    (Some(first), Some(last)) => (first, last),
+                    _ => continue,
+                },
+                _ => continue,
+            };
+            let line = |offset: u32| sources.line_number(place.source, offset as usize);
+            if self.lines.get(first) != Some(&line(place.span.start))
+                || self.lines.get(last) != Some(&line(place.span.end))
+            {
                 problem.place = None;
             }
         }
+    }
+
+    /// Takes out of `problems` the addresses gone that a serve let go of
+    /// as it wrote the file: a warning of them alone, and each from a
+    /// warning of several, which can be told then only by what remains.
+    pub(crate) fn forget_dropped(&self, problems: &mut Vec<Problem>) {
+        let dropped = |address: &String| self.dropped.contains(address);
+        problems.retain_mut(|problem| match &mut problem.kind {
+            Kind::AddressGone { written, .. } => !dropped(written),
+            Kind::AddressesGone { gone, .. } => {
+                let before = gone.len();
+                gone.retain(|address| !dropped(address));
+                if gone.len() != before {
+                    problem.place = None;
+                }
+                !gone.is_empty()
+            }
+            _ => true,
+        });
     }
 }
 

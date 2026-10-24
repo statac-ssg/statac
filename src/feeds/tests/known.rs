@@ -121,7 +121,7 @@ impl Drop for Kept {
 fn told(outcome: &Outcome) -> Vec<(Kind, Option<String>)> {
     let sources = outcome.sources();
     (outcome.problems.iter())
-        .filter(|p| !matches!(p.kind, Kind::AddressGone { .. }))
+        .filter(|p| p.kind.code() != crate::problem::Code::AddressGone)
         .map(|p| {
             let at = p.place.map(|place| sources.spelling(place).to_owned());
             (p.kind.clone(), at)

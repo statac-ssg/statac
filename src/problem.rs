@@ -730,6 +730,15 @@ pub enum Kind {
         address: String,
         written: String,
     },
+    /// Every address the site published before under a folder, two or
+    /// more, that nothing answers at any more: the folder with the site's
+    /// own path, and as `published.txt` writes it, and each address as it
+    /// writes them, in the order of their lines.
+    AddressesGone {
+        under: String,
+        written: String,
+        gone: Vec<String>,
+    },
     /// A name some common disk can't hold.
     UnwritableName {
         path: String,
@@ -2721,7 +2730,7 @@ impl Kind {
             Kind::WorkerOutsideImportMap { .. } => Code::WorkerOutsideImportMap,
             Kind::SameAddress { .. } | Kind::LaterPageTaken { .. } => Code::SameAddress,
             Kind::AddressTaken { .. } => Code::AddressTaken,
-            Kind::AddressGone { .. } => Code::AddressGone,
+            Kind::AddressGone { .. } | Kind::AddressesGone { .. } => Code::AddressGone,
             Kind::UnwritableName { .. } => Code::UnwritableName,
             Kind::NotStatacsFolder { .. } => Code::NotStatacsFolder,
             Kind::OutputInTheWay { .. } => Code::OutputInTheWay,

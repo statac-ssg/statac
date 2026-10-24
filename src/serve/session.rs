@@ -614,13 +614,7 @@ impl Session {
         let ours = self.ours.get_or_insert_default();
         match site.published.keep(at, &now, (!first).then_some(ours)) {
             Ok(written) => {
-                round
-                    .outcome
-                    .problems
-                    .retain(|problem| match &problem.kind {
-                        Kind::AddressGone { written: gone, .. } => !written.dropped.contains(gone),
-                        _ => true,
-                    });
+                written.forget_dropped(&mut round.outcome.problems);
                 written.re_place(&mut round.outcome.problems, renderer.sources());
                 round.outcome.kept = written.kept;
                 round.recorded = written.hash;

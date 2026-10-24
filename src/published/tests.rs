@@ -212,3 +212,47 @@ fn a_warning_keeps_its_line_only_where_the_file_as_written_has_the_address_there
         assert_eq!(line(&problems, sources), [wanted], "{now:?}");
     }
 }
+
+#[test]
+fn every_address_under_a_folder_gone_is_one_warning_under_the_outermost_such_folder() {
+    let site = TempSite::site(&[
+        ("templates/page.html", "{{ page.content }}\n"),
+        ("content/about.md", "---\ntitle: About\n---\n"),
+        ("content/notes/note-1.md", "---\ntitle: Note 1\n---\n"),
+        (
+            FILE,
+            "/about/\n/blog/2026/post-1/\n/blog/2026/post-2/\n/blog/feed.xml\n\
+             /notes/note-1/\n/notes/note-2/\n/old/\n",
+        ),
+    ]);
+    let prepared = crate::build::prepared(&site.root, &run());
+    let sources = prepared.renderer.sources();
+    let told: Vec<(String, String)> = (prepared.problems.iter())
+        .filter(|p| p.kind.code() == Code::AddressGone)
+        .map(|p| {
+            let at = sources.spelling(p.place.unwrap()).to_owned();
+            (crate::wording::headline(&p.kind), at)
+        })
+        .collect();
+    assert_eq!(
+        told,
+        [
+            (
+                "Addresses gone: the 3 addresses under `/blog/` were published before, and \
+                 nothing answers at any of them now"
+                    .into(),
+                "/blog/2026/post-1/\n/blog/2026/post-2/\n/blog/feed.xml".into()
+            ),
+            (
+                "Address gone: `/notes/note-2/` was published before, and nothing answers \
+                 there now"
+                    .into(),
+                "/notes/note-2/".into()
+            ),
+            (
+                "Address gone: `/old/` was published before, and nothing answers there now".into(),
+                "/old/".into()
+            ),
+        ]
+    );
+}
