@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use super::{fixes, uri};
 use crate::build::Outcome;
 use crate::json;
-use crate::problem::{Problem, Severity};
+use crate::problem::{Kind, Named, Problem, Severity};
 use crate::report::shown;
 use crate::source::{Place, SourceId, Sources};
 
@@ -60,7 +60,7 @@ pub(super) struct Offered {
 
 /// Every problem `outcome` holds that isn't quietened, as diagnostics by
 /// the file each is told in. A problem in no file is told at the start of
-/// `nowhere`.
+/// each file of the site it names, or else of `nowhere`.
 pub(super) fn by_file(
     outcome: &Outcome,
     site: &Path,
@@ -82,14 +82,20 @@ pub(super) fn by_file(
         if outcome.quiet.quietens(&problem.kind) {
             continue;
         }
-        let (file, (from, to)) = match problem.place {
+        let (files, (from, to)) = match problem.place {
             Some(place) if problem.kind.of_a_whole_file() => {
-                (path(sources, site, place.source), ((0, 0), (0, 0)))
+                (vec![path(sources, site, place.source)], ((0, 0), (0, 0)))
             }
-            Some(place) => (path(sources, site, place.source), ends(place)),
-            None => (nowhere.to_path_buf(), ((0, 0), (0, 0))),
+            Some(place) => (vec![path(sources, site, place.source)], ends(place)),
+            None => {
+                let mut files = named_files(&problem.kind, site);
+                if files.is_empty() {
+                    files.push(nowhere.to_path_buf());
+                }
+                (files, ((0, 0), (0, 0)))
+            }
         };
-        let fixes = (fixes::fixes(problem, sources, &base).into_iter())
+        let fixes: Vec<Offered> = (fixes::fixes(problem, sources, &base).into_iter())
             .map(|fix| {
                 let (from, to) = ends(fix.place);
                 let was = sources.text(fix.place.source)[fix.place.span.range()].to_owned();
@@ -103,14 +109,43 @@ pub(super) fn by_file(
             })
             .collect();
         let diagnostic = diagnostic(problem, &ranged(from, to), sources, site, encoding);
-        found.entry(file).or_default().push(Told {
-            diagnostic,
-            from,
-            to,
-            fixes,
-        });
+        for file in files {
+            found.entry(file).or_default().push(Told {
+                diagnostic: diagnostic.clone(),
+                from,
+                to,
+                fixes: fixes.clone(),
+            });
+        }
     }
     found
+}
+
+/// The files of the site a problem in no file names, each of which it is
+/// told at the start of: both sides of two things at one address.
+fn named_files(kind: &Kind, site: &Path) -> Vec<PathBuf> {
+    let named: Vec<&Named> = match kind {
+        Kind::SameAddress { first, second, .. } => vec![first, second],
+        Kind::LaterPageTaken { page, .. } => vec![page],
+        _ => Vec::new(),
+    };
+    let mut files: Vec<PathBuf> = Vec::new();
+    for named in named {
+        let Named::File(name) = named else {
+            continue;
+        };
+        // An item is named by its file and the item: `data/people.yaml: ada`.
+        let file = (std::iter::once(name.as_str()))
+            .chain(name.split_once(": ").map(|(file, _)| file))
+            .map(|name| site.join(name))
+            .find(|file| file.is_file());
+        if let Some(file) = file
+            && !files.contains(&file)
+        {
+            files.push(file);
+        }
+    }
+    files
 }
 
 /// The protocol's range from `from` to `to`.

@@ -1039,6 +1039,37 @@ fn renaming_a_pages_file_answers_with_the_edits_that_keep_its_links() {
     );
 }
 
+#[test]
+fn two_files_published_at_one_address_are_each_told_it_at_their_start() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\nlanguage: en\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        ("templates/home.html", "{{ page.content }}\n"),
+        ("content/about.md", "---\ntitle: About\n---\n"),
+        ("content/team.md", "---\ntitle: Team\n---\n"),
+        ("static/team/index.html", "<p>The team</p>\n"),
+    ]);
+    let about = site.root.join("content/about.md");
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    editor.send(&opened(&about));
+    for file in ["content/team.md", "static/team/index.html"] {
+        let told = editor.told_until(0, &site.root.join(file), |told| !told.is_empty());
+        assert_eq!(
+            told,
+            [("same-address".into(), "0".into(), "0".into())],
+            "{file}"
+        );
+    }
+    let (sent, _) = editor.end(true);
+    let settings = uri::of(&site.root.join("statac.yaml"));
+    let told: Vec<Told> = (sent.iter())
+        .filter_map(|message| diagnostics_for(message, &settings))
+        .flatten()
+        .collect();
+    assert!(told.is_empty(), "{told:?}");
+}
+
 const DRAFT: &str = "---\ntitle: Draft 1\ndraft: true\nlayout: pots\n---\n\
                      See [the team](/about/#the-team).\n";
 
