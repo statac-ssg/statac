@@ -31,9 +31,9 @@ pub(crate) const FILE: &str = "published.txt";
 
 /// What opens the file, as Statac writes it.
 const ABOUT: &str = "\
-# Every address this site has published, so Statac can say when one
-# stops answering. Statac adds to it each time it builds the site.
-# Take out the line of an address that is gone for good.
+# Every URL this site has published, so Statac can say when one is no
+# longer published. Statac adds to it each time it builds the site.
+# Take out the line of a URL that is gone for good.
 ";
 
 /// The addresses the file holds, each with where its line is.
@@ -115,10 +115,10 @@ impl Record {
     pub(crate) fn gone(&self, outputs: &[(String, Named)], settings: &Settings) -> Vec<Problem> {
         let published: BTreeSet<&str> = outputs.iter().map(|(file, _)| file.as_str()).collect();
         let base = settings.base();
-        let made_after: Vec<String> = (settings.texts("after_build_makes").iter())
+        let made_after: Vec<String> = (settings.texts("after_build_outputs").iter())
             .map(|place| place.value.trim_start_matches('/').to_owned())
             .collect();
-        let not_ours: Vec<String> = (settings.texts("not_ours").iter())
+        let served_elsewhere: Vec<String> = (settings.texts("served_elsewhere").iter())
             .map(|path| format!("/{}", path.value.trim_matches('/')))
             .collect();
         let answered = |address: &Address| {
@@ -130,7 +130,7 @@ impl Record {
                     None => file == *place,
                 });
             let whole = format!("{base}{}", address.as_str());
-            let elsewhere = not_ours.iter().any(|path| {
+            let elsewhere = served_elsewhere.iter().any(|path| {
                 (whole.strip_prefix(path.as_str()))
                     .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
             });
@@ -158,7 +158,7 @@ impl Record {
         let mut told = Vec::new();
         for each @ (address, place) in &gone {
             let Some(folder) = whole(address.as_str(), &held) else {
-                let kind = Kind::AddressGone {
+                let kind = Kind::UrlGone {
                     address: format!("{base}{}", address.as_str()),
                     written: address.as_str().to_owned(),
                 };
@@ -291,7 +291,7 @@ impl Written {
                 continue;
             };
             let (first, last) = match &problem.kind {
-                Kind::AddressGone { written, .. } => (written, written),
+                Kind::UrlGone { written, .. } => (written, written),
                 Kind::AddressesGone { gone, .. } => match (gone.first(), gone.last()) {
                     (Some(first), Some(last)) => (first, last),
                     _ => continue,
@@ -313,7 +313,7 @@ impl Written {
     pub(crate) fn forget_dropped(&self, problems: &mut Vec<Problem>) {
         let dropped = |address: &String| self.dropped.contains(address);
         problems.retain_mut(|problem| match &mut problem.kind {
-            Kind::AddressGone { written, .. } => !dropped(written),
+            Kind::UrlGone { written, .. } => !dropped(written),
             Kind::AddressesGone { gone, .. } => {
                 let before = gone.len();
                 gone.retain(|address| !dropped(address));

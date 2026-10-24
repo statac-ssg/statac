@@ -1,30 +1,32 @@
 # Footnote never shown
 
-The page has a footnote's note, `[^label]: The note.`, but no marker in
-the writing points at it. A note appears at the foot of the page only if
-a marker points at it, so this one doesn't appear anywhere.
+The page has a footnote definition, `[^label]: The note.`, but no
+footnote reference in the content points at it. A definition appears at
+the foot of the page only if a reference points at it, so this one
+doesn't appear anywhere.
 
 ## What you'll see {#what-youll-see}
 
 ```text
 warning  Footnote never shown: nothing points at `[^sources]`
-  Is it the note for `[^source]`?
+  Is it the definition for `[^source]`?
   More: https://statac.dev/e/footnote-never-shown/
 ```
 
 ## Why Statac warns
 
-Readers never see the note you wrote. Usually a marker's label is
-spelled differently, or the marker was removed and the note was left
-behind. Statac publishes the page without the note and tells
-you. A marker can point at a note written anywhere on the page, even inside
-a snippet call that wraps writing.
+Readers never see the footnote you wrote. Usually a reference's label is
+spelled differently, or the reference was removed and the definition was
+left behind. Statac publishes the page without the footnote and tells
+you. A reference can point at a definition written anywhere on the page,
+even inside a snippet call that wraps content.
 
 ## How to fix it
 
-Add a marker with the same label, `[^label]`, where the note belongs, or
-remove the note. If a marker with no note has a label close to the
-note's, the message asks whether the note belongs to that marker. Case
+Add a reference with the same label, `[^label]`, where the footnote
+belongs, or remove the definition. If a reference with no definition has
+a label close to the definition's, the message asks whether the
+definition belongs to that reference. Case
 doesn't matter when labels are matched.
 
 ## Example
@@ -37,7 +39,7 @@ The figures are from 2026.[^source]
 [^sources]: The yearly report.
 ```
 
-Give the marker and its note the same label:
+Give the reference and its definition the same label:
 
 ```markdown
 The figures are from 2026.[^sources]

@@ -4,7 +4,7 @@
     <article>
       {% if page.cover %}
       <div class="column">
-        <figure class="shot wide">{{ picture(page.photo(page.cover), loading="eager") }}</figure>
+        <figure class="shot wide">{{ picture(page.image(page.cover), loading="eager") }}</figure>
       </div>
       {% endif %}
       <header class="top under column">

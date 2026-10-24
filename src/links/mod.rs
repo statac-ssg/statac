@@ -6,8 +6,8 @@
 //! `assets/`, `static/` or beside the writing, or an old address that
 //! sends readers on. An `#anchor` is held to the ids on the page it lands
 //! on, once every page is built. Links to other sites are never fetched,
-//! nor are links under a path `not_ours` names or into what
-//! `after_build_makes` names. The pages built from templates are the ones
+//! nor are links under a path `served_elsewhere` names or into what
+//! `after_build_outputs` names. The pages built from templates are the ones
 //! read: a feed's links are its posts', told on their pages, and a file
 //! published as it is was written by the author's other tools.
 //!

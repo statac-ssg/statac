@@ -289,7 +289,7 @@ pub(crate) fn newer_starter(site: &Path, starter: &Starter) -> Option<Problem> {
     let files = (survey(&root, starter).iter())
         .filter(|found| matches!(found.is, Is::Older { .. } | Is::Yours { new: Some(_), .. }))
         .count();
-    (files > 0).then(|| Problem::nowhere(Kind::NewerStarter { files }))
+    (files > 0).then(|| Problem::nowhere(Kind::UpdateAvailable { files }))
 }
 
 /// The sharing card's font that `statac new --update --missing` would

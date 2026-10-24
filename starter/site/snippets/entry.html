@@ -8,7 +8,7 @@
   <div>
     <h3><a href="{{ post.url }}">{{ called(post) }}</a></h3>
     {% if pictured is defined and pictured and post.cover %}
-    {{ picture(post.photo(post.cover, decorative=true), alt="") }}
+    {{ picture(post.image(post.cover, decorative=true), alt="") }}
     {% endif %}
     {% if post.excerpt %}
     {{ post.excerpt }}

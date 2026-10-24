@@ -11,8 +11,8 @@ use std::process::Command;
 use image::{ImageFormat, Rgb, RgbImage};
 
 const LAYOUT: &str = "<!doctype html>\n<title>{{ headline(page) }}</title>\n{{ page.content }}\n\
-                      {% for mention in page.webmentions.said %}<a href=\"{{ mention.url }}\">\
-                      {{ mention.author }}</a>{% if mention.face %}<img src=\"{{ mention.face.src }}\">\
+                      {% for mention in page.webmentions.comments %}<a href=\"{{ mention.url }}\">\
+                      {{ mention.author }}</a>{% if mention.avatar %}<img src=\"{{ mention.avatar.src }}\">\
                       {% endif %}\n{% endfor %}";
 
 const SETTINGS: &str = "title: Site\nlanguage: en\ntimezone: Europe/London\npages.feed: false\n\
@@ -631,7 +631,7 @@ fn the_help_names_the_command() {
     let help = String::from_utf8(output.stdout).unwrap();
     assert!(
         help.contains(
-            "  statac refuse <address> [folder]\n                         Remove the webmention"
+            "  statac refuse <url> [folder]\n                         Remove the webmention"
         ),
         "{help}"
     );

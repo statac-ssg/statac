@@ -15,12 +15,12 @@
           {% if page.updated %}
           <li>{{ words.updated }} <time datetime="{{ page.updated | moment }}">{{ page.updated }}</time></li>
           {% endif %}
-          <li>{{ [1, page.words // 200] | max | digits }} {{ words.minutes }}</li>
+          <li>{{ [1, page.word_count // 200] | max | digits }} {{ words.minutes }}</li>
         </ul>
       </header>
       <div class="writing column">
         {% if page.cover %}
-        <figure class="wide">{{ picture(page.photo(page.cover), loading="eager") }}</figure>
+        <figure class="wide">{{ picture(page.image(page.cover), loading="eager") }}</figure>
         {% endif %}
         {% if page.contents and page.toc %}
         <nav class="contents" aria-labelledby="contents">

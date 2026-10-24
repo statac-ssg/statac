@@ -457,7 +457,7 @@ fn a_cards_file_is_brought_up_to_date_where_it_is_here_and_never_missed_where_it
     let told = newer_starter(&folder, &STARTER);
     assert_eq!(
         told.map(|problem| problem.kind),
-        Some(Kind::NewerStarter { files: 1 })
+        Some(Kind::UpdateAvailable { files: 1 })
     );
     let (said, code) = updated(&folder, Update::default());
     assert_eq!(code, 0, "{said}");
@@ -912,7 +912,7 @@ fn the_note_counts_older_files_and_the_authors_with_something_new() {
     let told = newer_starter(&folder, &STARTER);
     assert_eq!(
         told.map(|problem| problem.kind),
-        Some(Kind::NewerStarter { files: 2 })
+        Some(Kind::UpdateAvailable { files: 2 })
     );
     let newest = made_site("note-newest", &[]);
     assert_eq!(newer_starter(&newest, &STARTER), None);
@@ -1010,21 +1010,21 @@ fn check_tells_the_note_once_and_build_counts_it() {
         "note  Newer starter files: 1 of the files `statac new` wrote has a newer version\n\
          \x20 Run `statac new --update`: it replaces those you never changed and shows what is \
          new in the rest.\n\
-         \x20 More: https://statac.dev/e/newer-starter/\n\
+         \x20 More: https://statac.dev/e/update-available/\n\
          \n\
-         1 note: 1 newer-starter.\n"
+         1 note: 1 update-available.\n"
     );
     let built = build::run_holding(&options(&folder, Mode::Build), Progress::Silent, &STYLED);
     let report = Report::new(built.sources(), &folder, false);
     let said = report.build(&built.problems, &built.quiet);
-    assert!(said.starts_with("1 note: 1 newer-starter. "), "{said}");
+    assert!(said.starts_with("1 note: 1 update-available. "), "{said}");
     assert!(built.published.is_some());
     assert_eq!(read(&folder, "assets/site.css"), CSS_1);
 }
 
 #[test]
 fn the_note_is_quietened_by_name() {
-    let settings = "title: Site 1\nlanguage: en\nquiet: [newer-starter]\n";
+    let settings = "title: Site 1\nlanguage: en\nquiet: [update-available]\n";
     let folder = styled_site("note-quiet", settings);
     let checked = build::run_holding(&options(&folder, Mode::Check), Progress::Silent, &STYLED);
     let report = Report::new(checked.sources(), &folder, false);

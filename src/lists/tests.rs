@@ -198,19 +198,19 @@ fn a_post_standing_at_a_lists_address_is_said_to_be_no_post() {
             "content/tags/rust.md",
             "---\ntitle: Rust\ndate: 2026-01-02\n---\n",
             "2026-01-02",
-            "Not a post: `content/tags/rust.md` speaks for the tag `Rust`",
+            "Not a post: `content/tags/rust.md` is the list page for the tag `Rust`",
         ),
         (
             "content/notes.md",
             "---\ndate: 2026-01-02\npermalink: /notes/\n---\n",
             "2026-01-02",
-            "Not a post: `content/notes.md` speaks for the folder `content/notes/`",
+            "Not a post: `content/notes.md` is the list page for the folder `content/notes/`",
         ),
         (
             "content/2026-01-02-home.md",
             "---\npermalink: /\n---\n",
             "---",
-            "Not a post: `content/2026-01-02-home.md` speaks for the site's own list",
+            "Not a post: `content/2026-01-02-home.md` is the list page for the site's own list",
         ),
     ];
     for (path, text, at, said) in cases {
@@ -887,7 +887,7 @@ fn drafts_and_posts_waiting_for_their_day_are_left_out_and_said() {
         problems(&read),
         [
             (
-                "waiting-for-its-day",
+                "scheduled-post",
                 "content/post-2.md".to_owned(),
                 "2026-10-05".to_owned()
             ),
@@ -897,7 +897,7 @@ fn drafts_and_posts_waiting_for_their_day_are_left_out_and_said() {
                 "true".to_owned()
             ),
             (
-                "waiting-for-its-day",
+                "scheduled-post",
                 "content/post-5.md".to_owned(),
                 "2026-10-04T23:30+00:00".to_owned()
             ),
@@ -1025,7 +1025,7 @@ fn a_list_goes_on_onto_later_pages_beneath_its_own() {
         ),
         ("posts_per_page: 0\n", ("blog/index.md", ""), blog(), 0, &[]),
         (
-            "posts_per_page: 2\nlater_pages: \"{list}{n}/\"\n",
+            "posts_per_page: 2\npagination.permalink: \"{list}{n}/\"\n",
             ("blog/index.md", ""),
             blog(),
             2,
@@ -1153,7 +1153,7 @@ fn a_later_page_taken_is_told_at_the_setting_placing_it_or_else_at_the_page() {
             None,
         ),
         (
-            "later_pages: \"{list}more/{n}/\"\n",
+            "pagination.permalink: \"{list}more/{n}/\"\n",
             "content/blog/more/2.md",
             ["statac.yaml", "\"{list}more/{n}/\""],
             Some(["content/blog/more/2.md", "---"]),
@@ -1170,7 +1170,7 @@ fn a_later_page_taken_is_told_at_the_setting_placing_it_or_else_at_the_page() {
         ]);
         assert_eq!(
             problems(&read),
-            [("same-address", file.to_owned(), written.to_owned())],
+            [("same-url", file.to_owned(), written.to_owned())],
             "{setting}"
         );
         let related: Vec<(String, String, String)> = read.problems[0]

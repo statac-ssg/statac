@@ -835,7 +835,7 @@ impl<'a> Writer<'a> {
             Kind::Link { destination, title } => {
                 if self.writes(Piece::Link) {
                     let values = vec![
-                        ("address", PieceValue::Text(destination.clone())),
+                        ("url", PieceValue::Text(destination.clone())),
                         ("title", PieceValue::Text(title.clone())),
                         ("body", PieceValue::Html(self.inline_html(&node.children))),
                     ];
@@ -1054,7 +1054,7 @@ impl<'a> Writer<'a> {
             ),
         };
         let values = vec![
-            ("address", PieceValue::Text(destination.clone())),
+            ("url", PieceValue::Text(destination.clone())),
             ("alt", PieceValue::Text(description)),
             ("title", PieceValue::Text(title.clone())),
             ("width", width),

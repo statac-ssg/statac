@@ -49,7 +49,7 @@ const STARTER_PAGES: &[(&str, &str)] = &[
 
 pub(super) static FIELD_RENAMED: FindingKind = FindingKind {
     heading: "Fields renamed",
-    sentence: "Each of these fields has the name of one of Statac's own words, which means \
+    sentence: "Each of these fields has the name of one of Statac's built-in fields, which means \
                something else there or holds another kind of value, so Statac put `old_` before \
                its name: show it from a template under that name, or take it out.",
 };
@@ -64,23 +64,23 @@ pub(super) static DATE_LEFT: FindingKind = FindingKind {
 pub(super) static NAME_TAKEN: FindingKind = FindingKind {
     heading: "Pages given another name",
     sentence: "Two pages of the old site would have had the same file in the new one, so the \
-               later has a number after its name; its address is kept all the same.",
+               later has a number after its name; its URL is kept all the same.",
 };
 
 pub(super) static FILE_RENAMED: FindingKind = FindingKind {
     heading: "Files given another name",
     sentence: "Statac can't publish a file under the name each of these had, so each has one it \
                can: a `%` and the two figures after it became the character they spell, as a \
-               browser reads them, and any other character an address or a disk won't take \
-               became `-`. Links in the writing that named the file reach it under its new \
-               name. Its old address is listed under Addresses, and nothing answers it: a file \
-               can't send readers on.",
+               browser reads them, and any other character a URL or a disk won't take became \
+               `-`. Links in the content that named the file reach it under its new name. Its \
+               old URL is listed under URLs, and nothing is published there now: a file can't \
+               redirect.",
 };
 
 pub(super) static MORE_OUT: FindingKind = FindingKind {
     heading: "Summary markers taken out",
     sentence: "Statac ends a summary only at `<!--more-->` on a line of its own between two \
-               blocks of the writing, and one anywhere else stops the build. Each of these stood \
+               blocks of Markdown, and one anywhere else stops the build. Each of these stood \
                inside a line, a list, a quotation or an HTML element, so it was taken out, and \
                the page's summary is its first paragraph: put `<!--more-->` on a line of its \
                own where the summary should end.",
@@ -95,27 +95,27 @@ pub(super) static LINKS: FindingKind = FindingKind {
 };
 
 pub(super) static NOT_IN_BUILT: FindingKind = FindingKind {
-    heading: "Addresses the old built site doesn't have",
-    sentence: "Statac worked these addresses out by the old tool's rules, but the old site's built \
+    heading: "URLs the old built site doesn't have",
+    sentence: "Statac worked these URLs out by the old tool's rules, but the old site's built \
                output has nothing there, so the rule was wrong for the page or the output is \
-               older than the writing: find where the old site published the page, and add that \
-               address to the page's `redirect_from`.",
+               older than the content: find where the old site published the page, and add that \
+               URL to the page's `redirect_from`.",
 };
 
 pub(super) static FEED_LEFT: FindingKind = FindingKind {
     heading: "Feeds made by templates",
-    sentence: "Readers subscribed to the old site's feed at each of these addresses, and the \
+    sentence: "Readers subscribed to the old site's feed at each of these URLs, and the \
                template that made it didn't come across, so nothing is there now. A list's \
-               `feed:` line can put that list's feed at an address of its own, as `feed: \
+               `feed:` line can put that list's feed at a URL of its own, as `feed: \
                /index.rss`, and the starter's feed template writes Atom: see \
                https://statac.dev/feeds/.",
 };
 
 pub(super) static FEED_LEFT_NO_STARTER: FindingKind = FindingKind {
     heading: "Feeds made by templates",
-    sentence: "Readers subscribed to the old site's feed at each of these addresses, and the \
+    sentence: "Readers subscribed to the old site's feed at each of these URLs, and the \
                template that made it didn't come across, so nothing is there now. A list's \
-               `feed:` line can put that list's feed at an address of its own, as `feed: \
+               `feed:` line can put that list's feed at a URL of its own, as `feed: \
                /index.rss`: see https://statac.dev/feeds/.",
 };
 
@@ -1239,9 +1239,16 @@ pub(super) fn collides(name: &str, value: &Value) -> bool {
     let words_of_statacs = words::is_statacs(name) && !SAME_MEANING.contains(&name);
     let other_tools = OTHER_SPELLINGS.iter().any(|(other, _)| *other == name);
     let placed = name == "pages"
-        || ["pages.", "site.", "default.", "tags.", "series."]
-            .iter()
-            .any(|start| name.starts_with(start));
+        || [
+            "pages.",
+            "site.",
+            "default.",
+            "tags.",
+            "series.",
+            "pagination.",
+        ]
+        .iter()
+        .any(|start| name.starts_with(start));
     words_of_statacs
         || other_tools
         || placed

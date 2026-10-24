@@ -30,10 +30,10 @@ use crate::source::Place;
 
 /// The names a page answers only when called.
 pub(super) const CALLS: &[&str] = &[
-    "photo", "photos", "file", "video", "audio", "youtube", "vimeo",
+    "image", "images", "file", "video", "audio", "youtube", "vimeo",
 ];
 
-/// What `page.photo` and `page.photos` take by name.
+/// What `page.image` and `page.images` take by name.
 const PHOTO_OPTIONS: &[&str] = &["sizes", "full", "decorative"];
 
 /// Who is asking, for a problem to be told where it was asked.
@@ -274,7 +274,7 @@ pub(super) fn uncalled(method: &str) -> Error {
         written: None,
     };
     Asking::new(method, "").wrong(match method {
-        "photos" => Needed::Names,
+        "images" => Needed::Names,
         "file" => Needed::Name(Sort::File),
         "video" => Needed::Name(Sort::Video),
         "audio" => Needed::Name(Sort::Recording),
@@ -296,12 +296,12 @@ pub(super) fn call(
     let asking = Asking::running(method, state);
     let (unnamed, named) = parted(args)?;
     match method {
-        "photo" => {
+        "image" => {
             let options = Options::read(&asking, &named)?;
             let name = one_name(&asking, &unnamed, Sort::Picture)?;
             photo(shared, of, name, &options, &asking)
         }
-        "photos" => {
+        "images" => {
             let options = Options::read(&asking, &named)?;
             photos(shared, of, &unnamed, &options, &asking)
         }
@@ -528,7 +528,7 @@ fn photos(
 /// The picture a piece writing a Markdown picture is handed: none where
 /// the address reaches no file of the site, or the file can't be shown.
 pub(super) fn for_piece(shared: &Arc<Shared>, of: PageId, address: &str, template: &str) -> Value {
-    let asking = Asking::new("photo", template);
+    let asking = Asking::new("image", template);
     match found(shared, of, address) {
         // Told where the writing shows the picture.
         Some(id) => {
@@ -594,7 +594,7 @@ fn shown(
         && (picture.left_alone() || shared.settings.truth("optimise_images") == Some(false));
     match &picture.seen {
         Seen::Unreadable(fault) if !left_alone => {
-            return Err(frame::raise(Kind::UnreadablePicture {
+            return Err(frame::raise(Kind::UnreadableImage {
                 path: picture.shown(),
                 fault: fault.clone(),
             }));
@@ -604,7 +604,7 @@ fn shown(
             ..
         } => asking.tell(
             shared,
-            Kind::HeicPicture {
+            Kind::HeicImage {
                 path: picture.shown(),
             },
         ),
@@ -781,7 +781,7 @@ impl Object for PhotoValue {
             }
             "alt" if self.undescribed => {
                 let picture = shared.site.pictures.get(self.id);
-                let kind = Kind::UndescribedPicture {
+                let kind = Kind::MissingAltText {
                     picture: picture.shown(),
                     shown: ShownBy::Template {
                         beside: described_beside(picture),
@@ -1264,7 +1264,7 @@ impl VideoValue {
         }
         frame::read(Key::Fetched(crate::fetched::key(&path)));
         let line = shared.site.fetched.record.get(&path);
-        let kind = Kind::NoStill {
+        let kind = Kind::NoThumbnail {
             host,
             id: id.clone(),
             absent: line.is_some_and(|line| line.held == crate::fetched::Held::Absent),
@@ -1306,7 +1306,7 @@ impl Object for VideoValue {
             "id" => Some(Value::from(self.video.id.as_str())),
             "start" => self.video.start.map(Value::from),
             "embed" => Some(Value::from(self.host.embed(&self.video))),
-            "still" => Some(self.still.get_or_init(|| self.still()).clone())
+            "thumbnail" => Some(self.still.get_or_init(|| self.still()).clone())
                 .filter(|still| !still.is_none()),
             _ => None,
         };
@@ -1317,7 +1317,7 @@ impl Object for VideoValue {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Str(&["id", "start", "embed", "still"])
+        Enumerator::Str(&["id", "start", "embed", "thumbnail"])
     }
 
     /// A video printed is its id.

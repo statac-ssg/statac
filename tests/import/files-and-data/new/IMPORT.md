@@ -1,4 +1,4 @@
-This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/files-and-data/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -7,11 +7,11 @@ It was made from `tests/import/files-and-data/old` by `statac import`, which cha
 - 1 post, into `content/posts/`.
 - 1 draft, with `draft: true`, so it isn't published by accident.
 - 2 pages, into `content/` where they stood in the old site.
-- 5 other files, copied as they were: files published as they are into `static/` at the same path, so their addresses stay, and data files into `data/`.
+- 5 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page is `content/index.md`, built with `templates/home.html`, which lists the posts below its writing.
+The old site's home page is `content/index.md`, built with `templates/home.html`, which lists the posts below its content.
 
-The starter's `content/robots.md` was left out: the old site's `robots.txt` stands at its address.
+The starter's `content/robots.md` was left out: the old site's `robots.txt` is published at its URL.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -32,13 +32,13 @@ date_stamp: 31 Dec 2025, 15:04
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 4 old addresses there: 3 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 4 old URLs there: 3 are published or redirected.
 
 - 2 pages carry a `permalink` of their own, where no pattern fits.
 
-Nothing in the new site answers these old addresses. Give the page that should answer each a `redirect_from` naming it, or a `permalink`:
+Nothing in the new site is published at these old URLs. Give the page each should lead to a `redirect_from` naming it, or a `permalink`:
 
 - `/archive.html`, for `archive.html`
 
@@ -74,8 +74,8 @@ Statac left these behind, and the new site has nothing of them:
 
 - `Gemfile`: a file Jekyll leaves out of the site.
 - `_sass/`: the old site's Sass, which the starter's `assets/site.css` takes the place of.
-- `assets/style.scss`: front matter but no writing, such as a stylesheet or a feed, which Jekyll built with its templates.
-- `feed.xml`: front matter but no writing, such as a stylesheet or a feed, which Jekyll built with its templates.
+- `assets/style.scss`: a file with front matter that isn't a page, such as a stylesheet or a feed, which Jekyll built with its templates.
+- `feed.xml`: a file with front matter that isn't a page, such as a stylesheet or a feed, which Jekyll built with its templates.
 - `notes.txt`: a file Jekyll leaves out of the site.
 
 ## What to do next

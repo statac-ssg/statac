@@ -14,8 +14,8 @@ error  Unclosed front matter: no `---` line ends it
 ## Why Statac stops
 
 Without the closing line, Statac can't tell where the fields end and the
-writing begins. Reading the whole file as fields would lose the writing,
-and reading it all as writing would lose the fields.
+content begins. Reading the whole file as fields would lose the content,
+and reading it all as content would lose the fields.
 
 ## How to fix it
 

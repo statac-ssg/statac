@@ -1,6 +1,6 @@
 {# takes clip #}
 {% set video = page.video(clip) %}
-<video controls preload="metadata"{% if poster is defined %} poster="{{ page.photo(poster).src }}"{% endif %}>
+<video controls preload="metadata"{% if poster is defined %} poster="{{ page.image(poster).src }}"{% endif %}>
   <source src="{{ video.src }}" type="{{ video.type }}">
   <a href="{{ video.src }}">Download the video</a>
 </video>

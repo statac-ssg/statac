@@ -1,4 +1,4 @@
-This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/source-folder/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -6,9 +6,9 @@ It was made from `tests/import/source-folder/old` by `statac import`, which chan
 
 - 1 post, into `content/posts/`.
 - 2 pages, into `content/` where they stood in the old site.
-- 1 other file, copied as it was: files published as they are into `static/` at the same path, so their addresses stay, and data files into `data/`.
+- 1 other file, copied as it was: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -29,13 +29,13 @@ date_stamp: 31 Dec 2025, 15:04
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 3 old addresses there: 3 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 3 old URLs there: 3 are published or redirected.
 
 - 3 pages carry a `permalink` of their own, where no pattern fits.
 
-Each address was also looked for in the old site's own built output, `built/`.
+Each URL was also looked for in the old site's own built output, `built/`.
 
 ## Left for you
 

@@ -19,9 +19,9 @@ const SETTINGS: &str = "title: Site\nlanguage: en\ntimezone: Europe/London\npage
 
 /// Snippets showing a video in place of its still.
 const YOUTUBE: &str = "{# takes address #}\n{% set video = page.youtube(address) %}\n\
-                       {% if video.still %}<img src=\"{{ video.still.src }}\">{% endif %}\n";
+                       {% if video.thumbnail %}<img src=\"{{ video.thumbnail.src }}\">{% endif %}\n";
 const VIMEO: &str = "{# takes address #}\n{% set video = page.vimeo(address) %}\n\
-                     {% if video.still %}<img src=\"{{ video.still.src }}\">{% endif %}\n";
+                     {% if video.thumbnail %}<img src=\"{{ video.thumbnail.src }}\">{% endif %}\n";
 
 const MAXRES: &str = "https://i.ytimg.com/vi/abcdefghijk/maxresdefault.jpg";
 const HQ: &str = "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg";
@@ -193,7 +193,7 @@ fn a_still_is_fetched_kept_and_recorded() {
     let (said, code, asked) = site.refresh(&|address| answer(address, &still));
     assert_eq!(
         said,
-        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 still.\n"
+        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n"
     );
     assert_eq!(code, 0);
     assert_eq!(asked, [MAXRES]);
@@ -227,7 +227,7 @@ fn the_smaller_still_is_taken_where_youtube_has_no_largest() {
     });
     assert_eq!(
         said,
-        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 still.\n"
+        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n"
     );
     assert_eq!(code, 0);
     assert_eq!(asked, [MAXRES, HQ]);
@@ -243,7 +243,7 @@ fn a_video_with_no_still_is_recorded_absent_and_never_asked_for_again() {
     let (said, code, asked) = site.refresh(&|_| missing());
     assert_eq!(
         said,
-        "No still: YouTube has no picture for `abcdefghijk`.\nFetched no stills.\n"
+        "No thumbnail: YouTube has no image for `abcdefghijk`.\nFetched no thumbnails.\n"
     );
     assert_eq!(code, 0);
     assert_eq!(asked, [MAXRES, HQ]);
@@ -258,11 +258,11 @@ fn a_video_with_no_still_is_recorded_absent_and_never_asked_for_again() {
     assert!(asked.is_empty());
     let (said, _) = site.run("check", "2026-10-06");
     assert!(
-        said.starts_with("warning  No still: YouTube has no picture for this video\n"),
+        said.starts_with("warning  No thumbnail: YouTube has no image for this video\n"),
         "{said}"
     );
     assert!(
-        said.contains("  Show a picture of your own in its place.\n"),
+        said.contains("  Show an image of your own in its place.\n"),
         "{said}"
     );
 
@@ -273,7 +273,7 @@ fn a_video_with_no_still_is_recorded_absent_and_never_asked_for_again() {
     assert_eq!(
         (said.as_str(), code),
         (
-            "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 still.\n",
+            "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n",
             0
         )
     );
@@ -286,18 +286,21 @@ fn each_reason_a_still_couldnt_be_fetched_is_said_and_nothing_is_kept() {
     let cases = [
         (
             Refusal::NotAnAddress,
-            format!("`{MAXRES}` isn't a web address"),
+            format!("`{MAXRES}` isn\'t an `https://` or `http://` URL"),
         ),
         (
             Refusal::Scheme {
                 scheme: "ftp".into(),
             },
-            format!("`{MAXRES}` isn't a web address"),
+            format!("`{MAXRES}` isn\'t an `https://` or `http://` URL"),
         ),
-        (Refusal::NoHost, format!("`{MAXRES}` isn't a web address")),
+        (
+            Refusal::NoHost,
+            format!("`{MAXRES}` isn't an `https://` or `http://` URL"),
+        ),
         (
             Refusal::Credentials,
-            format!("`{MAXRES}` isn't a web address"),
+            format!("`{MAXRES}` holds a user name or password"),
         ),
         (
             Refusal::UnknownHost { host: host() },
@@ -316,7 +319,7 @@ fn each_reason_a_still_couldnt_be_fetched_is_said_and_nothing_is_kept() {
         ),
         (
             Refusal::Redirects { limit: 5 },
-            "the address redirected more than 5 times".into(),
+            "the URL redirected more than 5 times".into(),
         ),
         (
             Refusal::NoRedirectTarget {
@@ -348,7 +351,9 @@ fn each_reason_a_still_couldnt_be_fetched_is_said_and_nothing_is_kept() {
         let (said, code, asked) = site.refresh(&|_| Err(refusal.clone()));
         assert_eq!(
             said,
-            format!("Can't fetch the still for `abcdefghijk`: {reason}.\n1 couldn't be fetched.\n"),
+            format!(
+                "Can't fetch the thumbnail for `abcdefghijk`: {reason}.\n1 couldn't be fetched.\n"
+            ),
             "{refusal:?}"
         );
         assert_eq!(code, 1, "{refusal:?}");
@@ -365,7 +370,7 @@ fn an_answer_that_isnt_a_picture_is_not_kept() {
         let (said, code, _) = site.refresh(&|address| answer(address, &bytes));
         assert_eq!(
             said,
-            "Can't fetch the still for `abcdefghijk`: the answer isn't a picture.\n\
+            "Can't fetch the thumbnail for `abcdefghijk`: the answer isn't an image.\n\
              1 couldn't be fetched.\n"
         );
         assert_eq!(code, 1);
@@ -390,7 +395,7 @@ fn a_vimeo_still_is_fetched_from_where_vimeo_says_it_is() {
     });
     assert_eq!(
         said,
-        "Fetched `fetched/stills/vimeo-123456789.jpg`.\nFetched 1 still.\n"
+        "Fetched `fetched/stills/vimeo-123456789.jpg`.\nFetched 1 thumbnail.\n"
     );
     assert_eq!(code, 0);
     assert_eq!(asked, [asked_about, named]);
@@ -406,7 +411,7 @@ fn a_vimeo_still_is_fetched_from_where_vimeo_says_it_is() {
     assert_eq!(
         (said.as_str(), code),
         (
-            "Can't fetch the still for `123456789`: the video site named no picture.\n\
+            "Can't fetch the thumbnail for `123456789`: the video site named no image.\n\
              1 couldn't be fetched.\n",
             1
         )
@@ -415,7 +420,7 @@ fn a_vimeo_still_is_fetched_from_where_vimeo_says_it_is() {
     assert_eq!(
         (said.as_str(), code),
         (
-            "No still: Vimeo has no picture for `123456789`.\nFetched no stills.\n",
+            "No thumbnail: Vimeo has no image for `123456789`.\nFetched no thumbnails.\n",
             0
         )
     );
@@ -455,12 +460,12 @@ fn only_the_stills_missing_are_asked_for_in_order_of_name() {
     });
     assert_eq!(
         said,
-        "No still: Vimeo has no picture for `123456789`.\n\
-         Can't fetch the still for `abcdefghijk`: no answer came within 30 seconds.\n\
+        "No thumbnail: Vimeo has no image for `123456789`.\n\
+         Can't fetch the thumbnail for `abcdefghijk`: no answer came within 30 seconds.\n\
          Fetched `fetched/stills/youtube-bcdefghijkl.jpg`.\n\
          Fetched `fetched/stills/youtube-defghijklmn.jpg`.\n\
          Fetched `fetched/stills/youtube-efghijklmno.jpg`.\n\
-         Fetched 3 stills. 1 already here. 1 couldn't be fetched.\n"
+         Fetched 3 thumbnails. 1 already here. 1 couldn't be fetched.\n"
     );
     assert_eq!(code, 1);
     assert_eq!(
@@ -549,7 +554,7 @@ fn a_site_only_a_draft_stops_gets_the_stills_of_what_it_publishes() {
     let (said, code, asked) = site.refresh(&|address| answer(address, &still));
     assert_eq!(
         said,
-        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 still.\n\
+        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n\
          Drafts weren't looked at: the site has 1 error with it. \
          Run `statac check --drafts` to see it.\n"
     );
@@ -589,9 +594,9 @@ fn build_says_how_old_the_stills_are() {
             .collect::<Vec<_>>()
             .join("\n")
     };
-    assert_eq!(said("2026-10-06"), "Fetched: 1 still, today.");
-    assert_eq!(said("2026-10-07"), "Fetched: 1 still, yesterday.");
-    assert_eq!(said("2026-10-12"), "Fetched: 1 still, 6 days ago.");
+    assert_eq!(said("2026-10-06"), "Fetched: 1 thumbnail, today.");
+    assert_eq!(said("2026-10-07"), "Fetched: 1 thumbnail, yesterday.");
+    assert_eq!(said("2026-10-12"), "Fetched: 1 thumbnail, 6 days ago.");
 
     site.write(
         "content/post-2.md",
@@ -600,15 +605,15 @@ fn build_says_how_old_the_stills_are() {
     site.put("fetched/stills/youtube-bcdefghijkl.jpg", &still);
     assert_eq!(
         said("2026-10-12"),
-        "Fetched: 2 stills, the oldest 6 days ago; 1 with no date."
+        "Fetched: 2 thumbnails, the oldest 6 days ago; 1 with no date."
     );
     site.refresh(&|address| answer(address, &still));
     assert_eq!(
         said("2026-10-12"),
-        "Fetched: 3 stills, the oldest 6 days ago; 1 with no date."
+        "Fetched: 3 thumbnails, the oldest 6 days ago; 1 with no date."
     );
     site.write("fetched/record", "statac fetched 1\n");
-    assert_eq!(said("2026-10-12"), "Fetched: 3 stills, with no date.");
+    assert_eq!(said("2026-10-12"), "Fetched: 3 thumbnails, with no date.");
 
     // Neither `check` nor a site with nothing fetched says it.
     let (said, _) = site.run("check", "2026-10-12");
@@ -793,7 +798,7 @@ fn webmentions_are_kept_with_their_faces_and_recorded() {
             "Fetched `fetched/faces/{face}`.\n\
              Fetched `fetched/mentions/2028899.yaml`.\n\
              Fetched `fetched/mentions/2028900.yaml`.\n\
-             Fetched 2 webmentions and 1 face.\n"
+             Fetched 2 webmentions and 1 avatar.\n"
         )
     );
     assert_eq!(code, 0);
@@ -919,7 +924,7 @@ fn each_mention_not_kept_is_said_recorded_and_never_asked_for_again() {
     assert_eq!(
         said,
         "Webmention `11` not kept: Statac doesn't read `follow-of`.\n\
-         Webmention `12` not kept: `javascript:alert(1)` isn't a web address.\n\
+         Webmention `12` not kept: `javascript:alert(1)` isn't an `https://` or `http://` URL.\n\
          Fetched `fetched/mentions/13.yaml`.\n\
          Webmention `14` not kept: `https://example.com/post-1/` isn't on this site.\n\
          Webmention `15` not kept: it doesn't say what kind it is.\n\
@@ -972,7 +977,7 @@ fn without_the_token_the_relay_isnt_asked_and_the_stills_are_fetched() {
     let (said, code, asked) = site.refresh(&|address| answer(address, &still));
     assert_eq!(
         said,
-        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 still.\n\
+        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n\
          Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n"
     );
     assert_eq!(code, 0);
@@ -991,7 +996,7 @@ fn a_token_the_relay_refuses_is_said_and_the_exit_code_is_1() {
         assert_eq!(
             (said.as_str(), code),
             (
-                "Can't ask for webmentions: the relay didn't accept the token.\n",
+                "Can't ask for webmentions: the webmention service didn't accept the token.\n",
                 1
             )
         );
@@ -1016,7 +1021,7 @@ fn an_answer_that_isnt_the_relays_feed_is_said_and_nothing_is_kept() {
         assert_eq!(
             (said.as_str(), code),
             (
-                "Can't ask for webmentions: the relay's answer couldn't be read.\n",
+                "Can't ask for webmentions: the webmention service's answer couldn't be read.\n",
                 1
             ),
             "{body}"
@@ -1040,15 +1045,15 @@ fn a_relay_that_cant_be_asked_is_said_without_its_address() {
         ),
         (
             Refusal::Missing { status: 404 },
-            "the server has nothing at that address".into(),
+            "the server has nothing at that URL".into(),
         ),
         (
             Refusal::NotAnAddress,
-            format!("`{RELAY}` isn't a web address"),
+            format!("`{RELAY}` isn\'t an `https://` or `http://` URL"),
         ),
         (
             Refusal::Credentials,
-            format!("`{RELAY}` isn't a web address"),
+            format!("`{RELAY}` holds a user name or password"),
         ),
         (
             Refusal::UnknownHost { host: host() },
@@ -1140,7 +1145,7 @@ fn a_face_is_made_again_from_its_pixels_or_left_out() {
         _ => answer(address, &feed(&[with_face(1), with_face(2)])),
     });
     assert!(
-        said.ends_with("Fetched 2 webmentions and 1 face.\n"),
+        said.ends_with("Fetched 2 webmentions and 1 avatar.\n"),
         "{said}"
     );
     assert_eq!(asked, [relay(0), FACE.to_owned()]);
@@ -1172,17 +1177,17 @@ fn a_face_that_cant_be_fetched_or_read_costs_the_mention_nothing() {
     let cases: [(Result<Fetched, Refusal>, &str); 4] = [
         (
             answer(FACE, b"<!doctype html>"),
-            "the answer isn't a picture",
+            "the answer isn't an image",
         ),
         (
             answer(FACE, &jpeg(64, 64)[..300]),
-            "the answer isn't a picture",
+            "the answer isn't an image",
         ),
         (
             answer(FACE, &wide),
-            "the picture is 4,097 by 1 pixels, too large to open",
+            "the image is 4,097 by 1 pixels, too large to open",
         ),
-        (missing(), "the server has nothing at that address"),
+        (missing(), "the server has nothing at that URL"),
     ];
     for (at, (fetched, reason)) in cases.into_iter().enumerate() {
         let site = Site::mentioned(&format!("no-face-{at}"));
@@ -1193,7 +1198,7 @@ fn a_face_that_cant_be_fetched_or_read_costs_the_mention_nothing() {
         assert_eq!(
             said,
             format!(
-                "Can't fetch the face for `1`: {reason}.\n\
+                "Can't fetch the avatar for `1`: {reason}.\n\
                  Fetched `fetched/mentions/1.yaml`.\nFetched 1 webmention.\n"
             )
         );
@@ -1216,9 +1221,9 @@ fn a_strangers_addresses_are_kept_only_on_the_web() {
     let (said, code, asked) = site.ask(&|address| answer(address, &feed(&children)));
     assert_eq!(
         said,
-        "Webmention `1`: `javascript:alert(1)` isn't a web address, so the sender's own \
-         address isn't kept.\n\
-         Can't fetch the face for `1`: `javascript:alert(1)` isn't a web address.\n\
+        "Webmention `1`: `javascript:alert(1)` isn't an `https://` or `http://` URL, so the \
+         sender's own URL isn't kept.\n\
+         Can't fetch the avatar for `1`: `javascript:alert(1)` isn't an `https://` or `http://` URL.\n\
          Fetched `fetched/mentions/1.yaml`.\nFetched 1 webmention.\n"
     );
     assert_eq!(code, 0);
@@ -1236,9 +1241,9 @@ fn a_strangers_words_reach_the_page_as_text() {
     site.write(
         "templates/page.html",
         "<!doctype html>\n<title>{{ headline(page) }}</title>\n\
-         {% for mention in page.webmentions.said %}\
+         {% for mention in page.webmentions.comments %}\
          <p>{% if mention.author %}{{ mention.author }}{% endif %}|{{ mention.url }}|\
-         {% if mention.words %}{{ mention.words }}{% endif %}</p>\n{% endfor %}",
+         {% if mention.content %}{{ mention.content }}{% endif %}</p>\n{% endfor %}",
     );
     let words = "\"Quoted\" and 'quoted', a \\ backslash: a colon\non a line\r\n# a hash - a dash \
                  = =today @youtube(\"abcdefghijk\") {{ site.title }} {% if page %}x{% endif %} \
@@ -1292,12 +1297,12 @@ fn build_says_how_old_the_webmentions_are() {
     site.put("fetched/stills/youtube-abcdefghijk.jpg", &jpeg(32, 18));
     assert_eq!(
         said("2026-10-12"),
-        "Fetched: 1 still, with no date; 2 webmentions, the newest 6 days ago."
+        "Fetched: 1 thumbnail, with no date; 2 webmentions, the newest 6 days ago."
     );
     site.write("fetched/record", "statac fetched 1\n");
     assert_eq!(
         said("2026-10-12"),
-        "Fetched: 1 still, with no date; 2 webmentions, with no date."
+        "Fetched: 1 thumbnail, with no date; 2 webmentions, with no date."
     );
 }
 
@@ -1308,10 +1313,10 @@ fn webmentions_on_a_site_without_url_are_not_asked_for() {
     let (said, code, asked) = site.ask(&|_| panic!("nothing is asked for"));
     assert_eq!(
         said,
-        "note  No site address: webmentions are left out until the site has a `url`\n  \
+        "note  No site URL: webmentions are left out until the site has a `url`\n  \
          statac.yaml, line 5\n   5 │ webmentions: true\n     │              ^^^^\n  \
-         Add the site's address to `statac.yaml`, as `url: https://example.org/`.\n  \
-         More: https://statac.dev/e/no-site-address/\nNothing to fetch.\n"
+         Add the site's full URL to `statac.yaml`, as `url: https://example.org/`.\n  \
+         More: https://statac.dev/e/no-site-url/\nNothing to fetch.\n"
     );
     assert_eq!(code, 0);
     assert!(asked.is_empty());
@@ -1374,7 +1379,7 @@ fn a_refused_mention_and_anything_from_a_refused_sender_is_not_kept() {
              Webmention `14` not kept: `https://a.example/` is refused.\n\
              Fetched `fetched/faces/{}`.\n\
              Fetched `fetched/mentions/15.yaml`.\n\
-             Fetched 1 webmention and 1 face. 3 not kept.\n",
+             Fetched 1 webmention and 1 avatar. 3 not kept.\n",
             face_name(FACE)
         )
     );

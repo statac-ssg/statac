@@ -391,7 +391,7 @@ fn the_address_for_a_run_is_a_whole_address() {
     assert_eq!(
         refused(&["build", "--url=preview.example.org/42/"]),
         "\
-error  Wrong kind of value: `--url` is a full address, such as `https://example.org`, \
+error  Wrong kind of value: `--url` is a full URL, such as `https://example.org`, \
 not `preview.example.org/42/`
   Write it as `https://preview.example.org/42/`.
   More: https://statac.dev/e/wrong-kind-of-value/
@@ -416,15 +416,15 @@ not `preview.example.org/42/`
     assert_eq!(
         refused(&["build", "--url="]),
         "\
-error  Missing value: `--url=` needs an address
-  Write it as `--url=<address>`.
+error  Missing value: `--url=` needs a full URL
+  Write it as `--url=<url>`.
   More: https://statac.dev/e/missing-value/
 "
     );
     assert_eq!(
         refused(&["build", "--url", "https://preview.example.org"]),
         "\
-error  Missing value: `--url` needs an address
+error  Missing value: `--url` needs a full URL
   Write it as `--url=https://preview.example.org`.
   More: https://statac.dev/e/missing-value/
 "
@@ -536,7 +536,7 @@ fn help_and_version_answer_on_standard_output() {
     assert_eq!(code, 0);
 }
 
-const WHOLE_SCREEN: &str = "Statac builds a website from a folder of writing.
+const WHOLE_SCREEN: &str = "Statac builds a website from a folder of Markdown.
 
 Usage:
   statac build [folder]  Read the site and write it out, ready to publish.
@@ -547,12 +547,12 @@ Usage:
                          the front matter of the site's pages.
   statac refresh [folder]
                          Fetch what the site keeps from other sites, such
-                         as the still of a video or a webmention, into
+                         as a video's thumbnail or a webmention, into
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
                          the site's .statac/token.
-  statac refuse <address> [folder]
-                         Remove the webmention sent from the address, or
+  statac refuse <url> [folder]
+                         Remove the webmention sent from the URL, or
                          every one from a sender at or under it, and never
                          keep it again.
   statac new [folder]    Ask five questions and write a new site from the
@@ -586,21 +586,21 @@ Options:
                          folder is in.
   --out=<folder>         Where statac build writes the built site. Without
                          it, _site in the site's folder.
-  --url=<address>        The site's address for this run, in place of url in
-                         statac.yaml, as a preview of the site needs.
+  --url=<url>            The site's full URL for this run, in place of url
+                         in statac.yaml, as a preview of the site needs.
   --today=<date>         The day the site is built on, as 2026-10-04, for
                          site.today, the day stamps are counted from, and
                          the day statac refresh and statac refuse record.
                          Without it, today in the site's zone, or for
                          statac refuse, on this computer's clock.
-  --drafts               Build drafts and posts dated after today as if
-                         they were published.
+  --drafts               Build drafts and scheduled posts as if they were
+                         published.
   --json                 Show every problem as JSON, for an editor or another
                          program to read, and nothing else.
   --timings              Show where statac build spent its time, once it
                          has finished.
-  --no-drafts            Leave drafts and posts dated after today out of
-                         what statac serve shows, as statac build does.
+  --no-drafts            Leave drafts and scheduled posts out of what
+                         statac serve shows, as statac build does.
   --offline              Fetch nothing as statac serve starts. Without it,
                          statac serve fetches what is new once, as statac
                          refresh does, after the first build with no
@@ -648,7 +648,7 @@ fn help_after_a_command_shows_its_entry_and_the_options_it_takes() {
     let (out, err, code) = ran(&["build", "--help"]);
     assert_eq!(
         out,
-        "Statac builds a website from a folder of writing.
+        "Statac builds a website from a folder of Markdown.
 
 Usage:
   statac build [folder]  Read the site and write it out, ready to publish.
@@ -659,15 +659,15 @@ Options:
                          folder is in.
   --out=<folder>         Where statac build writes the built site. Without
                          it, _site in the site's folder.
-  --url=<address>        The site's address for this run, in place of url in
-                         statac.yaml, as a preview of the site needs.
+  --url=<url>            The site's full URL for this run, in place of url
+                         in statac.yaml, as a preview of the site needs.
   --today=<date>         The day the site is built on, as 2026-10-04, for
                          site.today, the day stamps are counted from, and
                          the day statac refresh and statac refuse record.
                          Without it, today in the site's zone, or for
                          statac refuse, on this computer's clock.
-  --drafts               Build drafts and posts dated after today as if
-                         they were published.
+  --drafts               Build drafts and scheduled posts as if they were
+                         published.
   --timings              Show where statac build spent its time, once it
                          has finished.
   --help                 Show this.
@@ -868,7 +868,7 @@ fn serve_shows_drafts_unasked_and_only_it_can_leave_them_out() {
         refused(&["serve", "--drafts"]),
         "\
 error  Unknown option: `statac serve` has no `--drafts`
-  `statac serve` shows drafts and posts waiting for their day already. `--no-drafts` leaves them \
+  `statac serve` shows drafts and scheduled posts already. `--no-drafts` leaves them \
 out.
   More: https://statac.dev/e/unknown-option/
 "
@@ -1274,26 +1274,26 @@ fn refuse_is_read_with_its_address_and_options() {
     assert_eq!(
         refused(&["refuse"]),
         "\
-error  Missing address: `statac refuse` needs the address of a webmention or a sender
-  Give the address after the command, as `statac refuse https://a.example/post-1/`.
-  More: https://statac.dev/e/missing-address/
+error  Missing URL: `statac refuse` needs the full URL of a webmention or a sender
+  Give the full URL after the command, as `statac refuse https://a.example/post-1/`.
+  More: https://statac.dev/e/missing-url/
 "
     );
     assert_eq!(
         refused(&["refuse", "--site=docs"]),
         "\
-error  Missing address: `statac refuse` needs the address of a webmention or a sender
-  Give the address after the command, as `statac refuse https://a.example/post-1/`.
-  More: https://statac.dev/e/missing-address/
+error  Missing URL: `statac refuse` needs the full URL of a webmention or a sender
+  Give the full URL after the command, as `statac refuse https://a.example/post-1/`.
+  More: https://statac.dev/e/missing-url/
 "
     );
     assert_eq!(
         refused(&["refuse", "a.example/post-1/"]),
         "\
-error  Not a web address: `statac refuse` takes an address starting `https://` or `http://`, \
+error  Not a URL: `statac refuse` takes a full URL starting `https://` or `http://`, \
 not `a.example/post-1/`
   Did you mean `https://a.example/post-1/`?
-  More: https://statac.dev/e/not-a-web-address/
+  More: https://statac.dev/e/not-a-url/
 "
     );
     for written in ["ftp://a.example/post-1/", "https://", "post 1"] {
@@ -1301,10 +1301,10 @@ not `a.example/post-1/`
             refused(&["refuse", written]),
             format!(
                 "\
-error  Not a web address: `statac refuse` takes an address starting `https://` or `http://`, \
+error  Not a URL: `statac refuse` takes a full URL starting `https://` or `http://`, \
 not `{written}`
-  Give the whole address, as the browser shows it.
-  More: https://statac.dev/e/not-a-web-address/
+  Give the full URL, as the browser shows it.
+  More: https://statac.dev/e/not-a-url/
 "
             )
         );
@@ -1484,7 +1484,7 @@ fn a_command_or_address_that_isnt_utf8_is_not_a_name() {
     assert!(err.starts_with("error  Unknown command: `buil\u{FFFD}`"));
     let (_, err, code) = ran_with(&["refuse".into(), OsString::from_vec(b"a\xff".to_vec())]);
     assert_eq!(code, 2);
-    assert!(err.starts_with("error  Not a web address:"), "{err}");
+    assert!(err.starts_with("error  Not a URL:"), "{err}");
 }
 
 #[test]

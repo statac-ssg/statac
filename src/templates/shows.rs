@@ -294,7 +294,7 @@ impl Renderer {
         let held = match &value {
             _ if holds == Holds::Call => Held::Call,
             Some(value) if holds == Holds::Mentions => {
-                let said = value.get_attr("said").ok().and_then(|said| said.len());
+                let said = value.get_attr("comments").ok().and_then(|said| said.len());
                 Held::Count(said.unwrap_or(0))
             }
             None => Held::Nothing,

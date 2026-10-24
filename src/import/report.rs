@@ -57,16 +57,16 @@ pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
         text.push_str(&format!("Converted: {}.\n", converted.join(", ")));
     }
     let kept = &summary.kept;
-    let addresses: Vec<String> = [
+    let urls: Vec<String> = [
         (kept.answered > 0).then(|| format!("{} kept", kept.answered)),
-        (kept.lost() > 0).then(|| format!("{} that nothing answers now", kept.lost())),
+        (kept.lost() > 0).then(|| format!("{} no longer published", kept.lost())),
         (!kept.unkept.is_empty()).then(|| format!("{} that can't be kept", kept.unkept.len())),
     ]
     .into_iter()
     .flatten()
     .collect();
-    if !addresses.is_empty() {
-        text.push_str(&format!("Addresses: {}.\n", addresses.join(", ")));
+    if !urls.is_empty() {
+        text.push_str(&format!("URLs: {}.\n", urls.join(", ")));
     }
     let (things, kinds) = summary.left_for_you();
     if things > 0 {
@@ -109,8 +109,8 @@ pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
 pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
     let mut text = format!(
         "This site was imported from {} {tool} site, as well as Statac can. It is a best effort: \
-         the writing, its settings and its addresses came across, the old site's templates and \
-         theme did not, and what is listed below needs your eye before you publish.\n\n",
+         the content, its settings and its URLs came across, the old site's templates and theme \
+         did not, and what is listed below needs your eye before you publish.\n\n",
         match shown.tool.starts_with(['A', 'E', 'I', 'O', 'U']) {
             true => "an",
             false => "a",
@@ -209,7 +209,7 @@ fn came_across(text: &mut String, summary: &Summary) {
     if summary.files > 0 {
         lines.push(format!(
             "{}, copied as {}: files published as they are into `static/` at the same path, \
-             so their addresses stay, and data files into `data/`.",
+             so their URLs stay, and data files into `data/`.",
             counted(summary.files, "other file", "other files"),
             one(summary.files, "it was", "they were")
         ));
@@ -223,22 +223,22 @@ fn came_across(text: &mut String, summary: &Summary) {
     text.push('\n');
     match (summary.starter, summary.home) {
         (true, false) => text.push_str(
-            "The old site had no home page of its own writing, so the starter's home page \
+            "The old site's home page had no content of its own, so the starter's home page \
              stays, listing the posts: `content/index.md`.\n\n",
         ),
         (true, true) => text.push_str(
             "The old site's home page is `content/index.md`, built with \
-             `templates/home.html`, which lists the posts below its writing.\n\n",
+             `templates/home.html`, which lists the posts below its content.\n\n",
         ),
         (false, false) => text.push_str(
-            "The old site had no home page of its own writing, so `content/index.md` holds \
+            "The old site's home page had no content of its own, so `content/index.md` holds \
              only front matter: write the home page there.\n\n",
         ),
         (false, true) => text.push_str("The old site's home page is `content/index.md`.\n\n"),
     }
     for (path, instead) in &summary.displaced {
         text.push_str(&format!(
-            "The starter's {} was left out: the old site's {} stands at its address.\n\n",
+            "The starter's {} was left out: the old site's {} is published at its URL.\n\n",
             code(&format!("content/{path}")),
             code(instead)
         ));
@@ -312,7 +312,7 @@ fn terms(summary: &Summary) -> Vec<String> {
     notes
 }
 
-/// What was changed in the pages' writing so Statac reads it as the old
+/// What was changed in the pages' content so Statac reads it as the old
 /// site showed it, a sentence for each kind of change made.
 fn settled(summary: &Summary) -> Vec<String> {
     let mut notes = Vec::new();
@@ -344,7 +344,7 @@ fn settled(summary: &Summary) -> Vec<String> {
     if moved > 0 {
         notes.push(format!(
             "Statac gave {} a blank line each side, where {} stood on a line of its own inside \
-             HTML: Statac ends a summary only at one between two blocks of the writing. The \
+             HTML: Statac ends a summary only at one between two blocks of Markdown. The \
              summary ends where it did, and the lines after the marker, up to the next blank \
              line, are read as Markdown now, where they were part of the HTML.",
             counted(moved, "`<!--more-->` marker", "`<!--more-->` markers"),
@@ -385,24 +385,22 @@ fn settled(summary: &Summary) -> Vec<String> {
 
 fn addresses(text: &mut String, summary: &Summary) {
     let kept = &summary.kept;
-    text.push_str("## Addresses\n\n");
+    text.push_str("## URLs\n\n");
     let all = kept.answered + kept.unanswered.len();
     if all == 0 {
-        text.push_str("The old site published no page at an address Statac could work out.\n\n");
+        text.push_str("The old site published no page at a URL Statac could work out.\n\n");
         unanswered(text, summary);
         return;
     }
     let found = match (all, kept.answered) {
-        (1, 1) => "looked for the one old address there: it is published there.".to_owned(),
-        (1, _) => "looked for the one old address there: nothing answers it.".to_owned(),
-        (_, 0) => format!("looked for each of the {all} old addresses there: nothing answers any."),
-        (_, 1) => format!(
-            "looked for each of the {all} old addresses there: 1 is published there, or sent on \
-             from there."
-        ),
+        (1, 1) => "looked for the one old URL there: it is published there.".to_owned(),
+        (1, _) => "looked for the one old URL there: nothing is published there.".to_owned(),
+        (_, 0) => format!("looked for each of the {all} old URLs there: none is published."),
+        (_, 1) => {
+            format!("looked for each of the {all} old URLs there: 1 is published or redirected.")
+        }
         (_, answered) => format!(
-            "looked for each of the {all} old addresses there: {answered} are published there, or \
-             sent on from there."
+            "looked for each of the {all} old URLs there: {answered} are published or redirected."
         ),
     };
     text.push_str(&format!(
@@ -412,14 +410,14 @@ fn addresses(text: &mut String, summary: &Summary) {
     let mut ways = Vec::new();
     for (folder, pattern, covered) in &kept.patterns {
         ways.push(format!(
-            "{} hands {} to every page in {}, which puts {} of them at {}.",
+            "{} cascades {} to every page in {}, which puts {} of them at {}.",
             code(&format!("content/{folder}/index.md")),
             code(&format!("pages.permalink: {pattern}")),
             code(&format!("content/{folder}/")),
             covered,
             match covered {
-                1 => "its old address",
-                _ => "their old addresses",
+                1 => "its old URL",
+                _ => "their old URLs",
             }
         ));
     }
@@ -438,7 +436,7 @@ fn addresses(text: &mut String, summary: &Summary) {
     }
     if kept.redirected > 0 {
         ways.push(format!(
-            "{} `redirect_from`, for the other addresses that led to {}.",
+            "{} `redirect_from`, for the other URLs that led to {}.",
             match kept.redirected {
                 1 => "1 page carries".to_owned(),
                 n => format!("{n} pages carry"),
@@ -452,15 +450,15 @@ fn addresses(text: &mut String, summary: &Summary) {
     if let Some((_, example)) = kept.sent_on.first() {
         ways.push(match kept.sent_on.len() {
             1 => format!(
-                "1 page at the top of `content/`, {}, sends readers on from the old page of a \
-                 tag, a category or a series to the page Statac makes for it, with `permalink` \
-                 and `redirect_to`.",
+                "1 page at the top of `content/`, {}, redirects from the old page of a tag, a \
+                 category or a series to the page Statac makes for it, with `permalink` and \
+                 `redirect_to`.",
                 code(example)
             ),
             n => format!(
-                "{n} pages at the top of `content/`, such as {}, send readers on from the old \
-                 page of a tag, a category or a series to the page Statac makes for it, each \
-                 with `permalink` and `redirect_to`.",
+                "{n} pages at the top of `content/`, such as {}, redirect from the old page of a \
+                 tag, a category or a series to the page Statac makes for it, each with \
+                 `permalink` and `redirect_to`.",
                 code(example)
             ),
         });
@@ -468,15 +466,15 @@ fn addresses(text: &mut String, summary: &Summary) {
     if let Some((_, example)) = kept.later.pages.first() {
         ways.push(match kept.later.pages.len() {
             1 => format!(
-                "1 page at the top of `content/`, {}, sends readers on from an old later page of \
-                 the home page to the page of `content/posts/` that holds the same posts, with \
+                "1 page at the top of `content/`, {}, redirects from an old paginated page of the \
+                 home page to the page of `content/posts/` that holds the same posts, with \
                  `permalink` and `redirect_to`.",
                 code(example)
             ),
             n => format!(
-                "{n} pages at the top of `content/`, such as {}, send readers on from the old \
-                 later pages of the home page, each to the page of `content/posts/` that holds \
-                 the same posts, with `permalink` and `redirect_to`.",
+                "{n} pages at the top of `content/`, such as {}, redirect from the old paginated \
+                 pages of the home page, each to the page of `content/posts/` that holds the \
+                 same posts, with `permalink` and `redirect_to`.",
                 code(example)
             ),
         });
@@ -484,14 +482,14 @@ fn addresses(text: &mut String, summary: &Summary) {
     if let Some((old, example)) = kept.later.unlike.first() {
         ways.push(match kept.later.unlike.len() {
             1 => format!(
-                "1 page at the top of `content/`, {}, sends readers on from {}, an old later \
-                 page of the home page, to the page of `content/posts/` with the same number, \
+                "1 page at the top of `content/`, {}, redirects from {}, an old paginated page \
+                 of the home page, to the page of `content/posts/` with the same number, \
                  which doesn't hold exactly the same posts, as happens where posts share a date.",
                 code(example),
                 code(old)
             ),
             n => format!(
-                "{n} pages at the top of `content/`, such as {}, send readers on from old later \
+                "{n} pages at the top of `content/`, such as {}, redirect from old paginated \
                  pages of the home page, each to the page of `content/posts/` with the same \
                  number, which doesn't hold exactly the same posts, as happens where posts \
                  share a date: {}.",
@@ -506,15 +504,15 @@ fn addresses(text: &mut String, summary: &Summary) {
     if let Some((_, example)) = kept.list_pages.first() {
         ways.push(match kept.list_pages.len() {
             1 => format!(
-                "1 page at the top of `content/`, {}, sends readers on from an old page of a \
-                 list, found in the old site's built output, to the list's page with the same \
-                 number, with `permalink` and `redirect_to`.",
+                "1 page at the top of `content/`, {}, redirects from an old paginated page of a \
+                 list, found in the old site's built output, to the list's paginated page with \
+                 the same number, with `permalink` and `redirect_to`.",
                 code(example)
             ),
             n => format!(
-                "{n} pages at the top of `content/`, such as {}, send readers on from old pages \
-                 of lists, found in the old site's built output, each to the list's page with \
-                 the same number, with `permalink` and `redirect_to`.",
+                "{n} pages at the top of `content/`, such as {}, redirect from old paginated \
+                 pages of lists, found in the old site's built output, each to the list's \
+                 paginated page with the same number, with `permalink` and `redirect_to`.",
                 code(example)
             ),
         });
@@ -522,21 +520,21 @@ fn addresses(text: &mut String, summary: &Summary) {
     match kept.later.left {
         0 => {}
         1 => ways.push(
-            "1 old later page of the home page held posts that no one page of `content/posts/` \
-             holds, and `content/posts/` has no page with the same number, so nothing answers \
-             it: it is listed below."
+            "1 old paginated page of the home page held posts that no one page of \
+             `content/posts/` holds, and `content/posts/` has no page with the same number, so \
+             nothing is published at its URL: it is listed below."
                 .to_owned(),
         ),
         n => ways.push(format!(
-            "{n} old later pages of the home page held posts that no one page of \
+            "{n} old paginated pages of the home page held posts that no one page of \
              `content/posts/` holds, and `content/posts/` has no page with the same number, so \
-             nothing answers them: they are listed below."
+             nothing is published at their URLs: they are listed below."
         )),
     }
     if !summary.base.is_empty() {
         ways.push(format!(
-            "The site is under a path, {}, as its `url` says, so every address starts with it, \
-             and links in the writing were written with it: see https://statac.dev/addresses/.",
+            "The site is under a path, {}, as its `url` says, so every URL starts with it, and \
+             links in the content were written with it: see https://statac.dev/addresses/.",
             code(&summary.base)
         ));
     }
@@ -549,22 +547,22 @@ fn addresses(text: &mut String, summary: &Summary) {
     text.push('\n');
     if let Some(built) = &summary.built {
         text.push_str(&format!(
-            "Each address was also looked for in the old site's own built output, {}.\n\n",
+            "Each URL was also looked for in the old site's own built output, {}.\n\n",
             code(&format!("{built}/"))
         ));
     }
     unanswered(text, summary);
 }
 
-/// The old addresses nothing answers: those Statac worked out, each on a
-/// line, then the pages of the old built output at any other address, by
+/// The old URLs where nothing is published: those Statac worked out, each
+/// on a line, then the pages of the old built output at any other URL, by
 /// the folder each is in.
 fn unanswered(text: &mut String, summary: &Summary) {
     let kept = &summary.kept;
     if !kept.unanswered.is_empty() {
         text.push_str(
-            "Nothing in the new site answers these old addresses. Give the page that should \
-             answer each a `redirect_from` naming it, or a `permalink`:\n\n",
+            "Nothing in the new site is published at these old URLs. Give the page each should \
+             lead to a `redirect_from` naming it, or a `permalink`:\n\n",
         );
         for (address, from) in &kept.unanswered {
             match from.is_empty() {
@@ -577,12 +575,12 @@ fn unanswered(text: &mut String, summary: &Summary) {
     if !kept.unkept.is_empty() {
         text.push_str(match kept.unkept.len() {
             1 => {
-                "This old address can't be kept: the new site can't send readers on from it, so \
-                  it was left out of its page's `redirect_from`.\n\n"
+                "This old URL can't be kept: the new site can't redirect from it, so it was left \
+                  out of its page's `redirect_from`.\n\n"
             }
             _ => {
-                "These old addresses can't be kept: the new site can't send readers on from \
-                  them, so each was left out of its page's `redirect_from`.\n\n"
+                "These old URLs can't be kept: the new site can't redirect from them, so each \
+                  was left out of its page's `redirect_from`.\n\n"
             }
         });
         for (address, from, why) in &kept.unkept {
@@ -605,33 +603,32 @@ fn unanswered(text: &mut String, summary: &Summary) {
     if let Some(example) = kept.pictures.first() {
         text.push_str(&match kept.pictures.len() {
             1 => format!(
-                "1 photograph beside a page is shown as copies Statac makes, and the file itself \
-                 isn't published, so its old address, {}, is no longer answered.",
+                "1 image beside a page is shown as resized copies Statac makes, and the file \
+                 itself isn't published, so its old URL, {}, is no longer published.",
                 code(example)
             ),
             n => format!(
-                "{n} photographs beside pages are shown as copies Statac makes, and the files \
-                 themselves aren't published, so the old address of each, such as {}, is no \
-                 longer answered.",
+                "{n} images beside pages are shown as resized copies Statac makes, and the files \
+                 themselves aren't published, so the old URL of each, such as {}, is no longer \
+                 published.",
                 code(example)
             ),
         });
         text.push_str(
-            " A photograph's own file is published where a page links to it, or where a file \
-             beside it, named after it with `.yaml` on the end, holds `optimise: false`; \
-             `optimise_images: false` in `statac.yaml` leaves every photograph as it is: see \
-             https://statac.dev/pictures/.\n\n",
+            " An image's own file is published where a page links to it, or where its sidecar \
+             file, such as `photo-1.jpg.yaml`, holds `optimise: false`; `optimise_images: false` \
+             in `statac.yaml` leaves every image as it is: see https://statac.dev/pictures/.\n\n",
         );
     }
     if !kept.files.is_empty() {
         text.push_str(match kept.files.len() {
             1 => {
-                "Nothing answers the old address of the file given another name, and a file \
-                  can't send readers on:\n\n"
+                "Nothing is published at the old URL of the file given another name, and a file \
+                  can't redirect:\n\n"
             }
             _ => {
-                "Nothing answers the old addresses of the files given another name, and a file \
-                  can't send readers on:\n\n"
+                "Nothing is published at the old URLs of the files given another name, and a \
+                  file can't redirect:\n\n"
             }
         });
         for (address, from) in &kept.files {
@@ -643,14 +640,14 @@ fn unanswered(text: &mut String, summary: &Summary) {
         return;
     }
     text.push_str(&match kept.unworked.len() {
-        1 => "The old site's built output also holds 1 page at an address Statac didn't work \
-              out, and nothing in the new site answers it. Give the page that should answer it \
-              a `redirect_from` naming it:\n\n"
+        1 => "The old site's built output also holds 1 page at a URL Statac didn't work out, \
+              and nothing in the new site is published there. Give the page it should lead to a \
+              `redirect_from` naming it:\n\n"
             .to_owned(),
         n => format!(
-            "The old site's built output also holds {n} pages at addresses Statac didn't work \
-             out, and nothing in the new site answers them. Give the page that should answer \
-             each a `redirect_from` naming it. By folder:\n\n"
+            "The old site's built output also holds {n} pages at URLs Statac didn't work out, \
+             and nothing in the new site is published there. Give the page each should lead to \
+             a `redirect_from` naming it. By folder:\n\n"
         ),
     });
     let folder_of = |address: &str| match address[1..].split_once('/') {

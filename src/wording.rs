@@ -72,7 +72,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
             }
         ),
         Kind::NestedTooDeep => format!(
-            "Nested too deep: the writing here is nested more than {} deep",
+            "Nested too deep: the Markdown here is nested more than {} deep",
             crate::problem::DEEPEST_NESTING
         ),
         Kind::UnknownYamlTag { tag } => format!("Unknown YAML tag: `{tag}`"),
@@ -122,16 +122,16 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::OptionGivenTwice { option } => format!("Option given twice: `{option}`"),
         Kind::UnexpectedArgument { written, .. } => format!("Unexpected argument: `{written}`"),
         Kind::MissingName => "Missing name: `statac explain` needs the name of a problem".into(),
-        Kind::MissingAddress => {
-            "Missing address: `statac refuse` needs the address of a webmention or a sender".into()
+        Kind::MissingUrl => {
+            "Missing URL: `statac refuse` needs the full URL of a webmention or a sender".into()
         }
         Kind::NothingToSearch => {
             "Nothing to search for: `statac search` needs the words to look for".into()
         }
-        Kind::NotAWebAddress { written, .. } => {
+        Kind::NotAUrl { written, .. } => {
             format!(
-                "Not a web address: `statac refuse` takes an address starting `https://` or \
-                 `http://`, not `{written}`"
+                "Not a URL: `statac refuse` takes a full URL starting `https://` or `http://`, \
+                 not `{written}`"
             )
         }
         Kind::UnreadableName { written } => {
@@ -145,7 +145,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::WorkerOutsideImportMap { written } => {
             format!("Worker outside the import map: `{written}` isn't published under that name")
         }
-        Kind::SameAddress {
+        Kind::SameUrl {
             first,
             second,
             alike,
@@ -154,14 +154,14 @@ pub(crate) fn headline(kind: &Kind) -> String {
             let (first, second) = (named(first), named(second));
             match alike {
                 Alike::Exactly => {
-                    format!("Same address: {first} and {second} are both published at `{address}`")
+                    format!("Same URL: {first} and {second} are both published at `{address}`")
                 }
                 Alike::ByCase => {
-                    format!("Same address: {first} and {second} differ only in capitals")
+                    format!("Same URL: {first} and {second} differ only in capitals")
                 }
-                Alike::ByNormalisation => format!(
-                    "Same address: {first} and {second} differ only in how an accent is stored"
-                ),
+                Alike::ByNormalisation => {
+                    format!("Same URL: {first} and {second} differ only in how an accent is stored")
+                }
             }
         }
         Kind::LaterPageTaken {
@@ -171,11 +171,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
             address,
             ..
         } => format!(
-            "Same address: {} and {} are both published at `{address}`",
+            "Same URL: {} and {} are both published at `{address}`",
             later(*number, list),
             named(page)
         ),
-        Kind::AddressTaken {
+        Kind::UrlTaken {
             held,
             address,
             taken,
@@ -185,17 +185,17 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 Held::Waiting => "post",
             };
             format!(
-                "Address taken: this {what} would be published at `{address}`, as {} is",
+                "URL taken: this {what} would be published at `{address}`, as {} is",
                 named(taken)
             )
         }
-        Kind::AddressGone { address, .. } => {
-            format!("Address gone: `{address}` was published before, and nothing answers there now")
+        Kind::UrlGone { address, .. } => {
+            format!("URL gone: `{address}` was published before, and nothing is there now")
         }
         Kind::AddressesGone { under, gone, .. } => format!(
-            "Addresses gone: the {} under `{under}` were published before, and nothing answers \
+            "URLs gone: the {} under `{under}` were published before, and nothing is \
              at any of them now",
-            how_many(gone.len(), "address", "addresses")
+            how_many(gone.len(), "URL", "URLs")
         ),
         Kind::UnwritableName { path, why } => unwritable(&visible(path), why),
         Kind::NotStatacsFolder { path, found } => {
@@ -278,13 +278,13 @@ pub(crate) fn headline(kind: &Kind) -> String {
             "Control character: U+{:04X} is left out of the page",
             *character as u32
         ),
-        Kind::ReadAsYourOwn { own, written, .. } => {
+        Kind::ReadAsCustom { own, written, .. } => {
             let own = match own {
                 Own::Field(_) => "field",
                 Own::Setting => "setting",
                 Own::Type => "type",
             };
-            format!("Read as your own {own}: `{written}`")
+            format!("Read as a custom {own}: `{written}`")
         }
         Kind::NestedSetting { key, under, .. } => {
             format!("Nested setting: `{key}` under `{under}`")
@@ -301,11 +301,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 )
             }
             SetAside::SendsOn => {
-                "Field set aside: a page sending readers on publishes only its redirect".into()
+                "Field set aside: a page that redirects publishes only its redirect".into()
             }
             SetAside::NotOnCard { .. } => format!("Field set aside: a card has no `{field}`"),
             SetAside::OwnPicture => {
-                "Field set aside: `og_image` names the picture this page is shared with".into()
+                "Field set aside: `og_image` names this page's social image".into()
             }
             SetAside::NothingWritten(Word::Setting) => {
                 format!("Setting set aside: `{field}` has nothing after its colon")
@@ -378,16 +378,16 @@ pub(crate) fn headline(kind: &Kind) -> String {
             "No names to check: `{path}` is a list, so `{declared}` can't name one of its items"
         ),
         Kind::WrongPlace { key, why } => match why {
-            WrongPlace::EachPagesOwn => format!("Wrong place: `{key}` can't be handed down"),
+            WrongPlace::EachPagesOwn => format!("Wrong place: `{key}` can't cascade"),
             WrongPlace::SiteSetting => format!("Wrong place: `{key}` is a site setting"),
             WrongPlace::TopFolder => {
                 format!("Wrong place: `{key}` at the top of `content/` reaches every page")
             }
             WrongPlace::NothingInside => {
-                format!("Wrong place: `{key}` hands down only from a folder's `index.md`")
+                format!("Wrong place: `{key}` cascades only from a folder's `index.md`")
             }
             WrongPlace::WholeSite => {
-                format!("Wrong place: `{key}` can't be handed down from `statac.yaml`")
+                format!("Wrong place: `{key}` can't cascade from `statac.yaml`")
             }
             WrongPlace::SiteValue => format!("Wrong place: a page can't set `{key}`"),
             WrongPlace::FolderOnly => {
@@ -417,7 +417,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 }
             },
         },
-        Kind::UnusableAddress { fault } => format!("Unusable address: {}", address_fault(fault)),
+        Kind::UnusableUrl { fault } => format!("Unusable URL: {}", address_fault(fault)),
         Kind::UnusableDateFormat { fault } => {
             format!("Unusable date format: {}", format_fault(fault))
         }
@@ -440,7 +440,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
              `after_build` runs"
         ),
         Kind::UnknownLanguage { tag } => {
-            format!("Unknown language: Statac has no words for `{tag}`")
+            format!("Unknown language: Statac has no translations for `{tag}`")
         }
         Kind::LanguageWrittenTwice {
             written,
@@ -458,8 +458,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
             let pages = how_many(*pages, "page", "pages");
             match words {
                 ShownWords::BackToTheText => format!(
-                    "Missing words: the footnotes of {pages} in `{tag}` have no words for the \
-                     way back"
+                    "Missing words: the footnotes of {pages} in `{tag}` have no translation for \
+                     the back link"
                 ),
                 ShownWords::Callouts => {
                     format!("Missing words: the callouts of {pages} in `{tag}` have no names")
@@ -564,11 +564,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
                     Needed::VideoOn {
                         site,
                         written: Some(written),
-                    } => format!("`{snippet}` needs a {site} address or id, not `{written}`"),
+                    } => format!("`{snippet}` needs a {site} URL or id, not `{written}`"),
                     Needed::VideoOn {
                         site,
                         written: None,
-                    } => format!("`{snippet}` needs a {site} address or id"),
+                    } => format!("`{snippet}` needs a {site} URL or id"),
                     Needed::Playable { sort, written } => format!(
                         "`{snippet}` needs a {} a browser plays, not `{written}`",
                         sort_name(*sort)
@@ -666,21 +666,21 @@ pub(crate) fn headline(kind: &Kind) -> String {
                     format!("`{name}` calls itself too many times")
                 }
                 Stopped::CallsTooDeep(None) => "calls nest too deeply".into(),
-                Stopped::NoSiteAddress => "`absolute` needs the site's `url`".into(),
+                Stopped::NoSiteUrl => "`absolute` needs the site's `url`".into(),
                 Stopped::NoFeedKey(_) => "`feed_id` needs the site's `feed_key`".into(),
                 Stopped::NotAPage(function) => format!("`{function}` needs a page"),
-                Stopped::NotAnAddress => "`url` needs an address from the top of the site".into(),
+                Stopped::NotAnAddress => "`url` needs a URL starting with `/`".into(),
                 Stopped::NotADate(filter) => format!("`{filter}` needs a date"),
                 Stopped::NotAList(filter) => format!("`{filter}` needs a list of pages"),
                 Stopped::CallsItself(snippet) => format!("`{snippet}` calls itself"),
-                Stopped::ContentInItself => "a page's writing shows itself".into(),
+                Stopped::ContentInItself => "a page's content shows itself".into(),
                 Stopped::RanOn { template, steps } => format!(
                     "`{template}` ran {} steps without finishing",
                     grouped(steps)
                 ),
                 Stopped::NotText => "a `!!binary` value holds bytes that aren't text".into(),
                 Stopped::CardInWriting => {
-                    "`page.card` isn't answered in a page's writing".into()
+                    "`page.card` isn't answered in a page's content".into()
                 }
                 Stopped::CardInCard => "`page.card` isn't answered in a card's own text".into(),
             }
@@ -691,8 +691,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::TextNeverShown {
             extended, block, ..
         } => format!("Text never shown: `{extended}` has no block called `{block}`"),
-        Kind::WritingNeverShown { layout, pages } => format!(
-            "Writing never shown: {} built by `{layout}` {} writing it never shows",
+        Kind::ContentNeverShown { layout, pages } => format!(
+            "Content never shown: {} built by `{layout}` {} content it never shows",
             how_many(*pages, "page", "pages"),
             if *pages == 1 { "has" } else { "have" }
         ),
@@ -716,8 +716,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
             )
         }
         Kind::DraftLeftOut { path } => format!("Draft left out: `{path}`"),
-        Kind::WaitingForItsDay { path, date } => {
-            format!("Waiting for its day: `{path}` is dated `{date}`")
+        Kind::ScheduledPost { path, date } => {
+            format!("Scheduled post: `{path}` is dated `{date}`")
         }
         Kind::NumberedFolder { folder } => {
             format!("Numbered folder: `{folder}` is ordered by the number each name opens with")
@@ -747,7 +747,10 @@ pub(crate) fn headline(kind: &Kind) -> String {
             }
         ),
         Kind::NotAPost { path, word, name } => {
-            format!("Not a post: `{path}` speaks for {}", the_list(*word, name))
+            format!(
+                "Not a post: `{path}` is the list page for {}",
+                the_list(*word, name)
+            )
         }
         Kind::FeedNotWritten { list, more, why } => {
             let lists = lists(list, *more);
@@ -778,7 +781,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
             }
         }
         Kind::NoFeedKey { .. } => "No feed key: `statac.yaml` has no `feed_key`".into(),
-        Kind::NoSiteAddress { waiting } => {
+        Kind::NoSiteUrl { waiting } => {
             let what = match waiting {
                 Waiting::Page(path) => format!("`{path}` is"),
                 Waiting::Feeds { list, more: 0 } => {
@@ -787,10 +790,10 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 Waiting::Feeds { list, more } => {
                     format!("the feeds of {} are", lists(list, *more))
                 }
-                Waiting::Cards => "sharing cards are".into(),
+                Waiting::Cards => "social cards are".into(),
                 Waiting::Webmentions => "webmentions are".into(),
             };
-            format!("No site address: {what} left out until the site has a `url`")
+            format!("No site URL: {what} left out until the site has a `url`")
         }
         Kind::FeedIdChanged { was, .. } => {
             format!("Feed id changed: this post was published at `{was}`")
@@ -800,16 +803,16 @@ pub(crate) fn headline(kind: &Kind) -> String {
             format!("Robots beneath a path: crawlers read only `{top}`")
         }
         Kind::RedirectToItself { written } => {
-            format!("Redirect to itself: `{written}` is this page's own address")
+            format!("Redirect to itself: `{written}` is this page's own URL")
         }
         Kind::RedirectFromItself { written } => {
-            format!("Redirect to itself: `{written}` is this page's own address")
+            format!("Redirect to itself: `{written}` is this page's own URL")
         }
         Kind::RedirectedBack { written } => {
-            format!("Redirect to itself: `{written}` sends readers back to this page")
+            format!("Redirect to itself: `{written}` redirects back to this page")
         }
-        Kind::WritingNotPublished { path } => {
-            format!("Writing not published: `{path}` sends readers on")
+        Kind::ContentNotPublished { path } => {
+            format!("Content not published: `{path}` redirects")
         }
         Kind::LoopOverEveryPage { written, pages, .. } => {
             let pages = match pages {
@@ -850,7 +853,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 Called::Summary => "its `summary`",
                 Called::OpeningWords => "its opening words",
                 Called::Date => "its date",
-                Called::Address => "its address",
+                Called::Address => "its URL",
             };
             format!("Untitled page: {} is called by {by}, `{name}`", named(page))
         }
@@ -892,52 +895,53 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::SizeKept {
             written, at, size, ..
         } => format!("Size kept: at `{at}`, `{written}` is drawn at {size}"),
-        Kind::UnreadablePicture { path, fault } => match fault {
+        Kind::UnreadableImage { path, fault } => match fault {
             PictureFault::CutShort => {
-                format!("Unreadable picture: `{path}` is cut short or damaged")
+                format!("Unreadable image: `{path}` is cut short or damaged")
             }
             PictureFault::Unsupported(_) => {
-                format!("Unreadable picture: `{path}` is saved in a form Statac doesn't read")
+                format!("Unreadable image: `{path}` is saved in a form Statac doesn't read")
             }
             PictureFault::TooLarge { width, height } => format!(
-                "Unreadable picture: `{path}` is {} by {} pixels, too large to open",
+                "Unreadable image: `{path}` is {} by {} pixels, too large to open",
                 grouped(width),
                 grouped(height)
             ),
             PictureFault::CantMake(message) => {
-                format!("Unreadable picture: no copy of `{path}` could be made: {message}")
+                format!("Unreadable image: no resized copy of `{path}` could be made: {message}")
             }
             PictureFault::NotAStill => {
-                format!("Unreadable picture: `{path}` isn't a JPEG, a PNG or a still WebP")
+                format!("Unreadable image: `{path}` isn't a JPEG, a PNG or a still WebP")
             }
         },
         Kind::ColourConverted { path, profile } => match profile {
             Some(profile) => format!(
-                "Colour converted: the copies of `{path}` are in sRGB, converted from `{profile}`"
+                "Colour converted: the resized copies of `{path}` are in sRGB, converted from \
+                 `{profile}`"
             ),
             None => format!(
-                "Colour converted: the copies of `{path}` are in sRGB, converted from its \
-                 colour profile"
+                "Colour converted: the resized copies of `{path}` are in sRGB, converted from \
+                 its colour profile"
             ),
         },
-        Kind::DescribesNoPicture { picture, .. } => {
-            format!("Describes no picture: there is no `{picture}`")
+        Kind::DescribesNoImage { picture, .. } => {
+            format!("Describes no image: there is no `{picture}`")
         }
         Kind::CacheNotWritten { path, reason } => format!(
             "Cache not written: can't write `{}`: {reason}",
             path.display()
         ),
-        Kind::UndescribedPicture { picture, .. } => {
-            format!("Picture with no description: `{picture}`")
+        Kind::MissingAltText { picture, .. } => {
+            format!("Missing alt text: `{picture}`")
         }
-        Kind::HeicPicture { path } => {
-            format!("HEIC picture: `{path}` is published as it is, with no copies made")
+        Kind::HeicImage { path } => {
+            format!("HEIC image: `{path}` is published as it is, with no resized copies made")
         }
         Kind::LocationPublished { path } => {
             format!("Location published: `{path}` holds where it was taken in its metadata")
         }
-        Kind::PicturesOutOfProportion { property } => format!(
-            "Pictures out of proportion: `img` has {} `{property}` and no `{}`",
+        Kind::ImagesOutOfProportion { property } => format!(
+            "Images out of proportion: `img` has {} `{property}` and no `{}`",
             if property.to_ascii_lowercase().starts_with('i') {
                 "an"
             } else {
@@ -945,9 +949,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
             },
             height_beside(property)
         ),
-        Kind::NoStill { host, absent, .. } => match absent {
-            false => "No still: no picture has been fetched for this video yet".into(),
-            true => format!("No still: {} has no picture for this video", host.site()),
+        Kind::NoThumbnail { host, absent, .. } => match absent {
+            false => "No thumbnail: no image has been fetched for this video yet".into(),
+            true => format!("No thumbnail: {} has no image for this video", host.site()),
         },
         Kind::MalformedRecord { fault } => format!(
             "Malformed record: {}",
@@ -967,9 +971,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 RecordFault::Reach(reach) => {
                     format!("`{reach}` is neither `mention` nor `sender`")
                 }
-                RecordFault::Address(address) => format!("`{address}` isn't a web address"),
+                RecordFault::Address(address) => {
+                    format!("`{address}` isn't an `https://` or `http://` URL")
+                }
                 RecordFault::NotAnAddress(written) => {
-                    format!("`{written}` isn't an address from the top of the site")
+                    format!("`{written}` isn't a URL starting with `/`")
                 }
             }
         ),
@@ -1014,7 +1020,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::NoSiteHere { folder } => {
             format!("No site here: `{folder}` has no `content/` folder and no `statac.yaml`")
         }
-        Kind::NewerStarter { files } => match files {
+        Kind::UpdateAvailable { files } => match files {
             1 => {
                 "Newer starter files: 1 of the files `statac new` wrote has a newer version".into()
             }
@@ -1096,17 +1102,17 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 n => format!("the `{path}` of {} pages", grouped(*n)),
             };
             match holds {
-                Some(kind) => format!("Sharing image may not show: {of} is {}", a_kind(*kind)),
+                Some(kind) => format!("Social image may not show: {of} is {}", a_kind(*kind)),
                 None => format!(
-                    "Sharing image may not show: {of} is a kind of picture some link previews \
-                     don't show"
+                    "Social image may not show: {of} is in a format some link previews don't \
+                     show"
                 ),
             }
         }
     }
 }
 
-/// The property that gives a picture its height, in the words `property`
+/// The property that gives an image its height, in the words `property`
 /// gives its width in: `block-size` beside `max-inline-size`.
 fn height_beside(property: &str) -> &'static str {
     match property.to_ascii_lowercase().ends_with("inline-size") {
@@ -1115,7 +1121,7 @@ fn height_beside(property: &str) -> &'static str {
     }
 }
 
-/// A kind of picture, as a file is said to be one.
+/// An image format, as a file is said to be one.
 fn a_kind(kind: crate::pictures::Kind) -> &'static str {
     use crate::pictures::Kind as Picture;
     match kind {
@@ -1126,8 +1132,8 @@ fn a_kind(kind: crate::pictures::Kind) -> &'static str {
         Picture::AnimatedPng => "an animated PNG",
         Picture::Gif => "a GIF",
         Picture::Svg => "an SVG",
-        Picture::Avif => "an AVIF picture",
-        Picture::Heic | Picture::Heif => "a HEIC picture",
+        Picture::Avif => "an AVIF image",
+        Picture::Heic | Picture::Heif => "a HEIC image",
     }
 }
 
@@ -1140,7 +1146,7 @@ fn characters_listed(characters: &[char]) -> String {
 /// A sort of file, as a call needing one names it.
 fn sort_name(sort: Sort) -> &'static str {
     match sort {
-        Sort::Picture => "picture",
+        Sort::Picture => "image",
         Sort::File => "file",
         Sort::Video => "video",
         Sort::Recording => "recording",
@@ -1195,7 +1201,7 @@ pub(crate) fn named(named: &Named) -> String {
     }
 }
 
-/// What to do about two things at one address: take the address out of a
+/// What to do about two things at one URL: take the URL out of a
 /// `redirect_from` that names it, or else change a `permalink` that gives
 /// it, or else rename one of them; to follow a comma, opening with a
 /// letter of ASCII.
@@ -1223,12 +1229,12 @@ fn same_address_help(first: &Named, second: &Named) -> String {
     }
 }
 
-/// A list's page after its first, by where the first stands.
+/// A paginated page of a list, by the list's URL.
 fn later(number: usize, list: &str) -> String {
     format!("page {number} of `{list}`")
 }
 
-/// A list a page speaks for, as the end of a sentence: `the tag `Rust``.
+/// A list, as the end of a sentence: `the tag `Rust``.
 fn the_list(word: Word, name: &str) -> String {
     match (word, name) {
         (Word::Folder, "") => "the site's own list".into(),
@@ -1238,36 +1244,28 @@ fn the_list(word: Word, name: &str) -> String {
     }
 }
 
-/// What `--drafts` brought into the run: drafts and posts waiting for their
-/// day, built as if published.
+/// What `--drafts` brought into the run: drafts and scheduled posts, built
+/// as if published.
 pub(crate) fn included(drafts: usize, waiting: usize) -> String {
     let mut what = Vec::new();
     if drafts > 0 {
         what.push(how_many(drafts, "draft", "drafts"));
     }
     if waiting > 0 {
-        what.push(how_many(
-            waiting,
-            "post waiting for its day",
-            "posts waiting for their day",
-        ));
+        what.push(how_many(waiting, "scheduled post", "scheduled posts"));
     }
     format!("Included {} as if published.", listed(&what))
 }
 
-/// What `serve` says as it opens of the drafts and posts waiting for
-/// their day that it shows and a build leaves out.
+/// What `serve` says as it opens of the drafts and scheduled posts that it
+/// shows and a build leaves out.
 pub(crate) fn showing(drafts: usize, waiting: usize) -> String {
     let mut what = Vec::new();
     if drafts > 0 {
         what.push(how_many(drafts, "draft", "drafts"));
     }
     if waiting > 0 {
-        what.push(how_many(
-            waiting,
-            "post waiting for its day",
-            "posts waiting for their day",
-        ));
+        what.push(how_many(waiting, "scheduled post", "scheduled posts"));
     }
     format!(
         "Showing {}, which `statac build` leaves out.",
@@ -1683,7 +1681,7 @@ fn malformed_call(found: &CallFault) -> String {
         CallFault::WrapsNothing(name) => {
             format!("`@{name}` isn't on a line of its own")
         }
-        CallFault::NotOneAddress => "`@url` takes one address from the top of the site".into(),
+        CallFault::NotOneAddress => "`@url` takes one URL starting with `/`".into(),
     }
 }
 
@@ -1872,7 +1870,7 @@ fn needs(option: &str) -> &'static str {
     match option {
         "--site" | "--out" => "a folder",
         "--today" => "a date",
-        "--url" => "an address",
+        "--url" => "a full URL",
         "--port" => "a number",
         "--watch" => "a way",
         _ => "a value",
@@ -1881,10 +1879,8 @@ fn needs(option: &str) -> &'static str {
 
 fn placeholder(option: &str) -> String {
     let needs = needs(option);
-    let named = needs
-        .strip_prefix("an ")
-        .or_else(|| needs.strip_prefix("a "));
-    format!("<{}>", named.unwrap_or(needs))
+    let named = needs.rsplit(' ').next().unwrap_or(needs);
+    format!("<{}>", named.to_lowercase())
 }
 
 /// `a`, `a and b`, `a, b and c`.
@@ -1905,7 +1901,7 @@ fn word_name(word: Word) -> &'static str {
         Word::Field => "field",
         Word::Setting => "setting",
         Word::FieldKind => "kind",
-        Word::AddressPiece => "address piece",
+        Word::AddressPiece => "placeholder",
         Word::File => "file",
         Word::TimeZone => "time zone",
         Word::Name => "name",
@@ -1941,8 +1937,8 @@ fn expected_words(expected: &Expected) -> String {
         Expected::List => "a list".into(),
         Expected::Date => "a date".into(),
         Expected::When => "a date, a year and month, or a year".into(),
-        Expected::Address => "an address, such as `https://example.org` or `/about/`".into(),
-        Expected::SiteAddress => "a full address, such as `https://example.org`".into(),
+        Expected::Address => "a URL, such as `https://example.org` or `/about/`".into(),
+        Expected::SiteAddress => "a full URL, such as `https://example.org`".into(),
         Expected::OneOf(words) => {
             let quoted: Vec<String> = words.iter().map(|w| format!("`{w}`")).collect();
             match quoted.as_slice() {
@@ -1952,11 +1948,11 @@ fn expected_words(expected: &Expected) -> String {
             }
         }
         Expected::LanguageCode => "a language code, such as `en-GB`".into(),
-        Expected::TrueFalseOrAddress => "`true`, `false` or an address".into(),
+        Expected::TrueFalseOrAddress => "`true`, `false` or a URL".into(),
         Expected::Fields => "`name: value` lines".into(),
-        Expected::ListAddress => "an address ending in `{slug}/`, such as `/topics/{slug}/`".into(),
+        Expected::ListAddress => "a URL ending in `{slug}/`, such as `/topics/{slug}/`".into(),
         Expected::LaterAddress => {
-            "an address opening with `{list}` and holding `{n}`, such as `{list}page/{n}/`".into()
+            "a URL starting with `{list}` and holding `{n}`, such as `{list}page/{n}/`".into()
         }
         Expected::Id => "six letters and digits, such as `k3m9x2`".into(),
         Expected::FieldKind => "a kind, such as `text` or `one of a, b`".into(),
@@ -1984,16 +1980,18 @@ fn expected_words(expected: &Expected) -> String {
         Expected::CardSize => "a size from 1 to 630, such as `36` or `up to 75`".into(),
         Expected::Colour => "a colour such as `#F2E9D3` or `#FFF`, or a template".into(),
         Expected::BuiltColour => "a colour such as `#F2E9D3` or `#FFF`".into(),
-        Expected::OwnPicture => "a picture of the site's".into(),
-        Expected::FaceName => "a face's file name, such as `0123456789abcdef.jpg`".into(),
+        Expected::OwnPicture => "an image of the site's".into(),
+        Expected::FaceName => "an avatar's file name, such as `0123456789abcdef.jpg`".into(),
         Expected::TableName => "`site.posts` or a table in `data/`, such as `data.people`".into(),
     }
 }
 
-/// Why an address can't be written, as the end of a sentence.
+/// Why a URL can't be written, as the end of a sentence.
 pub(crate) fn address_fault(fault: &AddressFault) -> String {
     match fault {
-        AddressFault::UnknownPiece { written, .. } => format!("there is no piece `{written}`"),
+        AddressFault::UnknownPiece { written, .. } => {
+            format!("there is no placeholder `{written}`")
+        }
         AddressFault::Unclosed => "`{` is never closed".into(),
         AddressFault::Stray => "`}` closes nothing".into(),
         AddressFault::Character(c) => format!("`{c}` can't be in a name"),
@@ -2006,7 +2004,7 @@ pub(crate) fn address_fault(fault: &AddressFault) -> String {
         AddressFault::Control => "a control character can't be in a name".into(),
         AddressFault::NoDate { piece } => format!("this page has no date for `{piece}`"),
         AddressFault::FillsNothing { pattern } => {
-            format!("`{pattern}` puts every page at one address")
+            format!("`{pattern}` puts every page at one URL")
         }
         AddressFault::ItemLacks {
             item: named,
@@ -2244,16 +2242,16 @@ pub(crate) fn fix_written(text: &str) -> String {
     format!("Write it as `{text}`")
 }
 
-/// The fix taking an address gone out of `published.txt`.
+/// The fix taking a URL gone out of `published.txt`.
 pub(crate) fn fix_forget(written: &str) -> String {
     format!("Take `{written}` out of `published.txt`")
 }
 
-/// The fix taking every address gone under a folder out of
+/// The fix taking every URL gone under a folder out of
 /// `published.txt`.
 pub(crate) fn fix_forget_all(count: usize, under: &str) -> String {
-    let addresses = how_many(count, "address", "addresses");
-    format!("Take the {addresses} under `{under}` out of `published.txt`")
+    let urls = how_many(count, "URL", "URLs");
+    format!("Take the {urls} under `{under}` out of `published.txt`")
 }
 
 pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
@@ -2329,6 +2327,11 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::SameId { .. } => Some("Give each page its own id.".into()),
         Kind::TwoLists { .. } => Some("Move one of them to a page of its own.".into()),
         Kind::UnclosedFrontMatter => Some("Add a `---` line after the last field.".into()),
+        Kind::UnknownProblemName {
+            suggestion: Some(ours),
+            renamed: true,
+            ..
+        } => Some(format!("Statac calls this `{ours}`.")),
         Kind::UnknownProblemName { suggestion, .. }
         | Kind::UnexpectedArgument { suggestion, .. } => {
             suggestion.as_ref().map(|s| format!("Did you mean `{s}`?"))
@@ -2345,8 +2348,8 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 let takers: Vec<_> = takers.iter().map(|c| format!("`statac {c}`")).collect();
                 format!("`{option}` is for {}.", listed(&takers))
             }
-            OptionHint::ShownAlready => "`statac serve` shows drafts and posts waiting for their \
-                                         day already. `--no-drafts` leaves them out."
+            OptionHint::ShownAlready => "`statac serve` shows drafts and scheduled posts already. \
+                                         `--no-drafts` leaves them out."
                 .into(),
             OptionHint::Takes { command, options } => {
                 let options: Vec<_> = options.iter().map(|o| format!("`{o}`")).collect();
@@ -2375,16 +2378,16 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }),
         Kind::OptionGivenTwice { .. } => Some("Keep one of them.".into()),
         Kind::MissingName => Some("The name is the last part of a problem's `More:` link.".into()),
-        Kind::MissingAddress => Some(
-            "Give the address after the command, as `statac refuse https://a.example/post-1/`."
+        Kind::MissingUrl => Some(
+            "Give the full URL after the command, as `statac refuse https://a.example/post-1/`."
                 .into(),
         ),
         Kind::NothingToSearch => {
             Some("Give them after the command, as `statac search \"raspberry pi\"`.".into())
         }
-        Kind::NotAWebAddress { respelt, .. } => Some(match respelt {
+        Kind::NotAUrl { respelt, .. } => Some(match respelt {
             Some(address) => format!("Did you mean `{address}`?"),
-            None => "Give the whole address, as the browser shows it.".into(),
+            None => "Give the full URL, as the browser shows it.".into(),
         }),
         Kind::UnreadableName { .. } => None,
         Kind::UnusableName { .. } => Some("Name the folder without it.".into()),
@@ -2399,7 +2402,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
              their own names."
                 .into(),
         ),
-        Kind::SameAddress {
+        Kind::SameUrl {
             first,
             second,
             alike,
@@ -2418,14 +2421,14 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             })
         }
         Kind::LaterPageTaken { page, .. } => Some(format!(
-            "Give {} another address, or put later pages elsewhere with `later_pages` \
-             in `statac.yaml`.",
+            "Give {} another URL, or put the paginated pages elsewhere with \
+             `pagination.permalink` in `statac.yaml`.",
             named(page)
         )),
-        Kind::AddressTaken { held, taken, .. } => {
+        Kind::UrlTaken { held, taken, .. } => {
             let (what, when) = match held {
                 Held::Draft => ("draft", "before it is published"),
-                Held::Waiting => ("post", "before its day comes"),
+                Held::Waiting => ("post", "before its scheduled date"),
             };
             Some(match &**taken {
                 Named::Redirect { page, .. } => format!(
@@ -2437,13 +2440,13 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             })
         }
         Kind::AddressesGone { .. } => Some(
-            "Send readers on with `redirect_from` in the pages that took their places, or take \
+            "Redirect them with `redirect_from` in the pages that took their places, or take \
              them out of `published.txt` if they are gone for good."
                 .into(),
         ),
-        Kind::AddressGone { written, .. } => Some(format!(
-            "Send readers on with `redirect_from: [{written}]` in the page that took its place, \
-             or take it out of `published.txt` if it is gone for good."
+        Kind::UrlGone { written, .. } => Some(format!(
+            "Redirect it with `redirect_from: [{written}]` in the page that took its place, or \
+             take it out of `published.txt` if it is gone for good."
         )),
         Kind::NotStatacsFolder { .. } => Some(
             "Statac replaces only folders it built, so build into a new folder or empty this \
@@ -2484,15 +2487,15 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                     .into()
             }
             CallFault::NoEnd(_) => {
-                "Put `@end` on a line of its own where the writing it wraps ends.".into()
+                "Put `@end` on a line of its own where the content it wraps ends.".into()
             }
             CallFault::StrayEnd => {
-                "Take the line out: only a call to a snippet that shows `body` wraps the writing \
+                "Take the line out: only a call to a snippet that shows `body` wraps the content \
                  up to an `@end`."
                     .into()
             }
             CallFault::WrapsNothing(_) => {
-                "Write the call on a line of its own, the writing it wraps below it, and `@end` \
+                "Write the call on a line of its own, the content it wraps below it, and `@end` \
                  on a line after that."
                     .into()
             }
@@ -2550,7 +2553,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             nearest.as_ref().map(|s| format!("Did you mean `{s}`?"))
         }
         Kind::AlwaysFalse { meant, .. } => Some(format!("Did you mean `{meant}`?")),
-        Kind::ReadAsYourOwn {
+        Kind::ReadAsCustom {
             own,
             written,
             nearest,
@@ -2577,7 +2580,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }
         Kind::SetAside { field, why, .. } => match why {
             SetAside::StatacFills(_) if field == "slug" || field == "url" => {
-                Some("Write `permalink:` to choose the page's address.".into())
+                Some("Write `permalink:` to choose the page's URL.".into())
             }
             SetAside::StatacFills(_) => {
                 Some(format!("Give it a name of your own, such as `my_{field}`."))
@@ -2639,16 +2642,18 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Requirer::Each => {
                 format!(
                     "Add a `{field}:` pattern, such as `/people/{{key}}/`, to give each item \
-                     its address."
+                     its URL."
                 )
             }
             Requirer::EachPost => format!(
                 "Add a `{field}:` pattern, such as `/cards/{{name}}/`, to give the page made for \
-                 each post its address."
+                 each post its URL."
             ),
             Requirer::Card => format!("Add `{field}:`, which every card needs."),
             Requirer::CardText => format!("Add `{field}:`, which each text on a card needs."),
-            Requirer::Mention => format!("Add `{field}:`, which every mention Statac keeps has."),
+            Requirer::Mention => {
+                format!("Add `{field}:`, which every webmention Statac keeps has.")
+            }
         }),
         Kind::WrongPlace { key, why } => match why {
             WrongPlace::EachPagesOwn => {
@@ -2680,14 +2685,14 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 Some("Move it to a line of its own between two paragraphs.".into())
             }
         },
-        Kind::UnusableAddress { fault } => match fault {
+        Kind::UnusableUrl { fault } => match fault {
             AddressFault::UnknownPiece { nearest, .. } => {
                 nearest.as_ref().map(|s| format!("Did you mean `{s}`?"))
             }
             AddressFault::Unclosed => Some("Close it with `}`.".into()),
             AddressFault::Character('\\') => Some("Separate folders with `/`.".into()),
             AddressFault::Character(_) | AddressFault::Control | AddressFault::Stray => {
-                Some("Leave it out of the address.".into())
+                Some("Leave it out of the URL.".into())
             }
             AddressFault::Percent => Some("Write the character it stands for instead.".into()),
             AddressFault::Hash => Some("Leave out the `#` and what follows it.".into()),
@@ -2700,7 +2705,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                     .into(),
             ),
             AddressFault::FillsNothing { .. } => {
-                Some("Add a piece such as `{slug}` so each page has its own.".into())
+                Some("Add a placeholder such as `{slug}` so each page has its own.".into())
             }
             AddressFault::ItemLacks { field, piece, .. } if field == "key" => Some(format!(
                 "Give the table's items names, or take `{piece}` out of the pattern."
@@ -2851,7 +2856,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 }
                 Needed::Names => Some(format!(
                     "Write it as `{snippet}([\"photo-1.jpg\", \"photo-2.jpg\"])`, or \
-                     `{snippet}()` for every photograph beside the page."
+                     `{snippet}()` for every JPEG, PNG or WebP image beside the page."
                 )),
                 Needed::Brackets => Some(format!("Write it as `{snippet}()`.")),
                 Needed::Text(option) if option == "sizes" => Some(
@@ -2860,7 +2865,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 ),
                 Needed::Text(_) | Needed::TrueFalse(_) | Needed::OnSite(_) => None,
                 Needed::VideoOn { site, .. } => Some(format!(
-                    "Write the address {site} gives for the video, such as `{}`.",
+                    "Write the URL {site} gives for the video, such as `{}`.",
                     match *site {
                         "Vimeo" => "https://vimeo.com/123456789",
                         _ => "https://www.youtube.com/watch?v=abcdefghijk",
@@ -2874,7 +2879,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             },
         },
         Kind::TemplateStopped { reason } => match reason {
-            Stopped::NoSiteAddress => Some("Add `url:` to `statac.yaml`.".into()),
+            Stopped::NoSiteUrl => Some("Add `url:` to `statac.yaml`.".into()),
             Stopped::NoFeedKey(key) => Some(feed_key_line(key)),
             Stopped::NotAPage(function) => Some(format!("Write it as `{function}(post)`.")),
             Stopped::NotAnAddress => Some("Write it as `url(\"/about/\")`.".into()),
@@ -2955,13 +2960,13 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::TextNeverShown { nearest, .. } => {
             nearest.as_ref().map(|s| format!("Did you mean `{s}`?"))
         }
-        Kind::WritingNeverShown { .. } => {
-            Some("Add `{{ page.content }}` where the writing belongs.".into())
+        Kind::ContentNeverShown { .. } => {
+            Some("Add `{{ page.content }}` where the content belongs.".into())
         }
         Kind::SpelledTwoWays { .. } => {
             Some("Use one spelling on every page to choose how it's shown.".into())
         }
-        Kind::DraftLeftOut { .. } | Kind::WaitingForItsDay { .. } => {
+        Kind::DraftLeftOut { .. } | Kind::ScheduledPost { .. } => {
             Some("Run with `--drafts` to build it as if published.".into())
         }
         Kind::NumberedFolder { folder } => Some(format!(
@@ -2987,8 +2992,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }),
         },
         Kind::NotAPost { .. } => Some(
-            "It stands at the list's address, so no list holds it; give it a `permalink` \
-             of its own to list it as a post."
+            "A list page is in no list; give it a `permalink` of its own to list it as a post."
                 .into(),
         ),
         Kind::FeedNotWritten { more, why, .. } => Some(match why {
@@ -3004,8 +3008,8 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 )
             }
             Unwritten::PageThere { .. } => {
-                "The page is published there instead; give the feed another address with \
-                 `feed:` on the list's page."
+                "The page is published there instead; give the feed another URL with \
+                 `feed:` on the list page."
                     .into()
             }
             Unwritten::Undated => {
@@ -3013,8 +3017,8 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
         }),
         Kind::NoFeedKey { key } => Some(feed_key_line(key)),
-        Kind::NoSiteAddress { .. } => {
-            Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`.".into())
+        Kind::NoSiteUrl { .. } => {
+            Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`.".into())
         }
         Kind::FeedIdChanged {
             id, item: false, ..
@@ -3028,15 +3032,16 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Some("Add the site's language to `statac.yaml`, as `language: en`.".into())
         }
         Kind::RobotsBeneathPath { .. } => Some(
-            "Copy its lines into the `robots.txt` at the top of the host to have them read.".into(),
+            "Copy its lines into the `robots.txt` at the root of the host to have them read."
+                .into(),
         ),
         Kind::RedirectToItself { .. } => {
-            Some("Point `redirect_to` at the address readers should reach.".into())
+            Some("Point `redirect_to` at the URL readers should reach.".into())
         }
         Kind::RedirectFromItself { .. } => Some("Take it out of `redirect_from`.".into()),
         Kind::RedirectedBack { .. } => None,
-        Kind::WritingNotPublished { .. } => Some(
-            "Move it to where readers are sent, or take out `redirect_to` to publish it.".into(),
+        Kind::ContentNotPublished { .. } => Some(
+            "Move it to the page it redirects to, or take out `redirect_to` to publish it.".into(),
         ),
         Kind::SortedLast { instead, .. } => instead
             .as_ref()
@@ -3051,7 +3056,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                     "Add `title:` to `statac.yaml`; the home page is called by it."
                 }
                 _ => {
-                    "Give it a `title`, or open its writing with a `# heading`. A folder whose \
+                    "Give it a `title`, or open its content with a `# heading`. A folder whose \
                      pages go without titles says `pages.untitled: true`."
                 }
             };
@@ -3065,7 +3070,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }
         Kind::FootnoteNeverShown { nearest, .. } => nearest
             .as_ref()
-            .map(|marker| format!("Is it the note for `[^{marker}]`?")),
+            .map(|marker| format!("Is it the definition for `[^{marker}]`?")),
         Kind::DefinitionWrittenTwice { .. } => {
             Some("Give one of them another name, or take one out.".into())
         }
@@ -3093,7 +3098,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::SizeKept { field, size, .. } => Some(format!(
             "Write `{field}: {size}`; only a text at `left`, `centre` or `right` is fitted."
         )),
-        Kind::UnreadablePicture { path, fault } => match fault {
+        Kind::UnreadableImage { path, fault } => match fault {
             PictureFault::CutShort => Some("Copy or export the file again.".into()),
             PictureFault::NotAStill => {
                 Some("Delete it, then run `statac refresh` to fetch one.".into())
@@ -3103,11 +3108,11 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             )),
             _ => None,
         },
-        Kind::DescribesNoPicture { nearest, .. } => {
+        Kind::DescribesNoImage { nearest, .. } => {
             nearest.as_ref().map(|n| format!("Did you mean `{n}`?"))
         }
         Kind::ColourConverted { .. } | Kind::CacheNotWritten { .. } => None,
-        Kind::UndescribedPicture { shown, .. } => Some(match shown {
+        Kind::MissingAltText { shown, .. } => Some(match shown {
             ShownBy::Markdown {
                 described_beside: true,
             } => "Describe it in the brackets, or mark it decorative.".into(),
@@ -3115,7 +3120,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 described_beside: false,
             } => "Describe it in the brackets.".into(),
             ShownBy::Html => {
-                "Give the `<img>` an `alt`, or `alt=\"\"` where it is decoration.".into()
+                "Give the `<img>` an `alt`, or `alt=\"\"` where it is decorative.".into()
             }
             ShownBy::Template {
                 beside: Some(beside),
@@ -3124,22 +3129,22 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Describe it where it is shown, or mark it decorative.".into()
             }
         }),
-        Kind::HeicPicture { .. } => {
-            Some("Export it as a JPEG: most browsers can't show a HEIC picture.".into())
+        Kind::HeicImage { .. } => {
+            Some("Export it as a JPEG: most browsers can't show a HEIC image.".into())
         }
         Kind::LocationPublished { .. } => Some(
             "Publish a copy without it, or add `location-published` to `quiet:` in \
              `statac.yaml`."
                 .into(),
         ),
-        Kind::PicturesOutOfProportion { property } => Some(format!(
+        Kind::ImagesOutOfProportion { property } => Some(format!(
             "Add `{}: auto` to the rule.",
             height_beside(property)
         )),
-        Kind::NoStill { absent, .. } => Some(
+        Kind::NoThumbnail { absent, .. } => Some(
             match absent {
                 false => "Run `statac refresh` to fetch one.",
-                true => "Show a picture of your own in its place.",
+                true => "Show an image of your own in its place.",
             }
             .into(),
         ),
@@ -3157,15 +3162,16 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             RecordFault::RefusedOpening => {
                 Some("Write `statac refused 1` as its first line.".into())
             }
-            RecordFault::RefusedFields(_) => Some(
-                "Write `mention` or `sender`, the address, and the day, parted by tabs.".into(),
-            ),
+            RecordFault::RefusedFields(_) => {
+                Some("Write `mention` or `sender`, the URL, and the day, parted by tabs.".into())
+            }
             RecordFault::Reach(_) => Some("Write `mention` or `sender`.".into()),
             RecordFault::Address(_) => {
-                Some("Write the address in full, starting `https://` or `http://`.".into())
+                Some("Write the full URL, starting `https://` or `http://`.".into())
             }
             RecordFault::NotAnAddress(_) => Some(
-                "Write it from the top of the site, as `/about/`, or take the line out.".into(),
+                "Write it as a URL starting with `/`, such as `/about/`, or take the line out."
+                    .into(),
             ),
         },
         Kind::TokenInSettings => Some(
@@ -3177,7 +3183,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Some("Add `webmentions: true` to `statac.yaml`, or remove the call.".into())
         }
         Kind::MentionOfNoPage { .. } => {
-            Some("If the page moved, add the old address to its `redirect_from`.".into())
+            Some("If the page moved, add the old URL to its `redirect_from`.".into())
         }
         Kind::FolderNotEmpty { by, .. } => Some(match by {
             Maker::New => "Give `statac new` an empty folder, or the name of a new one.".into(),
@@ -3194,7 +3200,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::NoSiteHere { .. } => {
             Some("Run it in a site's folder, or make one with `statac new`.".into())
         }
-        Kind::NewerStarter { .. } => Some(
+        Kind::UpdateAvailable { .. } => Some(
             "Run `statac new --update`: it replaces those you never changed and shows what is \
              new in the rest."
                 .into(),
@@ -3263,7 +3269,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             "Write `card: {name}` on the pages it is for, or remove the card's settings."
         )),
         Kind::ImageMayNotShow { .. } => {
-            Some("For a picture more link previews show, save it as a PNG.".into())
+            Some("For an image more link previews show, save it as a PNG.".into())
         }
     }
 }
@@ -3398,7 +3404,7 @@ pub(crate) fn javascript(carried: &Carried, sure: bool, pages: usize) -> String 
         Carried::Loaded(address) => format!("`{address}`, {on}"),
         Carried::Written(file) => format!("Written in `{file}`, {on}"),
         Carried::Embedded(address) if address.is_empty() => {
-            format!("An embed with no address, which may run its own, {on}")
+            format!("An embed with no URL, which may run its own, {on}")
         }
         Carried::Embedded(address) => format!("`{address}` embedded, which may run its own, {on}"),
     }
@@ -3433,8 +3439,8 @@ pub(crate) fn stage(stage: crate::build::Stage) -> &'static str {
         Stage::Reading => "Reading the site",
         Stage::Building => "Building the pages",
         Stage::Concluding => "Concluding",
-        Stage::Copies => "Making photograph copies",
-        Stage::Cards => "Drawing sharing cards",
+        Stage::Copies => "Resizing images",
+        Stage::Cards => "Drawing social cards",
         Stage::After => "Running after_build",
         Stage::Writing => "Writing the rest",
     }
@@ -3455,8 +3461,9 @@ pub(crate) const WORK_REST: &str = "The rest";
 
 /// What `build --timings` heads the slowest of each kind with.
 pub(crate) const SLOWEST_TEMPLATES: &str = "Slowest templates, by time in the template itself:";
-pub(crate) const SLOWEST_WRITING: &str = "Slowest writing:";
-pub(crate) const SLOWEST_PHOTOGRAPHS: &str = "Slowest photographs (copies made this build only):";
+pub(crate) const SLOWEST_WRITING: &str = "Slowest Markdown:";
+pub(crate) const SLOWEST_PHOTOGRAPHS: &str =
+    "Slowest images (resized copies made this build only):";
 
 /// What `build --timings` heads the slowest pages with, given the time
 /// half of them took less than, and the time 95 in 100 took no more than.
@@ -3469,49 +3476,50 @@ pub(crate) fn runs(n: usize) -> String {
     how_many(n, "run", "runs")
 }
 
-/// How many copies of a photograph were made, beside their time.
+/// How many resized copies of an image were made, beside their time.
 pub(crate) fn copies_made(n: usize) -> String {
     how_many(n, "copy", "copies")
 }
 
-/// What `build` says of the addresses it added to `published.txt`, or
-/// of starting the file.
+/// What `build` says of the URLs it added to `published.txt`, or of
+/// starting the file.
 pub(crate) fn kept_published(kept: crate::published::Kept) -> String {
-    let addresses = how_many(kept.added, "address", "addresses");
+    let addresses = how_many(kept.added, "URL", "URLs");
     match kept.started {
         true => format!(
             "Started `published.txt` with the {addresses} this site publishes, so a later \
-             build can say when one stops answering. Commit it with the site."
+             build can say when one is no longer published. Commit it with the site."
         ),
         false => format!("Added {addresses} to `published.txt`."),
     }
 }
 
-/// What `build` says of the copies of photographs it made.
+/// What `build` says of the resized copies of images it made.
 pub(crate) fn made_copies(copies: usize, photographs: usize) -> String {
     format!(
         "Made {} of {}.",
-        how_many(copies, "copy", "copies"),
-        how_many(photographs, "photograph", "photographs")
+        how_many(copies, "resized copy", "resized copies"),
+        how_many(photographs, "image", "images")
     )
 }
 
-/// What `build` says of the copies it kept that no page shows any more.
+/// What `build` says of the resized copies it kept that no page shows any
+/// more.
 pub(crate) fn removed_copies(copies: usize) -> String {
-    let copies = how_many(copies, "copy", "copies");
+    let copies = how_many(copies, "resized copy", "resized copies");
     format!("Removed {copies} no page shows any more from `.statac`.")
 }
 
-/// How far a build has got with the copies of photographs it is making.
+/// How far a build has got with the resized copies of images it is making.
 pub(crate) fn making_copies(done: usize, of: usize) -> String {
     format!(
-        "Making copies of photographs: {} of {}.",
+        "Making resized copies of images: {} of {}.",
         grouped(done),
         grouped(of)
     )
 }
 
-/// What `build` says of the sharing cards it drew.
+/// What `build` says of the social cards it drew.
 pub(crate) fn drew_cards(cards: usize) -> String {
     format!("Drew {}.", how_many(cards, "card", "cards"))
 }
@@ -3531,9 +3539,9 @@ pub(crate) fn drawing_cards(done: usize, of: usize) -> String {
 /// How many of the last lines a command printed are shown.
 const LINES_SHOWN: usize = 40;
 
-/// What one of the site's own commands printed before it stopped, as a
-/// heading and the lines under it, the last of them where there are many;
-/// none for a kind that carries no such thing.
+/// What a hook printed before it stopped, as a heading and the lines under
+/// it, the last of them where there are many; none for a kind that carries
+/// no such thing.
 pub(crate) fn printed(kind: &Kind) -> Option<(String, Vec<&str>)> {
     let Kind::HookStopped { said, ended, .. } = kind else {
         return None;
@@ -3556,8 +3564,7 @@ pub(crate) fn printed(kind: &Kind) -> Option<(String, Vec<&str>)> {
     Some((heading, lines[from..].to_vec()))
 }
 
-/// What `build` says on a terminal while a command of the site's own
-/// runs.
+/// What `build` says on a terminal while a hook runs.
 pub(crate) fn running_hook(hook: &str) -> String {
     format!("Running `{hook}`.")
 }
@@ -3566,7 +3573,7 @@ pub(crate) fn running_hook(hook: &str) -> String {
 /// running, before waiting for it to end.
 pub(crate) const WAITING: &str = "Waiting for another build of the site to finish.";
 
-/// What `build` says of a command of the site's own that it ran.
+/// What `build` says of a hook it ran.
 pub(crate) fn ran_hook(hook: &str) -> String {
     format!("Ran `{hook}`.")
 }
@@ -3627,13 +3634,13 @@ pub(crate) const OFFERED_SETTING: &str = "setting";
 pub(crate) const OFFERED_FIELD: &str = "field";
 
 /// What an editor's completion says beside a `pages.` field.
-pub(crate) const OFFERED_HANDED: &str = "handed down";
+pub(crate) const OFFERED_HANDED: &str = "cascade";
 
 /// What an editor's completion says beside a type the site declares.
 pub(crate) const OFFERED_TYPE: &str = "type";
 
-/// What an editor's completion says beside `@url(...)` in the writing.
-pub(crate) const OFFERED_IN_SITE: &str = "address in the site";
+/// What an editor's completion says beside `@url(...)` in the content.
+pub(crate) const OFFERED_IN_SITE: &str = "URL in the site";
 
 /// What an editor's completion says beside a name a snippet call may
 /// give a value by.
@@ -3674,28 +3681,28 @@ pub(crate) fn hover_field(name: &str) -> String {
 
 /// What an editor's hover says a `pages.` line is.
 pub(crate) fn hover_handed(name: &str) -> String {
-    format!("`{name}`, handed down")
+    format!("`{name}`, a cascade")
 }
 
 /// What an editor's hover says a `pages.` line does, in `statac.yaml` or
 /// in a folder's page.
 pub(crate) fn hands_down(field: &str, in_folder: bool) -> String {
     match in_folder {
-        false => format!("Hands `{field}` down to every page."),
+        false => format!("Cascades `{field}` to every page."),
         true => {
-            format!("Hands `{field}` down to every page in this folder and the folders inside it.")
+            format!("Cascades `{field}` to every page in this folder and the folders inside it.")
         }
     }
 }
 
-/// What an editor's hover says a value of the site's own is.
+/// What an editor's hover says a custom setting is.
 pub(crate) fn hover_own_value(name: &str) -> String {
-    format!("`{name}`, a value of your own")
+    format!("`{name}`, a custom setting")
 }
 
-/// What an editor's hover says a field of the author's own is.
+/// What an editor's hover says a custom field is.
 pub(crate) fn hover_own_field(name: &str) -> String {
-    format!("`{name}`, a field of your own")
+    format!("`{name}`, a custom field")
 }
 
 /// How an editor's hover says a template reaches a value, as `site.author`.
@@ -3703,7 +3710,7 @@ pub(crate) fn shown_as(reached: &str) -> String {
     format!("Templates show it as `{reached}`.")
 }
 
-/// How an editor's hover says a field of the author's own is declared.
+/// How an editor's hover says a custom field is declared.
 pub(crate) fn declared_as(kind: &str) -> String {
     format!("Declared in `statac.yaml` as `{kind}`.")
 }
@@ -3727,9 +3734,9 @@ pub(crate) fn hover_series(name: &str, pages: usize) -> String {
     format!("`{name}`, a series of {}", how_many(pages, "page", "pages"))
 }
 
-/// Where an editor's hover says a tag's or a series' page is.
+/// Where an editor's hover says a tag's or a series' list page is.
 pub(crate) fn list_page_at(address: &str) -> String {
-    format!("Its page is `{address}`.")
+    format!("Its list page is `{address}`.")
 }
 
 /// What an editor's hover says one of the site's templates is.
@@ -3796,15 +3803,15 @@ pub(crate) fn hover_snippet(call: &str) -> String {
     format!("`{call}`, a snippet")
 }
 
-/// What an editor's hover says of a snippet that wraps the writing below
+/// What an editor's hover says of a snippet that wraps the content below
 /// a call to it.
-pub(crate) const WRAPS_WRITING: &str = "It wraps the writing below the call, up to `@end`.";
+pub(crate) const WRAPS_WRITING: &str = "It wraps the content below the call, up to `@end`.";
 
-/// What an editor's hover says a file beside the page is: a picture, or
+/// What an editor's hover says a file beside the page is: an image, or
 /// any other file.
 pub(crate) fn hover_beside(name: &str, picture: bool) -> String {
     match picture {
-        true => format!("`{name}`, a picture beside the page"),
+        true => format!("`{name}`, an image beside the page"),
         false => format!("`{name}`, a file beside the page"),
     }
 }
@@ -3845,16 +3852,17 @@ pub(crate) const NOT_STAMPED: &str = "Didn't stamp: `statac.yaml` has an error."
 /// same words whatever was being fetched.
 pub(crate) fn refusal(address: &str, refusal: &Refusal) -> String {
     match refusal {
-        Refusal::NotAnAddress | Refusal::Scheme { .. } | Refusal::NoHost | Refusal::Credentials => {
-            format!("`{address}` isn't a web address")
+        Refusal::NotAnAddress | Refusal::Scheme { .. } | Refusal::NoHost => {
+            format!("`{address}` isn't an `https://` or `http://` URL")
         }
+        Refusal::Credentials => format!("`{address}` holds a user name or password"),
         Refusal::UnknownHost { host } => format!("nothing answers to the name `{host}`"),
         Refusal::PrivateAddress { host, address } => {
             format!("`{host}` is at `{address}`, which isn't on the open web")
         }
-        Refusal::Missing { .. } => "the server has nothing at that address".into(),
+        Refusal::Missing { .. } => "the server has nothing at that URL".into(),
         Refusal::Status { status } => format!("the server answered {status}"),
-        Refusal::Redirects { limit } => format!("the address redirected more than {limit} times"),
+        Refusal::Redirects { limit } => format!("the URL redirected more than {limit} times"),
         Refusal::NoRedirectTarget { .. } => "the server redirected without saying where".into(),
         Refusal::TooLarge { limit, .. } => {
             format!("the answer is larger than {} MB", limit / 1_000_000)
@@ -3866,11 +3874,11 @@ pub(crate) fn refusal(address: &str, refusal: &Refusal) -> String {
     }
 }
 
-/// Why an answer fetched as a picture wasn't kept.
-pub(crate) const NOT_A_PICTURE: &str = "the answer isn't a picture";
+/// Why an answer fetched as an image wasn't kept.
+pub(crate) const NOT_A_PICTURE: &str = "the answer isn't an image";
 
-/// Why a video site's answer naming its picture led to none.
-pub(crate) const NO_PICTURE_NAMED: &str = "the video site named no picture";
+/// Why a video site's answer naming its thumbnail led to none.
+pub(crate) const NO_PICTURE_NAMED: &str = "the video site named no image";
 
 /// What `refresh` says of a file it fetched, by its path from the site's
 /// folder.
@@ -3878,23 +3886,26 @@ pub(crate) fn fetched_file(file: &str) -> String {
     format!("Fetched `{file}`.")
 }
 
-/// What `refresh` says where a video site answered it has no still.
+/// What `refresh` says where a video site answered it has no thumbnail.
 pub(crate) fn no_still_there(site: &str, id: &str) -> String {
-    format!("No still: {site} has no picture for `{id}`.")
+    format!("No thumbnail: {site} has no image for `{id}`.")
 }
 
-/// What `refresh` says of a still it couldn't fetch, and why.
+/// What `refresh` says of a thumbnail it couldn't fetch, and why.
 pub(crate) fn cant_fetch_still(id: &str, reason: &str) -> String {
-    format!("Can't fetch the still for `{id}`: {reason}.")
+    format!("Can't fetch the thumbnail for `{id}`: {reason}.")
 }
 
-/// `refresh`'s last line, where some still was missing: what it fetched,
+/// `refresh`'s last line, where some thumbnail was missing: what it fetched,
 /// what was there already, and what it couldn't fetch, each where there
 /// is any.
 pub(crate) fn refreshed(fetched: usize, here: usize, failed: usize) -> String {
     let mut parts = Vec::new();
     if fetched > 0 {
-        parts.push(format!("Fetched {}.", how_many(fetched, "still", "stills")));
+        parts.push(format!(
+            "Fetched {}.",
+            how_many(fetched, "thumbnail", "thumbnails")
+        ));
     }
     if here > 0 {
         parts.push(format!("{} already here.", grouped(here)));
@@ -3903,13 +3914,13 @@ pub(crate) fn refreshed(fetched: usize, here: usize, failed: usize) -> String {
         parts.push(format!("{} couldn't be fetched.", grouped(failed)));
     }
     match parts.is_empty() {
-        true => "Fetched no stills.".into(),
+        true => "Fetched no thumbnails.".into(),
         false => parts.join(" "),
     }
 }
 
 /// What `refresh` says after its last line where the site stops with its
-/// drafts and posts waiting for their day, and builds without them.
+/// drafts and scheduled posts, and builds without them.
 pub(crate) fn drafts_not_refreshed(errors: usize) -> String {
     let them = if errors == 1 { "it" } else { "them" };
     let errors = how_many(errors, "error", "errors");
@@ -3919,11 +3930,11 @@ pub(crate) fn drafts_not_refreshed(errors: usize) -> String {
     )
 }
 
-/// `refresh`'s last line, where no still was missing.
+/// `refresh`'s last line, where no thumbnail was missing.
 pub(crate) const NOTHING_TO_FETCH: &str = "Nothing to fetch.";
 
-/// What `refresh` says where the site uses webmentions and the relay's
-/// token wasn't given.
+/// What `refresh` says where the site uses webmentions and the webmention
+/// service's token wasn't given.
 pub(crate) const NO_TOKEN: &str =
     "Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.";
 
@@ -3944,19 +3955,22 @@ pub(crate) fn token_file_linked(rel: &str) -> String {
     }
 }
 
-/// What `refresh` says where the relay couldn't be asked, and why.
+/// What `refresh` says where the webmention service couldn't be asked, and
+/// why.
 pub(crate) fn cant_ask(reason: &str) -> String {
     format!("Can't ask for webmentions: {reason}.")
 }
 
-/// Why the relay couldn't be asked, where it refused the token.
-pub(crate) const TOKEN_REFUSED: &str = "the relay didn't accept the token";
+/// Why the webmention service couldn't be asked, where it refused the
+/// token.
+pub(crate) const TOKEN_REFUSED: &str = "the webmention service didn't accept the token";
 
-/// Why the relay couldn't be asked, where its answer isn't the feed it
-/// sends.
-pub(crate) const UNREADABLE_ANSWER: &str = "the relay's answer couldn't be read";
+/// Why the webmention service couldn't be asked, where its answer isn't
+/// the feed it sends.
+pub(crate) const UNREADABLE_ANSWER: &str = "the webmention service's answer couldn't be read";
 
-/// What `refresh` says where it stopped asking the relay with more to come.
+/// What `refresh` says where it stopped asking the webmention service with
+/// more to come.
 pub(crate) fn asked_enough(asks: usize) -> String {
     format!(
         "Stopped asking for webmentions after {asks} asks: run `statac refresh` again for the rest."
@@ -3968,22 +3982,23 @@ pub(crate) fn not_read(id: u64, property: &str) -> String {
     format!("Webmention `{id}` not kept: Statac doesn't read `{property}`.")
 }
 
-/// What `refresh` says of a mention the relay gave no kind for.
+/// What `refresh` says of a mention the webmention service gave no kind
+/// for.
 pub(crate) fn no_kind_said(id: u64) -> String {
     format!("Webmention `{id}` not kept: it doesn't say what kind it is.")
 }
 
 /// What `refresh` says of a mention naming no page of its sender's.
 pub(crate) fn no_address_named(id: u64) -> String {
-    format!("Webmention `{id}` not kept: it names no address.")
+    format!("Webmention `{id}` not kept: it names no URL.")
 }
 
 /// What `refresh` says of a mention whose sender's page isn't on the web.
 pub(crate) fn not_a_web_address(id: u64, url: &str) -> String {
-    format!("Webmention `{id}` not kept: `{url}` isn't a web address.")
+    format!("Webmention `{id}` not kept: `{url}` isn't an `https://` or `http://` URL.")
 }
 
-/// What `refresh` says of a mention of an address elsewhere.
+/// What `refresh` says of a mention of a URL elsewhere.
 pub(crate) fn not_on_site(id: u64, target: &str) -> String {
     format!("Webmention `{id}` not kept: `{target}` isn't on this site.")
 }
@@ -4008,19 +4023,19 @@ pub(crate) fn removed_file(file: &str) -> String {
     format!("Removed `{file}`.")
 }
 
-/// What `refuse` says of an address its list holds, where nothing kept is
-/// from it.
+/// What `refuse` says of a URL its list holds, where nothing kept is from
+/// it.
 pub(crate) fn refused_already(address: &str) -> String {
     format!("`{address}` is refused already.")
 }
 
-/// What `refuse` says where nothing kept is from the address.
+/// What `refuse` says where nothing kept is from the URL.
 pub(crate) fn nothing_refused(address: &str) -> String {
     format!("Nothing refused: no webmention kept here is from `{address}`.")
 }
 
-/// What `refuse` says after [`nothing_refused`] of a kept mention's
-/// address close to the one given.
+/// What `refuse` says after [`nothing_refused`] of a kept mention's URL
+/// close to the one given.
 pub(crate) fn did_you_mean(address: &str) -> String {
     format!("Did you mean `{address}`?")
 }
@@ -4030,34 +4045,35 @@ pub(crate) fn refused_here(id: u64, address: &str) -> String {
     format!("Webmention `{id}` not kept: `{address}` is refused.")
 }
 
-/// What `refresh` says of a mention kept without its sender's address.
+/// What `refresh` says of a mention kept without its sender's URL.
 pub(crate) fn sender_not_kept(id: u64, address: &str) -> String {
     format!(
-        "Webmention `{id}`: `{address}` isn't a web address, so the sender's own address isn't \
-         kept."
+        "Webmention `{id}`: `{address}` isn't an `https://` or `http://` URL, so the sender's \
+         own URL isn't kept."
     )
 }
 
-/// What `refresh` says of a mention kept without its sender's face.
+/// What `refresh` says of a mention kept without its sender's avatar.
 pub(crate) fn cant_fetch_face(id: u64, reason: &str) -> String {
-    format!("Can't fetch the face for `{id}`: {reason}.")
+    format!("Can't fetch the avatar for `{id}`: {reason}.")
 }
 
-/// Why a face fetched wasn't kept: its pixels would take too much to read.
+/// Why an avatar fetched wasn't kept: its pixels would take too much to
+/// read.
 pub(crate) fn too_large_to_open(width: u32, height: u32) -> String {
     format!(
-        "the picture is {} by {} pixels, too large to open",
+        "the image is {} by {} pixels, too large to open",
         grouped(width),
         grouped(height)
     )
 }
 
-/// Why a face fetched wasn't kept: no copy of it could be made.
-pub(crate) const NOT_MADE_AGAIN: &str = "the picture couldn't be made again";
+/// Why an avatar fetched wasn't kept: no copy of it could be made.
+pub(crate) const NOT_MADE_AGAIN: &str = "the image couldn't be made again";
 
-/// `refresh`'s line for webmentions, where the relay answered: what it
-/// kept, the faces it fetched, and what it didn't keep, each where there
-/// is any.
+/// `refresh`'s line for webmentions, where the webmention service
+/// answered: what it kept, the avatars it fetched, and what it didn't keep,
+/// each where there is any.
 pub(crate) fn mentions_refreshed(fetched: usize, faces: usize, not_kept: usize) -> String {
     let mut parts = Vec::new();
     match (fetched, faces) {
@@ -4069,7 +4085,7 @@ pub(crate) fn mentions_refreshed(fetched: usize, faces: usize, not_kept: usize) 
         (fetched, faces) => parts.push(format!(
             "Fetched {} and {}.",
             how_many(fetched, "webmention", "webmentions"),
-            how_many(faces, "face", "faces")
+            how_many(faces, "avatar", "avatars")
         )),
     }
     if not_kept > 0 {
@@ -4107,11 +4123,11 @@ pub(crate) fn fetched_ages(parts: &[String]) -> String {
     format!("Fetched: {}.", parts.join("; "))
 }
 
-/// The part of [`fetched_ages`] for the stills: how many, the age of the
+/// The part of [`fetched_ages`] for the thumbnails: how many, the age of the
 /// oldest the record dates, in days before the build's, and how many it
 /// doesn't date.
 pub(crate) fn stills_age(stills: usize, oldest: Option<i64>, undated: usize) -> String {
-    let counted = how_many(stills, "still", "stills");
+    let counted = how_many(stills, "thumbnail", "thumbnails");
     let age = days_ago;
     match (oldest, undated) {
         (None, _) => format!("{counted}, with no date"),
@@ -4131,8 +4147,8 @@ pub(crate) fn wrote_nothing(errors: usize) -> String {
     format!("Wrote nothing: {errors} stopped the build.")
 }
 
-/// Where `serve` answers, and the folder it answers from. The address
-/// comes last and bare, so a terminal makes a link of exactly it.
+/// Where `serve` answers, and the folder it answers from. The URL comes
+/// last and bare, so a terminal makes a link of exactly it.
 pub(crate) fn serving(folder: &str, address: &str) -> String {
     format!("Serving `{folder}` at {address}")
 }
@@ -4170,7 +4186,7 @@ pub(crate) const STOP_SERVING: &str = "Press Ctrl+C to stop.";
 /// changes.
 pub(crate) const WATCHING_ENDED: &str = "Stopped: the site's folder is no longer being watched.";
 
-/// The files of the site a round of `serve` answers to, as its line
+/// The files of the site a rebuild of `serve` answers to, as its line
 /// opens. With none named, the system lost count of them.
 pub(crate) fn files_changed(files: &[String]) -> String {
     match files {
@@ -4181,7 +4197,7 @@ pub(crate) fn files_changed(files: &[String]) -> String {
     }
 }
 
-/// What a round of `serve` built.
+/// What a rebuild of `serve` built.
 pub(crate) fn built_round(built: usize, of: usize, seconds: f64) -> String {
     format!(
         "Built {} of {} in {seconds:.2} seconds.",
@@ -4190,12 +4206,12 @@ pub(crate) fn built_round(built: usize, of: usize, seconds: f64) -> String {
     )
 }
 
-/// A round of `serve` that errors stopped.
+/// A rebuild of `serve` that errors stopped.
 pub(crate) fn stopped_round(errors: usize) -> String {
     format!("{} stopped the build.", how_many(errors, "error", "errors"))
 }
 
-/// What a round of `serve` asked of the pages open in a browser.
+/// What a rebuild of `serve` asked of the pages open in a browser.
 pub(crate) fn told(told: &Told) -> String {
     match told {
         Told::Nothing => "No built file changed.".into(),
@@ -4207,35 +4223,36 @@ pub(crate) fn told(told: &Told) -> String {
     }
 }
 
-/// After a round of `serve` that stopped, in the terminal.
+/// After a rebuild of `serve` that stopped, in the terminal.
 pub(crate) const BROWSER_KEEPS: &str = "The browser keeps the pages as last built.";
 
-/// After a round of `serve` that stopped, on the page.
+/// After a rebuild of `serve` that stopped, on the page.
 pub(crate) const PAGE_KEPT: &str = "This page is as last built.";
 
-/// What the panel on a served page calls the page it is on and the site.
+/// What the debug panel on a served page calls the page it is on and the
+/// site.
 pub(crate) const PANEL_PAGE: &str = "This page";
 pub(crate) const PANEL_SITE: &str = "The site";
 pub(crate) const PANEL_WRITTEN: &str = "Written into your files";
 
-/// What the panel says of the page it is on.
+/// What the debug panel says of the page it is on.
 pub(crate) const PANEL_IS_DRAFT: &str = "A draft: `statac build` leaves it out.";
 pub(crate) fn panel_is_waiting(day: &str) -> String {
-    format!("Waiting for its day, {day}: `statac build` leaves it out until then.")
+    format!("Scheduled for {day}: `statac build` leaves it out until then.")
 }
 pub(crate) const PANEL_PAGE_CLEAR: &str = "No problems on this page.";
 
-/// The panel's account of the page it is on: what builds it and which
-/// lists hold it.
+/// The debug panel's account of the page it is on: what builds it and
+/// which lists hold it.
 pub(crate) const PANEL_FILE: &str = "File";
-pub(crate) const PANEL_ADDRESS: &str = "Address";
+pub(crate) const PANEL_ADDRESS: &str = "URL";
 pub(crate) const PANEL_LAYOUT: &str = "Layout";
 pub(crate) const PANEL_FEEDS: &str = "Feeds";
 pub(crate) const PANEL_NO_FILE: &str = "None: Statac made this page.";
 pub(crate) const PANEL_NO_LAYOUT: &str = "None.";
 pub(crate) const PANEL_IN_NO_FEED: &str = "None.";
 
-/// A list a page is in, as the panel names it.
+/// A list a page is in, as the debug panel names it.
 pub(crate) fn panel_list(word: Word, name: &str) -> String {
     let list = the_list(word, name);
     let list = list.strip_prefix("the ").unwrap_or(&list);
@@ -4247,7 +4264,7 @@ pub(crate) const PANEL_READ_PAGES: &str = "Which pages there are";
 pub(crate) const PANEL_READ_LISTS: &str = "Which lists there are";
 pub(crate) const PANEL_READ_ORDER: &str = "The order of the pages in their lists";
 pub(crate) const PANEL_READ_TRANSLATIONS: &str = "Which pages are translations of which";
-pub(crate) const PANEL_READ_FILES: &str = "Which pictures and other files the site has";
+pub(crate) const PANEL_READ_FILES: &str = "Which images and other files the site has";
 pub(crate) const PANEL_READ_MENTIONS: &str = "The webmentions in `fetched/mentions/`";
 pub(crate) const PANEL_READ_TODAY: &str = "Today's date";
 pub(crate) fn panel_read_list(word: Word, name: &str) -> String {
@@ -4257,7 +4274,8 @@ pub(crate) fn panel_read_field(name: &str) -> String {
     format!("What every page writes as `{name}`")
 }
 
-/// The panel's table of every name a template can write on the page.
+/// The debug panel's table of every name a template can write on the
+/// page.
 pub(crate) const PANEL_COLUMNS: [&str; 4] = ["Write", "Holds", "On this page", "Written at"];
 pub(crate) const PANEL_NO_VALUE: &str = "no value";
 pub(crate) const PANEL_FIELDS_BELOW: &str = "the fields beneath";
@@ -4287,21 +4305,21 @@ pub(crate) fn panel_count(holds: Holds, count: usize) -> String {
     match holds {
         Holds::Pages => how_many(count, "page", "pages"),
         Holds::Lists => how_many(count, "list", "lists"),
-        Holds::Mentions => how_many(count, "mention", "mentions"),
+        Holds::Mentions => how_many(count, "webmention", "webmentions"),
         _ => how_many(count, "item", "items"),
     }
 }
 
-/// After the fields of a value with more than the panel shows.
+/// After the fields of a value with more than the debug panel shows.
 pub(crate) fn panel_more_fields(more: usize) -> String {
     format!("and {}", how_many(more, "more field", "more fields"))
 }
 
-/// Above the panel's links to the pages a build leaves out.
+/// Above the debug panel's links to the pages a build leaves out.
 pub(crate) const PANEL_DRAFTS: &str = "Drafts:";
-pub(crate) const PANEL_WAITING: &str = "Waiting for their day:";
+pub(crate) const PANEL_WAITING: &str = "Scheduled posts:";
 
-/// A word of the panel's, which the page fills in where it has holes,
+/// A word of the debug panel's, which the page fills in where it has holes,
 /// each written as `{name}` with a count's as `{n}`.
 pub(crate) enum PanelWord {
     Said(String),
@@ -4309,8 +4327,8 @@ pub(crate) enum PanelWord {
     Counted(&'static str, &'static str),
 }
 
-/// Every word the panel on a served page shows that the page itself puts
-/// together, by the name the page knows it by.
+/// Every word the debug panel on a served page shows that the page itself
+/// puts together, by the name the page knows it by.
 pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
     use PanelWord::{Counted, Said};
     let said = |text: &str| Said(text.to_owned());
@@ -4320,13 +4338,13 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("building", said("Building")),
         ("buildStopped", said("Build stopped")),
         ("draft", said("Draft")),
-        ("waits", said("Waits for {day}")),
-        ("tabLabel", said("Statac: {said}. Open the panel")),
+        ("waits", said("Scheduled for {day}")),
+        ("tabLabel", said("Statac: {said}. Open the debug panel")),
         ("labelBuiltAt", said("built at {time}")),
         ("labelBuilding", said("building")),
         ("labelStopped", said("build stopped")),
         ("labelDraft", said("a draft")),
-        ("labelWaits", said("waits for {day}")),
+        ("labelWaits", said("scheduled for {day}")),
         ("errors", Counted("{n} error", "{n} errors")),
         ("warnings", Counted("{n} warning", "{n} warnings")),
         ("notes", Counted("{n} note", "{n} notes")),
@@ -4392,7 +4410,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("names", said("Names")),
         ("page", said(PANEL_PAGE)),
         ("site", said(PANEL_SITE)),
-        ("parts", said("What the panel shows")),
+        ("parts", said("What the debug panel shows")),
         (
             "statusStopped",
             said("Stopped at {time}; the page is as built at {built}"),
@@ -4403,8 +4421,8 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("settings", said("Settings")),
         ("dockSide", said("Dock to the side")),
         ("dockBottom", said("Dock to the bottom")),
-        ("close", said("Close the panel")),
-        ("resize", said("Resize the panel")),
+        ("close", said("Close the debug panel")),
+        ("resize", said("Resize the debug panel")),
         // Problems.
         ("onThisPage", said("On this page")),
         ("wholeSite", said("The whole site")),
@@ -4446,7 +4464,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
             ),
         ),
         ("noneLeft", said("The filters leave no name here.")),
-        ("noPage", said("No page is published at this address.")),
+        ("noPage", said("No page is published at this URL.")),
         ("chosen", said("The chosen name")),
         ("copy", said("Copy")),
         ("copied", said("Copied")),
@@ -4468,7 +4486,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("wayLinkIf", said("A link to it, where there is one")),
         ("wayTrue", said("Only where it is true")),
         ("wayHtml", said("As it is, as HTML")),
-        ("wayFaces", said("Each face of those who replied or liked")),
+        ("wayReactions", said("Each like, repost or bookmark")),
         ("wayEachItem", said("Each item in it")),
         ("wayHasOne", said("Only on the pages that have one")),
         ("wayAsIs", said("As it is")),
@@ -4488,7 +4506,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("layoutNamed", said("Named `layout: {name}` at {place}.")),
         (
             "layoutHanded",
-            said("Named `layout: {name}` at {place}, and handed down to every page in the folder."),
+            said("Named `layout: {name}` at {place}, and cascaded to every page in the folder."),
         ),
         (
             "layoutUnnamed",
@@ -4519,7 +4537,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ),
         ("show", said("Show")),
         // The site.
-        ("lastRound", said("The last round")),
+        ("lastRound", said("The last rebuild")),
         ("changedOne", said("`{file}` changed.")),
         ("changedTwo", said("`{file}` and `{other}` changed.")),
         ("changedMany", said("`{file}` and {n} other files changed.")),
@@ -4530,7 +4548,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("tookConcluding", said("Concluding")),
         ("tookWriting", said("Writing")),
         ("ms", said("{n} ms")),
-        ("rounds", said("Rounds since serve started")),
+        ("rounds", said("Rebuilds since serve started")),
         ("firstRound", said("first")),
         ("acrossSite", said("Problems across the site")),
         ("leftOut", said("Left out of `statac build`")),
@@ -4539,8 +4557,8 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         (
             "leftOutNone",
             said(
-                "No drafts, and no page waits for its day. A page with `draft: true`, or a \
-                 date after today, is listed here with a link to it.",
+                "No drafts and no scheduled posts. A page with `draft: true`, or a date after \
+                 today, is listed here with a link to it.",
             ),
         ),
         (
@@ -4551,13 +4569,13 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         (
             "writtenNone",
             said(
-                "Nothing this round. When a stamp such as `=today` is turned into a date, \
-                 the file and line show here.",
+                "Nothing in the last rebuild. When a stamp such as `=today` is turned into a \
+                 date, the file and line show here.",
             ),
         ),
         // Settings.
         ("settingsLabel", said("Panel settings")),
-        ("sits", said("Where the panel sits")),
+        ("sits", said("Where the debug panel sits")),
         ("corner", said("Corner")),
         ("bar", said("Bar")),
         ("side", said("Side")),
@@ -4608,7 +4626,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ),
         (
             "searchDrafts",
-            said("Drafts and posts waiting for their day are searched too, as serve shows them."),
+            said("Drafts and scheduled posts are searched too, as serve shows them."),
         ),
         ("pagesFound", Counted("{n} page found.", "{n} pages found.")),
         ("foundSome", said("No page holds every word.")),
@@ -4636,7 +4654,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("placeHeading", said("Heading")),
         ("placeTags", said("Tags")),
         ("placeSummary", said("Summary")),
-        ("placePictures", said("Picture descriptions")),
+        ("placePictures", said("Image alt text")),
         ("placeText", said("Text")),
         ("holding", said("In {n} of the site's {count} parts")),
         ("adds", said("Adds {score}")),
@@ -4657,7 +4675,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
     ]
 }
 
-/// The problems a round of `serve` no longer has, counted by kind.
+/// The problems a rebuild of `serve` no longer has, counted by kind.
 pub(crate) fn gone(kinds: &[(&str, usize)]) -> String {
     let kinds: Vec<_> = kinds
         .iter()
@@ -4666,17 +4684,17 @@ pub(crate) fn gone(kinds: &[(&str, usize)]) -> String {
     format!("Gone since the last build: {}.", kinds.join(", "))
 }
 
-/// The page `serve` answers with where the site has nothing at an address
-/// and no `404.html` of its own.
+/// The page `serve` answers with where the site has nothing at a URL and
+/// no `404.html` of its own.
 pub(crate) const NOT_FOUND_TITLE: &str = "Not found";
-pub(crate) const NOT_FOUND: &str = "Nothing is published at this address.";
+pub(crate) const NOT_FOUND: &str = "Nothing is published at this URL.";
 
 /// Before the link to the top of a site published under a path, on the
 /// same page.
 pub(crate) const PUBLISHED_UNDER: &str = "The site is published under";
 
-/// `serve`'s answer to an address that could name a file outside the site.
-pub(crate) const ADDRESS_REFUSED: &str = "This address can't name a file of the site.";
+/// `serve`'s answer to a URL that could name a file outside the site.
+pub(crate) const ADDRESS_REFUSED: &str = "This URL can't name a file of the site.";
 
 /// `serve`'s answer to a request that names another machine, or comes
 /// from another site's page.
@@ -4697,9 +4715,9 @@ pub(crate) fn new_site_in(folder: &str) -> String {
 pub(crate) const ASK_ENTER: &str = "Enter takes the answer in brackets.";
 
 pub(crate) const ASK_TITLE: &str = "What is the site called?";
-pub(crate) const ASK_ADDRESS: &str = "What will its address be?";
+pub(crate) const ASK_ADDRESS: &str = "What will its URL be?";
 pub(crate) const ASK_ADDRESS_HINT: &str = "Enter for none yet.";
-pub(crate) const ASK_OLD_ADDRESS: &str = "What is the site's address?";
+pub(crate) const ASK_OLD_ADDRESS: &str = "What is the site's URL?";
 pub(crate) const ASK_OLD_ADDRESS_HINT: &str = "The old site's settings don't say.";
 pub(crate) const ASK_LANGUAGE: &str = "What language is it written in?";
 pub(crate) const ASK_LANGUAGE_HINT: &str = "For more than one, the main one first, as `en, fr`.";
@@ -4728,7 +4746,7 @@ pub(crate) fn ask_default(default: &str) -> String {
 pub(crate) const ASK_MARK: &str = ">";
 
 pub(crate) fn not_a_site_address(written: &str) -> String {
-    format!("`{written}` isn't a web address. Write it whole, as `https://example.org`.")
+    format!("`{written}` isn't a full URL. Write it as `https://example.org`.")
 }
 
 pub(crate) fn not_a_language_code(written: &str) -> String {
@@ -4740,10 +4758,13 @@ pub(crate) fn language_given_twice(written: &str, first: &str) -> String {
 }
 
 pub(crate) fn no_words_for(tag: &str) -> String {
-    format!("Statac has no words for `{tag}`: write its months and days in `languages/{tag}.yaml`.")
+    format!(
+        "Statac has no translations for `{tag}`: write its months and days in \
+         `languages/{tag}.yaml`."
+    )
 }
 
-/// Where the docs describe a language's own words.
+/// Where the docs describe a language's translations.
 pub(crate) const LANGUAGE_FILES: &str = "https://statac.dev/dates-and-languages/#languages";
 
 pub(crate) fn made_site(folder: &str, files: usize) -> String {
@@ -4955,7 +4976,7 @@ mod tests {
     }
 
     fn fetched() -> Vec<(Kind, &'static str, Option<&'static str>)> {
-        let no_still = |host, absent| Kind::NoStill {
+        let no_still = |host, absent| Kind::NoThumbnail {
             host,
             id: "abcdefghijk".into(),
             absent,
@@ -4964,18 +4985,18 @@ mod tests {
         vec![
             (
                 no_still(Host::YouTube, false),
-                "No still: no picture has been fetched for this video yet",
+                "No thumbnail: no image has been fetched for this video yet",
                 Some("Run `statac refresh` to fetch one."),
             ),
             (
                 no_still(Host::YouTube, true),
-                "No still: YouTube has no picture for this video",
-                Some("Show a picture of your own in its place."),
+                "No thumbnail: YouTube has no image for this video",
+                Some("Show an image of your own in its place."),
             ),
             (
                 no_still(Host::Vimeo, true),
-                "No still: Vimeo has no picture for this video",
-                Some("Show a picture of your own in its place."),
+                "No thumbnail: Vimeo has no image for this video",
+                Some("Show an image of your own in its place."),
             ),
             (
                 record(RecordFault::Opening),
@@ -5020,7 +5041,7 @@ mod tests {
             (
                 record(RecordFault::RefusedFields(2)),
                 "Malformed record: a line has 2 fields, not 3",
-                Some("Write `mention` or `sender`, the address, and the day, parted by tabs."),
+                Some("Write `mention` or `sender`, the URL, and the day, parted by tabs."),
             ),
             (
                 record(RecordFault::Reach("site".into())),
@@ -5029,20 +5050,22 @@ mod tests {
             ),
             (
                 record(RecordFault::Address("a.example".into())),
-                "Malformed record: `a.example` isn't a web address",
-                Some("Write the address in full, starting `https://` or `http://`."),
+                "Malformed record: `a.example` isn't an `https://` or `http://` URL",
+                Some("Write the full URL, starting `https://` or `http://`."),
             ),
             (
                 record(RecordFault::NotAnAddress("about/".into())),
-                "Malformed record: `about/` isn't an address from the top of the site",
-                Some("Write it from the top of the site, as `/about/`, or take the line out."),
+                "Malformed record: `about/` isn't a URL starting with `/`",
+                Some(
+                    "Write it as a URL starting with `/`, such as `/about/`, or take the line out.",
+                ),
             ),
             (
-                Kind::UnreadablePicture {
+                Kind::UnreadableImage {
                     path: "fetched/stills/youtube-abcdefghijk.jpg".into(),
                     fault: PictureFault::NotAStill,
                 },
-                "Unreadable picture: `fetched/stills/youtube-abcdefghijk.jpg` isn't a JPEG, a \
+                "Unreadable image: `fetched/stills/youtube-abcdefghijk.jpg` isn't a JPEG, a \
                  PNG or a still WebP",
                 Some("Delete it, then run `statac refresh` to fetch one."),
             ),
@@ -5064,14 +5087,14 @@ mod tests {
                     target: "https://example.org/post-1/".into(),
                 },
                 "Mention of no page: nothing is published at `https://example.org/post-1/`",
-                Some("If the page moved, add the old address to its `redirect_from`."),
+                Some("If the page moved, add the old URL to its `redirect_from`."),
             ),
             (
-                Kind::NoSiteAddress {
+                Kind::NoSiteUrl {
                     waiting: Waiting::Webmentions,
                 },
-                "No site address: webmentions are left out until the site has a `url`",
-                Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`."),
+                "No site URL: webmentions are left out until the site has a `url`",
+                Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`."),
             ),
             (
                 Kind::WrongKind {
@@ -5080,7 +5103,7 @@ mod tests {
                     found: Found::Written("\"../record\"".into()),
                     respelt: None,
                 },
-                "Wrong kind of value: `face` is a face's file name, such as \
+                "Wrong kind of value: `face` is an avatar's file name, such as \
                  `0123456789abcdef.jpg`, not `\"../record\"`",
                 None,
             ),
@@ -5090,7 +5113,7 @@ mod tests {
                     required_by: Requirer::Mention,
                 },
                 "Missing field: `target`",
-                Some("Add `target:`, which every mention Statac keeps has."),
+                Some("Add `target:`, which every webmention Statac keeps has."),
             ),
         ]
     }
@@ -5112,11 +5135,11 @@ mod tests {
         );
         assert_eq!(
             cant_ask(TOKEN_REFUSED),
-            "Can't ask for webmentions: the relay didn't accept the token."
+            "Can't ask for webmentions: the webmention service didn't accept the token."
         );
         assert_eq!(
             cant_ask(UNREADABLE_ANSWER),
-            "Can't ask for webmentions: the relay's answer couldn't be read."
+            "Can't ask for webmentions: the webmention service's answer couldn't be read."
         );
         assert_eq!(
             not_read(1, "follow-of"),
@@ -5124,7 +5147,7 @@ mod tests {
         );
         assert_eq!(
             not_a_web_address(1, "javascript:alert(1)"),
-            "Webmention `1` not kept: `javascript:alert(1)` isn't a web address."
+            "Webmention `1` not kept: `javascript:alert(1)` isn't an `https://` or `http://` URL."
         );
         assert_eq!(
             not_on_site(1, "https://example.com/"),
@@ -5132,21 +5155,21 @@ mod tests {
         );
         assert_eq!(
             sender_not_kept(1, "ftp://a.example/"),
-            "Webmention `1`: `ftp://a.example/` isn't a web address, so the sender's own address \
-             isn't kept."
+            "Webmention `1`: `ftp://a.example/` isn't an `https://` or `http://` URL, so the \
+             sender's own URL isn't kept."
         );
         assert_eq!(
             cant_fetch_face(1, NOT_A_PICTURE),
-            "Can't fetch the face for `1`: the answer isn't a picture."
+            "Can't fetch the avatar for `1`: the answer isn't an image."
         );
         assert_eq!(
             mentions_refreshed(3, 2, 1),
-            "Fetched 3 webmentions and 2 faces. 1 not kept."
+            "Fetched 3 webmentions and 2 avatars. 1 not kept."
         );
         assert_eq!(mentions_refreshed(1, 0, 0), "Fetched 1 webmention.");
         assert_eq!(
             mentions_refreshed(1, 1, 0),
-            "Fetched 1 webmention and 1 face."
+            "Fetched 1 webmention and 1 avatar."
         );
         assert_eq!(mentions_refreshed(0, 0, 2), "2 not kept.");
         assert_eq!(mentions_refreshed(0, 0, 0), "No new webmentions.");
@@ -5157,7 +5180,7 @@ mod tests {
         let line = |parts: &[String]| fetched_ages(parts);
         assert_eq!(
             line(&[stills_age(87, Some(6), 0), mentions_age(12, Some(0))]),
-            "Fetched: 87 stills, the oldest 6 days ago; 12 webmentions, the newest today."
+            "Fetched: 87 thumbnails, the oldest 6 days ago; 12 webmentions, the newest today."
         );
         assert_eq!(
             line(&[mentions_age(1, Some(1))]),
@@ -5188,18 +5211,21 @@ mod tests {
         let cases = [
             (
                 Refusal::NotAnAddress,
-                format!("`{address}` isn't a web address"),
+                format!("`{address}` isn't an `https://` or `http://` URL"),
             ),
             (
                 Refusal::Scheme {
                     scheme: "ftp".into(),
                 },
-                format!("`{address}` isn't a web address"),
+                format!("`{address}` isn't an `https://` or `http://` URL"),
             ),
-            (Refusal::NoHost, format!("`{address}` isn't a web address")),
+            (
+                Refusal::NoHost,
+                format!("`{address}` isn't an `https://` or `http://` URL"),
+            ),
             (
                 Refusal::Credentials,
-                format!("`{address}` isn't a web address"),
+                format!("`{address}` holds a user name or password"),
             ),
             (
                 Refusal::UnknownHost { host: host() },
@@ -5214,7 +5240,7 @@ mod tests {
             ),
             (
                 Refusal::Missing { status: 404 },
-                "the server has nothing at that address".into(),
+                "the server has nothing at that URL".into(),
             ),
             (
                 Refusal::Status { status: 503 },
@@ -5222,7 +5248,7 @@ mod tests {
             ),
             (
                 Refusal::Redirects { limit: 5 },
-                "the address redirected more than 5 times".into(),
+                "the URL redirected more than 5 times".into(),
             ),
             (
                 Refusal::NoRedirectTarget {
@@ -5253,8 +5279,8 @@ mod tests {
         for (refused, words) in cases {
             assert_eq!(refusal(address, &refused), words, "{refused:?}");
         }
-        assert_eq!(NOT_A_PICTURE, "the answer isn't a picture");
-        assert_eq!(NO_PICTURE_NAMED, "the video site named no picture");
+        assert_eq!(NOT_A_PICTURE, "the answer isn't an image");
+        assert_eq!(NO_PICTURE_NAMED, "the video site named no image");
     }
 
     #[test]
@@ -5325,11 +5351,11 @@ mod tests {
     fn what_refresh_fetched_is_counted_rightly() {
         assert_eq!(
             refreshed(2, 85, 1),
-            "Fetched 2 stills. 85 already here. 1 couldn't be fetched."
+            "Fetched 2 thumbnails. 85 already here. 1 couldn't be fetched."
         );
-        assert_eq!(refreshed(1, 0, 0), "Fetched 1 still.");
+        assert_eq!(refreshed(1, 0, 0), "Fetched 1 thumbnail.");
         assert_eq!(refreshed(0, 1, 0), "1 already here.");
-        assert_eq!(refreshed(0, 0, 0), "Fetched no stills.");
+        assert_eq!(refreshed(0, 0, 0), "Fetched no thumbnails.");
         assert_eq!(
             drafts_not_refreshed(1),
             "Drafts weren't looked at: the site has 1 error with it. Run `statac check --drafts` \
@@ -5352,19 +5378,19 @@ mod tests {
         let line = |stills, oldest, undated| fetched_ages(&[stills_age(stills, oldest, undated)]);
         assert_eq!(
             line(87, Some(6), 0),
-            "Fetched: 87 stills, the oldest 6 days ago."
+            "Fetched: 87 thumbnails, the oldest 6 days ago."
         );
-        assert_eq!(line(1, Some(0), 0), "Fetched: 1 still, today.");
-        assert_eq!(line(1, Some(1), 0), "Fetched: 1 still, yesterday.");
+        assert_eq!(line(1, Some(0), 0), "Fetched: 1 thumbnail, today.");
+        assert_eq!(line(1, Some(1), 0), "Fetched: 1 thumbnail, yesterday.");
         assert_eq!(
             line(87, Some(6), 2),
-            "Fetched: 87 stills, the oldest 6 days ago; 2 with no date."
+            "Fetched: 87 thumbnails, the oldest 6 days ago; 2 with no date."
         );
-        assert_eq!(line(2, None, 2), "Fetched: 2 stills, with no date.");
+        assert_eq!(line(2, None, 2), "Fetched: 2 thumbnails, with no date.");
         // Another part joins after a semicolon.
         assert_eq!(
-            fetched_ages(&["1 still, today".into(), "a part to come".into()]),
-            "Fetched: 1 still, today; a part to come."
+            fetched_ages(&["1 thumbnail, today".into(), "a part to come".into()]),
+            "Fetched: 1 thumbnail, today; a part to come."
         );
     }
 
@@ -5557,7 +5583,7 @@ mod tests {
                     field: "card".into(),
                     why: SetAside::OwnPicture,
                 },
-                "Field set aside: `og_image` names the picture this page is shared with",
+                "Field set aside: `og_image` names this page's social image",
                 Some("Take out `card`, or take out `og_image` to have the card drawn."),
             ),
             (
@@ -5567,7 +5593,7 @@ mod tests {
                     found: Found::Written("https://example.org/photo-1.jpg".into()),
                     respelt: None,
                 },
-                "Wrong kind of value: `og_image` is a picture of the site's, not \
+                "Wrong kind of value: `og_image` is an image of the site's, not \
                  `https://example.org/photo-1.jpg`",
                 None,
             ),
@@ -5586,7 +5612,7 @@ mod tests {
                 Kind::TemplateStopped {
                     reason: Stopped::CardInWriting,
                 },
-                "Template stopped: `page.card` isn't answered in a page's writing",
+                "Template stopped: `page.card` isn't answered in a page's content",
                 Some("Read `page.card` in a layout."),
             ),
             (
@@ -5649,7 +5675,7 @@ mod tests {
                     nearest: Some("source".into()),
                 },
                 "Footnote never shown: nothing points at `[^sources]`",
-                Some("Is it the note for `[^source]`?"),
+                Some("Is it the definition for `[^source]`?"),
             ),
             (
                 Kind::FootnoteNeverShown {
@@ -5844,8 +5870,8 @@ mod tests {
                 ),
                 "Feed not written: `content/feed.md` is published at `/list-1/feed.xml`",
                 Some(
-                    "The page is published there instead; give the feed another address \
-                     with `feed:` on the list's page.",
+                    "The page is published there instead; give the feed another URL with \
+                     `feed:` on the list page.",
                 ),
             ),
             (
@@ -5867,33 +5893,33 @@ mod tests {
                 Some("Add the site's language to `statac.yaml`, as `language: en`."),
             ),
             (
-                Kind::NoSiteAddress {
+                Kind::NoSiteUrl {
                     waiting: Waiting::Page("content/sitemap.md".into()),
                 },
-                "No site address: `content/sitemap.md` is left out until the site has a `url`",
-                Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`."),
+                "No site URL: `content/sitemap.md` is left out until the site has a `url`",
+                Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`."),
             ),
             (
-                Kind::NoSiteAddress {
+                Kind::NoSiteUrl {
                     waiting: Waiting::Feeds {
                         list: site.clone(),
                         more: 0,
                     },
                 },
-                "No site address: the feed of the site's own list is left out until the site \
+                "No site URL: the feed of the site's own list is left out until the site \
                  has a `url`",
-                Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`."),
+                Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`."),
             ),
             (
-                Kind::NoSiteAddress {
+                Kind::NoSiteUrl {
                     waiting: Waiting::Feeds {
                         list: (Word::Series, "Series 1".into()),
                         more: 1,
                     },
                 },
-                "No site address: the feeds of the series `Series 1` and 1 other list are left \
+                "No site URL: the feeds of the series `Series 1` and 1 other list are left \
                  out until the site has a `url`",
-                Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`."),
+                Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`."),
             ),
             (
                 Kind::FeedIdChanged {
@@ -5925,26 +5951,26 @@ mod tests {
                 },
                 "Robots beneath a path: crawlers read only `https://example.org/robots.txt`",
                 Some(
-                    "Copy its lines into the `robots.txt` at the top of the host to have them \
+                    "Copy its lines into the `robots.txt` at the root of the host to have them \
                      read.",
                 ),
             ),
             (
-                Kind::UnusableAddress {
+                Kind::UnusableUrl {
                     fault: AddressFault::FeedAtFolder {
                         nearest: "/feeds/feed.xml".into(),
                     },
                 },
-                "Unusable address: a feed can't be published at a folder",
+                "Unusable URL: a feed can't be published at a folder",
                 Some("Did you mean `/feeds/feed.xml`?"),
             ),
             (
-                Kind::UnusableAddress {
+                Kind::UnusableUrl {
                     fault: AddressFault::SlashBesidePage {
                         nearest: "/posts/feeds/atom.xml".into(),
                     },
                 },
-                "Unusable address: a name beside the page can't hold `/`",
+                "Unusable URL: a name beside the page can't hold `/`",
                 Some("Did you mean `/posts/feeds/atom.xml`?"),
             ),
             (
@@ -6008,11 +6034,11 @@ mod tests {
                 Some("Run with `--drafts` to build it as if published."),
             ),
             (
-                Kind::WaitingForItsDay {
+                Kind::ScheduledPost {
                     path: "content/post-2.md".into(),
                     date: "2026-10-05".into(),
                 },
-                "Waiting for its day: `content/post-2.md` is dated `2026-10-05`",
+                "Scheduled post: `content/post-2.md` is dated `2026-10-05`",
                 Some("Run with `--drafts` to build it as if published."),
             ),
             (
@@ -6161,10 +6187,9 @@ mod tests {
                     word: Word::Tag,
                     name: "Rust".into(),
                 },
-                "Not a post: `content/tags/rust.md` speaks for the tag `Rust`",
+                "Not a post: `content/tags/rust.md` is the list page for the tag `Rust`",
                 Some(
-                    "It stands at the list's address, so no list holds it; give it a \
-                     `permalink` of its own to list it as a post.",
+                    "A list page is in no list; give it a `permalink` of its own to list it as a post.",
                 ),
             ),
             (
@@ -6173,10 +6198,9 @@ mod tests {
                     word: Word::Folder,
                     name: "notes".into(),
                 },
-                "Not a post: `content/notes.md` speaks for the folder `content/notes/`",
+                "Not a post: `content/notes.md` is the list page for the folder `content/notes/`",
                 Some(
-                    "It stands at the list's address, so no list holds it; give it a \
-                     `permalink` of its own to list it as a post.",
+                    "A list page is in no list; give it a `permalink` of its own to list it as a post.",
                 ),
             ),
             (
@@ -6185,39 +6209,40 @@ mod tests {
                     word: Word::Folder,
                     name: String::new(),
                 },
-                "Not a post: `content/home.md` speaks for the site's own list",
+                "Not a post: `content/home.md` is the list page for the site's own list",
                 Some(
-                    "It stands at the list's address, so no list holds it; give it a \
-                     `permalink` of its own to list it as a post.",
+                    "A list page is in no list; give it a `permalink` of its own to list it as a post.",
                 ),
             ),
             (
                 Kind::RedirectToItself {
                     written: "/post-1/".into(),
                 },
-                "Redirect to itself: `/post-1/` is this page's own address",
-                Some("Point `redirect_to` at the address readers should reach."),
+                "Redirect to itself: `/post-1/` is this page's own URL",
+                Some("Point `redirect_to` at the URL readers should reach."),
             ),
             (
                 Kind::RedirectFromItself {
                     written: "/post-1/".into(),
                 },
-                "Redirect to itself: `/post-1/` is this page's own address",
+                "Redirect to itself: `/post-1/` is this page's own URL",
                 Some("Take it out of `redirect_from`."),
             ),
             (
                 Kind::RedirectedBack {
                     written: "/post-2/".into(),
                 },
-                "Redirect to itself: `/post-2/` sends readers back to this page",
+                "Redirect to itself: `/post-2/` redirects back to this page",
                 None,
             ),
             (
-                Kind::WritingNotPublished {
+                Kind::ContentNotPublished {
                     path: "content/post-1.md".into(),
                 },
-                "Writing not published: `content/post-1.md` sends readers on",
-                Some("Move it to where readers are sent, or take out `redirect_to` to publish it."),
+                "Content not published: `content/post-1.md` redirects",
+                Some(
+                    "Move it to the page it redirects to, or take out `redirect_to` to publish it.",
+                ),
             ),
             (
                 Kind::SortedLast {
@@ -6282,7 +6307,7 @@ mod tests {
                 "Untitled page: `content/post-1.md` is called by its opening words, `Post 1 \
                  opens\u{2026}`",
                 Some(
-                    "Give it a `title`, or open its writing with a `# heading`. A folder whose \
+                    "Give it a `title`, or open its content with a `# heading`. A folder whose \
                      pages go without titles says `pages.untitled: true`.",
                 ),
             ),
@@ -6292,7 +6317,7 @@ mod tests {
                     by: Called::Address,
                     name: "/".into(),
                 },
-                "Untitled page: the site's home page is called by its address, `/`",
+                "Untitled page: the site's home page is called by its URL, `/`",
                 Some("Add `title:` to `statac.yaml`; the home page is called by it."),
             ),
             (
@@ -6300,7 +6325,7 @@ mod tests {
                     field: "tags".into(),
                     why: SetAside::SendsOn,
                 },
-                "Field set aside: a page sending readers on publishes only its redirect",
+                "Field set aside: a page that redirects publishes only its redirect",
                 Some("Take it out, or take out `redirect_to` to publish the page."),
             ),
         ]
@@ -6319,11 +6344,11 @@ mod tests {
         assert_eq!(included(2, 0), "Included 2 drafts as if published.");
         assert_eq!(
             included(1, 1),
-            "Included 1 draft and 1 post waiting for its day as if published."
+            "Included 1 draft and 1 scheduled post as if published."
         );
         assert_eq!(
             included(0, 3),
-            "Included 3 posts waiting for their day as if published."
+            "Included 3 scheduled posts as if published."
         );
     }
 
@@ -6475,7 +6500,7 @@ mod tests {
                 "Missing field: `permalink`",
                 Some(
                     "Add a `permalink:` pattern, such as `/people/{key}/`, to give each item its \
-                     address.",
+                     URL.",
                 ),
             ),
             (
@@ -6487,47 +6512,47 @@ mod tests {
                 Some("Write it on a page in `content/` instead."),
             ),
             (
-                Kind::UnusableAddress {
+                Kind::UnusableUrl {
                     fault: AddressFault::ItemLacks {
                         item: "data/people.yaml: item 3".into(),
                         field: "isbn".into(),
                         piece: "{isbn}".into(),
                     },
                 },
-                "Unusable address: `data/people.yaml: item 3` has no `isbn` for `{isbn}`",
+                "Unusable URL: `data/people.yaml: item 3` has no `isbn` for `{isbn}`",
                 Some("Add `isbn:` to the item, or take `{isbn}` out of the pattern."),
             ),
             (
-                Kind::UnusableAddress {
+                Kind::UnusableUrl {
                     fault: AddressFault::ItemLacks {
                         item: "data/people.yaml: item 3".into(),
                         field: "key".into(),
                         piece: "{key}".into(),
                     },
                 },
-                "Unusable address: `data/people.yaml: item 3` has no `key` for `{key}`",
+                "Unusable URL: `data/people.yaml: item 3` has no `key` for `{key}`",
                 Some("Give the table's items names, or take `{key}` out of the pattern."),
             ),
             (
-                Kind::UnusableAddress {
+                Kind::UnusableUrl {
                     fault: AddressFault::PostLacks {
                         post: "content/post-1.md".into(),
                         field: "isbn".into(),
                         piece: "{isbn}".into(),
                     },
                 },
-                "Unusable address: `content/post-1.md` has no `isbn` for `{isbn}`",
+                "Unusable URL: `content/post-1.md` has no `isbn` for `{isbn}`",
                 Some("Add `isbn:` to the post, or take `{isbn}` out of the pattern."),
             ),
             (
-                Kind::UnusableAddress {
+                Kind::UnusableUrl {
                     fault: AddressFault::PageLacks {
                         page: "content/a.md".into(),
                         field: "isbn".into(),
                         piece: "{isbn}".into(),
                     },
                 },
-                "Unusable address: `content/a.md` has no `isbn` for `{isbn}`",
+                "Unusable URL: `content/a.md` has no `isbn` for `{isbn}`",
                 Some("Add `isbn:` to the page, or take `{isbn}` out of the pattern."),
             ),
             (
@@ -6538,7 +6563,7 @@ mod tests {
                 "Missing field: `permalink`",
                 Some(
                     "Add a `permalink:` pattern, such as `/cards/{name}/`, to give the page made \
-                     for each post its address.",
+                     for each post its URL.",
                 ),
             ),
         ]
@@ -6553,7 +6578,7 @@ mod tests {
     }
 
     fn files() -> Vec<(Kind, &'static str, Option<&'static str>)> {
-        let same = |alike| Kind::SameAddress {
+        let same = |alike| Kind::SameUrl {
             first: "static/Logo.png".into(),
             second: "static/logo.png".into(),
             alike,
@@ -6572,7 +6597,7 @@ mod tests {
             page: path.into(),
             at,
         };
-        let clash = |first, second, alike| Kind::SameAddress {
+        let clash = |first, second, alike| Kind::SameUrl {
             first: Box::new(first),
             second: Box::new(second),
             alike,
@@ -6653,13 +6678,13 @@ mod tests {
                 ),
             ),
             (
-                Kind::SameAddress {
+                Kind::SameUrl {
                     first: "assets/site.css".into(),
                     second: "assets/site.scss".into(),
                     alike: Alike::Exactly,
                     address: "/site.css".into(),
                 },
-                "Same address: `assets/site.css` and `assets/site.scss` are both published at \
+                "Same URL: `assets/site.css` and `assets/site.scss` are both published at \
                  `/site.css`",
                 Some("Rename one of them."),
             ),
@@ -6671,40 +6696,40 @@ mod tests {
                     page_at: None,
                     address: "/blog/page/2/".into(),
                 },
-                "Same address: page 2 of `/blog/` and `content/blog/page/2.md` are both \
+                "Same URL: page 2 of `/blog/` and `content/blog/page/2.md` are both \
                  published at `/blog/page/2/`",
                 Some(
-                    "Give `content/blog/page/2.md` another address, or put later pages \
-                     elsewhere with `later_pages` in `statac.yaml`.",
+                    "Give `content/blog/page/2.md` another URL, or put the paginated \
+                     pages elsewhere with `pagination.permalink` in `statac.yaml`.",
                 ),
             ),
             (
-                Kind::AddressTaken {
+                Kind::UrlTaken {
                     held: Held::Draft,
                     address: "/post-1/".into(),
                     taken: "content/post-2.md".into(),
                 },
-                "Address taken: this draft would be published at `/post-1/`, as \
+                "URL taken: this draft would be published at `/post-1/`, as \
                  `content/post-2.md` is",
                 Some("Give one of them another `permalink` before it is published."),
             ),
             (
-                Kind::AddressTaken {
+                Kind::UrlTaken {
                     held: Held::Waiting,
                     address: "/post-1/".into(),
                     taken: "content/post-2.md".into(),
                 },
-                "Address taken: this post would be published at `/post-1/`, as \
+                "URL taken: this post would be published at `/post-1/`, as \
                  `content/post-2.md` is",
-                Some("Give one of them another `permalink` before its day comes."),
+                Some("Give one of them another `permalink` before its scheduled date."),
             ),
             (
-                Kind::AddressTaken {
+                Kind::UrlTaken {
                     held: Held::Draft,
                     address: "/post-1/".into(),
                     taken: Box::new(redirect("content/post-2.md")),
                 },
-                "Address taken: this draft would be published at `/post-1/`, as a redirect in \
+                "URL taken: this draft would be published at `/post-1/`, as a redirect in \
                  `content/post-2.md` is",
                 Some(
                     "Take it out of `redirect_from` in `content/post-2.md`, or give this draft \
@@ -6712,13 +6737,13 @@ mod tests {
                 ),
             ),
             (
-                Kind::AddressGone {
+                Kind::UrlGone {
                     address: "/about/".into(),
                     written: "/about/".into(),
                 },
-                "Address gone: `/about/` was published before, and nothing answers there now",
+                "URL gone: `/about/` was published before, and nothing is there now",
                 Some(
-                    "Send readers on with `redirect_from: [/about/]` in the page that took its \
+                    "Redirect it with `redirect_from: [/about/]` in the page that took its \
                      place, or take it out of `published.txt` if it is gone for good.",
                 ),
             ),
@@ -6728,32 +6753,32 @@ mod tests {
                     written: "/notes/".into(),
                     gone: vec!["/notes/".into(), "/notes/note-1/".into()],
                 },
-                "Addresses gone: the 2 addresses under `/blog/notes/` were published before, and \
-                 nothing answers at any of them now",
+                "URLs gone: the 2 URLs under `/blog/notes/` were published before, and \
+                 nothing is at any of them now",
                 Some(
-                    "Send readers on with `redirect_from` in the pages that took their places, or \
+                    "Redirect them with `redirect_from` in the pages that took their places, or \
                      take them out of `published.txt` if they are gone for good.",
                 ),
             ),
             (
-                Kind::AddressGone {
+                Kind::UrlGone {
                     address: "/blog/about/".into(),
                     written: "/about/".into(),
                 },
-                "Address gone: `/blog/about/` was published before, and nothing answers there now",
+                "URL gone: `/blog/about/` was published before, and nothing is there now",
                 Some(
-                    "Send readers on with `redirect_from: [/about/]` in the page that took its \
+                    "Redirect it with `redirect_from: [/about/]` in the page that took its \
                      place, or take it out of `published.txt` if it is gone for good.",
                 ),
             ),
             (
                 same(Alike::ByCase),
-                "Same address: `static/Logo.png` and `static/logo.png` differ only in capitals",
+                "Same URL: `static/Logo.png` and `static/logo.png` differ only in capitals",
                 Some("Most disks hold them as one file, so rename one of them."),
             ),
             (
                 same(Alike::ByNormalisation),
-                "Same address: `static/Logo.png` and `static/logo.png` differ only in how an \
+                "Same URL: `static/Logo.png` and `static/logo.png` differ only in how an \
                  accent is stored",
                 Some("Most disks hold them as one file, so rename one of them."),
             ),
@@ -6763,7 +6788,7 @@ mod tests {
                     redirect("content/b.md"),
                     Alike::Exactly,
                 ),
-                "Same address: `content/a.md` and a redirect in `content/b.md` are both \
+                "Same URL: `content/a.md` and a redirect in `content/b.md` are both \
                  published at `/a/index.html`",
                 Some("Take it out of `redirect_from` in `content/b.md`."),
             ),
@@ -6773,7 +6798,7 @@ mod tests {
                     redirect("content/b.md"),
                     Alike::Exactly,
                 ),
-                "Same address: a redirect in `content/a.md` and a redirect in `content/b.md` \
+                "Same URL: a redirect in `content/a.md` and a redirect in `content/b.md` \
                  are both published at `/a/index.html`",
                 Some("Take it out of the `redirect_from` of one of them."),
             ),
@@ -6783,7 +6808,7 @@ mod tests {
                     redirect("content/b.md"),
                     Alike::ByCase,
                 ),
-                "Same address: `content/a.md` and a redirect in `content/b.md` differ only in \
+                "Same URL: `content/a.md` and a redirect in `content/b.md` differ only in \
                  capitals",
                 Some(
                     "Most disks hold them as one file, so take it out of `redirect_from` in \
@@ -6796,7 +6821,7 @@ mod tests {
                     page("content/b.md"),
                     Alike::Exactly,
                 ),
-                "Same address: `content/a.md` and `content/b.md` are both published at \
+                "Same URL: `content/a.md` and `content/b.md` are both published at \
                  `/a/index.html`",
                 Some("Change the `permalink` of `content/a.md`."),
             ),
@@ -6806,7 +6831,7 @@ mod tests {
                     permalink("content/b.md"),
                     Alike::Exactly,
                 ),
-                "Same address: `static/a.html` and `content/b.md` are both published at \
+                "Same URL: `static/a.html` and `content/b.md` are both published at \
                  `/a/index.html`",
                 Some("Change the `permalink` of `content/b.md`."),
             ),
@@ -6816,7 +6841,7 @@ mod tests {
                     permalink("content/b.md"),
                     Alike::Exactly,
                 ),
-                "Same address: `content/a.md` and `content/b.md` are both published at \
+                "Same URL: `content/a.md` and `content/b.md` are both published at \
                  `/a/index.html`",
                 Some("Change the `permalink` of one of them."),
             ),
@@ -6918,41 +6943,41 @@ mod tests {
                 None,
             ),
             (
-                Kind::UnreadablePicture {
+                Kind::UnreadableImage {
                     path: "content/photo-1.jpg".into(),
                     fault: PictureFault::CutShort,
                 },
-                "Unreadable picture: `content/photo-1.jpg` is cut short or damaged",
+                "Unreadable image: `content/photo-1.jpg` is cut short or damaged",
                 Some("Copy or export the file again."),
             ),
             (
-                Kind::UnreadablePicture {
+                Kind::UnreadableImage {
                     path: "content/photo-1.jpg".into(),
                     fault: PictureFault::Unsupported("JPEG without a frame header".into()),
                 },
-                "Unreadable picture: `content/photo-1.jpg` is saved in a form Statac doesn't read",
+                "Unreadable image: `content/photo-1.jpg` is saved in a form Statac doesn't read",
                 Some(
                     "To publish it as the file it is, write `optimise: false` in \
                      `content/photo-1.jpg.yaml`.",
                 ),
             ),
             (
-                Kind::UnreadablePicture {
+                Kind::UnreadableImage {
                     path: "static/photo-1.avif".into(),
                     fault: PictureFault::Unsupported("AVIF without an image size".into()),
                 },
-                "Unreadable picture: `static/photo-1.avif` is saved in a form Statac doesn't read",
+                "Unreadable image: `static/photo-1.avif` is saved in a form Statac doesn't read",
                 None,
             ),
             (
-                Kind::UnreadablePicture {
+                Kind::UnreadableImage {
                     path: "content/photo-1.jpg".into(),
                     fault: PictureFault::TooLarge {
                         width: 40000,
                         height: 30000,
                     },
                 },
-                "Unreadable picture: `content/photo-1.jpg` is 40,000 by 30,000 pixels, too large \
+                "Unreadable image: `content/photo-1.jpg` is 40,000 by 30,000 pixels, too large \
                  to open",
                 Some(
                     "To publish it as the file it is, write `optimise: false` in \
@@ -6960,12 +6985,12 @@ mod tests {
                 ),
             ),
             (
-                Kind::UnreadablePicture {
+                Kind::UnreadableImage {
                     path: "static/photo-1.jpg".into(),
                     fault: PictureFault::CantMake("too large for JPEG".into()),
                 },
-                "Unreadable picture: no copy of `static/photo-1.jpg` could be made: too large \
-                 for JPEG",
+                "Unreadable image: no resized copy of `static/photo-1.jpg` could be made: too \
+                 large for JPEG",
                 None,
             ),
             (
@@ -6973,8 +6998,8 @@ mod tests {
                     path: "content/photo-1.jpg".into(),
                     profile: Some("Display P3".into()),
                 },
-                "Colour converted: the copies of `content/photo-1.jpg` are in sRGB, converted \
-                 from `Display P3`",
+                "Colour converted: the resized copies of `content/photo-1.jpg` are in sRGB, \
+                 converted from `Display P3`",
                 None,
             ),
             (
@@ -6982,24 +7007,24 @@ mod tests {
                     path: "content/photo-1.jpg".into(),
                     profile: None,
                 },
-                "Colour converted: the copies of `content/photo-1.jpg` are in sRGB, converted \
-                 from its colour profile",
+                "Colour converted: the resized copies of `content/photo-1.jpg` are in sRGB, \
+                 converted from its colour profile",
                 None,
             ),
             (
-                Kind::DescribesNoPicture {
+                Kind::DescribesNoImage {
                     picture: "content/photo-1.jpg".into(),
                     nearest: Some("photo-1.jpeg".into()),
                 },
-                "Describes no picture: there is no `content/photo-1.jpg`",
+                "Describes no image: there is no `content/photo-1.jpg`",
                 Some("Did you mean `photo-1.jpeg`?"),
             ),
             (
-                Kind::DescribesNoPicture {
+                Kind::DescribesNoImage {
                     picture: "content/photo-1.jpg".into(),
                     nearest: None,
                 },
-                "Describes no picture: there is no `content/photo-1.jpg`",
+                "Describes no image: there is no `content/photo-1.jpg`",
                 None,
             ),
             (
@@ -7011,60 +7036,61 @@ mod tests {
                 None,
             ),
             (
-                Kind::UndescribedPicture {
+                Kind::MissingAltText {
                     picture: "photo-1.jpg".into(),
                     shown: ShownBy::Markdown {
                         described_beside: true,
                     },
                 },
-                "Picture with no description: `photo-1.jpg`",
+                "Missing alt text: `photo-1.jpg`",
                 Some("Describe it in the brackets, or mark it decorative."),
             ),
             (
-                Kind::UndescribedPicture {
+                Kind::MissingAltText {
                     picture: "https://example.org/photo-1.jpg".into(),
                     shown: ShownBy::Markdown {
                         described_beside: false,
                     },
                 },
-                "Picture with no description: `https://example.org/photo-1.jpg`",
+                "Missing alt text: `https://example.org/photo-1.jpg`",
                 Some("Describe it in the brackets."),
             ),
             (
-                Kind::UndescribedPicture {
+                Kind::MissingAltText {
                     picture: "photo-1.jpg".into(),
                     shown: ShownBy::Html,
                 },
-                "Picture with no description: `photo-1.jpg`",
-                Some("Give the `<img>` an `alt`, or `alt=\"\"` where it is decoration."),
+                "Missing alt text: `photo-1.jpg`",
+                Some("Give the `<img>` an `alt`, or `alt=\"\"` where it is decorative."),
             ),
             (
-                Kind::UndescribedPicture {
+                Kind::MissingAltText {
                     picture: "content/photo-1.jpg".into(),
                     shown: ShownBy::Template {
                         beside: Some("content/photo-1.jpg.yaml".into()),
                     },
                 },
-                "Picture with no description: `content/photo-1.jpg`",
+                "Missing alt text: `content/photo-1.jpg`",
                 Some(
                     "Describe it with `alt:` in `content/photo-1.jpg.yaml`, or mark it \
                      decorative.",
                 ),
             ),
             (
-                Kind::UndescribedPicture {
+                Kind::MissingAltText {
                     picture: "static/photo-1.jpg".into(),
                     shown: ShownBy::Template { beside: None },
                 },
-                "Picture with no description: `static/photo-1.jpg`",
+                "Missing alt text: `static/photo-1.jpg`",
                 Some("Describe it where it is shown, or mark it decorative."),
             ),
             (
-                Kind::HeicPicture {
+                Kind::HeicImage {
                     path: "content/photo-1.heic".into(),
                 },
-                "HEIC picture: `content/photo-1.heic` is published as it is, with no copies made",
-                Some("Export it as a JPEG: most browsers can't show a HEIC picture."),
+                "HEIC image: `content/photo-1.heic` is published as it is, with no resized copies \
+                 made",
+                Some("Export it as a JPEG: most browsers can't show a HEIC image."),
             ),
             (
                 Kind::LocationPublished {
@@ -7078,31 +7104,31 @@ mod tests {
                 ),
             ),
             (
-                Kind::PicturesOutOfProportion {
+                Kind::ImagesOutOfProportion {
                     property: "max-width".into(),
                 },
-                "Pictures out of proportion: `img` has a `max-width` and no `height`",
+                "Images out of proportion: `img` has a `max-width` and no `height`",
                 Some("Add `height: auto` to the rule."),
             ),
             (
-                Kind::PicturesOutOfProportion {
+                Kind::ImagesOutOfProportion {
                     property: "width".into(),
                 },
-                "Pictures out of proportion: `img` has a `width` and no `height`",
+                "Images out of proportion: `img` has a `width` and no `height`",
                 Some("Add `height: auto` to the rule."),
             ),
             (
-                Kind::PicturesOutOfProportion {
+                Kind::ImagesOutOfProportion {
                     property: "max-inline-size".into(),
                 },
-                "Pictures out of proportion: `img` has a `max-inline-size` and no `block-size`",
+                "Images out of proportion: `img` has a `max-inline-size` and no `block-size`",
                 Some("Add `block-size: auto` to the rule."),
             ),
             (
-                Kind::PicturesOutOfProportion {
+                Kind::ImagesOutOfProportion {
                     property: "inline-size".into(),
                 },
-                "Pictures out of proportion: `img` has an `inline-size` and no `block-size`",
+                "Images out of proportion: `img` has an `inline-size` and no `block-size`",
                 Some("Add `block-size: auto` to the rule."),
             ),
             (
@@ -7292,11 +7318,11 @@ mod tests {
                 Some("Write `card: wide` on the pages it is for, or remove the card's settings."),
             ),
             (
-                Kind::NoSiteAddress {
+                Kind::NoSiteUrl {
                     waiting: Waiting::Cards,
                 },
-                "No site address: sharing cards are left out until the site has a `url`",
-                Some("Add the site's address to `statac.yaml`, as `url: https://example.org/`."),
+                "No site URL: social cards are left out until the site has a `url`",
+                Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`."),
             ),
             (
                 Kind::ImageMayNotShow {
@@ -7304,8 +7330,8 @@ mod tests {
                     holds: Some(crate::pictures::Kind::WebP),
                     pages: 1,
                 },
-                "Sharing image may not show: `content/cover.webp` is a WebP",
-                Some("For a picture more link previews show, save it as a PNG."),
+                "Social image may not show: `content/cover.webp` is a WebP",
+                Some("For an image more link previews show, save it as a PNG."),
             ),
             (
                 Kind::ImageMayNotShow {
@@ -7313,8 +7339,8 @@ mod tests {
                     holds: Some(crate::pictures::Kind::Svg),
                     pages: 3,
                 },
-                "Sharing image may not show: the `static/shared/cover.svg` of 3 pages is an SVG",
-                Some("For a picture more link previews show, save it as a PNG."),
+                "Social image may not show: the `static/shared/cover.svg` of 3 pages is an SVG",
+                Some("For an image more link previews show, save it as a PNG."),
             ),
             (
                 Kind::ImageMayNotShow {
@@ -7322,8 +7348,8 @@ mod tests {
                     holds: Some(crate::pictures::Kind::Gif),
                     pages: 1,
                 },
-                "Sharing image may not show: `content/cover.gif` is a GIF",
-                Some("For a picture more link previews show, save it as a PNG."),
+                "Social image may not show: `content/cover.gif` is a GIF",
+                Some("For an image more link previews show, save it as a PNG."),
             ),
             (
                 Kind::ImageMayNotShow {
@@ -7331,9 +7357,9 @@ mod tests {
                     holds: None,
                     pages: 1,
                 },
-                "Sharing image may not show: `content/cover.bmp` is a kind of picture some link \
-                 previews don't show",
-                Some("For a picture more link previews show, save it as a PNG."),
+                "Social image may not show: `content/cover.bmp` is in a format some link previews \
+                 don't show",
+                Some("For an image more link previews show, save it as a PNG."),
             ),
             (
                 Kind::ImageMayNotShow {
@@ -7341,9 +7367,9 @@ mod tests {
                     holds: None,
                     pages: 1200,
                 },
-                "Sharing image may not show: the `content/cover.bmp` of 1,200 pages is a kind of \
-                 picture some link previews don't show",
-                Some("For a picture more link previews show, save it as a PNG."),
+                "Social image may not show: the `content/cover.bmp` of 1,200 pages is in a format \
+                 some link previews don't show",
+                Some("For an image more link previews show, save it as a PNG."),
             ),
             (
                 Kind::CantRemove {
@@ -7438,27 +7464,27 @@ mod tests {
             (
                 call(CallFault::NoEnd("note".into())),
                 "Malformed call: `@note` has no `@end`",
-                Some("Put `@end` on a line of its own where the writing it wraps ends."),
+                Some("Put `@end` on a line of its own where the content it wraps ends."),
             ),
             (
                 call(CallFault::StrayEnd),
                 "Malformed call: `@end` closes nothing",
                 Some(
                     "Take the line out: only a call to a snippet that shows `body` wraps the \
-                     writing up to an `@end`.",
+                     content up to an `@end`.",
                 ),
             ),
             (
                 call(CallFault::WrapsNothing("note".into())),
                 "Malformed call: `@note` isn't on a line of its own",
                 Some(
-                    "Write the call on a line of its own, the writing it wraps below it, and \
+                    "Write the call on a line of its own, the content it wraps below it, and \
                      `@end` on a line after that.",
                 ),
             ),
             (
                 call(CallFault::NotOneAddress),
-                "Malformed call: `@url` takes one address from the top of the site",
+                "Malformed call: `@url` takes one URL starting with `/`",
                 Some("Write it as `@url(/about/)`."),
             ),
             (
@@ -7598,9 +7624,19 @@ mod tests {
                 Kind::UnknownProblemName {
                     written: "brokn-link".into(),
                     suggestion: Some("broken-link".into()),
+                    renamed: false,
                 },
                 "Unknown problem name: `brokn-link`",
                 Some("Did you mean `broken-link`?"),
+            ),
+            (
+                Kind::UnknownProblemName {
+                    written: "undescribed-picture".into(),
+                    suggestion: Some("missing-alt-text".into()),
+                    renamed: true,
+                },
+                "Unknown problem name: `undescribed-picture`",
+                Some("Statac calls this `missing-alt-text`."),
             ),
             (
                 Kind::CantQuieten {
@@ -7725,7 +7761,7 @@ mod tests {
                 },
                 "Unknown option: `statac serve` has no `--drafts`",
                 Some(
-                    "`statac serve` shows drafts and posts waiting for their day already. \
+                    "`statac serve` shows drafts and scheduled posts already. \
                      `--no-drafts` leaves them out.",
                 ),
             ),
@@ -7761,8 +7797,8 @@ mod tests {
                     option: "--url".into(),
                     value: None,
                 },
-                "Missing value: `--url` needs an address",
-                Some("Write it as `--url=<address>`."),
+                "Missing value: `--url` needs a full URL",
+                Some("Write it as `--url=<url>`."),
             ),
             (
                 Kind::OptionGivenTwice {
@@ -7785,10 +7821,10 @@ mod tests {
                 Some("The name is the last part of a problem's `More:` link."),
             ),
             (
-                Kind::MissingAddress,
-                "Missing address: `statac refuse` needs the address of a webmention or a sender",
+                Kind::MissingUrl,
+                "Missing URL: `statac refuse` needs the full URL of a webmention or a sender",
                 Some(
-                    "Give the address after the command, as `statac refuse \
+                    "Give the full URL after the command, as `statac refuse \
                      https://a.example/post-1/`.",
                 ),
             ),
@@ -7798,22 +7834,22 @@ mod tests {
                 Some("Give them after the command, as `statac search \"raspberry pi\"`."),
             ),
             (
-                Kind::NotAWebAddress {
+                Kind::NotAUrl {
                     written: "a.example".into(),
                     respelt: Some("https://a.example".into()),
                 },
-                "Not a web address: `statac refuse` takes an address starting `https://` or \
+                "Not a URL: `statac refuse` takes a full URL starting `https://` or \
                  `http://`, not `a.example`",
                 Some("Did you mean `https://a.example`?"),
             ),
             (
-                Kind::NotAWebAddress {
+                Kind::NotAUrl {
                     written: "ftp://a.example/post-1".into(),
                     respelt: None,
                 },
-                "Not a web address: `statac refuse` takes an address starting `https://` or \
+                "Not a URL: `statac refuse` takes a full URL starting `https://` or \
                  `http://`, not `ftp://a.example/post-1`",
-                Some("Give the whole address, as the browser shows it."),
+                Some("Give the full URL, as the browser shows it."),
             ),
             (
                 Kind::UnreadableName {
@@ -7904,7 +7940,7 @@ mod tests {
                 Some("Run it in a site's folder, or make one with `statac new`."),
             ),
             (
-                Kind::NewerStarter { files: 1 },
+                Kind::UpdateAvailable { files: 1 },
                 "Newer starter files: 1 of the files `statac new` wrote has a newer version",
                 Some(
                     "Run `statac new --update`: it replaces those you never changed and shows \
@@ -7912,7 +7948,7 @@ mod tests {
                 ),
             ),
             (
-                Kind::NewerStarter { files: 3 },
+                Kind::UpdateAvailable { files: 3 },
                 "Newer starter files: 3 of the files `statac new` wrote have a newer version",
                 Some(
                     "Run `statac new --update`: it replaces those you never changed and shows \
@@ -7957,7 +7993,7 @@ mod tests {
             found,
             respelt: respelt.map(Into::into),
         };
-        let unusable = |fault| Kind::UnusableAddress { fault };
+        let unusable = |fault| Kind::UnusableUrl { fault };
         vec![
             (
                 Kind::OtherSpelling {
@@ -7983,7 +8019,7 @@ mod tests {
                     written: ":year".into(),
                     ours: "{year}".into(),
                 },
-                "Unknown address piece: `:year`",
+                "Unknown placeholder: `:year`",
                 Some("Statac calls this `{year}`."),
             ),
             (
@@ -8034,45 +8070,45 @@ mod tests {
                 None,
             ),
             (
-                Kind::ReadAsYourOwn {
+                Kind::ReadAsCustom {
                     own: Own::Field("titel".into()),
                     written: "titel".into(),
                     nearest: "title".into(),
                 },
-                "Read as your own field: `titel`",
+                "Read as a custom field: `titel`",
                 Some(
                     "Did you mean `title`? To keep `titel`, declare it in `statac.yaml` as \
                      `fields.titel: text`.",
                 ),
             ),
             (
-                Kind::ReadAsYourOwn {
+                Kind::ReadAsCustom {
                     own: Own::Field("titel".into()),
                     written: "pages.titel".into(),
                     nearest: "pages.title".into(),
                 },
-                "Read as your own field: `pages.titel`",
+                "Read as a custom field: `pages.titel`",
                 Some(
                     "Did you mean `pages.title`? To keep `pages.titel`, declare it in \
                      `statac.yaml` as `fields.titel: text`.",
                 ),
             ),
             (
-                Kind::ReadAsYourOwn {
+                Kind::ReadAsCustom {
                     own: Own::Setting,
                     written: "posts_per_pge".into(),
                     nearest: "posts_per_page".into(),
                 },
-                "Read as your own setting: `posts_per_pge`",
+                "Read as a custom setting: `posts_per_pge`",
                 Some("Did you mean `posts_per_page`?"),
             ),
             (
-                Kind::ReadAsYourOwn {
+                Kind::ReadAsCustom {
                     own: Own::Type,
                     written: "repyl".into(),
                     nearest: "reply".into(),
                 },
-                "Read as your own type: `repyl`",
+                "Read as a custom type: `repyl`",
                 Some("Did you mean `reply`?"),
             ),
             (
@@ -8115,7 +8151,7 @@ mod tests {
                     why: SetAside::StatacFills(Root::Page),
                 },
                 "Field set aside: Statac fills `page.slug` itself",
-                Some("Write `permalink:` to choose the page's address."),
+                Some("Write `permalink:` to choose the page's URL."),
             ),
             (
                 Kind::SetAside {
@@ -8331,7 +8367,7 @@ mod tests {
                     key: "pages.title".into(),
                     why: WrongPlace::EachPagesOwn,
                 },
-                "Wrong place: `pages.title` can't be handed down",
+                "Wrong place: `pages.title` can't cascade",
                 Some("Write `title:` on each page instead."),
             ),
             (
@@ -8355,7 +8391,7 @@ mod tests {
                     key: "pages.layout".into(),
                     why: WrongPlace::NothingInside,
                 },
-                "Wrong place: `pages.layout` hands down only from a folder's `index.md`",
+                "Wrong place: `pages.layout` cascades only from a folder's `index.md`",
                 Some("Move it to the folder's `index.md`."),
             ),
             (
@@ -8363,7 +8399,7 @@ mod tests {
                     key: "pages.index_page".into(),
                     why: WrongPlace::WholeSite,
                 },
-                "Wrong place: `pages.index_page` can't be handed down from `statac.yaml`",
+                "Wrong place: `pages.index_page` can't cascade from `statac.yaml`",
                 Some("Write `index_page:` in a folder's `index.md` instead."),
             ),
             (
@@ -8379,69 +8415,69 @@ mod tests {
                     written: "{yaer}".into(),
                     nearest: Some("{year}".into()),
                 }),
-                "Unusable address: there is no piece `{yaer}`",
+                "Unusable URL: there is no placeholder `{yaer}`",
                 Some("Did you mean `{year}`?"),
             ),
             (
                 unusable(AddressFault::Unclosed),
-                "Unusable address: `{` is never closed",
+                "Unusable URL: `{` is never closed",
                 Some("Close it with `}`."),
             ),
             (
                 unusable(AddressFault::Stray),
-                "Unusable address: `}` closes nothing",
-                Some("Leave it out of the address."),
+                "Unusable URL: `}` closes nothing",
+                Some("Leave it out of the URL."),
             ),
             (
                 unusable(AddressFault::Character(':')),
-                "Unusable address: `:` can't be in a name",
-                Some("Leave it out of the address."),
+                "Unusable URL: `:` can't be in a name",
+                Some("Leave it out of the URL."),
             ),
             (
                 unusable(AddressFault::Character('\\')),
-                "Unusable address: `\\` can't be in a name",
+                "Unusable URL: `\\` can't be in a name",
                 Some("Separate folders with `/`."),
             ),
             (
                 unusable(AddressFault::Dots("..".into())),
-                "Unusable address: `..` can't be a name",
+                "Unusable URL: `..` can't be a name",
                 None,
             ),
             (
                 unusable(AddressFault::TrailingSpaceOrDot('.')),
-                "Unusable address: a name can't end with `.`",
+                "Unusable URL: a name can't end with `.`",
                 Some("Take it off: Windows drops it, and links would miss the page."),
             ),
             (
                 unusable(AddressFault::TrailingSpaceOrDot(' ')),
-                "Unusable address: a name can't end with a space",
+                "Unusable URL: a name can't end with a space",
                 Some("Take it off: Windows drops it, and links would miss the page."),
             ),
             (
                 unusable(AddressFault::Device("con".into())),
-                "Unusable address: `con` is kept for a device on Windows",
+                "Unusable URL: `con` is kept for a device on Windows",
                 None,
             ),
             (
                 unusable(AddressFault::Percent),
-                "Unusable address: `%` can't be in a name",
+                "Unusable URL: `%` can't be in a name",
                 Some("Write the character it stands for instead."),
             ),
             (
                 unusable(AddressFault::Hash),
-                "Unusable address: `#` can't be in a name",
+                "Unusable URL: `#` can't be in a name",
                 Some("Leave out the `#` and what follows it."),
             ),
             (
                 unusable(AddressFault::Control),
-                "Unusable address: a control character can't be in a name",
-                Some("Leave it out of the address."),
+                "Unusable URL: a control character can't be in a name",
+                Some("Leave it out of the URL."),
             ),
             (
                 unusable(AddressFault::NoDate {
                     piece: "{year}".into(),
                 }),
-                "Unusable address: this page has no date for `{year}`",
+                "Unusable URL: this page has no date for `{year}`",
                 Some(
                     "Add a `date:` line, or start the file name with a date such as `2026-10-04-`.",
                 ),
@@ -8450,8 +8486,8 @@ mod tests {
                 unusable(AddressFault::FillsNothing {
                     pattern: "/blog/".into(),
                 }),
-                "Unusable address: `/blog/` puts every page at one address",
-                Some("Add a piece such as `{slug}` so each page has its own."),
+                "Unusable URL: `/blog/` puts every page at one URL",
+                Some("Add a placeholder such as `{slug}` so each page has its own."),
             ),
         ]
     }
@@ -8709,26 +8745,26 @@ mod tests {
             ),
             (
                 Kind::WrongPlace {
-                    key: "after_build_makes".into(),
+                    key: "after_build_outputs".into(),
                     why: WrongPlace::NoCommand("after_build"),
                 },
-                "Wrong place: `after_build_makes` is for a site that sets `after_build`",
+                "Wrong place: `after_build_outputs` is for a site that sets `after_build`",
                 Some("Add the `after_build:` line it describes, or take it out."),
             ),
             (
-                Kind::SameAddress {
+                Kind::SameUrl {
                     first: "static/search/index.js".into(),
                     second: Box::new(Named::MadeAfter("search/".into())),
                     alike: Alike::Exactly,
                     address: "/search/index.js".into(),
                 },
-                "Same address: `static/search/index.js` and what `after_build` makes at \
+                "Same URL: `static/search/index.js` and what `after_build` makes at \
                  `search/` are both published at `/search/index.js`",
                 Some("Rename one of them."),
             ),
             (
                 Kind::UnknownLanguage { tag: "sw".into() },
-                "Unknown language: Statac has no words for `sw`",
+                "Unknown language: Statac has no translations for `sw`",
                 Some("Write its months, weekdays and quotation marks in `languages/sw.yaml`."),
             ),
             (
@@ -8762,7 +8798,8 @@ mod tests {
                     words: ShownWords::BackToTheText,
                     pages: 1,
                 },
-                "Missing words: the footnotes of 1 page in `fr` have no words for the way back",
+                "Missing words: the footnotes of 1 page in `fr` have no translation for the back \
+                 link",
                 Some(
                     "Add them to `languages/fr.yaml`, translating the English line \
                      `back_to_the_text: back to the text`.",
@@ -9133,9 +9170,9 @@ mod tests {
             ),
             (
                 Kind::NotSupported {
-                    what: Unsupported::NotYet("page.photo".into()),
+                    what: Unsupported::NotYet("page.image".into()),
                 },
-                "Not supported: `page.photo` isn't available yet",
+                "Not supported: `page.image` isn't available yet",
                 None,
             ),
             (
@@ -9182,9 +9219,9 @@ mod tests {
                 Some("Write it as `card(post=...)`."),
             ),
             (
-                asked("page.photo", Needed::Name(Sort::Picture)),
-                "Wrong argument: `page.photo` needs the name of one picture",
-                Some("Write it as `page.photo(\"photo-1.jpg\")`."),
+                asked("page.image", Needed::Name(Sort::Picture)),
+                "Wrong argument: `page.image` needs the name of one image",
+                Some("Write it as `page.image(\"photo-1.jpg\")`."),
             ),
             (
                 asked("page.audio", Needed::Name(Sort::Recording)),
@@ -9197,32 +9234,32 @@ mod tests {
                 Some("Write it as `page.search_box()`."),
             ),
             (
-                asked("page.photos", Needed::Names),
-                "Wrong argument: `page.photos` needs a list of names",
+                asked("page.images", Needed::Names),
+                "Wrong argument: `page.images` needs a list of names",
                 Some(
-                    "Write it as `page.photos([\"photo-1.jpg\", \"photo-2.jpg\"])`, or \
-                     `page.photos()` for every photograph beside the page.",
+                    "Write it as `page.images([\"photo-1.jpg\", \"photo-2.jpg\"])`, or \
+                     `page.images()` for every JPEG, PNG or WebP image beside the page.",
                 ),
             ),
             (
-                asked("page.photo", Needed::Text("sizes".into())),
-                "Wrong argument: `page.photo` needs `sizes` as text",
+                asked("page.image", Needed::Text("sizes".into())),
+                "Wrong argument: `page.image` needs `sizes` as text",
                 Some(
                     "Write it as a browser reads it: `sizes=\"(max-width: 40rem) 100vw, \
                      40rem\"`.",
                 ),
             ),
             (
-                asked("page.photo", Needed::TrueFalse("full".into())),
-                "Wrong argument: `page.photo` needs `full` to be `true` or `false`",
+                asked("page.image", Needed::TrueFalse("full".into())),
+                "Wrong argument: `page.image` needs `full` to be `true` or `false`",
                 None,
             ),
             (
                 asked(
-                    "page.photo",
+                    "page.image",
                     Needed::OnSite("https://example.org/photo-1.jpg".into()),
                 ),
-                "Wrong argument: `page.photo` needs a file of the site, not \
+                "Wrong argument: `page.image` needs a file of the site, not \
                  `https://example.org/photo-1.jpg`",
                 None,
             ),
@@ -9234,9 +9271,9 @@ mod tests {
                         written: Some("video-1".into()),
                     },
                 ),
-                "Wrong argument: `page.youtube` needs a YouTube address or id, not `video-1`",
+                "Wrong argument: `page.youtube` needs a YouTube URL or id, not `video-1`",
                 Some(
-                    "Write the address YouTube gives for the video, such as \
+                    "Write the URL YouTube gives for the video, such as \
                      `https://www.youtube.com/watch?v=abcdefghijk`.",
                 ),
             ),
@@ -9248,9 +9285,9 @@ mod tests {
                         written: None,
                     },
                 ),
-                "Wrong argument: `page.vimeo` needs a Vimeo address or id",
+                "Wrong argument: `page.vimeo` needs a Vimeo URL or id",
                 Some(
-                    "Write the address Vimeo gives for the video, such as \
+                    "Write the URL Vimeo gives for the video, such as \
                      `https://vimeo.com/123456789`.",
                 ),
             ),
@@ -9278,7 +9315,7 @@ mod tests {
                 Some("Save it as `.mp3`, `.m4a`, `.ogg`, `.wav` or `.flac`."),
             ),
             (
-                stopped(Stopped::NoSiteAddress),
+                stopped(Stopped::NoSiteUrl),
                 "Template stopped: `absolute` needs the site's `url`",
                 Some("Add `url:` to `statac.yaml`."),
             ),
@@ -9303,7 +9340,7 @@ mod tests {
             ),
             (
                 stopped(Stopped::NotAnAddress),
-                "Template stopped: `url` needs an address from the top of the site",
+                "Template stopped: `url` needs a URL starting with `/`",
                 Some(r#"Write it as `url("/about/")`."#),
             ),
             (
@@ -9338,22 +9375,22 @@ mod tests {
                 Some("Did you mean `main`?"),
             ),
             (
-                Kind::WritingNeverShown {
+                Kind::ContentNeverShown {
                     layout: "templates/hollow.html".into(),
                     pages: 3,
                 },
-                "Writing never shown: 3 pages built by `templates/hollow.html` have writing it \
+                "Content never shown: 3 pages built by `templates/hollow.html` have content it \
                  never shows",
-                Some("Add `{{ page.content }}` where the writing belongs."),
+                Some("Add `{{ page.content }}` where the content belongs."),
             ),
             (
-                Kind::WritingNeverShown {
+                Kind::ContentNeverShown {
                     layout: "templates/hollow.html".into(),
                     pages: 1,
                 },
-                "Writing never shown: 1 page built by `templates/hollow.html` has writing it \
+                "Content never shown: 1 page built by `templates/hollow.html` has content it \
                  never shows",
-                Some("Add `{{ page.content }}` where the writing belongs."),
+                Some("Add `{{ page.content }}` where the content belongs."),
             ),
             (
                 Kind::UnknownWord {
@@ -9672,7 +9709,7 @@ mod tests {
             ),
             (
                 Kind::NestedTooDeep,
-                "Nested too deep: the writing here is nested more than 200 deep",
+                "Nested too deep: the Markdown here is nested more than 200 deep",
                 None,
             ),
             (

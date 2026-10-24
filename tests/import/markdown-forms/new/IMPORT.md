@@ -1,4 +1,4 @@
-This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/markdown-forms/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -6,13 +6,13 @@ It was made from `tests/import/markdown-forms/old` by `statac import`, which cha
 
 - 2 posts, into `content/posts/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
 The settings name no time zone, so none is written, and Statac reads a date written without an offset as UTC, and says so: add `timezone` to `statac.yaml`, as `Europe/London`.
 
-Statac put a blank line after 1 footnote that had a link definition on the next line: Jekyll read such a line as a link definition, and Statac's Markdown reads it as more of the footnote.
+Statac put a blank line after 1 footnote definition that had a link definition on the next line: Jekyll read such a line as a link definition, and Statac's Markdown reads it as more of the footnote.
 
 The settings written in `statac.yaml`:
 
@@ -27,15 +27,15 @@ date_stamp: 31 Dec 2025, 15:04
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 2 old addresses there: 2 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 2 old URLs there: 2 are published or redirected.
 
-- `content/posts/index.md` hands `pages.permalink: /{year}/{month}/{day}/{slug}.html` to every page in `content/posts/`, which puts 2 of them at their old addresses.
+- `content/posts/index.md` cascades `pages.permalink: /{year}/{month}/{day}/{slug}.html` to every page in `content/posts/`, which puts 2 of them at their old URLs.
 
 ## Left for you
 
-### Tables of contents written in the writing
+### Tables of contents written in Markdown
 
 Statac's Markdown reads `{:toc}` as words: take it and the list above it out, and write `contents: true` in the page's front matter, which the starter's post template reads to show a table of contents.
 

@@ -899,8 +899,10 @@ pub(crate) fn conclude(
                     // where the first page to read its still asks for it,
                     // and so is a call to `webmention()` on a site without
                     // webmentions.
-                    if matches!(problem.kind.code(), Code::NoStill | Code::WebmentionsOff)
-                        && problems.iter().any(|told| told.kind == problem.kind)
+                    if matches!(
+                        problem.kind.code(),
+                        Code::NoThumbnail | Code::WebmentionsOff
+                    ) && problems.iter().any(|told| told.kind == problem.kind)
                     {
                         continue;
                     }
@@ -918,11 +920,11 @@ pub(crate) fn conclude(
                     }
                     // Each page says its layout never shows its writing;
                     // the layout is told once, counting them.
-                    if let Kind::WritingNeverShown { .. } = problem.kind {
+                    if let Kind::ContentNeverShown { .. } = problem.kind {
                         match hollow.get(&problem.place) {
                             Some(&at) => {
                                 problems[at].met_building_too(problem);
-                                if let Kind::WritingNeverShown { pages, .. } =
+                                if let Kind::ContentNeverShown { pages, .. } =
                                     &mut problems[at].kind
                                 {
                                     *pages += 1;

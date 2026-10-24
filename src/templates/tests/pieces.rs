@@ -12,7 +12,7 @@ fn every_name(piece: crate::markdown::Piece) -> (String, String) {
                         {{ note.id }} \
                         {{ note.back }} {{ note.body }}]{% endfor %}"
                 .to_owned(),
-            "photo" => "photo={% if photo %}{{ photo.src }}{% endif %}".to_owned(),
+            "image" => "image={% if image %}{{ image.src }}{% endif %}".to_owned(),
             "head" => "head={% for cell in head %}[{{ cell.body }} {{ cell.align }}]{% endfor %}"
                 .to_owned(),
             "rows" => "rows={% for row in rows %}[{% for cell in row %}\
@@ -40,7 +40,7 @@ fn every_piece_is_written_through_its_file_handed_what_the_writing_says() {
     site_files.extend([
         (
             "statac.yaml",
-            "language: en\nurl: https://example.org\nalso_at: [example.net]\ntimezone: UTC\n\
+            "language: en\nurl: https://example.org\nother_hosts: [example.net]\ntimezone: UTC\n\
              pages.feed: false\n",
         ),
         (
@@ -64,10 +64,10 @@ fn every_piece_is_written_through_its_file_handed_what_the_writing_says() {
         "<title>Post 1</title>\
          <heading level=2 id=a-heading classes= body=A <em>heading</em>>\n\
          <p>\
-         <link address=/about/ title= body=In outside=False> \
-         <link address=https://example.net/a title= body=own outside=False> \
-         <link address=https://other.org title=Other body=out outside=True> \
-         <image address=a.png alt=A picture title=Shown width= height= photo=> \
+         <link url=/about/ title= body=In external=False> \
+         <link url=https://example.net/a title= body=own external=False> \
+         <link url=https://other.org title=Other body=out external=True> \
+         <image url=a.png alt=A picture title=Shown width= height= image=> \
          <inline_code code=x &lt; y>\
          <footnote number=1 shown=1 id=back-1 note=note-1></p>\n\
          <code code=let x = 1 &lt; 2; body=<span class=\"hl-keyword\">let</span> \
@@ -134,9 +134,9 @@ fn a_value_read_as_markdown_is_written_through_the_pieces_that_need_no_page() {
     assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
     assert_eq!(
         rendered.html.unwrap(),
-        "A \u{201c}quoted\u{201d} <link address=https://other.org title= body=link outside=True>\n\
+        "A \u{201c}quoted\u{201d} <link url=https://other.org title= body=link external=True>\n\
          <h2>A heading</h2>\n\
-         <p><link address=/about/ title= body=In outside=False> \
+         <p><link url=/about/ title= body=In external=False> \
          <img src=\"a.png\" alt=\"A picture\" loading=\"lazy\" decoding=\"async\"> \
          <inline_code code=x &lt; y>\
          <sup class=\"footnote\"><a href=\"#note-1\" id=\"back-1\">1</a></sup></p>\n\
@@ -169,7 +169,7 @@ fn a_piece_that_stops_in_a_value_is_told_once() {
         ("templates/page.html", "{{ page.summary | markdown }}"),
         (
             "snippets/markdown/link.html",
-            "<a href=\"{{ address }}\">{{ page.deck }}</a>",
+            "<a href=\"{{ url }}\">{{ page.deck }}</a>",
         ),
     ]);
     assert!(built.problems.is_empty(), "{:?}", built.problems);
@@ -200,7 +200,7 @@ fn an_address_written_bare_is_written_through_the_link_file() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\nurl: https://www.example.org\nalso_at: [example.net]\ntimezone: UTC\n\
+            "language: en\nurl: https://www.example.org\nother_hosts: [example.net]\ntimezone: UTC\n\
              pages.feed: false\n",
         ),
         (
@@ -212,7 +212,7 @@ fn an_address_written_bare_is_written_through_the_link_file() {
         PAGE,
         (
             "snippets/markdown/link.html",
-            "<link {{ address }} {{ title }} {{ outside }}>{{ body }}</link>",
+            "<link {{ url }} {{ title }} {{ external }}>{{ body }}</link>",
         ),
     ]);
     assert!(built.problems.is_empty(), "{:?}", built.problems);
@@ -382,9 +382,9 @@ fn a_picture_alone_written_as_a_block_stands_in_place_of_its_paragraph() {
         PAGE,
         (
             "snippets/markdown/image.html",
-            "{% if title %}<figure><img src=\"{{ address }}\" alt=\"{{ alt }}\">\n\
+            "{% if title %}<figure><img src=\"{{ url }}\" alt=\"{{ alt }}\">\n\
              <figcaption>{{ title }}</figcaption></figure>\
-             {% else %}<img src=\"{{ address }}\" alt=\"{{ alt }}\">{% endif %}\n",
+             {% else %}<img src=\"{{ url }}\" alt=\"{{ alt }}\">{% endif %}\n",
         ),
     ]);
     assert_eq!(
@@ -413,7 +413,10 @@ fn a_footnote_marker_the_site_writes_is_left_out_of_the_excerpt() {
             "snippets/markdown/footnote.html",
             "<sup>[{{ number }}]</sup>",
         ),
-        ("templates/page.html", "{{ page.excerpt }}|{{ page.words }}"),
+        (
+            "templates/page.html",
+            "{{ page.excerpt }}|{{ page.word_count }}",
+        ),
     ]);
     assert_eq!(built.html("post-1.md"), "<p>One two.</p>|3");
 }

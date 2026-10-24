@@ -1,6 +1,6 @@
 # Unmatched tag
 
-HTML in your writing, or in a value a template shows through the
+HTML in a page's Markdown, or in a value a template shows through the
 `markdown` filter, opens an element and never closes it, or closes an
 element it never opened. The message points at the tag. It is one of
 these:
@@ -21,11 +21,11 @@ warning  Unmatched tag: `<div>` is never closed
 
 Statac publishes what you wrote as written. A browser reads your HTML as
 part of the whole page, not on its own, so a tag that doesn't match
-reaches past your writing. An element left open takes in what the layout
-puts after the writing: on a list of posts, the posts after this one, the
+reaches past your content. An element left open takes in what the layout
+puts after the content: on a list of posts, the posts after this one, the
 links to more pages and the footer. A comment left open hides all of it.
 A closing tag with nothing to close is ignored where the layout has
-nothing of that name open round the writing, and closes part of the
+nothing of that name open round the content, and closes part of the
 layout where it has, so what follows falls out of place. Which it does
 turns on the layout, which can change, so every one is warned of.
 
@@ -45,8 +45,8 @@ HTML that browsers close without harm isn't warned about:
   again round what follows, until their own closing tag.
 - HTML in a code span or a code block, which is shown as text.
 
-Each piece of writing is matched on its own: a page's writing, each
-footnote's note, the writing each snippet call wraps, and each value
+Each piece of Markdown is matched on its own: a page's content, each
+footnote definition, the content each snippet call wraps, and each value
 shown through `markdown`. HTML that a snippet writes isn't counted.
 
 ## How to fix it

@@ -428,7 +428,7 @@ fn a_link_into_what_after_build_makes_lands() {
         "statac.yaml",
         &format!(
             "{SETTINGS}after_build: echo made> \"{out}/search.json\"\n\
-             after_build_makes: [search.json, /more/]\n"
+             after_build_outputs: [search.json, /more/]\n"
         ),
     );
     let (said, code) = site.build();
@@ -450,13 +450,13 @@ fn a_link_into_what_after_build_makes_lands() {
 fn what_after_build_makes_is_held_to_the_addresses_the_site_publishes() {
     let site = Site::new(
         "claimed",
-        "after_build: echo made\nafter_build_makes: [kept.txt]\n",
+        "after_build: echo made\nafter_build_outputs: [kept.txt]\n",
     );
     let (said, code) = site.build();
     assert_eq!(code, 1, "{said}");
     assert!(
         said.contains(
-            "error  Same address: `static/kept.txt` and what `after_build` makes at \
+            "error  Same URL: `static/kept.txt` and what `after_build` makes at \
              `kept.txt` are both published at `/kept.txt`\n  statac.yaml, line 6\n"
         ),
         "{said}"
@@ -467,12 +467,12 @@ fn what_after_build_makes_is_held_to_the_addresses_the_site_publishes() {
 fn a_setting_about_a_command_needs_the_command() {
     let site = Site::new(
         "alone",
-        "after_build_makes: [search/]\nbefore_build_watches: [templates/]\n",
+        "after_build_outputs: [search/]\nbefore_build_watches: [templates/]\n",
     );
     let (said, code) = site.build();
     assert_eq!(code, 1, "{said}");
     for (about, command) in [
-        ("after_build_makes", "after_build"),
+        ("after_build_outputs", "after_build"),
         ("before_build_watches", "before_build"),
     ] {
         assert!(

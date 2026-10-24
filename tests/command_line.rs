@@ -32,19 +32,19 @@ fn a_mistake_in_the_address_for_a_run_is_a_mistake_on_the_command_line() {
         (
             "build",
             "--url=preview.example.org",
-            "error  Wrong kind of value: `--url` is a full address, such as `https://example.org`, \
+            "error  Wrong kind of value: `--url` is a full URL, such as `https://example.org`, \
              not `preview.example.org`\n  Write it as `https://preview.example.org`.\n",
         ),
         (
             "check",
             "--url=mailto:someone@example.org",
-            "error  Wrong kind of value: `--url` is a full address, such as `https://example.org`, \
+            "error  Wrong kind of value: `--url` is a full URL, such as `https://example.org`, \
              not `mailto:someone@example.org`\n  More: ",
         ),
         (
             "build",
             "--url=",
-            "error  Missing value: `--url=` needs an address\n",
+            "error  Missing value: `--url=` needs a full URL\n",
         ),
         (
             "serve",
@@ -121,7 +121,7 @@ fn update_brings_a_site_up_to_date_in_the_folder_given_or_the_one_run_in() {
 
     let output = statac(&["check", &folder.to_string_lossy()]);
     let said = String::from_utf8(output.stdout).unwrap();
-    assert!(!said.contains("newer-starter"), "{said}");
+    assert!(!said.contains("update-available"), "{said}");
 }
 
 #[test]

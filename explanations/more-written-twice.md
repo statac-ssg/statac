@@ -1,6 +1,6 @@
 # More written twice
 
-A page's writing has `<!--more-->` on a line of its own more than once.
+A page's content has `<!--more-->` on a line of its own more than once.
 The first one marks the end of the excerpt that a list shows. The later
 ones have no effect.
 

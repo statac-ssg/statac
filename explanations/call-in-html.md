@@ -14,12 +14,12 @@ note  Call in HTML: `@book` is built as a snippet
 
 ## Why Statac says so
 
-Calls work inside a page's HTML the same way they do in its writing, so
+Calls work inside a page's HTML the same way they do in its Markdown, so
 you can place a snippet inside a `<div>` or a `<figure>` of your own. In
 HTML, only the names of the site's snippets count as calls. Inside
 `<style>`, `<script>`, `<pre>`, `<code>` and comments, nothing does.
 
-Text in HTML is usually meant to appear as written, so an address or a
+Text in HTML is usually meant to appear as written, so an email address or a
 handle that happens to match a snippet's name would otherwise be
 replaced without any warning. Statac tells you once for the whole site,
 at the first call it builds inside HTML. Once you have understood it,

@@ -187,7 +187,7 @@ pub fn gather(
     let mut unwritten = BTreeSet::new();
     for (wanted, read) in wanted.into_iter().zip(read) {
         if let Some(first) = claimed.get(&wanted.name) {
-            problems.push(Problem::nowhere(Kind::SameAddress {
+            problems.push(Problem::nowhere(Kind::SameUrl {
                 first: Box::new(Named::File(first.clone())),
                 second: Box::new(Named::File(wanted.source)),
                 alike: Alike::Exactly,
@@ -349,7 +349,7 @@ fn narrowed(
     let property = text[span.clone()].to_owned();
     let source = sources.add(path, text.into_owned());
     Some(Problem::at(
-        Kind::PicturesOutOfProportion { property },
+        Kind::ImagesOutOfProportion { property },
         Place {
             source,
             span: Span::new(span.start, span.end),
@@ -776,7 +776,7 @@ pub fn same_address(outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
             && told.insert((first.clone(), second.clone()))
         {
             let at = second.given_at().or(first.given_at());
-            let kind = Kind::SameAddress {
+            let kind = Kind::SameUrl {
                 first: Box::new(first.clone()),
                 second: Box::new(second.clone()),
                 alike,

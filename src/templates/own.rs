@@ -788,7 +788,7 @@ fn absolute(value: &Value) -> Result<Value, Error> {
     frame::read(Key::Setting(shared.name_id("url")));
     let Some(url) = shared.settings.text("url") else {
         return Err(frame::raise(Kind::TemplateStopped {
-            reason: Stopped::NoSiteAddress,
+            reason: Stopped::NoSiteUrl,
         }));
     };
     let origin = origin_of(url.value);

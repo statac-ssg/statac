@@ -1,7 +1,7 @@
 # Field written two ways
 
-On one page, one of your own fields is written with a dot in its name, such
-as `book.author:`. On another page it is nested, as `book:` with `author:`
+On one page, a custom field is written with a dot in its name, such as
+`book.author:`. On another page it is nested, as `book:` with `author:`
 beneath it. YAML reads these as two different fields.
 
 ## What you'll see {#what-youll-see}

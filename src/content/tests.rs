@@ -303,9 +303,9 @@ fn front_matter_refusals_are_placed_at_what_was_written() {
         ("feed: yes", "wrong-kind-of-value", "yes"),
         ("needs: site", "wrong-kind-of-value", "site"),
         ("id: abc", "wrong-kind-of-value", "abc"),
-        ("permalink: /{yaer}/", "unusable-address", "{yaer}"),
+        ("permalink: /{yaer}/", "unusable-url", "{yaer}"),
         ("permalink: /:year/", "other-spelling", ":year"),
-        ("permalink: /a:b/", "unusable-address", "a:b"),
+        ("permalink: /a:b/", "unusable-url", "a:b"),
     ];
     for (line, name, at) in cases {
         let text = format!("---\nsummary: Post 1\n{line}\n---\n");
@@ -398,7 +398,7 @@ fn a_key_one_slip_from_a_known_word_is_told_and_kept_as_written() {
         let told = kinds_at(&read);
         let expected: Vec<(Kind, String)> = (nearest.iter())
             .map(|nearest| {
-                let kind = Kind::ReadAsYourOwn {
+                let kind = Kind::ReadAsCustom {
                     own: crate::problem::Own::Field((*key).into()),
                     written: (*key).into(),
                     nearest: (*nearest).into(),
@@ -419,7 +419,7 @@ fn a_handed_down_key_one_slip_from_a_word_is_told_where_it_is_written() {
         ("content/a/post-1.md", "---\ntitle: Post 1\n---\n"),
     ]);
     let told = kinds_at(&read);
-    let slip = |name: &str, nearest: &str| Kind::ReadAsYourOwn {
+    let slip = |name: &str, nearest: &str| Kind::ReadAsCustom {
         own: crate::problem::Own::Field(name.into()),
         written: format!("pages.{name}"),
         nearest: format!("pages.{nearest}"),
@@ -454,7 +454,7 @@ fn a_type_one_slip_from_a_declared_type_is_told_at_its_value() {
         let read = site(&files);
         let expected = told.then(|| {
             (
-                Kind::ReadAsYourOwn {
+                Kind::ReadAsCustom {
                     own: crate::problem::Own::Type,
                     written: written.into(),
                     nearest: "reply".into(),
@@ -484,7 +484,7 @@ fn a_type_handed_down_is_told_once_where_it_is_written() {
     assert_eq!(
         problems(&read),
         [(
-            "read-as-your-own",
+            "read-as-custom",
             "content/a/index.md".to_owned(),
             "repyl".to_owned()
         )]
@@ -692,11 +692,11 @@ fn what_a_folder_hands_down_is_checked_where_it_is_written() {
     let respelt = Kind::OtherSpelling {
         word: Word::Setting,
         written: "pages.later".into(),
-        ours: "later_pages".into(),
+        ours: "pagination.permalink".into(),
     };
     assert_eq!(kinds.iter().filter(|kind| **kind == respelt).count(), 2);
     assert!(kinds.contains(&place("pages.layout", WrongPlace::NothingInside)));
-    assert!(kinds.contains(&Kind::UnusableAddress {
+    assert!(kinds.contains(&Kind::UnusableUrl {
         fault: AddressFault::FillsNothing {
             pattern: "/a/".into()
         }
@@ -704,10 +704,7 @@ fn what_a_folder_hands_down_is_checked_where_it_is_written() {
     assert!(kinds.iter().any(|k| k.name() == "set-aside"));
     // A refused pattern is told once, at the line, however many pages it reached.
     assert_eq!(
-        kinds
-            .iter()
-            .filter(|k| k.name() == "unusable-address")
-            .count(),
+        kinds.iter().filter(|k| k.name() == "unusable-url").count(),
         1
     );
 }
@@ -976,7 +973,7 @@ fn a_nested_declared_field_fills_its_piece_from_where_it_is_nested() {
     assert_eq!(at("b.md/1"), "/b/name-2/");
     assert_eq!(at("b.md/2"), "/own/name-3/");
 
-    let lacks = |fault| (Kind::UnusableAddress { fault }, "{book.author}".to_owned());
+    let lacks = |fault| (Kind::UnusableUrl { fault }, "{book.author}".to_owned());
     let read = site(&[
         ("statac.yaml", declared),
         (
@@ -1009,14 +1006,14 @@ fn a_nested_declared_field_fills_its_piece_from_where_it_is_nested() {
 #[test]
 fn a_pattern_asking_for_a_field_a_page_lacks_is_refused_where_it_asks() {
     let declared = "language: en\nfields.isbn: text\n";
-    let lacks = |page: &str| Kind::UnusableAddress {
+    let lacks = |page: &str| Kind::UnusableUrl {
         fault: AddressFault::PageLacks {
             page: page.into(),
             field: "isbn".into(),
             piece: "{isbn}".into(),
         },
     };
-    let no_piece = |nearest: Option<&str>| Kind::UnusableAddress {
+    let no_piece = |nearest: Option<&str>| Kind::UnusableUrl {
         fault: AddressFault::UnknownPiece {
             written: "{isbn}".into(),
             nearest: nearest.map(str::to_owned),
@@ -1118,7 +1115,7 @@ fn a_pattern_needing_a_date_on_a_page_without_one_is_refused() {
             .iter()
             .map(|p| p.kind.clone())
             .collect::<Vec<_>>(),
-        [Kind::UnusableAddress {
+        [Kind::UnusableUrl {
             fault: AddressFault::NoDate {
                 piece: "{year}".into()
             }
@@ -1790,7 +1787,7 @@ fn old_addresses_are_claimed_and_refused_where_unusable() {
     assert_eq!(
         problems(&read),
         [(
-            "unusable-address",
+            "unusable-url",
             "content/post-1.md".to_owned(),
             "a:b".to_owned()
         )]
@@ -1833,7 +1830,7 @@ fn two_claims_on_one_address_are_refused_naming_both() {
     // (each side, and the text the problem is told at)
     let mut same: Vec<(String, String, &str)> = (read.problems.iter())
         .filter_map(|p| match &p.kind {
-            Kind::SameAddress { first, second, .. } => Some((
+            Kind::SameUrl { first, second, .. } => Some((
                 told(first),
                 told(second),
                 p.place.map_or("", |at| read.sources.spelling(at)),
@@ -1885,18 +1882,18 @@ fn a_claim_on_a_page_statac_makes_names_that_page() {
     let mut same: Vec<String> = read
         .problems
         .iter()
-        .filter(|p| p.kind.code() == Code::SameAddress)
+        .filter(|p| p.kind.code() == Code::SameUrl)
         .map(Problem::headline)
         .collect();
     same.sort();
     assert_eq!(
         same,
         [
-            "Same address: `static/blog/page/2/index.html` and page 2 of `/blog/` are both \
+            "Same URL: `static/blog/page/2/index.html` and page 2 of `/blog/` are both \
              published at `/blog/page/2/index.html`",
-            "Same address: `static/index.html` and the site's home page are both published \
+            "Same URL: `static/index.html` and the site's home page are both published \
              at `/index.html`",
-            "Same address: `static/tags/rust/index.html` and the page for the tag `Rust` are \
+            "Same URL: `static/tags/rust/index.html` and the page for the tag `Rust` are \
              both published at `/tags/rust/index.html`",
         ]
     );
@@ -2330,8 +2327,8 @@ fn a_page_sending_readers_to_itself_or_nowhere_usable_is_refused() {
             "redirect-to-itself",
             "/old/",
         ),
-        ("redirect_to: /a:b/", "unusable-address", "a:b"),
-        ("redirect_to: '/a%3Ab/'", "unusable-address", "/a%3Ab/"),
+        ("redirect_to: /a:b/", "unusable-url", "a:b"),
+        ("redirect_to: '/a%3Ab/'", "unusable-url", "/a%3Ab/"),
     ];
     for (front, name, at) in cases {
         let read = site(&[("content/post-1.md", &format!("---\n{front}\n---\n"))]);
@@ -2397,12 +2394,12 @@ fn what_a_page_sending_readers_on_never_publishes_is_told() {
         (
             "content/post-1.md",
             "---\n\n  The first post.\nMore.\n",
-            &[("writing-not-published", "The first post.")],
+            &[("content-not-published", "The first post.")],
         ),
         (
             "content/post-1.html",
             "---\n<p>Text</p>\n",
-            &[("writing-not-published", "<p>Text</p>")],
+            &[("content-not-published", "<p>Text</p>")],
         ),
         (
             "content/folder-1/index.md",
@@ -2489,8 +2486,8 @@ fn a_redirect_to_an_address_nothing_stands_at_is_warned_of() {
 /// naming it.
 #[test]
 fn a_page_left_out_at_an_address_already_taken_is_warned_of() {
-    const DRAFT: &str = "Address taken: this draft would be published at";
-    const WAITING: &str = "Address taken: this post would be published at";
+    const DRAFT: &str = "URL taken: this draft would be published at";
+    const WAITING: &str = "URL taken: this post would be published at";
     // (the page left out's front matter, the text it is left out by, and
     // the headline where there is a warning)
     let cases = [
@@ -2549,15 +2546,15 @@ fn a_page_left_out_at_an_address_already_taken_is_warned_of() {
         let (read, ..) = crate::build::read(&temp.root, &run_on(2026, 12, 31));
         let left_out = match at {
             "true" => "draft-left-out",
-            _ => "waiting-for-its-day",
+            _ => "scheduled-post",
         };
         let mut wanted = vec![(left_out, "content/held.md".to_owned(), at.to_owned())];
         if warned.is_some() {
-            wanted.push(("address-taken", "content/held.md".to_owned(), at.to_owned()));
+            wanted.push(("url-taken", "content/held.md".to_owned(), at.to_owned()));
         }
         assert_eq!(problems(&read), wanted, "{front}");
         let headlines: Vec<String> = (read.problems.iter())
-            .filter(|p| p.kind.code() == Code::AddressTaken)
+            .filter(|p| p.kind.code() == Code::UrlTaken)
             .map(|p| crate::wording::headline(&p.kind))
             .collect();
         assert_eq!(headlines, Vec::from_iter(warned), "{front}");
@@ -2581,7 +2578,7 @@ fn a_draft_built_at_an_address_already_taken_is_the_same_address() {
     };
     let (read, ..) = crate::build::read(&temp.root, &run);
     let codes: Vec<Code> = read.problems.iter().map(|p| p.kind.code()).collect();
-    assert_eq!(codes, [Code::SameAddress]);
+    assert_eq!(codes, [Code::SameUrl]);
 }
 
 /// Pages sending readers on to addresses that are themselves redirects,
@@ -2809,7 +2806,7 @@ fn a_ring_of_redirects_is_refused_at_each_page_in_it() {
             .map(|p| crate::wording::headline(&p.kind))
             .collect();
         let wanted: Vec<String> = (said.iter())
-            .map(|(_, at)| format!("Redirect to itself: `{at}` sends readers back to this page"))
+            .map(|(_, at)| format!("Redirect to itself: `{at}` redirects back to this page"))
             .collect();
         assert_eq!(headlines, wanted, "{pages:?}");
         let left: Vec<&str> = (read.site.redirects.iter())

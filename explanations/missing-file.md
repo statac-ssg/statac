@@ -25,7 +25,7 @@ can't be drawn without its background or font.
 Correct the name, or add the file to `assets/` (or, for a card, to
 `templates/og/`). If there is a file with a similar name, Statac
 suggests it. A file in `static/` keeps its own name, so link to it
-directly instead. Statac tells you the address to use.
+directly instead. Statac tells you the URL to use.
 
 ## Example
 

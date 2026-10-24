@@ -1003,7 +1003,7 @@ impl Server<'_> {
             .partition(|problem| {
                 matches!(
                     problem.kind,
-                    Kind::DraftLeftOut { .. } | Kind::WaitingForItsDay { .. }
+                    Kind::DraftLeftOut { .. } | Kind::ScheduledPost { .. }
                 ) && (problem.place).is_some_and(|at| files.contains(&at.source))
             });
         outcome.problems = rest;

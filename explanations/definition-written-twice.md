@@ -1,9 +1,10 @@
 # Definition written twice
 
-A page has two footnote notes with the same label, such as two lines that
-start with `[^1]:`. Labels match whatever their case, so `[^note]:` and
-`[^Note]:` also count as the same label. Every marker with that label
-points to the later note, so the first note is never shown.
+A page has two footnote definitions with the same label, such as two
+lines that start with `[^1]:`. Labels match whatever their case, so
+`[^note]:` and `[^Note]:` also count as the same label. Every footnote
+reference with that label points to the later definition, so the first
+definition is never shown.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,16 +16,17 @@ warning  Definition written twice: the first `[^n]:` line isn't shown
 
 ## Why Statac warns
 
-Statac shows the later note and publishes the page. It warns you because
-readers never see the first note, which you wrote, and it is often the
-note you meant. This happens when a note is copied from another page, or
-when two notes are given the same label by mistake.
+Statac shows the later definition and publishes the page. It warns you
+because readers never see the first definition, which you wrote, and it
+is often the one you meant. This happens when a footnote is copied from
+another page, or when two footnotes are given the same label by mistake.
 
 ## How to fix it
 
-Give one of the notes another label, and change the marker where that
-note belongs to use the new label. Or delete one of the notes. The message
-points to the first note, and to the later one that is shown instead.
+Give one of the definitions another label, and change the reference
+where that footnote belongs to use the new label. Or delete one of the
+definitions. The message points to the first definition, and to the
+later one that is shown instead.
 
 ## Example
 
@@ -38,7 +40,7 @@ The figures are from 2026.[^1] The photograph is from 2025.[^1]
 [^1]: Photograph by the author.
 ```
 
-Give each note its own label:
+Give each footnote its own label:
 
 ```markdown
 The figures are from 2026.[^1] The photograph is from 2025.[^2]

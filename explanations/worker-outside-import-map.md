@@ -37,7 +37,7 @@ const worker = new Worker("./worker.js", { type: "module" });
 ```
 
 Move `assets/worker.js` to `static/worker.js`, along with the files it
-imports, and give its address from the top of the site:
+imports, and give it a URL starting with `/`:
 
 ```js
 const worker = new Worker("/worker.js", { type: "module" });

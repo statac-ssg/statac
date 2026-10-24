@@ -305,8 +305,8 @@ fn serve_says_where_the_site_is() {
         assert!(said.contains(&wanted), "{way}:\n{said}");
         assert!(
             said.starts_with(&format!(
-                "Started `published.txt` with the 2 addresses this site publishes, so a later \
-                 build can say when one stops answering. Commit it with the site.\n\
+                "Started `published.txt` with the 2 URLs this site publishes, so a later \
+                 build can say when one is no longer published. Commit it with the site.\n\
                  Wrote 2 pages and 2 other files to `{}` in ",
                 folder.display()
             )),
@@ -524,7 +524,7 @@ fn a_miss_is_answered_404() {
     let served = served("miss", How::Native);
     let (status, body) = get(served.port, "/post-3/");
     assert!(status.contains("404"), "{status}");
-    assert!(body.contains("Nothing is published at this address."));
+    assert!(body.contains("Nothing is published at this URL."));
     assert!(body.contains("/.statac-live/client.js"));
     let (status, _) = get(served.port, "/%2e%2e/statac.yaml");
     assert!(status.contains("400"), "{status}");
@@ -621,9 +621,7 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     });
     let said = served.said.text();
     assert!(
-        said.contains(
-            "Showing 1 draft and 1 post waiting for its day, which `statac build` leaves out.\n"
-        ),
+        said.contains("Showing 1 draft and 1 scheduled post, which `statac build` leaves out.\n"),
         "{said}"
     );
     let plain = panel(&served, "/post-1/");
@@ -637,9 +635,9 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
                  {\"kind\":\"broken-link\",\"severity\":\"warning\",\"title\":\"Broken link\",\
                  \"count\":1,\"quietened\":0,\"suggestion\":[{\"text\":\"Did you mean \"},\
                  {\"code\":\"/post-1/\"},{\"text\":\"?\"}]},\
-                 {\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
+                 {\"kind\":\"no-site-url\",\"severity\":\"note\",\"title\":\"No site URL\",\
                  \"count\":1,\"quietened\":0,\
-                 \"suggestion\":[{\"text\":\"Add the site\\u0027s address \
+                 \"suggestion\":[{\"text\":\"Add the site\\u0027s full URL \
                  to \"},{\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
                  {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}],\"gone\":null,\
                  \"drafts\":[{\"text\":\"Post \\u003c2\\u003e\",\"href\":\"/post-2/\"}],\
@@ -759,9 +757,9 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
             "\"problems\":[{link}],\"stopped\":null,\"explanations\":{{\
              \"broken-link\":{{\"title\":\"Broken link\",\"opening\":[{{\"said\":[\
              {{\"text\":\"A link, or a page\\u0027s \"}},{{\"code\":\"redirect_to\"}},\
-             {{\"text\":\", points at an address on this site, but nothing is published at \
-             that address. A reader who follows it lands on a missing page.\"}}]}}],\
-             \"fix\":[{{\"said\":[{{\"text\":\"Change the link to an address the site publishes."
+             {{\"text\":\", points at a URL on this site, but nothing is published at \
+             that URL. A reader who follows it lands on a missing page.\"}}]}}],\
+             \"fix\":[{{\"said\":[{{\"text\":\"Change the link to a URL the site publishes."
         )) && built.contains(&format!(
             "\"round\":{{\"state\":\"built\",\"at\":\"{at}\",\"builtAt\":\"{at}\",\"changed\":[],\
              \"built\":3,\"outputs\":3,\"took\":{{\"before\":"
@@ -904,9 +902,9 @@ fn the_panel_is_handed_a_kinds_suggestion_where_each_of_its_problems_has_it() {
             "{\"kind\":\"broken-link\",\"severity\":\"warning\",\"title\":\"Broken link\",\
              \"count\":2,\"quietened\":0,\"suggestion\":null}"
         ) && site.contains(
-            "{\"kind\":\"no-site-address\",\"severity\":\"note\",\"title\":\"No site address\",\
+            "{\"kind\":\"no-site-url\",\"severity\":\"note\",\"title\":\"No site URL\",\
              \"count\":2,\"quietened\":0,\
-             \"suggestion\":[{\"text\":\"Add the site\\u0027s address to \"},\
+             \"suggestion\":[{\"text\":\"Add the site\\u0027s full URL to \"},\
              {\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
              {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}"
         ),
@@ -1091,7 +1089,7 @@ fn asked_for_no_drafts_serve_shows_what_a_build_publishes() {
     let said = served.said.text();
     assert!(!said.contains("Showing"), "{said}");
     assert!(
-        said.contains("4 notes: 3 draft-left-out, 1 waiting-for-its-day."),
+        said.contains("4 notes: 3 draft-left-out, 1 scheduled-post."),
         "{said}"
     );
     let (status, _) = get(served.port, "/post-2/");
@@ -1313,7 +1311,7 @@ fn the_command_after_a_build_runs_once_and_serve_says_so() {
             "statac.yaml",
             "title: Site\nlanguage: en\ntimezone: Europe/London\n\
              after_build: test \"$STATAC_SERVE\" = yes && echo made >> \"$STATAC_OUT/made.txt\"\n\
-             after_build_makes: [made.txt]\n",
+             after_build_outputs: [made.txt]\n",
         );
     });
     let said = served.said.text();
@@ -1421,7 +1419,7 @@ fn a_round_waits_for_a_build_holding_the_site_and_says_so_once() {
 }
 
 const YOUTUBE: &str = "{# takes address #}\n{% set video = page.youtube(address) %}\n\
-                       {% if video.still %}<img src=\"{{ video.still.src }}\">{% endif %}\n";
+                       {% if video.thumbnail %}<img src=\"{{ video.thumbnail.src }}\">{% endif %}\n";
 
 const MAXRES: &str = "https://i.ytimg.com/vi/abcdefghijk/maxresdefault.jpg";
 
@@ -1489,8 +1487,8 @@ fn with_webmentions(site: &Site) {
     site.write(
         "templates/mentioned.html",
         "<!doctype html>\n<title>{{ page.title }}</title>\n\
-         {% for m in page.webmentions.said %}{{ m.words }}\
-         {% if m.face %}<img src=\"{{ m.face.src }}\" alt=\"\">{% endif %}{% endfor %}\n\
+         {% for m in page.webmentions.comments %}{{ m.content }}\
+         {% if m.avatar %}<img src=\"{{ m.avatar.src }}\" alt=\"\">{% endif %}{% endfor %}\n\
          {{ page.content }}\n",
     );
     site.write(
@@ -1613,9 +1611,9 @@ fn a_still_is_fetched_after_the_first_round_and_built_as_a_build_would() {
     assert_eq!(
         steady(&served, &opened),
         "\
-1 warning: 1 no-still. Run `statac check` to see it.
+1 warning: 1 no-thumbnail. Run `statac check` to see it.
 
-Started `published.txt` with the 3 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
+Started `published.txt` with the 3 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
 Wrote 3 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Fetching what's new from other sites. `--offline` turns this off.
@@ -1627,9 +1625,9 @@ Press Ctrl+C to stop.
         steady_from_the_start(&served, &said),
         "\
 Fetched `fetched/stills/youtube-abcdefghijk.jpg`.
-Fetched 1 still.
+Fetched 1 thumbnail.
 FILES changed. Built 1 of 3 files in TIME seconds. Browser told to reload.
-Gone since the last build: 1 no-still.
+Gone since the last build: 1 no-thumbnail.
 "
     );
     assert_eq!(*asked.lock().unwrap(), [MAXRES]);
@@ -1644,7 +1642,7 @@ Gone since the last build: 1 no-still.
     );
     let said = served.said.after(mark, "Browser told to reload.\n");
     assert!(
-        said.contains("No still: no picture has been fetched"),
+        said.contains("No thumbnail: no image has been fetched"),
         "{said}"
     );
     let generation = served.hub.generation();
@@ -1672,7 +1670,7 @@ fn a_webmention_and_its_face_are_fetched_in_one_round_and_built_as_a_build_would
     assert_eq!(
         steady(&served, &opened),
         "\
-Started `published.txt` with the 2 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
+Started `published.txt` with the 2 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
 Wrote 2 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Fetching what's new from other sites. `--offline` turns this off.
@@ -1685,7 +1683,7 @@ Press Ctrl+C to stop.
         "\
 Fetched `fetched/faces/0a523cc7bab84b06.jpg`.
 Fetched `fetched/mentions/1.yaml`.
-Fetched 1 webmention and 1 face.
+Fetched 1 webmention and 1 avatar.
 FILES changed. Built 1 of 2 files in TIME seconds. Browser told to reload.
 "
     );
@@ -1717,7 +1715,7 @@ fn a_fetch_that_fails_is_said_and_serving_goes_on() {
     let said = served.said.after(opened.len(), "couldn't be fetched.\n");
     assert_eq!(
         steady_from_the_start(&served, &said),
-        "Can't fetch the still for `abcdefghijk`: the server answered 503.\n\
+        "Can't fetch the thumbnail for `abcdefghijk`: the server answered 503.\n\
          1 couldn't be fetched.\n"
     );
     let mark = served.said.text().len();
@@ -1764,7 +1762,7 @@ fn fetching_waits_for_the_first_round_with_no_error() {
 
     let mark = served.said.text().len();
     served.site.write("templates/page.html", LAYOUT);
-    let said = served.said.after(mark, "Fetched 1 still.\n");
+    let said = served.said.after(mark, "Fetched 1 thumbnail.\n");
     let said = steady(&served, &said);
     assert!(
         said.starts_with("`templates/page.html` changed. Built 3 of 3 files in TIME seconds."),
@@ -1774,7 +1772,7 @@ fn fetching_waits_for_the_first_round_with_no_error() {
         said.ends_with(
             "Fetching what's new from other sites. `--offline` turns this off.\n\
              Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\n\
-             Fetched 1 still.\n"
+             Fetched 1 thumbnail.\n"
         ),
         "{said}"
     );
@@ -1787,9 +1785,9 @@ fn offline_nothing_is_fetched_and_serve_says_so() {
     assert_eq!(
         steady(&served, &opened),
         "\
-1 warning: 1 no-still. Run `statac check` to see it.
+1 warning: 1 no-thumbnail. Run `statac check` to see it.
 
-Started `published.txt` with the 3 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
+Started `published.txt` with the 3 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
 Wrote 3 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Offline: nothing is fetched from other sites.
@@ -1813,7 +1811,7 @@ fn a_site_with_nothing_to_fetch_is_served_as_it_was_without_fetching() {
     assert_eq!(
         steady(&fetching, &opened),
         "\
-Started `published.txt` with the 2 addresses this site publishes, so a later build can say when one stops answering. Commit it with the site.
+Started `published.txt` with the 2 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
 Wrote 2 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Press Ctrl+C to stop.

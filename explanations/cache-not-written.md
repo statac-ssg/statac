@@ -2,7 +2,7 @@
 
 Statac couldn't save something in `.statac/`. This folder, inside the
 site's folder, is where Statac keeps work that saves time on the next
-build: the copies of photographs it made, the sharing cards it drew, the
+build: the resized copies of images it made, the social cards it drew, the
 spare copy of the built site, or a record of where each post in a feed was
 published. It also keeps there the lock, `.statac/lock`, that lets only
 one build of the site run at a time. The message says which of these it
@@ -18,18 +18,18 @@ warning  Cache not written: can't write `.statac/pictures`: permission denied
 
 ## Why Statac warns
 
-Making copies of a photograph is the slowest part of a build, so Statac
-keeps each copy and makes it only once. If it can't keep them, the site
-is still built in full and published, with every copy in it, but the
-next build makes them all again and takes as long as this one did. If it
-can't keep the spare, `.statac/spare`, each build rewrites every file of
-the site and removes the old ones, instead of writing only the files that
-changed. If it can't keep `.statac/feeds` and a post moves before the next build,
-Statac can't offer that post the `id:` line that keeps it the same post in
-feed readers. If it can't keep the lock, a build doesn't wait for
-another build of the same site, such as `statac serve` in another
-window, and two that run at once may get in each other's way. Statac
-warns only once, however much it couldn't keep.
+Resizing images is the slowest part of a build, so Statac keeps each
+resized copy and makes it only once. If it can't keep them, the site is
+still built in full and published, with every copy in it, but the next
+build makes them all again and takes as long as this one did. If it can't
+keep the spare, `.statac/spare`, each build rewrites every file of the
+site and removes the old ones, instead of writing only the files that
+changed. If it can't keep `.statac/feeds` and a post moves before the next
+build, Statac can't offer that post the `id:` line that keeps it the same
+post in feed readers. If it can't keep the lock, a build doesn't wait for
+another build of the same site, such as `statac serve` in another window,
+and two that run at once may get in each other's way. Statac warns only
+once, however much it couldn't keep.
 
 ## How to fix it
 

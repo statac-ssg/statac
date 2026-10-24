@@ -3,7 +3,7 @@
 The folder given to `statac new`, or the folder `statac import` was to
 write the new site into, already contains a site. It has a `statac.yaml`,
 with the site's settings, or a `content/` folder, with the site's
-writing.
+content.
 
 ## What you'll see {#what-youll-see}
 

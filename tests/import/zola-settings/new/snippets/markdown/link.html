@@ -1,2 +1,2 @@
-{# Each link in the writing, one to another site opened as the old site's settings asked: see /snippets/#pieces-of-the-writing -#}
-<a href="{{ address }}"{% if title %} title="{{ title }}"{% endif %}{% if outside %} target="_blank" rel="noopener nofollow"{% endif %}>{{ body }}</a>
+{# Each link in the Markdown, one to another site opened as the old site's settings asked: see /snippets/#pieces-of-the-writing -#}
+<a href="{{ url }}"{% if title %} title="{{ title }}"{% endif %}{% if external %} target="_blank" rel="noopener nofollow"{% endif %}>{{ body }}</a>

@@ -1,13 +1,13 @@
 # Language folder in pattern
 
-An address pattern for one language's pages starts with that language's
+A URL pattern for one language's pages starts with that language's
 folder. On a site in several languages, the patterns for English are read
-from `/en/`, the English folder's own address. This applies to a
+from `/en/`, the English folder's own URL. This applies to a
 `permalink:` on a page in `content/en/`, and to `tags.permalink` and
 `series.permalink` for the English tags and series. So the pattern
 `/{year}/{slug}/` puts an English post at `/en/2026/post-1/`. If the
 pattern were written as `/en/{year}/{slug}/`, the folder would be in the
-address twice.
+URL twice.
 
 ## What you'll see {#what-youll-see}
 
@@ -19,7 +19,7 @@ warning  Language folder in pattern: `/en/{year}/{slug}/` is read from `/en/` al
 
 ## Why Statac warns
 
-Statac is sure what you meant: an address with the folder in it once. It
+Statac is sure what you meant: a URL with the folder in it once. It
 reads the pattern without the folder, so the post is published at
 `/en/2026/post-1/`. It still warns you, because the same pattern is read
 from `/` on the main language's pages, at the top of `content/`.

@@ -2,7 +2,7 @@
 
 A command that works on a site, such as `statac build`, found no site to
 work on. A site is a folder with a `statac.yaml` (the site's settings) or a
-`content/` folder (the site's writing).
+`content/` folder (the site's content).
 
 If you named a folder, after the command or with `--site`, Statac looks
 only in that folder, and it has neither. If you didn't, Statac looks in

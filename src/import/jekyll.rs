@@ -125,7 +125,7 @@ pub(super) static HTML_WRITING: FindingKind = FindingKind {
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Template tags left as written",
-    sentence: "Statac's writing runs no template tags and these have no equal in it, so each is \
+    sentence: "Statac's Markdown runs no template tags and these have no equal in it, so each is \
                left as written and shows on the page as it stands: write by hand what it made, \
                or call a snippet, as https://statac.dev/snippets/ describes.",
 };
@@ -139,7 +139,7 @@ pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
 pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page Statac couldn't find in the old site, or one Jekyll \
-               didn't publish, so it is left as written: link to the page's address instead.",
+               didn't publish, so it is left as written: link to the page's URL instead.",
 };
 
 pub(super) static INCLUDE: FindingKind = FindingKind {
@@ -162,14 +162,14 @@ pub(super) static ATTRIBUTE_LINES: FindingKind = FindingKind {
 };
 
 pub(super) static TOC: FindingKind = FindingKind {
-    heading: "Tables of contents written in the writing",
+    heading: "Tables of contents written in Markdown",
     sentence: "Statac's Markdown reads `{:toc}` as words: take it and the list above it out, and \
                write `contents: true` in the page's front matter, which the starter's post \
                template reads to show a table of contents.",
 };
 
 pub(super) static TOC_NO_STARTER: FindingKind = FindingKind {
-    heading: "Tables of contents written in the writing",
+    heading: "Tables of contents written in Markdown",
     sentence: "Statac's Markdown reads `{:toc}` as words: take it and the list above it out. A \
                template can show the page's headings from `page.toc`, as \
                https://statac.dev/templates/#what-a-template-sees describes.",
@@ -242,10 +242,10 @@ pub(super) static NUMBER_LEFT: FindingKind = FindingKind {
 };
 
 pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
-    heading: "Addresses Statac couldn't work out",
+    heading: "URLs Statac couldn't work out",
     sentence: "Each of these pages has a `permalink` holding a placeholder Statac doesn't know, so \
-               its old address wasn't worked out or kept: give the page a `permalink` of the \
-               address the old site published it at.",
+               its old URL wasn't worked out or kept: give the page a `permalink` of the URL \
+               the old site published it at.",
 };
 
 /// Whether `folder` holds a Jekyll site: a settings file Jekyll reads at
@@ -843,15 +843,14 @@ impl Reader<'_> {
             }
             (_, Some(given)) => self.import.address = Some(super::under(given, &s.base)),
             (Some(url), None) => notes.push(format!(
-                "The settings' `url`, {}, isn't a web address, so the new site has no `url` yet: \
-                 add it to `statac.yaml` once it is known.",
+                "The settings' `url`, {}, isn't an `https://` or `http://` URL, so the new site \
+                 has no `url` yet: add it to `statac.yaml` once it is known.",
                 code(url)
             )),
             (None, None) if !s.base.is_empty() => notes.push(format!(
                 "The settings give a `baseurl`, {}, but no `url`, and Statac puts a site under a \
                  path only by its `url`: the links that named it were written without it, so add \
-                 the whole address as `url` in `statac.yaml`, and put the path back in those \
-                 links.",
+                 the full URL as `url` in `statac.yaml`, and put the path back in those links.",
                 code(&s.base)
             )),
             (None, None) => {}
@@ -890,7 +889,8 @@ impl Reader<'_> {
         if s.future {
             notes.push(
                 "The settings had `future: true`, by which Jekyll published posts dated after \
-                 the day it built the site; Statac publishes each on its day."
+                 the day it built the site; Statac publishes each on its date, as a scheduled \
+                 post."
                     .to_owned(),
             );
         }
@@ -971,7 +971,7 @@ impl Reader<'_> {
             if self.from(&path) == self.settings.destination {
                 self.left(
                     &shown,
-                    "the old site's built output, read only to check the addresses",
+                    "the old site's built output, read only to check the URLs",
                 );
                 continue;
             }
@@ -999,7 +999,7 @@ impl Reader<'_> {
                     ),
                     (
                         s.includes_dir.as_str(),
-                        "the old site's includes; each one the writing calls has a snippet of its \
+                        "the old site's includes; each one the content calls has a snippet of its \
                          name standing for it"
                             .to_owned(),
                     ),
@@ -1236,8 +1236,8 @@ impl Reader<'_> {
                     }
                     self.left(
                         rel,
-                        "front matter but no writing, such as a stylesheet or a feed, which \
-                         Jekyll built with its templates",
+                        "a file with front matter that isn't a page, such as a stylesheet or a \
+                         feed, which Jekyll built with its templates",
                     )
                 }
                 (false, Found::Page) => self.import.files.push(super::File {
@@ -1731,8 +1731,8 @@ impl Reader<'_> {
                  Jekyll read such a line as a link definition, and Statac's Markdown reads it as \
                  more of the footnote.",
                 match set_apart {
-                    1 => "1 footnote".to_owned(),
-                    n => format!("{n} footnotes"),
+                    1 => "1 footnote definition".to_owned(),
+                    n => format!("{n} footnote definitions"),
                 }
             ));
         }
@@ -1839,7 +1839,7 @@ impl Reader<'_> {
         self.import.addresses.extend(addresses.iter().cloned());
         self.note(format!(
             "The old site's home page showed its posts {per_page} to a page. {}, and the posts' \
-             own page shows them {per_page} to a page, as `posts_per_page` in `statac.yaml` says \
+             list page shows them {per_page} to a page, as `posts_per_page` in `statac.yaml` says \
              for every list: see https://statac.dev/lists/#pages-of-a-list.",
             one_home_page(self.starter)
         ));

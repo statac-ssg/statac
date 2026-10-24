@@ -904,7 +904,7 @@ mod tests {
         for target in ["/%2e%2e/secret.txt", "/a%5cb", "/posts/..%2f..%2fx"] {
             let answer = get(&site, target);
             assert_eq!(answer.status, 400, "{target}");
-            assert_eq!(answer.body, "This address can't name a file of the site.");
+            assert_eq!(answer.body, "This URL can't name a file of the site.");
         }
     }
 
@@ -998,7 +998,7 @@ mod tests {
         assert!(miss.body.contains("<title>Not found</title>"));
         assert!(
             miss.body
-                .contains("<h1>Nothing is published at this address.</h1>")
+                .contains("<h1>Nothing is published at this URL.</h1>")
         );
         assert!(!miss.body.contains("published under"));
         assert!(miss.body.contains(&format!("{}</head>", tag(&site))));

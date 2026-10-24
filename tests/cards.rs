@@ -280,12 +280,12 @@ fn a_site_with_no_address_draws_nothing_and_says_so() {
     }
     let said = site.build();
     assert!(!said.contains("Drew"), "{said}");
-    assert!(said.contains("1 note: 1 no-site-address."), "{said}");
+    assert!(said.contains("1 note: 1 no-site-url."), "{said}");
     assert_eq!(site.cards(), [""; 0]);
     assert_eq!(meta(&site.html("post-1/index.html"), "og:image"), None);
     assert_eq!(
         told(&site.check()),
-        ["note  No site address: sharing cards are left out until the site has a `url`"]
+        ["note  No site URL: social cards are left out until the site has a `url`"]
     );
 }
 
@@ -469,9 +469,9 @@ fn a_picture_a_page_cannot_be_shared_with_stops_the_build() {
         told(&said),
         [
             "error  Missing file: there is no `content/photo-1.jpg`",
-            "error  Wrong kind of value: `og_image` is a picture of the site's, not \
+            "error  Wrong kind of value: `og_image` is an image of the site's, not \
              `https://example.com/photo-2.jpg`",
-            "error  Unreadable picture: `content/photo-3.jpg` is cut short or damaged",
+            "error  Unreadable image: `content/photo-3.jpg` is cut short or damaged",
         ]
     );
     assert!(said.contains("  Did you mean `photo-10.jpg`?"), "{said}");
@@ -528,19 +528,19 @@ fn a_picture_of_any_kind_is_used_and_one_some_previews_may_not_show_is_warned_of
     assert_eq!(
         told(&said),
         [
-            "warning  Sharing image may not show: `content/photo-1.png` is a WebP",
-            "warning  Sharing image may not show: `content/drawing-2.svg` is an SVG",
-            "warning  Sharing image may not show: `content/drawing-3.svg` is an SVG",
-            "warning  Sharing image may not show: `content/moving-4.gif` is a GIF",
-            "warning  Sharing image may not show: `content/scan-5.bmp` is a kind of picture some \
-             link previews don't show",
+            "warning  Social image may not show: `content/photo-1.png` is a WebP",
+            "warning  Social image may not show: `content/drawing-2.svg` is an SVG",
+            "warning  Social image may not show: `content/drawing-3.svg` is an SVG",
+            "warning  Social image may not show: `content/moving-4.gif` is a GIF",
+            "warning  Social image may not show: `content/scan-5.bmp` is in a format some link \
+             previews don't show",
         ]
     );
     assert!(
         said.contains(
             "  content/post-1.md, line 3\n   3 │ og_image: photo-1.png\n     \
              │           ^^^^^^^^^^^\n  \
-             For a picture more link previews show, save it as a PNG.\n  \
+             For an image more link previews show, save it as a PNG.\n  \
              More: https://statac.dev/e/image-may-not-show/\n"
         ),
         "{said}"
@@ -588,9 +588,7 @@ fn a_picture_several_pages_name_is_warned_of_once_with_how_many() {
     let said = site.check();
     assert_eq!(
         told(&said),
-        [
-            "warning  Sharing image may not show: the `static/shared/cover.webp` of 3 pages is a WebP"
-        ]
+        ["warning  Social image may not show: the `static/shared/cover.webp` of 3 pages is a WebP"]
     );
     assert!(
         said.contains("  content/post-1.md, line 3\n   3 │ og_image: /shared/cover.webp\n"),
@@ -653,7 +651,7 @@ fn a_card_picked_beside_a_picture_of_the_pages_own_is_set_aside() {
     let said = site.check();
     assert_eq!(
         told(&said),
-        ["warning  Field set aside: `og_image` names the picture this page is shared with"]
+        ["warning  Field set aside: `og_image` names this page's social image"]
     );
     assert!(
         said.contains("  content/post-1.md, line 4\n   4 │ card: plain\n"),
@@ -727,7 +725,7 @@ fn files_no_card_can_be_drawn_with_stop_the_build_once() {
     });
     assert_eq!(
         told(&said),
-        ["error  Unreadable picture: `templates/og/background.png` is cut short or damaged"]
+        ["error  Unreadable image: `templates/og/background.png` is cut short or damaged"]
     );
     let said = unusable("moving", &|site| {
         site.put(
@@ -1159,7 +1157,7 @@ fn a_card_is_answered_in_a_layout_and_nowhere_else() {
     assert_eq!(code, 1, "{said}");
     assert_eq!(
         told(&said),
-        ["error  Template stopped: `page.card` isn't answered in a page's writing"]
+        ["error  Template stopped: `page.card` isn't answered in a page's content"]
     );
     assert!(
         said.contains("  snippets/shared.html, line 1\n   1 │ {{ page.card.url }}\n"),
@@ -1212,7 +1210,7 @@ fn a_problem_raised_in_a_text_or_a_snippet_it_calls_is_told_where_raised() {
     assert_eq!(
         told(&said),
         [
-            "error  Template stopped: `url` needs an address from the top of the site",
+            "error  Template stopped: `url` needs a URL starting with `/`",
             "error  Template stopped: `page.card` isn't answered in a card's own text",
         ]
     );

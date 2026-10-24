@@ -13,7 +13,7 @@ weekday. An example of any other moment, such as `1 January 2020`, can't
 be read. Neither can an example with the same piece written twice.
 
 Months and weekdays in words are written in the site's language, using
-its file in `languages/` or Statac's own words for that language. The
+its file in `languages/` or Statac's own translations for that language. The
 site-wide `date_format` must have the day, the month and the year, with
 the year in full, because every date on the site is written with it.
 

@@ -1,7 +1,7 @@
 # Draft left out
 
 A page has `draft: true`, so it isn't built. The field is either written
-on the page itself, or handed down from its folder's `index.md` as
+on the page itself, or cascaded from its folder's `index.md` with
 `pages.draft: true`.
 
 ## What you'll see {#what-youll-see}
@@ -17,8 +17,9 @@ note  Draft left out: `content/post-1.md`
 A draft is left out of everything: it has no page of its own, and no
 folder, tag, series or feed lists it. Statac reports every page it leaves
 out, so a page you marked as a draft and then forgot about never
-disappears without a word. `statac check` shows each draft, and `statac build` counts them.
-This can't be quietened, because it leaves a page out.
+disappears without a word. `statac check` shows each draft, and
+`statac build` counts them. This can't be quietened, because it leaves a
+page out.
 
 ## How to fix it
 

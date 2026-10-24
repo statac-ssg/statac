@@ -20,7 +20,7 @@ fn site() -> TempSite {
         ),
         (
             "snippets/figure.html",
-            "{# takes photo, alt #}\n{% set shown = page.photo(photo) %}\
+            "{# takes photo, alt #}\n{% set shown = page.image(photo) %}\
              {{ shown.alt }}{{ alt if alt is defined }}{{ caption | default('') }}\n",
         ),
         ("snippets/card.html", "{# takes post #}\n{{ post.title }}\n"),
@@ -131,7 +131,7 @@ fn a_field_offers_what_the_value_before_its_dot_holds() {
     assert_eq!(item(&fields, "title").1, "text");
     assert_eq!(item(&fields, "date").1, "date");
     assert_eq!(item(&fields, "tags").1, "lists");
-    assert_eq!(item(&fields, "photo").2, "photo($1)");
+    assert_eq!(item(&fields, "image").2, "image($1)");
     assert!(has(&fields, "book"), "a field the site declares");
     let looped = in_page(&site, "{% for post in site.posts %}{{ post.da|").unwrap();
     assert!(has(&looped, "date"), "the loop's page, the tag left open");

@@ -1,4 +1,4 @@
-This site was imported from a Zola site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/zola-beside/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -6,9 +6,9 @@ It was made from `tests/import/zola-beside/old` by `statac import`, which change
 
 - 5 posts, into `content/fr/posts/` and `content/posts/`.
 - 2 pages, into `content/` where they stood in the old site.
-- 6 other files, copied as they were: files published as they are into `static/` at the same path, so their addresses stay, and data files into `data/`.
+- 6 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 The settings declare 2 languages, so the new site is in each, the main one, `en`, first: each other language's pages are in its own folder in `content/`, where they stand at the same place as the page they translate, as https://statac.dev/dates-and-languages/#a-site-in-several-languages describes.
 
@@ -16,9 +16,9 @@ Zola has no setting for a time zone, and reads a date written without an offset 
 
 Zola's settings left straight quotes, `--` and `...` as typed, so `typography: false` keeps them so: take the line out to have Statac set them as print does.
 
-Zola shows all of a list's pages on one page, unless the list's own page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
+Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
 
-`content/fr/posts/index.md` and `content/posts/index.md` each hand `pages.layout: post`, so the pages beneath them, every one dated, are built with the starter's template for posts.
+`content/fr/posts/index.md` and `content/posts/index.md` each cascade `pages.layout: post`, so the pages beneath them, every one dated, are built with the starter's template for posts.
 
 The settings written in `statac.yaml`:
 
@@ -38,9 +38,9 @@ posts_per_page: 0
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 7 old addresses there: 7 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 7 old URLs there: 7 are published or redirected.
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
 
@@ -48,7 +48,7 @@ Statac worked out where the old site published each page, read the new site, and
 
 ### Links to pages that didn't come across
 
-Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so it is left as written: link to the page's address instead.
+Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so it is left as written: link to the page's URL instead.
 
 - `content/posts/post-3.fr.md`, line 5: `{{ get_url(path="@/posts/post-2/file-4.txt") }}`
 

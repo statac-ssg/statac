@@ -90,8 +90,8 @@ const DATE_NAMES: &[&str] = &[
 ];
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
-    heading: "Tags in the writing left as written",
-    sentence: "Statac's writing runs none of Hugo's tags, and these have no equal in it, so each \
+    heading: "Tags in the content left as written",
+    sentence: "Statac's Markdown runs none of Hugo's tags, and these have no equal in it, so each \
                is left as written and shows on the page as it stands: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
@@ -103,16 +103,16 @@ pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
 };
 
 pub(super) static TAG_IN_ADDRESS: FindingKind = FindingKind {
-    heading: "Tags inside an address",
-    sentence: "Each of these tags stands inside a link's address, where Statac runs no snippet, \
-               so it is left as written and the link leads nowhere: write the address the tag \
-               made in its place.",
+    heading: "Tags inside a URL",
+    sentence: "Each of these tags stands inside a link's URL, where Statac runs no snippet, so it \
+               is left as written and the link leads nowhere: write the URL the tag made in its \
+               place.",
 };
 
 pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page Statac couldn't find in the old site, so it is left as \
-               written: link to the page's address instead.",
+               written: link to the page's URL instead.",
 };
 
 pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
@@ -124,7 +124,7 @@ pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
 
 pub(super) static FIGURE_HTML: FindingKind = FindingKind {
     heading: "Figures written as HTML",
-    sentence: "Each of these figures shows a picture kept elsewhere or one the starter's `figure` \
+    sentence: "Each of these figures shows an image kept elsewhere or one the starter's `figure` \
                snippet can't show, such as a GIF, stands inside HTML, or asks for what the \
                snippet has no equal for, such as a link, so Statac wrote the HTML Hugo made for \
                it.",
@@ -139,7 +139,7 @@ pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
 
 pub(super) static RAW_HTML: FindingKind = FindingKind {
     heading: "HTML Hugo left out",
-    sentence: "Hugo's settings left HTML written in the writing out of the page, and Statac \
+    sentence: "Hugo's settings left HTML in Markdown out of the page, and Statac \
                publishes it as it is, so each of these now shows: read each page that has one, \
                and take out what wasn't meant to show.",
 };
@@ -166,10 +166,10 @@ pub(super) static SUMMARY_CUT: FindingKind = FindingKind {
 };
 
 pub(super) static PUBLISH_DATE: FindingKind = FindingKind {
-    heading: "Pages published on a day of their own",
+    heading: "Pages with a different `publishDate`",
     sentence: "Hugo published each of these pages from its `publishDate`, a day other than its \
                `date`, and Statac publishes a page on its `date`, so the line was taken off: \
-               where the page should wait, write that day as its `date`.",
+               to schedule the page, write that day as its `date`.",
 };
 
 pub(super) static EXPIRY_DATE: FindingKind = FindingKind {
@@ -195,10 +195,10 @@ pub(super) static UNPUBLISHED: FindingKind = FindingKind {
 };
 
 pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
-    heading: "Addresses Statac couldn't work out",
+    heading: "URLs Statac couldn't work out",
     sentence: "Each of these pages is published by a pattern in `[permalinks]` holding a \
-               placeholder Statac doesn't know, so its old address wasn't worked out or kept: \
-               give the page a `permalink` of the address the old site published it at.",
+               placeholder Statac doesn't know, so its old URL wasn't worked out or kept: give \
+               the page a `permalink` of the URL the old site published it at.",
 };
 
 pub(super) static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
@@ -427,8 +427,8 @@ impl Reader<'_> {
             (_, Some(given)) => self.import.address = Some(given.to_owned()),
             (Some(url), None) if url.trim_matches('/').is_empty() => {}
             (Some(url), None) => notes.push(format!(
-                "The settings' `baseURL`, {}, isn't a web address, so the new site has no `url` \
-                 yet: add it to `statac.yaml` once it is known.",
+                "The settings' `baseURL`, {}, isn't an `https://` or `http://` URL, so the new \
+                 site has no `url` yet: add it to `statac.yaml` once it is known.",
                 code(url)
             )),
             (None, None) => {}
@@ -623,7 +623,7 @@ impl Reader<'_> {
             let special = [
                 (
                     s.publish_dir.as_str(),
-                    "the old site's built output, read only to check the addresses".to_owned(),
+                    "the old site's built output, read only to check the URLs".to_owned(),
                 ),
                 (
                     s.layout_dir.as_str(),
@@ -657,7 +657,7 @@ impl Reader<'_> {
                 (
                     s.i18n_dir.as_str(),
                     left_behind(
-                        "the words the old site's templates showed in each language",
+                        "the translations the old site's templates showed in each language",
                         "the starter's `data/words.yaml` takes",
                         starter,
                     ),
@@ -885,7 +885,7 @@ impl Reader<'_> {
                 } else if is_writing(name) {
                     self.left(
                         &path,
-                        "writing kept among a page's files, which Hugo doesn't publish as a page",
+                        "content kept among a page's files, which Hugo doesn't publish as a page",
                     );
                 } else {
                     self.beside(root, language, rel, name, true)?;
@@ -1723,8 +1723,8 @@ impl Reader<'_> {
                 .unwrap_or_default();
             self.note(format!(
                 "{} a tag of the site's own that showed one of the site's values and nothing \
-                 else, such as {}: {} the value itself now, the site's address as the path from \
-                 its top.",
+                 else, such as {}: {} the value itself now, the site's URL as a path starting with \
+                 `/`.",
                 match valued {
                     1 => "1 place held".to_owned(),
                     n => format!("{n} places held"),
@@ -1747,7 +1747,7 @@ impl Reader<'_> {
                     0 => String::new(),
                     n => format!(
                         " `class`, `width` and `height` were taken off {n} of them, which the \
-                         snippet doesn't take: each shows at the size the starter gives a picture."
+                         snippet doesn't take: each shows at the size the starter gives an image."
                     ),
                 }
             ));
@@ -2049,23 +2049,23 @@ impl Reader<'_> {
         }
         let on = match (home, lists) {
             (true, false) => "the home page",
-            _ => "each list's page",
+            _ => "each list page",
         };
         let (now, kept) = match self.starter {
             true => (
                 "is now an Atom feed",
                 format!(
-                    "at the same address, written by `templates/feed.xml`, as `feed: {name}` on \
-                     {on} says, and `feed_ids_before` keeps each post's id the address Hugo gave \
-                     it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids."
+                    "at the same URL, written by `templates/feed.xml`, as `feed: {name}` on {on} \
+                     says, and `feed_ids_before` keeps each post's id the URL Hugo gave it, so \
+                     feed readers see nothing new: see https://statac.dev/feeds/#entry-ids."
                 ),
             ),
             false => (
                 "stays",
                 format!(
-                    "at the same address, as `feed: {name}` on {on} says, built with \
+                    "at the same URL, as `feed: {name}` on {on} says, built with \
                      `templates/feed.xml` once you add it, and `feed_ids_before` keeps each \
-                     post's id the address Hugo gave it, so feed readers see nothing new: see \
+                     post's id the URL Hugo gave it, so feed readers see nothing new: see \
                      https://statac.dev/feeds/#entry-ids."
                 ),
             ),
@@ -2073,14 +2073,14 @@ impl Reader<'_> {
         let mut said = match (fed, home, lists) {
             (false, ..) => String::new(),
             (true, true, true) => format!(
-                "Hugo's feeds were RSS, at `{name}` beside the home page and each list's own \
-                 page. Each {now} {kept}"
+                "Hugo's feeds were RSS, at `{name}` beside the home page and each list page. \
+                 Each {now} {kept}"
             ),
             (true, true, false) => {
                 format!("Hugo's feed was RSS, at `{name}` beside the home page. It {now} {kept}")
             }
             (true, false, _) => format!(
-                "Hugo's feeds were RSS, at `{name}` beside each list's own page. Each {now} {kept}"
+                "Hugo's feeds were RSS, at `{name}` beside each list page. Each {now} {kept}"
             ),
         };
         match whole.as_slice() {
@@ -2088,7 +2088,7 @@ impl Reader<'_> {
             [(page, to, feed)] => {
                 said += &format!(
                     " A list published as its own file, {}, had its feed in the folder of the \
-                     same name, so {} gives the feed's whole address: {}.",
+                     same name, so {} gives its feed's URL: {}.",
                     code(page),
                     code(&format!("content/{to}")),
                     code(&format!("feed: {feed}"))
@@ -2097,8 +2097,8 @@ impl Reader<'_> {
             [(page, to, feed), ..] => {
                 said += &format!(
                     " The lists published as their own files, such as {}, had their feeds in \
-                     the folders of the same names, so the page of each gives its feed's whole \
-                     address, as {} does: {}.",
+                     the folders of the same names, so the list page of each gives its feed's \
+                     URL, as {} does: {}.",
                     code(page),
                     code(&format!("content/{to}")),
                     code(&format!("feed: {feed}"))
@@ -2108,11 +2108,11 @@ impl Reader<'_> {
         if unfed {
             said += match fed {
                 true => {
-                    " Hugo made no feed for the other lists, so the page of each says \
+                    " Hugo made no feed for the other lists, so the list page of each says \
                      `feed: false`."
                 }
                 false => {
-                    "Hugo made no feeds, so the page of each list says `feed: false`: see \
+                    "Hugo made no feeds, so each list page says `feed: false`: see \
                      https://statac.dev/feeds/."
                 }
             };
@@ -2133,9 +2133,9 @@ impl Reader<'_> {
                  with the starter's template for posts.",
                 folders.join(", "),
                 if folders.len() == 1 {
-                    "hands"
+                    "cascades"
                 } else {
-                    "each hand"
+                    "each cascade"
                 },
                 if folders.len() == 1 { "it" } else { "them" }
             ));
@@ -2158,9 +2158,9 @@ impl Reader<'_> {
             .collect();
         if !made.is_empty() {
             let mut said = format!(
-                "Hugo made a list of each folder at the top of the writing, and these had no \
-                 `_index.md` of their own, so Statac wrote one to keep what the list was given: \
-                 {}.",
+                "Hugo made a list of each folder at the top of the content folder, and these had \
+                 no `_index.md` of their own, so Statac wrote one to keep what the list was \
+                 given: {}.",
                 made.join(", ")
             );
             match moved.as_slice() {
@@ -2296,9 +2296,10 @@ impl Reader<'_> {
                         };
                         let later = match later {
                             Some(later) => format!(
-                                " {one} later pages stood beneath its page, such as {}: \
-                                 nothing answers those. With the old site's built output in {}, \
-                                 `statac import` sends readers on from each it finds there.",
+                                " {one} paginated pages were published beneath its list page, \
+                                 such as {}: nothing is published at those now. With the old \
+                                 site's built output in {}, `statac import` redirects from each it \
+                                 finds there.",
                                 code(&later),
                                 code(&format!("{}/", self.s.publish_dir))
                             ),
@@ -2307,14 +2308,14 @@ impl Reader<'_> {
                         self.note(format!(
                             "The settings' `[permalinks]` put the page of each of the `{plural}` \
                              at {}, which Statac has no pattern for, so each is at Statac's own \
-                             address, and a page at the old one sends readers on to it.{later}",
+                             URL, and a page at the old one redirects to it.{later}",
                             code(&pattern)
                         ))
                     }
                     false => self.note(format!(
                         "The settings' `[permalinks]` put the page of each of the `{plural}` at \
-                         {}, which Statac has no pattern for, so each is at Statac's own \
-                         address: those Hugo used are listed under Addresses.",
+                         {}, which Statac has no pattern for, so each is at Statac's own URL: \
+                         those Hugo used are listed under URLs.",
                         code(&pattern)
                     )),
                     true => self
@@ -2347,8 +2348,8 @@ impl Reader<'_> {
             if let Some(example) = feeds.first() {
                 let said = format!(
                     "Hugo's feed for each tag and each list of that kind, {} of them, such as {}: \
-                     Statac gives such a list a feed only where a page of yours at its address \
-                     asks for one with `feed:`.",
+                     Statac gives such a list a feed only where a list page of yours asks for one \
+                     with `feed:`.",
                     feeds.len(),
                     code(example)
                 );
@@ -2552,7 +2553,7 @@ impl Reader<'_> {
             let path = path.trim_matches('/');
             if path != "page" && !path.is_empty() {
                 self.import.settings.push((
-                    "later_pages".into(),
+                    "pagination.permalink".into(),
                     Value::Text(format!("{{list}}{path}/{{n}}/")),
                 ));
             }
@@ -2563,15 +2564,15 @@ impl Reader<'_> {
         if self.s.pager_size.is_some() || self.s.pager_path.is_some() || more || firsts {
             let firsts = match firsts {
                 true => {
-                    " The first of a list's later pages, which Hugo sent on to the list, is in \
-                     the list's `redirect_from`."
+                    " The first of a list's paginated pages, which Hugo redirected to the list, \
+                     is in the list page's `redirect_from`."
                 }
                 false => "",
             };
             self.note(format!(
-                "Hugo made later pages only for the lists whose templates asked for them, which \
-                 Statac can't tell from the writing; Statac makes them for every list with more \
-                 posts than a page shows: see https://statac.dev/lists/#pages-of-a-list.{firsts}"
+                "Hugo paginated only the lists whose templates asked for it, which Statac can't \
+                 tell from the content; Statac paginates every list with more posts than a page \
+                 shows: see https://statac.dev/lists/#pages-of-a-list.{firsts}"
             ));
         }
         // The old built output, where it is there, shows which of these
@@ -2580,38 +2581,38 @@ impl Reader<'_> {
             _ if self.import.built.is_some() => None,
             (Some((list, later)), None) => Some(format!(
                 "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
-                 {}, which now sends readers on to the list, and its later pages as files too, \
-                 such as {}: nothing answers those.",
+                 {}, which now redirects to the list, and its paginated pages as files too, such \
+                 as {}: nothing is published at those now.",
                 code(list),
                 code(later)
             )),
             (Some((list, later)), Some(tags)) => Some(format!(
                 "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
-                 {}, which now sends readers on to the list, and its later pages as files too, \
-                 such as {}; and every version published a tag's later pages as files, such as \
-                 {}: nothing answers those.",
+                 {}, which now redirects to the list, and its paginated pages as files too, such \
+                 as {}; and every version published a tag's paginated pages as files, such as {}: \
+                 nothing is published at those now.",
                 code(list),
                 code(later),
                 code(tags)
             )),
             (None, Some(tags)) => Some(format!(
-                "Hugo published a tag's later pages under `uglyURLs` as files, such as {}: \
-                 nothing answers those.",
+                "Hugo published a tag's paginated pages under `uglyURLs` as files, such as {}: \
+                 nothing is published at those now.",
                 code(tags)
             )),
             (None, None) => None,
         };
         if let Some(files) = files {
             self.note(format!(
-                "{files} With the old site's built output in {}, `statac import` sends readers on \
-                 from each it finds there.",
+                "{files} With the old site's built output in {}, `statac import` redirects from \
+                 each it finds there.",
                 code(&format!("{}/", self.s.publish_dir))
             ));
         }
         if self.s.pager_size.is_some() || more {
             self.note(format!(
-                "Where the old home page had later pages, nothing answers them: {}, and Statac \
-                 can't tell from the writing which later pages Hugo made.",
+                "Where the old home page was paginated, nothing is published at page 2 onwards \
+                 now: {}, and Statac can't tell from the content which pages Hugo made.",
                 one_home_page(self.starter)
             ));
         }

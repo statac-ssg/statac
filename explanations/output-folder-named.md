@@ -1,6 +1,6 @@
 # Output folder named
 
-The site's `after_build` command contains the name of the folder the
+The site's `after_build` hook contains the name of the folder the
 built site is published in. That folder is `_site` unless the build was
 told to use another. While the command runs, the folder still holds the
 site built last time.

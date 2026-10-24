@@ -1,7 +1,7 @@
 # Spelled two ways
 
 Your pages spell one tag, or one series, in two ways that give the same
-address, such as `Rust` on some pages and `rust` on others.
+URL, such as `Rust` on some pages and `rust` on others.
 
 ## What you'll see {#what-youll-see}
 
@@ -13,7 +13,7 @@ warning  Tag spelled two ways: `Rust` (12 pages) and `rust` (2 pages) are one ta
 
 ## Why Statac warns
 
-Both spellings would be published at the same address, `/tags/rust/`, so
+Both spellings would be published at the same URL, `/tags/rust/`, so
 they can only be one tag. Statac merges them into one tag under the
 spelling most pages use, and carries on. If two spellings are used by the
 same number of pages, Statac uses the one that sorts first, which puts
@@ -29,9 +29,9 @@ You choose the spelling. Use the one you want on every page. The warning
 lists each spelling and how many pages use it, so you can see which pages
 to change.
 
-If you want two separate tags that would otherwise get the same address,
-use `tags.slugs` (or `series.slugs`) in `statac.yaml` to give one of them
-its own part of the address.
+If you want two separate tags that would otherwise get the same URL, use
+`tags.slugs` (or `series.slugs`) in `statac.yaml` to give one of them its
+own slug.
 
 ## Example
 

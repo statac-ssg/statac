@@ -125,7 +125,7 @@ pub(super) fn by_file(
 /// told at the start of: both sides of two things at one address.
 fn named_files(kind: &Kind, site: &Path) -> Vec<PathBuf> {
     let named: Vec<&Named> = match kind {
-        Kind::SameAddress { first, second, .. } => vec![first, second],
+        Kind::SameUrl { first, second, .. } => vec![first, second],
         Kind::LaterPageTaken { page, .. } => vec![page],
         _ => Vec::new(),
     };

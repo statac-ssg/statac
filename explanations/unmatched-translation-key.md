@@ -17,7 +17,7 @@ Statac builds the page as written. A key is there to link a page to its
 translations, so a key that links nothing usually means one of two
 things. Either it is spelled differently on the page and on its
 translation, or the translation hasn't been written yet. A draft, or a
-post waiting for its day, still counts as having its key. The page is
+scheduled post, still counts as having its key. The page is
 linked to it once it is published.
 
 On a site in only one language there is no other language, so no key

@@ -269,7 +269,7 @@ fn a_file_at_an_address_of_the_index_is_told_as_a_clash() {
         site.write(file, "\n");
         let (said, code) = site.run(&["check", "--today=2026-10-04"]);
         assert_eq!(code, 1, "{file}: {said}");
-        let told = said.lines().find(|line| line.contains("Same address"));
+        let told = said.lines().find(|line| line.contains("Same URL"));
         let told = told.unwrap_or_else(|| panic!("{file}: {said}"));
         assert!(told.contains(&format!("`{named}`")), "{told}");
         assert!(told.contains("the site's search index"), "{told}");

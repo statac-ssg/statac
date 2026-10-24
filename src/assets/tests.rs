@@ -1247,7 +1247,7 @@ fn two_files_claiming_one_name_are_both_named() {
     let (_, problems, _) = site.gather("");
     assert_eq!(
         problems,
-        [Problem::nowhere(Kind::SameAddress {
+        [Problem::nowhere(Kind::SameUrl {
             first: "assets/site.css".into(),
             second: "assets/site.scss".into(),
             alike: Alike::Exactly,
@@ -1269,7 +1269,7 @@ fn two_files_meeting_again_in_the_other_order_are_told_once() {
     .collect();
     assert_eq!(
         same_address(&outputs, ""),
-        [Problem::nowhere(Kind::SameAddress {
+        [Problem::nowhere(Kind::SameUrl {
             first: "static/Photo-1.png".into(),
             second: "content/photo-1.png".into(),
             alike: Alike::ByCase,
@@ -1287,7 +1287,7 @@ fn a_static_file_over_an_asset_is_an_error() {
     let (_, problems, _) = site.gather("");
     assert_eq!(
         problems,
-        [Problem::nowhere(Kind::SameAddress {
+        [Problem::nowhere(Kind::SameUrl {
             first: "assets/site.css".into(),
             second: format!("static/{published}").into(),
             alike: Alike::Exactly,
@@ -1305,7 +1305,7 @@ fn a_page_over_an_asset_is_an_error() {
     claims.push((published.clone(), "content/post-1.md".into()));
     assert_eq!(
         same_address(&claims, ""),
-        [Problem::nowhere(Kind::SameAddress {
+        [Problem::nowhere(Kind::SameUrl {
             first: "assets/site.css".into(),
             second: "content/post-1.md".into(),
             alike: Alike::Exactly,
@@ -1320,11 +1320,11 @@ fn told_one_by_one(outputs: &[(String, Named)]) -> Vec<Kind> {
     let mut told: Vec<Kind> = Vec::new();
     let mut tell = |first: &Named, second: &Named, alike: Alike, rel: &str| {
         let twice = |kind: &Kind| {
-            matches!(kind, Kind::SameAddress { first: a, second: b, .. }
+            matches!(kind, Kind::SameUrl { first: a, second: b, .. }
                 if **a == *first && **b == *second)
         };
         if !told.iter().any(twice) {
-            told.push(Kind::SameAddress {
+            told.push(Kind::SameUrl {
                 first: Box::new(first.clone()),
                 second: Box::new(second.clone()),
                 alike,
@@ -1446,7 +1446,7 @@ fn names_a_disk_holds_as_one_collide() {
             ("Logo.png", "static/Logo.png"),
             ("logo.png", "static/logo.png")
         ]),
-        [Kind::SameAddress {
+        [Kind::SameUrl {
             first: "static/Logo.png".into(),
             second: "static/logo.png".into(),
             alike: Alike::ByCase,
@@ -1458,7 +1458,7 @@ fn names_a_disk_holds_as_one_collide() {
             ("caf\u{e9}.txt", "static/caf\u{e9}.txt"),
             ("cafe\u{301}.txt", "static/cafe\u{301}.txt"),
         ]),
-        [Kind::SameAddress {
+        [Kind::SameUrl {
             first: "static/caf\u{e9}.txt".into(),
             second: "static/cafe\u{301}.txt".into(),
             alike: Alike::ByNormalisation,
@@ -1472,7 +1472,7 @@ fn names_a_disk_holds_as_one_collide() {
             ("fonts/b.woff2", "static/fonts/b.woff2"),
             ("fonts/c.woff2", "static/fonts/c.woff2"),
         ]),
-        [Kind::SameAddress {
+        [Kind::SameUrl {
             first: "static/Fonts".into(),
             second: "static/fonts".into(),
             alike: Alike::ByCase,
@@ -1485,7 +1485,7 @@ fn names_a_disk_holds_as_one_collide() {
             ("fonts/a.1a2b3c4d.woff2", "assets/fonts/a.woff2"),
             ("fonts", "static/fonts"),
         ]),
-        [Kind::SameAddress {
+        [Kind::SameUrl {
             first: "assets/fonts".into(),
             second: "static/fonts".into(),
             alike: Alike::Exactly,
@@ -1498,7 +1498,7 @@ fn names_a_disk_holds_as_one_collide() {
             ("site.1a2b3c4d.css", "assets/site.css"),
             ("Site.1a2b3c4d.css", "content/post-1.md"),
         ]),
-        [Kind::SameAddress {
+        [Kind::SameUrl {
             first: "assets/site.css".into(),
             second: "content/post-1.md".into(),
             alike: Alike::ByCase,
@@ -1512,7 +1512,7 @@ fn names_a_disk_holds_as_one_collide() {
             ("post-2/index.html", "content/Post-2.md"),
             ("POST-2/index.html", "content/post-3.md"),
         ]),
-        [Kind::SameAddress {
+        [Kind::SameUrl {
             first: "content/Post-2.md".into(),
             second: "content/post-3.md".into(),
             alike: Alike::ByCase,

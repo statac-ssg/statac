@@ -195,7 +195,7 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
     }
     let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
     let left_behind: HashSet<&str> = settings
-        .texts("left_behind")
+        .texts("exclude")
         .iter()
         .map(|name| name.value.as_str())
         .collect();
@@ -922,7 +922,7 @@ impl Reader<'_> {
             && needs.value == "url"
             && self.settings.text("url").is_none()
         {
-            let kind = Kind::NoSiteAddress {
+            let kind = Kind::NoSiteUrl {
                 waiting: crate::problem::Waiting::Page(path.clone()),
             };
             problems.push(Problem::at(kind, needs.origin.place.unwrap_or(head)));
@@ -965,7 +965,7 @@ impl Reader<'_> {
             } else {
                 self.waiting.push(d.source);
                 self.left_out(&words, folder_at);
-                let kind = Kind::WaitingForItsDay {
+                let kind = Kind::ScheduledPost {
                     path: path.clone(),
                     date: date.value.iso_day(),
                 };
@@ -1206,7 +1206,7 @@ impl Reader<'_> {
                     Err((fault, span)) => {
                         let place = crate::value::place_within(sources, &to.origin, to.value, span)
                             .unwrap_or(place);
-                        problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
+                        problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
                     }
                 }
             }
@@ -1246,7 +1246,7 @@ impl Reader<'_> {
                             span,
                         )
                         .unwrap_or(place);
-                        problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
+                        problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
                     }
                 }
             }
@@ -1407,7 +1407,7 @@ fn unpublished(sources: &Sources, page: &Page) -> Vec<Problem> {
             .map_or(text.len(), |len| start + len);
         let path = sources.path(source).to_string_lossy().into_owned();
         problems.push(Problem::at(
-            Kind::WritingNotPublished { path },
+            Kind::ContentNotPublished { path },
             Place {
                 source,
                 span: Span::new(start, end),
@@ -1500,7 +1500,7 @@ pub fn taken(site: &Site, outputs: &[(String, Named)], base: &str) -> Vec<Proble
         .collect();
     let taken = site.held_back.iter().filter_map(|held| {
         let named = published.get(&held.address.key())?;
-        let kind = Kind::AddressTaken {
+        let kind = Kind::UrlTaken {
             held: held.held,
             address: format!("{base}{}", held.address.as_str()),
             taken: Box::new((*named).clone()),
@@ -1577,7 +1577,7 @@ fn address_of(
             .filter(|_| written_here)
             .and_then(|p| p.origin.place)
             .unwrap_or(head);
-        problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
+        problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
         Address::made(path)
     };
     let Some(permalink) = permalink.filter(|_| place != PagePlace::Folder || written_here) else {
@@ -1611,7 +1611,7 @@ fn address_of(
     let expanded = match address::expand(&pattern, &pieces) {
         Ok(expanded) => top.address(&expanded),
         Err(fault) => {
-            problems.push(Problem::at(Kind::UnusableAddress { fault }, head));
+            problems.push(Problem::at(Kind::UnusableUrl { fault }, head));
             return Address::made(path);
         }
     };
@@ -1624,7 +1624,7 @@ fn address_of(
     match read {
         Ok(address) => address,
         Err((fault, _)) => {
-            problems.push(Problem::at(Kind::UnusableAddress { fault }, head));
+            problems.push(Problem::at(Kind::UnusableUrl { fault }, head));
             Address::made(path)
         }
     }

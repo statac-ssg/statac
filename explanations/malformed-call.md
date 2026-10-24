@@ -1,6 +1,6 @@
 # Malformed call
 
-Statac found what looks like a snippet call in your writing, `@name(...)`,
+Statac found what looks like a snippet call in your content, `@name(...)`,
 but couldn't read it. The message says what it found and points at the
 place to fix, such as a bracket that is never closed.
 
@@ -15,7 +15,7 @@ error  Malformed call: `@image(` is never closed
 ## Why Statac stops
 
 A call Statac can't read would appear on the page as the text you typed,
-or absorb the writing after it. Neither is what you meant, so Statac stops
+or absorb the content after it. Neither is what you meant, so Statac stops
 instead of publishing either.
 
 ## How to fix it
@@ -31,17 +31,18 @@ Look at the place the caret points to. Common causes:
 - A snippet name with letters other than a to z. Name the snippet using
   only the letters a to z, digits and `_`.
 - A call to a snippet that shows `body`, with no `@end` after it. A call
-  like this wraps the writing below it, and an `@end` on a line of its own
-  marks where that writing ends.
-- An `@end` with no call above it for it to close. Only a call to a snippet that
-  shows `body`, on a line of its own, wraps writing up to an `@end`.
+  like this wraps the content below it, and an `@end` on a line of its own
+  marks where that content ends.
+- An `@end` with no call above it for it to close. Only a call to a
+  snippet that shows `body`, on a line of its own, wraps content up to an
+  `@end`.
 - A call to a snippet that shows `body`, in the middle of a sentence. Put
-  it on a line of its own, with the writing it wraps below it and `@end`
+  it on a line of its own, with the content it wraps below it and `@end`
   on a line after that.
-- An `@url(...)` given anything other than a single address from the top
-  of the site: no address, two addresses, a value with a name, or an
-  address that doesn't start with a single `/`. Write the address the page
-  is published at, as in `@url(/about/)`.
+- An `@url(...)` given anything other than a single URL starting with
+  `/`: no URL, two URLs, a value with a name, or a URL that doesn't start
+  with a single `/`. Write the URL the page is published at, as in
+  `@url(/about/)`.
 
 To show a call as text instead, write a backslash before the `@`:
 `\@image('photo-1.jpg')`.
@@ -60,11 +61,11 @@ The call is never closed. Close it with `)`:
 A photograph: @image('photo-1.jpg')
 ```
 
-If `snippets/note.html` shows `{{ body }}`, a call to it wraps the writing
-below it, and that writing ends at an `@end` on its own line:
+If `snippets/note.html` shows `{{ body }}`, a call to it wraps the content
+below it, and that content ends at an `@end` on its own line:
 
 ```markdown
 @note('warning')
-The writing the note wraps.
+The content the note wraps.
 @end
 ```

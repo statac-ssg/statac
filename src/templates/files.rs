@@ -137,7 +137,7 @@ pub(super) fn files_named(ast: &Stmt<'_>, params: &[String]) -> Vec<(String, Sor
             return;
         };
         let sort = match method.name {
-            "photo" | "photos" => Sort::Picture,
+            "image" | "images" => Sort::Picture,
             "file" => Sort::File,
             "video" => Sort::Video,
             "audio" => Sort::Recording,

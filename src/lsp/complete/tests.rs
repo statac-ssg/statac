@@ -167,7 +167,7 @@ fn settings_offer_statacs_names_and_what_each_takes() {
         find(&names, "pages.layout"),
         &(
             "pages.layout".into(),
-            "handed down".into(),
+            "cascade".into(),
             "pages.layout: ".into()
         )
     );
@@ -236,7 +236,7 @@ fn front_matter_offers_statacs_fields_then_the_sites() {
     )
     .unwrap();
     assert!(labels(&folder).contains(&"numbered"));
-    assert_eq!(find(&folder, "pages.layout").1, "handed down");
+    assert_eq!(find(&folder, "pages.layout").1, "cascade");
     assert_eq!(find(&folder, "pages.status").1, "one of draft, final");
 
     let nested = offered(&site, "content/posts/post-3.md", "---\nbook:\n  |\n---\n").unwrap();

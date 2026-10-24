@@ -5,7 +5,7 @@ every page or for pages of the page's `type`. A page made from an item in
 `data/` is missing the field if the item is missing it.
 
 A page with `each:` makes a page for each item of a table, or for each
-post, and needs a `permalink:` pattern to set each page's address.
+post, and needs a `permalink:` pattern to set each page's URL.
 
 A card's settings in `templates/` need a `background` and a `font`. Each
 text on the card needs all four of its fields, `text`, `place`, `size` and

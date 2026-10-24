@@ -1,6 +1,6 @@
 # Control character
 
-Your writing contains a control character. These are invisible
+Your content contains a control character. These are invisible
 characters that were once used to tell a printer or a terminal what to
 do, such as a vertical tab, U+000B. They usually come from text pasted
 from a word processor, which uses one to mark a line break inside a
@@ -28,7 +28,7 @@ would copy a character they can't see. Statac tells you because the
 character may stand in for one you meant to type.
 
 Tabs and line endings are the only control characters Statac keeps in
-your writing.
+your content.
 
 ## How to fix it
 

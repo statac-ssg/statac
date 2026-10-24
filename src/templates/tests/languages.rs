@@ -432,7 +432,7 @@ fn digits_writes_figures_in_the_digits_of_the_pages_own_language() {
         ("content/en/post-1.md", WORDS),
         (
             "templates/page.html",
-            "{{ 12 | digits }}|{{ page.words | digits }}|{{ \"Page 3 of 10\" | digits }}|\
+            "{{ 12 | digits }}|{{ page.word_count | digits }}|{{ \"Page 3 of 10\" | digits }}|\
              {{ (-1.5) | digits }}|{{ \"1,234.50\" | digits }}|{{ \"\u{6f3} and 4\" | digits }}|\
              {{ \"<b>1</b> & 2\" | safe | digits }}|{{ page.content }}",
         ),

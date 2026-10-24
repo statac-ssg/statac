@@ -9,7 +9,7 @@ folders for this beside the output folder, with names ending
 `.statac-new` or `.statac-old`. Those are the folders it couldn't remove.
 
 `statac refuse` removes a webmention's file from `fetched/mentions/`, and
-the sender's face from `fetched/faces/`. It never removes either one if
+the sender's avatar from `fetched/faces/`. It never removes either one if
 it is a link, and never removes anything that isn't a file.
 
 ## What you'll see {#what-youll-see}

@@ -16,8 +16,8 @@ note  Numbered folder: `content/days/` is ordered by the number each name opens 
 
 In a numbered folder, the numbers set the order. The folder's list
 includes every page in it, dated or not, in order of their numbers. The
-numbers are left out of the addresses, so `03-day-three.md` is published
-at `/day-three/`, and renumbering a page never changes its address. Only
+numbers are left out of the URLs, so `03-day-three.md` is published at
+`/day-three/`, and renumbering a page never changes its URL. Only
 the first number sets the order, so `07-50-notes.md` is published at
 `/50-notes/`.
 
@@ -26,7 +26,7 @@ The site's list, its tags and its series still sort it by date.
 
 Statac tells you once for each folder, because otherwise a folder whose
 names happen to start with numbers would be reordered and given new
-addresses without a word. Once you have understood it, you can
+URLs without a word. Once you have understood it, you can
 quieten it.
 
 ## How to fix it
@@ -34,7 +34,7 @@ quieten it.
 If you meant the numbers to order the folder, nothing is wrong.
 
 If the numbers are part of the names, as in a folder of years, write
-this in the folder's `index.md`. The names and addresses then keep the
+this in the folder's `index.md`. The names and URLs then keep the
 numbers:
 
 ```yaml
@@ -51,7 +51,7 @@ numbered.
 `/days/day-two/` and `/days/day-three/`.
 
 To order a folder without renaming its files, write the order in its
-`index.md` instead, using the names in the pages' addresses:
+`index.md` instead, naming each page by the last part of its URL:
 
 ```yaml
 order: [day-one, day-two, day-three]

@@ -68,7 +68,7 @@ fn a_setting_says_what_it_does() {
         lines,
         [
             "`code_style`, a setting",
-            "The colours of code in the writing: `ocean`, `gruvbox`, `solarized`, \
+            "The colours of code in the content: `ocean`, `gruvbox`, `solarized`, \
              `catppuccin` or `one-half`, or `none` to colour no code. Unset, it is `ocean`.",
         ]
     );
@@ -78,14 +78,14 @@ fn a_setting_says_what_it_does() {
     );
     let (lines, more, _) = settings(&site, "fields.book.au|thor: text\n").unwrap();
     assert_eq!(lines[0], "`fields.book.author`, a setting");
-    assert!(lines[1].starts_with("The kind of value a field of your own holds"));
+    assert!(lines[1].starts_with("The kind of value a custom field holds"));
     assert_eq!(more.unwrap(), "https://statac.dev/settings/#fields");
     let (lines, more, _) = settings(&site, "pages.lay|out: post\n").unwrap();
     assert_eq!(
         lines,
         [
-            "`pages.layout`, handed down",
-            "Hands `layout` down to every page.",
+            "`pages.layout`, a cascade",
+            "Cascades `layout` to every page.",
             "The template the page is built with, by its name in `templates/`. On a page \
              with `each:`, the template for the pages it makes.",
         ]
@@ -98,8 +98,8 @@ fn a_setting_says_what_it_does() {
     assert_eq!(
         lines,
         [
-            "`pages.isbn`, handed down",
-            "Hands `isbn` down to every page.",
+            "`pages.isbn`, a cascade",
+            "Cascades `isbn` to every page.",
             "Templates show it as `page.isbn`.",
             "Declared in `statac.yaml` as `required text`.",
         ]
@@ -114,14 +114,14 @@ fn a_value_of_the_sites_own_says_how_templates_show_it() {
     assert_eq!(
         lines,
         [
-            "`tagline`, a value of your own",
+            "`tagline`, a custom setting",
             "Templates show it as `site.tagline`."
         ]
     );
     assert_eq!(more.unwrap(), "https://statac.dev/settings/#your-own");
     let nested = "tagline: Notes\nbook:\n  auth|or: Author 1\n";
     let (lines, ..) = settings(&site, nested).unwrap();
-    assert_eq!(lines[0], "`book.author`, a value of your own");
+    assert_eq!(lines[0], "`book.author`, a custom setting");
     assert_eq!(lines[1], "Templates show it as `site.book.author`.");
 }
 
@@ -133,8 +133,8 @@ fn a_quietened_kind_says_what_it_is() {
     assert_eq!(lines[0], "`broken-link`, a warning");
     assert_eq!(
         lines[1],
-        "A link, or a page's `redirect_to`, points at an address on this site, but nothing \
-         is published at that address. A reader who follows it lands on a missing page."
+        "A link, or a page's `redirect_to`, points at a URL on this site, but nothing is \
+         published at that URL. A reader who follows it lands on a missing page."
     );
     assert_eq!(more.unwrap(), "https://statac.dev/e/broken-link/");
 }
@@ -159,7 +159,7 @@ fn a_field_says_what_it_does() {
     assert_eq!(
         lines,
         [
-            "`isbn`, a field of your own",
+            "`isbn`, a custom field",
             "Templates show it as `page.isbn`.",
             "Declared in `statac.yaml` as `required text`.",
         ]
@@ -169,7 +169,7 @@ fn a_field_says_what_it_does() {
     assert_eq!(
         lines,
         [
-            "`greeting`, a field of your own",
+            "`greeting`, a custom field",
             "Templates show it as `page.greeting`."
         ]
     );
@@ -177,7 +177,7 @@ fn a_field_says_what_it_does() {
     let (lines, ..) = said(&site, "content/posts/index.md", index).unwrap();
     assert_eq!(
         lines[1],
-        "Hands `layout` down to every page in this folder and the folders inside it."
+        "Cascades `layout` to every page in this folder and the folders inside it."
     );
 }
 
@@ -190,7 +190,7 @@ fn a_value_says_what_the_site_holds_of_it() {
         lines,
         [
             "`Rust`, a tag on 2 pages",
-            "Its page is `/blog/tags/rust/`."
+            "Its list page is `/blog/tags/rust/`."
         ]
     );
     assert_eq!(more, None);
@@ -269,7 +269,7 @@ fn writing_site() -> TempSite {
         ("templates/page.html", "{{ page.content }}\n"),
         (
             "snippets/figure.html",
-            "{# takes photo, alt #}\n{% set shown = page.photo(photo) %}\
+            "{# takes photo, alt #}\n{% set shown = page.image(photo) %}\
              {{ shown.alt }}{{ alt if alt is defined }}\n",
         ),
         ("snippets/note.html", "<aside>{{ body }}</aside>\n"),
@@ -349,13 +349,13 @@ fn a_call_says_what_its_snippet_is_and_a_name_the_file_it_names() {
     assert_eq!(
         lines,
         [
-            "`photo-1.jpg`, a picture beside the page",
+            "`photo-1.jpg`, an image beside the page",
             "Its file is `content/posts/post-1/photo-1.jpg`.",
         ]
     );
     let (lines, _, over) = in_writing(&site, "![A photo](pho|to-1.jpg)").unwrap();
     assert_eq!(over, "![A photo](photo-1.jpg)");
-    assert_eq!(lines[0], "`photo-1.jpg`, a picture beside the page");
+    assert_eq!(lines[0], "`photo-1.jpg`, an image beside the page");
     let (lines, _, over) = in_writing(&site, "@no|te()\nA note.\n@end").unwrap();
     assert_eq!(over, "@note()");
     assert_eq!(
@@ -363,7 +363,7 @@ fn a_call_says_what_its_snippet_is_and_a_name_the_file_it_names() {
         [
             "`note()`, a snippet",
             "Its file is `snippets/note.html`.",
-            "It wraps the writing below the call, up to `@end`.",
+            "It wraps the content below the call, up to `@end`.",
         ]
     );
 }

@@ -115,7 +115,7 @@ const OTHER_SPELLINGS: [(&str, &str); 7] = [
 ];
 
 /// The first line of the usage screen.
-const INTRO: &str = "Statac builds a website from a folder of writing.\n";
+const INTRO: &str = "Statac builds a website from a folder of Markdown.\n";
 
 /// Each command's entry on the usage screen, as the screen sets it.
 const USAGE: [(&str, &str); 13] = [
@@ -143,7 +143,7 @@ const USAGE: [(&str, &str); 13] = [
         "refresh",
         "  statac refresh [folder]
                          Fetch what the site keeps from other sites, such
-                         as the still of a video or a webmention, into
+                         as a video's thumbnail or a webmention, into
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
                          the site's .statac/token.
@@ -151,8 +151,8 @@ const USAGE: [(&str, &str); 13] = [
     ),
     (
         "refuse",
-        "  statac refuse <address> [folder]
-                         Remove the webmention sent from the address, or
+        "  statac refuse <url> [folder]
+                         Remove the webmention sent from the URL, or
                          every one from a sender at or under it, and never
                          keep it again.
 ",
@@ -228,8 +228,8 @@ const OPTION_LINES: [(&str, &str); 18] = [
     ),
     (
         "--url",
-        "  --url=<address>        The site's address for this run, in place of url in
-                         statac.yaml, as a preview of the site needs.
+        "  --url=<url>            The site's full URL for this run, in place of url
+                         in statac.yaml, as a preview of the site needs.
 ",
     ),
     (
@@ -243,8 +243,8 @@ const OPTION_LINES: [(&str, &str); 18] = [
     ),
     (
         "--drafts",
-        "  --drafts               Build drafts and posts dated after today as if
-                         they were published.
+        "  --drafts               Build drafts and scheduled posts as if they were
+                         published.
 ",
     ),
     (
@@ -261,8 +261,8 @@ const OPTION_LINES: [(&str, &str); 18] = [
     ),
     (
         "--no-drafts",
-        "  --no-drafts            Leave drafts and posts dated after today out of
-                         what statac serve shows, as statac build does.
+        "  --no-drafts            Leave drafts and scheduled posts out of what
+                         statac serve shows, as statac build does.
 ",
     ),
     (
@@ -791,11 +791,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             } else if known == Some("explain") && name.is_none() {
                 name = Some(arg);
                 if Code::from_name(arg).is_none() {
-                    mistake(Kind::UnknownProblemName {
-                        written: arg.into(),
-                        suggestion: suggest::nearest(arg, Code::ALL.iter().map(|c| c.name()))
-                            .map(str::to_owned),
-                    });
+                    mistake(Code::unknown(arg));
                 }
             } else if known == Some("refuse") && address.is_none() {
                 address = Some(arg);
@@ -804,7 +800,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                     let respelt = (!arg.contains("://")
                         && crate::fetched::mentions::web_address(&https))
                     .then_some(https);
-                    mistake(Kind::NotAWebAddress {
+                    mistake(Kind::NotAUrl {
                         written: arg.into(),
                         respelt,
                     });
@@ -1043,7 +1039,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
         problems.push(Problem::nowhere(Kind::MissingName));
     }
     if known == Some("refuse") && address.is_none() {
-        problems.push(Problem::nowhere(Kind::MissingAddress));
+        problems.push(Problem::nowhere(Kind::MissingUrl));
     }
     if known == Some("search") && words.is_none_or(|words| words.trim().is_empty()) {
         problems.push(Problem::nowhere(Kind::NothingToSearch));

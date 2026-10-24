@@ -48,7 +48,7 @@ pub(super) const PAGE_ANSWERS: &[&str] = &[
     "folder",
     "source",
     "content",
-    "words",
+    "word_count",
     "excerpt",
     "excerpt_marked",
     "maths",
@@ -75,7 +75,7 @@ const WORKED_OUT: &[&str] = &[
     "slug",
     "date",
     "content",
-    "words",
+    "word_count",
     "toc",
     "excerpt",
     "opening",
@@ -339,12 +339,12 @@ impl PageValue {
                     .map(|d| DateValue::value(shared, d.value))
             }
             "content" if later => Some(Value::from_safe_string(String::new())),
-            "words" if later => Some(Value::from(0)),
+            "word_count" if later => Some(Value::from(0)),
             "toc" if later => Some(Value::from(Vec::<Value>::new())),
             "excerpt" | "opening" if later => None,
             "excerpt_marked" | "maths" if later => Some(Value::from(false)),
             "content" => super::render::html_of(shared, self.id, Part::Content),
-            "words" => {
+            "word_count" => {
                 super::render::of_body(shared, self.id, |written| Some(Value::from(written.words)))
             }
             "excerpt" => super::render::html_of(shared, self.id, Part::Excerpt),
@@ -480,7 +480,7 @@ impl PageValue {
     /// The names the page answers to, for a template that walks them.
     fn names(&self) -> Vec<Value> {
         let page = self.shared.site.pages.get(self.id);
-        let mut names: Vec<&str> = vec!["url", "slug", "content", "words", "tags", "folder"];
+        let mut names: Vec<&str> = vec!["url", "slug", "content", "word_count", "tags", "folder"];
         if page.title.is_some() {
             names.push("title");
         }
@@ -1723,8 +1723,8 @@ fn webmentions(shared: &Arc<Shared>, id: PageId) -> Value {
         )
     };
     Value::from_object(Ordered(vec![
-        ("said".into(), listed(said)),
-        ("faces".into(), listed(faces)),
+        ("comments".into(), listed(said)),
+        ("reactions".into(), listed(faces)),
     ]))
 }
 
@@ -1735,8 +1735,8 @@ const MENTION_ANSWERS: &[&str] = &[
     "author_url",
     "url",
     "published",
-    "words",
-    "face",
+    "content",
+    "avatar",
 ];
 
 /// One mention of a page, every text of it as plain text. Its face is
@@ -1766,8 +1766,8 @@ impl Object for MentionValue {
             "author_url" => text(&mention.author_url),
             "url" => Some(Value::from(mention.url.as_str())),
             "published" => (mention.published).map(|day| DateValue::value(&self.shared, day)),
-            "words" => text(&mention.words),
-            "face" => (mention.face.as_deref())
+            "content" => text(&mention.words),
+            "avatar" => (mention.face.as_deref())
                 .map(|name| super::media::face(&self.shared, name))
                 .filter(|face| !face.is_none()),
             _ => None,

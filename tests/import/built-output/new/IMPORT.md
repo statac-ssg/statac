@@ -1,4 +1,4 @@
-This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/built-output/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -6,7 +6,7 @@ It was made from `tests/import/built-output/old` by `statac import`, which chang
 
 - 1 post, into `content/posts/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -28,22 +28,22 @@ date_stamp: 31 Dec 2025, 15:04
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old addresses there: 5 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old URLs there: 5 are published or redirected.
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
-- 3 pages at the top of `content/`, such as `content/categories-linux.md`, send readers on from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
+- 3 pages at the top of `content/`, such as `content/categories-linux.md`, redirect from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
 
-Each address was also looked for in the old site's own built output, `_site/`.
+Each URL was also looked for in the old site's own built output, `_site/`.
 
-Nothing in the new site answers these old addresses. Give the page that should answer each a `redirect_from` naming it, or a `permalink`:
+Nothing in the new site is published at these old URLs. Give the page each should lead to a `redirect_from` naming it, or a `permalink`:
 
 - `/archive.html`, for `archive.html`
 
 The old site published a page listing every one of its `categories` at `/categories/`, and the starter has none.
 
-The old site's built output also holds 6 pages at addresses Statac didn't work out, and nothing in the new site answers them. Give the page that should answer each a `redirect_from` naming it. By folder:
+The old site's built output also holds 6 pages at URLs Statac didn't work out, and nothing in the new site is published there. Give the page each should lead to a `redirect_from` naming it. By folder:
 
 - `/`: 1 page, `/page-9.html`
 - `/tag/`: 3 pages, `/tag/b.html`, `/tag/c.html` and `/tag/d.html`
@@ -60,7 +60,7 @@ Each of these pages was mostly the old site's templates at work, such as a home 
 
 ### Feeds made by templates
 
-Readers subscribed to the old site's feed at each of these addresses, and the template that made it didn't come across, so nothing is there now. A list's `feed:` line can put that list's feed at an address of its own, as `feed: /index.rss`, and the starter's feed template writes Atom: see https://statac.dev/feeds/.
+Readers subscribed to the old site's feed at each of these URLs, and the template that made it didn't come across, so nothing is there now. A list's `feed:` line can put that list's feed at a URL of its own, as `feed: /index.rss`, and the starter's feed template writes Atom: see https://statac.dev/feeds/.
 
 - `feeds/index.xml`: `/feeds/index.xml`
 - `feeds/posts.rss`: `/feeds/posts.rss`
@@ -69,11 +69,11 @@ Readers subscribed to the old site's feed at each of these addresses, and the te
 
 Statac left these behind, and the new site has nothing of them:
 
-- `_site/`: the old site's built output, read only to check the addresses.
-- `feed.xml`: front matter but no writing, such as a stylesheet or a feed, which Jekyll built with its templates.
-- `feeds/index.xml`: front matter but no writing, such as a stylesheet or a feed, which Jekyll built with its templates.
-- `feeds/map.xml`: front matter but no writing, such as a stylesheet or a feed, which Jekyll built with its templates.
-- `feeds/posts.rss`: front matter but no writing, such as a stylesheet or a feed, which Jekyll built with its templates.
+- `_site/`: the old site's built output, read only to check the URLs.
+- `feed.xml`: a file with front matter that isn't a page, such as a stylesheet or a feed, which Jekyll built with its templates.
+- `feeds/index.xml`: a file with front matter that isn't a page, such as a stylesheet or a feed, which Jekyll built with its templates.
+- `feeds/map.xml`: a file with front matter that isn't a page, such as a stylesheet or a feed, which Jekyll built with its templates.
+- `feeds/posts.rss`: a file with front matter that isn't a page, such as a stylesheet or a feed, which Jekyll built with its templates.
 
 ## What to do next
 

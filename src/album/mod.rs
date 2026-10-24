@@ -604,7 +604,7 @@ pub fn read(
                     });
                 let nearest = crate::suggest::nearest(name, beside).map(str::to_owned);
                 problems.push(Problem::at(
-                    Told::DescribesNoPicture {
+                    Told::DescribesNoImage {
                         picture: format!("content/{picture}"),
                         nearest,
                     },

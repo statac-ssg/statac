@@ -199,7 +199,7 @@ fn a_site_is_gathered_and_published_whole_or_not_at_all() {
     assert_eq!(
         collision.headline(),
         format!(
-            "Same address: `assets/util.js` and `static/{util}` are both published at \
+            "Same URL: `assets/util.js` and `static/{util}` are both published at \
              `/{util}`"
         )
     );

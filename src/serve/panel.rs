@@ -372,7 +372,7 @@ fn left_out(built: &mut Built, outcome: &Outcome, report: &Report) {
     for problem in report.ordered(&outcome.problems) {
         let (links, path, day) = match &problem.kind {
             Kind::DraftLeftOut { path } => (&mut built.drafts, path, None),
-            Kind::WaitingForItsDay { path, date } => (&mut built.waiting, path, Some(date)),
+            Kind::ScheduledPost { path, date } => (&mut built.waiting, path, Some(date)),
             _ => continue,
         };
         if !listed.insert(path) {

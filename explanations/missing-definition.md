@@ -1,6 +1,6 @@
 # Missing definition
 
-Your writing refers to a footnote, `[^label]`, or to a link by its label,
+Your content refers to a footnote, `[^label]`, or to a link by its label,
 `[text][label]` or `[label][]`, but no line on the page defines that
 label. Statac publishes what you wrote as plain text, brackets and all.
 
@@ -15,9 +15,9 @@ warning  Missing definition: there is no `[^2]:` line
 ## Why Statac warns
 
 Markdown shows a reference with no definition as the text you typed. The
-page is still readable, but the note or link you meant is missing. A
-footnote's note and a link's address can be written anywhere on the page,
-even inside a snippet call that wraps writing. So the usual cause is a
+page is still readable, but the footnote or link you meant is missing. A
+footnote definition and a link's URL can be written anywhere on the page,
+even inside a snippet call that wraps content. So the usual cause is a
 label spelled differently in the two places. Statac ignores brackets that
 aren't a reference, such as `[draft]` on its own or `x[i][j]`.
 
@@ -38,7 +38,7 @@ The figures are from 2026.[^source]
 [^sources]: The yearly report.
 ```
 
-Write the marker and its note with the same label:
+Write the reference and its definition with the same label:
 
 ```markdown
 The figures are from 2026.[^sources]

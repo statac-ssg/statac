@@ -10,7 +10,7 @@ that has changed since.
 ```text
 note  Newer starter files: 1 of the files `statac new` wrote has a newer version
   Run `statac new --update`: it replaces those you never changed and shows what is new in the rest.
-  More: https://statac.dev/e/newer-starter/
+  More: https://statac.dev/e/update-available/
 ```
 
 ## Why Statac says so

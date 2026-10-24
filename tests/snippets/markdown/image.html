@@ -1,5 +1,5 @@
-{% if photo.avif %}
-<picture><source type="image/avif" srcset="{{ photo.avif }}" sizes="{{ photo.sizes }}"><img src="{{ photo.src }}" srcset="{{ photo.fallback }}" sizes="{{ photo.sizes }}" width="{{ photo.width }}" height="{{ photo.height }}" alt="{{ alt }}"></picture>
+{% if image.avif %}
+<picture><source type="image/avif" srcset="{{ image.avif }}" sizes="{{ image.sizes }}"><img src="{{ image.src }}" srcset="{{ image.fallback }}" sizes="{{ image.sizes }}" width="{{ image.width }}" height="{{ image.height }}" alt="{{ alt }}"></picture>
 {%- else %}
-<img src="{{ photo.src if photo else address }}" alt="{{ alt }}">
+<img src="{{ image.src if image else url }}" alt="{{ alt }}">
 {%- endif %}

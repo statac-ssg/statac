@@ -360,7 +360,7 @@ impl Rendered {
         {
             let source = shared.templates.files[layout].source;
             let path = shared.sources.path(source).to_string_lossy();
-            let kind = Kind::WritingNeverShown {
+            let kind = Kind::ContentNeverShown {
                 layout: path.replace('\\', "/"),
                 pages: 1,
             };
@@ -1572,7 +1572,7 @@ fn undescribed_in_html(shared: &Shared, page: PageId, source: SourceId, span: cr
             span: crate::source::Span::new(start, start + written.len()),
         };
         let picture = crate::html::decoded(written, false);
-        let kind = Kind::UndescribedPicture {
+        let kind = Kind::MissingAltText {
             picture: picture.clone(),
             shown: ShownBy::Html,
         };
@@ -1949,7 +1949,7 @@ impl markdown::Snippets for Prose<'_> {
             // A picture is told where its address is written, as a picture
             // Statac writes is.
             let calling = match (piece, values.first()) {
-                (Piece::Image, Some(("address", PieceValue::Text(address)))) => {
+                (Piece::Image, Some(("url", PieceValue::Text(address)))) => {
                     self.address_place(address, place)
                 }
                 _ => place,
@@ -2003,14 +2003,14 @@ impl markdown::Snippets for Prose<'_> {
             picture.left_alone() || shared.settings.truth("optimise_images") == Some(false);
         frame::read(Key::Setting(shared.name_id("optimise_images")));
         let told = match &picture.seen {
-            crate::album::Seen::Unreadable(fault) if !left_alone => Some(Kind::UnreadablePicture {
+            crate::album::Seen::Unreadable(fault) if !left_alone => Some(Kind::UnreadableImage {
                 path: picture.shown(),
                 fault: fault.clone(),
             }),
             crate::album::Seen::Plain {
                 kind: crate::pictures::Kind::Heic | crate::pictures::Kind::Heif,
                 ..
-            } => Some(Kind::HeicPicture {
+            } => Some(Kind::HeicImage {
                 path: picture.shown(),
             }),
             _ => None,
@@ -2089,7 +2089,7 @@ impl markdown::Snippets for Prose<'_> {
 
     fn undescribed(&self, picture: &str, found: Option<&markdown::Picture>, place: Place) {
         let at = self.address_place(picture, place);
-        let kind = Kind::UndescribedPicture {
+        let kind = Kind::MissingAltText {
             picture: picture.to_owned(),
             shown: ShownBy::Markdown {
                 described_beside: found.is_some_and(|found| found.described_beside),

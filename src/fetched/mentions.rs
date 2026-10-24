@@ -283,7 +283,7 @@ pub(crate) fn read(
     // A mention names the page where its sender found it, whatever
     // address the run was given.
     let Some(url) = settings.home().map(str::to_owned) else {
-        let kind = Kind::NoSiteAddress {
+        let kind = Kind::NoSiteUrl {
             waiting: Waiting::Webmentions,
         };
         let at = settings.get("webmentions").and_then(|on| on.origin.place);

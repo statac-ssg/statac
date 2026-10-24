@@ -1,7 +1,7 @@
 # Same id
 
 Two pages have the same `id:`. A page's id is its permanent identity: it
-stays the same when the page's title or address changes. The message
+stays the same when the page's title or URL changes. The message
 points at the second page, and shows where the first was written.
 
 ## What you'll see {#what-youll-see}

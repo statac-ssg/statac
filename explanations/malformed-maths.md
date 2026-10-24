@@ -1,6 +1,6 @@
 # Malformed maths
 
-Statac found maths between dollar signs in your writing, but couldn't
+Statac found maths between dollar signs in your content, but couldn't
 turn it into maths on the page. The message says what it found and points
 at the place to fix, such as a brace that is never closed or a command
 Statac doesn't know.

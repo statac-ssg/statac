@@ -221,7 +221,7 @@ impl Site {
         let root = self.root();
         let report = Report::new(outcome.sources(), &root, false);
         let problems: Vec<_> = (outcome.problems.iter())
-            .filter(|problem| problem.kind.code().name() != "address-gone")
+            .filter(|problem| problem.kind.code().name() != "url-gone")
             .cloned()
             .collect();
         format!(
@@ -1044,7 +1044,7 @@ fn a_rule_narrowing_pictures_is_told_of_pages_kept_as_of_pages_built() {
         let problems = round.outcome.problems.iter();
         let names = problems.map(|problem| problem.kind.code().name());
         names
-            .filter(|&name| name == "pictures-out-of-proportion")
+            .filter(|&name| name == "images-out-of-proportion")
             .count()
     };
     let (mut session, round) = Session::start(&Options {
@@ -1236,7 +1236,7 @@ fn the_photographs_a_page_lists_follow_one_added_and_removed() {
     let site = Site::new("photographs");
     site.write(
         "templates/album.html",
-        "{% for photo in page.photos() %}{{ photo }}\n{% endfor %}",
+        "{% for photo in page.images() %}{{ photo }}\n{% endfor %}",
     );
     site.write(
         "content/album/index.md",
@@ -1594,7 +1594,7 @@ fn a_layout_that_stops_showing_the_writing_and_a_page_that_loses_its_own() {
         let said = site.said(&round.outcome);
         match pages {
             Some(pages) => assert!(
-                said.contains(&format!("Writing never shown: {pages} {layout}")),
+                said.contains(&format!("Content never shown: {pages} {layout}")),
                 "after {after}: {said}"
             ),
             None => assert!(!said.contains(layout), "after {after}: {said}"),
@@ -1982,7 +1982,7 @@ fn javascript_written_in_a_called_snippet_is_listed_by_neither() {
 
     site.write(
         "snippets/markdown/link.html",
-        "<a href=\"{{ address }}\" onclick=\"run()\">{{ body }}</a>\n",
+        "<a href=\"{{ url }}\" onclick=\"run()\">{{ body }}</a>\n",
     );
     let round = session.rebuild();
     site.same(&session, &round, "a script in a piece of the writing");
@@ -2169,7 +2169,7 @@ fn the_command_after_a_build_runs_once_and_what_it_made_stays() {
         "after_build: test \"$STATAC_SERVE\" = yes && echo made >> \"$STATAC_OUT/made.txt\" \
          && mkdir \"$STATAC_OUT/search\" && echo index > \"$STATAC_OUT/search/index.txt\" \
          && echo ran >> \"{}\"\n\
-         after_build_makes: [search/, made.txt]\n",
+         after_build_outputs: [search/, made.txt]\n",
         ran.display()
     );
     site.write("statac.yaml", &format!("{SETTINGS}{commands}"));
@@ -2414,7 +2414,7 @@ fn a_still_fetched_and_a_still_found_absent() {
     site.write(
         "snippets/youtube.html",
         "{# takes address #}\n{% set video = page.youtube(address) %}\n\
-         {% if video.still %}<img src=\"{{ video.still.src }}\">{% endif %}\n",
+         {% if video.thumbnail %}<img src=\"{{ video.thumbnail.src }}\">{% endif %}\n",
     );
     site.write(
         "content/post-7.md",
@@ -2474,9 +2474,9 @@ fn a_mention_written_changed_and_removed_rebuilds_only_the_pages_that_read_their
     site.write(
         "templates/mentioned.html",
         &format!(
-            "{BASE}{PAGE}{{% for m in page.webmentions.said %}}{{{{ m.kind }}}} \
-             {{% if m.words %}}{{{{ m.words }}}}{{% endif %}}\
-             {{% if m.face %}}<img src=\"{{{{ m.face.src }}}}\" alt=\"\">{{% endif %}}\
+            "{BASE}{PAGE}{{% for m in page.webmentions.comments %}}{{{{ m.kind }}}} \
+             {{% if m.content %}}{{{{ m.content }}}}{{% endif %}}\
+             {{% if m.avatar %}}<img src=\"{{{{ m.avatar.src }}}}\" alt=\"\">{{% endif %}}\
              {{% endfor %}}\n"
         ),
     );

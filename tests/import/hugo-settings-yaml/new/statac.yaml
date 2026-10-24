@@ -10,7 +10,7 @@ date_stamp: 31 Dec 2025, 15:04
 feed_key: 0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20
 feed_ids_before: 2026-10-06
 posts_per_page: 5
-later_pages: "{list}pages/{n}/"
+pagination.permalink: "{list}pages/{n}/"
 author: Name
 book:
   isbn: 0-000-00000-0

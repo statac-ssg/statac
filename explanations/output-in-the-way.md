@@ -31,7 +31,7 @@ such as `public`, works as well.
 statac build --out=content/built
 ```
 
-`content/built` is inside `content/`, where the site's writing is. To
+`content/built` is inside `content/`, where the site's content is. To
 build into `public` instead:
 
 ```text

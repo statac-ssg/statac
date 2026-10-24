@@ -1,6 +1,6 @@
 # Unusable card file
 
-A sharing card's settings name a background or a font that Statac can't
+A social card's settings name a background or a font that Statac can't
 draw a card with. The message names the file and says what is wrong
 with it:
 
@@ -22,13 +22,13 @@ Every card those settings describe is drawn over that background, in
 those fonts. Statac never stretches or crops a background to fit, because
 you decide where the text sits on it. It also never draws in a font you
 didn't name. If no card can be drawn, every page that reads `page.card`
-would be shared with no picture, so the build stops.
+would be shared with no image, so the build stops.
 
 ## How to fix it
 
 Save the background at 1200 by 630 pixels, as a PNG or a JPEG. Name
 TrueType or OpenType font files, ending `.ttf`, `.otf` or `.ttc`. A web
-font ending `.woff2` is a different kind of file, even if you rename it.
+font ending `.woff2` is a different format, even if you rename it.
 
 ## Example
 

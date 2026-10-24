@@ -34,18 +34,18 @@ pub(super) fn build(
     let mut context: BTreeMap<&str, Value> = BTreeMap::new();
     for (name, handed) in values {
         if piece == Piece::Link
-            && name == "address"
+            && name == "url"
             && let PieceValue::Text(address) = &handed
         {
-            context.insert("outside", Value::from(outside(shared, address)));
+            context.insert("external", Value::from(outside(shared, address)));
         }
         if piece == Piece::Image
-            && name == "address"
+            && name == "url"
             && let PieceValue::Text(address) = &handed
         {
             let template = &templates.files[file].name;
             let photo = super::media::for_piece(shared, page, address, template);
-            context.insert("photo", photo);
+            context.insert("image", photo);
         }
         if piece == Piece::Callout
             && name == "kind"
@@ -120,29 +120,33 @@ fn value(handed: PieceValue) -> Value {
 }
 
 /// Whether a link to `address` leaves the site, by the site's `url` and
-/// `also_at`.
+/// `other_hosts`.
 fn outside(shared: &Shared, address: &str) -> bool {
     frame::read(Key::Setting(shared.name_id("url")));
-    frame::read(Key::Setting(shared.name_id("also_at")));
+    frame::read(Key::Setting(shared.name_id("other_hosts")));
     let settings = &shared.settings;
     // Where the run was given another address, the site's own is one it
     // is also at.
     let home = settings.home().filter(|_| settings.elsewhere());
-    let also_at: Vec<&str> = settings
-        .texts("also_at")
+    let other_hosts: Vec<&str> = settings
+        .texts("other_hosts")
         .iter()
         .map(|other| other.value.as_str())
         .chain(home)
         .collect();
-    leaves(address, settings.text("url").map(|url| url.value), &also_at)
+    leaves(
+        address,
+        settings.text("url").map(|url| url.value),
+        &other_hosts,
+    )
 }
 
 /// Whether `address` leads to another site: an `http`, `https` or `//`
-/// address on a host that is neither `url`'s nor one `also_at` names. On a
+/// address on a host that is neither `url`'s nor one `other_hosts` names. On a
 /// site with no `url`, every such address does. Hosts are compared as the
 /// URL standard writes them, so capitals and an internationalised name
 /// spelled either way are alike.
-fn leaves(address: &str, url: Option<&str>, also_at: &[&str]) -> bool {
+fn leaves(address: &str, url: Option<&str>, other_hosts: &[&str]) -> bool {
     let site = url.and_then(|url| Url::parse(url).ok());
     let link = match Url::parse(address) {
         Ok(link) => link,
@@ -165,13 +169,13 @@ fn leaves(address: &str, url: Option<&str>, also_at: &[&str]) -> bool {
         return false;
     };
     let own = site.as_ref().and_then(Url::host_str) == Some(host);
-    let also = also_at
+    let also = other_hosts
         .iter()
         .any(|other| host_named(other).as_deref() == Some(host));
     !(own || also)
 }
 
-/// The host an `also_at` entry names, written bare, `example.net`, or as a
+/// The host an `other_hosts` entry names, written bare, `example.net`, or as a
 /// whole address.
 fn host_named(written: &str) -> Option<String> {
     let whole = Url::parse(written)

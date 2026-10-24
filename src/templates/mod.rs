@@ -665,7 +665,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("updated", Ty::Record(Rec::Date), false),
         ("summary", Ty::Text, every(summarised)),
         ("content", Ty::Html, true),
-        ("words", Ty::Number, true),
+        ("word_count", Ty::Number, true),
         ("excerpt", Ty::Html, false),
         ("excerpt_marked", Ty::Bool, true),
         ("maths", Ty::Bool, true),

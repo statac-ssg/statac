@@ -564,7 +564,7 @@ fn own_picture(shared: &Arc<Shared>, id: PageId, named: &Sourced<&str>) -> Outco
         Seen::Photograph { photograph, .. } => (photograph.kind, Some(photograph.stored)),
         Seen::Plain { kind, size } => (*kind, *size),
         Seen::Unreadable(fault) => {
-            let kind = Kind::UnreadablePicture {
+            let kind = Kind::UnreadableImage {
                 path: picture.shown(),
                 fault: fault.clone(),
             };
@@ -674,7 +674,7 @@ fn make_kit(cards: &Cards, at: usize) -> Result<Kit, Problem> {
                 unusable(&card.background, CardFileFault::NotAStill)
             }
             KitFailure::Background(error) => {
-                let kind = Kind::UnreadablePicture {
+                let kind = Kind::UnreadableImage {
                     path: cards::file_named(&card.background.value),
                     fault: crate::album::fault(error),
                 };
@@ -1058,7 +1058,7 @@ pub(super) fn told(shared: &Shared, asked: &Gathered) -> Vec<Problem> {
     let mut whole = whole.into_iter();
     if !has_url {
         if answers().any(|(_, answer)| answer.waiting) {
-            let kind = Kind::NoSiteAddress {
+            let kind = Kind::NoSiteUrl {
                 waiting: Waiting::Cards,
             };
             problems.push(Problem::placed(kind, whole.next().and_then(head)));

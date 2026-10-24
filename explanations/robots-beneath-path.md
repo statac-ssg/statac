@@ -8,21 +8,21 @@ ends up beneath the same path, at `https://example.org/blog/robots.txt`.
 
 ```text
 note  Robots beneath a path: crawlers read only `https://example.org/robots.txt`
-  Copy its lines into the `robots.txt` at the top of the host to have them read.
+  Copy its lines into the `robots.txt` at the root of the host to have them read.
   More: https://statac.dev/e/robots-beneath-path/
 ```
 
 ## Why Statac notes it
 
-Crawlers read `robots.txt` only at the top of a host, so they never read
+Crawlers read `robots.txt` only at the root of a host, so they never read
 this one. Statac publishes it anyway, since it is your file, and tells
 you once.
 
 ## How to fix it
 
 Copy the lines you want crawlers to read into the `robots.txt` at the
-top of the host, wherever that file is kept. A line giving the sitemap's
-address works from there:
+root of the host, wherever that file is kept. A line giving the sitemap's
+URL works from there:
 
 ```
 Sitemap: https://example.org/blog/sitemap.xml

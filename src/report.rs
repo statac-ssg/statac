@@ -16,7 +16,7 @@ use crate::origin::Sourced;
 use crate::problem::{Code, Kind, Problem, Published, Severity, Unquietenable};
 use crate::source::{Place, SourceId, Sources};
 use crate::stamp::Pass;
-use crate::{suggest, wording};
+use crate::wording;
 
 /// Columns between tab stops.
 const TAB: usize = 4;
@@ -105,11 +105,7 @@ impl Quiet {
                         _ => Unquietenable::LeavesAPageOut,
                     },
                 },
-                None => Kind::UnknownProblemName {
-                    written: written.clone(),
-                    suggestion: suggest::nearest(written, Code::ALL.iter().map(|c| c.name()))
-                        .map(str::to_owned),
-                },
+                None => Code::unknown(written),
             };
             problems.push(Problem {
                 kind,

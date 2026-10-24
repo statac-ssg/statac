@@ -3,26 +3,27 @@
 A page sets a field that Statac doesn't use. This happens when:
 
 - Statac fills that name itself on every page, such as `source` or
-  `content`.
-- The page sends readers on with `redirect_to`, and the field, such as
-  `tags` or `feed`, has nothing to act on. A page that sends readers on
-  uses only its `title`, `date`, `permalink`, `draft`, `needs` and
-  `redirect_from`, and, on a folder's own page, its `order` and
-  `numbered`.
+  `content`. Since 0.7.0 this includes `image` and `images`, which were
+  free before, so a page that writes `image:` or `images:` has the field
+  set aside.
+- The page redirects with `redirect_to`, and the field, such as `tags`
+  or `feed`, has nothing to act on. A page that redirects uses only its
+  `title`, `date`, `permalink`, `draft`, `needs` and `redirect_from`,
+  and, on a folder's list page, its `order` and `numbered`.
 
 A card's settings in `templates/` can use `background`, `font` and
 `padding`, and, for each text, `text`, `place`, `size` and `colour`
 (written like `title.size`). Any other name in them is set aside.
 
-A page's `card` is set aside if the page also names a picture of its own
-with `og_image`, because `og_image` takes priority.
+A page's `card` is set aside if the page also names its own social
+image with `og_image`, because `og_image` takes priority.
 
-One of Statac's words, one of its settings, or a field that `statac.yaml`
-declares is set aside if nothing at all is written after its colon, as in
-`title:`. Statac treats it as though the line weren't there. `~` and
-`null` are written on purpose, so Statac never reports them. Nor does it
-report an empty field of your own that isn't declared, because a template
-may test for it.
+A built-in field, a setting, or a field that `statac.yaml` declares is
+set aside if nothing at all is written after its colon, as in `title:`.
+Statac treats it as though the line weren't there. `~` and `null` are
+written on purpose, so Statac never reports them. Nor does it report an
+empty custom field that isn't declared, because a template may test for
+it.
 
 ## What you'll see {#what-youll-see}
 
@@ -36,17 +37,19 @@ warning  Field set aside: Statac fills `page.source` itself
 
 Statac is sure what to do here: it leaves the line alone and uses its
 own value, so the build carries on. It warns you because what you wrote
-doesn't reach the page. A page that sends readers on is in no list or
+doesn't reach the page. A page that redirects is in no list or
 feed, and is built with no layout, so its tags, its feed and similar
 fields do nothing.
 
 ## How to fix it
 
 Give the field a name of your own if you want to use it in your
-templates. To choose where a page is published, write `permalink:`. On
-a page that sends readers on, remove the field, or remove `redirect_to`
-to publish the page. In the card's settings, correct the name to one a
-card uses. Statac suggests the nearest. On a page with both `card` and
+templates. A page that writes `image:` or `images:` keeps its value under
+another name: rename the field, to `cover:` say, and change the templates
+that read it to `page.cover`. To choose where a page is published, write
+`permalink:`. On a page that redirects, remove the field, or remove
+`redirect_to` to publish the page. In the card's settings, correct the
+name to one a card uses. Statac suggests the nearest. On a page with both `card` and
 `og_image`, remove one of them. If nothing is written after the colon,
 give the line a value, or remove it.
 

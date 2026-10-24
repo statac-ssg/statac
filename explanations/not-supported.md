@@ -3,14 +3,14 @@
 A template or a page uses something Statac doesn't support.
 
 `include`, `import` and `from` are other ways to place one template inside
-another. In Statac, a piece of a page is a snippet, which is a file in
-`snippets/`. A template places a snippet by calling it by its file name:
+another. In Statac, a reusable part of a template is a snippet, which is a file
+in `snippets/`. A template places a snippet by calling it by its file name:
 `{{ card(post) }}` places `snippets/card.html` and hands it `post`. For
 `include`, the message suggests the call to write in place of the line.
 For `import` and `from`, it suggests the call to write in place of each
 later use of what the line brought in.
 
-Some of Statac's own names, such as the one for the pictures beside a
+Some of Statac's own names, such as the one for the images beside a
 page, aren't available in this version yet. The message says which one
 you used.
 

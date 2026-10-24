@@ -3,7 +3,7 @@
 {% set words = site.data.words[page.language] %}
 {% set video = page.video(clip) %}
 <figure>
-  <video controls preload="metadata"{% if caption is defined %} aria-label="{{ caption | markdown | plain }}"{% endif %}{% if poster is defined %} poster="{{ page.photo(poster).src }}"{% endif %}>
+  <video controls preload="metadata"{% if caption is defined %} aria-label="{{ caption | markdown | plain }}"{% endif %}{% if poster is defined %} poster="{{ page.image(poster).src }}"{% endif %}>
     <source src="{{ video.src }}" type="{{ video.type }}">
     <a href="{{ video.src }}">{{ words.download_video }}</a>
   </video>

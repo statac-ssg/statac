@@ -93,8 +93,9 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
         | Kind::UnknownProblemName {
             written,
             suggestion: Some(nearest),
+            ..
         }
-        | Kind::UnusableAddress {
+        | Kind::UnusableUrl {
             fault:
                 AddressFault::UnknownPiece {
                     written,
@@ -132,7 +133,7 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
             handed: nearest,
             ..
         }
-        | Kind::ReadAsYourOwn {
+        | Kind::ReadAsCustom {
             written, nearest, ..
         } => respelt(written, nearest),
         Kind::NoValue {
@@ -232,7 +233,7 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
         } if writes(at.trim(), base).as_deref() == Some(target.trim()) => {
             whole(at.trim(), suggestion)
         }
-        Kind::AddressGone { written, .. } if at.trim() == written.as_str() => {
+        Kind::UrlGone { written, .. } if at.trim() == written.as_str() => {
             let (start, end) = lines(file, place.span);
             Some(Fix {
                 title: wording::fix_forget(written),

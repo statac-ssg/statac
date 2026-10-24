@@ -15,7 +15,7 @@ warning  Dates disagree: `date` is `2026-10-05`, the file name `2026-10-04`
 
 The `date:` line is written in the page itself, so Statac uses it, and the
 build goes on. Statac warns you because one of the two is probably a
-mistake, and a post's address often includes its date.
+mistake, and a post's URL often includes its date.
 
 ## How to fix it
 

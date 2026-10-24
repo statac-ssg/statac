@@ -55,8 +55,12 @@ fn every_setting_the_sites_write_is_read() {
             "npx pagefind --site \"$STATAC_OUT\"",
         ),
         ("before_build", "rm -f _site/a", "rm -f _site/a"),
-        ("later_pages", "\"{list}{n}/\"", "{list}{n}/"),
-        ("later_pages", "\"{list}page{n}/\"", "{list}page{n}/"),
+        ("pagination.permalink", "\"{list}{n}/\"", "{list}{n}/"),
+        (
+            "pagination.permalink",
+            "\"{list}page{n}/\"",
+            "{list}page{n}/",
+        ),
         ("tags.permalink", "/tag/{slug}/", "/tag/{slug}/"),
         ("series.permalink", "/runs/{slug}/", "/runs/{slug}/"),
         ("feed_ids_from", "jekyll", "jekyll"),
@@ -74,8 +78,8 @@ fn every_setting_the_sites_write_is_read() {
         "typography: false\ndate_zeros: false\noptimise_images: false\ntags.pages: false\n\
          write_feed_ids: true\n\
          series.pages: false\nposts_per_page: 0\nmax_width: 1200\n\
-         feed_ids_before: 2026-09-29\nnot_ours: [/en/]\nalso_at: [example.net]\n\
-         after_build_makes: [pagefind/]\nleft_behind: [notes.md]\nquiet: [broken-link]\n\
+         feed_ids_before: 2026-09-29\nserved_elsewhere: [/en/]\nother_hosts: [example.net]\n\
+         after_build_outputs: [pagefind/]\nexclude: [notes.md]\nquiet: [broken-link]\n\
          tags.slugs:\n  C++: cpp\n",
     );
     assert_eq!(problems, []);
@@ -92,10 +96,10 @@ fn every_setting_the_sites_write_is_read() {
         Some(&crate::date::Date::day_only(2026, 9, 29))
     );
     for (name, value) in [
-        ("not_ours", "/en/"),
-        ("also_at", "example.net"),
-        ("after_build_makes", "pagefind/"),
-        ("left_behind", "notes.md"),
+        ("served_elsewhere", "/en/"),
+        ("other_hosts", "example.net"),
+        ("after_build_outputs", "pagefind/"),
+        ("exclude", "notes.md"),
         ("quiet", "broken-link"),
     ] {
         assert_eq!(settings.texts(name)[0].value, value, "{name}");
@@ -129,7 +133,10 @@ fn a_setting_nobody_wrote_is_defaulted() {
         ),
         ("tags.permalink", Value::Text("/tags/{slug}/".into())),
         ("series.permalink", Value::Text("/series/{slug}/".into())),
-        ("later_pages", Value::Text("{list}page/{n}/".into())),
+        (
+            "pagination.permalink",
+            Value::Text("{list}page/{n}/".into()),
+        ),
     ];
     for (name, value) in cases {
         let read = settings.get(name).unwrap();
@@ -137,7 +144,7 @@ fn a_setting_nobody_wrote_is_defaulted() {
         assert_eq!(read.origin, Origin::defaulted(), "{name}");
     }
     let left: Vec<&str> = settings
-        .texts("left_behind")
+        .texts("exclude")
         .iter()
         .map(|t| t.value.as_str())
         .collect();
@@ -198,7 +205,41 @@ fn second_spellings_and_nested_settings_are_refused() {
         ),
         (
             "pages.later: \"{list}{n}/\"\n",
-            vec![(other("pages.later", "later_pages"), "pages.later")],
+            vec![(other("pages.later", "pagination.permalink"), "pages.later")],
+        ),
+        (
+            "later_pages: \"{list}{n}/\"\n",
+            vec![(other("later_pages", "pagination.permalink"), "later_pages")],
+        ),
+        (
+            "left_behind: [drafts]\n",
+            vec![(other("left_behind", "exclude"), "left_behind")],
+        ),
+        (
+            "also_at: [https://example.com]\n",
+            vec![(other("also_at", "other_hosts"), "also_at")],
+        ),
+        (
+            "not_ours: [/path/]\n",
+            vec![(other("not_ours", "served_elsewhere"), "not_ours")],
+        ),
+        (
+            "after_build_makes: [search/]\n",
+            vec![(
+                other("after_build_makes", "after_build_outputs"),
+                "after_build_makes",
+            )],
+        ),
+        (
+            "pagination.permalnk: \"{list}{n}/\"\n",
+            vec![(
+                Kind::UnknownWord {
+                    word: Word::Setting,
+                    written: "pagination.permalnk".into(),
+                    nearest: Some("pagination.permalink".into()),
+                },
+                "pagination.permalnk",
+            )],
         ),
         (
             "default.layout: post\n",
@@ -414,22 +455,27 @@ fn settings_of_the_wrong_kind_are_refused_at_the_value() {
             wrong("tags.permalink", Expected::ListAddress, "/{slug}/", None),
         ),
         (
-            "later_pages: page/{n}/",
-            wrong("later_pages", Expected::LaterAddress, "page/{n}/", None),
+            "pagination.permalink: page/{n}/",
+            wrong(
+                "pagination.permalink",
+                Expected::LaterAddress,
+                "page/{n}/",
+                None,
+            ),
         ),
         (
-            "later_pages: \"{list}page/\"",
+            "pagination.permalink: \"{list}page/\"",
             wrong(
-                "later_pages",
+                "pagination.permalink",
                 Expected::LaterAddress,
                 "\"{list}page/\"",
                 None,
             ),
         ),
         (
-            "later_pages: \"{list}page:{n}/\"",
+            "pagination.permalink: \"{list}page:{n}/\"",
             wrong(
-                "later_pages",
+                "pagination.permalink",
                 Expected::LaterAddress,
                 "\"{list}page:{n}/\"",
                 None,
@@ -917,10 +963,10 @@ fn a_name_one_slip_from_a_setting_is_told_and_kept_as_the_sites_own() {
         let text = format!("{name}: 5\n");
         let told: Vec<_> = found(&text)
             .into_iter()
-            .filter(|(kind, _)| kind.name() == "read-as-your-own")
+            .filter(|(kind, _)| kind.name() == "read-as-custom")
             .collect();
         let expected = nearest.map(|nearest| {
-            let kind = Kind::ReadAsYourOwn {
+            let kind = Kind::ReadAsCustom {
                 own: Own::Setting,
                 written: name.into(),
                 nearest: nearest.into(),

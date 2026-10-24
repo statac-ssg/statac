@@ -36,6 +36,6 @@ nothing. To write the site to `public`:
 statac build --out=public
 ```
 
-`statac serve` shows drafts and posts waiting for their day by default,
+`statac serve` shows drafts and scheduled posts by default,
 so it has no `--drafts` option. To leave them out, use
 `statac serve --no-drafts`.

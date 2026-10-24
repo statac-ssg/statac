@@ -1546,7 +1546,7 @@ fn a_layout_that_reads_none_of_a_pages_writing_is_told_at_its_head() {
     assert_eq!(rendered.html.as_deref(), Some("<h1>Post 1</h1>\n<hr>\n"));
     assert_eq!(
         rendered.problems[0].kind,
-        Kind::WritingNeverShown {
+        Kind::ContentNeverShown {
             layout: "templates/page.html".into(),
             pages: 1,
         }
@@ -1554,7 +1554,7 @@ fn a_layout_that_reads_none_of_a_pages_writing_is_told_at_its_head() {
     assert_eq!(
         built.told(&rendered.problems),
         [(
-            "writing-never-shown",
+            "content-never-shown",
             "templates/page.html".into(),
             "<h1>{{ page.title }}</h1>".into()
         )]
@@ -1571,7 +1571,7 @@ fn a_layout_that_reads_none_of_a_pages_writing_is_told_at_its_head() {
 
 /// `templates/page.html` told to show none of one page's writing.
 fn hollow() -> Kind {
-    Kind::WritingNeverShown {
+    Kind::ContentNeverShown {
         layout: "templates/page.html".into(),
         pages: 1,
     }
@@ -1606,7 +1606,7 @@ fn a_layout_asking_for_the_writing_or_its_excerpt_shows_it() {
 fn a_layout_reading_the_writing_without_asking_for_it_shows_none() {
     for layout in [
         "{{ page.opening }}",
-        "{{ page.words }}",
+        "{{ page.word_count }}",
         "{{ page.maths }}",
         "{{ page.excerpt_marked }}",
         "{{ page.toc | length }}",
@@ -1688,7 +1688,7 @@ fn a_page_whose_layout_stopped_is_told_of_that_alone() {
     let rendered = built.render("post-1.md");
     assert_eq!(rendered.html, None);
     assert_eq!(rendered.problems.len(), 1, "{:?}", rendered.problems);
-    assert_ne!(rendered.problems[0].kind.name(), "writing-never-shown");
+    assert_ne!(rendered.problems[0].kind.name(), "content-never-shown");
 }
 
 #[test]
@@ -1850,7 +1850,7 @@ fn a_pages_search_boxes_are_counted_across_its_layout_and_its_writing() {
          [statac-search-2]\n[statac-search-3]|[statac-search-4]"
     );
     // A layout that shows none of the writing counts none of its boxes.
-    let (own, _) = shown("{% set words = page.words %}{{ find() }}");
+    let (own, _) = shown("{% set words = page.word_count %}{{ find() }}");
     assert_eq!(own, "[statac-search first]");
 }
 
@@ -2454,7 +2454,7 @@ fn a_posts_excerpt_opening_and_words_are_read_from_its_writing() {
         ),
         (
             "templates/home.html",
-            "{% for post in page.posts | sort(attribute='title') %}[{{ post.excerpt | default('none') }}|{{ post.excerpt_marked }}|{{ post.opening | default('none') }}|{{ post.words }}]{% endfor %}",
+            "{% for post in page.posts | sort(attribute='title') %}[{{ post.excerpt | default('none') }}|{{ post.excerpt_marked }}|{{ post.opening | default('none') }}|{{ post.word_count }}]{% endfor %}",
         ),
         ("templates/page.html", "{{ page.content }}"),
     ]);
@@ -3257,7 +3257,7 @@ fn a_filter_that_needs_the_sites_address_says_so() {
     assert_eq!(
         rendered.problems[0].kind,
         Kind::TemplateStopped {
-            reason: Stopped::NoSiteAddress
+            reason: Stopped::NoSiteUrl
         }
     );
     assert_eq!(built.told(&rendered.problems)[0].2, "page.url | absolute");
@@ -3415,7 +3415,7 @@ fn a_problem_raised_in_a_snippet_called_from_a_macro_is_told_where_raised() {
         ("content/index.md", "---\ntitle: Home\n---\n"),
         (
             "snippets/figure.html",
-            "{% macro picture(name) %}{{ page.photo(name) }}{% endmacro %}{{ picture(file) }}",
+            "{% macro picture(name) %}{{ page.image(name) }}{% endmacro %}{{ picture(file) }}",
         ),
         (
             "templates/home.html",
@@ -3438,7 +3438,7 @@ fn a_problem_raised_in_a_snippet_called_from_a_macro_is_told_where_raised() {
         [(
             "missing-file",
             "snippets/figure.html".into(),
-            "page.photo(name)".into()
+            "page.image(name)".into()
         )]
     );
     assert_eq!(
@@ -4635,7 +4635,7 @@ fn a_lists_first_page_alone_is_told_its_writing_is_never_shown() {
         let problems = rendered.problems.iter();
         problems.map(|problem| problem.kind.name()).collect()
     };
-    assert_eq!(told(built.renderer.render(page)), ["writing-never-shown"]);
+    assert_eq!(told(built.renderer.render(page)), ["content-never-shown"]);
     assert!(told(built.renderer.render_later(page, 2)).is_empty());
 }
 

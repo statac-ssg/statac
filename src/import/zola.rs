@@ -31,8 +31,8 @@ use slug::Strategy;
 use writing::Reading;
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
-    heading: "Tags in the writing left as written",
-    sentence: "Statac's writing runs none of Zola's tags, and these have no equal in it, so each \
+    heading: "Tags in the content left as written",
+    sentence: "Statac's Markdown runs none of Zola's tags, and these have no equal in it, so each \
                is left as written and shows on the page as it stands: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
@@ -55,7 +55,7 @@ pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page by its file, and Statac couldn't find that file in the \
                old site, or Zola didn't publish it, so it is left as written: link to the page's \
-               address instead.",
+               URL instead.",
 };
 
 pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
@@ -92,18 +92,17 @@ pub(super) static SETTINGS_LEFT: FindingKind = FindingKind {
 };
 
 pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
-    heading: "Addresses Statac couldn't work out",
-    sentence: "Zola wrote each of these names in ASCII for its address, and Statac doesn't know \
-               how it writes a letter of this script, so the page's old address wasn't worked \
-               out or kept: give the page a `permalink` of the address the old site published it \
-               at.",
+    heading: "URLs Statac couldn't work out",
+    sentence: "Zola wrote each of these names in ASCII for its slug, and Statac doesn't know how \
+               it writes a letter of this script, so the page's old URL wasn't worked out or \
+               kept: give the page a `permalink` of the URL the old site published it at.",
 };
 
 pub(super) static ADDRESS_UNUSABLE: FindingKind = FindingKind {
-    heading: "Addresses Statac can't publish at",
-    sentence: "Zola published each of these pages at an address holding a character Statac's \
-               addresses can't hold, such as `%` or `?`, so the page is at Statac's own address, \
-               and the old one isn't kept.",
+    heading: "URLs Statac can't publish at",
+    sentence: "Zola published each of these pages at a URL holding a character Statac's URLs \
+               can't hold, such as `%` or `?`, so the page is at Statac's own URL, and the old \
+               one isn't kept.",
 };
 
 pub(super) static ORDER_UNKNOWN: FindingKind = FindingKind {
@@ -387,8 +386,8 @@ impl Reader<'_> {
             }
             (_, Some(given)) => self.import.address = Some(given.to_owned()),
             (Some(url), None) => notes.push(format!(
-                "The settings' `base_url`, {}, isn't a web address, so the new site has no `url` \
-                 yet: add it to `statac.yaml` once it is known.",
+                "The settings' `base_url`, {}, isn't an `https://` or `http://` URL, so the new \
+                 site has no `url` yet: add it to `statac.yaml` once it is known.",
                 code(url)
             )),
             (None, None) => {}
@@ -492,10 +491,10 @@ impl Reader<'_> {
             self.import.written.push((
                 "snippets/markdown/link.html".into(),
                 format!(
-                    "{{# Each link in the writing, one to another site opened as the old site's \
+                    "{{# Each link in the Markdown, one to another site opened as the old site's \
                      settings asked: see /snippets/#pieces-of-the-writing -#}}\n\
-                     <a href=\"{{{{ address }}}}\"{{% if title %}} title=\"{{{{ title }}}}\"\
-                     {{% endif %}}{{% if outside %}}{target} rel=\"{}\"{{% endif %}}>\
+                     <a href=\"{{{{ url }}}}\"{{% if title %}} title=\"{{{{ title }}}}\"\
+                     {{% endif %}}{{% if external %}}{target} rel=\"{}\"{{% endif %}}>\
                      {{{{ body }}}}</a>",
                     rel.join(" ")
                 ),
@@ -585,7 +584,7 @@ impl Reader<'_> {
                     starter,
                 ),
                 (name, true) if name == output_top => {
-                    "the old site's built output, read only to check the addresses".into()
+                    "the old site's built output, read only to check the URLs".into()
                 }
                 (_, true) => "a folder Zola doesn't publish".into(),
                 (_, false) => "a file Zola doesn't publish".into(),
@@ -727,7 +726,7 @@ impl Reader<'_> {
                     Some(("index", language)) => self.page(&within, &language, Shape::Bundle)?,
                     Some(_) => self.left(
                         &path,
-                        "writing kept among a page's files, which Zola doesn't publish as a page",
+                        "content kept among a page's files, which Zola doesn't publish as a page",
                     ),
                     None => {
                         let (dir, folder) = (parent(rel), last(rel));
@@ -1201,7 +1200,7 @@ impl Reader<'_> {
                             self.docs[*b].made.as_deref().unwrap_or_default(),
                         )
                     });
-                    "the names in their addresses, A to Z"
+                    "their slugs, A to Z"
                 }
                 _ => {
                     let from = self.docs[list].from.clone();
@@ -1330,16 +1329,16 @@ impl Reader<'_> {
             };
             self.import
                 .settings
-                .push(("later_pages".into(), Value::Text(later)));
+                .push(("pagination.permalink".into(), Value::Text(later)));
         }
-        let mut note = "Zola shows all of a list's pages on one page, unless the list's own page \
-                        gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the \
-                        same"
+        let mut note = "Zola shows all of a list's pages on one page, unless its list page gives \
+                        `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same"
             .to_owned();
         if any {
             note.push_str(
-                ", and each list's page that gave it says `posts_per_page`; the first of its \
-                 later pages, which Zola sent on to the list, is in the list's `redirect_from`",
+                ", and each list page that gave it says `posts_per_page`; the first of its \
+                 paginated pages, which Zola redirected to the list, is in the list page's \
+                 `redirect_from`",
             );
         }
         note.push('.');
@@ -1351,8 +1350,8 @@ impl Reader<'_> {
             );
             if later {
                 note.push_str(
-                    ", and nothing answers the old home page's later pages: they are listed \
-                     under Addresses",
+                    ", and nothing is published at the old home page's paginated pages now: \
+                     they are listed under URLs",
                 );
             }
             note.push('.');
@@ -1360,9 +1359,9 @@ impl Reader<'_> {
         }
         if later_paths.len() > 1 {
             self.note(format!(
-                "The lists' `paginate_path` put their later pages at {}, and Statac puts every \
-                 list's in one place, so only the first are kept: the others are listed under \
-                 Addresses.",
+                "The lists' `paginate_path` put their paginated pages at {}, and Statac puts \
+                 every list's in one place, so only the first are kept: the others are listed \
+                 under URLs.",
                 listed(&later_paths.iter().map(|p| code(p)).collect::<Vec<_>>())
             ));
         }
@@ -1441,16 +1440,16 @@ impl Reader<'_> {
                 (_, false) => ("feeds", "each stay"),
             };
             let written = match self.starter {
-                true => "written by `templates/feed.xml`, as `feed:` on each list's page says",
+                true => "written by `templates/feed.xml`, as `feed:` on each list page says",
                 false => {
-                    "as `feed:` on each list's page says, built with `templates/feed.xml` once \
-                     you add it"
+                    "as `feed:` on each list page says, built with `templates/feed.xml` once you \
+                     add it"
                 }
             };
             self.note(format!(
-                "Zola's {feeds}, at {}, {are} at the same address, {written}, and \
-                 `feed_ids_before` keeps each post's id the address Zola gave it, so feed \
-                 readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
+                "Zola's {feeds}, at {}, {are} at the same URL, {written}, and \
+                 `feed_ids_before` keeps each post's id the URL Zola gave it, so feed readers \
+                 see nothing new: see https://statac.dev/feeds/#entry-ids.",
                 listed(&shown)
             ));
             self.import.addresses.extend(feed_addresses);
@@ -1461,7 +1460,7 @@ impl Reader<'_> {
             let shown: Vec<String> = extra_names.iter().map(|n| code(n)).collect();
             self.note(format!(
                 "The settings' `feed_filenames` gave each list more than one feed, and Statac \
-                 writes one: those named {} aren't made, and are listed under Addresses.",
+                 writes one: those named {} aren't made, and are listed under URLs.",
                 listed(&shown)
             ));
         }
@@ -1475,9 +1474,9 @@ impl Reader<'_> {
                  with the starter's template for posts.",
                 listed(&folders),
                 if folders.len() == 1 {
-                    "hands"
+                    "cascades"
                 } else {
-                    "each hand"
+                    "each cascade"
                 },
                 if folders.len() == 1 { "it" } else { "them" }
             ));
@@ -1578,14 +1577,15 @@ impl Reader<'_> {
         if feeds {
             self.note(
                 "Zola made a feed for each tag, as the settings' `taxonomies` asked, which has no \
-                 equal in Statac: a tag has a feed only where a page of yours speaks for it."
+                 equal in Statac: a tag has a feed only where a list page of yours asks for one \
+                 with `feed:`."
                     .to_owned(),
             );
         }
         if paged {
             self.note(
                 "Zola showed the posts of each tag some at a time, as the settings' `taxonomies` \
-                 asked, and Statac shows them all on one page, so the later pages of a tag aren't \
+                 asked, and Statac shows them all on one page, so a tag's paginated pages aren't \
                  made."
                     .to_owned(),
             );
@@ -1614,7 +1614,7 @@ impl Reader<'_> {
                                   already"
                     .into(),
                 "render" => "with `render = false` Zola published the list's pages but no page \
-                             for the list itself; `index_page: false` on the list's page does \
+                             for the list itself; `index_page: false` on the list page does \
                              that in Statac"
                     .into(),
                 "in_search_index" => "it said whether Zola's search index held the page, and \

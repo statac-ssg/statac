@@ -61,7 +61,7 @@ const BASE: &str = "<!doctype html>\n<title>{{ headline(page) }}</title>\n";
 /// A snippet showing a picture as a site might write one, reading the
 /// picture's own description only where the call gives none.
 const IMAGE: &str = "{# takes photo, alt #}\n\
-    {% set picture = page.photo(photo, decorative=(decorative if decorative is defined else false)) %}\n\
+    {% set picture = page.image(photo, decorative=(decorative if decorative is defined else false)) %}\n\
     <img src=\"{{ picture.src }}\" alt=\"{{ alt if alt is defined else picture.alt }}\">\n";
 
 impl Site {
@@ -172,7 +172,7 @@ fn unhash(text: &str) -> String {
 }
 
 /// Every name a photograph answers to, one to a line.
-const EVERY_NAME: &str = "{% set p = page.photo(page.shows) %}\
+const EVERY_NAME: &str = "{% set p = page.image(page.shows) %}\
     src={{ p.src }}\navif={{ p.avif }}\nfallback={{ p.fallback }}\nsizes={{ p.sizes }}\n\
     full={{ p.full }}\nwidth={{ p.width }}\nheight={{ p.height }}\nalt={{ p.alt }}\n\
     caption={{ p.caption }}\nname={{ p.name }}";
@@ -190,7 +190,7 @@ fn a_photograph_asked_for_by_a_template_answers_to_every_name_and_is_published_a
         "alt: Photo 1\ncaption: Caption 1\n",
     );
     let said = site.build();
-    assert!(said.contains("Made 6 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 6 resized copies of 1 image."), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
         "src=/post-1/first-photo-1-900.#.jpg\n\
@@ -241,7 +241,7 @@ fn a_picture_is_found_from_the_page_asked_wherever_it_is_shown() {
         "templates/home.html",
         &format!(
             "{BASE}{{% for post in site.pages %}}{{% if post.shows %}}\
-             {{{{ post.photo(post.shows).src }}}}\n{{% endif %}}{{% endfor %}}"
+             {{{{ post.image(post.shows).src }}}}\n{{% endif %}}{{% endfor %}}"
         ),
     );
     site.write(
@@ -269,9 +269,9 @@ fn a_picture_is_found_from_the_page_asked_wherever_it_is_shown() {
 fn a_pages_photographs_are_gathered_by_name_or_given_as_named() {
     let site = Site::new(
         "photos",
-        "{% for p in page.photos() %}{{ p.name }} {% endfor %}|\
-         {% for p in page.photos(['photo-2.jpg', 'diagram-1.png']) %}{{ p.name }} {% endfor %}|\
-         {% for p in page.photos(none, sizes='10rem') %}{{ p.sizes }} {% endfor %}",
+        "{% for p in page.images() %}{{ p.name }} {% endfor %}|\
+         {% for p in page.images(['photo-2.jpg', 'diagram-1.png']) %}{{ p.name }} {% endfor %}|\
+         {% for p in page.images(none, sizes='10rem') %}{{ p.sizes }} {% endfor %}",
     );
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
     for name in ["photo-2.jpg", "photo-10.jpg", "photo-1.jpg"] {
@@ -282,7 +282,7 @@ fn a_pages_photographs_are_gathered_by_name_or_given_as_named() {
     // A post that is one file has no photographs of its own.
     site.write(
         "templates/gathered.html",
-        &format!("{BASE}{{% for p in page.photos() %}}{{{{ p.name }}}}{{% endfor %}}|\n"),
+        &format!("{BASE}{{% for p in page.images() %}}{{{{ p.name }}}}{{% endfor %}}|\n"),
     );
     site.write(
         "content/post-2.md",
@@ -300,7 +300,7 @@ fn a_pages_photographs_are_gathered_by_name_or_given_as_named() {
 #[test]
 fn full_adds_a_copy_at_the_photographs_own_width() {
     let layout =
-        "{{ page.photo('photo-1.jpg').full }}\n{{ page.photo('photo-1.jpg', full=true).full }}";
+        "{{ page.image('photo-1.jpg').full }}\n{{ page.image('photo-1.jpg', full=true).full }}";
     let site = Site::new("full", layout);
     site.write(
         "statac.yaml",
@@ -309,7 +309,7 @@ fn full_adds_a_copy_at_the_photographs_own_width() {
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
     site.put("content/post-1/photo-1.jpg", &jpeg(1000, 600));
     let said = site.build();
-    assert!(said.contains("Made 5 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 5 resized copies of 1 image."), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
         "/post-1/photo-1-800.#.jpg\n/post-1/photo-1-1000.#.jpg"
@@ -334,10 +334,10 @@ fn full_adds_a_copy_at_the_photographs_own_width() {
     // Without the asking, the copy is neither made nor kept.
     site.write(
         "templates/page.html",
-        &format!("{BASE}{{{{ page.photo('photo-1.jpg').full }}}}\n"),
+        &format!("{BASE}{{{{ page.image('photo-1.jpg').full }}}}\n"),
     );
     let said = site.build();
-    assert!(said.contains("Removed 1 copy"), "{said}");
+    assert!(said.contains("Removed 1 resized copy"), "{said}");
     assert_eq!(site.copies("post-1").len(), 4);
 }
 
@@ -345,7 +345,7 @@ fn full_adds_a_copy_at_the_photographs_own_width() {
 fn what_a_pictures_own_file_says_reaches_the_template_under_statacs_names() {
     let site = Site::new(
         "sidecar",
-        "{% set p = page.photo('photo-1.jpg') %}{{ p.credit }}|{{ p.taken.place }}|{{ p.src }}|\
+        "{% set p = page.image('photo-1.jpg') %}{{ p.credit }}|{{ p.taken.place }}|{{ p.src }}|\
          {{ p.width }}|{{ p.caption | markdown }}",
     );
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
@@ -382,54 +382,54 @@ fn a_picture_with_no_description_is_noted_once_where_it_is_shown() {
     site.put("static/img/photo-5.jpg", &jpeg(30, 20));
     let said = site.check();
     let expected = "\
-note  Picture with no description: `photo-1.jpg`
+note  Missing alt text: `photo-1.jpg`
   content/post-1/index.md, line 4
    4 │ ![](photo-1.jpg) and again ![](photo-1.jpg)
      │     ^^^^^^^^^^^
   Describe it in the brackets, or mark it decorative.
-  More: https://statac.dev/e/undescribed-picture/
+  More: https://statac.dev/e/missing-alt-text/
 
-note  Picture with no description: `https://example.org/photo-2.jpg`
+note  Missing alt text: `https://example.org/photo-2.jpg`
   content/post-1/index.md, line 6
    6 │ ![](https://example.org/photo-2.jpg)
      │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Describe it in the brackets.
-  More: https://statac.dev/e/undescribed-picture/
+  More: https://statac.dev/e/missing-alt-text/
 
-note  Picture with no description: `photo-3.jpg`
+note  Missing alt text: `photo-3.jpg`
   content/post-1/index.md, line 8
    8 │ <img src=\"photo-3.jpg\">
      │           ^^^^^^^^^^^
-  Give the `<img>` an `alt`, or `alt=\"\"` where it is decoration.
-  More: https://statac.dev/e/undescribed-picture/
+  Give the `<img>` an `alt`, or `alt=\"\"` where it is decorative.
+  More: https://statac.dev/e/missing-alt-text/
 
-note  Picture with no description: `content/post-1/photo-4.jpg`
+note  Missing alt text: `content/post-1/photo-4.jpg`
   content/post-1/index.md, line 10
   10 │ @image(\"photo-4.jpg\")
      │ ^^^^^^^^^^^^^^^^^^^^^
   Describe it with `alt:` in `content/post-1/photo-4.jpg.yaml`, or mark it decorative.
-  More: https://statac.dev/e/undescribed-picture/
+  More: https://statac.dev/e/missing-alt-text/
 
-note  Picture with no description: `/img/photo-5.jpg`
+note  Missing alt text: `/img/photo-5.jpg`
   content/post-1/index.md, line 12
   12 │ ![](/img/photo-5.jpg)
      │     ^^^^^^^^^^^^^^^^
   Describe it in the brackets.
-  More: https://statac.dev/e/undescribed-picture/
+  More: https://statac.dev/e/missing-alt-text/
 ";
     assert!(said.contains(expected), "{said}");
-    assert_eq!(said.matches("Picture with no description").count(), 5);
+    assert_eq!(said.matches("Missing alt text:").count(), 5);
 
     // `build` counts them, and a site may quieten them by name.
     let said = site.build();
-    assert!(said.contains("5 notes: 5 undescribed-picture."), "{said}");
+    assert!(said.contains("5 notes: 5 missing-alt-text."), "{said}");
     site.write(
         "statac.yaml",
         "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
-         quiet: [undescribed-picture]\n",
+         quiet: [missing-alt-text]\n",
     );
     let said = site.check();
-    assert!(!said.contains("Picture with no description"), "{said}");
+    assert!(!said.contains("Missing alt text:"), "{said}");
 }
 
 #[test]
@@ -437,7 +437,7 @@ fn a_picture_shown_by_the_writing_and_the_layout_is_noted_once_at_the_writing() 
     let site = Site::new(
         "twice",
         "{{ page.content }}\n\
-         {{ page.photo('/img/photo-1.jpg').alt }}{{ page.photo('/img/photo-2.jpg').alt }}",
+         {{ page.image('/img/photo-1.jpg').alt }}{{ page.image('/img/photo-2.jpg').alt }}",
     );
     site.write(
         "content/post-1/index.md",
@@ -454,18 +454,18 @@ fn a_picture_shown_by_the_writing_and_the_layout_is_noted_once_at_the_writing() 
     // The one both show is told at the writing on each page, and the one
     // only the layout shows is told for the pages building it.
     let at_writing = said
-        .matches("note  Picture with no description: `/img/photo-1.jpg`\n  content/post-")
+        .matches("note  Missing alt text: `/img/photo-1.jpg`\n  content/post-")
         .count();
     let by_layout = said
-        .matches("note  Picture with no description: `static/img/photo-2.jpg`\n")
+        .matches("note  Missing alt text: `static/img/photo-2.jpg`\n")
         .count();
     assert_eq!((at_writing, by_layout), (2, 1), "{said}");
     assert!(
         said.contains(
-            "note  Picture with no description: `static/img/photo-2.jpg`\n  \
+            "note  Missing alt text: `static/img/photo-2.jpg`\n  \
              templates/page.html, line 4\n   \
-             4 │ {{ page.photo('/img/photo-1.jpg').alt }}\
-             {{ page.photo('/img/photo-2.jpg').alt }}\n     \
+             4 │ {{ page.image('/img/photo-1.jpg').alt }}\
+             {{ page.image('/img/photo-2.jpg').alt }}\n     \
              │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  \
              While building: content/post-1/index.md\n  \
              And while building 1 more:\n    \
@@ -473,7 +473,7 @@ fn a_picture_shown_by_the_writing_and_the_layout_is_noted_once_at_the_writing() 
         ),
         "{said}"
     );
-    assert_eq!(said.matches("Picture with no description").count(), 3);
+    assert_eq!(said.matches("Missing alt text:").count(), 3);
 }
 
 #[test]
@@ -515,8 +515,8 @@ fn a_picture_described_or_marked_decorative_is_never_mentioned() {
 fn a_picture_a_template_shows_is_noted_where_its_description_is_read_empty() {
     let site = Site::new(
         "template",
-        "{% set p = page.photo('photo-1.jpg') %}<img src=\"{{ p.src }}\">\n\
-         {% set q = page.photo('/img/photo-2.jpg') %}<img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\">",
+        "{% set p = page.image('photo-1.jpg') %}<img src=\"{{ p.src }}\">\n\
+         {% set q = page.image('/img/photo-2.jpg') %}<img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\">",
     );
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
     site.put("content/post-1/photo-1.jpg", &jpeg(30, 20));
@@ -526,37 +526,37 @@ fn a_picture_a_template_shows_is_noted_where_its_description_is_read_empty() {
     // the call that asked for it.
     assert!(
         said.contains(
-            "note  Picture with no description: `static/img/photo-2.jpg`\n  \
+            "note  Missing alt text: `static/img/photo-2.jpg`\n  \
              templates/page.html, line 4\n   \
-             4 │ {% set q = page.photo('/img/photo-2.jpg') %}\
+             4 │ {% set q = page.image('/img/photo-2.jpg') %}\
              <img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\">\n     \
              │            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
         ) && said.contains("Describe it where it is shown, or mark it decorative."),
         "{said}"
     );
-    assert_eq!(said.matches("Picture with no description").count(), 1);
+    assert_eq!(said.matches("Missing alt text:").count(), 1);
 
     // A template asking once is told at the call.
     site.write(
         "templates/page.html",
-        &format!("{BASE}{{{{ page.photo('photo-1.jpg').alt }}}}\n"),
+        &format!("{BASE}{{{{ page.image('photo-1.jpg').alt }}}}\n"),
     );
     let said = site.check();
     assert!(
         said.contains(
-            "note  Picture with no description: `content/post-1/photo-1.jpg`\n  \
+            "note  Missing alt text: `content/post-1/photo-1.jpg`\n  \
              templates/page.html, line 3\n   \
-             3 │ {{ page.photo('photo-1.jpg').alt }}\n     \
+             3 │ {{ page.image('photo-1.jpg').alt }}\n     \
              │    ^^^^^^^^^^^^^^^^^^^^^^^^^\n"
         ),
         "{said}"
     );
     site.write(
         "templates/page.html",
-        &format!("{BASE}{{{{ page.photo('photo-1.jpg', decorative=true).alt }}}}\n"),
+        &format!("{BASE}{{{{ page.image('photo-1.jpg', decorative=true).alt }}}}\n"),
     );
     let said = site.check();
-    assert!(!said.contains("Picture with no description"), "{said}");
+    assert!(!said.contains("Missing alt text:"), "{said}");
 }
 
 #[test]
@@ -570,7 +570,7 @@ fn a_picture_handed_to_a_snippet_is_noted_only_where_its_description_is_read() {
     site.write(
         "snippets/image.html",
         "{# takes photo, alt #}\n\
-         {% set picture = page.photo(photo) %}\n\
+         {% set picture = page.image(photo) %}\n\
          {% if alt is defined %}{{ shown(picture, alt=alt) }}{% else %}\
          {{ shown(picture) }}{% endif %}\n",
     );
@@ -584,10 +584,10 @@ fn a_picture_handed_to_a_snippet_is_noted_only_where_its_description_is_read() {
     site.put("content/post-1/photo-2.jpg", &jpeg(30, 20));
     let said = site.check();
     assert!(
-        said.contains("note  Picture with no description: `content/post-1/photo-2.jpg`\n"),
+        said.contains("note  Missing alt text: `content/post-1/photo-2.jpg`\n"),
         "{said}"
     );
-    assert_eq!(said.matches("Picture with no description").count(), 1);
+    assert_eq!(said.matches("Missing alt text:").count(), 1);
 }
 
 #[test]
@@ -595,11 +595,11 @@ fn a_piece_writing_pictures_is_handed_the_picture() {
     let site = Site::new("piece", "{{ page.content }}");
     site.write(
         "snippets/markdown/image.html",
-        "{% if photo.avif %}<picture><source srcset=\"{{ photo.avif }}\">\
-         <img src=\"{{ photo.src }}\" alt=\"{{ alt }}\"></picture>\
-         {% elif photo %}\
-         <img src=\"{{ photo.src }}\" width=\"{{ photo.width }}\" alt=\"{{ alt }}\">\
-         {% else %}<img src=\"{{ address }}\" alt=\"{{ alt }}\" class=\"elsewhere\">{% endif %}",
+        "{% if image.avif %}<picture><source srcset=\"{{ image.avif }}\">\
+         <img src=\"{{ image.src }}\" alt=\"{{ alt }}\"></picture>\
+         {% elif image %}\
+         <img src=\"{{ image.src }}\" width=\"{{ image.width }}\" alt=\"{{ alt }}\">\
+         {% else %}<img src=\"{{ url }}\" alt=\"{{ alt }}\" class=\"elsewhere\">{% endif %}",
     );
     site.write(
         "content/post-1.md",
@@ -610,7 +610,7 @@ fn a_piece_writing_pictures_is_handed_the_picture() {
     site.put("content/diagram-1.gif", &gif(40, 30));
     site.write("content/photo-1.jpg.yaml", "alt: In its own file\n");
     let said = site.build();
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     assert!(!said.contains("note"), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
@@ -628,7 +628,7 @@ fn a_piece_that_names_no_copy_has_none_made() {
     let site = Site::new("piece-plain", "{{ page.content }}");
     site.write(
         "snippets/markdown/image.html",
-        "<img src=\"{{ address }}\" alt=\"{{ alt }}\">",
+        "<img src=\"{{ url }}\" alt=\"{{ alt }}\">",
     );
     site.write(
         "content/post-1/index.md",
@@ -644,7 +644,7 @@ fn a_piece_that_names_no_copy_has_none_made() {
 fn a_heic_picture_a_template_shows_is_told_at_the_call_that_asks_for_it() {
     let site = Site::new(
         "heic-template",
-        "{{ page.photo('/img/photo-1.jpg').src }}\n{{ page.photo('/img/photo-2.heic').src }}",
+        "{{ page.image('/img/photo-1.jpg').src }}\n{{ page.image('/img/photo-2.heic').src }}",
     );
     for n in [1, 2] {
         site.write(
@@ -656,18 +656,18 @@ fn a_heic_picture_a_template_shows_is_told_at_the_call_that_asks_for_it() {
     site.put("static/img/photo-2.heic", HEIC);
     let said = site.check();
     let expected = "\
-warning  HEIC picture: `static/img/photo-2.heic` is published as it is, with no copies made
+warning  HEIC image: `static/img/photo-2.heic` is published as it is, with no resized copies made
   templates/page.html, line 4
-   4 │ {{ page.photo('/img/photo-2.heic').src }}
+   4 │ {{ page.image('/img/photo-2.heic').src }}
      │    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   While building: content/post-1/index.md
   And while building 1 more:
     content/post-2/index.md
-  Export it as a JPEG: most browsers can't show a HEIC picture.
-  More: https://statac.dev/e/heic-picture/
+  Export it as a JPEG: most browsers can't show a HEIC image.
+  More: https://statac.dev/e/heic-image/
 ";
     assert!(said.contains(expected), "{said}");
-    assert_eq!(said.matches("HEIC picture:").count(), 1, "{said}");
+    assert_eq!(said.matches("HEIC image:").count(), 1, "{said}");
 }
 
 #[test]
@@ -683,23 +683,23 @@ fn a_heic_picture_is_published_as_it_is_and_told_where_it_is_shown() {
     site.put("content/post-1/photo-2.heic", HEIC);
     let said = site.check();
     let expected = "\
-warning  HEIC picture: `content/post-1/photo-1.heic` is published as it is, with no copies made
+warning  HEIC image: `content/post-1/photo-1.heic` is published as it is, with no resized copies made
   content/post-1/index.md, line 4
    4 │ ![A photograph](photo-1.heic)
      │                 ^^^^^^^^^^^^
-  Export it as a JPEG: most browsers can't show a HEIC picture.
-  More: https://statac.dev/e/heic-picture/
+  Export it as a JPEG: most browsers can't show a HEIC image.
+  More: https://statac.dev/e/heic-image/
 
-warning  HEIC picture: `content/post-1/photo-2.heic` is published as it is, with no copies made
+warning  HEIC image: `content/post-1/photo-2.heic` is published as it is, with no resized copies made
   content/post-1/index.md, line 6
    6 │ @image(\"photo-2.heic\", alt=\"Another\")
      │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Export it as a JPEG: most browsers can't show a HEIC picture.
-  More: https://statac.dev/e/heic-picture/
+  Export it as a JPEG: most browsers can't show a HEIC image.
+  More: https://statac.dev/e/heic-image/
 ";
     assert!(said.contains(expected), "{said}");
     let said = site.build();
-    assert!(said.contains("2 warnings: 2 heic-picture."), "{said}");
+    assert!(said.contains("2 warnings: 2 heic-image."), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
         "<p><img src=\"photo-1.heic\" alt=\"A photograph\" loading=\"lazy\" decoding=\"async\"></p>\n\
@@ -897,18 +897,18 @@ fn a_video_kept_elsewhere_gives_its_player_and_the_still_fetched_for_it() {
     let site = Site::new(
         "videos",
         "{% set y = page.youtube('https://youtu.be/abcdefghijk?t=1m30s') %}\
-         {{ y.id }} {{ y.start }} {{ y.embed }} {% if y.still %}{{ y.still.src }}{% else %}no still{% endif %} | \
+         {{ y.id }} {{ y.start }} {{ y.embed }} {% if y.thumbnail %}{{ y.thumbnail.src }}{% else %}no still{% endif %} | \
          {% set v = page.vimeo('https://vimeo.com/123456789') %}\
          {{ v.id }} {{ v.start | default('from the start') }} {{ v.embed }} \
-         {% if v.still %}{{ v.still.src }}{% else %}{{ v.still | default('no still') }}{% endif %}",
+         {% if v.thumbnail %}{{ v.thumbnail.src }}{% else %}{{ v.thumbnail | default('no still') }}{% endif %}",
     );
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
     site.put("fetched/stills/youtube-abcdefghijk.jpg", &jpeg(400, 200));
     // A picture beside the page is the author's own, and no still.
     site.put("content/post-1/vimeo-123456789.jpg", &jpeg(400, 200));
     let said = site.build();
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
-    assert!(said.contains("1 warning: 1 no-still."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
+    assert!(said.contains("1 warning: 1 no-thumbnail."), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
         "abcdefghijk 90 https://www.youtube-nocookie.com/embed/abcdefghijk?autoplay=1&amp;start=90 \
@@ -967,7 +967,7 @@ error  No value: nothing is set for `page.{host}.start`
 fn a_still_is_read_by_its_bytes_and_shown_as_copies_whatever_the_settings() {
     let site = Site::new(
         "still-png",
-        "{% set y = page.youtube('abcdefghijk') %}{{ y.still.src }} {{ y.still.width }}",
+        "{% set y = page.youtube('abcdefghijk') %}{{ y.thumbnail.src }} {{ y.thumbnail.width }}",
     );
     site.write(
         "statac.yaml",
@@ -977,7 +977,7 @@ fn a_still_is_read_by_its_bytes_and_shown_as_copies_whatever_the_settings() {
     // A PNG, kept under the name every still has.
     site.put("fetched/stills/youtube-abcdefghijk.jpg", &png(48, 32));
     let said = site.build();
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
         "/stills/youtube-abcdefghijk-48.#.jpg 48"
@@ -997,7 +997,7 @@ fn a_still_is_read_by_its_bytes_and_shown_as_copies_whatever_the_settings() {
     assert_eq!(code, 1, "{said}");
     assert!(
         said.contains(
-            "error  Unreadable picture: `fetched/stills/youtube-abcdefghijk.jpg` isn't a JPEG, \
+            "error  Unreadable image: `fetched/stills/youtube-abcdefghijk.jpg` isn't a JPEG, \
              a PNG or a still WebP\n"
         ) && said.contains("  Delete it, then run `statac refresh` to fetch one.\n"),
         "{said}"
@@ -1007,11 +1007,11 @@ fn a_still_is_read_by_its_bytes_and_shown_as_copies_whatever_the_settings() {
 /// A snippet showing a video kept on YouTube in place of its still.
 const YOUTUBE: &str = "{# takes address #}\n\
     {% set video = page.youtube(address) %}\n\
-    {% if video.still %}<img src=\"{{ video.still.src }}\">{% endif %}\n";
+    {% if video.thumbnail %}<img src=\"{{ video.thumbnail.src }}\">{% endif %}\n";
 
 #[test]
 fn a_video_with_no_still_is_told_once_at_the_first_call_in_the_writing() {
-    let site = Site::new("no-still", "{{ page.content }}");
+    let site = Site::new("no-thumbnail", "{{ page.content }}");
     site.write("snippets/youtube.html", YOUTUBE);
     site.write(
         "content/post-1.md",
@@ -1026,31 +1026,31 @@ fn a_video_with_no_still_is_told_once_at_the_first_call_in_the_writing() {
     assert_eq!(
         said,
         "\
-warning  No still: no picture has been fetched for this video yet
+warning  No thumbnail: no image has been fetched for this video yet
   content/post-1.md, line 6
    6 │ @youtube(\"https://youtu.be/abcdefghijk\")
      │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Run `statac refresh` to fetch one.
-  More: https://statac.dev/e/no-still/
+  More: https://statac.dev/e/no-thumbnail/
 
-warning  No still: no picture has been fetched for this video yet
+warning  No thumbnail: no image has been fetched for this video yet
   content/post-1.md, line 8
    8 │ @youtube(\"https://youtu.be/bcdefghijkl\")
      │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Run `statac refresh` to fetch one.
-  More: https://statac.dev/e/no-still/
+  More: https://statac.dev/e/no-thumbnail/
 
-2 warnings: 2 no-still.
+2 warnings: 2 no-thumbnail.
 "
     );
     let said = site.build();
-    assert!(said.contains("2 warnings: 2 no-still."), "{said}");
+    assert!(said.contains("2 warnings: 2 no-thumbnail."), "{said}");
     assert!(!site.root.join("fetched").exists());
 
     // Quietened by name, and counted still.
     site.write(
         "statac.yaml",
-        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nquiet: [no-still]\n",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nquiet: [no-thumbnail]\n",
     );
     let said = site.check();
     assert_eq!(said, "2 warnings, all quietened.\n");
@@ -1061,7 +1061,7 @@ fn a_video_a_template_shows_with_no_still_is_told_at_the_templates_call() {
     let site = Site::new(
         "no-still-template",
         "{% set video = page.vimeo('https://vimeo.com/123456789') %}\n\
-         {% if video.still %}{{ video.still.src }}{% endif %}",
+         {% if video.thumbnail %}{{ video.thumbnail.src }}{% endif %}",
     );
     site.write("content/post-1.md", "---\ntitle: Post 1\n---\n");
     site.write("content/post-2.md", "---\ntitle: Post 2\n---\n");
@@ -1073,14 +1073,14 @@ fn a_video_a_template_shows_with_no_still_is_told_at_the_templates_call() {
     assert_eq!(
         said,
         "\
-warning  No still: Vimeo has no picture for this video
+warning  No thumbnail: Vimeo has no image for this video
   templates/page.html, line 3
    3 │ {% set video = page.vimeo('https://vimeo.com/123456789') %}
      │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Show a picture of your own in its place.
-  More: https://statac.dev/e/no-still/
+  Show an image of your own in its place.
+  More: https://statac.dev/e/no-thumbnail/
 
-1 warning: 1 no-still.
+1 warning: 1 no-thumbnail.
 "
     );
 }
@@ -1106,10 +1106,10 @@ fn a_video_whose_still_is_never_read_or_has_none_is_never_told() {
 /// of those `page.photos()` gathers.
 const BOTH: &str = "{{ page.content }}\n\
     {% for name in ['diagram-1.png', 'drawing-2.png'] %}\
-    {% set p = page.photo(name) %}\
+    {% set p = page.image(name) %}\
     {{ p.src }}|{{ p.avif }}|{{ p.fallback }}|{{ p.full }}|{{ p.width }}x{{ p.height }}\n\
     {% endfor %}\
-    {% for p in page.photos() %}{{ p.name }}:{{ p.avif }} {% endfor %}";
+    {% for p in page.images() %}{{ p.name }}:{{ p.avif }} {% endfor %}";
 
 /// A PNG that says it moves: a PNG with the chunk announcing its frames
 /// before its pixels.
@@ -1152,7 +1152,7 @@ fn a_png_is_published_as_copies_however_it_is_shown_and_one_that_moves_as_it_is(
     site.put("content/post-1/diagram-1.png", &png(500, 200));
     site.put("content/post-1/drawing-2.png", &moving_png(500, 200));
     let said = site.build();
-    assert!(said.contains("Made 4 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 4 resized copies of 1 image."), "{said}");
     let sizes = "(max-width: 46rem) 100vw, 46rem";
     assert_eq!(
         site.page("post-1/index.html"),
@@ -1186,7 +1186,7 @@ fn a_png_is_published_as_copies_however_it_is_shown_and_one_that_moves_as_it_is(
     // A piece writing the pictures is handed them the same.
     site.write(
         "snippets/markdown/image.html",
-        "[{{ photo.src }}|{{ photo.fallback }}|{{ photo.width }}]",
+        "[{{ image.src }}|{{ image.fallback }}|{{ image.width }}]",
     );
     site.build();
     assert!(
@@ -1209,7 +1209,10 @@ fn a_small_photograph_is_published_as_copies_at_its_own_width() {
     site.put("content/post-1/photo-1.jpg", &jpeg(120, 80));
     site.put("content/post-1/diagram-2.png", &png(120, 80));
     let said = site.build();
-    assert!(said.contains("Made 4 copies of 2 photographs."), "{said}");
+    assert!(
+        said.contains("Made 4 resized copies of 2 images."),
+        "{said}"
+    );
     assert_eq!(
         site.copies("post-1"),
         [
@@ -1250,57 +1253,57 @@ fn each_mistake_asking_for_a_picture_or_a_file_is_told_at_the_call() {
     };
     for (n, (call, headline, suggestion)) in [
         (
-            "page.photo('photo-2.jpg')",
+            "page.image('photo-2.jpg')",
             "Missing file: there is no `content/post-1/photo-2.jpg`",
             Some("Did you mean `photo-1.jpg`?"),
         ),
         (
-            "page.photo('/img/photo-1.jpg')",
+            "page.image('/img/photo-1.jpg')",
             "Missing file: there is no `/img/photo-1.jpg`",
             None,
         ),
         (
-            "page.photo()",
-            "Wrong argument: `page.photo` needs the name of one picture",
-            Some("Write it as `page.photo(\"photo-1.jpg\")`."),
+            "page.image()",
+            "Wrong argument: `page.image` needs the name of one image",
+            Some("Write it as `page.image(\"photo-1.jpg\")`."),
         ),
         (
-            "page.photo('')",
-            "Wrong argument: `page.photo` needs the name of one picture",
-            Some("Write it as `page.photo(\"photo-1.jpg\")`."),
+            "page.image('')",
+            "Wrong argument: `page.image` needs the name of one image",
+            Some("Write it as `page.image(\"photo-1.jpg\")`."),
         ),
         (
-            "page.photo('photo-1.jpg', 'photo-2.jpg')",
-            "Wrong argument: `page.photo` needs the name of one picture",
-            Some("Write it as `page.photo(\"photo-1.jpg\")`."),
+            "page.image('photo-1.jpg', 'photo-2.jpg')",
+            "Wrong argument: `page.image` needs the name of one image",
+            Some("Write it as `page.image(\"photo-1.jpg\")`."),
         ),
         (
-            "page.photo('https://example.org/photo-1.jpg')",
-            "Wrong argument: `page.photo` needs a file of the site, not \
+            "page.image('https://example.org/photo-1.jpg')",
+            "Wrong argument: `page.image` needs a file of the site, not \
              `https://example.org/photo-1.jpg`",
             None,
         ),
         (
-            "page.photo('photo-1.jpg', size='10rem')",
-            "Wrong argument: `page.photo` takes no `size`",
+            "page.image('photo-1.jpg', size='10rem')",
+            "Wrong argument: `page.image` takes no `size`",
             Some("Did you mean `sizes`?"),
         ),
         (
-            "page.photo('photo-1.jpg', sizes=10)",
-            "Wrong argument: `page.photo` needs `sizes` as text",
+            "page.image('photo-1.jpg', sizes=10)",
+            "Wrong argument: `page.image` needs `sizes` as text",
             Some("Write it as a browser reads it: `sizes=\"(max-width: 40rem) 100vw, 40rem\"`."),
         ),
         (
-            "page.photo('photo-1.jpg', full='yes')",
-            "Wrong argument: `page.photo` needs `full` to be `true` or `false`",
+            "page.image('photo-1.jpg', full='yes')",
+            "Wrong argument: `page.image` needs `full` to be `true` or `false`",
             None,
         ),
         (
-            "page.photos('photo-1.jpg')",
-            "Wrong argument: `page.photos` needs a list of names",
+            "page.images('photo-1.jpg')",
+            "Wrong argument: `page.images` needs a list of names",
             Some(
-                "Write it as `page.photos([\"photo-1.jpg\", \"photo-2.jpg\"])`, or \
-                 `page.photos()` for every photograph beside the page.",
+                "Write it as `page.images([\"photo-1.jpg\", \"photo-2.jpg\"])`, or \
+                 `page.images()` for every JPEG, PNG or WebP image beside the page.",
             ),
         ),
         (
@@ -1335,17 +1338,17 @@ fn each_mistake_asking_for_a_picture_or_a_file_is_told_at_the_call() {
         ),
         (
             "page.youtube('video-1')",
-            "Wrong argument: `page.youtube` needs a YouTube address or id, not `video-1`",
+            "Wrong argument: `page.youtube` needs a YouTube URL or id, not `video-1`",
             Some(
-                "Write the address YouTube gives for the video, such as \
+                "Write the URL YouTube gives for the video, such as \
                  `https://www.youtube.com/watch?v=abcdefghijk`.",
             ),
         ),
         (
             "page.vimeo()",
-            "Wrong argument: `page.vimeo` needs a Vimeo address or id",
+            "Wrong argument: `page.vimeo` needs a Vimeo URL or id",
             Some(
-                "Write the address Vimeo gives for the video, such as \
+                "Write the URL Vimeo gives for the video, such as \
                  `https://vimeo.com/123456789`.",
             ),
         ),
@@ -1365,7 +1368,7 @@ fn each_mistake_asking_for_a_picture_or_a_file_is_told_at_the_call() {
 
 #[test]
 fn a_name_never_given_is_told_as_a_missing_value() {
-    let said = told("never-given", "{{ page.photo(page.shows).src }}");
+    let said = told("never-given", "{{ page.image(page.shows).src }}");
     assert!(
         said.starts_with("error  No value: nothing is set for `page.shows`"),
         "{said}"
@@ -1374,14 +1377,14 @@ fn a_name_never_given_is_told_as_a_missing_value() {
 
 #[test]
 fn a_photograph_that_cannot_be_read_stops_the_template_asking_for_it() {
-    let site = Site::new("cut-short", "{{ page.photo('photo-1.jpg').src }}");
+    let site = Site::new("cut-short", "{{ page.image('photo-1.jpg').src }}");
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
     let whole = jpeg(30, 20);
     site.put("content/post-1/photo-1.jpg", &whole[..20]);
     let said = site.check();
     assert!(
         said.contains(
-            "error  Unreadable picture: `content/post-1/photo-1.jpg` is cut short or damaged\n  \
+            "error  Unreadable image: `content/post-1/photo-1.jpg` is cut short or damaged\n  \
              templates/page.html, line 3\n"
         ),
         "{said}"
@@ -1435,13 +1438,13 @@ fn snippets_of_a_sites_own_show_its_pictures_and_videos_as_they_are_written() {
     ] {
         assert!(
             said.contains(&format!(
-                "note  Picture with no description: `content/post-1/{picture}`\n  \
+                "note  Missing alt text: `content/post-1/{picture}`\n  \
                  content/post-1/index.md, line {line}\n"
             )),
             "{said}"
         );
     }
-    assert!(said.contains("3 notes: 3 undescribed-picture."), "{said}");
+    assert!(said.contains("3 notes: 3 missing-alt-text."), "{said}");
     site.build();
     let page = site.page("post-1/index.html");
     for shown in [
@@ -1513,7 +1516,7 @@ fn a_snippet_shows_a_picture_of_the_sites_own_in_place_of_the_still_fetched() {
         "---\ntitle: Post 1\n---\n@youtube(\"abcdefghijk\")\n",
     );
     let said = site.check();
-    assert!(said.contains("1 warning: 1 no-still."), "{said}");
+    assert!(said.contains("1 warning: 1 no-thumbnail."), "{said}");
 }
 
 #[test]
@@ -1601,13 +1604,13 @@ impl Site {
 }
 
 /// Every name a mention answers to, a mention to a line.
-const EVERY_MENTION_NAME: &str = "{% for m in page.webmentions.said %}\
+const EVERY_MENTION_NAME: &str = "{% for m in page.webmentions.comments %}\
     said {{ m.kind }} {% if m.author %}{{ m.author }}{% endif %} \
     {% if m.author_url %}{{ m.author_url }}{% endif %} {{ m.url }} \
     {% if m.published %}{{ m.published }} {{ m.published.year }}{% endif %} \
-    {% if m.words %}{{ m.words }}{% endif %} \
-    {% if m.face %}{{ m.face.src }} {{ m.face.width }} {{ m.face.height }} [{{ m.face.alt }}]{% endif %}\n\
-    {% endfor %}{% for m in page.webmentions.faces %}faces {{ m.kind }} {{ m.url }}\n{% endfor %}";
+    {% if m.content %}{{ m.content }}{% endif %} \
+    {% if m.avatar %}{{ m.avatar.src }} {{ m.avatar.width }} {{ m.avatar.height }} [{{ m.avatar.alt }}]{% endif %}\n\
+    {% endfor %}{% for m in page.webmentions.reactions %}faces {{ m.kind }} {{ m.url }}\n{% endfor %}";
 
 #[test]
 fn a_pages_mentions_are_said_or_faces_oldest_first_with_every_field() {
@@ -1645,7 +1648,7 @@ fn a_pages_mentions_are_said_or_faces_oldest_first_with_every_field() {
     site.put(&format!("fetched/faces/{FACE}"), &jpeg(96, 96));
     assert_eq!(site.check(), "No problems.\n");
     let said = site.build();
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
         "said mentioned A https://a.example/ https://a.example/post-1/ 3 September 2026 2026 \
@@ -1668,7 +1671,7 @@ fn a_pages_mentions_are_said_or_faces_oldest_first_with_every_field() {
 fn a_site_built_at_another_address_keeps_the_mentions_of_its_own() {
     let site = Site::mentioned(
         "mentions-elsewhere",
-        "{{ page.webmentions.said | length }} {{ page.url | absolute }}\n{{ webmention() }}",
+        "{{ page.webmentions.comments | length }} {{ page.url | absolute }}\n{{ webmention() }}",
     );
     site.write(
         "fetched/mentions/1.yaml",
@@ -1701,14 +1704,14 @@ fn a_site_built_at_another_address_keeps_the_mentions_of_its_own() {
 fn every_page_answers_its_mentions_whatever_mentions_says() {
     let site = Site::mentioned(
         "mentions-everywhere",
-        "{{ page.webmentions.said | length }} {{ page.webmentions.faces | length }}\
+        "{{ page.webmentions.comments | length }} {{ page.webmentions.reactions | length }}\
          {% if page.mentions %} shown{% endif %}",
     );
     site.write(
         "templates/home.html",
         &format!(
             "{BASE}{{% for post in site.pages %}}{{{{ post.url }}}} \
-             {{{{ post.webmentions.said | length }}}};{{% endfor %}}"
+             {{{{ post.webmentions.comments | length }}}};{{% endfor %}}"
         ),
     );
     site.write(
@@ -1731,7 +1734,7 @@ fn every_page_answers_its_mentions_whatever_mentions_says() {
 
 #[test]
 fn a_mention_reaches_its_page_however_its_address_is_written() {
-    let layout = "{{ page.webmentions.said | length }}";
+    let layout = "{{ page.webmentions.comments | length }}";
     let site = Site::mentioned("mention-addresses", layout);
     site.write(
         "statac.yaml",
@@ -1767,7 +1770,10 @@ fn a_mention_reaches_its_page_however_its_address_is_written() {
 
 #[test]
 fn a_mention_of_no_page_is_told_at_its_target_and_kept() {
-    let site = Site::mentioned("mention-of-no-page", "{{ page.webmentions.said | length }}");
+    let site = Site::mentioned(
+        "mention-of-no-page",
+        "{{ page.webmentions.comments | length }}",
+    );
     let target = "https://example.org/post-9/";
     site.write("fetched/mentions/1.yaml", &mention("replied", target, ""));
     // On the site's host, under no path of the site, it is still no page.
@@ -1782,14 +1788,14 @@ warning  Mention of no page: nothing is published at `https://example.org/post-9
   fetched/mentions/1.yaml, line 3
    3 │ target: \"https://example.org/post-9/\"
      │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  If the page moved, add the old address to its `redirect_from`.
+  If the page moved, add the old URL to its `redirect_from`.
   More: https://statac.dev/e/mention-of-no-page/
 
 warning  Mention of no page: nothing is published at `https://example.com/post-1/`
   fetched/mentions/2.yaml, line 3
    3 │ target: \"https://example.com/post-1/\"
      │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  If the page moved, add the old address to its `redirect_from`.
+  If the page moved, add the old URL to its `redirect_from`.
   More: https://statac.dev/e/mention-of-no-page/
 
 2 warnings: 2 mention-of-no-page.
@@ -1815,7 +1821,10 @@ warning  Mention of no page: nothing is published at `https://example.com/post-1
 
 #[test]
 fn a_mention_of_a_page_left_out_waits_with_it() {
-    let site = Site::mentioned("mention-of-a-draft", "{{ page.webmentions.said | length }}");
+    let site = Site::mentioned(
+        "mention-of-a-draft",
+        "{{ page.webmentions.comments | length }}",
+    );
     site.write(
         "content/post-2.md",
         "---\ntitle: Post 2\ndraft: true\nredirect_from: [/old-2/]\n---\n",
@@ -1845,7 +1854,7 @@ fn a_mention_of_a_page_left_out_waits_with_it() {
 
 #[test]
 fn a_mention_file_that_isnt_as_statac_writes_it_is_told_at_its_value() {
-    let site = Site::mentioned("mention-files", "{{ page.webmentions.said | length }}");
+    let site = Site::mentioned("mention-files", "{{ page.webmentions.comments | length }}");
     let to = "https://example.org/post-1/";
     let cases: [(&str, String, &str, &str); 12] = [
         (
@@ -1875,19 +1884,19 @@ fn a_mention_file_that_isnt_as_statac_writes_it_is_told_at_its_value() {
         (
             "5",
             mention("replied", to, "").replace("https://a.example/post-1/", "javascript:alert(1)"),
-            "Wrong kind of value: `url` is a full address, such as `https://example.org`, not `\"javascript:alert(1)\"`",
+            "Wrong kind of value: `url` is a full URL, such as `https://example.org`, not `\"javascript:alert(1)\"`",
             "line 2",
         ),
         (
             "6",
             mention("replied", to, "author_url: \"ftp://a.example/\"\n"),
-            "Wrong kind of value: `author_url` is a full address, such as `https://example.org`, not `\"ftp://a.example/\"`",
+            "Wrong kind of value: `author_url` is a full URL, such as `https://example.org`, not `\"ftp://a.example/\"`",
             "line 5",
         ),
         (
             "7",
             mention("replied", to, "face: \"../record\"\n"),
-            "Wrong kind of value: `face` is a face's file name, such as `0123456789abcdef.jpg`, not `\"../record\"`",
+            "Wrong kind of value: `face` is an avatar's file name, such as `0123456789abcdef.jpg`, not `\"../record\"`",
             "line 5",
         ),
         (
@@ -1940,17 +1949,17 @@ fn a_mention_file_that_isnt_as_statac_writes_it_is_told_at_its_value() {
 fn a_misspelt_name_of_a_mention_is_told_with_the_nearest() {
     let site = Site::mentioned(
         "mention-names",
-        "{{ page.webmentions.sayd | length }}\n\
-         {% for m in page.webmentions.faces %}{{ m.wrds }}{% endfor %}",
+        "{{ page.webmentions.coments | length }}\n\
+         {% for m in page.webmentions.reactions %}{{ m.contnt }}{% endfor %}",
     );
     let said = site.check();
     assert!(
-        said.contains("Unknown field: `page.webmentions.sayd`")
-            && said.contains("Did you mean `page.webmentions.said`?"),
+        said.contains("Unknown field: `page.webmentions.coments`")
+            && said.contains("Did you mean `page.webmentions.comments`?"),
         "{said}"
     );
     assert!(
-        said.contains("Unknown field: `m.wrds`") && said.contains("Did you mean `m.words`?"),
+        said.contains("Unknown field: `m.contnt`") && said.contains("Did you mean `m.content`?"),
         "{said}"
     );
 }
@@ -2006,7 +2015,7 @@ warning  Webmentions off: `webmention()` writes nothing here
     let said = site.check();
     assert!(
         said.starts_with(
-            "note  No site address: webmentions are left out until the site has a `url`\n  \
+            "note  No site URL: webmentions are left out until the site has a `url`\n  \
              statac.yaml, line 5\n"
         ),
         "{said}"

@@ -15,10 +15,10 @@ error  Nested setting: `layout` under `pages`
 
 ## Why Statac stops
 
-Your own fields can be nested, and templates reach them through that
-nesting. Statac's settings keep their one flat
-spelling, so every site writes them the same way, and anyone reading a
-site's files only has to learn them once.
+Custom fields can be nested, and templates reach them through that
+nesting. Statac's settings keep their one flat spelling, so every site
+writes them the same way, and anyone reading a site's files only has to
+learn them once.
 
 ## How to fix it
 

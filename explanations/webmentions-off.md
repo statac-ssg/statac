@@ -1,7 +1,7 @@
 # Webmentions off
 
 A template calls `webmention()`, which tells other sites where to send
-mentions of your pages, but `statac.yaml` doesn't have
+webmentions of your pages, but `statac.yaml` doesn't have
 `webmentions: true`. The call writes nothing.
 
 ## What you'll see {#what-youll-see}
@@ -14,11 +14,12 @@ warning  Webmentions off: `webmention()` writes nothing here
 
 ## Why Statac warns
 
-`webmention()` writes a line in the page's `<head>` that gives the
-address of the relay that receives mentions for the site. Another site
-that links to the page reads this line and notifies the relay. Without
-`webmentions: true`, Statac doesn't fetch what the relay has received,
-so the line would ask other sites to send mentions that nothing reads.
+`webmention()` writes a line in the page's `<head>` that gives the URL
+of the webmention service that receives webmentions for the site. Another
+site that links to the page reads this line and notifies the service.
+Without `webmentions: true`, Statac doesn't fetch what the service has
+received, so the line would ask other sites to send webmentions that
+nothing reads.
 So Statac leaves the line out.
 
 ## How to fix it

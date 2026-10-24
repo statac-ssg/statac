@@ -1,9 +1,9 @@
-# Pictures out of proportion
+# Images out of proportion
 
 A stylesheet in `assets/` has a rule for `img` that sets a `max-width` or
-a `width` for pictures, but no rule for `img` in any of the site's
-stylesheets sets their height. If the rule makes a picture narrower, the
-picture keeps the height written in the page, so it is shown too tall for
+a `width` for images, but no rule for `img` in any of the site's
+stylesheets sets their height. If the rule makes an image narrower, the
+image keeps the height written in the page, so it is shown too tall for
 its width.
 
 Statac warns once for the whole site, at the first rule like this.
@@ -11,27 +11,27 @@ Statac warns once for the whole site, at the first rule like this.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Pictures out of proportion: `img` has a `max-width` and no `height`
+warning  Images out of proportion: `img` has a `max-width` and no `height`
   Add `height: auto` to the rule.
-  More: https://statac.dev/e/pictures-out-of-proportion/
+  More: https://statac.dev/e/images-out-of-proportion/
 ```
 
 ## Why Statac warns
 
-Statac writes each picture's `width` and `height` into the page, so the
-page keeps a space of the right size for the picture and doesn't jump as
-pictures load. A browser treats those two numbers as the picture's size.
+Statac writes each image's `width` and `height` into the page, so the
+page keeps a space of the right size for the image and doesn't jump as
+images load. A browser treats those two numbers as the image's size.
 A rule that changes only the width leaves the height as the page wrote
-it. For example, a photograph 1600 wide and 1067 tall, shown in a column
+it. For example, an image 1600 wide and 1067 tall, shown in a column
 400 wide, is drawn 400 wide but still 1067 tall.
 
 Adding `height: auto` to the rule leaves the height to the browser, which
-works it out from the width. The space kept for the picture is then still
+works it out from the width. The space kept for the image is then still
 the right shape.
 
 Statac reads the stylesheets in `assets/`, including Sass. It doesn't warn
 if any rule for `img` sets a `height`, a `block-size` or an
-`aspect-ratio`, or if no page shows a picture with a width and a height.
+`aspect-ratio`, or if no page shows an image with a width and a height.
 It doesn't read styles written in a template's `<style>`. If you set the
 height there, quieten the warning by name.
 
@@ -63,5 +63,5 @@ img {
 In `statac.yaml`, to stop it being shown:
 
 ```yaml
-quiet: [pictures-out-of-proportion]
+quiet: [images-out-of-proportion]
 ```

@@ -3,7 +3,7 @@
 A page's `tags` are written on one line with commas between them and no
 brackets around them, as `tags: hills, water`. To YAML, that is a single
 piece of text, so the page has one tag, called `hills, water`. The same
-applies to `pages.tags` handed down, and to `tags` on an item in a table.
+applies to `pages.tags` in a cascade, and to `tags` on an item in a table.
 
 ## What you'll see {#what-youll-see}
 

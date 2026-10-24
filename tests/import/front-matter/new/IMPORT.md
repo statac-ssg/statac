@@ -1,4 +1,4 @@
-This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/front-matter/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -8,7 +8,7 @@ It was made from `tests/import/front-matter/old` by `statac import`, which chang
 - 1 draft, with `draft: true`, so it isn't published by accident.
 - 2 pages, into `content/` where they stood in the old site.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -38,12 +38,12 @@ old_tags:
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old addresses there: 6 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old URLs there: 6 are published or redirected.
 
 - 4 pages carry a `permalink` of their own, where no pattern fits.
-- 2 pages carry `redirect_from`, for the other addresses that led to them.
+- 2 pages carry `redirect_from`, for the other URLs that led to them.
 
 ## Left for you
 
@@ -61,7 +61,7 @@ Jekyll read each of these as a number other than its figures say, as an older re
 
 ### Fields renamed
 
-Each of these fields has the name of one of Statac's own words, which means something else there or holds another kind of value, so Statac put `old_` before its name: show it from a template under that name, or take it out.
+Each of these fields has the name of one of Statac's built-in fields, which means something else there or holds another kind of value, so Statac put `old_` before its name: show it from a template under that name, or take it out.
 
 - `_config.yml`, line 3: `tags: [one]`
 - `_posts/2026-01-01-post-1.md`, line 8: `order: 3`

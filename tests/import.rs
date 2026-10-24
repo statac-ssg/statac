@@ -177,7 +177,7 @@ fn imported(name: &str) -> (Scratch, Vec<String>) {
     (new, found)
 }
 
-const NO_ADDRESS: &str = "no-site-address";
+const NO_ADDRESS: &str = "no-site-url";
 const NO_ZONE: &str = "no-time-zone";
 const DRAFT: &str = "draft-left-out";
 const AS_TEXT: &str = "published-as-text";
@@ -221,10 +221,10 @@ fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts(
     assert!(!out.join("page").exists());
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
     assert!(report.contains(
-        "sends readers on from `/page2/`, an old later page of the home page, to the page of \
+        "redirects from `/page2/`, an old paginated page of the home page, to the page of \
          `content/posts/` with the same number, which doesn't hold exactly the same posts"
     ));
-    assert!(!report.contains("Nothing in the new site answers these old addresses"));
+    assert!(!report.contains("Nothing in the new site is published at these old URLs"));
 }
 
 #[test]
@@ -260,13 +260,15 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
         fs::read_to_string(Path::new("tests/import").join(name).join("new/IMPORT.md")).unwrap()
     };
     assert!(report("hugo-home-pages").contains(
-        "Where the old home page had later pages, nothing answers them: Statac's home page \
-         shows the newest of each folder itself"
+        "Where the old home page was paginated, nothing is published at page 2 onwards now: \
+         Statac's home page shows the newest of each folder itself"
     ));
     let zola = report("zola-home-pages");
-    assert!(zola.contains("nothing answers the old home page's later pages: they are listed"));
+    assert!(zola.contains(
+        "nothing is published at the old home page's paginated pages now: they are listed"
+    ));
     assert!(zola.contains("\n- `/page/2/`\n"));
-    assert!(!report("eleventy-home-pages").contains("later pages"));
+    assert!(!report("eleventy-home-pages").contains("paginated pages"));
 }
 
 #[test]
@@ -275,7 +277,7 @@ fn a_site_under_a_path_keeps_its_addresses_and_links() {
     // `search: false`.
     assert_eq!(
         fixture("baseurl"),
-        ["newer-starter", NO_ZONE, "robots-beneath-path"]
+        [NO_ZONE, "robots-beneath-path", "update-available"]
     );
 }
 
@@ -377,7 +379,7 @@ fn what_is_said_counts_the_old_built_pages_nothing_answers() {
     let (code, said) = import(old, &new, None);
     assert_eq!(code, 0);
     assert!(
-        said.contains("\nAddresses: 5 kept, 8 that nothing answers now.\n"),
+        said.contains("\nURLs: 5 kept, 8 no longer published.\n"),
         "{said}"
     );
 }
@@ -394,7 +396,7 @@ fn an_old_address_the_new_site_cant_keep_is_left_out_and_listed() {
     let (code, said) = import(old, &scratch("said-aliases"), None);
     assert_eq!(code, 0);
     assert!(
-        said.contains("\nAddresses: 8 kept, 5 that can't be kept.\n"),
+        said.contains("\nURLs: 8 kept, 5 that can't be kept.\n"),
         "{said}"
     );
 }
@@ -436,7 +438,7 @@ fn what_is_said_counts_what_came_across() {
              best effort: read `{shown}/IMPORT.md` before you publish.\n\
              \n\
              Converted: 2 posts, 1 draft, 2 pages.\n\
-             Addresses: 6 kept.\n\
+             URLs: 6 kept.\n\
              Left for you: 6 things of 3 kinds.\n\
              \n\
              Next: `cd {shown}`, then `statac check`.\n"
@@ -764,7 +766,7 @@ fn the_command_line_asks_for_a_folder_and_a_tool_statac_knows() {
     assert!(said.contains("`hugo`"), "{said}");
 }
 
-const PICTURE: &str = "undescribed-picture";
+const PICTURE: &str = "missing-alt-text";
 
 #[test]
 fn hugo_settings_are_read_in_each_format_and_split_over_a_folder() {
@@ -871,8 +873,8 @@ fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
         ),
     ];
     let older = "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
-                 `/posts.html`, which now sends readers on to the list, and its later pages as \
-                 files too, such as `/posts/page/2.html`: nothing answers those.";
+                 `/posts.html`, which now redirects to the list, and its paginated pages as files \
+                 too, such as `/posts/page/2.html`: nothing is published at those now.";
     for (at, (settings, front, permalink, sent, files)) in cases.into_iter().enumerate() {
         let old = scratch(&format!("hugo-list-old-{at}"));
         let new = scratch(&format!("hugo-list-new-{at}"));
@@ -906,7 +908,7 @@ fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
         );
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         assert!(
-            !report.contains("Nothing in the new site answers"),
+            !report.contains("Nothing in the new site is published"),
             "{at}: {report}"
         );
         assert!(
@@ -984,9 +986,9 @@ fn later_pages_in_the_old_built_output_send_readers_on() {
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
     assert!(
         report.contains(
-            "4 pages at the top of `content/`, such as `content/posts-page-1.md`, send readers \
-             on from old pages of lists, found in the old site's built output, each to the \
-             list's page with the same number"
+            "4 pages at the top of `content/`, such as `content/posts-page-1.md`, redirect from \
+             old paginated pages of lists, found in the old site's built output, each to the \
+             list's paginated page with the same number"
         ),
         "{report}"
     );
@@ -1040,16 +1042,16 @@ fn hugo_tags_published_as_files_are_kept_without_the_built_output() {
     assert!(
         report.contains(
             "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
-             `/posts.html`, which now sends readers on to the list, and its later pages as files \
-             too, such as `/posts/page/2.html`; and every version published a tag's later pages \
-             as files, such as `/tags/a/page/2.html`: nothing answers those. With the old \
-             site's built output in `public/`, `statac import` sends readers on from each it \
+             `/posts.html`, which now redirects to the list, and its paginated pages as files too, \
+             such as `/posts/page/2.html`; and every version published a tag's paginated pages \
+             as files, such as `/tags/a/page/2.html`: nothing is published at those now. With \
+             the old site's built output in `public/`, `statac import` redirects from each it \
              finds there."
         ),
         "{report}"
     );
     assert!(
-        !report.contains("Nothing in the new site answers"),
+        !report.contains("Nothing in the new site is published"),
         "{report}"
     );
     build_into(&new, &out);
@@ -1109,15 +1111,15 @@ fn a_hugo_tag_moved_by_permalinks_sends_readers_on() {
         assert!(!new.join("content/tags-a.md").exists(), "{at}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         assert!(
-            !report.contains("Nothing in the new site answers"),
+            !report.contains("Nothing in the new site is published"),
             "{at}: {report}"
         );
         if let Some(later) = later {
             assert!(
                 report.contains(&format!(
-                    "so each is at Statac's own address, and a page at the old one sends \
-                     readers on to it. A tag's later pages stood beneath its page, such as \
-                     {later}: nothing answers those."
+                    "so each is at Statac's own URL, and a page at the old one redirects to it. \
+                     A tag's paginated pages were published beneath its list page, such as \
+                     {later}: nothing is published at those now."
                 )),
                 "{at}: {report}"
             );
@@ -1185,7 +1187,7 @@ fn later_pages_of_a_moved_hugo_tag_in_the_built_output_send_readers_on() {
     }
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
     assert!(!report.contains("`/tags/a/posts/page/2/`"), "{report}");
-    assert!(!report.contains("A tag's later pages"), "{report}");
+    assert!(!report.contains("A tag's paginated pages"), "{report}");
     build_into(&new, &out);
     for file in [
         "tags/a/posts/index.html",
@@ -1255,9 +1257,9 @@ fn a_hugo_series_page_where_statacs_isnt_sends_readers_on() {
         if let Some(later) = later {
             assert!(
                 report.contains(&format!(
-                    "so each is at Statac's own address, and a page at the old one sends \
-                     readers on to it. A series' later pages stood beneath its page, such as \
-                     {later}: nothing answers those."
+                    "so each is at Statac's own URL, and a page at the old one redirects to it. \
+                     A series' paginated pages were published beneath its list page, such as \
+                     {later}: nothing is published at those now."
                 )),
                 "{at}: {report}"
             );
@@ -1316,7 +1318,7 @@ fn later_pages_of_a_moved_hugo_series_in_the_built_output_send_readers_on() {
         );
     }
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
-    assert!(!report.contains("A series' later pages"), "{report}");
+    assert!(!report.contains("A series' paginated pages"), "{report}");
     build_into(&new, &out);
     for file in [
         "series/a/posts/index.html",
@@ -1360,7 +1362,7 @@ fn hugo_later_pages_count_what_hugo_listed() {
     assert!(!deep.contains("redirect_from"), "{deep}");
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
     assert!(
-        !report.contains("Nothing in the new site answers"),
+        !report.contains("Nothing in the new site is published"),
         "{report}"
     );
 }
@@ -1372,8 +1374,8 @@ fn hugo_site_under_a_path_keeps_its_addresses_and_links() {
 
 #[test]
 fn hugo_later_pages_are_spoken_of_wherever_the_old_site_could_have_had_them() {
-    let lists = "Hugo made later pages only for the lists whose templates asked for them";
-    let home = "Where the old home page had later pages, nothing answers them";
+    let lists = "Hugo paginated only the lists whose templates asked for it";
+    let home = "Where the old home page was paginated, nothing is published at page 2 onwards";
     // How many posts, the settings, and whether later pages are spoken of.
     for (posts, settings, said) in [
         (10, "", false),
@@ -1400,14 +1402,14 @@ fn hugo_later_pages_are_spoken_of_wherever_the_old_site_could_have_had_them() {
 
 #[test]
 fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
-    let both =
-        "Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own page";
+    let both = "Hugo's feeds were RSS, at `index.xml` beside the home page and each list page";
     let home = "Hugo's feed was RSS, at `feed.xml` beside the home page. It is now an Atom feed \
-                at the same address, written by `templates/feed.xml`, as `feed: feed.xml` on the \
-                home page says";
-    let lists = "Hugo's feeds were RSS, at `index.xml` beside each list's own page";
-    let others = "Hugo made no feed for the other lists, so the page of each says `feed: false`.";
-    let none = "Hugo made no feeds, so the page of each list says `feed: false`";
+                at the same URL, written by `templates/feed.xml`, as `feed: feed.xml` on the home \
+                page says";
+    let lists = "Hugo's feeds were RSS, at `index.xml` beside each list page";
+    let others =
+        "Hugo made no feed for the other lists, so the list page of each says `feed: false`.";
+    let none = "Hugo made no feeds, so each list page says `feed: false`";
     // The settings, whether the old site has a home page of its own, the
     // `feed` of the new home page and of the posts' page, and what is said.
     let cases = [
@@ -1574,10 +1576,10 @@ fn hugo_tags_in_the_writing_convert_or_stay_as_written() {
         fixture("hugo-tags-in-writing"),
         [
             "broken-link",
+            PICTURE,
             "missing-definition",
-            "no-still",
-            AS_TEXT,
-            PICTURE
+            "no-thumbnail",
+            AS_TEXT
         ]
     );
 }
@@ -2423,7 +2425,7 @@ fn a_hugo_figure_is_a_call_where_its_file_holds_a_photograph_whatever_its_ending
     // Statac reads no file as a picture under this name.
     assert!(post.contains("<img src=\"photo-2.jfif\""), "{post}");
     // The new site builds: the call's picture is one Statac shows.
-    assert_eq!(checked(&new), [NO_ZONE, "undescribed-picture"]);
+    assert_eq!(checked(&new), ["missing-alt-text", NO_ZONE]);
 }
 
 #[test]
@@ -2476,8 +2478,8 @@ fn an_old_address_that_cant_be_kept_is_told_of_once_though_the_built_output_hold
     assert_eq!(report.matches("`/old/post-1-??/`").count(), 1, "{report}");
     assert!(
         report.contains(
-            "This old address can't be kept: the new site can't send readers on from it, so it \
-             was left out of its page's `redirect_from`.\n\
+            "This old URL can't be kept: the new site can't redirect from it, so it was left \
+             out of its page's `redirect_from`.\n\
              \n\
              - `/old/post-1-??/`, for `content/posts/post-1.md`: `?` can't be in a name\n"
         ),
@@ -2552,7 +2554,7 @@ fn a_zola_list_stays_at_the_address_zola_gave_it() {
         );
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         assert!(
-            !report.contains("Nothing in the new site answers"),
+            !report.contains("Nothing in the new site is published"),
             "{at}: {report}"
         );
         build_into(&new, &out);
@@ -2595,7 +2597,7 @@ fn zola_languages_come_across_by_place() {
 fn zola_tags_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(
         fixture("zola-tags-in-writing"),
-        ["broken-link", DRAFT, "no-still", AS_TEXT]
+        ["broken-link", DRAFT, "no-thumbnail", AS_TEXT]
     );
 }
 
@@ -2604,7 +2606,7 @@ fn zola_tags_in_the_writing_convert_or_stay_as_written() {
 /// template can work out, or named with a `.`, stays as written.
 #[test]
 fn zola_components_in_the_writing_convert_or_stay_as_written() {
-    assert_eq!(fixture("zola-components"), ["no-still", AS_TEXT]);
+    assert_eq!(fixture("zola-components"), ["no-thumbnail", AS_TEXT]);
 }
 
 /// Zola 0.23 runs the writing as a template: `raw` is taken out, and the
@@ -2938,7 +2940,7 @@ fn eleventy_addresses_through_the_url_filter_carry_the_path_the_settings_give() 
     assert_eq!(fixture("eleventy-under-path"), ["broken-link", NO_ADDRESS]);
 }
 
-const ADD_URL: &str = "Add the whole address as `url` in `statac.yaml`";
+const ADD_URL: &str = "Add the full URL as `url` in `statac.yaml`";
 
 #[test]
 fn an_address_given_for_a_site_whose_settings_give_none_is_its_url() {
@@ -2950,10 +2952,7 @@ fn an_address_given_for_a_site_whose_settings_give_none_is_its_url() {
     let read = |path: &str| fs::read_to_string(new.join(path)).unwrap();
     assert!(read("statac.yaml").contains("\nurl: https://example.org/blog\n"));
     let report = read("IMPORT.md");
-    assert!(
-        report.contains("its `url` is the address you gave"),
-        "{report}"
-    );
+    assert!(report.contains("its `url` is the URL you gave"), "{report}");
     assert!(!report.contains(ADD_URL), "{report}");
     assert!(report.contains("The site is under a path, `/blog`, as its `url` says"));
     assert_eq!(
@@ -2988,14 +2987,14 @@ fn a_site_whose_settings_give_no_address_has_no_url_where_none_is_given() {
 #[test]
 fn the_sites_address_is_asked_for_at_a_terminal_until_it_is_one_or_enter() {
     let old = Path::new("tests/import/eleventy-under-path/old");
-    let question = "What is the site's address?\n\x20 The old site's settings don't say.\n\
+    let question = "What is the site's URL?\n\x20 The old site's settings don't say.\n\
                     \x20 Enter for none yet.\n";
     let new = scratch("address-asked");
     let typed = "example\nhttps://example.org/blog\n";
     let (code, said) = import_answering(old, &new, typed, true);
     assert_eq!(code, 0, "{said}");
     let asked = format!(
-        "{question}\x20 > \x20 `example` isn't a web address. Write it whole, as \
+        "{question}\x20 > \x20 `example` isn't a full URL. Write it as \
          `https://example.org`.\n\x20 > \nImported the Eleventy site"
     );
     assert!(said.starts_with(&asked), "{said}");
@@ -3024,7 +3023,7 @@ fn an_unusable_address_read_with_no_terminal_stops_the_import() {
     assert_eq!(code, 1);
     assert_eq!(
         said,
-        "`example` isn't a web address. Write it whole, as `https://example.org`.\n"
+        "`example` isn't a full URL. Write it as `https://example.org`.\n"
     );
     assert!(!new.exists());
 }
@@ -3053,7 +3052,7 @@ fn the_sites_address_is_asked_for_of_any_tool_and_only_where_the_settings_give_n
         let new = scratch(&format!("address-{label}"));
         let (code, said) = import_answering(old, &new, "https://example.org/\n", true);
         assert_eq!(code, 0, "{said}");
-        assert!(said.starts_with("What is the site's address?\n"), "{said}");
+        assert!(said.starts_with("What is the site's URL?\n"), "{said}");
         let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
         assert!(settings.contains("\nurl: https://example.org\n"), "{label}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();

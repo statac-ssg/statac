@@ -17,7 +17,7 @@ pub(crate) struct Site {
     /// The top of the site's host, from its `url`, or a host no link can
     /// name where it has none.
     top: Url,
-    /// The other hosts the site is published at, as `also_at` names them,
+    /// The other hosts the site is published at, as `other_hosts` names them,
     /// written as the URL standard writes hosts.
     hosts: Vec<String>,
     /// The host and the path the site is at beyond this run, where the
@@ -27,10 +27,10 @@ pub(crate) struct Site {
     /// Every file the build publishes, from the top of the built site.
     files: HashSet<String>,
     /// Paths on the site's host that something else answers at, named by
-    /// `not_ours` as a link from the top of the host names them, without a
+    /// `served_elsewhere` as a link from the top of the host names them, without a
     /// `/` at their end.
-    not_ours: Vec<String>,
-    /// What `after_build_makes` names, made once Statac has finished.
+    served_elsewhere: Vec<String>,
+    /// What `after_build_outputs` names, made once Statac has finished.
     made_after: Vec<String>,
     /// Every address the site publishes, gathered the first time a link
     /// that lands nowhere wants the nearest of them.
@@ -83,17 +83,17 @@ impl Site {
             .and_then(|url| url.join("/").ok())
             .unwrap_or_else(|| Url::parse(NO_HOST).expect("a URL"));
         let hosts = settings
-            .texts("also_at")
+            .texts("other_hosts")
             .iter()
             .filter_map(|also| host_named(&also.value))
             .collect();
-        let not_ours = settings
-            .texts("not_ours")
+        let served_elsewhere = settings
+            .texts("served_elsewhere")
             .iter()
             .map(|path| format!("/{}", path.value.trim_matches('/')))
             .collect();
         let made_after = settings
-            .texts("after_build_makes")
+            .texts("after_build_outputs")
             .iter()
             .map(|place| place.value.trim_start_matches('/').to_owned())
             .collect();
@@ -108,7 +108,7 @@ impl Site {
             hosts,
             home,
             files: files.into_iter().collect(),
-            not_ours,
+            served_elsewhere,
             made_after,
             addresses: OnceLock::new(),
             lists: HashSet::new(),
@@ -216,11 +216,11 @@ impl Site {
         let origin = named_host(written).map(str::to_owned);
         let path = link.path().to_owned();
         let path = address::decoded(&path);
-        let not_ours = self.not_ours.iter().any(|named| {
+        let served_elsewhere = self.served_elsewhere.iter().any(|named| {
             path.strip_prefix(named.as_str())
                 .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
         });
-        if not_ours {
+        if served_elsewhere {
             return Leads::Away;
         }
         // A path on the site's host outside the site's own path is
@@ -299,7 +299,7 @@ impl Site {
 /// names, so every link naming a host leads away.
 const NO_HOST: &str = "https://site.invalid/";
 
-/// The host an `also_at` entry names, written bare, `example.net`, or as a
+/// The host an `other_hosts` entry names, written bare, `example.net`, or as a
 /// whole address, as the URL standard writes hosts.
 fn host_named(written: &str) -> Option<String> {
     let whole = Url::parse(written)

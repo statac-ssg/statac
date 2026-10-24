@@ -2074,7 +2074,7 @@ fn a_footnote_nothing_points_at_is_told() {
             line(
                 "Footnote never shown: nothing points at `[^sources]`",
                 "[^sources]",
-                Some("Is it the note for `[^source]`?")
+                Some("Is it the definition for `[^source]`?")
             ),
             line(
                 "Definition written twice: the first `[^twice]:` line isn't shown",

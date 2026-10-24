@@ -38,6 +38,7 @@ fn front_matter(
     summary: Option<&str>,
     severity: Option<Severity>,
     layout: Option<&str>,
+    redirect_from: &[String],
     from: &str,
 ) -> String {
     for text in [Some(title), summary].into_iter().flatten() {
@@ -54,9 +55,13 @@ fn front_matter(
         None => "",
     };
     let layout = layout.map_or_else(String::new, |layout| format!("layout: {layout}\n"));
+    let redirect_from = match redirect_from {
+        [] => String::new(),
+        from => format!("redirect_from: [{}]\n", from.join(", ")),
+    };
     format!(
         "---\n# Written from {from} by `cargo run --example explanation_pages`.\n\
-         title: {title}\n{summary}{severity}{layout}---\n"
+         title: {title}\n{summary}{severity}{layout}{redirect_from}---\n"
     )
 }
 
@@ -105,6 +110,10 @@ fn page(code: Code) -> String {
             None,
             Some(code.severity()),
             None,
+            &code
+                .former_names()
+                .map(|former| format!("/e/{former}/"))
+                .collect::<Vec<_>>(),
             &format!("explanations/{name}.md")
         ),
         body.trim_end()
@@ -117,6 +126,7 @@ fn index() -> String {
         Some("Every error, warning and note Statac reports, what each means and how to fix it."),
         None,
         Some("page"),
+        &[],
         "explanations/",
     );
     out.push_str(

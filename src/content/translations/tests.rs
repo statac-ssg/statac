@@ -313,7 +313,7 @@ fn a_draft_translation_is_no_pages_translation_and_shares_its_key() {
     let names: Vec<_> = problems(&read).into_iter().map(|(name, ..)| name).collect();
     assert_eq!(
         names,
-        ["draft-left-out", "draft-left-out", "waiting-for-its-day"]
+        ["draft-left-out", "draft-left-out", "scheduled-post"]
     );
     assert_eq!(translations(&read, "post-1.md"), Vec::<String>::new());
     assert_eq!(translations(&read, "about.md"), Vec::<String>::new());

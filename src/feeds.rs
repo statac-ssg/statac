@@ -235,7 +235,7 @@ pub(crate) fn unusable(site: &Site, settings: &Settings, sources: &Sources) -> V
             continue;
         }
         told.push(place);
-        problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
+        problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
     }
     problems
 }
@@ -329,7 +329,7 @@ pub(crate) fn plan(
                 list: described(site, sources, all[0]),
                 more: all.len() - 1,
             };
-            return lacking(Problem::nowhere(Kind::NoSiteAddress { waiting }));
+            return lacking(Problem::nowhere(Kind::NoSiteUrl { waiting }));
         }
         Some(_) => return lacking(Problem::nowhere(Kind::NoFeedKey { key: mint_key() })),
         None => {}

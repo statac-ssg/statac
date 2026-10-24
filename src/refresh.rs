@@ -163,7 +163,7 @@ pub fn fetch_new(
 /// Whether the site built as `outcome` has something to fetch: the still
 /// of a video a page reads one for, or webmentions.
 pub fn wanted(outcome: &build::Outcome) -> bool {
-    let lacks = |problem: &Problem| matches!(problem.kind, Kind::NoStill { absent: false, .. });
+    let lacks = |problem: &Problem| matches!(problem.kind, Kind::NoThumbnail { absent: false, .. });
     let webmentions = outcome
         .settings()
         .and_then(|settings| settings.truth("webmentions"));
@@ -210,7 +210,7 @@ fn refresh(
     };
     let mut missing: Vec<(String, Host, &str)> = (outcome.problems.iter())
         .filter_map(|problem| match &problem.kind {
-            Kind::NoStill {
+            Kind::NoThumbnail {
                 host,
                 id,
                 absent: false,
@@ -231,7 +231,7 @@ fn refresh(
     let webmentions = settings.truth("webmentions") == Some(true);
     let waiting = |problem: &&Problem| {
         problem.kind
-            == Kind::NoSiteAddress {
+            == Kind::NoSiteUrl {
                 waiting: crate::problem::Waiting::Webmentions,
             }
     };

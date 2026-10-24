@@ -1,13 +1,17 @@
 # Other spelling
 
-A field or setting uses a word that Statac spells differently, or the
-writing has a marker such as `<!--more-->` spelled differently, such as
-`<!-- More -->`. On a card, Statac uses `colour` and `centre`, never
+A field or setting uses a word that Statac spells differently, or a
+page's content has a marker such as `<!--more-->` spelled differently,
+such as `<!-- More -->`. On a card, Statac uses `colour` and `centre`, never
 `color` or `center`. A stamp in front matter is written `=today` or
 `=monday 09:00`, never `=Today`, `=mon`, `=next monday` or `=monday 9am`.
 A Markdown file that starts with a `+++` line, as some other tools write
 front matter, is refused, and its page isn't built. Statac has one
 spelling for each of its own words, and this isn't it.
+
+Statac 0.7.0 renamed some of its own settings, fields and problem names.
+An old name is refused the same way, with the new one offered:
+`later_pages:` becomes `pagination.permalink:`.
 
 ## What you'll see {#what-youll-see}
 

@@ -1,6 +1,6 @@
 # Unordered pages
 
-A list's page sets its order as a list of names, `order: [day-one,
+A list page sets its order as a list of names, `order: [day-one,
 day-two]`, but the list has pages that aren't named there.
 
 ## What you'll see {#what-youll-see}
@@ -22,7 +22,7 @@ probably added after the order was written.
 ## How to fix it
 
 Add each page the warning lists to the `order:` list, in the place where
-it belongs. A page is named by the last part of its address, so
+it belongs. A page is named by the last part of its URL, so
 `content/days/day-four.md` is `day-four`.
 
 ## Example

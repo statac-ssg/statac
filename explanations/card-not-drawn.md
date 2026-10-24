@@ -1,8 +1,8 @@
 # Card not drawn
 
-Statac couldn't draw a page's sharing card from what the page says, so
+Statac couldn't draw a page's social card from what the page says, so
 the page has no card. `page.card` has no value on that page, and a layout
-that tests for one writes no picture for it. The message gives one of
+that tests for one writes no image for it. The message gives one of
 these reasons:
 
 - a text in the middle of the card doesn't fit the space it has, even at
@@ -31,7 +31,7 @@ Statac never cuts a text short, lets a text run off the card, or draws
 a box in place of a character. If it can't draw the whole card, it
 doesn't draw the card at all. The page is still built and published, so
 the build carries on, and Statac tells you which pages will be shared
-without a picture.
+without an image.
 
 ## How to fix it
 
@@ -48,7 +48,7 @@ has the character but isn't in `templates/og/`, the message says so. Run
 `statac new --update --missing` to write the font again, then add it to
 those fonts.
 
-To share a page with a picture of your own instead, give that picture in
+To share a page with an image of your own instead, give that image in
 the page's `og_image`.
 
 ## Example

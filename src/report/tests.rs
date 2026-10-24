@@ -657,6 +657,7 @@ fn quiet_names_are_checked() {
             Kind::UnknownProblemName {
                 written: "brokn-link".into(),
                 suggestion: Some("broken-link".into()),
+                renamed: false,
             },
             Kind::CantQuieten {
                 name: "duplicate-key".into(),
@@ -665,6 +666,7 @@ fn quiet_names_are_checked() {
             Kind::UnknownProblemName {
                 written: "post-1".into(),
                 suggestion: None,
+                renamed: false,
             },
         ]
     );

@@ -46,7 +46,7 @@ fn here(path: &str, fragment: Option<&str>) -> Leads {
 
 #[test]
 fn a_link_is_followed_as_a_browser_follows_it() {
-    let site = site("url: https://example.org/\nalso_at: [www.example.org]\n");
+    let site = site("url: https://example.org/\nother_hosts: [www.example.org]\n");
     let from = "/posts/post-1/";
     let table: &[(&str, Leads)] = &[
         ("photo-1.jpg", here("/posts/post-1/photo-1.jpg", None)),
@@ -101,7 +101,7 @@ fn a_link_to_the_sites_own_address_leads_into_a_site_built_at_another() {
             home: true,
         })
     };
-    let yaml = "url: https://example.org/blog/\nalso_at: [www.example.org]\n";
+    let yaml = "url: https://example.org/blog/\nother_hosts: [www.example.org]\n";
     // Each address a run is given: on another host, at its top and under
     // a path, and on the site's own host.
     let table: &[(&str, &str, &str)] = &[
@@ -153,13 +153,13 @@ fn a_link_to_the_sites_own_address_leads_into_a_site_built_at_another() {
 }
 
 /// Under a site path, a link elsewhere on the host is somewhere the site
-/// publishes nothing; one `not_ours` names, or into what an `after_build`
+/// publishes nothing; one `served_elsewhere` names, or into what an `after_build`
 /// hook makes, is left alone.
 #[test]
 fn a_site_under_a_path_owns_only_that_path() {
     let site = site(
-        "url: https://example.org/blog/\nnot_ours: [/video/]\nafter_build: echo\n\
-         after_build_makes: [pagefind/]\n",
+        "url: https://example.org/blog/\nserved_elsewhere: [/video/]\nafter_build: echo\n\
+         after_build_outputs: [pagefind/]\n",
     );
     let from = "/blog/posts/post-1/";
     assert_eq!(site.leads("/blog/", from), here("/", None));

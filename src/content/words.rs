@@ -144,14 +144,14 @@ pub const STATAC_FILLS: &[&str] = &[
     "key",
     "content",
     "toc",
-    "words",
+    "word_count",
     "folder",
     "list",
     "number",
     "next",
     "previous",
-    "photo",
-    "photos",
+    "image",
+    "images",
     "file",
     "video",
     "audio",
@@ -389,7 +389,7 @@ pub fn read_front_matter(
                 Kind::OtherSpelling {
                     word: Word::Setting,
                     written: name,
-                    ours: "later_pages".into(),
+                    ours: "pagination.permalink".into(),
                 },
                 key.place,
             ));
@@ -538,7 +538,7 @@ fn slip(
     let known = words.map(|word| word as &str).chain(declarations.names());
     let nearest = crate::suggest::one_slip(name, known)?;
     Some(Problem::at(
-        Kind::ReadAsYourOwn {
+        Kind::ReadAsCustom {
             own: Own::Field(name.to_owned()),
             written: format!("{prefix}{name}"),
             nearest: format!("{prefix}{nearest}"),
@@ -624,7 +624,7 @@ pub fn type_slips<'a>(
         }
         if let Some(nearest) = crate::suggest::one_slip(written.value, declarations.types()) {
             problems.push(Problem::at(
-                Kind::ReadAsYourOwn {
+                Kind::ReadAsCustom {
                     own: Own::Type,
                     written: written.value.to_owned(),
                     nearest: nearest.to_owned(),

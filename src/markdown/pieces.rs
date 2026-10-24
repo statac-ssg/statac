@@ -56,13 +56,13 @@ impl Piece {
     }
 
     /// Every name its file is handed besides `page` and `site`. The writing
-    /// hands all but a link's `outside`, a callout's `title` and a
-    /// picture's `photo`, which are the site's to say.
+    /// hands all but a link's `external`, a callout's `title` and an
+    /// image's `image`, which are the site's to say.
     pub fn handed(self) -> &'static [&'static str] {
         match self {
             Piece::Heading => &["level", "id", "classes", "body"],
-            Piece::Link => &["address", "title", "body", "outside"],
-            Piece::Image => &["address", "alt", "title", "width", "height", "photo"],
+            Piece::Link => &["url", "title", "body", "external"],
+            Piece::Image => &["url", "alt", "title", "width", "height", "image"],
             Piece::Code => &["code", "body", "language", "caption"],
             Piece::InlineCode => &["code"],
             Piece::Footnote => &["number", "shown", "id", "note"],

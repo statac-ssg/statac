@@ -1,4 +1,4 @@
-This site was imported from a Zola site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/zola-tags/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -6,15 +6,15 @@ It was made from `tests/import/zola-tags/old` by `statac import`, which changed 
 
 - 2 posts, into `content/posts/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
-Zola shows all of a list's pages on one page, unless the list's own page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
+Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
 
-Zola made a feed for each tag, as the settings' `taxonomies` asked, which has no equal in Statac: a tag has a feed only where a page of yours speaks for it.
+Zola made a feed for each tag, as the settings' `taxonomies` asked, which has no equal in Statac: a tag has a feed only where a list page of yours asks for one with `feed:`.
 
-Zola showed the posts of each tag some at a time, as the settings' `taxonomies` asked, and Statac shows them all on one page, so the later pages of a tag aren't made.
+Zola showed the posts of each tag some at a time, as the settings' `taxonomies` asked, and Statac shows them all on one page, so a tag's paginated pages aren't made.
 
 3 names in the old site's `categories` are now tags, each with `category_` before it, as `category_Notes`, so they can still be told from the site's own tags. To rename one across the site, change it on each page that has it.
 
@@ -40,11 +40,11 @@ tags.permalink: /Tags/{slug}/
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 9 old addresses there: 9 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 9 old URLs there: 9 are published or redirected.
 
-- 4 pages at the top of `content/`, such as `content/categories-Notes.md`, send readers on from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
+- 4 pages at the top of `content/`, such as `content/categories-Notes.md`, redirect from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
 
 The old site published a page listing every one of its `categories` at `/categories/`, and the starter has none.
 

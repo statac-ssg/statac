@@ -3,9 +3,8 @@
 A field that `statac.yaml` declares as `one of data.` and a table, or
 `one of folder.` and a folder, has a value that matches none of the names
 there. A table's names are the names its items are written under. A
-folder's names are the names of its pages as they appear in their
-addresses: `book-1` for `book-1.md`, and `day-one` for `03-day-one.md` in
-a numbered folder.
+folder's names are the slugs made from its pages' file names: `book-1`
+for `book-1.md`, and `day-one` for `03-day-one.md` in a numbered folder.
 
 ## What you'll see {#what-youll-see}
 
@@ -26,7 +25,7 @@ suggests it.
 
 Write one of the names that the table or the folder has, or add the
 record or page that the value refers to. The value can refer to a draft,
-or to a post waiting for its day.
+or to a scheduled post.
 
 ## Example
 

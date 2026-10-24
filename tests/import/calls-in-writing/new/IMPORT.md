@@ -1,4 +1,4 @@
-This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Jekyll site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/calls-in-writing/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -6,7 +6,7 @@ It was made from `tests/import/calls-in-writing/old` by `statac import`, which c
 
 - 1 post, into `content/posts/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -29,9 +29,9 @@ date_stamp: 31 Dec 2025, 15:04
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for the one old address there: it is published there.
+Statac worked out where the old site published each page, read the new site, and looked for the one old URL there: it is published there.
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
 
@@ -49,7 +49,7 @@ Each include is now a call to a snippet of its name, and the snippet holds only 
 
 Statac left these behind, and the new site has nothing of them:
 
-- `_includes/`: the old site's includes; each one the writing calls has a snippet of its name standing for it.
+- `_includes/`: the old site's includes; each one the content calls has a snippet of its name standing for it.
 
 ## What to do next
 

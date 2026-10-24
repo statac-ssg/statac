@@ -245,7 +245,7 @@ impl Reader<'_> {
                         let key = (language, key.value.to_owned());
                         self.keys_left_out.push(key);
                     }
-                    let kind = Kind::WaitingForItsDay {
+                    let kind = Kind::ScheduledPost {
                         path: named.clone(),
                         date: date.value.iso_day(),
                     };
@@ -480,7 +480,7 @@ fn read_address(
     match read {
         Ok(address) => Some(address),
         Err((fault, _)) => {
-            problems.push(Problem::at(Kind::UnusableAddress { fault }, head));
+            problems.push(Problem::at(Kind::UnusableUrl { fault }, head));
             None
         }
     }
@@ -712,7 +712,7 @@ impl Filling<'_> {
                 Ok(expanded) => Some(top.address(&expanded)),
                 Err(fault) => {
                     let place = own.origin.place.unwrap_or(head);
-                    problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
+                    problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
                     None
                 }
             };
@@ -889,7 +889,7 @@ fn told(
             piece,
         },
     };
-    problems.push(Problem::at(Kind::UnusableAddress { fault }, place));
+    problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
 }
 
 /// `text` as a name in an address, made from where it comes from where it

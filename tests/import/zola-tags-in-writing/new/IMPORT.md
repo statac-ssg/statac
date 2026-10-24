@@ -1,4 +1,4 @@
-This site was imported from a Zola site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/zola-tags-in-writing/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -8,13 +8,13 @@ It was made from `tests/import/zola-tags-in-writing/old` by `statac import`, whi
 - 1 draft, with `draft: true`, so it isn't published by accident.
 - 1 page, into `content/` where it stood in the old site.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
-Zola shows all of a list's pages on one page, unless the list's own page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
+Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
 
-`content/posts/index.md` hands `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
+`content/posts/index.md` cascades `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
 
 Statac put a backslash before the `@` in 1 place it would have read as a snippet call, as `\@name(`, so it shows as written: see https://statac.dev/writing/#snippet-calls.
 
@@ -34,17 +34,17 @@ posts_per_page: 0
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 4 old addresses there: 4 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 4 old URLs there: 4 are published or redirected.
 
 - Every page lands where the old site published it, with nothing added.
 
 ## Left for you
 
-### Tags in the writing left as written
+### Tags in the content left as written
 
-Statac's writing runs none of Zola's tags, and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
+Statac's Markdown runs none of Zola's tags, and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
 - `content/posts/post-1.md`, line 13: `{{ youtube(id="abcdefghijk", autoplay=true) }}`
 - `content/posts/post-1.md`, line 27: `{% aside(kind='tip') %}`
@@ -53,7 +53,7 @@ Statac's writing runs none of Zola's tags, and these have no equal in it, so eac
 
 ### Links to pages that didn't come across
 
-Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so it is left as written: link to the page's address instead.
+Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so it is left as written: link to the page's URL instead.
 
 - `content/posts/post-1.md`, line 33: `@/posts/post-4.md`
 - `content/posts/post-1.md`, line 33: `@/posts/post-9.md`
@@ -94,7 +94,7 @@ Each of these tags is now a call to a snippet of its name, and the snippet holds
 
 ### Summary markers taken out
 
-Statac ends a summary only at `<!--more-->` on a line of its own between two blocks of the writing, and one anywhere else stops the build. Each of these stood inside a line, a list, a quotation or an HTML element, so it was taken out, and the page's summary is its first paragraph: put `<!--more-->` on a line of its own where the summary should end.
+Statac ends a summary only at `<!--more-->` on a line of its own between two blocks of Markdown, and one anywhere else stops the build. Each of these stood inside a line, a list, a quotation or an HTML element, so it was taken out, and the page's summary is its first paragraph: put `<!--more-->` on a line of its own where the summary should end.
 
 - `content/posts/post-1.md`: `<!--more-->`
 

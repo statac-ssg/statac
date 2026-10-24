@@ -7,10 +7,10 @@ Statac builds a page with the first of these that applies:
 
 1. the template named by the page's own `layout:`, such as `layout: post`;
 2. the template named by its `type:`, if `templates/` has one;
-3. a `layout:` handed down from its folder or `statac.yaml`, such as
-   `pages.layout: post`, unless the page speaks for a list;
-4. `home` for the home page, `folder` for any other page that speaks for
-   a list, and `page` for the rest.
+3. a `layout:` cascaded from its folder or `statac.yaml`, such as
+   `pages.layout: post`, unless the page is a list page;
+4. `home` for the home page, `folder` for any other list page, and `page`
+   for the rest.
 
 A template's `{% extends "base" %}` refers to another template in the same
 way. Each name is the file's name in `templates/`, with or without

@@ -1,6 +1,6 @@
 {# takes photo, alt #}
 {# A picture with its caption, called as @figure("photo-1.jpg"): see /pictures/ -#}
-{% set shown = page.photo(photo, decorative=decorative | default(false)) %}
+{% set shown = page.image(photo, decorative=decorative | default(false)) %}
 {% set captioned = caption if caption is defined else shown.caption %}
 <figure{% if wide is defined and wide %} class="wide"{% endif %}>
   {{ picture(shown, alt=alt) if alt is defined else picture(shown) }}

@@ -591,13 +591,13 @@ fn check_shows_every_problem_as_json_with_where_it_starts_and_ends_and_nothing_e
              \"suggestion\":\"Change one so they match; Statac uses the `date` line.\",\
              \"explanation\":\"https://statac.dev/e/dates-disagree/\",\"quietened\":true,\
              \"related\":[],\"pages\":[]}},\
-             {{\"severity\":\"note\",\"kind\":\"undescribed-picture\",\
-             \"message\":\"Picture with no description: `https://a.example/b.jpg`\",\
+             {{\"severity\":\"note\",\"kind\":\"missing-alt-text\",\
+             \"message\":\"Missing alt text: `https://a.example/b.jpg`\",\
              \"file\":\"content/ete.md\",\
              \"start\":{{\"line\":4,\"column\":14,\"offset\":35}},\
              \"end\":{{\"line\":4,\"column\":37,\"offset\":58}},\
              \"suggestion\":\"Describe it in the brackets.\",\
-             \"explanation\":\"https://statac.dev/e/undescribed-picture/\",\"quietened\":false,\
+             \"explanation\":\"https://statac.dev/e/missing-alt-text/\",\"quietened\":false,\
              \"related\":[],\"pages\":[]}},\
              {{\"severity\":\"warning\",\"kind\":\"broken-link\",\
              \"message\":\"Broken link: nothing is published at `/nope/`\",\
@@ -721,7 +721,7 @@ fn build_shows_where_its_time_went_when_asked() {
                 ])
             ),
             (
-                "Slowest writing:".into(),
+                "Slowest Markdown:".into(),
                 rows(&["content/index.md", "content/post-1.md"])
             ),
             (
@@ -963,8 +963,7 @@ fn every_whole_address_follows_the_address_given_for_the_run() {
         "`content/robots.md` is",
         "`content/sitemap.md` is",
     ] {
-        let note =
-            format!("note  No site address: {waiting} left out until the site has a `url`\n");
+        let note = format!("note  No site URL: {waiting} left out until the site has a `url`\n");
         assert!(said.contains(&note), "{said}");
     }
     let (said, code) = site.check_without_javascript(&["--url=https://preview.example.org"]);
@@ -1338,7 +1337,7 @@ fn a_layout_that_never_shows_its_pages_writing_is_told_once_counting_them() {
     assert!(
         said.contains(
             "\
-warning  Writing never shown: 3 pages built by `templates/hollow.html` have writing it never shows
+warning  Content never shown: 3 pages built by `templates/hollow.html` have content it never shows
   templates/hollow.html, line 1
    1 │ <title>{{ page.title }}</title>
      │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1346,20 +1345,20 @@ warning  Writing never shown: 3 pages built by `templates/hollow.html` have writ
   And while building 2 more:
     content/post-3.md
     content/post-4.md
-  Add `{{ page.content }}` where the writing belongs.
-  More: https://statac.dev/e/writing-never-shown/
+  Add `{{ page.content }}` where the content belongs.
+  More: https://statac.dev/e/content-never-shown/
 "
         ),
         "{said}"
     );
     assert!(
-        said.contains("1 warning: 1 writing-never-shown.\n"),
+        said.contains("1 warning: 1 content-never-shown.\n"),
         "{said}"
     );
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
     assert!(
-        said.starts_with("1 warning: 1 writing-never-shown.\n"),
+        said.starts_with("1 warning: 1 content-never-shown.\n"),
         "{said}"
     );
     let post = fs::read_to_string(site.out().join("post-2/index.html")).unwrap();
@@ -1368,11 +1367,11 @@ warning  Writing never shown: 3 pages built by `templates/hollow.html` have writ
     site.write(
         "statac.yaml",
         "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
-         quiet: [writing-never-shown]\n",
+         quiet: [content-never-shown]\n",
     );
     let (said, code) = site.run(&["check", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
-    assert!(!said.contains("Writing never shown"), "{said}");
+    assert!(!said.contains("Content never shown"), "{said}");
     assert!(said.contains("1 warning, quietened.\n"), "{said}");
 }
 
@@ -1401,7 +1400,7 @@ fn words_a_language_lacks_are_noted_once_for_the_language_counting_its_pages() {
     assert_eq!(
         said,
         "\
-note  Missing words: the footnotes of 3 pages in `fr` have no words for the way back
+note  Missing words: the footnotes of 3 pages in `fr` have no translation for the back link
   While building: content/post-1.md
   And while building 2 more:
     content/post-2.md
@@ -1478,7 +1477,7 @@ note  Untitled page: `content/post-2.md` is called by its opening words, `Post 2
   content/post-2.md, line 1
    1 │ ---
      │ ^^^
-  Give it a `title`, or open its writing with a `# heading`. \
+  Give it a `title`, or open its content with a `# heading`. \
 A folder whose pages go without titles says `pages.untitled: true`.
   More: https://statac.dev/e/untitled-page/
 
@@ -1544,7 +1543,7 @@ note  Untitled page: `content/notes/note-1.md` is called by its opening words, `
   content/notes/note-1.md, line 1
    1 │ ---
      │ ^^^
-  Give it a `title`, or open its writing with a `# heading`. \
+  Give it a `title`, or open its content with a `# heading`. \
 A folder whose pages go without titles says `pages.untitled: true`.
   More: https://statac.dev/e/untitled-page/
 
@@ -1598,7 +1597,7 @@ fn a_long_list_goes_on_onto_later_pages() {
     assert_eq!(code, 1, "{said}");
     assert!(
         said.contains(
-            "error  Same address: page 2 of `/` and `content/page/2.md` are both published \
+            "error  Same URL: page 2 of `/` and `content/page/2.md` are both published \
              at `/page/2/`\n  content/page/2.md, line 1\n"
         ),
         "{said}"
@@ -2184,7 +2183,7 @@ fn drafts_and_waiting_posts_are_counted_by_build_and_drawn_by_check() {
     assert_eq!(code, 0, "{said}");
     assert!(
         said.starts_with(
-            "2 notes: 1 draft-left-out, 1 waiting-for-its-day. Run `statac check` to see them.\n"
+            "2 notes: 1 draft-left-out, 1 scheduled-post. Run `statac check` to see them.\n"
         ),
         "{said}"
     );
@@ -2200,7 +2199,7 @@ fn drafts_and_waiting_posts_are_counted_by_build_and_drawn_by_check() {
     );
     assert!(
         said.contains(
-            "note  Waiting for its day: `content/post-3.md` is dated `2026-10-05`\n  \
+            "note  Scheduled post: `content/post-3.md` is dated `2026-10-05`\n  \
              content/post-3.md, line 3\n"
         ),
         "{said}"
@@ -2209,7 +2208,7 @@ fn drafts_and_waiting_posts_are_counted_by_build_and_drawn_by_check() {
     let (said, code) = site.run(&["build", "--today=2026-10-04", "--drafts"]);
     assert_eq!(code, 0, "{said}");
     assert!(
-        said.starts_with("Included 1 draft and 1 post waiting for its day as if published.\n\n"),
+        said.starts_with("Included 1 draft and 1 scheduled post as if published.\n\n"),
         "{said}"
     );
     assert!(said.contains("Wrote 4 pages"), "{said}");
@@ -2372,8 +2371,8 @@ fn an_address_published_before_that_stops_answering_is_told() {
     assert_eq!(code, 0, "{said}");
     assert!(
         said.contains(
-            "Started `published.txt` with the 2 addresses this site publishes, so a later \
-             build can say when one stops answering. Commit it with the site.\n"
+            "Started `published.txt` with the 2 URLs this site publishes, so a later \
+             build can say when one is no longer published. Commit it with the site.\n"
         ),
         "{said}"
     );
@@ -2395,16 +2394,13 @@ fn an_address_published_before_that_stops_answering_is_told() {
     let (said, _) = site.check_without_javascript(&[]);
     assert!(
         said.contains(
-            "warning  Address gone: `/post-1/` was published before, and nothing answers there \
-             now\n  published.txt, line 5\n"
+            "warning  URL gone: `/post-1/` was published before, and nothing is \
+             there now\n  published.txt, line 5\n"
         ),
         "{said}"
     );
     let (said, _) = site.run(&["build", "--today=2026-10-04"]);
-    assert!(
-        said.contains("Added 1 address to `published.txt`.\n"),
-        "{said}"
-    );
+    assert!(said.contains("Added 1 URL to `published.txt`.\n"), "{said}");
 }
 
 /// A template's link is offered the nearest address the site publishes,
@@ -2556,7 +2552,7 @@ fn a_site_under_a_path_owns_only_that_path() {
     site.write(
         "statac.yaml",
         "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
-         url: https://example.org/blog/\nnot_ours: [/video/]\n",
+         url: https://example.org/blog/\nserved_elsewhere: [/video/]\n",
     );
     site.write(
         "templates/home.html",
@@ -3489,7 +3485,7 @@ fn writing_nested_past_two_hundred_deep_is_told_once_where_the_201st_level_opens
             let (said, code) = site.check_without_javascript(&[]);
             assert_eq!(code, 1, "{kind} {depth}: {said}");
             let start = format!(
-                "error  Nested too deep: the writing here is nested more than 200 deep\n  \
+                "error  Nested too deep: the Markdown here is nested more than 200 deep\n  \
                  content/post-1.md, line {}\n",
                 line_of_the_201st(kind)
             );
@@ -3524,7 +3520,7 @@ fn a_value_read_as_markdown_nested_past_two_hundred_deep_is_told() {
             assert_eq!(code, 1, "{kind}: {said}");
             assert!(
                 said.starts_with(
-                    "error  Nested too deep: the writing here is nested more than 200 deep\n"
+                    "error  Nested too deep: the Markdown here is nested more than 200 deep\n"
                 ) && said.ends_with("\n1 error: 1 nested-too-deep.\n"),
                 "{kind}: {said}"
             );

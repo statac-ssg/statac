@@ -5,7 +5,7 @@ list and gives the reason, which is one of these:
 
 - The site has no `title`, which the feed uses as its name.
 - There is no `templates/feed.xml` to build the feed with.
-- One of your pages is published at the feed's address.
+- One of your pages is published at the feed's URL.
 - A `feed:` line asks for a feed of a list where nothing is dated, so the
   feed would have nothing in it.
 
@@ -20,37 +20,37 @@ warning  Feed not written: the site's own list needs `templates/feed.xml`
 ## Why Statac warns
 
 The site's own list and each folder at the top of `content/` have a feed
-unless their page turns it off. Any other list has a feed only if its page
-asks for one with `feed:`. Statac has no built-in feed. The file a feed
-reader reads is built from your template, so you decide what it says.
-If something a feed needs is missing, Statac publishes the rest of the
-site without the feed, and warns once. If one of your pages is at the
-feed's address, the page is published as you wrote it, and the feed is
-left out.
+unless their list page turns it off. Any other list has a feed only if its
+list page asks for one with `feed:`. Statac has no built-in feed. The file
+a feed reader reads is built from your template, so you decide what it
+says. If something a feed needs is missing, Statac publishes the rest of
+the site without the feed, and warns once. If one of your pages is at the
+feed's URL, the page is published as you wrote it, and the feed is left
+out.
 
 ## How to fix it
 
 Add what is missing: a `title:` line in `statac.yaml`, or the template.
 
-A feed is built with `templates/feed.xml`. If the feed's address ends in
+A feed is built with `templates/feed.xml`. If the feed's URL ends in
 another extension, Statac uses the template with that name if you have
 one, such as `templates/feed.json` for `/feed.json`. The template is
 handed `list` (the list), `posts` (its posts, newest first) and `page`
-(the page that speaks for the list).
+(the list page).
 
-To turn off every feed, hand `feed: false` down to every page in
+To turn off every feed, cascade `feed: false` to every page from
 `statac.yaml`:
 
 ```yaml
 pages.feed: false
 ```
 
-If a page is at the feed's address, give the feed a different address
-with `feed:` on the list's page, such as `feed: atom.xml`, or move the
+If a page is at the feed's URL, give the feed a different URL with
+`feed:` on the list page, such as `feed: atom.xml`, or move the
 page.
 
 If nothing in the list is dated, give one of its pages a `date:`, or
-remove the `feed:` line. If the line is handed down to several such
+remove the `feed:` line. If the line cascades to several such
 lists, such as `pages.feed: true`, Statac warns once, at that line, and
 names the first of the lists.
 
@@ -74,7 +74,7 @@ templates/
   page.html
 ```
 
-A folder of notes with no dates, whose page asks for a feed. In
+A folder of notes with no dates, whose list page asks for a feed. In
 `content/notes/index.md`:
 
 ```yaml

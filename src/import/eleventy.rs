@@ -43,7 +43,7 @@ pub(super) static TEMPLATE_PAGE: FindingKind = FindingKind {
 pub(super) static PARTS: FindingKind = FindingKind {
     heading: "Files that were parts of other pages",
     sentence: "Eleventy made no page of a file with `permalink: false`, and these had no title \
-               and filled whole folders: writing a template showed inside other pages, as \
+               and filled whole folders: content a template showed inside other pages, as \
                comments are, and not drafts. Statac left them behind, each folder listed under \
                Not converted, and they are counted here by the `tags` a template found them by. \
                To show them again, put what they say in a data file for a template to read: see \
@@ -59,7 +59,7 @@ pub(super) static HTML_WRITING: FindingKind = FindingKind {
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Template tags left as written",
-    sentence: "Statac's writing runs no template tags and these have no equal in it, so each is \
+    sentence: "Statac's Markdown runs no template tags and these have no equal in it, so each is \
                left as written and shows on the page as it stands: write by hand what it made, \
                or call a snippet, as https://statac.dev/snippets/ describes.",
 };
@@ -98,7 +98,7 @@ pub(super) static ATTRIBUTES: FindingKind = FindingKind {
 };
 
 pub(super) static LINK_NOT_MADE: FindingKind = FindingKind {
-    heading: "Addresses no longer linked",
+    heading: "URLs no longer linked",
     sentence: "The old site's Markdown linked each of these, written without `www.` or `http`, \
                and Statac doesn't, so each shows as words: write it as a link, as \
                `<https://example.org>`, where one is meant.",
@@ -107,7 +107,7 @@ pub(super) static LINK_NOT_MADE: FindingKind = FindingKind {
 pub(super) static HTML_SHOWN: FindingKind = FindingKind {
     heading: "HTML the old site showed as text",
     sentence: "The old site's Markdown had HTML turned off and showed each of these as text, and \
-               Statac publishes HTML in the writing as it is: write each as you mean it, or put a \
+               Statac publishes HTML in Markdown as it is: write each as you mean it, or put a \
                backslash before its `<` to show it as text.",
 };
 
@@ -131,18 +131,18 @@ pub(super) static DATE_FROM_FILE: FindingKind = FindingKind {
 };
 
 pub(super) static ELEVENTYS_WORD: FindingKind = FindingKind {
-    heading: "Eleventy's words kept as fields",
-    sentence: "Statac has no equal for each of these words of Eleventy's own, so each came across \
-               as a field of your own and does nothing: take it out, or show it from a template.",
+    heading: "Eleventy's fields kept as custom fields",
+    sentence: "Statac has no equal for each of these fields of Eleventy's own, so each came across \
+               as a custom field and does nothing: take it out, or show it from a template.",
 };
 
 pub(super) static ADDRESS_PROGRAM: FindingKind = FindingKind {
-    heading: "Addresses a program gave",
+    heading: "URLs a program gave",
     sentence: "Each of these data files is a program that names `permalink`, so it may have given \
-               pages their addresses, and Statac runs none: for those pages it took the address \
-               Eleventy gives a file by its name, which may not be where the old site published \
-               them. Compare the old site's addresses with the new site's, and give each page \
-               that differs its old address as a `permalink`.",
+               pages their URLs, and Statac runs none: for those pages it took the URL Eleventy \
+               gives a file by its name, which may not be where the old site published them. \
+               Compare the old site's URLs with the new site's, and give each page that differs \
+               its old URL as a `permalink`.",
 };
 
 pub(super) static DATA_PROGRAM: FindingKind = FindingKind {
@@ -165,25 +165,25 @@ pub(super) static DATA_LEFT: FindingKind = FindingKind {
 };
 
 pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
-    heading: "Addresses Statac couldn't work out",
+    heading: "URLs Statac couldn't work out",
     sentence: "Each of these pages has a `permalink` holding a template tag Statac can't work out, \
-               so its old address wasn't kept and the page is at Statac's own: give it a \
-               `permalink` of the address the old site published it at.",
+               so its old URL wasn't kept and the page is at Statac's own: give it a \
+               `permalink` of the URL the old site published it at.",
 };
 
 pub(super) static ADDRESS_A_FILE: FindingKind = FindingKind {
-    heading: "Addresses with no ending",
+    heading: "URLs with no ending",
     sentence: "Eleventy wrote each of these pages as a file of exactly that name, and Statac \
-               publishes a page whose address has no ending in a folder of that name, as \
-               `/about/` for `/about`: most hosts send a reader on from one to the other, but \
-               check that yours does.",
+               publishes a page whose URL has no ending in a folder of that name, as `/about/` \
+               for `/about`: most hosts redirect from one to the other, but check that yours \
+               does.",
 };
 
 pub(super) static REDIRECT_LEFT: FindingKind = FindingKind {
     heading: "Lines of `_redirects` not kept",
-    sentence: "Each of these lines sends readers to an address no page of the old site has, holds \
-               a pattern, or does more than send them on, so it isn't kept: keep it with your \
-               host, or add its first address to the `redirect_from` of the page it meant.",
+    sentence: "Each of these lines redirects to a URL no page of the old site has, holds a \
+               pattern, or does more than redirect, so it isn't kept: keep it with your host, or \
+               add its first URL to the `redirect_from` of the page it meant.",
 };
 
 pub(super) static COPY_UNREAD: FindingKind = FindingKind {
@@ -1010,7 +1010,7 @@ impl Reader<'_> {
                 continue;
             }
             let what = if inner == self.output {
-                "the old site's built output, read only to check the addresses".to_owned()
+                "the old site's built output, read only to check the URLs".to_owned()
             } else if name == "node_modules" {
                 "the packages Eleventy and its plugins were installed from".to_owned()
             } else if settings::FILES.contains(&inner.as_str()) {
@@ -1054,7 +1054,7 @@ impl Reader<'_> {
             if inner == self.output {
                 self.left(
                     &shown,
-                    "the old site's built output, read only to check the addresses",
+                    "the old site's built output, read only to check the URLs",
                 );
                 continue;
             }
@@ -1107,7 +1107,7 @@ impl Reader<'_> {
                 self.left(
                     &shown,
                     &format!(
-                        "{what}; each include the writing calls has a snippet of its name \
+                        "{what}; each include the content calls has a snippet of its name \
                          standing for it"
                     ),
                 );
@@ -2118,9 +2118,9 @@ impl Reader<'_> {
         self.layouts_taken += layouts;
         if !told.is_empty() {
             self.note(format!(
-                "The data each folder's own file handed the pages beneath it is in `pages.` lines \
-                 of {}, as https://statac.dev/front-matter/#handing-down describes; what \
-                 can't be handed down that way, as a `title` or a field inside a folder with no \
+                "The data each folder's own file cascaded to the pages beneath it is in `pages.` \
+                 lines of {}, as https://statac.dev/front-matter/#handing-down describes; what \
+                 can't cascade that way, as a `title` or a field inside a folder with no \
                  page of its own, is in each page's own front matter.",
                 listed(&told)
             ));
@@ -2217,10 +2217,10 @@ impl Reader<'_> {
         }
         if kept > 0 {
             self.note(format!(
-                "The old site's {} sent readers on from {} to a page, each now in that page's \
+                "The old site's {} redirected {} to a page, each now in that page's \
                  `redirect_from`.",
                 code(&path),
-                counted(kept, "old address", "old addresses")
+                counted(kept, "old URL", "old URLs")
             ));
         }
     }
@@ -2281,22 +2281,22 @@ impl Reader<'_> {
         let base = self.s.base();
         self.import.address = self.given.map(|given| super::under(given, &base));
         notes.push(format!(
-            "Eleventy's settings hold no title, address or language for the site, so the new \
+            "Eleventy's settings hold no title, URL or language for the site, so the new \
              site's `title` is made from the old folder's name, {}, and it is in English, `en`: \
              put each right in `statac.yaml`.",
             match self.given {
-                Some(_) => "its `url` is the address you gave",
+                Some(_) => "its `url` is the URL you gave",
                 None => "it has no `url` yet",
             }
         ));
         if !base.is_empty() && self.given.is_none() {
             notes.push(format!(
-                "The settings' `pathPrefix` puts the old site under {path}, and each address \
+                "The settings' `pathPrefix` puts the old site under {path}, and each URL \
                  through the `url` filter is written with {path} in front, as Eleventy wrote it. \
                  Statac puts a site under a path only by its `url`, and the new site has none \
-                 yet. Add the whole address as `url` in `statac.yaml`, such as {example}. Until \
-                 then, `statac check` says nothing is published at those links: leave them as \
-                 they are, even where it offers another address.",
+                 yet. Add the full URL as `url` in `statac.yaml`, such as {example}. Until then, \
+                 `statac check` says nothing is published at those links: leave them as they \
+                 are, even where it offers another URL.",
                 path = code(&base),
                 example = code(&format!("url: https://example.org{base}"))
             ));
@@ -2324,7 +2324,7 @@ impl Reader<'_> {
         );
         notes.push(match copies.is_empty() {
             true => "The settings copy nothing as it is with an `addPassthroughCopy` Statac can \
-                     read, so Statac copied only the files beside a page that its writing names."
+                     read, so Statac copied only the files beside a page that its content names."
                 .to_owned(),
             false => format!(
                 "The settings copy {} as {} with `addPassthroughCopy`, so Statac copied {} into \
@@ -2337,8 +2337,8 @@ impl Reader<'_> {
                 },
                 counted(self.copied_count, "file", "files"),
                 match self.copied_count {
-                    1 => "it keeps its address",
-                    _ => "each keeps its address",
+                    1 => "it keeps its URL",
+                    _ => "each keeps its URL",
                 }
             ),
         });
@@ -2399,17 +2399,17 @@ impl Reader<'_> {
         });
         notes.push(match self.s.linkify.as_ref().map(|b| b.value) {
             Some(true) => format!(
-                "The settings' Markdown had `linkify: true`, which linked addresses written bare; \
-                 Statac links those starting `www.`, `http://` or `https://` too, and {}, listed \
-                 under Left for you.",
+                "The settings' Markdown had `linkify: true`, which linked bare URLs; Statac links \
+                 those starting `www.`, `http://` or `https://` too, and {}, listed under Left \
+                 for you.",
                 match counts[1] {
-                    0 => "the writing has no other".to_owned(),
+                    0 => "the content has no other".to_owned(),
                     1 => "1 other is no longer linked".to_owned(),
                     n => format!("{n} others are no longer linked"),
                 }
             ),
-            _ => "The settings don't set `linkify: true`, so Eleventy left addresses written bare \
-                  as words, and Statac links those starting `www.`, `http://` or `https://`, as \
+            _ => "The settings don't set `linkify: true`, so Eleventy left bare URLs as words, \
+                  and Statac links those starting `www.`, `http://` or `https://`, as \
                   https://statac.dev/writing/#addresses-written-bare describes."
                 .to_owned(),
         });
@@ -2422,13 +2422,13 @@ impl Reader<'_> {
         }
         notes.push(match (&self.s.html, self.s.library) {
             (Some(given), _) if given.value => "The settings' Markdown had `html: true`, so \
-                 Eleventy published HTML in the writing as it is, as Statac does."
+                 Eleventy published HTML in Markdown as it is, as Statac does."
                 .to_owned(),
             (Some(_), _) => format!(
-                "The settings' Markdown had `html: false`, so Eleventy showed HTML in the writing \
-                 as text, and Statac publishes it as HTML: {}.",
+                "The settings' Markdown had `html: false`, so Eleventy showed HTML in Markdown as \
+                 text, and Statac publishes it as HTML: {}.",
                 match counts[2] {
-                    0 => "the writing holds none".to_owned(),
+                    0 => "the Markdown holds none".to_owned(),
                     n => format!(
                         "{} listed under Left for you",
                         counted(n, "place is", "places are")
@@ -2437,10 +2437,9 @@ impl Reader<'_> {
             ),
             (None, Some(_)) => format!(
                 "The settings give Markdown a library of their own and don't set `html: true`, \
-                 so Eleventy showed HTML in the writing as text, and Statac publishes it as HTML: \
-                 {}.",
+                 so Eleventy showed HTML in Markdown as text, and Statac publishes it as HTML: {}.",
                 match counts[2] {
-                    0 => "the writing holds none".to_owned(),
+                    0 => "the Markdown holds none".to_owned(),
                     n => format!(
                         "{} listed under Left for you",
                         counted(n, "place is", "places are")
@@ -2448,7 +2447,7 @@ impl Reader<'_> {
                 }
             ),
             (None, None) => "The settings give Markdown no library of their own, so Statac took \
-                 Eleventy's own, which publishes HTML in the writing as it is, as Statac does."
+                 Eleventy's own, which publishes HTML in Markdown as it is, as Statac does."
                 .to_owned(),
         });
         notes.push(match &self.s.attributes {
@@ -2457,7 +2456,7 @@ impl Reader<'_> {
                  reads them only at the end of a heading, so {}.",
                 code(&plugin.value),
                 match counts[0] {
-                    0 => "the writing has none elsewhere".to_owned(),
+                    0 => "the content has none elsewhere".to_owned(),
                     1 => "1 elsewhere shows as written, listed under Left for you".to_owned(),
                     n => format!("{n} elsewhere show as written, listed under Left for you"),
                 }
@@ -2517,7 +2516,7 @@ impl Reader<'_> {
         }
         if self.overrides > 0 {
             notes.push(format!(
-                "`templateEngineOverride` was taken off {}, once the writing was read in the \
+                "`templateEngineOverride` was taken off {}, once the content was read in the \
                  language it named.",
                 counted(self.overrides, "page", "pages")
             ));

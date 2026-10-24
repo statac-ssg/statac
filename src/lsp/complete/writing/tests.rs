@@ -104,12 +104,12 @@ fn site() -> TempSite {
         ("templates/page.html", "{{ page.content }}\n"),
         (
             "snippets/figure.html",
-            "{# takes photo, alt #}\n{% set shown = page.photo(photo) %}\
+            "{# takes photo, alt #}\n{% set shown = page.image(photo) %}\
              {{ shown.alt }}{{ alt if alt is defined }}{{ caption | default('') }}\n",
         ),
         (
             "snippets/gallery.html",
-            "{# takes photos... #}\n{% for shown in page.photos(photos if photos is defined else none) %}{{ shown.alt }}{% endfor %}\n",
+            "{# takes photos... #}\n{% for shown in page.images(photos if photos is defined else none) %}{{ shown.alt }}{% endfor %}\n",
         ),
         (
             "snippets/clip.html",
@@ -198,7 +198,7 @@ fn a_call_offers_the_sites_snippets_written_to_be_filled_in() {
         item(&calls, "url(address)"),
         &(
             "url(address)".into(),
-            "address in the site".into(),
+            "URL in the site".into(),
             "url($1)".into()
         )
     );

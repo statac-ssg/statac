@@ -25,11 +25,10 @@ Look at the place the caret points to, on the page the message gives.
 Common causes:
 
 - `absolute` used on a site whose `statac.yaml` doesn't give the site's
-  own address. `absolute` needs it to make a full address.
+  full URL. `absolute` needs it to make a full URL.
 - `date` or `moment` given something that isn't a date.
 - `headline` given something that isn't a page, such as a title.
-- `url` given something that isn't an address from the top of the site,
-  starting with a single `/`.
+- `url` given something that isn't a URL starting with a single `/`.
 - A snippet that calls another snippet, which calls the first one back.
   Remove the call from one of them.
 - A loop that never ends, or a loop inside a loop over long lists, which

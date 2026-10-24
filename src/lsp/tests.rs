@@ -565,7 +565,7 @@ fn a_call_is_written_with_places_to_fill_only_for_an_editor_that_fills_them() {
         ("templates/list.html", "{{ ur }}\n"),
         (
             "snippets/figure.html",
-            "{# takes photo #}\n{{ page.photo(photo).alt }}\n",
+            "{# takes photo #}\n{{ page.image(photo).alt }}\n",
         ),
         ("content/post-1.md", "---\ntitle: Post 1\n---\n@fi\n"),
     ]);
@@ -671,7 +671,7 @@ fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
             .expect("the hover");
         assert_eq!(answer.text(&["result", "contents", "kind"]), Some(kind));
         let value = answer.text(&["result", "contents", "value"]).unwrap();
-        let first = "`code_style`, a setting\n\nThe colours of code in the writing:";
+        let first = "`code_style`, a setting\n\nThe colours of code in the content:";
         assert!(value.starts_with(first), "{value}");
         assert!(value.ends_with(&format!(".\n\n{more}")), "{value}");
         let range = ["result", "range"];
@@ -1057,7 +1057,7 @@ fn two_files_published_at_one_address_are_each_told_it_at_their_start() {
         let told = editor.told_until(0, &site.root.join(file), |told| !told.is_empty());
         assert_eq!(
             told,
-            [("same-address".into(), "0".into(), "0".into())],
+            [("same-url".into(), "0".into(), "0".into())],
             "{file}"
         );
     }

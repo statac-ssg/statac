@@ -218,7 +218,7 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
             "no address",
             "language: en\ntitle: Site\nfeed_key: key\ntimezone: UTC\n",
             vec![FEED],
-            vec![Kind::NoSiteAddress {
+            vec![Kind::NoSiteUrl {
                 waiting: Waiting::Feeds {
                     list: site.clone(),
                     more: 1,
@@ -459,7 +459,7 @@ fn a_feed_and_a_static_file_at_one_address_are_refused_naming_both() {
         .kinds()
         .into_iter()
         .filter_map(|kind| match kind {
-            Kind::SameAddress { first, second, .. } => match (*first, *second) {
+            Kind::SameUrl { first, second, .. } => match (*first, *second) {
                 (Named::File(first), Named::File(second)) => Some((first, second)),
                 _ => None,
             },
@@ -524,11 +524,11 @@ fn a_feed_value_that_names_no_file_stops_at_the_value_with_the_nearest() {
             .kinds()
             .into_iter()
             .zip(built.told().into_iter().map(|(_, at)| at))
-            .filter(|(kind, _)| matches!(kind, Kind::UnusableAddress { .. }))
+            .filter(|(kind, _)| matches!(kind, Kind::UnusableUrl { .. }))
             .collect();
         assert_eq!(
             told,
-            [(Kind::UnusableAddress { fault }, Some(at.to_owned()))],
+            [(Kind::UnusableUrl { fault }, Some(at.to_owned()))],
             "{line}"
         );
     }
@@ -716,15 +716,15 @@ fn a_page_that_needs_the_sites_address_waits_for_it_and_is_said_left_out() {
     assert_eq!(
         built.told(),
         [
-            ("no-site-address", Some("url".into())),
-            ("no-site-address", Some("url".into())),
+            ("no-site-url", Some("url".into())),
+            ("no-site-url", Some("url".into())),
         ]
     );
     let kinds = built.kinds();
     assert!(kinds.iter().all(|kind| !kind.quietenable()));
     assert!(matches!(
         &kinds[0],
-        Kind::NoSiteAddress {
+        Kind::NoSiteUrl {
             waiting: Waiting::Page(path)
         } if path == "content/robots.md"
     ));

@@ -46,8 +46,8 @@ the field. Leave out the pages without it first, as in
 `selectattr("rank", "eq", 1)`, skips a page without it, as `if` does.
 `sort(attribute="rank")` puts pages without the field last, and warns.
 
-A page that Statac makes for a list, such as a tag's page, has no
-`title`. For such a page, `{{ headline(page) }}` shows the list's name.
+A list page that Statac makes itself, such as a tag's, has no `title`.
+For such a page, `{{ headline(page) }}` shows the list's name.
 For any other page, it shows the page's `title` if it has one.
 
 In a snippet, `page` is the page being built, not a page that the call

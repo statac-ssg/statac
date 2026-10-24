@@ -206,7 +206,7 @@ impl<'a> Fields<'a> {
 fn faults(pattern: &str, handed: bool, fields: Fields) -> Vec<(Kind, Span)> {
     let items = matches!(fields, Fields::Any);
     let mut found = Vec::new();
-    let unusable = |fault| Kind::UnusableAddress { fault };
+    let unusable = |fault| Kind::UnusableUrl { fault };
     let mut chars = pattern.char_indices().peekable();
     let mut fills = false;
     while let Some((start, c)) = chars.next() {
@@ -313,7 +313,7 @@ fn first_unwritable(pattern: &str) -> Option<(Kind, Span)> {
         }
         if let Some(fault) = name_fault(&named) {
             return Some((
-                Kind::UnusableAddress { fault },
+                Kind::UnusableUrl { fault },
                 Span::new(start, start + piece.len()),
             ));
         }
@@ -624,7 +624,7 @@ mod tests {
 
     #[test]
     fn an_items_pattern_takes_any_name_as_a_piece() {
-        let unusable = |fault| Kind::UnusableAddress { fault };
+        let unusable = |fault| Kind::UnusableUrl { fault };
         let cases = [
             ("/people/{key}/", None),
             ("/{year}/{isbn}.html", None),
@@ -680,7 +680,7 @@ mod tests {
 
     #[test]
     fn a_patterns_faults_are_found_where_they_are() {
-        let unusable = |fault| Kind::UnusableAddress { fault };
+        let unusable = |fault| Kind::UnusableUrl { fault };
         let cases = [
             (
                 "/{yaer}/{slug}/",
@@ -750,7 +750,7 @@ mod tests {
     #[test]
     fn a_pages_pattern_takes_a_declared_field_as_a_piece() {
         let declared = ["isbn", "book.author"];
-        let unusable = |fault| Kind::UnusableAddress { fault };
+        let unusable = |fault| Kind::UnusableUrl { fault };
         let cases = [
             ("/books/{isbn}/", None),
             ("/{year}/{isbn}.html", None),

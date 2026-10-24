@@ -232,8 +232,9 @@ fn two_files_differing_in_capitals_are_told_once_photographs_or_not() {
     assert_eq!(
         told,
         [
-            "error  Same address: `static/File-1.txt` and `content/file-1.txt` differ only in capitals",
-            "error  Same address: `static/Photo-1.jpg` and `content/photo-1.jpg` differ only in capitals",
+            "error  Same URL: `static/File-1.txt` and `content/file-1.txt` differ only in capitals",
+            "error  Same URL: `static/Photo-1.jpg` and `content/photo-1.jpg` differ only in \
+             capitals",
         ]
     );
 }
@@ -254,10 +255,10 @@ fn build_times_the_copies_it_makes_of_each_photograph() {
     let said = timed();
     let stage = said
         .lines()
-        .find(|line| line.starts_with("  Making photograph copies"));
+        .find(|line| line.starts_with("  Resizing images"));
     assert!(stage.is_some(), "{said}");
     let (_, slowest) = said
-        .split_once("\nSlowest photographs (copies made this build only):\n")
+        .split_once("\nSlowest images (resized copies made this build only):\n")
         .expect(&said);
     let row = slowest.lines().next().unwrap();
     assert!(row.starts_with("  content/post-1/photo-1.jpg  "), "{said}");
@@ -281,7 +282,10 @@ fn a_photograph_beside_a_page_in_its_own_folder_is_published_as_copies() {
     site.put("content/post-1/photo-1.jpg", &jpeg(900, 600));
     site.put("content/post-1/picture-1.gif", &gif(40, 30));
     let said = site.build();
-    assert!(said.contains("Made 6 copies of 1 photograph.\n"), "{said}");
+    assert!(
+        said.contains("Made 6 resized copies of 1 image.\n"),
+        "{said}"
+    );
     assert!(said.contains("\nWrote 2 pages and 8 other files"), "{said}");
     let sizes = "(max-width: 46rem) 100vw, 46rem";
     assert_eq!(
@@ -371,8 +375,8 @@ fn a_picture_the_sites_own_file_writes_is_checked_as_the_page_carries_it() {
     let site = Site::new("own-file");
     site.write(
         "snippets/markdown/image.html",
-        "{% if photo %}<img src=\"{{ photo.src }}\" alt=\"{{ alt }}\">\
-         {% else %}<img src=\"{{ address }}\" alt=\"{{ alt }}\">{% endif %}",
+        "{% if image %}<img src=\"{{ image.src }}\" alt=\"{{ alt }}\">\
+         {% else %}<img src=\"{{ url }}\" alt=\"{{ alt }}\">{% endif %}",
     );
     site.write(
         "content/posts/post-1.md",
@@ -393,7 +397,7 @@ fn a_picture_the_sites_own_file_writes_is_checked_as_the_page_carries_it() {
     // and so does one the site has no file for.
     site.write(
         "snippets/markdown/image.html",
-        "<img src=\"{{ address }}\" alt=\"{{ alt }}\">",
+        "<img src=\"{{ url }}\" alt=\"{{ alt }}\">",
     );
     site.write(
         "content/posts/post-1.md",
@@ -483,7 +487,7 @@ fn a_photograph_two_pages_show_has_one_set_of_copies() {
     }
     site.put("content/shared/photo-1.jpg", &jpeg(400, 200));
     let said = site.build();
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     assert_eq!(site.kept().len(), 2);
     assert_eq!(
         unhashed(&site.built()),
@@ -511,7 +515,7 @@ fn a_second_build_makes_nothing_and_publishes_the_same_bytes() {
     );
     site.put("content/post-1/photo-1.jpg", &jpeg(900, 600));
     let said = site.build();
-    assert!(said.contains("Made 6 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 6 resized copies of 1 image."), "{said}");
     let first: Vec<(String, Vec<u8>)> = site
         .built()
         .into_iter()
@@ -667,7 +671,10 @@ fn a_second_copy_is_a_png_only_where_the_photograph_is_transparent() {
     assert!(!site.root.join(".statac").exists());
 
     let said = site.build();
-    assert!(said.contains("Made 6 copies of 3 photographs."), "{said}");
+    assert!(
+        said.contains("Made 6 resized copies of 3 images."),
+        "{said}"
+    );
     let copies: Vec<String> = site
         .built()
         .into_iter()
@@ -763,7 +770,7 @@ fn a_photograph_left_alone_is_published_as_it_is() {
         "optimise: false\nalt: A photograph\ncredit: Person 1\n",
     );
     let said = site.build();
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     let html = site.html("post-1/index.html");
     assert!(
         html.contains(
@@ -791,7 +798,7 @@ fn a_photograph_left_alone_is_published_as_it_is() {
     );
     let said = site.build();
     assert!(
-        said.contains("Removed 2 copies no page shows any more"),
+        said.contains("Removed 2 resized copies no page shows any more"),
         "{said}"
     );
     assert!(!site.html("post-1/index.html").contains("<picture>"));
@@ -817,7 +824,7 @@ fn a_file_describing_a_picture_is_read_and_one_describing_none_is_told() {
     assert_eq!(code, 1, "{said}");
     assert!(
         said.contains(
-            "warning  Describes no picture: there is no `content/photo-1.jpg`\n  \
+            "warning  Describes no image: there is no `content/photo-1.jpg`\n  \
              content/photo-1.jpg.yaml, line 1\n"
         ) && said.contains("Did you mean `photo-1.jpeg`?"),
         "{said}"
@@ -842,7 +849,7 @@ fn a_photograph_cut_short_stops_the_build_where_the_writing_shows_it() {
     assert_eq!(code, 1, "{said}");
     assert!(
         said.starts_with(
-            "error  Unreadable picture: `content/post-1/photo-1.jpg` is cut short or damaged\n  \
+            "error  Unreadable image: `content/post-1/photo-1.jpg` is cut short or damaged\n  \
              content/post-1/index.md, line 6\n"
         ),
         "{said}"
@@ -863,7 +870,7 @@ fn a_photograph_cut_short_stops_the_build_where_the_writing_shows_it() {
     let (said, code) = site.run(&["check"]);
     assert_eq!(code, 1, "{said}");
     assert!(
-        said.contains("error  Unreadable picture: `content/post-1/photo-1.jpg`"),
+        said.contains("error  Unreadable image: `content/post-1/photo-1.jpg`"),
         "{said}"
     );
 
@@ -889,7 +896,10 @@ fn a_photograph_nothing_shows_travels_and_one_linked_plainly_is_published() {
         site.put(&format!("content/post-1/{photo}"), &jpeg(400, 200));
     }
     let said = site.build();
-    assert!(said.contains("Made 4 copies of 2 photographs."), "{said}");
+    assert!(
+        said.contains("Made 4 resized copies of 2 images."),
+        "{said}"
+    );
     assert!(said.contains("Wrote 2 pages and 7 other files"), "{said}");
     assert_eq!(
         unhashed(&site.built()),
@@ -1016,7 +1026,10 @@ fn a_drafts_photograph_is_kept_and_what_no_page_shows_is_removed() {
     site.put("content/post-2/photo-2.jpg", &jpeg(400, 300));
     let (said, code) = site.run(&["build", "--drafts"]);
     assert_eq!(code, 0, "{said}");
-    assert!(said.contains("Made 4 copies of 2 photographs."), "{said}");
+    assert!(
+        said.contains("Made 4 resized copies of 2 images."),
+        "{said}"
+    );
     assert_eq!(site.kept().len(), 4);
 
     // The draft left out, its photograph is not published and its copies
@@ -1042,7 +1055,9 @@ fn a_drafts_photograph_is_kept_and_what_no_page_shows_is_removed() {
     site.put("content/post-1/photo-1.jpg", &jpeg(420, 200));
     let said = site.build();
     assert!(
-        said.contains("Made 2 copies of 1 photograph.\nRemoved 2 copies no page shows any more"),
+        said.contains(
+            "Made 2 resized copies of 1 image.\nRemoved 2 resized copies no page shows any more"
+        ),
         "{said}"
     );
     assert_eq!(site.kept().len(), 4);
@@ -1061,7 +1076,7 @@ fn a_drafts_photograph_is_kept_and_what_no_page_shows_is_removed() {
     );
     let said = site.build();
     assert!(
-        said.contains("Removed 2 copies no page shows any more"),
+        said.contains("Removed 2 resized copies no page shows any more"),
         "{said}"
     );
     assert_eq!(site.kept().len(), 2);
@@ -1092,8 +1107,8 @@ fn a_photograph_in_another_colour_space_is_converted_and_said() {
     assert_eq!(code, 0, "{said}");
     assert!(
         said.starts_with(
-            "note  Colour converted: the copies of `content/post-1/photo-1.jpg` are in sRGB, \
-             converted from `"
+            "note  Colour converted: the resized copies of `content/post-1/photo-1.jpg` are in \
+             sRGB, converted from `"
         ),
         "{said}"
     );
@@ -1129,7 +1144,7 @@ fn copies_that_cannot_be_kept_are_still_published() {
     fs::set_permissions(site.root.join(".statac"), fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(code, 0, "{said}");
     assert!(said.contains("1 warning: 1 cache-not-written."), "{said}");
-    assert!(said.contains("Made 6 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 6 resized copies of 1 image."), "{said}");
     assert_eq!(site.built().len(), 9);
     let (said, _) = site.run(&["check"]);
     assert_eq!(said, "No problems.\n");
@@ -1186,7 +1201,7 @@ fn a_link_where_copies_are_kept_is_never_followed() {
                 "{linked}: {said}"
             );
             assert!(
-                said.contains("Made 2 copies of 1 photograph."),
+                said.contains("Made 2 resized copies of 1 image."),
                 "{linked}: {said}"
             );
             assert!(copies_are_pictures(&site), "{linked}");
@@ -1221,12 +1236,12 @@ fn a_link_standing_for_a_copy_kept_is_neither_published_nor_removed() {
     let (said, code) = site.run(&["build"]);
     assert_eq!(code, 0, "{said}");
     assert!(said.contains("1 warning: 1 cache-not-written."), "{said}");
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     assert!(copies_are_pictures(&site));
     assert_eq!(fs::read(outside.join("private.avif")).unwrap(), b"private");
     // Only the file that is itself a stale copy went.
     assert!(
-        said.contains("Removed 1 copy no page shows any more"),
+        said.contains("Removed 1 resized copy no page shows any more"),
         "{said}"
     );
     let left = names(&kept);
@@ -1290,7 +1305,7 @@ fn a_copy_kept_that_is_another_name_for_a_file_outside_is_not_published() {
     let (said, code) = site.run(&["build"]);
     assert_eq!(code, 0, "{said}");
     assert!(said.contains("1 warning: 1 cache-not-written."), "{said}");
-    assert!(said.contains("Made 2 copies of 1 photograph."), "{said}");
+    assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     assert!(copies_are_pictures(&site));
     assert_eq!(fs::read(outside.join("private.avif")).unwrap(), b"private");
     assert_eq!(
@@ -1312,7 +1327,7 @@ fn with_a_sized_picture(name: &str) -> Site {
     site
 }
 
-const OUT_OF_PROPORTION: &str = "warning  Pictures out of proportion: ";
+const OUT_OF_PROPORTION: &str = "warning  Images out of proportion: ";
 
 #[test]
 fn a_rule_narrowing_pictures_and_keeping_their_height_is_told_once_at_its_property() {
@@ -1332,7 +1347,7 @@ fn a_rule_narrowing_pictures_and_keeping_their_height_is_told_once_at_its_proper
     let (said, _) = site.run(&["check"]);
     assert!(
         said.contains(
-            "warning  Pictures out of proportion: `img` has a `max-width` and no `height`\n  \
+            "warning  Images out of proportion: `img` has a `max-width` and no `height`\n  \
              assets/site.css, line 5\n   \
              5 │     max-width: 100%;\n     \
              │     ^^^^^^^^^\n  \
@@ -1344,7 +1359,7 @@ fn a_rule_narrowing_pictures_and_keeping_their_height_is_told_once_at_its_proper
     assert_eq!(said.matches(OUT_OF_PROPORTION).count(), 1, "{said}");
     let said = site.build();
     assert!(
-        said.contains("1 warning: 1 pictures-out-of-proportion."),
+        said.contains("1 warning: 1 images-out-of-proportion."),
         "{said}"
     );
 
@@ -1352,7 +1367,7 @@ fn a_rule_narrowing_pictures_and_keeping_their_height_is_told_once_at_its_proper
     let (said, _) = site.run(&["check"]);
     assert!(
         said.contains(
-            "warning  Pictures out of proportion: `img` has an `inline-size` and no \
+            "warning  Images out of proportion: `img` has an `inline-size` and no \
              `block-size`\n  assets/third.css, line 1\n"
         ) && said.contains("Add `block-size: auto` to the rule."),
         "{said}"

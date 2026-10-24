@@ -114,8 +114,9 @@ fn every_combination_is_written_checks_and_builds() {
             let mut wanted: Vec<(String, String)> = without_words
                 .iter()
                 .map(|tag| {
-                    let line =
-                        format!("warning  Unknown language: Statac has no words for `{tag}`");
+                    let line = format!(
+                        "warning  Unknown language: Statac has no translations for `{tag}`"
+                    );
                     ("unknown-language".to_owned(), line)
                 })
                 .collect();
@@ -127,8 +128,8 @@ fn every_combination_is_written_checks_and_builds() {
                     "`content/sitemap.md` is left out until the site has a `url`",
                 ];
                 for waits in waiting {
-                    let line = format!("note  No site address: {waits}");
-                    wanted.push(("no-site-address".to_owned(), line));
+                    let line = format!("note  No site URL: {waits}");
+                    wanted.push(("no-site-url".to_owned(), line));
                 }
             }
             wanted.sort();
@@ -178,8 +179,8 @@ fn a_site_in_a_language_lacking_the_words_statac_shows_is_given_them_in_english(
         assert_eq!(ran(&folder, false, update), nothing, "{tag}");
         assert!(!file.exists(), "{tag}");
         let line = format!(
-            "note  Missing words: the footnotes of 1 page in `{tag}` have no words for the way \
-             back"
+            "note  Missing words: the footnotes of 1 page in `{tag}` have no translation for \
+             the back link"
         );
         let wanted = [("missing-words".to_owned(), line)];
         assert_eq!(built(&folder, Mode::Check).0, wanted, "{tag}");
@@ -341,11 +342,11 @@ fn the_stylesheet_written_leaves_a_pictures_height_to_the_browser() {
     assert_ne!(css, without);
     fs::write(&stylesheet, without).unwrap();
     let (found, _) = built(&folder, Mode::Check);
-    let line = "warning  Pictures out of proportion: `img` has a `max-inline-size` and no \
+    let line = "warning  Images out of proportion: `img` has a `max-inline-size` and no \
                 `block-size`";
     assert_eq!(
         found,
-        [("pictures-out-of-proportion".to_owned(), line.to_owned())]
+        [("images-out-of-proportion".to_owned(), line.to_owned())]
     );
 }
 
@@ -853,9 +854,9 @@ fn a_site_with_a_card_and_no_address_is_told_its_cards_wait() {
     made_with(&folder, "Site 1\n\nen-GB\n\n", true);
     let (found, published) = built(&folder, Mode::Build);
     assert!(published);
-    let line = "note  No site address: sharing cards are left out until the site has a `url`";
+    let line = "note  No site URL: social cards are left out until the site has a `url`";
     assert!(
-        found.contains(&("no-site-address".to_owned(), line.to_owned())),
+        found.contains(&("no-site-url".to_owned(), line.to_owned())),
         "{found:?}"
     );
 }
@@ -989,7 +990,7 @@ fn the_menu_ends_with_notes_and_photographs_and_a_note_is_called_by_its_date_and
     let (found, _) = built(&folder, Mode::Build);
     // The pages taken away were published by the build before.
     let found: Vec<_> = (found.iter())
-        .filter(|(code, _)| *code != "address-gone")
+        .filter(|(code, _)| *code != "url-gone")
         .collect();
     assert!(found.is_empty(), "{found:?}");
     let home = read_built(&folder, "index.html");

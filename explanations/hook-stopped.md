@@ -1,9 +1,8 @@
 # Hook stopped
 
-One of the site's own commands, `before_build` or `after_build` in
-`statac.yaml`, failed. The message says which command it was and how it
-ended. It also shows what the command printed (the last 40 lines, if it
-printed more).
+A hook, `before_build` or `after_build` in `statac.yaml`, failed. The
+message says which hook it was and how its command ended. It also shows
+what the command printed (the last 40 lines, if it printed more).
 
 A command succeeds if it ends with exit code 0. The build stops if the
 command ends with any other code, if something else ends the command
@@ -18,10 +17,10 @@ error  Hook stopped: `after_build` ended with exit code 3
 
 ## Why Statac stops
 
-A `before_build` command makes something the site is built from, such
-as a stylesheet. An `after_build` command finishes off the built site,
-for example by making its search index. Statac can't tell how far a
-failed command got, so it publishes nothing, and the site from the last
+A `before_build` hook makes something the site is built from, such as a
+stylesheet. An `after_build` hook finishes off the built site, for
+example by making its search index. Statac can't tell how far a failed
+command got, so it publishes nothing, and the site from the last
 build stays as it was.
 
 ## How to fix it
@@ -40,10 +39,11 @@ A command is handed five values:
 - `STATAC_SITE`: the site's folder.
 - `STATAC_OUT`: the folder to work on.
 - `STATAC_DRAFTS`: `yes` or `no`.
-- `STATAC_SERVE`: `yes` if `statac serve` is running the command, and `no` otherwise.
-- `STATAC_HOOK`: the setting the command is written in.
+- `STATAC_SERVE`: `yes` if `statac serve` is running the command, and `no`
+  otherwise.
+- `STATAC_HOOK`: the hook the command is written in.
 
-An `after_build` command runs before the built site is moved into place,
+An `after_build` hook runs before the built site is moved into place,
 so it must work on `STATAC_OUT`, not on `_site`. At that point `_site`
 still holds the site from the last build.
 

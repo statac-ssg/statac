@@ -174,7 +174,7 @@ fn every_default_is_taken_by_enter() {
              \n\
              What is the site called?\n\
              \x20 [My Site] > \n\
-             What will its address be?\n\
+             What will its URL be?\n\
              \x20 Enter for none yet.\n\
              \x20 > \n\
              What language is it written in?\n\
@@ -390,7 +390,7 @@ fn each_unusable_answer_is_told_and_asked_again() {
     let typed = "\nexample\nhttps://example.org/\nenglish\nen, EN\nen\n1 January 2020\n3\n";
     let (said, code) = asked(&folder, typed);
     assert_eq!(code, 0, "{said}");
-    let address = "What will its address be?\n\x20 Enter for none yet.\n";
+    let address = "What will its URL be?\n\x20 Enter for none yet.\n";
     let language = "What language is it written in?\n\
                     \x20 For more than one, the main one first, as `en, fr`.\n";
     let dates = "How should dates look?\n\
@@ -400,7 +400,7 @@ fn each_unusable_answer_is_told_and_asked_again() {
                  \x20 Or type an example of your own.\n";
     let told = [
         format!(
-            "{address}\x20 > \x20 `example` isn't a web address. Write it whole, as \
+            "{address}\x20 > \x20 `example` isn't a full URL. Write it as \
              `https://example.org`.\n\x20 > \n{language}"
         ),
         format!(
@@ -501,7 +501,7 @@ fn with_no_terminal_an_unusable_answer_stops_with_what_a_person_is_told() {
         (
             "piped-address",
             "Site 1\nexample\nhttps://example.org\n",
-            "`example` isn't a web address. Write it whole, as `https://example.org`.\n",
+            "`example` isn't a full URL. Write it as `https://example.org`.\n",
         ),
         (
             "piped-language",
@@ -608,7 +608,7 @@ fn a_language_with_no_words_offers_dates_in_figures_and_says_where_words_go() {
     assert!(
         said.contains(
             "  [en] > \n\
-             Statac has no words for `sw`: write its months and days in \
+             Statac has no translations for `sw`: write its months and days in \
              `languages/sw.yaml`.\n\
              More: https://statac.dev/dates-and-languages/#languages\n\
              \n\
@@ -633,7 +633,7 @@ fn a_language_with_no_words_offers_dates_in_figures_and_says_where_words_go() {
     assert_eq!(code, 0, "{said}");
     assert!(
         said.starts_with(
-            "Statac has no words for `sw-KE`: write its months and days in \
+            "Statac has no translations for `sw-KE`: write its months and days in \
              `languages/sw-KE.yaml`.\n\
              More: https://statac.dev/dates-and-languages/#languages\n\
              \n\
@@ -1206,16 +1206,16 @@ fn a_refused_address_is_told_under_the_answer_and_asked_again_without_the_questi
     assert_eq!(code, 0, "{said}");
     assert!(
         said.contains(
-            "What will its address be?\n\
+            "What will its URL be?\n\
              \x20 Enter for none yet.\n\
-             \x20 > \x20 `example` isn't a web address. Write it whole, as \
+             \x20 > \x20 `example` isn't a full URL. Write it as \
              `https://example.org`.\n\
              \x20 > \n\
              What language is it written in?\n"
         ),
         "{said}"
     );
-    assert_eq!(said.matches("What will its address be?").count(), 1);
+    assert_eq!(said.matches("What will its URL be?").count(), 1);
 }
 
 #[test]

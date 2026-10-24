@@ -15,7 +15,7 @@ error  Malformed YAML: `"` is never closed
 ## Why Statac stops
 
 After the mistake, Statac can't tell which values you meant, and a guess
-could publish the wrong title, date or address without anyone noticing.
+could publish the wrong title, date or URL without anyone noticing.
 
 ## How to fix it
 

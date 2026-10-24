@@ -2,7 +2,7 @@
 {# A video kept on Vimeo, with its caption if it has one. It shows as its still until a reader presses play, called as @vimeo("123456789"): see /videos/ -#}
 {% set words = site.data.words[page.language] %}
 {% set video = page.vimeo(address) %}
-{% set still = page.photo(poster) if poster is defined else video.still %}
+{% set still = page.image(poster) if poster is defined else video.thumbnail %}
 {% set name = title if title is defined else caption | markdown | plain if caption is defined else "" %}
 {% set play = words.play ~ " " ~ name if name else words.play_video %}
 <figure class="video">

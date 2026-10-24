@@ -350,8 +350,8 @@ pub(super) fn ways(holds: Holds) -> &'static [(&'static str, &'static str)] {
         Holds::Truth => &[("{% if {name} %}\n  ...\n{% endif %}", "wayTrue")],
         Holds::Html => &[("{{ {name} }}", "wayHtml")],
         Holds::Mentions => &[(
-            "{% for face in {name}.faces %}\n  ...\n{% endfor %}",
-            "wayFaces",
+            "{% for reaction in {name}.reactions %}\n  ...\n{% endfor %}",
+            "wayReactions",
         )],
         Holds::Unknown => &[("{% if {name} %}{{ {name} }}{% endif %}", "wayHasOne")],
         Holds::Text | Holds::Number => &[("{{ {name} }}", "wayAsIs")],

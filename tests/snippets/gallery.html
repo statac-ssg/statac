@@ -1,6 +1,6 @@
 {# takes photos... #}
 <div class="gallery">
-{% for picture in page.photos(photos if photos is defined else none, sizes="(max-width: 30rem) 100vw, 15rem", full=true) %}
+{% for picture in page.images(photos if photos is defined else none, sizes="(max-width: 30rem) 100vw, 15rem", full=true) %}
   <a href="{{ picture.full }}"{% if not picture.alt %} aria-label="{{ picture.name }}"{% endif %}>
 {% if picture.avif %}
     <picture>

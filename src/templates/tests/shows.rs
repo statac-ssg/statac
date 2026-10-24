@@ -77,9 +77,9 @@ fn every_name_a_template_can_write_is_told_with_what_it_holds() {
     assert_eq!(date.holds, Holds::Date);
     assert_eq!(date.has, ["day", "month", "weekday", "year"]);
     assert_eq!(row(page, "page.tags").held, Held::Shown("Rust".into()));
-    assert_eq!(row(page, "page.words").held, Held::Shown("2".into()));
+    assert_eq!(row(page, "page.word_count").held, Held::Shown("2".into()));
     assert_eq!(row(page, "page.maths").held, Held::Shown("false".into()));
-    assert_eq!(row(page, "page.photo").held, Held::Call);
+    assert_eq!(row(page, "page.image").held, Held::Call);
 
     // A field of the author's own is followed into what it holds.
     assert_eq!(row(page, "page.book").held, Held::Fields);
@@ -123,7 +123,7 @@ fn a_name_is_reached_by_its_top_name_or_under_data_by_its_file() {
     let on_page = |name: &str| Reached::Page(renderer.name_id(name));
     assert_eq!(row(page, "page.title").reached, on_page("title"));
     assert_eq!(row(page, "page.book.author").reached, on_page("book"));
-    assert_eq!(row(page, "page.photo").reached, on_page("photo"));
+    assert_eq!(row(page, "page.image").reached, on_page("image"));
     let site = &explained.groups[1].rows;
     let on_site = Reached::Site(renderer.name_id("motto"));
     assert_eq!(row(site, "site.motto").reached, on_site);
@@ -180,7 +180,7 @@ fn an_output_notes_what_it_asks_of_its_own_page_and_the_site_by_name() {
     }
     // Answered from the same writing, or the same language, but never
     // asked for.
-    for unwritten in ["excerpt", "maths", "direction", "words"] {
+    for unwritten in ["excerpt", "maths", "direction", "word_count"] {
         assert!(!asked.asked_page(name(unwritten)), "{unwritten}");
     }
     assert!(asked.asked_site(name("data")));

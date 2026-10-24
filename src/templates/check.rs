@@ -84,6 +84,8 @@ pub(super) enum Rec {
     /// A page's mentions, as `page.webmentions` gives them.
     Webmentions,
     Mention,
+    /// A video `page.youtube` or `page.vimeo` gives.
+    Video,
 }
 
 impl Ty {
@@ -91,6 +93,25 @@ impl Ty {
         Ty::List(Box::new(of))
     }
 }
+
+/// Names a template once read on a record, with each one's name now.
+const FORMER_NAMES: &[(Rec, &str, &str)] = &[
+    (Rec::Page, "photo", "image"),
+    (Rec::Page, "photos", "images"),
+    (Rec::Page, "words", "word_count"),
+    (Rec::Webmentions, "said", "comments"),
+    (Rec::Webmentions, "faces", "reactions"),
+    (Rec::Mention, "face", "avatar"),
+    (Rec::Mention, "words", "content"),
+    (Rec::Video, "still", "thumbnail"),
+];
+
+/// Names a Markdown snippet was once handed, with each one's name now.
+const FORMER_HANDED: &[(&str, &str)] = &[
+    ("address", "url"),
+    ("outside", "external"),
+    ("photo", "image"),
+];
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Field {
@@ -115,6 +136,7 @@ pub(super) struct Schema {
     when: BTreeMap<String, Field>,
     webmentions: BTreeMap<String, Field>,
     mention: BTreeMap<String, Field>,
+    video: BTreeMap<String, Field>,
     looping: BTreeMap<String, Field>,
     /// Each snippet by its name.
     pub snippets: BTreeMap<String, Snippet>,
@@ -155,8 +177,8 @@ impl Schema {
                 ("day", Ty::Number, false),
             ]),
             webmentions: fields(&[
-                ("said", Ty::list(Ty::Record(Rec::Mention)), true),
-                ("faces", Ty::list(Ty::Record(Rec::Mention)), true),
+                ("comments", Ty::list(Ty::Record(Rec::Mention)), true),
+                ("reactions", Ty::list(Ty::Record(Rec::Mention)), true),
             ]),
             mention: fields(&[
                 ("kind", Ty::Text, true),
@@ -164,8 +186,14 @@ impl Schema {
                 ("author_url", Ty::Text, false),
                 ("url", Ty::Text, true),
                 ("published", Ty::Record(Rec::Date), false),
-                ("words", Ty::Text, false),
-                ("face", Ty::Any, false),
+                ("content", Ty::Text, false),
+                ("avatar", Ty::Any, false),
+            ]),
+            video: fields(&[
+                ("id", Ty::Text, true),
+                ("start", Ty::Number, false),
+                ("embed", Ty::Text, true),
+                ("thumbnail", Ty::Any, false),
             ]),
             looping: fields(&[
                 ("index", Ty::Number, true),
@@ -196,6 +224,7 @@ impl Schema {
             Rec::When => &self.when,
             Rec::Webmentions => &self.webmentions,
             Rec::Mention => &self.mention,
+            Rec::Video => &self.video,
         }
     }
 }
@@ -413,10 +442,10 @@ fn handed_to(piece: Piece) -> Vec<(&'static str, Ty)> {
             let ty = match name {
                 "body" => Ty::Html,
                 "level" | "number" => Ty::Number,
-                "outside" => Ty::Bool,
+                "external" => Ty::Bool,
                 "notes" | "head" => Ty::list(Ty::Any),
                 "rows" => Ty::list(Ty::list(Ty::Any)),
-                "width" | "height" | "photo" => Ty::Any,
+                "width" | "height" | "image" => Ty::Any,
                 _ => Ty::Text,
             };
             (name, ty)
@@ -687,6 +716,17 @@ impl<'a> Checker<'a> {
     }
 
     fn unknown_var(&mut self, name: &str, span: Span) {
+        if let Some(&(_, ours)) = (FORMER_HANDED.iter())
+            .find(|&&(former, ours)| former == name && self.extra.iter().any(|(n, _)| *n == ours))
+        {
+            let kind = Kind::OtherSpelling {
+                word: Word::Name,
+                written: name.to_owned(),
+                ours: ours.to_owned(),
+            };
+            self.tell(kind, span);
+            return;
+        }
         let visible = self.visible();
         let nearest = nearest(name, visible.iter().map(String::as_str)).map(str::to_owned);
         let kind = self.unknown_word(Word::Name, name, nearest);
@@ -1264,6 +1304,17 @@ impl<'a> Checker<'a> {
     fn unknown_field(&mut self, rec: Rec, base_expr: &Expr<'_>, name: &str, span: Span) {
         let base_text = self.spelling(full_span(base_expr, self.text)).to_owned();
         let written = format!("{base_text}.{name}");
+        if let Some(&(_, _, ours)) =
+            (FORMER_NAMES.iter()).find(|&&(on, former, _)| on == rec && former == name)
+        {
+            let kind = Kind::OtherSpelling {
+                word: Word::Field,
+                written,
+                ours: format!("{base_text}.{ours}"),
+            };
+            self.tell(kind, span);
+            return;
+        }
         let fields = self.schema.record(rec);
         let near = nearest(name, fields.keys().map(String::as_str));
         let kind = match (near, rec) {
@@ -1331,16 +1382,34 @@ impl<'a> Checker<'a> {
                     Info::told()
                 }
             }
-            CallType::Method(receiver, _) => {
+            CallType::Method(receiver, method) => {
                 if let Expr::Var(module) = receiver
                     && self.imported.contains(module.id)
                 {
                     self.args(&call.args, Seen::ByGuard);
                     return Info::told();
                 }
-                self.expr(receiver, Seen::Unseen);
+                let on = self.expr(receiver, Seen::Unseen);
                 self.args(&call.args, Seen::Unseen);
-                Info::of(Ty::Any)
+                if let Ty::Record(rec) = on.ty
+                    && let Some(&(_, _, ours)) = (FORMER_NAMES.iter())
+                        .find(|&&(of, former, _)| of == rec && former == method)
+                {
+                    let base = self.spelling(full_span(receiver, self.text)).to_owned();
+                    let kind = Kind::OtherSpelling {
+                        word: Word::Field,
+                        written: format!("{base}.{method}"),
+                        ours: format!("{base}.{ours}"),
+                    };
+                    self.tell(kind, call.expr.span());
+                    return Info::told();
+                }
+                match method {
+                    "youtube" | "vimeo" if on.ty == Ty::Record(Rec::Page) => {
+                        Info::of(Ty::Record(Rec::Video))
+                    }
+                    _ => Info::of(Ty::Any),
+                }
             }
             CallType::Block(_) => Info::of(Ty::Html),
             CallType::Object(callee) => {

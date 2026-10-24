@@ -56,7 +56,7 @@ fn an_address_kept_that_nothing_answers_at_is_told_at_its_line_with_the_sites_pa
         (
             "statac.yaml",
             "language: en\nurl: https://example.org/blog/\n\
-             after_build_makes: [/made/]\nnot_ours: [/blog/shop]\n",
+             after_build_outputs: [/made/]\nserved_elsewhere: [/blog/shop]\n",
         ),
         ("templates/page.html", "{{ page.content }}\n"),
         ("content/about.md", "---\ntitle: About\n---\n"),
@@ -69,16 +69,14 @@ fn an_address_kept_that_nothing_answers_at_is_told_at_its_line_with_the_sites_pa
     let prepared = crate::build::prepared(&site.root, &run());
     let sources = prepared.renderer.sources();
     let gone: Vec<(String, String)> = (prepared.problems.iter())
-        .filter(|p| p.kind.code() == Code::AddressGone)
+        .filter(|p| p.kind.code() == Code::UrlGone)
         .map(|p| {
             let at = sources.spelling(p.place.unwrap()).to_owned();
             (crate::wording::headline(&p.kind), at)
         })
         .collect();
     let told = |address: &str| {
-        format!(
-            "Address gone: `/blog{address}` was published before, and nothing answers there now"
-        )
+        format!("URL gone: `/blog{address}` was published before, and nothing is there now")
     };
     assert_eq!(
         gone,
@@ -156,7 +154,7 @@ fn serve_keeps_what_it_publishes_and_lets_go_quietly_of_what_came_and_went_while
     };
     let gone = |round: &crate::serve::session::Round| {
         (round.outcome.problems.iter())
-            .filter(|p| p.kind.code() == Code::AddressGone)
+            .filter(|p| p.kind.code() == Code::UrlGone)
             .count()
     };
     let (mut session, round) = crate::serve::session::Session::start(&options);
@@ -191,7 +189,7 @@ fn serve_keeps_what_it_publishes_and_lets_go_quietly_of_what_came_and_went_while
 fn a_warning_keeps_its_line_only_where_the_file_as_written_has_the_address_there() {
     let line = |problems: &[Problem], sources: &Sources| -> Vec<Option<usize>> {
         (problems.iter())
-            .filter(|p| p.kind.code() == Code::AddressGone)
+            .filter(|p| p.kind.code() == Code::UrlGone)
             .map(|p| (p.place).map(|at| sources.line_number(at.source, at.span.start as usize)))
             .collect()
     };
@@ -228,7 +226,7 @@ fn every_address_under_a_folder_gone_is_one_warning_under_the_outermost_such_fol
     let prepared = crate::build::prepared(&site.root, &run());
     let sources = prepared.renderer.sources();
     let told: Vec<(String, String)> = (prepared.problems.iter())
-        .filter(|p| p.kind.code() == Code::AddressGone)
+        .filter(|p| p.kind.code() == Code::UrlGone)
         .map(|p| {
             let at = sources.spelling(p.place.unwrap()).to_owned();
             (crate::wording::headline(&p.kind), at)
@@ -238,19 +236,19 @@ fn every_address_under_a_folder_gone_is_one_warning_under_the_outermost_such_fol
         told,
         [
             (
-                "Addresses gone: the 3 addresses under `/blog/` were published before, and \
-                 nothing answers at any of them now"
+                "URLs gone: the 3 URLs under `/blog/` were published before, and \
+                 nothing is at any of them now"
                     .into(),
                 "/blog/2026/post-1/\n/blog/2026/post-2/\n/blog/feed.xml".into()
             ),
             (
-                "Address gone: `/notes/note-2/` was published before, and nothing answers \
+                "URL gone: `/notes/note-2/` was published before, and nothing is \
                  there now"
                     .into(),
                 "/notes/note-2/".into()
             ),
             (
-                "Address gone: `/old/` was published before, and nothing answers there now".into(),
+                "URL gone: `/old/` was published before, and nothing is there now".into(),
                 "/old/".into()
             ),
         ]

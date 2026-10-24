@@ -25,12 +25,12 @@ line after that describes one file, in three parts separated by tabs:
 
 `fetched/refused` lists the webmentions and senders that `statac refuse`
 turned away, and is written the same way. Its first line is
-`statac refused 1`, and each line after that describes one address, in
-three parts separated by tabs:
+`statac refused 1`, and each line after that describes one URL, in three
+parts separated by tabs:
 
-- `mention`, for the single webmention sent from the address, or
-  `sender`, for everything sent from that address or any address under it
-- the address, such as `https://a.example/post-1/`
+- `mention`, for the single webmention sent from the URL, or `sender`,
+  for everything sent from that URL or any URL under it
+- the URL, such as `https://a.example/post-1/`
 - the date it was refused, such as `2026-10-06`
 
 A line written any other way, usually by hand or by a merge that went
@@ -45,7 +45,7 @@ with no fetch date. If the line marked the file `absent`, the next
 `statac refresh` asks for it again.
 
 In `fetched/refused`, put the line back as Statac wrote it, or delete it.
-If you delete it, `statac refresh` keeps what is sent from that address
+If you delete it, `statac refresh` keeps what is sent from that URL
 again.
 
 ## Example

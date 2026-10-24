@@ -25,7 +25,7 @@ error  Can't tell what made the site: `old` has no settings file Statac knows
 
 ## Why Statac stops
 
-Each tool stores its writing, settings and addresses in its own way.
+Each tool stores its content, settings and URLs in its own way.
 Reading a site by the wrong tool's rules would import it wrongly, with no
 warning. So Statac doesn't guess which tool you used.
 

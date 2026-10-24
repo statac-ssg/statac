@@ -228,7 +228,7 @@ pub(super) fn keep(
                 continue;
             }
             let holder = format!(
-                "{} sends readers on from there already",
+                "{} already redirects from there",
                 super::report::code(&page.from)
             );
             taken.insert(file.clone(), holder);
@@ -556,7 +556,7 @@ pub(super) struct LaterPages {
 /// output, that the new site doesn't publish, to the new list's page of
 /// the same number, and gives each old address so answered with the file
 /// written for it. Such a page stands where the new list's page of its
-/// number does, or its first would, by the new site's `later_pages`, or
+/// number does, or its first would, by the new site's `pagination.permalink`, or
 /// there as a file: `/posts/page/2.html` for `/posts/page/2/`, and
 /// `/tags/rust/page/1/` beside `/tags/rust/page/2/`; or beneath an old
 /// address in `moved` that now sends readers on to the list, each with the

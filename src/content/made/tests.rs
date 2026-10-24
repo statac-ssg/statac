@@ -146,7 +146,7 @@ fn an_item_is_held_back_as_a_written_page_is() {
             .collect::<Vec<_>>(),
         [
             "Draft left out: `data/people.yaml: person-1`",
-            "Waiting for its day: `data/people.yaml: person-2` is dated `2026-10-05`",
+            "Scheduled post: `data/people.yaml: person-2` is dated `2026-10-05`",
         ]
     );
     assert_eq!(made(&read).len(), 1);
@@ -176,12 +176,12 @@ fn an_items_key_or_type_one_slip_from_a_known_word_is_told() {
         problems(&read),
         [
             (
-                "read-as-your-own",
+                "read-as-custom",
                 "data/lists.yaml".to_owned(),
                 "sumary".to_owned()
             ),
             (
-                "read-as-your-own",
+                "read-as-custom",
                 "data/lists.yaml".to_owned(),
                 "lnik".to_owned()
             ),
@@ -257,7 +257,7 @@ fn what_stops_a_page_making_pages_is_told_where_it_is() {
         (
             "each: data.people\npermalink: /{key/",
             &[people],
-            &[("unusable-address", "content/people.md", "{key/")],
+            &[("unusable-url", "content/people.md", "{key/")],
         ),
         (
             "each: data.lists\npermalink: /{key}/",
@@ -277,7 +277,7 @@ fn what_stops_a_page_making_pages_is_told_where_it_is() {
         (
             "each: data.people\npermalink: /{isbn}/",
             &[people],
-            &[("unusable-address", "content/people.md", "{isbn}")],
+            &[("unusable-url", "content/people.md", "{isbn}")],
         ),
         (
             "each: data.people\npermalink: /{version}/",
@@ -367,7 +367,7 @@ fn a_piece_an_item_lacks_names_the_item() {
         ),
     ]);
     let kinds: Vec<Kind> = read.problems.iter().map(|p| p.kind.clone()).collect();
-    let lacks = |item: &str, field: &str, piece: &str| Kind::UnusableAddress {
+    let lacks = |item: &str, field: &str, piece: &str| Kind::UnusableUrl {
         fault: AddressFault::ItemLacks {
             item: item.into(),
             field: field.into(),
@@ -421,7 +421,7 @@ fn two_items_at_one_address_are_told_by_name() {
     let kinds: Vec<Kind> = read.problems.iter().map(|p| p.kind.clone()).collect();
     assert_eq!(
         kinds,
-        [Kind::SameAddress {
+        [Kind::SameUrl {
             first: "data/people.yaml: person-1".into(),
             second: "data/people.yaml: Person-1".into(),
             alike: crate::platform::Alike::Exactly,
@@ -486,7 +486,7 @@ fn a_page_is_made_for_each_post_the_line_chooses() {
                 "true".into()
             ),
             (
-                "waiting-for-its-day",
+                "scheduled-post",
                 "content/posts/post-4.md".into(),
                 "2026-10-05".into()
             ),
@@ -571,7 +571,7 @@ fn a_post_fills_its_fields_and_is_told_where_it_lacks_one() {
     let kinds: Vec<Kind> = read.problems.iter().map(|p| p.kind.clone()).collect();
     assert_eq!(
         kinds,
-        [Kind::UnusableAddress {
+        [Kind::UnusableUrl {
             fault: AddressFault::PostLacks {
                 post: "content/post-2.md".into(),
                 field: "isbn".into(),
@@ -581,11 +581,7 @@ fn a_post_fills_its_fields_and_is_told_where_it_lacks_one() {
     );
     assert_eq!(
         problems(&read),
-        [(
-            "unusable-address",
-            "content/cards.md".into(),
-            "{isbn}".into()
-        )]
+        [("unusable-url", "content/cards.md".into(), "{isbn}".into())]
     );
     assert_eq!(
         made_for_posts(&read),

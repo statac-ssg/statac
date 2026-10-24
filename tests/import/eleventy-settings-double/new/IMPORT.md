@@ -1,31 +1,31 @@
-This site was imported from an Eleventy site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from an Eleventy site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/eleventy-settings-double/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
 ## What came across
 
 - 1 post, into `content/posts/`.
-- 3 other files, copied as they were: files published as they are into `static/` at the same path, so their addresses stay, and data files into `data/`.
+- 3 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `.eleventy.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
-Eleventy's settings hold no title, address or language for the site, so the new site's `title` is made from the old folder's name, it has no `url` yet, and it is in English, `en`: put each right in `statac.yaml`.
+Eleventy's settings hold no title, URL or language for the site, so the new site's `title` is made from the old folder's name, it has no `url` yet, and it is in English, `en`: put each right in `statac.yaml`.
 
 Eleventy reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
 The settings' `dir` names `input` as `src`, `output` as `dist`, `includes` as `parts` and `data` as `info`.
 
-The settings copy `src/img` and `fonts` as they are with `addPassthroughCopy`, so Statac copied 2 files into `static/`, where each keeps its address.
+The settings copy `src/img` and `fonts` as they are with `addPassthroughCopy`, so Statac copied 2 files into `static/`, where each keeps its URL.
 
 The settings' `markdownTemplateEngine` is `njk`, so Statac read the template tags in the Markdown files as Nunjucks.
 
 The settings' Markdown had `breaks: true`, which made each line end inside a paragraph a line break, so Statac ended 1 line with `\`, which Statac reads as a line break.
 
-The settings' Markdown had `linkify: true`, which linked addresses written bare; Statac links those starting `www.`, `http://` or `https://` too, and 1 other is no longer linked, listed under Left for you.
+The settings' Markdown had `linkify: true`, which linked bare URLs; Statac links those starting `www.`, `http://` or `https://` too, and 1 other is no longer linked, listed under Left for you.
 
-The settings' Markdown had `html: true`, so Eleventy published HTML in the writing as it is, as Statac does.
+The settings' Markdown had `html: true`, so Eleventy published HTML in Markdown as it is, as Statac does.
 
 The settings use `markdown-it-attrs`, which read attributes in braces, as `{.class}`; Statac reads them only at the end of a heading, so 1 elsewhere shows as written, listed under Left for you.
 
@@ -45,15 +45,15 @@ date_stamp: 31 Dec 2025, 15:04
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for the one old address there: it is published there.
+Statac worked out where the old site published each page, read the new site, and looked for the one old URL there: it is published there.
 
 - Every page lands where the old site published it, with nothing added.
 
 ## Left for you
 
-### Addresses no longer linked
+### URLs no longer linked
 
 The old site's Markdown linked each of these, written without `www.` or `http`, and Statac doesn't, so each shows as words: write it as a link, as `<https://example.org>`, where one is meant.
 
@@ -67,7 +67,7 @@ The old site's Markdown read each of these as attributes of what stands before i
 
 ### Template tags left as written
 
-Statac's writing runs no template tags and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
+Statac's Markdown runs no template tags and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
 - `src/posts/post-1.md`, line 14: `{# A Nunjucks comment. #}`
 
@@ -83,7 +83,7 @@ Eleventy's settings file is a program, and Statac ran none of it, so it doesn't 
 
 Statac left these behind, and the new site has nothing of them:
 
-- `src/parts/`: the old site's includes and layouts, which the starter's templates take the place of; each include the writing calls has a snippet of its name standing for it.
+- `src/parts/`: the old site's includes and layouts, which the starter's templates take the place of; each include the content calls has a snippet of its name standing for it.
 
 ## What to do next
 

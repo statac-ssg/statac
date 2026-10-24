@@ -1,4 +1,4 @@
-This site was imported from a Hugo site, as well as Statac can. It is a best effort: the writing, its settings and its addresses came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
+This site was imported from a Hugo site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
 It was made from `tests/import/hugo-tags/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
 
@@ -6,13 +6,13 @@ It was made from `tests/import/hugo-tags/old` by `statac import`, which changed 
 
 - 3 posts, into `content/posts/`.
 
-The old site had no home page of its own writing, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
 
-Hugo's feeds were RSS, at `index.xml` beside the home page and each list's own page. Each is now an Atom feed at the same address, written by `templates/feed.xml`, as `feed: index.xml` on each list's page says, and `feed_ids_before` keeps each post's id the address Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
+Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each is now an Atom feed at the same URL, written by `templates/feed.xml`, as `feed: index.xml` on each list page says, and `feed_ids_before` keeps each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
 
-`content/posts/index.md` hands `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
+`content/posts/index.md` cascades `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
 
-Hugo made a list of each folder at the top of the writing, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
+Hugo made a list of each folder at the top of the content folder, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
 
 2 names in the old site's `categories` are now tags, each with `category_` before it, as `category_Category 1`, so they can still be told from the site's own tags. To rename one across the site, change it on each page that has it.
 
@@ -40,13 +40,13 @@ tags.permalink: /topics/{slug}/
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
-## Addresses
+## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 14 old addresses there: 14 are published there, or sent on from there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 14 old URLs there: 14 are published or redirected.
 
-- 4 pages at the top of `content/`, such as `content/categories-category-1.md`, send readers on from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
+- 4 pages at the top of `content/`, such as `content/categories-category-1.md`, redirect from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
 
-Each address was also looked for in the old site's own built output, `public/`.
+Each URL was also looked for in the old site's own built output, `public/`.
 
 The old site published a page listing every one of its `series` at `/series/`, and the starter has none.
 
@@ -58,13 +58,13 @@ The old site published a page listing every one of its `authors` at `/authors/`,
 
 ### Feeds made by templates
 
-Readers subscribed to the old site's feed at each of these addresses, and the template that made it didn't come across, so nothing is there now. A list's `feed:` line can put that list's feed at an address of its own, as `feed: /index.rss`, and the starter's feed template writes Atom: see https://statac.dev/feeds/.
+Readers subscribed to the old site's feed at each of these URLs, and the template that made it didn't come across, so nothing is there now. A list's `feed:` line can put that list's feed at a URL of its own, as `feed: /index.rss`, and the starter's feed template writes Atom: see https://statac.dev/feeds/.
 
-- Hugo's feed for each tag and each list of that kind, 8 of them, such as `/tags/c++/index.xml`: Statac gives such a list a feed only where a page of yours at its address asks for one with `feed:`.
+- Hugo's feed for each tag and each list of that kind, 8 of them, such as `/tags/c++/index.xml`: Statac gives such a list a feed only where a list page of yours asks for one with `feed:`.
 
-### Addresses the old built site doesn't have
+### URLs the old built site doesn't have
 
-Statac worked these addresses out by the old tool's rules, but the old site's built output has nothing there, so the rule was wrong for the page or the output is older than the writing: find where the old site published the page, and add that address to the page's `redirect_from`.
+Statac worked these URLs out by the old tool's rules, but the old site's built output has nothing there, so the rule was wrong for the page or the output is older than the content: find where the old site published the page, and add that URL to the page's `redirect_from`.
 
 - `content/posts/post-1.md`: `/posts/post-1/`
 - `content/posts/post-2.md`: `/posts/post-2/`
@@ -81,7 +81,7 @@ Statac worked these addresses out by the old tool's rules, but the old site's bu
 
 Statac left these behind, and the new site has nothing of them:
 
-- `public/`: the old site's built output, read only to check the addresses.
+- `public/`: the old site's built output, read only to check the URLs.
 
 ## What to do next
 

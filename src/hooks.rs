@@ -20,7 +20,7 @@ use crate::source::Sources;
 pub(crate) const BEFORE: &str = "before_build";
 pub(crate) const AFTER: &str = "after_build";
 /// The setting naming what `after_build` makes in the built site.
-pub(crate) const MAKES: &str = "after_build_makes";
+pub(crate) const MAKES: &str = "after_build_outputs";
 /// The setting naming what `before_build` is run again for.
 pub(crate) const WATCHES: &str = "before_build_watches";
 
@@ -195,7 +195,7 @@ fn told(setting: &str, stopped: Stopped) -> Kind {
 
 /// Runs the site's `after_build`, where it sets one, on the folder
 /// `staging` has written, which must hold the whole site. Gives what the
-/// command changed, and anything `after_build_makes` names that it left
+/// command changed, and anything `after_build_outputs` names that it left
 /// nothing at.
 pub(crate) fn after(
     settings: &Settings,
@@ -232,7 +232,7 @@ pub(crate) fn after(
     Ok((Some(changed), unmade(settings, held)))
 }
 
-/// Each place `after_build_makes` names that the built site has nothing
+/// Each place `after_build_outputs` names that the built site has nothing
 /// at. `held` says whether it has, of a path from its top and whether the
 /// path is written as a folder.
 fn unmade(settings: &Settings, held: impl Fn(&str, bool) -> bool) -> Vec<Problem> {
@@ -249,7 +249,7 @@ fn unmade(settings: &Settings, held: impl Fn(&str, bool) -> bool) -> Vec<Problem
     told.collect()
 }
 
-/// Each place `after_build_makes` names that the built site in `folder`
+/// Each place `after_build_outputs` names that the built site in `folder`
 /// has nothing at, where the command ran on an earlier build of it.
 pub(crate) fn still_unmade(settings: &Settings, folder: &Path) -> Vec<Problem> {
     unmade(settings, |rel, as_folder| {
@@ -287,7 +287,7 @@ pub(crate) fn watched(settings: &Settings, changed: &[String]) -> bool {
     })
 }
 
-/// What an entry of `after_build_makes` names, from the top of the built
+/// What an entry of `after_build_outputs` names, from the top of the built
 /// site, and whether it is written as a folder.
 fn made(written: &str) -> (&str, bool) {
     let rel = written.strip_prefix('/').unwrap_or(written);
@@ -311,7 +311,7 @@ pub(crate) fn a_place(written: &str) -> bool {
 }
 
 /// Whether `written` names a file or a folder in the built site, as an
-/// entry of `after_build_makes` does: from its top, with or without the
+/// entry of `after_build_outputs` does: from its top, with or without the
 /// `/` an address opens with.
 pub(crate) fn a_built_place(written: &str) -> bool {
     a_place(written.strip_prefix('/').unwrap_or(written))
@@ -352,7 +352,7 @@ pub(crate) fn check(site: &Path, settings: &Settings) -> Vec<Problem> {
 }
 
 /// Each of `outputs`, a path in the built site and what is published
-/// there, that stands where `after_build_makes` says the command makes
+/// there, that stands where `after_build_outputs` says the command makes
 /// something. `base` is the path the site is published under.
 pub(crate) fn claimed(
     settings: &Settings,
@@ -370,7 +370,7 @@ pub(crate) fn claimed(
         if let Some((file, source)) = taken {
             // Told as two things at one address whatever their spellings:
             // the command's own spelling isn't known until it has run.
-            let kind = Kind::SameAddress {
+            let kind = Kind::SameUrl {
                 first: Box::new(source.clone()),
                 second: Box::new(Named::MadeAfter(place.value.clone())),
                 alike: platform::Alike::Exactly,

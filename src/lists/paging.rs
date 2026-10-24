@@ -3,7 +3,7 @@
 //!
 //! A list shows `posts_per_page` posts on each page, as its page says or
 //! else the site, `0` showing them all on one. Page 1 is the list's own
-//! page; the rest stand where `later_pages` puts them beneath it, built
+//! page; the rest stand where `pagination.permalink` puts them beneath it, built
 //! through the same template.
 
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ const LATER: &str = "{list}page/{n}/";
 
 /// Settles how many posts each list's pages show, where its later pages
 /// stand, and each page's previous and next. Gives the problem with each
-/// later page an author's page already stands at, told at `later_pages`
+/// later page an author's page already stands at, told at `pagination.permalink`
 /// where the site sets it, or else at the page.
 pub(super) fn settle(site: &mut Site, settings: &Settings, sources: &Sources) -> Vec<Problem> {
     let problems = pages(site, settings, sources);
@@ -33,7 +33,7 @@ fn pages(site: &mut Site, settings: &Settings, sources: &Sources) -> Vec<Problem
         .whole("posts_per_page")
         .and_then(|n| usize::try_from(n).ok())
         .unwrap_or_default();
-    let written = settings.text("later_pages");
+    let written = settings.text("pagination.permalink");
     let setting = written.as_ref().and_then(|later| later.origin.place);
     let pattern = written.map_or_else(|| LATER.to_owned(), |later| later.value.to_owned());
     let after = pattern.strip_prefix("{list}").unwrap_or(&pattern);

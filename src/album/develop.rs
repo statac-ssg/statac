@@ -291,7 +291,7 @@ pub fn develop(
             };
             let began = Instant::now();
             let unreadable = |fault| {
-                let kind = Kind::UnreadablePicture {
+                let kind = Kind::UnreadableImage {
                     path: picture.shown(),
                     fault,
                 };
@@ -362,7 +362,7 @@ pub fn develop(
         }
         for problem in problems {
             let once = match &problem.kind {
-                Kind::UnreadablePicture { path, .. } => told.insert(path.clone()),
+                Kind::UnreadableImage { path, .. } => told.insert(path.clone()),
                 _ => true,
             };
             if once {

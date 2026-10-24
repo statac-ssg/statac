@@ -1,8 +1,9 @@
-//! What each of Statac's settings and front matter words does, in a line
+//! What each of Statac's settings and front matter fields does, in a line
 //! or two, as an editor's hover says it, with the section of the docs
 //! that says more.
 
-/// What one of Statac's own words does, and where the docs say more.
+/// What one of Statac's settings or fields does, and where the docs say
+/// more.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Described {
     pub text: &'static str,
@@ -28,17 +29,17 @@ const LIST: &str = "https://statac.dev/front-matter/#list-fields";
 const LIST_PAGE: &str = "https://statac.dev/front-matter/#list-page-fields";
 const SHARING: &str = "https://statac.dev/front-matter/#sharing-fields";
 
-/// Where the docs say more of a line handing a field down.
+/// Where the docs say more of a cascade line.
 pub(crate) const HANDING_DOWN: &str = "https://statac.dev/front-matter/#handing-down";
 
 /// Where the docs say more of a setting for one language.
 pub(crate) const FOR_ONE_LANGUAGE: &str =
     "https://statac.dev/dates-and-languages/#settings-for-one-language";
 
-/// Where the docs say more of a value of the site's own.
+/// Where the docs say more of a custom setting.
 pub(crate) const OWN_VALUE: &str = "https://statac.dev/settings/#your-own";
 
-/// Where the docs say more of a field of the author's own.
+/// Where the docs say more of a custom field.
 pub(crate) const OWN_FIELD: &str = "https://statac.dev/front-matter/#your-own";
 
 /// Each of Statac's settings, by name.
@@ -53,9 +54,8 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "url",
         described(
-            "The address the site is published at, starting with `https://` or `http://`. \
-             Feeds, sharing cards, webmentions and pages with `needs: url` are left out \
-             until it is set.",
+            "The site's full URL, starting with `https://` or `http://`. Feeds, social \
+             cards, webmentions and pages with `needs: url` are left out until it is set.",
             SITE,
         ),
     ),
@@ -94,7 +94,7 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "typography",
         described(
-            "`false` leaves quotes, `--`, `---` and `...` in the writing exactly as \
+            "`false` leaves quotes, `--`, `---` and `...` in the content exactly as \
              typed. Unset, it is `true`.",
             WRITING,
         ),
@@ -102,7 +102,7 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "code_style",
         described(
-            "The colours of code in the writing: `ocean`, `gruvbox`, `solarized`, \
+            "The colours of code in the content: `ocean`, `gruvbox`, `solarized`, \
              `catppuccin` or `one-half`, or `none` to colour no code. Unset, it is \
              `ocean`.",
             WRITING,
@@ -112,78 +112,78 @@ const SETTINGS: &[(&str, Described)] = &[
         "posts_per_page",
         described(
             "How many posts each page of a list shows. `0` shows them all on one page. \
-             A list's own page can set its own number. Unset, it is `10`.",
+             A list page can set its own number. Unset, it is `10`.",
             LISTS,
         ),
     ),
     (
-        "later_pages",
+        "pagination.permalink",
         described(
-            "Where a list's later pages go: a pattern that starts with `{list}`, holds \
-             `{n}` once and ends with `/`. Unset, it is `{list}page/{n}/`.",
+            "Where a list's paginated pages go: a pattern that starts with `{list}`, \
+             holds `{n}` once and ends with `/`. Unset, it is `{list}page/{n}/`.",
             LISTS,
         ),
     ),
     (
         "tags.permalink",
         described(
-            "Where each tag's page is published: a pattern ending with `{slug}/`. Unset, \
-             it is `/tags/{slug}/`.",
+            "Where each tag's list page is published: a pattern ending with `{slug}/`. \
+             Unset, it is `/tags/{slug}/`.",
             LISTS,
         ),
     ),
     (
         "series.permalink",
         described(
-            "Where each series' page is published: a pattern ending with `{slug}/`. \
-             Unset, it is `/series/{slug}/`.",
+            "Where each series' list page is published: a pattern ending with \
+             `{slug}/`. Unset, it is `/series/{slug}/`.",
             LISTS,
         ),
     ),
     (
         "tags.pages",
         described(
-            "`false` stops Statac making a page for each tag. The tags still work in \
-             templates. Unset, it is `true`.",
+            "`false` stops Statac making a list page for each tag. The tags still work \
+             in templates. Unset, it is `true`.",
             LISTS,
         ),
     ),
     (
         "series.pages",
         described(
-            "`false` stops Statac making a page for each series. The series still work \
-             in templates. Unset, it is `true`.",
+            "`false` stops Statac making a list page for each series. The series still \
+             work in templates. Unset, it is `true`.",
             LISTS,
         ),
     ),
     (
         "tags.slugs",
         described(
-            "The name in the address for a tag: each tag on its own line beneath the \
-             setting, as in `C++: cpp`.",
+            "The slug for a tag: each tag on its own line beneath the setting, as in \
+             `C++: cpp`.",
             LISTS,
         ),
     ),
     (
         "series.slugs",
         described(
-            "The name in the address for a series: each series on its own line beneath \
-             the setting, as in `C++: cpp`.",
+            "The slug for a series: each series on its own line beneath the setting, as \
+             in `C++: cpp`.",
             LISTS,
         ),
     ),
     (
         "max_width",
         described(
-            "The widest copy Statac makes of a photograph, in pixels: a whole number, 1 \
-             or more. Unset, it is `1600`.",
+            "The widest resized copy Statac makes of an image, in pixels: a whole \
+             number, 1 or more. Unset, it is `1600`.",
             PICTURES,
         ),
     ),
     (
         "image_sizes",
         described(
-            "How wide photographs are shown on the page, written as the `sizes` of an \
+            "How wide images are shown on the page, written as the `sizes` of an \
              `<img>`. Unset, it is `(max-width: 46rem) 100vw, 46rem`.",
             PICTURES,
         ),
@@ -191,8 +191,8 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "optimise_images",
         described(
-            "`false` stops Statac making copies of photographs: each is published as it \
-             is. Unset, it is `true`.",
+            "`false` stops Statac making resized copies of images: each is published as \
+             it is. Unset, it is `true`.",
             PICTURES,
         ),
     ),
@@ -208,7 +208,7 @@ const SETTINGS: &[(&str, Described)] = &[
         "feed_ids_before",
         described(
             "A date, for a site moving from another tool. Each post dated before it \
-             keeps its full address as its id in a feed.",
+             keeps its full URL as its id in a feed.",
             FEEDS,
         ),
     ),
@@ -258,7 +258,7 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "before_build",
         described(
-            "A command to run before the site is read, such as one that makes a \
+            "A hook run before the site is read, such as a command that makes a \
              stylesheet.",
             HOOKS,
         ),
@@ -274,13 +274,13 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "after_build",
         described(
-            "A command to run on the built files after the site builds with no errors, \
-             before they are published.",
+            "A hook run on the built files after the site builds with no errors, before \
+             they are published.",
             HOOKS,
         ),
     ),
     (
-        "after_build_makes",
+        "after_build_outputs",
         described(
             "The files and folders the `after_build` command makes, from the top of the \
              built site: `[indexer/]`. Links into them count as working links.",
@@ -288,7 +288,7 @@ const SETTINGS: &[(&str, Described)] = &[
         ),
     ),
     (
-        "also_at",
+        "other_hosts",
         described(
             "Other hosts the site is published at, such as `[www.example.org]`. A link \
              to one of them is checked as a link into the site.",
@@ -296,7 +296,7 @@ const SETTINGS: &[(&str, Described)] = &[
         ),
     ),
     (
-        "not_ours",
+        "served_elsewhere",
         described(
             "Paths on the site's host that something else publishes, such as \
              `[/video/]`. Links into them aren't checked.",
@@ -304,7 +304,7 @@ const SETTINGS: &[(&str, Described)] = &[
         ),
     ),
     (
-        "left_behind",
+        "exclude",
         described(
             "Names in `content/` that are never published. Setting it replaces the whole \
              list. Unset, it is `.DS_Store`, `Thumbs.db` and `desktop.ini`.",
@@ -313,22 +313,22 @@ const SETTINGS: &[(&str, Described)] = &[
     ),
 ];
 
-/// A line declaring a field of the author's own.
+/// A line declaring a custom field.
 const FIELDS: Described = described(
-    "The kind of value a field of your own holds, with `required` before it where \
+    "The kind of value a custom field holds, with `required` before it where \
      every page must have it: `fields.isbn: required text`.",
     "https://statac.dev/settings/#fields",
 );
 
 /// A line declaring a field for the pages of one type.
 const TYPES: Described = described(
-    "The kind of value a field of your own holds on the pages of one `type`, with \
+    "The kind of value a custom field holds on the pages of one `type`, with \
      `required` before it where each of them must have it: `types.book.isbn: required \
      text`.",
     "https://statac.dev/settings/#fields",
 );
 
-/// Each of Statac's front matter words, by name.
+/// Each of Statac's front matter fields, by name.
 const FIELDS_OF_A_PAGE: &[(&str, Described)] = &[
     (
         "title",
@@ -386,23 +386,18 @@ const FIELDS_OF_A_PAGE: &[(&str, Described)] = &[
     (
         "permalink",
         described(
-            "The address the page is published at, or a pattern such as \
-             `/{year}/{slug}/`.",
+            "The page's URL, or a pattern such as `/{year}/{slug}/`.",
             ADDRESS,
         ),
     ),
     (
         "redirect_from",
-        described(
-            "Old addresses of the page. Each one sends readers on to it.",
-            ADDRESS,
-        ),
+        described("Old URLs of the page. Each one redirects to it.", ADDRESS),
     ),
     (
         "redirect_to",
         described(
-            "The address readers arriving at the page are sent to instead. The page \
-             publishes nothing else.",
+            "The URL the page redirects to. The page publishes nothing else.",
             ADDRESS,
         ),
     ),
@@ -482,7 +477,7 @@ const FIELDS_OF_A_PAGE: &[(&str, Described)] = &[
     (
         "index_page",
         described(
-            "`false` publishes nothing at the list's address, and none of its later \
+            "`false` publishes nothing at the list's URL, and none of its paginated \
              pages. The list still works in templates.",
             LIST_PAGE,
         ),
@@ -490,7 +485,7 @@ const FIELDS_OF_A_PAGE: &[(&str, Described)] = &[
     (
         "feed",
         described(
-            "Where the list's feed is published, as a name or an address. `true` adds a \
+            "Where the list's feed is published, as a name or a URL. `true` adds a \
              feed to a list that has none by default, and `false` means no feed.",
             LIST_PAGE,
         ),
@@ -509,17 +504,14 @@ const FIELDS_OF_A_PAGE: &[(&str, Described)] = &[
     (
         "card",
         described(
-            "Which of the site's sharing cards is drawn for the page, once cards are \
+            "Which of the site's social cards is drawn for the page, once cards are \
              turned on.",
             SHARING,
         ),
     ),
     (
         "og_image",
-        described(
-            "A picture to share the page with, in place of a card.",
-            SHARING,
-        ),
+        described("The page's social image, in place of a card.", SHARING),
     ),
     (
         "og_title",
@@ -550,7 +542,7 @@ pub(crate) fn setting(name: &str) -> Option<Described> {
     find(SETTINGS, name)
 }
 
-/// What the front matter word `name` does, where it is one of Statac's.
+/// What the front matter field `name` does, where it is one of Statac's.
 pub(crate) fn field(name: &str) -> Option<Described> {
     find(FIELDS_OF_A_PAGE, name)
 }
@@ -612,8 +604,6 @@ mod tests {
                 "just",
                 "parse",
                 "render",
-                "url",
-                "slug",
                 "undefined",
             ] {
                 assert!(!words.contains(&banned), "{name} says {banned:?}");

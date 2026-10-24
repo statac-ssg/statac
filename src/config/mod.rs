@@ -32,6 +32,7 @@ const RESERVED: &[&str] = &[
     "folders",
     "tags",
     "series",
+    "pagination",
     "feed",
     "feeds",
     "host",
@@ -55,10 +56,16 @@ const SECRETS: &[&str] = &[TOKEN];
 /// not hold.
 const TOKEN: &str = "webmention_token";
 
-/// Other spellings of Statac's settings.
+/// Other spellings of Statac's settings, and the names some were once
+/// read under.
 const OTHER_SPELLINGS: &[(&str, &str)] = &[
     ("jpeg_max_width", "max_width"),
-    ("pages.later", "later_pages"),
+    ("pages.later", "pagination.permalink"),
+    ("later_pages", "pagination.permalink"),
+    ("left_behind", "exclude"),
+    ("also_at", "other_hosts"),
+    ("not_ours", "served_elsewhere"),
+    ("after_build_makes", "after_build_outputs"),
 ];
 
 #[derive(Copy, Clone, Debug)]
@@ -111,8 +118,8 @@ const fn setting(name: &'static str, shape: Shape, default: Option<Preset>) -> S
 const SETTINGS: &[Setting] = &[
     setting("title", Shape::Text, None),
     setting("url", Shape::SiteAddress, None),
-    setting("also_at", Shape::Texts, None),
-    setting("not_ours", Shape::Texts, None),
+    setting("other_hosts", Shape::Texts, None),
+    setting("served_elsewhere", Shape::Texts, None),
     setting("language", Shape::Language, None),
     setting("timezone", Shape::Text, None),
     setting("date_format", Shape::Text, None),
@@ -127,7 +134,7 @@ const SETTINGS: &[Setting] = &[
     setting("before_build", Shape::Text, None),
     setting("after_build", Shape::Text, None),
     setting(
-        "after_build_makes",
+        "after_build_outputs",
         Shape::Places(crate::hooks::a_built_place, PlaceIn::BuiltSite),
         None,
     ),
@@ -162,7 +169,7 @@ const SETTINGS: &[Setting] = &[
     setting("series.slugs", Shape::Table, None),
     setting("posts_per_page", Shape::Whole(0), Some(Preset::Whole(10))),
     setting(
-        "later_pages",
+        "pagination.permalink",
         Shape::LaterAddress,
         Some(Preset::Text("{list}page/{n}/")),
     ),
@@ -172,7 +179,7 @@ const SETTINGS: &[Setting] = &[
         Some(Preset::Text("(max-width: 46rem) 100vw, 46rem")),
     ),
     setting(
-        "left_behind",
+        "exclude",
         Shape::Texts,
         Some(Preset::Texts(&[".DS_Store", "Thumbs.db", "desktop.ini"])),
     ),
@@ -582,7 +589,7 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
         } else if RESERVED.contains(&name.as_str()) && matches!(value.value, Yaml::Mapping(_)) {
             problems.extend(words::nested(sources, &name, value));
         } else if let Some((head, _)) = name.split_once('.')
-            && matches!(head, "tags" | "series")
+            && matches!(head, "tags" | "series" | "pagination")
         {
             problems.push(unknown_setting(&name, key));
         } else if RESERVED.contains(&name.split('.').next().unwrap_or(&name)) {
@@ -599,7 +606,7 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
                 && let Some(nearest) = crate::suggest::one_slip(&name, known)
             {
                 problems.push(Problem::at(
-                    Kind::ReadAsYourOwn {
+                    Kind::ReadAsCustom {
                         own: Own::Setting,
                         written: name.clone(),
                         nearest: nearest.into(),

@@ -1,11 +1,12 @@
 # Reserved name
 
-One of your own values uses a name that already has a meaning in Statac.
+A custom setting, field or snippet uses a name that already has a
+meaning in Statac.
 In `statac.yaml`, names such as `posts`, `tags` and `today` are reserved,
 because Statac uses them on `site`. In a field declaration, names such as
 `title` and `date` are reserved because Statac uses them on `page`. In
 `snippets/`, a file named `url.html` would have the same name as
-`@url(...)`, which Statac provides for use in a page's writing.
+`@url(...)`, which Statac provides for use in a page's Markdown.
 
 ## What you'll see {#what-youll-see}
 

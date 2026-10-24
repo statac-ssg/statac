@@ -72,17 +72,17 @@ codes! {
     OptionGivenTwice "option-given-twice",
     UnexpectedArgument "unexpected-argument",
     MissingName "missing-name",
-    MissingAddress "missing-address",
+    MissingUrl "missing-url",
     NothingToSearch "nothing-to-search",
-    NotAWebAddress "not-a-web-address",
+    NotAUrl "not-a-url",
     UnreadableName "unreadable-name",
     UnusableName "unusable-name",
     MissingFile "missing-file",
     SassStopped "sass-stopped",
     WorkerOutsideImportMap "worker-outside-import-map",
-    SameAddress "same-address",
-    AddressTaken "address-taken",
-    AddressGone "address-gone",
+    SameUrl "same-url",
+    UrlTaken "url-taken",
+    UrlGone "url-gone",
     UnwritableName "unwritable-name",
     NotStatacsFolder "not-statacs-folder",
     OutputInTheWay "output-in-the-way",
@@ -98,7 +98,7 @@ codes! {
     PublishedAsText "published-as-text",
     UnknownWord "unknown-word",
     AlwaysFalse "always-false",
-    ReadAsYourOwn "read-as-your-own",
+    ReadAsCustom "read-as-custom",
     NestedSetting "nested-setting",
     FieldWrittenTwoWays "field-written-two-ways",
     ReservedName "reserved-name",
@@ -116,7 +116,7 @@ codes! {
     MissingContentFolder "missing-content-folder",
     NoNamesToCheck "no-names-to-check",
     WrongPlace "wrong-place",
-    UnusableAddress "unusable-address",
+    UnusableUrl "unusable-url",
     UnusableDateFormat "unusable-date-format",
     NoTimeZone "no-time-zone",
     HookStopped "hook-stopped",
@@ -142,10 +142,10 @@ codes! {
     TemplateStopped "template-stopped",
     PageInSnippet "page-in-snippet",
     TextNeverShown "text-never-shown",
-    WritingNeverShown "writing-never-shown",
+    ContentNeverShown "content-never-shown",
     SpelledTwoWays "spelled-two-ways",
     DraftLeftOut "draft-left-out",
-    WaitingForItsDay "waiting-for-its-day",
+    ScheduledPost "scheduled-post",
     NumberedFolder "numbered-folder",
     UnorderedPages "unordered-pages",
     MalformedList "malformed-list",
@@ -154,11 +154,11 @@ codes! {
     FeedNotWritten "feed-not-written",
     NoFeedKey "no-feed-key",
     FeedIdChanged "feed-id-changed",
-    NoSiteAddress "no-site-address",
+    NoSiteUrl "no-site-url",
     NoLanguage "no-language",
     RobotsBeneathPath "robots-beneath-path",
     RedirectToItself "redirect-to-itself",
-    WritingNotPublished "writing-not-published",
+    ContentNotPublished "content-not-published",
     SortedLast "sorted-last",
     LoopOverEveryPage "loop-over-every-page",
     CallInHtml "call-in-html",
@@ -172,19 +172,19 @@ codes! {
     IdUsedTwice "id-used-twice",
     UnmatchedTag "unmatched-tag",
     SizeKept "size-kept",
-    UnreadablePicture "unreadable-picture",
+    UnreadableImage "unreadable-image",
     ColourConverted "colour-converted",
-    DescribesNoPicture "describes-no-picture",
+    DescribesNoImage "describes-no-image",
     CacheNotWritten "cache-not-written",
-    UndescribedPicture "undescribed-picture",
-    HeicPicture "heic-picture",
+    MissingAltText "missing-alt-text",
+    HeicImage "heic-image",
     LocationPublished "location-published",
-    PicturesOutOfProportion "pictures-out-of-proportion",
+    ImagesOutOfProportion "images-out-of-proportion",
     UnusableCardFile "unusable-card-file",
     CardNotDrawn "card-not-drawn",
     UnusedCard "unused-card",
     ImageMayNotShow "image-may-not-show",
-    NoStill "no-still",
+    NoThumbnail "no-thumbnail",
     MalformedRecord "malformed-record",
     TokenInSettings "token-in-settings",
     WebmentionsOff "webmentions-off",
@@ -192,14 +192,67 @@ codes! {
     FolderNotEmpty "folder-not-empty",
     AlreadyASite "already-a-site",
     NoSiteHere "no-site-here",
-    NewerStarter "newer-starter",
+    UpdateAvailable "update-available",
     CantTellWhatMade "cant-tell-what-made",
     MissingFolder "missing-folder",
 }
 
+/// Names kinds of problem were known by, with each kind's name now.
+const FORMER_NAMES: &[(&str, Code)] = &[
+    ("address-gone", Code::UrlGone),
+    ("address-taken", Code::UrlTaken),
+    ("missing-address", Code::MissingUrl),
+    ("no-site-address", Code::NoSiteUrl),
+    ("not-a-web-address", Code::NotAUrl),
+    ("same-address", Code::SameUrl),
+    ("unusable-address", Code::UnusableUrl),
+    ("describes-no-picture", Code::DescribesNoImage),
+    ("heic-picture", Code::HeicImage),
+    ("pictures-out-of-proportion", Code::ImagesOutOfProportion),
+    ("undescribed-picture", Code::MissingAltText),
+    ("unreadable-picture", Code::UnreadableImage),
+    ("newer-starter", Code::UpdateAvailable),
+    ("waiting-for-its-day", Code::ScheduledPost),
+    ("writing-never-shown", Code::ContentNeverShown),
+    ("writing-not-published", Code::ContentNotPublished),
+    ("read-as-your-own", Code::ReadAsCustom),
+    ("no-still", Code::NoThumbnail),
+];
+
 impl Code {
     pub fn from_name(name: &str) -> Option<Code> {
         Code::ALL.iter().copied().find(|code| code.name() == name)
+    }
+
+    /// The kind once called `name`, which is refused with the name it
+    /// has now.
+    pub fn renamed(name: &str) -> Option<Code> {
+        FORMER_NAMES
+            .iter()
+            .find(|(former, _)| *former == name)
+            .map(|&(_, code)| code)
+    }
+
+    /// The problem with `written`, a name given to `quiet:` or `statac
+    /// explain` that names no kind.
+    pub fn unknown(written: &str) -> Kind {
+        let renamed = Code::renamed(written).map(Code::name);
+        Kind::UnknownProblemName {
+            written: written.to_owned(),
+            renamed: renamed.is_some(),
+            suggestion: renamed
+                .or_else(|| crate::suggest::nearest(written, Code::ALL.iter().map(|c| c.name())))
+                .map(str::to_owned),
+        }
+    }
+
+    /// The names this kind was known by before, each of whose pages on
+    /// the docs site sends readers on to this one.
+    pub fn former_names(self) -> impl Iterator<Item = &'static str> {
+        FORMER_NAMES
+            .iter()
+            .filter(move |(_, code)| *code == self)
+            .map(|&(former, _)| former)
     }
 
     /// The explanation as a terminal shows it: a heading's `{#id}`, which
@@ -229,14 +282,14 @@ impl Code {
         match self {
             Code::BrokenLink
             | Code::WorkerOutsideImportMap
-            | Code::AddressTaken
-            | Code::AddressGone
+            | Code::UrlTaken
+            | Code::UrlGone
             | Code::SassWarning
             | Code::ColonInCall
             | Code::PublishedAsText
             | Code::ControlCharacter
             | Code::FieldWrittenTwoWays
-            | Code::ReadAsYourOwn
+            | Code::ReadAsCustom
             | Code::SetAside
             | Code::OneTagNotTwo
             | Code::DatesDisagree
@@ -253,11 +306,11 @@ impl Code {
             | Code::CodeColoursNotLoaded
             | Code::PageInSnippet
             | Code::AlwaysFalse
-            | Code::WritingNeverShown
+            | Code::ContentNeverShown
             | Code::SpelledTwoWays
             | Code::UnorderedPages
             | Code::NotAPost
-            | Code::WritingNotPublished
+            | Code::ContentNotPublished
             | Code::SortedLast
             | Code::NotData
             | Code::FeedNotWritten
@@ -271,31 +324,31 @@ impl Code {
             | Code::IdUsedTwice
             | Code::UnmatchedTag
             | Code::SizeKept
-            | Code::DescribesNoPicture
+            | Code::DescribesNoImage
             | Code::CacheNotWritten
-            | Code::HeicPicture
-            | Code::PicturesOutOfProportion
+            | Code::HeicImage
+            | Code::ImagesOutOfProportion
             | Code::CardNotDrawn
             | Code::UnusedCard
             | Code::ImageMayNotShow
-            | Code::NoStill
+            | Code::NoThumbnail
             | Code::WebmentionsOff
             | Code::MentionOfNoPage => Severity::Warning,
             Code::DraftLeftOut
             | Code::HookNotRun
-            | Code::UndescribedPicture
+            | Code::MissingAltText
             | Code::ColourConverted
-            | Code::WaitingForItsDay
+            | Code::ScheduledPost
             | Code::NumberedFolder
             | Code::CallInHtml
             | Code::UntitledPage
-            | Code::NoSiteAddress
+            | Code::NoSiteUrl
             | Code::NoLanguage
             | Code::MissingWords
             | Code::LocationPublished
             | Code::RobotsBeneathPath
             | Code::LoopOverEveryPage
-            | Code::NewerStarter => Severity::Note,
+            | Code::UpdateAvailable => Severity::Note,
             Code::OtherSpelling
             | Code::CantWrite
             | Code::MalformedYaml
@@ -318,14 +371,14 @@ impl Code {
             | Code::OptionGivenTwice
             | Code::UnexpectedArgument
             | Code::MissingName
-            | Code::MissingAddress
+            | Code::MissingUrl
             | Code::NothingToSearch
-            | Code::NotAWebAddress
+            | Code::NotAUrl
             | Code::UnreadableName
             | Code::UnusableName
             | Code::MissingFile
             | Code::SassStopped
-            | Code::SameAddress
+            | Code::SameUrl
             | Code::UnwritableName
             | Code::NotStatacsFolder
             | Code::OutputInTheWay
@@ -349,7 +402,7 @@ impl Code {
             | Code::MissingContentFolder
             | Code::NoNamesToCheck
             | Code::WrongPlace
-            | Code::UnusableAddress
+            | Code::UnusableUrl
             | Code::RedirectToItself
             | Code::UnusableDateFormat
             | Code::LanguageWrittenTwice
@@ -363,7 +416,7 @@ impl Code {
             | Code::TextNeverShown
             | Code::MalformedList
             | Code::NoFeedKey
-            | Code::UnreadablePicture
+            | Code::UnreadableImage
             | Code::UnusableCardFile
             | Code::HookStopped
             | Code::MalformedRecord
@@ -381,14 +434,14 @@ impl Code {
         match self {
             Code::BrokenLink
             | Code::WorkerOutsideImportMap
-            | Code::AddressTaken
-            | Code::AddressGone
+            | Code::UrlTaken
+            | Code::UrlGone
             | Code::SassWarning
             | Code::ColonInCall
             | Code::PublishedAsText
             | Code::ControlCharacter
             | Code::FieldWrittenTwoWays
-            | Code::ReadAsYourOwn
+            | Code::ReadAsCustom
             | Code::SetAside
             | Code::OneTagNotTwo
             | Code::DatesDisagree
@@ -407,13 +460,13 @@ impl Code {
             | Code::CodeColoursNotLoaded
             | Code::PageInSnippet
             | Code::AlwaysFalse
-            | Code::WritingNeverShown
+            | Code::ContentNeverShown
             | Code::SpelledTwoWays
             | Code::NumberedFolder
             | Code::NoLanguage
             | Code::UnorderedPages
             | Code::NotAPost
-            | Code::WritingNotPublished
+            | Code::ContentNotPublished
             | Code::SortedLast
             | Code::NotData
             | Code::FeedNotWritten
@@ -431,20 +484,20 @@ impl Code {
             | Code::UnmatchedTag
             | Code::SizeKept
             | Code::ColourConverted
-            | Code::DescribesNoPicture
+            | Code::DescribesNoImage
             | Code::CacheNotWritten
-            | Code::UndescribedPicture
-            | Code::HeicPicture
+            | Code::MissingAltText
+            | Code::HeicImage
             | Code::LocationPublished
-            | Code::PicturesOutOfProportion
+            | Code::ImagesOutOfProportion
             | Code::CardNotDrawn
             | Code::UnusedCard
             | Code::ImageMayNotShow
-            | Code::NoStill
+            | Code::NoThumbnail
             | Code::WebmentionsOff
             | Code::MentionOfNoPage
             | Code::LoopOverEveryPage
-            | Code::NewerStarter => false,
+            | Code::UpdateAvailable => false,
             Code::OtherSpelling
             | Code::CantWrite
             | Code::MalformedYaml
@@ -467,14 +520,14 @@ impl Code {
             | Code::OptionGivenTwice
             | Code::UnexpectedArgument
             | Code::MissingName
-            | Code::MissingAddress
+            | Code::MissingUrl
             | Code::NothingToSearch
-            | Code::NotAWebAddress
+            | Code::NotAUrl
             | Code::UnreadableName
             | Code::UnusableName
             | Code::MissingFile
             | Code::SassStopped
-            | Code::SameAddress
+            | Code::SameUrl
             | Code::UnwritableName
             | Code::NotStatacsFolder
             | Code::OutputInTheWay
@@ -498,7 +551,7 @@ impl Code {
             | Code::MissingContentFolder
             | Code::NoNamesToCheck
             | Code::WrongPlace
-            | Code::UnusableAddress
+            | Code::UnusableUrl
             | Code::RedirectToItself
             | Code::UnusableDateFormat
             | Code::LanguageWrittenTwice
@@ -512,10 +565,10 @@ impl Code {
             | Code::TextNeverShown
             | Code::MalformedList
             | Code::DraftLeftOut
-            | Code::WaitingForItsDay
+            | Code::ScheduledPost
             | Code::NoFeedKey
-            | Code::NoSiteAddress
-            | Code::UnreadablePicture
+            | Code::NoSiteUrl
+            | Code::UnreadableImage
             | Code::UnusableCardFile
             | Code::HookStopped
             | Code::MalformedRecord
@@ -626,6 +679,9 @@ pub enum Kind {
     UnknownProblemName {
         written: String,
         suggestion: Option<String>,
+        /// Whether `suggestion` is the name the kind once called
+        /// `written` has now.
+        renamed: bool,
     },
     /// A kind given to `quiet:` that can never be quietened.
     CantQuieten {
@@ -661,13 +717,13 @@ pub enum Kind {
     /// `statac explain` with no name after it.
     MissingName,
     /// `statac refuse` given no address.
-    MissingAddress,
+    MissingUrl,
     /// `statac search` given no words to search for.
     NothingToSearch,
     /// `statac refuse` given an address that isn't `http` or `https`, as
     /// written, and the address with `https://` before it where that is
     /// one.
-    NotAWebAddress {
+    NotAUrl {
         written: String,
         respelt: Option<String>,
     },
@@ -698,7 +754,7 @@ pub enum Kind {
         written: String,
     },
     /// Two sources published at one address, or at two a disk holds as one.
-    SameAddress {
+    SameUrl {
         first: Box<Named>,
         second: Box<Named>,
         alike: Alike,
@@ -712,13 +768,13 @@ pub enum Kind {
         number: usize,
         page: Box<Named>,
         /// Where the page is shown, where the problem is told at
-        /// `later_pages`.
+        /// `pagination.permalink`.
         page_at: Option<Place>,
         address: String,
     },
     /// A page left out as a draft or until its day, at whose address, as
     /// the site's own path makes it, `taken` is already published.
-    AddressTaken {
+    UrlTaken {
         held: Held,
         address: String,
         taken: Box<Named>,
@@ -726,7 +782,7 @@ pub enum Kind {
     /// An address the site published before that nothing answers at any
     /// more: with the site's own path, and as `published.txt` and
     /// `redirect_from` write it, without.
-    AddressGone {
+    UrlGone {
         address: String,
         written: String,
     },
@@ -823,7 +879,7 @@ pub enum Kind {
     },
     /// A name kept as the author's own that is one slip from a word
     /// Statac or the site knows, and that word.
-    ReadAsYourOwn {
+    ReadAsCustom {
         own: Own,
         written: String,
         nearest: String,
@@ -937,7 +993,7 @@ pub enum Kind {
         why: WrongPlace,
     },
     /// An address no disk can write, or a pattern that can't make one.
-    UnusableAddress {
+    UnusableUrl {
         fault: AddressFault,
     },
     /// A `date_format`, or a template's example of one, that can't be read
@@ -960,7 +1016,7 @@ pub enum Kind {
     HookNotRun {
         hooks: Vec<String>,
     },
-    /// Something `after_build_makes` names that `after_build` left
+    /// Something `after_build_outputs` names that `after_build` left
     /// nothing at.
     NothingMade {
         place: String,
@@ -1096,7 +1152,7 @@ pub enum Kind {
     },
     /// Pages with writing, built by a layout that asks for neither it nor
     /// its excerpt: the layout's file, and how many pages.
-    WritingNeverShown {
+    ContentNeverShown {
         layout: String,
         pages: usize,
     },
@@ -1112,7 +1168,7 @@ pub enum Kind {
         path: String,
     },
     /// A post dated after the build's day, by its file and its day.
-    WaitingForItsDay {
+    ScheduledPost {
         path: String,
         date: String,
     },
@@ -1152,7 +1208,7 @@ pub enum Kind {
     },
     /// What is left out of a site with no `url`: a page with `needs: url`,
     /// or the feeds lists have.
-    NoSiteAddress {
+    NoSiteUrl {
         waiting: Waiting,
     },
     /// A post in a feed published at another address than feed readers
@@ -1187,7 +1243,7 @@ pub enum Kind {
         written: String,
     },
     /// Writing on a page sending readers on, by the page's file.
-    WritingNotPublished {
+    ContentNotPublished {
         path: String,
     },
     /// Items `sort` was handed without the field it sorts by, put after
@@ -1284,7 +1340,7 @@ pub enum Kind {
     },
     /// A picture the writing shows that can't be read, or a photograph
     /// whose copies can't be made: its file, and what is wrong with it.
-    UnreadablePicture {
+    UnreadableImage {
         path: String,
         fault: PictureFault,
     },
@@ -1297,7 +1353,7 @@ pub enum Kind {
     },
     /// A file describing a picture that isn't beside it: the picture it
     /// names, and the nearest picture in its folder.
-    DescribesNoPicture {
+    DescribesNoImage {
         picture: String,
         nearest: Option<String>,
     },
@@ -1310,12 +1366,12 @@ pub enum Kind {
     /// A picture a page shows with nothing said of it for a reader who
     /// can't see it: the picture as it is named where it is shown, and how
     /// it is shown.
-    UndescribedPicture {
+    MissingAltText {
         picture: String,
         shown: ShownBy,
     },
     /// A HEIC or HEIF picture a page shows, published as it is: its file.
-    HeicPicture {
+    HeicImage {
         path: String,
     },
     /// A JPEG, PNG or WebP beside the writing published as it is, that
@@ -1326,7 +1382,7 @@ pub enum Kind {
     /// A stylesheet rule giving `img` a width, on a site whose pages show
     /// pictures with their width and height and whose stylesheets nowhere
     /// say what a picture's height is: the property, as written.
-    PicturesOutOfProportion {
+    ImagesOutOfProportion {
         property: String,
     },
     /// A file a card's description names that no card can be drawn with:
@@ -1358,7 +1414,7 @@ pub enum Kind {
     /// A video a page reads the still of, with no still in `fetched/`:
     /// the site keeping it, its id, and whether the record says the site
     /// answered it has none.
-    NoStill {
+    NoThumbnail {
         host: Host,
         id: String,
         absent: bool,
@@ -1401,7 +1457,7 @@ pub enum Kind {
     },
     /// Starter files `statac new` wrote with a newer version, by how
     /// many: those never changed, and the author's with something new.
-    NewerStarter {
+    UpdateAvailable {
         files: usize,
     },
     /// A site `statac import` was given whose files no reader, or more
@@ -1887,7 +1943,7 @@ pub enum Stopped {
     /// The template engine's own words for it.
     Engine(String),
     /// `absolute` on a site with no `url` setting.
-    NoSiteAddress,
+    NoSiteUrl,
     /// `feed_id` on a site with no `feed_key`, with a key freshly made
     /// for it.
     NoFeedKey(String),
@@ -2606,7 +2662,7 @@ pub enum Named {
     Feed(Box<NamedFeed>),
     /// An item that is no page, by its place: `item 2`.
     Item(String),
-    /// What `after_build` makes, as `after_build_makes` names it.
+    /// What `after_build` makes, as `after_build_outputs` names it.
     MadeAfter(String),
     /// The files a reader's browser searches the site with.
     Search,
@@ -2720,17 +2776,17 @@ impl Kind {
             Kind::OptionGivenTwice { .. } => Code::OptionGivenTwice,
             Kind::UnexpectedArgument { .. } => Code::UnexpectedArgument,
             Kind::MissingName => Code::MissingName,
-            Kind::MissingAddress => Code::MissingAddress,
+            Kind::MissingUrl => Code::MissingUrl,
             Kind::NothingToSearch => Code::NothingToSearch,
-            Kind::NotAWebAddress { .. } => Code::NotAWebAddress,
+            Kind::NotAUrl { .. } => Code::NotAUrl,
             Kind::UnreadableName { .. } => Code::UnreadableName,
             Kind::UnusableName { .. } => Code::UnusableName,
             Kind::MissingFile { .. } => Code::MissingFile,
             Kind::SassStopped { .. } => Code::SassStopped,
             Kind::WorkerOutsideImportMap { .. } => Code::WorkerOutsideImportMap,
-            Kind::SameAddress { .. } | Kind::LaterPageTaken { .. } => Code::SameAddress,
-            Kind::AddressTaken { .. } => Code::AddressTaken,
-            Kind::AddressGone { .. } | Kind::AddressesGone { .. } => Code::AddressGone,
+            Kind::SameUrl { .. } | Kind::LaterPageTaken { .. } => Code::SameUrl,
+            Kind::UrlTaken { .. } => Code::UrlTaken,
+            Kind::UrlGone { .. } | Kind::AddressesGone { .. } => Code::UrlGone,
             Kind::UnwritableName { .. } => Code::UnwritableName,
             Kind::NotStatacsFolder { .. } => Code::NotStatacsFolder,
             Kind::OutputInTheWay { .. } => Code::OutputInTheWay,
@@ -2746,7 +2802,7 @@ impl Kind {
             Kind::PublishedAsText { .. } => Code::PublishedAsText,
             Kind::UnknownWord { .. } | Kind::LoopInForIf { .. } => Code::UnknownWord,
             Kind::AlwaysFalse { .. } => Code::AlwaysFalse,
-            Kind::ReadAsYourOwn { .. } => Code::ReadAsYourOwn,
+            Kind::ReadAsCustom { .. } => Code::ReadAsCustom,
             Kind::NestedSetting { .. } => Code::NestedSetting,
             Kind::FieldWrittenTwoWays { .. } => Code::FieldWrittenTwoWays,
             Kind::ReservedName { .. } => Code::ReservedName,
@@ -2764,7 +2820,7 @@ impl Kind {
             Kind::MissingContentFolder { .. } => Code::MissingContentFolder,
             Kind::NoNamesToCheck { .. } => Code::NoNamesToCheck,
             Kind::WrongPlace { .. } => Code::WrongPlace,
-            Kind::UnusableAddress { .. } => Code::UnusableAddress,
+            Kind::UnusableUrl { .. } => Code::UnusableUrl,
             Kind::UnusableDateFormat { .. } => Code::UnusableDateFormat,
             Kind::NoTimeZone => Code::NoTimeZone,
             Kind::HookStopped { .. } => Code::HookStopped,
@@ -2790,10 +2846,10 @@ impl Kind {
             Kind::TemplateStopped { .. } => Code::TemplateStopped,
             Kind::PageInSnippet { .. } => Code::PageInSnippet,
             Kind::TextNeverShown { .. } => Code::TextNeverShown,
-            Kind::WritingNeverShown { .. } => Code::WritingNeverShown,
+            Kind::ContentNeverShown { .. } => Code::ContentNeverShown,
             Kind::SpelledTwoWays { .. } => Code::SpelledTwoWays,
             Kind::DraftLeftOut { .. } => Code::DraftLeftOut,
-            Kind::WaitingForItsDay { .. } => Code::WaitingForItsDay,
+            Kind::ScheduledPost { .. } => Code::ScheduledPost,
             Kind::NumberedFolder { .. } => Code::NumberedFolder,
             Kind::UnorderedPages { .. } => Code::UnorderedPages,
             Kind::MalformedList { .. } => Code::MalformedList,
@@ -2801,13 +2857,13 @@ impl Kind {
             Kind::FeedNotWritten { .. } => Code::FeedNotWritten,
             Kind::NoFeedKey { .. } => Code::NoFeedKey,
             Kind::FeedIdChanged { .. } => Code::FeedIdChanged,
-            Kind::NoSiteAddress { .. } => Code::NoSiteAddress,
+            Kind::NoSiteUrl { .. } => Code::NoSiteUrl,
             Kind::NoLanguage => Code::NoLanguage,
             Kind::RobotsBeneathPath { .. } => Code::RobotsBeneathPath,
             Kind::RedirectToItself { .. }
             | Kind::RedirectFromItself { .. }
             | Kind::RedirectedBack { .. } => Code::RedirectToItself,
-            Kind::WritingNotPublished { .. } => Code::WritingNotPublished,
+            Kind::ContentNotPublished { .. } => Code::ContentNotPublished,
             Kind::SortedLast { .. } => Code::SortedLast,
             Kind::LoopOverEveryPage { .. } => Code::LoopOverEveryPage,
             Kind::CallInHtml { .. } => Code::CallInHtml,
@@ -2820,19 +2876,19 @@ impl Kind {
             Kind::IdUsedTwice { .. } => Code::IdUsedTwice,
             Kind::UnmatchedTag { .. } => Code::UnmatchedTag,
             Kind::SizeKept { .. } => Code::SizeKept,
-            Kind::UnreadablePicture { .. } => Code::UnreadablePicture,
+            Kind::UnreadableImage { .. } => Code::UnreadableImage,
             Kind::ColourConverted { .. } => Code::ColourConverted,
-            Kind::DescribesNoPicture { .. } => Code::DescribesNoPicture,
+            Kind::DescribesNoImage { .. } => Code::DescribesNoImage,
             Kind::CacheNotWritten { .. } => Code::CacheNotWritten,
-            Kind::UndescribedPicture { .. } => Code::UndescribedPicture,
-            Kind::HeicPicture { .. } => Code::HeicPicture,
+            Kind::MissingAltText { .. } => Code::MissingAltText,
+            Kind::HeicImage { .. } => Code::HeicImage,
             Kind::LocationPublished { .. } => Code::LocationPublished,
-            Kind::PicturesOutOfProportion { .. } => Code::PicturesOutOfProportion,
+            Kind::ImagesOutOfProportion { .. } => Code::ImagesOutOfProportion,
             Kind::UnusableCardFile { .. } => Code::UnusableCardFile,
             Kind::CardNotDrawn { .. } => Code::CardNotDrawn,
             Kind::UnusedCard { .. } => Code::UnusedCard,
             Kind::ImageMayNotShow { .. } => Code::ImageMayNotShow,
-            Kind::NoStill { .. } => Code::NoStill,
+            Kind::NoThumbnail { .. } => Code::NoThumbnail,
             Kind::MalformedRecord { .. } => Code::MalformedRecord,
             Kind::TokenInSettings => Code::TokenInSettings,
             Kind::WebmentionsOff => Code::WebmentionsOff,
@@ -2840,7 +2896,7 @@ impl Kind {
             Kind::FolderNotEmpty { .. } => Code::FolderNotEmpty,
             Kind::AlreadyASite { .. } => Code::AlreadyASite,
             Kind::NoSiteHere { .. } => Code::NoSiteHere,
-            Kind::NewerStarter { .. } => Code::NewerStarter,
+            Kind::UpdateAvailable { .. } => Code::UpdateAvailable,
             Kind::CantTellWhatMade { .. } => Code::CantTellWhatMade,
             Kind::MissingFolder => Code::MissingFolder,
         }
@@ -3528,6 +3584,27 @@ mod tests {
     }
 
     #[test]
+    fn a_former_name_is_no_kind_now_and_names_one_kind() {
+        let mut formers: Vec<_> = FORMER_NAMES.iter().map(|(former, _)| *former).collect();
+        formers.sort_unstable();
+        formers.dedup();
+        assert_eq!(formers.len(), FORMER_NAMES.len());
+        for &(former, code) in FORMER_NAMES {
+            assert_eq!(Code::from_name(former), None, "{former}");
+            assert_eq!(Code::renamed(former), Some(code));
+            assert!(code.former_names().any(|name| name == former));
+        }
+        assert_eq!(
+            Code::unknown("undescribed-picture"),
+            Kind::UnknownProblemName {
+                written: "undescribed-picture".into(),
+                suggestion: Some("missing-alt-text".into()),
+                renamed: true,
+            }
+        );
+    }
+
+    #[test]
     fn explanations_follow_the_wording_guide() {
         for &code in Code::ALL {
             let text = code.explanation();
@@ -3562,9 +3639,11 @@ mod tests {
                 "oops",
                 "parse",
                 "render",
-                "url",
-                "slug",
                 "undefined",
+                "picture",
+                "pictures",
+                "photograph",
+                "photographs",
             ] {
                 assert!(!words.contains(&banned), "{name} says {banned:?}");
             }

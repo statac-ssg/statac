@@ -58,7 +58,7 @@ fn a_word_spelled_near_one_statac_knows_is_written_as_that_word() {
         [
             "other-spelling in content/post-1.md: `aliases` as `redirect_from`, offered as \
              Write it as `redirect_from`",
-            "read-as-your-own in content/post-1.md: `summery` as `summary`, offered as \
+            "read-as-custom in content/post-1.md: `summery` as `summary`, offered as \
              Write it as `summary`",
             "unknown-word in statac.yaml: `tags.permalnk` as `tags.permalink`, offered as \
              Write it as `tags.permalink`",
@@ -88,7 +88,7 @@ fn a_key_is_not_respelt_as_one_its_mapping_has() {
     assert_eq!(
         found,
         [
-            "read-as-your-own in content/post-1.md: `summery` as `summary`, offered as \
+            "read-as-custom in content/post-1.md: `summery` as `summary`, offered as \
           Write it as `summary`"
         ]
     );
@@ -263,7 +263,7 @@ fn a_name_near_one_the_site_has_is_written_as_that_name() {
              Write it as `python`",
             "unknown-problem-name in statac.yaml: `broken-lnk` as `broken-link`, offered as \
              Write it as `broken-link`",
-            "unusable-address in content/post-1.md: `{yaer}` as `{year}`, offered as \
+            "unusable-url in content/post-1.md: `{yaer}` as `{year}`, offered as \
              Write it as `{year}`",
             "wrong-argument in content/post-1.md: `atl` as `alt`, offered as Write it as `alt`",
             "wrong-kind-of-value in content/post-1.md: `yes` as `true`, offered as \
@@ -360,16 +360,13 @@ fn an_address_gone_is_taken_out_of_the_record_alone_or_with_every_one_gone_under
              /notes/note-1/\n/notes/note-2/\n",
         ),
     ]);
-    let found: Vec<&String> = found
-        .iter()
-        .filter(|f| f.contains("address-gone"))
-        .collect();
+    let found: Vec<&String> = found.iter().filter(|f| f.contains("url-gone")).collect();
     assert_eq!(
         found,
         [
-            "address-gone in published.txt: `/blog/\n/blog/feed.xml\n/blog/post-1/\n` as ``, \
-             offered as Take the 3 addresses under `/blog/` out of `published.txt`",
-            "address-gone in published.txt: `/notes/note-2/\n` as ``, offered as Take \
+            "url-gone in published.txt: `/blog/\n/blog/feed.xml\n/blog/post-1/\n` as ``, \
+             offered as Take the 3 URLs under `/blog/` out of `published.txt`",
+            "url-gone in published.txt: `/notes/note-2/\n` as ``, offered as Take \
              `/notes/note-2/` out of `published.txt`",
         ]
     );

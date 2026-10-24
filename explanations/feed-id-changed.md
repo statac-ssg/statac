@@ -1,8 +1,8 @@
 # Feed id changed
 
-A post in a feed is now published at a different address from the one
-the last build used, and it has no `id:` of its own. The message shows
-its old address.
+A post in a feed is now published at a different URL from the one the
+last build used, and it has no `id:` of its own. The message shows its
+old URL.
 
 ## What you'll see {#what-youll-see}
 
@@ -16,28 +16,28 @@ warning  Feed id changed: this post was published at `/posts/post-1/`
 
 A feed reader identifies each post by an id, and shows any post whose id
 it hasn't seen before as new. A post with no `id:` gets an id made from
-its address, so moving the post changes its id, and everyone following
+its URL, so moving the post changes its id, and everyone following
 the feed sees it again as a new post.
 
 Each time `statac build` publishes the site, Statac records in
 `.statac/feeds` where each post in a feed was published. It recognises a
 post by its file. The file can be at the same path, or, if the file has
 moved too, it can have exactly the same contents as before, or have the
-old address in its `redirect_from:`. If a post is moved and edited at the
+old URL in its `redirect_from:`. If a post is moved and edited at the
 same time, with no `redirect_from:`, Statac can't tell it from a new
 post, and says nothing about it.
 
 A post made from a data file, by a page with `each:`, Statac knows by
 that page and its item: an item with a name by its name, and an item in
 a list by its fields being written exactly as before, or by the old
-address in its `redirect_from:`. Two items in a list written alike are
+URL in its `redirect_from:`. Two items in a list written alike are
 both taken as new.
 
 ## How to fix it
 
 Add the `id:` line that the message suggests to the post's front matter.
 For a post made from a data file, the line goes in the item's record in
-the data file. It is the id the post had at its old address, so feed
+the data file. It is the id the post had at its old URL, so feed
 readers keep treating it as the same post. From then on, the id stays
 with the post wherever it moves.
 
@@ -55,7 +55,7 @@ line by hand.
 ## Example
 
 `content/posts/post-1.md` was published at `/posts/post-1/`, and now
-sets a different address:
+sets a different URL:
 
 ```yaml
 ---

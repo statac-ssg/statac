@@ -2,10 +2,10 @@
 
 A heading or a table has an id in braces, such as `## Title {#id}` or a
 line of `{#id}` under a table's last row, but something earlier on the
-page already has that id. It may be another heading or table with the
-same id, or a footnote. Statac gives footnotes their ids itself:
-`note-1`, `note-2` and so on for the notes, and `back-1` and so on for the
-markers that link to them. The message points at the second use of the
+page already has that id. It may be another heading or table with the same
+id, or a footnote. Statac gives footnotes their ids itself: `note-1`,
+`note-2` and so on for the definitions, and `back-1` and so on for the
+references that link to them. The message points at the second use of the
 id, and also shows the first if it is a heading or a table.
 
 ## What you'll see {#what-youll-see}

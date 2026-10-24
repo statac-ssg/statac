@@ -1,7 +1,7 @@
 {# takes photos... #}
 {# Several pictures, each linked to its largest copy, called as @gallery("photo-1.jpg", "photo-2.jpg"): see /pictures/ -#}
 <ul class="gallery">
-  {% for shown in page.photos(photos if photos is defined else none, sizes="(max-width: 30rem) 50vw, 20rem", full=true) %}
+  {% for shown in page.images(photos if photos is defined else none, sizes="(max-width: 30rem) 50vw, 20rem", full=true) %}
   <li><a href="{{ shown.full }}"{% if not shown.alt %} aria-label="{{ shown.name }}"{% endif %}>{{ picture(shown) }}</a></li>
   {% endfor %}
 </ul>

@@ -1,0 +1,64 @@
+# No thumbnail
+
+A page shows a video hosted on YouTube or Vimeo, and uses the video's
+`thumbnail`: the image shown in place of the video until a reader presses
+play. The site's `fetched/stills/` folder has no thumbnail for this video,
+so `thumbnail` is empty.
+
+## What you'll see {#what-youll-see}
+
+```text
+warning  No thumbnail: no image has been fetched for this video yet
+  Run `statac refresh` to fetch one.
+  More: https://statac.dev/e/no-thumbnail/
+```
+
+## Why Statac warns
+
+If a page loads a video site's player as soon as it opens, the video site
+learns about every reader who visits, whether or not they watch. If the
+page shows a thumbnail instead, and loads the player only when the
+reader presses play, the video site learns about no one until then.
+`statac refresh` fetches the thumbnail from the video site once, and the
+thumbnail is kept in the site, because `statac build` never uses the network.
+That way, building the same files gives the same result every time, and
+works with no connection at all.
+
+Statac warns once for each video, however many pages show it. If a
+page's content shows the video, the warning points at the call in the
+Markdown. Otherwise it points at the template. If the video site replied
+that it has no image for the video, `fetched/record` marks the video `absent`.
+`statac refresh` then doesn't ask again, and the warning says so.
+
+## How to fix it
+
+Run `statac refresh` in the site's folder. It fetches a thumbnail into
+`fetched/stills/` for every video whose thumbnail a page uses, and lists what
+it fetched. Commit `fetched/` with the rest of the site.
+
+If the video site has no image, show one of your own. A snippet can take
+your image as an argument you define, such as `poster`, and show it with
+`page.image` instead of the thumbnail.
+
+Once you have understood the warning, you can quieten it by name.
+
+## Example
+
+In `content/post-1.md`:
+
+```markdown
+@youtube("https://youtu.be/abcdefghijk")
+```
+
+After `statac refresh`:
+
+```text
+Fetched `fetched/stills/youtube-abcdefghijk.jpg`.
+Fetched 1 thumbnail.
+```
+
+In `statac.yaml`, to stop it being shown:
+
+```yaml
+quiet: [no-thumbnail]
+```
