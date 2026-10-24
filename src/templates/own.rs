@@ -943,7 +943,7 @@ fn markdown(state: &State, value: &Value) -> Value {
     let words = shared
         .as_ref()
         .map(|shared| super::render::words_of(shared, frame::language()));
-    let html = crate::markdown::to_html(
+    let written = crate::markdown::write(
         &document,
         &crate::markdown::Options {
             snippets: &of_value,
@@ -954,11 +954,37 @@ fn markdown(state: &State, value: &Value) -> Value {
             highlighter: None,
         },
     );
+    let html = &written.html;
     let trimmed = html.trim_end();
     let bare = trimmed
         .strip_prefix("<p>")
         .and_then(|rest| rest.strip_suffix("</p>"))
         .filter(|inside| !inside.contains("<p>"));
+    let origin_place = origin.map(|(_, place)| place);
+    let lined_up = match in_place {
+        Some(_) => None,
+        None => origin.and_then(|(shared, place)| lined_up(&text, shared.sources.spelling(place))),
+    };
+    // Where each part of the HTML is written: in the file, where the value
+    // is written there as it is, or else where each part lines up with it.
+    let traced = match (in_place, origin_place, &shared) {
+        (Some(_), ..) => super::indent::Own::of_writing(&written.traced, &[], &[], html, sources),
+        (None, Some(place), Some(shared)) => {
+            let lined = |part: &Place| match &lined_up {
+                Some(map) => {
+                    let at = |within: u32| place.span.start as usize + map[within as usize];
+                    let span = Span::new(at(part.span.start), at(part.span.end));
+                    Place { span, ..place }
+                }
+                None => place,
+            };
+            let traced: Vec<_> = (written.traced.iter())
+                .map(|(range, part)| (range.clone(), lined(part)))
+                .collect();
+            super::indent::Own::of_writing(&traced, &[], &[], html, &shared.sources)
+        }
+        _ => super::indent::Own::default(),
+    };
     if let Some(shared) = &shared {
         // Without its `<p>`, the paragraph closes nothing for the value.
         let held = bare.map(|_| document.held_in_paragraph).unwrap_or_default();
@@ -968,11 +994,7 @@ fn markdown(state: &State, value: &Value) -> Value {
             .collect();
         if !told.is_empty() {
             let filter = super::explain::filter(shared, state, "markdown", &text, None);
-            let origin = origin.map(|(_, place)| place);
-            let lined_up = match in_place {
-                Some(_) => None,
-                None => origin.and_then(|place| lined_up(&text, shared.sources.spelling(place))),
-            };
+            let origin = origin_place;
             let placed = |place: Option<Place>| match (in_place, origin) {
                 (Some(_), _) => place,
                 (None, Some(origin)) => Some(match (place.map(|p| p.span), &lined_up) {
@@ -1005,7 +1027,14 @@ fn markdown(state: &State, value: &Value) -> Value {
             });
         }
     }
-    Value::from_safe_string(bare.map_or_else(|| html.clone(), str::to_owned))
+    match bare {
+        Some(bare) => {
+            let opens = "<p>".len();
+            let traced = traced.copied(&[(0..bare.len(), opens)]);
+            frame::made(bare.to_owned(), traced, true)
+        }
+        None => frame::made(html.clone(), traced, true),
+    }
 }
 
 /// Where each byte of `text`, and its end, stands in `written`, the same

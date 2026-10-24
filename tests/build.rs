@@ -3069,6 +3069,61 @@ warning  Broken link: nothing is published at `/abot/`
     );
 }
 
+/// A link in a field or data made into HTML by `markdown` is told where
+/// the field or data writes it, and one in writing a snippet changes with
+/// `replace`, in the writing.
+#[test]
+fn a_link_is_told_where_written_through_markdown_and_replace() {
+    let site = Site::new("links-markdown-replace");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write(
+        "templates/home.html",
+        "<title>{{ page.title }}</title>\n{{ page.deck | markdown }}\n\
+         {{ site.data.notes.said | markdown }}\n{{ page.content }}\n",
+    );
+    site.write(
+        "snippets/shout.html",
+        "{% set loud = body | replace(\"!\", \"!!\") %}<div>{{ loud | safe }}</div>\n",
+    );
+    site.write(
+        "content/index.md",
+        "---\ntitle: Home\ndeck: See [post 1](/gone-1/).\n---\n\
+         @shout()\nSee [post 2](/gone-2/)!\n@end\n",
+    );
+    site.write("data/notes.yaml", "said: \"See\\n  [post 3](/gone-3/).\"\n");
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/gone-1/`
+  content/index.md, line 3
+   3 │ deck: See [post 1](/gone-1/).
+     │                    ^^^^^^^^
+  While building: content/index.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/gone-2/`
+  content/index.md, line 6
+   6 │ See [post 2](/gone-2/)!
+     │              ^^^^^^^^
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/gone-3/`
+  data/notes.yaml, line 1
+   1 │ said: \"See\\n  [post 3](/gone-3/).\"
+     │                        ^^^^^^^^
+  While building: content/index.md
+  More: https://statac.dev/e/broken-link/
+
+3 warnings: 3 broken-link.
+"
+    );
+}
+
 /// An address a field holds, printed into a template's attribute, is told
 /// at the field; a link a snippet the writing calls writes in its own text
 /// is told in the snippet, and the address the writing hands it at the

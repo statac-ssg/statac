@@ -196,6 +196,20 @@ impl Own {
         }
     }
 
+    /// Where a text `len` long was written: as written at `place`.
+    pub(super) fn text(place: SourcePlace, len: usize) -> Own {
+        let print = Print {
+            at: 0,
+            len,
+            within: Some(0),
+            from: Printed::Text(place, None),
+        };
+        Own {
+            runs: Vec::new(),
+            prints: vec![print],
+        }
+    }
+
     /// Where what is copied from the output, piece by piece, was written:
     /// each piece where it is in the copy, and where it starts in the
     /// output.

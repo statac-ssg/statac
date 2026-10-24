@@ -748,6 +748,11 @@ pub(super) fn install(env: &mut Environment<'_>) {
             // Markup a file holds, marked safe, is still found there.
             Ok::<Value, Error>(match (name, args.first()) {
                 ("safe", Some(text)) => frame::copied(text, made),
+                // As is what `replace` keeps of it.
+                ("replace", Some(text)) => match args.get(1) {
+                    Some(from) => frame::replaced(text, from, made),
+                    None => made,
+                },
                 _ => made,
             })
         });

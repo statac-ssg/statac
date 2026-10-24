@@ -282,7 +282,7 @@ pub(super) struct Body {
     indexed: Vec<LanguageId>,
     /// The writing as its own page shows it whole after search boxes of
     /// the layout's, by how many, its own numbered after them.
-    after_boxes: Mutex<Vec<(usize, String)>>,
+    after_boxes: Mutex<Vec<(usize, String, Arc<Own>)>>,
     /// The writing as shown on other pages, made when first shown there.
     elsewhere: OnceLock<Elsewhere>,
     /// The writing as a feed shows it, built again without colour when
@@ -1479,7 +1479,7 @@ fn build_body_untimed(
 /// the page has one first box and no two with one id. Shown after boxes
 /// the layout asked for, the writing is built again with its own numbered
 /// after them, since the writing kept numbers its own from the first.
-fn among_the_pages_boxes(shared: &Arc<Shared>, page: PageId, body: &Body) -> String {
+fn among_the_pages_boxes(shared: &Arc<Shared>, page: PageId, body: &Body) -> Value {
     let before = frame::with(|frame| {
         *frame.boxes_before_writing.get_or_insert_with(|| {
             let before = frame.search_boxes;
@@ -1489,23 +1489,24 @@ fn among_the_pages_boxes(shared: &Arc<Shared>, page: PageId, body: &Body) -> Str
     });
     let before = before.unwrap_or_default();
     if before == 0 {
-        return body.written.html.clone();
+        return frame::kept(body.written.html.clone(), Arc::clone(&body.traced), true);
     }
     let kept = |body: &Body| {
         let kept = body.after_boxes.lock().expect("never poisoned");
-        let found = kept.iter().find(|(after, _)| *after == before);
-        found.map(|(_, html)| html.clone())
+        let found = kept.iter().find(|(after, ..)| *after == before);
+        found.map(|(_, html, traced)| (html.clone(), Arc::clone(traced)))
     };
-    if let Some(html) = kept(body) {
-        return html;
+    if let Some((html, traced)) = kept(body) {
+        return frame::kept(html, traced, true);
     }
     // What building it again tells and reads, the first building did.
     WRITING.with_borrow_mut(|writing| writing.push(page));
     let again = build_body(shared, page, before, false);
     WRITING.with_borrow_mut(Vec::pop);
     let mut kept = body.after_boxes.lock().expect("never poisoned");
-    kept.push((before, again.written.html.clone()));
-    again.written.html
+    let html = again.written.html;
+    kept.push((before, html.clone(), Arc::clone(&again.traced)));
+    frame::kept(html, again.traced, true)
 }
 
 /// The words `document` is shown with that its page's language has none
@@ -1793,9 +1794,8 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         let counted = matches!(part, Part::Content)
             && body.search_boxes > 0
             && making == Some(frame::Making::Output);
-        // Only the writing as built is known where each part is written.
         return Some(match counted {
-            true => Value::from_safe_string(among_the_pages_boxes(shared, page, &body)),
+            true => among_the_pages_boxes(shared, page, &body),
             false => frame::kept(own.clone(), Arc::clone(traced), true),
         });
     }

@@ -355,6 +355,49 @@ pub(super) fn copied(text: &Value, made: Value) -> Value {
     made
 }
 
+/// What `replace` made of `text`, each `from` in it replaced, as a value
+/// that remembers where what it kept of `text` was written, where `text`
+/// does and what is kept is as `text` has it.
+pub(super) fn replaced(text: &Value, from: &Value, made: Value) -> Value {
+    let (Some(input), Some(from), Some(out)) = (text.as_str(), from.as_str(), made.as_str()) else {
+        return made;
+    };
+    if out.is_empty() {
+        return made;
+    }
+    let own = match (written(text), origin(text)) {
+        (Some(own), _) => own,
+        (None, Some(place)) => Arc::new(Own::text(place, input.len())),
+        (None, None) => return made,
+    };
+    let found: Vec<usize> = input.match_indices(from).map(|(at, _)| at).collect();
+    let grown = out.len() as isize - input.len() as isize;
+    let count = found.len() as isize;
+    if count == 0 && grown != 0 || count > 0 && grown % count != 0 {
+        return made;
+    }
+    // What each `from` became may have been escaped on the way in, so
+    // its length is what each grew by.
+    let to = from.len() as isize + if count > 0 { grown / count } else { 0 };
+    let Ok(to) = usize::try_from(to) else {
+        return made;
+    };
+    let mut pieces = Vec::with_capacity(found.len() + 1);
+    let (mut old, mut new) = (0, 0);
+    for at in found.into_iter().chain([input.len()]) {
+        let kept = at - old;
+        if out.get(new..new + kept) != input.get(old..at) {
+            return made;
+        }
+        if kept > 0 {
+            pieces.push((new..new + kept, old));
+        }
+        (old, new) = (at + from.len(), new + kept + to);
+    }
+    let safe = made.is_safe();
+    kept(out.to_owned(), Arc::new(own.copied(&pieces)), safe)
+}
+
 /// `text`, which a body the engine held back or a snippet wrote, as a
 /// value that remembers where what it holds was written: marked safe where
 /// `safe`.
