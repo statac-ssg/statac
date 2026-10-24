@@ -3015,6 +3015,61 @@ warning  Broken link: nothing is published at `/abot/`
     );
 }
 
+/// An address a field holds, printed into a template's attribute, is told
+/// at the field; a link a snippet the writing calls writes in its own text
+/// is told in the snippet, and the address the writing hands it at the
+/// call.
+#[test]
+fn a_link_is_told_where_its_address_is_written_through_fields_and_the_writings_snippets() {
+    let site = Site::new("address-written");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write(
+        "templates/page.html",
+        "<a href=\"{{ page.following }}\">Next</a>\n{{ page.content }}\n",
+    );
+    site.write(
+        "snippets/card.html",
+        "<p><a href=\"/cards/\">Cards</a> <a href=\"{{ to }}\">{{ to }}</a></p>\n",
+    );
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\nfollowing: /post-2/\n---\n\
+         Before.\n\n@card(to=/post-3/)\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/post-2/`
+  content/post-1.md, line 4
+   4 │ following: /post-2/
+     │            ^^^^^^^^
+  While building: content/post-1.md
+  Did you mean `/post-1/`?
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/post-3/`
+  content/post-1.md, line 8
+   8 │ @card(to=/post-3/)
+     │          ^^^^^^^^
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/cards/`
+  snippets/card.html, line 1
+   1 │ <p><a href=\"/cards/\">Cards</a> <a href=\"{{ to }}\">{{ to }}</a></p>
+     │             ^^^^^^^
+  While building: content/post-1.md
+  More: https://statac.dev/e/broken-link/
+
+3 warnings: 3 broken-link.
+"
+    );
+}
+
 /// A link a snippet writes from a value is told at the snippet's line,
 /// whether the snippet is called in the writing or by a template, and told
 /// once where that writing is also shown on another page.

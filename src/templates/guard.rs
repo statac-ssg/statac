@@ -669,13 +669,10 @@ pub(super) fn writes_json(state: &State) -> bool {
 }
 
 /// Where `value`, which the template `state` renders is printing, was
-/// written: where a file of the site holds it, for markup printed whole,
-/// or else the print.
+/// written: where a file of the site holds it, or else the print.
 fn printed(state: &State, value: &Value) -> Option<Printed> {
-    if value.is_safe()
-        && let Some(place) = frame::origin(value)
-    {
-        return Some(Printed::Text(place));
+    if let Some(place) = frame::origin(value) {
+        return Some(Printed::Text(place, None));
     }
     let span = state.printing_span()?;
     let shared = frame::shared()?;

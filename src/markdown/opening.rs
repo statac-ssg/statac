@@ -38,6 +38,18 @@ pub struct Written {
     /// is written in the page's file: nested, a part inside the part
     /// holding it.
     pub traced: Vec<(Range<usize>, Place)>,
+    /// Where in `html` each line a snippet call wrote is written.
+    pub called: Vec<Called>,
+}
+
+/// A line, or the whole, of what a snippet call wrote, as the writing's
+/// HTML holds it: where it is in that HTML, where it starts in what the
+/// call wrote, and the call's place as the snippets were handed it.
+#[derive(Clone, PartialEq, Debug)]
+pub struct Called {
+    pub at: Range<usize>,
+    pub within: usize,
+    pub place: Place,
 }
 
 /// Which of the writing's blocks holds the more marker that ends the
@@ -287,6 +299,7 @@ pub fn as_written(html: &str) -> Written {
         maths: false,
         headings: headings_in_html(html),
         traced: Vec::new(),
+        called: Vec::new(),
     }
 }
 

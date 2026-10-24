@@ -80,8 +80,9 @@ struct Print {
 #[derive(Clone, Debug)]
 pub(crate) enum Printed {
     /// Markup a file of the site holds, as a field or data does: the text
-    /// written at this place.
-    Text(SourcePlace),
+    /// written at this place; or what a snippet call written there wrote,
+    /// with where in that each part was written.
+    Text(SourcePlace, Option<Arc<Own>>),
     /// What the template made of anything else, printed at this place:
     /// what `{{ ... }}` holds; with where its text was written, where a
     /// body the engine held back or a snippet wrote it.
@@ -128,7 +129,11 @@ impl Own {
         let print = (self.prints[..after].last()).filter(|print| at - print.at < print.len)?;
         let within = print.within.map(|within| within + (at - print.at));
         Some(match &print.from {
-            Printed::Text(place) => Origin::Text(*place, within),
+            Printed::Text(place, None) => Origin::Text(*place, within),
+            // What a snippet call wrote, at the call where nothing in the
+            // snippet places it.
+            Printed::Text(place, Some(inner)) => (within.and_then(|within| inner.origin(within)))
+                .unwrap_or(Origin::Text(*place, None)),
             Printed::Made(place, inner) => (inner.as_ref().zip(within))
                 .and_then(|(inner, within)| inner.origin(within))
                 .unwrap_or(Origin::Made(*place)),
@@ -168,28 +173,48 @@ impl Own {
     /// Where a page's writing, `html`, is written, from where each part of
     /// it is in `html`, nested, and where in the page's file that part is:
     /// each byte the innermost part's, and known within the part where the
-    /// file spells the part as `html` has it.
+    /// file spells the part as `html` has it. Each line a snippet call
+    /// wrote, in `called`, is followed into what the snippet wrote where
+    /// `calls` says, by the call's place.
     pub(super) fn of_writing(
         traced: &[(Range<usize>, SourcePlace)],
+        called: &[crate::markdown::Called],
+        calls: &[(SourcePlace, Arc<Own>)],
         html: &str,
         sources: &crate::source::Sources,
     ) -> Own {
-        let mut order: Vec<usize> = (0..traced.len()).collect();
-        order.sort_by_key(|&at| (traced[at].0.start, std::cmp::Reverse(traced[at].0.end)));
-        let mut spelt: Vec<Option<bool>> = vec![None; traced.len()];
+        // A call's lines after the nodes, so a line as long as its call is
+        // taken as inside it.
+        let mut parts: Vec<Part> = (traced.iter())
+            .map(|(range, place)| (range.clone(), *place, None))
+            .collect();
+        parts.extend(called.iter().filter_map(|line| {
+            let (_, own) = calls.iter().find(|(place, _)| *place == line.place)?;
+            Some((line.at.clone(), line.place, Some((line.within, own))))
+        }));
+        let mut order: Vec<usize> = (0..parts.len()).collect();
+        order.sort_by_key(|&at| (parts[at].0.start, std::cmp::Reverse(parts[at].0.end)));
+        let mut spelt: Vec<Option<bool>> = vec![None; parts.len()];
         let mut prints = Vec::new();
         let mut put = |from: usize, to: usize, part: usize| {
             if from >= to {
                 return;
             }
-            let (range, place) = &traced[part];
-            let same = *spelt[part]
-                .get_or_insert_with(|| html.get(range.clone()) == Some(sources.spelling(*place)));
+            let (range, place, call) = &parts[part];
+            let (within, inner) = match call {
+                Some((within, own)) => (Some(within + from - range.start), Some(Arc::clone(own))),
+                None => {
+                    let same = *spelt[part].get_or_insert_with(|| {
+                        html.get(range.clone()) == Some(sources.spelling(*place))
+                    });
+                    (same.then(|| from - range.start), None)
+                }
+            };
             prints.push(Print {
                 at: from,
                 len: to - from,
-                within: same.then(|| from - range.start),
-                from: Printed::Text(*place),
+                within,
+                from: Printed::Text(*place, inner),
             });
         };
         // The parts open around the byte reached, innermost last, each with
@@ -197,7 +222,7 @@ impl Own {
         let mut open: Vec<(usize, usize)> = Vec::new();
         let mut reached = 0;
         for at in order {
-            let range = &traced[at].0;
+            let range = &parts[at].0;
             while let Some(&(end, part)) = open.last() {
                 if end > range.start {
                     break;
@@ -225,6 +250,11 @@ impl Own {
         }
     }
 }
+
+/// A part of a page's writing: where it is in the writing's HTML, where it
+/// is written, and for a line a snippet call wrote, where the line starts
+/// in what the call wrote and where that was written.
+type Part<'a> = (Range<usize>, SourcePlace, Option<(usize, &'a Arc<Own>)>);
 
 /// A value being written: where it was written, and where its text is in
 /// memory, by address and length.
@@ -896,7 +926,7 @@ mod tests {
             (tag.clone(), at(17, 20)),
             (0..html.len(), at(0, text.len())),
         ];
-        let own = Own::of_writing(&traced, html, &sources);
+        let own = Own::of_writing(&traced, &[], &[], html, &sources);
         assert_eq!(own.origin(0), Some(Origin::Text(at(0, text.len()), None)));
         assert_eq!(
             own.origin(link.start + 9),

@@ -1318,6 +1318,7 @@ fn build_body_untimed(
     let document = writing(shared, page);
     // The frame is new, so what it has read the reading read.
     let reading = frame::with(|frame| frame.reads.keys().to_vec()).unwrap_or_default();
+    let mut calls = Vec::new();
     let written = match document {
         None => match p.source {
             Some(source) => {
@@ -1366,6 +1367,8 @@ fn build_body_untimed(
                 moved: RefCell::new(Vec::new()),
                 pieced: RefCell::new(Vec::new()),
                 colouring: RefCell::new(Vec::new()),
+                calls: RefCell::new(Vec::new()),
+                wrapped: RefCell::new(Vec::new()),
             };
             let words = words_of(shared, p.language);
             let written = markdown::write(
@@ -1419,6 +1422,7 @@ fn build_body_untimed(
                 .partition(|linked| pieced.contains(&linked.place));
             links.written = kept;
             links.handed.extend(handed);
+            calls = prose.calls.into_inner();
             written
         }
     };
@@ -1427,11 +1431,14 @@ fn build_body_untimed(
     problems.append(&mut frame.problems);
     let wordless = wordless.into_iter().map(Problem::nowhere);
     problems.extend(wordless.map(|problem| met_building(problem, &frame)));
-    let traced = Arc::new(Own::of_writing(
+    let traced = Own::of_writing(
         &written.traced,
+        &written.called,
+        &calls,
         &written.html,
         &shared.sources,
-    ));
+    );
+    let traced = Arc::new(traced);
     Body {
         written,
         traced,
@@ -1830,6 +1837,14 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
 
 /// Builds the snippet calls in a page's writing, and the pieces of it the
 /// site writes itself.
+/// Where each part of the writing a call wraps is written, as the
+/// writing's HTML has it.
+struct Wrapped {
+    place: Place,
+    traced: Vec<(Range<usize>, Place)>,
+    called: Vec<markdown::Called>,
+}
+
 struct Prose<'a> {
     shared: &'a Arc<Shared>,
     page: PageId,
@@ -1853,6 +1868,12 @@ struct Prose<'a> {
     /// Where each call and piece is written, with the places in the
     /// frame's `coloured` that building it added.
     colouring: RefCell<Vec<(Place, Range<usize>)>>,
+    /// Where what each call's snippet wrote was written, by the call's
+    /// place.
+    calls: RefCell<Vec<(Place, Arc<Own>)>>,
+    /// Where each part of the writing a call wraps is written, by the
+    /// call's place, until the call is built.
+    wrapped: RefCell<Vec<Wrapped>>,
 }
 
 impl Prose<'_> {
@@ -1889,6 +1910,14 @@ impl Prose<'_> {
 }
 
 impl markdown::Snippets for Prose<'_> {
+    fn wraps(&self, place: Place, traced: &[(Range<usize>, Place)], called: &[markdown::Called]) {
+        self.wrapped.borrow_mut().push(Wrapped {
+            place,
+            traced: traced.to_vec(),
+            called: called.to_vec(),
+        });
+    }
+
     fn writes(&self, piece: Piece) -> bool {
         self.shared.templates.pieces.contains_key(&piece) && !self.failed.borrow().contains(&piece)
     }
@@ -2132,6 +2161,11 @@ impl markdown::Snippets for Prose<'_> {
             let typography = words.map(markdown::Typography::of);
             for argument in &call.arguments {
                 let value = prose_value(&argument.value.value, typography.as_ref());
+                // Text handed to the snippet remembers where it is written.
+                let value = match (argument.value.origin.place, value.as_str()) {
+                    (Some(written), Some(text)) => frame::sourced(text, written),
+                    _ => value,
+                };
                 let at = argument.value.origin.place.unwrap_or(place);
                 match &argument.name {
                     Some(given) => {
@@ -2204,7 +2238,20 @@ impl markdown::Snippets for Prose<'_> {
             if let Some(body) = body
                 && snippet.wrapped.iter().any(|name| name == "body")
             {
-                handed.push(("body".into(), Value::from_safe_string(body.to_owned())));
+                let mut wrapped = self.wrapped.borrow_mut();
+                let traced = (wrapped.iter().position(|wrapped| wrapped.place == place))
+                    .map(|at| wrapped.swap_remove(at));
+                drop(wrapped);
+                let value = match traced {
+                    Some(Wrapped { traced, called, .. }) => {
+                        let calls = self.calls.borrow();
+                        let own = Own::of_writing(&traced, &called, &calls, body, &shared.sources);
+                        drop(calls);
+                        frame::made(body.to_owned(), own, true)
+                    }
+                    None => Value::from_safe_string(body.to_owned()),
+                };
+                handed.push(("body".into(), value));
             }
             handed.push((
                 "standalone".into(),
@@ -2214,8 +2261,12 @@ impl markdown::Snippets for Prose<'_> {
             let site = SiteValue::value(shared, frame::language());
             let before = frame::with(|frame| frame.calling.replace(place)).flatten();
             let standalone = placement == Placement::Standalone;
-            let built = build_snippet(shared, snippet, handed, page, site, None, standalone)
-                .map(|(html, _)| html);
+            let built = build_snippet(shared, snippet, handed, page, site, None, standalone).map(
+                |(html, own)| {
+                    self.calls.borrow_mut().push((place, Arc::new(own)));
+                    html
+                },
+            );
             frame::with(|frame| frame.calling = before);
             match built {
                 Ok(html) => html,

@@ -339,21 +339,18 @@ impl Site {
                 }
                 checked.reached.extend(file);
             }
-            // What opens the value, a quote or the `=`, is the template's
-            // own where the template wrote the attribute: no writing's.
-            let mut placed = link
-                .at
-                .checked_sub(1)
-                .and_then(|opens| renderer.written_at(page.own, opens))
-                .map(|(template, opens)| Placed::Attribute(template, opens + 1));
             let key = address::decoded(&written);
             let same = |w: &&Linked| address::decoded(&w.address) == key;
-            // Else where its address was written, where that is known: a
-            // file of the site's, or what a template made.
-            let printed = (placed.is_none())
-                .then(|| renderer.printed_at(page.own, html, link.at, link.raw.len()))
-                .flatten();
+            // Where its address was written, where that is known: a file of
+            // the site's, or what a template made.
+            let printed = renderer.printed_at(page.own, html, link.at, link.raw.len());
             let in_file = printed.filter(|at| renderer.template_of(at.source).is_none());
+            // Else what opens the value, a quote or the `=`, is a template's
+            // own where the template wrote the attribute.
+            let mut placed = (in_file.is_none())
+                .then(|| renderer.written_at(page.own, link.at.checked_sub(1)?))
+                .flatten()
+                .map(|(template, opens)| Placed::Attribute(template, opens + 1));
             // In the writing of the page, or of another page shown here, it
             // is that writing's link at that place, or else of that address.
             let writer = in_file.and_then(|at| {
@@ -391,9 +388,13 @@ impl Site {
                     None => {}
                 }
             }
+            // Written in a file, it is told there.
+            if let Some(at) = in_file {
+                placed = Some(Placed::Printed(at));
+            }
             // Where nothing says where it was written, a link of the
             // writing's own is one with its address, each taken once.
-            let unknown = placed.is_none() && in_file.is_none();
+            let unknown = placed.is_none();
             if unknown && let Some(count) = left.get_mut(&key).filter(|count| **count > 0) {
                 *count -= 1;
                 continue;

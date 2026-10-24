@@ -7,7 +7,7 @@ use std::ops::Range;
 use super::Document;
 use super::call::Call;
 use super::node::{Alignment, Kind, Node};
-use super::opening::{self, Written, words_of};
+use super::opening::{self, Called, Written, words_of};
 use super::pieces::{self, Piece, PieceValue};
 use crate::highlight::{self, Highlighter, Language};
 use crate::html::{Markup, PREFORMATTED, escape, markup};
@@ -19,6 +19,11 @@ pub trait Snippets {
     /// `place` is the call as written, as far as its `)`. `body` is the
     /// writing a call that wraps writing wraps, as HTML.
     fn html(&self, call: &Call, place: Place, placement: Placement, body: Option<&str>) -> String;
+
+    /// Told, before [`html`](Snippets::html) for the call at `place`, where
+    /// each part of the writing it wraps is written: `traced` and `called`
+    /// as [`Written`] has them for its HTML.
+    fn wraps(&self, _place: Place, _traced: &[(Range<usize>, Place)], _called: &[Called]) {}
 
     /// Whether the site writes `piece` itself.
     fn writes(&self, _piece: Piece) -> bool {
@@ -172,6 +177,7 @@ pub fn write(document: &Document, options: &Options<'_>) -> Written {
         maths: super::uses_maths(document),
         headings: writer.headings,
         traced: writer.traced,
+        called: writer.called,
         html: writer.out,
     }
 }
@@ -229,6 +235,8 @@ struct Writer<'a> {
     headings: Vec<(usize, String)>,
     /// Where in `out` each node is written, with where the node is.
     traced: Vec<(Range<usize>, Place)>,
+    /// Where in `out` each line a call wrote is written.
+    called: Vec<Called>,
 }
 
 impl<'a> Writer<'a> {
@@ -244,6 +252,7 @@ impl<'a> Writer<'a> {
             after_comment: None,
             headings: Vec::new(),
             traced: Vec::new(),
+            called: Vec::new(),
         }
     }
 
@@ -479,10 +488,12 @@ impl<'a> Writer<'a> {
                 self.table(node, alignments, id.as_deref(), classes);
             }
             Kind::Call(call) => {
-                let html = self.call(call, node, Placement::Standalone);
+                let (html, place) = self.call(call, node, Placement::Standalone);
                 if !html.trim().is_empty() {
                     self.new_block();
-                    self.laid_out(&html);
+                    let html = html.trim();
+                    let lines = html.lines().map(|line| (line, Some((html, place))));
+                    self.at_depth_from(lines, &preformatted_lines(html));
                 }
             }
             // Gathered at the foot of the page.
@@ -553,7 +564,7 @@ impl<'a> Writer<'a> {
             match &child.kind {
                 Kind::Html(text) => html.push_str(text),
                 Kind::Call(call) => {
-                    let written = self.call(call, child, Placement::Inline);
+                    let (written, _) = self.call(call, child, Placement::Inline);
                     html.push_str(&written);
                 }
                 _ => {}
@@ -583,15 +594,42 @@ impl<'a> Writer<'a> {
     /// Lines of HTML, each after the first indented to the depth it sits at
     /// unless it starts where `shown` says the spaces would show.
     fn at_depth<'l>(&mut self, lines: impl Iterator<Item = &'l str>, shown: &[bool]) {
-        for (n, line) in lines.enumerate() {
+        self.at_depth_from(lines.map(|line| (line, None)), shown);
+    }
+
+    /// The same, noting each line a call wrote: with the HTML the call
+    /// wrote, which the line is part of, and where the call is.
+    fn at_depth_from<'l>(
+        &mut self,
+        lines: impl Iterator<Item = (&'l str, Option<(&'l str, Place)>)>,
+        shown: &[bool],
+    ) {
+        for (n, (line, wrote)) in lines.enumerate() {
             if n > 0 {
                 self.out.push('\n');
                 if !shown[n] {
                     self.indent();
                 }
             }
+            let at = self.out.len();
             self.out.push_str(line);
+            if let Some((html, place)) = wrote {
+                self.called(at, line, html, place);
+            }
         }
+    }
+
+    /// Notes that `piece`, part of `html`, which the call at `place` wrote,
+    /// is written at `at`.
+    fn called(&mut self, at: usize, piece: &str, html: &str, place: Place) {
+        if piece.is_empty() {
+            return;
+        }
+        self.called.push(Called {
+            at: at..at + piece.len(),
+            within: piece.as_ptr() as usize - html.as_ptr() as usize,
+            place,
+        });
     }
 
     /// A footnote's number as a reader sees it, in the language's digits.
@@ -666,6 +704,16 @@ impl<'a> Writer<'a> {
                     let start = (at.start + shift).max(kept.start);
                     let end = (at.end + shift).min(kept.end);
                     (start < end).then_some((start..end, *place))
+                }));
+            self.called
+                .extend((inside.called.iter()).filter_map(|called| {
+                    let at = called.at.start + shift..called.at.end + shift;
+                    let inside = at.start >= kept.start && at.end <= kept.end;
+                    inside.then_some(Called {
+                        at,
+                        within: called.within,
+                        place: called.place,
+                    })
                 }));
             let body = written.strip_suffix("</p>");
             self.out.push_str(body.unwrap_or(written));
@@ -859,27 +907,30 @@ impl<'a> Writer<'a> {
                 "<input type=\"checkbox\" disabled> "
             }),
             Kind::Call(call) => {
-                let html = self.call(call, node, Placement::Inline);
+                let (html, place) = self.call(call, node, Placement::Inline);
+                let at = self.out.len();
                 self.out.push_str(&html);
+                self.called(at, &html, &html, place);
             }
             _ => self.block(node),
         }
     }
 
-    /// A call's HTML, handed the writing it wraps where it wraps any.
-    fn call(&self, call: &Call, node: &Node, placement: Placement) -> String {
-        let body = call.wraps().then(|| {
-            let mut inside = Writer::new(self.options, Vec::new());
-            inside.blocks(&node.children);
-            inside.out
-        });
+    /// A call's HTML, handed the writing it wraps where it wraps any, and
+    /// the call's place as the snippets are handed it.
+    fn call(&self, call: &Call, node: &Node, placement: Placement) -> (String, Place) {
         let place = Place {
             span: call.head.unwrap_or(node.place.span),
             ..node.place
         };
-        self.options
-            .snippets
-            .html(call, place, placement, body.as_deref())
+        let body = call.wraps().then(|| {
+            let mut inside = Writer::new(self.options, Vec::new());
+            inside.blocks(&node.children);
+            (self.options.snippets).wraps(place, &inside.traced, &inside.called);
+            inside.out
+        });
+        let html = (self.options.snippets).html(call, place, placement, body.as_deref());
+        (html, place)
     }
 
     /// A block's code as HTML: coloured where its fence names a language
