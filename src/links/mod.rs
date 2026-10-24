@@ -521,12 +521,12 @@ impl Site {
             let problem = match &miss.blame {
                 Blame::Writing(place, handed) => {
                     let wrote = in_writing(*place, *handed);
-                    let kind = self.kind(miss, page, there, wrote, named(*place));
+                    let kind = self.kind(miss, page, there, wrote, named(*place), true);
                     Problem::at(kind, *place)
                 }
                 Blame::Shown(place, handed) => {
                     let wrote = in_writing(*place, *handed);
-                    let kind = self.kind(miss, page, there, wrote, named(*place));
+                    let kind = self.kind(miss, page, there, wrote, named(*place), false);
                     building(renderer, page, Problem::at(kind, *place))
                 }
                 Blame::Template(found, placed) => {
@@ -569,7 +569,7 @@ impl Site {
                             used: false,
                         },
                     };
-                    let kind = self.kind(miss, page, there, wrote, None);
+                    let kind = self.kind(miss, page, there, wrote, None, false);
                     let place = best.map(|(template, at)| Place {
                         source: renderer.template_source(template),
                         span: crate::source::Span::new(at.start, at.end),
@@ -590,6 +590,8 @@ impl Site {
     /// the site publishes, or the nearest id on `there`, the page it lands
     /// on. `wrote` says how the link was written, and `named` is the
     /// address of the page it names by its file, which is offered first.
+    /// `own` says the link is written in `page`'s own writing, so that
+    /// page isn't offered.
     fn kind(
         &self,
         miss: &Miss,
@@ -597,6 +599,7 @@ impl Site {
         there: &[String],
         wrote: Wrote,
         named: Option<String>,
+        own: bool,
     ) -> Kind {
         let fragment = miss.arrival.fragment.as_deref();
         let Some(file) = &miss.file else {
@@ -616,8 +619,8 @@ impl Site {
             // A link naming its own page from outside the site's path
             // means that page.
             let path = &miss.arrival.path;
-            let own = self.file_at(path).as_ref() != Some(&page.file);
-            let from = own.then_some(page.file.as_str());
+            let leaves_out = own && self.file_at(path).as_ref() != Some(&page.file);
+            let from = leaves_out.then_some(page.file.as_str());
             let named = named.filter(|address| self.file_at(address).is_some());
             let nearest = named.as_deref().or_else(|| self.nearest(path, from));
             let suggestion = nearest.map(|nearest| {

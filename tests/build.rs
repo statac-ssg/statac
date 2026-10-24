@@ -2356,6 +2356,29 @@ fn every_link_on_the_built_site_is_followed_and_told_where_it_was_written() {
     assert_eq!(said.matches("`/about-us/`").count(), 1, "{said}");
 }
 
+/// A template's link is offered the nearest address the site publishes,
+/// even where that is the page being built when it is first met.
+#[test]
+fn a_templates_broken_link_is_offered_the_page_it_is_first_met_on() {
+    let site = Site::new("links-template-nearest");
+    site.write(
+        "templates/about.html",
+        "<a href=\"{{ url('/abot/') }}\">About</a>\n{{ page.content }}\n",
+    );
+    site.write(
+        "content/about.md",
+        "---\ntitle: About\nlayout: about\n---\nAbout the site.\n",
+    );
+    let (said, code) = site.run(&["check", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let told = "warning  Broken link: nothing is published at `/abot/`\n";
+    assert!(said.contains(told), "{said}");
+    assert!(
+        said.contains("  Did you mean `{{ url(\"/about/\") }}`?\n"),
+        "{said}"
+    );
+}
+
 /// Writing shown on another page keeps what its addresses mean: one read
 /// from the writing's own page is spelled from the top of the site there,
 /// in a feed and at an old address too, and on its own page it is as
@@ -2711,6 +2734,7 @@ warning  Broken link: nothing is published at `/post-2/`
    4 │ <a href=\"{{ address }}\">{{ address }}</a>
      │          ^^^^^^^^^^^^^
   While building: content/post-1.md
+  Did you mean `/post-1/`?
   More: https://statac.dev/e/broken-link/
 
 warning  Broken link: nothing is published at `/post-3/`
@@ -2718,6 +2742,7 @@ warning  Broken link: nothing is published at `/post-3/`
    4 │ <a href=\"{{ address }}\">{{ address }}</a>
      │          ^^^^^^^^^^^^^
   While building: content/post-1.md
+  Did you mean `/post-1/`?
   More: https://statac.dev/e/broken-link/
 
 warning  Broken link: nothing is published at `/post-4/`
@@ -2725,6 +2750,7 @@ warning  Broken link: nothing is published at `/post-4/`
    4 │ <a href=\"{{ address }}\">{{ address }}</a>
      │          ^^^^^^^^^^^^^
   While building: content/post-1.md
+  Did you mean `/post-1/`?
   More: https://statac.dev/e/broken-link/
 
 warning  Broken link: nothing is published at `/post-5/`
@@ -2732,6 +2758,7 @@ warning  Broken link: nothing is published at `/post-5/`
    7 │ <a href={{ \"/post-5/\" }}>Five</a>
      │         ^^^^^^^^^^^^^^^^
   While building: content/post-1.md
+  Did you mean `/post-1/`?
   More: https://statac.dev/e/broken-link/
 
 4 warnings: 4 broken-link.
@@ -2790,6 +2817,7 @@ warning  Broken link: nothing is published at `/post-4/`
    2 │ <a href=\"{{ \"/post-4/\" }}\">Four</a>
      │          ^^^^^^^^^^^^^^^^
   While building: content/post-1.md
+  Did you mean `/post-1/`?
   More: https://statac.dev/e/broken-link/
 
 warning  Broken link: nothing is published at `/post-2/`
@@ -2797,6 +2825,7 @@ warning  Broken link: nothing is published at `/post-2/`
    2 │ <a href=\"{{ address }}\">{{ address }}</a>
      │          ^^^^^^^^^^^^^
   While building: content/post-1.md
+  Did you mean `/post-1/`?
   More: https://statac.dev/e/broken-link/
 
 warning  Broken link: nothing is published at `/post-3/`
@@ -2804,6 +2833,7 @@ warning  Broken link: nothing is published at `/post-3/`
    2 │ <a href=\"{{ address }}\">{{ address }}</a>
      │          ^^^^^^^^^^^^^
   While building: content/post-1.md
+  Did you mean `/post-1/`?
   More: https://statac.dev/e/broken-link/
 
 warning  Broken link: nothing is published at `part/`
@@ -2906,7 +2936,7 @@ warning  Broken link: nothing is published at `/blog/post-2/`
    2 │ <nav><a href=\"{{ url(\"/\") }}\">Home</a> <a href=\"{{ url(\"/post-2/\") }}\">Next</a>
      │                                                 ^^^^^^^^^^^^^^^^^^^^^
   While building: content/post-1.md
-  Did you mean `{{ url(\"/post-4/\") }}`?
+  Did you mean `{{ url(\"/post-1/\") }}`?
   More: https://statac.dev/e/broken-link/
 
 warning  Broken link: nothing is published at `/post-1/`
