@@ -10,10 +10,11 @@ use crate::content::address;
 use crate::html::{self, start_tags};
 
 /// `html`, writing published at `page`, with each address in it read from
-/// where it stands spelled from the top of the site; none where it holds no
+/// where it stands spelled from the top of the site, and where each such
+/// address is in `html` and in what is made of it; none where it holds no
 /// such address. `page` is a path from the top of the host, the site's own
 /// path included.
-pub(crate) fn html(html: &str, page: &str) -> Option<String> {
+pub(crate) fn html(html: &str, page: &str) -> Option<(String, Respelt)> {
     let mut moved: Vec<(Range<usize>, String)> = Vec::new();
     start_tags(html, |tag| {
         for attribute in &tag.attributes {
@@ -36,15 +37,21 @@ pub(crate) fn html(html: &str, page: &str) -> Option<String> {
         return None;
     }
     let mut out = String::with_capacity(html.len() + moved.len() * page.len());
+    let mut respelt = Vec::with_capacity(moved.len());
     let mut from = 0;
     for (range, spelt) in moved {
         out.push_str(&html[from..range.start]);
+        respelt.push((range.clone(), out.len()..out.len() + spelt.len()));
         out.push_str(&spelt);
         from = range.end;
     }
     out.push_str(&html[from..]);
-    Some(out)
+    Some((out, respelt))
 }
+
+/// Each address spelled again, in order: where it is in the HTML as
+/// written, and where in the HTML made of it.
+pub(crate) type Respelt = Vec<(Range<usize>, Range<usize>)>;
 
 /// `written`, an address as a browser follows it on writing published at
 /// `page`, spelled from the top of the site where it is read from where it
@@ -254,7 +261,7 @@ mod tests {
                        <object data=\"x.svg\"></object> <a href=\"  ../post-2/ \">2</a>\
                        <!-- <a href=\"c.html\"> --><script>let a = '<a href=\"d.html\">';</script></p>";
         assert_eq!(
-            html(written, page).as_deref(),
+            html(written, page).map(|(html, _)| html).as_deref(),
             Some(
                 "<p><a href=\"/post-1/photo-1.jpg\" title=\"photo-1.jpg\">photo-1.jpg</a> \
                  <img src='/post-1/a.jpg' srcset=\"/post-1/a.jpg 1x, /b.jpg 2x,/post-1/c.jpg 3x\" alt=\"\"> \
@@ -265,6 +272,8 @@ mod tests {
             )
         );
         assert_eq!(html("<a href=\"/post-2/\">2</a> a.jpg", page), None);
+        let (_, respelt) = html("<a href=\"a\">a</a><img src=b>", page).unwrap();
+        assert_eq!(respelt, [(9..10, 9..18), (26..27, 34..43)]);
     }
 
     /// The site's part is spelled as an attribute carries an address; the
@@ -272,11 +281,15 @@ mod tests {
     #[test]
     fn the_sites_part_is_spelled_for_an_attribute() {
         assert_eq!(
-            html("<a href=\"a&amp;b.jpg?x=1&amp;y=2\">", "/caf\u{e9} & co/").as_deref(),
+            html("<a href=\"a&amp;b.jpg?x=1&amp;y=2\">", "/caf\u{e9} & co/")
+                .map(|(html, _)| html)
+                .as_deref(),
             Some("<a href=\"/caf%C3%A9%20&amp;%20co/a&amp;b.jpg?x=1&amp;y=2\">")
         );
         assert_eq!(
-            html("<img src=\"d\u{e9}j\u{e0}.jpg\">", "/post-1/").as_deref(),
+            html("<img src=\"d\u{e9}j\u{e0}.jpg\">", "/post-1/")
+                .map(|(html, _)| html)
+                .as_deref(),
             Some("<img src=\"/post-1/d\u{e9}j\u{e0}.jpg\">")
         );
     }

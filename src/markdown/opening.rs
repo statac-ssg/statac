@@ -16,6 +16,9 @@ pub struct Written {
     /// The writing before the more marker, or else its opening paragraph,
     /// as HTML, without the footnotes' markers; none where that is empty.
     pub excerpt: Option<String>,
+    /// Each piece of the excerpt copied from `html`: where it is in the
+    /// excerpt, and where it starts in `html`.
+    pub excerpt_from: Vec<(Range<usize>, usize)>,
     /// Where the writing the excerpt shows is written in the page's file;
     /// none for a page written in HTML.
     pub excerpt_span: Option<Span>,
@@ -283,15 +286,28 @@ pub fn as_written(html: &str) -> Written {
         at += line.len();
     }
     let opening = first_html_paragraph(html);
-    let excerpt = match more_at {
-        Some(at) => Some(html[..at].trim().to_owned()).filter(|kept| !kept.is_empty()),
-        None => opening
-            .clone()
-            .map(|inner| format!("<p>{}</p>", &html[inner])),
+    let (excerpt, excerpt_from) = match (more_at, opening.clone()) {
+        (Some(at), _) => {
+            let kept = html[..at].trim_end();
+            let start = kept.len() - kept.trim_start().len();
+            let kept = &kept[start..];
+            let from = (!kept.is_empty()).then_some((0..kept.len(), start));
+            (
+                Some(kept.to_owned()).filter(|kept| !kept.is_empty()),
+                Vec::from_iter(from),
+            )
+        }
+        (None, Some(inner)) => {
+            let opens = "<p>".len();
+            let from = vec![(opens..opens + inner.len(), inner.start)];
+            (Some(format!("<p>{}</p>", &html[inner])), from)
+        }
+        (None, None) => (None, Vec::new()),
     };
     Written {
         html: html.to_owned(),
         excerpt,
+        excerpt_from,
         excerpt_span: None,
         excerpt_marked: more_at.is_some(),
         opening: opening.map(|inner| closed_up(&words_of(&html[inner]))),

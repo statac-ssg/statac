@@ -149,12 +149,29 @@ pub fn write(document: &Document, options: &Options<'_>) -> Written {
     }
     let opening = writer.opening.or(writer.html_opening);
     let read = |range: Range<usize>| uncut(&writer.out, &writer.cuts, range);
-    let excerpt = match more_at {
-        Some(at) => Some(read(0..at).trim_end().to_owned()).filter(|kept| !kept.is_empty()),
-        None => opening
-            .as_ref()
-            .map(|opening| format!("<p>{}</p>", read(opening.inner.clone()))),
+    let (excerpt, mut excerpt_from) = match more_at {
+        Some(at) => {
+            let (kept, from) = read(0..at);
+            (Some(kept.trim_end().to_owned()), from)
+        }
+        None => match &opening {
+            Some(opening) => {
+                let (kept, from) = read(opening.inner.clone());
+                let opens = "<p>".len();
+                let from = (from.into_iter())
+                    .map(|(at, start)| (at.start + opens..at.end + opens, start))
+                    .collect();
+                (Some(format!("<p>{kept}</p>")), from)
+            }
+            None => (None, Vec::new()),
+        },
     };
+    let excerpt = excerpt.filter(|kept| !kept.is_empty());
+    let shown = excerpt.as_ref().map_or(0, String::len);
+    excerpt_from.retain_mut(|(at, _)| {
+        at.end = at.end.min(shown);
+        at.start < at.end
+    });
     let children = &document.root.children;
     let excerpt_span = match more {
         Some((at, after)) => {
@@ -167,9 +184,10 @@ pub fn write(document: &Document, options: &Options<'_>) -> Written {
         None => opening.as_ref().map(|opening| opening.written),
     }
     .filter(|_| excerpt.is_some());
-    let words = opening::count_words(&read(0..writer.out.len()));
+    let words = opening::count_words(&read(0..writer.out.len()).0);
     Written {
         excerpt,
+        excerpt_from,
         excerpt_span,
         excerpt_marked: more.is_some(),
         opening: opening.map(|opening| opening.words),
@@ -182,23 +200,35 @@ pub fn write(document: &Document, options: &Options<'_>) -> Written {
     }
 }
 
-/// The HTML in `range` without the cuts inside it. Where a cut stood
-/// between two spaces, one of them goes with it.
-fn uncut(html: &str, cuts: &[Range<usize>], range: Range<usize>) -> String {
+/// The HTML in `range` without the cuts inside it, with where each piece
+/// kept is in what is kept and where it starts in `html`. Where a cut
+/// stood between two spaces, one of them goes with it.
+fn uncut(
+    html: &str,
+    cuts: &[Range<usize>],
+    range: Range<usize>,
+) -> (String, Vec<(Range<usize>, usize)>) {
     let mut kept = String::with_capacity(range.len());
+    let mut pieces = Vec::new();
+    let mut keep = |kept: &mut String, piece: Range<usize>| {
+        if !piece.is_empty() {
+            pieces.push((kept.len()..kept.len() + piece.len(), piece.start));
+            kept.push_str(&html[piece]);
+        }
+    };
     let mut from = range.start;
     for cut in cuts
         .iter()
         .filter(|cut| range.start <= cut.start && cut.end <= range.end)
     {
-        kept.push_str(&html[from..cut.start]);
+        keep(&mut kept, from..cut.start);
         from = cut.end;
         if kept.ends_with(' ') && html[from..range.end].starts_with(' ') {
             from += 1;
         }
     }
-    kept.push_str(&html[from..range.end]);
-    kept
+    keep(&mut kept, from..range.end);
+    (kept, pieces)
 }
 
 /// The paragraph the writing opens with: where its words stand in the

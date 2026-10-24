@@ -2496,6 +2496,60 @@ fn writing_shown_on_another_page_links_where_it_does_on_its_own() {
     }
 }
 
+/// A link in writing shown on a page that doesn't publish it is told at
+/// the writing, as spelled from the top of the site, though the page
+/// showing it links to the same address itself.
+#[test]
+fn a_link_in_writing_shown_from_a_page_publishing_nothing_is_told_there() {
+    let site = Site::new("links-shown-unpublished");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+    );
+    site.write(
+        "templates/page.html",
+        "<title>{{ page.title }}</title>\n{{ page.folder.page.excerpt }}\n{{ page.content }}\n",
+    );
+    site.write(
+        "content/notes/index.md",
+        "---\ntitle: Notes\nindex_page: false\n---\n\
+         See [the photo](photo.jpg)[^1] and [the old notes](/gone/).\n\n\
+         [^1]: Taken in [the hall](hall/).\n",
+    );
+    site.write(
+        "content/notes/note-1.md",
+        "---\ntitle: Note 1\ndate: 2026-01-01\n---\n[Gone](/gone/).\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+warning  Broken link: nothing is published at `/notes/photo.jpg`
+  content/notes/index.md, line 5
+   5 │ See [the photo](photo.jpg)[^1] and [the old notes](/gone/).
+     │                 ^^^^^^^^^
+  While building: content/notes/note-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/gone/`
+  content/notes/index.md, line 5
+   5 │ See [the photo](photo.jpg)[^1] and [the old notes](/gone/).
+     │                                                    ^^^^^^
+  While building: content/notes/note-1.md
+  More: https://statac.dev/e/broken-link/
+
+warning  Broken link: nothing is published at `/gone/`
+  content/notes/note-1.md, line 5
+   5 │ [Gone](/gone/).
+     │        ^^^^^^
+  More: https://statac.dev/e/broken-link/
+
+3 warnings: 3 broken-link.
+"
+    );
+}
+
 #[test]
 fn a_site_under_a_path_owns_only_that_path() {
     let site = Site::new("links-path");

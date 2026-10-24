@@ -125,9 +125,7 @@ impl Own {
         if let Some(from) = self.written_from(at) {
             return Some(Origin::Own(from));
         }
-        let after = self.prints.partition_point(|print| print.at <= at);
-        let print = (self.prints[..after].last()).filter(|print| at - print.at < print.len)?;
-        let within = print.within.map(|within| within + (at - print.at));
+        let (print, within) = self.print_at(at)?;
         Some(match &print.from {
             Printed::Text(place, None) => Origin::Text(*place, within),
             // What a snippet call wrote, at the call where nothing in the
@@ -138,6 +136,39 @@ impl Own {
                 .and_then(|(inner, within)| inner.origin(within))
                 .unwrap_or(Origin::Made(*place)),
         })
+    }
+
+    /// The value printed holding the byte at `at`, and where in its text
+    /// the byte is, where that is known.
+    fn print_at(&self, at: usize) -> Option<(&Print, Option<usize>)> {
+        let after = self.prints.partition_point(|print| print.at <= at);
+        let print = (self.prints[..after].last()).filter(|print| at - print.at < print.len)?;
+        Some((print, print.within.map(|within| within + (at - print.at))))
+    }
+
+    /// The outermost markup of a file's holding the byte at `at`, followed
+    /// through bodies and snippets as [`Own::origin`] follows them: for a
+    /// byte a snippet called in the writing wrote, the call.
+    pub(super) fn in_text(&self, at: usize) -> Option<SourcePlace> {
+        if self.written_from(at).is_some() {
+            return None;
+        }
+        match self.print_at(at)? {
+            (
+                Print {
+                    from: Printed::Text(place, _),
+                    ..
+                },
+                _,
+            ) => Some(*place),
+            (
+                Print {
+                    from: Printed::Made(_, inner),
+                    ..
+                },
+                within,
+            ) => inner.as_ref()?.in_text(within?),
+        }
     }
 
     /// Forgets what was written from `len` on, which the output no longer
@@ -162,6 +193,81 @@ impl Own {
                 break;
             }
             self.prints.pop();
+        }
+    }
+
+    /// Where what is copied from the output, piece by piece, was written:
+    /// each piece where it is in the copy, and where it starts in the
+    /// output.
+    pub(super) fn copied(&self, pieces: &[(Range<usize>, usize)]) -> Own {
+        let mut own = Own::default();
+        for (to, from) in pieces {
+            self.copy(&mut own, to.start, *from..from + to.len());
+        }
+        own
+    }
+
+    /// Where the output, with each address in `respelt` spelled again, was
+    /// written: an address as the one it replaces, byte for byte as far as
+    /// both go, and the rest of it where the last byte replaced was.
+    pub(super) fn respelt(&self, respelt: &crate::elsewhere::Respelt, len: usize) -> Own {
+        let mut own = Own::default();
+        let (mut old, mut new) = (0, 0);
+        for (was, now) in respelt {
+            self.copy(&mut own, new, old..was.start);
+            let both = was.len().min(now.len());
+            self.copy(&mut own, now.start, was.start..was.start + both);
+            let last = self.prints.partition_point(|print| print.at < was.end);
+            let last = (self.prints[..last].last()).filter(|print| print.at + print.len >= was.end);
+            if let Some(print) = last.filter(|_| now.len() > both) {
+                own.prints.push(Print {
+                    at: now.start + both,
+                    len: now.len() - both,
+                    within: None,
+                    from: print.from.clone(),
+                });
+            }
+            (old, new) = (was.end, now.end);
+        }
+        self.copy(&mut own, new, old..len);
+        own
+    }
+
+    /// Copies into `own`, at `to`, what is known of where bytes `from` of
+    /// the output were written.
+    fn copy(&self, own: &mut Own, to: usize, from: Range<usize>) {
+        let moved = |at: usize| to + at - from.start;
+        let first = self
+            .runs
+            .partition_point(|run| run.at + run.len <= from.start);
+        for run in self.runs[first..]
+            .iter()
+            .take_while(|run| run.at < from.end)
+        {
+            let (start, end) = (run.at.max(from.start), (run.at + run.len).min(from.end));
+            own.runs.push(Run {
+                at: moved(start),
+                from: run.from + (start - run.at),
+                len: end - start,
+            });
+        }
+        let first = self
+            .prints
+            .partition_point(|print| print.at + print.len <= from.start);
+        for print in self.prints[first..]
+            .iter()
+            .take_while(|print| print.at < from.end)
+        {
+            let (start, end) = (
+                print.at.max(from.start),
+                (print.at + print.len).min(from.end),
+            );
+            own.prints.push(Print {
+                at: moved(start),
+                len: end - start,
+                within: print.within.map(|within| within + (start - print.at)),
+                from: print.from.clone(),
+            });
         }
     }
 
@@ -946,6 +1052,34 @@ mod tests {
             Some(Origin::Text(at(0, text.len()), None))
         );
         assert_eq!(own.origin(html.len()), None);
+    }
+
+    #[test]
+    fn what_is_copied_or_respelt_from_the_writing_is_known_where_the_writing_is() {
+        let mut sources = Sources::default();
+        let html = "<b>a</b> <i>b</i>";
+        let source = sources.add("content/post-1.md", html.to_owned());
+        let at = |start, end| Place {
+            source,
+            span: Span::new(start, end),
+        };
+        let traced = [(0..8, at(0, 8)), (9..17, at(9, 17)), (0..17, at(0, 17))];
+        let own = Own::of_writing(&traced, &[], &[], html, &sources);
+        let text = |place, within| Some(Origin::Text(place, within));
+        // `a` spelt `xyz`: byte for byte as far as both go, then where the
+        // last byte replaced was.
+        let respelt = own.respelt(&vec![(3..4, 3..6)], html.len());
+        assert_eq!(respelt.origin(2), text(at(0, 8), Some(2)));
+        assert_eq!(respelt.origin(3), text(at(0, 8), Some(3)));
+        assert_eq!(respelt.origin(5), text(at(0, 8), None));
+        assert_eq!(respelt.origin(6), text(at(0, 8), Some(4)));
+        assert_eq!(respelt.origin(10), text(at(0, 17), Some(8)));
+        assert_eq!(respelt.origin(14), text(at(9, 17), Some(3)));
+        assert_eq!(respelt.origin(19), None);
+        let copied = own.copied(&[(0..3, 9), (3..4, 12)]);
+        assert_eq!(copied.origin(0), text(at(9, 17), Some(0)));
+        assert_eq!(copied.origin(3), text(at(9, 17), Some(3)));
+        assert_eq!(copied.origin(4), None);
     }
 
     #[test]

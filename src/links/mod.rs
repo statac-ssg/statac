@@ -351,6 +351,26 @@ impl Site {
                 .then(|| renderer.written_at(page.own, link.at.checked_sub(1)?))
                 .flatten()
                 .map(|(template, opens)| Placed::Attribute(template, opens + 1));
+            // A template's link in another page's writing shown here, as a
+            // snippet called there writes, is told on that page where it
+            // leads the same from there.
+            let called = in_file
+                .is_none()
+                .then(|| renderer.in_text(page.own, link.at));
+            if let Some(call) = called.flatten() {
+                let other = shown
+                    .iter()
+                    .find(|shown| site.pages.get(shown.page).source == Some(call.source));
+                if let Some(other) = other {
+                    let there = site.pages.get(other.page);
+                    let at_home = format!("{}{}", self.base(), there.address.as_str());
+                    if there.lands()
+                        && self.leads(&written, &at_home) == self.leads(&written, &from)
+                    {
+                        continue;
+                    }
+                }
+            }
             // In the writing of the page, or of another page shown here, it
             // is that writing's link at that place, or else of that address.
             let writer = in_file.and_then(|at| {
@@ -366,13 +386,24 @@ impl Site {
                 })
             });
             if let (Some(at), Some((writer, writing))) = (in_file, writer) {
+                // Shown here, its address may be spelled from the top of the
+                // site.
+                let home = (writer != page.id)
+                    .then(|| format!("{}{}", self.base(), site.pages.get(writer).address.as_str()));
+                let alike = |w: &&Linked| {
+                    let moved = || {
+                        let home = home.as_deref()?;
+                        crate::elsewhere::address(&w.address, home)
+                    };
+                    same(w) || moved().is_some_and(|moved| address::decoded(&moved) == key)
+                };
                 let there = |w: &&Linked| {
                     let (a, b) = (w.place.span, at.span);
-                    same(w) && w.place.source == at.source && a.start < b.end && b.start < a.end
+                    alike(w) && w.place.source == at.source && a.start < b.end && b.start < a.end
                 };
                 let found = (writing.written.iter().find(there).map(|w| (w, false)))
                     .or_else(|| writing.handed.iter().find(there).map(|w| (w, true)))
-                    .or_else(|| writing.written.iter().find(same).map(|w| (w, false)));
+                    .or_else(|| writing.written.iter().find(alike).map(|w| (w, false)));
                 match found {
                     // The writing's own links were followed above.
                     Some((_, false)) if writer == page.id => continue,

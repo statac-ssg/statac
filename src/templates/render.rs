@@ -250,6 +250,8 @@ pub(super) struct Body {
     written: markdown::Written,
     /// Where each part of `written`'s HTML is written in the page's file.
     traced: Arc<Own>,
+    /// The same for its excerpt.
+    excerpt_traced: Arc<Own>,
     reads: Reads,
     /// Those of `reads` reading the writing as Markdown read, which its
     /// headings turn on.
@@ -290,12 +292,13 @@ pub(super) struct Body {
 
 /// A page's writing as shown other than on its own page, its HTML and its
 /// excerpt: with the addresses read from the page spelled from the top of
-/// the site, or in a feed without colour too; none where that changes
+/// the site, or in a feed without colour too, each with where its parts
+/// were written, which a feed doesn't keep; none where that changes
 /// nothing.
 #[derive(Debug)]
 struct Elsewhere {
-    html: Option<String>,
-    excerpt: Option<String>,
+    html: Option<(String, Arc<Own>)>,
+    excerpt: Option<(String, Arc<Own>)>,
 }
 
 /// A part of a page's writing as built: the heading it starts with, by
@@ -717,6 +720,13 @@ impl Renderer {
                 })
             }
         }
+    }
+
+    /// The outermost markup of a file's that the byte at `at` of an output
+    /// is in: for a byte a snippet called in a page's writing wrote, the
+    /// call.
+    pub fn in_text(&self, own: &Own, at: usize) -> Option<Place> {
+        own.in_text(at)
     }
 
     /// The template or snippet read from `source`, where it is one.
@@ -1438,10 +1448,12 @@ fn build_body_untimed(
         &written.html,
         &shared.sources,
     );
+    let excerpt_traced = Arc::new(traced.copied(&written.excerpt_from));
     let traced = Arc::new(traced);
     Body {
         written,
         traced,
+        excerpt_traced,
         undescribed: frame.undescribed,
         reads: frame.reads,
         reading,
@@ -1772,9 +1784,9 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
             frame.colours |= body.colours;
         });
     }
-    let own = match part {
-        Part::Content => &body.written.html,
-        Part::Excerpt => body.written.excerpt.as_ref()?,
+    let (own, traced) = match part {
+        Part::Content => (&body.written.html, &body.traced),
+        Part::Excerpt => (body.written.excerpt.as_ref()?, &body.excerpt_traced),
     };
     let (home, making) = frame::with(|frame| (frame.home(), frame.making)).unzip();
     if home.flatten() == Some(page) {
@@ -1782,31 +1794,35 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
             && body.search_boxes > 0
             && making == Some(frame::Making::Output);
         // Only the writing as built is known where each part is written.
-        return Some(match (counted, part) {
-            (true, _) => Value::from_safe_string(among_the_pages_boxes(shared, page, &body)),
-            (false, Part::Content) => frame::kept(own.clone(), Arc::clone(&body.traced), true),
-            (false, Part::Excerpt) => Value::from_safe_string(own.clone()),
+        return Some(match counted {
+            true => Value::from_safe_string(among_the_pages_boxes(shared, page, &body)),
+            false => frame::kept(own.clone(), Arc::clone(traced), true),
         });
     }
     frame::read(Key::Field(page, shared.name_id("url")));
     let elsewhere = body.elsewhere.get_or_init(|| {
         let address = shared.address_of(page);
+        let moved = |html: &str, traced: &Own| {
+            let (moved, respelt) = crate::elsewhere::html(html, &address)?;
+            let traced = traced.respelt(&respelt, html.len());
+            Some((moved, Arc::new(traced)))
+        };
         let written = &body.written;
         Elsewhere {
-            html: crate::elsewhere::html(&written.html, &address),
-            excerpt: written
-                .excerpt
-                .as_deref()
-                .and_then(|excerpt| crate::elsewhere::html(excerpt, &address)),
+            html: moved(&written.html, &body.traced),
+            excerpt: (written.excerpt.as_deref())
+                .and_then(|excerpt| moved(excerpt, &body.excerpt_traced)),
         }
     });
     let moved = match part {
         Part::Content => &elsewhere.html,
         Part::Excerpt => &elsewhere.excerpt,
     };
-    let shown = moved.as_ref().unwrap_or(own);
+    let (shown, traced) = moved
+        .as_ref()
+        .map_or((own, traced), |(html, traced)| (html, traced));
     if !colourless || !body.colours {
-        return Some(Value::from_safe_string(shown.clone()));
+        return Some(frame::kept(shown.clone(), Arc::clone(traced), true));
     }
     let in_feeds = match body.in_feeds.get() {
         Some(in_feeds) => in_feeds,
@@ -1816,8 +1832,10 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
             let again = build_body(shared, page, 0, true).written;
             WRITING.with_borrow_mut(Vec::pop);
             let address = shared.address_of(page);
-            let moved =
-                |html: String| Some(crate::elsewhere::html(&html, &address).unwrap_or(html));
+            let moved = |html: String| {
+                let moved = crate::elsewhere::html(&html, &address).map(|(moved, _)| moved);
+                Some((moved.unwrap_or(html), Arc::default()))
+            };
             // Another thread may have built it meanwhile; the first kept wins.
             let _ = body.in_feeds.set(Elsewhere {
                 html: moved(again.html),
@@ -1830,9 +1848,8 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
         Part::Content => &in_feeds.html,
         Part::Excerpt => &in_feeds.excerpt,
     };
-    Some(Value::from_safe_string(
-        uncoloured.as_ref().unwrap_or(shown).clone(),
-    ))
+    let uncoloured = uncoloured.as_ref().map_or(shown, |(html, _)| html);
+    Some(Value::from_safe_string(uncoloured.clone()))
 }
 
 /// Builds the snippet calls in a page's writing, and the pieces of it the
