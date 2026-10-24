@@ -64,7 +64,7 @@ fn changed_after(
     let moves: Vec<(String, String)> = (moves.iter())
         .map(|(from, to)| ((*from).to_owned(), (*to).to_owned()))
         .collect();
-    let edits = renamed(renderer, &site.root, Unsaved::default(), &moves);
+    let edits = renamed(renderer, &site.root, Unsaved::default(), &moves, None);
     let sources = renderer.sources();
     let mut changed: BTreeMap<String, String> = BTreeMap::new();
     for (place, text) in edits.iter().rev() {

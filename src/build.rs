@@ -24,7 +24,7 @@ use crate::publish::{self, Staging};
 use crate::reads::{Asked, Key, Reads, Record};
 use crate::report::Quiet;
 use crate::site::{Id, ListId, OutputId, PageId, PictureId};
-use crate::source::{Place, Sources};
+use crate::source::{Place, SourceId, Sources};
 use crate::templates::{self, Renderer};
 use scripts::{Finding, Found};
 
@@ -98,6 +98,9 @@ pub struct Outcome {
     pub record: Record,
     /// The drafts and posts waiting for their day built as if published.
     pub included: content::Included,
+    /// The files of the pages left out as drafts and until their day:
+    /// each page's own, or the data file a page was made from.
+    pub pages_left_out: Vec<SourceId>,
     /// What became of the copies of photographs, where the site was written.
     pub copies: Copies,
     /// What became of the sharing cards, where the site was written.
@@ -197,6 +200,7 @@ impl Outcome {
             javascript: Vec::new(),
             record: Record::default(),
             included: content::Included::default(),
+            pages_left_out: Vec::new(),
             copies: Copies::default(),
             cards: Cards::default(),
             hooks: crate::hooks::Ran::default(),
@@ -333,6 +337,9 @@ pub(crate) struct Prepared {
     pub quiet: Quiet,
     /// What `--drafts` brought in.
     pub included: content::Included,
+    /// The files of the pages left out of the build, as
+    /// [`Outcome::pages_left_out`] has them.
+    pub pages_left_out: Vec<SourceId>,
     /// The pictures that pages left out of the build name.
     pub left_out: Vec<PictureId>,
     /// The posts feed readers know, as the last build to publish kept
@@ -398,6 +405,7 @@ pub(crate) fn prepared_with(
         problems,
         quiet,
         included: read.included,
+        pages_left_out: (read.drafts.iter().chain(&read.waiting).copied()).collect(),
         left_out,
         known,
     }
@@ -1083,6 +1091,7 @@ pub(crate) fn publish(
         problems: _,
         quiet,
         included,
+        pages_left_out,
         left_out,
         known,
     } = prepared;
@@ -1277,6 +1286,7 @@ pub(crate) fn publish(
         javascript,
         record: Record::default(),
         included,
+        pages_left_out,
         copies,
         cards,
         hooks,

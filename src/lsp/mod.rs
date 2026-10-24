@@ -30,7 +30,7 @@ mod symbols;
 mod tests;
 mod wire;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -45,8 +45,10 @@ use references::Written;
 use crate::build::incremental::Checking;
 use crate::build::{Mode, Options};
 use crate::json;
+use crate::problem::Kind;
 use crate::serve::watch::{self, How, Settle, Watching};
 use crate::source::Sources;
+use crate::templates::Renderer;
 use crate::unsaved::Unsaved;
 use crate::yaml::{Node, Value};
 
@@ -164,6 +166,28 @@ struct Server<'a> {
 /// A site kept checked.
 struct Site {
     checking: Checking,
+    /// The site read with its drafts and posts waiting for their day as if
+    /// published, where it has any, for what is told and asked of their
+    /// files: what they would be once published.
+    drafts: Checking,
+    /// The paths in the site of the files of the pages the last check left
+    /// out.
+    left_out: HashSet<String>,
+    /// Whether the site has been checked since it was last checked with
+    /// the pages left out, and has any.
+    drafts_stale: bool,
+    /// The files of pages left out that the editor holds open, as the last
+    /// check found them: told what they would be once published, the rest
+    /// being told only that they are left out.
+    open_left_out: HashSet<PathBuf>,
+    /// The problems the last check found, by the file each is told in, but
+    /// for the notes that a page is left out told in its own file.
+    published: BTreeMap<PathBuf, Vec<Told>>,
+    /// Those notes, by file.
+    notes: BTreeMap<PathBuf, Vec<Told>>,
+    /// The problems the last check with the pages left out found in each
+    /// of their files the editor holds open.
+    drafts_told: BTreeMap<PathBuf, Vec<Told>>,
     /// Where a problem in no file is told.
     nowhere: PathBuf,
     /// The problems the editor was last told of in each file.
@@ -172,6 +196,76 @@ struct Site {
     due: Option<Instant>,
     /// Held while the site's folder is watched.
     _watching: Option<Watching>,
+}
+
+impl Site {
+    /// The site as last read for what is asked of `file`, a file in the
+    /// site at `folder`: with the pages left out where it is one of theirs.
+    fn known_for(&self, folder: &Path, file: &Path) -> Option<&Renderer> {
+        match self.left_out.contains(&in_site(folder, file)) {
+            true => self.known_whole(),
+            false => self.checking.renderer(),
+        }
+    }
+
+    /// The site as last read for what is asked of it whole, links and
+    /// names written in pages left out among the rest.
+    fn known_whole(&self) -> Option<&Renderer> {
+        (self.drafts.renderer()).or_else(|| self.checking.renderer())
+    }
+
+    /// The paths of the files of the pages left out, where
+    /// [`Site::known_whole`] holds them.
+    fn left_out(&self) -> Option<&HashSet<String>> {
+        (self.drafts.renderer()).map(|_| &self.left_out)
+    }
+
+    /// Whether the check with the pages left out is to follow the site's
+    /// own, to tell the files of theirs the editor holds open.
+    fn drafts_wanted(&self) -> bool {
+        self.drafts_stale && !self.open_left_out.is_empty()
+    }
+
+    /// The problems to tell the editor of now, by file, for the site at
+    /// `folder`: what its last check found, each file of a page left out
+    /// that the editor holds open told what the last check with it found
+    /// there, and the rest that they are left out.
+    fn told_now(&self, folder: &Path) -> BTreeMap<PathBuf, Vec<Told>> {
+        let mut found = self.published.clone();
+        for path in &self.left_out {
+            let file = folder.join(path);
+            let more = (self.drafts_told.get(&file)).or_else(|| self.notes.get(&file));
+            let Some(more) = more.filter(|more| !more.is_empty()) else {
+                continue;
+            };
+            let had = found.entry(file).or_default();
+            for told in more {
+                if !had.iter().any(|was| was.diagnostic == told.diagnostic) {
+                    had.push(told.clone());
+                }
+            }
+        }
+        found
+    }
+}
+
+/// How the server checks the site at `folder`: with its drafts and posts
+/// waiting for their day as if published where `drafts` holds.
+fn options(folder: &Path, drafts: bool) -> Options {
+    Options {
+        mode: Mode::Check,
+        site: folder.to_path_buf(),
+        out: None,
+        today: None,
+        drafts,
+        url: None,
+    }
+}
+
+/// `file`'s path in the site at `folder`, with `/` between its parts.
+fn in_site(folder: &Path, file: &Path) -> String {
+    let rel = file.strip_prefix(folder).unwrap_or(file);
+    rel.to_string_lossy().replace('\\', "/")
 }
 
 /// Where a request about a place in a file stands.
@@ -225,12 +319,35 @@ impl Server<'_> {
                     return 1;
                 }
             }
+            // Typing heard meanwhile puts the check with drafts off until
+            // the site's own check is done again.
+            while let Ok(event) = heard.try_recv() {
+                if let Some(code) = ended(self.hear(event)) {
+                    return code;
+                }
+            }
+            let mut drafts: Vec<PathBuf> = (self.sites.iter())
+                .filter(|(_, site)| site.drafts_wanted() && site.due.is_none())
+                .map(|(folder, _)| folder.clone())
+                .collect();
+            drafts.sort();
+            for folder in drafts {
+                if self.check_drafts(&folder).is_err() {
+                    return 1;
+                }
+            }
         }
     }
 
-    /// When the next site is due to be checked, where one is.
+    /// When the next site is due to be checked, where one is. The check
+    /// with a site's pages left out follows its own check as soon as
+    /// nothing else is waiting, where the editor holds one of their files
+    /// open, and waits while typing goes on.
     fn next_due(&self) -> Option<Instant> {
-        self.sites.values().filter_map(|site| site.due).min()
+        let now = Instant::now();
+        (self.sites.values())
+            .filter_map(|site| site.due.or(site.drafts_wanted().then_some(now)))
+            .min()
     }
 
     fn hear(&mut self, event: Event) -> Answered {
@@ -403,6 +520,13 @@ impl Server<'_> {
         }
         let site = Site {
             checking: Checking::new(),
+            drafts: Checking::new(),
+            left_out: HashSet::new(),
+            drafts_stale: false,
+            open_left_out: HashSet::new(),
+            published: BTreeMap::new(),
+            notes: BTreeMap::new(),
+            drafts_told: BTreeMap::new(),
             nowhere,
             told: BTreeMap::new(),
             due: Some(Instant::now()),
@@ -455,6 +579,10 @@ impl Server<'_> {
             return Ok(None);
         };
         self.read_if_unread(&folder)?;
+        let left_out = |site: &Site| site.left_out.contains(&in_site(&folder, &file));
+        if self.sites.get(&folder).is_some_and(left_out) {
+            self.drafts_if_due(&folder)?;
+        }
         Ok(Some((folder, file, text)))
     }
 
@@ -481,7 +609,7 @@ impl Server<'_> {
         else {
             return Ok("null".to_owned());
         };
-        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let known = (self.sites.get(&folder)).and_then(|site| site.known_for(&folder, &file));
         let completion = complete::complete(&folder, &file, &text, offset, known, self.snippets);
         let Some(completion) = completion else {
             return Ok("null".to_owned());
@@ -538,7 +666,7 @@ impl Server<'_> {
         else {
             return Ok("null".to_owned());
         };
-        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let known = (self.sites.get(&folder)).and_then(|site| site.known_for(&folder, &file));
         let Some(hover) = hover::hover(&folder, &file, &text, offset, known) else {
             return Ok("null".to_owned());
         };
@@ -583,7 +711,7 @@ impl Server<'_> {
         else {
             return Ok("null".to_owned());
         };
-        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let known = (self.sites.get(&folder)).and_then(|site| site.known_for(&folder, &file));
         let to = hover::hover(&folder, &file, &text, offset, known).and_then(|hover| hover.to);
         let (path, range) = match (to, known) {
             (Some(Goes::File(path)), _) => (folder.join(path), diagnostics::START.to_owned()),
@@ -613,8 +741,8 @@ impl Server<'_> {
         else {
             return Ok("null".to_owned());
         };
-        let Some(known) = (self.sites.get(&folder)).and_then(|site| site.checking.renderer())
-        else {
+        self.drafts_if_due(&folder)?;
+        let Some(known) = (self.sites.get(&folder)).and_then(Site::known_whole) else {
             return Ok("null".to_owned());
         };
         let to = hover::hover(&folder, &file, &text, offset, Some(known)).and_then(|h| h.to);
@@ -733,14 +861,17 @@ impl Server<'_> {
             if site.due.is_some() {
                 self.check(&folder)?;
             }
-            let Some(renderer) =
-                (self.sites.get(&folder)).and_then(|site| site.checking.renderer())
-            else {
+            self.drafts_if_due(&folder)?;
+            let Some(site) = self.sites.get(&folder) else {
+                continue;
+            };
+            let Some(renderer) = site.known_whole() else {
                 continue;
             };
             let unsaved = Unsaved::new(self.open.clone());
             let sources = renderer.sources();
-            for (place, text) in rename::renamed(renderer, &folder, unsaved, &moves) {
+            let left_out = site.left_out();
+            for (place, text) in rename::renamed(renderer, &folder, unsaved, &moves, left_out) {
                 let file = folder.join(sources.path(place.source));
                 changes.entry(uri::of(&file)).or_default().push(format!(
                     "{{\"range\":{},\"newText\":{}}}",
@@ -765,7 +896,7 @@ impl Server<'_> {
         let Some((folder, file, text)) = self.named(message)? else {
             return Ok("null".to_owned());
         };
-        let known = (self.sites.get(&folder)).and_then(|site| site.checking.renderer());
+        let known = (self.sites.get(&folder)).and_then(|site| site.known_for(&folder, &file));
         let Some(headings) = symbols::headings(&folder, &file, &text, known) else {
             return Ok("null".to_owned());
         };
@@ -810,9 +941,8 @@ impl Server<'_> {
         let mut told = Vec::new();
         for folder in folders {
             self.read_if_unread(&folder)?;
-            let Some(renderer) =
-                (self.sites.get(&folder)).and_then(|site| site.checking.renderer())
-            else {
+            self.drafts_if_due(&folder)?;
+            let Some(renderer) = (self.sites.get(&folder)).and_then(Site::known_whole) else {
                 continue;
             };
             for found in symbols::found(renderer, query) {
@@ -837,7 +967,8 @@ impl Server<'_> {
     }
 
     /// Checks the site at `folder` and tells the editor of each file whose
-    /// problems differ from what it was last told.
+    /// problems differ from what it was last told, the files of pages left
+    /// out as the check with them last told them, where one has.
     fn check(&mut self, folder: &Path) -> std::io::Result<()> {
         let encoding = self.encoding;
         let Some(site) = self.sites.get_mut(folder) else {
@@ -845,27 +976,102 @@ impl Server<'_> {
         };
         site.due = None;
         site.checking.set_unsaved(Unsaved::new(self.open.clone()));
-        let options = Options {
-            mode: Mode::Check,
-            site: folder.to_path_buf(),
-            out: None,
-            today: None,
-            drafts: false,
-            url: None,
-        };
+        let options = options(folder, false);
         let checking = &mut site.checking;
         let checked =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| checking.check(&options)));
-        let Ok(outcome) = checked else {
+        let Ok(mut outcome) = checked else {
             // What a check that stopped part way kept may be anything.
             site.checking = Checking::new();
+            site.drafts = Checking::new();
+            site.drafts_stale = false;
             let params = format!(
                 "{{\"type\":1,\"message\":{}}}",
                 json::string(crate::wording::CHECK_STOPPED)
             );
             return self.notify("window/showMessage", &params).map(|_| ());
         };
-        let found = diagnostics::by_file(&outcome, folder, &site.nowhere, encoding);
+        let sources = outcome.sources();
+        site.left_out = (outcome.pages_left_out.iter())
+            .map(|&source| sources.path(source).to_string_lossy().replace('\\', "/"))
+            .collect();
+        // That a page is left out is said only until the check with it
+        // says what it would be once published.
+        let files = &outcome.pages_left_out;
+        let (notes, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut outcome.problems)
+            .into_iter()
+            .partition(|problem| {
+                matches!(
+                    problem.kind,
+                    Kind::DraftLeftOut { .. } | Kind::WaitingForItsDay { .. }
+                ) && (problem.place).is_some_and(|at| files.contains(&at.source))
+            });
+        outcome.problems = rest;
+        site.published = diagnostics::by_file(&outcome, folder, &site.nowhere, encoding);
+        outcome.problems = notes;
+        site.notes = diagnostics::by_file(&outcome, folder, &site.nowhere, encoding);
+        site.drafts_stale = !site.left_out.is_empty();
+        if !site.drafts_stale {
+            site.drafts = Checking::new();
+        }
+        let open = &self.open;
+        site.open_left_out = (site.left_out.iter())
+            .map(|path| folder.join(path))
+            .filter(|file| open.contains_key(&real(file)))
+            .collect();
+        let shown = &site.open_left_out;
+        site.drafts_told.retain(|file, _| shown.contains(file));
+        let found = site.told_now(folder);
+        self.tell(folder, found)
+    }
+
+    /// Checks the site at `folder` with its drafts and posts waiting for
+    /// their day as if published, and tells the editor of each of their
+    /// files it holds open whose problems differ from what it was last
+    /// told.
+    fn check_drafts(&mut self, folder: &Path) -> std::io::Result<()> {
+        let encoding = self.encoding;
+        let Some(site) = self.sites.get_mut(folder) else {
+            return Ok(());
+        };
+        site.drafts_stale = false;
+        site.drafts.set_unsaved(Unsaved::new(self.open.clone()));
+        let options = options(folder, true);
+        let checking = &mut site.drafts;
+        let checked =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| checking.check(&options)));
+        site.drafts_told.clear();
+        match checked {
+            Ok(outcome) => {
+                let mut told = diagnostics::by_file(&outcome, folder, &site.nowhere, encoding);
+                for file in &site.open_left_out {
+                    let found = told.remove(file).unwrap_or_default();
+                    site.drafts_told.insert(file.clone(), found);
+                }
+            }
+            // Their files are told as the site's own check told them.
+            Err(_) => site.drafts = Checking::new(),
+        }
+        let found = site.told_now(folder);
+        self.tell(folder, found)
+    }
+
+    /// Runs the check with the pages left out of the site at `folder`,
+    /// where it is due, so that what is asked of them is answered as the
+    /// site stands.
+    fn drafts_if_due(&mut self, folder: &Path) -> std::io::Result<()> {
+        match (self.sites.get(folder)).is_some_and(|site| site.drafts_stale) {
+            true => self.check_drafts(folder),
+            false => Ok(()),
+        }
+    }
+
+    /// Tells the editor of each file whose problems in `found` differ from
+    /// what it was last told of the site at `folder`.
+    fn tell(&mut self, folder: &Path, found: BTreeMap<PathBuf, Vec<Told>>) -> std::io::Result<()> {
+        let Some(site) = self.sites.get_mut(folder) else {
+            return Ok(());
+        };
         let before = std::mem::replace(&mut site.told, found);
         let found = &self.sites[folder].told;
         let gone: Vec<PathBuf> = (before.keys())

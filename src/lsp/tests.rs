@@ -1038,3 +1038,152 @@ fn renaming_a_pages_file_answers_with_the_edits_that_keep_its_links() {
         )
     );
 }
+
+const DRAFT: &str = "---\ntitle: Draft 1\ndraft: true\nlayout: pots\n---\n\
+                     See [the team](/about/#the-team).\n";
+
+fn drafting() -> TempSite {
+    TempSite::site(&[
+        ("statac.yaml", "title: Site 1\nlanguage: en\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        (
+            "content/about.md",
+            "---\ntitle: About\n---\nSee [the draft](/draft-1/).\n\n## The team\n",
+        ),
+        ("content/draft-1.md", DRAFT),
+    ])
+}
+
+#[test]
+fn a_draft_is_told_what_it_would_be_once_published_and_the_rest_as_published() {
+    let site = drafting();
+    let draft = site.root.join("content/draft-1.md");
+    let about = site.root.join("content/about.md");
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    editor.send(&opened(&draft));
+    let told = editor.told_until(0, &draft, |told| has(told, "missing-template"));
+    assert!(!has(&told, "draft-left-out"), "{told:?}");
+    let told = editor.told_until(0, &about, |told| has(told, "broken-link"));
+    assert_eq!(told, [("broken-link".into(), "3".into(), "16".into())]);
+    // Published, it is the rest of the site's like any page.
+    let mark = editor.mark();
+    let published = DRAFT.replace("draft: true\n", "");
+    editor.send(&changed(&draft, &published));
+    editor.told_until(mark, &about, <[Told]>::is_empty);
+    let told = editor.told_until(mark, &draft, |told| !told.is_empty());
+    assert!(has(&told, "missing-template"), "{told:?}");
+    editor.end(true);
+}
+
+#[test]
+fn a_draft_the_editor_doesnt_hold_open_is_told_only_that_it_is_left_out() {
+    let site = drafting();
+    let draft = site.root.join("content/draft-1.md");
+    let page = site.root.join("content/about.md");
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    editor.send(&opened(&page));
+    let told = editor.told_until(0, &draft, |told| !told.is_empty());
+    assert_eq!(told, [("draft-left-out".into(), "2".into(), "7".into())]);
+    // Opened, it is told what it would be once published, and closed,
+    // that it is left out again.
+    let mark = editor.mark();
+    editor.send(&opened(&draft));
+    editor.told_until(mark, &draft, |told| has(told, "missing-template"));
+    let mark = editor.mark();
+    editor.send(&about("didClose", &draft));
+    editor.told_until(mark, &draft, |told| has(told, "draft-left-out"));
+    editor.end(true);
+}
+
+#[test]
+fn what_is_asked_in_a_draft_is_answered_as_of_a_page() {
+    let site = drafting();
+    let draft = site.root.join("content/draft-1.md");
+    let about = site.root.join("content/about.md");
+    let references = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/references\",\
+         \"params\":{{\"textDocument\":{{\"uri\":{}}},\
+         \"position\":{{\"line\":5,\"character\":0}},\
+         \"context\":{{\"includeDeclaration\":false}}}}}}",
+        json::string(&uri::of(&draft))
+    );
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    let mark = editor.mark();
+    editor.send_all(&[&opened(&draft), &references]);
+    editor.until(mark, |message| message.id() == Some("2"));
+    let (sent, _) = editor.end(true);
+    let answer = (sent.iter())
+        .find(|message| message.id() == Some("2"))
+        .expect("the references");
+    let found = answer
+        .sources
+        .spelling(answer.at(&["result"]).unwrap().place);
+    assert_eq!(
+        found,
+        format!(
+            "[{{\"uri\":{},\"range\":{{\"start\":{{\"line\":3,\"character\":16}},\
+             \"end\":{{\"line\":3,\"character\":25}}}}}}]",
+            json::string(&uri::of(&about))
+        )
+    );
+}
+
+#[test]
+fn renaming_finds_the_links_drafts_write_and_sends_no_one_on_from_where_a_draft_was() {
+    let site = drafting();
+    let draft = site.root.join("content/draft-1.md");
+    let about = site.root.join("content/about.md");
+    let rename = |id: u32, from: &str, to: &str| {
+        format!(
+            "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"workspace/willRenameFiles\",\
+             \"params\":{{\"files\":[{{\"oldUri\":{},\"newUri\":{}}}]}}}}",
+            json::string(&uri::of(&site.root.join(from))),
+            json::string(&uri::of(&site.root.join(to)))
+        )
+    };
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    let mark = editor.mark();
+    editor.send_all(&[
+        &opened(&about),
+        &rename(2, "content/about.md", "content/about-us.md"),
+        &rename(3, "content/draft-1.md", "content/draft-2.md"),
+    ]);
+    editor.until(mark, |message| message.id() == Some("3"));
+    let (sent, _) = editor.end(true);
+    let edits = |id: &str| {
+        let answer = (sent.iter())
+            .find(|message| message.id() == Some(id))
+            .expect("the edits");
+        answer
+            .sources
+            .spelling(answer.at(&["result"]).unwrap().place)
+            .to_owned()
+    };
+    let edit = |file: &Path, line: usize, start: usize, end: usize, text: &str| {
+        format!(
+            "{}:[{{\"range\":{{\"start\":{{\"line\":{line},\"character\":{start}}},\
+             \"end\":{{\"line\":{line},\"character\":{end}}}}},\"newText\":{}}}]",
+            json::string(&uri::of(file)),
+            json::string(text)
+        )
+    };
+    assert_eq!(
+        edits("2"),
+        format!(
+            "{{\"changes\":{{{},{}}}}}",
+            edit(&about, 2, 0, 0, "redirect_from: [/about/]\n"),
+            edit(&draft, 5, 15, 31, "/about-us/#the-team"),
+        )
+    );
+    assert_eq!(
+        edits("3"),
+        format!(
+            "{{\"changes\":{{{}}}}}",
+            edit(&about, 3, 16, 25, "/draft-2/")
+        )
+    );
+}

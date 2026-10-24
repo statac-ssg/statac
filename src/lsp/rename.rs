@@ -9,7 +9,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::references;
@@ -27,12 +27,16 @@ use crate::unsaved::Unsaved;
 /// by `moves`, each a file or folder from its path in the site to its new
 /// one: each the text written in place of what is at its place, which is
 /// empty where the text goes in. The site's files are read as `unsaved`
-/// has them.
+/// has them. Where `renderer` read the site with its drafts and posts
+/// waiting for their day, `left_out` holds the paths of their files,
+/// whose pages send no one on from where they were, never having been
+/// published there.
 pub(super) fn renamed(
     renderer: &Renderer,
     root: &Path,
     unsaved: Unsaved,
     moves: &[(String, String)],
+    left_out: Option<&HashSet<String>>,
 ) -> Vec<(Place, String)> {
     let under = |path: &str| {
         let path = path.strip_prefix("content/")?.trim_end_matches('/');
@@ -49,6 +53,7 @@ pub(super) fn renamed(
     texts.set_unsaved(unsaved);
     let run = Run {
         renamed: renamed.clone(),
+        drafts: left_out.is_some(),
         ..Run::default()
     };
     let read = content::read_with(root, &run, &mut texts);
@@ -90,7 +95,11 @@ pub(super) fn renamed(
                 edits.push((link.place, text));
             }
         }
-        edits.extend(redirect(renderer, page, before, &moved[&page]));
+        let file = (site.pages.get(page).source)
+            .map(|source| sources.path(source).to_string_lossy().replace('\\', "/"));
+        if !(left_out.zip(file)).is_some_and(|(left_out, file)| left_out.contains(&file)) {
+            edits.extend(redirect(renderer, page, before, &moved[&page]));
+        }
     }
     // A moved page's links to a page that stays, written from where the
     // page was, are written again from where it goes.
