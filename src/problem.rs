@@ -764,7 +764,6 @@ pub enum Kind {
     /// An argument the command has no use for.
     UnexpectedArgument {
         written: String,
-        suggestion: Option<String>,
     },
     /// `statac explain` with no name after it.
     MissingName,

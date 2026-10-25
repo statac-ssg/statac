@@ -96,7 +96,6 @@ fn only_an_unknown_command_is_told_not_what_follows_it() {
             &["build", "site", "extra"],
             vec![Kind::UnexpectedArgument {
                 written: "extra".into(),
-                suggestion: None,
             }],
         ),
     ];
@@ -328,7 +327,6 @@ fn the_site_is_given_once() {
         parsed(&["build", "docs", "public"]),
         Err(vec![Kind::UnexpectedArgument {
             written: "public".into(),
-            suggestion: None,
         }])
     );
 }

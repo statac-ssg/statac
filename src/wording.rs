@@ -2436,10 +2436,11 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             former: Former::Retired,
             ..
         } => Some("This kind of problem no longer exists.".into()),
-        Kind::UnknownProblemName { suggestion, .. }
-        | Kind::UnexpectedArgument { suggestion, .. } => {
+        Kind::UnknownProblemName { suggestion, .. } => {
             suggestion.as_ref().map(|s| format!("Did you mean `{s}`?"))
         }
+        // An argument the command has no use for has no right spelling to offer.
+        Kind::UnexpectedArgument { .. } => None,
         Kind::CantQuieten { .. } => Some("Take it out of `quiet:`.".into()),
         Kind::UnknownCommand { hint, .. } => Some(match hint {
             CommandHint::Similar(s) => format!("Did you mean `statac {s}`?"),
@@ -8186,7 +8187,6 @@ mod tests {
             (
                 Kind::UnexpectedArgument {
                     written: "public".into(),
-                    suggestion: None,
                 },
                 "Unexpected argument: `public`",
                 None,
