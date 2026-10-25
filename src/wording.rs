@@ -11,7 +11,7 @@
 use crate::fetch::Refusal;
 use crate::platform::{Alike, Unwritable};
 use crate::problem::{
-    AddressFault, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
+    AddressFault, AllOf, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
     Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found, Held, Hint, Holds,
     InPlace, Instead, JsonFault, Kind, LabelledBy, Lack, ListFault, Maker, Malformed, MathsFault,
     Missing, MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own,
@@ -3255,6 +3255,23 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             nearest.as_ref().map(|n| format!("Did you mean `{n}`?"))
         }
         Kind::ColourConverted { .. } | Kind::CacheNotWritten { .. } => None,
+        Kind::MissingAltText {
+            shown,
+            all_of: Some(all_of),
+            ..
+        } => {
+            let (saying, what) = match all_of {
+                AllOf::Link(Some(to)) => (format!("where the link to `{to}` leads"), "link"),
+                AllOf::Link(None) => ("where the link leads".to_owned(), "link"),
+                AllOf::Button => ("what the button does".to_owned(), "button"),
+            };
+            let all = format!("as the image is all the {what} shows");
+            Some(match shown {
+                ShownBy::Markdown { .. } => format!("Say in the brackets {saying}, {all}."),
+                ShownBy::Html => format!("Give the `<img>` an `alt` saying {saying}, {all}."),
+                ShownBy::Template { .. } => format!("Give it alt text saying {saying}, {all}."),
+            })
+        }
         Kind::MissingAltText { shown, .. } => Some(match shown {
             ShownBy::Markdown {
                 described_beside: true,
@@ -7383,6 +7400,7 @@ mod tests {
                     shown: ShownBy::Markdown {
                         described_beside: true,
                     },
+                    all_of: None,
                 },
                 "Missing alt text: `photo-1.jpg`",
                 Some("Describe it in the brackets, or mark it decorative."),
@@ -7393,6 +7411,7 @@ mod tests {
                     shown: ShownBy::Markdown {
                         described_beside: false,
                     },
+                    all_of: None,
                 },
                 "Missing alt text: `https://example.org/photo-1.jpg`",
                 Some("Describe it in the brackets."),
@@ -7401,6 +7420,7 @@ mod tests {
                 Kind::MissingAltText {
                     picture: "photo-1.jpg".into(),
                     shown: ShownBy::Html,
+                    all_of: None,
                 },
                 "Missing alt text: `photo-1.jpg`",
                 Some("Give the `<img>` an `alt`, or `alt=\"\"` where it is decorative."),
@@ -7411,6 +7431,7 @@ mod tests {
                     shown: ShownBy::Template {
                         beside: Some("content/photo-1.jpg.yaml".into()),
                     },
+                    all_of: None,
                 },
                 "Missing alt text: `content/photo-1.jpg`",
                 Some(
@@ -7422,6 +7443,7 @@ mod tests {
                 Kind::MissingAltText {
                     picture: "static/photo-1.jpg".into(),
                     shown: ShownBy::Template { beside: None },
+                    all_of: None,
                 },
                 "Missing alt text: `static/photo-1.jpg`",
                 Some("Describe it where it is shown, or mark it decorative."),

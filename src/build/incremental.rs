@@ -454,6 +454,10 @@ fn carry(
                 full: shown.full,
             })
         });
+        let folded = old.folded.iter().map(|place| match place {
+            Some(place) => Some(Some(to.place(*place)?)),
+            None => Some(None),
+        });
         let cards = old.cards.iter().map(|asked| {
             // Worked out again from the site as it is read now, which
             // gives what was asked for wherever what it read is the same.
@@ -476,6 +480,7 @@ fn carry(
             walked: old.walked,
             written: old.written,
             indexed: old.indexed.clone(),
+            folded: folded.collect::<Option<_>>()?,
         })
     };
     let outputs = plan.outputs.par_iter().enumerate();

@@ -449,6 +449,9 @@ pub(crate) struct Built {
     pub written: bool,
     /// The languages whose search index it names.
     pub indexed: Vec<crate::site::LanguageId>,
+    /// Where each link or button it shows was written that is all an image
+    /// told as missing alt text, which no page tells as missing words.
+    pub folded: Vec<Option<Place>>,
 }
 
 /// Where an output goes once it is built.
@@ -833,6 +836,9 @@ pub(crate) fn conclude(
     // Where in `problems` each element no screen reader has words for is
     // told, by its kind and place.
     let mut unheard: HashMap<(Code, Option<Place>), Vec<usize>> = HashMap::new();
+    let folded: HashSet<Option<Place>> = (built.iter())
+        .flat_map(|built| built.folded.iter().copied())
+        .collect();
     for built in built {
         if let Output::Page(page) = built.output
             && let Some(list) = site.pages.get(page).speaks_for
@@ -846,6 +852,7 @@ pub(crate) fn conclude(
             .problems
             .iter()
             .filter(|p| unnamed::finds(p.kind.code()))
+            .filter(|p| !(unnamed::of_an_image(p) && folded.contains(&p.place)))
         {
             let key = (problem.kind.code(), problem.place);
             let alike = unheard.entry(key).or_default();
@@ -1476,6 +1483,7 @@ pub(crate) fn build_output(
     let mut scripts = Vec::new();
     let mut pieces = Vec::new();
     let mut checked = None;
+    let mut folded = Vec::new();
     let mut written = false;
     let mut held = None;
     let mut sized = false;
@@ -1491,8 +1499,10 @@ pub(crate) fn build_output(
             && file.ends_with(".html")
         {
             let layout = rendered.layout;
-            let unnamed = unnamed::told(renderer, page, number, &rendered.own, &html, layout);
-            problems.extend(unnamed);
+            let own = &rendered.own;
+            let unnamed = unnamed::told(renderer, page, number, own, &html, layout, &mut problems);
+            problems.extend(unnamed.problems);
+            folded = unnamed.folded;
             let page = links::Page {
                 id: page,
                 number,
@@ -1542,6 +1552,7 @@ pub(crate) fn build_output(
         walked: rendered.walked,
         written,
         indexed: rendered.indexed,
+        folded,
     }
 }
 

@@ -4,7 +4,7 @@ use crate::problem::{Kind, LabelledBy};
 /// What `html` is told of, each with the text its tag opens with.
 fn told(html: &str, titled: bool) -> Vec<(Kind, Option<&str>)> {
     (unnamed(html, titled).into_iter())
-        .map(|(kind, at)| (kind, at.map(|at| &html[at])))
+        .map(|found| (found.kind, found.at.map(|at| &html[at])))
         .collect()
 }
 

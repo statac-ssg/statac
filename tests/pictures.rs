@@ -810,6 +810,52 @@ fn a_photograph_left_alone_is_published_as_it_is() {
     );
 }
 
+/// An image with no alt text that is all a link or a button shows is told
+/// once, as missing alt text saying what the alt text should say; one
+/// marked decorative leaves the link with no words, which is told.
+#[test]
+fn an_image_that_is_all_a_link_shows_is_told_once_as_its_alt_text() {
+    let site = Site::new("linked");
+    for name in ["photo-1", "photo-2", "photo-3", "photo-4"] {
+        site.put(&format!("content/post-1/{name}.jpg"), &jpeg(30, 20));
+    }
+    site.write("content/post-1/photo-4.jpg.yaml", "decorative: true\n");
+    site.write(
+        "content/post-1/index.md",
+        "---\ntitle: Post 1\n---\n[![](photo-1.jpg)](/post-2/)\n\n\
+         <a href=\"/post-2/\"><img src=\"photo-2.jpg\"></a>\n\n\
+         <button><img src=\"photo-3.jpg\"></button>\n\n\
+         [![](photo-4.jpg)](/post-2/)\n",
+    );
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(code, 0, "{said}");
+    let told: Vec<&str> = (said.lines())
+        .filter(|line| {
+            line.starts_with("note  Missing")
+                || line.starts_with("  Say ")
+                || line.starts_with("  Give ")
+        })
+        .collect();
+    assert_eq!(
+        told,
+        [
+            "note  Missing alt text: `photo-1.jpg`",
+            "  Say in the brackets where the link to `/post-2/` leads, as the image is all the \
+             link shows.",
+            "note  Missing alt text: `photo-2.jpg`",
+            "  Give the `<img>` an `alt` saying where the link to `/post-2/` leads, as the image \
+             is all the link shows.",
+            "note  Missing alt text: `photo-3.jpg`",
+            "  Give the `<img>` an `alt` saying what the button does, as the image is all the \
+             button shows.",
+            "note  Missing link text: the link to `/post-2/` has nothing a screen reader can read \
+             out",
+            "  Give the `<img>` inside it an `alt` saying where the link leads.",
+        ],
+        "{said}"
+    );
+}
+
 #[test]
 fn a_file_describing_a_picture_is_read_and_one_describing_none_is_told() {
     let site = Site::new("sidecar");

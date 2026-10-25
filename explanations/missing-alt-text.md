@@ -32,7 +32,9 @@ An image marked decorative is never reported.
 ## How to fix it
 
 Say what the image shows in a few words, as you would to someone on the
-phone.
+phone. Where the image is all a link or a button shows, its alt text is
+what a screen reader names the link or the button by, so say where the
+link leads or what the button does; the note says which.
 
 In Markdown, write it in the brackets:
 `![A gradient from blue to orange](photo-1.jpg)`.

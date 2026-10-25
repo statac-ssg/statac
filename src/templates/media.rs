@@ -786,6 +786,7 @@ impl Object for PhotoValue {
                     shown: ShownBy::Template {
                         beside: described_beside(picture),
                     },
+                    all_of: None,
                 };
                 let at = self.asking.place(shared);
                 undescribed(picture.shown(), |frame| {

@@ -1586,6 +1586,7 @@ fn undescribed_in_html(shared: &Shared, page: PageId, source: SourceId, span: cr
         let kind = Kind::MissingAltText {
             picture: picture.clone(),
             shown: ShownBy::Html,
+            all_of: None,
         };
         let found =
             super::media::found(shared, page, &picture).map(|id| shared.site.pictures.get(id));
@@ -2076,6 +2077,7 @@ impl markdown::Snippets for Prose<'_> {
             shown: ShownBy::Markdown {
                 described_beside: found.is_some_and(|found| found.described_beside),
             },
+            all_of: None,
         };
         let file = found.and_then(|found| found.file.clone());
         let key = file.unwrap_or_else(|| picture.to_owned());

@@ -1448,11 +1448,12 @@ pub enum Kind {
         reason: Reason,
     },
     /// A picture a page shows with nothing said of it for a reader who
-    /// can't see it: the picture as it is named where it is shown, and how
-    /// it is shown.
+    /// can't see it: the picture as it is named where it is shown, how it
+    /// is shown, and the link or button it is all of, where it is.
     MissingAltText {
         picture: String,
         shown: ShownBy,
+        all_of: Option<AllOf>,
     },
     /// A link on a built page with nothing a screen reader can read out as
     /// its name: its `href` with its character references read, where that
@@ -1685,6 +1686,15 @@ pub enum ShownBy {
     /// By a template or a snippet, with the file that may describe it,
     /// for a picture under `content/`.
     Template { beside: Option<String> },
+}
+
+/// A link or a button an image with no alt text is all of, so that its
+/// alt text is what a screen reader names the link or the button by.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum AllOf {
+    /// A link, with its `href` where it isn't empty.
+    Link(Option<String>),
+    Button,
 }
 
 /// What gives a form control of its kind its label, where nothing else

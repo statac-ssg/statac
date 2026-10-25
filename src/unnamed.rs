@@ -17,7 +17,7 @@
 use std::ops::Range;
 
 use crate::html::{self, Markup, Tag};
-use crate::problem::{Code, Kind, LabelledBy, Problem};
+use crate::problem::{AllOf, Code, Kind, LabelledBy, Problem};
 use crate::site::{Id, PageId, TemplateId};
 use crate::source::{Place, Span};
 use crate::templates::{Own, Renderer};
@@ -46,7 +46,9 @@ pub(crate) fn alike(renderer: &Renderer, a: &Problem, b: &Problem) -> bool {
 
 /// Each element of `html`, the page `number` of `page`'s list counted from
 /// 1, built with the template `layout`, that a screen reader has no words
-/// for, told where it was written.
+/// for, told where it was written. A link or a button that is all an image
+/// with no alt text, where `shown`, the page's problems, tells that image,
+/// is told there instead.
 pub(crate) fn told(
     renderer: &Renderer,
     page: PageId,
@@ -54,18 +56,33 @@ pub(crate) fn told(
     own: &Own,
     html: &str,
     layout: Option<usize>,
-) -> Vec<Problem> {
+    shown: &mut [Problem],
+) -> Told {
     let source = renderer.site().pages.get(page).source;
     let found = unnamed(html, layout.is_some());
     let building = (!found.is_empty())
         .then(|| renderer.building(page, number))
         .flatten();
     let mut told = Vec::with_capacity(found.len());
-    for (kind, at) in found {
-        let place = at.and_then(|at| placed(renderer, own, html, at));
+    let mut folded = Vec::new();
+    for Unnamed { kind, at, image } in found {
+        let all_of = match &kind {
+            Kind::MissingLinkText { href, .. } => AllOf::Link(href.clone()),
+            _ => AllOf::Button,
+        };
+        let at_place = at.and_then(|at| placed(renderer, own, html, at));
+        let image = image.and_then(|image| tag_placed(renderer, own, html, image));
+        if let Some(image) = image
+            && let Some(told) = shown.iter_mut().find(|problem| shows(problem, image))
+            && let Kind::MissingAltText { all_of: at, .. } = &mut told.kind
+        {
+            *at = Some(all_of);
+            folded.push(at_place);
+            continue;
+        }
         // With nothing on the page to place it at, a missing `<title>` is
         // the layout's.
-        let place = place.or_else(|| {
+        let place = at_place.or_else(|| {
             let layout = layout.filter(|_| matches!(kind, Kind::MissingTitle { .. }))?;
             let template = renderer.template_source(TemplateId::from_index(layout));
             Some(crate::content::words::head(renderer.sources(), template))
@@ -84,7 +101,54 @@ pub(crate) fn told(
             _ => problem,
         });
     }
-    told
+    Told {
+        problems: told,
+        folded,
+    }
+}
+
+/// What [`told`] found on a page: its problems, and where each link or
+/// button was written that is all an image told as missing alt text.
+pub(crate) struct Told {
+    pub problems: Vec<Problem>,
+    pub folded: Vec<Option<Place>>,
+}
+
+/// Whether `problem` is a link or a button with no words that is all an
+/// image with no alt text.
+pub(crate) fn of_an_image(problem: &Problem) -> bool {
+    matches!(
+        problem.kind,
+        Kind::MissingLinkText { image: true, .. } | Kind::MissingButtonText { image: true }
+    )
+}
+
+/// Whether `problem` is an image's missing alt text told within the tag
+/// written at `image`, not yet named as all of a link or a button.
+fn shows(problem: &Problem, image: Place) -> bool {
+    matches!(problem.kind, Kind::MissingAltText { all_of: None, .. })
+        && problem.place.is_some_and(|place| {
+            place.source == image.source
+                && image.span.start <= place.span.start
+                && place.span.end <= image.span.end
+        })
+}
+
+/// Where the whole tag at `at` on a built page was written: in a
+/// template's own text where it opens and closes there, else where the
+/// value holding it was written.
+fn tag_placed(renderer: &Renderer, own: &Own, html: &str, at: Range<usize>) -> Option<Place> {
+    let opens = renderer.written_at(own, at.start);
+    if let Some((template, start)) = opens {
+        return match renderer.written_at(own, at.end - 1) {
+            Some((closing, end)) if closing == template && end >= start => Some(Place {
+                source: renderer.template_source(template),
+                span: Span::new(start, end + 1),
+            }),
+            _ => None,
+        };
+    }
+    renderer.printed_at(own, html, at.start, at.len())
 }
 
 /// Where the tag whose opening, `<` and its name, is at `at` on a built
@@ -114,8 +178,17 @@ struct Open {
     at: Range<usize>,
     /// Whether anything inside it, or on its tag, gives it words.
     named: bool,
-    /// Whether it holds an image with no alt text.
-    image: bool,
+    /// The whole tag of the first image with no alt text it holds.
+    image: Option<Range<usize>>,
+}
+
+/// An element a screen reader has no words for, with where its tag opens,
+/// `<` and its name, and for a link or a button, the whole tag of the
+/// first image with no alt text it holds.
+pub(crate) struct Unnamed {
+    pub kind: Kind,
+    pub at: Option<Range<usize>>,
+    pub image: Option<Range<usize>>,
 }
 
 /// A form control with no label but perhaps a `<label for>` further on.
@@ -141,8 +214,8 @@ enum Text {
 /// the page, where it is a document, should have a `<title>`. A missing
 /// `<title>` is placed at the `<head>`, else at the `<html>`, else at the
 /// doctype.
-pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<(Kind, Option<Range<usize>>)> {
-    let mut found: Vec<(Kind, Option<Range<usize>>)> = Vec::new();
+pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<Unnamed> {
+    let mut found: Vec<Unnamed> = Vec::new();
     let mut open: Vec<Open> = Vec::new();
     let mut controls: Vec<Control> = Vec::new();
     // The ids `<label for>` names, and how many labels are open.
@@ -204,7 +277,8 @@ pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<(Kind, Option<Range<usize
         let opening = range.start..range.start + 1 + name.len();
         // In foreign content, `/>` closes an element.
         let closed = html::VOID.contains(&name)
-            || (foreign > 0 || matches!(name, "svg" | "math")) && html[range].ends_with("/>");
+            || (foreign > 0 || matches!(name, "svg" | "math"))
+                && html[range.clone()].ends_with("/>");
         text = match name {
             "title" | "xmp" | "plaintext" => Text::Shown,
             name if name == "script" || html::RAW_TEXT.contains(&name) => Text::Unshown,
@@ -247,7 +321,7 @@ pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<(Kind, Option<Range<usize
             if names_itself || name == "img" && alt {
                 open.named = true;
             } else if name == "img" {
-                open.image = true;
+                open.image.get_or_insert(range.clone());
             }
         }
         match name {
@@ -261,7 +335,7 @@ pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<(Kind, Option<Range<usize
                     href: given(&tag, "href"),
                     at: opening,
                     named: names_itself,
-                    image: false,
+                    image: None,
                 };
                 match closed {
                     true => close(opened, &mut found),
@@ -270,7 +344,7 @@ pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<(Kind, Option<Range<usize
             }
             "iframe" if !names_itself => {
                 let src = given(&tag, "src");
-                found.push((Kind::MissingIframeTitle { src }, Some(opening)));
+                found.push(Unnamed::at(Kind::MissingIframeTitle { src }, opening));
             }
             "input" | "select" | "textarea"
                 if !names_itself && labels == 0 && tag.get("disabled").is_none() =>
@@ -314,21 +388,21 @@ pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<(Kind, Option<Range<usize
     }
     for control in controls {
         if !(control.id.as_ref()).is_some_and(|id| labelled.contains(id)) {
-            found.push((control.kind, Some(control.at)));
+            found.push(Unnamed::at(control.kind, control.at));
         }
     }
     if titled {
         match title {
             Some((_, true)) => {}
-            Some((at, false)) => found.push((Kind::MissingTitle { empty: true }, Some(at))),
+            Some((at, false)) => found.push(Unnamed::at(Kind::MissingTitle { empty: true }, at)),
             None => {
                 if let Some(at) = head.or(root).or(doctype) {
-                    found.push((Kind::MissingTitle { empty: false }, Some(at)));
+                    found.push(Unnamed::at(Kind::MissingTitle { empty: false }, at));
                 }
             }
         }
     }
-    found.sort_by_key(|(_, at)| at.as_ref().map(|at| at.start));
+    found.sort_by_key(|found| found.at.as_ref().map(|at| at.start));
     found
 }
 
@@ -342,17 +416,32 @@ fn heard(between: &str, text: Text, hidden: bool, open: &mut [Open]) -> bool {
     says
 }
 
+impl Unnamed {
+    fn at(kind: Kind, at: Range<usize>) -> Unnamed {
+        Unnamed {
+            kind,
+            at: Some(at),
+            image: None,
+        }
+    }
+}
+
 /// Tells `open` where nothing gave it words.
-fn close(open: Open, found: &mut Vec<(Kind, Option<Range<usize>>)>) {
+fn close(open: Open, found: &mut Vec<Unnamed>) {
     if !open.named {
+        let image = open.image.is_some();
         let kind = match open.name {
             "a" => Kind::MissingLinkText {
                 href: open.href,
-                image: open.image,
+                image,
             },
-            _ => Kind::MissingButtonText { image: open.image },
+            _ => Kind::MissingButtonText { image },
         };
-        found.push((kind, Some(open.at)));
+        found.push(Unnamed {
+            kind,
+            at: Some(open.at),
+            image: open.image,
+        });
     }
 }
 
