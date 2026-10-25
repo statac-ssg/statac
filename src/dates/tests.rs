@@ -920,7 +920,7 @@ const CASES: &[Case] = &[
     },
     Case {
         format: None,
-        language: "en",
+        language: "en-GB",
         zone: "UTC",
         examples: &["2025"],
         rows: &[
@@ -1118,7 +1118,6 @@ fn words(words: Words) -> DateWords {
         words: Arc::new(words),
         from: WordsFrom::Site("languages/xx.yaml".into()),
         zeros: true,
-        house: None,
     }
 }
 
@@ -1438,7 +1437,9 @@ fn a_month_and_a_year_are_written_in_the_formats_own_register() {
 
 #[test]
 fn the_house_format_is_in_the_sites_words_or_in_figures() {
-    assert_eq!(Format::house(&english()).shown(), "31 December 2025");
+    assert_eq!(Format::house(&english()).shown(), "December 31, 2025");
+    let british = words(bundled("en-GB"));
+    assert_eq!(Format::house(&british).shown(), "31 December 2025");
     let french = Format::house(&words(bundled("fr")));
     assert_eq!(french.shown(), "31 décembre 2025");
     assert_eq!(french.write(&at(2026, 1, 1)), "1 janvier 2026");
@@ -1446,10 +1447,56 @@ fn the_house_format_is_in_the_sites_words_or_in_figures() {
     assert_eq!(none.shown(), "2025-12-31");
 }
 
-/// A day as a date pattern of the Unicode CLDR's writes it in `words`.
-/// Only the letters the long patterns of Statac's languages use are read.
-fn in_the_cldrs_pattern(pattern: &str, words: &Words, year: i32, month: u8, day: u8) -> String {
-    let figures = |number: i32| format::in_digits(&number.to_string(), words.digits.as_ref());
+/// The CLDR's data for `tag`: its own files where they are here, else
+/// those of the tag it inherits from, as the CLDR's parent locales say.
+fn the_cldrs_tag(tag: &str) -> String {
+    use crate::language::tests::{cldr, under};
+    let parents = cldr("cldr-core/supplemental/parentLocales.json");
+    let parents = under(&parents, &["supplemental", "parentLocales", "parentLocale"]);
+    let folder = format!(
+        "{}/tests/cldr/cldr-dates-full/main",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let mut tag = tag.to_owned();
+    while !std::path::Path::new(&format!("{folder}/{tag}")).exists() {
+        tag = match parents.get(&tag).map(|parent| &parent.value) {
+            Some(crate::yaml::Value::Scalar(parent)) => parent.clone(),
+            _ => tag
+                .rsplit_once('-')
+                .expect("a tag the CLDR has")
+                .0
+                .to_owned(),
+        };
+    }
+    tag
+}
+
+/// A moment as a date pattern of the Unicode CLDR's writes it, its words
+/// from the CLDR's `calendar` and its figures in `digits`. Only the
+/// letters the patterns of Statac's languages use are read.
+fn in_the_cldrs_pattern(
+    pattern: &str,
+    calendar: &crate::yaml::Node,
+    digits: Option<&[char; 10]>,
+    at: &Reading,
+) -> String {
+    use crate::language::tests::{texts, under};
+    let (hour, minute) = at.time.expect("a time");
+    let figures = |number: u32, padded: bool| {
+        let written = match padded {
+            true => format!("{number:02}"),
+            false => number.to_string(),
+        };
+        format::in_digits(&written, digits)
+    };
+    let month = |context: &str, width: &str| {
+        let month = at.month.to_string();
+        let [name] = texts(
+            under(calendar, &["months", context, width]),
+            [month.as_str()],
+        );
+        name
+    };
     let mut out = String::new();
     let mut rest = pattern;
     while let Some(first) = rest.chars().next() {
@@ -1464,10 +1511,22 @@ fn in_the_cldrs_pattern(pattern: &str, words: &Words, year: i32, month: u8, day:
             false => 1,
         };
         match (first, run) {
-            ('d', 1) => out.push_str(&figures(day.into())),
-            ('M', 1) => out.push_str(&figures(month.into())),
-            ('M', 4) => out.push_str(&words.months.as_ref().unwrap()[usize::from(month) - 1]),
-            ('y', 1) => out.push_str(&figures(year)),
+            ('d', 1 | 2) => out.push_str(&figures(at.day.into(), run == 2)),
+            ('M' | 'L', 1 | 2) => out.push_str(&figures(at.month.into(), run == 2)),
+            ('M', 3) => out.push_str(&month("format", "abbreviated")),
+            ('M', 4) => out.push_str(&month("format", "wide")),
+            ('L', 3) => out.push_str(&month("stand-alone", "abbreviated")),
+            ('L', 4) => out.push_str(&month("stand-alone", "wide")),
+            ('y', 1) => out.push_str(&figures(at.year as u32, false)),
+            ('h', 1) => out.push_str(&figures(u32::from((hour + 11) % 12 + 1), false)),
+            ('H', 1 | 2) => out.push_str(&figures(hour.into(), run == 2)),
+            ('m', 2) => out.push_str(&figures(minute.into(), true)),
+            ('a', 1) => {
+                let half = if hour < 12 { "am" } else { "pm" };
+                let periods = under(calendar, &["dayPeriods", "format", "abbreviated"]);
+                let [word] = texts(periods, [half]);
+                out.push_str(&word);
+            }
             (letter, _) if letter.is_ascii_alphabetic() => {
                 panic!("{pattern}: {run} of the letter {letter} is not read")
             }
@@ -1478,25 +1537,339 @@ fn in_the_cldrs_pattern(pattern: &str, words: &Words, year: i32, month: u8, day:
     out
 }
 
-/// A site in a language Statac has words for, naming no `date_format`,
-/// writes a date as the Unicode CLDR's long pattern for the language
-/// does, and a new site is offered that way first.
+/// A site in each language Statac has words for, and in English regions
+/// among them, naming no `date_format`: each look a template names, a
+/// date written with only a month and a year or a year alone, and a date
+/// shown by default, written as the Unicode CLDR's patterns for the
+/// language write them.
 #[test]
-fn the_house_format_of_every_other_language_is_the_cldrs_long_pattern() {
-    use crate::language::tests::{calendar, texts, under};
-    for tag in ["ar", "de", "es", "fa", "fr", "ja", "ko"] {
-        let [pattern] = texts(under(&calendar(tag), &["dateFormats"]), ["long"]);
-        let words = bundled(tag);
-        let (dates, problems, _) = site(&format!("language: {tag}\n"));
+fn every_look_of_every_language_is_the_cldrs() {
+    use crate::language::tests::{calendar, patterns};
+    let mut tags = vec!["ar", "de", "es", "fa", "fr", "ja", "ko"];
+    tags.extend(["en", "en-US", "en-GB", "en-AU", "en-CA", "en-IE", "en-IN"]);
+    tags.extend([
+        "en-001", "en-150", "en-BE", "en-BZ", "en-MV", "en-NZ", "en-DE", "en-JP",
+    ]);
+    let readings = [
+        timed(2025, 12, 31, 15, 4),
+        timed(2024, 3, 5, 9, 7),
+        timed(2026, 9, 1, 0, 30),
+        timed(2026, 7, 4, 12, 0),
+    ];
+    for tag in tags {
+        let held = the_cldrs_tag(tag);
+        let (calendar, patterns) = (calendar(&held), patterns(&held));
+        let digits = crate::language::statacs(tag).unwrap().1.digits;
+        let (dates, problems, _) = site(&format!("language: {tag}\ntimezone: UTC\n"));
         assert!(problems.is_empty(), "{tag}: {problems:?}");
-        for (written, year, month, day) in
-            [("2025-12-31", 2025, 12, 31), ("2024-03-05", 2024, 3, 5)]
-        {
-            let the_cldrs = in_the_cldrs_pattern(&pattern, &words, year, month, day);
-            let statacs = dates.format(main(), &date(written), None).unwrap();
-            assert_eq!(statacs, the_cldrs, "{tag} {pattern} {written}");
+        let stamp = patterns
+            .date_and_time
+            .replace("{1}", &patterns.short)
+            .replace("{0}", &patterns.time);
+        let looks = [
+            ("long", &patterns.long),
+            ("short", &patterns.short),
+            ("day", &patterns.day),
+            ("stamp", &stamp),
+        ];
+        for at in &readings {
+            let (hour, minute) = at.time.unwrap();
+            let timed = date(&format!(
+                "{:04}-{:02}-{:02} {hour:02}:{minute:02}",
+                at.year, at.month, at.day
+            ));
+            let untimed = Date::day_only(at.year, at.month, at.day);
+            let the_cldrs =
+                |pattern: &str| in_the_cldrs_pattern(pattern, &calendar, digits.as_ref(), at);
+            for (look, pattern) in looks {
+                let label = format!("{tag} {look} {pattern} {at:?}");
+                let statacs = dates.format(main(), &timed, Some(look));
+                assert_eq!(statacs, Ok(the_cldrs(pattern)), "{label}");
+                // A date with no time is written as the stamp with its date alone.
+                let pattern = if look == "stamp" {
+                    &patterns.short
+                } else {
+                    pattern
+                };
+                let statacs = dates.format(main(), &untimed, Some(look));
+                assert_eq!(statacs, Ok(the_cldrs(pattern)), "{label} with no time");
+            }
+            let shown = dates.format(main(), &untimed, None);
+            assert_eq!(shown, Ok(the_cldrs(&patterns.long)), "{tag} {at:?}");
+            let month = dates.when(main(), &When::Month(at.year, at.month));
+            assert_eq!(month, the_cldrs(&patterns.month_and_year), "{tag} {at:?}");
+            let year = dates.when(main(), &When::Year(at.year));
+            assert_eq!(year, the_cldrs(&patterns.year), "{tag} {at:?}");
         }
     }
+}
+
+/// English is written as each region of it writes a date, `en` as the
+/// United States does.
+#[test]
+fn english_writes_dates_as_its_region_does() {
+    let cases: [(&str, [&str; 4]); 8] = [
+        (
+            "en",
+            [
+                "December 31, 2025",
+                "Dec 31, 2025",
+                "Dec 31",
+                "Dec 31, 2025, 3:04\u{202f}PM",
+            ],
+        ),
+        (
+            "en-US",
+            [
+                "December 31, 2025",
+                "Dec 31, 2025",
+                "Dec 31",
+                "Dec 31, 2025, 3:04\u{202f}PM",
+            ],
+        ),
+        (
+            "en-GB",
+            [
+                "31 December 2025",
+                "31 Dec 2025",
+                "31 Dec",
+                "31 Dec 2025, 15:04",
+            ],
+        ),
+        (
+            "en-AU",
+            [
+                "31 December 2025",
+                "31 Dec 2025",
+                "31 Dec",
+                "31 Dec 2025, 3:04\u{202f}pm",
+            ],
+        ),
+        (
+            "en-CA",
+            [
+                "December 31, 2025",
+                "Dec 31, 2025",
+                "Dec 31",
+                "Dec 31, 2025, 3:04\u{202f}p.m.",
+            ],
+        ),
+        (
+            "en-IE",
+            [
+                "31 December 2025",
+                "31 Dec 2025",
+                "31 Dec",
+                "31 Dec 2025, 15:04",
+            ],
+        ),
+        (
+            "en-IN",
+            [
+                "31 December 2025",
+                "31 Dec 2025",
+                "31 Dec",
+                "31 Dec 2025, 3:04\u{202f}pm",
+            ],
+        ),
+        (
+            "en-ZA",
+            [
+                "31 December 2025",
+                "31 Dec 2025",
+                "31 Dec",
+                "31 Dec 2025, 15:04",
+            ],
+        ),
+    ];
+    let at = date("2025-12-31 15:04");
+    for (tag, written) in cases {
+        let (dates, problems, _) = site(&format!("language: {tag}\ntimezone: UTC\n"));
+        assert!(problems.is_empty(), "{tag}: {problems:?}");
+        let looks = Look::ALL.map(|look| dates.format(main(), &at, Some(look.name())).unwrap());
+        assert_eq!(looks, written, "{tag}");
+        assert_eq!(
+            dates.format(main(), &at, None).unwrap(),
+            written[0],
+            "{tag}"
+        );
+    }
+    // Each region's own words: English beyond the United States shortens
+    // September to Sept, and Australian English keeps June whole.
+    let at = date("2026-06-05 09:07");
+    for (tag, short, stamp) in [
+        ("en", "Jun 5, 2026", "Jun 5, 2026, 9:07\u{202f}AM"),
+        ("en-GB", "5 Jun 2026", "5 Jun 2026, 09:07"),
+        ("en-AU", "5 June 2026", "5 June 2026, 9:07\u{202f}am"),
+        ("en-ZA", "05 Jun 2026", "05 Jun 2026, 09:07"),
+    ] {
+        let (dates, ..) = site(&format!("language: {tag}\ntimezone: UTC\n"));
+        assert_eq!(
+            dates.format(main(), &at, Some("short")).unwrap(),
+            short,
+            "{tag}"
+        );
+        assert_eq!(
+            dates.format(main(), &at, Some("stamp")).unwrap(),
+            stamp,
+            "{tag}"
+        );
+    }
+    let (dates, ..) = site("language: en-GB\ntimezone: UTC\n");
+    let september = date("2026-09-05");
+    assert_eq!(
+        dates.format(main(), &september, Some("short")).unwrap(),
+        "5 Sept 2026"
+    );
+}
+
+/// A month and a year, and a year alone, are written in the order of the
+/// language's own pattern, whatever the order of the site's `date_format`,
+/// and with its month as that format writes it.
+#[test]
+fn a_month_and_a_year_are_written_in_the_languages_order() {
+    let cases = [
+        ("ja", None, "2025年12月", "2025年"),
+        ("ja", Some("2025年12月31日"), "2025年12月", "2025年"),
+        ("ja", Some("2025-12-31"), "2025-12", "2025"),
+        ("ko", None, "2025년 12월", "2025년"),
+        ("ko", Some("2025년 12월 31일"), "2025년 12월", "2025년"),
+        ("es", None, "diciembre de 2025", "2025"),
+        ("es", Some("31 dic 2025"), "dic 2025", "2025"),
+        ("de", Some("31. Dez. 2025"), "Dez. 2025", "2025"),
+        ("fa", None, "دسامبر ۲۰۲۵", "۲۰۲۵"),
+        ("en", Some("WED 31 DEC 2025"), "DEC 2025", "2025"),
+        ("en", Some("31/12/2025"), "2025-12", "2025"),
+        ("en-GB", None, "December 2025", "2025"),
+    ];
+    for (tag, format, month, year) in cases {
+        let mut settings = format!("language: {tag}\n");
+        if let Some(format) = format {
+            settings.push_str(&format!("date_format: \"{format}\"\n"));
+        }
+        let (dates, problems, _) = site(&settings);
+        assert!(problems.is_empty(), "{settings}{problems:?}");
+        assert_eq!(
+            dates.when(main(), &When::Month(2025, 12)),
+            month,
+            "{settings}"
+        );
+        assert_eq!(dates.when(main(), &When::Year(2025)), year, "{settings}");
+    }
+    // A month in words the language writes alone or in a date is as its
+    // pattern has it: Persian writes January in a month and a year as it
+    // does in a date.
+    let (dates, ..) = site("language: fa\n");
+    assert_eq!(dates.when(main(), &When::Month(2025, 1)), "ژانویهٔ ۲۰۲۵");
+}
+
+/// A site with `date_zeros: false` writes a look's figures without their
+/// zeros too, as it does an example's.
+#[test]
+fn a_site_without_zeros_writes_a_looks_figures_bare() {
+    let at = date("2026-03-07 09:05");
+    let (dates, ..) = site("language: ja\ndate_zeros: false\n");
+    assert_eq!(
+        dates.format(main(), &at, Some("short")).unwrap(),
+        "2026/3/7"
+    );
+    let (dates, ..) = site("language: ja\n");
+    assert_eq!(
+        dates.format(main(), &at, Some("short")).unwrap(),
+        "2026/03/07"
+    );
+    let (dates, ..) = site("language: en-ZA\ndate_zeros: false\n");
+    assert_eq!(
+        dates.format(main(), &at, Some("stamp")).unwrap(),
+        "7 Mar 2026, 09:05"
+    );
+}
+
+/// A look named in a language Statac has no patterns for writes the day
+/// as a site naming no `date_format` does: in figures, year first, where
+/// the language has no months, and the stamp with the time after it.
+#[test]
+fn a_look_in_a_language_statac_has_no_patterns_for_is_the_usual_day() {
+    let at = date("2025-12-31 15:04");
+    let (dates, problems, _) = site("language: sw\n");
+    let names: Vec<&str> = problems.iter().map(|problem| problem.kind.name()).collect();
+    assert_eq!(names, ["unknown-language"]);
+    for (look, written) in [
+        ("long", "2025-12-31"),
+        ("short", "2025-12-31"),
+        ("day", "2025-12-31"),
+        ("stamp", "2025-12-31 15:04"),
+    ] {
+        assert_eq!(
+            dates.format(main(), &at, Some(look)).as_deref(),
+            Ok(written),
+            "{look}"
+        );
+    }
+    let site = TempSite::new(&[
+        ("statac.yaml", "language: sw\n"),
+        (
+            "languages/sw.yaml",
+            "months: [Januari, Februari, Machi, Aprili, Mei, Juni,\n  \
+             Julai, Agosti, Septemba, Oktoba, Novemba, Desemba]\n",
+        ),
+    ]);
+    let mut sources = Sources::default();
+    let (settings, _) = crate::config::read(&site.root, &mut sources);
+    let (dates, problems) = Dates::read(&site.root, &settings, &mut sources);
+    assert!(problems.is_empty(), "{problems:?}");
+    let written = |look| dates.format(main(), &at, Some(look)).unwrap();
+    assert_eq!(written("long"), "31 Desemba 2025");
+    assert_eq!(written("stamp"), "31 Desemba 2025 15:04");
+}
+
+/// A template's example that is neither a look nor an example of the
+/// reference moment is refused with the looks offered; the site's
+/// `date_format` is never offered them.
+#[test]
+fn an_example_that_is_no_look_is_offered_the_looks() {
+    let at = date("2026-03-07");
+    let (dates, ..) = site("language: en-GB\n");
+    for example in ["lnog", "Long", ""] {
+        let refusal = dates.format(main(), &at, Some(example)).unwrap_err();
+        let (FormatFault::NoPattern { looks, .. } | FormatFault::Empty { looks, .. }) =
+            refusal.fault
+        else {
+            panic!("{example}: {refusal:?}");
+        };
+        assert!(looks, "{example}");
+    }
+    let (_, problems, _) = site("date_format: long\n");
+    let Kind::UnusableDateFormat { fault } = &problems[0].kind else {
+        panic!("{problems:?}");
+    };
+    assert!(matches!(
+        **fault,
+        FormatFault::NoPattern { looks: false, .. }
+    ));
+
+    // A look wanting words the site's own file leaves out is refused.
+    let site = TempSite::new(&[
+        ("statac.yaml", "language: en\n"),
+        ("languages/en.yaml", "am_pm:\n"),
+    ]);
+    let mut sources = Sources::default();
+    let (settings, _) = crate::config::read(&site.root, &mut sources);
+    let (dates, _) = Dates::read(&site.root, &settings, &mut sources);
+    let refusal = dates.format(main(), &date("2026-03-07 09:05"), Some("stamp"));
+    assert_eq!(
+        refusal.unwrap_err().fault,
+        FormatFault::NoWords {
+            list: WordsWanted::AmPm,
+            from: WordsFrom::Site("languages/en.yaml".into()),
+        }
+    );
+    assert_eq!(
+        dates
+            .format(main(), &date("2026-03-07"), Some("long"))
+            .as_deref(),
+        Ok("March 7, 2026")
+    );
 }
 
 /// Each refusal of a format, the stretch of the example it is told at,
@@ -1504,8 +1877,8 @@ fn the_house_format_of_every_other_language_is_the_cldrs_long_pattern() {
 #[test]
 fn a_format_that_cant_be_read_is_told_why_at_the_text() {
     let english = english();
-    let reference = "Wednesday 31 December 2025, 3.04pm";
-    let examples = || vec!["31/12/2025".to_owned(), "31 December 2025".to_owned()];
+    let reference = "Wednesday 31 December 2025, 3.04PM";
+    let examples = || vec!["31/12/2025".to_owned(), "December 31, 2025".to_owned()];
     let not_in = |written: &str, corrected: Option<&str>| FormatFault::NotInReference {
         written: written.into(),
         reference: reference.into(),
@@ -1519,6 +1892,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             FormatFault::Empty {
                 reference: reference.into(),
                 examples: examples(),
+                looks: false,
             },
         ),
         (
@@ -1528,6 +1902,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
                 example: "dd/mm/yyyy".into(),
                 reference: reference.into(),
                 examples: examples(),
+                looks: false,
             },
         ),
         (
@@ -1555,7 +1930,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "January",
             FormatFault::OtherMonth {
                 written: "January".into(),
-                day: "31 December 2025".into(),
+                day: "December 31, 2025".into(),
                 month: "December".into(),
                 corrected: "1 December 2020".into(),
             },
@@ -1565,7 +1940,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "Sept",
             FormatFault::OtherMonth {
                 written: "Sept".into(),
-                day: "31 December 2025".into(),
+                day: "December 31, 2025".into(),
                 month: "December".into(),
                 corrected: "31 Dec 2025".into(),
             },
@@ -1575,7 +1950,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "Mon",
             FormatFault::OtherWeekday {
                 written: "Mon".into(),
-                day: "31 December 2025".into(),
+                day: "December 31, 2025".into(),
                 weekday: "Wednesday".into(),
                 corrected: "Wed 31 December 2025".into(),
             },
@@ -1585,8 +1960,8 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "3",
             FormatFault::LoneHour {
                 written: "3".into(),
-                am: "am".into(),
-                pm: "pm".into(),
+                am: "AM".into(),
+                pm: "PM".into(),
             },
         ),
         (
@@ -1594,7 +1969,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "04",
             FormatFault::MinuteWithoutHour {
                 written: "04".into(),
-                examples: vec!["15:04".into(), "3.04pm".into()],
+                examples: vec!["15:04".into(), "3.04PM".into()],
             },
         ),
         (
@@ -1602,7 +1977,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "3.04pm",
             FormatFault::OnlyATime {
                 example: "3.04pm".into(),
-                with_date: "31 December 2025, 3.04pm".into(),
+                with_date: "December 31, 2025, 3.04pm".into(),
             },
         ),
         (
@@ -1610,7 +1985,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "Wednesday",
             FormatFault::OnlyAWeekday {
                 example: "Wednesday".into(),
-                with_date: Some("Wednesday 31 December 2025".into()),
+                with_date: Some("Wednesday December 31, 2025".into()),
             },
         ),
         (
@@ -1731,14 +2106,12 @@ fn a_refusal_in_the_sites_digits_is_told_as_written() {
 
 #[test]
 fn another_weekday_after_figures_is_the_languages_word_for_them() {
-    let korean = DateWords {
-        house: format::house_example("ko"),
-        ..words(Words {
-            months: bundled("ko").months,
-            weekdays_short: bundled("ko").weekdays_short,
-            ..Words::default()
-        })
-    };
+    let korean = words(Words {
+        months: bundled("ko").months,
+        weekdays_short: bundled("ko").weekdays_short,
+        dates: bundled("ko").dates,
+        ..Words::default()
+    });
     let refusal = refused("2025년 12월 31일 (일)", &korean);
     assert_eq!(
         refusal.fault,

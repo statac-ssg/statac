@@ -9,3 +9,14 @@ weekdays_short: [الاثنين, الثلاثاء, الأربعاء, الخمي�
 am_pm: [ص, م]
 quotes: ” “ ’ ‘
 direction: rtl
+# How dates are written, in the CLDR's own patterns. These are Statac's alone:
+# a site's file for the language can't change them.
+dates:
+  long: d MMMM y
+  short: "dd\u200F/MM\u200F/y"
+  day: d MMM
+  time: h:mm a
+  date_and_time: "{1}، {0}"
+  month_and_year: MMMM y
+  month_short_and_year: MMM y
+  year: y

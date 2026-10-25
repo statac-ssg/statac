@@ -1272,6 +1272,62 @@ fn the_sites_own_words_for_a_language_added_edited_and_removed() {
     );
 }
 
+/// A layout naming each look a date can take, in English and German.
+const LOOKS: &str = "{{ page.date }}|{{ page.date | date(\"long\") }}|\
+                     {{ page.date | date(\"short\") }}|{{ page.date | date(\"day\") }}|\
+                     {{ page.date | date(\"stamp\") }}\n";
+
+#[test]
+fn a_date_named_by_its_look_follows_the_language_and_its_words() {
+    let site = Site::new("looks");
+    site.write("templates/looks.html", LOOKS);
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01 09:05\nlayout: looks\n---\nPost 1.\n",
+    );
+    site.write(
+        "content/de/post-1.md",
+        "---\ntitle: Beitrag 1\ndate: 2026-01-01 09:05\nlayout: looks\n---\nBeitrag 1.\n",
+    );
+    through(
+        &site,
+        &[
+            ("the language's region", &|site| {
+                site.write(
+                    "statac.yaml",
+                    &SETTINGS.replace("language: [en, de]", "language: [en-GB, de]"),
+                )
+            }),
+            ("the site's own words", &|site| {
+                site.write("languages/en.yaml", "am_pm: [a.m., p.m.]\n")
+            }),
+            ("a date format", &|site| {
+                let settings = SETTINGS.replace("language: [en, de]", "language: [en-AU, de]");
+                site.write(
+                    "statac.yaml",
+                    &format!("{settings}date_format: 31/12/2025\n"),
+                )
+            }),
+            ("the words removed", &|site| {
+                site.remove("languages/en.yaml")
+            }),
+        ],
+    );
+    let (fresh, _) = site.fresh(&site.options());
+    let page = |path: &str| {
+        let (_, bytes) = fresh.iter().find(|(name, _)| name == path).unwrap();
+        String::from_utf8_lossy(bytes).into_owned()
+    };
+    assert_eq!(
+        page("post-1/index.html"),
+        "01/01/2026|1 January 2026|1 Jan 2026|1 Jan|1 Jan 2026, 9:05\u{202f}am\n"
+    );
+    assert_eq!(
+        page("de/post-1/index.html"),
+        "01/01/2026|1. Januar 2026|01.01.2026|1. Jan.|01.01.2026, 09:05\n"
+    );
+}
+
 /// A sharing card described as the title on a background, and a layout
 /// for posts that announces it.
 const CARD: &str = "background: background.png\nfont: text.ttf\n\n\
@@ -2656,7 +2712,7 @@ fn a_new_day_builds_what_read_the_day() {
     site.same_as(&day("2026-10-04"), &session, &round, "the first day");
     let folder = session.folder().to_path_buf();
     let read = |path: &str| fs::read_to_string(folder.join(path)).unwrap();
-    assert_eq!(read("post-5/index.html"), "4 October 2026 Post 5\n");
+    assert_eq!(read("post-5/index.html"), "October 4, 2026 Post 5\n");
     assert!(!session.folder().join("post-7").exists());
 
     let round = session.rebuild();
@@ -2664,7 +2720,7 @@ fn a_new_day_builds_what_read_the_day() {
 
     session.set_today(statac::date::read("2026-10-05").ok());
     let round = session.rebuild();
-    assert_eq!(read("post-5/index.html"), "5 October 2026 Post 5\n");
+    assert_eq!(read("post-5/index.html"), "October 5, 2026 Post 5\n");
     assert!(session.folder().join("post-7/index.html").is_file());
     assert!(
         round.built > 0 && round.built < round.outputs,

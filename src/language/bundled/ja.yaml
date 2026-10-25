@@ -6,3 +6,14 @@ weekdays: [月曜日, 火曜日, 水曜日, 木曜日, 金曜日, 土曜日, 日
 weekdays_short: [月, 火, 水, 木, 金, 土, 日]
 am_pm: [午前, 午後]
 quotes: 「 」 『 』
+# How dates are written, in the CLDR's own patterns. These are Statac's alone:
+# a site's file for the language can't change them.
+dates:
+  long: y年M月d日
+  short: y/MM/dd
+  day: M月d日
+  time: H:mm
+  date_and_time: "{1} {0}"
+  month_and_year: y年M月
+  month_short_and_year: y年M月
+  year: y年

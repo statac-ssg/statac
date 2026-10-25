@@ -5,12 +5,15 @@
 //! Every piece of the reference moment is a different number or word, so
 //! an example can only be read one way: `15:04` is the hour and the
 //! minute, because nothing else in the moment is 15 or 4.
+//!
+//! A look a template names is read instead from the Unicode CLDR's pattern
+//! for the language, in the CLDR's letters: `d MMMM y`.
 
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use crate::language::Words;
+use crate::language::{Patterns, Words};
 use crate::problem::{FormatFault, Kind, Piece, WordsFrom, WordsWanted};
 
 const DAY: u32 = 31;
@@ -29,25 +32,57 @@ const YEAR_FIRST: &str = "2025-12-31";
 /// The reference day in figures, offered beside its spelling in words.
 const IN_FIGURES: &str = "31/12/2025";
 
-/// How languages write the reference day, where it isn't the day, the
-/// month in words and the year: what a site naming no `date_format`
-/// writes, and what Statac offers as an example. Each is the Unicode
-/// CLDR's long date pattern for the language, as is a language's left out.
-const HOUSE: &[(&str, &str)] = &[
-    ("de", "31. Dezember 2025"),
-    ("es", "31 de diciembre de 2025"),
-    ("ja", "2025年12月31日"),
-    ("ko", "2025년 12월 31일"),
-];
+/// A look a template names a date by, each written as the language's
+/// Unicode CLDR data has it.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Look {
+    /// The CLDR's long date: `31 December 2025`.
+    Long,
+    /// Its medium date: `31 Dec 2025`.
+    Short,
+    /// The day and the month: `31 Dec`.
+    Day,
+    /// The medium date and the short time: `31 Dec 2025, 15:04`.
+    Stamp,
+}
 
-/// How the language of `tag` writes the reference day, where
-/// [`HOUSE`] says.
-pub fn house_example(tag: &str) -> Option<&'static str> {
-    let language = tag.split('-').next().unwrap_or(tag);
-    HOUSE
-        .iter()
-        .find(|(known, _)| known.eq_ignore_ascii_case(language))
-        .map(|(_, example)| *example)
+impl Look {
+    pub const ALL: [Look; 4] = [Look::Long, Look::Short, Look::Day, Look::Stamp];
+
+    /// As a template names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Look::Long => "long",
+            Look::Short => "short",
+            Look::Day => "day",
+            Look::Stamp => "stamp",
+        }
+    }
+
+    pub fn named(name: &str) -> Option<Look> {
+        Look::ALL.into_iter().find(|look| look.name() == name)
+    }
+}
+
+/// The reference day, with no time.
+const REFERENCE_DAY: Reading = Reading {
+    year: YEAR as i32,
+    month: MONTH as u8,
+    day: DAY as u8,
+    weekday: WEEKDAY,
+    time: None,
+};
+
+/// The first day of a month, for writing a month or a year alone: no
+/// format writing either writes the day or the weekday.
+fn first_day(year: i32, month: u8) -> Reading {
+    Reading {
+        year,
+        month,
+        day: 1,
+        weekday: 0,
+        time: None,
+    }
 }
 
 /// A date as a format writes it: the calendar day, the weekday it falls
@@ -71,9 +106,6 @@ pub struct DateWords {
     pub from: WordsFrom,
     /// Whether a day or a month in figures keeps its leading zero.
     pub zeros: bool,
-    /// How the language writes the reference day, where it isn't the
-    /// day, the month in words and the year.
-    pub house: Option<&'static str>,
 }
 
 impl DateWords {
@@ -82,7 +114,6 @@ impl DateWords {
             words: crate::language::english(),
             from: WordsFrom::Statac("en".into()),
             zeros: true,
-            house: None,
         }
     }
 
@@ -94,7 +125,7 @@ impl DateWords {
 
     /// The reference moment as these words write it, for saying what an
     /// example is read against. Other languages have it in figures, year
-    /// first: Statac knows no other language's order of a date's words.
+    /// first.
     pub fn moment(&self) -> String {
         let months = match &self.words.months {
             Some(months) if self.english_like() => months,
@@ -123,11 +154,12 @@ impl DateWords {
     }
 
     /// The reference day with its month in words, where there are words,
-    /// as the language writes it.
+    /// as the language's long look writes it in 0 to 9.
     fn in_words(&self) -> Option<String> {
         let months = self.words.months.as_ref()?;
-        Some(match self.house {
-            Some(example) => example.to_owned(),
+        let long = (self.words.dates.as_ref()).and_then(|_| Format::look(Look::Long, self).ok());
+        Some(match long {
+            Some(long) => long.written(&REFERENCE_DAY, false),
             None => format!("31 {} 2025", months[MONTH_LISTED]),
         })
     }
@@ -174,6 +206,16 @@ pub struct Refusal {
 }
 
 impl Refusal {
+    /// The refusal of an example that could have named a look instead.
+    fn offering_looks(mut self) -> Refusal {
+        if let FormatFault::NoPattern { looks, .. } | FormatFault::Empty { looks, .. } =
+            &mut self.fault
+        {
+            *looks = true;
+        }
+        self
+    }
+
     /// The problem to tell, placed by whoever knows where the example is
     /// written.
     pub fn into_kind(self) -> Kind {
@@ -195,9 +237,23 @@ enum Case {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum MonthForm {
-    Figures,
+    Figures {
+        /// None where the format's own rule decides its zero.
+        padded: Option<bool>,
+    },
     Full,
     Short,
+}
+
+/// Which of the language's lists a month in words is written from.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+enum Stands {
+    /// As an example has it: alone where no day is beside it.
+    ByTheDay,
+    /// As inside a date, the CLDR's `M`.
+    InADate,
+    /// As with no day beside it, the CLDR's `L`.
+    Alone,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -209,10 +265,13 @@ enum Component {
     /// `worded` where the day is written from the language's `days`.
     Day {
         worded: bool,
+        /// None where the format's own rule decides its zero.
+        padded: Option<bool>,
     },
     Month {
         form: MonthForm,
         case: Case,
+        stands: Stands,
     },
     Year {
         short: bool,
@@ -252,30 +311,44 @@ impl Component {
     }
 
     /// The list of words this piece is written from, where the language
-    /// hasn't got it. A month with no day beside it stands alone.
+    /// hasn't got it.
     fn unwritable(self, has_day: bool, words: &Words) -> Option<WordsWanted> {
         let missing = match self {
             Component::Weekday { full: true, .. } => words.weekdays.is_none(),
             Component::Weekday { full: false, .. } => words.weekdays_short.is_none(),
             Component::Month {
-                form: MonthForm::Full,
+                form: MonthForm::Figures { .. },
                 ..
-            } => match has_day {
-                true => words.months.is_none(),
-                false => words.months_with_no_day().is_none(),
-            },
-            Component::Month {
-                form: MonthForm::Short,
-                ..
-            } => match has_day {
-                true => words.months_short.is_none(),
-                false => words.months_short_with_no_day().is_none(),
-            },
+            } => false,
+            Component::Month { form, stands, .. } => {
+                month_list(form, stands, has_day, words).is_none()
+            }
             Component::AmPm { .. } => words.am_pm.is_none(),
-            Component::Day { worded: true } => words.days.is_none(),
+            Component::Day { worded: true, .. } => words.days.is_none(),
             _ => false,
         };
         missing.then(|| wanted(self))
+    }
+}
+
+/// The list a month in words is written from, where the language has it.
+fn month_list(
+    form: MonthForm,
+    stands: Stands,
+    has_day: bool,
+    words: &Words,
+) -> Option<&[String; 12]> {
+    let alone = match stands {
+        Stands::ByTheDay => !has_day,
+        Stands::InADate => false,
+        Stands::Alone => true,
+    };
+    match (form, alone) {
+        (MonthForm::Full, false) => words.months.as_ref(),
+        (MonthForm::Full, true) => words.months_with_no_day(),
+        (MonthForm::Short, false) => words.months_short.as_ref(),
+        (MonthForm::Short, true) => words.months_short_with_no_day(),
+        (MonthForm::Figures { .. }, _) => None,
     }
 }
 
@@ -299,11 +372,13 @@ enum Part {
     Component(Component),
 }
 
-/// A date format read from an example.
+/// A date format read from an example, or from a look's pattern.
 #[derive(Clone, Debug)]
 pub struct Format {
     parts: Vec<Part>,
     words: DateWords,
+    /// Whether it is one of the language's looks.
+    of_a_look: bool,
 }
 
 impl Format {
@@ -311,7 +386,7 @@ impl Format {
     /// any piece alone, but a day and a year with no month between them is
     /// an example whose month is in words the site hasn't got.
     pub fn for_a_template(example: &str, words: &DateWords) -> Result<Format, Refusal> {
-        let format = Format::read(example, words)?;
+        let format = Format::read(example, words).map_err(Refusal::offering_looks)?;
         if format.writes(Piece::Day) && format.writes(Piece::Year) && !format.writes(Piece::Month) {
             return Err(whole(
                 example,
@@ -371,37 +446,76 @@ impl Format {
     }
 
     /// The format a site naming no `date_format` writes its dates in: the
-    /// reference day with its month in the site's words, or in figures
-    /// where it has none.
+    /// long look.
     pub fn house(words: &DateWords) -> Format {
-        let in_figures =
-            || Format::read(YEAR_FIRST, words).expect("a date in figures needs no words");
-        match words.in_words() {
-            Some(example) => Format::for_the_site(&example, words).unwrap_or_else(|_| in_figures()),
-            None => in_figures(),
+        Format::look(Look::Long, words).unwrap_or_else(|_| Format::unpatterned(Look::Long, words))
+    }
+
+    /// `look` as the language's Unicode CLDR pattern writes it, or as
+    /// [`Format::unpatterned`] does where Statac has no patterns for the
+    /// language. A pattern wanting words the language hasn't got is
+    /// refused.
+    pub fn look(look: Look, words: &DateWords) -> Result<Format, Refusal> {
+        let Some(patterns) = &words.words.dates else {
+            return Ok(Format::unpatterned(look, words));
+        };
+        let parts = match look {
+            Look::Long => pattern(&patterns.long),
+            Look::Short => pattern(&patterns.short),
+            Look::Day => pattern(&patterns.day),
+            Look::Stamp => stamp(patterns),
         }
+        .expect("Statac's own patterns are read whole");
+        let format = Format {
+            parts,
+            words: words.clone(),
+            of_a_look: true,
+        };
+        format.writable(look.name())?;
+        Ok(format)
+    }
+
+    /// Every look of a language Statac has no patterns for: the reference
+    /// day with its month in the language's words, or in figures where it
+    /// has none, the stamp with the time after it.
+    fn unpatterned(look: Look, words: &DateWords) -> Format {
+        let time = match look {
+            Look::Stamp => " 15:04",
+            _ => "",
+        };
+        Format::read(&format!("{}{time}", words.day()), words)
+            .or_else(|_| Format::read(&format!("{YEAR_FIRST}{time}"), words))
+            .expect("a date in figures needs no words")
+    }
+
+    /// Refuses a format writing a word from a list the language hasn't got,
+    /// told of the whole of `example`.
+    fn writable(&self, example: &str) -> Result<(), Refusal> {
+        let has_day = self.writes(Piece::Day);
+        for part in &self.parts {
+            if let Part::Component(component) = part
+                && let Some(list) = component.unwritable(has_day, &self.words.words)
+            {
+                let fault = FormatFault::NoWords {
+                    list,
+                    from: self.words.from.clone(),
+                };
+                return Err(whole(example, fault));
+            }
+        }
+        Ok(())
     }
 
     /// The same pieces written in another language's `words`, the text
     /// between them as written in `example`. A piece written in words that
     /// language hasn't got is refused.
     pub fn in_words(&self, words: &DateWords, example: &str) -> Result<Format, Refusal> {
-        let has_day = self.writes(Piece::Day);
-        for part in &self.parts {
-            if let Part::Component(component) = part
-                && let Some(list) = component.unwritable(has_day, &words.words)
-            {
-                let fault = FormatFault::NoWords {
-                    list,
-                    from: words.from.clone(),
-                };
-                return Err(whole(example, fault));
-            }
-        }
         let mut format = Format {
             parts: self.parts.clone(),
             words: words.clone(),
+            of_a_look: self.of_a_look,
         };
+        format.writable(example)?;
         format.settle_the_day();
         Ok(format)
     }
@@ -437,6 +551,7 @@ impl Format {
                     example: example.to_owned(),
                     reference: words.moment(),
                     examples: words.examples(),
+                    looks: false,
                 },
             )),
             false => Ok(self),
@@ -449,6 +564,7 @@ impl Format {
                 fault: FormatFault::Empty {
                     reference: words.moment(),
                     examples: words.examples(),
+                    looks: false,
                 },
                 at: 0..example.len(),
             });
@@ -683,12 +799,14 @@ impl Format {
                     example: example.to_owned(),
                     reference: words.moment(),
                     examples: words.examples(),
+                    looks: false,
                 },
             ));
         }
         let mut format = Format {
             parts,
             words: words.clone(),
+            of_a_look: false,
         };
         format.settle_the_day();
         Ok(format)
@@ -708,7 +826,7 @@ impl Format {
             return;
         }
         for part in &mut self.parts {
-            if let Part::Component(Component::Day { worded }) = part {
+            if let Part::Component(Component::Day { worded, .. }) = part {
                 *worded = false;
             }
         }
@@ -733,13 +851,20 @@ impl Format {
     /// A date with no time of day never has one invented: the time's
     /// pieces go, with the text beside them.
     pub fn write(&self, reading: &Reading) -> String {
+        self.written(reading, true)
+    }
+
+    /// `reading` written in this format, its numbers in 0 to 9 unless
+    /// `in_its_digits`.
+    fn written(&self, reading: &Reading, in_its_digits: bool) -> String {
         let machine = self.for_a_machine();
+        let zeros = self.words.zeros || machine;
         let written = Written {
-            day_padded: (self.words.zeros || machine) && self.day_padded(),
-            month_padded: self.words.zeros || machine,
+            day_padded: zeros && self.day_padded(),
+            zeros,
             has_day: self.writes(Piece::Day),
             words: &self.words.words,
-            digits: match machine {
+            digits: match machine || !in_its_digits {
                 true => None,
                 false => self.words.words.digits.as_ref(),
             },
@@ -763,13 +888,7 @@ impl Format {
 
     /// The reference day as this format writes it.
     pub fn shown(&self) -> String {
-        self.write(&Reading {
-            year: 2025,
-            month: 12,
-            day: 31,
-            weekday: WEEKDAY,
-            time: None,
-        })
+        self.write(&REFERENCE_DAY)
     }
 
     /// Which parts a date with no time of day leaves out: every piece of
@@ -817,26 +936,26 @@ impl Format {
     }
 
     /// A month and a year in this format's style, for a date that names no
-    /// day, the month standing alone. A format writing its month in figures
-    /// gets the one spelling of a month and a year read only one way.
+    /// day, in the order of the language's Unicode CLDR pattern where
+    /// Statac has one, else the month standing alone before the year. A
+    /// format writing its month in figures by example gets the one
+    /// spelling of a month and a year read only one way.
     pub fn month_and_year(&self, year: i32, month: u8) -> String {
-        let words = &self.words.words;
-        let at = usize::from(month).wrapping_sub(1);
         let form = self.parts.iter().find_map(|part| match part {
-            Part::Component(Component::Month { form, case }) => Some((*form, *case)),
+            Part::Component(Component::Month { form, case, .. }) => Some((*form, *case)),
             _ => None,
         });
-        let named = match form {
-            Some((MonthForm::Full, case)) => words
-                .months_with_no_day()
-                .and_then(|months| months.get(at))
-                .map(|month| cased(month, case)),
-            Some((MonthForm::Short, case)) => words
-                .months_short_with_no_day()
-                .and_then(|months| months.get(at))
-                .map(|month| cased(month, case)),
-            _ => None,
-        };
+        if let Some(format) =
+            form.and_then(|(form, case)| self.month_and_year_patterned(form, case))
+        {
+            return format.write(&first_day(year, month));
+        }
+        let words = &self.words.words;
+        let at = usize::from(month).wrapping_sub(1);
+        let named = form.and_then(|(form, case)| {
+            let month = month_list(form, Stands::Alone, false, words)?.get(at)?;
+            Some(cased(month, case))
+        });
         let written = match named {
             Some(month) => format!("{month} {year}"),
             None => format!("{year:04}-{month:02}"),
@@ -844,8 +963,50 @@ impl Format {
         in_digits(&written, self.digits())
     }
 
+    /// The language's pattern for a month and a year, its month in `form`
+    /// written in `case`: a look's own month in figures is written as the
+    /// language writes a month in full.
+    fn month_and_year_patterned(&self, form: MonthForm, case: Case) -> Option<Format> {
+        let patterns = self.words.words.dates.as_ref()?;
+        let written = match form {
+            MonthForm::Full => &patterns.month_and_year,
+            MonthForm::Short => &patterns.month_short_and_year,
+            MonthForm::Figures { .. } if self.of_a_look => &patterns.month_and_year,
+            MonthForm::Figures { .. } => return None,
+        };
+        let mut parts = pattern(written)?;
+        for part in &mut parts {
+            if let Part::Component(Component::Month { case: as_cased, .. }) = part {
+                *as_cased = case;
+            }
+        }
+        let format = Format {
+            parts,
+            words: self.words.clone(),
+            of_a_look: true,
+        };
+        format.writable("").ok()?;
+        Some(format)
+    }
+
+    /// A year alone, as the language's Unicode CLDR pattern writes it
+    /// where Statac has one and this format isn't a machine's.
     pub fn year_alone(&self, year: i32) -> String {
-        in_digits(&year.to_string(), self.digits())
+        let patterned = match self.for_a_machine() {
+            true => None,
+            false => (self.words.words.dates.as_ref()).and_then(|p| pattern(&p.year)),
+        };
+        match patterned {
+            Some(parts) => {
+                let format = Format {
+                    parts,
+                    words: self.words.clone(),
+                    of_a_look: true,
+                };
+                format.write(&first_day(year, 1))
+            }
+            None => in_digits(&year.to_string(), self.digits()),
+        }
     }
 
     fn digits(&self) -> Option<&[char; 10]> {
@@ -866,11 +1027,11 @@ impl Format {
                 Part::Component(Component::Year { short: false }),
                 dash,
                 Part::Component(Component::Month {
-                    form: MonthForm::Figures,
+                    form: MonthForm::Figures { .. },
                     ..
                 }),
                 other_dash,
-                Part::Component(Component::Day { worded: false }),
+                Part::Component(Component::Day { worded: false, .. }),
             ] => literal(dash, &["-"]) && literal(other_dash, &["-"]),
             _ => false,
         };
@@ -891,7 +1052,7 @@ impl Format {
     /// `07/03/2026` but `7 March 2026`.
     fn day_padded(&self) -> bool {
         !self.parts.iter().any(|part| {
-            matches!(part, Part::Component(Component::Month { form, .. }) if *form != MonthForm::Figures)
+            matches!(part, Part::Component(Component::Month { form, .. }) if !matches!(form, MonthForm::Figures { .. }))
         })
     }
 }
@@ -913,9 +1074,9 @@ fn attached_apart(parts: Vec<Part>) -> Vec<Part> {
         };
         let figures = matches!(
             before,
-            Component::Day { worded: false }
+            Component::Day { worded: false, .. }
                 | Component::Month {
-                    form: MonthForm::Figures,
+                    form: MonthForm::Figures { .. },
                     ..
                 }
                 | Component::Year { .. }
@@ -957,8 +1118,10 @@ fn open_slot(seen: &HashMap<Piece, Range<usize>>) -> Option<String> {
 
 /// What a format needs to write each piece.
 struct Written<'a> {
+    /// Whether a day in figures keeps its zero, by an example's rule.
     day_padded: bool,
-    month_padded: bool,
+    /// Whether a day or a month in figures may keep its zero at all.
+    zeros: bool,
     has_day: bool,
     words: &'a Words,
     digits: Option<&'a [char; 10]>,
@@ -987,24 +1150,26 @@ impl Written<'_> {
                 };
                 out.push_str(&cased(from(list, at.weekday), case));
             }
-            Component::Day { worded: true } => {
+            Component::Day { worded: true, .. } => {
                 out.push_str(from(words.days.as_ref(), usize::from(at.day) - 1));
             }
-            Component::Day { worded: false } => {
-                self.padded(out, u32::from(at.day), self.day_padded);
+            Component::Day {
+                worded: false,
+                padded,
+            } => {
+                let padded = padded.map_or(self.day_padded, |padded| padded && self.zeros);
+                self.padded(out, u32::from(at.day), padded);
             }
-            Component::Month { form, case } => {
-                let at_month = usize::from(at.month) - 1;
-                let list = match (form, self.has_day) {
-                    (MonthForm::Figures, _) => {
-                        return self.padded(out, u32::from(at.month), self.month_padded);
-                    }
-                    (MonthForm::Full, true) => words.months.as_ref(),
-                    (MonthForm::Full, false) => words.months_with_no_day(),
-                    (MonthForm::Short, true) => words.months_short.as_ref(),
-                    (MonthForm::Short, false) => words.months_short_with_no_day(),
-                };
-                out.push_str(&cased(from(list, at_month), case));
+            Component::Month {
+                form: MonthForm::Figures { padded },
+                ..
+            } => {
+                let padded = padded.is_none_or(|padded| padded) && self.zeros;
+                self.padded(out, u32::from(at.month), padded);
+            }
+            Component::Month { form, case, stands } => {
+                let list = month_list(form, stands, self.has_day, words);
+                out.push_str(&cased(from(list, usize::from(at.month) - 1), case));
             }
             Component::Year { short: true } => {
                 self.figures(out, format!("{:02}", at.year.rem_euclid(100)));
@@ -1020,7 +1185,10 @@ impl Written<'_> {
                 };
                 self.padded(out, u32::from(hour), padded);
             }
-            Component::Hour { twelve: false, .. } => self.padded(out, u32::from(hour), true),
+            Component::Hour {
+                twelve: false,
+                padded,
+            } => self.padded(out, u32::from(hour), padded),
             Component::Minute { padded } => self.padded(out, u32::from(minute), padded),
             Component::AmPm { dots, case } => {
                 let word = cased(from(words.am_pm.as_ref(), usize::from(hour >= 12)), case);
@@ -1149,11 +1317,13 @@ impl<'a> Plain<'a> {
             FormatFault::NoPattern {
                 reference,
                 examples,
+                looks,
                 ..
             } => FormatFault::NoPattern {
                 example: example(),
                 reference,
                 examples,
+                looks,
             },
             FormatFault::OnlyATime { with_date, .. } => FormatFault::OnlyATime {
                 example: example(),
@@ -1244,6 +1414,116 @@ fn cased(word: &str, case: Case) -> String {
         Case::Upper => word.to_uppercase(),
         Case::Title => capitalised(word),
         Case::Kept => word.to_owned(),
+    }
+}
+
+// Reading a pattern of the Unicode CLDR's.
+
+/// The parts of a CLDR date pattern, or none where it holds a letter
+/// Statac doesn't read. Text between quotes is written as it is, and two
+/// quotes together are one.
+fn pattern(pattern: &str) -> Option<Vec<Part>> {
+    let mut parts = Vec::new();
+    let mut literal = String::new();
+    let mut rest = pattern;
+    while let Some(first) = rest.chars().next() {
+        if first == '\'' {
+            rest = &rest[1..];
+            if let Some(after) = rest.strip_prefix('\'') {
+                literal.push('\'');
+                rest = after;
+                continue;
+            }
+            loop {
+                let end = rest.find('\'')?;
+                literal.push_str(&rest[..end]);
+                rest = &rest[end + 1..];
+                match rest.strip_prefix('\'') {
+                    Some(after) => {
+                        literal.push('\'');
+                        rest = after;
+                    }
+                    None => break,
+                }
+            }
+            continue;
+        }
+        if !first.is_ascii_alphabetic() {
+            literal.push(first);
+            rest = &rest[first.len_utf8()..];
+            continue;
+        }
+        let run = rest.chars().take_while(|letter| *letter == first).count();
+        rest = &rest[run..];
+        let padded = Some(run == 2);
+        let month = |form, stands| Component::Month {
+            form,
+            case: Case::Kept,
+            stands,
+        };
+        let component = match (first, run) {
+            ('d', 1 | 2) => Component::Day {
+                worded: false,
+                padded,
+            },
+            ('M', 1 | 2) | ('L', 1 | 2) => month(MonthForm::Figures { padded }, Stands::InADate),
+            ('M', 3) => month(MonthForm::Short, Stands::InADate),
+            ('M', 4) => month(MonthForm::Full, Stands::InADate),
+            ('L', 3) => month(MonthForm::Short, Stands::Alone),
+            ('L', 4) => month(MonthForm::Full, Stands::Alone),
+            ('y', 2) => Component::Year { short: true },
+            ('y', _) => Component::Year { short: false },
+            ('E', 1..=3) => Component::Weekday {
+                full: false,
+                case: Case::Kept,
+            },
+            ('E', 4) => Component::Weekday {
+                full: true,
+                case: Case::Kept,
+            },
+            ('h', 1 | 2) => Component::Hour {
+                twelve: true,
+                padded: run == 2,
+            },
+            ('H', 1 | 2) => Component::Hour {
+                twelve: false,
+                padded: run == 2,
+            },
+            ('m', 1 | 2) => Component::Minute { padded: run == 2 },
+            ('a', 1..=3) => Component::AmPm {
+                dots: false,
+                case: Case::Kept,
+            },
+            _ => return None,
+        };
+        if !literal.is_empty() {
+            parts.push(Part::Literal(std::mem::take(&mut literal)));
+        }
+        parts.push(Part::Component(component));
+    }
+    if !literal.is_empty() {
+        parts.push(Part::Literal(literal));
+    }
+    Some(parts)
+}
+
+/// The parts of the stamp: the medium date and the short time put
+/// together as the language does. The text joining them stays apart from
+/// the date's own, so a date with no time keeps all of its own.
+fn stamp(patterns: &Patterns) -> Option<Vec<Part>> {
+    let mut parts = Vec::new();
+    let mut rest = patterns.date_and_time.as_str();
+    loop {
+        let date = rest.find("{1}").map(|at| (at, &patterns.short));
+        let time = rest.find("{0}").map(|at| (at, &patterns.time));
+        let next = [date, time].into_iter().flatten().min_by_key(|(at, _)| *at);
+        let Some((at, inside)) = next else {
+            parts.extend(pattern(rest)?);
+            return Some(parts);
+        };
+        parts.extend(pattern(&rest[..at])?);
+        parts.extend(pattern(inside)?);
+        rest = &rest[at + "{0}".len()..];
     }
 }
 
@@ -1632,9 +1912,16 @@ fn resolve(token: &Token, words: &Words) -> Resolution {
             Named::Weekday { full, case } => {
                 Resolution::Component(Component::Weekday { full, case })
             }
-            Named::Month { form, case } => Resolution::Component(Component::Month { form, case }),
+            Named::Month { form, case } => Resolution::Component(Component::Month {
+                form,
+                case,
+                stands: Stands::ByTheDay,
+            }),
             Named::AmPm { dots, case } => Resolution::Component(Component::AmPm { dots, case }),
-            Named::Day => Resolution::Component(Component::Day { worded: true }),
+            Named::Day => Resolution::Component(Component::Day {
+                worded: true,
+                padded: None,
+            }),
             Named::Unworded(list) => Resolution::Unworded(list),
             Named::OtherWeekday { full } => Resolution::OtherWeekday { full },
             Named::OtherMonth { list } => Resolution::OtherMonth { list },
@@ -1672,10 +1959,14 @@ fn number(text: &str, ordinal: bool) -> Option<Component> {
     let value: u32 = text.parse().ok()?;
     let len = text.len();
     Some(match value {
-        DAY => Component::Day { worded: false },
+        DAY => Component::Day {
+            worded: false,
+            padded: None,
+        },
         MONTH => Component::Month {
-            form: MonthForm::Figures,
+            form: MonthForm::Figures { padded: None },
             case: Case::Lower,
+            stands: Stands::ByTheDay,
         },
         YEAR if len == 4 => Component::Year { short: false },
         YEAR_SHORT if len == 2 => Component::Year { short: true },
@@ -1716,6 +2007,7 @@ fn begun(text: &str, words: &Words) -> Option<Component> {
         return Some(Component::Month {
             form: MonthForm::Short,
             case,
+            stands: Stands::ByTheDay,
         });
     }
     words

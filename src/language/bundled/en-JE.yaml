@@ -1,0 +1,5 @@
+# English as en-JE writes it, where that differs from en-001, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+dates:
+  time: HH:mm

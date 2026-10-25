@@ -11,10 +11,21 @@ src/language/direction.rs.
 
 The files for sw are there for the example in
 explanations/unknown-language.md alone, which the same tests hold to them:
-Statac has no words for Swahili. The usual form of a date in each language
-is held to these files by a test in src/dates/tests.rs.
+Statac has no words for Swahili. The patterns each language writes a date
+by, and every look a template names, are held to these files by tests in
+src/language/tests.rs and src/dates/tests.rs.
+
+English is here as ca-gregorian.json for en, and for en-001 and each other
+English region whose words or patterns for dates differ from those of the
+tag it inherits from: Statac has a file of its own for each, in
+src/language/bundled/, holding only what differs. Every other English
+region is written as the tag it inherits from, which is why its files are
+not here. cldr-core/supplemental/parentLocales.json gives the tag each
+English region inherits from, to which src/language/parents.rs is held.
 
 To move to a later release, fetch the same files at its tag in place of
-these and run the tests. Then bring the files in src/language/bundled/ and
+these and run the tests. For English, fetch every region's
+ca-gregorian.json and keep those that differ from the tag each inherits
+from, since a release may write another region otherwise. Then bring the files in src/language/bundled/ and
 the example to what the tests say, and name the new release wherever this
 one is named.

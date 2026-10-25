@@ -4,7 +4,9 @@
 write one moment, Wednesday 31 December 2025 at 15:04, the way you want
 every date written, and Statac writes each date the same way. A template
 can do the same for a single date, as in
-`{{ page.date | date("December 2025") }}`.
+`{{ page.date | date("December 2025") }}`, or name one of the looks a
+date takes in the page's language: `long`, `short`, `day` or `stamp`, as
+in `{{ page.date | date("short") }}`.
 
 Each piece of that moment is a different number or word, so Statac can
 tell which piece you wrote where: 31 is the day, 12 is the month, 2025 is
@@ -34,7 +36,7 @@ on every page.
 
 Write the moment Statac expects: 31 December 2025, with 15:04 or 3.04pm
 if you want the time. Write the month in the site's language, or as a
-number.
+number. In a template, you can name a look instead.
 
 ## Example
 

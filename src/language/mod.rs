@@ -8,9 +8,14 @@
 //! language Statac has no words for, the file is the language whole, on
 //! lines running the way its script does. A tag neither has is looked for
 //! again without its last part, `en-US` as `en`, as the Unicode CLDR's own
-//! data inherits.
+//! data inherits; an English region is looked for first as the broader
+//! English the CLDR writes it as, `en-GB` as `en-001`.
+//!
+//! Statac's own words for a language come with the CLDR's patterns for
+//! writing a date in it, which a site's file can't change.
 
 mod direction;
+mod parents;
 mod read;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -22,7 +27,9 @@ use crate::origin::Sourced;
 use crate::problem::{Kind, Problem};
 use crate::source::Sources;
 
-pub(crate) use read::{read, read_onto};
+#[cfg(test)]
+pub(crate) use read::read;
+pub(crate) use read::{read_onto, read_statacs};
 
 /// Where a site keeps its languages.
 pub(crate) const FOLDER: &str = "languages";
@@ -85,6 +92,32 @@ pub struct Words {
     pub back_to_the_text: Option<String>,
     /// The words for each kind of callout, in the order of `CALLOUTS`.
     pub callouts: Option<[String; 5]>,
+    /// How the Unicode CLDR writes a date in the language, where Statac
+    /// has the language's own.
+    pub dates: Option<Patterns>,
+}
+
+/// The Unicode CLDR's patterns for a language's dates, in its letters:
+/// `d MMMM y`.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Patterns {
+    /// The CLDR's long date.
+    pub long: String,
+    /// The CLDR's medium date.
+    pub short: String,
+    /// The day and the month, `MMMd`.
+    pub day: String,
+    /// The CLDR's short time.
+    pub time: String,
+    /// How a date and a time are put together, `{1}` the date and `{0}`
+    /// the time: the CLDR's medium.
+    pub date_and_time: String,
+    /// `yMMMM`.
+    pub month_and_year: String,
+    /// `yMMM`.
+    pub month_short_and_year: String,
+    /// `y`.
+    pub year: String,
 }
 
 /// The kinds of callout, in the order a language file gives their words.
@@ -119,11 +152,63 @@ impl Words {
     }
 }
 
-/// Statac's own languages, by tag.
+/// Statac's own languages, by tag, each after the tag it inherits from.
+/// A region's file holds only where it differs from that tag's.
 const BUNDLED: &[(&str, &str)] = &[
     ("ar", include_str!("bundled/ar.yaml")),
     ("de", include_str!("bundled/de.yaml")),
     ("en", include_str!("bundled/en.yaml")),
+    ("en-001", include_str!("bundled/en-001.yaml")),
+    ("en-150", include_str!("bundled/en-150.yaml")),
+    ("en-AE", include_str!("bundled/en-AE.yaml")),
+    ("en-AI", include_str!("bundled/en-AI.yaml")),
+    ("en-AU", include_str!("bundled/en-AU.yaml")),
+    ("en-BE", include_str!("bundled/en-BE.yaml")),
+    ("en-BI", include_str!("bundled/en-BI.yaml")),
+    ("en-BW", include_str!("bundled/en-BW.yaml")),
+    ("en-BZ", include_str!("bundled/en-BZ.yaml")),
+    ("en-CA", include_str!("bundled/en-CA.yaml")),
+    ("en-CC", include_str!("bundled/en-CC.yaml")),
+    ("en-CK", include_str!("bundled/en-CK.yaml")),
+    ("en-CM", include_str!("bundled/en-CM.yaml")),
+    ("en-CX", include_str!("bundled/en-CX.yaml")),
+    ("en-DG", include_str!("bundled/en-DG.yaml")),
+    ("en-DK", include_str!("bundled/en-DK.yaml")),
+    ("en-FI", include_str!("bundled/en-FI.yaml")),
+    ("en-FK", include_str!("bundled/en-FK.yaml")),
+    ("en-GB", include_str!("bundled/en-GB.yaml")),
+    ("en-GG", include_str!("bundled/en-GG.yaml")),
+    ("en-GI", include_str!("bundled/en-GI.yaml")),
+    ("en-GS", include_str!("bundled/en-GS.yaml")),
+    ("en-ID", include_str!("bundled/en-ID.yaml")),
+    ("en-IE", include_str!("bundled/en-IE.yaml")),
+    ("en-IL", include_str!("bundled/en-IL.yaml")),
+    ("en-IM", include_str!("bundled/en-IM.yaml")),
+    ("en-IO", include_str!("bundled/en-IO.yaml")),
+    ("en-JE", include_str!("bundled/en-JE.yaml")),
+    ("en-JP", include_str!("bundled/en-JP.yaml")),
+    ("en-KE", include_str!("bundled/en-KE.yaml")),
+    ("en-MG", include_str!("bundled/en-MG.yaml")),
+    ("en-MS", include_str!("bundled/en-MS.yaml")),
+    ("en-MT", include_str!("bundled/en-MT.yaml")),
+    ("en-MU", include_str!("bundled/en-MU.yaml")),
+    ("en-MV", include_str!("bundled/en-MV.yaml")),
+    ("en-NF", include_str!("bundled/en-NF.yaml")),
+    ("en-NG", include_str!("bundled/en-NG.yaml")),
+    ("en-NR", include_str!("bundled/en-NR.yaml")),
+    ("en-NU", include_str!("bundled/en-NU.yaml")),
+    ("en-PK", include_str!("bundled/en-PK.yaml")),
+    ("en-PN", include_str!("bundled/en-PN.yaml")),
+    ("en-RW", include_str!("bundled/en-RW.yaml")),
+    ("en-SC", include_str!("bundled/en-SC.yaml")),
+    ("en-SH", include_str!("bundled/en-SH.yaml")),
+    ("en-SX", include_str!("bundled/en-SX.yaml")),
+    ("en-TK", include_str!("bundled/en-TK.yaml")),
+    ("en-TV", include_str!("bundled/en-TV.yaml")),
+    ("en-TZ", include_str!("bundled/en-TZ.yaml")),
+    ("en-UG", include_str!("bundled/en-UG.yaml")),
+    ("en-ZA", include_str!("bundled/en-ZA.yaml")),
+    ("en-ZW", include_str!("bundled/en-ZW.yaml")),
     ("es", include_str!("bundled/es.yaml")),
     ("fa", include_str!("bundled/fa.yaml")),
     ("fr", include_str!("bundled/fr.yaml")),
@@ -135,21 +220,30 @@ const BUNDLED: &[(&str, &str)] = &[
 pub(crate) fn bundled(tag: &str) -> Option<(&'static str, Arc<Words>)> {
     static READ: OnceLock<Vec<Arc<Words>>> = OnceLock::new();
     let read = READ.get_or_init(|| {
-        BUNDLED
-            .iter()
-            .map(|(tag, text)| {
-                let mut sources = Sources::default();
-                let id = sources.add(format!("{FOLDER}/{tag}.yaml"), (*text).to_owned());
-                let (words, problems) = read(&sources, id);
-                debug_assert!(problems.is_empty(), "{tag}: {problems:?}");
-                Arc::new(words)
-            })
-            .collect()
+        let mut read: Vec<Arc<Words>> = Vec::with_capacity(BUNDLED.len());
+        for (tag, text) in BUNDLED {
+            let onto = parents::inherited(tag)
+                .skip(1)
+                .find_map(|broader| BUNDLED.iter().position(|(known, _)| *known == broader))
+                .map(|at| (*read[at]).clone())
+                .unwrap_or_default();
+            let mut sources = Sources::default();
+            let id = sources.add(format!("{FOLDER}/{tag}.yaml"), (*text).to_owned());
+            let (words, problems) = read_statacs(&sources, id, onto);
+            debug_assert!(problems.is_empty(), "{tag}: {problems:?}");
+            read.push(Arc::new(words));
+        }
+        read
     });
     BUNDLED
         .iter()
         .position(|(known, _)| known.eq_ignore_ascii_case(tag))
         .map(|at| (BUNDLED[at].0, Arc::clone(&read[at])))
+}
+
+/// Statac's own words for `tag`, or for the nearest tag it inherits from.
+pub(crate) fn statacs(tag: &str) -> Option<(&'static str, Arc<Words>)> {
+    parents::inherited(tag).find_map(bundled)
 }
 
 /// The code of English, the language of a site naming none.
@@ -213,8 +307,10 @@ impl Languages {
         Languages { files, real }
     }
 
-    /// The language a site names by `tag`, its file read into `sources`.
-    /// A tag with no words at all is said once, at the tag.
+    /// The language a site names by `tag`, its file read into `sources`:
+    /// the site's file for the tag or a broader one, over Statac's words
+    /// for the tag, or else Statac's alone. A tag with no words at all is
+    /// said once, at the tag.
     pub(crate) fn language(
         &self,
         tag: Option<Sourced<&str>>,
@@ -224,39 +320,37 @@ impl Languages {
         let Some(tag) = tag else {
             return Language::unnamed();
         };
-        for wanted in broader(tag.value) {
-            let found = match self.file(wanted) {
-                Some((name, at)) => {
-                    let shown = format!("{FOLDER}/{name}");
-                    match sources.unsaved().read(&self.real, at) {
-                        Ok(text) => {
-                            let id = sources.add(shown.clone(), text);
-                            let statacs = broader(wanted)
-                                .find_map(bundled)
-                                .map(|(_, words)| (*words).clone())
-                                .unwrap_or_else(|| Words::wordless(tag.value));
-                            let (words, found) = read_onto(sources, id, statacs);
-                            problems.extend(found);
-                            Some((Arc::new(words), Whence::Site(shown)))
-                        }
-                        Err(error) => {
-                            problems.push(Problem::nowhere(Kind::CantRead {
-                                path: shown.clone().into(),
-                                reason: crate::problem::Reason::of(&error),
-                            }));
-                            Some((Arc::new(Words::wordless(tag.value)), Whence::Site(shown)))
-                        }
+        let file = broader(tag.value).find_map(|wanted| self.file(wanted));
+        let found = match file {
+            Some((name, at)) => {
+                let shown = format!("{FOLDER}/{name}");
+                match sources.unsaved().read(&self.real, at) {
+                    Ok(text) => {
+                        let id = sources.add(shown.clone(), text);
+                        let statacs = statacs(tag.value)
+                            .map(|(_, words)| (*words).clone())
+                            .unwrap_or_else(|| Words::wordless(tag.value));
+                        let (words, found) = read_onto(sources, id, statacs);
+                        problems.extend(found);
+                        Some((Arc::new(words), Whence::Site(shown)))
+                    }
+                    Err(error) => {
+                        problems.push(Problem::nowhere(Kind::CantRead {
+                            path: shown.clone().into(),
+                            reason: crate::problem::Reason::of(&error),
+                        }));
+                        Some((Arc::new(Words::wordless(tag.value)), Whence::Site(shown)))
                     }
                 }
-                None => bundled(wanted).map(|(known, words)| (words, Whence::Statac(known))),
-            };
-            if let Some((words, whence)) = found {
-                return Language {
-                    tag: Some(tag.value.to_owned()),
-                    words,
-                    whence,
-                };
             }
+            None => statacs(tag.value).map(|(known, words)| (words, Whence::Statac(known))),
+        };
+        if let Some((words, whence)) = found {
+            return Language {
+                tag: Some(tag.value.to_owned()),
+                words,
+                whence,
+            };
         }
         let kind = Kind::UnknownLanguage {
             tag: tag.value.to_owned(),

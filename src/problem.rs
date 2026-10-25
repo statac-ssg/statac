@@ -2583,9 +2583,11 @@ pub enum AddressFault {
 /// where there is one.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum FormatFault {
+    /// `looks` where a template's example could have named a look.
     Empty {
         reference: String,
         examples: Vec<String>,
+        looks: bool,
     },
     /// A piece written twice: `first` is the piece already read.
     Twice {
@@ -2610,11 +2612,13 @@ pub enum FormatFault {
         written: String,
         examples: Vec<String>,
     },
-    /// Nothing in the example is part of the reference moment.
+    /// Nothing in the example is part of the reference moment: `looks`
+    /// where it is a template's, which could have named a look.
     NoPattern {
         example: String,
         reference: String,
         examples: Vec<String>,
+        looks: bool,
     },
     OnlyATime {
         example: String,

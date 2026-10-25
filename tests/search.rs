@@ -217,7 +217,7 @@ fn a_page_asking_for_a_search_box_publishes_the_index_its_files_named_by_content
     let post = text(&index, &format!("pages/{}", shown[2]));
     assert_eq!(
         post,
-        "{\"url\":\"/blog/post-1/\",\"title\":\"Post 1\",\"date\":\"2026-01-01\",\"day\":\"1 January 2026\",\
+        "{\"url\":\"/blog/post-1/\",\"title\":\"Post 1\",\"date\":\"2026-01-01\",\"day\":\"January 1, 2026\",\
          \"parts\":[[null,null,\"The first post, on running.\"],\
          [\"later\",\"Later\",\"It runs on.\"]]}"
     );
@@ -426,14 +426,14 @@ fn the_browsers_script_finds_what_statac_search_finds() {
     assert!(rust.contains("\"Running\""), "{rust}");
     // A note called by its date isn't dated again; a titled page is.
     assert!(
-        rust.contains("\"/blog/notes/note-1/\",\"5 January 2026\",null,"),
+        rust.contains("\"/blog/notes/note-1/\",\"January 5, 2026\",null,"),
         "{rust}"
     );
     assert!(
         rust.contains("\"An untitled page, called by its opening words.\",null,"),
         "{rust}"
     );
-    assert!(rust.contains("\"Post 1\",\"1 January 2026\","), "{rust}");
+    assert!(rust.contains("\"Post 1\",\"January 1, 2026\","), "{rust}");
     // Each item of a list stands on a line of its own.
     assert!(
         rust.contains("way to brew\\n\",false],[\"another\",true],[\"\\nset in"),
@@ -579,7 +579,7 @@ fn a_page_opening_with_a_heading_is_found_by_its_title_at_that_heading_with_its_
     assert_eq!(
         rust,
         "[[1,false,[[\"/blog/post-3/#heading-1\",\"Opens with a heading\",\
-         \"3 January 2026\",\"Heading 1\",[[\"Text 1.\",false]]]],null]]"
+         \"January 3, 2026\",\"Heading 1\",[[\"Text 1.\",false]]]],null]]"
     );
     let Some(browser) = browser_finds(&site.root.join("_site/search/index.js"), asked, None) else {
         return;

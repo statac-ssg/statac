@@ -1424,9 +1424,18 @@ fn quoted_either(items: &[String]) -> String {
 }
 
 fn format_suggestion(fault: &FormatFault) -> Option<String> {
-    let write = |reference: &str, examples: &[String]| {
+    let write = |reference: &str, examples: &[String], looks: bool| {
+        let looks = match looks {
+            true => {
+                let names: Vec<String> = (crate::dates::Look::ALL.iter())
+                    .map(|look| look.name().to_owned())
+                    .collect();
+                format!(", or name a look: {}", quoted_either(&names))
+            }
+            false => String::new(),
+        };
         format!(
-            "Write `{reference}` the way dates should look, such as {}.",
+            "Write `{reference}` the way dates should look, such as {}{looks}.",
             quoted_either(examples)
         )
     };
@@ -1434,12 +1443,14 @@ fn format_suggestion(fault: &FormatFault) -> Option<String> {
         FormatFault::Empty {
             reference,
             examples,
+            looks,
         }
         | FormatFault::NoPattern {
             reference,
             examples,
+            looks,
             ..
-        } => Some(write(reference, examples)),
+        } => Some(write(reference, examples, *looks)),
         FormatFault::Twice { first, piece, .. } => Some(format!(
             "`{first}` is already the {}, so keep one of them.",
             piece_name(*piece)
@@ -8671,6 +8682,7 @@ mod tests {
                 unusable(FormatFault::Empty {
                     reference: reference(),
                     examples: examples(),
+                    looks: false,
                 }),
                 "Unusable date format: it is empty",
                 Some(
@@ -8683,9 +8695,24 @@ mod tests {
                     example: "dd/mm/yyyy".into(),
                     reference: "2025-12-31 15:04".into(),
                     examples: vec!["2025-12-31".into()],
+                    looks: false,
                 }),
                 "Unusable date format: nothing in `dd/mm/yyyy` is in `2025-12-31 15:04`",
                 Some("Write `2025-12-31 15:04` the way dates should look, such as `2025-12-31`."),
+            ),
+            (
+                unusable(FormatFault::NoPattern {
+                    example: "lnog".into(),
+                    reference: reference(),
+                    examples: examples(),
+                    looks: true,
+                }),
+                "Unusable date format: nothing in `lnog` is in `Wednesday 31 December 2025, 3.04pm`",
+                Some(
+                    "Write `Wednesday 31 December 2025, 3.04pm` the way dates should look, such as \
+                     `31/12/2025` or `31 December 2025`, or name a look: `long`, `short`, `day` \
+                     or `stamp`.",
+                ),
             ),
             (
                 unusable(FormatFault::Twice {

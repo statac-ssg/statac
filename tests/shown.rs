@@ -1646,10 +1646,10 @@ fn a_pages_mentions_are_said_or_faces_oldest_first_with_every_field() {
     assert!(said.contains("Made 2 resized copies of 1 image."), "{said}");
     assert_eq!(
         site.page("post-1/index.html"),
-        "said mentioned A https://a.example/ https://a.example/post-1/ 3 September 2026 2026 \
+        "said mentioned A https://a.example/ https://a.example/post-1/ September 3, 2026 2026 \
          Words. /faces/0123456789abcdef-96.#.jpg 96 96 []\n\
-         said replied   https://a.example/post-1/ 5 September 2026 2026 Three. \n\
-         said replied   https://a.example/post-1/ 5 September 2026 2026  \n\
+         said replied   https://a.example/post-1/ September 5, 2026 2026 Three. \n\
+         said replied   https://a.example/post-1/ September 5, 2026 2026  \n\
          said bookmarked   https://a.example/post-1/   \n\
          faces liked https://a.example/post-1/\n\
          faces reposted https://a.example/post-1/"
@@ -2083,7 +2083,7 @@ fn a_layout_shows_a_pages_webmentions_by_their_kind() {
         "<a href=\"https://a.example/post-1/\" rel=\"nofollow ugc\"><img \
          src=\"/faces/0123456789abcdef-96.#.jpg\" width=\"96\" height=\"96\" alt=\"\"> liked</a>",
         "<a href=\"https://a.example/\" rel=\"nofollow ugc\">A</a>",
-        "<a href=\"https://a.example/post-1/\" rel=\"nofollow ugc\">replied</a> on 3 September 2026",
+        "<a href=\"https://a.example/post-1/\" rel=\"nofollow ugc\">replied</a> on September 3, 2026",
         "<p>&lt;b&gt;Words.&lt;/b&gt;</p>",
         "<a href=\"https://a.example/post-1/\" rel=\"nofollow ugc\">mentioned</a>",
     ] {

@@ -180,7 +180,7 @@ fn a_clean_site_is_built_and_says_what_it_wrote() {
     let post = String::from_utf8(built[3].1.clone()).unwrap();
     assert!(post.contains("<title>Post 1</title>"), "{post}");
     assert!(post.contains("<p>The first post.</p>"), "{post}");
-    assert!(post.contains("<p>4 October 2026</p>"), "{post}");
+    assert!(post.contains("<p>October 4, 2026</p>"), "{post}");
     assert!(post.contains(&format!("href=\"/{}\"", names[4])), "{post}");
 
     // A build says nothing of the JavaScript; `check` does.
@@ -1779,10 +1779,10 @@ fn a_folder_whose_pages_go_untitled_is_called_by_its_dates_and_never_noted() {
     let built = fs::read_to_string(site.out().join("notes-1/note-1/index.html")).unwrap();
     assert_eq!(
         built,
-        "<title>2 January 2026</title>\n<meta property=\"og:title\" content=\"2 January 2026\">\n"
+        "<title>January 2, 2026</title>\n<meta property=\"og:title\" content=\"January 2, 2026\">\n"
     );
     let feed = fs::read_to_string(site.out().join("feed.xml")).unwrap();
-    assert_eq!(feed, "<title>2 January 2026</title><title>Post 1</title>");
+    assert_eq!(feed, "<title>January 2, 2026</title><title>Post 1</title>");
 
     // One page of the folder says it isn't meant to go untitled.
     site.write(

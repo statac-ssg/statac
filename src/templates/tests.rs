@@ -3087,7 +3087,7 @@ fn headline_calls_a_page_by_the_first_name_there_is() {
             "Two three four five six seven eight nine ten eleven twelve thirteen\u{2026}",
             Some(Called::OpeningWords),
         ),
-        (built.id("post-6.md"), "6 January 2026", Some(Called::Date)),
+        (built.id("post-6.md"), "January 6, 2026", Some(Called::Date)),
         (
             built.id("notes/note-1.md"),
             "/notes/note-1/",

@@ -1,0 +1,7 @@
+# English as en-AE writes it, where that differs from en, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+dates:
+  long: d MMMM y
+  short: d MMM y
+  day: d MMM

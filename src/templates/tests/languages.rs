@@ -60,7 +60,7 @@ fn each_page_is_built_in_its_own_languages_words_and_settings() {
     let english = built.html("en/post-1.md");
     let said = |html: &str| html.splitn(7, '|').take(6).collect::<Vec<_>>().join("|");
     assert_eq!(said(&arabic), "ar|rtl|ar|Site 1|ar,en|4 أكتوبر 2026");
-    assert_eq!(said(&english), "en|ltr|en|Site 2|ar,en|4 October 2026");
+    assert_eq!(said(&english), "en|ltr|en|Site 2|ar,en|October 4, 2026");
     assert!(
         arabic.contains("<p>\u{201d}Words\u{201c} and a note."),
         "{arabic}"
@@ -219,7 +219,7 @@ fn a_date_format_no_language_reads_offers_its_own_languages_word_or_a_figure() {
         refused("31 Decembr 2025"),
         crate::problem::FormatFault::NotInReference {
             written: "Decembr".into(),
-            reference: "Wednesday 31 December 2025, 3.04pm".into(),
+            reference: "Wednesday 31 December 2025, 3.04PM".into(),
             corrected: Some("31 December 2025".into()),
         }
     );

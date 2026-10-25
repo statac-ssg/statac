@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::date::Date;
-use crate::dates::format::{self, DateWords};
+use crate::dates::format::DateWords;
 use crate::language::Languages;
 use crate::origin::{Origin, Sourced};
 use crate::platform;
@@ -493,7 +493,6 @@ fn date_words(tag: &str) -> DateWords {
         words: language.words,
         from,
         zeros: true,
-        house: format::house_example(tag),
     }
 }
 

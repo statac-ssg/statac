@@ -7,7 +7,7 @@ use crate::source::{Place, SourceId, Sources, Span};
 use crate::value::{Reader, place_within};
 use crate::yaml::{Node, Resolved, Value as Yaml};
 
-use super::{Direction, Quotes, Words};
+use super::{Direction, Patterns, Quotes, Words};
 
 /// Every key a language file reads.
 pub(crate) const KEYS: &[&str] = &[
@@ -29,8 +29,21 @@ pub(crate) const KEYS: &[&str] = &[
     "callouts",
 ];
 
+/// The keys of the `dates` of Statac's own files, each a pattern.
+const PATTERNS: &[&str] = &[
+    "long",
+    "short",
+    "day",
+    "time",
+    "date_and_time",
+    "month_and_year",
+    "month_short_and_year",
+    "year",
+];
+
 /// Reads the language file `source`. A key whose value can't be read is
 /// left out of the words, with the problem said.
+#[cfg(test)]
 pub(crate) fn read(sources: &Sources, source: SourceId) -> (Words, Vec<Problem>) {
     read_onto(sources, source, Words::default())
 }
@@ -42,7 +55,26 @@ pub(crate) fn read(sources: &Sources, source: SourceId) -> (Words, Vec<Problem>)
 pub(crate) fn read_onto(
     sources: &Sources,
     source: SourceId,
+    words: Words,
+) -> (Words, Vec<Problem>) {
+    read_file(sources, source, words, false)
+}
+
+/// Reads one of Statac's own files over `words`, as [`read_onto`] does,
+/// and its `dates` too, pattern by pattern.
+pub(crate) fn read_statacs(
+    sources: &Sources,
+    source: SourceId,
+    words: Words,
+) -> (Words, Vec<Problem>) {
+    read_file(sources, source, words, true)
+}
+
+fn read_file(
+    sources: &Sources,
+    source: SourceId,
     mut words: Words,
+    statacs: bool,
 ) -> (Words, Vec<Problem>) {
     let mut problems = Vec::new();
     let node = match crate::yaml::read(sources, source) {
@@ -90,6 +122,9 @@ pub(crate) fn read_onto(
             "direction" => file.direction().map(|d| words.direction = d),
             "back_to_the_text" => file.text().map(|t| words.back_to_the_text = t),
             "callouts" => file.list(WordList::Callouts).map(|l| words.callouts = l),
+            "dates" if statacs => file
+                .patterns(words.dates.take().unwrap_or_default())
+                .map(|p| words.dates = Some(p)),
             _ => Err(vec![Problem::at(
                 Kind::UnknownWord {
                     word: Word::Setting,
@@ -300,6 +335,53 @@ impl File<'_> {
         match (chars.next(), chars.next()) {
             (Some(one), None) if is_a_space(one) => Ok(Some(one)),
             _ => Err(vec![reader.wrong(self.value, Expected::Space, None)]),
+        }
+    }
+
+    /// Patterns by name, each over the one in `onto`.
+    fn patterns(&self, mut onto: Patterns) -> Read<Patterns> {
+        let Yaml::Mapping(entries) = &self.value.value else {
+            return Err(vec![self.reader().wrong(
+                self.value,
+                Expected::Fields,
+                None,
+            )]);
+        };
+        let mut problems = Vec::new();
+        for entry in entries {
+            let key = crate::content::words::key_name(&entry.key);
+            let reader = Reader::new(self.sources, &key);
+            let pattern = match key.as_str() {
+                "long" => &mut onto.long,
+                "short" => &mut onto.short,
+                "day" => &mut onto.day,
+                "time" => &mut onto.time,
+                "date_and_time" => &mut onto.date_and_time,
+                "month_and_year" => &mut onto.month_and_year,
+                "month_short_and_year" => &mut onto.month_short_and_year,
+                "year" => &mut onto.year,
+                _ => {
+                    problems.push(Problem::at(
+                        Kind::UnknownWord {
+                            word: Word::Setting,
+                            written: key.clone(),
+                            nearest: crate::suggest::nearest(&key, PATTERNS.iter().copied())
+                                .map(str::to_owned),
+                        },
+                        entry.key.place,
+                    ));
+                    continue;
+                }
+            };
+            match reader.text(&entry.value) {
+                Ok(Some(text)) => *pattern = text.value,
+                Ok(None) => problems.push(reader.wrong(&entry.value, Expected::Text, None)),
+                Err(problem) => problems.push(problem),
+            }
+        }
+        match problems.is_empty() {
+            true => Ok(onto),
+            false => Err(problems),
         }
     }
 

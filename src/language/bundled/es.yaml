@@ -7,3 +7,14 @@ weekdays: [lunes, martes, miércoles, jueves, viernes, sábado, domingo]
 weekdays_short: [lun, mar, mié, jue, vie, sáb, dom]
 am_pm: ["a.\u202Fm.", "p.\u202Fm."]
 quotes: “ ” ‘ ’
+# How dates are written, in the CLDR's own patterns. These are Statac's alone:
+# a site's file for the language can't change them.
+dates:
+  long: d 'de' MMMM 'de' y
+  short: d MMM y
+  day: d MMM
+  time: H:mm
+  date_and_time: "{1}, {0}"
+  month_and_year: MMMM 'de' y
+  month_short_and_year: MMM y
+  year: y

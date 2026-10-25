@@ -1086,7 +1086,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
     assert!(
         post.contains(title)
             && post.contains(
-                "{\"name\":\"page.date\",\"kind\":\"date\",\"holds\":\"date\",\"value\":\"3 October 2026\",\
+                "{\"name\":\"page.date\",\"kind\":\"date\",\"holds\":\"date\",\"value\":\"October 3, 2026\",\
                  \"empty\":false,\"has\":[\"day\",\"month\",\"weekday\",\"year\"],\
                  \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":3,\"excerpt\":[\
                  {\"line\":3,\"text\":[{\"text\":\"date: \"},{\"mark\":\"2026-10-03\"}]}]},\
@@ -1254,7 +1254,7 @@ fn the_panel_searches_the_site_as_serve_shows_it_saying_why_each_page_ranks() {
     let post = search(&served, "post", "/post-1/");
     assert!(
         post.contains(
-            "{\"title\":\"Post 3\",\"day\":\"1 January 2999\",\"heading\":null,\
+            "{\"title\":\"Post 3\",\"day\":\"January 1, 2999\",\"heading\":null,\
              \"href\":\"/post-3/\",\"file\":\"content/post-3.md\",\"draft\":false,\
              \"waiting\":\"2999-01-01\","
         ) && post.contains("\"places\":[{\"place\":\"title\",\"times\":1,\"adds\":")

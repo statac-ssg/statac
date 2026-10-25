@@ -25,12 +25,12 @@ use crate::site::{Id, LanguageId};
 use crate::source::{Place, Sources, Span};
 use crate::value::place_within;
 
-pub use format::{DateWords, Format, Reading, Refusal};
+pub use format::{DateWords, Format, Look, Reading, Refusal};
 
 /// What templates ask of a site's dates.
 pub trait ShowDates {
     /// A date as the site writes it in `language`, or as a template's
-    /// `example` of the reference moment does.
+    /// `example` of the reference moment, or the look it names, does.
     fn format(
         &self,
         language: LanguageId,
@@ -260,7 +260,6 @@ impl Dates {
                     Whence::Nothing => WordsFrom::Nowhere(language.tag.clone().unwrap_or_default()),
                 },
                 zeros,
-                house: language.tag.as_deref().and_then(format::house_example),
             })
             .collect();
         let mut told_of_the_plain = false;
@@ -408,8 +407,9 @@ impl Dates {
         }
     }
 
-    /// A template's example as `language` writes it: read in its words,
-    /// or else in the first other language's that reads it.
+    /// A template's example as `language` writes it: the language's look
+    /// where it names one, else read in its words, or else in the first
+    /// other language's that reads it.
     fn example(&self, language: LanguageId, example: &str) -> Example {
         let own = &self.languages[language.index()];
         if let Some(read) = own
@@ -420,9 +420,17 @@ impl Dates {
         {
             return read.clone();
         }
-        let all = self.languages.iter().map(|language| &language.words);
-        let others = others(language.index(), all);
-        let read = Example::read(example, &own.words, &others, Format::for_a_template);
+        let read = match Look::named(example) {
+            Some(look) => Example {
+                format: Format::look(look, &own.words),
+                read_in: None,
+            },
+            None => {
+                let all = self.languages.iter().map(|language| &language.words);
+                let others = others(language.index(), all);
+                Example::read(example, &own.words, &others, Format::for_a_template)
+            }
+        };
         own.examples
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner())

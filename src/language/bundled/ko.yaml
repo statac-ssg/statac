@@ -6,3 +6,14 @@ weekdays: [월요일, 화요일, 수요일, 목요일, 금요일, 토요일, 일
 weekdays_short: [월, 화, 수, 목, 금, 토, 일]
 am_pm: [오전, 오후]
 quotes: “ ” ‘ ’
+# How dates are written, in the CLDR's own patterns. These are Statac's alone:
+# a site's file for the language can't change them.
+dates:
+  long: y년 MMMM d일
+  short: y. M. d.
+  day: MMM d일
+  time: a h:mm
+  date_and_time: "{1} {0}"
+  month_and_year: y년 MMMM
+  month_short_and_year: y년 MMM
+  year: y년

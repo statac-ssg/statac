@@ -1,6 +1,7 @@
-# English. The months, the weekdays and the quotation marks are as the
-# Unicode CLDR, release 48.2.3, gives them: see LICENSE-CLDR.txt. The other
-# lines are Statac's own.
+# English. The months, the weekdays, the words for morning and afternoon,
+# the quotation marks and how dates are written are as the Unicode CLDR,
+# release 48.2.3, gives them: see LICENSE-CLDR.txt. The other lines are
+# Statac's own.
 months: [January, February, March, April, May, June,
   July, August, September, October, November, December]
 months_short: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
@@ -9,8 +10,19 @@ weekdays_short: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
 days: [1st, 2nd, 3rd, 4th, 5th, 6th, 7th, 8th, 9th, 10th, 11th,
   12th, 13th, 14th, 15th, 16th, 17th, 18th, 19th, 20th, 21st,
   22nd, 23rd, 24th, 25th, 26th, 27th, 28th, 29th, 30th, 31st]
-am_pm: [am, pm]
+am_pm: [AM, PM]
 quotes: “ ” ‘ ’
 back_to_the_text: back to the text
 # Not from the CLDR: the names GitHub gives its callouts.
 callouts: [Note, Tip, Important, Warning, Caution]
+# How dates are written, in the CLDR's own patterns. These are Statac's alone:
+# a site's file for the language can't change them.
+dates:
+  long: MMMM d, y
+  short: MMM d, y
+  day: MMM d
+  time: "h:mm\u202Fa"
+  date_and_time: "{1}, {0}"
+  month_and_year: MMMM y
+  month_short_and_year: MMM y
+  year: y

@@ -1,0 +1,5 @@
+# English as en-AU writes it, where that differs from en-001, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+months_short: [Jan, Feb, Mar, Apr, May, June, July, Aug, Sept, Oct, Nov, Dec]
+months_short_alone: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sept, Oct, Nov, Dec]

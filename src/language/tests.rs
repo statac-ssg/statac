@@ -38,16 +38,40 @@ fn language(tag: &str, files: &[(&str, &str)]) -> (Language, Vec<(&'static str, 
     (language, problems)
 }
 
+/// The words Statac's own file for `tag` gives, read over `onto`.
+fn statacs_file(tag: &str, onto: Words) -> (Words, Vec<Problem>) {
+    let (_, text) = BUNDLED.iter().find(|(known, _)| *known == tag).unwrap();
+    let mut sources = Sources::default();
+    let id = sources.add(format!("languages/{tag}.yaml"), (*text).to_owned());
+    read_statacs(&sources, id, onto)
+}
+
+/// The tag Statac's own file for `tag` is read over, if any.
+fn bundled_parent(tag: &str) -> Option<&'static str> {
+    parents::inherited(tag)
+        .skip(1)
+        .find_map(bundled)
+        .map(|(known, _)| known)
+}
+
 #[test]
 fn every_bundled_language_reads_whole() {
-    for (tag, text) in BUNDLED {
-        let mut sources = Sources::default();
-        let id = sources.add(format!("languages/{tag}.yaml"), (*text).to_owned());
-        let (words, problems) = read(&sources, id);
+    for (tag, _) in BUNDLED {
+        let onto = bundled_parent(tag).map_or_else(Words::default, |parent| {
+            (*bundled(parent).unwrap().1).clone()
+        });
+        let (words, problems) = statacs_file(tag, onto);
         assert!(problems.is_empty(), "{tag}: {problems:?}");
+        assert_eq!(words, *bundled(tag).unwrap().1, "{tag}");
         assert!(words.months.is_some() && words.weekdays.is_some(), "{tag}");
         assert!(words.quotes.is_some() && words.am_pm.is_some(), "{tag}");
+        assert!(words.dates.is_some(), "{tag}");
     }
+    // A region is read over the tag it inherits from, which comes first.
+    assert_eq!(bundled_parent("en-GB"), Some("en-001"));
+    assert_eq!(bundled_parent("en-BE"), Some("en-150"));
+    assert_eq!(bundled_parent("en-CA"), Some("en"));
+    assert_eq!(bundled_parent("en"), None);
     let english = english();
     assert_eq!(english.months.as_ref().unwrap()[11], "December");
     assert_eq!(english.days.as_ref().unwrap()[0], "1st");
@@ -138,14 +162,59 @@ pub(crate) fn example(code: crate::problem::Code) -> &'static str {
     example.split_once("```").expect("a closed example").0
 }
 
+/// The CLDR's patterns for the dates of the language `tag`.
+pub(crate) fn patterns(tag: &str) -> Patterns {
+    let calendar = calendar(tag);
+    let [long, short] = texts(under(&calendar, &["dateFormats"]), ["long", "medium"]);
+    let [time] = texts(under(&calendar, &["timeFormats"]), ["short"]);
+    let [date_and_time] = texts(under(&calendar, &["dateTimeFormats"]), ["medium"]);
+    let available = under(&calendar, &["dateTimeFormats", "availableFormats"]);
+    let [day, month_and_year, month_short_and_year, year] =
+        texts(available, ["MMMd", "yMMMM", "yMMM", "y"]);
+    Patterns {
+        long,
+        short,
+        day,
+        time,
+        date_and_time,
+        month_and_year,
+        month_short_and_year,
+        year,
+    }
+}
+
+/// The words for dates of the language `tag` as the CLDR has them, and
+/// its patterns. A month alone is left out where it is written as it is
+/// in a date, as a file leaves it out.
+fn the_cldrs_dates(tag: &str) -> Words {
+    let calendar = calendar(tag);
+    let months = |form, width| texts(under(&calendar, &["months", form, width]), MONTHS);
+    let weekdays = |width| texts(under(&calendar, &["days", "format", width]), WEEKDAYS);
+    let mut words = Words {
+        months: Some(months("format", "wide")),
+        months_short: Some(months("format", "abbreviated")),
+        weekdays: Some(weekdays("wide")),
+        weekdays_short: Some(weekdays("abbreviated")),
+        am_pm: Some(texts(
+            under(&calendar, &["dayPeriods", "format", "abbreviated"]),
+            ["am", "pm"],
+        )),
+        dates: Some(patterns(tag)),
+        ..Words::default()
+    };
+    let alone = months("stand-alone", "wide");
+    let short_alone = months("stand-alone", "abbreviated");
+    words.months_alone = (words.months.as_ref() != Some(&alone)).then_some(alone);
+    words.months_short_alone =
+        (words.months_short.as_ref() != Some(&short_alone)).then_some(short_alone);
+    words
+}
+
 /// The lines a language's file holds and the words they give, as the
 /// Unicode CLDR has them. A line is left out where it would say what
 /// Statac takes a file without it to mean: a month alone written as it is
 /// in a date, Western digits, lines running left to right.
 fn the_cldrs(tag: &str, systems: &Node) -> (Vec<&'static str>, Words) {
-    let calendar = calendar(tag);
-    let months = |form, width| texts(under(&calendar, &["months", form, width]), MONTHS);
-    let weekdays = |width| texts(under(&calendar, &["days", "format", width]), WEEKDAYS);
     let [order] = texts(
         &main(tag, "cldr-misc-full", "layout", &["layout", "orientation"]),
         ["characterOrder"],
@@ -160,22 +229,9 @@ fn the_cldrs(tag: &str, systems: &Node) -> (Vec<&'static str>, Words) {
     );
 
     let mut words = Words {
-        months: Some(months("format", "wide")),
-        months_short: Some(months("format", "abbreviated")),
-        weekdays: Some(weekdays("wide")),
-        weekdays_short: Some(weekdays("abbreviated")),
-        am_pm: Some(texts(
-            under(&calendar, &["dayPeriods", "format", "abbreviated"]),
-            ["am", "pm"],
-        )),
         quotes: Some(quotes(tag)),
-        ..Words::default()
+        ..the_cldrs_dates(tag)
     };
-    let alone = months("stand-alone", "wide");
-    let short_alone = months("stand-alone", "abbreviated");
-    words.months_alone = (words.months.as_ref() != Some(&alone)).then_some(alone);
-    words.months_short_alone =
-        (words.months_short.as_ref() != Some(&short_alone)).then_some(short_alone);
     words.digits = (system != "latn").then(|| characters(&digits));
     words.direction = match order.as_str() {
         "right-to-left" => Direction::RightToLeft,
@@ -193,6 +249,7 @@ fn the_cldrs(tag: &str, systems: &Node) -> (Vec<&'static str>, Words) {
         ("digits", words.digits.is_some()),
         ("quotes", true),
         ("direction", words.direction == Direction::RightToLeft),
+        ("dates", true),
     ];
     let held = lines.into_iter().filter(|(_, held)| *held);
     (held.map(|(line, _)| line).collect(), words)
@@ -204,7 +261,8 @@ fn the_cldrs(tag: &str, systems: &Node) -> (Vec<&'static str>, Words) {
 #[test]
 fn every_bundled_line_outside_english_is_the_cldrs() {
     let systems = cldr("cldr-core/supplemental/numberingSystems.json");
-    let others: Vec<_> = BUNDLED.iter().filter(|(tag, _)| *tag != ENGLISH).collect();
+    let english = |tag: &str| tag.split('-').next() == Some(ENGLISH);
+    let others: Vec<_> = BUNDLED.iter().filter(|(tag, _)| !english(tag)).collect();
     assert_eq!(others.len(), 7);
     for (tag, text) in others {
         let (lines, words) = the_cldrs(tag, &systems);
@@ -218,10 +276,160 @@ fn every_bundled_line_outside_english_is_the_cldrs() {
             .map(|entry| crate::content::words::key_name(&entry.key))
             .collect();
         assert_eq!(written, lines, "{tag}");
-        let (read, problems) = read(&sources, id);
+        let (read, problems) = read_statacs(&sources, id, Words::default());
         assert!(problems.is_empty(), "{tag}: {problems:?}");
         assert_eq!(read, words, "{tag}");
     }
+}
+
+/// English's months, weekdays, words for morning and afternoon and
+/// patterns, as `words` holds them.
+fn dated(words: &Words) -> Words {
+    Words {
+        months: words.months.clone(),
+        months_alone: words.months_alone.clone(),
+        months_short: words.months_short.clone(),
+        months_short_alone: words.months_short_alone.clone(),
+        weekdays: words.weekdays.clone(),
+        weekdays_short: words.weekdays_short.clone(),
+        am_pm: words.am_pm.clone(),
+        dates: words.dates.clone(),
+        ..Words::default()
+    }
+}
+
+/// The English tags the CLDR's files here are for: `en`, and each region
+/// written otherwise than the tag it inherits from.
+fn englishes_held() -> Vec<String> {
+    let folder = format!(
+        "{}/tests/cldr/cldr-dates-full/main",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let mut tags: Vec<String> = std::fs::read_dir(folder)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|tag| tag.split('-').next() == Some(ENGLISH))
+        .collect();
+    tags.sort();
+    tags
+}
+
+/// English's words for dates are the Unicode CLDR's, region by region:
+/// Statac has a file for `en` and for each region the CLDR writes
+/// otherwise than the tag it inherits from, holding only the lines that
+/// differ, with the CLDR's values.
+#[test]
+fn english_and_its_regions_write_dates_as_the_cldr_does() {
+    let held = englishes_held();
+    let files: Vec<&str> = (BUNDLED.iter())
+        .map(|(tag, _)| *tag)
+        .filter(|tag| tag.split('-').next() == Some(ENGLISH))
+        .collect();
+    assert_eq!(files, held);
+    for tag in &held {
+        let words = bundled(tag).unwrap().1;
+        assert_eq!(dated(&words), the_cldrs_dates(tag), "{tag}");
+        let Some(parent) = bundled_parent(tag) else {
+            continue;
+        };
+        let (own, theirs) = (the_cldrs_dates(tag), the_cldrs_dates(parent));
+        let differ = |line: &'static str, differs: bool| differs.then_some(line);
+        let mut lines: Vec<&str> = [
+            differ("months", own.months != theirs.months),
+            differ("months_alone", own.months_alone != theirs.months_alone),
+            differ("months_short", own.months_short != theirs.months_short),
+            differ(
+                "months_short_alone",
+                own.months_short_alone != theirs.months_short_alone,
+            ),
+            differ("weekdays", own.weekdays != theirs.weekdays),
+            differ(
+                "weekdays_short",
+                own.weekdays_short != theirs.weekdays_short,
+            ),
+            differ("am_pm", own.am_pm != theirs.am_pm),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        let (own, theirs) = (own.dates.unwrap(), theirs.dates.unwrap());
+        let patterns: Vec<&str> = [
+            differ("long", own.long != theirs.long),
+            differ("short", own.short != theirs.short),
+            differ("day", own.day != theirs.day),
+            differ("time", own.time != theirs.time),
+            differ("date_and_time", own.date_and_time != theirs.date_and_time),
+            differ(
+                "month_and_year",
+                own.month_and_year != theirs.month_and_year,
+            ),
+            differ(
+                "month_short_and_year",
+                own.month_short_and_year != theirs.month_short_and_year,
+            ),
+            differ("year", own.year != theirs.year),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if !patterns.is_empty() {
+            lines.push("dates");
+        }
+        assert!(!lines.is_empty(), "{tag} is written as {parent} is");
+        let (_, text) = BUNDLED.iter().find(|(known, _)| known == tag).unwrap();
+        let mut sources = Sources::default();
+        let id = sources.add(format!("languages/{tag}.yaml"), (*text).to_owned());
+        let Yaml::Mapping(entries) = crate::yaml::read(&sources, id).unwrap().value else {
+            panic!("{tag}");
+        };
+        let keys = |entries: &[crate::yaml::Entry]| -> Vec<String> {
+            (entries.iter())
+                .map(|entry| crate::content::words::key_name(&entry.key))
+                .collect()
+        };
+        assert_eq!(keys(&entries), lines, "{tag}");
+        if let Some(dates) = entries.last().filter(|_| !patterns.is_empty()) {
+            let Yaml::Mapping(written) = &dates.value.value else {
+                panic!("{tag}");
+            };
+            assert_eq!(keys(written), patterns, "{tag}");
+        }
+    }
+}
+
+/// The broader English each English region is written as is the
+/// Unicode CLDR's.
+#[test]
+fn the_broader_english_of_each_english_region_is_the_cldrs() {
+    let parents = cldr("cldr-core/supplemental/parentLocales.json");
+    let Yaml::Mapping(parents) =
+        &under(&parents, &["supplemental", "parentLocales", "parentLocale"]).value
+    else {
+        panic!("parent locales");
+    };
+    let mut the_cldrs: Vec<(String, String)> = (parents.iter())
+        .map(|entry| {
+            let Yaml::Scalar(parent) = &entry.value.value else {
+                panic!("{entry:?}");
+            };
+            (crate::content::words::key_name(&entry.key), parent.clone())
+        })
+        .collect();
+    the_cldrs.retain(|(tag, parent)| tag.starts_with("en-") && parent != "und");
+    let mut statacs: Vec<(String, String)> = (parents::ENGLISHES.iter())
+        .flat_map(|(parent, regions)| {
+            regions
+                .iter()
+                .map(|region| ((*region).to_owned(), (*parent).to_owned()))
+        })
+        .collect();
+    the_cldrs.sort();
+    statacs.sort();
+    assert_eq!(statacs, the_cldrs);
+    let inherited: Vec<&str> = parents::inherited("en-GB-oxendict").collect();
+    assert_eq!(inherited, ["en-GB-oxendict", "en-GB", "en-001", "en"]);
+    let inherited: Vec<&str> = parents::inherited("EN-at").collect();
+    assert_eq!(inherited, ["EN-at", "en-150", "en-001", "en"]);
 }
 
 /// The explanation of a language Statac has no words for shows a file of
@@ -414,6 +622,16 @@ fn a_value_that_cant_be_read_is_refused_at_its_text() {
             wrong("languages/xx.yaml", Expected::Fields, Found::List, None),
             "- months",
         ),
+        // How dates are written is Statac's own, which no site's file writes.
+        (
+            "dates:\n  long: d MMMM y\n",
+            Kind::UnknownWord {
+                word: Word::Setting,
+                written: "dates".into(),
+                nearest: None,
+            },
+            "dates",
+        ),
     ];
     for (text, kind, at) in cases {
         let (_, problems) = file(text);
@@ -443,9 +661,22 @@ type Pairs<'a> = &'a [(&'a str, &'a str)];
 #[test]
 fn a_tag_is_looked_for_whole_and_then_broader() {
     let own = "months: [a, b, c, d, e, f, g, h, i, j, k, l]\n";
-    let cases: [(&str, Pairs, Whence, Pairs); 8] = [
+    let cases: [(&str, Pairs, Whence, Pairs); 13] = [
         ("fr", &[], Whence::Statac("fr"), &[]),
         ("en-US", &[], Whence::Statac("en"), &[]),
+        // An English region is looked for as the broader English the CLDR
+        // writes it as.
+        ("en-GB", &[], Whence::Statac("en-GB"), &[]),
+        ("en-NZ", &[], Whence::Statac("en-001"), &[]),
+        ("en-AT", &[], Whence::Statac("en-150"), &[]),
+        ("en-GB-oxendict", &[], Whence::Statac("en-GB"), &[]),
+        // The site's own file wins over Statac's for a narrower tag.
+        (
+            "en-GB",
+            &[("languages/en.yaml", own)],
+            Whence::Site("languages/en.yaml".into()),
+            &[],
+        ),
         (
             "en-US",
             &[("languages/en-GB.yaml", own)],
@@ -510,6 +741,16 @@ fn a_sites_own_file_adds_to_statacs_words_key_by_key() {
     );
     assert_eq!(regional.words.am_pm.as_ref().unwrap()[0], "a.m.");
     assert_eq!(regional.words.months, french.months);
+    assert_eq!(regional.words.dates, french.dates);
+
+    // A file for the language adds to Statac's words for the region.
+    let (english, _) = language("en-AU", &[("languages/en.yaml", text)]);
+    assert_eq!(
+        english.words.months_short,
+        bundled("en-AU").unwrap().1.months_short
+    );
+    assert_eq!(english.words.dates, bundled("en-001").unwrap().1.dates);
+    assert_eq!(english.words.am_pm, None);
 
     // A key whose value can't be read keeps Statac's.
     let (unread, problems) = language("fr", &[("languages/fr.yaml", "months: [janvier]\n")]);
