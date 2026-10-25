@@ -2326,59 +2326,105 @@ fn letters_run_together_part_at_the_languages_marks() {
     );
 }
 
-/// With words and no patterns, as a site's own file gives, the letter
-/// straight after figures parts from the language's words after it.
+/// The language's words run into other letters, with none of its
+/// patterns' marks before them, as a site's own file, which carries no
+/// patterns, has none, are refused and offered written apart, which reads.
 #[test]
-fn letters_run_together_part_after_the_figures_mark_with_no_patterns() {
+fn words_run_together_are_offered_apart() {
     let without_patterns = |tag: &str| {
         words(Words {
             dates: None,
             ..(*crate::language::statacs(tag).unwrap().1).clone()
         })
     };
-    let (japanese, korean, chinese) = (without_patterns("ja"), without_patterns("ko"), chinese());
+    let (japanese, korean, chinese) = (statacs("ja"), statacs("ko"), chinese());
+    let (japanese_alone, korean_alone) = (without_patterns("ja"), without_patterns("ko"));
     let cases = [
-        ("2025年12月31日星期三", &chinese, "2026年03月07日星期六"),
-        ("2025年12月31号星期三", &chinese, "2026年03月07号星期六"),
-        ("2025年12月31日周三", &chinese, "2026年03月07日周六"),
+        (
+            "2025年12月31日星期三",
+            &chinese,
+            "日星期三",
+            "2025年12月31日 星期三",
+            "2026年03月07日 星期六",
+        ),
+        (
+            "2025年12月31号周三",
+            &chinese,
+            "号周三",
+            "2025年12月31号 周三",
+            "2026年03月07号 周六",
+        ),
         (
             "2025年12月31日星期三下午3:04",
             &chinese,
-            "2026年03月07日星期六上午9:05",
-        ),
-        ("2025年12月31日水曜日", &japanese, "2026年3月7日土曜日"),
-        ("2025년12월31일수요일", &korean, "2026년3월7일토요일"),
-        // A letter none of the language's patterns write is kept as text.
-        ("2025年12月31号水曜日", &statacs("ja"), "2026年3月7号土曜日"),
-    ];
-    for (example, words, saturday) in cases {
-        let written = written(example, words, &timed(2026, 3, 7, 9, 5));
-        assert_eq!(written, saturday, "{example}");
-    }
-    let slips = [
-        (
-            "2025年12月31日星朝三",
-            &chinese,
-            "星朝三",
-            "2025年12月31日星期三",
+            "日星期三下午",
+            "2025年12月31日 星期三 下午3:04",
+            "2026年03月07日 星期六 上午9:05",
         ),
         (
-            "2025年12月31星朝三",
-            &chinese,
-            "星朝三",
-            "2025年12月31星期三",
+            "2025年12月31日水曜日",
+            &japanese_alone,
+            "日水曜日",
+            "2025年12月31日 水曜日",
+            "2026年3月7日 土曜日",
+        ),
+        (
+            "2025년12월31일수요일",
+            &korean_alone,
+            "일수요일",
+            "2025년12월31일 수요일",
+            "2026년3월7일 토요일",
+        ),
+        // A letter none of the language's patterns write is no mark.
+        (
+            "2025年12月31号水曜日",
+            &japanese,
+            "号水曜日",
+            "2025年12月31号 水曜日",
+            "2026年3月7号 土曜日",
+        ),
+        (
+            "2025年12月31日水曜日午後3:04",
+            &japanese,
+            "水曜日午後",
+            "2025年12月31日水曜日 午後3:04",
+            "2026年3月7日土曜日 午前9:05",
+        ),
+        (
+            "2025年12月31日 水午後3:04",
+            &japanese,
+            "水午後",
+            "2025年12月31日 水 午後3:04",
+            "2026年3月7日 土 午前9:05",
+        ),
+        (
+            "2025년 12월 31일 수요일오후 3:04",
+            &korean,
+            "수요일오후",
+            "2025년 12월 31일 수요일 오후 3:04",
+            "2026년 3월 7일 토요일 오전 9:05",
         ),
     ];
-    for (example, words, at, corrected) in slips {
+    for (example, words, at, apart, saturday) in cases {
         let refusal = refused(example, words);
         let fault = FormatFault::NotInReference {
             written: at.into(),
             reference: words.moment(),
-            corrected: Some(corrected.into()),
+            corrected: Some(apart.into()),
         };
         assert_eq!(refusal.fault, fault, "{example}");
         assert_eq!(&example[refusal.at], at, "{example}");
+        let written = written(apart, words, &timed(2026, 3, 7, 9, 5));
+        assert_eq!(written, saturday, "{example}");
     }
+    // Letters of a script with spaces between words stay one word.
+    let fault = FormatFault::LoneHour {
+        written: "3".into(),
+        am: "ص".into(),
+        pm: "م".into(),
+    };
+    let arabic = statacs("ar");
+    assert_eq!(refused("31 ديسمبر 2025 3:04 صم", &arabic).fault, fault);
 }
 
 fn chinese() -> DateWords {
@@ -2508,41 +2554,6 @@ fn a_slip_in_a_word_of_syllables_is_told_and_other_text_kept() {
     ];
     for (example, words, saturday) in kept {
         assert_eq!(written(example, words, &timed(2026, 3, 7, 9, 5)), saturday);
-    }
-}
-
-/// Two of the language's words of Han or kana run together part with no
-/// mark between them, as the script writes no spaces between words. A
-/// single letter, and words of a script with spaces, stay one word.
-#[test]
-fn words_of_a_script_without_spaces_part_where_they_run_together() {
-    let (japanese, korean, arabic, chinese) =
-        (statacs("ja"), statacs("ko"), statacs("ar"), chinese());
-    let parted = [
-        (
-            "2025年12月31日水曜日午後3:04",
-            &japanese,
-            "2026年3月7日土曜日午前9:05",
-        ),
-        ("水曜日午後3:04", &japanese, "土曜日午前9:05"),
-        ("星期三下午3:04", &chinese, "星期六上午9:05"),
-        ("周三下午3:04", &chinese, "周六上午9:05"),
-    ];
-    for (example, words, saturday) in parted {
-        assert_eq!(written(example, words, &timed(2026, 3, 7, 9, 5)), saturday);
-    }
-    let one_word = [
-        ("2025年12月31日 水午後3:04", &japanese, "午前", "午後"),
-        ("2025년 12월 31일 수요일오후 3:04", &korean, "오전", "오후"),
-        ("31 ديسمبر 2025 3:04 صم", &arabic, "ص", "م"),
-    ];
-    for (example, words, am, pm) in one_word {
-        let fault = FormatFault::LoneHour {
-            written: "3".into(),
-            am: am.into(),
-            pm: pm.into(),
-        };
-        assert_eq!(refused(example, words).fault, fault, "{example}");
     }
 }
 

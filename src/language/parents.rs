@@ -54,17 +54,11 @@ pub(super) const SCRIPTS: &[(&str, &str)] = &[
 
 /// The tag `tag` inherits from: none for a language and a script other
 /// than its usual one, `en-Dsrt`, whose CLDR data inherits from no
-/// language; the tag without its script where that is the language's
-/// usual one, `en-Latn-GB` being `en-GB`, since the CLDR names its data
-/// without a script its likely subtags imply; the broader form of its
-/// language the CLDR names for a region; else the tag without its last
-/// part.
+/// language; the broader form of its language the CLDR names for a
+/// region; else the tag without its last part.
 pub(super) fn parent(tag: &str) -> Option<String> {
-    if in_another_script(tag) {
+    if tag.matches('-').count() == 1 && in_another_script(tag) {
         return None;
-    }
-    if let Some(without) = without_usual_script(tag) {
-        return Some(without);
     }
     let named = PARENTS.iter().find(|(_, regions)| {
         regions
@@ -77,41 +71,51 @@ pub(super) fn parent(tag: &str) -> Option<String> {
     }
 }
 
-/// The usual script of the language `tag` names, if Statac has words for
-/// it, and the script `tag` names next, if any.
-fn scripts(tag: &str) -> Option<(&'static str, &str)> {
-    let mut parts = tag.split('-');
-    let language = parts.next()?;
-    let script = parts.next()?;
-    let (_, usual) = SCRIPTS
-        .iter()
-        .find(|(known, _)| known.eq_ignore_ascii_case(language))?;
-    let is_script = script.len() == 4 && script.bytes().all(|b| b.is_ascii_alphabetic());
-    is_script.then_some((*usual, script))
-}
-
-/// Whether `tag` is a language Statac has words for and a script other
-/// than its usual one, and nothing more.
+/// Whether `tag` names a language Statac has words for and, next, a script
+/// other than its usual one.
 fn in_another_script(tag: &str) -> bool {
-    tag.matches('-').count() == 1
-        && scripts(tag).is_some_and(|(usual, script)| !usual.eq_ignore_ascii_case(script))
+    let mut parts = tag.split('-');
+    let (Some(language), Some(script)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    SCRIPTS
+        .iter()
+        .find(|(known, _)| known.eq_ignore_ascii_case(language))
+        .is_some_and(|(_, usual)| is_script(script) && !usual.eq_ignore_ascii_case(script))
 }
 
-/// `tag` without its script, where that is the usual one of a language
-/// Statac has words for.
-fn without_usual_script(tag: &str) -> Option<String> {
-    let (usual, script) = scripts(tag)?;
-    if !usual.eq_ignore_ascii_case(script) {
+fn is_script(part: &str) -> bool {
+    part.len() == 4 && part.bytes().all(|b| b.is_ascii_alphabetic())
+}
+
+/// `tag` without the script it names, where that isn't another script
+/// than its language's usual one: `en-Latn-GB` as `en-GB`.
+fn without_script(tag: &str) -> Option<String> {
+    let mut parts = tag.splitn(3, '-');
+    let (language, script) = (parts.next()?, parts.next()?);
+    if !is_script(script) || in_another_script(tag) {
         return None;
     }
-    let (language, rest) = tag.split_once('-')?;
-    Some(match rest.split_once('-') {
-        Some((_, after)) => format!("{language}-{after}"),
+    Some(match parts.next() {
+        Some(rest) => format!("{language}-{rest}"),
         None => language.to_owned(),
     })
 }
 
-/// The tag, then each it inherits from in turn: `en-GB`, `en-001`, `en`.
+/// The tag, then the tag without its script and each it inherits from,
+/// then each the tag itself inherits from, every one once at its last
+/// place: `en-Latn-GB`, `en-GB`, `en-001`, `en-Latn`, `en`.
 pub(super) fn inherited(tag: &str) -> impl Iterator<Item = String> {
-    std::iter::successors(Some(tag.to_owned()), |tag| parent(tag))
+    let chain = |from: String| std::iter::successors(Some(from), |tag| parent(tag));
+    let all: Vec<String> = std::iter::once(tag.to_owned())
+        .chain(without_script(tag).into_iter().flat_map(chain))
+        .chain(chain(tag.to_owned()).skip(1))
+        .collect();
+    let mut once: Vec<String> = Vec::with_capacity(all.len());
+    for tag in all.into_iter().rev() {
+        if !once.iter().any(|known| known.eq_ignore_ascii_case(&tag)) {
+            once.push(tag);
+        }
+    }
+    once.into_iter().rev()
 }

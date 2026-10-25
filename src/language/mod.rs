@@ -7,14 +7,15 @@
 //! the place of Statac's, and a key it leaves out keeps Statac's. For a
 //! language Statac has no words for, the file is the language whole, on
 //! lines running the way its script does. The site's file and Statac's
-//! words are each looked for by one rule, as the Unicode CLDR's own data
-//! inherits: a tag neither has is looked for again without its last part,
-//! `en-US` as `en`; a tag naming its language's usual script first without
-//! it, `en-Latn-GB` as `en-GB`; a region first as the broader form of its
-//! language the CLDR writes it as, `en-GB` as `en-001` and `es-MX` as
-//! `es-419`. Neither the words for a language nor its file reach it
-//! written in a script other than its usual one, `en-Dsrt`, whose CLDR
-//! data inherits from no language.
+//! words are each looked for by one rule: a tag neither has is looked for
+//! again without its last part, `en-US` as `en`, as the Unicode CLDR's own
+//! data inherits; a tag naming a script first without it and then with
+//! it, `zh-Hant-TW` as `zh-TW` and then `zh-Hant`; a region first as the
+//! broader form of its language the CLDR writes it as, `en-GB` as `en-001`
+//! and `es-MX` as `es-419`. A language
+//! Statac has words for written in a script other than its usual one,
+//! `en-Dsrt`, takes neither those words nor the language's file, as its
+//! CLDR data inherits from no language.
 //!
 //! Statac's own words for a language come with the CLDR's patterns for
 //! writing a date in it, which a site's file can't change.

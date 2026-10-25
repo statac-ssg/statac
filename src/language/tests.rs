@@ -447,7 +447,8 @@ fn every_language_and_its_regions_write_dates_and_quotes_as_the_cldr_does() {
 /// The broader form of its language each region is written as is the
 /// Unicode CLDR's, in every language Statac has words for, and so is a
 /// tag that inherits from no language: one in a script other than the
-/// language's usual one.
+/// language's usual one. A tag naming a script is looked for without it,
+/// then with it.
 #[test]
 fn the_broader_form_of_each_region_is_the_cldrs() {
     let all = cldr("cldr-core/supplemental/parentLocales.json");
@@ -484,25 +485,17 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
     the_cldrs.sort();
     statacs.sort();
     assert_eq!(statacs, the_cldrs);
-    let inherited: Vec<String> = parents::inherited("en-GB-oxendict").collect();
-    assert_eq!(inherited, ["en-GB-oxendict", "en-GB", "en-001", "en"]);
-    let inherited: Vec<String> = parents::inherited("EN-at").collect();
-    assert_eq!(inherited, ["EN-at", "en-150", "en-001", "en"]);
-    let inherited: Vec<String> = parents::inherited("es-MX").collect();
-    assert_eq!(inherited, ["es-MX", "es-419", "es"]);
 
     // The CLDR's rule beyond its list: any language and a script other
     // than its likely one inherits from no language.
     let likely = cldr("cldr-core/supplemental/likelySubtags.json");
     let likely = under(&likely, &["supplemental", "likelySubtags"]);
-    let languages: Vec<&str> = (BUNDLED.iter())
+    let the_cldrs: Vec<(&str, String)> = (BUNDLED.iter())
         .map(|(tag, _)| *tag)
         .filter(|tag| !tag.contains('-'))
-        .collect();
-    let the_cldrs: Vec<(&str, String)> = (languages.iter())
         .map(|language| {
-            let [full] = texts(likely, [*language]);
-            (*language, full.split('-').nth(1).unwrap().to_owned())
+            let [full] = texts(likely, [language]);
+            (language, full.split('-').nth(1).unwrap().to_owned())
         })
         .collect();
     let statacs: Vec<(&str, String)> = (parents::SCRIPTS.iter())
@@ -510,36 +503,25 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
         .collect();
     assert_eq!(statacs, the_cldrs);
 
-    // A tag naming its language's usual script is looked up without it,
-    // as the CLDR's data is named: `en-Latn-GB` as `en-GB`. A region
-    // whose likely script differs from its language's would keep it, and
-    // the CLDR names none in these languages.
-    let Yaml::Mapping(all_likely) = &likely.value else {
-        panic!("likely subtags");
-    };
-    let regional: Vec<String> = (all_likely.iter())
-        .map(|entry| crate::content::words::key_name(&entry.key))
-        .filter(|tag| {
-            let mut parts = tag.split('-');
-            parts
-                .next()
-                .is_some_and(|language| languages.contains(&language))
-                && parts.next().is_some_and(|next| next.len() != 4)
-        })
-        .collect();
-    assert_eq!(regional, Vec::<String>::new());
     let cases: [(&str, &[&str]); 15] = [
-        ("en-Dsrt", &["en-Dsrt"]),
-        ("en-Shaw-GB", &["en-Shaw-GB", "en-Shaw"]),
-        ("EN-dsrt", &["EN-dsrt"]),
-        ("ja-Latn", &["ja-Latn"]),
-        ("ar-Latn-EG", &["ar-Latn-EG", "ar-Latn"]),
-        ("en-Latn", &["en-Latn", "en"]),
-        ("en-Latn-GB", &["en-Latn-GB", "en-GB", "en-001", "en"]),
-        ("en-latn-gb", &["en-latn-gb", "en-gb", "en-001", "en"]),
         (
-            "en-Latn-AT",
-            &["en-Latn-AT", "en-AT", "en-150", "en-001", "en"],
+            "en-GB-oxendict",
+            &["en-GB-oxendict", "en-GB", "en-001", "en"],
+        ),
+        ("EN-at", &["EN-at", "en-150", "en-001", "en"]),
+        ("es-MX", &["es-MX", "es-419", "es"]),
+        ("en-Dsrt", &["en-Dsrt"]),
+        ("EN-dsrt", &["EN-dsrt"]),
+        ("en-Shaw-GB", &["en-Shaw-GB", "en-Shaw"]),
+        ("ja-Latn", &["ja-Latn"]),
+        ("en-Latn", &["en-Latn", "en"]),
+        (
+            "en-Latn-GB",
+            &["en-Latn-GB", "en-GB", "en-001", "en-Latn", "en"],
+        ),
+        (
+            "en-latn-gb",
+            &["en-latn-gb", "en-gb", "en-001", "en-latn", "en"],
         ),
         (
             "en-Latn-GB-oxendict",
@@ -548,14 +530,18 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
                 "en-GB-oxendict",
                 "en-GB",
                 "en-001",
+                "en-Latn-GB",
+                "en-Latn",
                 "en",
             ],
         ),
-        ("en-Latn-US", &["en-Latn-US", "en-US", "en"]),
-        ("es-Latn-MX", &["es-Latn-MX", "es-MX", "es-419", "es"]),
-        ("fr-Latn-CA", &["fr-Latn-CA", "fr-CA", "fr"]),
-        ("ko-Kore-KR", &["ko-Kore-KR", "ko-KR", "ko"]),
-        ("sw-Latn-KE", &["sw-Latn-KE", "sw-Latn", "sw"]),
+        (
+            "es-Latn-MX",
+            &["es-Latn-MX", "es-MX", "es-419", "es-Latn", "es"],
+        ),
+        ("ko-Kore-KR", &["ko-Kore-KR", "ko-KR", "ko-Kore", "ko"]),
+        ("sw-Latn-KE", &["sw-Latn-KE", "sw-KE", "sw-Latn", "sw"]),
+        ("zh-Hant-TW", &["zh-Hant-TW", "zh-TW", "zh-Hant", "zh"]),
     ];
     for (tag, chain) in cases {
         let inherited: Vec<String> = parents::inherited(tag).collect();
@@ -792,7 +778,7 @@ type Pairs<'a> = &'a [(&'a str, &'a str)];
 #[test]
 fn a_tag_is_looked_for_whole_and_then_broader() {
     let own = "months: [a, b, c, d, e, f, g, h, i, j, k, l]\n";
-    let cases: [(&str, Pairs, Whence, Pairs); 42] = [
+    let cases: [(&str, Pairs, Whence, Pairs); 44] = [
         ("fr", &[], Whence::Statac("fr"), &[]),
         ("en-US", &[], Whence::Statac("en"), &[]),
         ("fr-SN", &[], Whence::Statac("fr"), &[]),
@@ -805,7 +791,7 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
         ("en-GB-oxendict", &[], Whence::Statac("en-GB"), &[]),
         ("es-MX", &[], Whence::Statac("es-MX"), &[]),
         ("es-CU", &[], Whence::Statac("es-419"), &[]),
-        // A language's usual script is looked for as the tag without it.
+        // A tag naming a script is looked for without it.
         ("en-Latn-GB", &[], Whence::Statac("en-GB"), &[]),
         ("en-Latn-NZ", &[], Whence::Statac("en-001"), &[]),
         ("fr-Latn-CA", &[], Whence::Statac("fr-CA"), &[]),
@@ -842,7 +828,19 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
         ),
         (
             "zh-Hant-TW",
+            &[("languages/zh-TW.yaml", own)],
+            Whence::Site("languages/zh-TW.yaml".into()),
+            &[],
+        ),
+        (
+            "zh-Hant-TW",
             &[("languages/zh-Hant.yaml", own)],
+            Whence::Site("languages/zh-Hant.yaml".into()),
+            &[],
+        ),
+        (
+            "zh-Hant-TW",
+            &[("languages/zh.yaml", own), ("languages/zh-Hant.yaml", own)],
             Whence::Site("languages/zh-Hant.yaml".into()),
             &[],
         ),
@@ -887,18 +885,26 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
             Whence::Site("languages/en.yaml".into()),
             &[],
         ),
-        // `en-Latn` is no tag `en-Latn-GB` inherits from, nor is
-        // `en-Latn-GB` one that `en-Latn-GB-oxendict` does.
+        // The tag with its script is looked for after the tags without it.
         (
             "en-Latn-GB",
             &[("languages/en-Latn.yaml", own)],
-            Whence::Statac("en-GB"),
+            Whence::Site("languages/en-Latn.yaml".into()),
             &[],
         ),
         (
             "en-Latn-GB",
             &[("languages/en-Latn.yaml", own), ("languages/en.yaml", own)],
-            Whence::Site("languages/en.yaml".into()),
+            Whence::Site("languages/en-Latn.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn-GB",
+            &[
+                ("languages/en-Latn.yaml", own),
+                ("languages/en-001.yaml", own),
+            ],
+            Whence::Site("languages/en-001.yaml".into()),
             &[],
         ),
         (
@@ -972,22 +978,10 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
             &[("unknown-language", "ja-Latn")],
         ),
         (
-            "en-Shaw",
-            &[("languages/en.yaml", own)],
-            Whence::Nothing,
-            &[("unknown-language", "en-Shaw")],
-        ),
-        (
             "ar-Latn",
             &[("languages/ar.yaml", own)],
             Whence::Nothing,
             &[("unknown-language", "ar-Latn")],
-        ),
-        (
-            "en-Shaw",
-            &[("languages/en-Shaw.yaml", own)],
-            Whence::Site("languages/en-Shaw.yaml".into()),
-            &[],
         ),
         (
             "en-Shaw-GB",
@@ -995,6 +989,12 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
                 ("languages/en-GB.yaml", own),
                 ("languages/en-Shaw.yaml", own),
             ],
+            Whence::Site("languages/en-Shaw.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Shaw",
+            &[("languages/en-Shaw.yaml", own)],
             Whence::Site("languages/en-Shaw.yaml".into()),
             &[],
         ),
