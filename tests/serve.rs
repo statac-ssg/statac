@@ -532,6 +532,100 @@ fn a_miss_is_answered_404() {
     assert!(status.contains("200") && body.contains("statac-live"));
 }
 
+/// A site whose own list is published nowhere, so nothing stands at its
+/// top.
+fn without_a_home_page(site: &Site) {
+    site.write("content/index.md", "---\nindex_page: false\n---\n");
+}
+
+#[test]
+fn a_site_with_no_home_page_is_answered_at_its_top_with_every_page_built() {
+    let served = served_as("no-home", How::Native, true, |site| {
+        without_a_home_page(site);
+        site.write(
+            "statac.yaml",
+            "title: Site\nlanguage: en\ntimezone: Europe/London\nposts_per_page: 1\n",
+        );
+        site.write(
+            "templates/folder.html",
+            "<!doctype html>\n<title>{{ headline(page) }}</title>\n",
+        );
+        site.write(
+            "content/post-2.md",
+            "---\ntitle: Post <2>\ndraft: true\n---\nA draft.\n",
+        );
+        site.write(
+            "content/post-3.md",
+            "---\ntitle: Post 3\ndate: 2999-01-01\n---\nScheduled.\n",
+        );
+        site.write("content/posts/index.md", "---\ntitle: Posts\n---\n");
+        site.write(
+            "content/posts/post-4.md",
+            "---\ndate: 2026-01-04\ntags: [tag-1]\n---\n# Post 4\n",
+        );
+        site.write(
+            "content/posts/post-5.md",
+            "---\ndate: 2026-01-05\n---\n# Post 5\n",
+        );
+    });
+    let (status, body) = get(served.port, "/");
+    assert!(status.contains("200"), "{status}");
+    assert!(body.contains("<title>No home page</title>"), "{body}");
+    assert!(
+        body.contains(
+            "<ul>\n\
+             <li><a href=\"/post-1/\">Post 1</a> <code>/post-1/</code></li>\n\
+             <li><a href=\"/post-2/\">Post &lt;2&gt;</a> <code>/post-2/</code> (Draft)</li>\n\
+             <li><a href=\"/post-3/\">Post 3</a> <code>/post-3/</code> \
+             (Scheduled for 2999-01-01)</li>\n\
+             <li><a href=\"/posts/\">Posts</a> <code>/posts/</code></li>\n\
+             <li><a href=\"/posts/page/2/\">Posts, page 2</a> <code>/posts/page/2/</code></li>\n\
+             <li><a href=\"/posts/post-4/\">Post 4</a> <code>/posts/post-4/</code></li>\n\
+             <li><a href=\"/posts/post-5/\">Post 5</a> <code>/posts/post-5/</code></li>\n\
+             <li><a href=\"/tags/tag-1/\"><code>/tags/tag-1/</code></a></li>\n\
+             </ul>"
+        ),
+        "{body}"
+    );
+    assert!(body.contains("/.statac-live/client.js"));
+    let (status, body) = get(served.port, "/post-9/");
+    assert!(status.contains("404"), "{status}");
+    assert!(body.contains("Nothing is published at this URL."));
+    same_as_a_build(&served);
+}
+
+#[test]
+fn a_site_with_no_home_page_under_a_path_lists_its_pages_under_it() {
+    let served = served_as("no-home-under", How::Native, true, |site| {
+        without_a_home_page(site);
+        site.write(
+            "statac.yaml",
+            "title: Site\nlanguage: en\ntimezone: Europe/London\n\
+             url: https://example.org/blog\n",
+        );
+    });
+    let body = served.page("/blog/");
+    assert!(
+        body.contains(
+            "<ul>\n<li><a href=\"/blog/post-1/\">Post 1</a> <code>/blog/post-1/</code></li>\n\
+             </ul>"
+        ),
+        "{body}"
+    );
+    let (status, _) = get(served.port, "/");
+    assert!(status.contains("302"), "{status}");
+    let (status, _) = get(served.port, "/blog/post-9/");
+    assert!(status.contains("404"), "{status}");
+}
+
+#[test]
+fn a_site_with_a_home_page_is_answered_with_it_at_its_top() {
+    let served = served("home", How::Native);
+    let body = served.page("/");
+    assert!(body.contains("The home page."), "{body}");
+    assert!(!body.contains("No home page"), "{body}");
+}
+
 #[test]
 fn a_stamp_saved_is_written_and_built_in_one_round() {
     each_way("stamp", |way, served| {

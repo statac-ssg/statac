@@ -752,7 +752,7 @@ fn written_between(
     written
 }
 
-fn is_page(file: &str) -> bool {
+pub(super) fn is_page(file: &str) -> bool {
     file.ends_with(".html") || file.ends_with(".htm")
 }
 

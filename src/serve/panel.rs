@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
-use super::session::{Read, Round, Took};
+use super::session::{Read, Round, Took, held_back, is_page};
 use crate::build::Outcome;
 use crate::content::address::on_the_wire;
 use crate::json;
@@ -96,6 +96,19 @@ struct Built {
     base: String,
     /// Each language's search index, by the language, once asked.
     indexes: OnceLock<Vec<crate::search::Index>>,
+}
+
+/// A page the last round to build the site built, as `serve` lists it at
+/// the top of a site with no home page.
+pub struct Listed {
+    /// Its URL, with the path the site is published under.
+    pub address: String,
+    pub title: Option<String>,
+    /// Which of its list's pages it is, counted from 1.
+    pub number: usize,
+    pub draft: bool,
+    /// The day it waits for, where that is after today.
+    pub waiting: Option<String>,
 }
 
 struct Page {
@@ -233,6 +246,34 @@ impl Panel {
         built.quiet = std::mem::take(&mut round.outcome.quiet);
         panel.built = Arc::new(built);
         panel
+    }
+
+    /// Every HTML page the last round to build the site built, by URL;
+    /// none before any round has built.
+    pub fn pages(&self) -> Option<Vec<Listed>> {
+        let built = &self.built;
+        let read = built.read.as_ref()?;
+        let site = read.renderer.site();
+        let pages = (read.pages.iter()).filter(|(file, _)| is_page(file));
+        let mut listed: Vec<Listed> = pages
+            .filter_map(|(_, &(id, number))| {
+                let page = site.pages.get(id);
+                let address = match number {
+                    1 => &page.address,
+                    _ => site.lists.get(page.speaks_for?).later_address(number)?,
+                };
+                let (draft, waiting) = held_back(&read.renderer, id);
+                Some(Listed {
+                    address: format!("{}{}", built.base, address.as_str()),
+                    title: page.title.as_ref().map(|title| title.value.clone()),
+                    number,
+                    draft,
+                    waiting,
+                })
+            })
+            .collect();
+        listed.sort_by(|one, other| one.address.cmp(&other.address));
+        Some(listed)
     }
 
     /// The last round to build the site's problems, of the kind named

@@ -12,6 +12,7 @@ use std::sync::{Arc, OnceLock, PoisonError, RwLock};
 use std::time::Duration;
 
 use super::live::Hub;
+use super::panel::Listed;
 use super::server::Server;
 use super::server::model::{Body, HeaderValue, Method, Request, Response, StatusCode, header};
 use crate::content::address::on_the_wire;
@@ -301,8 +302,12 @@ fn file(site: &Site, path: &str, query: &str, range: Option<&str>) -> Response<B
     // Read before the file, so a round landing in between costs at most
     // one reload more, never one missed.
     let generation = site.hub.generation();
-    let Ok(bytes) = std::fs::read(&at) else {
-        return not_found(site, false);
+    let bytes = match std::fs::read(&at) {
+        Ok(bytes) => bytes,
+        Err(error) if within == "/" && error.kind() == io::ErrorKind::NotFound => {
+            return home(site, generation);
+        }
+        Err(_) => return not_found(site, false),
     };
     let kind = content_type(&at, &bytes);
     if kind.starts_with("text/html") {
@@ -388,16 +393,94 @@ fn plain_page(base: &str, outside: bool) -> String {
         }
         false => String::new(),
     };
+    own_page(
+        wording::NOT_FOUND_TITLE,
+        &format!("<h1>{}</h1>\n{under}", wording::NOT_FOUND),
+    )
+}
+
+/// The answer at the top of a site with nothing published there: a list
+/// of the pages the last round to build the site built, each linked.
+/// `build` never writes it, so it is `serve`'s alone.
+fn home(site: &Site, generation: u64) -> Response<Body> {
+    let page = home_page(site.hub.panel().pages().as_deref());
+    respond(
+        StatusCode::OK,
+        "text/html; charset=utf-8",
+        inject(page.as_bytes(), generation),
+    )
+}
+
+fn home_page(pages: Option<&[Listed]>) -> String {
+    let Some(pages) = pages else {
+        let main = format!(
+            "<h1>{}</h1>\n<p>{}</p>\n",
+            wording::NOTHING_BUILT_TITLE,
+            coded(wording::NOTHING_BUILT)
+        );
+        return own_page(wording::NOTHING_BUILT_TITLE, &main);
+    };
+    let mut main = format!(
+        "<h1>{}</h1>\n<p>{}</p>\n",
+        wording::NO_HOME_TITLE,
+        coded(wording::NO_HOME)
+    );
+    if pages.is_empty() {
+        main.push_str(&format!("<p>{}</p>\n", wording::NO_HOME_NO_PAGES));
+        return own_page(wording::NO_HOME_TITLE, &main);
+    }
+    main.push_str("<ul>\n");
+    for page in pages {
+        let href = escaped(&on_the_wire(&page.address));
+        let address = escaped(&page.address);
+        // A page with no title is named by its URL, which is then not
+        // shown twice.
+        let title = page
+            .title
+            .as_deref()
+            .filter(|title| !title.trim().is_empty());
+        let (named, shown) = match title {
+            Some(title) if page.number > 1 => {
+                let later = wording::no_home_later(title, page.number);
+                (escaped(&later), format!(" <code>{address}</code>"))
+            }
+            Some(title) => (escaped(title), format!(" <code>{address}</code>")),
+            None => (format!("<code>{address}</code>"), String::new()),
+        };
+        let held = match (&page.waiting, page.draft) {
+            (_, true) => format!(" ({})", wording::PANEL_DRAFT),
+            (Some(day), false) => format!(" ({})", escaped(&wording::panel_waits(day))),
+            (None, false) => String::new(),
+        };
+        main.push_str(&format!(
+            "<li><a href=\"{href}\">{named}</a>{shown}{held}</li>\n"
+        ));
+    }
+    main.push_str("</ul>\n");
+    own_page(wording::NO_HOME_TITLE, &main)
+}
+
+/// A sentence of Statac's own as HTML, each name it writes in backticks
+/// marked as code.
+fn coded(sentence: &str) -> String {
+    let pieces = sentence.split('`').enumerate();
+    let pieces = pieces.map(|(at, piece)| match at % 2 {
+        0 => escaped(piece),
+        _ => format!("<code>{}</code>", escaped(piece)),
+    });
+    pieces.collect()
+}
+
+/// A page of `serve`'s own, titled `title`, holding `main`.
+fn own_page(title: &str, main: &str) -> String {
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <meta name=\"color-scheme\" content=\"light dark\">\n\
-         <title>{}</title>\n\
+         <title>{title}</title>\n\
          <style>body{{font:1.125rem/1.5 system-ui,sans-serif;max-width:40rem;\
          margin:4rem auto;padding:0 1rem}}h1{{font-size:1.5rem}}</style>\n\
-         </head>\n<body>\n<main>\n<h1>{}</h1>\n{under}</main>\n</body>\n</html>\n",
-        wording::NOT_FOUND_TITLE,
-        wording::NOT_FOUND,
+         </head>\n<body>\n<main>\n{main}</main>\n</body>\n</html>\n"
     )
 }
 
@@ -1010,6 +1093,89 @@ mod tests {
         assert_eq!(
             miss.body,
             format!("<html><head>{}</head><body>Lost</body></html>", tag(&site))
+        );
+    }
+
+    #[test]
+    fn the_top_of_a_site_with_nothing_there_says_when_nothing_is_built_yet() {
+        let scratch = Scratch::new("no-home");
+        let site = serving(&scratch, "");
+        std::fs::remove_file(scratch.0.join("index.html")).unwrap();
+        // The hub has been told of no round, so nothing is built yet.
+        let top = get(&site, "/");
+        assert_eq!(
+            (top.status, top.kind.as_str()),
+            (200, "text/html; charset=utf-8")
+        );
+        assert!(top.body.contains("<title>Nothing built yet</title>"));
+        assert!(top.body.contains(
+            "<h1>Nothing built yet</h1>\n<p>Every build so far has stopped. The terminal and \
+             the debug panel say why.</p>\n</main>"
+        ));
+        assert!(top.body.contains(&format!("{}</head>", tag(&site))));
+        // Only the top: any other miss is answered as one.
+        assert_eq!(get(&site, "/index.html").status, 404);
+        assert_eq!(get(&site, "/posts/post-2/").status, 404);
+
+        site.set_base("/blog".into());
+        assert_eq!(get(&site, "/blog/").status, 200);
+        assert_eq!(get(&site, "/blog/index.html").status, 404);
+        let root = get(&site, "/");
+        assert_eq!(
+            (root.status, root.location.as_deref()),
+            (302, Some("/blog/"))
+        );
+
+        scratch.write("index.html", "<html><head></head><body>home</body></html>");
+        assert!(get(&site, "/blog/").body.contains("home"));
+    }
+
+    #[test]
+    fn the_list_of_pages_names_each_by_its_title_or_its_url() {
+        let listed = |address: &str, title: Option<&str>, number| Listed {
+            address: address.into(),
+            title: title.map(str::to_owned),
+            number,
+            draft: false,
+            waiting: None,
+        };
+        let pages = [
+            listed("/blog/", Some("Posts"), 1),
+            listed("/blog/page/2/", Some("Posts"), 2),
+            listed("/blog/post-1/", Some("Post <1> & more"), 1),
+            Listed {
+                draft: true,
+                ..listed("/blog/post-2/", Some("Post 2"), 1)
+            },
+            Listed {
+                waiting: Some("2999-01-01".into()),
+                ..listed("/blog/post-3/", Some(" "), 1)
+            },
+            listed("/blog/tags/caf\u{e9}/", None, 1),
+        ];
+        let page = home_page(Some(&pages));
+        assert!(page.contains("<title>No home page</title>"), "{page}");
+        assert!(
+            page.contains(
+                "<main>\n<h1>No home page</h1>\n<p><code>statac serve</code> shows this list \
+                 of the site's pages in its place. <code>statac build</code> doesn't publish \
+                 it.</p>\n<ul>\n\
+                 <li><a href=\"/blog/\">Posts</a> <code>/blog/</code></li>\n\
+                 <li><a href=\"/blog/page/2/\">Posts, page 2</a> <code>/blog/page/2/</code></li>\n\
+                 <li><a href=\"/blog/post-1/\">Post &lt;1&gt; &amp; more</a> \
+                 <code>/blog/post-1/</code></li>\n\
+                 <li><a href=\"/blog/post-2/\">Post 2</a> <code>/blog/post-2/</code> (Draft)</li>\n\
+                 <li><a href=\"/blog/post-3/\"><code>/blog/post-3/</code></a> \
+                 (Scheduled for 2999-01-01)</li>\n\
+                 <li><a href=\"/blog/tags/caf%C3%A9/\"><code>/blog/tags/caf\u{e9}/</code></a></li>\n\
+                 </ul>\n</main>"
+            ),
+            "{page}"
+        );
+        let none = home_page(Some(&[]));
+        assert!(
+            none.contains("it.</p>\n<p>The last build made no pages.</p>\n</main>"),
+            "{none}"
         );
     }
 

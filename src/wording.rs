@@ -4235,6 +4235,13 @@ pub(crate) const PANEL_PAGE: &str = "This page";
 pub(crate) const PANEL_SITE: &str = "The site";
 pub(crate) const PANEL_WRITTEN: &str = "Written into your files";
 
+/// How the debug panel marks a draft and a scheduled post, and how
+/// `serve`'s list of pages at the top of a site with no home page does.
+pub(crate) const PANEL_DRAFT: &str = "Draft";
+pub(crate) fn panel_waits(day: &str) -> String {
+    format!("Scheduled for {day}")
+}
+
 /// What the debug panel says of the page it is on.
 pub(crate) const PANEL_IS_DRAFT: &str = "A draft: `statac build` leaves it out.";
 pub(crate) fn panel_is_waiting(day: &str) -> String {
@@ -4337,8 +4344,8 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("name", said(NAME)),
         ("building", said("Building")),
         ("buildStopped", said("Build stopped")),
-        ("draft", said("Draft")),
-        ("waits", said("Scheduled for {day}")),
+        ("draft", said(PANEL_DRAFT)),
+        ("waits", Said(panel_waits("{day}"))),
         ("tabLabel", said("Statac: {said}. Open the debug panel")),
         ("labelBuiltAt", said("built at {time}")),
         ("labelBuilding", said("building")),
@@ -4688,6 +4695,25 @@ pub(crate) fn gone(kinds: &[(&str, usize)]) -> String {
 /// no `404.html` of its own.
 pub(crate) const NOT_FOUND_TITLE: &str = "Not found";
 pub(crate) const NOT_FOUND: &str = "Nothing is published at this URL.";
+
+/// The page `serve` answers the top of a site with where the site has no
+/// home page, listing the pages the last build made. `build` never
+/// publishes it.
+pub(crate) const NO_HOME_TITLE: &str = "No home page";
+pub(crate) const NO_HOME: &str = "`statac serve` shows this list of the site's pages \
+                                  in its place. `statac build` doesn't publish it.";
+/// A page on that list that is one of its list's pages after the first.
+pub(crate) fn no_home_later(title: &str, number: usize) -> String {
+    format!("{title}, page {number}")
+}
+/// On that page in place of the list, where the last build made no pages.
+pub(crate) const NO_HOME_NO_PAGES: &str = "The last build made no pages.";
+
+/// The page `serve` answers the top of a site with where nothing is
+/// published there and no build has finished without an error.
+pub(crate) const NOTHING_BUILT_TITLE: &str = "Nothing built yet";
+pub(crate) const NOTHING_BUILT: &str =
+    "Every build so far has stopped. The terminal and the debug panel say why.";
 
 /// Before the link to the top of a site published under a path, on the
 /// same page.
