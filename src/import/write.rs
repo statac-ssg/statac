@@ -835,7 +835,7 @@ fn base_of(address: &str) -> String {
 /// The file a tool writes for `address` in its built output: a folder's
 /// `index.html`, a file by its name, and a name with no extension as an
 /// HTML file.
-fn built_file(address: &str) -> String {
+pub(super) fn built_file(address: &str) -> String {
     let path = address.trim_start_matches('/');
     if path.is_empty() || path.ends_with('/') {
         return format!("{path}index.html");

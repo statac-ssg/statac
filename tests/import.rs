@@ -1931,6 +1931,42 @@ fn a_hugo_tag_moved_by_permalinks_sends_readers_on() {
     }
 }
 
+/// A tag's old URL that nothing answers is told of once, though the old
+/// built output holds it at a URL Statac can't publish at.
+#[test]
+fn a_hugo_tags_old_url_holding_a_hash_is_told_of_once() {
+    let old = scratch("hugo-tag-hash-old");
+    let new = scratch("hugo-tag-hash-new");
+    fs::create_dir_all(old.join("content/posts")).unwrap();
+    let settings = "baseURL = 'https://example.org/'\n[permalinks]\ntags = '/tt/:slug/'\n";
+    fs::write(old.join("hugo.toml"), settings).unwrap();
+    let post = "---\ntitle: a\ndate: 2026-01-01\ntags: [a+b#c]\n---\na\n";
+    fs::write(old.join("content/posts/a.md"), post).unwrap();
+    // What Hugo 0.166 published.
+    for file in [
+        "categories/index.html",
+        "categories/index.xml",
+        "index.html",
+        "index.xml",
+        "posts/a/index.html",
+        "posts/index.html",
+        "posts/index.xml",
+        "sitemap.xml",
+        "tags/index.html",
+        "tags/index.xml",
+        "tt/a-b#c/index.html",
+        "tt/a-b#c/index.xml",
+    ] {
+        let path = old.join("public").join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "x").unwrap();
+    }
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert_eq!(report.matches("`/tt/a-b#c/`").count(), 1, "{report}");
+}
+
 /// Each later page of a tag's page `[permalinks]` put where Statac's
 /// isn't, in the old built output, sends readers on to the tag's page of
 /// the same number.

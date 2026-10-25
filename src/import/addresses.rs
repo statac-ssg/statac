@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use super::write::{Out, page_text};
+use super::write::{Out, built_file, page_text};
 use super::{Field, HomePages, Page, Value};
 use crate::assets::Assets;
 use crate::build::{self, Mode, Options};
@@ -1067,11 +1067,15 @@ pub(super) fn check(
             checked.lists.push((address.clone(), list.clone()));
         }
     }
+    // An address Statac can't publish at is still one it worked out, at
+    // the file the tool wrote for it.
     let worked_out: HashSet<String> = old
         .iter()
         .chain(lists)
-        .filter_map(|(address, _)| Address::read(address).ok())
-        .map(|address| crate::platform::folded(&address.file()))
+        .map(|(address, _)| match Address::read(address) {
+            Ok(address) => crate::platform::folded(&address.file()),
+            Err(_) => crate::platform::folded(&built_file(address)),
+        })
         .collect();
     for page in built.map(pages_in).unwrap_or_default() {
         let file = crate::platform::folded(&page);
