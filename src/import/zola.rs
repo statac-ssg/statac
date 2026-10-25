@@ -6,6 +6,7 @@
 //! `[slugify]` makes a name ready for an address, which dates it reads
 //! from a file's name, and what its own tags do in the writing.
 
+mod ids;
 mod settings;
 mod slug;
 mod writing;
@@ -1645,6 +1646,9 @@ impl Reader<'_> {
         };
         let mut calls = Vec::new();
         let mut written = Vec::new();
+        let mut headings_kept = 0;
+        // The first heading given Zola's id, and its file.
+        let mut ids_kept: Option<(String, String)> = None;
         for doc in &docs {
             let reading = match reading {
                 Reading::Template if self.ignored(&skip, &doc.rel) => Reading::AsWritten,
@@ -1655,10 +1659,34 @@ impl Reader<'_> {
                 language: &doc.language,
                 ..cx
             };
-            let converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
+            let mut converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
+            if self.s.anchors == Strategy::On {
+                let kept = ids::keep(
+                    &mut converted.writing,
+                    &mut converted.called,
+                    self.s.render_emoji,
+                );
+                if let Some(line) = kept.first().filter(|_| ids_kept.is_none()) {
+                    ids_kept = Some((line.clone(), format!("content/{}", doc.to)));
+                }
+                headings_kept += kept.len();
+            }
             self.import.findings.extend(converted.findings);
             calls.extend(converted.calls);
             written.push((converted.writing, converted.called));
+        }
+        if let Some((line, file)) = ids_kept {
+            let (each, one) = match headings_kept {
+                1 => ("it", "it"),
+                _ => ("each", "one"),
+            };
+            self.note(format!(
+                "Statac wrote the id Zola gave {} after {each} in braces, as {} in {}, where \
+                 Statac's own id would differ, so a link to {one} by its old id still lands.",
+                counted(headings_kept, "heading", "headings"),
+                code(&line),
+                code(&file),
+            ));
         }
         for (doc, (writing, called)) in docs.into_iter().zip(written) {
             if doc.words_only {

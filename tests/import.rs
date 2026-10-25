@@ -3344,6 +3344,11 @@ fn zola_names_are_made_ready_by_each_slugify_setting() {
 }
 
 #[test]
+fn zola_headings_keep_the_ids_zola_gave_them() {
+    assert_eq!(fixture("zola-heading-ids"), [BUILT]);
+}
+
+#[test]
 fn zola_tags_keep_the_addresses_zola_gave_them() {
     assert_eq!(fixture("zola-tags"), [BUILT]);
 }
