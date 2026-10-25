@@ -3843,6 +3843,45 @@ fn listed(templates: &[(&'static str, &'static str)]) -> Built {
 }
 
 #[test]
+fn a_page_whose_list_is_refused_lists_no_posts() {
+    let cases = [
+        ("posts: site.nothing", "malformed-list", "site.nothing"),
+        (
+            "each: data.nothing\npermalink: /listed/{key}/",
+            "unknown-word",
+            "data.nothing",
+        ),
+    ];
+    for (asks, name, at) in cases {
+        let page = format!("---\ntitle: Listed\n{asks}\n---\n");
+        let built = site(&[
+            (
+                "content/posts/post-1.md",
+                "---\ntitle: Post 1\ndate: 2026-01-01\n---\n",
+            ),
+            ("content/listed.md", &page),
+            ("templates/page.html", "[{{ page.posts | length }}]"),
+        ]);
+        let placed: Vec<Problem> = built
+            .problems
+            .iter()
+            .filter(|p| p.place.is_some())
+            .cloned()
+            .collect();
+        assert_eq!(
+            built.told(&placed),
+            [(name, "content/listed.md".into(), at.into())],
+            "{asks}"
+        );
+        assert_eq!(
+            built.render("listed.md").html.as_deref(),
+            Some("[0]"),
+            "{asks}"
+        );
+    }
+}
+
+#[test]
 fn every_kind_of_list_answers_the_same_names() {
     let built = listed(&[
         (

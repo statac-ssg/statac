@@ -420,8 +420,9 @@ impl PageValue {
                         frame::read(Key::ListPage(list, stretch_key(self.number)));
                         Some(Pages::value(shared, Which::Stretch(list, self.number)))
                     }
-                    // A page making a page per item lists nothing of its own.
-                    None if page.speaks_for_a_list() => Some(all_pages(shared)),
+                    // A page whose `each:` was refused, which has stopped
+                    // the build.
+                    None if page.speaks_for_a_list() => Some(Value::from(Vec::<Value>::new())),
                     None => None,
                 }
             }
