@@ -490,6 +490,18 @@ fn a_name_or_field_in_a_template_says_what_it_holds_and_what_it_is() {
             Some((Group::Page, "image")),
         ),
         (
+            "{{ page.image('photo-1.jpg').s|rc }}",
+            "`src` holds text",
+            "src",
+            Some((Group::Image, "src")),
+        ),
+        (
+            "{{ site.search_without_javascript.act|ion }}",
+            "`site.search_without_javascript.action` holds text",
+            "action",
+            Some((Group::Search, "action")),
+        ),
+        (
             "{{ page.title | up|per }}",
             "`upper`, a filter",
             "upper",

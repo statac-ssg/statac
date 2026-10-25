@@ -298,6 +298,14 @@ fn each_of_statacs_names_filters_and_functions_says_what_it_is() {
         ("{{ page.| }}", "book", None),
         ("{{ site.| }}", "posts", Group::Site.of("posts")),
         ("{{ page.date.| }}", "weekday", Group::Date.of("weekday")),
+        ("{{ page.image('a.jpg').| }}", "alt", Group::Image.of("alt")),
+        ("{{ page.file('a.pdf').| }}", "url", Group::File.of("url")),
+        ("{{ page.card.| }}", "url", Group::Card.of("url")),
+        (
+            "{% for heading in page.toc %}{{ heading.| }}{% endfor %}",
+            "level",
+            Group::Heading.of("level"),
+        ),
         ("{{ page.title | | }}", "upper", Group::Filters.of("upper")),
         ("{{ page.date | | }}", "moment", Group::Filters.of("moment")),
         (

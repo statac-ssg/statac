@@ -674,7 +674,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("excerpt_marked", Ty::Bool, true),
         ("maths", Ty::Bool, true),
         ("opening", Ty::Text, false),
-        ("toc", Ty::List(Box::new(Ty::Any)), true),
+        ("toc", Ty::List(Box::new(Ty::Record(Rec::Heading))), true),
         ("language", Ty::Text, true),
         ("direction", Ty::Text, true),
         ("tags", lists.clone(), true),
@@ -688,7 +688,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("previous", Ty::Record(Rec::Page), false),
         ("translations", pages.clone(), true),
         ("og_title", Ty::Text, true),
-        ("card", Ty::Any, false),
+        ("card", Ty::Record(Rec::Card), false),
         ("webmentions", Ty::Record(Rec::Webmentions), true),
     ] {
         page.insert(name.to_owned(), Field { ty, always });
@@ -729,6 +729,15 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
                 always: true,
             },
         );
+    }
+    // An image has what the file describing it says, past Statac's own.
+    let described = (site.pictures.iter()).filter_map(|(_, picture)| picture.sidecar.as_ref());
+    for field in described.flat_map(|sidecar| &sidecar.own) {
+        let own = Field {
+            ty: Ty::Any,
+            always: false,
+        };
+        schema.image.entry(field.name.clone()).or_insert(own);
     }
 
     let site_fields = &mut schema.site;
@@ -776,7 +785,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("data", Ty::Any),
         ("languages", Ty::Any),
         ("webmentions", Ty::Bool),
-        ("search_without_javascript", Ty::Any),
+        ("search_without_javascript", Ty::Record(Rec::SearchForm)),
     ] {
         site_fields.insert(name.to_owned(), Field { ty, always: true });
     }

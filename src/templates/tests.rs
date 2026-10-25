@@ -5069,6 +5069,143 @@ fn a_snippet_named_url_is_told_as_a_reserved_name() {
 }
 
 #[test]
+fn a_misspelt_field_of_a_value_a_page_or_the_site_gives_is_told_with_the_field_meant() {
+    // (where it is read, the template, the field meant)
+    let cases = [
+        (
+            "templates/page.html",
+            "{{ page.image('a.jpg').scr }}",
+            "src",
+        ),
+        (
+            "templates/page.html",
+            "{% for i in page.images() %}{{ i.atl }}{% endfor %}",
+            "alt",
+        ),
+        (
+            "templates/page.html",
+            "{{ page.file('a.pdf').sise }}",
+            "size",
+        ),
+        (
+            "templates/page.html",
+            "{{ page.video('a.mp4').tipe }}",
+            "type",
+        ),
+        (
+            "templates/page.html",
+            "{{ page.audio('a.mp3').scr }}",
+            "src",
+        ),
+        ("templates/page.html", "{{ page.search_box().ids }}", "id"),
+        ("templates/page.html", "{{ page.card.alts }}", "alt"),
+        (
+            "templates/page.html",
+            "{% for h in page.toc %}{{ h.titel }}{% endfor %}",
+            "title",
+        ),
+        (
+            "templates/page.html",
+            "{% for h in page.toc %}{% for s in h.headings %}{{ s.levle }}{% endfor %}{% endfor %}",
+            "level",
+        ),
+        (
+            "templates/page.html",
+            "{{ site.search_without_javascript.acton }}",
+            "action",
+        ),
+        (
+            "templates/page.html",
+            "{% for f in site.search_without_javascript.fields %}{{ f.vaule }}{% endfor %}",
+            "value",
+        ),
+        (
+            "templates/page.html",
+            "{{ page.youtube('a').thumbnail.scr }}",
+            "src",
+        ),
+        (
+            "templates/page.html",
+            "{% for m in page.webmentions.comments %}{{ m.avatar.scr }}{% endfor %}",
+            "src",
+        ),
+        ("snippets/markdown/image.html", "{{ image.scr }}", "src"),
+    ];
+    for (path, template, meant) in cases {
+        // Never built, so only the reading tells.
+        let template = format!("{{% if false %}}{template}{{% endif %}}");
+        let built = site(&[
+            NO_HOME,
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("templates/page.html", "{{ page.content }}"),
+            (path, &template),
+        ]);
+        let told = built.template_problems();
+        let [(code, at, written)] = told.as_slice() else {
+            panic!("{template}: {told:?}");
+        };
+        assert_eq!((*code, at.as_str()), ("unknown-word", path), "{template}");
+        let (read, _) = written.rsplit_once('.').unwrap();
+        let Kind::UnknownWord { nearest, .. } = &built.problems[0].kind else {
+            panic!("{template}: {:?}", built.problems[0].kind);
+        };
+        assert_eq!(nearest.as_deref(), Some(&*format!("{read}.{meant}")));
+    }
+}
+
+#[test]
+fn each_field_a_value_a_page_or_the_site_gives_is_read_untold() {
+    let template = "{% if false %}\
+        {% set i = page.image('a.jpg') %}{{ i.src }}{{ i.avif }}{{ i.fallback }}{{ i.sizes }}\
+        {{ i.full }}{{ i.width }}{{ i.height }}{{ i.alt }}{{ i.caption }}{{ i.name }}\
+        {% for i in page.images() %}{{ i.src }}{% endfor %}\
+        {% set f = page.file('a.pdf') %}{{ f.url }}{{ f.name }}{{ f.size }}{{ f.text }}\
+        {{ f.code }}{{ f.language }}\
+        {{ page.video('a.mp4').src }}{{ page.audio('a.mp3').type }}\
+        {% set box = page.search_box() %}{{ box.id }}{{ box.first }}{{ box.index }}\
+        {{ page.card.url }}{{ page.card.width }}{{ page.card.height }}{{ page.card.alt }}\
+        {% for h in page.toc %}{{ h.title }}{{ h.id }}{{ h.url }}{{ h.level }}\
+        {{ h.headings | length }}{% endfor %}\
+        {% set form = site.search_without_javascript %}{{ form.name }}{{ form.action }}\
+        {{ form.words }}{% for f in form.fields %}{{ f.name }}{{ f.value }}{% endfor %}\
+        {% endif %}";
+    let built = site(&[
+        NO_HOME,
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        ("templates/page.html", template),
+    ]);
+    assert_eq!(built.template_problems(), []);
+}
+
+/// A key of the author's own in an image's file is a field of every image,
+/// and one no such file has is told as unset.
+#[test]
+fn an_image_has_the_fields_the_files_describing_images_add() {
+    for (described, told) in [
+        ("credit: Person 1\n", vec![]),
+        (
+            "alt: Alt 1\n",
+            vec![("no-value", "templates/page.html".into(), "i.credit".into())],
+        ),
+    ] {
+        let built = site(&[
+            NO_HOME,
+            ("content/post-1/index.md", "---\ntitle: Post 1\n---\n"),
+            (
+                "content/post-1/a.svg",
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+            ),
+            ("content/post-1/a.svg.yaml", described),
+            (
+                "templates/page.html",
+                "{% if false %}{% set i = page.image('a.svg') %}{{ i.credit }}{% endif %}",
+            ),
+        ]);
+        assert_eq!(built.template_problems(), told, "{described}");
+    }
+}
+
+#[test]
 fn every_name_statac_hands_a_template_is_described_once() {
     use crate::described::Group;
     use check::Rec;
@@ -5098,14 +5235,26 @@ fn every_name_statac_hands_a_template_is_described_once() {
         &[Rec::Date, Rec::When],
         &[Rec::Webmentions, Rec::Mention],
         &[Rec::Video],
+        &[Rec::Image],
+        &[Rec::File, Rec::Media],
+        &[Rec::Card],
+        &[Rec::Heading],
+        &[Rec::SearchBox, Rec::SearchForm],
+        &[Rec::SearchField],
         &[Rec::Loop],
     ] {
         let group = recs[0].described_in();
         assert!(recs.iter().all(|rec| rec.described_in() == group));
         assert_eq!(described(group), fields(recs), "{group:?}");
     }
-    // A group of two records holds no name that both have.
-    let both = fields(&[Rec::Webmentions]).len() + fields(&[Rec::Mention]).len();
-    assert_eq!(both, described(Group::Webmentions).len());
+    // A group of two records holds no name that both have, save a date's.
+    for [one, other] in [
+        [Rec::Webmentions, Rec::Mention],
+        [Rec::File, Rec::Media],
+        [Rec::SearchBox, Rec::SearchForm],
+    ] {
+        let both = fields(&[one]).len() + fields(&[other]).len();
+        assert_eq!(both, described(one.described_in()).len(), "{one:?}");
+    }
     assert_eq!(described(Group::Handed), check::handed_names());
 }

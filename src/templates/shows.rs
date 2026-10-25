@@ -260,18 +260,22 @@ impl Renderer {
                 None => Reached::Site(self.name_id(name)),
             };
             let at = rows.len();
-            self.row(&mut rows, full, &field.ty, value, from, has, reached, 1);
+            self.row(
+                &mut rows, schema, full, &field.ty, value, from, has, reached, 1,
+            );
             rows[at].about = rec.described_in().of(name);
         }
         rows
     }
 
     /// The row for one name, and beneath it a row for each field of the
-    /// author's own it holds.
+    /// author's own it holds, or of Statac's where it holds no more than
+    /// its fields.
     #[allow(clippy::too_many_arguments)]
     fn row(
         &self,
         rows: &mut Vec<Row>,
+        schema: &super::Schema,
         name: String,
         ty: &Ty,
         value: Option<Value>,
@@ -291,7 +295,7 @@ impl Renderer {
             None => reached.clone(),
         };
         let fields = value.as_ref().filter(|value| {
-            matches!(ty, Ty::Any)
+            matches!(ty, Ty::Any | Ty::Record(Rec::Card | Rec::SearchForm))
                 && value.kind() == ValueKind::Map
                 && !statacs_own(value)
                 && depth < DEEPEST
@@ -309,7 +313,7 @@ impl Renderer {
         let more = fields
             .and_then(|value| value.len())
             .map_or(0, |fields| fields.saturating_sub(WIDEST));
-        let inner: Vec<(String, Value, Reached)> = fields
+        let inner: Vec<(String, String, Value, Reached)> = fields
             .and_then(|value| value.try_iter().ok())
             .into_iter()
             .flatten()
@@ -317,7 +321,7 @@ impl Renderer {
             .filter_map(|key| {
                 let inner = value.as_ref()?.get_item(&key).ok()?;
                 let key = key.as_str()?;
-                Some((within(&name, key), inner, reached_by(key)))
+                Some((key.to_owned(), within(&name, key), inner, reached_by(key)))
             })
             .collect();
         let further = (more > 0).then(|| Row {
@@ -338,19 +342,29 @@ impl Renderer {
             reached,
             about: None,
         });
-        for (name, value, reached) in inner {
+        for (key, name, value, reached) in inner {
             let from = frame::origin(&value);
             let value = Some(value).filter(|value| !nothing(value));
+            let (ty, about) = match ty {
+                Ty::Record(rec) => (
+                    (schema.record(*rec).get(&key)).map_or(Ty::Any, |field| field.ty.clone()),
+                    rec.described_in().of(&key),
+                ),
+                _ => (Ty::Any, None),
+            };
+            let at = rows.len();
             self.row(
                 rows,
+                schema,
                 name,
-                &Ty::Any,
+                &ty,
                 value,
                 from,
                 Vec::new(),
                 reached,
                 depth + 1,
             );
+            rows[at].about = about;
         }
         rows.extend(further);
     }

@@ -106,6 +106,33 @@ fn every_name_a_template_can_write_is_told_with_what_it_holds() {
 }
 
 #[test]
+fn a_value_of_statacs_that_holds_only_its_fields_is_told_field_by_field() {
+    use crate::described::Group;
+    let built = site(&[
+        (
+            "statac.yaml",
+            "url: https://example.org/\nsearch_without_javascript: duckduckgo\n",
+        ),
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        ("templates/page.html", "{{ page.title }}"),
+    ]);
+    let explained = built.renderer.explained(built.at("/post-1/"), 1);
+    let site = &explained.groups[1].rows;
+    let form = row(site, "site.search_without_javascript");
+    assert_eq!((form.holds, &form.held), (Holds::Fields, &Held::Fields));
+    let action = row(site, "site.search_without_javascript.action");
+    assert_eq!(action.holds, Holds::Text);
+    assert_eq!(action.held, Held::Shown("https://duckduckgo.com/".into()));
+    assert_eq!(action.about, Group::Search.of("action"));
+    let fields = row(site, "site.search_without_javascript.fields");
+    assert_eq!(
+        (fields.holds, &fields.held),
+        (Holds::Items, &Held::Count(1))
+    );
+    assert_eq!(fields.about, Group::Search.of("fields"));
+}
+
+#[test]
 fn asking_what_a_page_shows_leaves_no_frame_behind() {
     let built = explained_site();
     let page = built.at("/blog/post-2/");

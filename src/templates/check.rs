@@ -87,6 +87,22 @@ pub(super) enum Rec {
     Mention,
     /// A video `page.youtube` or `page.vimeo` gives.
     Video,
+    /// An image `page.image` gives.
+    Image,
+    /// A file `page.file` gives.
+    File,
+    /// A video or recording `page.video` or `page.audio` gives.
+    Media,
+    /// A page's social card.
+    Card,
+    /// A heading in `page.toc`.
+    Heading,
+    /// A search box `page.search_box` gives.
+    SearchBox,
+    /// What a form needs to send a search elsewhere.
+    SearchForm,
+    /// One of the hidden fields such a form sends.
+    SearchField,
 }
 
 impl Ty {
@@ -106,6 +122,12 @@ impl Rec {
             Rec::Date | Rec::When => Group::Date,
             Rec::Webmentions | Rec::Mention => Group::Webmentions,
             Rec::Video => Group::Video,
+            Rec::Image => Group::Image,
+            Rec::File | Rec::Media => Group::File,
+            Rec::Card => Group::Card,
+            Rec::Heading => Group::Heading,
+            Rec::SearchBox | Rec::SearchForm => Group::Search,
+            Rec::SearchField => Group::SearchField,
         }
     }
 }
@@ -153,6 +175,15 @@ pub(super) struct Schema {
     webmentions: BTreeMap<String, Field>,
     mention: BTreeMap<String, Field>,
     video: BTreeMap<String, Field>,
+    /// Statac's own, and those the files describing the site's images add.
+    pub image: BTreeMap<String, Field>,
+    file: BTreeMap<String, Field>,
+    media: BTreeMap<String, Field>,
+    card: BTreeMap<String, Field>,
+    heading: BTreeMap<String, Field>,
+    search_box: BTreeMap<String, Field>,
+    search_form: BTreeMap<String, Field>,
+    search_field: BTreeMap<String, Field>,
     looping: BTreeMap<String, Field>,
     /// Each snippet by its name.
     pub snippets: BTreeMap<String, Snippet>,
@@ -171,6 +202,7 @@ impl Schema {
                 .collect()
         };
         let pages = Ty::list(Ty::Record(Rec::Page));
+        let image = Ty::Record(Rec::Image);
         Schema {
             list: fields(&[
                 ("name", Ty::Text, true),
@@ -207,14 +239,61 @@ impl Schema {
                 ("url", Ty::Text, true),
                 ("published", Ty::Record(Rec::Date), false),
                 ("content", Ty::Text, false),
-                ("avatar", Ty::Any, false),
+                ("avatar", image.clone(), false),
             ]),
             video: fields(&[
                 ("id", Ty::Text, true),
                 ("start", Ty::Number, false),
                 ("embed", Ty::Text, true),
-                ("thumbnail", Ty::Any, false),
+                ("thumbnail", image, false),
             ]),
+            // A size is empty words where it isn't known.
+            image: fields(&[
+                ("src", Ty::Text, true),
+                ("avif", Ty::Text, true),
+                ("fallback", Ty::Text, true),
+                ("sizes", Ty::Text, true),
+                ("full", Ty::Text, true),
+                ("width", Ty::Any, true),
+                ("height", Ty::Any, true),
+                ("alt", Ty::Text, true),
+                ("caption", Ty::Text, true),
+                ("name", Ty::Text, true),
+            ]),
+            file: fields(&[
+                ("url", Ty::Text, true),
+                ("name", Ty::Text, true),
+                ("size", Ty::Number, true),
+                ("text", Ty::Text, true),
+                ("code", Ty::Html, true),
+                ("language", Ty::Text, true),
+            ]),
+            media: fields(&[("src", Ty::Text, true), ("type", Ty::Text, true)]),
+            card: fields(&[
+                ("url", Ty::Text, true),
+                ("width", Ty::Any, true),
+                ("height", Ty::Any, true),
+                ("alt", Ty::Text, true),
+            ]),
+            heading: fields(&[
+                ("title", Ty::Text, true),
+                ("id", Ty::Text, true),
+                ("url", Ty::Text, true),
+                ("level", Ty::Number, true),
+                ("headings", Ty::list(Ty::Record(Rec::Heading)), true),
+            ]),
+            search_box: fields(&[
+                ("id", Ty::Text, true),
+                ("first", Ty::Bool, true),
+                ("index", Ty::Text, true),
+            ]),
+            search_form: fields(&[
+                ("name", Ty::Text, true),
+                ("action", Ty::Text, true),
+                ("words", Ty::Text, true),
+                ("fields", Ty::list(Ty::Record(Rec::SearchField)), true),
+            ]),
+            search_field: fields(&[("name", Ty::Text, true), ("value", Ty::Text, true)]),
             looping: fields(&[
                 ("index", Ty::Number, true),
                 ("index0", Ty::Number, true),
@@ -245,6 +324,14 @@ impl Schema {
             Rec::Webmentions => &self.webmentions,
             Rec::Mention => &self.mention,
             Rec::Video => &self.video,
+            Rec::Image => &self.image,
+            Rec::File => &self.file,
+            Rec::Media => &self.media,
+            Rec::Card => &self.card,
+            Rec::Heading => &self.heading,
+            Rec::SearchBox => &self.search_box,
+            Rec::SearchForm => &self.search_form,
+            Rec::SearchField => &self.search_field,
         }
     }
 }
@@ -504,7 +591,8 @@ fn handed_to(piece: Piece) -> Vec<(&'static str, Ty)> {
                 "external" => Ty::Bool,
                 "notes" | "head" => Ty::list(Ty::Any),
                 "rows" => Ty::list(Ty::list(Ty::Any)),
-                "width" | "height" | "image" => Ty::Any,
+                "width" | "height" => Ty::Any,
+                "image" => Ty::Record(Rec::Image),
                 _ => Ty::Text,
             };
             (name, ty)
@@ -1384,7 +1472,7 @@ impl<'a> Checker<'a> {
                 written,
                 nearest: Some(format!("{base_text}.{near}")),
             },
-            (None, Rec::Page | Rec::Site) => Kind::NoValue {
+            (None, Rec::Page | Rec::Site | Rec::Image) => Kind::NoValue {
                 instead: Instead::Default(defaulted(&written)),
                 written,
                 lack: Lack::Unset,
@@ -1465,12 +1553,18 @@ impl<'a> Checker<'a> {
                     self.tell(kind, call.expr.span());
                     return Info::told();
                 }
-                match method {
-                    "youtube" | "vimeo" if on.ty == Ty::Record(Rec::Page) => {
-                        Info::of(Ty::Record(Rec::Video))
-                    }
-                    _ => Info::of(Ty::Any),
+                if on.ty != Ty::Record(Rec::Page) {
+                    return Info::of(Ty::Any);
                 }
+                Info::of(match method {
+                    "youtube" | "vimeo" => Ty::Record(Rec::Video),
+                    "image" => Ty::Record(Rec::Image),
+                    "images" => Ty::list(Ty::Record(Rec::Image)),
+                    "file" => Ty::Record(Rec::File),
+                    "video" | "audio" => Ty::Record(Rec::Media),
+                    "search_box" => Ty::Record(Rec::SearchBox),
+                    _ => Ty::Any,
+                })
             }
             CallType::Block(_) => Info::of(Ty::Html),
             CallType::Object(callee) => {
