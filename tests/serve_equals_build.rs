@@ -941,6 +941,43 @@ fn a_file_a_page_shows_written_again_at_its_length_within_the_step_is_read_again
 }
 
 #[test]
+fn a_file_a_page_shows_written_within_the_step_is_known_by_its_bytes() {
+    let site = Site::new("file-known-by-bytes");
+    site.write(
+        "templates/note.html",
+        "{{ page.file('note.txt').text }}\n{{ page.file('/note.txt').text }}\n",
+    );
+    site.write(
+        "content/notes/index.md",
+        "---\ntitle: Notes\ntype: note\n---\nNotes.\n",
+    );
+    // A time the round's clock is before, as a file written within the
+    // step a disk's times were in as the round began has.
+    let later = SystemTime::now() + Duration::from_secs(3600);
+    written_at(&site, "content/notes/note.txt", "one\n", later);
+    site.write("static/note.txt", "one\n");
+    let built = through(
+        &site,
+        &[
+            ("no edit", &|_| {}),
+            ("a file in static/ given a later time", &|site| {
+                written_at(site, "static/note.txt", "two\n", later)
+            }),
+            ("no edit", &|_| {}),
+            ("the file beside written again", &|site| {
+                written_at(site, "content/notes/note.txt", "two\n", later)
+            }),
+            ("no edit", &|_| {}),
+        ],
+    );
+    assert_eq!(built[1].0, 0, "{built:?}");
+    assert!(built[2].0 > 0, "{built:?}");
+    assert_eq!(built[3].0, 0, "{built:?}");
+    assert!(built[4].0 > 0, "{built:?}");
+    assert_eq!(built[5].0, 0, "{built:?}");
+}
+
+#[test]
 fn files_beside_a_page_and_in_static_added_changed_and_removed() {
     let Some(_counted) = counted(files_beside_a_page_and_in_static_added_changed_and_removed)
     else {

@@ -264,7 +264,7 @@ pub(crate) fn rebuild(
     };
     let reading = Reading::of(prepared.renderer.share());
     let renderer = &reading.renderer;
-    let prints = Prints::new(&reading, disk);
+    let prints = Prints::new(&reading, disk, last.map(|last| &last.prints));
     let taken = Taken {
         reading: &reading,
         at,
@@ -306,6 +306,7 @@ pub(crate) fn rebuild(
     };
     let stood: HashSet<PageId> = standing.keys().copied().collect();
     search.stand(standing);
+    taken.before_building();
     lap(&mut took.comparing);
 
     let fresh = kept.iter().filter(|kept| kept.is_none()).count();

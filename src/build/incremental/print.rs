@@ -16,8 +16,10 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Write};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+
+use rayon::prelude::*;
 
 use crate::album::Root;
 use crate::build::{Options, Output, Plan};
@@ -260,28 +262,36 @@ impl Print {
         }
     }
 
-    /// With a file on disk as the reading read it, by `stamp`, its stamp
-    /// where it is there: that, where `clock`, read as the reading began,
-    /// settles it. Otherwise the file may have changed since it was read,
-    /// and the print is equal to no other.
-    fn on_disk(self, stamp: Option<Stamp>, clock: Option<&Clock>) -> Print {
-        static UNSETTLED: AtomicU64 = AtomicU64::new(0);
-        match stamp {
-            Some(stamp) if !clock.is_some_and(|clock| stamp.settled(clock)) => {
-                self.with((1u8, UNSETTLED.fetch_add(1, Ordering::Relaxed)))
-            }
-            stamp => self.with((0u8, stamp)),
-        }
-    }
-
     fn done(self) -> u64 {
         self.0.finish()
     }
 }
 
-/// The stamp of the file `opened` is, where it could be opened.
-fn stamp_of(opened: std::io::Result<std::fs::File>) -> Option<Stamp> {
-    Stamp::of(&opened.ok()?.metadata().ok()?)
+/// Which of the site's files on disk a file is among.
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+enum Among {
+    Beside,
+    Statics,
+}
+
+/// What a print takes of a file on disk.
+#[derive(Copy, Clone, Hash)]
+enum Held {
+    /// Its stamp, settled.
+    Stamp(Stamp),
+    /// Its bytes, hashed before any output was built.
+    Bytes([u8; 32]),
+    /// Nothing: the print is equal to no other.
+    Unsure(u64),
+}
+
+/// A file on disk as a reading knew it.
+#[derive(Copy, Clone)]
+struct Known {
+    stamp: Stamp,
+    /// Whether the reading's clock settled the stamp.
+    settled: bool,
+    held: Held,
 }
 
 type Slots = Vec<OnceLock<u64>>;
@@ -337,11 +347,20 @@ pub(super) struct Prints {
     /// What each file the cards are drawn with held, by its path, with
     /// the stamp that settles it, where one did.
     drawn_with: OnceLock<HashMap<String, (Stamp, blake3::Hash)>>,
+    /// Each file beside the writing and in `static/` a print took, by its
+    /// name among them, as the print knew it.
+    on_disk: Mutex<HashMap<(Among, String), Known>>,
+    /// The same of the reading before, where there was one.
+    on_disk_before: Option<HashMap<(Among, String), Known>>,
+    /// Whether outputs are being built, so a file found now may have been
+    /// read by one already.
+    building: AtomicBool,
 }
 
 impl Prints {
-    /// The prints of `reading`, which began once `clock` was read.
-    pub(super) fn new(reading: &Reading, clock: Option<Clock>) -> Prints {
+    /// The prints of `reading`, which began once `clock` was read, `last`
+    /// those of the reading before.
+    pub(super) fn new(reading: &Reading, clock: Option<Clock>, last: Option<&Prints>) -> Prints {
         let (pages, lists) = (reading.pages.len(), reading.lists.len());
         let languages = reading.renderer.site().languages.len();
         Prints {
@@ -375,6 +394,9 @@ impl Prints {
             mentions: slots(pages),
             today: OnceLock::new(),
             drawn_with: OnceLock::new(),
+            on_disk: Mutex::default(),
+            on_disk_before: last.map(|last| last.on_disk.lock().expect("never poisoned").clone()),
+            building: AtomicBool::new(false),
         }
     }
 }
@@ -487,6 +509,78 @@ impl Taken<'_> {
         Some(hash)
     }
 
+    /// What the print of the file `opened`, `name` among its files, takes
+    /// of it, where it could be opened: what the reading before took,
+    /// where the file has the stamp that reading's clock settled; else its
+    /// stamp, where this reading's clock settles it and the reading before
+    /// didn't find it at that stamp unsettled; else its bytes, as a file
+    /// may change under a stamp that isn't settled, or nothing where an
+    /// output may have read them before they were hashed.
+    fn held(
+        &self,
+        among: Among,
+        name: &str,
+        opened: std::io::Result<std::fs::File>,
+    ) -> Option<Held> {
+        static UNSURE: AtomicU64 = AtomicU64::new(0);
+        let prints = self.prints;
+        let file = opened.ok()?;
+        let stamp = file.metadata().ok().as_ref().and_then(Stamp::of);
+        let clock = prints.clock.as_ref();
+        let settled = stamp.filter(|stamp| clock.is_some_and(|clock| stamp.settled(clock)));
+        let name = (among, name.to_owned());
+        let before = (prints.on_disk_before.as_ref())
+            .and_then(|before| before.get(&name))
+            .filter(|before| Some(before.stamp) == stamp);
+        let held = match (before, settled) {
+            (Some(before), _) if before.settled => before.held,
+            (None, Some(settled)) => Held::Stamp(settled),
+            _ if prints.building.load(Ordering::Relaxed) => {
+                Held::Unsure(UNSURE.fetch_add(1, Ordering::Relaxed))
+            }
+            _ => {
+                let hash = blake3::Hasher::new().update_reader(file).ok()?.finalize();
+                Held::Bytes(*hash.as_bytes())
+            }
+        };
+        if let Some(stamp) = stamp {
+            let known = Known {
+                stamp,
+                settled: settled.is_some(),
+                held,
+            };
+            prints
+                .on_disk
+                .lock()
+                .expect("never poisoned")
+                .insert(name, known);
+        }
+        Some(held)
+    }
+
+    /// Takes the print of each file beside the writing and in `static/`
+    /// that the reading before took, or of every one where there was
+    /// none, before any output is built: a file whose stamp isn't settled
+    /// is known by its bytes only where they were hashed before an output
+    /// read them.
+    pub(super) fn before_building(&self) {
+        let reading = self.reading;
+        let before = self.prints.on_disk_before.as_ref();
+        let took = |among, name: &String| {
+            before.is_none_or(|before| before.contains_key(&(among, name.clone())))
+        };
+        let beside = (0..reading.beside.len()).into_par_iter();
+        let beside = beside.filter(|&at| took(Among::Beside, &reading.beside[at]));
+        let statics = (0..reading.statics.len()).into_par_iter();
+        let statics = statics.filter(|&at| took(Among::Statics, &reading.statics[at]));
+        let keys = (beside.map(|at| u32::try_from(at).map(Key::Beside)))
+            .chain(statics.map(|at| u32::try_from(at).map(Key::Static)));
+        keys.flatten().for_each(|key| {
+            self.of(key);
+        });
+        self.prints.building.store(true, Ordering::Relaxed);
+    }
+
     /// What `output` is built from besides what it reads.
     pub(super) fn own(&self, output: Output) -> u64 {
         let renderer = &self.reading.renderer;
@@ -554,7 +648,6 @@ impl Taken<'_> {
         let prints = self.prints;
         let renderer = &reading.renderer;
         let site = renderer.site();
-        let clock = prints.clock.as_ref();
         match key {
             Key::Field(page, _) | Key::Card(page) => self.front(page),
             Key::Body(page) => self.body(page),
@@ -652,10 +745,11 @@ impl Taken<'_> {
             Key::Beside(at) => *prints.beside[at as usize].get_or_init(|| {
                 let file = &site.files[at as usize];
                 let page = file.page.map(|page| self.named(&[page]));
+                let held = self.held(Among::Beside, &file.path, site.open_content(&file.path));
                 Print::default()
                     .with((self.every_file(), &file.path, page))
                     .shown(&file.address)
-                    .on_disk(stamp_of(site.open_content(&file.path)), clock)
+                    .with(held)
                     .done()
             }),
             Key::Static(at) => *prints.statics[at as usize].get_or_init(|| {
@@ -664,7 +758,7 @@ impl Taken<'_> {
                 let opened = crate::platform::open_file(assets.real(), file.at());
                 Print::default()
                     .with((self.every_file(), &file.name))
-                    .on_disk(stamp_of(opened), clock)
+                    .with(self.held(Among::Statics, &file.name, opened))
                     .done()
             }),
             Key::Files => self.every_file(),
@@ -1030,7 +1124,7 @@ mod tests {
         fs::write(root.join("content/page-1.md"), page).unwrap();
         let (renderer, _) = crate::build::renderer(root, None);
         let reading = Reading::of(renderer);
-        let prints = Prints::new(&reading, None);
+        let prints = Prints::new(&reading, None, None);
         let taken = Taken {
             reading: &reading,
             at: root,
@@ -1082,7 +1176,7 @@ mod tests {
     }
 
     #[test]
-    fn a_file_changed_after_the_reading_began_is_held_to_no_print() {
+    fn a_file_changed_after_the_reading_began_is_known_by_its_bytes_until_outputs_are_built() {
         let root = std::env::temp_dir().join(format!("statac-print-disk-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("content")).unwrap();
@@ -1095,17 +1189,20 @@ mod tests {
         fs::write(root.join("content/page-1.md"), "A page.\n").unwrap();
         let note = root.join("content/note-1.txt");
         fs::write(&note, "one\n").unwrap();
-        // What a reading begun once `clock` was read takes of the file.
-        let print = |clock: Option<Clock>| {
+        // What a reading begun once `clock` was read, after `last`, takes
+        // of the file, before outputs are built or once they are.
+        let print = |clock: Option<Clock>, last: Option<&Prints>, building: bool| {
             let (renderer, _) = crate::build::renderer(&root, None);
             let reading = Reading::of(renderer);
-            let prints = Prints::new(&reading, clock);
+            let prints = Prints::new(&reading, clock, last);
+            prints.building.store(building, Ordering::Relaxed);
             let taken = Taken {
                 reading: &reading,
                 at: &root,
                 prints: &prints,
             };
-            taken.of(Key::Beside(0))
+            let print = taken.of(Key::Beside(0));
+            (print, prints)
         };
         // A clock its times are surely before, however coarse the disk's.
         let long_after =
@@ -1115,12 +1212,18 @@ mod tests {
         // Saved at its length once the reading began, before what the
         // reading read of it is taken.
         fs::write(&note, "two\n").unwrap();
-        let during = print(began);
-        let after = print(long_after());
-        let again = print(long_after());
+        let (before, kept) = print(began, None, false);
+        let (again, _) = print(began, None, false);
+        let (after, _) = print(long_after(), Some(&kept), false);
+        let (built, _) = print(began, None, true);
+        let (built_again, _) = print(began, None, true);
+        let (settled, _) = print(long_after(), None, true);
+        let (settled_again, _) = print(long_after(), None, true);
         let _ = fs::remove_dir_all(&root);
         assert!(began.is_some());
-        assert_ne!(during, after);
-        assert_eq!(after, again);
+        assert_eq!(before, again);
+        assert_eq!(before, after);
+        assert_ne!(built, built_again);
+        assert_eq!(settled, settled_again);
     }
 }
