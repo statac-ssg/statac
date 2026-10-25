@@ -170,25 +170,24 @@ fn a_clean_site_is_built_and_says_what_it_wrote() {
     assert_eq!(code, 0, "{said}");
     let built = files(&site.out());
     let names = names(&built);
-    assert_eq!(names.len(), 6, "{names:?}");
+    assert_eq!(names.len(), 5, "{names:?}");
     assert_eq!(names[0], ".statac-built");
     assert!(names[1].starts_with("app.") && names[1].ends_with(".js"));
-    assert!(names[2].starts_with("code.") && names[2].ends_with(".css"));
-    assert_eq!(names[3], "index.html");
-    assert_eq!(names[4], "post-1/index.html");
-    assert!(names[5].starts_with("site.") && names[5].ends_with(".css"));
+    assert_eq!(names[2], "index.html");
+    assert_eq!(names[3], "post-1/index.html");
+    assert!(names[4].starts_with("site.") && names[4].ends_with(".css"));
 
-    let post = String::from_utf8(built[4].1.clone()).unwrap();
+    let post = String::from_utf8(built[3].1.clone()).unwrap();
     assert!(post.contains("<title>Post 1</title>"), "{post}");
     assert!(post.contains("<p>The first post.</p>"), "{post}");
     assert!(post.contains("<p>4 October 2026</p>"), "{post}");
-    assert!(post.contains(&format!("href=\"/{}\"", names[5])), "{post}");
+    assert!(post.contains(&format!("href=\"/{}\"", names[4])), "{post}");
 
     // A build says nothing of the JavaScript; `check` does.
     assert!(!said.contains("JavaScript"), "{said}");
     assert_eq!(
         last_line(&said),
-        "Wrote 2 pages and 3 other files to `SITE/_site` in a moment."
+        "Wrote 2 pages and 2 other files to `SITE/_site` in a moment."
     );
     let script = names[1];
     let (said, code) = site.run(&["check", "--today=2026-10-04"]);
@@ -365,8 +364,12 @@ warning  Control character: U+000B is left out of the page
 fn a_block_with_a_line_past_five_thousand_characters_is_published_uncoloured_and_told() {
     let site = Site::new("long-line");
     site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_colours: true\n",
+    );
+    site.write(
         "templates/page.html",
-        "<!doctype html>\n{{ css('code.css') }}\n{{ page.content }}\n",
+        "<!doctype html>\n{{ page.content }}\n",
     );
     // A character of two bytes, so the line is measured in characters.
     let post = |letters: usize| {
@@ -422,67 +425,129 @@ warning  Code not coloured: a line in this block is 5,001 characters long
 }
 
 #[test]
-fn coloured_code_whose_colours_no_template_asks_for_is_told_once_at_the_first_block() {
+fn code_is_coloured_only_where_code_colours_asks_and_no_stylesheet_is_written() {
     let site = Site::new("colours");
-    let post = |n: u32, writing: &str| {
-        let text = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\n---\n{writing}\n");
-        site.write(&format!("content/post-{n}.md"), &text);
-    };
-    post(1, "```text\nas it is\n```\n\n```yaml\ntitle: Post 1\n```");
-    post(2, "```js\nlet a = 1;\n```");
-    post(3, "```rust\nfn main() {}\n```");
-    post(4, "```\nlet a = 1;\n```");
-    let told = "\
-warning  Code colours not loaded: no template asks for `code.css`
-  content/post-1.md, line 9
-   9 │ ```yaml
-     │    ^^^^
-  Add `{{ css(\"code.css\") }}` inside a template's `<head>`.
-  More: https://statac.dev/e/code-colours-not-loaded/
-
-1 warning: 1 code-colours-not-loaded.
-";
-    let checked = || {
-        let (said, code) = site.check_without_javascript(&[]);
-        assert_eq!(code, 0, "{said}");
-        said
-    };
-    assert_eq!(checked(), told);
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n```js\nlet a = 1;\n```\n\n```cosole\n$ ls\n```\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(said, "No problems.\n");
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
+    let page = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
     assert!(
-        said.starts_with("1 warning: 1 code-colours-not-loaded. Run `statac check` to see it.\n"),
-        "{said}"
+        page.contains("<pre class=\"code\"><code class=\"language-js\">let a = 1;</code></pre>"),
+        "{page}"
     );
-    let page = fs::read_to_string(site.out().join("post-2/index.html")).unwrap();
-    assert!(page.contains("<span class=\"hl-"), "{page}");
+    assert!(!page.contains("hl-"), "{page}");
 
-    // Asked for by a page that shows no code, and by `asset` as by `css`.
-    let home = "<!doctype html>\n<title>{{ page.title }}</title>\n{{ page.content }}\n";
     site.write(
-        "templates/home.html",
-        &format!("{home}{{{{ css('code.css') }}}}\n"),
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_colours: true\n",
     );
-    assert_eq!(checked(), "No problems.\n");
-    let linked = "<link rel=\"stylesheet\" href=\"{{ asset('code.css') }}\">\n";
-    site.write("templates/home.html", &format!("{home}{linked}"));
-    assert_eq!(checked(), "No problems.\n");
-
-    // The site's own stylesheet of that name is asked for or not as Statac's is.
-    site.write("assets/code.css", ".code { color: black; }\n");
-    assert_eq!(checked(), "No problems.\n");
-    site.write("templates/home.html", home);
-    assert_eq!(checked(), told);
-
-    // A block left uncoloured for a long line is no coloured code.
-    for n in 1..=3 {
-        post(n, &format!("```js\n{}\n```", "a".repeat(5_001)));
-    }
-    let said = checked();
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
     assert!(
-        said.ends_with("\n3 warnings: 3 code-not-coloured.\n"),
+        said.starts_with("warning  Unknown code language: Statac has no colours for `cosole`\n"),
         "{said}"
     );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let page = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    assert!(
+        page.contains(
+            "<pre class=\"code\"><code class=\"language-js\"><span class=\"hl-keyword\">"
+        ),
+        "{page}"
+    );
+    let written: Vec<_> = fs::read_dir(site.out())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.starts_with("code"))
+        .collect();
+    assert_eq!(written, Vec::<String>::new());
+}
+
+#[test]
+fn a_template_asking_for_code_css_is_told_statac_no_longer_writes_it() {
+    let site = Site::new("code-css");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_colours: true\n",
+    );
+    site.write(
+        "templates/page.html",
+        "<!doctype html>\n<title>{{ page.title }}</title>\n{{ css('code.css') }}\n{{ page.content }}\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 1, "{said}");
+    assert_eq!(
+        said,
+        "\
+error  Missing file: there is no `assets/code.css`
+  templates/page.html, line 3
+   3 │ {{ css('code.css') }}
+     │    ^^^^^^^^^^^^^^^
+  While building: content/post-1.md
+  Statac no longer writes `code.css`. Coloured code needs `code_colours: true` and a theme's rules from https://statac.dev/code-colours/ in a stylesheet of the site's own.
+  More: https://statac.dev/e/missing-file/
+
+1 error: 1 missing-file.
+"
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 1, "{said}");
+
+    // A `code.css` of the site's own is published as any stylesheet is.
+    site.write("assets/code.css", ".hl-keyword { font-weight: bold; }\n");
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(said, "No problems.\n");
+}
+
+#[test]
+fn code_style_stops_the_build_with_what_to_write_in_its_place() {
+    let site = Site::new("code-style");
+    for (style, told) in [
+        (
+            "ocean",
+            "Write `code_colours: true` in its place, and copy the `ocean` theme's rules from \
+             https://statac.dev/code-colours/ into a stylesheet of the site's own.",
+        ),
+        (
+            "none",
+            "Delete the line: Statac colours no code unless `code_colours: true` asks.",
+        ),
+    ] {
+        site.write(
+            "statac.yaml",
+            &format!(
+                "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_style: {style}\n"
+            ),
+        );
+        let (said, code) = site.check_without_javascript(&[]);
+        assert_eq!(code, 1, "{said}");
+        let carets = "^".repeat("code_style".len());
+        assert_eq!(
+            said,
+            format!(
+                "\
+error  Retired setting: Statac no longer reads `code_style`
+  statac.yaml, line 5
+   5 │ code_style: {style}
+     │ {carets}
+  {told}
+  More: https://statac.dev/e/retired-setting/
+
+1 error: 1 retired-setting.
+"
+            )
+        );
+    }
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 1, "{said}");
 }
 
 #[test]
@@ -943,7 +1008,7 @@ fn every_whole_address_follows_the_address_given_for_the_run() {
         assert_eq!(code, 0, "{given:?}: {said}");
         assert_eq!(
             last_line(&said),
-            "Wrote 4 pages, 1 redirect, 1 feed and 5 other files to `SITE/_site` in a moment.",
+            "Wrote 4 pages, 1 redirect, 1 feed and 4 other files to `SITE/_site` in a moment.",
             "{given:?}"
         );
         for (file, holds) in WHOLE_ADDRESSES {
@@ -1016,7 +1081,7 @@ note  Built without template: 1 redirect is published as a refresh and a link
     );
     assert_eq!(
         last_line(&said),
-        "Wrote 2 pages, 1 redirect and 3 other files to `SITE/_site` in a moment."
+        "Wrote 2 pages, 1 redirect and 2 other files to `SITE/_site` in a moment."
     );
 }
 
@@ -1232,7 +1297,7 @@ fn a_page_sends_readers_on_from_its_own_address() {
     assert!(!site.out().join("tags").exists());
     assert_eq!(
         last_line(&said),
-        "Wrote 2 pages, 2 redirects and 3 other files to `SITE/_site` in a moment."
+        "Wrote 2 pages, 2 redirects and 2 other files to `SITE/_site` in a moment."
     );
 }
 
@@ -1779,7 +1844,7 @@ fn a_long_list_goes_on_onto_later_pages() {
     assert_eq!(read("page/2/index.html"), "Post 1|");
     assert_eq!(
         last_line(&said),
-        "Wrote 4 pages and 3 other files to `SITE/_site` in a moment."
+        "Wrote 4 pages and 2 other files to `SITE/_site` in a moment."
     );
 
     site.write("content/page/2.md", "---\ntitle: Page 2\n---\n");

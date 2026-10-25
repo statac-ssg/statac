@@ -51,6 +51,7 @@ macro_rules! codes {
 codes! {
     BrokenLink "broken-link",
     OtherSpelling "other-spelling",
+    RetiredSetting "retired-setting",
     CantWrite "cant-write",
     MalformedYaml "malformed-yaml",
     MalformedJson "malformed-json",
@@ -131,7 +132,6 @@ codes! {
     NotLinkedByPlace "not-linked-by-place",
     UnknownCodeLanguage "unknown-code-language",
     CodeNotColoured "code-not-coloured",
-    CodeColoursNotLoaded "code-colours-not-loaded",
     MalformedTemplate "malformed-template",
     MissingTemplate "missing-template",
     BuiltWithPageTemplate "built-with-page-template",
@@ -230,6 +230,7 @@ const RETIRED_NAMES: &[(&str, Code)] = &[
     ("not-a-web-address", Code::RefusedWebmentions),
     ("newer-starter", Code::UnknownOption),
     ("update-available", Code::UnknownOption),
+    ("code-colours-not-loaded", Code::RetiredSetting),
 ];
 
 impl Code {
@@ -326,7 +327,6 @@ impl Code {
             | Code::NotLinkedByPlace
             | Code::UnknownCodeLanguage
             | Code::CodeNotColoured
-            | Code::CodeColoursNotLoaded
             | Code::PageInSnippet
             | Code::AlwaysFalse
             | Code::ContentNeverShown
@@ -379,6 +379,7 @@ impl Code {
             | Code::LoopOverEveryPage
             | Code::RefusedWebmentions => Severity::Note,
             Code::OtherSpelling
+            | Code::RetiredSetting
             | Code::CantWrite
             | Code::MalformedYaml
             | Code::MalformedJson
@@ -487,7 +488,6 @@ impl Code {
             | Code::NotLinkedByPlace
             | Code::UnknownCodeLanguage
             | Code::CodeNotColoured
-            | Code::CodeColoursNotLoaded
             | Code::PageInSnippet
             | Code::AlwaysFalse
             | Code::ContentNeverShown
@@ -533,6 +533,7 @@ impl Code {
             | Code::RefusedWebmentions
             | Code::LoopOverEveryPage => false,
             Code::OtherSpelling
+            | Code::RetiredSetting
             | Code::CantWrite
             | Code::MalformedYaml
             | Code::MalformedJson
@@ -644,6 +645,12 @@ pub enum Kind {
         word: Word,
         written: String,
         ours: String,
+    },
+    /// A setting Statac once had and no longer reads, refused, with what
+    /// the site writes in its place.
+    RetiredSetting {
+        setting: String,
+        in_place: InPlace,
     },
     /// A problem in no file names what Statac was doing.
     CantWrite {
@@ -1120,9 +1127,6 @@ pub enum Kind {
         characters: usize,
         block: bool,
     },
-    /// Coloured code on a site none of whose outputs read the stylesheet
-    /// holding the colours, placed at the first block coloured.
-    CodeColoursNotLoaded,
     /// A template or snippet that can't be read.
     MalformedTemplate {
         found: TemplateFault,
@@ -2200,6 +2204,18 @@ pub enum Hint {
     Closest(String),
     /// The file is in `static/`, published under its own name at this address.
     InStatic(String),
+    /// `code.css`, which Statac once wrote beside the site's own files.
+    NoLongerWritten,
+}
+
+/// What a site writes in place of a retired setting.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum InPlace {
+    /// Nothing: what it asked for is what Statac does now.
+    Nothing,
+    /// `code_colours: true`, with a theme's rules in the site's own
+    /// stylesheet: the theme `code_style` named, where it named one.
+    CodeColours { theme: Option<String> },
 }
 
 /// What sort of word a second or unknown spelling stands for.
@@ -2840,6 +2856,7 @@ impl Kind {
         match self {
             Kind::BrokenLink { .. } => Code::BrokenLink,
             Kind::OtherSpelling { .. } => Code::OtherSpelling,
+            Kind::RetiredSetting { .. } => Code::RetiredSetting,
             Kind::CantWrite { .. } => Code::CantWrite,
             Kind::MalformedYaml { .. } => Code::MalformedYaml,
             Kind::MalformedJson { .. } => Code::MalformedJson,
@@ -2922,7 +2939,6 @@ impl Kind {
             Kind::NotLinkedByPlace { .. } => Code::NotLinkedByPlace,
             Kind::UnknownCodeLanguage { .. } => Code::UnknownCodeLanguage,
             Kind::CodeNotColoured { .. } => Code::CodeNotColoured,
-            Kind::CodeColoursNotLoaded => Code::CodeColoursNotLoaded,
             Kind::MalformedTemplate { .. } => Code::MalformedTemplate,
             Kind::MissingTemplate { .. } => Code::MissingTemplate,
             Kind::BuiltWithPageTemplate { .. } => Code::BuiltWithPageTemplate,

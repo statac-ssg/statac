@@ -459,7 +459,6 @@ fn carry(
             // gives what was asked for wherever what it read is the same.
             Some(renderer.card_asked(to.page(asked.page())?))
         });
-        let coloured = old.coloured.iter().map(|&place| to.place(place));
         Some(Built {
             output,
             timed: Default::default(),
@@ -474,7 +473,6 @@ fn carry(
             developed: developed.collect::<Option<_>>()?,
             cards: cards.collect::<Option<_>>()?,
             sized: old.sized,
-            coloured: coloured.collect::<Option<_>>()?,
             walked: old.walked,
             written: old.written,
             indexed: old.indexed.clone(),

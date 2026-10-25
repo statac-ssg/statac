@@ -41,7 +41,7 @@ fn every_piece_is_written_through_its_file_handed_what_the_writing_says() {
         (
             "statac.yaml",
             "language: en\nurl: https://example.org\nother_hosts: [example.net]\ntimezone: UTC\n\
-             pages.feed: false\n",
+             pages.feed: false\ncode_colours: true\n",
         ),
         (
             "content/post-1.md",

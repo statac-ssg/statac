@@ -1,19 +1,14 @@
-//! Code coloured as the site is built, and `code.css`, the colours it is
-//! shown in, written from the site's `code_style`.
+//! Code coloured as the site is built, where `code_colours: true` asks.
 //!
 //! Each piece of code a grammar tells apart is marked with the kind of thing
 //! it is, a comment or a keyword, by one class carrying `hl-` so a site's own
 //! stylesheet never meets one by chance; code of no kind carries none. The
-//! marking is the same in every style. A style is a light theme and its dark
-//! twin, giving each kind a colour in both, and the reader's own preference
-//! chooses between them. A theme's colour too faint to read on its
-//! background is written darker or lighter.
+//! site's own stylesheet gives each class its colour: Statac writes none.
 //!
-//! The grammars and styles are written by `cargo run --example grammars`,
-//! which says where they come from.
+//! The grammars are written by `cargo run --example grammars`, which says
+//! where they come from.
 
 mod languages;
-mod styles;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -28,29 +23,12 @@ use ferriki_textmate::{
 
 use crate::html::escape;
 
-/// The name a template asks for the stylesheet by.
-pub const STYLESHEET: &str = "code.css";
-
-/// The styles `code_style` takes.
-pub const NAMES: &[&str] = &["ocean", "gruvbox", "solarized", "catppuccin", "one-half"];
-
-/// What `code_style` is where the site wants no code coloured.
-pub const OFF: &str = "none";
-
-/// Every word `code_style` takes: the styles, then `OFF`.
-pub const SETTING: &[&str] = &[
-    "ocean",
-    "gruvbox",
-    "solarized",
-    "catppuccin",
-    "one-half",
-    OFF,
-];
-
 const CLASS_PREFIX: &str = "hl-";
 
 /// The kinds of thing code is marked as, each the name of its class after
-/// `hl-` and of its property in `code.css` after `--code-`.
+/// `hl-`. Sites' stylesheets, and the themes the docs give, colour the
+/// classes by name, so the list is a contract kept from one release to
+/// the next.
 pub const KINDS: [&str; 19] = [
     "comment",
     "keyword",
@@ -240,18 +218,6 @@ const NAMED_AS_THEIR_FILES: &[&str] = &[
 
 /// Endings of a file's name that no language is named by.
 const ENDINGS: &[(&str, &str)] = &[("h", "c"), ("hpp", "cpp"), ("cc", "cpp"), ("htm", "html")];
-
-/// A style as `styles.rs` writes it, each colour as its light theme gives
-/// it, then its dark.
-struct Style {
-    name: &'static str,
-    /// Text of no kind.
-    text: [&'static str; 2],
-    background: [&'static str; 2],
-    /// Each kind's colour and the font style the light theme gives it, in
-    /// the order of `KINDS`.
-    kinds: [([&'static str; 2], &'static str); KINDS.len()],
-}
 
 /// A grammar as `grammars.bin` holds it.
 struct Held {
@@ -610,21 +576,14 @@ fn tokeniser(language: &str) -> Option<Rc<Tokeniser>> {
 /// Blocks of code coloured, by their language and their code.
 type Done = HashMap<(&'static str, Box<str>), Arc<str>>;
 
-/// Colours code. The same code is coloured the same in every style.
+/// Colours code.
+#[derive(Default)]
 pub struct Highlighter {
     /// Each block once coloured, so a block written twice is coloured once.
     done: Mutex<Done>,
 }
 
 impl Highlighter {
-    /// None for `none`, and for a name `code_style` doesn't take, which
-    /// the setting has already refused.
-    pub fn new(code_style: &str) -> Option<Highlighter> {
-        NAMES.contains(&code_style).then(|| Highlighter {
-            done: Mutex::new(HashMap::new()),
-        })
-    }
-
     /// The inside of a `<code>` holding `code`, coloured as `language`.
     pub fn html(&self, language: &'static str, code: &str) -> Arc<str> {
         let key = (language, Box::from(code));
@@ -652,173 +611,6 @@ pub fn plain(code: &str) -> String {
     let mut out = String::with_capacity(code.len());
     escape(code, &mut out);
     out
-}
-
-/// The stylesheet for the style `code_style` names; none for a name that
-/// isn't one, which the setting has already refused.
-pub fn stylesheet(code_style: &str) -> Option<String> {
-    let style = styles::STYLES
-        .iter()
-        .find(|style| style.name == code_style)?;
-    let background = style.background.map(colour);
-    let text = style.text.map(colour);
-    // Some themes carry a half-transparent text colour, which a terminal
-    // ignores and a page does not: left alone it washes out every block.
-    let shown = |colours: [Colour; 2]| {
-        let [light, dark] = [0, 1].map(|side| {
-            let colour = match colours[side] == text[side] {
-                true => opaque(colours[side]),
-                false => colours[side],
-            };
-            legible(colour, background[side])
-        });
-        both(light, dark)
-    };
-    let mut out = format!(
-        "/* Code colours: {}, light and dark. Statac writes this file; to change the\n   \
-         style, set `code_style` in {}. To change one colour, set its property,\n   \
-         `--code-comment` for a comment's, in a stylesheet of your own, on `.code`\n   \
-         or on anything around it. */\n\n",
-        style.name,
-        crate::config::FILE_NAME
-    );
-    // A custom property is inherited, so the nearest `data-theme` above the
-    // code decides, however many stand above it; two rules setting
-    // `color-scheme` itself would leave it to whichever is written last.
-    out.push_str(
-        "[data-theme=\"light\"] { --statac-code-scheme: light; }\n\
-         [data-theme=\"dark\"] { --statac-code-scheme: dark; }\n\n",
-    );
-    writeln!(
-        out,
-        ".code {{\n  color-scheme: var(--statac-code-scheme, light dark);\n  \
-         color: var(--code-text, {});\n  \
-         background-color: var(--code-background, {});\n}}\n",
-        shown(text),
-        both(background[0], background[1])
-    )
-    .unwrap();
-    for (kind, (colours, font)) in KINDS.iter().zip(&style.kinds) {
-        write!(
-            out,
-            ".{CLASS_PREFIX}{kind} {{ color: var(--code-{kind}, {});",
-            shown(colours.map(colour))
-        )
-        .unwrap();
-        for word in font.split_whitespace() {
-            out.push_str(match word {
-                "bold" => " font-weight: bold;",
-                "italic" => " font-style: italic;",
-                "underline" => " text-decoration: underline;",
-                _ => " text-decoration: line-through;",
-            });
-        }
-        out.push_str(" }\n");
-    }
-    Some(out)
-}
-
-/// A colour's red, green and blue, and how far from transparent it is.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct Colour([u8; 4]);
-
-impl Colour {
-    /// A colour written as `#rrggbb` or `#rrggbbaa`.
-    fn from_hex(hex: &str) -> Option<Colour> {
-        let digits = hex.strip_prefix('#')?;
-        if !matches!(digits.len(), 6 | 8) || !digits.is_ascii() {
-            return None;
-        }
-        let part = |at: usize| match digits.get(at * 2..at * 2 + 2) {
-            Some(part) => u8::from_str_radix(part, 16).ok(),
-            None => Some(255),
-        };
-        Some(Colour([part(0)?, part(1)?, part(2)?, part(3)?]))
-    }
-
-    fn hex(self) -> String {
-        let [r, g, b, a] = self.0;
-        match a {
-            255 => format!("#{r:02x}{g:02x}{b:02x}"),
-            _ => format!("#{r:02x}{g:02x}{b:02x}{a:02x}"),
-        }
-    }
-
-    /// Its red, green and blue; none where it is part transparent.
-    fn solid(self) -> Option<[u8; 3]> {
-        let [r, g, b, a] = self.0;
-        (a == 255).then_some([r, g, b])
-    }
-}
-
-fn colour(hex: &str) -> Colour {
-    Colour::from_hex(hex).expect("styles.rs writes colours")
-}
-
-/// A colour written so the reader's preference chooses it.
-fn both(light: Colour, dark: Colour) -> String {
-    let (light, dark) = (light.hex(), dark.hex());
-    if light == dark {
-        light
-    } else {
-        format!("light-dark({light}, {dark})")
-    }
-}
-
-/// The least contrast text has with what it stands on, as WCAG asks of
-/// text of an ordinary size.
-const LEGIBLE: f64 = 4.5;
-
-/// How far apart two colours are in lightness, from 1 to 21, as WCAG
-/// reckons it.
-fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
-    let luminance = |[r, g, b]: [u8; 3]| {
-        let linear = |part: u8| {
-            let part = f64::from(part) / 255.0;
-            if part <= 0.04045 {
-                part / 12.92
-            } else {
-                ((part + 0.055) / 1.055).powf(2.4)
-            }
-        };
-        0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
-    };
-    let (a, b) = (luminance(a), luminance(b));
-    (a.max(b) + 0.05) / (a.min(b) + 0.05)
-}
-
-/// `text` as it is where it can be read on `on`, and otherwise moved
-/// towards black or white, whichever stands further from `on`, by the
-/// least that makes it so. A part-transparent colour is left alone.
-fn legible(text: Colour, on: Colour) -> Colour {
-    let (Some(from), Some(on)) = (text.solid(), on.solid()) else {
-        return text;
-    };
-    if contrast(from, on) >= LEGIBLE {
-        return text;
-    }
-    let (black, white) = ([0; 3], [255; 3]);
-    let towards = if contrast(black, on) >= contrast(white, on) {
-        black
-    } else {
-        white
-    };
-    let moved = |hundredths: i32| -> [u8; 3] {
-        std::array::from_fn(|part| {
-            let (from, to) = (i32::from(from[part]), i32::from(towards[part]));
-            u8::try_from(from + (to - from) * hundredths / 100).expect("between two colours")
-        })
-    };
-    let [r, g, b] = (1..100)
-        .map(moved)
-        .find(|colour| contrast(*colour, on) >= LEGIBLE)
-        .unwrap_or(towards);
-    Colour([r, g, b, 255])
-}
-
-fn opaque(colour: Colour) -> Colour {
-    let [r, g, b, _] = colour.0;
-    Colour([r, g, b, 255])
 }
 
 #[cfg(test)]

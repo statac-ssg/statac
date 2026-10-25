@@ -13,13 +13,13 @@ use crate::platform::{Alike, Unwritable};
 use crate::problem::{
     AddressFault, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
     Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found, Held, Hint, Holds,
-    Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing, MoreAt,
-    Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault, Piece,
-    Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation, Repeated,
-    Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy, ShownWords,
-    SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told, Translated,
-    Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting, Wanted, Word,
-    WordList, WordsFrom, WordsWanted, WrongPlace,
+    InPlace, Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing,
+    MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault,
+    Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation,
+    Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy,
+    ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told,
+    Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting, Wanted,
+    Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 
 mod described;
@@ -52,6 +52,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
         }
         Kind::OtherSpelling { word, written, .. } | Kind::UnknownWord { word, written, .. } => {
             unknown(*word, written)
+        }
+        Kind::RetiredSetting { setting, .. } => {
+            format!("Retired setting: Statac no longer reads `{setting}`")
         }
         Kind::LoopInForIf { word } => unknown(*word, "loop"),
         Kind::AlwaysFalse { name, .. } => format!("Always false: no page has `{name}`"),
@@ -476,9 +479,6 @@ pub(crate) fn headline(kind: &Kind) -> String {
             "Code not coloured: a line in this block is {} characters long",
             grouped(*characters)
         ),
-        Kind::CodeColoursNotLoaded => {
-            "Code colours not loaded: no template asks for `code.css`".into()
-        }
         Kind::MalformedTemplate { found } => format!(
             "Malformed template: {}",
             match found {
@@ -2306,6 +2306,19 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             ..
         } if written == "+++" => Some("Write the front matter as YAML between `---` lines.".into()),
         Kind::OtherSpelling { ours, .. } => Some(format!("Statac calls this `{ours}`.")),
+        Kind::RetiredSetting { in_place, .. } => Some(match in_place {
+            InPlace::Nothing => {
+                "Delete the line: Statac colours no code unless `code_colours: true` asks.".into()
+            }
+            InPlace::CodeColours { theme } => format!(
+                "Write `code_colours: true` in its place, and copy {} rules from {CODE_COLOURS} \
+                 into a stylesheet of the site's own.",
+                theme.as_ref().map_or_else(
+                    || "a theme's".to_owned(),
+                    |theme| format!("the `{theme}` theme's")
+                )
+            ),
+        }),
         Kind::CantWrite { .. } => None,
         Kind::MalformedYaml { found } => match found {
             Malformed::UnclosedQuote(quote) => {
@@ -2441,6 +2454,10 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Hint::InStatic(address) => {
                 format!("Link it as `{address}`, where `static/` publishes it under its own name.")
             }
+            Hint::NoLongerWritten => format!(
+                "Statac no longer writes `code.css`. Coloured code needs `code_colours: true` and \
+                 a theme's rules from {CODE_COLOURS} in a stylesheet of the site's own."
+            ),
         }),
         Kind::WorkerOutsideImportMap { .. } => Some(
             "Keep the worker and the files it imports in `static/`, which publishes them under \
@@ -2813,9 +2830,6 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }
         Kind::CodeNotColoured { block, .. } => block
             .then(|| "Break the line up, or take the language off the block's first line.".into()),
-        Kind::CodeColoursNotLoaded => {
-            Some("Add `{{ css(\"code.css\") }}` inside a template's `<head>`.".into())
-        }
         Kind::MalformedTemplate { found } => match found {
             TemplateFault::Syntax(fault) => syntax_suggestion(fault),
             TemplateFault::Takes(fault) => Some(match fault {
@@ -4867,6 +4881,9 @@ pub(crate) fn no_words_for(tag: &str) -> String {
          `languages/{tag}.yaml`."
     )
 }
+
+/// Where the docs give each theme's rules for coloured code.
+pub(crate) const CODE_COLOURS: &str = "https://statac.dev/code-colours/";
 
 /// Where the docs describe a language's translations.
 pub(crate) const LANGUAGE_FILES: &str = "https://statac.dev/dates-and-languages/#languages";
@@ -9042,9 +9059,48 @@ mod tests {
                 None,
             ),
             (
-                Kind::CodeColoursNotLoaded,
-                "Code colours not loaded: no template asks for `code.css`",
-                Some("Add `{{ css(\"code.css\") }}` inside a template's `<head>`."),
+                Kind::RetiredSetting {
+                    setting: "code_style".into(),
+                    in_place: InPlace::CodeColours {
+                        theme: Some("ocean".into()),
+                    },
+                },
+                "Retired setting: Statac no longer reads `code_style`",
+                Some(
+                    "Write `code_colours: true` in its place, and copy the `ocean` theme's rules \
+                     from https://statac.dev/code-colours/ into a stylesheet of the site's own.",
+                ),
+            ),
+            (
+                Kind::RetiredSetting {
+                    setting: "code_style".into(),
+                    in_place: InPlace::CodeColours { theme: None },
+                },
+                "Retired setting: Statac no longer reads `code_style`",
+                Some(
+                    "Write `code_colours: true` in its place, and copy a theme's rules from \
+                     https://statac.dev/code-colours/ into a stylesheet of the site's own.",
+                ),
+            ),
+            (
+                Kind::RetiredSetting {
+                    setting: "code_style".into(),
+                    in_place: InPlace::Nothing,
+                },
+                "Retired setting: Statac no longer reads `code_style`",
+                Some("Delete the line: Statac colours no code unless `code_colours: true` asks."),
+            ),
+            (
+                Kind::MissingFile {
+                    path: "assets/code.css".into(),
+                    hint: Some(Hint::NoLongerWritten),
+                },
+                "Missing file: there is no `assets/code.css`",
+                Some(
+                    "Statac no longer writes `code.css`. Coloured code needs \
+                     `code_colours: true` and a theme's rules from \
+                     https://statac.dev/code-colours/ in a stylesheet of the site's own.",
+                ),
             ),
             (
                 Kind::UnknownWord {

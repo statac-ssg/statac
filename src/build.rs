@@ -230,12 +230,7 @@ pub(crate) fn read_with(
 ) -> (content::Read, Assets, Vec<feeds::Feed>) {
     let mut read = content::read_with(site, run, texts);
     let base = read.settings.base();
-    let (assets, problems) = assets::gather(
-        site,
-        &base,
-        read.settings.text("code_style").map(|style| style.value),
-        &mut read.sources,
-    );
+    let (assets, problems) = assets::gather(site, &base, &mut read.sources);
     read.problems.extend(problems);
     let has = |name: &str| read.templates.contains(name);
     let (feeds, problems) = feeds::plan(&read.site, &read.settings, &read.sources, &has);
@@ -447,9 +442,6 @@ pub(crate) struct Built {
     pub cards: Vec<templates::Asked>,
     /// Whether it is a page showing a picture with its width and height.
     pub sized: bool,
-    /// Where the first block of code coloured names its language, in each
-    /// page's writing it shows, whole or as its excerpt.
-    pub coloured: Vec<Place>,
     /// How many pages of lists of the whole site it reached.
     pub walked: u64,
     /// Whether the built site holds it.
@@ -983,7 +975,6 @@ pub(crate) fn conclude(
     if built.iter().any(|built| built.sized) {
         problems.extend(renderer.assets().narrowed().cloned());
     }
-    problems.extend(colours_not_loaded(renderer, built));
     problems.extend(no_language(renderer, built));
     problems.extend(
         renderer.loops_over_every_page(built.iter().map(|built| (built.walked, &built.reads))),
@@ -1059,27 +1050,6 @@ fn no_language(renderer: &Renderer, built: &[Built]) -> Option<Problem> {
         .iter()
         .any(|built| built.reads.keys().contains(&language));
     read.then(|| Problem::nowhere(Kind::NoLanguage))
-}
-
-/// The warning for pages showing coloured code where nothing `built` read
-/// the stylesheet holding the colours, however it used it: told once, at
-/// the first block coloured on the first such page by its file's path.
-fn colours_not_loaded(renderer: &Renderer, built: &[Built]) -> Option<Problem> {
-    let stylesheet = Key::Asset(renderer.assets().id(crate::highlight::STYLESHEET)?);
-    let pages = built
-        .iter()
-        .filter(|built| built.file.ends_with(".html") || built.file.ends_with(".htm"));
-    let mut blocks: Vec<Place> = pages.flat_map(|built| &built.coloured).copied().collect();
-    if blocks.is_empty()
-        || built
-            .iter()
-            .any(|built| built.reads.keys().contains(&stylesheet))
-    {
-        return None;
-    }
-    let sources = renderer.sources();
-    blocks.sort_unstable_by_key(|block| (sources.path(block.source), block.span.start));
-    Some(Problem::at(Kind::CodeColoursNotLoaded, *blocks.first()?))
 }
 
 /// Where a concluded build is written, and how.
@@ -1531,7 +1501,6 @@ pub(crate) fn build_output(
         developed: rendered.developed,
         cards: rendered.cards,
         sized,
-        coloured: rendered.coloured,
         walked: rendered.walked,
         written,
         indexed: rendered.indexed,

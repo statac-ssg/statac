@@ -76,7 +76,8 @@ pub(super) struct Shared {
     /// What there is to tell of the pages a sort worked out once put
     /// last, by what the sort is known by.
     pub put_last: Mutex<HashMap<(String, Vec<Value>), PutLast>>,
-    /// What colours the code in the writing, in the site's `code_style`.
+    /// What colours the code in the writing, where `code_colours: true`
+    /// asks.
     pub highlighter: Option<Highlighter>,
     /// What the site's cards come to, each worked out once.
     pub cards: super::card::Room,
@@ -264,12 +265,6 @@ pub(super) struct Body {
     undescribed: Vec<String>,
     /// The photographs whose copies the writing names.
     developed: Vec<crate::album::Shown>,
-    /// Where the first block of code coloured in the writing names its
-    /// language, and the same for each page whose writing it shows, whole
-    /// or as its excerpt.
-    coloured: Vec<Place>,
-    /// The same for the writing its excerpt shows.
-    excerpt_coloured: Vec<Place>,
     /// Whether the writing shows any code coloured, its own or another
     /// page's.
     colours: bool,
@@ -338,9 +333,6 @@ pub struct Rendered {
     pub developed: Vec<crate::album::Shown>,
     /// The sharing cards it asked for, each page's once.
     pub cards: Vec<super::card::Asked>,
-    /// Where the first block of code coloured names its language, in each
-    /// page's writing it shows, whole or as its excerpt.
-    pub coloured: Vec<Place>,
     /// How many pages of lists of the whole site it reached.
     pub walked: u64,
     /// Where its HTML is the own text of the templates it is built with.
@@ -382,7 +374,6 @@ impl Rendered {
             asked: frame.asked,
             problems,
             developed: frame.developed,
-            coloured: frame.coloured,
             walked: frame.walked,
             own: Own::default(),
             indexed: frame.indexed,
@@ -438,9 +429,7 @@ impl Renderer {
             feeds_of[feed.list.index()].push(at);
         }
         let known = known_names(&settings, &site);
-        let highlighter = settings
-            .text("code_style")
-            .and_then(|style| Highlighter::new(style.value));
+        let highlighter = (settings.truth("code_colours") == Some(true)).then(Highlighter::default);
         let bodies = std::iter::repeat_with(OnceLock::new)
             .take(site.pages.len())
             .collect();
@@ -1373,7 +1362,6 @@ fn build_body_untimed(
     });
     let mut problems = Vec::new();
     let mut wordless = Vec::new();
-    let mut excerpt_coloured = Vec::new();
     let mut links = crate::links::Writing::default();
     let document = writing(shared, page);
     // The frame is new, so what it has read the reading read.
@@ -1401,12 +1389,8 @@ fn build_body_untimed(
             links.written = crate::links::written(&document, &shared.sources);
             links.handed = crate::links::handed(&document);
             problems.extend(document.problems.iter().cloned());
-            let blocks = code_languages(shared, &document, &mut problems);
-            if let Some(&first) = blocks.first() {
-                frame::with(|frame| {
-                    frame.coloured.push(first);
-                    frame.colours = true;
-                });
+            if code_languages(shared, &document, &mut problems) {
+                frame::with(|frame| frame.colours = true);
             }
             for top in std::iter::once(&document.root).chain(&document.notes) {
                 undescribed_in_node(shared, page, top);
@@ -1426,7 +1410,6 @@ fn build_body_untimed(
                 unreadable_said: RefCell::new(Vec::new()),
                 moved: RefCell::new(Vec::new()),
                 pieced: RefCell::new(Vec::new()),
-                colouring: RefCell::new(Vec::new()),
                 calls: RefCell::new(Vec::new()),
                 wrapped: RefCell::new(Vec::new()),
             };
@@ -1442,29 +1425,6 @@ fn build_body_untimed(
                 },
             );
             wordless = missing_words(shared, p.language, &document);
-            if let Some(span) = written.excerpt_span {
-                let inside = |place: &Place, span: crate::source::Span| {
-                    place.source == document.root.place.source
-                        && span.start <= place.span.start
-                        && place.span.end <= span.end
-                };
-                // A note is written apart from the excerpt wherever it is defined.
-                let shown = |place: &Place| {
-                    inside(place, span)
-                        && !document
-                            .notes
-                            .iter()
-                            .any(|note| inside(place, note.place.span))
-                };
-                excerpt_coloured.extend(blocks.iter().find(|&place| shown(place)));
-                frame::with(|frame| {
-                    for (place, added) in prose.colouring.take() {
-                        if shown(&place) {
-                            excerpt_coloured.extend_from_slice(&frame.coloured[added]);
-                        }
-                    }
-                });
-            }
             // A picture's tag leads where it was written to, not where
             // the writing spells it.
             for (place, address) in prose.moved.into_inner() {
@@ -1509,8 +1469,6 @@ fn build_body_untimed(
         asked: frame.asked,
         problems,
         developed: frame.developed,
-        coloured: frame.coloured,
-        excerpt_coloured,
         colours: frame.colours,
         writing: links,
         elsewhere: OnceLock::new(),
@@ -1662,18 +1620,18 @@ pub(super) fn opening(shared: &Arc<Shared>, page: PageId) -> Result<Option<Strin
 
 /// Tells each block of code whose language Statac has no colours for, and
 /// each left uncoloured for a line too long, at the word naming its
-/// language, and records the style read where any is coloured. Gives
-/// where the first block coloured names its language.
+/// language, and records the setting read where any is coloured. Gives
+/// whether any is.
 fn code_languages(
     shared: &Shared,
     document: &markdown::Document,
     problems: &mut Vec<Problem>,
-) -> Vec<Place> {
+) -> bool {
     if shared.highlighter.is_none() {
-        frame::read(Key::Setting(shared.name_id("code_style")));
-        return Vec::new();
+        frame::read(Key::Setting(shared.name_id("code_colours")));
+        return false;
     }
-    let mut coloured = Vec::new();
+    let mut coloured = false;
     let mut visit = |node: &markdown::Node| {
         let markdown::Kind::CodeBlock { info, text, .. } = &node.kind else {
             return;
@@ -1686,7 +1644,7 @@ fn code_languages(
             Language::Known(_) => {
                 let place = fence_word(&shared.sources, node.place).unwrap_or(node.place);
                 match highlight::too_long(text) {
-                    None => coloured.push(place),
+                    None => coloured = true,
                     Some(characters) => {
                         problems.push(Problem::at(
                             Kind::CodeNotColoured {
@@ -1716,16 +1674,15 @@ fn code_languages(
     for note in &document.notes {
         note.walk(&mut visit);
     }
-    if !coloured.is_empty() {
-        frame::read(Key::Setting(shared.name_id("code_style")));
+    if coloured {
+        frame::read(Key::Setting(shared.name_id("code_colours")));
     }
     coloured
 }
 
 /// The inside of a `<code>` holding `text`, which a template shows:
 /// coloured as `language` where that names a grammar and no line is too
-/// long, and as it is otherwise. A line too long is told at `at`, where
-/// coloured code is recorded as shown.
+/// long, and as it is otherwise. A line too long is told at `at`.
 pub(super) fn code_html(
     shared: &Shared,
     text: &str,
@@ -1739,7 +1696,7 @@ pub(super) fn code_html(
         return highlight::plain(text);
     }
     if shared.highlighter.is_none() {
-        frame::read(Key::Setting(shared.name_id("code_style")));
+        frame::read(Key::Setting(shared.name_id("code_colours")));
         return highlight::plain(text);
     }
     if let Some(characters) = highlight::too_long(text) {
@@ -1750,21 +1707,17 @@ pub(super) fn code_html(
         super::media::told_at(at(), kind);
         return highlight::plain(text);
     }
-    frame::read(Key::Setting(shared.name_id("code_style")));
-    let at = at();
-    frame::with(|frame| {
-        frame.coloured.extend(at);
-        frame.colours = true;
-    });
+    frame::read(Key::Setting(shared.name_id("code_colours")));
+    frame::with(|frame| frame.colours = true);
     match &shared.highlighter {
         Some(highlighter) => highlighter.html(name, text).as_ref().to_owned(),
         None => highlight::plain(text),
     }
 }
 
-/// Whether the site has `code_style: none`, recorded as read.
+/// Whether the site colours no code, recorded as read.
 pub(super) fn colouring_off(shared: &Shared) -> bool {
-    frame::read(Key::Setting(shared.name_id("code_style")));
+    frame::read(Key::Setting(shared.name_id("code_colours")));
     shared.highlighter.is_none()
 }
 
@@ -1826,13 +1779,7 @@ pub(super) fn html_of(shared: &Arc<Shared>, page: PageId, part: Part) -> Option<
     });
     let colourless = frame::with(|frame| frame.colourless).unwrap_or(false);
     if !colourless {
-        frame::with(|frame| {
-            frame.coloured.extend(match part {
-                Part::Content => &body.coloured,
-                Part::Excerpt => &body.excerpt_coloured,
-            });
-            frame.colours |= body.colours;
-        });
+        frame::with(|frame| frame.colours |= body.colours);
     }
     let (own, traced) = match part {
         Part::Content => (&body.written.html, &body.traced),
@@ -1931,9 +1878,6 @@ struct Prose<'a> {
     /// Where each picture the site's own file wrote has its address
     /// written: the page carries what that file made of it.
     pieced: RefCell<Vec<Place>>,
-    /// Where each call and piece is written, with the places in the
-    /// frame's `coloured` that building it added.
-    colouring: RefCell<Vec<(Place, Range<usize>)>>,
     /// Where what each call's snippet wrote was written, by the call's
     /// place.
     calls: RefCell<Vec<(Place, Arc<Own>)>>,
@@ -1943,19 +1887,6 @@ struct Prose<'a> {
 }
 
 impl Prose<'_> {
-    /// `build`, recording the coloured places it adds as those of the call
-    /// or piece at `place`.
-    fn counted<T>(&self, place: Place, build: impl FnOnce() -> T) -> T {
-        let coloured = || frame::with(|frame| frame.coloured.len()).unwrap_or_default();
-        let from = coloured();
-        let built = build();
-        let to = coloured();
-        if to > from {
-            self.colouring.borrow_mut().push((place, from..to));
-        }
-        built
-    }
-
     /// Where `address` is written within the picture at `place`.
     fn address_place(&self, address: &str, place: Place) -> Place {
         if let Some(stands) = self.document.in_site_at(address, place) {
@@ -1998,34 +1929,32 @@ impl markdown::Snippets for Prose<'_> {
         values: Vec<(&'static str, PieceValue)>,
         place: Place,
     ) -> Option<String> {
-        self.counted(place, || {
-            // A picture is told where its address is written, as a picture
-            // Statac writes is.
-            let calling = match (piece, values.first()) {
-                (Piece::Image, Some(("url", PieceValue::Text(address)))) => {
-                    self.address_place(address, place)
-                }
-                _ => place,
-            };
-            let before = frame::with(|frame| frame.calling.replace(calling)).flatten();
-            let built = super::pieces::build(self.shared, self.page, piece, values);
-            frame::with(|frame| frame.calling = before);
-            match built? {
-                Ok(html) => {
-                    if piece == Piece::Image {
-                        self.pieced.borrow_mut().push(calling);
-                    }
-                    Some(html)
-                }
-                Err(error) => {
-                    self.failed.borrow_mut().insert(piece);
-                    let problems = frame::with(|frame| explain::explain(&error, frame, &[place]))
-                        .unwrap_or_default();
-                    frame::with(|frame| frame.problems.extend(problems));
-                    None
-                }
+        // A picture is told where its address is written, as a picture
+        // Statac writes is.
+        let calling = match (piece, values.first()) {
+            (Piece::Image, Some(("url", PieceValue::Text(address)))) => {
+                self.address_place(address, place)
             }
-        })
+            _ => place,
+        };
+        let before = frame::with(|frame| frame.calling.replace(calling)).flatten();
+        let built = super::pieces::build(self.shared, self.page, piece, values);
+        frame::with(|frame| frame.calling = before);
+        match built? {
+            Ok(html) => {
+                if piece == Piece::Image {
+                    self.pieced.borrow_mut().push(calling);
+                }
+                Some(html)
+            }
+            Err(error) => {
+                self.failed.borrow_mut().insert(piece);
+                let problems = frame::with(|frame| explain::explain(&error, frame, &[place]))
+                    .unwrap_or_default();
+                frame::with(|frame| frame.problems.extend(problems));
+                None
+            }
+        }
     }
 
     fn picture(&self, address: &str, place: Place, tagged: bool) -> Option<markdown::Picture> {
@@ -2160,190 +2089,186 @@ impl markdown::Snippets for Prose<'_> {
         placement: Placement,
         body: Option<&str>,
     ) -> String {
-        self.counted(place, || {
-            let shared = self.shared;
-            let name = &call.name.value;
-            let Some(snippet) = shared.templates.snippets.get(name) else {
-                // In HTML, only a name the site has is a call; anything
-                // else is the author's HTML, written back as it is.
-                if call.within != Within::Prose {
-                    return shared.sources.spelling(place).to_owned();
-                }
-                let nearest = crate::suggest::nearest(
-                    name,
-                    shared.templates.snippets.keys().map(String::as_str),
-                )
-                .map(str::to_owned);
-                let at = call.name.origin.place.unwrap_or(place);
-                frame::with(|frame| {
-                    frame.problems.push(Problem::at(
-                        Kind::UnknownWord {
-                            word: Word::Snippet,
-                            written: name.clone(),
-                            nearest,
-                        },
-                        at,
-                    ))
-                });
-                return String::new();
+        let shared = self.shared;
+        let name = &call.name.value;
+        let Some(snippet) = shared.templates.snippets.get(name) else {
+            // In HTML, only a name the site has is a call; anything
+            // else is the author's HTML, written back as it is.
+            if call.within != Within::Prose {
+                return shared.sources.spelling(place).to_owned();
+            }
+            let nearest =
+                crate::suggest::nearest(name, shared.templates.snippets.keys().map(String::as_str))
+                    .map(str::to_owned);
+            let at = call.name.origin.place.unwrap_or(place);
+            frame::with(|frame| {
+                frame.problems.push(Problem::at(
+                    Kind::UnknownWord {
+                        word: Word::Snippet,
+                        written: name.clone(),
+                        nearest,
+                    },
+                    at,
+                ))
+            });
+            return String::new();
+        };
+        if call.within != Within::Prose && !self.in_html_said.replace(true) {
+            frame::with(|frame| {
+                frame
+                    .problems
+                    .push(Problem::at(Kind::CallInHtml { name: name.clone() }, place))
+            });
+        }
+        if !snippet.readable {
+            frame::read(Key::Template(Templates::id(snippet.file)));
+            return String::new();
+        }
+        if !snippet.wrapped.is_empty() && !call.wraps() {
+            frame::with(|frame| {
+                frame.problems.push(Problem::at(
+                    Kind::MalformedCall {
+                        found: crate::problem::CallFault::WrapsNothing(name.clone()),
+                    },
+                    place,
+                ))
+            });
+            return String::new();
+        }
+        let wrong = |fault, at: Place| {
+            frame::with(|frame| {
+                frame.problems.push(Problem::at(
+                    Kind::WrongArgument {
+                        snippet: name.clone(),
+                        fault,
+                    },
+                    at,
+                ))
+            });
+            String::new()
+        };
+        let mut handed: Vec<(String, Value)> = Vec::new();
+        let mut unnamed = Vec::new();
+        let words = typography_of(shared, self.page);
+        let typography = words.map(markdown::Typography::of);
+        for argument in &call.arguments {
+            let value = prose_value(&argument.value.value, typography.as_ref());
+            // Text handed to the snippet remembers where it is written.
+            let value = match (argument.value.origin.place, value.as_str()) {
+                (Some(written), Some(text)) => frame::sourced(text, written),
+                _ => value,
             };
-            if call.within != Within::Prose && !self.in_html_said.replace(true) {
-                frame::with(|frame| {
-                    frame
-                        .problems
-                        .push(Problem::at(Kind::CallInHtml { name: name.clone() }, place))
-                });
+            let at = argument.value.origin.place.unwrap_or(place);
+            match &argument.name {
+                Some(given) => {
+                    let given_at = given.origin.place.unwrap_or(at);
+                    let given_name = given.value.as_str();
+                    if super::files::SUPPLIED.contains(&given_name)
+                        || super::files::WRAPPED.contains(&given_name)
+                    {
+                        return wrong(ArgumentFault::Supplied(given.value.clone()), given_at);
+                    }
+                    if !snippet.params.contains(&given.value) {
+                        let nearest = crate::suggest::nearest(
+                            &given.value,
+                            snippet.params.iter().map(String::as_str),
+                        )
+                        .map(str::to_owned);
+                        return wrong(
+                            ArgumentFault::NoSuchName {
+                                given: given.value.clone(),
+                                nearest,
+                            },
+                            given_at,
+                        );
+                    }
+                    handed.push((given.value.clone(), value));
+                }
+                None => unnamed.push((value, at)),
             }
-            if !snippet.readable {
-                frame::read(Key::Template(Templates::id(snippet.file)));
-                return String::new();
+        }
+        let first = unnamed.first().map_or(place, |(_, at)| *at);
+        match unnamed_fills(
+            snippet.takes.as_ref(),
+            &snippet.params,
+            unnamed.len(),
+            |p| handed.iter().any(|(h, _)| h == p),
+        ) {
+            Unnamed::Nothing => {}
+            Unnamed::Fills(names) => {
+                for (name, (value, _)) in names.into_iter().zip(unnamed) {
+                    handed.push((name, value));
+                }
             }
-            if !snippet.wrapped.is_empty() && !call.wraps() {
-                frame::with(|frame| {
-                    frame.problems.push(Problem::at(
-                        Kind::MalformedCall {
-                            found: crate::problem::CallFault::WrapsNothing(name.clone()),
-                        },
-                        place,
-                    ))
-                });
-                return String::new();
+            Unnamed::Gathers(name) => {
+                let values: Vec<Value> = unnamed.into_iter().map(|(v, _)| v).collect();
+                handed.push((name, Value::from(values)));
             }
-            let wrong = |fault, at: Place| {
-                frame::with(|frame| {
-                    frame.problems.push(Problem::at(
-                        Kind::WrongArgument {
-                            snippet: name.clone(),
-                            fault,
-                        },
-                        at,
-                    ))
-                });
+            Unnamed::NeedsNames => {
+                return wrong(
+                    ArgumentFault::NeedsNames {
+                        wanted: snippet.params.clone(),
+                    },
+                    first,
+                );
+            }
+            Unnamed::TooMany { takes, past } => {
+                let at = unnamed.get(past).map_or(first, |(_, at)| *at);
+                let others = snippet
+                    .params
+                    .iter()
+                    .filter(|p| !takes.contains(p))
+                    .cloned()
+                    .collect();
+                return wrong(ArgumentFault::TooMany { takes, others }, at);
+            }
+            Unnamed::Twice { name: twice, at } => {
+                let at = unnamed.get(at).map_or(first, |(_, at)| *at);
+                return wrong(ArgumentFault::Twice(twice), at);
+            }
+        }
+        if let Some(body) = body
+            && snippet.wrapped.iter().any(|name| name == "body")
+        {
+            let mut wrapped = self.wrapped.borrow_mut();
+            let traced = (wrapped.iter().position(|wrapped| wrapped.place == place))
+                .map(|at| wrapped.swap_remove(at));
+            drop(wrapped);
+            let value = match traced {
+                Some(Wrapped { traced, called, .. }) => {
+                    let calls = self.calls.borrow();
+                    let own = Own::of_writing(&traced, &called, &calls, body, &shared.sources);
+                    drop(calls);
+                    frame::made(body.to_owned(), own, true)
+                }
+                None => Value::from_safe_string(body.to_owned()),
+            };
+            handed.push(("body".into(), value));
+        }
+        handed.push((
+            "standalone".into(),
+            Value::from(placement == Placement::Standalone),
+        ));
+        let page = PageValue::value(shared, self.page);
+        let site = SiteValue::value(shared, frame::language());
+        let before = frame::with(|frame| frame.calling.replace(place)).flatten();
+        let standalone = placement == Placement::Standalone;
+        let built = build_snippet(shared, snippet, handed, page, site, None, standalone).map(
+            |(html, own)| {
+                self.calls.borrow_mut().push((place, Arc::new(own)));
+                html
+            },
+        );
+        frame::with(|frame| frame.calling = before);
+        match built {
+            Ok(html) => html,
+            Err(error) => {
+                let problems = frame::with(|frame| explain::explain(&error, frame, &[place]))
+                    .unwrap_or_default();
+                frame::with(|frame| frame.problems.extend(problems));
                 String::new()
-            };
-            let mut handed: Vec<(String, Value)> = Vec::new();
-            let mut unnamed = Vec::new();
-            let words = typography_of(shared, self.page);
-            let typography = words.map(markdown::Typography::of);
-            for argument in &call.arguments {
-                let value = prose_value(&argument.value.value, typography.as_ref());
-                // Text handed to the snippet remembers where it is written.
-                let value = match (argument.value.origin.place, value.as_str()) {
-                    (Some(written), Some(text)) => frame::sourced(text, written),
-                    _ => value,
-                };
-                let at = argument.value.origin.place.unwrap_or(place);
-                match &argument.name {
-                    Some(given) => {
-                        let given_at = given.origin.place.unwrap_or(at);
-                        let given_name = given.value.as_str();
-                        if super::files::SUPPLIED.contains(&given_name)
-                            || super::files::WRAPPED.contains(&given_name)
-                        {
-                            return wrong(ArgumentFault::Supplied(given.value.clone()), given_at);
-                        }
-                        if !snippet.params.contains(&given.value) {
-                            let nearest = crate::suggest::nearest(
-                                &given.value,
-                                snippet.params.iter().map(String::as_str),
-                            )
-                            .map(str::to_owned);
-                            return wrong(
-                                ArgumentFault::NoSuchName {
-                                    given: given.value.clone(),
-                                    nearest,
-                                },
-                                given_at,
-                            );
-                        }
-                        handed.push((given.value.clone(), value));
-                    }
-                    None => unnamed.push((value, at)),
-                }
             }
-            let first = unnamed.first().map_or(place, |(_, at)| *at);
-            match unnamed_fills(
-                snippet.takes.as_ref(),
-                &snippet.params,
-                unnamed.len(),
-                |p| handed.iter().any(|(h, _)| h == p),
-            ) {
-                Unnamed::Nothing => {}
-                Unnamed::Fills(names) => {
-                    for (name, (value, _)) in names.into_iter().zip(unnamed) {
-                        handed.push((name, value));
-                    }
-                }
-                Unnamed::Gathers(name) => {
-                    let values: Vec<Value> = unnamed.into_iter().map(|(v, _)| v).collect();
-                    handed.push((name, Value::from(values)));
-                }
-                Unnamed::NeedsNames => {
-                    return wrong(
-                        ArgumentFault::NeedsNames {
-                            wanted: snippet.params.clone(),
-                        },
-                        first,
-                    );
-                }
-                Unnamed::TooMany { takes, past } => {
-                    let at = unnamed.get(past).map_or(first, |(_, at)| *at);
-                    let others = snippet
-                        .params
-                        .iter()
-                        .filter(|p| !takes.contains(p))
-                        .cloned()
-                        .collect();
-                    return wrong(ArgumentFault::TooMany { takes, others }, at);
-                }
-                Unnamed::Twice { name: twice, at } => {
-                    let at = unnamed.get(at).map_or(first, |(_, at)| *at);
-                    return wrong(ArgumentFault::Twice(twice), at);
-                }
-            }
-            if let Some(body) = body
-                && snippet.wrapped.iter().any(|name| name == "body")
-            {
-                let mut wrapped = self.wrapped.borrow_mut();
-                let traced = (wrapped.iter().position(|wrapped| wrapped.place == place))
-                    .map(|at| wrapped.swap_remove(at));
-                drop(wrapped);
-                let value = match traced {
-                    Some(Wrapped { traced, called, .. }) => {
-                        let calls = self.calls.borrow();
-                        let own = Own::of_writing(&traced, &called, &calls, body, &shared.sources);
-                        drop(calls);
-                        frame::made(body.to_owned(), own, true)
-                    }
-                    None => Value::from_safe_string(body.to_owned()),
-                };
-                handed.push(("body".into(), value));
-            }
-            handed.push((
-                "standalone".into(),
-                Value::from(placement == Placement::Standalone),
-            ));
-            let page = PageValue::value(shared, self.page);
-            let site = SiteValue::value(shared, frame::language());
-            let before = frame::with(|frame| frame.calling.replace(place)).flatten();
-            let standalone = placement == Placement::Standalone;
-            let built = build_snippet(shared, snippet, handed, page, site, None, standalone).map(
-                |(html, own)| {
-                    self.calls.borrow_mut().push((place, Arc::new(own)));
-                    html
-                },
-            );
-            frame::with(|frame| frame.calling = before);
-            match built {
-                Ok(html) => html,
-                Err(error) => {
-                    let problems = frame::with(|frame| explain::explain(&error, frame, &[place]))
-                        .unwrap_or_default();
-                    frame::with(|frame| frame.problems.extend(problems));
-                    String::new()
-                }
-            }
-        })
+        }
     }
 }
 

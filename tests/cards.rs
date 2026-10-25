@@ -218,8 +218,7 @@ fn a_page_whose_layout_asks_gets_a_card_beside_it() {
     let site = Site::new("drawn");
     let said = site.build();
     assert!(said.contains("Drew 2 cards."), "{said}");
-    // The cards, and the stylesheet for code.
-    assert!(said.contains("2 pages and 3 other files"), "{said}");
+    assert!(said.contains("2 pages and 2 other files"), "{said}");
 
     let cards = site.cards();
     assert_eq!(cards.len(), 2, "{cards:?}");

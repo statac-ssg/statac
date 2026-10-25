@@ -25,7 +25,6 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 
-use crate::highlight;
 use crate::html::escaped;
 use crate::platform::{self, Alike, Unwritable};
 use crate::problem::{Hint, Kind, Named, Problem, Reach, Reason};
@@ -116,15 +115,8 @@ pub struct Assets {
 
 /// Reads, compiles and fingerprints everything under `site`'s `assets/`,
 /// and finds everything under its `static/`. `base` is the path the site
-/// is published under, empty at the top of its domain. `code_style` names
-/// the colours of the `code.css` Statac writes beside them, unless
-/// `assets/` has a `code.css` of its own.
-pub fn gather(
-    site: &Path,
-    base: &str,
-    code_style: Option<&str>,
-    sources: &mut Sources,
-) -> (Assets, Vec<Problem>) {
+/// is published under, empty at the top of its domain.
+pub fn gather(site: &Path, base: &str, sources: &mut Sources) -> (Assets, Vec<Problem>) {
     let base = match base.trim_matches('/') {
         "" => String::new(),
         trimmed => format!("/{trimmed}"),
@@ -217,19 +209,6 @@ pub fn gather(
             }
         }
     }
-    if let Some(css) = code_style
-        .filter(|_| !claimed.contains_key(highlight::STYLESHEET))
-        .and_then(highlight::stylesheet)
-    {
-        files.push(File {
-            name: highlight::STYLESHEET.to_owned(),
-            source: crate::config::FILE_NAME.to_owned(),
-            bytes: css.into_bytes(),
-            kind: AssetKind::Stylesheet,
-            workers: Vec::new(),
-        });
-    }
-
     let published = fingerprinted(&mut files, &base);
     let mut assets = Arena::default();
     let mut names = BTreeMap::new();
@@ -549,6 +528,8 @@ impl Assets {
         }
         let hint = if self.static_names.contains(wanted) {
             Some(Hint::InStatic(format!("{}/{wanted}", self.base)))
+        } else if wanted == "code.css" {
+            Some(Hint::NoLongerWritten)
         } else if let Some(under) = wanted.strip_prefix("assets/")
             && self.names.contains_key(under)
         {

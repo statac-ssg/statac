@@ -13,7 +13,7 @@ use std::path::Path;
 
 use crate::content::words::{self, Field, Words};
 use crate::origin::{Origin, Sourced};
-use crate::problem::{Expected, Kind, Own, Problem, Root, Word, WrongPlace};
+use crate::problem::{Expected, InPlace, Kind, Own, Problem, Root, Word, WrongPlace};
 use crate::source::{SourceId, Sources};
 use crate::value::{Reader, Value};
 use crate::yaml::{Node, Value as Yaml};
@@ -67,6 +67,9 @@ const OTHER_SPELLINGS: &[(&str, &str)] = &[
     ("not_ours", "served_elsewhere"),
     ("after_build_makes", "after_build_outputs"),
 ];
+
+/// The themes `code_style` once named, whose rules the docs now give.
+const FORMER_CODE_STYLES: &[&str] = &["ocean", "gruvbox", "solarized", "catppuccin", "one-half"];
 
 #[derive(Copy, Clone, Debug)]
 enum Shape {
@@ -129,11 +132,7 @@ const SETTINGS: &[Setting] = &[
     setting("timezone", Shape::Text, None),
     setting("date_format", Shape::Text, None),
     setting("date_zeros", Shape::Truth, Some(Preset::Truth(true))),
-    setting(
-        "code_style",
-        Shape::OneOf(crate::highlight::SETTING),
-        Some(Preset::Text("ocean")),
-    ),
+    setting("code_colours", Shape::Truth, Some(Preset::Truth(false))),
     setting("typography", Shape::Truth, Some(Preset::Truth(true))),
     setting("optimise_images", Shape::Truth, Some(Preset::Truth(true))),
     setting("before_build", Shape::Text, None),
@@ -558,6 +557,8 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
             && names_a_language(tag, &declared)
         {
             problems.push(unknown_for_a_language(&name, key, &declared));
+        } else if name == "code_style" {
+            problems.push(code_style_retired(value, key));
         } else if let Some(&(_, ours)) = OTHER_SPELLINGS.iter().find(|(other, _)| *other == name) {
             problems.push(Problem::at(
                 Kind::OtherSpelling {
@@ -758,6 +759,30 @@ fn unknown_for_a_language(name: &str, key: &Node, declared: &[String]) -> Proble
             word: Word::Setting,
             written: name.to_owned(),
             nearest,
+        },
+        key.place,
+    )
+}
+
+/// `code_style`, which named the colours Statac once wrote for code, with
+/// what the site writes in its place: nothing where it was `none`.
+fn code_style_retired(value: &Node, key: &Node) -> Problem {
+    let written = match &value.value {
+        Yaml::Scalar(text) => Some(text.as_str()),
+        _ => None,
+    };
+    let in_place = match written {
+        Some("none") => InPlace::Nothing,
+        _ => InPlace::CodeColours {
+            theme: written
+                .filter(|written| FORMER_CODE_STYLES.contains(written))
+                .map(str::to_owned),
+        },
+    };
+    Problem::at(
+        Kind::RetiredSetting {
+            setting: "code_style".into(),
+            in_place,
         },
         key.place,
     )

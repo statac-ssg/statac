@@ -565,68 +565,43 @@ fn the_first_round_is_a_whole_build_and_one_with_no_edit_builds_nothing() {
 }
 
 #[test]
-fn code_colours_no_template_asks_for_are_told_as_a_build_tells_them() {
+fn code_colours_turned_on_and_off_and_code_css_asked_for_rebuild_as_a_build_does() {
     let site = Site::new("colours");
     let (mut session, round) = Session::start(&Options {
         out: None,
         ..site.options()
     });
     site.same(&session, &round, "the first build");
-    let coloured = |n: u32| {
-        let text = format!("Post {n} says this.\n\n```rust\nfn main() {{}}\n```");
-        post(&format!("Post {n}"), &format!("2026-01-0{n}"), "one", &text)
-    };
-    let plain = post("Post 2", "2026-01-02", "one", "Post 2 says this.");
+    let text = "Post 2 says this.\n\n```rust\nfn main() {}\n```\n\n```cosole\n$ ls\n```";
+    let coloured = format!("{SETTINGS}code_colours: true\n");
     let asking = format!("{BASE}{{{{ css('code.css') }}}}\n{PAGE}");
-    let not_asking = format!("{BASE}{PAGE}");
-    // Each edit, and the files the warning then names: its own, and the
-    // other pages'.
-    let edits: [(&str, &str, &str, &[&str]); 6] = [
+    let edits: [(&str, &str, &str); 6] = [
         (
-            "a coloured block",
+            "a block of code",
             "content/post-2.md",
-            &coloured(2),
-            &["post-2.md"],
+            &post("Post 2", "2026-01-02", "one", text),
         ),
+        ("colours asked for", "statac.yaml", &coloured),
         (
-            "a second page's",
-            "content/post-4.md",
-            &coloured(4),
-            &["post-2.md"],
-        ),
-        ("a layout asking", "templates/page.html", &asking, &[]),
-        (
-            "none asking",
+            "a layout asking for code.css",
             "templates/page.html",
-            &not_asking,
-            &["post-2.md"],
+            &asking,
         ),
         (
-            "the first block gone",
-            "content/post-2.md",
-            &plain,
-            &["post-4.md"],
+            "the site's own code.css",
+            "assets/code.css",
+            ".hl-keyword { font-weight: bold; }\n",
         ),
+        ("colours no longer asked for", "statac.yaml", SETTINGS),
         (
-            "a block on a page built already",
-            "content/post-1.md",
-            &coloured(1),
-            &["post-1.md"],
+            "the layout as it was",
+            "templates/page.html",
+            &format!("{BASE}{PAGE}"),
         ),
     ];
-    for (after, path, text, named) in edits {
+    for (after, path, text) in edits {
         site.write(path, text);
         let round = session.rebuild();
-        assert!(round.built < round.outputs, "after {after}");
-        let said = site.said(&round.outcome);
-        let told: Vec<&str> = said
-            .lines()
-            .skip_while(|line| !line.contains("Code colours not loaded"))
-            .take_while(|line| !line.contains("Add `{{ css"))
-            .filter_map(|line| line.split("content/").nth(1))
-            .map(|file| file.split(',').next().unwrap_or(file))
-            .collect();
-        assert_eq!(told, named, "after {after}:\n{said}");
         site.same(&session, &round, after);
     }
 }

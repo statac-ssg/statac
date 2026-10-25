@@ -76,9 +76,6 @@ pub(super) struct Frame {
     /// The photographs whose copies what is built names, as each was
     /// named.
     pub developed: Vec<crate::album::Shown>,
-    /// Where the first block of code coloured names its language, in each
-    /// page's writing what is built shows, whole or as its excerpt.
-    pub coloured: Vec<Place>,
     /// Whether what is built shows any code coloured, its own or in the
     /// writing of a page it shows, whole or as its excerpt.
     pub colours: bool,
@@ -168,7 +165,6 @@ impl Frame {
             boxes_before_writing: None,
             indexed: Vec::new(),
             developed: Vec::new(),
-            coloured: Vec::new(),
             colours: false,
             making: Making::Output,
             layout: None,

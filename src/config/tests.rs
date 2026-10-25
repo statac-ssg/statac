@@ -1,6 +1,6 @@
 use super::*;
 use crate::origin::{Arrival, Style};
-use crate::problem::{Expected, Found, WrongPlace};
+use crate::problem::{Expected, Found, InPlace, WrongPlace};
 
 fn read_settings(text: &str) -> (Sources, Settings, Vec<Problem>) {
     let mut sources = Sources::default();
@@ -38,7 +38,6 @@ fn every_setting_the_sites_write_is_read() {
         ),
         ("date_format", "December 31, 2025", "December 31, 2025"),
         ("date_format", "\"2025-12-31\"", "2025-12-31"),
-        ("code_style", "one-half", "one-half"),
         (
             "feed_key",
             "6b0f3c52-9e1d-8a47-b3c2-5d8e7f1a2c90",
@@ -126,7 +125,7 @@ fn a_setting_nobody_wrote_is_defaulted() {
         ("write_feed_ids", Value::Bool(false)),
         ("tags.pages", Value::Bool(false)),
         ("series.pages", Value::Bool(false)),
-        ("code_style", Value::Text("ocean".into())),
+        ("code_colours", Value::Bool(false)),
         (
             "image_sizes",
             Value::Text("(max-width: 46rem) 100vw, 46rem".into()),
@@ -186,6 +185,34 @@ fn pages_lines_are_handed_to_every_page() {
     );
     assert_eq!(settings.pages.truth(words::PageWord::Feed), Some(false));
     assert_eq!(settings.pages.field("active").unwrap().name, "active");
+}
+
+#[test]
+fn code_style_is_refused_at_its_name_with_what_to_write_in_its_place() {
+    let retired = |in_place| Kind::RetiredSetting {
+        setting: "code_style".into(),
+        in_place,
+    };
+    let theme = |theme: Option<&str>| InPlace::CodeColours {
+        theme: theme.map(str::to_owned),
+    };
+    for (text, in_place) in [
+        ("code_style: none\n", InPlace::Nothing),
+        ("code_style: \"none\"\n", InPlace::Nothing),
+        ("code_style: ocean\n", theme(Some("ocean"))),
+        ("code_style: one-half\n", theme(Some("one-half"))),
+        ("code_style: dracula\n", theme(None)),
+        ("code_style: [ocean]\n", theme(None)),
+    ] {
+        assert_eq!(
+            found(text),
+            [(retired(in_place), "code_style".to_owned())],
+            "{text}"
+        );
+    }
+    let (_, settings, _) = read_settings("code_style: ocean\n");
+    assert_eq!(settings.truth("code_colours"), Some(false));
+    assert!(settings.own.is_empty());
 }
 
 #[test]
@@ -395,20 +422,6 @@ fn settings_of_the_wrong_kind_are_refused_at_the_value() {
             found: Found::Written(found.into()),
             respelt: respelt.map(Into::into),
         };
-    let styles = || {
-        Expected::OneOf(
-            [
-                "ocean",
-                "gruvbox",
-                "solarized",
-                "catppuccin",
-                "one-half",
-                "none",
-            ]
-            .map(String::from)
-            .to_vec(),
-        )
-    };
     let cases = [
         (
             "url: example.org",
@@ -417,10 +430,6 @@ fn settings_of_the_wrong_kind_are_refused_at_the_value() {
         (
             "language: english",
             wrong("language", Expected::LanguageCode, "english", None),
-        ),
-        (
-            "code_style: dracula",
-            wrong("code_style", styles(), "dracula", None),
         ),
         (
             "search_without_javascript: google",

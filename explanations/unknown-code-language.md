@@ -3,7 +3,8 @@
 A code block gives its language as the first word after the opening
 fence, and Statac has no colours for that word. The block is published as
 it is, without colour, and its `<code>` element keeps the word in its
-class, such as `language-qbasic`.
+class, such as `language-qbasic`. Statac tells of this only on a site
+with `code_colours: true`, where it colours code.
 
 ## What you'll see {#what-youll-see}
 
@@ -31,9 +32,9 @@ this warning. If the word is there on purpose, so that your own
 stylesheet or script can find it in the class, quieten this warning with
 `quiet: [unknown-code-language]` in `statac.yaml`.
 
-If your own script colours all the site's code, set `code_style: none`
-in `statac.yaml` instead. Statac then colours nothing and has no warning
-for any language.
+If your own script colours all the site's code, take `code_colours: true`
+out of `statac.yaml` instead. Statac then colours nothing and has no
+warning for any language.
 
 ## Example
 

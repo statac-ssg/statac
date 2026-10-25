@@ -1,13 +1,13 @@
-# The notices of the grammars and themes Statac carries
+# The notices of the grammars Statac carries
 
 Written by `cargo run --example grammars` from the `NOTICE` file of npm's
 tm-grammars 1.32.22,
 https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz, and
 `src/highlight/notices-read-at-source.txt`.
 
-Every grammar and theme a built `statac` colours code with, each with its
-licence, its source and the notice it asks for. A number in square brackets
-is a text under [Notices](#notices), where each text is given once, as the
+Every grammar a built `statac` colours code with, each with its licence,
+its source and the notice it asks for. A number in square brackets is a
+text under [Notices](#notices), where each text is given once, as the
 address above it gave it.
 
 ## Grammars
@@ -239,19 +239,6 @@ address above it gave it.
 -  (`vue-directives`): MIT. https://github.com/vuejs/language-tools/blob/784dd56026e07f1dadb9ef2498418eccbb3dee29/extensions/vscode/syntaxes/vue-directives.json [112]
 -  (`vue-interpolations`): MIT. https://github.com/vuejs/language-tools/blob/784dd56026e07f1dadb9ef2498418eccbb3dee29/extensions/vscode/syntaxes/vue-interpolations.json [112]
 -  (`vue-sfc-style-variable-injection`): MIT. https://github.com/vuejs/language-tools/blob/e85556a2e4bf0d6c981bdbd95c8a0b1e85e7ae8a/extensions/vscode/syntaxes/vue-sfc-style-variable-injection.json [112]
-
-## Themes
-
-- `base16-ocean-light`: MIT. https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-light.json [125]
-- `base16-ocean-dark`: MIT. https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-dark.json [125]
-- `gruvbox-light-medium`: MIT. tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts [126]
-- `gruvbox-dark-medium`: MIT. tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts [126]
-- `solarized-light`: MIT. tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/0132168df99ab8830a1eb158b1a5e8242f3e94ff/extensions/theme-solarized-light/themes/solarized-light-color-theme.json [3]
-- `solarized-dark`: MIT. tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/e886f3e07de31233c89ecdba812b05bfd07616d7/extensions/theme-solarized-dark/themes/solarized-dark-color-theme.json [3]
-- `catppuccin-latte`: MIT. tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json [127]
-- `catppuccin-mocha`: MIT. tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json [127]
-- `one-half-light`: MIT. https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfLight.tmTheme, written as JSON [128]
-- `one-half-dark`: MIT. https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfDark.tmTheme, written as JSON [128]
 
 ## Notices
 
@@ -519,7 +506,7 @@ Portions copyright:
 
 ### [3]
 
-`angular-html`, `angular-ts`, `bat`, `bibtex`, `c`, `clojure`, `coffee`, `cpp`, `csharp`, `css`, `dart`, `diff`, `docker`, `fsharp`, `git-commit`, `git-rebase`, `go`, `groovy`, `handlebars`, `hlsl`, `html`, `html-derivative`, `ini`, `java`, `javascript`, `json`, `jsonc`, `jsonl`, `jsx`, `julia`, `latex`, `less`, `lua`, `make`, `markdown`, `objective-c`, `objective-cpp`, `perl`, `php`, `powershell`, `pug`, `python`, `raku`, `rst`, `ruby`, `rust`, `scss`, `shaderlab`, `shellscript`, `sql`, `tex`, `tsx`, `typescript`, `vb`, `xml`, `xsl`, `cpp-macro`, `solarized-light`, `solarized-dark`. From https://raw.githubusercontent.com/onivim/vscode-exthost/master/LICENSE.txt and https://raw.githubusercontent.com/microsoft/vscode/main/LICENSE.txt.
+`angular-html`, `angular-ts`, `bat`, `bibtex`, `c`, `clojure`, `coffee`, `cpp`, `csharp`, `css`, `dart`, `diff`, `docker`, `fsharp`, `git-commit`, `git-rebase`, `go`, `groovy`, `handlebars`, `hlsl`, `html`, `html-derivative`, `ini`, `java`, `javascript`, `json`, `jsonc`, `jsonl`, `jsx`, `julia`, `latex`, `less`, `lua`, `make`, `markdown`, `objective-c`, `objective-cpp`, `perl`, `php`, `powershell`, `pug`, `python`, `raku`, `rst`, `ruby`, `rust`, `scss`, `shaderlab`, `shellscript`, `sql`, `tex`, `tsx`, `typescript`, `vb`, `xml`, `xsl`, `cpp-macro`. From https://raw.githubusercontent.com/onivim/vscode-exthost/master/LICENSE.txt and https://raw.githubusercontent.com/microsoft/vscode/main/LICENSE.txt.
 
 ````text
 MIT License
@@ -5545,114 +5532,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-````
-
-### [125]
-
-`base16-ocean-light`, `base16-ocean-dark`. From https://raw.githubusercontent.com/jryans/base16-vscode/81ad380452b8828062d1be91501b495637eff2ac/LICENSE.md.
-
-````text
-The MIT License (MIT)
-
-Copyright (c) 2016 Andrés Del Carpio
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-````
-
-### [126]
-
-`gruvbox-light-medium`, `gruvbox-dark-medium`. From https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/LICENSE.
-
-````text
-Copyright © 2017 JD
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-````
-
-### [127]
-
-`catppuccin-latte`, `catppuccin-mocha`. From https://raw.githubusercontent.com/catppuccin/vscode/main/LICENSE.
-
-````text
-MIT License
-
-Copyright (c) 2021 Catppuccin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-````
-
-### [128]
-
-`one-half-light`, `one-half-dark`. From https://raw.githubusercontent.com/sonph/onehalf/75eb2e97acd74660779fed8380989ee7891eec56/LICENSE.txt.
-
-````text
-MIT License
-
-Copyright (c) 2019 Son A. Pham <sp@sonpham.me>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ````

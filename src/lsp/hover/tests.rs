@@ -62,14 +62,15 @@ fn post(site: &TempSite, text: &str) -> Option<(Vec<String>, Option<String>, Str
 #[test]
 fn a_setting_says_what_it_does() {
     let site = site();
-    let (lines, more, over) = settings(&site, "title: Site 1\ncode_s|tyle: gruvbox\n").unwrap();
-    assert_eq!(over, "code_style");
+    let (lines, more, over) = settings(&site, "title: Site 1\ncode_c|olours: true\n").unwrap();
+    assert_eq!(over, "code_colours");
     assert_eq!(
         lines,
         [
-            "`code_style`, a setting",
-            "The colours of code in the content: `ocean`, `gruvbox`, `solarized`, \
-             `catppuccin` or `one-half`, or `none` to colour no code. Unset, it is `ocean`.",
+            "`code_colours`, a setting",
+            "`true` marks each piece of code in the content with a class for its kind, such \
+             as `hl-keyword`, for the site's own stylesheet to colour. Unset, it is `false`, \
+             and code is written as it is.",
         ]
     );
     assert_eq!(

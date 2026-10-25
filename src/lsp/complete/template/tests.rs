@@ -217,7 +217,7 @@ fn what_a_template_names_is_offered_from_the_site() {
     let addresses = in_page(&site, "<a href=\"{{ url('/ab| }}").unwrap();
     assert_eq!(item(&addresses, "/about/").1, "About");
     let css = in_page(&site, "{{ css(\"|").unwrap();
-    assert_eq!(labels(&css), ["code.css", "site.css"]);
+    assert_eq!(labels(&css), ["site.css"]);
     let js = in_page(&site, "{{ js(\"|").unwrap();
     assert_eq!(labels(&js), ["menu.js"]);
     let headings = in_page(&site, "{{ url(\"/about/#|\") }}").unwrap();

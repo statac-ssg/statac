@@ -631,7 +631,7 @@ fn a_site_with_nothing_fetched_builds_as_it_did() {
         .filter(|line| !line.starts_with("Started `published.txt`"))
         .collect();
     assert!(
-        lines.len() == 1 && lines[0].starts_with("Wrote 2 pages and 1 other file to `SITE"),
+        lines.len() == 1 && lines[0].starts_with("Wrote 2 pages to `SITE"),
         "{said}"
     );
     assert!(!site.holds("fetched"));

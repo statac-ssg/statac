@@ -307,7 +307,7 @@ fn serve_says_where_the_site_is() {
             said.starts_with(&format!(
                 "Started `published.txt` with the 2 URLs this site publishes, so a later \
                  build can say when one is no longer published. Commit it with the site.\n\
-                 Wrote 2 pages and 2 other files to `{}` in ",
+                 Wrote 2 pages and 1 other file to `{}` in ",
                 folder.display()
             )),
             "{way}:\n{said}"
@@ -866,8 +866,8 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
              \"built\":3,\"outputs\":3,\"took\":{{\"before\":"
         )) && built.contains(&format!(
             "\"counts\":{{\"error\":0,\"warning\":0,\"note\":0}}}},\"rounds\":[\
-             {{\"state\":\"built\",\"at\":\"{at}\",\"said\":[{{\"text\":\"Wrote 3 pages and 2 \
-             other files to \"}},{{\"code\":\""
+             {{\"state\":\"built\",\"at\":\"{at}\",\"said\":[{{\"text\":\"Wrote 3 pages and 1 \
+             other file to \"}},{{\"code\":\""
         )) && built.contains(
             "\"site\":{\"kinds\":[{\"kind\":\"broken-link\",\"severity\":\"warning\",\
              \"title\":\"Broken link\",\"count\":2,\"quietened\":2,\"suggestion\":[\
@@ -1716,7 +1716,7 @@ fn a_still_is_fetched_after_the_first_round_and_built_as_a_build_would() {
 1 warning: 1 no-thumbnail. Run `statac check` to see it.
 
 Started `published.txt` with the 3 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
-Wrote 3 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
+Wrote 3 pages and 1 other file to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Fetching what's new from other sites. `--offline` turns this off.
 Press Ctrl+C to stop.
@@ -1773,7 +1773,7 @@ fn a_webmention_and_its_face_are_fetched_in_one_round_and_built_as_a_build_would
         steady(&served, &opened),
         "\
 Started `published.txt` with the 2 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
-Wrote 2 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
+Wrote 2 pages and 1 other file to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Fetching what's new from other sites. `--offline` turns this off.
 Press Ctrl+C to stop.
@@ -1890,7 +1890,7 @@ fn offline_nothing_is_fetched_and_serve_says_so() {
 1 warning: 1 no-thumbnail. Run `statac check` to see it.
 
 Started `published.txt` with the 3 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
-Wrote 3 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
+Wrote 3 pages and 1 other file to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Offline: nothing is fetched from other sites.
 Press Ctrl+C to stop.
@@ -1914,7 +1914,7 @@ fn a_site_with_nothing_to_fetch_is_served_as_it_was_without_fetching() {
         steady(&fetching, &opened),
         "\
 Started `published.txt` with the 2 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
-Wrote 2 pages and 2 other files to `SITE/.statac/serve` in TIME seconds.
+Wrote 2 pages and 1 other file to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
 Press Ctrl+C to stop.
 "

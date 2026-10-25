@@ -177,7 +177,6 @@ fn templated(site: &Path) {
 
 const BUILT: &str = "built-without-template";
 const NO_FEED: &str = "feed-not-written";
-const NO_COLOURS: &str = "code-colours-not-loaded";
 
 #[test]
 fn each_permalink_style_keeps_every_address() {
@@ -293,10 +292,7 @@ fn front_matter_comes_across_in_statacs_words() {
 
 #[test]
 fn tags_in_the_writing_convert_or_stay_as_written() {
-    assert_eq!(
-        fixture("tags-in-writing"),
-        [BUILT, NO_COLOURS, NO_ZONE, AS_TEXT]
-    );
+    assert_eq!(fixture("tags-in-writing"), [BUILT, NO_ZONE, AS_TEXT]);
 }
 
 #[test]
@@ -311,7 +307,7 @@ fn words_statac_would_read_as_a_snippet_call_are_escaped() {
 
 #[test]
 fn code_inside_html_is_given_a_blank_line_and_stays_code() {
-    assert_eq!(fixture("html-writing"), [BUILT, NO_COLOURS, NO_ZONE]);
+    assert_eq!(fixture("html-writing"), [BUILT, NO_ZONE]);
 }
 
 #[test]
@@ -1586,7 +1582,6 @@ fn hugo_tags_in_the_writing_convert_or_stay_as_written() {
             "broken-link",
             BUILT,
             "call-in-html",
-            NO_COLOURS,
             NO_FEED,
             "missing-definition",
             AS_TEXT
@@ -2576,7 +2571,7 @@ fn zola_languages_come_across_by_place() {
 fn zola_tags_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(
         fixture("zola-tags-in-writing"),
-        ["broken-link", BUILT, NO_COLOURS, DRAFT, AS_TEXT]
+        ["broken-link", BUILT, DRAFT, AS_TEXT]
     );
 }
 
@@ -3073,7 +3068,7 @@ fn eleventy_redirects_become_the_pages_old_addresses() {
 fn eleventy_tags_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(
         fixture("eleventy-tags-in-writing"),
-        ["broken-link", BUILT, NO_COLOURS, AS_TEXT]
+        ["broken-link", BUILT, AS_TEXT]
     );
 }
 

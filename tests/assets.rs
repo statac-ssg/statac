@@ -78,7 +78,7 @@ fn a_site_is_gathered_and_published_whole_or_not_at_all() {
     }
 
     let mut sources = Sources::default();
-    let (gathered, problems) = assets::gather(&site, "", None, &mut sources);
+    let (gathered, problems) = assets::gather(&site, "", &mut sources);
 
     // The worker is the one thing said.
     let [warning] = &problems[..] else {
@@ -191,7 +191,7 @@ fn a_site_is_gathered_and_published_whole_or_not_at_all() {
     // A static file over an asset's address stops the build, and the
     // published site stays as it was.
     folder.write(&format!("site/static/{util}"), "");
-    let (gathered, problems) = assets::gather(&site, "", None, &mut Sources::default());
+    let (gathered, problems) = assets::gather(&site, "", &mut Sources::default());
     let errors = errors(&problems);
     let [collision] = &errors[..] else {
         panic!("{problems:?}")

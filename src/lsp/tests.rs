@@ -638,7 +638,7 @@ fn at_position(method: &str, id: u32, file: &Path, line: usize, character: usize
 #[test]
 fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
     let site = TempSite::site(&[
-        ("statac.yaml", "title: Site 1\ncode_style: ocean\n"),
+        ("statac.yaml", "title: Site 1\ncode_colours: true\n"),
         ("templates/page.html", "{{ page.content }}\n"),
         ("content/post-1.md", "---\ntitle: Post 1\n---\nA post.\n"),
     ]);
@@ -671,13 +671,13 @@ fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
             .expect("the hover");
         assert_eq!(answer.text(&["result", "contents", "kind"]), Some(kind));
         let value = answer.text(&["result", "contents", "value"]).unwrap();
-        let first = "`code_style`, a setting\n\nThe colours of code in the content:";
+        let first = "`code_colours`, a setting\n\n`true` marks each piece of code";
         assert!(value.starts_with(first), "{value}");
         assert!(value.ends_with(&format!(".\n\n{more}")), "{value}");
         let range = ["result", "range"];
         let end = [&range[..], &["end", "character"]].concat();
         let end = answer.at(&end).unwrap();
-        assert_eq!(answer.sources.spelling(end.place), "10");
+        assert_eq!(answer.sources.spelling(end.place), "12");
         assert_eq!(
             sent[at]
                 .sources

@@ -1,5 +1,5 @@
 //! Writes what Statac colours code with, from the grammars of npm's
-//! `tm-grammars` package and the themes in `src/highlight/themes/`.
+//! `tm-grammars` package.
 //!
 //! The grammars checked in were taken from `tm-grammars` 1.32.22, the
 //! version [`PACKAGE`] names. To take them again, fetch and unpack that
@@ -11,9 +11,6 @@
 //! cargo run --example grammars -- package
 //! ```
 //!
-//! The themes are kept in the repository, each with its source, version or
-//! commit, and licence in [`THEME_SOURCES`].
-//!
 //! - `src/highlight/grammars.bin`: the grammars the binary carries, the same
 //!   bytes on every run. A grammar is carried only under a licence that lets
 //!   it ship inside a permissively licensed binary. Each is its JSON without
@@ -24,122 +21,25 @@
 //!   with its grammar. A number is four bytes, the lowest first, and a text
 //!   follows its length.
 //! - `src/highlight/languages.rs`: every name and alias a fence can use.
-//! - `src/highlight/styles.rs`: for each style, the colour its light theme
-//!   and its dark give each kind of code, ordinary text and the background.
-//!   The tests fail while it differs from what the themes give.
-//! - `src/highlight/licences.md`: every grammar and theme carried, with its
-//!   licence and source.
+//! - `src/highlight/licences.md`: every grammar carried, with its licence
+//!   and source.
 //! - `THIRD-PARTY-GRAMMARS.md`: the same list, each with the notice it asks
 //!   for, which a release carries. A grammar's notice is the one the
-//!   package's `NOTICE` file gives; where it gives none, and for a theme,
-//!   the one `src/highlight/notices-read-at-source.txt` holds. The tests
-//!   fail while a grammar or theme carried has no notice there.
+//!   package's `NOTICE` file gives; where it gives none, the one
+//!   `src/highlight/notices-read-at-source.txt` holds. The tests fail while
+//!   a grammar carried has no notice there.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use ferriki_textmate::{
-    EncodedTokenAttributes, FontStyle, GrammarConfiguration, RawTheme, RawThemeScope,
-    RawThemeSetting, RawThemeStyle, SyncRegistry, parse_raw_grammar,
-};
-use statac::highlight::KINDS;
+use ferriki_textmate::parse_raw_grammar;
 use statac::source::Sources;
 use statac::yaml::{Node, Resolved, Value};
-
-/// A style `code_style` names: its light theme and its dark twin, by their
-/// files in `src/highlight/themes/`.
-pub struct Pair {
-    pub name: &'static str,
-    pub light: &'static str,
-    pub dark: &'static str,
-}
-
-pub const STYLES: &[Pair] = &[
-    Pair {
-        name: "ocean",
-        light: "base16-ocean-light",
-        dark: "base16-ocean-dark",
-    },
-    Pair {
-        name: "gruvbox",
-        light: "gruvbox-light-medium",
-        dark: "gruvbox-dark-medium",
-    },
-    Pair {
-        name: "solarized",
-        light: "solarized-light",
-        dark: "solarized-dark",
-    },
-    Pair {
-        name: "catppuccin",
-        light: "catppuccin-latte",
-        dark: "catppuccin-mocha",
-    },
-    Pair {
-        name: "one-half",
-        light: "one-half-light",
-        dark: "one-half-dark",
-    },
-];
 
 /// The version of `tm-grammars` the grammars are taken from. A new one is
 /// a change to this line, so the documentation above stays true.
 pub const PACKAGE: &str = "1.32.22";
-
-/// Each theme file's licence and where it came from.
-pub const THEME_SOURCES: &[(&str, &str, &str)] = &[
-    (
-        "base16-ocean-light",
-        "MIT",
-        "https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-light.json",
-    ),
-    (
-        "base16-ocean-dark",
-        "MIT",
-        "https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-dark.json",
-    ),
-    (
-        "gruvbox-light-medium",
-        "MIT",
-        "tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts",
-    ),
-    (
-        "gruvbox-dark-medium",
-        "MIT",
-        "tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts",
-    ),
-    (
-        "solarized-light",
-        "MIT",
-        "tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/0132168df99ab8830a1eb158b1a5e8242f3e94ff/extensions/theme-solarized-light/themes/solarized-light-color-theme.json",
-    ),
-    (
-        "solarized-dark",
-        "MIT",
-        "tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/e886f3e07de31233c89ecdba812b05bfd07616d7/extensions/theme-solarized-dark/themes/solarized-dark-color-theme.json",
-    ),
-    (
-        "catppuccin-latte",
-        "MIT",
-        "tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json",
-    ),
-    (
-        "catppuccin-mocha",
-        "MIT",
-        "tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json",
-    ),
-    (
-        "one-half-light",
-        "MIT",
-        "https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfLight.tmTheme, written as JSON",
-    ),
-    (
-        "one-half-dark",
-        "MIT",
-        "https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfDark.tmTheme, written as JSON",
-    ),
-];
 
 /// Licences that let a grammar ship inside a permissively licensed binary.
 const PERMISSIVE: &[&str] = &["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"];
@@ -208,12 +108,6 @@ pub fn notices_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("THIRD-PARTY-GRAMMARS.md")
 }
 
-fn theme_path(stem: &str) -> PathBuf {
-    highlight_folder()
-        .join("themes")
-        .join(format!("{stem}.json"))
-}
-
 fn main() {
     let package = PathBuf::from(
         std::env::args()
@@ -257,7 +151,6 @@ fn main() {
         languages_rs(&languages),
     )
     .expect("languages.rs");
-    std::fs::write(highlight_folder().join("styles.rs"), styles_rs()).expect("styles.rs");
     std::fs::write(
         highlight_folder().join("licences.md"),
         licences_md(&version, &carried),
@@ -276,11 +169,10 @@ fn main() {
         .expect("THIRD-PARTY-GRAMMARS.md");
 
     println!(
-        "Carried {} grammars ({} names) in {} bytes, and {} themes.",
+        "Carried {} grammars ({} names) in {} bytes.",
         carried.len(),
         languages.len(),
-        held.len(),
-        STYLES.len() * 2
+        held.len()
     );
     println!("Left out: {}.", left_out.join(", "));
 }
@@ -396,8 +288,7 @@ struct Entry {
     line: String,
 }
 
-/// The grammars carried, then the themes.
-fn entries(carried: &[(Grammar, String, String)]) -> [Vec<Entry>; 2] {
+fn entries(carried: &[(Grammar, String, String)]) -> Vec<Entry> {
     let grammars = carried.iter().map(|(grammar, licence, source)| Entry {
         file: format!("{}.json", grammar.name),
         name: grammar.name.clone(),
@@ -407,33 +298,24 @@ fn entries(carried: &[(Grammar, String, String)]) -> [Vec<Entry>; 2] {
             grammar.display_name, grammar.name
         ),
     });
-    let themes = THEME_SOURCES.iter().map(|(stem, licence, source)| Entry {
-        file: format!("themes/{stem}.json"),
-        name: (*stem).to_owned(),
-        licence: (*licence).to_owned(),
-        line: format!("- `{stem}`: {licence}. {source}"),
-    });
-    [grammars.collect(), themes.collect()]
+    grammars.collect()
 }
 
 fn licences_md(version: &str, carried: &[(Grammar, String, String)]) -> String {
     let mut out = format!(
-        "# Grammars and themes Statac carries\n\n\
+        "# Grammars Statac carries\n\n\
          Written by `cargo run --example grammars` from npm's tm-grammars {version},\n\
-         https://registry.npmjs.org/tm-grammars/-/tm-grammars-{version}.tgz, and\n\
-         the themes in `src/highlight/themes/`.\n"
+         https://registry.npmjs.org/tm-grammars/-/tm-grammars-{version}.tgz.\n"
     );
-    for (heading, entries) in LISTS.iter().zip(entries(carried)) {
-        writeln!(out, "\n{heading}\n").unwrap();
-        for entry in entries {
-            writeln!(out, "{}", entry.line).unwrap();
-        }
+    writeln!(out, "\n{LIST}\n").unwrap();
+    for entry in entries(carried) {
+        writeln!(out, "{}", entry.line).unwrap();
     }
     out
 }
 
-/// The headings of the two lists `licences.md` and the notices both have.
-pub const LISTS: [&str; 2] = ["## Grammars", "## Themes"];
+/// The heading of the list `licences.md` and the notices both have.
+pub const LIST: &str = "## Grammars";
 
 /// The length of the line of equals signs that opens each notice of the
 /// package's `NOTICE` file, and of the line of hyphens that ends a
@@ -482,55 +364,53 @@ struct Text {
 
 fn notices_md(version: &str, carried: &[(Grammar, String, String)], notices: &[Notice]) -> String {
     let mut out = format!(
-        "# The notices of the grammars and themes Statac carries\n\n\
+        "# The notices of the grammars Statac carries\n\n\
          Written by `cargo run --example grammars` from the `NOTICE` file of npm's\n\
          tm-grammars {version},\n\
          https://registry.npmjs.org/tm-grammars/-/tm-grammars-{version}.tgz, and\n\
          `src/highlight/notices-read-at-source.txt`.\n\n\
-         Every grammar and theme a built `statac` colours code with, each with its\n\
-         licence, its source and the notice it asks for. A number in square brackets\n\
-         is a text under [Notices](#notices), where each text is given once, as the\n\
+         Every grammar a built `statac` colours code with, each with its licence,\n\
+         its source and the notice it asks for. A number in square brackets is a\n\
+         text under [Notices](#notices), where each text is given once, as the\n\
          address above it gave it.\n"
     );
     let mut texts: Vec<Text> = Vec::new();
     let mut without = Vec::new();
-    for (heading, entries) in LISTS.iter().zip(entries(carried)) {
-        writeln!(out, "\n{heading}\n").unwrap();
-        for entry in entries {
-            let Some(notice) = notices
-                .iter()
-                .find(|notice| notice.files.contains(&entry.file))
-            else {
-                without.push(entry.file);
-                continue;
-            };
-            if let Some(spdx) = &notice.spdx {
-                assert_eq!(
-                    *spdx, entry.licence,
-                    "the notice of {} is of another licence",
-                    entry.file
-                );
-            }
-            // Texts that differ only in space at a line's end are one.
-            let lines: Vec<&str> = notice.text.lines().map(str::trim_end).collect();
-            let text = lines.join("\n").trim_matches('\n').to_owned();
-            let at = match texts.iter().position(|held| held.text == text) {
-                Some(at) => at,
-                None => {
-                    texts.push(Text {
-                        text,
-                        of: Vec::new(),
-                        from: Vec::new(),
-                    });
-                    texts.len() - 1
-                }
-            };
-            texts[at].of.push(format!("`{}`", entry.name));
-            if !texts[at].from.contains(&notice.from) {
-                texts[at].from.push(notice.from.clone());
-            }
-            writeln!(out, "{} [{}]", entry.line, at + 1).unwrap();
+    writeln!(out, "\n{LIST}\n").unwrap();
+    for entry in entries(carried) {
+        let Some(notice) = notices
+            .iter()
+            .find(|notice| notice.files.contains(&entry.file))
+        else {
+            without.push(entry.file);
+            continue;
+        };
+        if let Some(spdx) = &notice.spdx {
+            assert_eq!(
+                *spdx, entry.licence,
+                "the notice of {} is of another licence",
+                entry.file
+            );
         }
+        // Texts that differ only in space at a line's end are one.
+        let lines: Vec<&str> = notice.text.lines().map(str::trim_end).collect();
+        let text = lines.join("\n").trim_matches('\n').to_owned();
+        let at = match texts.iter().position(|held| held.text == text) {
+            Some(at) => at,
+            None => {
+                texts.push(Text {
+                    text,
+                    of: Vec::new(),
+                    from: Vec::new(),
+                });
+                texts.len() - 1
+            }
+        };
+        texts[at].of.push(format!("`{}`", entry.name));
+        if !texts[at].from.contains(&notice.from) {
+            texts[at].from.push(notice.from.clone());
+        }
+        writeln!(out, "{} [{}]", entry.line, at + 1).unwrap();
     }
     assert!(
         without.is_empty(),
@@ -713,180 +593,5 @@ fn grammars_bin(package: &Path, grammars: &[&Grammar]) -> Vec<u8> {
         number(&mut out, at);
     }
     out.extend(deflated.into_iter().flatten());
-    out
-}
-
-/// The scopes each kind's colour is read at in a theme, the innermost last:
-/// the kind's usual scope, or where themes differ over that, the scopes of a
-/// common piece of code of the kind.
-const READ_AT: [(&str, &str); KINDS.len()] = [
-    ("comment", "comment"),
-    ("keyword", "keyword"),
-    ("string", "string"),
-    ("number", "constant.numeric"),
-    ("constant", "constant.language"),
-    ("function", "entity.name.function"),
-    ("type", "entity.name.type.class"),
-    ("variable", "variable.other.readwrite"),
-    ("property", "variable.other.property"),
-    ("tag", "entity.name.tag"),
-    ("attribute", "entity.other.attribute-name"),
-    ("operator", "keyword.operator"),
-    ("punctuation", "punctuation"),
-    (
-        "heading",
-        "markup.heading.markdown heading.1.markdown entity.name.section.markdown",
-    ),
-    ("emphasis", "markup.italic"),
-    ("strong", "markup.bold"),
-    (
-        "link",
-        "meta.link.inline.markdown markup.underline.link.markdown",
-    ),
-    ("inserted", "markup.inserted.diff"),
-    ("deleted", "markup.deleted.diff"),
-];
-
-/// A theme's rules for text: its editor's colours for ordinary text, then
-/// each rule's colour and font style. A rule's own background is left out.
-fn theme(stem: &str) -> RawTheme {
-    let json = read_json(&theme_path(stem));
-    let rule = |scope: Option<Vec<String>>, style: RawThemeStyle| {
-        let mut rule = RawThemeSetting::default();
-        rule.scope = scope.map(RawThemeScope::Array);
-        rule.settings = Some(style);
-        rule
-    };
-    let editor = |key: &str| {
-        let colour = json.get("colors").and_then(|colours| colours.get(key));
-        Some(colour.and_then(text_of).expect("an editor's colour"))
-    };
-    let mut ordinary = RawThemeStyle::default();
-    ordinary.foreground = editor("editor.foreground");
-    ordinary.background = editor("editor.background");
-    let mut rules = vec![rule(None, ordinary)];
-    let items = match json.get("tokenColors").map(|node| &node.value) {
-        Some(Value::Sequence(items)) => items.as_slice(),
-        _ => &[],
-    };
-    for item in items {
-        let scope: Vec<String> = match item.get("scope").map(|node| &node.value) {
-            Some(Value::Scalar(list)) => {
-                list.split(',').map(|part| part.trim().to_owned()).collect()
-            }
-            Some(Value::Sequence(list)) => list.iter().filter_map(text_of).collect(),
-            _ => continue,
-        };
-        let setting = |key: &str| {
-            let settings = item.get("settings")?;
-            settings.get(key).and_then(text_of)
-        };
-        let mut style = RawThemeStyle::default();
-        style.foreground = setting("foreground");
-        style.font_style = setting("fontStyle");
-        rules.push(rule(Some(scope), style));
-    }
-    let mut theme = RawTheme::default();
-    theme.settings = rules;
-    theme
-}
-
-/// What a theme gives code: the colour of ordinary text, the background,
-/// and each kind's colour and font style.
-struct Given {
-    text: String,
-    background: String,
-    kinds: Vec<(String, String)>,
-}
-
-/// Reads a theme by colouring, under it, a grammar of one rule to a kind,
-/// each giving one letter the scopes the kind is read at.
-fn given(stem: &str) -> Given {
-    let letters = || ('a'..).take(KINDS.len());
-    let mut grammar = String::from("{\"scopeName\":\"source.kinds\",\"patterns\":[");
-    for (letter, (kind, scope)) in letters().zip(READ_AT) {
-        assert_eq!(kind, KINDS[letter as usize - 'a' as usize]);
-        write!(grammar, "{{\"match\":\"{letter}\",\"name\":\"{scope}\"}},").unwrap();
-    }
-    grammar.pop();
-    grammar.push_str("]}");
-    let mut registry = SyncRegistry::new(Some(theme(stem)), None).expect(stem);
-    let grammar = parse_raw_grammar(&grammar, Some("kinds.json")).expect("a grammar");
-    registry.add_grammar(grammar, Vec::new());
-    let grammar = registry
-        .grammar_for_scope_name("source.kinds", GrammarConfiguration::default())
-        .expect(stem)
-        .expect("the grammar added");
-    let colours = registry.get_color_map();
-    let look = |text: &str| {
-        let read = grammar.tokenize_line2(text, None, 0).expect(stem);
-        let token = EncodedTokenAttributes::new(read.tokens[1]);
-        let colour = |number: u32| {
-            let colour = colours[number as usize].to_lowercase();
-            assert!(matches!(colour.len(), 7 | 9), "{stem}: {colour}");
-            colour
-        };
-        let mut font = Vec::new();
-        for (bit, word) in [
-            (FontStyle::BOLD, "bold"),
-            (FontStyle::ITALIC, "italic"),
-            (FontStyle::UNDERLINE, "underline"),
-            (FontStyle::STRIKETHROUGH, "strikethrough"),
-        ] {
-            if token.font_style().contains(bit) {
-                font.push(word);
-            }
-        }
-        (
-            colour(token.foreground()),
-            colour(token.background()),
-            font.join(" "),
-        )
-    };
-    let (text, background, _) = look(".");
-    let kinds = letters().map(|letter| {
-        let (colour, _, font) = look(&letter.to_string());
-        (colour, font)
-    });
-    Given {
-        kinds: kinds.collect(),
-        text,
-        background,
-    }
-}
-
-/// `styles.rs`, from the themes alone.
-pub fn styles_rs() -> String {
-    let mut out = String::from(
-        "// Written by `cargo run --example grammars`. For each style, the colour of\n\
-         // ordinary text and of the background, then each kind's colour and the\n\
-         // font style its light theme gives it. Each colour is the light theme's,\n\
-         // then the dark's.\n\n\
-         use super::Style;\n\n#[rustfmt::skip]\npub(super) const STYLES: &[Style] = &[\n",
-    );
-    for style in STYLES {
-        let (light, dark) = (given(style.light), given(style.dark));
-        writeln!(out, "    Style {{").unwrap();
-        writeln!(out, "        name: {:?},", style.name).unwrap();
-        writeln!(out, "        text: [{:?}, {:?}],", light.text, dark.text).unwrap();
-        writeln!(
-            out,
-            "        background: [{:?}, {:?}],",
-            light.background, dark.background
-        )
-        .unwrap();
-        writeln!(out, "        kinds: [").unwrap();
-        for (kind, (light, dark)) in KINDS.iter().zip(light.kinds.iter().zip(&dark.kinds)) {
-            writeln!(
-                out,
-                "            ([{:?}, {:?}], {:?}), // {kind}",
-                light.0, dark.0, light.1
-            )
-            .unwrap();
-        }
-        writeln!(out, "        ],").unwrap();
-        writeln!(out, "    }},").unwrap();
-    }
-    out.push_str("];\n");
     out
 }

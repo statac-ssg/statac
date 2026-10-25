@@ -407,15 +407,14 @@ fn list() -> String {
     )
     .unwrap();
 
-    out.push_str("\n### Grammars and themes\n\n");
+    out.push_str("\n### Grammars\n\n");
     let record = read("THIRD-PARTY-GRAMMARS.md");
     writeln!(
         out,
-        "- {} grammars and {} themes colour code. Each is listed with its \
-         licence, its source and the notice it asks for, copyright line and \
-         all, in `THIRD-PARTY-GRAMMARS.md`, beside this file.",
-        carried(&record, "## Grammars"),
-        carried(&record, "## Themes")
+        "- {} grammars colour code. Each is listed with its licence, its \
+         source and the notice it asks for, copyright line and all, in \
+         `THIRD-PARTY-GRAMMARS.md`, beside this file.",
+        carried(&record, "## Grammars")
     )
     .unwrap();
 

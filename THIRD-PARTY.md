@@ -10,9 +10,9 @@ Statac's own code is offered under MIT or Apache-2.0, at your choice. A built `s
 
 - What Statac has for every language but English, in `src/language/bundled/`, is from the Unicode CLDR: the names of the months and the weekdays, the words for am and pm, the quotation marks, the direction of writing and the digits. So is the usual form of a date in each of those languages, in `src/dates/format.rs`, so are English's months, weekdays and quotation marks, and so is the direction of a language Statac has no words for, in `src/language/direction.rs`: Unicode License V3. [2]
 
-### Grammars and themes
+### Grammars
 
-- 227 grammars and 10 themes colour code. Each is listed with its licence, its source and the notice it asks for, copyright line and all, in `THIRD-PARTY-GRAMMARS.md`, beside this file.
+- 227 grammars colour code. Each is listed with its licence, its source and the notice it asks for, copyright line and all, in `THIRD-PARTY-GRAMMARS.md`, beside this file.
 
 ### The server
 

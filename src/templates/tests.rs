@@ -2136,17 +2136,18 @@ fn a_lists_feed_is_answered_by_the_feeds_the_build_publishes() {
 }
 
 #[test]
-fn the_code_stylesheet_and_the_feeds_are_named_by_their_addresses() {
+fn a_stylesheet_and_the_feeds_are_named_by_their_addresses() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org/blog/\nfeed_key: key\ntimezone: UTC\ncode_style: one-half\nfeed: true\n",
+            "language: en\ntitle: Site\nurl: https://example.org/blog/\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
         ),
+        ("assets/site.css", "body { margin: 0; }\n"),
         ("content/posts/post-1.md", "---\ndate: 2026-10-04\n---\n"),
         ("content/posts/index.md", "---\nfeed: atom.xml\n---\n"),
         (
             "templates/base.html",
-            "{{ css('code.css') }}|{{ site.feed }}|{% if page.list is defined %}{{ page.list.feed }}{% endif %}",
+            "{{ css('site.css') }}|{{ site.feed }}|{% if page.list is defined %}{{ page.list.feed }}{% endif %}",
         ),
         ("templates/page.html", "{% extends \"base\" %}"),
         ("templates/folder.html", "{% extends \"base\" %}"),
@@ -2156,7 +2157,7 @@ fn the_code_stylesheet_and_the_feeds_are_named_by_their_addresses() {
     let html = built.html("posts/index.md");
     let parts: Vec<&str> = html.split('|').collect();
     assert!(
-        parts[0].starts_with("<link rel=\"stylesheet\" href=\"/blog/code."),
+        parts[0].starts_with("<link rel=\"stylesheet\" href=\"/blog/site."),
         "{}",
         parts[0]
     );
@@ -2178,7 +2179,8 @@ fn a_feed_carries_code_uncoloured_where_its_page_colours_it() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n\
+             code_colours: true\n",
         ),
         ("content/index.md", "# Home\n"),
         (
@@ -2196,7 +2198,6 @@ fn a_feed_carries_code_uncoloured_where_its_page_colours_it() {
     assert!(built.html("post-1.md").contains("<span class=\"hl-"));
     let feed = built.renderer.render_feed(&built.renderer.feeds()[0]);
     assert!(feed.problems.is_empty(), "{:?}", feed.problems);
-    assert!(feed.coloured.is_empty());
     assert_eq!(
         feed.html.unwrap(),
         "<pre class=\"code\"><code class=\"language-rust\">let a = 1 &lt; 2;</code></pre>|fn f() {}"
@@ -2208,7 +2209,8 @@ fn a_feed_carries_the_writing_built_without_colour_with_the_authors_own_spans() 
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n\
+             code_colours: true\n",
         ),
         (
             "content/index.md",
@@ -2244,7 +2246,6 @@ fn a_feed_carries_the_writing_built_without_colour_with_the_authors_own_spans() 
     }
     let feed = built.renderer.render_feed(&built.renderer.feeds()[0]);
     assert!(feed.problems.is_empty(), "{:?}", feed.problems);
-    assert!(feed.coloured.is_empty());
     let excerpt = "<p>An <span class=\"hl-keyword\">own</span> word.</p>\n\
                    <pre class=\"code\"><code class=\"language-rust\">let a = 1;</code></pre>";
     let content = format!("{excerpt}\n<p>After.</p>");
@@ -2255,57 +2256,6 @@ fn a_feed_carries_the_writing_built_without_colour_with_the_authors_own_spans() 
              <p>Two.</p>\n{content}|<p>Two.</p>|{content}|{excerpt}|"
         )
     );
-}
-
-/// A page showing another's excerpt shows the code coloured in it, at the
-/// first block the excerpt holds and at each call in it that colours any,
-/// and none the excerpt leaves out.
-#[test]
-fn coloured_code_in_an_excerpt_is_shown_where_the_excerpt_is() {
-    // A call's colours are placed at the filter in its snippet.
-    const FILTER: &str = "'let a' | highlight('rust')";
-    let cases: [(&str, &[&str]); 7] = [
-        (
-            "```rust\nlet a = 1;\n```\n\n<!--more-->\n\n```yaml\nb: 2\n```\n",
-            &["rust"],
-        ),
-        (
-            "```text\nas it is\n```\n\n```yaml\nb: 2\n```\n\n<!--more-->\n\n```rust\nlet a = 1;\n```\n",
-            &["yaml"],
-        ),
-        ("One.\n\n<!--more-->\n\n```rust\nlet a = 1;\n```\n", &[]),
-        ("One.\n\n```rust\nlet a = 1;\n```\n", &[]),
-        ("@coloured()\n\n<!--more-->\n\nTwo.\n", &[FILTER]),
-        ("One @coloured() two.\n\nThree.\n", &[FILTER]),
-        ("One.\n\n<!--more-->\n\n@coloured()\n", &[]),
-    ];
-    for (writing, shown) in cases {
-        let built = site(&[
-            NO_HOME,
-            (
-                "content/post-1.md",
-                &format!("---\ntitle: Post 1\n---\n{writing}"),
-            ),
-            ("content/posts.md", "---\ntitle: Posts\n---\n"),
-            (
-                "snippets/coloured.html",
-                "{{ 'let a' | highlight('rust') }}",
-            ),
-            (
-                "templates/page.html",
-                "{% for post in site.pages %}{% if post.title == 'Post 1' %}{{ post.excerpt }}{% endif %}{% endfor %}",
-            ),
-        ]);
-        let rendered = built.render("posts.md");
-        assert!(rendered.problems.is_empty(), "{:?}", rendered.problems);
-        let sources = built.renderer.sources();
-        let spelt: Vec<&str> = rendered
-            .coloured
-            .iter()
-            .map(|&place| sources.spelling(place))
-            .collect();
-        assert_eq!(spelt, shown, "{writing:?}");
-    }
 }
 
 #[test]
@@ -2342,8 +2292,9 @@ fn writing_built_again_for_a_feed_still_cannot_show_itself() {
 }
 
 #[test]
-fn code_is_coloured_in_the_sites_style_and_a_language_it_lacks_is_told_at_its_word() {
+fn code_is_coloured_where_asked_and_a_language_it_lacks_is_told_at_its_word() {
     let built = site(&[
+        ("statac.yaml", "language: en\ncode_colours: true\n"),
         (
             "content/post-1.md",
             "---\ntitle: Post 1\n---\n\n```rust\nfn main() {}\n```\n\n\
@@ -2380,25 +2331,24 @@ fn code_is_coloured_in_the_sites_style_and_a_language_it_lacks_is_told_at_its_wo
     );
     assert!(html.contains("<code class=\"language-cosole\">$ ls</code>"));
     assert!(html.contains("<code class=\"language-text\">as it is</code>"));
-    // The classes follow the style, so a page with coloured code reads it.
-    let style = built.renderer.name_id("code_style");
-    assert!(rendered.reads.keys().contains(&Key::Setting(style)));
+    // A page with coloured code reads the setting that asks for it.
+    let asked = built.renderer.name_id("code_colours");
+    assert!(rendered.reads.keys().contains(&Key::Setting(asked)));
     let plain = built.render("post-2.md");
     assert!(plain.problems.is_empty());
-    assert!(!plain.reads.keys().contains(&Key::Setting(style)));
+    assert!(!plain.reads.keys().contains(&Key::Setting(asked)));
 }
 
 #[test]
-fn code_style_none_colours_nothing_tells_of_no_language_and_asks_for_no_stylesheet() {
+fn code_not_asked_to_be_coloured_is_written_as_it_is_with_no_language_told() {
     let built = site(&[
-        ("statac.yaml", "title: Site\ncode_style: none\n"),
         (
             "content/post-1.md",
             "---\ntitle: Post 1\n---\n\n```rust\nfn main() {}\n```\n\n~~~ cosole\n$ ls\n~~~\n",
         ),
         (
             "templates/base.html",
-            "<head>{{ css(\"code.css\") }}</head>{% block main %}{% endblock %}\
+            "{% block main %}{% endblock %}\
              <i>{{ \"let a\" | highlight(\"rust\") }}{{ \"b\" | highlight(\"cosole\") }}</i>",
         ),
         PAGE,
@@ -2406,17 +2356,22 @@ fn code_style_none_colours_nothing_tells_of_no_language_and_asks_for_no_styleshe
     let rendered = built.render("post-1.md");
     assert_eq!(built.told(&rendered.problems), []);
     let html = rendered.html.unwrap();
-    assert!(html.contains("<head></head>"), "{html}");
-    assert!(html.contains("<code class=\"language-rust\">fn main() {}</code>"));
+    assert!(
+        html.contains(
+            "<pre class=\"code\"><code class=\"language-rust\">fn main() {}</code></pre>"
+        )
+    );
     assert!(html.contains("<code class=\"language-cosole\">$ ls</code>"));
     assert!(html.contains("<i>let ab</i>"), "{html}");
-    let style = built.renderer.name_id("code_style");
-    assert!(rendered.reads.keys().contains(&Key::Setting(style)));
+    assert!(!html.contains("hl-"), "{html}");
+    let asked = built.renderer.name_id("code_colours");
+    assert!(rendered.reads.keys().contains(&Key::Setting(asked)));
 }
 
 #[test]
 fn a_fence_opening_with_a_files_name_is_coloured_by_it_where_its_ending_names_a_language() {
     let built = site(&[
+        ("statac.yaml", "language: en\ncode_colours: true\n"),
         (
             "content/post-1.md",
             "---\ntitle: Post 1\n---\n\n```post-1.rs\nfn main() {}\n```\n\n\

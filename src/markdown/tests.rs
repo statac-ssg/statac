@@ -3409,7 +3409,7 @@ impl Snippets for OwnCode {
 
 #[test]
 fn code_is_coloured_for_a_file_of_the_sites_only_where_the_file_can_read_it() {
-    let highlighter = Highlighter::new("ocean").unwrap();
+    let highlighter = Highlighter::default();
     let coloured = highlighter.html("yaml", "a: 1");
     assert!(coloured.contains("<span"), "{coloured}");
     let written =

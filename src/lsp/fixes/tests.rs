@@ -75,7 +75,7 @@ fn a_key_is_not_respelt_as_one_its_mapping_has() {
     let found = fixed(&[
         (
             "statac.yaml",
-            "title: Site 1\ncode_styl: ocean\ncode_style: ocean\n\
+            "title: Site 1\ncode_colour: true\ncode_colours: true\n\
              tags.permalnk: /a/{slug}/\n# A note.\n\ntags.permalink: /b/{slug}/\n",
         ),
         ("templates/page.html", "{{ page.content }}\n"),
@@ -214,7 +214,7 @@ fn a_name_near_one_the_site_has_is_written_as_that_name() {
     let found = fixed(&[
         (
             "statac.yaml",
-            "title: Site 1\nquiet: [broken-lnk]\nfields.item: one of data.table-1\n\
+            "title: Site 1\ncode_colours: true\nquiet: [broken-lnk]\nfields.item: one of data.table-1\n\
              fields.other: one of data.tabel-1\nfields.shelf: one of folder.notse\n",
         ),
         ("data/table-1.yaml", "item-1: One\n"),

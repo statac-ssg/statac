@@ -160,8 +160,12 @@ fn settings_offer_statacs_names_and_what_each_takes() {
     let site = site();
     let names = offered(&site, "statac.yaml", "title: Site 1\nco|\n").unwrap();
     assert_eq!(
-        find(&names, "code_style"),
-        &("code_style".into(), "setting".into(), "code_style: ".into())
+        find(&names, "code_colours"),
+        &(
+            "code_colours".into(),
+            "setting".into(),
+            "code_colours: ".into()
+        )
     );
     assert_eq!(
         find(&names, "pages.layout"),
@@ -176,11 +180,11 @@ fn settings_offer_statacs_names_and_what_each_takes() {
     assert!(!labels(&names).contains(&"pages.title"), "each page's own");
     assert!(!labels(&names).contains(&"pages.index_page"));
 
-    let styles = offered(&site, "statac.yaml", "code_style: |\n").unwrap();
+    let words = offered(&site, "statac.yaml", "search_without_javascript: |\n").unwrap();
     assert_eq!(
-        labels(&styles),
-        crate::highlight::SETTING.to_vec(),
-        "every style, in order"
+        labels(&words),
+        crate::search::elsewhere::SETTING.to_vec(),
+        "every word, in order"
     );
     let truth = offered(&site, "statac.yaml", "typography:|\n").unwrap();
     assert_eq!(find(&truth, "false").2, " false");

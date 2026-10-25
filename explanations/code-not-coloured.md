@@ -4,7 +4,8 @@ A code block names a language that Statac colours, and one of its lines
 is longer than 5,000 characters. Statac did not colour the block. It is
 published as it is, the same as a block in a language Statac has no
 colours for, and its `<code>` element keeps the language name in its
-class, such as `language-js`.
+class, such as `language-js`. Statac tells of this only on a site with
+`code_colours: true`, where it colours code.
 
 ## What you'll see {#what-youll-see}
 

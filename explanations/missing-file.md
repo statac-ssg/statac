@@ -27,6 +27,15 @@ Correct the name, or add the file to `assets/` (or, for a card, to
 suggests it. A file in `static/` keeps its own name, so link to it
 directly instead. Statac tells you the URL to use.
 
+Statac before 0.7.0 wrote a `code.css` of its own, holding the colours
+of coloured code, and a template asked for it with `css("code.css")`.
+Statac writes no stylesheet now, so a site asking for `code.css` needs
+one of its own. Copy a theme's rules from [Code
+colours](https://statac.dev/code-colours/) into the site's stylesheet
+and take the call out, or save them as `assets/code.css`. Either way,
+`code_colours: true` in `statac.yaml` asks Statac to mark the code with
+the classes the rules colour.
+
 ## Example
 
 In `templates/base.html`:

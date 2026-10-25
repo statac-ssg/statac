@@ -100,11 +100,11 @@ const SETTINGS: &[(&str, Described)] = &[
         ),
     ),
     (
-        "code_style",
+        "code_colours",
         described(
-            "The colours of code in the content: `ocean`, `gruvbox`, `solarized`, \
-             `catppuccin` or `one-half`, or `none` to colour no code. Unset, it is \
-             `ocean`.",
+            "`true` marks each piece of code in the content with a class for its kind, \
+             such as `hl-keyword`, for the site's own stylesheet to colour. Unset, it is \
+             `false`, and code is written as it is.",
             WRITING,
         ),
     ),

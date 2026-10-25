@@ -744,6 +744,10 @@ const FILE: &str = "{% set file = page.file(name) %}\n\
 #[test]
 fn a_file_beside_the_page_is_shown_as_code_coloured_by_its_name() {
     let site = Site::new("file-code", "{{ page.content }}");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_colours: true\n",
+    );
     site.write("snippets/file.html", FILE);
     site.write(
         "content/post-1/index.md",
@@ -754,20 +758,7 @@ fn a_file_beside_the_page_is_shown_as_code_coloured_by_its_name() {
     site.write("content/post-1/notes-1.txt", "a < b\n");
     site.put("content/post-1/data-1.bin", &[0xff, 0xfe, 0x00]);
     site.write("content/post-1/code-2.rs", &"//".repeat(100_001));
-    let said = site.check();
-    assert_eq!(
-        said,
-        "\
-warning  Code colours not loaded: no template asks for `code.css`
-  content/post-1/index.md, line 4
-   4 │ @file(\"code-1.rs\")
-     │ ^^^^^^^^^^^^^^^^^^
-  Add `{{ css(\"code.css\") }}` inside a template's `<head>`.
-  More: https://statac.dev/e/code-colours-not-loaded/
-
-1 warning: 1 code-colours-not-loaded.
-"
-    );
+    assert_eq!(site.check(), "No problems.\n");
     site.build();
     let html = site.page("post-1/index.html");
     let (code, rest) = html.split_once('\n').unwrap();
@@ -793,6 +784,10 @@ fn an_unknown_language_is_told_at_its_own_highlight_where_two_colour_worked_out_
         "highlight-two",
         "<code>{{ (\"let x\" ~ \" = 1;\") | highlight(\"pyhton\") }}</code>\n\
          <code>{{ (\"let x\" ~ \" = 1;\") | highlight(\"rbuy\") }}</code>",
+    );
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_colours: true\n",
     );
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
     let said = site.check();
@@ -841,19 +836,16 @@ fn text_a_template_colours_is_told_of_a_language_unknown_and_a_line_too_long() {
          <code>{{ \"let x = 1;\" | highlight(\"pyhton\") }}</code>\n\
          <code>{{ page.file(\"code-1.rs\").code | length }}</code>",
     );
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_colours: true\n",
+    );
     site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
     site.write("content/post-1/code-1.rs", &"x".repeat(5_001));
     let said = site.check();
     assert_eq!(
         said,
         "\
-warning  Code colours not loaded: no template asks for `code.css`
-  templates/page.html, line 3
-   3 │ <code>{{ \"let x = 1;\" | highlight(\"rust\") }}</code>
-     │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Add `{{ css(\"code.css\") }}` inside a template's `<head>`.
-  More: https://statac.dev/e/code-colours-not-loaded/
-
 warning  Unknown code language: Statac has no colours for `pyhton`
   templates/page.html, line 5
    5 │ <code>{{ \"let x = 1;\" | highlight(\"pyhton\") }}</code>
@@ -867,7 +859,7 @@ warning  Code not coloured: a line in this block is 5,001 characters long
      │          ^^^^^^^^^^^^^^^^^^^^^^
   More: https://statac.dev/e/code-not-coloured/
 
-3 warnings: 1 code-colours-not-loaded, 1 code-not-coloured, 1 unknown-code-language.
+2 warnings: 1 code-not-coloured, 1 unknown-code-language.
 "
     );
     site.build();
@@ -1536,15 +1528,10 @@ fn a_snippet_for_code_numbers_its_lines_and_names_those_picked_out() {
         snippet!("markdown/code.html"),
     );
     site.write(
-        "statac.yaml",
-        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
-         quiet: [code-colours-not-loaded]\n",
-    );
-    site.write(
         "content/post-1.md",
         "---\ntitle: Post 1\n---\n```rust 2,4\nlet x = 1 < 2;\n```\n\n```\nas it is\n```\n",
     );
-    assert_eq!(site.check(), "1 warning, quietened.\n");
+    assert_eq!(site.check(), "No problems.\n");
     site.build();
     assert_eq!(
         site.page("post-1/index.html"),
@@ -1559,8 +1546,7 @@ fn a_snippet_for_code_is_handed_it_coloured_however_it_comes_to_read_it() {
     let site = Site::new("own-code-coloured", "{{ page.content }}");
     site.write(
         "statac.yaml",
-        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
-         quiet: [code-colours-not-loaded]\n",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ncode_colours: true\n",
     );
     site.write(
         "content/post-1.md",

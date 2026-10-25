@@ -286,7 +286,7 @@ fn a_photograph_beside_a_page_in_its_own_folder_is_published_as_copies() {
         said.contains("Made 6 resized copies of 1 image.\n"),
         "{said}"
     );
-    assert!(said.contains("\nWrote 2 pages and 8 other files"), "{said}");
+    assert!(said.contains("\nWrote 2 pages and 7 other files"), "{said}");
     let sizes = "(max-width: 46rem) 100vw, 46rem";
     assert_eq!(
         line_with(&site.html("post-1/index.html"), "<picture>"),
@@ -305,7 +305,6 @@ fn a_photograph_beside_a_page_in_its_own_folder_is_published_as_copies() {
     assert_eq!(
         unhashed(&site.built()),
         [
-            "code.#.css",
             "index.html",
             "post-1/index.html",
             "post-1/photo-1-400.#.avif",
@@ -492,7 +491,6 @@ fn a_photograph_two_pages_show_has_one_set_of_copies() {
     assert_eq!(
         unhashed(&site.built()),
         [
-            "code.#.css",
             "index.html",
             "post-1/index.html",
             "post-2/index.html",
@@ -534,7 +532,7 @@ fn a_second_build_makes_nothing_and_publishes_the_same_bytes() {
         .into_iter()
         .map(|name| (name.clone(), fs::read(site.out().join(name)).unwrap()))
         .collect();
-    assert_eq!(first.len(), 9);
+    assert_eq!(first.len(), 8);
     assert!(first == second);
     assert_eq!(site.kept(), kept);
 }
@@ -783,7 +781,6 @@ fn a_photograph_left_alone_is_published_as_it_is() {
     assert_eq!(
         unhashed(&site.built()),
         [
-            "code.#.css",
             "index.html",
             "post-1/index.html",
             "post-1/photo-1.jpg",
@@ -805,7 +802,6 @@ fn a_photograph_left_alone_is_published_as_it_is() {
     assert_eq!(
         site.built(),
         [
-            site.built()[0].as_str(),
             "index.html",
             "post-1/index.html",
             "post-1/photo-1.jpg",
@@ -900,11 +896,10 @@ fn a_photograph_nothing_shows_travels_and_one_linked_plainly_is_published() {
         said.contains("Made 4 resized copies of 2 images."),
         "{said}"
     );
-    assert!(said.contains("Wrote 2 pages and 7 other files"), "{said}");
+    assert!(said.contains("Wrote 2 pages and 6 other files"), "{said}");
     assert_eq!(
         unhashed(&site.built()),
         [
-            "code.#.css",
             "index.html",
             "post-1/index.html",
             "post-1/photo-1-400.#.avif",
@@ -1043,7 +1038,6 @@ fn a_drafts_photograph_is_kept_and_what_no_page_shows_is_removed() {
     assert_eq!(
         unhashed(&site.built()),
         [
-            "code.#.css",
             "index.html",
             "post-1/index.html",
             "post-1/photo-1-400.#.avif",
@@ -1145,7 +1139,7 @@ fn copies_that_cannot_be_kept_are_still_published() {
     assert_eq!(code, 0, "{said}");
     assert!(said.contains("1 warning: 1 cache-not-written."), "{said}");
     assert!(said.contains("Made 6 resized copies of 1 image."), "{said}");
-    assert_eq!(site.built().len(), 9);
+    assert_eq!(site.built().len(), 8);
     let (said, _) = site.run(&["check"]);
     assert_eq!(said, "No problems.\n");
 }

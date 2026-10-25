@@ -24,7 +24,7 @@ impl Site {
 
     fn gather(&self, base: &str) -> (Assets, Vec<Problem>, Sources) {
         let mut sources = Sources::default();
-        let (assets, problems) = gather(&self.0, base, None, &mut sources);
+        let (assets, problems) = gather(&self.0, base, &mut sources);
         (assets, problems, sources)
     }
 }
@@ -44,45 +44,32 @@ fn mark_of(published: &str) -> &str {
 }
 
 #[test]
-fn no_code_stylesheet_is_published_where_code_style_is_none() {
-    let site = Site::new(
-        "code-css-off",
-        &[("assets/site.css", "body { margin: 0; }\n")],
-    );
-    let (assets, problems) = gather(&site.0, "", Some("none"), &mut Sources::default());
+fn code_css_is_the_sites_own_and_its_absence_says_statac_no_longer_writes_it() {
+    let site = Site::new("code-css", &[("assets/site.css", "body { margin: 0; }\n")]);
+    let (assets, problems, _) = site.gather("");
     assert_eq!(problems, []);
     assert!(assets.get("code.css").is_none());
-}
+    for asked in ["code.css", "/code.css"] {
+        assert_eq!(
+            assets.css(asked, &mut Reads::default()),
+            Err(Kind::MissingFile {
+                path: "assets/code.css".into(),
+                hint: Some(Hint::NoLongerWritten),
+            })
+        );
+    }
 
-#[test]
-fn the_code_stylesheet_is_written_from_the_style_and_published_like_any_other() {
-    let site = Site::new("code-css", &[("assets/site.css", "body { margin: 0; }\n")]);
-    let gathered = || gather(&site.0, "", Some("one-half"), &mut Sources::default());
-    let (assets, problems) = gathered();
+    site.write("assets/code.css", ".hl-comment { color: grey; }\n");
+    let (assets, problems, _) = site.gather("");
     assert_eq!(problems, []);
     let code = assets.get("code.css").unwrap();
-    assert_eq!(code.source, "statac.yaml");
+    assert_eq!(code.source, "assets/code.css");
     assert_eq!(code.kind, AssetKind::Stylesheet);
-    assert_eq!(
-        text(code),
-        crate::highlight::stylesheet("one-half").unwrap()
-    );
-    assert_eq!(
-        code.published,
-        format!("code.{}.css", fingerprint::mark(code.bytes()))
-    );
+    assert_eq!(text(code), ".hl-comment { color: grey; }\n");
     assert_eq!(
         assets.css("code.css", &mut Reads::default()).unwrap(),
         format!("<link rel=\"stylesheet\" href=\"/{}\">", code.published)
     );
-
-    // A `code.css` of the site's own is the one published.
-    site.write("assets/code.css", ".hl-comment { color: grey; }\n");
-    let (assets, problems) = gathered();
-    assert_eq!(problems, []);
-    let code = assets.get("code.css").unwrap();
-    assert_eq!(code.source, "assets/code.css");
-    assert_eq!(text(code), ".hl-comment { color: grey; }\n");
 }
 
 #[test]

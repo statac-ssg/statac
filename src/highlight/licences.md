@@ -1,8 +1,7 @@
-# Grammars and themes Statac carries
+# Grammars Statac carries
 
 Written by `cargo run --example grammars` from npm's tm-grammars 1.32.22,
-https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz, and
-the themes in `src/highlight/themes/`.
+https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz.
 
 ## Grammars
 
@@ -233,16 +232,3 @@ the themes in `src/highlight/themes/`.
 -  (`vue-directives`): MIT. https://github.com/vuejs/language-tools/blob/784dd56026e07f1dadb9ef2498418eccbb3dee29/extensions/vscode/syntaxes/vue-directives.json
 -  (`vue-interpolations`): MIT. https://github.com/vuejs/language-tools/blob/784dd56026e07f1dadb9ef2498418eccbb3dee29/extensions/vscode/syntaxes/vue-interpolations.json
 -  (`vue-sfc-style-variable-injection`): MIT. https://github.com/vuejs/language-tools/blob/e85556a2e4bf0d6c981bdbd95c8a0b1e85e7ae8a/extensions/vscode/syntaxes/vue-sfc-style-variable-injection.json
-
-## Themes
-
-- `base16-ocean-light`: MIT. https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-light.json
-- `base16-ocean-dark`: MIT. https://github.com/jryans/base16-vscode/blob/81ad380452b8828062d1be91501b495637eff2ac/themes/ocean-dark.json
-- `gruvbox-light-medium`: MIT. tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts
-- `gruvbox-dark-medium`: MIT. tm-themes 1.12.12, from https://github.com/jdinhify/vscode-theme-gruvbox/blob/f0d6e1fc1f325da636b90591eccc45d2f44738fd/src/main.ts
-- `solarized-light`: MIT. tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/0132168df99ab8830a1eb158b1a5e8242f3e94ff/extensions/theme-solarized-light/themes/solarized-light-color-theme.json
-- `solarized-dark`: MIT. tm-themes 1.12.12, from https://github.com/microsoft/vscode/blob/e886f3e07de31233c89ecdba812b05bfd07616d7/extensions/theme-solarized-dark/themes/solarized-dark-color-theme.json
-- `catppuccin-latte`: MIT. tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json
-- `catppuccin-mocha`: MIT. tm-themes 1.12.12, from https://github.com/catppuccin/vscode/blob/befc9e6fc41980f4241408f7049755d47c06ff45/packages/catppuccin-vsc/package.json
-- `one-half-light`: MIT. https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfLight.tmTheme, written as JSON
-- `one-half-dark`: MIT. https://github.com/sonph/onehalf/blob/75eb2e97acd74660779fed8380989ee7891eec56/vscode/OneHalfDark.tmTheme, written as JSON
