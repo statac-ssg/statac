@@ -1066,10 +1066,14 @@ pub(super) fn check(
     for problem in &outcome.problems {
         let template = match &problem.kind {
             Kind::MissingTemplate { path, .. } => path,
+            // The last looked for, `templates/feed.xml`, builds any feed.
             Kind::FeedNotWritten {
-                why: Unwritten::NoTemplate(path),
+                why: Unwritten::NoTemplate(paths),
                 ..
-            } => path,
+            } => match paths.last() {
+                Some(path) => path,
+                None => continue,
+            },
             _ => continue,
         };
         if !checked.templates.contains(template) {

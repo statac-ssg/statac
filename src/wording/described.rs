@@ -202,8 +202,9 @@ const SETTINGS: &[(&str, Described)] = &[
         "feed",
         described(
             "`true` gives the site's own list a feed, beside its page as `feed.xml`, and a \
-             name or a URL puts it there. On a site in several languages, each language's own \
-             list has one. A `feed:` line on the list page wins over it.",
+             name or a URL puts it there. A list of them gives it a feed at each, templates \
+             linking the first. On a site in several languages, each language's own list has \
+             one. A `feed:` line on the list page wins over it.",
             FEEDS,
         ),
     ),
@@ -506,7 +507,8 @@ const FIELDS_OF_A_PAGE: &[(&str, Described)] = &[
         "feed",
         described(
             "`true` gives the list a feed, beside its page as `feed.xml`, and a name or a \
-             URL puts it there. A list has no feed unless it asks for one.",
+             URL puts it there. A list of them gives it a feed at each, templates linking the \
+             first. A list has no feed unless it asks for one.",
             LIST_PAGE,
         ),
     ),

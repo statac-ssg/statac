@@ -55,8 +55,9 @@ pub(super) struct Shared {
     pub data_values: Vec<OnceLock<(Value, frame::Origins)>>,
     /// Every feed the site publishes.
     feeds: Vec<crate::feeds::Feed>,
-    /// Each list's feed among `feeds`, by list.
-    feed_of: Vec<Option<usize>>,
+    /// Each list's feeds among `feeds`, in the order its `feed:` names
+    /// them, by list.
+    feeds_of: Vec<Vec<usize>>,
     /// The page published at each address, by the address's key, a list's
     /// later pages under their first page; made when first asked.
     standing: OnceLock<HashMap<String, PageId>>,
@@ -197,9 +198,11 @@ impl Shared {
         after_known(self.later.write().expect("never poisoned").intern(name))
     }
 
-    /// The feed `list` publishes, where it publishes one.
-    pub(super) fn feed(&self, list: ListId) -> Option<&crate::feeds::Feed> {
-        self.feed_of[list.index()].map(|at| &self.feeds[at])
+    /// Every feed `list` publishes, in the order its `feed:` names them.
+    pub(super) fn feeds_of(&self, list: ListId) -> impl Iterator<Item = &crate::feeds::Feed> {
+        self.feeds_of[list.index()]
+            .iter()
+            .map(|&at| &self.feeds[at])
     }
 
     /// The page published at `address`, or the page whose list's later
@@ -430,9 +433,9 @@ impl Renderer {
         feeds: Vec<crate::feeds::Feed>,
     ) -> Renderer {
         let base = settings.base();
-        let mut feed_of = vec![None; site.lists.len()];
+        let mut feeds_of = vec![Vec::new(); site.lists.len()];
         for (at, feed) in feeds.iter().enumerate() {
-            feed_of[feed.list.index()] = Some(at);
+            feeds_of[feed.list.index()].push(at);
         }
         let known = known_names(&settings, &site);
         let highlighter = settings
@@ -460,7 +463,7 @@ impl Renderer {
                 bodies,
                 data_values,
                 feeds,
-                feed_of,
+                feeds_of,
                 standing: OnceLock::new(),
                 every_page: OnceLock::new(),
                 files_by_path: OnceLock::new(),
@@ -633,9 +636,9 @@ impl Renderer {
         crate::dates::ShowDates::today(&self.shared.dates)
     }
 
-    /// The feed `list` publishes, where it publishes one.
-    pub(crate) fn feed_of(&self, list: ListId) -> Option<&crate::feeds::Feed> {
-        self.shared.feed(list)
+    /// Every feed `list` publishes, in the order its `feed:` names them.
+    pub(crate) fn feeds_of(&self, list: ListId) -> impl Iterator<Item = &crate::feeds::Feed> {
+        self.shared.feeds_of(list)
     }
 
     /// What `list` is known by but for its members.
@@ -1018,9 +1021,9 @@ impl Renderer {
         &self.shared.feeds
     }
 
-    /// Builds a list's feed with its template, handed `list`, its dated
-    /// `posts` newest first, and `page`, the page speaking for the list,
-    /// where one does.
+    /// Builds a list's feed with its template, handed `feed`, where it is
+    /// published, `list`, its dated `posts` newest first, and `page`, the
+    /// page speaking for the list, where one does.
     pub fn render_feed(&self, feed: &crate::feeds::Feed) -> Rendered {
         let shared = &self.shared;
         let page = shared.site.lists.get(feed.list).page;
@@ -1036,6 +1039,8 @@ impl Renderer {
             .map(|post| PageValue::value(shared, post))
             .collect();
         let mut context: BTreeMap<&str, Value> = BTreeMap::new();
+        let address = format!("{}{}", shared.base, feed.address.as_str());
+        context.insert("feed", Value::from(address));
         context.insert("list", ListValue::value(shared, feed.list));
         context.insert("posts", Value::from(posts));
         context.insert("site", SiteValue::value(shared, frame::language()));

@@ -198,7 +198,7 @@ impl Renderer {
         }
         let feeds = (shared.site.lists.iter())
             .filter(|(_, list)| list.members.contains(&page))
-            .filter_map(|(id, _)| self.feeds().iter().find(|feed| feed.list == id))
+            .flat_map(|(id, _)| self.feeds_of(id))
             .map(|feed| format!("{}{}", shared.base, feed.address.as_str()));
         let layout = self.layout_of(page).ok().flatten();
         let templates = &shared.templates;

@@ -4,7 +4,7 @@ A list asks for a feed, but Statac didn't write it. The message names the
 list and gives the reason, which is one of these:
 
 - The site has no `title`, which the feed uses as its name.
-- There is no `templates/feed.xml` to build the feed with.
+- There is no template to build the feed with, such as `templates/feed.xml`.
 - One of your pages is published at the feed's URL.
 - A `feed:` line asks for a feed of a list where nothing is dated, so the
   feed would have nothing in it.
@@ -31,11 +31,20 @@ out.
 
 Add what is missing: a `title:` line in `statac.yaml`, or the template.
 
-A feed is built with `templates/feed.xml`. If the feed's URL ends in
-another extension, Statac uses the template with that name if you have
-one, such as `templates/feed.json` for `/feed.json`. The template is
-handed `list` (the list), `posts` (its posts, newest first) and `page`
-(the list page).
+A feed is built with the template named as the feed's file, if you have
+one, such as `templates/rss.xml` for `rss.xml`. Otherwise, if the feed's
+URL ends in an extension other than `.xml`, Statac uses the template
+named `feed` with that extension, such as `templates/feed.json` for
+`/feed.json`, and otherwise `templates/feed.xml`. The message names the
+templates in the order Statac looks for them, and any one of them builds
+the feed. The template is handed `feed` (the feed's own URL), `list`
+(the list), `posts` (its posts, newest first) and `page` (the list
+page).
+
+A list can have several feeds, such as an Atom feed and an RSS feed:
+`feed: [feed.xml, rss.xml]` builds `feed.xml` with `templates/feed.xml`
+and `rss.xml` with `templates/rss.xml`. Statac warns once for each
+template that is missing, naming the first list that needs it.
 
 If you don't want the feed, take out the `feed:` line that asks for
 it.

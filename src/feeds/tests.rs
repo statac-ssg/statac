@@ -21,6 +21,10 @@ type Asking<'a> = (&'a str, &'a str, Vec<(&'a str, String)>, Feeds);
 /// A file under `content/` and its text.
 type File<'a> = (&'a str, &'a str);
 
+/// What a case is called, what the settings add, the folder's page where
+/// one is written, and the folder's feeds.
+type Naming<'a> = (&'a str, &'a str, Option<(&'a str, String)>, Vec<&'a str>);
+
 /// The site's feed and the feed of the folder `posts`, for a site of
 /// `files` beside a `statac.yaml` holding `settings`.
 fn feeds(settings: &str, files: &[(&str, &str)]) -> Feeds {
@@ -373,6 +377,143 @@ fn a_folder_below_the_top_has_a_feed_only_where_its_page_asks() {
         feeds_of(UNFED, &[POST, nested, asks], "posts/2026"),
         (None, some("/posts/2026/feed.xml"))
     );
+}
+
+/// A `feed:` line naming several feeds, times where each list has them:
+/// one at each name, in the order written, handed down whole, the first
+/// being the list's feed, and none for a name giving an address a name
+/// before it gives, or a list naming none.
+#[test]
+fn a_list_naming_several_feeds_has_one_at_each() {
+    let posts = |feed: &str| ("posts/index.md", format!("---\n{feed}\n---\n"));
+    // (the case, what the settings add, the folder's page, its feeds)
+    let cases: Vec<Naming> = vec![
+        (
+            "two names",
+            "",
+            Some(posts("feed: [feed.xml, rss.xml]")),
+            vec!["/posts/feed.xml", "/posts/rss.xml"],
+        ),
+        (
+            "in the order written",
+            "",
+            Some(posts("feed: [rss.xml, feed.xml]")),
+            vec!["/posts/rss.xml", "/posts/feed.xml"],
+        ),
+        (
+            "one from the top of the site",
+            "",
+            Some(posts("feed: [feed.xml, /feeds/posts.xml]")),
+            vec!["/posts/feed.xml", "/feeds/posts.xml"],
+        ),
+        (
+            "one name in a list",
+            "",
+            Some(posts("feed: [rss.xml]")),
+            vec!["/posts/rss.xml"],
+        ),
+        (
+            "handed down whole",
+            "pages.feed: [feed.xml, rss.xml]\n",
+            None,
+            vec!["/posts/feed.xml", "/posts/rss.xml"],
+        ),
+        (
+            "a page's own line over what is handed down",
+            "pages.feed: [feed.xml, rss.xml]\n",
+            Some(posts("feed: atom.xml")),
+            vec!["/posts/atom.xml"],
+        ),
+        (
+            "a page refusing what is handed down",
+            "pages.feed: [feed.xml, rss.xml]\n",
+            Some(posts("feed: false")),
+            vec![],
+        ),
+        (
+            "the same name twice",
+            "",
+            Some(posts("feed: [feed.xml, rss.xml, feed.xml]")),
+            vec!["/posts/feed.xml", "/posts/rss.xml"],
+        ),
+        (
+            "two names giving one address",
+            "",
+            Some(posts("feed: [feed.xml, /posts/feed.xml]")),
+            vec!["/posts/feed.xml"],
+        ),
+        (
+            "two names differing in capitals",
+            "",
+            Some(posts("feed: [feed.xml, Feed.xml]")),
+            vec!["/posts/feed.xml"],
+        ),
+        (
+            "a name naming no file beside one that does",
+            "",
+            Some(posts("feed: [/feeds/, rss.xml]")),
+            vec!["/posts/rss.xml"],
+        ),
+        ("no names", "", Some(posts("feed: []")), vec![]),
+    ];
+    for (case, added, page, wanted_feeds) in cases {
+        let settings = format!("{UNFED}{added}");
+        let mut files: Vec<(&str, &str)> = vec![POST];
+        files.extend(page.iter().map(|(path, text)| (*path, text.as_str())));
+        let read = read(&settings, &files);
+        let list = (read.site.lists.iter())
+            .find(|(_, list)| list.key == ListKey::Folder("posts".into()))
+            .map(|(id, _)| id)
+            .unwrap();
+        let feeds = wanted(&read.site, &read.settings, list);
+        let feeds: Vec<&str> = feeds.iter().map(Address::as_str).collect();
+        assert_eq!(feeds, wanted_feeds, "{case}");
+        let first = wanted_feeds.first().map(|first| (*first).to_owned());
+        assert_eq!(feed_at(&read, list), first, "{case}");
+    }
+}
+
+#[test]
+fn the_setting_naming_several_feeds_gives_the_sites_own_list_each() {
+    let settings = format!("{UNFED}feed: [atom.xml, /rss.xml]\n");
+    let read = read(&settings, &[POST]);
+    let list = read.site.own_list(crate::site::Id::from_index(0)).unwrap();
+    let feeds = wanted(&read.site, &read.settings, list);
+    let feeds: Vec<&str> = feeds.iter().map(Address::as_str).collect();
+    assert_eq!(feeds, ["/atom.xml", "/rss.xml"]);
+    assert_eq!(feed_at(&read, list), some("/atom.xml"));
+}
+
+/// Where a feed is published, times the templates it may be built with,
+/// in the order they are looked for.
+#[test]
+fn a_feed_looks_for_the_template_named_as_its_file_then_by_its_extension() {
+    let cases = [
+        ("/feed.xml", vec!["feed.xml"]),
+        ("/rss.xml", vec!["rss.xml", "feed.xml"]),
+        ("/posts/atom.xml", vec!["atom.xml", "feed.xml"]),
+        ("/feed.json", vec!["feed.json", "feed.xml"]),
+        ("/posts.json", vec!["posts.json", "feed.json", "feed.xml"]),
+        ("/index.rss", vec!["index.rss", "feed.rss", "feed.xml"]),
+        (
+            "/blog.html.feed.xml",
+            vec!["blog.html.feed.xml", "feed.xml"],
+        ),
+        ("/feed.html", vec!["feed.xml"]),
+        ("/feed", vec!["feed.xml"]),
+    ];
+    for (address, wanted) in cases {
+        let address = Address::read(address).unwrap();
+        assert_eq!(looked_for(&address), wanted, "{}", address.as_str());
+    }
+    let address = Address::read("/rss.xml").unwrap();
+    let has = |names: &'static [&'static str]| move |name: &str| names.contains(&name);
+    assert_eq!(
+        template(&address, &has(&["feed.xml", "rss.xml"])),
+        some("rss.xml")
+    );
+    assert_eq!(template(&address, &has(&["feed.xml"])), some("feed.xml"));
+    assert_eq!(template(&address, &has(&["feed.json"])), None);
 }
 
 mod known;

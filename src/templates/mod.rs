@@ -263,6 +263,7 @@ pub(crate) fn read(
         .filter(|f| f.role == Role::Template)
         .map(|f| f.name.clone())
         .collect();
+    schema.feeds = crate::feeds::templates(site, settings, &|name| schema.templates.contains(name));
     let checked: Vec<Checked> = files
         .iter()
         .map(|f| Checked {
@@ -278,6 +279,7 @@ pub(crate) fn read(
         let mut with_url = self::schema(site, settings);
         with_url.snippets = snippets.clone();
         with_url.templates.clone_from(&schema.templates);
+        with_url.feeds.clone_from(&schema.feeds);
         for name in ["url", "host"] {
             let always = Field {
                 ty: Ty::Text,
@@ -768,6 +770,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("series", lists),
         ("today", Ty::Record(Rec::Date)),
         ("feed", Ty::Text),
+        ("feeds", Ty::List(Box::new(Ty::Text))),
         ("data", Ty::Any),
         ("languages", Ty::Any),
         ("webmentions", Ty::Bool),

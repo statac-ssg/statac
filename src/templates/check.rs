@@ -142,6 +142,9 @@ pub(super) struct Schema {
     pub snippets: BTreeMap<String, Snippet>,
     /// The templates, by the names `extends` and `layout:` use.
     pub templates: BTreeSet<String>,
+    /// The templates the site's feeds are built with, by name. One named
+    /// `feed.` is checked as a feed's whether or not one is.
+    pub feeds: BTreeSet<String>,
 }
 
 impl Schema {
@@ -163,6 +166,7 @@ impl Schema {
                 ("word", Ty::Text, true),
                 ("order", Ty::Text, true),
                 ("feed", Ty::Text, true),
+                ("feeds", Ty::list(Ty::Text), true),
                 ("pager", pages, true),
             ]),
             date: fields(&[
@@ -557,10 +561,15 @@ impl<'a> Checker<'a> {
             Role::Template if file.name == super::render::REDIRECT => {
                 vec![("to", Ty::Text), ("title", Ty::Text)]
             }
-            Role::Template if file.name.starts_with("feed.") => vec![
-                ("list", Ty::Record(Rec::List)),
-                ("posts", Ty::list(Ty::Record(Rec::Page))),
-            ],
+            Role::Template
+                if file.name.starts_with("feed.") || schema.feeds.contains(file.name) =>
+            {
+                vec![
+                    ("feed", Ty::Text),
+                    ("list", Ty::Record(Rec::List)),
+                    ("posts", Ty::list(Ty::Record(Rec::Page))),
+                ]
+            }
             Role::Piece(piece) => handed_to(*piece),
             _ => Vec::new(),
         };

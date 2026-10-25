@@ -243,6 +243,8 @@ pub(crate) fn read_with(
     read.problems
         .extend(feeds::unusable(&read.site, &read.settings, &read.sources));
     read.problems
+        .extend(feeds::twice(&read.site, &read.settings));
+    read.problems
         .extend(feeds::undated(&read.site, &read.settings, &read.sources));
     read.problems
         .extend(feeds::unasked(&read.site, &read.settings, &read.templates));

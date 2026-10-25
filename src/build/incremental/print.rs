@@ -782,7 +782,7 @@ impl Taken<'_> {
                 ))
                 .shown(&(address.map(|address| &address.value), &list.later))
                 .place(sources, address.and_then(|address| address.origin.place));
-            if let Some(feed) = renderer.feed_of(id) {
+            for feed in renderer.feeds_of(id) {
                 print = print
                     .shown(&(&feed.address, &feed.template))
                     .place(sources, feed.placed);
@@ -799,7 +799,7 @@ impl Taken<'_> {
             let page = (known.page).map(|(page, lands)| (self.named(&[page]), lands));
             Print::default()
                 .with(page)
-                .shown(&(known.feed, known.order))
+                .shown(&(&known.feeds, known.order))
                 .done()
         })
     }

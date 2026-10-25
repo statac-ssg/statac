@@ -5,27 +5,29 @@
 //! speaks for it, handed down to that page, or for each language's own
 //! list, the site's `feed:` setting, which the page's own line wins over.
 //! The feed sits beside that page, as `feed.xml`, unless the line gives it
-//! another name, or an address of its own from the top of the site. A feed
-//! needs the site's address, its `feed_key` and its `title` in the list's
-//! language, and a list with no dated pages has nothing to carry, so has
-//! none.
+//! another name, or an address of its own from the top of the site. A line
+//! naming several has a feed at each, the first being the list's feed that
+//! templates are handed to link. A feed needs the site's address, its
+//! `feed_key` and its `title` in the list's language, and a list with no
+//! dated pages has nothing to carry, so has none.
 //!
 //! Statac ships no feed of its own: each is built with the site's template
-//! named by the feed's extension, `templates/feed.json` for `/feed.json`,
-//! or else `templates/feed.xml`. A page of the author's standing at a
-//! feed's address is published in its place.
+//! named as the feed's file, `templates/rss.xml` for `rss.xml`, or else the
+//! one named by its extension, `templates/feed.json` for `/feed.json`, or
+//! else `templates/feed.xml`. A page of the author's standing at a feed's
+//! address is published in its place.
 
 mod ids;
 pub(crate) mod known;
 #[cfg(test)]
 mod tests;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::config::Settings;
 use crate::content::address::Address;
 use crate::content::words::PageWord;
-use crate::origin::{Arrival, Sourced};
+use crate::origin::{Arrival, Origin, Sourced};
 use crate::problem::{AddressFault, Kind, Named, Problem, Unwritten, Waiting, Word};
 use crate::site::{ListId, ListKey, Page, PageId, Site};
 use crate::source::{Place, Sources, Span};
@@ -82,11 +84,25 @@ fn asked<'a>(site: &'a Site, settings: &'a Settings, id: ListId) -> Option<Asked
     })
 }
 
+/// The names a `feed:` value gives a list's feeds, in order, each as
+/// written with where it is written: `true` names `feed.xml`, written
+/// nowhere, and `false` names none.
+fn names(feed: &Sourced<Value>) -> Vec<(&str, Option<&Origin>)> {
+    match &feed.value {
+        Value::Bool(true) => vec![(FILE_NAME, None)],
+        Value::Text(written) => vec![(written.as_str(), Some(&feed.origin))],
+        Value::Texts(written) => (written.iter())
+            .map(|name| (name.value.as_str(), Some(&name.origin)))
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// Whether `list` asks for a feed, whether or not it can have one.
 fn asks(site: &Site, settings: &Settings, list: ListId) -> bool {
     asked(site, settings, list)
         .and_then(|asked| asked.feed)
-        .is_some_and(|feed| matches!(feed.value, Value::Bool(true) | Value::Text(_)))
+        .is_some_and(|feed| !names(feed).is_empty())
 }
 
 /// Where a list's page stands, or a folder's would.
@@ -102,37 +118,41 @@ fn standing(site: &Site, list: ListId, page: Option<&Page>) -> Option<Address> {
     }
 }
 
-/// Where `list`'s feed would be published were the site to have everything
-/// a feed needs: from the top of the site and without the site's own path.
-/// None where the list has no feed, or its `feed:` gives no address.
-pub(crate) fn wanted(site: &Site, settings: &Settings, list: ListId) -> Option<Address> {
-    let asked = asked(site, settings, list)?;
-    let (fed, written) = match asked.feed.map(|feed| &feed.value) {
-        Some(Value::Bool(fed)) => (*fed, None),
-        Some(Value::Text(written)) => (true, Some(written.as_str())),
-        _ => (false, None),
+/// Each feed `list` would publish were the site to have everything a feed
+/// needs, in the order its `feed:` names them: where, from the top of the
+/// site and without the site's own path, and where the name giving that is
+/// written, where one is. None for a name that gives no address, or one
+/// given by a name before it.
+fn wanting(site: &Site, settings: &Settings, list: ListId) -> Vec<(Address, Option<Place>)> {
+    let Some(asked) = asked(site, settings, list) else {
+        return Vec::new();
     };
-    let carries = site
-        .lists
-        .get(list)
-        .members
-        .iter()
-        .any(|&member| site.pages.get(member).date.is_some());
-    if !fed || !carries {
-        return None;
+    let carries =
+        (site.lists.get(list).members.iter()).any(|&member| site.pages.get(member).date.is_some());
+    let (Some(feed), true) = (asked.feed, carries) else {
+        return Vec::new();
+    };
+    let Some(at) = standing(site, list, asked.page) else {
+        return Vec::new();
+    };
+    let mut feeds: Vec<(Address, Option<Place>)> = Vec::new();
+    for (written, origin) in names(feed) {
+        let Ok(address) = written_address(&at, written) else {
+            continue;
+        };
+        if feeds.iter().all(|(was, _)| was.key() != address.key()) {
+            feeds.push((address, origin.and_then(|origin| origin.place)));
+        }
     }
-    let at = standing(site, list, asked.page)?;
-    written_address(&at, written.unwrap_or(FILE_NAME)).ok()
+    feeds
 }
 
-/// Where the `feed:` giving `list`'s feed its address is written, where
-/// one does.
-fn placed(site: &Site, settings: &Settings, list: ListId) -> Option<Place> {
-    let feed = asked(site, settings, list)?.feed?;
-    match feed.value {
-        Value::Text(_) => feed.origin.place,
-        _ => None,
-    }
+/// Where each of `list`'s feeds would be published were the site to have
+/// everything a feed needs, as [`wanting`] gives them.
+pub(crate) fn wanted(site: &Site, settings: &Settings, list: ListId) -> Vec<Address> {
+    (wanting(site, settings, list).into_iter())
+        .map(|(address, _)| address)
+        .collect()
 }
 
 /// The first of what every feed needs that `list`'s feed lacks: the site's
@@ -147,14 +167,14 @@ fn lacks(site: &Site, settings: &Settings, list: ListId) -> Option<&'static str>
     })
 }
 
-/// Where `list`'s feed is published, from the top of the site and without
-/// the site's own path; none where the list has no feed, or the site lacks
-/// something every feed needs.
+/// Where `list`'s feed is published, the first its `feed:` names, from the
+/// top of the site and without the site's own path; none where the list
+/// has no feed, or the site lacks something every feed needs.
 pub(crate) fn address(site: &Site, settings: &Settings, list: ListId) -> Option<Address> {
     if lacks(site, settings, list).is_some() {
         return None;
     }
-    wanted(site, settings, list)
+    wanted(site, settings, list).into_iter().next()
 }
 
 /// The address a feed written as `written` takes for a list whose page
@@ -229,23 +249,70 @@ pub(crate) fn unusable(site: &Site, settings: &Settings, sources: &Sources) -> V
         let Some(feed) = asked.feed else {
             continue;
         };
-        let Value::Text(written) = &feed.value else {
+        let Some(at) = standing(site, list, asked.page) else {
+            continue;
+        };
+        for (written, origin) in names(feed) {
+            let Some(origin) = origin else {
+                continue;
+            };
+            let Err((fault, span)) = written_address(&at, written) else {
+                continue;
+            };
+            let Some(place) = crate::value::place_within(sources, origin, written, span) else {
+                continue;
+            };
+            if told.contains(&place) {
+                continue;
+            }
+            told.push(place);
+            problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
+        }
+    }
+    problems
+}
+
+/// Each name in a `feed:` line giving the address a name before it gives,
+/// whose feed is published once, told once where it is written.
+pub(crate) fn twice(site: &Site, settings: &Settings) -> Vec<Problem> {
+    let mut told = Vec::new();
+    let mut problems = Vec::new();
+    for (list, _) in site.lists.iter() {
+        let Some(asked) = asked(site, settings, list) else {
+            continue;
+        };
+        let Some(feed) = asked.feed else {
             continue;
         };
         let Some(at) = standing(site, list, asked.page) else {
             continue;
         };
-        let Err((fault, span)) = written_address(&at, written) else {
-            continue;
-        };
-        let Some(place) = crate::value::place_within(sources, &feed.origin, written, span) else {
-            continue;
-        };
-        if told.contains(&place) {
-            continue;
+        let mut named: Vec<(Address, &str, Place)> = Vec::new();
+        for (written, origin) in names(feed) {
+            let (Ok(address), Some(place)) = (
+                written_address(&at, written),
+                origin.and_then(|origin| origin.place),
+            ) else {
+                continue;
+            };
+            let Some((_, first_written, first)) =
+                named.iter().find(|(was, ..)| was.key() == address.key())
+            else {
+                named.push((address, written, place));
+                continue;
+            };
+            if told.contains(&place) {
+                continue;
+            }
+            told.push(place);
+            let kind = Kind::FeedWrittenTwice {
+                written: written.to_owned(),
+                first_written: (*first_written).to_owned(),
+                first: *first,
+                address: format!("{}{}", settings.base(), address.as_str()),
+            };
+            problems.push(Problem::at(kind, place));
         }
-        told.push(place);
-        problems.push(Problem::at(Kind::UnusableUrl { fault }, place));
     }
     problems
 }
@@ -269,12 +336,11 @@ pub(crate) fn undated(site: &Site, settings: &Settings, sources: &Sources) -> Ve
             continue;
         }
         // A value naming no file is told as that.
-        match &feed.value {
-            Value::Bool(true) => {}
-            Value::Text(written)
-                if standing(site, list, asked.page)
-                    .is_some_and(|at| written_address(&at, written).is_ok()) => {}
-            _ => continue,
+        let at = standing(site, list, asked.page);
+        let usable =
+            |written: &str| (at.as_ref()).is_some_and(|at| written_address(at, written).is_ok());
+        if !(names(feed).into_iter()).any(|(written, origin)| origin.is_none() || usable(written)) {
+            continue;
         }
         let members = &site.lists.get(list).members;
         if members
@@ -294,26 +360,54 @@ pub(crate) fn undated(site: &Site, settings: &Settings, sources: &Sources) -> Ve
     problems
 }
 
-/// The template a feed at `address` is built with: the one named by its
-/// extension, as `feed.json`, where the site has it, or else `feed.xml`.
-/// None where the site has neither. `has` says whether the site has a
-/// template of a name.
-pub(crate) fn template(address: &Address, has: &dyn Fn(&str) -> bool) -> Option<String> {
+/// The templates a feed at `address` may be built with, the first the site
+/// has building it: the one named as its file, as `rss.xml`, then the one
+/// named by its extension, as `feed.json`, then `feed.xml`. A file with no
+/// extension, or ending `.html`, would name a page's template, so looks for
+/// none of its own.
+fn looked_for(address: &Address) -> Vec<String> {
     let last = address.as_str().rsplit('/').next().unwrap_or_default();
-    let own = last
-        .rsplit_once('.')
+    let extension = (last.rsplit_once('.'))
         .map(|(_, extension)| extension)
-        .filter(|extension| !matches!(*extension, "html" | "htm" | "xml"))
-        .map(|extension| format!("feed.{extension}"));
-    own.into_iter()
-        .chain([FILE_NAME.to_owned()])
-        .find(|name| has(name))
+        .filter(|extension| !matches!(*extension, "html" | "htm"));
+    let mut names = Vec::new();
+    names.extend(extension.map(|_| last.to_owned()));
+    names.extend(
+        extension
+            .filter(|&extension| extension != "xml")
+            .map(|extension| format!("feed.{extension}")),
+    );
+    names.push(FILE_NAME.to_owned());
+    names.dedup();
+    names
 }
 
-/// Every feed the site publishes, in the order of its lists, and what is
-/// said of each feed a list asks for that isn't: once for the site where
-/// the site lacks the template, or what every feed needs; once for each
-/// feed a page of the author's stands in the way of.
+/// The template a feed at `address` is built with, as [`looked_for`]
+/// gives them; none where the site has none of them. `has` says whether
+/// the site has a template of a name.
+pub(crate) fn template(address: &Address, has: &dyn Fn(&str) -> bool) -> Option<String> {
+    looked_for(address).into_iter().find(|name| has(name))
+}
+
+/// The names of the templates the site's feeds are built with, among
+/// those `has` says the site has, whether or not it has everything a feed
+/// needs.
+pub(crate) fn templates(
+    site: &Site,
+    settings: &Settings,
+    has: &dyn Fn(&str) -> bool,
+) -> BTreeSet<String> {
+    (site.lists.iter())
+        .flat_map(|(list, _)| wanted(site, settings, list))
+        .filter_map(|address| template(&address, has))
+        .collect()
+}
+
+/// Every feed the site publishes, in the order of its lists and each
+/// list's in the order its `feed:` names them, and what is said of each
+/// feed a list asks for that isn't: once for the site where the site lacks
+/// what every feed needs, and once for each template it lacks; once for
+/// each feed a page of the author's stands in the way of.
 pub(crate) fn plan(
     site: &Site,
     settings: &Settings,
@@ -321,20 +415,27 @@ pub(crate) fn plan(
     has: &dyn Fn(&str) -> bool,
 ) -> (Vec<Feed>, Vec<Problem>) {
     let mut problems = Vec::new();
-    let mut untemplated = Vec::new();
-    let mut fed: Vec<(ListId, Address, String)> = Vec::new();
+    // The templates looked for, and the lists whose feeds look for them.
+    let mut untemplated: Vec<(Vec<String>, Vec<ListId>)> = Vec::new();
+    let mut fed: Vec<(ListId, Address, String, Option<Place>)> = Vec::new();
     for (list, _) in site.lists.iter() {
-        let Some(address) = wanted(site, settings, list) else {
-            continue;
-        };
-        match template(&address, has) {
-            Some(template) => fed.push((list, address, template)),
-            None => untemplated.push(list),
+        for (address, placed) in wanting(site, settings, list) {
+            if let Some(template) = template(&address, has) {
+                fed.push((list, address, template, placed));
+                continue;
+            }
+            let looked = looked_for(&address);
+            match untemplated.iter_mut().find(|(was, _)| *was == looked) {
+                Some((_, lists)) if lists.last() == Some(&list) => {}
+                Some((_, lists)) => lists.push(list),
+                None => untemplated.push((looked, vec![list])),
+            }
         }
     }
-    if !untemplated.is_empty() {
-        let why = Unwritten::NoTemplate(format!("templates/{FILE_NAME}"));
-        problems.push(not_written(site, sources, &untemplated, why));
+    for (looked, lists) in untemplated {
+        let looked = looked.iter().map(|name| format!("templates/{name}"));
+        let why = Unwritten::NoTemplate(looked.collect());
+        problems.push(not_written(site, sources, &lists, why));
     }
     let Some((first, ..)) = fed.first() else {
         return (Vec::new(), problems);
@@ -346,7 +447,8 @@ pub(crate) fn plan(
         Some(&"url") => {
             let waiting = Waiting::Feeds {
                 list: described(site, sources, *first),
-                more: fed.len() - 1,
+                more: lists_of(&fed).len() - 1,
+                feeds: fed.len(),
             };
             problems.push(Problem::nowhere(Kind::NoSiteUrl { waiting }));
             return (Vec::new(), problems);
@@ -362,7 +464,7 @@ pub(crate) fn plan(
         .into_iter()
         .partition(|(list, ..)| lacks(site, settings, *list).is_some());
     if !untitled.is_empty() {
-        let untitled: Vec<ListId> = untitled.into_iter().map(|(list, ..)| list).collect();
+        let untitled = lists_of(&untitled);
         problems.push(not_written(site, sources, &untitled, Unwritten::NoTitle));
     }
     let mut landed: HashMap<String, PageId> = HashMap::new();
@@ -370,7 +472,7 @@ pub(crate) fn plan(
         landed.entry(page.address.key()).or_insert(id);
     }
     let mut feeds = Vec::new();
-    for (list, address, template) in fed {
+    for (list, address, template, placed) in fed {
         if let Some(&page) = landed.get(&address.key()) {
             let why = Unwritten::PageThere {
                 page: Box::new(site.named(page, sources)),
@@ -383,10 +485,22 @@ pub(crate) fn plan(
             list,
             address,
             template,
-            placed: placed(site, settings, list),
+            placed,
         });
     }
     (feeds, problems)
+}
+
+/// The lists of `fed`, each once, in order; a list's feeds are side by
+/// side.
+fn lists_of(fed: &[(ListId, Address, String, Option<Place>)]) -> Vec<ListId> {
+    let mut lists: Vec<ListId> = Vec::new();
+    for &(list, ..) in fed {
+        if lists.last() != Some(&list) {
+            lists.push(list);
+        }
+    }
+    lists
 }
 
 /// The note for a site with a feed template where no list asks for a

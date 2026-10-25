@@ -56,7 +56,7 @@ enum Shape {
     /// One of a set of words, or `false` for none of them.
     OneOfOrFalse(&'static [&'static str]),
     Whole(u64),
-    /// `true`, `false`, or where.
+    /// `true`, `false`, or where, or a list of wheres.
     Feed,
     Id,
     /// An address, or a pattern to fill one in from.
@@ -706,8 +706,11 @@ pub fn nested(sources: &Sources, under: &str, value: &Node) -> Vec<Problem> {
 }
 
 /// A `feed:` value, on a page or in the settings: `true`, `false`, or the
-/// name or URL of the list's feed.
+/// name or URL of the list's feed, or a list of them for several feeds.
 pub(crate) fn feed(reader: &Reader, node: &Node) -> Result<Option<Sourced<Value>>, Problem> {
+    if let Yaml::Sequence(_) = &node.value {
+        return Ok(reader.texts(node)?.map(|names| names.map(Value::Texts)));
+    }
     match reader.truth(node) {
         Ok(truth) => Ok(truth.map(|b| b.map(Value::Bool))),
         // `yes` is another spelling of `true` here too, not a feed's name.

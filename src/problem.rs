@@ -152,6 +152,7 @@ codes! {
     NotAPost "not-a-post",
     TwoLists "two-lists",
     FeedNotWritten "feed-not-written",
+    FeedWrittenTwice "feed-written-twice",
     NoFeedKey "no-feed-key",
     FeedIdChanged "feed-id-changed",
     NoSiteUrl "no-site-url",
@@ -336,6 +337,7 @@ impl Code {
             | Code::SortedLast
             | Code::NotData
             | Code::FeedNotWritten
+            | Code::FeedWrittenTwice
             | Code::FeedIdChanged
             | Code::MoreWrittenTwice
             | Code::MissingDefinition
@@ -500,6 +502,7 @@ impl Code {
             | Code::SortedLast
             | Code::NotData
             | Code::FeedNotWritten
+            | Code::FeedWrittenTwice
             | Code::FeedIdChanged
             | Code::RobotsBeneathPath
             | Code::UnusedFeedTemplate
@@ -1234,6 +1237,15 @@ pub enum Kind {
         more: usize,
         why: Unwritten,
     },
+    /// A feed a `feed:` list names twice, by one name or two giving one
+    /// address, placed at the second: as written there, as first written
+    /// and where, and its address, with the site's own path.
+    FeedWrittenTwice {
+        written: String,
+        first_written: String,
+        first: Place,
+        address: String,
+    },
     /// Lists that have feeds on a site with no `feed_key`, told with a key
     /// freshly made for it.
     NoFeedKey {
@@ -1680,9 +1692,13 @@ pub enum Held {
 pub enum Waiting {
     /// A page, by its file.
     Page(String),
-    /// Feeds, by the first list, as `NotAPost` names one, and how many
-    /// more there are.
-    Feeds { list: (Word, String), more: usize },
+    /// Feeds, by the first list, as `NotAPost` names one, how many more
+    /// lists there are, and how many feeds all of them have.
+    Feeds {
+        list: (Word, String),
+        more: usize,
+        feeds: usize,
+    },
     /// The pictures pages are shared with.
     Cards,
     /// The mentions in `fetched/mentions/`, and the relay's address.
@@ -1693,8 +1709,9 @@ pub enum Waiting {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Unwritten {
     NoTitle,
-    /// No template to build it with, by the file looked for.
-    NoTemplate(String),
+    /// No template to build it with, by the files looked for, in the order
+    /// they are looked for.
+    NoTemplate(Vec<String>),
     /// A page stands at the feed's address.
     PageThere {
         page: Box<Named>,
@@ -2365,7 +2382,7 @@ pub enum Expected {
     SiteAddress,
     OneOf(Vec<String>),
     LanguageCode,
-    /// `true`, `false` or an address, as `feed:` takes.
+    /// `true`, `false`, an address or a list of addresses, as `feed:` takes.
     TrueFalseOrAddress,
     /// `name: value` lines.
     Fields,
@@ -2925,6 +2942,7 @@ impl Kind {
             Kind::MalformedList { .. } => Code::MalformedList,
             Kind::NotAPost { .. } => Code::NotAPost,
             Kind::FeedNotWritten { .. } => Code::FeedNotWritten,
+            Kind::FeedWrittenTwice { .. } => Code::FeedWrittenTwice,
             Kind::NoFeedKey { .. } => Code::NoFeedKey,
             Kind::FeedIdChanged { .. } => Code::FeedIdChanged,
             Kind::NoSiteUrl { .. } => Code::NoSiteUrl,
@@ -3011,6 +3029,7 @@ impl Kind {
             | Kind::MoreWrittenTwice { first, .. }
             | Kind::SameId { first, .. }
             | Kind::LanguageWrittenTwice { first, .. }
+            | Kind::FeedWrittenTwice { first, .. }
             | Kind::TwoLists {
                 first_at: first, ..
             } => {

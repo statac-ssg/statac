@@ -1580,7 +1580,7 @@ fn a_folder_list_holds_only_its_own_languages_pages() {
     let feeds: Vec<String> = site
         .lists
         .iter()
-        .filter_map(|(id, _)| crate::feeds::wanted(site, &read.settings, id))
+        .flat_map(|(id, _)| crate::feeds::wanted(site, &read.settings, id))
         .map(|address| address.as_str().to_owned())
         .collect();
     assert_eq!(
@@ -1613,7 +1613,8 @@ fn where_the_main_language_has_a_folder_the_top_holds_only_what_is_outside() {
     let main = site.own_list(Id::from_index(0)).unwrap();
     assert_eq!(site.lists.get(main).key, folder("ar"));
     let fed = crate::feeds::wanted(site, &read.settings, main);
-    assert_eq!(fed.as_ref().map(|at| at.as_str()), Some("/ar/feed.xml"));
+    let fed: Vec<&str> = fed.iter().map(|at| at.as_str()).collect();
+    assert_eq!(fed, ["/ar/feed.xml"]);
     // The top is no language's own list: the setting gives it no feed.
     let top = site
         .lists
@@ -1621,7 +1622,7 @@ fn where_the_main_language_has_a_folder_the_top_holds_only_what_is_outside() {
         .find(|(_, list)| list.key == folder(""))
         .map(|(id, _)| id)
         .unwrap();
-    assert_eq!(crate::feeds::wanted(site, &read.settings, top), None);
+    assert_eq!(crate::feeds::wanted(site, &read.settings, top), []);
     // A language's folder holding only its `index.md` is still its top.
     let english = site.own_list(Id::from_index(1)).unwrap();
     assert_eq!(site.lists.get(english).key, folder("en"));

@@ -778,6 +778,13 @@ impl SiteValue {
                     Value::from("")
                 }
             }),
+            "feeds" => Some(match shared.site.own_list(self.language) {
+                Some(list) => feeds_value(shared, list),
+                None => {
+                    frame::read(Key::Home(self.language));
+                    Value::from(Vec::<Value>::new())
+                }
+            }),
             _ => {
                 frame::read(setting_key(shared, key));
                 let own = shared.settings.own(key)?;
@@ -809,7 +816,7 @@ impl Object for SiteValue {
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         let settings = &self.shared.settings;
         let mut names: Vec<Value> = [
-            "data", "feed", "folders", "pages", "posts", "series", "tags", "today",
+            "data", "feed", "feeds", "folders", "pages", "posts", "series", "tags", "today",
         ]
         .into_iter()
         .chain(
@@ -1153,9 +1160,27 @@ fn fragment(id: &str) -> String {
     out
 }
 
-/// Where a list's feed is published, the site's own path included; empty
-/// where none is, so `{% if list.feed %}` asks whether it has one.
+/// Where a list's feed is published, the first its `feed:` names, the
+/// site's own path included; empty where none is, so `{% if list.feed %}`
+/// asks whether it has one.
 fn feed_value(shared: &Shared, list: ListId) -> Value {
+    let known = feeds_known(shared, list);
+    Value::from(known.feeds.first().map_or_else(String::new, |address| {
+        format!("{}{}", shared.base, address.as_str())
+    }))
+}
+
+/// Where each of a list's feeds is published, in the order its `feed:`
+/// names them, the site's own path included.
+fn feeds_value(shared: &Shared, list: ListId) -> Value {
+    let known = feeds_known(shared, list);
+    (known.feeds.iter())
+        .map(|address| Value::from(format!("{}{}", shared.base, address.as_str())))
+        .collect()
+}
+
+/// What a list is known by, having read all its feeds turn on.
+fn feeds_known(shared: &Shared, list: ListId) -> ListKnown<'_> {
     let language = shared.site.lists.get(list).language;
     for name in crate::feeds::NEEDS {
         match *name {
@@ -1178,9 +1203,7 @@ fn feed_value(shared: &Shared, list: ListId) -> Value {
         }
         None => frame::read(setting_key(shared, "pages.feed")),
     }
-    Value::from(known.feed.map_or_else(String::new, |address| {
-        format!("{}{}", shared.base, address.as_str())
-    }))
+    known
 }
 
 /// What a list is called: a folder by its own name, a tag or a series as
@@ -1211,8 +1234,8 @@ pub(super) fn list_name(shared: &Shared, id: ListId) -> String {
 pub(crate) struct ListKnown<'a> {
     /// The page that speaks for it, and whether that is published.
     pub page: Option<(PageId, bool)>,
-    /// Where its feed is published.
-    pub feed: Option<&'a crate::content::address::Address>,
+    /// Where its feeds are published, in the order its `feed:` names them.
+    pub feeds: Vec<&'a crate::content::address::Address>,
     pub order: Option<Order>,
 }
 
@@ -1221,7 +1244,7 @@ pub(super) fn list_known(shared: &Shared, id: ListId) -> ListKnown<'_> {
     let list = site.lists.get(id);
     ListKnown {
         page: (list.page).map(|page| (page, site.pages.get(page).lands())),
-        feed: shared.feed(id).map(|feed| &feed.address),
+        feeds: shared.feeds_of(id).map(|feed| &feed.address).collect(),
         order: list.order,
     }
 }
@@ -1292,6 +1315,7 @@ impl ListValue {
                 })
             }
             "feed" => Some(feed_value(shared, self.id)),
+            "feeds" => Some(feeds_value(shared, self.id)),
             "word" => Some(Value::from(match shared.site.is_home(self.id) {
                 true => "site",
                 false => list.key.word(),
@@ -1322,7 +1346,8 @@ impl Object for ListValue {
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         Enumerator::Str(&[
-            "name", "title", "url", "page", "feed", "posts", "pages", "pager", "word", "order",
+            "name", "title", "url", "page", "feed", "feeds", "posts", "pages", "pager", "word",
+            "order",
         ])
     }
 

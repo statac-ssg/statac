@@ -46,6 +46,9 @@ impl Renderer {
             .filter(|file| file.role == Role::Template)
             .map(|file| file.name.clone())
             .collect();
+        schema.feeds = crate::feeds::templates(&shared.site, &shared.settings, &|name| {
+            schema.templates.contains(name)
+        });
         let mut sources = Sources::default();
         let source = sources.add(path, text.to_owned());
         let checked = Checked {

@@ -227,6 +227,227 @@ fn a_feed_is_built_with_the_template_its_extension_names_or_else_feed_xml() {
     }
 }
 
+/// What a case is called, the folder's page and its text, the templates
+/// besides, each problem told with the text it is placed at, and the feeds
+/// written.
+type Lacking<'a> = (
+    &'a str,
+    (&'a str, String),
+    Files<'a>,
+    Vec<(Kind, Option<&'a str>)>,
+    Vec<&'a str>,
+);
+
+/// A template for a list's feeds printing which template it is, where the
+/// feed is published, the list's feed and every one of its feeds, and
+/// each post's id.
+fn several(name: &str) -> String {
+    format!(
+        "{name}|{{{{ feed }}}}|{{{{ list.feed }}}}|{{{{ list.feeds | join(\",\") }}}}|\
+         {{{{ site.feeds | join(\",\") }}}}|\
+         {{% for post in posts %}}{{{{ feed_id(post) }}}};{{% endfor %}}"
+    )
+}
+
+/// A list naming several feeds has each, built with the template named
+/// as its file where the site has it and otherwise `feed.xml`, each
+/// handed its own address, the list's first as its feed and all of them,
+/// and each post with one id in every feed.
+#[test]
+fn a_list_naming_several_feeds_builds_each_with_its_own_template() {
+    let (atom, rss) = (several("atom"), several("rss"));
+    let home = (
+        "content/index.md",
+        "---\ntitle: Home\nfeed: [feed.xml, rss.xml, atom.xml]\n---\n",
+    );
+    let quiet = (
+        "statac.yaml",
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+    );
+    let built = with_posts(&[
+        quiet,
+        home,
+        PAGE,
+        HOME_TEMPLATE,
+        FOLDER,
+        ("templates/feed.xml", &atom),
+        ("templates/rss.xml", &rss),
+    ]);
+    assert!(built.outcome.problems.is_empty(), "{:?}", built.kinds());
+    let all = "/feed.xml,/rss.xml,/atom.xml";
+    let ids = |feed: &str| feed.rsplit('|').next().unwrap_or_default().to_owned();
+    let mut seen = Vec::new();
+    for (file, starts) in [
+        ("feed.xml", format!("atom|/feed.xml|/feed.xml|{all}|{all}|")),
+        ("rss.xml", format!("rss|/rss.xml|/feed.xml|{all}|{all}|")),
+        ("atom.xml", format!("atom|/atom.xml|/feed.xml|{all}|{all}|")),
+    ] {
+        let written = built.file(file).unwrap_or_else(|| panic!("no {file}"));
+        assert!(written.starts_with(&starts), "{file}: {written}");
+        seen.push(ids(&written));
+    }
+    assert!(seen[0].starts_with("urn:uuid:"), "{seen:?}");
+    assert!(seen.iter().all(|ids| *ids == seen[0]), "{seen:?}");
+}
+
+/// What a `feed:` list asks for that isn't published, times what is said:
+/// a name given twice, or two giving one address, at the second; a name
+/// with no template by the templates it looks for, once for each such
+/// list; and a list with nothing dated once, at the line.
+#[test]
+fn what_a_list_naming_several_feeds_lacks_is_said_where_it_is_written() {
+    let posts = |feed: &'static str| {
+        let text = format!("---\ntitle: Posts\nfeed: {feed}\n---\n");
+        ("content/posts/index.md", text)
+    };
+    let quiet = (
+        "statac.yaml",
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+    );
+    let twice = |written: &str, first_written: &str, address: &str| Kind::FeedWrittenTwice {
+        written: written.into(),
+        first_written: first_written.into(),
+        first: crate::source::Place {
+            source: crate::source::SourceId::from_index(0),
+            span: crate::source::Span::new(0, 0),
+        },
+        address: address.into(),
+    };
+    let posts_list = (Word::Folder, String::from("posts"));
+    let untemplated = |templates: &[&str]| Kind::FeedNotWritten {
+        list: posts_list.clone(),
+        more: 0,
+        why: Unwritten::NoTemplate(templates.iter().map(|name| (*name).to_owned()).collect()),
+    };
+    let cases: Vec<Lacking> = vec![
+        (
+            "the same name twice",
+            posts("[feed.xml, rss.xml, feed.xml]"),
+            vec![FEED],
+            vec![(
+                twice("feed.xml", "feed.xml", "/posts/feed.xml"),
+                Some("feed.xml"),
+            )],
+            vec!["posts/feed.xml", "posts/rss.xml"],
+        ),
+        (
+            "two names giving one address",
+            posts("[feed.xml, /posts/feed.xml]"),
+            vec![FEED],
+            vec![(
+                twice("/posts/feed.xml", "feed.xml", "/posts/feed.xml"),
+                Some("/posts/feed.xml"),
+            )],
+            vec!["posts/feed.xml"],
+        ),
+        (
+            "a name with no template",
+            posts("[atom.xml, rss.xml]"),
+            vec![("templates/atom.xml", "{{ list.word }}")],
+            vec![(
+                untemplated(&["templates/rss.xml", "templates/feed.xml"]),
+                None,
+            )],
+            vec!["posts/atom.xml"],
+        ),
+        (
+            "two names with none",
+            posts("[rss.xml, feed.json]"),
+            vec![],
+            vec![
+                (
+                    untemplated(&["templates/rss.xml", "templates/feed.xml"]),
+                    None,
+                ),
+                (
+                    untemplated(&["templates/feed.json", "templates/feed.xml"]),
+                    None,
+                ),
+            ],
+            vec![],
+        ),
+    ];
+    for (case, page, templates, wanted, written) in cases {
+        let mut files = vec![quiet, HOME, PAGE, HOME_TEMPLATE, FOLDER];
+        files.push((page.0, page.1.as_str()));
+        files.extend(templates);
+        let built = with_posts(&files);
+        let sources = built.outcome.sources();
+        let told: Vec<(Kind, Option<&str>)> = (built.outcome.problems.iter())
+            .map(|problem| {
+                let mut kind = problem.kind.clone();
+                if let Kind::FeedWrittenTwice { first, .. } = &mut kind {
+                    assert_eq!(sources.spelling(*first), "feed.xml", "{case}");
+                    *first = crate::source::Place {
+                        source: crate::source::SourceId::from_index(0),
+                        span: crate::source::Span::new(0, 0),
+                    };
+                }
+                let at = problem.place.map(|place| sources.spelling(place));
+                (kind, at)
+            })
+            .collect();
+        assert_eq!(told, wanted, "{case}");
+        for feed in [
+            "posts/feed.xml",
+            "posts/rss.xml",
+            "posts/atom.xml",
+            "posts/feed.json",
+        ] {
+            let wanted = written.contains(&feed);
+            assert_eq!(built.file(feed).is_some(), wanted, "{case}: {feed}");
+        }
+    }
+}
+
+/// A list naming several feeds with nothing dated is told so once, at the
+/// line, and a site with no `url` counts every feed it leaves out, the
+/// templates they would be built with checked as feeds' all the same.
+#[test]
+fn a_list_naming_several_feeds_is_told_of_once_for_what_every_feed_lacks() {
+    let notes = (
+        "content/notes/index.md",
+        "---\ntitle: Notes\nfeed: [feed.xml, rss.xml]\n---\n",
+    );
+    let note = ("content/notes/note-1.md", "---\ntitle: Note 1\n---\n");
+    let built = with_posts(&[
+        SETTINGS,
+        HOME,
+        PAGE,
+        HOME_TEMPLATE,
+        FOLDER,
+        FEED,
+        notes,
+        note,
+    ]);
+    assert_eq!(
+        built.told(),
+        [("feed-not-written", Some("[feed.xml, rss.xml]".into()))]
+    );
+    let unaddressed = (
+        "statac.yaml",
+        "language: en\ntitle: Site\nfeed_key: key\ntimezone: UTC\n",
+    );
+    let home = (
+        "content/index.md",
+        "---\ntitle: Home\nfeed: [feed.xml, rss.xml]\n---\n",
+    );
+    // The template named as the second is checked as one building a feed.
+    let rss = several("rss");
+    let rss = ("templates/rss.xml", rss.as_str());
+    let built = with_posts(&[unaddressed, home, PAGE, HOME_TEMPLATE, FOLDER, FEED, rss]);
+    assert_eq!(
+        built.kinds(),
+        [Kind::NoSiteUrl {
+            waiting: Waiting::Feeds {
+                list: (Word::Folder, String::new()),
+                more: 0,
+                feeds: 2,
+            },
+        }]
+    );
+}
+
 #[test]
 fn what_a_feed_lacks_is_said_once_for_the_site() {
     let site = (Word::Folder, String::new());
@@ -240,6 +461,7 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
                 waiting: Waiting::Feeds {
                     list: site.clone(),
                     more: 1,
+                    feeds: 2,
                 },
             }],
         ),
@@ -260,7 +482,7 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
             vec![Kind::FeedNotWritten {
                 list: site.clone(),
                 more: 1,
-                why: Unwritten::NoTemplate("templates/feed.xml".into()),
+                why: Unwritten::NoTemplate(vec!["templates/feed.xml".into()]),
             }],
         ),
         (
@@ -273,7 +495,7 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
             vec![Kind::FeedNotWritten {
                 list: posts,
                 more: 0,
-                why: Unwritten::NoTemplate("templates/feed.xml".into()),
+                why: Unwritten::NoTemplate(vec!["templates/feed.xml".into()]),
             }],
         ),
     ];
@@ -348,7 +570,7 @@ fn a_feed_with_no_template_is_told_so_before_what_it_lacks() {
         [Kind::FeedNotWritten {
             list: (Word::Folder, String::new()),
             more: 0,
-            why: Unwritten::NoTemplate("templates/feed.xml".into()),
+            why: Unwritten::NoTemplate(vec!["templates/feed.xml".into()]),
         }]
     );
 }

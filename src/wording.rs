@@ -760,8 +760,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 Unwritten::NoTitle => {
                     format!("Feed not written: {lists} {need} the site's `title`")
                 }
-                Unwritten::NoTemplate(template) => {
-                    format!("Feed not written: {lists} {need} `{template}`")
+                Unwritten::NoTemplate(templates) => {
+                    format!(
+                        "Feed not written: {lists} {need} {}",
+                        quoted_either(templates)
+                    )
                 }
                 Unwritten::PageThere { page, address } => {
                     format!(
@@ -778,15 +781,30 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 }
             }
         }
+        Kind::FeedWrittenTwice {
+            written,
+            first_written,
+            address,
+            ..
+        } => match written == first_written {
+            true => format!("Feed written twice: `{written}`"),
+            false => format!(
+                "Feed written twice: `{first_written}` and `{written}` are both at `{address}`"
+            ),
+        },
         Kind::NoFeedKey { .. } => "No feed key: `statac.yaml` has no `feed_key`".into(),
         Kind::UnusedFeedTemplate { .. } => "Unused feed template: no list asks for a feed".into(),
         Kind::NoSiteUrl { waiting } => {
             let what = match waiting {
                 Waiting::Page(path) => format!("`{path}` is"),
-                Waiting::Feeds { list, more: 0 } => {
+                Waiting::Feeds {
+                    list,
+                    more: 0,
+                    feeds: 1,
+                } => {
                     format!("the feed of {} is", lists(list, 0))
                 }
-                Waiting::Feeds { list, more } => {
+                Waiting::Feeds { list, more, .. } => {
                     format!("the feeds of {} are", lists(list, *more))
                 }
                 Waiting::Cards => "social cards are".into(),
@@ -1968,7 +1986,7 @@ fn expected_words(expected: &Expected) -> String {
             }
         }
         Expected::LanguageCode => "a language code, such as `en-GB`".into(),
-        Expected::TrueFalseOrAddress => "`true`, `false` or a URL".into(),
+        Expected::TrueFalseOrAddress => "`true`, `false`, a URL or a list of URLs".into(),
         Expected::Fields => "`name: value` lines".into(),
         Expected::ListAddress => "a URL ending in `{slug}/`, such as `/topics/{slug}/`".into(),
         Expected::LaterAddress => {
@@ -3053,6 +3071,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Give a page in it a `date:`, or take the `feed:` line out.".into()
             }
         }),
+        Kind::FeedWrittenTwice { .. } => {
+            Some("The feed is published once; take one of them out of the `feed:` line.".into())
+        }
         Kind::NoFeedKey { key } => Some(feed_key_line(key)),
         Kind::UnusedFeedTemplate { template, line } => Some(format!(
             "Write `{line}` in `statac.yaml` for the site's feed, built with `{template}`."
@@ -5811,25 +5832,46 @@ mod tests {
 
     fn feeds() -> Vec<(Kind, &'static str, Option<&'static str>)> {
         let site = (Word::Folder, String::new());
+        let first = crate::source::Place {
+            source: crate::source::SourceId::from_index(0),
+            span: crate::source::Span::new(0, 1),
+        };
         let not_written = |list, more, why| Kind::FeedNotWritten { list, more, why };
         vec![
             (
                 not_written(
                     site.clone(),
                     0,
-                    Unwritten::NoTemplate("templates/feed.xml".into()),
+                    Unwritten::NoTemplate(vec!["templates/feed.xml".into()]),
                 ),
                 "Feed not written: the site's own list needs `templates/feed.xml`",
                 Some("Add the template to publish it, or take out the `feed:` line asking for it."),
             ),
             (
                 not_written(
+                    site.clone(),
+                    0,
+                    Unwritten::NoTemplate(vec![
+                        "templates/rss.json".into(),
+                        "templates/feed.json".into(),
+                        "templates/feed.xml".into(),
+                    ]),
+                ),
+                "Feed not written: the site's own list needs `templates/rss.json`, \
+                 `templates/feed.json` or `templates/feed.xml`",
+                Some("Add the template to publish it, or take out the `feed:` line asking for it."),
+            ),
+            (
+                not_written(
                     (Word::Folder, "posts".into()),
                     2,
-                    Unwritten::NoTemplate("templates/feed.xml".into()),
+                    Unwritten::NoTemplate(vec![
+                        "templates/rss.xml".into(),
+                        "templates/feed.xml".into(),
+                    ]),
                 ),
                 "Feed not written: the folder `content/posts/` and 2 other lists need \
-                 `templates/feed.xml`",
+                 `templates/rss.xml` or `templates/feed.xml`",
                 Some(
                     "Add the template to publish them, or take out the `feed:` lines asking \
                      for them.",
@@ -5859,6 +5901,27 @@ mod tests {
                 not_written((Word::Folder, "notes".into()), 0, Unwritten::Undated),
                 "Feed not written: the folder `content/notes/` has nothing dated",
                 Some("Give a page in it a `date:`, or take the `feed:` line out."),
+            ),
+            (
+                Kind::FeedWrittenTwice {
+                    written: "/posts/feed.xml".into(),
+                    first_written: "feed.xml".into(),
+                    first,
+                    address: "/posts/feed.xml".into(),
+                },
+                "Feed written twice: `feed.xml` and `/posts/feed.xml` are both at \
+                 `/posts/feed.xml`",
+                Some("The feed is published once; take one of them out of the `feed:` line."),
+            ),
+            (
+                Kind::FeedWrittenTwice {
+                    written: "rss.xml".into(),
+                    first_written: "rss.xml".into(),
+                    first,
+                    address: "/rss.xml".into(),
+                },
+                "Feed written twice: `rss.xml`",
+                Some("The feed is published once; take one of them out of the `feed:` line."),
             ),
             (
                 Kind::UnusedFeedTemplate {
@@ -5907,6 +5970,7 @@ mod tests {
                     waiting: Waiting::Feeds {
                         list: site.clone(),
                         more: 0,
+                        feeds: 1,
                     },
                 },
                 "No site URL: the feed of the site's own list is left out until the site \
@@ -5916,8 +5980,21 @@ mod tests {
             (
                 Kind::NoSiteUrl {
                     waiting: Waiting::Feeds {
+                        list: site.clone(),
+                        more: 0,
+                        feeds: 2,
+                    },
+                },
+                "No site URL: the feeds of the site's own list are left out until the site \
+                 has a `url`",
+                Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`."),
+            ),
+            (
+                Kind::NoSiteUrl {
+                    waiting: Waiting::Feeds {
                         list: (Word::Series, "Series 1".into()),
                         more: 1,
+                        feeds: 2,
                     },
                 },
                 "No site URL: the feeds of the series `Series 1` and 1 other list are left \

@@ -3436,6 +3436,57 @@ fn the_menu_folders_feed_and_languages() {
 }
 
 #[test]
+fn a_lists_several_feeds_follow_their_names_and_templates() {
+    let site = Site::listing("several-feeds");
+    let settings = site.read("statac.yaml");
+    let home = site.read("content/index.md");
+    // The home page and the folders' pages show the site's feeds and
+    // their list's.
+    let shown = "{{ site.feeds | join(\" \") }}|{{ page.list.feeds | join(\" \") }}\n";
+    for (template, rest) in &LISTED[..2] {
+        site.write(
+            &format!("templates/{template}.html"),
+            &format!("{LISTED_BASE}{shown}{rest}"),
+        );
+    }
+    let fed = |feed: &str| home.replace("title: Home\n", &format!("title: Home\nfeed: {feed}\n"));
+    through(
+        &site,
+        &[
+            ("the home's feeds made two", &|site| {
+                site.write("content/index.md", &fed("[feed.xml, news.xml]"))
+            }),
+            ("the second given a template of its own", &|site| {
+                site.write(
+                    "templates/news.xml",
+                    "<rss>{{ feed }} {{ list.feed }}{% for post in posts %}\
+                     <item>{{ feed_id(post) }}</item>{% endfor %}</rss>\n",
+                )
+            }),
+            ("the two swapped", &|site| {
+                site.write("content/index.md", &fed("[news.xml, feed.xml]"))
+            }),
+            ("the first named again", &|site| {
+                site.write("content/index.md", &fed("[news.xml, feed.xml, news.xml]"))
+            }),
+            ("the second's template removed", &|site| {
+                site.remove("templates/news.xml")
+            }),
+            ("two handed to every list page", &|site| {
+                let handed = format!("{settings}pages.feed: [feed.xml, rss.xml]\n");
+                site.write("statac.yaml", &handed)
+            }),
+            ("and taken back", &|site| {
+                site.write("statac.yaml", &settings)
+            }),
+            ("the home as it was", &|site| {
+                site.write("content/index.md", &home)
+            }),
+        ],
+    );
+}
+
+#[test]
 fn what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them() {
     let Some(_counted) = counted(what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them)
     else {
