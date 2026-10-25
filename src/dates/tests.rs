@@ -1973,6 +1973,36 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             },
         ),
         (
+            "Tusday 31 December 2025",
+            "Tusday",
+            FormatFault::OtherWeekday {
+                written: "Tusday".into(),
+                day: "December 31, 2025".into(),
+                weekday: "Wednesday".into(),
+                corrected: "Wednesday 31 December 2025".into(),
+            },
+        ),
+        (
+            "Tuse 31 December 2025",
+            "Tuse",
+            FormatFault::OtherWeekday {
+                written: "Tuse".into(),
+                day: "December 31, 2025".into(),
+                weekday: "Wednesday".into(),
+                corrected: "Wed 31 December 2025".into(),
+            },
+        ),
+        (
+            "31 Novmber 2025",
+            "Novmber",
+            FormatFault::OtherMonth {
+                written: "Novmber".into(),
+                day: "December 31, 2025".into(),
+                month: "December".into(),
+                corrected: "31 December 2025".into(),
+            },
+        ),
+        (
             "Mon 31 December 2025",
             "Mon",
             FormatFault::OtherWeekday {
@@ -2364,6 +2394,48 @@ fn a_slip_in_a_word_of_syllables_is_told_and_other_text_kept() {
             reference: words.moment(),
             corrected: Some(corrected.into()),
         };
+        assert_eq!(refusal.fault, fault, "{example}");
+        assert_eq!(&example[refusal.at], at, "{example}");
+    }
+    // A slip in another weekday's or month's word is refused as the word
+    // itself is.
+    let others = [
+        (
+            "2025年12月31日火曜",
+            &japanese,
+            "火曜",
+            FormatFault::OtherWeekday {
+                written: "火曜".into(),
+                day: "2025年12月31日".into(),
+                weekday: "水曜日".into(),
+                corrected: "2025年12月31日水曜日".into(),
+            },
+        ),
+        (
+            "2025년 12월 31일 화요알",
+            &korean,
+            "화요알",
+            FormatFault::OtherWeekday {
+                written: "화요알".into(),
+                day: "2025년 12월 31일".into(),
+                weekday: "수요일".into(),
+                corrected: "2025년 12월 31일 수요일".into(),
+            },
+        ),
+        (
+            "31 十一目 2025",
+            &chinese,
+            "十一目",
+            FormatFault::OtherMonth {
+                written: "十一目".into(),
+                day: "31 十二月 2025".into(),
+                month: "十二月".into(),
+                corrected: "31 十二月 2025".into(),
+            },
+        ),
+    ];
+    for (example, words, at, fault) in others {
+        let refusal = refused(example, words);
         assert_eq!(refusal.fault, fault, "{example}");
         assert_eq!(&example[refusal.at], at, "{example}");
     }

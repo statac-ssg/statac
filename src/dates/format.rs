@@ -2152,24 +2152,33 @@ fn resolve(token: &Token, words: &Words) -> Resolution {
             if let Some(component) = begun(text, words) {
                 return Resolution::Component(component);
             }
+            // A slip in another weekday's or month's word is refused as
+            // the word itself is, the reference moment's winning a tie.
+            let candidates: Vec<(&str, Meant)> = known_words(words)
+                .map(|word| (word, Meant::Reference))
+                .chain(other_names(words))
+                .collect();
             // A letter of Han, kana or Hangul is a syllable or more, so one
             // slip from a word of three is a typo however short the word
             // written, where one from a word of two leaves half of it.
-            if syllabic(text) {
-                let mut known =
-                    known_words(words).filter(|word| syllabic(word) && word.chars().count() >= 3);
-                return match known.find(|word| crate::suggest::is_one_slip(text, word)) {
-                    Some(word) => Resolution::Typo(word.to_owned()),
-                    None => Resolution::Literal,
-                };
-            }
-            // A short word near a known one is left alone: "on" is a
-            // letter from "Mon".
-            if text.chars().count() < 4 {
-                return Resolution::Literal;
-            }
-            match crate::suggest::nearest(text, known_words(words)) {
-                Some(word) => Resolution::Typo(word.to_owned()),
+            let slipped = if syllabic(text) {
+                candidates.iter().find(|(word, _)| {
+                    syllabic(word)
+                        && word.chars().count() >= 3
+                        && crate::suggest::is_one_slip(text, word)
+                })
+            } else if text.chars().count() < 4 {
+                // A short word near a known one is left alone: "on" is a
+                // letter from "Mon".
+                None
+            } else {
+                crate::suggest::nearest(text, candidates.iter().map(|(word, _)| *word))
+                    .and_then(|nearest| candidates.iter().find(|(word, _)| *word == nearest))
+            };
+            match slipped {
+                Some((word, Meant::Reference)) => Resolution::Typo((*word).to_owned()),
+                Some((_, Meant::Weekday { full })) => Resolution::OtherWeekday { full: *full },
+                Some((_, Meant::Month { list })) => Resolution::OtherMonth { list: *list },
                 None => Resolution::Literal,
             }
         }
@@ -2339,5 +2348,37 @@ fn known_words(words: &Words) -> impl Iterator<Item = &str> {
     .into_iter()
     .flatten()
     .map(|list| list[MONTH_LISTED].as_str());
+    weekdays.chain(months)
+}
+
+/// Which word a slip was meant for.
+enum Meant {
+    /// The reference moment's weekday or month.
+    Reference,
+    Weekday {
+        full: bool,
+    },
+    Month {
+        list: MonthList,
+    },
+}
+
+/// Every other weekday's and month's word in the language's lists.
+fn other_names(words: &Words) -> impl Iterator<Item = (&str, Meant)> {
+    let weekdays = [(&words.weekdays, true), (&words.weekdays_short, false)]
+        .into_iter()
+        .flat_map(|(list, full)| {
+            list.iter()
+                .flat_map(|names| names.iter().enumerate())
+                .filter(|(day, _)| *day != WEEKDAY)
+                .map(move |(_, name)| (name.as_str(), Meant::Weekday { full }))
+        });
+    let months = MonthList::ALL.into_iter().flat_map(move |list| {
+        list.in_words(words)
+            .into_iter()
+            .flat_map(|names| names.iter().enumerate())
+            .filter(|(month, _)| *month != MONTH_LISTED)
+            .map(move |(_, name)| (name.as_str(), Meant::Month { list }))
+    });
     weekdays.chain(months)
 }
