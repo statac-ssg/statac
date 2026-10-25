@@ -19,8 +19,9 @@ build and a post never reappears as new in readers. Without a key, Statac
 has nothing to make the ids from. Ids made up for one build would change on
 the next, so Statac stops rather than publish a feed whose ids change.
 
-Statac never writes the key into `statac.yaml` itself. The key has to go
-with every copy of the site, so it belongs in a file you keep.
+A build never writes the key into `statac.yaml`: only `statac import`
+does, for a site whose feeds come across with it. The key has to go with
+every copy of the site, so it belongs in a file you keep.
 
 ## How to fix it
 
