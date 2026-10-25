@@ -1322,12 +1322,16 @@ impl Reader<'_> {
         }
     }
 
-    /// The feed each list and each language keeps, and the layout each
+    /// The feeds each list and each language keeps, and the layout each
     /// list of posts hands its pages.
     fn feeds(&mut self) {
         let mut feed_addresses: Vec<String> = Vec::new();
-        let mut kept: Vec<String> = Vec::new();
-        let mut extra_names: Vec<String> = Vec::new();
+        // In Zola's order: the first a list's `feed:` names is the one its
+        // page links to.
+        let asked = |names: &[String]| match names {
+            [name] => Value::Text(name.clone()),
+            _ => Value::List(names.iter().cloned().map(Value::Text).collect()),
+        };
         for at in 0..self.docs.len() {
             let doc = &self.docs[at];
             if doc.shape != Shape::List || doc.draft {
@@ -1340,12 +1344,10 @@ impl Reader<'_> {
                 && !doc.dir.is_empty()
                 && let Some(base) = doc.address.clone()
             {
-                words.push(Field::new("feed", Value::Text(names[0].clone()), None));
-                kept.push(format!("{base}{}", names[0]));
+                words.push(Field::new("feed", asked(&names), None));
                 for name in &names {
                     feed_addresses.push(format!("{base}{name}"));
                 }
-                extra_names.extend(names.iter().skip(1).cloned());
             }
             self.docs[at].words.extend(words);
         }
@@ -1356,7 +1358,7 @@ impl Reader<'_> {
             }
             let prefix = self.prefix(&language);
             let index = format!("{prefix}index.md");
-            let word = Field::new("feed", Value::Text(names[0].clone()), None);
+            let word = Field::new("feed", asked(&names), None);
             match self.docs.iter_mut().find(|d| d.to == index) {
                 Some(doc) => doc.words.push(word),
                 None if prefix.is_empty() => self.import.words.push((index, word)),
@@ -1368,11 +1370,9 @@ impl Reader<'_> {
                     self.import.addresses.push(format!("/{prefix}"));
                 }
             }
-            kept.push(format!("/{prefix}{}", names[0]));
             for name in &names {
                 feed_addresses.push(format!("/{prefix}{name}"));
             }
-            extra_names.extend(names.iter().skip(1).cloned());
         }
         if !feed_addresses.is_empty() {
             self.import
@@ -1381,7 +1381,7 @@ impl Reader<'_> {
             self.import
                 .settings
                 .push(("feed_ids_from".into(), Value::Text("zola".into())));
-            let shown: Vec<String> = kept.iter().map(|a| code(a)).collect();
+            let shown: Vec<String> = feed_addresses.iter().map(|a| code(a)).collect();
             let (feeds, are) = match shown.len() {
                 1 => ("feed", "stays"),
                 _ => ("feeds", "each stay"),
@@ -1394,16 +1394,6 @@ impl Reader<'_> {
                 listed(&shown)
             ));
             self.import.addresses.extend(feed_addresses);
-        }
-        extra_names.sort();
-        extra_names.dedup();
-        if !extra_names.is_empty() {
-            let shown: Vec<String> = extra_names.iter().map(|n| code(n)).collect();
-            self.note(format!(
-                "The settings' `feed_filenames` gave each list more than one feed, and Statac \
-                 writes one: those named {} aren't made, and are listed under URLs.",
-                listed(&shown)
-            ));
         }
     }
 

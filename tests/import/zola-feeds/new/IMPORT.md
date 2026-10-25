@@ -13,9 +13,7 @@ Zola has no setting for a time zone, and reads a date written without an offset 
 
 Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
-Zola's feeds, at `/posts/atom.xml` and `/atom.xml`, each stay at the same URL, as `feed:` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` and `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids.
-
-The settings' `feed_filenames` gave each list more than one feed, and Statac writes one: those named `rss.xml` aren't made, and are listed under URLs.
+Zola's feeds, at `/posts/atom.xml`, `/posts/rss.xml`, `/atom.xml` and `/rss.xml`, each stay at the same URL, as `feed:` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` and `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids.
 
 The settings written in `statac.yaml`:
 
@@ -32,14 +30,9 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 8 old URLs there: 6 are published or redirected.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 8 old URLs there: 8 are published or redirected.
 
 - Every page lands where the old site published it, with nothing added.
-
-Nothing in the new site is published at these old URLs. Give the page each should lead to a `redirect_from` naming it, or a `permalink`:
-
-- `/posts/rss.xml`
-- `/rss.xml`
 
 ## Left for you
 

@@ -1,3 +1,5 @@
 ---
-feed: atom.xml
+feed:
+  - atom.xml
+  - rss.xml
 ---
