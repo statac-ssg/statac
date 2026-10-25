@@ -318,7 +318,7 @@ pub(crate) fn bundled(tag: &str) -> Option<(&'static str, Arc<Words>)> {
 
 /// Statac's own words for `tag`, or for the nearest tag it inherits from.
 pub(crate) fn statacs(tag: &str) -> Option<(&'static str, Arc<Words>)> {
-    parents::inherited(tag).find_map(bundled)
+    parents::inherited(tag).find_map(|tag| bundled(&tag))
 }
 
 /// The code of English, the language of a site naming none.

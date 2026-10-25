@@ -50,7 +50,7 @@ fn statacs_file(tag: &str, onto: Words) -> (Words, Vec<Problem>) {
 fn bundled_parent(tag: &str) -> Option<&'static str> {
     parents::inherited(tag)
         .skip(1)
-        .find_map(bundled)
+        .find_map(|tag| bundled(&tag))
         .map(|(known, _)| known)
 }
 
@@ -331,10 +331,10 @@ fn tags_held(package: &str) -> Vec<String> {
 /// The first of `tag` and the tags it inherits from that the CLDR's files
 /// of `package` here are for: a region whose files aren't here is written
 /// as that tag is.
-fn nearest_held<'a>(tag: &'a str, package: &str) -> &'a str {
+fn nearest_held(tag: &str, package: &str) -> String {
     let held = tags_held(package);
     parents::inherited(tag)
-        .find(|tag| held.iter().any(|known| known == tag))
+        .find(|tag| held.contains(tag))
         .unwrap_or_else(|| panic!("{tag}: nothing in {package}"))
 }
 
@@ -342,8 +342,8 @@ fn nearest_held<'a>(tag: &'a str, package: &str) -> &'a str {
 /// them.
 fn the_cldrs_dates_and_quotes(tag: &str) -> Words {
     Words {
-        quotes: Some(quotes(nearest_held(tag, MARKS))),
-        ..the_cldrs_dates(nearest_held(tag, DATES))
+        quotes: Some(quotes(&nearest_held(tag, MARKS))),
+        ..the_cldrs_dates(&nearest_held(tag, DATES))
     }
 }
 
@@ -484,11 +484,11 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
     the_cldrs.sort();
     statacs.sort();
     assert_eq!(statacs, the_cldrs);
-    let inherited: Vec<&str> = parents::inherited("en-GB-oxendict").collect();
+    let inherited: Vec<String> = parents::inherited("en-GB-oxendict").collect();
     assert_eq!(inherited, ["en-GB-oxendict", "en-GB", "en-001", "en"]);
-    let inherited: Vec<&str> = parents::inherited("EN-at").collect();
+    let inherited: Vec<String> = parents::inherited("EN-at").collect();
     assert_eq!(inherited, ["EN-at", "en-150", "en-001", "en"]);
-    let inherited: Vec<&str> = parents::inherited("es-MX").collect();
+    let inherited: Vec<String> = parents::inherited("es-MX").collect();
     assert_eq!(inherited, ["es-MX", "es-419", "es"]);
 
     // The CLDR's rule beyond its list: any language and a script other
@@ -509,17 +509,56 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
         .map(|(language, script)| (*language, (*script).to_owned()))
         .collect();
     assert_eq!(statacs, the_cldrs);
-    let cases: [(&str, &[&str]); 7] = [
+
+    // A tag naming its language's usual script is looked up without it,
+    // as the CLDR's data is named: `en-Latn-GB` as `en-GB`. A region
+    // whose likely script differs from its language's would keep it, and
+    // the CLDR names none in these languages.
+    let Yaml::Mapping(all_likely) = &likely.value else {
+        panic!("likely subtags");
+    };
+    let regional: Vec<String> = (all_likely.iter())
+        .map(|entry| crate::content::words::key_name(&entry.key))
+        .filter(|tag| {
+            let mut parts = tag.split('-');
+            parts
+                .next()
+                .is_some_and(|language| languages.contains(&language))
+                && parts.next().is_some_and(|next| next.len() != 4)
+        })
+        .collect();
+    assert_eq!(regional, Vec::<String>::new());
+    let cases: [(&str, &[&str]); 15] = [
         ("en-Dsrt", &["en-Dsrt"]),
         ("en-Shaw-GB", &["en-Shaw-GB", "en-Shaw"]),
         ("EN-dsrt", &["EN-dsrt"]),
         ("ja-Latn", &["ja-Latn"]),
         ("ar-Latn-EG", &["ar-Latn-EG", "ar-Latn"]),
         ("en-Latn", &["en-Latn", "en"]),
-        ("ko-Kore-KR", &["ko-Kore-KR", "ko-Kore", "ko"]),
+        ("en-Latn-GB", &["en-Latn-GB", "en-GB", "en-001", "en"]),
+        ("en-latn-gb", &["en-latn-gb", "en-gb", "en-001", "en"]),
+        (
+            "en-Latn-AT",
+            &["en-Latn-AT", "en-AT", "en-150", "en-001", "en"],
+        ),
+        (
+            "en-Latn-GB-oxendict",
+            &[
+                "en-Latn-GB-oxendict",
+                "en-GB-oxendict",
+                "en-GB",
+                "en-001",
+                "en",
+            ],
+        ),
+        ("en-Latn-US", &["en-Latn-US", "en-US", "en"]),
+        ("es-Latn-MX", &["es-Latn-MX", "es-MX", "es-419", "es"]),
+        ("fr-Latn-CA", &["fr-Latn-CA", "fr-CA", "fr"]),
+        ("ko-Kore-KR", &["ko-Kore-KR", "ko-KR", "ko"]),
+        ("sw-Latn-KE", &["sw-Latn-KE", "sw-Latn", "sw"]),
     ];
     for (tag, chain) in cases {
-        let inherited: Vec<&str> = parents::inherited(tag).collect();
+        let inherited: Vec<String> = parents::inherited(tag).collect();
         assert_eq!(inherited, chain, "{tag}");
     }
 }
@@ -753,7 +792,7 @@ type Pairs<'a> = &'a [(&'a str, &'a str)];
 #[test]
 fn a_tag_is_looked_for_whole_and_then_broader() {
     let own = "months: [a, b, c, d, e, f, g, h, i, j, k, l]\n";
-    let cases: [(&str, Pairs, Whence, Pairs); 20] = [
+    let cases: [(&str, Pairs, Whence, Pairs); 23] = [
         ("fr", &[], Whence::Statac("fr"), &[]),
         ("en-US", &[], Whence::Statac("en"), &[]),
         ("fr-SN", &[], Whence::Statac("fr"), &[]),
@@ -766,6 +805,10 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
         ("en-GB-oxendict", &[], Whence::Statac("en-GB"), &[]),
         ("es-MX", &[], Whence::Statac("es-MX"), &[]),
         ("es-CU", &[], Whence::Statac("es-419"), &[]),
+        // A language's usual script is looked for as the tag without it.
+        ("en-Latn-GB", &[], Whence::Statac("en-GB"), &[]),
+        ("en-Latn-NZ", &[], Whence::Statac("en-001"), &[]),
+        ("fr-Latn-CA", &[], Whence::Statac("fr-CA"), &[]),
         // The site's own file wins over Statac's for a narrower tag.
         (
             "en-GB",

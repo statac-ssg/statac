@@ -1614,10 +1614,10 @@ fn every_look_of_every_language_is_the_cldrs() {
 }
 
 /// English is written as each region of it writes a date, `en` as the
-/// United States does.
+/// United States does, and a tag naming Latin script as its region does.
 #[test]
 fn english_writes_dates_as_its_region_does() {
-    let cases: [(&str, [&str; 4]); 8] = [
+    let cases: [(&str, [&str; 4]); 10] = [
         (
             "en",
             [
@@ -1643,6 +1643,24 @@ fn english_writes_dates_as_its_region_does() {
                 "31 Dec 2025",
                 "31 Dec",
                 "31 Dec 2025, 15:04",
+            ],
+        ),
+        (
+            "en-Latn-GB",
+            [
+                "31 December 2025",
+                "31 Dec 2025",
+                "31 Dec",
+                "31 Dec 2025, 15:04",
+            ],
+        ),
+        (
+            "en-Latn-US",
+            [
+                "December 31, 2025",
+                "Dec 31, 2025",
+                "Dec 31",
+                "Dec 31, 2025, 3:04\u{202f}PM",
             ],
         ),
         (

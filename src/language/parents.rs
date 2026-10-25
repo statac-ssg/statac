@@ -54,11 +54,17 @@ pub(super) const SCRIPTS: &[(&str, &str)] = &[
 
 /// The tag `tag` inherits from: none for a language and a script other
 /// than its usual one, `en-Dsrt`, whose CLDR data inherits from no
-/// language; the broader form of its language the CLDR names for a
-/// region; else the tag without its last part.
-pub(super) fn parent(tag: &str) -> Option<&str> {
+/// language; the tag without its script where that is the language's
+/// usual one, `en-Latn-GB` being `en-GB`, since the CLDR names its data
+/// without a script its likely subtags imply; the broader form of its
+/// language the CLDR names for a region; else the tag without its last
+/// part.
+pub(super) fn parent(tag: &str) -> Option<String> {
     if in_another_script(tag) {
         return None;
+    }
+    if let Some(without) = without_usual_script(tag) {
+        return Some(without);
     }
     let named = PARENTS.iter().find(|(_, regions)| {
         regions
@@ -66,26 +72,46 @@ pub(super) fn parent(tag: &str) -> Option<&str> {
             .any(|region| region.eq_ignore_ascii_case(tag))
     });
     match named {
-        Some((broader, _)) => Some(broader),
-        None => tag.rsplit_once('-').map(|(less, _)| less),
+        Some((broader, _)) => Some((*broader).to_owned()),
+        None => tag.rsplit_once('-').map(|(less, _)| less.to_owned()),
     }
+}
+
+/// The usual script of the language `tag` names, if Statac has words for
+/// it, and the script `tag` names next, if any.
+fn scripts(tag: &str) -> Option<(&'static str, &str)> {
+    let mut parts = tag.split('-');
+    let language = parts.next()?;
+    let script = parts.next()?;
+    let (_, usual) = SCRIPTS
+        .iter()
+        .find(|(known, _)| known.eq_ignore_ascii_case(language))?;
+    let is_script = script.len() == 4 && script.bytes().all(|b| b.is_ascii_alphabetic());
+    is_script.then_some((*usual, script))
 }
 
 /// Whether `tag` is a language Statac has words for and a script other
 /// than its usual one, and nothing more.
 fn in_another_script(tag: &str) -> bool {
-    let Some((language, script)) = tag.split_once('-') else {
-        return false;
-    };
-    let usual = SCRIPTS
-        .iter()
-        .find(|(known, _)| known.eq_ignore_ascii_case(language));
-    script.len() == 4
-        && script.bytes().all(|b| b.is_ascii_alphabetic())
-        && usual.is_some_and(|(_, usual)| !usual.eq_ignore_ascii_case(script))
+    tag.matches('-').count() == 1
+        && scripts(tag).is_some_and(|(usual, script)| !usual.eq_ignore_ascii_case(script))
+}
+
+/// `tag` without its script, where that is the usual one of a language
+/// Statac has words for.
+fn without_usual_script(tag: &str) -> Option<String> {
+    let (usual, script) = scripts(tag)?;
+    if !usual.eq_ignore_ascii_case(script) {
+        return None;
+    }
+    let (language, rest) = tag.split_once('-')?;
+    Some(match rest.split_once('-') {
+        Some((_, after)) => format!("{language}-{after}"),
+        None => language.to_owned(),
+    })
 }
 
 /// The tag, then each it inherits from in turn: `en-GB`, `en-001`, `en`.
-pub(super) fn inherited(tag: &str) -> impl Iterator<Item = &str> {
-    std::iter::successors(Some(tag), |tag| parent(tag))
+pub(super) fn inherited(tag: &str) -> impl Iterator<Item = String> {
+    std::iter::successors(Some(tag.to_owned()), |tag| parent(tag))
 }
