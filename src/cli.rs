@@ -61,12 +61,11 @@ const COMMANDS: [&str; 10] = [
 /// Commands Statac once had, each with the setting that does its work now.
 const FORMER_COMMANDS: [(&str, &str); 1] = [("refuse", crate::fetched::refused::SETTING)];
 
+/// The commands that work on a site, named by the folder after the command.
+const SITE_COMMANDS: [&str; 6] = ["build", "check", "serve", "stamp", "refresh", "search"];
+
 /// The options that take a value, and the commands that take each.
-const OPTIONS: [(&str, &[&str]); 8] = [
-    (
-        "--site",
-        &["build", "check", "serve", "stamp", "refresh", "search"],
-    ),
+const OPTIONS: [(&str, &[&str]); 7] = [
     ("--out", &["build"]),
     ("--url", &["build", "check"]),
     (
@@ -96,6 +95,10 @@ const FLAGS: [(&str, &[&str]); 6] = [
 
 /// Options Statac once had for writing its own files into a site.
 const RETIRED_OPTIONS: [&str; 4] = ["--cards", "--update", "--missing", "--no-starter"];
+
+/// The option Statac once had for the site's folder, which the folder
+/// after the command names now.
+const RETIRED_SITE: &str = "--site";
 
 /// Options any command takes, which take no value.
 const QUESTIONS: [&str; 2] = ["--help", "--version"];
@@ -184,15 +187,15 @@ const USAGE: [(&str, &str); 10] = [
     ),
 ];
 
+/// What the usage screen says, after the entries of the commands that work
+/// on a site, of where they work without a folder.
+const NO_FOLDER: &str = "
+Without a folder, statac build, check, serve, stamp, refresh and search
+work on the site the current folder is in.
+";
+
 /// Each option's entry on the usage screen, as the screen sets it.
-const OPTION_LINES: [(&str, &str); 16] = [
-    (
-        "--site",
-        "  --site=<folder>        The site's folder, as the folder after the command
-                         gives it. Without either, the site the current
-                         folder is in.
-",
-    ),
+const OPTION_LINES: [(&str, &str); 15] = [
     (
         "--out",
         "  --out=<folder>         Where statac build writes the built site. Without
@@ -301,6 +304,9 @@ fn help(command: Option<&str>) -> String {
         if command.is_none_or(|command| command == of) {
             screen.push_str(entry);
         }
+    }
+    if command.is_none_or(|command| SITE_COMMANDS.contains(&command)) {
+        screen.push_str(NO_FOLDER);
     }
     screen.push_str("\nOptions:\n");
     for (option, entry) in OPTION_LINES {
@@ -683,8 +689,8 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     let mut problems = Vec::new();
     let mut mistake = |kind| problems.push(Problem::nowhere(kind));
     let mut site = None;
-    // Whether the site's folder came as the word after the command.
-    let mut site_bare = false;
+    // Whether a folder for the site was written, usable or not.
+    let mut site_named = false;
     let mut out = None;
     let mut url = None;
     let mut today = None;
@@ -749,18 +755,11 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                     Some(kind) => mistake(kind),
                     None => new_folder = Some(PathBuf::from(arg)),
                 }
-            } else if matches!(
-                known,
-                Some("build" | "check" | "serve" | "stamp" | "refresh" | "search")
-            ) && !site_bare
-            {
-                site_bare = true;
-                match (&site, unusable_name(arg, unreadable(i - 1))) {
-                    (Some(_), _) => mistake(Kind::OptionGivenTwice {
-                        option: "--site".into(),
-                    }),
-                    (None, Some(kind)) => mistake(kind),
-                    (None, None) => site = Some(PathBuf::from(arg)),
+            } else if known.is_some_and(|command| SITE_COMMANDS.contains(&command)) && !site_named {
+                site_named = true;
+                match unusable_name(arg, unreadable(i - 1)) {
+                    Some(kind) => mistake(kind),
+                    None => site = Some(PathBuf::from(arg)),
                 }
             } else {
                 mistake(Kind::UnexpectedArgument {
@@ -775,6 +774,28 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             Some((written_name, value)) => (written_name, Some(value)),
             None => (arg, None),
         };
+        if written_name == RETIRED_SITE {
+            // Its folder given apart is taken with it, as an option's value is.
+            let folder = match value {
+                None if takes_apart(args, i, at) => {
+                    i += 1;
+                    Some(args[i - 1].clone())
+                }
+                _ => value.filter(|value| !value.is_empty()).map(str::to_owned),
+            };
+            let hint = match known {
+                Some("explain" | "lsp") => hint(written_name, value, known),
+                _ => OptionHint::FolderAfterCommand {
+                    command: known.map(str::to_owned),
+                    folder,
+                },
+            };
+            mistake(Kind::UnknownOption {
+                written: arg.into(),
+                hint,
+            });
+            continue;
+        }
         if RETIRED_OPTIONS.contains(&written_name) {
             mistake(Kind::UnknownOption {
                 written: arg.into(),
@@ -827,7 +848,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             });
             continue;
         };
-        // `--site docs` is the value given apart, and taken with its option.
+        // `--out public` is the value given apart, and taken with its option.
         let apart = match value {
             None if takes_apart(args, i, at) => {
                 i += 1;
@@ -948,17 +969,12 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             }
             continue;
         }
-        let slot = if option == "--site" {
-            &mut site
-        } else {
-            &mut out
-        };
-        match (&slot, unusable_name(value, unreadable(i - 1))) {
+        match (&out, unusable_name(value, unreadable(i - 1))) {
             (Some(_), _) => mistake(Kind::OptionGivenTwice {
                 option: option.into(),
             }),
             (None, Some(kind)) => mistake(kind),
-            (None, None) => *slot = Some(PathBuf::from(value)),
+            (None, None) => out = Some(PathBuf::from(value)),
         }
     }
     if command.is_none() {
@@ -1081,7 +1097,8 @@ fn command_at(args: &[String]) -> Option<usize> {
         if !is_option(arg) {
             return Some(i - 1);
         }
-        if OPTIONS.iter().any(|(o, _)| *o == arg) && takes_apart(args, i, None) {
+        let takes_value = arg == RETIRED_SITE || OPTIONS.iter().any(|(o, _)| *o == arg);
+        if takes_value && takes_apart(args, i, None) {
             i += 1;
         }
     }

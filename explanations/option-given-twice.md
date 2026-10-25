@@ -1,13 +1,11 @@
 # Option given twice
 
-The same option is given twice on the command line. A folder written after
-`statac build` or `statac check` sets the site's folder, the same as
-`--site` does, so writing both counts as giving `--site` twice.
+The same option is given twice on the command line.
 
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Option given twice: `--site`
+error  Option given twice: `--out`
   Keep one of them.
   More: https://statac.dev/e/option-given-twice/
 ```
@@ -24,11 +22,11 @@ Keep the option once, with the value you want.
 ## Example
 
 ```text
-statac build docs --site=site
+statac build --out=public --out=dist
 ```
 
 Keep one of them:
 
 ```text
-statac build docs
+statac build --out=public
 ```

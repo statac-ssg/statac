@@ -25,11 +25,11 @@ takes.
 ## Example
 
 ```text
-statac --site=docs
+statac --out=public
 ```
 
-To check the site in `docs`:
+To build the site into `public`:
 
 ```text
-statac check --site=docs
+statac build --out=public
 ```

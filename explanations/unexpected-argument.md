@@ -1,14 +1,14 @@
 # Unexpected argument
 
 The command line includes a word that the command doesn't use.
-`statac build` and `statac check` take one word, the site's folder, and
-`statac explain` takes one name.
+`statac build`, `check`, `serve`, `stamp` and `refresh` take one word,
+the site's folder; `statac search` takes its words and then the folder;
+and `statac explain` takes one name.
 
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Unexpected argument: `docs`
-  Did you mean `--site=docs`?
+error  Unexpected argument: `public`
   More: https://statac.dev/e/unexpected-argument/
 ```
 

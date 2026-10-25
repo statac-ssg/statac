@@ -55,16 +55,19 @@ fn commands_are_read_with_their_options() {
         })
     );
     assert_eq!(
-        parsed(&["build", "--site=docs", "--out=public"]),
+        parsed(&["build", "docs", "--out=public"]),
         Ok(Request::Build {
             options: options(Mode::Build, "docs", Some("public")),
             timings: false,
         })
     );
     assert_eq!(
-        parsed(&["--site=docs", "check"]),
+        parsed(&["--drafts", "check", "docs"]),
         Ok(Request::Check {
-            options: options(Mode::Check, "docs", None),
+            options: Options {
+                drafts: true,
+                ..options(Mode::Check, "docs", None)
+            },
             json: false,
         })
     );
@@ -111,10 +114,10 @@ error  Unknown command: `post-1.md`
 #[test]
 fn an_unknown_option_is_offered_the_nearest() {
     assert_eq!(
-        refused(&["build", "--sit=docs"]),
+        refused(&["build", "--otu=public"]),
         "\
-error  Unknown option: `--sit=docs`
-  Did you mean `--site=docs`?
+error  Unknown option: `--otu=public`
+  Did you mean `--out=public`?
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -130,7 +133,7 @@ error  Unknown option: `-h`
         refused(&["build", "--publish"]),
         "\
 error  Unknown option: `--publish`
-  `statac build` takes `--site`, `--out`, `--url`, `--today`, `--drafts` and `--timings`.
+  `statac build` takes `--out`, `--url`, `--today`, `--drafts` and `--timings`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -247,10 +250,10 @@ error  Unknown option: `statac check` has no `--out`
 #[test]
 fn a_value_given_apart_is_offered_joined() {
     assert_eq!(
-        refused(&["build", "--site", "docs"]),
+        refused(&["build", "--out", "public"]),
         "\
-error  Missing value: `--site` needs a folder
-  Write it as `--site=docs`.
+error  Missing value: `--out` needs a folder
+  Write it as `--out=public`.
   More: https://statac.dev/e/missing-value/
 "
     );
@@ -263,11 +266,11 @@ error  Missing value: `--site` needs a folder
         }])
     );
     assert_eq!(
-        parsed(&["--site", "docs", "build"]),
+        parsed(&["--out", "public", "build"]),
         Err(vec![Kind::MissingValue {
-            written: "--site".into(),
-            option: "--site".into(),
-            value: Some("docs".into()),
+            written: "--out".into(),
+            option: "--out".into(),
+            value: Some("public".into()),
         }])
     );
 }
@@ -299,20 +302,6 @@ fn the_folder_after_the_command_is_the_site() {
 
 #[test]
 fn the_site_is_given_once() {
-    assert_eq!(
-        refused(&["build", "docs", "--site=site"]),
-        "\
-error  Option given twice: `--site`
-  Keep one of them.
-  More: https://statac.dev/e/option-given-twice/
-"
-    );
-    assert_eq!(
-        parsed(&["build", "--site=site", "docs"]),
-        Err(vec![Kind::OptionGivenTwice {
-            option: "--site".into()
-        }])
-    );
     assert_eq!(
         parsed(&["build", "docs", "public"]),
         Err(vec![Kind::UnexpectedArgument {
@@ -462,15 +451,15 @@ error  Unknown option: `statac {command}` has no `--url`
 #[test]
 fn every_mistake_is_said_in_order() {
     assert_eq!(
-        refused(&["--sit=docs", "--out=a", "--out=b"]),
+        refused(&["--otu=a", "--out=b", "--out=c"]),
         "\
 error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `new`, `import` or \
 `explain`
   Run `statac --help` to see the commands.
   More: https://statac.dev/e/missing-command/
 
-error  Unknown option: `--sit=docs`
-  Did you mean `--site=docs`?
+error  Unknown option: `--otu=a`
+  Did you mean `--out=a`?
   More: https://statac.dev/e/unknown-option/
 
 error  Option given twice: `--out`
@@ -499,13 +488,15 @@ error  Unknown problem name: `brokn-link`
 "
     );
     assert_eq!(
-        parsed(&["explain", "--site=docs", "broken-link"]),
+        parsed(&["explain", "--today=2026-10-04", "broken-link"]),
         Err(vec![Kind::UnknownOption {
-            written: "--site=docs".into(),
+            written: "--today=2026-10-04".into(),
             hint: OptionHint::ForOther {
                 command: "explain".into(),
-                option: "--site".into(),
-                takers: Box::new(["build", "check", "serve", "stamp", "refresh", "search"]),
+                option: "--today".into(),
+                takers: Box::new([
+                    "build", "check", "serve", "stamp", "refresh", "import", "search",
+                ]),
             },
         }])
     );
@@ -566,10 +557,10 @@ Usage:
   statac lsp             Tell an editor the site's problems as you type. The
                          editor starts it.
 
+Without a folder, statac build, check, serve, stamp, refresh and search
+work on the site the current folder is in.
+
 Options:
-  --site=<folder>        The site's folder, as the folder after the command
-                         gives it. Without either, the site the current
-                         folder is in.
   --out=<folder>         Where statac build writes the built site. Without
                          it, _site in the site's folder.
   --url=<url>            The site's full URL for this run, in place of url
@@ -613,7 +604,7 @@ fn help_alone_or_before_a_command_shows_the_whole_screen() {
         &[][..],
         &["--help"],
         &["--help", "build"],
-        &["--site=docs", "--help", "check"],
+        &["--out=public", "--help", "check"],
         &["biuld", "--help"],
         &["post-1.md", "--help"],
     ] {
@@ -633,10 +624,10 @@ fn help_after_a_command_shows_its_entry_and_the_options_it_takes() {
 Usage:
   statac build [folder]  Read the site and write it out, ready to publish.
 
+Without a folder, statac build, check, serve, stamp, refresh and search
+work on the site the current folder is in.
+
 Options:
-  --site=<folder>        The site's folder, as the folder after the command
-                         gives it. Without either, the site the current
-                         folder is in.
   --out=<folder>         Where statac build writes the built site. Without
                          it, _site in the site's folder.
   --url=<url>            The site's full URL for this run, in place of url
@@ -691,7 +682,7 @@ fn each_commands_screen_is_the_whole_screens_lines_for_it() {
     }
     let (new, _, _) = ran(&["new", "--help"]);
     assert!(new.contains("  --yes  "), "{new}");
-    assert!(!new.contains("  --site="), "{new}");
+    assert!(!new.contains(NO_FOLDER), "{new}");
 }
 
 #[test]
@@ -768,7 +759,7 @@ fn serve_is_read_with_its_options() {
     assert_eq!(parsed(&["serve"]), Ok(online(serving(UNNAMED))));
     assert_eq!(parsed(&["serve", "docs"]), Ok(online(serving("docs"))));
     assert_eq!(
-        parsed(&["--site=docs", "serve", "--port=8080", "--watch=native"]),
+        parsed(&["--port=8080", "serve", "docs", "--watch=native"]),
         Ok(online(serve::Options {
             port: 8080,
             watch: How::Native,
@@ -981,6 +972,92 @@ error  Unknown option: `--no-starter`
 }
 
 #[test]
+fn the_site_named_with_an_option_is_refused_with_the_folder_after_the_command() {
+    let refusal =
+        |written: &str, command: Option<&str>, folder: Option<&str>| Kind::UnknownOption {
+            written: written.into(),
+            hint: OptionHint::FolderAfterCommand {
+                command: command.map(str::to_owned),
+                folder: folder.map(str::to_owned),
+            },
+        };
+    for command in ["build", "check", "serve", "stamp", "refresh", "new"] {
+        for args in [
+            &[command, "--site=docs"][..],
+            &["--site=docs", command],
+            &[command, "docs", "--site=docs"],
+        ] {
+            let refused = refusal("--site=docs", Some(command), Some("docs"));
+            assert_eq!(parsed(args), Err(vec![refused]), "{args:?}");
+        }
+        for args in [
+            &[command, "--site", "docs"][..],
+            &["--site", "docs", command],
+        ] {
+            let refused = refusal("--site", Some(command), Some("docs"));
+            assert_eq!(parsed(args), Err(vec![refused]), "{args:?}");
+        }
+    }
+    assert_eq!(
+        parsed(&["import", "old-1", "--site=docs"]),
+        Err(vec![refusal("--site=docs", Some("import"), Some("docs"))])
+    );
+    assert_eq!(
+        parsed(&["search", "zfs", "--site=docs"]),
+        Err(vec![refusal("--site=docs", Some("search"), Some("docs"))])
+    );
+    for (args, written) in [
+        (&["build", "--site"][..], "--site"),
+        (&["build", "--site="], "--site="),
+    ] {
+        assert_eq!(
+            parsed(args),
+            Err(vec![refusal(written, Some("build"), None)]),
+            "{args:?}"
+        );
+    }
+    assert_eq!(
+        parsed(&["--site=docs"]),
+        Err(vec![
+            Kind::MissingCommand,
+            refusal("--site=docs", None, Some("docs"))
+        ])
+    );
+    for args in [
+        &["explain", "--site=docs", "broken-link"][..],
+        &["lsp", "--site=docs"],
+    ] {
+        assert_eq!(
+            parsed(args),
+            Err(vec![Kind::UnknownOption {
+                written: "--site=docs".into(),
+                hint: OptionHint::Takes {
+                    command: args[0].into(),
+                    options: Box::new([]),
+                },
+            }]),
+            "{args:?}"
+        );
+    }
+    assert_eq!(
+        refused(&["build", "--site=docs"]),
+        "\
+error  Unknown option: `--site=docs`
+  Name the folder after the command, as `statac build docs`.
+  More: https://statac.dev/e/unknown-option/
+"
+    );
+    assert_eq!(
+        refused(&["search", "zfs", "--site", "docs"]),
+        "\
+error  Unknown option: `--site`
+  Name the folder after the words, as `statac search <words> docs`.
+  More: https://statac.dev/e/unknown-option/
+"
+    );
+}
+
+#[test]
 fn a_way_of_watching_is_one_of_three() {
     assert_eq!(
         refused(&["serve", "--watch=fast"]),
@@ -1016,7 +1093,7 @@ fn stamp_is_read_with_its_options() {
     assert_eq!(parsed(&["stamp"]), stamping(UNNAMED, None));
     assert_eq!(parsed(&["stamp", "docs"]), stamping("docs", None));
     assert_eq!(
-        parsed(&["--site=docs", "stamp", "--today=2026-10-04"]),
+        parsed(&["--today=2026-10-04", "stamp", "docs"]),
         stamping("docs", Some("2026-10-04"))
     );
     assert_eq!(
@@ -1064,7 +1141,7 @@ fn refresh_is_read_with_its_options() {
     assert_eq!(parsed(&["refresh"]), refreshing(UNNAMED, None));
     assert_eq!(parsed(&["refresh", "docs"]), refreshing("docs", None));
     assert_eq!(
-        parsed(&["--site=docs", "refresh", "--today=2026-10-06"]),
+        parsed(&["--today=2026-10-06", "refresh", "docs"]),
         refreshing("docs", Some("2026-10-06"))
     );
     assert_eq!(
@@ -1102,7 +1179,7 @@ error  Unknown command: `refrsh`
         refused(&["refresh", "--fetch"]),
         "\
 error  Unknown option: `--fetch`
-  `statac refresh` takes `--site` and `--today`.
+  `statac refresh` takes `--today`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1148,24 +1225,18 @@ error  Unknown command: `refuse`
 
 #[test]
 fn a_site_to_search_that_isnt_there_is_said_to_be_missing() {
-    for args in [
-        &["search", "post", "site-that-isnt-there"][..],
-        &["search", "post", "--site=site-that-isnt-there"],
-    ] {
-        let (out, err, code) = ran(args);
-        assert_eq!(
-            (out.as_str(), err.as_str(), code),
-            (
-                "\
+    let (out, err, code) = ran(&["search", "post", "site-that-isnt-there"]);
+    assert_eq!(
+        (out.as_str(), err.as_str(), code),
+        (
+            "\
 error  Can't read `site-that-isnt-there`: it doesn't exist
   More: https://statac.dev/e/cant-read/
 ",
-                "",
-                1
-            ),
-            "{args:?}"
-        );
-    }
+            "",
+            1
+        )
+    );
 }
 
 #[test]
@@ -1198,7 +1269,7 @@ error  Unknown option: `--prot=8080`
         refused(&["serve", "--open"]),
         "\
 error  Unknown option: `--open`
-  `statac serve` takes `--site`, `--today`, `--port`, `--watch`, `--no-drafts` and `--offline`.
+  `statac serve` takes `--today`, `--port`, `--watch`, `--no-drafts` and `--offline`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1248,7 +1319,7 @@ error  Unreadable name: `folder-1-\u{FFFD}` holds bytes that aren't UTF-8
     };
     let commands: [&[OsString]; 9] = [
         &["build".into(), name.clone()],
-        &["check".into(), option("--site=")],
+        &["check".into(), name.clone()],
         &["serve".into(), name.clone()],
         &["stamp".into(), name.clone()],
         &["refresh".into(), name.clone()],
@@ -1287,7 +1358,7 @@ error  Unusable name: `folder-1\u{241b}` holds a character that can't be shown
     let name = "folder-1\u{1b}";
     let commands: [&[&str]; 9] = [
         &["build", name],
-        &["check", "--site=folder-1\u{1b}"],
+        &["check", name],
         &["serve", name],
         &["stamp", name],
         &["refresh", name],
@@ -1404,7 +1475,7 @@ fn search_is_read_with_its_words_and_options() {
         searching("zfs", "docs", true, None)
     );
     assert_eq!(
-        parsed(&["--site=docs", "search", "zfs", "--today=2026-10-06"]),
+        parsed(&["--today=2026-10-06", "search", "zfs", "docs"]),
         searching("zfs", "docs", false, Some("2026-10-06"))
     );
     // The code is read against the site's once the site is read.
@@ -1431,11 +1502,7 @@ error  Unknown option: `statac build` has no `--language`
   More: https://statac.dev/e/unknown-option/
 "
     );
-    for words in [
-        &["search"][..],
-        &["search", " "],
-        &["search", "--site=docs"],
-    ] {
+    for words in [&["search"][..], &["search", " "], &["search", "--drafts"]] {
         assert_eq!(
             refused(words),
             "\

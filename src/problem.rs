@@ -2707,6 +2707,12 @@ pub enum OptionHint {
     None,
     /// An option Statac once had for writing its own files into a site.
     Retired,
+    /// `--site`, which Statac once had for the site's folder, with the
+    /// command and the folder, where each was written.
+    FolderAfterCommand {
+        command: Option<String>,
+        folder: Option<String>,
+    },
 }
 
 /// Something published, or an item a template handled, as a problem

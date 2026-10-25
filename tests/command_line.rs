@@ -290,7 +290,6 @@ fn a_folder_named_is_taken_as_named_and_never_looked_above() {
     let stopped = format!("{headline}{NO_SITE}\nWrote nothing: 1 error stopped the build.\n");
     let counted = format!("{headline}{NO_SITE}\n1 error: 1 no-site-here.\n");
     assert_eq!(refused(&["build", "notes"]), stopped);
-    assert_eq!(refused(&["build", "--site=notes"]), stopped);
     assert_eq!(refused(&["serve", "notes", "--offline"]), stopped);
     assert_eq!(refused(&["check", "notes"]), counted);
     assert_eq!(refused(&["refresh", "notes"]), counted);

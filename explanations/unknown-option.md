@@ -6,8 +6,8 @@ has no option by that name, or it belongs to another command.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Unknown option: `--sight=docs`
-  Did you mean `--site=docs`?
+error  Unknown option: `--otu=public`
+  Did you mean `--out=public`?
   More: https://statac.dev/e/unknown-option/
 ```
 
@@ -31,6 +31,11 @@ said a newer version of those files was available, `update-available`,
 went with them. Leave the options out: a
 site's templates are its own, written as
 [Templates](https://statac.dev/templates/) describes.
+
+Statac before 0.7.0 also had `--site`, for naming the site's folder. The
+folder written after the command names it now, so `--site` is refused
+with a message saying how to write it: `statac build docs`, not
+`statac build --site=docs`.
 
 ## Example
 

@@ -1888,7 +1888,7 @@ fn visible(text: &str) -> String {
 /// What an option's value is, as a phrase and as a placeholder.
 fn needs(option: &str) -> &'static str {
     match option {
-        "--site" | "--out" => "a folder",
+        "--out" => "a folder",
         "--today" => "a date",
         "--url" => "a full URL",
         "--port" => "a number",
@@ -2394,6 +2394,18 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                       https://statac.dev/templates/."
                     .into(),
             },
+            OptionHint::FolderAfterCommand { command, folder } => {
+                let folder = folder.as_deref().unwrap_or("<folder>");
+                match command.as_deref() {
+                    Some("search") => format!(
+                        "Name the folder after the words, as `statac search <words> {folder}`."
+                    ),
+                    command => format!(
+                        "Name the folder after the command, as `statac {} {folder}`.",
+                        command.unwrap_or("<command>")
+                    ),
+                }
+            }
         }),
         Kind::MissingValue { option, value, .. } => Some(match value {
             Some(value) => format!("Write it as `{option}={value}`."),
@@ -7727,11 +7739,11 @@ mod tests {
             ),
             (
                 Kind::UnknownOption {
-                    written: "--sight=docs".into(),
-                    hint: OptionHint::Similar("--site=docs".into()),
+                    written: "--otu=public".into(),
+                    hint: OptionHint::Similar("--out=public".into()),
                 },
-                "Unknown option: `--sight=docs`",
-                Some("Did you mean `--site=docs`?"),
+                "Unknown option: `--otu=public`",
+                Some("Did you mean `--out=public`?"),
             ),
             (
                 Kind::UnknownOption {
@@ -7747,26 +7759,26 @@ mod tests {
             ),
             (
                 Kind::UnknownOption {
-                    written: "--site=docs".into(),
+                    written: "--url=https://example.org".into(),
                     hint: OptionHint::ForOther {
                         command: "explain".into(),
-                        option: "--site".into(),
+                        option: "--url".into(),
                         takers: Box::new(["build", "check"]),
                     },
                 },
-                "Unknown option: `statac explain` has no `--site`",
-                Some("`--site` is for `statac build` and `statac check`."),
+                "Unknown option: `statac explain` has no `--url`",
+                Some("`--url` is for `statac build` and `statac check`."),
             ),
             (
                 Kind::UnknownOption {
                     written: "--drafts".into(),
                     hint: OptionHint::Takes {
                         command: "build".into(),
-                        options: Box::new(["--site", "--out"]),
+                        options: Box::new(["--out", "--url"]),
                     },
                 },
                 "Unknown option: `--drafts`",
-                Some("`statac build` takes `--site` and `--out`."),
+                Some("`statac build` takes `--out` and `--url`."),
             ),
             (
                 Kind::UnknownOption {
@@ -7800,6 +7812,50 @@ mod tests {
             ),
             (
                 Kind::UnknownOption {
+                    written: "--site=docs".into(),
+                    hint: OptionHint::FolderAfterCommand {
+                        command: Some("build".into()),
+                        folder: Some("docs".into()),
+                    },
+                },
+                "Unknown option: `--site=docs`",
+                Some("Name the folder after the command, as `statac build docs`."),
+            ),
+            (
+                Kind::UnknownOption {
+                    written: "--site".into(),
+                    hint: OptionHint::FolderAfterCommand {
+                        command: Some("check".into()),
+                        folder: None,
+                    },
+                },
+                "Unknown option: `--site`",
+                Some("Name the folder after the command, as `statac check <folder>`."),
+            ),
+            (
+                Kind::UnknownOption {
+                    written: "--site=docs".into(),
+                    hint: OptionHint::FolderAfterCommand {
+                        command: None,
+                        folder: Some("docs".into()),
+                    },
+                },
+                "Unknown option: `--site=docs`",
+                Some("Name the folder after the command, as `statac <command> docs`."),
+            ),
+            (
+                Kind::UnknownOption {
+                    written: "--site=docs".into(),
+                    hint: OptionHint::FolderAfterCommand {
+                        command: Some("search".into()),
+                        folder: Some("docs".into()),
+                    },
+                },
+                "Unknown option: `--site=docs`",
+                Some("Name the folder after the words, as `statac search <words> docs`."),
+            ),
+            (
+                Kind::UnknownOption {
                     written: "--drafts".into(),
                     hint: OptionHint::ShownAlready,
                 },
@@ -7819,12 +7875,12 @@ mod tests {
             ),
             (
                 Kind::MissingValue {
-                    written: "--site".into(),
-                    option: "--site".into(),
-                    value: Some("docs".into()),
+                    written: "--out".into(),
+                    option: "--out".into(),
+                    value: Some("public".into()),
                 },
-                "Missing value: `--site` needs a folder",
-                Some("Write it as `--site=docs`."),
+                "Missing value: `--out` needs a folder",
+                Some("Write it as `--out=public`."),
             ),
             (
                 Kind::MissingValue {
@@ -7846,18 +7902,18 @@ mod tests {
             ),
             (
                 Kind::OptionGivenTwice {
-                    option: "--site".into(),
+                    option: "--out".into(),
                 },
-                "Option given twice: `--site`",
+                "Option given twice: `--out`",
                 Some("Keep one of them."),
             ),
             (
                 Kind::UnexpectedArgument {
-                    written: "docs".into(),
-                    suggestion: Some("--site=docs".into()),
+                    written: "public".into(),
+                    suggestion: None,
                 },
-                "Unexpected argument: `docs`",
-                Some("Did you mean `--site=docs`?"),
+                "Unexpected argument: `public`",
+                None,
             ),
             (
                 Kind::MissingName,

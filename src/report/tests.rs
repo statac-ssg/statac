@@ -710,15 +710,15 @@ fn a_quiet_name_is_placed_where_it_was_written() {
 #[test]
 fn command_line_mistakes_are_drawn_without_a_place() {
     let problem = Problem::nowhere(Kind::UnknownOption {
-        written: "--sit=docs".into(),
-        hint: OptionHint::Similar("--site=docs".into()),
+        written: "--otu=public".into(),
+        hint: OptionHint::Similar("--out=public".into()),
     });
     assert_eq!(
         drawn(&Sources::default(), &problem),
         lines(
             "
-            |error  Unknown option: `--sit=docs`
-            |  Did you mean `--site=docs`?
+            |error  Unknown option: `--otu=public`
+            |  Did you mean `--out=public`?
             |  More: https://statac.dev/e/unknown-option/
             "
         )

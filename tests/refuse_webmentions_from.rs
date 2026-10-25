@@ -175,7 +175,7 @@ impl Site {
     fn run(&self, args: &[&str]) -> (String, Option<i32>) {
         let output = Command::new(env!("CARGO_BIN_EXE_statac"))
             .args(args)
-            .arg(format!("--site={}", self.0.display()))
+            .arg(&self.0)
             .arg("--today=2026-10-06")
             .env("NO_COLOR", "1")
             .env_remove("STATAC_WEBMENTION_TOKEN")
