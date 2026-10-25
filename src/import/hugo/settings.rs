@@ -6,6 +6,7 @@ use std::path::Path;
 
 use super::super::common::{fields, text_of, texts_of};
 use super::super::{Failed, Field, Left, Value, inside, toml, yaml};
+use super::title::Style;
 use crate::problem::{Kind, Problem, Reason};
 use crate::source::Sources;
 use crate::yaml::Value as Yaml;
@@ -351,6 +352,8 @@ pub(super) struct Settings {
     pub ugly: Ugly,
     pub lower: bool,
     pub accents_removed: bool,
+    /// How Hugo put the name of a term in capitals for its title.
+    pub titles: Style,
     /// Where each date of a page is taken from, by the date's name.
     pub dates: Vec<(String, Vec<String>)>,
     pub languages: Vec<Language>,
@@ -465,6 +468,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
         ugly: Ugly::default(),
         lower: true,
         accents_removed: false,
+        titles: Style::Ap,
         dates: Vec::new(),
         languages: Vec::new(),
         params: Vec::new(),
@@ -494,6 +498,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
     };
     let old = folder;
     let unread = std::cell::RefCell::new(Vec::new());
+    let mut capitalised = true;
     for Entry { field, file } in entries {
         let value = &field.value;
         let text = text_of(value);
@@ -573,6 +578,24 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
             },
             "disablepathtolower" => s.lower = !truth_of(value),
             "removepathaccents" => s.accents_removed = truth_of(value),
+            // Each also has Hugo put the titles of the pages it makes in
+            // capitals, which Statac has no equal for.
+            "titlecasestyle" => {
+                s.titles = text.as_deref().map_or(Style::Ap, Style::named);
+                leave(format!(
+                    "{}: {}",
+                    field.name,
+                    super::super::write::shown_value(value)
+                ));
+            }
+            "capitalizelisttitles" => {
+                capitalised = truth_of(value);
+                leave(format!(
+                    "{}: {}",
+                    field.name,
+                    super::super::write::shown_value(value)
+                ));
+            }
             "frontmatter" => {
                 s.dates = fields(value)
                     .iter()
@@ -761,6 +784,9 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                 super::super::write::shown_value(value)
             )),
         }
+    }
+    if !capitalised {
+        s.titles = Style::None;
     }
     s.unread = unread.into_inner();
     s

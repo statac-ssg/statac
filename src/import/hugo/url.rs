@@ -15,7 +15,7 @@ const KEPT: GeneralCategoryGroup = GeneralCategoryGroup::Letter
     .union(GeneralCategoryGroup::Mark);
 
 /// Whether `c` is in `group`, by its Unicode general category.
-fn is(group: GeneralCategoryGroup, c: char) -> bool {
+pub(super) fn is(group: GeneralCategoryGroup, c: char) -> bool {
     group.contains(CodePointMapData::<GeneralCategory>::new().get(c))
 }
 
@@ -123,7 +123,7 @@ pub(super) fn read(name: &str) -> String {
 
 /// `text` in small letters as Go makes them, a letter at a time: `Σ` is
 /// `σ` wherever it stands, and `İ` is `i`.
-fn lowered(text: &str) -> String {
+pub(super) fn lowered(text: &str) -> String {
     text.chars()
         .flat_map(|c| match c {
             'İ' => 'i'.to_lowercase(),
@@ -203,11 +203,11 @@ const DAYS: [&str; 7] = [
     "Saturday",
 ];
 
-/// Where Hugo publishes the page of the term `term` by the `[permalinks]`
-/// pattern `pattern`: its `:slug` and `:title` are the term's name, put in
-/// as a page's are.
-pub(super) fn term(pattern: &str, term: &str, making: &Making) -> String {
-    let urlized = making.urlized(term);
+/// Where Hugo publishes the page of the term titled `title` by the
+/// `[permalinks]` pattern `pattern`: its `:slug` and `:title` are that
+/// title, put in as a page's are.
+pub(super) fn term(pattern: &str, title: &str, making: &Making) -> String {
+    let urlized = making.urlized(title);
     let filled = pattern
         .replace(":slug", &urlized)
         .replace(":title", &urlized);

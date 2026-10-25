@@ -8,6 +8,7 @@
 //! what its own tags do in the writing.
 
 mod settings;
+mod title;
 mod url;
 mod writing;
 
@@ -2130,7 +2131,7 @@ impl Reader<'_> {
         match pattern {
             // A pattern's `:slug` is the term's title, not its place in the
             // content folder.
-            Some(pattern) => url::term(pattern, term, &self.making),
+            Some(pattern) => url::term(pattern, &self.s.titles.titled(term), &self.making),
             None => self.making.listed(plural, term),
         }
     }
@@ -2846,6 +2847,96 @@ mod tests {
             .map(|(_, _, address)| address.as_str())
             .collect();
         assert_eq!(sent_on, ["/tt/a-b#c/"]);
+    }
+
+    /// A pattern's `:slug` is a tag's title, which Hugo 0.166 made from its
+    /// name in capitals by the settings, and published the tag by.
+    #[test]
+    fn a_tags_slug_in_a_pattern_is_its_title_in_capitals() {
+        let top = crate::testing::Scratch::new("hugo-term-title");
+        let upper = "disablePathToLower = true\n";
+        // The settings, then the URL of each of the tags `a & b`,
+        // `What? Why!`, `the art of war`, `x from y` and `ςx`.
+        let cases = [
+            (
+                upper.to_owned(),
+                [
+                    "/tt/A-B/",
+                    "/tt/What-Why/",
+                    "/tt/The-Art-of-War/",
+                    "/tt/X-From-Y/",
+                    "/tt/Σx/",
+                ],
+            ),
+            (
+                format!("{upper}titleCaseStyle = 'Chicago'\n"),
+                [
+                    "/tt/A-B/",
+                    "/tt/What-Why/",
+                    "/tt/The-Art-of-War/",
+                    "/tt/X-from-Y/",
+                    "/tt/Σx/",
+                ],
+            ),
+            (
+                format!("{upper}titleCaseStyle = 'go'\n"),
+                [
+                    "/tt/A-B/",
+                    "/tt/What-Why/",
+                    "/tt/The-Art-Of-War/",
+                    "/tt/X-From-Y/",
+                    "/tt/Σx/",
+                ],
+            ),
+            (
+                format!("{upper}titleCaseStyle = 'firstupper'\n"),
+                [
+                    "/tt/A-b/",
+                    "/tt/What-why/",
+                    "/tt/The-art-of-war/",
+                    "/tt/X-from-y/",
+                    "/tt/Σx/",
+                ],
+            ),
+            (
+                format!("{upper}capitalizeListTitles = false\n"),
+                [
+                    "/tt/a-b/",
+                    "/tt/What-why/",
+                    "/tt/the-art-of-war/",
+                    "/tt/x-from-y/",
+                    "/tt/ςx/",
+                ],
+            ),
+            (
+                String::new(),
+                [
+                    "/tt/a-b/",
+                    "/tt/what-why/",
+                    "/tt/the-art-of-war/",
+                    "/tt/x-from-y/",
+                    "/tt/σx/",
+                ],
+            ),
+        ];
+        for (at, (settings, wanted)) in cases.into_iter().enumerate() {
+            let folder = top.join(at.to_string());
+            std::fs::create_dir_all(folder.join("content/posts")).unwrap();
+            let toml = format!(
+                "baseURL = 'https://example.org/'\n{settings}[permalinks.term]\ntags = '/tt/:slug/'\n"
+            );
+            std::fs::write(folder.join("hugo.toml"), toml).unwrap();
+            let tags = "['a & b', 'What? why!', 'the art of war', 'x from y', 'ςx']";
+            let page = format!("---\ntitle: Post\ndate: 2026-01-01\ntags: {tags}\n---\n");
+            std::fs::write(folder.join("content/posts/post.md"), page).unwrap();
+            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None) else {
+                panic!("{at}: the site wasn't read");
+            };
+            let tags: Vec<&String> = (import.addresses.iter())
+                .filter(|address| address.starts_with("/tt/"))
+                .collect();
+            assert_eq!(tags, wanted, "{at}");
+        }
     }
 
     /// Of pages whose paths are the same as Hugo reads paths, the one Hugo
