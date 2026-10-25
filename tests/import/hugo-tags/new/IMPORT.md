@@ -35,7 +35,10 @@ feed_ids_before: 2026-10-06
 tags.slugs:
   C++: c++
   Café: café
+tags.pages: true
 tags.permalink: /topics/{slug}/
+series.pages: true
+posts_per_page: 10
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

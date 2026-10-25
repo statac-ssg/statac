@@ -157,6 +157,8 @@ codes! {
     NoSiteUrl "no-site-url",
     UnusedFeedTemplate "unused-feed-template",
     NoLanguage "no-language",
+    NoListPage "no-list-page",
+    NoHomePage "no-home-page",
     RobotsBeneathPath "robots-beneath-path",
     RedirectToItself "redirect-to-itself",
     ContentNotPublished "content-not-published",
@@ -364,6 +366,8 @@ impl Code {
             | Code::UntitledPage
             | Code::NoSiteUrl
             | Code::NoLanguage
+            | Code::NoListPage
+            | Code::NoHomePage
             | Code::MissingWords
             | Code::BuiltWithPageTemplate
             | Code::BuiltWithoutTemplate
@@ -489,6 +493,8 @@ impl Code {
             | Code::SpelledTwoWays
             | Code::NumberedFolder
             | Code::NoLanguage
+            | Code::NoListPage
+            | Code::NoHomePage
             | Code::UnorderedPages
             | Code::NotAPost
             | Code::ContentNotPublished
@@ -1258,6 +1264,21 @@ pub enum Kind {
     },
     /// A site naming no language, read as English.
     NoLanguage,
+    /// Lists with pages that nothing asks a list page for, of one kind: the
+    /// first, as `NotAPost` names one, and how many more there are. A
+    /// folder asks for one with its `index.md`; the tags and the series
+    /// with `tags.pages` and `series.pages`.
+    NoListPage {
+        list: (Word, String),
+        more: usize,
+    },
+    /// The tops of languages with pages where nothing is published, with
+    /// no `index.md` there and no `templates/home.html`: each top's
+    /// address, and the path of the first one's `index.md`.
+    NoHomePage {
+        addresses: Vec<String>,
+        index: String,
+    },
     /// A `robots.txt` published beneath the site's path, where crawlers
     /// never look; `top` is the one address they read.
     RobotsBeneathPath {
@@ -2926,6 +2947,8 @@ impl Kind {
             Kind::NoSiteUrl { .. } => Code::NoSiteUrl,
             Kind::UnusedFeedTemplate { .. } => Code::UnusedFeedTemplate,
             Kind::NoLanguage => Code::NoLanguage,
+            Kind::NoListPage { .. } => Code::NoListPage,
+            Kind::NoHomePage { .. } => Code::NoHomePage,
             Kind::RobotsBeneathPath { .. } => Code::RobotsBeneathPath,
             Kind::RedirectToItself { .. }
             | Kind::RedirectFromItself { .. }

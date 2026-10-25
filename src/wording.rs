@@ -806,6 +806,38 @@ pub(crate) fn headline(kind: &Kind) -> String {
             format!("Feed id changed: this post was published at `{was}`")
         }
         Kind::NoLanguage => "No language set: the site is read as English".into(),
+        Kind::NoListPage {
+            list: (word, name),
+            more,
+        } => {
+            let (first, others, lacking) = match word {
+                Word::Folder => (
+                    format!("`content/{name}/`"),
+                    ("other folder", "other folders"),
+                    "no `index.md`",
+                ),
+                Word::Series => (
+                    the_list(*word, name),
+                    ("other series", "other series"),
+                    "none",
+                ),
+                _ => (the_list(*word, name), ("other tag", "other tags"), "none"),
+            };
+            match more {
+                0 => format!("No list page: {first} has {lacking}"),
+                n => format!(
+                    "No list page: {first} and {} have {lacking}",
+                    how_many(*n, others.0, others.1)
+                ),
+            }
+        }
+        Kind::NoHomePage { addresses, .. } => {
+            let quoted: Vec<String> = addresses.iter().map(|at| format!("`{at}`")).collect();
+            format!(
+                "No home page: nothing is published at {}",
+                either_of(&quoted)
+            )
+        }
         Kind::RobotsBeneathPath { top } => {
             format!("Robots beneath a path: crawlers read only `{top}`")
         }
@@ -3048,6 +3080,24 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::NoLanguage => {
             Some("Add the site's language to `statac.yaml`, as `language: en`.".into())
         }
+        Kind::NoListPage {
+            list: (word, name),
+            more,
+        } => Some(match (word, more) {
+            (Word::Folder, 0) => format!("Add `content/{name}/index.md` to publish one."),
+            (Word::Folder, _) => "Add an `index.md` to a folder to publish its list page.".into(),
+            (Word::Series, _) => {
+                "Add `series.pages: true` to `statac.yaml` to publish a page for each series."
+                    .into()
+            }
+            _ => "Add `tags.pages: true` to `statac.yaml` to publish a page for each tag.".into(),
+        }),
+        Kind::NoHomePage { addresses, index } => Some(match addresses.len() {
+            1 => format!("Add `{index}`, or `templates/home.html` to list the posts there."),
+            _ => "Add an `index.md` at the top of each language, or `templates/home.html` to \
+                  list the posts there."
+                .into(),
+        }),
         Kind::RobotsBeneathPath { .. } => Some(
             "Copy its lines into the `robots.txt` at the root of the host to have them read."
                 .into(),
@@ -6447,6 +6497,68 @@ mod tests {
                 },
                 "Field set aside: a page that redirects publishes only its redirect",
                 Some("Take it out, or take out `redirect_to` to publish the page."),
+            ),
+            (
+                Kind::NoListPage {
+                    list: (Word::Folder, "notes".into()),
+                    more: 0,
+                },
+                "No list page: `content/notes/` has no `index.md`",
+                Some("Add `content/notes/index.md` to publish one."),
+            ),
+            (
+                Kind::NoListPage {
+                    list: (Word::Folder, "notes".into()),
+                    more: 2,
+                },
+                "No list page: `content/notes/` and 2 other folders have no `index.md`",
+                Some("Add an `index.md` to a folder to publish its list page."),
+            ),
+            (
+                Kind::NoListPage {
+                    list: (Word::Tag, "Rust".into()),
+                    more: 0,
+                },
+                "No list page: the tag `Rust` has none",
+                Some("Add `tags.pages: true` to `statac.yaml` to publish a page for each tag."),
+            ),
+            (
+                Kind::NoListPage {
+                    list: (Word::Tag, "Rust".into()),
+                    more: 11,
+                },
+                "No list page: the tag `Rust` and 11 other tags have none",
+                Some("Add `tags.pages: true` to `statac.yaml` to publish a page for each tag."),
+            ),
+            (
+                Kind::NoListPage {
+                    list: (Word::Series, "Rust".into()),
+                    more: 1,
+                },
+                "No list page: the series `Rust` and 1 other series have none",
+                Some(
+                    "Add `series.pages: true` to `statac.yaml` to publish a page for each \
+                     series.",
+                ),
+            ),
+            (
+                Kind::NoHomePage {
+                    addresses: vec!["/".into()],
+                    index: "content/index.md".into(),
+                },
+                "No home page: nothing is published at `/`",
+                Some("Add `content/index.md`, or `templates/home.html` to list the posts there."),
+            ),
+            (
+                Kind::NoHomePage {
+                    addresses: vec!["/en/".into(), "/fr/".into()],
+                    index: "content/en/index.md".into(),
+                },
+                "No home page: nothing is published at `/en/` or `/fr/`",
+                Some(
+                    "Add an `index.md` at the top of each language, or `templates/home.html` to \
+                     list the posts there.",
+                ),
             ),
         ]
     }

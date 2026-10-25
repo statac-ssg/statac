@@ -6,7 +6,7 @@ use crate::site::LanguageId;
 
 const SETTINGS: (&str, &str) = (
     "statac.yaml",
-    "language: [ar, en]\ntimezone: UTC\npages.feed: false\n",
+    "language: [ar, en]\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
 );
 
 const POST: &str = "---\ndate: 2026-10-01\ntags: [Rust]\n---\n";

@@ -463,3 +463,64 @@ fn digits_stops_at_a_missing_value_as_any_filter_does() {
     ]);
     assert!(built.render("post-1.md").html.is_none());
 }
+
+/// A site naming no language, times what its template reads: the note is
+/// told once where a template reads the language of the site or of a
+/// page, and never where the site names one or something was told of the
+/// line as written.
+#[test]
+fn a_site_naming_no_language_is_told_so_once_where_a_template_reads_its_language() {
+    let none = Some("");
+    let settings = [
+        (None, true),
+        (none, true),
+        (Some("title: Site 1\n"), true),
+        (Some("language: ~\n"), true),
+        (Some("language: en\n"), false),
+        (Some("language: en-GB\n"), false),
+        (Some("language: [ar, en]\n"), false),
+        (Some("language:\n"), false),
+        (Some("language: 12\n"), false),
+    ];
+    let templates = [
+        ("{{ page.language }}", true),
+        ("{{ site.language }}", true),
+        ("{{ site.languages | join(\",\") }}", true),
+        (
+            "{{ page.content }} {{ page.date }} {{ page.direction }}",
+            false,
+        ),
+    ];
+    for (written, unset) in settings {
+        for (template, reads) in templates {
+            let mut files = vec![
+                ("content/post-1.md", DATED),
+                ("content/post-2.md", DATED),
+                NO_HOME,
+                ("templates/page.html", template),
+            ];
+            if let Some(written) = written {
+                files.push(("statac.yaml", written));
+            }
+            let temp = TempSite::site(&files);
+            if written.is_none() {
+                std::fs::remove_file(temp.root.join("statac.yaml")).unwrap();
+            }
+            for mode in [crate::build::Mode::Check, crate::build::Mode::Build] {
+                let outcome = crate::build::run(&crate::build::Options {
+                    mode,
+                    site: temp.root.clone(),
+                    out: Some(temp.root.join("_site")),
+                    today: Some(crate::date::Date::day_only(2026, 10, 4)),
+                    drafts: false,
+                    url: None,
+                });
+                let told = (outcome.problems.iter())
+                    .filter(|problem| problem.kind == Kind::NoLanguage)
+                    .count();
+                assert_eq!(told, usize::from(unset && reads), "{written:?} {template}");
+            }
+        }
+    }
+    assert!(Kind::NoLanguage.quietenable());
+}

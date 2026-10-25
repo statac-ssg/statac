@@ -14,7 +14,7 @@ The settings declare 2 languages, so the new site is in each, the main one, `en`
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
-Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
+Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
 Zola's feeds, at `/atom.xml` and `/fr/atom.xml`, are each now Statac's Atom feed at the same URL, written by `templates/feed.xml`, as `feed:` on each list page says, and `feed_ids_before` keeps each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids.
 
@@ -31,9 +31,10 @@ date_format: 31 December 2025
 date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
+series.pages: true
 fr.title: Langues
-posts_per_page: 0
 feed_ids_before: 2026-10-06
+tags.pages: true
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

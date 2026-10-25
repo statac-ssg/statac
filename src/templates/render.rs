@@ -584,6 +584,11 @@ impl Renderer {
             .collect()
     }
 
+    /// Whether the site has the template `name` to build a page with.
+    pub(crate) fn has_layout(&self, name: &str) -> bool {
+        self.shared.templates.is_layout(name)
+    }
+
     /// Whether the site's snippet `name` wraps the writing below a call to
     /// it, as the writing is read.
     pub(crate) fn wraps(&self, name: &str) -> Option<bool> {

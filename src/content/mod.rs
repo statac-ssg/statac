@@ -75,6 +75,10 @@ pub struct Read {
     /// The files beside pages left out of the build, by their paths under
     /// `content/`, left out with them.
     pub left_out: Vec<String>,
+    /// The names of the templates at the top of the site's `templates/`,
+    /// as the template reader names them: `feed.xml`, and `home` for
+    /// `home.html`. Which pages the site has turns on them.
+    pub templates: HashSet<String>,
 }
 
 /// How many drafts and posts waiting for their day `--drafts` built.
@@ -169,13 +173,11 @@ pub fn read(root: &Path, run: &Run) -> Read {
 /// what this reading read.
 pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
     texts.begin(root);
+    let templates = template_names(root);
     let mut sources = Sources::over(texts.unsaved().clone());
     let (mut settings, mut problems) = config::read(root, &mut sources);
     if let Some(address) = &run.url {
         settings.at(address);
-    }
-    if settings.languages().is_empty() && !settings.language_told {
-        problems.push(Problem::nowhere(Kind::NoLanguage));
     }
     let (dates, found) = Dates::read(root, &settings, &mut sources);
     let dates = match run.today {
@@ -246,7 +248,10 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
     site.held_back = reader.held_back;
     site.layouts_needing_url = reader.layouts_needing_url;
     let (sidecars, left_out) = (reader.sidecars, reader.files_left_out);
-    problems.extend(crate::lists::build(&mut site, &settings, &dates, &sources));
+    let has = |name: &str| templates.contains(name);
+    problems.extend(crate::lists::build(
+        &mut site, &settings, &dates, &sources, &has,
+    ));
     made::make_for_posts(&sources, &mut site, for_posts, &mut problems);
     let written = (reader.docs.iter())
         .flat_map(|doc| [&doc.words.own, &doc.words.layer])
@@ -301,7 +306,30 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
         dates,
         sidecars,
         left_out,
+        templates,
     }
+}
+
+/// The names of the templates at the top of the site's `templates/`, as
+/// the template reader names them: `feed.xml`, and `home` for `home.html`.
+fn template_names(root: &Path) -> HashSet<String> {
+    let Ok(entries) = std::fs::read_dir(root.join("templates")) else {
+        return HashSet::new();
+    };
+    let mut names = HashSet::new();
+    for entry in entries.flatten() {
+        if !entry.path().is_file() {
+            continue;
+        }
+        let Ok(name) = entry.file_name().into_string() else {
+            continue;
+        };
+        match name.strip_suffix(".html") {
+            Some(bare) => names.insert(bare.to_owned()),
+            None => names.insert(name),
+        };
+    }
+    names
 }
 
 /// What one folder under `content/` holds.

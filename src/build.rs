@@ -238,8 +238,7 @@ pub(crate) fn read_with(
         &mut read.sources,
     );
     read.problems.extend(problems);
-    let templates = template_names(site);
-    let has = |name: &str| templates.contains(name);
+    let has = |name: &str| read.templates.contains(name);
     let (feeds, problems) = feeds::plan(&read.site, &read.settings, &read.sources, &has);
     read.problems.extend(problems);
     read.problems
@@ -247,7 +246,7 @@ pub(crate) fn read_with(
     read.problems
         .extend(feeds::undated(&read.site, &read.settings, &read.sources));
     read.problems
-        .extend(feeds::unasked(&read.site, &read.settings, &templates));
+        .extend(feeds::unasked(&read.site, &read.settings, &read.templates));
     read.problems.extend(robots_beneath_path(&read));
     let (fetched, found) = crate::fetched::read(site, &mut read.sources);
     read.site.fetched = fetched;
@@ -277,28 +276,6 @@ fn claims(read: &content::Read, assets: &Assets, feeds: &[feeds::Feed]) -> Vec<(
     outputs.extend(read.site.pictures.claims());
     outputs.extend(feeds::claims(feeds));
     outputs
-}
-
-/// The names of the templates at the top of the site's `templates/`, as
-/// the template reader names them: `feed.xml`, and `home` for `home.html`.
-fn template_names(site: &Path) -> HashSet<String> {
-    let Ok(entries) = fs::read_dir(site.join("templates")) else {
-        return HashSet::new();
-    };
-    let mut names = HashSet::new();
-    for entry in entries.flatten() {
-        if !entry.path().is_file() {
-            continue;
-        }
-        let Ok(name) = entry.file_name().into_string() else {
-            continue;
-        };
-        match name.strip_suffix(".html") {
-            Some(bare) => names.insert(bare.to_owned()),
-            None => names.insert(name),
-        };
-    }
-    names
 }
 
 /// The note for a `robots.txt` page published beneath the site's path,
@@ -637,8 +614,9 @@ pub(crate) fn run_holding(options: &Options, progress: Progress, starter: &Start
 }
 
 /// Adds to `outcome` what is told once the site is built as `options`
-/// asks: of the site's own commands, and in a check, of the pictures
-/// published with where they were taken.
+/// asks: of the site's own commands, and in a check, of the list pages
+/// nothing asks for and of the pictures published with where they were
+/// taken.
 pub(crate) fn told_once_built(outcome: &mut Outcome, options: &Options) {
     let Held::Renderer(renderer) = &outcome.held else {
         return;
@@ -648,6 +626,9 @@ pub(crate) fn told_once_built(outcome: &mut Outcome, options: &Options) {
     if options.mode == Mode::Check {
         let unrun = crate::hooks::unrun_by_check(renderer.settings());
         outcome.problems.extend(unrun);
+        let has = |name: &str| renderer.has_layout(name);
+        let unasked = crate::lists::unasked(renderer.site(), renderer.settings(), &has);
+        outcome.problems.extend(unasked);
         // What is held back is only known of a site that could be built.
         if !stops(&outcome.problems) {
             let located = locations_published(renderer.site(), &outcome.held_back);
@@ -1010,6 +991,7 @@ pub(crate) fn conclude(
         problems.extend(renderer.assets().narrowed().cloned());
     }
     problems.extend(colours_not_loaded(renderer, built));
+    problems.extend(no_language(renderer, built));
     problems.extend(
         renderer.loops_over_every_page(built.iter().map(|built| (built.walked, &built.reads))),
     );
@@ -1070,6 +1052,20 @@ pub(crate) fn conclude(
         held_back,
         search,
     }
+}
+
+/// The note for a site that sets no `language` where something `built`
+/// read the language of the site or of a page, which is then English.
+fn no_language(renderer: &Renderer, built: &[Built]) -> Option<Problem> {
+    let settings = renderer.settings();
+    if !settings.languages().is_empty() || settings.language_told {
+        return None;
+    }
+    let language = Key::Setting(renderer.name_id("language"));
+    let read = built
+        .iter()
+        .any(|built| built.reads.keys().contains(&language));
+    read.then(|| Problem::nowhere(Kind::NoLanguage))
 }
 
 /// The warning for pages showing coloured code where nothing `built` read

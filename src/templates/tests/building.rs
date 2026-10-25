@@ -9,13 +9,14 @@ use crate::report::Report;
 
 /// Every kind of page a site has: the author's own, a list's page the
 /// author wrote, pages made from a table, and the pages Statac makes for a
-/// tag, a series, a folder, the site itself and a list's later pages.
+/// tag, a series, the site itself and a list's later pages.
 fn every_kind() -> Built {
     site(&[
         (
             "statac.yaml",
             "timezone: UTC\npages.feed: false\nposts_per_page: 1\n\
-             tags.permalink: /topics/{slug}/\nlanguage: en\n",
+             tags.permalink: /topics/{slug}/\nlanguage: en\ntags.pages: true\n\
+             series.pages: true\n",
         ),
         ("content/blog/index.md", "---\ntitle: Blog\n---\n"),
         (
@@ -114,13 +115,6 @@ fn a_problem_names_the_page_it_was_met_building() {
             &["While building the page for the series `Intro`"],
         ),
         (
-            "/notes/",
-            1,
-            "folder",
-            "the page for the folder `content/notes/`",
-            &["While building the page for the folder `content/notes/`"],
-        ),
-        (
             "/",
             1,
             "home",
@@ -166,7 +160,7 @@ fn a_page_statac_makes_with_no_template_is_named_as_it_is() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntimezone: UTC\npages.feed: false\n",
+            "language: en\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
         ),
         ("content/index.md", "---\ntitle: Home\n---\n"),
         (
@@ -191,7 +185,7 @@ fn a_problem_met_building_a_feed_names_the_feed() {
         (
             "statac.yaml",
             "title: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n\
-             pages.feed: feed.xml\nlanguage: en\n",
+             pages.feed: feed.xml\nlanguage: en\ntags.pages: true\n",
         ),
         (
             "content/blog/index.md",

@@ -230,10 +230,12 @@ fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts(
 
 #[test]
 fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
-    for (name, found, posts_page) in [
+    // Only Hugo paginated every list, so only its site asks for
+    // pagination, and its home page says `0`.
+    for (name, found, paged) in [
         ("hugo-home-pages", &[][..], true),
         ("zola-home-pages", &[UNUSED_FEED][..], false),
-        ("eleventy-home-pages", &[NO_ADDRESS, UNUSED_FEED][..], true),
+        ("eleventy-home-pages", &[NO_ADDRESS, UNUSED_FEED][..], false),
     ] {
         let (new, problems) = imported(name);
         assert_eq!(problems, found, "{name}");
@@ -248,9 +250,13 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
         });
         assert!(outcome.published.is_some(), "{name}");
         let home = fs::read_to_string(new.join("content/index.md")).unwrap();
-        assert!(home.contains("\nposts_per_page: 0\n"), "{name}: {home}");
+        assert_eq!(
+            home.contains("\nposts_per_page: 0\n"),
+            paged,
+            "{name}: {home}"
+        );
         assert!(!out.join("page/2").exists(), "{name}");
-        assert_eq!(out.join("posts/page/2").exists(), posts_page, "{name}");
+        assert_eq!(out.join("posts/page/2").exists(), paged, "{name}");
         // Zola sent `/page/1/` on to the home page, and so does the new
         // site.
         let first = fs::read_to_string(out.join("page/1/index.html")).ok();
@@ -3018,7 +3024,11 @@ fn eleventy_permalinks_are_kept_in_each_form() {
 
 #[test]
 fn eleventy_data_is_handed_down_as_statac_hands_it() {
-    assert_eq!(fixture("eleventy-data"), [NO_ADDRESS, UNUSED_FEED]);
+    // Eleventy published no page listing `notes/`, and nothing asks for one.
+    assert_eq!(
+        fixture("eleventy-data"),
+        ["no-list-page", NO_ADDRESS, UNUSED_FEED]
+    );
 }
 
 #[test]

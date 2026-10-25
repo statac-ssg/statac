@@ -68,7 +68,7 @@
         {# Notes and photographs come after the other folders, which keep the order of their addresses. #}
         {% set last = ["notes", "photos"] %}
         {% for folder in (site.folders | rejectattr("name", "in", last) | list) + (site.folders | selectattr("name", "in", last) | list) %}
-        <li><a href="{{ folder.url }}"{% if page.url == folder.url %} aria-current="page"{% elif page.folder is defined and page.folder.url == folder.url %} aria-current="true"{% endif %}>{{ headline(folder.page) }}</a></li>
+        <li><a href="{{ folder.url }}"{% if page.url == folder.url %} aria-current="page"{% elif page.folder is defined and page.folder == folder %} aria-current="true"{% endif %}>{{ headline(folder.page) }}</a></li>
         {% endfor %}
         {# Then each page with `menu: true` in its front matter, in the order of their addresses. #}
         {% for entry in site.pages | selectattr("menu") | selectattr("language", "eq", page.language) %}

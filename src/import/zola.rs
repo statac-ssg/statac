@@ -1317,9 +1317,6 @@ impl Reader<'_> {
                 self.import.addresses.push(at(n));
             }
         }
-        self.import
-            .settings
-            .push(("posts_per_page".into(), Value::Number("0".into())));
         if let Some(path) = later_paths.first()
             && path != "page"
         {
@@ -1331,12 +1328,12 @@ impl Reader<'_> {
                 .settings
                 .push(("pagination.permalink".into(), Value::Text(later)));
         }
-        let mut note = "Zola shows all of a list's pages on one page, unless its list page gives \
-                        `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same"
+        let mut note = "Zola shows all of a list's pages on one page unless its list page gives \
+                        `paginate_by`, and Statac does the same unless it gives `posts_per_page`"
             .to_owned();
         if any {
             note.push_str(
-                ", and each list page that gave it says `posts_per_page`; the first of its \
+                ": each list page that gave it says `posts_per_page`, and the first of its \
                  paginated pages, which Zola redirected to the list, is in the list page's \
                  `redirect_from`",
             );
@@ -1346,7 +1343,7 @@ impl Reader<'_> {
         if let Some((size, later)) = home_paged {
             let mut note = format!(
                 "The old site's home page showed its posts {size} to a page. {}",
-                one_home_page(self.starter)
+                one_home_page(self.starter, false)
             );
             if later {
                 note.push_str(
@@ -1562,6 +1559,13 @@ impl Reader<'_> {
                     }
                 }
             }
+        }
+        // Zola published a page for each tag, which Statac makes only where
+        // asked.
+        if !addresses.is_empty() {
+            self.import
+                .settings
+                .push(("tags.pages".into(), Value::Truth(true)));
         }
         self.import.addresses.extend(addresses);
         if !slugs.is_empty() {

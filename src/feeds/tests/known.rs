@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::build::{self, Mode, Options, Outcome};
-use crate::problem::{Kind, Reason};
+use crate::problem::{Code, Kind, Reason};
 use crate::serve::session::Session;
 
 /// A site in a folder of its own, removed when dropped.
@@ -27,8 +27,8 @@ const ID: &str = "fc370633-88f0-8092-9f96-7749dbfff0eb";
 const POST: &str = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
 
 impl Kept {
-    /// A site with `settings`, a folder `posts` and a folder `notes`, each
-    /// feed printing its posts' ids.
+    /// A site with `settings`, a folder `posts` and a folder `notes` with
+    /// their pages, each feed printing its posts' ids.
     fn new(settings: &str) -> Kept {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let root = std::env::temp_dir().join(format!(
@@ -41,6 +41,8 @@ impl Kept {
         for (path, text) in [
             ("statac.yaml", settings),
             ("content/index.md", "---\ntitle: Home\n---\n"),
+            ("content/posts/index.md", "---\ntitle: Posts\n---\n"),
+            ("content/notes/index.md", "---\ntitle: Notes\n---\n"),
             ("content/posts/post-1.md", POST),
             (
                 "content/notes/post-2.md",
@@ -120,13 +122,13 @@ impl Drop for Kept {
     }
 }
 
-/// Each problem's kind and the text it is placed at.
-/// Each problem `outcome` holds but an address gone, which moving a post
-/// makes as well, with the text it is placed at.
+/// Each problem `outcome` holds, with the text it is placed at, but an
+/// address gone, which moving a post makes as well, and news of the
+/// starter's files, which the folders' short pages are taken for.
 fn told(outcome: &Outcome) -> Vec<(Kind, Option<String>)> {
     let sources = outcome.sources();
     (outcome.problems.iter())
-        .filter(|p| p.kind.code() != crate::problem::Code::UrlGone)
+        .filter(|p| !matches!(p.kind.code(), Code::UrlGone | Code::UpdateAvailable))
         .map(|p| {
             let at = p.place.map(|place| sources.spelling(place).to_owned());
             (p.kind.clone(), at)

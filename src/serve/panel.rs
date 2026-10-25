@@ -557,7 +557,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         write(
             "statac.yaml",
-            "language: en\ntitle: Site\ntimezone: UTC\npages.feed: false\n",
+            "language: en\ntitle: Site\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
         );
         write(
             "content/blog/index.md",

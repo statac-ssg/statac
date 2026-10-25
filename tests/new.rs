@@ -255,6 +255,11 @@ fn every_tag_is_listed_on_a_page_and_a_page_asks_into_the_menu() {
     made(&folder, "Site 1\nhttps://example.org\nen, fr\n\n");
     fs::create_dir_all(folder.join("content/fr/posts")).unwrap();
     fs::write(
+        folder.join("content/fr/posts/index.md"),
+        "---\ntitle: Posts\n---\n",
+    )
+    .unwrap();
+    fs::write(
         folder.join("content/fr/posts/post-1.md"),
         "---\ntitle: Post 1\ndate: 2026-10-01\ntags: [Tag 1]\n---\nText.\n",
     )
@@ -296,6 +301,43 @@ fn every_tag_is_listed_on_a_page_and_a_page_asks_into_the_menu() {
             "{page}"
         );
     }
+}
+
+/// A folder with no `index.md` has no page and no URL: the menu marks
+/// the folder a post is in all the same, and a new site's lists page
+/// through their posts and their tags have pages, as the starter's
+/// templates show them.
+#[test]
+fn a_post_in_a_folder_with_no_page_is_built_and_the_starters_lists_page_through_their_posts() {
+    let folder = scratch("no-folder-page");
+    made(&folder, "Site 1\nhttps://example.org\nen\n\n");
+    let settings = fs::read_to_string(folder.join("statac.yaml")).unwrap();
+    assert!(
+        settings.contains("\ntags.pages: true\nseries.pages: true\nposts_per_page: 10\n"),
+        "{settings}"
+    );
+    for n in 1..=11 {
+        fs::write(
+            folder.join(format!("content/posts/post-{n}.md")),
+            format!("---\ntitle: Post {n}\ndate: 2026-09-{n:02}\ntags: [Tag 1]\n---\nText.\n"),
+        )
+        .unwrap();
+    }
+    fs::create_dir_all(folder.join("content/posts/2026")).unwrap();
+    fs::write(
+        folder.join("content/posts/2026/post-12.md"),
+        "---\ntitle: Post 12\ndate: 2026-09-12\n---\nText.\n",
+    )
+    .unwrap();
+    let (found, published) = built(&folder, Mode::Build);
+    assert!(found.is_empty() && published, "{found:?}");
+    let post = read_built(&folder, "posts/2026/post-12/index.html");
+    assert!(post.contains("Post 12"), "{post}");
+    for later in ["posts/page/2/index.html", "tags/tag-1/page/2/index.html"] {
+        assert!(read_built(&folder, later).contains("Post 1"), "{later}");
+    }
+    // The home page shows the newest of each folder itself, on one page.
+    assert!(!folder.with_extension("built").join("page/2").exists());
 }
 
 #[test]

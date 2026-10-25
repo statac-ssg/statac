@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering as Counting};
 use super::*;
 use crate::content::{Read, Run};
 use crate::date::Date;
+use crate::problem::Code;
 
 /// A site written to a fresh folder and read on `today`, the folder removed
 /// once read. A site that names no time zone is given UTC.
@@ -151,21 +152,122 @@ fn a_folder_lists_every_post_beneath_it_and_the_site_every_post() {
         speaker(&read, &folder("posts")),
         Some("posts/index.md".into())
     );
-    // A folder inside another has a page only by its own `index.md`; one
-    // at the top of `content/` has a page made where it has none.
+    // A folder has a page only by its own `index.md`, at the top of
+    // `content/` or inside another.
     assert_eq!(speaker(&read, &folder("posts/2024")), None);
-    assert_eq!(speaker(&read, &folder("notes")), Some("/notes/".into()));
-    let made = list(&read, &folder("notes")).page.unwrap();
-    let page = read.site.pages.get(made);
-    assert!(page.title.is_none());
-    assert_eq!(page.speaks_for, Some(page.folder));
+    assert_eq!(speaker(&read, &folder("notes")), None);
+}
+
+/// A folder of posts at the top of `content/` or inside another, times
+/// its `index.md` and `templates/folder.html`: only the `index.md` asks
+/// for its page.
+#[test]
+fn a_folder_has_a_page_only_where_its_index_asks() {
+    for path in ["notes", "posts/notes"] {
+        for index in [false, true] {
+            for template in [false, true] {
+                let post = format!("content/{path}/post-1.md");
+                let own = format!("content/{path}/index.md");
+                let mut files = vec![(post.as_str(), "---\ndate: 2026-01-01\n---\n")];
+                if index {
+                    files.push((own.as_str(), "---\ntitle: Notes\n---\n"));
+                }
+                if template {
+                    files.push(("templates/folder.html", ""));
+                }
+                let read = site(&files);
+                let case = format!("{path}, index {index}, template {template}");
+                assert_eq!(problems(&read), [], "{case}");
+                let wanted = index.then(|| format!("{path}/index.md"));
+                assert_eq!(speaker(&read, &folder(path)), wanted, "{case}");
+                // Its posts are published as before.
+                let posted = format!("{path}/post-1.md");
+                assert_eq!(members(&read, &folder(path)), [posted.as_str()], "{case}");
+                assert_eq!(address_of(&read, &posted), format!("/{path}/post-1/"));
+            }
+        }
+    }
+}
+
+/// A site in one language and in two, times whether a language's top has
+/// an `index.md` and whether the site has `templates/home.html`: a page is
+/// made only for a top with no `index.md`, where the site has the
+/// template.
+#[test]
+fn a_languages_own_list_has_a_page_made_only_where_the_site_has_a_home_template() {
+    for languages in [&["en"][..], &["en", "fr"]] {
+        for index in [false, true] {
+            for template in [false, true] {
+                let settings = format!("language: [{}]\ntimezone: UTC\n", languages.join(", "));
+                let posts: Vec<(String, String)> = languages
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(at, tag)| {
+                        let top = match at {
+                            0 => String::new(),
+                            _ => format!("{tag}/"),
+                        };
+                        let mut files =
+                            vec![(format!("content/{top}posts/post-1.md"), post("2026-01-01"))];
+                        if index {
+                            files.push((format!("content/{top}index.md"), "# Home\n".into()));
+                        }
+                        files
+                    })
+                    .collect();
+                let mut files: Vec<(&str, &str)> = vec![("statac.yaml", &settings)];
+                files.extend(
+                    posts
+                        .iter()
+                        .map(|(path, text)| (path.as_str(), text.as_str())),
+                );
+                if template {
+                    files.push(("templates/home.html", ""));
+                }
+                let read = site(&files);
+                let case = format!("{languages:?}, index {index}, template {template}");
+                assert_eq!(problems(&read), [], "{case}");
+                for (at, tag) in languages.iter().enumerate() {
+                    let top = match at {
+                        0 => String::new(),
+                        _ => (*tag).to_owned(),
+                    };
+                    let wanted = match (index, template) {
+                        (true, _) if top.is_empty() => Some("index.md".to_owned()),
+                        (true, _) => Some(format!("{top}/index.md")),
+                        (false, true) if top.is_empty() => Some("/".to_owned()),
+                        (false, true) => Some(format!("/{top}/")),
+                        (false, false) => None,
+                    };
+                    assert_eq!(speaker(&read, &folder(&top)), wanted, "{case}: {tag}");
+                    let id = read.site.own_list(Id::from_index(at)).unwrap();
+                    let posted = match top.is_empty() {
+                        true => "posts/post-1.md".to_owned(),
+                        false => format!("{top}/posts/post-1.md"),
+                    };
+                    assert_eq!(
+                        read.site.lists.get(id).members,
+                        [read
+                            .site
+                            .pages
+                            .iter()
+                            .find(|(_, p)| p.path == posted)
+                            .unwrap()
+                            .0],
+                        "{case}: {tag}"
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[test]
-fn the_sites_own_list_has_a_page_made_where_it_has_no_index() {
+fn a_page_made_for_the_sites_own_list_is_untitled_and_lands() {
     let read = site(&[
         ("content/about.md", "---\ntitle: About\n---\n"),
         ("content/posts/post-1.md", &post("2026-01-01")),
+        ("templates/home.html", ""),
     ]);
     assert_eq!(problems(&read), []);
     assert_eq!(speaker(&read, &folder("")), Some("/".into()));
@@ -181,11 +283,12 @@ fn the_sites_own_list_has_a_page_made_where_it_has_no_index() {
     let read = site(&[
         ("content/home.md", "---\ntitle: Home\npermalink: /\n---\n"),
         ("content/posts/post-1.md", &post("2026-01-01")),
+        ("templates/home.html", ""),
     ]);
     assert_eq!(problems(&read), []);
     assert_eq!(speaker(&read, &folder("")), Some("home.md".into()));
     // A site with no pages has none made.
-    let read = site(&[]);
+    let read = site(&[("templates/home.html", "")]);
     assert!(read.site.pages.is_empty());
 }
 
@@ -232,29 +335,47 @@ fn a_post_standing_at_a_lists_address_is_said_to_be_no_post() {
     }
 }
 
-/// The settings for tag pages, times what they make.
+/// The settings for tag pages, times what they make, with a template that
+/// would build them or none: a template alone asks for nothing.
 #[test]
 fn tags_and_series_have_pages_where_the_site_says() {
+    const BOTH: &str = "tags.pages: true\nseries.pages: true\n";
     // (settings, the tag's page, the series' page)
     let cases = [
-        ("", Some("/tags/rust/"), Some("/series/series-1/")),
+        ("", None, None),
+        ("tags.pages: false\nseries.pages: false\n", None, None),
+        (BOTH, Some("/tags/rust/"), Some("/series/series-1/")),
         (
             "tags.permalink: /topics/{slug}/\nseries.permalink: /runs/{slug}/\n",
+            None,
+            None,
+        ),
+        (
+            "tags.permalink: /topics/{slug}/\nseries.permalink: /runs/{slug}/\n\
+             tags.pages: true\nseries.pages: true\n",
             Some("/topics/rust/"),
             Some("/runs/series-1/"),
         ),
-        ("tags.pages: false\n", None, Some("/series/series-1/")),
-        ("series.pages: false\n", Some("/tags/rust/"), None),
+        ("tags.pages: true\n", Some("/tags/rust/"), None),
+        ("series.pages: true\n", None, Some("/series/series-1/")),
         (
-            "tags.slugs:\n  Rust: rust-lang\n",
+            "tags.pages: true\nseries.pages: false\n",
+            Some("/tags/rust/"),
+            None,
+        ),
+        (
+            "tags.slugs:\n  Rust: rust-lang\ntags.pages: true\n",
             Some("/tags/rust-lang/"),
-            Some("/series/series-1/"),
+            None,
         ),
     ];
-    for (settings, tag_page, series_page) in cases {
+    for ((settings, tag_page, series_page), template) in cases
+        .into_iter()
+        .flat_map(|case| [(case, false), (case, true)])
+    {
         let settings = format!("language: en\ntimezone: UTC\n{settings}");
-        let read = site(&[
-            ("statac.yaml", &settings),
+        let mut files = vec![
+            ("statac.yaml", settings.as_str()),
             (
                 "content/post-1.md",
                 "---\ndate: 2026-01-01\ntags: [Rust]\nseries: Series 1\n---\n",
@@ -263,7 +384,11 @@ fn tags_and_series_have_pages_where_the_site_says() {
                 "content/post-2.md",
                 "---\ndate: 2026-02-01\ntags: [Rust]\nseries: Series 1\n---\n",
             ),
-        ]);
+        ];
+        if template {
+            files.push(("templates/folder.html", ""));
+        }
+        let read = site(&files);
         assert_eq!(problems(&read), [], "{settings}");
         assert_eq!(
             speaker(&read, &tag("Rust")).as_deref(),
@@ -284,10 +409,16 @@ fn tags_and_series_have_pages_where_the_site_says() {
 
 #[test]
 fn a_made_page_is_untitled_and_placed_by_its_list() {
-    let read = site(&[(
-        "content/post-1.md",
-        "---\ndate: 2026-01-01\ntags: [Rust]\n---\n",
-    )]);
+    let read = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\ntags.pages: true\n",
+        ),
+        (
+            "content/post-1.md",
+            "---\ndate: 2026-01-01\ntags: [Rust]\n---\n",
+        ),
+    ]);
     let made = list(&read, &tag("Rust")).page.unwrap();
     let page = read.site.pages.get(made);
     assert_eq!(page.place, PagePlace::Made);
@@ -977,8 +1108,17 @@ fn a_list_goes_on_onto_later_pages_beneath_its_own() {
         usize,
         &'a [&'a str],
     );
-    let cases: [Case; 17] = [
-        ("", ("blog/index.md", ""), blog(), 10, &[]),
+    let cases: [Case; 21] = [
+        // Nothing is paginated unless the site or the list page asks.
+        ("", ("blog/index.md", ""), blog(), 0, &[]),
+        ("", ("index.md", ""), Some(folder("")), 0, &[]),
+        (
+            "",
+            ("blog/index.md", "posts_per_page: 2\n"),
+            blog(),
+            2,
+            &["/blog/page/2/"],
+        ),
         (
             "posts_per_page: 2\n",
             ("blog/index.md", ""),
@@ -1038,15 +1178,8 @@ fn a_list_goes_on_onto_later_pages_beneath_its_own() {
             2,
             &[],
         ),
-        // A folder at the top with no `index.md` goes on from the page
-        // made for it.
-        (
-            "posts_per_page: 2\n",
-            ("about.md", ""),
-            blog(),
-            2,
-            &["/blog/page/2/"],
-        ),
+        // A folder with no `index.md` has no page to go on from.
+        ("posts_per_page: 2\n", ("about.md", ""), blog(), 2, &[]),
         (
             "posts_per_page: 2\n",
             ("index.md", ""),
@@ -1054,8 +1187,17 @@ fn a_list_goes_on_onto_later_pages_beneath_its_own() {
             2,
             &["/page/2/"],
         ),
+        // A tag or a series goes on from the page made for it, where the
+        // site asks for one.
         (
             "posts_per_page: 2\n",
+            ("about.md", ""),
+            Some(tag("Rust")),
+            2,
+            &[],
+        ),
+        (
+            "posts_per_page: 2\ntags.pages: true\n",
             ("about.md", ""),
             Some(tag("Rust")),
             2,
@@ -1063,6 +1205,13 @@ fn a_list_goes_on_onto_later_pages_beneath_its_own() {
         ),
         (
             "posts_per_page: 2\n",
+            ("about.md", ""),
+            Some(ListKey::Series("Series 1".into())),
+            2,
+            &[],
+        ),
+        (
+            "posts_per_page: 2\nseries.pages: true\n",
             ("about.md", ""),
             Some(ListKey::Series("Series 1".into())),
             2,
@@ -1539,4 +1688,198 @@ fn a_pattern_opening_with_its_languages_folder_is_read_once_and_warned_of() {
     let english = list_in(&read, &tag("Rust"), 1);
     let address = english.address.as_ref().map(|a| a.value.as_str());
     assert_eq!(address, Some("/en/tags/rust/"));
+}
+
+/// What `check` and then `build` tell of the list pages nothing asks for,
+/// on a site of `files` with a template for its pages.
+fn unasked(files: &[(&str, &str)]) -> (Vec<Kind>, Vec<Kind>) {
+    let mut all = vec![("templates/page.html", "{{ page.content }}")];
+    all.extend_from_slice(files);
+    let temp = crate::testing::TempSite::site(&all);
+    let told = |mode| {
+        let outcome = crate::build::run(&crate::build::Options {
+            mode,
+            site: temp.root.clone(),
+            out: Some(temp.root.join("_site")),
+            today: Some(Date::day_only(2026, 10, 4)),
+            drafts: false,
+            url: None,
+        });
+        (outcome.problems.into_iter())
+            .map(|problem| problem.kind)
+            .filter(|kind| matches!(kind, Kind::NoListPage { .. } | Kind::NoHomePage { .. }))
+            .collect::<Vec<_>>()
+    };
+    (
+        told(crate::build::Mode::Check),
+        told(crate::build::Mode::Build),
+    )
+}
+
+fn no_list_page(word: Word, name: &str, more: usize) -> Kind {
+    Kind::NoListPage {
+        list: (word, name.to_owned()),
+        more,
+    }
+}
+
+const HOME: (&str, &str) = ("content/index.md", "# Home\n");
+const FOLDER_TEMPLATE: (&str, &str) = ("templates/folder.html", "");
+
+/// Folders of posts at the top of `content/` with no `index.md`, times
+/// how many and whether the site has `templates/folder.html`, which would
+/// have built their pages: `check` says so once, counting them, and only
+/// where it has; `build` says nothing.
+#[test]
+fn folders_of_posts_with_no_index_are_told_once_where_the_site_has_a_folder_template() {
+    for (folders, template) in [(1, false), (1, true), (3, false), (3, true)] {
+        let paths: Vec<String> = (1..=folders)
+            .map(|n| format!("content/folder-{n}/post-1.md"))
+            .collect();
+        let mut files: Vec<(&str, &str)> = paths
+            .iter()
+            .map(|path| (path.as_str(), "---\ndate: 2026-01-01\n---\n"))
+            .collect();
+        files.push(HOME);
+        // A folder with an `index.md`, one of undated pages and one inside
+        // another are no part of it.
+        files.push(("content/listed/index.md", "# Listed\n"));
+        files.push(("content/listed/post-1.md", "---\ndate: 2026-01-01\n---\n"));
+        files.push(("content/pages/page-1.md", "# Page 1\n"));
+        files.push((
+            "content/listed/inner/post-2.md",
+            "---\ndate: 2026-01-01\n---\n",
+        ));
+        if template {
+            files.push(FOLDER_TEMPLATE);
+        }
+        let (checked, built) = unasked(&files);
+        let wanted = match template {
+            true => vec![no_list_page(Word::Folder, "folder-1", folders - 1)],
+            false => Vec::new(),
+        };
+        assert_eq!(checked, wanted, "{folders} {template}");
+        assert_eq!(built, [], "{folders} {template}");
+    }
+}
+
+/// Tags and series used by pages, times `tags.pages` and `series.pages`
+/// unset, `true` or `false`, and whether the site has
+/// `templates/folder.html`: `check` says once of each where the setting is
+/// unset and the site has the template, counting them.
+#[test]
+fn tags_and_series_with_no_setting_asking_for_pages_are_told_once_each() {
+    let posts = [
+        (
+            "content/post-1.md",
+            "---\ndate: 2026-01-01\ntags: [Go, Rust]\nseries: Series 1\n---\n",
+        ),
+        (
+            "content/post-2.md",
+            "---\ndate: 2026-01-02\ntags: [Zig]\nseries: Series 1\n---\n",
+        ),
+    ];
+    for setting in ["", "true", "false"] {
+        for template in [false, true] {
+            let settings = match setting {
+                "" => "language: en\ntimezone: UTC\n".to_owned(),
+                truth => format!(
+                    "language: en\ntimezone: UTC\ntags.pages: {truth}\nseries.pages: {truth}\n"
+                ),
+            };
+            let mut files = vec![("statac.yaml", settings.as_str()), HOME];
+            files.extend(posts);
+            if template {
+                files.push(FOLDER_TEMPLATE);
+            }
+            let (checked, built) = unasked(&files);
+            let wanted = match (setting, template) {
+                ("", true) => vec![
+                    no_list_page(Word::Tag, "Go", 2),
+                    no_list_page(Word::Series, "Series 1", 0),
+                ],
+                _ => Vec::new(),
+            };
+            assert_eq!(checked, wanted, "{setting:?} {template}");
+            assert_eq!(built, [], "{setting:?} {template}");
+        }
+    }
+}
+
+/// A site in one language and in two, times whether each top has an
+/// `index.md` and whether the site has `templates/home.html`: `check`
+/// says once where nothing is published at a top, naming each.
+#[test]
+fn a_top_with_nothing_published_is_told_once() {
+    for languages in [&["en"][..], &["en", "fr"]] {
+        for index in [false, true] {
+            for template in [false, true] {
+                let settings = format!("language: [{}]\ntimezone: UTC\n", languages.join(", "));
+                let mut owned = Vec::new();
+                for (at, tag) in languages.iter().enumerate() {
+                    let top = match at {
+                        0 => String::new(),
+                        _ => format!("{tag}/"),
+                    };
+                    owned.push((format!("content/{top}post-1.md"), "# Post 1\n"));
+                    if index {
+                        owned.push((format!("content/{top}index.md"), "# Home\n"));
+                    }
+                }
+                let mut files = vec![("statac.yaml", settings.as_str())];
+                files.extend(owned.iter().map(|(path, text)| (path.as_str(), *text)));
+                if template {
+                    files.push(("templates/home.html", ""));
+                }
+                let (checked, built) = unasked(&files);
+                let addresses: Vec<String> = match languages.len() {
+                    1 => vec!["/".into()],
+                    _ => vec!["/".into(), "/fr/".into()],
+                };
+                let wanted = match (index, template) {
+                    (false, false) => vec![Kind::NoHomePage {
+                        addresses,
+                        index: "content/index.md".into(),
+                    }],
+                    _ => Vec::new(),
+                };
+                let case = format!("{languages:?} {index} {template}");
+                assert_eq!(checked, wanted, "{case}");
+                assert_eq!(built, [], "{case}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_notes_of_list_pages_nothing_asks_for_are_quietened_by_name() {
+    for code in [Code::NoListPage, Code::NoHomePage] {
+        assert!(code.quietenable(), "{}", code.name());
+    }
+    let quiet = "language: en\ntimezone: UTC\nquiet: [no-list-page, no-home-page]\n";
+    let temp = crate::testing::TempSite::site(&[
+        ("statac.yaml", quiet),
+        ("templates/page.html", "{{ page.content }}"),
+        FOLDER_TEMPLATE,
+        (
+            "content/notes/post-1.md",
+            "---\ndate: 2026-01-01\ntags: [Rust]\n---\n",
+        ),
+    ]);
+    let outcome = crate::build::run(&crate::build::Options {
+        mode: crate::build::Mode::Check,
+        site: temp.root.clone(),
+        out: None,
+        today: Some(Date::day_only(2026, 10, 4)),
+        drafts: false,
+        url: None,
+    });
+    let codes: Vec<Code> = outcome.problems.iter().map(|p| p.kind.code()).collect();
+    assert!(codes.contains(&Code::NoListPage) && codes.contains(&Code::NoHomePage));
+    let said = crate::report::Report::new(outcome.sources(), &temp.root, false)
+        .check(&outcome.problems, &outcome.quiet);
+    assert!(
+        !said.contains("No list page") && !said.contains("No home page"),
+        "{said}"
+    );
 }

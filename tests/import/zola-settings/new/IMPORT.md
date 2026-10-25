@@ -16,7 +16,7 @@ Zola has no setting for a time zone, and reads a date written without an offset 
 
 Zola's settings' `[markdown]` opened each link to another site with its own `target` or `rel`, so `snippets/markdown/link.html` writes each link the same.
 
-Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
+Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
 `content/posts/index.md` cascades `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
 
@@ -31,7 +31,8 @@ date_format: 31 December 2025
 date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
-posts_per_page: 0
+tags.pages: true
+series.pages: true
 description: A site whose settings come across.
 author: Name
 github: name

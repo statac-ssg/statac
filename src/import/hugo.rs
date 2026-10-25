@@ -2268,6 +2268,13 @@ impl Reader<'_> {
                     .settings
                     .push((format!("{plural}.slugs"), Value::Fields(slugs)));
             }
+            // Hugo published a page for each, which Statac makes only where
+            // asked.
+            if !counts.is_empty() {
+                self.import
+                    .settings
+                    .push((format!("{plural}.pages"), Value::Truth(true)));
+            }
             if kept {
                 held.extend(
                     counts
@@ -2542,13 +2549,12 @@ impl Reader<'_> {
     /// The settings for a list's later pages, in a site of so many posts.
     /// `firsts` is whether a list's first later page was sent on.
     fn paging(&mut self, posts: u64, firsts: bool) {
-        if let Some(size) = self.s.pager_size
-            && size != 10
-        {
-            self.import
-                .settings
-                .push(("posts_per_page".into(), Value::Number(size.to_string())));
-        }
+        // Hugo paginates a list ten posts to a page unless its settings
+        // say otherwise.
+        let size = self.s.pager_size.unwrap_or(10);
+        self.import
+            .settings
+            .push(("posts_per_page".into(), Value::Number(size.to_string())));
         if let Some(path) = self.s.pager_path.clone() {
             let path = path.trim_matches('/');
             if path != "page" && !path.is_empty() {
@@ -2613,7 +2619,7 @@ impl Reader<'_> {
             self.note(format!(
                 "Where the old home page was paginated, nothing is published at page 2 onwards \
                  now: {}, and Statac can't tell from the content which pages Hugo made.",
-                one_home_page(self.starter)
+                one_home_page(self.starter, true)
             ));
         }
     }

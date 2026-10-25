@@ -8,7 +8,7 @@ It was made from `tests/import/hugo-no-starter/old` by `statac import --no-start
 - 1 page, into `content/` where it stood in the old site.
 - 1 other file, copied as it was: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page had no content of its own, so `content/index.md` holds only front matter: write the home page there.
+The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
 Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each stays at the same URL, as `feed: index.xml` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` keeps each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
 
@@ -28,6 +28,7 @@ date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
 feed_ids_before: 2026-10-06
+posts_per_page: 10
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

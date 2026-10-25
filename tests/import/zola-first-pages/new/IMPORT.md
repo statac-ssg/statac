@@ -13,9 +13,9 @@ Zola has no setting for a time zone, and reads a date written without an offset 
 
 Zola's settings left straight quotes, `--` and `...` as typed, so `typography: false` keeps them so: take the line out to have Statac set them as print does.
 
-Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same, and each list page that gave it says `posts_per_page`; the first of its paginated pages, which Zola redirected to the list, is in the list page's `redirect_from`.
+Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`: each list page that gave it says `posts_per_page`, and the first of its paginated pages, which Zola redirected to the list, is in the list page's `redirect_from`.
 
-The old site's home page showed its posts 1 to a page. Statac's home page shows the newest of each folder itself, so `content/index.md` keeps its own list to one page with `posts_per_page: 0`.
+The old site's home page showed its posts 1 to a page. Statac's home page shows the newest of each folder itself, so `content/index.md` gives no `posts_per_page` and its own list stays on one page.
 
 `content/posts/index.md` cascades `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
 
@@ -30,8 +30,9 @@ date_format: 31 December 2025
 date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
+tags.pages: true
+series.pages: true
 typography: false
-posts_per_page: 0
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

@@ -111,8 +111,9 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "posts_per_page",
         described(
-            "How many posts each page of a list shows. `0` shows them all on one page. \
-             A list page can set its own number. Unset, it is `10`.",
+            "How many posts each page of a list shows, the rest going on to paginated \
+             pages. A list page can set its own number. Unset, or `0`, a list shows all \
+             its posts on one page.",
             LISTS,
         ),
     ),
@@ -143,16 +144,17 @@ const SETTINGS: &[(&str, Described)] = &[
     (
         "tags.pages",
         described(
-            "`false` stops Statac making a list page for each tag. The tags still work \
-             in templates. Unset, it is `true`.",
+            "`true` makes a list page for each tag where no page of yours is published \
+             at its URL. The tags work in templates either way. Unset, it is `false`.",
             LISTS,
         ),
     ),
     (
         "series.pages",
         described(
-            "`false` stops Statac making a list page for each series. The series still \
-             work in templates. Unset, it is `true`.",
+            "`true` makes a list page for each series where no page of yours is \
+             published at its URL. The series work in templates either way. Unset, it is \
+             `false`.",
             LISTS,
         ),
     ),

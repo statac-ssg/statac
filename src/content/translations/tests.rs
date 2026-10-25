@@ -19,6 +19,15 @@ fn site_with(files: &[(&str, &str)], drafts: bool) -> Read {
 
 const TWO: (&str, &str) = ("statac.yaml", "language: [ar, en]\ntimezone: UTC\n");
 
+/// [`TWO`], asking for a page for each tag and each series.
+const ASKING: (&str, &str) = (
+    "statac.yaml",
+    "language: [ar, en]\ntimezone: UTC\ntags.pages: true\nseries.pages: true\n",
+);
+
+/// What asks for a page for each language's top with no `index.md`.
+const HOME: (&str, &str) = ("templates/home.html", "");
+
 fn id(read: &Read, path: &str) -> PageId {
     read.site
         .pages
@@ -221,7 +230,8 @@ fn translations_come_main_language_first_then_as_declared() {
 #[test]
 fn pages_statac_makes_match_by_their_lists() {
     let read = site(&[
-        TWO,
+        ASKING,
+        HOME,
         (
             "content/post-1.md",
             "---\ndate: 2026-01-01\ntags: [Rust]\n---\n",
@@ -287,7 +297,7 @@ fn an_authors_page_at_a_lists_address_matches_the_page_statac_makes_for_it() {
     ];
     for (files, (page, translation)) in cases {
         let mut files: Vec<(&str, &str)> = files.iter().map(|(p, t)| (*p, t.as_str())).collect();
-        files.push(TWO);
+        files.push(ASKING);
         let read = site(&files);
         assert_eq!(problems(&read), [], "{page}");
         assert_eq!(translations(&read, page), [translation], "{page}");

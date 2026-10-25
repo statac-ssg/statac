@@ -797,7 +797,7 @@ fn make_with(
     write: &mut Writer<'_>,
 ) -> Result<Made, Problem> {
     refusal(folder, &folder.to_string_lossy(), by)?;
-    let settings = settings(answers, timezone, by);
+    let settings = settings(answers, timezone, by, by == Maker::New && writes.starter);
     let samples = (by == Maker::New).then_some(today);
     let files = files(answers, &settings, samples, writes);
     let mut made = Written::default();
@@ -890,14 +890,24 @@ impl Written {
     }
 }
 
+/// How many posts each list page of a new site shows before its
+/// paginated pages, as the starter's templates page through them.
+const STARTER_PER_PAGE: u64 = 10;
+
 /// The comment written above a setting that needs one.
 const FEED_KEY_COMMENT: &str =
     "# What each post's id in a feed is made from: never change it once a feed is published.";
 
+/// The settings asking for the list pages the starter's templates link to
+/// and show: a page for each tag and each series.
+pub(crate) const STARTER_LIST_PAGES: &[&str] = &["tags.pages", "series.pages"];
+
 /// `statac.yaml` for a site answered as `answers`, made `by` a command:
 /// a new site asks for its own feed, and an imported one for the feeds the
-/// old site had, which the import writes.
-fn settings(answers: &Answers, timezone: Option<&str>, by: Maker) -> String {
+/// old site had, which the import writes. Where `statac new` writes the
+/// `starter`, it asks for what the starter's templates show: the list
+/// pages they link to, and lists paginated.
+fn settings(answers: &Answers, timezone: Option<&str>, by: Maker, starter: bool) -> String {
     let language = match answers.languages.as_slice() {
         [one] => yaml::write::text(one),
         many => {
@@ -914,6 +924,12 @@ fn settings(answers: &Answers, timezone: Option<&str>, by: Maker) -> String {
     ];
     for (name, example) in shorter_dates(&answers.languages[0], &answers.date_format) {
         lines.push((name, Some(yaml::write::text(&example))));
+    }
+    if starter {
+        for &name in STARTER_LIST_PAGES {
+            lines.push((name, Some("true".to_owned())));
+        }
+        lines.push(("posts_per_page", Some(STARTER_PER_PAGE.to_string())));
     }
     let fed = (by == Maker::New).then(|| "true".to_owned());
     lines.push((crate::feeds::SETTING, fed));
@@ -1045,7 +1061,7 @@ pub fn files_of_a_new_site(cards: bool) -> Vec<(String, Vec<u8>)> {
         language: "en".to_owned(),
     };
     let answers = defaults.answers();
-    let settings = settings(&answers, None, Maker::New);
+    let settings = settings(&answers, None, Maker::New, true);
     let day = Date::day_only(2026, 1, 1);
     let writes = Writes {
         starter: true,

@@ -8,7 +8,7 @@ fn site() -> TempSite {
         (
             "statac.yaml",
             "title: Site 1\nurl: https://example.org/blog/\nfields.isbn: required text\n\
-             tagline: Notes\nbook:\n  author: Author 1\n",
+             tagline: Notes\nbook:\n  author: Author 1\ntags.pages: true\n",
         ),
         ("templates/page.html", "{{ page.content }}\n"),
         ("templates/post.html", "{{ page.content }}\n"),

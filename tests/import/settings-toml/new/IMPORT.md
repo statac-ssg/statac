@@ -22,6 +22,8 @@ date_format: 31 December 2025
 date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
+tags.pages: true
+series.pages: true
 author: Name
 book:
   isbn: 0-000-00000-0

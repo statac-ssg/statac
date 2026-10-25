@@ -544,7 +544,8 @@ fn a_site_with_no_home_page_is_answered_at_its_top_with_every_page_built() {
         without_a_home_page(site);
         site.write(
             "statac.yaml",
-            "title: Site\nlanguage: en\ntimezone: Europe/London\nposts_per_page: 1\n",
+            "title: Site\nlanguage: en\ntimezone: Europe/London\nposts_per_page: 1\n\
+             tags.pages: true\n",
         );
         site.write(
             "templates/folder.html",

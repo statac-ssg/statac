@@ -119,13 +119,13 @@ fn a_setting_nobody_wrote_is_defaulted() {
     let (_, settings, problems) = read_settings("title: Site 1\n");
     assert_eq!(problems, []);
     let cases = [
-        ("posts_per_page", Value::Whole(10)),
         ("max_width", Value::Whole(1600)),
         ("typography", Value::Bool(true)),
         ("date_zeros", Value::Bool(true)),
         ("optimise_images", Value::Bool(true)),
         ("write_feed_ids", Value::Bool(false)),
-        ("tags.pages", Value::Bool(true)),
+        ("tags.pages", Value::Bool(false)),
+        ("series.pages", Value::Bool(false)),
         ("code_style", Value::Text("ocean".into())),
         (
             "image_sizes",
@@ -143,6 +143,8 @@ fn a_setting_nobody_wrote_is_defaulted() {
         assert_eq!(read.value, value, "{name}");
         assert_eq!(read.origin, Origin::defaulted(), "{name}");
     }
+    // Nothing is paginated unless asked.
+    assert!(settings.get("posts_per_page").is_none());
     let left: Vec<&str> = settings
         .texts("exclude")
         .iter()
@@ -347,7 +349,7 @@ fn a_former_file_name_is_refused_by_name() {
         })]
     );
     assert!(settings.get("title").is_none());
-    assert_eq!(settings.whole("posts_per_page"), Some(10));
+    assert_eq!(settings.whole("max_width"), Some(1600));
 }
 
 #[test]
@@ -696,7 +698,7 @@ fn settings_that_arent_name_value_lines_are_refused() {
     );
     let (_, settings, problems) = read_settings("");
     assert_eq!(problems, []);
-    assert_eq!(settings.whole("posts_per_page"), Some(10));
+    assert_eq!(settings.whole("max_width"), Some(1600));
 }
 
 #[test]
@@ -977,7 +979,7 @@ fn a_name_one_slip_from_a_setting_is_told_and_kept_as_the_sites_own() {
     }
     let (_, settings, _) = read_settings("posts_per_pge: 5\n");
     assert!(settings.own("posts_per_pge").is_some());
-    assert_eq!(settings.whole("posts_per_page"), Some(10));
+    assert_eq!(settings.whole("posts_per_page"), None);
 }
 
 #[test]

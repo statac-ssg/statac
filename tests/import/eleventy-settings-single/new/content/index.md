@@ -1,6 +1,5 @@
 ---
 greeting: Hello.
-posts_per_page: 0
 ---
 This is the home page of an imported site, the file `content/index.md`. Write here what the site is, in place of these words.
 

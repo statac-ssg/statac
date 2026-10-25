@@ -1847,7 +1847,7 @@ impl Reader<'_> {
             "The old site's home page showed its posts {per_page} to a page. {}, and the posts' \
              list page shows them {per_page} to a page, as `posts_per_page` in `statac.yaml` says \
              for every list: see https://statac.dev/lists/#pages-of-a-list.",
-            one_home_page(self.starter)
+            one_home_page(self.starter, true)
         ));
         self.import.home_pages = Some(HomePages {
             per_page,

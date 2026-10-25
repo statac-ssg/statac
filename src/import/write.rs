@@ -595,6 +595,13 @@ pub(super) fn write<'a>(
         out.remove(&format!("content/{path}"))?;
         summary.displaced.push(((*path).to_owned(), instead));
     }
+    // The starter's templates link to a page for each tag and each series.
+    let mut settings = settings;
+    for &name in new::STARTER_LIST_PAGES.iter().rev().filter(|_| starter) {
+        if !settings.iter().any(|(written, _)| written == name) {
+            settings.insert(0, (name.to_owned(), Value::Truth(true)));
+        }
+    }
     let mut text = made.settings.clone();
     text.push_str(&yaml::fields(
         settings.iter().map(|(name, value)| (name.as_str(), value)),
@@ -621,8 +628,13 @@ pub(super) fn write<'a>(
     summary.settings = text;
 
     // The home page, and each other language's, shows the newest of each
-    // folder itself, so its own list is kept to one page, as a new site's is.
-    for language in std::iter::once("").chain(other_languages.iter().map(String::as_str)) {
+    // folder itself, so its own list is kept to one page, as a new site's
+    // is, where the settings page the lists.
+    let paged = settings.iter().any(|(name, value)| {
+        name == "posts_per_page" && !matches!(value, Value::Number(n) if n == "0")
+    });
+    let homes = std::iter::once("").chain(other_languages.iter().map(String::as_str));
+    for language in homes.filter(|_| paged) {
         let path = match language {
             "" => "index.md".to_owned(),
             language => format!("{language}/index.md"),
@@ -723,6 +735,18 @@ pub(super) fn write<'a>(
     }
     for (path, text) in &written {
         out.put(path, text.as_bytes())?;
+    }
+    // Without the starter, the home page of each language that no page
+    // came across to is written with no content, so the site has one.
+    let homes = std::iter::once(String::new()).chain(other_languages.iter().cloned());
+    for language in homes.filter(|_| !starter) {
+        let path = match language.is_empty() {
+            true => "index.md".to_owned(),
+            false => format!("{language}/index.md"),
+        };
+        if !came.contains(&path) && out.text(&format!("content/{path}")).is_none() {
+            out.put(&format!("content/{path}"), b"")?;
+        }
     }
     // Without the starter, a page the words are for that isn't there is
     // written to hold them.

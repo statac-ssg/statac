@@ -403,9 +403,8 @@ fn an_index_page_set_aside_publishes_only_the_items() {
     assert_eq!(problems(&read), []);
     assert!(!page(&read, "people.md").lands());
     assert!(page(&read, "people.md/person-1").lands());
-    // Beside the page Statac makes for the site's own list.
     let files: Vec<String> = read.claims().into_iter().map(|(file, _)| file).collect();
-    assert_eq!(files, ["person-1/index.html", "index.html"]);
+    assert_eq!(files, ["person-1/index.html"]);
 }
 
 #[test]

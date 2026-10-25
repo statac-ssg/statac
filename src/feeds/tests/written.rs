@@ -91,6 +91,8 @@ const SETTINGS: (&str, &str) = (
 /// The page of the folder `posts`, asking for its feed.
 const POSTS: (&str, &str) = ("content/posts/index.md", "---\nfeed: true\n---\n");
 const HOME: (&str, &str) = ("content/index.md", "---\ntitle: Home\n---\n");
+/// The page of the folder `posts`, asking for no feed.
+const POSTS_PAGE: (&str, &str) = ("content/posts/index.md", "---\ntitle: Posts\n---\n");
 const PAGE: (&str, &str) = (
     "templates/page.html",
     "{{ headline(page) }}{{ page.content }}",
@@ -112,13 +114,16 @@ fn post(n: u32, extra: &str) -> (String, String) {
 }
 
 /// A site of the given files, with posts 1 to 3 in `content/posts/` in a
-/// series, besides.
+/// series, and the folder's page where they give none, besides.
 fn with_posts(files: &[(&str, &str)]) -> Built {
     let posts: Vec<(String, String)> = (1..=3).map(|n| post(n, "series: Series 1\n")).collect();
     let mut all: Vec<(&str, &str)> = posts
         .iter()
         .map(|(p, t)| (p.as_str(), t.as_str()))
         .collect();
+    if !files.iter().any(|(path, _)| *path == POSTS_PAGE.0) {
+        all.push(POSTS_PAGE);
+    }
     all.extend_from_slice(files);
     Built::new(&all)
 }
@@ -852,6 +857,7 @@ fn entry_ids_are_those_the_previous_build_published() {
         let mut files = vec![
             ("statac.yaml", settings.as_str()),
             HOME,
+            POSTS,
             PAGE,
             HOME_TEMPLATE,
         ];

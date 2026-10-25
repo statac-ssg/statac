@@ -8,13 +8,13 @@ It was made from `tests/import/zola-no-starter/old` by `statac import --no-start
 - 2 pages, into `content/` where they stood in the old site.
 - 1 other file, copied as it was: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page had no content of its own, so `content/index.md` holds only front matter: write the home page there.
+The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
 Zola's settings left straight quotes, `--` and `...` as typed, so `typography: false` keeps them so: take the line out to have Statac set them as print does.
 
-Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
+Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
 The settings written in `statac.yaml`:
 
@@ -28,7 +28,6 @@ date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
 typography: false
-posts_per_page: 0
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

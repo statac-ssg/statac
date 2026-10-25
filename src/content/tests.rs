@@ -583,7 +583,7 @@ fn front_matter_between_plus_lines_is_refused_at_the_opening_line() {
         Kind::OtherSpelling { word: Word::Marker, written, ours } if written == "+++" && ours == "---"
     ));
     let paths: Vec<String> = addresses(&read).into_iter().map(|(path, _)| path).collect();
-    assert_eq!(paths, ["", "post-3.md"]);
+    assert_eq!(paths, ["post-3.md"]);
 }
 
 #[test]
@@ -760,8 +760,6 @@ fn pages_are_found_with_their_titles_and_lists() {
     assert_eq!(
         addresses(&read),
         [
-            // `posts/` has no `index.md`, so Statac makes its page.
-            ("", "/posts/"),
             ("about.markdown", "/about/"),
             ("index.md", "/"),
             ("notes.md", "/notes/"),
@@ -806,7 +804,8 @@ fn pages_are_found_with_their_titles_and_lists() {
         lists,
         [
             (&ListKey::Folder(String::new()), Some("index.md"), 1, 5),
-            (&ListKey::Folder("posts".into()), Some(""), 1, 1),
+            // `posts/` has no `index.md`, so no page speaks for it.
+            (&ListKey::Folder("posts".into()), None, 1, 1),
         ]
     );
     let dated = page(&read, "posts/2024-01-02-post-1.md")
@@ -1863,8 +1862,9 @@ fn a_claim_on_a_page_statac_makes_names_that_page() {
     let temp = TempSite::site(&[
         (
             "statac.yaml",
-            "language: en\ntimezone: UTC\nposts_per_page: 1\n",
+            "language: en\ntimezone: UTC\nposts_per_page: 1\ntags.pages: true\n",
         ),
+        ("templates/home.html", ""),
         ("content/blog/index.md", "---\ntitle: Blog\n---\n"),
         (
             "content/blog/post-1.md",
@@ -2521,17 +2521,17 @@ fn a_page_left_out_at_an_address_already_taken_is_warned_of() {
             )),
         ),
         (
-            "draft: true\npermalink: /folder-1/",
+            "draft: true\npermalink: /tags/tag-1/",
             "true",
             Some(format!(
-                "{DRAFT} `/folder-1/`, as the page for the folder `content/folder-1/` is"
+                "{DRAFT} `/tags/tag-1/`, as the page for the tag `Tag 1` is"
             )),
         ),
         (
-            "date: 2027-01-01\npermalink: /folder-1/",
+            "date: 2027-01-01\npermalink: /tags/tag-1/",
             "2027-01-01",
             Some(format!(
-                "{WAITING} `/folder-1/`, as the page for the folder `content/folder-1/` is"
+                "{WAITING} `/tags/tag-1/`, as the page for the tag `Tag 1` is"
             )),
         ),
     ];
@@ -2539,9 +2539,15 @@ fn a_page_left_out_at_an_address_already_taken_is_warned_of() {
         let temp = TempSite::site(&[
             ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
             ("content/held.md", &format!("---\n{front}\n---\n")),
-            ("content/folder-1/post-3.md", "---\ntitle: Post 3\n---\n"),
+            (
+                "content/folder-1/post-3.md",
+                "---\ntitle: Post 3\ntags: [Tag 1]\n---\n",
+            ),
             ("static/file-1.txt", "text"),
-            ("statac.yaml", "language: en\ntimezone: UTC\n"),
+            (
+                "statac.yaml",
+                "language: en\ntimezone: UTC\ntags.pages: true\n",
+            ),
         ]);
         let (read, ..) = crate::build::read(&temp.root, &run_on(2026, 12, 31));
         let left_out = match at {
@@ -2838,34 +2844,6 @@ fn a_redirect_followed_to_nothing_is_warned_of_where_nothing_is_named() {
             "/nothing/".to_owned()
         )]
     );
-}
-
-#[test]
-fn a_site_naming_no_language_is_told_once_and_one_naming_any_is_not() {
-    let told = |settings: &str| {
-        let read = site(&[
-            ("statac.yaml", settings),
-            ("content/post-1.md", "Text.\n"),
-            ("content/post-2.md", "Text.\n"),
-        ]);
-        problems(&read)
-    };
-    let note = [("no-language", String::new(), String::new())];
-    assert_eq!(told(""), note);
-    assert_eq!(told("title: Site 1\n"), note);
-    assert_eq!(told("language: ~\n"), note);
-    assert_eq!(told("language: en\n"), []);
-    assert_eq!(told("language: en-GB\n"), []);
-    assert!(!told("language: [ar, en]\n").contains(&note[0]));
-    // What is told of the line as written is told alone.
-    let at = |name, text: &str| (name, "statac.yaml".to_owned(), text.to_owned());
-    assert_eq!(told("language:\n"), [at("set-aside", "language")]);
-    assert_eq!(told("language: 12\n"), [at("wrong-kind-of-value", "12")]);
-
-    let temp = TempSite::site(&[("content/post-1.md", "Text.\n")]);
-    std::fs::remove_file(temp.root.join("statac.yaml")).unwrap();
-    assert_eq!(problems(&read_site(&temp)), note);
-    assert!(Kind::NoLanguage.quietenable());
 }
 
 #[cfg(unix)]

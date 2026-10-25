@@ -85,8 +85,13 @@ const MADE: &str =
 
 #[test]
 fn the_pages_statac_makes_have_their_translations_too() {
+    let settings = (
+        "statac.yaml",
+        "language: [ar, en, fr]\nurl: https://example.org\ntimezone: UTC\npages.feed: false\n\
+         tags.pages: true\n",
+    );
     let built = site(&[
-        SETTINGS,
+        settings,
         (
             "content/post-1.md",
             "---\ndate: 2026-01-01\ntags: [Rust]\n---\n",

@@ -1058,10 +1058,6 @@ fn a_site_of_two_pages_and_no_templates_publishes_their_content_alone() {
     assert_eq!(
         said,
         "\
-note  No language set: the site is read as English
-  Add the site's language to `statac.yaml`, as `language: en`.
-  More: https://statac.dev/e/no-language/
-
 note  Built without template: 2 pages are published as their content alone
   While building: content/hello.md
   And while building 1 more:
@@ -1069,15 +1065,13 @@ note  Built without template: 2 pages are published as their content alone
   Add `templates/page.html` to build them with a template.
   More: https://statac.dev/e/built-without-template/
 
-2 notes: 1 built-without-template, 1 no-language.
+1 note: 1 built-without-template.
 "
     );
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
     assert!(
-        said.starts_with(
-            "2 notes: 1 built-without-template, 1 no-language. Run `statac check` to see them.\n"
-        ),
+        said.starts_with("1 note: 1 built-without-template. Run `statac check` to see it.\n"),
         "{said}"
     );
     let pages: Vec<(String, String)> = files(&site.out())
@@ -1272,7 +1266,8 @@ fn a_redirect_is_titled_by_what_the_page_it_sends_to_is_called() {
     let site = Site::new("redirect-title");
     site.write(
         "statac.yaml",
-        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nposts_per_page: 1\n",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nposts_per_page: 1\n\
+         tags.pages: true\n",
     );
     site.write(
         "content/index.md",
@@ -1379,7 +1374,7 @@ fn a_value_read_as_markdown_on_many_pages_is_told_at_its_place_once() {
     let site = Site::new("markdown-value");
     site.write(
         "statac.yaml",
-        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
     );
     site.write(
         "content/post-1.md",
@@ -2340,6 +2335,10 @@ fn a_script_in_one_post_shown_on_another_page_is_blamed_on_the_post() {
 #[test]
 fn a_script_in_a_field_shown_on_a_page_statac_makes_is_blamed_on_its_file() {
     let site = Site::new("made-shown");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
+    );
     site.write("templates/page.html", "<title>{{ page.title }}</title>\n");
     site.write(
         "templates/folder.html",
@@ -3972,4 +3971,58 @@ warning  Broken link: nothing is published at `/gone/`
             )
         );
     }
+}
+
+#[test]
+fn check_says_once_of_each_kind_of_list_page_nothing_asks_for_and_build_says_nothing() {
+    let site = Site::new("unasked");
+    site.write("templates/folder.html", "{{ page.content }}\n");
+    for n in 1..=2 {
+        site.write(
+            &format!("content/notes-{n}/note-1.md"),
+            "---\ntitle: Note 1\ndate: 2026-01-02\ntags: [Rust, Go]\n---\nA note.\n",
+        );
+    }
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+note  No list page: `content/notes-1/` and 1 other folder have no `index.md`
+  Add an `index.md` to a folder to publish its list page.
+  More: https://statac.dev/e/no-list-page/
+
+note  No list page: the tag `Go` and 1 other tag have none
+  Add `tags.pages: true` to `statac.yaml` to publish a page for each tag.
+  More: https://statac.dev/e/no-list-page/
+
+2 notes: 2 no-list-page.
+"
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(!said.contains("no-list-page"), "{said}");
+
+    // Nothing is published at the top of a site that never published it.
+    fs::remove_file(site.root.join("published.txt")).unwrap();
+    fs::remove_file(site.root.join("content/index.md")).unwrap();
+    fs::remove_file(site.root.join("templates/home.html")).unwrap();
+    site.write("content/notes-1/index.md", "---\ntitle: Notes\n---\n");
+    site.write("content/notes-2/index.md", "---\ntitle: Notes\n---\n");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+note  No home page: nothing is published at `/`
+  Add `content/index.md`, or `templates/home.html` to list the posts there.
+  More: https://statac.dev/e/no-home-page/
+
+1 note: 1 no-home-page.
+"
+    );
 }

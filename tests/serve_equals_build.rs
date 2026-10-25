@@ -28,7 +28,8 @@ struct Site {
 const TODAY: &str = "2026-10-04";
 
 const SETTINGS: &str = "title: Site\nlanguage: [en, de]\nurl: https://example.org\n\
-                        feed_key: key\ntimezone: UTC\nposts_per_page: 2\nfeed: true\n";
+                        feed_key: key\ntimezone: UTC\nposts_per_page: 2\ntags.pages: true\n\
+                        feed: true\n";
 
 const BASE: &str = "<!doctype html>\n<title>{{ headline(page) }}</title>\n{{ css('site.css') }}\n\
                     <nav>{% for tag in site.tags %}<a href=\"{{ tag.url }}\">{{ tag.name }}</a>\
@@ -163,7 +164,9 @@ impl Site {
         let code = new::run(&options, machine, &mut said, false);
         assert_eq!(code, 0, "{}", String::from_utf8_lossy(&said));
         let settings = fs::read_to_string(site.root().join("statac.yaml")).unwrap();
-        site.write("statac.yaml", &format!("{settings}posts_per_page: 3\n"));
+        let paged = settings.replace("\nposts_per_page: 10\n", "\nposts_per_page: 3\n");
+        assert_ne!(paged, settings);
+        site.write("statac.yaml", &paged);
         for n in 1..=8 {
             let tags = if n % 3 == 0 { "one, two" } else { "one" };
             site.write(
@@ -3442,6 +3445,103 @@ fn what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them() {
             }),
         ],
     );
+}
+
+/// Each thing that asks for a list page or for pagination, added and
+/// taken away while serving, on a site in one language and in two: the
+/// pages a round makes are those a build makes.
+#[test]
+fn the_list_pages_and_pagination_follow_what_asks_for_them() {
+    for (name, languages) in [("asked-one", "en"), ("asked-two", "[en, de]")] {
+        let site = Site::empty(name);
+        let settings = format!("title: Site\nlanguage: {languages}\ntimezone: UTC\n");
+        site.write("statac.yaml", &settings);
+        let listed = "{% for folder in site.folders %}{{ folder.url }};{% endfor %}|\
+                      {% for tag in site.tags %}{{ tag.url | default('none') }};{% endfor %}|\
+                      {{ page.folder.url | default('none') }}\n";
+        let list = "{% for post in page.posts %}{{ post.title }};{% endfor %}|\
+                    {% if page.next %}{{ page.next.url }}{% endif %}\n";
+        site.write("templates/page.html", listed);
+        site.write("templates/folder.html", list);
+        let tops: &[&str] = match languages {
+            "en" => &[""],
+            _ => &["", "de/"],
+        };
+        for top in tops {
+            for n in 1..=2 {
+                let text = post(
+                    &format!("Post {n}"),
+                    &format!("2026-01-0{n}"),
+                    "one",
+                    "Text.",
+                );
+                let text = text.replacen("---\n", "---\nseries: Series 1\n", 1);
+                site.write(&format!("content/{top}notes/post-{n}.md"), &text);
+            }
+        }
+        let with = |more: &str| format!("{settings}{more}");
+        through(
+            &site,
+            &[
+                ("`templates/home.html` added", &|site| {
+                    site.write("templates/home.html", list)
+                }),
+                ("a page asked for each tag", &|site| {
+                    site.write("statac.yaml", &with("tags.pages: true\n"))
+                }),
+                ("and for each series", &|site| {
+                    site.write(
+                        "statac.yaml",
+                        &with("tags.pages: true\nseries.pages: true\n"),
+                    )
+                }),
+                ("every list paginated", &|site| {
+                    site.write(
+                        "statac.yaml",
+                        &with("tags.pages: true\nseries.pages: true\nposts_per_page: 1\n"),
+                    )
+                }),
+                ("the folders' pages added", &|site| {
+                    for top in tops {
+                        site.write(&format!("content/{top}notes/index.md"), "# Notes\n")
+                    }
+                }),
+                ("only the folders' pages paginated", &|site| {
+                    site.write(
+                        "statac.yaml",
+                        &with("tags.pages: true\nseries.pages: true\n"),
+                    );
+                    for top in tops {
+                        site.write(
+                            &format!("content/{top}notes/index.md"),
+                            "---\nposts_per_page: 1\n---\n# Notes\n",
+                        )
+                    }
+                }),
+                ("the home pages written", &|site| {
+                    for top in tops {
+                        site.write(&format!("content/{top}index.md"), "# Home\n")
+                    }
+                }),
+                ("`templates/home.html` removed", &|site| {
+                    site.remove("templates/home.html")
+                }),
+                ("the home pages removed", &|site| {
+                    for top in tops {
+                        site.remove(&format!("content/{top}index.md"))
+                    }
+                }),
+                ("the folders' pages removed", &|site| {
+                    for top in tops {
+                        site.remove(&format!("content/{top}notes/index.md"))
+                    }
+                }),
+                ("the settings as they were", &|site| {
+                    site.write("statac.yaml", &settings)
+                }),
+            ],
+        );
+    }
 }
 
 #[test]

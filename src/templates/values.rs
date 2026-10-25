@@ -391,6 +391,7 @@ impl PageValue {
             }
             "language" => {
                 frame::read(Key::Language(page.language));
+                frame::read(setting_key(shared, "language"));
                 Some(Value::from(code_of(shared, page.language)))
             }
             "direction" => {
@@ -1267,22 +1268,11 @@ impl ListValue {
                 }
             }
             "page" => (known().page).map(|(page, _)| PageValue::value(shared, page)),
-            "url" => {
-                match (known().page, &list.key) {
-                    (Some((page, _)), _) => {
-                        frame::read(field_key(shared, page, "url"));
-                        Some(Value::from(shared.address_of(page)))
-                    }
-                    (None, ListKey::Folder(path)) => Some(Value::from(format!(
-                        "{}/{}",
-                        shared.base,
-                        crate::content::slug::tidied_path(&format!("{path}/"))
-                            .trim_start_matches('/')
-                    ))),
-                    // A tag or a series with no page stands at no address.
-                    (None, _) => None,
-                }
-            }
+            // A list with no page stands at no address.
+            "url" => known().page.map(|(page, _)| {
+                frame::read(field_key(shared, page, "url"));
+                Value::from(shared.address_of(page))
+            }),
             "posts" => {
                 read_whole(self.id);
                 Some(Pages::value(shared, Which::Posts(self.id)))

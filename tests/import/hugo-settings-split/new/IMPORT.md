@@ -25,7 +25,10 @@ date_format: 31 December 2025
 date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
+tags.pages: true
+series.pages: true
 feed_ids_before: 2026-10-06
+posts_per_page: 10
 author: Name
 description: A site whose settings are split over config/_default/.
 ```

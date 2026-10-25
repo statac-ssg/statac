@@ -25,7 +25,10 @@ date_format: 31 décembre 2025
 date_short: 31 déc. 2025
 date_day: 31 déc.
 date_stamp: 31 déc. 2025, 15:04
+tags.pages: true
+series.pages: true
 feed_ids_before: 2026-10-06
+posts_per_page: 10
 author: Name
 ```
 

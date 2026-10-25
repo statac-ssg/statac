@@ -231,8 +231,8 @@ fn came_across(text: &mut String, summary: &Summary) {
              `templates/home.html`, which lists the posts below its content.\n\n",
         ),
         (false, false) => text.push_str(
-            "The old site's home page had no content of its own, so `content/index.md` holds \
-             only front matter: write the home page there.\n\n",
+            "The old site's home page had no content of its own, so `content/index.md` has \
+             none: write the home page there.\n\n",
         ),
         (false, true) => text.push_str("The old site's home page is `content/index.md`.\n\n"),
     }

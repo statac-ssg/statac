@@ -23,9 +23,9 @@ Zola ordered the pages of `content/by-weight/` by their `weight`, lightest first
 
 Zola gave the pages of `content/by-none/` no order of its own, as no `sort_by` asked for one, and Statac lists them newest first.
 
-Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same, and each list page that gave it says `posts_per_page`; the first of its paginated pages, which Zola redirected to the list, is in the list page's `redirect_from`.
+Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`: each list page that gave it says `posts_per_page`, and the first of its paginated pages, which Zola redirected to the list, is in the list page's `redirect_from`.
 
-The old site's home page showed its posts 2 to a page. Statac's home page shows the newest of each folder itself, so `content/index.md` keeps its own list to one page with `posts_per_page: 0`.
+The old site's home page showed its posts 2 to a page. Statac's home page shows the newest of each folder itself, so `content/index.md` gives no `posts_per_page` and its own list stays on one page.
 
 `content/by-date/index.md`, `content/by-none/index.md`, `content/by-slug/index.md`, `content/by-title/index.md`, `content/by-update/index.md`, `content/by-weight/index.md`, `content/hidden/index.md` and `content/outer/index.md` each cascade `pages.layout: post`, so the pages beneath them, every one dated, are built with the starter's template for posts.
 
@@ -54,7 +54,8 @@ date_format: 31 December 2025
 date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
-posts_per_page: 0
+tags.pages: true
+series.pages: true
 pagination.permalink: "{list}p/{n}/"
 ```
 

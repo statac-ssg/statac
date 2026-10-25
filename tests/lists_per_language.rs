@@ -10,7 +10,8 @@ struct Site {
 }
 
 const SETTINGS: &str = "language: [ar, en]\ntitle: Site 1\nen.title: Site 2\n\
-                        url: https://example.org\nfeed_key: key\ntimezone: UTC\n";
+                        url: https://example.org\nfeed_key: key\ntimezone: UTC\n\
+                        tags.pages: true\n";
 
 /// What each list's page shows: its language, the site's title, posts,
 /// feed and tags as `site` answers them on it.

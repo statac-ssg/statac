@@ -411,14 +411,25 @@ fn left_behind(what: &str, by: &str, starter: bool) -> String {
 }
 
 /// What a reader says of the new home page's own list, kept to one page:
-/// with why, where the new site has the `starter`'s home page.
-fn one_home_page(starter: bool) -> &'static str {
-    match starter {
-        true => {
+/// with why, where the new site has the `starter`'s home page. Where the
+/// settings give the lists `posts_per_page`, the home page says `0`, and
+/// otherwise nothing.
+fn one_home_page(starter: bool, paged: bool) -> &'static str {
+    match (starter, paged) {
+        (true, true) => {
             "Statac's home page shows the newest of each folder itself, so `content/index.md` \
              keeps its own list to one page with `posts_per_page: 0`"
         }
-        false => "`content/index.md` keeps its own list to one page with `posts_per_page: 0`",
+        (false, true) => {
+            "`content/index.md` keeps its own list to one page with `posts_per_page: 0`"
+        }
+        (true, false) => {
+            "Statac's home page shows the newest of each folder itself, so `content/index.md` \
+             gives no `posts_per_page` and its own list stays on one page"
+        }
+        (false, false) => {
+            "`content/index.md` gives no `posts_per_page`, so its own list stays on one page"
+        }
     }
 }
 

@@ -304,7 +304,7 @@ fn a_default_template_the_site_lacks_gives_way_to_page_then_to_the_content_alone
         ("content/about.md", "---\nlayout: psot\n---\nAbout.\n"),
         (
             "statac.yaml",
-            "language: en\ntimezone: UTC\npages.feed: false\n",
+            "language: en\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
         ),
     ];
     for index in [true, false] {
@@ -327,17 +327,22 @@ fn a_default_template_the_site_lacks_gives_way_to_page_then_to_the_content_alone
                 }
             }
             let built = site(&files);
-            let chosen = |address: &str| match built.renderer.layout_of(built.at(address)) {
-                Ok(Some(chosen)) => match chosen.instead_of {
-                    Some(instead_of) => format!("{} for {instead_of}", chosen.name),
-                    None => chosen.name,
-                },
-                Ok(None) => "content alone".to_owned(),
-                Err(Problem {
-                    kind: Kind::MissingTemplate { path, chosen, .. },
-                    ..
-                }) => format!("missing {path}, {chosen:?}"),
-                Err(problem) => panic!("{problem:?}"),
+            let chosen = |address: &str| {
+                let Some(page) = built.find(address) else {
+                    return "no page".to_owned();
+                };
+                match built.renderer.layout_of(page) {
+                    Ok(Some(chosen)) => match chosen.instead_of {
+                        Some(instead_of) => format!("{} for {instead_of}", chosen.name),
+                        None => chosen.name,
+                    },
+                    Ok(None) => "content alone".to_owned(),
+                    Err(Problem {
+                        kind: Kind::MissingTemplate { path, chosen, .. },
+                        ..
+                    }) => format!("missing {path}, {chosen:?}"),
+                    Err(problem) => panic!("{problem:?}"),
+                }
             };
             let own = |template: &str, has: bool| match (has, page) {
                 (true, _) => template.to_owned(),
@@ -348,9 +353,10 @@ fn a_default_template_the_site_lacks_gives_way_to_page_then_to_the_content_alone
                 true => template.to_owned(),
                 false => format!("missing templates/{template}.html, Default"),
             };
-            let home_page = match index {
-                true => own("home", home),
-                false => made("home", home),
+            let home_page = match (index, home) {
+                (true, _) => own("home", home),
+                (false, true) => "home".to_owned(),
+                (false, false) => "no page".to_owned(),
             };
             let wanted = [
                 ("/", home_page),
@@ -3060,7 +3066,8 @@ fn headline_calls_a_page_by_the_first_name_there_is() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\ntimezone: UTC\npages.feed: false\nposts_per_page: 2\n",
+            "language: en\ntitle: Site\ntimezone: UTC\npages.feed: false\nposts_per_page: 2\n\
+             tags.pages: true\n",
         ),
         ("content/index.md", "The home page opens here.\n"),
         (
@@ -3823,13 +3830,18 @@ fn a_calls_words_are_set_and_its_names_left_as_typed() {
 impl Built {
     /// The page standing at `address`, such as a page Statac made.
     fn at(&self, address: &str) -> PageId {
+        self.find(address)
+            .unwrap_or_else(|| panic!("nothing at {address}"))
+    }
+
+    /// [`Built::at`], where a page stands there.
+    fn find(&self, address: &str) -> Option<PageId> {
         self.renderer
             .site()
             .pages
             .iter()
             .find(|(_, page)| page.address.as_str() == address)
             .map(|(id, _)| id)
-            .unwrap_or_else(|| panic!("nothing at {address}"))
     }
 
     fn html_at(&self, address: &str) -> String {
@@ -3849,7 +3861,7 @@ fn listed(templates: &[(&'static str, &'static str)]) -> Built {
     let mut files = vec![
         (
             "statac.yaml",
-            "language: en\ntimezone: UTC\npages.feed: false\n",
+            "language: en\ntimezone: UTC\npages.feed: false\ntags.pages: true\nseries.pages: true\n",
         ),
         ("content/index.md", "---\ntitle: Home\n---\n"),
         ("content/blog/index.md", "---\ntitle: Blog\n---\n"),
@@ -3939,7 +3951,7 @@ fn every_kind_of_list_answers_the_same_names() {
 }
 
 #[test]
-fn a_top_folder_with_no_index_is_built_with_the_folder_template() {
+fn a_folder_with_no_index_has_no_page_and_no_url_whatever_its_templates() {
     let built = site(&[
         (
             "statac.yaml",
@@ -3953,23 +3965,32 @@ fn a_top_folder_with_no_index_is_built_with_the_folder_template() {
             "content/notes/2026/post-2.md",
             "---\ntitle: Post 2\ndate: 2026-02-01\n---\n",
         ),
-        ("templates/page.html", "{{ page.title }}"),
         (
-            "templates/folder.html",
-            "{{ page.list.name }}:{{ page.list.word }}:{{ page.content }}:\
-             {% for p in page.posts %}{{ p.title }};{% endfor %}",
+            "templates/page.html",
+            "{{ page.title }}:{{ page.folder.name }}:{{ page.folder.url is defined }}:\
+             {% for p in page.folder.posts %}{{ p.title }};{% endfor %}",
         ),
+        ("templates/folder.html", "{{ page.list.name }}"),
+        ("templates/home.html", ""),
     ]);
     assert!(built.problems.is_empty(), "{:?}", built.problems);
-    assert_eq!(built.html_at("/notes/"), "notes:folder::Post 2;Post 1;");
-    // A folder inside another has a page only by its own `index.md`.
-    let inner = built
-        .renderer
-        .site()
-        .pages
-        .iter()
-        .any(|(_, page)| page.address.as_str() == "/notes/2026/");
-    assert!(!inner);
+    let site = built.renderer.site();
+    for at in ["/notes/", "/notes/2026/"] {
+        let standing = site
+            .pages
+            .iter()
+            .any(|(_, page)| page.address.as_str() == at);
+        assert!(!standing, "{at}");
+    }
+    // Its posts are built, and the folder still lists them.
+    assert_eq!(
+        built.html("notes/post-1.md"),
+        "Post 1:notes:False:Post 2;Post 1;"
+    );
+    assert_eq!(
+        built.html("notes/2026/post-2.md"),
+        "Post 2:2026:False:Post 2;"
+    );
 }
 
 #[test]
@@ -3977,7 +3998,7 @@ fn a_missing_title_is_offered_the_headline_only_on_a_page_statac_made() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntimezone: UTC\npages.feed: false\n",
+            "language: en\ntimezone: UTC\npages.feed: false\ntags.pages: true\n",
         ),
         (
             "content/post-1.md",
@@ -4037,11 +4058,12 @@ fn a_list_says_which_way_its_posts_run_or_nothing_where_dates_dont_place_them() 
         let mut all = vec![
             (
                 "statac.yaml",
-                "language: en\ntimezone: UTC\npages.feed: false\n",
+                "language: en\ntimezone: UTC\npages.feed: false\nseries.pages: true\n",
             ),
             ("templates/page.html", ""),
             ("templates/home.html", ""),
             ("templates/folder.html", "{{ page.list.order }}"),
+            ("content/blog/index.md", ""),
         ];
         all.extend_from_slice(files);
         let built = site(&all);
@@ -4068,6 +4090,7 @@ fn the_site_lists_its_folders_that_have_a_page_by_address() {
             "language: en\ntimezone: UTC\npages.feed: false\n",
         ),
         ("content/notes/post-1.md", post),
+        ("content/blog/index.md", "---\ntitle: Blog\n---\n"),
         ("content/blog/post-1.md", post),
         ("content/blog/2026/post-2.md", post),
         ("content/blog/2026/index.md", "---\ntitle: Year\n---\n"),
@@ -4081,7 +4104,8 @@ fn the_site_lists_its_folders_that_have_a_page_by_address() {
         ),
     ]);
     assert!(built.problems.is_empty(), "{:?}", built.problems);
-    assert_eq!(built.html_at("/"), "/blog/;/blog/2026/;/notes/;");
+    // `notes/` has no `index.md`, and `hidden/` publishes none.
+    assert_eq!(built.html_at("/"), "/blog/;/blog/2026/;");
 }
 
 #[test]

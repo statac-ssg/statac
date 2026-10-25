@@ -16,11 +16,11 @@
 //! stand beneath its top.
 //!
 //! Whatever page stands at a list's address speaks for it. A tag or a
-//! series no page speaks for has a page made for it, unless the site says
-//! `tags.pages: false` or `series.pages: false`; so do each language's own
-//! list and each folder directly inside its top, where it has no
-//! `index.md`. A list longer than one page goes on onto pages of its own
-//! beneath it.
+//! series no page speaks for has a page made for it where the site says
+//! `tags.pages: true` or `series.pages: true`, and a language's own list
+//! where the site has `templates/home.html`. A folder has a page only
+//! where it has an `index.md`. A list whose page sets `posts_per_page`, or
+//! the site's, goes on onto pages of its own beneath it.
 
 mod chain;
 mod filter;
@@ -112,13 +112,15 @@ impl Named {
     }
 }
 
-/// Fills and orders every list of the site, and makes the pages of the
-/// tags and series no page speaks for.
+/// Fills and orders every list of the site, and makes the list pages the
+/// site asks for that no page of its own is: as `has` says which templates
+/// the site has.
 pub(crate) fn build(
     site: &mut Site,
     settings: &Settings,
     dates: &Dates,
     sources: &Sources,
+    has: &dyn Fn(&str) -> bool,
 ) -> Vec<Problem> {
     let mut problems = Vec::new();
     let declared = declare(site);
@@ -127,7 +129,7 @@ pub(crate) fn build(
         tags_and_series.extend(named_lists(site, settings, named, &mut problems));
     }
     speakers_at_addresses(site, sources, &mut problems);
-    made_pages(site, settings, &tags_and_series);
+    made_pages(site, settings, &tags_and_series, has);
     fill(site);
     let moments: Vec<Option<i64>> = site
         .pages
@@ -355,22 +357,24 @@ fn speakers_at_addresses(site: &mut Site, sources: &Sources, problems: &mut Vec<
     }
 }
 
-/// A page for each tag and series no page speaks for, where the site makes
-/// them, filed in its language's own list; and for each language's own
-/// list and each folder directly inside its top with no `index.md`. It has
-/// no title, having no front matter and no writing: templates call it by
-/// its list's name. It carries what `pages.` lines hand every page.
-fn made_pages(site: &mut Site, settings: &Settings, named: &[ListId]) {
-    let folders: Vec<(ListId, String)> = site
+/// A page for each tag and series no page speaks for, where `tags.pages:
+/// true` or `series.pages: true` asks, filed in its language's own list;
+/// and for each language's own list no page speaks for, where the site has
+/// `templates/home.html`, as `has` says. It has no title, having no front
+/// matter and no writing: templates call it by its list's name. It carries
+/// what `pages.` lines hand every page.
+fn made_pages(site: &mut Site, settings: &Settings, named: &[ListId], has: &dyn Fn(&str) -> bool) {
+    let homes: Vec<(ListId, String)> = site
         .lists
         .iter()
-        .filter(|&(id, list)| list.page.is_none() && site.outermost(id))
+        .filter(|_| has("home"))
+        .filter(|(_, list)| list.page.is_none())
         .filter_map(|(id, list)| match &list.key {
-            ListKey::Folder(path) => Some((id, path.clone())),
+            ListKey::Folder(path) if path == site.top(list.language) => Some((id, path.clone())),
             _ => None,
         })
         .collect();
-    for (id, path) in folders {
+    for (id, path) in homes {
         let inside = match path.is_empty() {
             true => String::new(),
             false => format!("{path}/"),
@@ -394,7 +398,7 @@ fn made_pages(site: &mut Site, settings: &Settings, named: &[ListId]) {
         let (Some(address), None) = (&list.address, list.page) else {
             continue;
         };
-        if settings.truth(setting) == Some(false) {
+        if settings.truth(setting) != Some(true) {
             continue;
         }
         let Some(top) = site.own_list(list.language) else {
@@ -403,6 +407,77 @@ fn made_pages(site: &mut Site, settings: &Settings, named: &[ListId]) {
         let address = address.value.clone();
         made_page(site, settings, id, top, address);
     }
+}
+
+/// The notes `check` gives of the list pages nothing asks for, as `has`
+/// says which templates the site has. Where the site has
+/// `templates/folder.html`, which would build them: one for the folders
+/// directly inside a language's top holding posts with no `index.md`, and
+/// one each for the tags and the series where `tags.pages` or
+/// `series.pages` isn't written. And one for the tops of languages holding
+/// pages where nothing is published.
+pub(crate) fn unasked(
+    site: &Site,
+    settings: &Settings,
+    has: &dyn Fn(&str) -> bool,
+) -> Vec<Problem> {
+    let holds_pages = |path: &str| {
+        let inside = match path.is_empty() {
+            true => String::new(),
+            false => format!("{path}/"),
+        };
+        site.pages
+            .iter()
+            .any(|(_, page)| page.path.starts_with(&inside))
+    };
+    let dated =
+        |list: &List| (list.members.iter()).any(|&member| site.pages.get(member).date.is_some());
+    let unspoken = site.lists.iter().filter(|(_, list)| list.page.is_none());
+    let mut folders = Vec::new();
+    let mut tops = Vec::new();
+    let mut named: [Vec<String>; 2] = Default::default();
+    for (id, list) in unspoken {
+        match &list.key {
+            ListKey::Folder(path) if !holds_pages(path) || folder_address(path).is_none() => {}
+            ListKey::Folder(path) if path == site.top(list.language) => tops.push(path),
+            ListKey::Folder(path) if site.outermost(id) && dated(list) => folders.push(path),
+            ListKey::Tag(name) if list.address.is_some() => named[0].push(name.clone()),
+            ListKey::Series(name) if list.address.is_some() => named[1].push(name.clone()),
+            _ => {}
+        }
+    }
+    let mut problems = Vec::new();
+    let mut tell = |word: Word, mut names: Vec<String>| {
+        if names.is_empty() {
+            return;
+        }
+        let more = names.len() - 1;
+        let list = (word, names.remove(0));
+        problems.push(Problem::nowhere(Kind::NoListPage { list, more }));
+    };
+    if has("folder") {
+        folders.sort_unstable();
+        tell(Word::Folder, folders.into_iter().cloned().collect());
+        for (named, names) in [Named::Tag, Named::Series].into_iter().zip(named) {
+            let setting = settings.get(&named.setting("pages"));
+            if setting.is_none_or(|setting| setting.origin.arrival == Arrival::Defaulted) {
+                tell(named.word(), names);
+            }
+        }
+    }
+    if let Some(first) = tops.first() {
+        let base = settings.base();
+        let addresses = (tops.iter())
+            .filter_map(|path| folder_address(path))
+            .map(|address| format!("{base}{}", address.as_str()))
+            .collect();
+        let index = match first.is_empty() {
+            true => "content/index.md".to_owned(),
+            false => format!("content/{first}/index.md"),
+        };
+        problems.push(Problem::nowhere(Kind::NoHomePage { addresses, index }));
+    }
+    problems
 }
 
 /// Makes the page that speaks for `list`, filed in `folder`, with no

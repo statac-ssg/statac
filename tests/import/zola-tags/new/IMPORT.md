@@ -10,7 +10,7 @@ The old site's home page had no content of its own, so the starter's home page s
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
-Zola shows all of a list's pages on one page, unless its list page gives `paginate_by`, so `posts_per_page: 0` in `statac.yaml` does the same.
+Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
 Zola made a feed for each tag, as the settings' `taxonomies` asked, which has no equal in Statac: a tag has a feed only where a list page of yours asks for one with `feed:`.
 
@@ -31,7 +31,8 @@ date_format: 31 December 2025
 date_short: 31 Dec 2025
 date_day: 31 Dec
 date_stamp: 31 Dec 2025, 15:04
-posts_per_page: 0
+series.pages: true
+tags.pages: true
 tags.slugs:
   Rust: Rust
   Straße: Straße
