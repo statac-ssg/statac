@@ -2,10 +2,22 @@
 //! file's place or a `[permalinks]` pattern, each name in it made ready for
 //! an address as Hugo makes one.
 
+use icu_properties::CodePointMapData;
+use icu_properties::props::{GeneralCategory, GeneralCategoryGroup};
 use unicode_normalization::UnicodeNormalization;
-use unicode_normalization::char::is_combining_mark;
 
 use crate::date::Date;
+
+/// What Hugo keeps of a name besides its few marks of punctuation: Go's
+/// letters, decimal digits and marks.
+const KEPT: GeneralCategoryGroup = GeneralCategoryGroup::Letter
+    .union(GeneralCategoryGroup::DecimalNumber)
+    .union(GeneralCategoryGroup::Mark);
+
+/// Whether `c` is in `group`, by its Unicode general category.
+fn is(group: GeneralCategoryGroup, c: char) -> bool {
+    group.contains(CodePointMapData::<GeneralCategory>::new().get(c))
+}
 
 /// How the settings have Hugo make a name ready for an address.
 #[derive(Copy, Clone, Debug)]
@@ -17,19 +29,12 @@ pub(super) struct Making {
 }
 
 impl Making {
-    /// `text` made ready for an address as Hugo makes it: letters, figures
-    /// and marks of any script kept, as are `. / \ _ # + ~ - @`, and `%`
-    /// before two hex digits; a run of spaces between them one hyphen, and
-    /// everything else dropped.
+    /// `text` made ready for an address as Hugo makes it: letters, decimal
+    /// digits and marks of any script kept, as are `. / \ _ # + ~ - @`, and
+    /// `%` before two hex digits; a run of spaces between them one hyphen,
+    /// and everything else dropped. Accents are taken off after, where the
+    /// settings ask: the marks that take no space of their own.
     pub(super) fn made(&self, text: &str) -> String {
-        let text: String = match self.accents_removed {
-            true => text
-                .nfd()
-                .filter(|c| !is_combining_mark(*c))
-                .nfc()
-                .collect(),
-            false => text.to_owned(),
-        };
         let chars: Vec<char> = text.chars().collect();
         let mut out = String::with_capacity(text.len());
         let mut hyphen_wanted = false;
@@ -37,8 +42,7 @@ impl Making {
         for (at, &c) in chars.iter().enumerate() {
             let hex = |n: usize| chars.get(n).is_some_and(char::is_ascii_hexdigit);
             let allowed = matches!(c, '.' | '/' | '\\' | '_' | '#' | '+' | '~' | '-' | '@')
-                || c.is_alphanumeric()
-                || is_combining_mark(c)
+                || is(KEPT, c)
                 || (c == '%' && hex(at + 1) && hex(at + 2));
             if allowed {
                 was_hyphen = c == '-';
@@ -52,6 +56,12 @@ impl Making {
             } else if !out.is_empty() && !was_hyphen && c.is_whitespace() {
                 hyphen_wanted = true;
             }
+        }
+        if self.accents_removed {
+            out = (out.nfd())
+                .filter(|c| !is(GeneralCategoryGroup::NonspacingMark, *c))
+                .nfc()
+                .collect();
         }
         match self.lower {
             true => lowered(&out),
@@ -327,6 +337,7 @@ mod tests {
             ("%20a", "%20a"),
             ("привет мир", "привет-мир"),
             ("日記", "日記"),
+            ("x ½ ² Ⓐ ⅻ", "x"),
             ("What? Why!", "what-why"),
         ] {
             assert_eq!(HUGO.made(given), made, "{given}");
@@ -381,6 +392,8 @@ mod tests {
             ("ΟΔΟΣ", "οδοσ", "ΟΔΟΣ", "οδοσ"),
             ("привет мир", "привет-мир", "привет-мир", "привет-мир"),
             ("日本 語", "日本-語", "日本-語", "日本-語"),
+            ("x ½ ² Ⓐ ⅻ", "x----", "x", "x----"),
+            ("देवनागरी", "देवनागरी", "देवनागरी", "दवनागरी"),
         ] {
             assert_eq!(HUGO.named(name), made, "{name:?}");
             assert_eq!(AS_IT_IS.named(name), as_it_is, "{name:?}");
@@ -408,6 +421,7 @@ mod tests {
             ("+y", "/-y/", "/-y/"),
             ("z%20", "/z/", "/z/"),
             ("w %20", "/w-/", "/w-/"),
+            ("x ½ ² Ⓐ ⅻ", "/x/", "/x/"),
         ] {
             let pieces = Pieces {
                 date: None,

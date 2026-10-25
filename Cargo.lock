@@ -1609,6 +1609,7 @@ dependencies = [
  "grass",
  "http",
  "httparse",
+ "icu_properties",
  "icu_segmenter",
  "image",
  "jiff",
