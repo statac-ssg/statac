@@ -1825,11 +1825,9 @@ impl Reader<'_> {
             false => (false, false, false),
         };
         let name = self.s.feed_name.clone();
-        let off = || Field::new("feed", Value::Truth(false), None);
         let mut homes: Vec<String> = Vec::new();
         let mut feed_addresses = Vec::new();
         let mut whole: Vec<(String, String, String)> = Vec::new();
-        let mut unfed = false;
         for at in 0..self.docs.len() {
             let doc = &self.docs[at];
             if !matches!(doc.shape, Shape::List | Shape::Made) || doc.draft {
@@ -1869,9 +1867,6 @@ impl Reader<'_> {
                 };
                 feed_addresses.push(feed);
                 words.push(Field::new("feed", Value::Text(word), None));
-            } else if dated && !doc.dir.contains('/') {
-                words.push(off());
-                unfed = true;
             }
             self.docs[at].words.extend(words);
         }
@@ -1886,19 +1881,13 @@ impl Reader<'_> {
                     && d.language == language
                     && matches!(d.shape, Shape::Single | Shape::Bundle)
             });
-            if homes.contains(&language) || !dated {
+            if homes.contains(&language) || !dated || !home {
                 continue;
             }
             let prefix = self.prefix(&language);
-            let word = match home {
-                true => Field::new("feed", Value::Text(name.clone()), None),
-                false => off(),
-            };
+            let word = Field::new("feed", Value::Text(name.clone()), None);
             self.import.words.push((format!("{prefix}index.md"), word));
-            match home {
-                true => feed_addresses.push(format!("/{prefix}{name}")),
-                false => unfed = true,
-            }
+            feed_addresses.push(format!("/{prefix}{name}"));
         }
         let fed = !feed_addresses.is_empty();
         if fed {
@@ -1954,18 +1943,6 @@ impl Reader<'_> {
                     code(&format!("feed: {feed}"))
                 );
             }
-        }
-        if unfed {
-            said += match fed {
-                true => {
-                    " Hugo made no feed for the other lists, so the list page of each says \
-                     `feed: false`."
-                }
-                false => {
-                    "Hugo made no feeds, so each list page says `feed: false`: see \
-                     https://statac.dev/feeds/."
-                }
-            };
         }
         if fed && tags && self.s.terms {
             said += " The feed Hugo made for each tag has no equal.";

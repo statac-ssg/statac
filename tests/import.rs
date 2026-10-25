@@ -1411,50 +1411,42 @@ fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
                 URL, as `feed: feed.xml` on the home page says, built with `templates/feed.xml` \
                 once you add it";
     let lists = "Hugo's feeds were RSS, at `index.xml` beside each list page";
-    let others =
-        "Hugo made no feed for the other lists, so the list page of each says `feed: false`.";
-    let none = "Hugo made no feeds, so each list page says `feed: false`";
     // The settings, whether the old site has a home page of its own, the
-    // `feed` of the new home page and of the posts' page, and what is said.
+    // `feed` of the new home page and of the posts' page, where each has
+    // one, and what is said.
     let cases = [
-        ("", true, "index.xml", "index.xml", &[both][..]),
-        ("", false, "index.xml", "index.xml", &[both][..]),
+        ("", true, Some("index.xml"), Some("index.xml"), &[both][..]),
+        ("", false, Some("index.xml"), Some("index.xml"), &[both][..]),
         (
             "[outputs]\nhome = ['html', 'rss']\nsection = ['html']\n\
              [outputFormats.RSS]\nbaseName = 'feed'\n",
             true,
-            "feed.xml",
-            "false",
-            &[home, others][..],
+            Some("feed.xml"),
+            None,
+            &[home][..],
         ),
         (
             "[outputs]\nhome = ['HTML', 'RSS']\nsection = ['HTML']\n\
              [outputformats.rss]\nbasename = 'feed'\n",
             false,
-            "feed.xml",
-            "false",
-            &[home, others][..],
+            Some("feed.xml"),
+            None,
+            &[home][..],
         ),
         (
             "[outputs]\nhome = ['html']\n",
             true,
-            "false",
-            "index.xml",
-            &[lists, others][..],
+            None,
+            Some("index.xml"),
+            &[lists][..],
         ),
-        (
-            "disableKinds = ['rss']\n",
-            true,
-            "false",
-            "false",
-            &[none][..],
-        ),
+        ("disableKinds = ['rss']\n", true, None, None, &[][..]),
         (
             "[outputs]\nhome = ['html']\nsection = ['html']\n",
             false,
-            "false",
-            "false",
-            &[none][..],
+            None,
+            None,
+            &[][..],
         ),
     ];
     for (at, (settings, has_home, home_feed, posts_feed, said)) in cases.into_iter().enumerate() {
@@ -1471,10 +1463,13 @@ fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
         let (code, told) = import(&old, &new, None);
         assert_eq!(code, 0, "{settings}: {told}");
         let read = |path: &str| fs::read_to_string(new.join(path)).unwrap();
-        let word = |path: &str, feed: &str| {
+        let word = |path: &str, feed: Option<&str>| {
             let page = read(path);
-            assert!(
-                page.contains(&format!("\nfeed: {feed}\n")),
+            let lines: Vec<&str> = page.lines().filter(|l| l.starts_with("feed:")).collect();
+            let wanted = feed.map(|feed| format!("feed: {feed}"));
+            assert_eq!(
+                lines,
+                Vec::from_iter(wanted.as_deref()),
                 "{settings}: {path}: {page}"
             );
         };
@@ -1484,6 +1479,7 @@ fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
         for sentence in said {
             assert!(report.contains(sentence), "{settings}: {report}");
         }
+        assert!(!report.contains("`feed: false`"), "{settings}: {report}");
         assert!(!report.contains("`outputs"), "{settings}: {report}");
         assert!(!report.contains("`outputFormats"), "{settings}: {report}");
 
@@ -1502,13 +1498,8 @@ fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
             .filter(|path| path.ends_with(".xml") && path != "sitemap.xml")
             .collect();
         feeds.sort();
-        let mut wanted = Vec::new();
-        if home_feed != "false" {
-            wanted.push(home_feed.to_owned());
-        }
-        if posts_feed != "false" {
-            wanted.push(format!("posts/{posts_feed}"));
-        }
+        let mut wanted = Vec::from_iter(home_feed.map(str::to_owned));
+        wanted.extend(posts_feed.map(|feed| format!("posts/{feed}")));
         assert_eq!(feeds, wanted, "{settings}");
     }
 }
