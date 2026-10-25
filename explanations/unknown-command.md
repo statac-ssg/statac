@@ -1,7 +1,7 @@
 # Unknown command
 
-The first word after `statac` isn't one of its commands. Statac's commands
-are `build`, `check`, `serve` and `explain`, and `statac --help` lists them.
+The first word after `statac` isn't one of its commands. `statac --help`
+lists them.
 
 ## What you'll see {#what-youll-see}
 
