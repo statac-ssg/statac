@@ -291,9 +291,9 @@ fn every_bundled_line_outside_english_is_the_cldrs() {
     }
 }
 
-/// A language's months, weekdays, words for morning and afternoon, digits
-/// and patterns, as `words` holds them.
-fn dated(words: &Words) -> Words {
+/// A language's months, weekdays, words for morning and afternoon, digits,
+/// quotation marks and patterns, as `words` holds them.
+fn dated_and_quoted(words: &Words) -> Words {
     Words {
         months: words.months.clone(),
         months_alone: words.months_alone.clone(),
@@ -303,19 +303,22 @@ fn dated(words: &Words) -> Words {
         weekdays_short: words.weekdays_short.clone(),
         am_pm: words.am_pm.clone(),
         digits: words.digits,
+        quotes: words.quotes,
         dates: words.dates.clone(),
         ..Words::default()
     }
 }
 
-/// The tags the CLDR's calendars here are for in the languages Statac has
-/// words for: each language, and each region written otherwise than the
-/// tag it inherits from.
-fn tags_held() -> Vec<String> {
-    let folder = format!(
-        "{}/tests/cldr/cldr-dates-full/main",
-        env!("CARGO_MANIFEST_DIR")
-    );
+/// The CLDR's package of calendars.
+const DATES: &str = "cldr-dates-full";
+/// The CLDR's package of quotation marks.
+const MARKS: &str = "cldr-misc-full";
+
+/// The tags the CLDR's files of `package` here are for in the languages
+/// Statac has words for: each language, and each region written otherwise
+/// than the tag it inherits from.
+fn tags_held(package: &str) -> Vec<String> {
+    let folder = format!("{}/tests/cldr/{package}/main", env!("CARGO_MANIFEST_DIR"));
     let mut tags: Vec<String> = std::fs::read_dir(folder)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
@@ -325,22 +328,52 @@ fn tags_held() -> Vec<String> {
     tags
 }
 
-/// Every language's words for dates are the Unicode CLDR's, region by
-/// region: Statac has a file for the language and for each region the
-/// CLDR writes otherwise than the tag it inherits from, holding only the
-/// lines that differ, with the CLDR's values.
+/// The first of `tag` and the tags it inherits from that the CLDR's files
+/// of `package` here are for: a region whose files aren't here is written
+/// as that tag is.
+fn nearest_held<'a>(tag: &'a str, package: &str) -> &'a str {
+    let held = tags_held(package);
+    parents::inherited(tag)
+        .find(|tag| held.iter().any(|known| known == tag))
+        .unwrap_or_else(|| panic!("{tag}: nothing in {package}"))
+}
+
+/// The words for dates and the quotation marks of `tag` as the CLDR has
+/// them.
+fn the_cldrs_dates_and_quotes(tag: &str) -> Words {
+    Words {
+        quotes: Some(quotes(nearest_held(tag, MARKS))),
+        ..the_cldrs_dates(nearest_held(tag, DATES))
+    }
+}
+
+/// Every language's words for dates and its quotation marks are the
+/// Unicode CLDR's, region by region: Statac has a file for the language
+/// and for each region the CLDR writes otherwise than the tag it inherits
+/// from, holding only the lines that differ, with the CLDR's values.
 #[test]
-fn every_language_and_its_regions_write_dates_as_the_cldr_does() {
-    let held = tags_held();
+fn every_language_and_its_regions_write_dates_and_quotes_as_the_cldr_does() {
+    let marked = tags_held(MARKS);
+    let mut held = tags_held(DATES);
+    held.extend(marked.iter().cloned());
+    held.sort();
+    held.dedup();
     let files: Vec<&str> = BUNDLED.iter().map(|(tag, _)| *tag).collect();
     assert_eq!(files, held);
     for tag in &held {
         let words = bundled(tag).unwrap().1;
-        assert_eq!(dated(&words), the_cldrs_dates(tag), "{tag}");
+        assert_eq!(
+            dated_and_quoted(&words),
+            the_cldrs_dates_and_quotes(tag),
+            "{tag}"
+        );
         let Some(parent) = bundled_parent(tag) else {
             continue;
         };
-        let (own, theirs) = (the_cldrs_dates(tag), the_cldrs_dates(parent));
+        let (own, theirs) = (
+            the_cldrs_dates_and_quotes(tag),
+            the_cldrs_dates_and_quotes(parent),
+        );
         let differ = |line: &'static str, differs: bool| differs.then_some(line);
         let mut lines: Vec<&str> = [
             differ("months", own.months != theirs.months),
@@ -357,10 +390,13 @@ fn every_language_and_its_regions_write_dates_as_the_cldr_does() {
             ),
             differ("am_pm", own.am_pm != theirs.am_pm),
             differ("digits", own.digits != theirs.digits),
+            differ("quotes", own.quotes != theirs.quotes),
         ]
         .into_iter()
         .flatten()
         .collect();
+        // A region's quotation marks are held only where they differ.
+        assert_eq!(lines.contains(&"quotes"), marked.contains(tag), "{tag}");
         let (own, theirs) = (own.dates.unwrap(), theirs.dates.unwrap());
         let patterns: Vec<&str> = [
             differ("full", own.full != theirs.full),
@@ -409,13 +445,16 @@ fn every_language_and_its_regions_write_dates_as_the_cldr_does() {
 }
 
 /// The broader form of its language each region is written as is the
-/// Unicode CLDR's, in every language Statac has words for.
+/// Unicode CLDR's, in every language Statac has words for, and so is a
+/// tag that inherits from no language: one in a script other than the
+/// language's usual one.
 #[test]
 fn the_broader_form_of_each_region_is_the_cldrs() {
-    let parents = cldr("cldr-core/supplemental/parentLocales.json");
-    let Yaml::Mapping(parents) =
-        &under(&parents, &["supplemental", "parentLocales", "parentLocale"]).value
-    else {
+    let all = cldr("cldr-core/supplemental/parentLocales.json");
+    let parents = under(&all, &["supplemental", "parentLocales"]);
+    let rules = under(parents, &["_localeRules", "parentLocale"]);
+    assert_eq!(texts(rules, ["nonlikelyScript"]), ["root"]);
+    let Yaml::Mapping(parents) = &under(parents, &["parentLocale"]).value else {
         panic!("parent locales");
     };
     let mut the_cldrs: Vec<(String, String)> = (parents.iter())
@@ -426,9 +465,15 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
             (crate::content::words::key_name(&entry.key), parent.clone())
         })
         .collect();
-    the_cldrs.retain(|(tag, parent)| {
-        tag.split('-').next().and_then(bundled).is_some() && parent != "und"
-    });
+    the_cldrs.retain(|(tag, _)| tag.split('-').next().and_then(bundled).is_some());
+    let (to_none, mut the_cldrs): (Vec<_>, Vec<_>) = the_cldrs
+        .into_iter()
+        .partition(|(_, parent)| parent == "und");
+    let to_none: Vec<String> = to_none.into_iter().map(|(tag, _)| tag).collect();
+    assert_eq!(to_none, ["en-Dsrt", "en-Shaw"]);
+    for tag in &to_none {
+        assert_eq!(parents::parent(tag), None, "{tag}");
+    }
     let mut statacs: Vec<(String, String)> = (parents::PARENTS.iter())
         .flat_map(|(parent, regions)| {
             regions
@@ -445,6 +490,38 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
     assert_eq!(inherited, ["EN-at", "en-150", "en-001", "en"]);
     let inherited: Vec<&str> = parents::inherited("es-MX").collect();
     assert_eq!(inherited, ["es-MX", "es-419", "es"]);
+
+    // The CLDR's rule beyond its list: any language and a script other
+    // than its likely one inherits from no language.
+    let likely = cldr("cldr-core/supplemental/likelySubtags.json");
+    let likely = under(&likely, &["supplemental", "likelySubtags"]);
+    let languages: Vec<&str> = (BUNDLED.iter())
+        .map(|(tag, _)| *tag)
+        .filter(|tag| !tag.contains('-'))
+        .collect();
+    let the_cldrs: Vec<(&str, String)> = (languages.iter())
+        .map(|language| {
+            let [full] = texts(likely, [*language]);
+            (*language, full.split('-').nth(1).unwrap().to_owned())
+        })
+        .collect();
+    let statacs: Vec<(&str, String)> = (parents::SCRIPTS.iter())
+        .map(|(language, script)| (*language, (*script).to_owned()))
+        .collect();
+    assert_eq!(statacs, the_cldrs);
+    let cases: [(&str, &[&str]); 7] = [
+        ("en-Dsrt", &["en-Dsrt"]),
+        ("en-Shaw-GB", &["en-Shaw-GB", "en-Shaw"]),
+        ("EN-dsrt", &["EN-dsrt"]),
+        ("ja-Latn", &["ja-Latn"]),
+        ("ar-Latn-EG", &["ar-Latn-EG", "ar-Latn"]),
+        ("en-Latn", &["en-Latn", "en"]),
+        ("ko-Kore-KR", &["ko-Kore-KR", "ko-Kore", "ko"]),
+    ];
+    for (tag, chain) in cases {
+        let inherited: Vec<&str> = parents::inherited(tag).collect();
+        assert_eq!(inherited, chain, "{tag}");
+    }
 }
 
 /// The explanation of a language Statac has no words for shows a file of
@@ -676,7 +753,7 @@ type Pairs<'a> = &'a [(&'a str, &'a str)];
 #[test]
 fn a_tag_is_looked_for_whole_and_then_broader() {
     let own = "months: [a, b, c, d, e, f, g, h, i, j, k, l]\n";
-    let cases: [(&str, Pairs, Whence, Pairs); 17] = [
+    let cases: [(&str, Pairs, Whence, Pairs); 20] = [
         ("fr", &[], Whence::Statac("fr"), &[]),
         ("en-US", &[], Whence::Statac("en"), &[]),
         ("fr-SN", &[], Whence::Statac("fr"), &[]),
@@ -727,6 +804,26 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
             &[],
         ),
         ("sw", &[], Whence::Nothing, &[("unknown-language", "sw")]),
+        // A language in a script other than its usual one takes none of
+        // Statac's words for the language, though a site's file for it may.
+        (
+            "en-Dsrt",
+            &[],
+            Whence::Nothing,
+            &[("unknown-language", "en-Dsrt")],
+        ),
+        (
+            "ja-Latn",
+            &[],
+            Whence::Nothing,
+            &[("unknown-language", "ja-Latn")],
+        ),
+        (
+            "en-Shaw",
+            &[("languages/en.yaml", own)],
+            Whence::Site("languages/en.yaml".into()),
+            &[],
+        ),
     ];
     for (tag, files, whence, said) in cases {
         let (language, problems) = language(tag, files);

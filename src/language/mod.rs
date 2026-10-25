@@ -10,7 +10,9 @@
 //! again without its last part, `en-US` as `en`, as the Unicode CLDR's own
 //! data inherits; a region is looked for first as the broader form of its
 //! language the CLDR writes it as, `en-GB` as `en-001` and `es-MX` as
-//! `es-419`.
+//! `es-419`. Statac's words for a language don't reach it written in a
+//! script other than its usual one, `en-Dsrt`, whose CLDR data inherits
+//! from no language.
 //!
 //! Statac's own words for a language come with the CLDR's patterns for
 //! writing a date in it, which a site's file can't change.

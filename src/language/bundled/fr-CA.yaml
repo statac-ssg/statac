@@ -4,6 +4,7 @@
 months_short: [janv., févr., mars, avr., mai, juin, juill., août, sept., oct.,
   nov., déc.]
 am_pm: [a.m., p.m.]
+quotes: « » ” “
 dates:
   figures: y-MM-dd
   time: HH 'h' mm

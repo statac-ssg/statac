@@ -1,6 +1,7 @@
 # French as fr-CH writes it, where that differs from fr, whose words and
 # patterns it takes otherwise. Every line is from the Unicode CLDR, release
 # 48.2.3: see LICENSE-CLDR.txt.
+quotes: « » ‹ ›
 dates:
   full: EEEE, d MMMM y
   figures: dd.MM.yy
