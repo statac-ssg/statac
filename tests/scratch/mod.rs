@@ -1,6 +1,16 @@
 //! A folder of a test's own, shared by the tests that make whole sites.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Mutex, MutexGuard};
+
+/// How many tests hold a folder in each suite's folder, which is made and
+/// removed only while this is held, so no test sees it vanish.
+static HELD: Mutex<Option<HashMap<PathBuf, usize>>> = Mutex::new(None);
+
+fn held() -> MutexGuard<'static, Option<HashMap<PathBuf, usize>>> {
+    HELD.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 /// A path of a test's own in the system's temporary folder, with nothing
 /// there yet, removed when dropped with whatever was made there and the
@@ -14,7 +24,10 @@ impl Scratch {
             .join(label);
         let _ = std::fs::remove_dir_all(&path);
         let _ = std::fs::remove_file(&path);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let suite = path.parent().unwrap().to_path_buf();
+        let mut held = held();
+        std::fs::create_dir_all(&suite).unwrap();
+        *held.get_or_insert_default().entry(suite).or_default() += 1;
         Scratch(path)
     }
 }
@@ -38,7 +51,15 @@ impl Drop for Scratch {
         let _ = std::fs::remove_dir_all(&self.0);
         let _ = std::fs::remove_file(&self.0);
         let _ = std::fs::remove_dir_all(self.0.with_extension("built"));
-        // The suite's folder, once its last test's is gone.
-        let _ = std::fs::remove_dir(self.0.parent().unwrap());
+        let suite = self.0.parent().unwrap();
+        let mut held = held();
+        let count = held
+            .get_or_insert_default()
+            .entry(suite.to_path_buf())
+            .or_default();
+        *count = count.saturating_sub(1);
+        if *count == 0 {
+            let _ = std::fs::remove_dir(suite);
+        }
     }
 }
