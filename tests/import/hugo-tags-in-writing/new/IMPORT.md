@@ -24,7 +24,6 @@ title: Tags in the writing
 url: https://example.org
 language: en
 timezone: UTC
-date_format: 31 December 2025
 feed_ids_before: 2026-10-06
 posts_per_page: 10
 author: Name

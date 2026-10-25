@@ -46,7 +46,6 @@ title: Lists
 url: https://example.org
 language: en
 timezone: UTC
-date_format: 31 December 2025
 pagination.permalink: "{list}p/{n}/"
 ```
 

@@ -23,7 +23,6 @@ title: Config
 url: https://example.org
 language: en
 timezone: UTC
-date_format: 31 December 2025
 typography: false
 feed_ids_before: 2026-10-06
 ```

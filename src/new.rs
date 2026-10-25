@@ -1,4 +1,4 @@
-//! `statac new`: four questions, and a new site's settings written from
+//! `statac new`: five questions, and a new site's settings written from
 //! the answers into an empty folder or a new one.
 //!
 //! A new site is `statac.yaml`, `.gitignore`, an empty `content/` and, for
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::date::Date;
-use crate::dates::format::{self, DateWords, Format};
+use crate::dates::format::{self, DateWords};
 use crate::language::Languages;
 use crate::origin::{Origin, Sourced};
 use crate::platform;
@@ -109,13 +109,16 @@ pub fn today_on_this_machine() -> Date {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Answers {
     pub title: String,
+    /// Whose site it is, where that is given.
+    pub author: Option<String>,
     /// The site's address, `http` or `https` with a host, and no slash at
     /// its end.
     pub address: Option<String>,
     /// Codes `statac.yaml` takes, the main language first, each once.
     pub languages: Vec<String>,
-    /// An example `date_format` reads in the main language's words.
-    pub date_format: String,
+    /// The zone the site's times are in, by its name in the time zone
+    /// database.
+    pub timezone: Option<String>,
 }
 
 /// What [`make`] wrote.
@@ -145,10 +148,8 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         say(&report.problem(&problem));
         return 1;
     }
-    let defaults = Defaults::of(&shown_as, &machine.locale);
-    let Machine {
-        input, timezone, ..
-    } = machine;
+    let defaults = Defaults::of(&shown_as, &machine.locale, machine.timezone.as_deref());
+    let Machine { input, .. } = machine;
     let answers = match input.filter(|_| !options.yes) {
         Some(input) => {
             if input.terminal {
@@ -183,7 +184,7 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
             answers
         }
     };
-    let made = match make(Maker::New, &folder, &answers, timezone.as_deref()) {
+    let made = match make(Maker::New, &folder, &answers) {
         Ok(made) => made,
         Err(problem) => {
             say(&report.problem(&problem));
@@ -194,10 +195,6 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         "{}\n",
         shown(&wording::made_site(&shown_as, made.files))
     ));
-    match &timezone {
-        Some(zone) => say(&format!("{}\n", wording::times_in(zone))),
-        None => say(&format!("{}\n", wording::NO_ZONE_HERE)),
-    }
     say(&format!("\n{}:\n", config::FILE_NAME));
     for line in made.settings.lines().filter(|line| !line.starts_with('#')) {
         say(&format!("  {}\n", shown(line)));
@@ -231,25 +228,31 @@ fn own_name(folder: &Path) -> String {
 struct Defaults {
     title: String,
     language: String,
+    /// Whether the language is the machine's.
+    machines_language: bool,
+    /// The machine's zone, where it has one.
+    timezone: Option<String>,
 }
 
 impl Defaults {
-    fn of(folder: &str, locale: &Locale) -> Defaults {
+    fn of(folder: &str, locale: &Locale, timezone: Option<&str>) -> Defaults {
         let name = folder.rsplit(['/', '\\']).find(|piece| !piece.is_empty());
+        let language = locale.language();
         Defaults {
             title: as_words(name.unwrap_or_default()),
-            language: locale.language().unwrap_or_else(|| "en".to_owned()),
+            machines_language: language.is_some(),
+            language: language.unwrap_or_else(|| "en".to_owned()),
+            timezone: timezone.map(str::to_owned),
         }
     }
 
     fn answers(&self) -> Answers {
-        let languages = vec![self.language.clone()];
-        let date_format = dates_offered(&languages[0])[0].1.clone();
         Answers {
             title: self.title.clone(),
+            author: None,
             address: None,
-            languages,
-            date_format,
+            languages: vec![self.language.clone()],
+            timezone: self.timezone.clone(),
         }
     }
 }
@@ -352,14 +355,18 @@ fn ask(defaults: &Defaults, mut asking: Asking) -> Result<Answers, String> {
         typed => typed,
     };
     asking.show("\n");
+    asking.block(wording::ASK_AUTHOR, &[wording::ASK_NONE_HINT.to_owned()]);
+    let author = Some(asking.reply(None)).filter(|typed| !typed.is_empty());
+    asking.show("\n");
     let address = asking.address(
         wording::ASK_ADDRESS,
         &[wording::ASK_ADDRESS_HINT.to_owned()],
     )?;
-    asking.block(
-        wording::ASK_LANGUAGE,
-        &[wording::ASK_LANGUAGE_HINT.to_owned()],
-    );
+    let mut hints = vec![wording::ASK_LANGUAGE_HINT.to_owned()];
+    if defaults.machines_language {
+        hints.push(wording::ASK_MACHINES.to_owned());
+    }
+    asking.block(wording::ASK_LANGUAGE, &hints);
     let languages = loop {
         let typed = asking.reply(Some(&defaults.language));
         let typed = match typed.is_empty() {
@@ -378,34 +385,31 @@ fn ask(defaults: &Defaults, mut asking: Asking) -> Result<Answers, String> {
     if !without_words(&languages).is_empty() {
         (asking.say)("\n");
     }
-    let offered = dates_offered(&languages[0]);
-    let mut hints: Vec<String> = (offered.iter())
-        .map(|(number, example)| wording::ask_choice(*number, example))
-        .collect();
-    hints.push(wording::ASK_DATES_OWN.to_owned());
-    asking.block(wording::ASK_DATES, &hints);
-    let first = offered[0].0.to_string();
-    let date_format = loop {
-        let typed = asking.reply(Some(&first));
-        let typed = match typed.is_empty() {
-            true => first.clone(),
-            false => typed,
-        };
-        if let Some((_, example)) = (offered.iter()).find(|(number, _)| number.to_string() == typed)
-        {
-            break example.clone();
+    let hint = match &defaults.timezone {
+        Some(_) => wording::ASK_MACHINES,
+        None => wording::ASK_ZONE_HINT,
+    };
+    asking.block(wording::ASK_ZONE, &[hint.to_owned()]);
+    let timezone = loop {
+        let typed = asking.reply(defaults.timezone.as_deref());
+        if typed.is_empty() {
+            break defaults.timezone.clone();
         }
-        match Format::for_the_site(&typed, &date_words(&languages[0])) {
-            Ok(_) => break typed,
-            Err(refusal) => asking.refused(wording::headline(&refusal.into_kind()))?,
+        match jiff::tz::TimeZone::get(&typed) {
+            Ok(_) => break Some(typed),
+            Err(_) => {
+                let nearest = crate::dates::nearest_zone(&typed);
+                asking.refused(wording::not_a_time_zone(&typed, nearest.as_deref()))?;
+            }
         }
     };
     asking.show("\n");
     Ok(Answers {
         title,
+        author,
         address,
         languages,
-        date_format,
+        timezone,
     })
 }
 
@@ -493,30 +497,6 @@ fn date_words(tag: &str) -> DateWords {
     }
 }
 
-/// The examples of how dates look offered for a site in `tag`, each by
-/// its number: the language's own way, which a site naming no
-/// `date_format` writes; the month first, in English alone; and the year
-/// first, which is all there is where Statac has no words for the
-/// language's months.
-pub(crate) fn dates_offered(tag: &str) -> Vec<(u8, String)> {
-    let date_words = date_words(tag);
-    let mut examples = Vec::new();
-    if let Some(months) = &date_words.words.months {
-        examples.push(Format::house(&date_words).shown());
-        if english(tag) {
-            examples.push(format!("{} 31, 2025", months[11]));
-        }
-    }
-    examples.push(YEAR_FIRST.to_owned());
-    (1..).zip(examples).collect()
-}
-
-/// Whether `tag` is English, in whichever region.
-fn english(tag: &str) -> bool {
-    let language = tag.split('-').next().unwrap_or(tag);
-    language.eq_ignore_ascii_case("en")
-}
-
 /// Why `by` can make nothing in `folder`, if it can't: it is a link or a
 /// file, it is a site already, or it holds something.
 pub(crate) fn refusal(folder: &Path, shown_as: &str, by: Maker) -> Result<(), Problem> {
@@ -589,18 +569,12 @@ pub(crate) fn site_mark(folder: &Path) -> io::Result<Option<SiteMark>> {
 }
 
 /// Writes a new site from `answers` into `folder`, which must be empty
-/// or not yet there, with `timezone` in its settings where the machine
-/// has one. No link is followed, in the folder or inside it. Where
+/// or not yet there. No link is followed, in the folder or inside it. Where
 /// anything stops it part way, the folder is left as it was found: every
 /// file written is removed, and every folder made, `folder` itself among
 /// them. A refusal names `by` as the command to run again.
-pub(crate) fn make(
-    by: Maker,
-    folder: &Path,
-    answers: &Answers,
-    timezone: Option<&str>,
-) -> Result<Made, Problem> {
-    make_with(by, folder, answers, timezone, &mut platform::make_file)
+pub(crate) fn make(by: Maker, folder: &Path, answers: &Answers) -> Result<Made, Problem> {
+    make_with(by, folder, answers, &mut platform::make_file)
 }
 
 /// Writes a file of the site's, by its path in the site's folder.
@@ -611,11 +585,10 @@ fn make_with(
     by: Maker,
     folder: &Path,
     answers: &Answers,
-    timezone: Option<&str>,
     write: &mut Writer<'_>,
 ) -> Result<Made, Problem> {
     refusal(folder, &folder.to_string_lossy(), by)?;
-    let settings = settings(answers, timezone);
+    let settings = settings(answers, by);
     let files = files(answers, &settings, by);
     let mut made = Written::default();
     let written = (|| -> Result<(), (PathBuf, io::Error)> {
@@ -725,8 +698,10 @@ impl Written {
 const FEED_KEY_COMMENT: &str =
     "# What each post's id in a feed is made from: never change it once a feed is published.";
 
-/// `statac.yaml` for a site answered as `answers`.
-fn settings(answers: &Answers, timezone: Option<&str>) -> String {
+/// `statac.yaml` for a site answered as `answers`, made `by` a command:
+/// what was answered, and for an imported site, whose feeds came across
+/// with it, the key its feeds' ids are made from.
+fn settings(answers: &Answers, by: Maker) -> String {
     let language = match answers.languages.as_slice() {
         [one] => yaml::write::text(one),
         many => {
@@ -736,12 +711,17 @@ fn settings(answers: &Answers, timezone: Option<&str>) -> String {
     };
     let mut lines = vec![
         ("title", Some(yaml::write::text(&answers.title))),
+        ("author", answers.author.as_deref().map(yaml::write::text)),
         ("url", answers.address.as_deref().map(yaml::write::text)),
         ("language", Some(language)),
-        ("timezone", timezone.map(yaml::write::text)),
-        ("date_format", Some(yaml::write::text(&answers.date_format))),
+        (
+            "timezone",
+            answers.timezone.as_deref().map(yaml::write::text),
+        ),
     ];
-    lines.push(("feed_key", Some(crate::feeds::mint_key())));
+    if by == Maker::Import {
+        lines.push(("feed_key", Some(crate::feeds::mint_key())));
+    }
     let mut text = String::new();
     for (name, value) in lines {
         let Some(value) = value else {
@@ -758,9 +738,6 @@ fn settings(answers: &Answers, timezone: Option<&str>) -> String {
     }
     text
 }
-
-/// The year-first date.
-const YEAR_FIRST: &str = "2025-12-31";
 
 /// Statac's own value for the setting `name` where `statac.yaml` doesn't
 /// write it, as text.

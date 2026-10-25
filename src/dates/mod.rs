@@ -630,7 +630,7 @@ fn days_from_civil(year: i32, month: u8, day: u8) -> i64 {
 }
 
 /// The zone named most like `written`, where one is near enough.
-fn nearest_zone(written: &str) -> Option<String> {
+pub(crate) fn nearest_zone(written: &str) -> Option<String> {
     let names: Vec<String> = jiff::tz::db()
         .available()
         .map(|name| name.as_str().to_owned())

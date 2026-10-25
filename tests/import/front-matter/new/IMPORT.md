@@ -25,7 +25,6 @@ The settings written in `statac.yaml`:
 ```yaml
 title: Front matter
 language: en
-date_format: 31 December 2025
 author: Name
 old_tags:
   - one

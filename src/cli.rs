@@ -148,7 +148,7 @@ const USAGE: [(&str, &str); 10] = [
     ),
     (
         "new",
-        "  statac new [folder]    Ask four questions and write a new site's settings
+        "  statac new [folder]    Ask five questions and write a new site's settings
                          from the answers into the folder, which must be
                          empty or not there yet.
 ",

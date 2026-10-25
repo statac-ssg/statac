@@ -18,7 +18,6 @@ title: Aliases
 url: https://example.org
 language: en
 timezone: UTC
-date_format: 31 December 2025
 feed_ids_before: 2026-10-06
 tags.pages: true
 posts_per_page: 10

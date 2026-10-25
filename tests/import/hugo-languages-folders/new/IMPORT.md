@@ -22,7 +22,6 @@ title: Languages by folder
 url: https://example.org
 language: [en, fr]
 timezone: UTC
-date_format: 31 December 2025
 fr.title: Langues par dossier
 feed_ids_before: 2026-10-06
 tags.pages: true

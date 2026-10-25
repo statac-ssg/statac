@@ -21,7 +21,6 @@ The settings written in `statac.yaml`:
 ```yaml
 title: Permalink none
 language: en
-date_format: 31 December 2025
 posts_per_page: 1
 ```
 

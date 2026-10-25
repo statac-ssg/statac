@@ -4794,20 +4794,19 @@ pub(crate) fn new_site_in(folder: &str) -> String {
 /// understood.
 pub(crate) const ASK_ENTER: &str = "Enter takes the answer in brackets.";
 
-pub(crate) const ASK_TITLE: &str = "What is the site called?";
-pub(crate) const ASK_ADDRESS: &str = "What will its URL be?";
+pub(crate) const ASK_TITLE: &str = "What is the site title?";
+pub(crate) const ASK_AUTHOR: &str = "What is the author's name?";
+pub(crate) const ASK_NONE_HINT: &str = "Enter for none.";
+pub(crate) const ASK_ADDRESS: &str = "What is the site URL?";
 pub(crate) const ASK_ADDRESS_HINT: &str = "Enter for none yet.";
 pub(crate) const ASK_OLD_ADDRESS: &str = "What is the site's URL?";
 pub(crate) const ASK_OLD_ADDRESS_HINT: &str = "The old site's settings don't say.";
-pub(crate) const ASK_LANGUAGE: &str = "What language is it written in?";
+pub(crate) const ASK_LANGUAGE: &str = "What is the site language?";
 pub(crate) const ASK_LANGUAGE_HINT: &str = "For more than one, the main one first, as `en, fr`.";
-pub(crate) const ASK_DATES: &str = "How should dates look?";
-pub(crate) const ASK_DATES_OWN: &str = "Or type an example of your own.";
-
-/// One answer offered, by its number.
-pub(crate) fn ask_choice(number: u8, offered: &str) -> String {
-    format!("{number}  {offered}")
-}
+pub(crate) const ASK_ZONE: &str = "What is the site time zone?";
+pub(crate) const ASK_ZONE_HINT: &str = "As `Europe/London`. Enter for none.";
+/// Said under a question whose answer in brackets is how this machine is set.
+pub(crate) const ASK_MACHINES: &str = "In brackets, as this machine is set.";
 
 /// The answer Enter gives, as the line the answer is typed on shows it.
 pub(crate) fn ask_default(default: &str) -> String {
@@ -4846,12 +4845,14 @@ pub(crate) fn made_site(folder: &str, files: usize) -> String {
     )
 }
 
-pub(crate) fn times_in(zone: &str) -> String {
-    format!("Times are in {zone}, as this machine is set.")
+pub(crate) fn not_a_time_zone(written: &str, nearest: Option<&str>) -> String {
+    match nearest {
+        Some(nearest) => {
+            format!("`{written}` isn't a time zone Statac knows. Did you mean `{nearest}`?")
+        }
+        None => format!("`{written}` isn't a time zone Statac knows. Write it as `Europe/London`."),
+    }
 }
-
-pub(crate) const NO_ZONE_HERE: &str = "This machine doesn't say where it is: add \
-     `timezone: Europe/London`, with your own, to `statac.yaml`.";
 
 /// Where the translations Statac has only in English for `tag` wait in a
 /// new site, in `file`.

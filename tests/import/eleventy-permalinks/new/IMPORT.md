@@ -39,7 +39,6 @@ The settings written in `statac.yaml`:
 title: Old
 language: en
 timezone: UTC
-date_format: 31 December 2025
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

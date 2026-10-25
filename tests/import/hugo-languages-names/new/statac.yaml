@@ -2,7 +2,6 @@ title: Languages by name
 url: https://example.org
 language: [en, fr]
 timezone: UTC
-date_format: 31 December 2025
 # What each post's id in a feed is made from: never change it once a feed is published.
 feed_key: 0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20
 feed_ids_before: 2026-10-06

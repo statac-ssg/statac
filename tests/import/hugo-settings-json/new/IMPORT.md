@@ -19,7 +19,6 @@ title: Settings in JSON
 url: https://example.org
 language: fr
 timezone: Europe/Paris
-date_format: 31 décembre 2025
 feed_ids_before: 2026-10-06
 posts_per_page: 10
 author: Name

@@ -100,7 +100,7 @@ fn every_combination_is_written_checks_and_builds() {
             let folder = scratch(&format!("site-{at}"));
             made(
                 &folder,
-                &format!("Site {at}\n{address}\n{typed_languages}\n\n"),
+                &format!("Site {at}\n\n{address}\n{typed_languages}\n\n"),
             );
             let mut wanted: Vec<(String, String)> = without_words
                 .iter()
@@ -126,7 +126,10 @@ fn every_combination_is_written_checks_and_builds() {
 fn a_site_in_a_language_lacking_the_words_statac_shows_is_given_them_in_english() {
     for tag in ["ar", "de", "es", "fa", "fr", "fr-CA", "ja", "ko"] {
         let folder = scratch(&format!("words-{tag}"));
-        made(&folder, &format!("Site 1\nhttps://example.org\n{tag}\n\n"));
+        made(
+            &folder,
+            &format!("Site 1\n\nhttps://example.org\n{tag}\n\n"),
+        );
         let file = folder.join(format!("languages/{tag}.yaml"));
         assert_eq!(
             fs::read_to_string(&file).unwrap(),
@@ -177,12 +180,12 @@ fn a_site_in_english_or_a_language_with_no_words_is_given_no_file_of_words() {
         let folder = scratch(&format!("no-words-file-{at}"));
         made(
             &folder,
-            &format!("Site 1\nhttps://example.org\n{typed}\n\n"),
+            &format!("Site 1\n\nhttps://example.org\n{typed}\n\n"),
         );
         assert!(!folder.join("languages").exists(), "{typed}");
     }
     let folder = scratch("no-words-file-for-one");
-    made(&folder, "Site 1\nhttps://example.org\nen, fr\n\n");
+    made(&folder, "Site 1\n\nhttps://example.org\nen, fr\n\n");
     let held: Vec<_> = fs::read_dir(folder.join("languages"))
         .unwrap()
         .map(|entry| entry.unwrap().file_name())
@@ -193,7 +196,7 @@ fn a_site_in_english_or_a_language_with_no_words_is_given_no_file_of_words() {
 #[test]
 fn a_site_naming_no_language_is_in_english() {
     let folder = scratch("no-language");
-    made(&folder, "Site 1\nhttps://example.org\nen\n\n");
+    made(&folder, "Site 1\n\nhttps://example.org\nen\n\n");
     let settings = folder.join("statac.yaml");
     let text = fs::read_to_string(&settings).unwrap();
     let kept: Vec<&str> = text

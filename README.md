@@ -100,7 +100,7 @@ cd site-1
 statac serve
 ```
 
-`statac new` asks four questions and writes the site's settings; the
+`statac new` asks five questions and writes the site's settings; the
 pages, templates and stylesheet are yours to write, as
 [Templates](https://statac.dev/templates/) describes. `statac serve`
 builds the site, shows it at `http://localhost:3000/` and builds it again

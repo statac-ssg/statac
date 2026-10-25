@@ -460,11 +460,12 @@ pub(super) fn write<'a>(
         .unwrap_or_default();
     let answers = Answers {
         title: title.unwrap_or_else(|| new::as_words(&old_name)),
+        author: None,
         address: address.clone(),
-        date_format: new::dates_offered(&languages[0])[0].1.clone(),
         languages,
+        timezone,
     };
-    let made = new::make(Maker::Import, folder, &answers, timezone.as_deref())?;
+    let made = new::make(Maker::Import, folder, &answers)?;
     let mut out = Out {
         folder,
         write,

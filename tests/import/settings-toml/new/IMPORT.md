@@ -18,7 +18,6 @@ title: Settings in TOML
 url: https://example.org
 language: en
 timezone: Europe/London
-date_format: 31 December 2025
 author: Name
 book:
   isbn: 0-000-00000-0

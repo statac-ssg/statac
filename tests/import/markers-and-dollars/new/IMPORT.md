@@ -21,7 +21,6 @@ The settings written in `statac.yaml`:
 ```yaml
 title: Markers and dollars
 language: en
-date_format: 31 December 2025
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

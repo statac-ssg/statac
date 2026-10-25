@@ -27,7 +27,6 @@ title: Tags
 url: https://example.org
 language: en
 timezone: UTC
-date_format: 31 December 2025
 tags.pages: true
 tags.slugs:
   Rust: Rust

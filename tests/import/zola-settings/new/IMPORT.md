@@ -23,7 +23,6 @@ title: Settings
 url: https://example.org
 language: en
 timezone: UTC
-date_format: 31 December 2025
 description: A site whose settings come across.
 author: Name
 github: name

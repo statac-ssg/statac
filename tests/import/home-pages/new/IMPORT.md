@@ -19,7 +19,6 @@ title: Home pages
 url: https://example.org
 language: en
 timezone: Europe/London
-date_format: 31 December 2025
 posts_per_page: 2
 ```
 

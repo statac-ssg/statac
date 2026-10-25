@@ -549,7 +549,7 @@ Usage:
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
                          the site's .statac/token.
-  statac new [folder]    Ask four questions and write a new site's settings
+  statac new [folder]    Ask five questions and write a new site's settings
                          from the answers into the folder, which must be
                          empty or not there yet.
   statac import <folder> [new folder]

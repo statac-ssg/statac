@@ -25,7 +25,6 @@ title: Files beside pages
 url: https://example.org
 language: [en, fr]
 timezone: UTC
-date_format: 31 December 2025
 fr.title: Fichiers
 typography: false
 ```

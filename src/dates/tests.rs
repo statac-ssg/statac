@@ -1496,8 +1496,6 @@ fn the_house_format_of_every_other_language_is_the_cldrs_long_pattern() {
             let statacs = dates.format(main(), &date(written), None).unwrap();
             assert_eq!(statacs, the_cldrs, "{tag} {pattern} {written}");
         }
-        let reference = in_the_cldrs_pattern(&pattern, &words, 2025, 12, 31);
-        assert_eq!(crate::new::dates_offered(tag)[0].1, reference, "{tag}");
     }
 }
 

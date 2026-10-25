@@ -328,7 +328,7 @@ fn new_reads_lines_handed_to_it_as_its_answers() {
         .spawn()
         .unwrap();
     let mut stdin = running.stdin.take().unwrap();
-    stdin.write_all(b"Site 1\nhttps://example.org\n").unwrap();
+    stdin.write_all(b"Site 1\n\nhttps://example.org\n").unwrap();
     drop(stdin);
     let output = running.wait_with_output().unwrap();
     assert_eq!(output.status.code(), Some(0), "{output:?}");
