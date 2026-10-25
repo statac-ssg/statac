@@ -54,9 +54,29 @@ impl Making {
             }
         }
         match self.lower {
-            true => out.to_lowercase(),
+            true => lowered(&out),
             false => out,
         }
+    }
+
+    /// A name from the content folder made ready: read first as [`read`]
+    /// reads it, unless `disablePathToLower` has Hugo take it as it is.
+    pub(super) fn named(&self, name: &str) -> String {
+        match self.lower {
+            true => self.made(&read(name)),
+            false => self.made(name),
+        }
+    }
+
+    /// `text` made ready and then read and written again as a URL, as Hugo
+    /// does with what it puts into a `[permalinks]` pattern: a `#` that
+    /// opens an empty fragment is lost.
+    fn urlized(&self, text: &str) -> String {
+        let mut made = self.made(text);
+        if made.find('#').is_some_and(|at| at + 1 == made.len()) {
+            made.pop();
+        }
+        made
     }
 
     /// A path made ready, as a whole: each piece as [`Making::made`], the
@@ -69,6 +89,46 @@ impl Making {
         }
         tidy
     }
+}
+
+/// A name from the content folder as Hugo reads every one, before
+/// making it ready: in small letters, each space a hyphen. A run of spaces,
+/// or a space beside a hyphen, so keeps a hyphen for each.
+pub(super) fn read(name: &str) -> String {
+    lowered(name).replace(' ', "-")
+}
+
+/// `text` in small letters as Go makes them, a letter at a time: `Σ` is
+/// `σ` wherever it stands, and `İ` is `i`.
+fn lowered(text: &str) -> String {
+    text.chars()
+        .flat_map(|c| match c {
+            'İ' => 'i'.to_lowercase(),
+            c => c.to_lowercase(),
+        })
+        .collect()
+}
+
+/// `text` with `+` read as a space and each `%` with two hex digits as the
+/// byte they stand for, as Go's `QueryUnescape` reads it.
+fn unescaped(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let hex = |b: Option<&u8>| b.and_then(|b| char::from(*b).to_digit(16));
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        match (bytes[at], hex(bytes.get(at + 1)), hex(bytes.get(at + 2))) {
+            (b'%', Some(high), Some(low)) => {
+                out.push((high * 16 + low) as u8);
+                at += 3;
+                continue;
+            }
+            (b'+', _, _) => out.push(b' '),
+            (b, _, _) => out.push(b),
+        }
+        at += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The address of a page whose path, made ready, is `path`: as a folder,
@@ -90,7 +150,8 @@ pub(super) struct Pieces<'a> {
     /// The file's name, without its ending or language, or the folder's
     /// for a page kept as a folder.
     pub file_name: &'a str,
-    /// The folders the page is in that are lists, outermost first.
+    /// The folders the page is in that are lists, outermost first, each as
+    /// [`read`] gives it.
     pub sections: &'a [String],
 }
 
@@ -119,8 +180,9 @@ const DAYS: [&str; 7] = [
     "Saturday",
 ];
 
-/// `pattern` filled in from `pieces`, then made ready as a whole. The
-/// placeholder Statac doesn't know where it holds one.
+/// `pattern` filled in from `pieces`, read as Go's `QueryUnescape` reads
+/// it, then made ready as a whole. The placeholder Statac doesn't know
+/// where it holds one.
 pub(super) fn expand(pattern: &str, pieces: &Pieces, making: &Making) -> Result<String, String> {
     let mut out = String::with_capacity(pattern.len());
     let mut rest = pattern;
@@ -153,7 +215,7 @@ pub(super) fn expand(pattern: &str, pieces: &Pieces, making: &Making) -> Result<
         rest = &after[length..];
     }
     out.push_str(rest);
-    Ok(making.path(&out))
+    Ok(making.path(&unescaped(&out)))
 }
 
 /// One placeholder's value.
@@ -165,9 +227,9 @@ fn piece(name: &str, slice: Option<&str>, pieces: &Pieces, making: &Making) -> O
         i8::try_from(date.day).ok()?,
     )
     .ok()?;
-    let title = || making.made(pieces.title);
-    let slug = || pieces.slug.map(|slug| making.made(slug));
-    let file_name = || making.made(pieces.file_name);
+    let title = || making.urlized(pieces.title);
+    let slug = || pieces.slug.map(|slug| making.urlized(slug));
+    let file_name = || making.urlized(pieces.file_name);
     if slice.is_some() && name != "sections" {
         return None;
     }
@@ -238,6 +300,89 @@ mod tests {
             accents_removed: true,
         };
         assert_eq!(cased.made("Café Crème"), "Cafe-Creme");
+    }
+
+    const AS_IT_IS: Making = Making {
+        lower: false,
+        accents_removed: false,
+    };
+
+    const ACCENTS_REMOVED: Making = Making {
+        lower: true,
+        accents_removed: true,
+    };
+
+    /// Each as Hugo 0.166 published `content/<name>.md`.
+    #[test]
+    fn a_name_from_the_content_folder_is_made_ready_as_hugo_makes_it() {
+        // The name, then made ready by default, under `disablePathToLower`
+        // and under `removePathAccents`.
+        for (name, made, as_it_is, accents_removed) in [
+            ("p04- - q", "p04----q", "p04--q", "p04----q"),
+            ("a  b", "a--b", "a-b", "a--b"),
+            (" lead", "-lead", "lead", "-lead"),
+            ("trail ", "trail-", "trail", "trail-"),
+            ("-lead", "-lead", "-lead", "-lead"),
+            ("trail-", "trail-", "trail-", "trail-"),
+            ("a--b", "a--b", "a--b", "a--b"),
+            ("a\u{a0}b", "a-b", "a-b", "a-b"),
+            ("a\tb", "a-b", "a-b", "a-b"),
+            ("a & b", "a--b", "a-b", "a--b"),
+            ("a&b", "ab", "ab", "ab"),
+            ("a (1)", "a-1", "a-1", "a-1"),
+            ("a, b", "a-b", "a-b", "a-b"),
+            ("what? why!", "what-why", "what-why", "what-why"),
+            ("C++ & C#", "c++--c#", "C++-C#", "c++--c#"),
+            ("v1.2_final", "v1.2_final", "v1.2_final", "v1.2_final"),
+            ("100%", "100", "100", "100"),
+            ("a%20b", "a%20b", "a%20b", "a%20b"),
+            ("a~b@c+d#e", "a~b@c+d#e", "a~b@c+d#e", "a~b@c+d#e"),
+            ("a'b\"c", "abc", "abc", "abc"),
+            ("Café Crème", "café-crème", "Café-Crème", "cafe-creme"),
+            ("Straße", "straße", "Straße", "straße"),
+            ("UPPER Case", "upper-case", "UPPER-Case", "upper-case"),
+            ("İstanbul", "istanbul", "İstanbul", "istanbul"),
+            ("ΟΔΟΣ", "οδοσ", "ΟΔΟΣ", "οδοσ"),
+            ("привет мир", "привет-мир", "привет-мир", "привет-мир"),
+            ("日本 語", "日本-語", "日本-語", "日本-語"),
+        ] {
+            assert_eq!(HUGO.named(name), made, "{name:?}");
+            assert_eq!(AS_IT_IS.named(name), as_it_is, "{name:?}");
+            assert_eq!(ACCENTS_REMOVED.named(name), accents_removed, "{name:?}");
+        }
+    }
+
+    /// Each as Hugo 0.166 published `content/posts/<name>.md` with
+    /// `/:filename/` as the pattern for posts.
+    #[test]
+    fn a_name_in_a_pattern_is_made_ready_then_read_as_a_url() {
+        // The name, then made ready by default and under
+        // `disablePathToLower`.
+        for (name, made, as_it_is) in [
+            ("p04- - q", "/p04--q/", "/p04--q/"),
+            (" lead", "/lead/", "/lead/"),
+            ("a & b", "/a-b/", "/a-b/"),
+            ("C++ & C#", "/c-c/", "/C-C/"),
+            ("C++ & C# 2", "/c-c#-2/", "/C-C#-2/"),
+            ("a~b@c+d#e", "/a~b@c-d#e/", "/a~b@c-d#e/"),
+            ("a%20b", "/a-b/", "/a-b/"),
+            ("UPPER Case", "/upper-case/", "/UPPER-Case/"),
+            ("İstanbul", "/istanbul/", "/İstanbul/"),
+        ] {
+            let pieces = Pieces {
+                date: None,
+                title: name,
+                slug: Some(name),
+                file_name: name,
+                sections: &[],
+            };
+            for pattern in ["/:filename/", "/:slug/", "/:title/"] {
+                let got = expand(pattern, &pieces, &HUGO);
+                assert_eq!(got.as_deref(), Ok(made), "{pattern} {name:?}");
+                let got = expand(pattern, &pieces, &AS_IT_IS);
+                assert_eq!(got.as_deref(), Ok(as_it_is), "{pattern} {name:?}");
+            }
+        }
     }
 
     #[test]

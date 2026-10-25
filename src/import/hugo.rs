@@ -1276,7 +1276,9 @@ impl Reader<'_> {
             let doc = &self.docs[at];
             let prefix = format!("/{}", self.prefix(&doc.language));
             let prefix = prefix.trim_end_matches('/');
-            let sections = self.sections(&doc.language, &doc.dir, &lists);
+            let sections: Vec<String> = (self.sections(&doc.language, &doc.dir, &lists).iter())
+                .map(|section| url::read(section))
+                .collect();
             let section = sections.first().cloned().unwrap_or_default();
             let ugly = self.s.ugly.of(&section);
             let pieces = Pieces {
@@ -1303,8 +1305,14 @@ impl Reader<'_> {
                     Some(pattern) => url::expand(pattern, &pieces, &self.making)
                         .map(|path| url::finished(&path, ugly)),
                     None => {
-                        let base = doc.slug.clone().unwrap_or_else(|| doc.name.clone());
-                        let path = self.making.path(&joined(&doc.dir, &base));
+                        // Hugo makes the folder and the name ready apart.
+                        let base = match &doc.slug {
+                            Some(slug) => self.making.made(slug),
+                            None => self.making.named(&doc.name),
+                        };
+                        let path = self
+                            .making
+                            .path(&joined(&self.making.named(&doc.dir), &base));
                         Ok(url::finished(&path, ugly))
                     }
                 },
@@ -1315,7 +1323,7 @@ impl Reader<'_> {
                         Some(pattern) if !doc.dir.is_empty() => {
                             url::expand(pattern, &pieces, &self.making)
                         }
-                        _ => Ok(self.making.path(&doc.dir)),
+                        _ => Ok(self.making.path(&self.making.named(&doc.dir))),
                     };
                     path.map(|path| {
                         if ugly && !doc.dir.is_empty() && own_url.is_none() && !doc.draft {
@@ -2044,7 +2052,12 @@ impl Reader<'_> {
                     continue;
                 }
                 for term in terms {
-                    let hugos = self.making.made(term);
+                    // A pattern's `:slug` is the term's title, not its
+                    // place in the content folder.
+                    let hugos = match &pattern {
+                        Some(_) => self.making.made(term),
+                        None => self.making.named(term),
+                    };
                     let path = match &pattern {
                         Some(pattern) => pattern.replace(":slug", &hugos).replace(":title", &hugos),
                         None => format!("/{plural}/{hugos}/"),
@@ -2150,7 +2163,7 @@ impl Reader<'_> {
                     for term in terms {
                         let feed = format!(
                             "{prefix}/{plural}/{}/{}",
-                            self.making.made(term),
+                            self.making.named(term),
                             self.s.feed_name
                         );
                         if !feeds.contains(&feed) {
@@ -2213,7 +2226,7 @@ impl Reader<'_> {
                     }
                     let ugly = self.s.ugly.of(plural);
                     for term in terms.iter().filter(|_| plural != "tags") {
-                        let path = format!("/{plural}/{}/", self.making.made(term));
+                        let path = format!("/{plural}/{}/", self.making.named(term));
                         let path = url::finished(&self.making.path(&path), ugly);
                         let page = (plural.clone(), term.clone(), format!("{prefix}{path}"));
                         if !self.import.term_pages.contains(&page) {
@@ -2502,6 +2515,68 @@ mod tests {
                 !looked_for,
                 "{at}: {:?}",
                 import.notes
+            );
+        }
+    }
+
+    /// Each page is looked for where Hugo 0.166 published it, its folders'
+    /// names and its own made ready as Hugo makes a name from the content
+    /// folder.
+    #[test]
+    fn a_page_is_looked_for_where_hugo_published_its_file() {
+        let top = crate::testing::Scratch::new("hugo-names");
+        // The file, then where Hugo published it by default and under
+        // `disablePathToLower`.
+        let pages = [
+            ("posts/p04- - q.md", "/posts/p04----q/", "/posts/p04--q/"),
+            ("posts/ lead.md", "/posts/-lead/", "/posts/lead/"),
+            ("posts/C++ & C#.md", "/posts/c++--c#/", "/posts/C++-C#/"),
+            ("posts/x - y/index.md", "/posts/x---y/", "/posts/x-y/"),
+            ("My Notes/_index.md", "/my-notes/", "/My-Notes/"),
+            (
+                "My Notes/Sub - Folder/_index.md",
+                "/my-notes/sub---folder/",
+                "/My-Notes/Sub-Folder/",
+            ),
+            (
+                "My Notes/Sub - Folder/A b.md",
+                "/m/my-notes/my-notes/sub---folder/a-b/",
+                "/m/my-notes/my-notes/sub---folder/A-b/",
+            ),
+        ];
+        // The address of the tag `p04- - q` by default and under
+        // `disablePathToLower`.
+        let tags = ["/tags/p04----q/", "/tags/p04--q/"];
+        for (at, settings) in ["", "disablePathToLower = true\n"].into_iter().enumerate() {
+            let folder = top.join(at.to_string());
+            let _ = std::fs::remove_dir_all(&folder);
+            let patterns = "[permalinks.page]\n'my-notes' = '/m/:section/:sections/:filename/'\n";
+            let toml =
+                format!("baseURL = 'https://example.org/'\ntitle = 'Names'\n{settings}{patterns}");
+            std::fs::create_dir_all(&folder).unwrap();
+            std::fs::write(folder.join("hugo.toml"), toml).unwrap();
+            for (file, _, _) in pages {
+                let path = folder.join("content").join(file);
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                let page = "---\ntitle: Post\ndate: 2026-01-01\ntags: ['p04- - q']\n---\n";
+                std::fs::write(path, page).unwrap();
+            }
+            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None) else {
+                panic!("{at}: the site wasn't read");
+            };
+            for (file, made, as_it_is) in pages {
+                let page =
+                    (import.pages.iter()).find(|page| page.from == format!("content/{file}"));
+                assert_eq!(
+                    page.and_then(|page| page.address.as_deref()),
+                    Some([made, as_it_is][at]),
+                    "{at}: {file}"
+                );
+            }
+            assert!(
+                import.addresses.iter().any(|a| a == tags[at]),
+                "{at}: {:?}",
+                import.addresses
             );
         }
     }
