@@ -68,7 +68,7 @@ A binary for Linux that asks nothing of the system's C library links a C library
 
 ### Rust crates
 
-The 169 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
+The 170 crates a binary links on macOS, Linux or Windows; some are linked on one of them only. Where a crate offers a choice of licence, the one taken is Apache-2.0 where it is offered and otherwise MIT. A binary taken under Apache-2.0 carries the licence's text [1] and what the crate's `NOTICE` file says; none of these crates has one. Under the other licences it carries the crate's own text, with its copyright line.
 
 | Crate | Version | Its licence | Taken under | Texts |
 | --- | --- | --- | --- | --- |
@@ -96,16 +96,17 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `crossbeam-deque` | 0.8.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `crossbeam-epoch` | 0.9.21 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `crossbeam-utils` | 0.8.23 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
+| `deunicode` | 1.6.2 | BSD-3-Clause | BSD-3-Clause | [21] |
 | `dtoa` | 1.0.11 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `either` | 1.18.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `equivalent` | 1.0.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `errno` | 0.3.14 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `fdeflate` | 0.3.7 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `ferriki-textmate` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] [21] |
-| `ferroni` | 2.2.2 | BSD-2-Clause | BSD-2-Clause | [22] |
+| `ferriki-textmate` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] [22] |
+| `ferroni` | 2.2.2 | BSD-2-Clause | BSD-2-Clause | [23] |
 | `flate2` | 1.1.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `font-types` | 0.11.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `fontdb` | 0.23.0 | MIT | MIT | [23] |
+| `fontdb` | 0.23.0 | MIT | MIT | [24] |
 | `form_urlencoded` | 1.2.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `getrandom` | 0.2.17 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `granit-parser` | 1.3.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
@@ -116,48 +117,48 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `hashbrown` | 0.17.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `http` | 1.5.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `httparse` | 1.10.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `icu_collections` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_locale_core` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_locale_fallback` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_locale_fallback_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_normalizer` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_normalizer_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_properties` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_properties_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_provider` | 2.3.1 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_segmenter` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `icu_segmenter_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_collections` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_locale_core` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_locale_fallback` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_locale_fallback_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_normalizer` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_normalizer_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_properties` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_properties_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_provider` | 2.3.1 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_segmenter` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `icu_segmenter_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [25] |
 | `idna` | 1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `idna_adapter` | 1.2.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `image` | 0.25.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `image-webp` | 0.2.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `indexmap` | 2.14.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `inotify` | 0.11.5 | ISC | ISC | [25] |
-| `inotify-sys` | 0.1.8 | ISC | ISC | [25] |
+| `inotify` | 0.11.5 | ISC | ISC | [26] |
+| `inotify-sys` | 0.1.8 | ISC | ISC | [26] |
 | `itoa` | 1.0.18 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `jiff` | 0.2.37 | Unlicense OR MIT | MIT | [13] [14] |
 | `jiff-core` | 0.1.1 | Unlicense OR MIT | MIT | [13] [14] |
 | `jiff-tzdb` | 0.1.8 | Unlicense OR MIT | MIT | [13] [14] |
-| `jpeg-encoder` | 0.7.1 | (MIT OR Apache-2.0) AND IJG | Apache-2.0, IJG | [1] [26] |
+| `jpeg-encoder` | 0.7.1 | (MIT OR Apache-2.0) AND IJG | Apache-2.0, IJG | [1] [27] |
 | `kstring` | 2.0.5 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `lasso` | 0.7.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `libc` | 0.2.190 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `libm` | 0.2.16 | MIT | MIT | [12] |
-| `libmimalloc-sys` | 0.1.49 | MIT | MIT | [27] |
+| `libmimalloc-sys` | 0.1.49 | MIT | MIT | [28] |
 | `linebender_resource_handle` | 0.1.1 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `linux-raw-sys` | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `litemap` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `litemap` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [25] |
 | `log` | 0.4.34 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `math-core` | 0.8.2 | MIT | MIT | none in the crate |
 | `math-core-renderer-internal` | 0.8.2 | MIT | MIT | none in the crate |
 | `memchr` | 2.8.3 | Unlicense OR MIT | MIT | [13] [14] |
 | `memmap2` | 0.9.11 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `mimalloc` | 0.1.52 | MIT | MIT | [27] |
+| `mimalloc` | 0.1.52 | MIT | MIT | [28] |
 | `miniz_oxide` | 0.8.9 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.9.1 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
-| `mio` | 1.2.4 | MIT | MIT | [28] |
+| `mio` | 1.2.4 | MIT | MIT | [29] |
 | `moxcms` | 0.8.1 | BSD-3-Clause OR Apache-2.0 | Apache-2.0 | [1] |
-| `notify` | 9.0.0-rc.5 | CC0-1.0 | CC0-1.0 | [29] |
+| `notify` | 9.0.0-rc.5 | CC0-1.0 | CC0-1.0 | [30] |
 | `notify-types` | 2.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `num-traits` | 0.2.19 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `objc2-core-foundation` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
@@ -165,13 +166,13 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `once_cell` | 1.21.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `pagefind_stem` | 1.0.0 | MIT | MIT | none in the crate |
 | `percent-encoding` | 2.3.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `phf` | 0.11.3 | MIT | MIT | [30] |
-| `phf` | 0.14.0 | MIT | MIT | [30] |
-| `phf_shared` | 0.11.3 | MIT | MIT | [30] |
-| `phf_shared` | 0.14.0 | MIT | MIT | [30] |
+| `phf` | 0.11.3 | MIT | MIT | [31] |
+| `phf` | 0.14.0 | MIT | MIT | [31] |
+| `phf_shared` | 0.11.3 | MIT | MIT | [31] |
+| `phf_shared` | 0.14.0 | MIT | MIT | [31] |
 | `png` | 0.18.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `potential_utf` | 0.1.6 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `pulldown-cmark` | 0.13.4 | MIT | MIT | [31] |
+| `potential_utf` | 0.1.6 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `pulldown-cmark` | 0.13.4 | MIT | MIT | [32] |
 | `pxfm` | 0.1.30 | BSD-3-Clause OR Apache-2.0 | Apache-2.0 | [1] |
 | `quick-error` | 2.0.1 | MIT/Apache-2.0 | Apache-2.0 | [1] |
 | `rangemap` | 1.8.0 | MIT/Apache-2.0 | Apache-2.0 | [1] |
@@ -184,27 +185,27 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `rustix` | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `rustls` | 0.23.45 | Apache-2.0 OR ISC OR MIT | Apache-2.0 | [1] |
 | `rustls-pki-types` | 1.15.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `rustls-webpki` | 0.103.15 | ISC | ISC | [32] |
-| `same-file` | 1.0.6 | Unlicense/MIT | MIT | [13] [33] |
+| `rustls-webpki` | 0.103.15 | ISC | ISC | [33] |
+| `same-file` | 1.0.6 | Unlicense/MIT | MIT | [13] [34] |
 | `self_cell` | 1.3.0 | Apache-2.0 OR GPL-2.0-only | Apache-2.0 | [1] |
 | `serde` | 1.0.229 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_core` | 1.0.229 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_json` | 1.0.151 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_spanned` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `simd-adler32` | 0.3.10 | MIT | MIT | [34] |
+| `simd-adler32` | 0.3.10 | MIT | MIT | [35] |
 | `siphasher` | 1.0.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `skrifa` | 0.40.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `slotmap` | 1.1.1 | Zlib | Zlib | [35] |
+| `slotmap` | 1.1.1 | Zlib | Zlib | [36] |
 | `smallvec` | 1.16.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `smol_str` | 0.3.6 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `stable-arena` | 0.3.0 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `stable_deref_trait` | 1.2.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `static_assertions` | 1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `strum` | 0.28.0 | MIT | MIT | [36] |
-| `subtle` | 2.6.1 | BSD-3-Clause | BSD-3-Clause | [37] |
+| `strum` | 0.28.0 | MIT | MIT | [37] |
+| `subtle` | 2.6.1 | BSD-3-Clause | BSD-3-Clause | [38] |
 | `swash` | 0.2.10 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `sys-locale` | 0.3.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `tinystr` | 0.8.4 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `tinystr` | 0.8.4 | Unicode-3.0 | Unicode-3.0 | [25] |
 | `tinyvec` | 1.13.3 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `toml` | 1.1.6+spec-1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `toml_datetime` | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
@@ -216,29 +217,29 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `unicode-normalization` | 0.1.25 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `unicode-script` | 0.5.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `unicode-segmentation` | 1.13.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `untrusted` | 0.9.0 | ISC | ISC | [38] |
+| `untrusted` | 0.9.0 | ISC | ISC | [39] |
 | `ureq` | 3.4.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `ureq-proto` | 0.6.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `url` | 2.5.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `utf8-zero` | 0.8.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `utf8_iter` | 1.0.4 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `walkdir` | 2.5.0 | Unlicense/MIT | MIT | [13] [14] |
-| `webpki-roots` | 1.0.9 | CDLA-Permissive-2.0 | CDLA-Permissive-2.0 | [39] |
-| `winapi-util` | 0.1.11 | Unlicense OR MIT | MIT | [13] [33] |
+| `webpki-roots` | 1.0.9 | CDLA-Permissive-2.0 | CDLA-Permissive-2.0 | [40] |
+| `winapi-util` | 0.1.11 | Unlicense OR MIT | MIT | [13] [34] |
 | `windows-link` | 0.2.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `windows-sys` | 0.61.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `winnow` | 1.0.4 | MIT | MIT | [40] |
-| `writeable` | 0.6.4 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `xxhash-rust` | 0.8.19 | BSL-1.0 | BSL-1.0 | [41] |
+| `winnow` | 1.0.4 | MIT | MIT | [41] |
+| `writeable` | 0.6.4 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `xxhash-rust` | 0.8.19 | BSL-1.0 | BSL-1.0 | [42] |
 | `yazi` | 0.2.1 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `yoke` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `yoke` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [25] |
 | `zeno` | 0.3.3 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `zerocopy` | 0.8.59 | BSD-2-Clause OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `zerofrom` | 0.1.8 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `zerofrom` | 0.1.8 | Unicode-3.0 | Unicode-3.0 | [25] |
 | `zeroize` | 1.9.0 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `zerotrie` | 0.2.5 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `zerovec` | 0.11.8 | Unicode-3.0 | Unicode-3.0 | [24] |
-| `zmij` | 1.0.23 | MIT | MIT | [42] |
+| `zerotrie` | 0.2.5 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `zerovec` | 0.11.8 | Unicode-3.0 | Unicode-3.0 | [25] |
+| `zmij` | 1.0.23 | MIT | MIT | [43] |
 | `zune-core` | 0.5.3 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 | `zune-jpeg` | 0.5.15 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 
@@ -2988,6 +2989,39 @@ SOFTWARE.
 
 ### [21]
 
+`deunicode` 1.6.2, `LICENSE`.
+
+````text
+Copyright (c) 2015, Amit Chowdhury
+Copyright (c) 2018-2021, Kornel Lesinski
+Copyright (c) 2020-2021, Hunter WB <hunterwb.com>
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * The names of this software's contributors may not be used to endorse or
+   promote products derived from this software without specific prior written
+   permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+````
+
+### [22]
+
 `ferriki-textmate` 1.1.1, `LICENSE-vscode-textmate.md`.
 
 ````text
@@ -3014,7 +3048,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [22]
+### [23]
 
 `ferroni` 2.2.2, `LICENSE`.
 
@@ -3074,7 +3108,7 @@ from vscode-oniguruma, used under the MIT License:
   DEALINGS IN THE SOFTWARE.
 ````
 
-### [23]
+### [24]
 
 `fontdb` 0.23.0, `LICENSE`.
 
@@ -3102,7 +3136,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [24]
+### [25]
 
 `icu_collections` 2.3.0, `LICENSE`; `icu_locale_core` 2.3.0, `LICENSE`; `icu_locale_fallback` 2.3.0, `LICENSE`; `icu_locale_fallback_data` 2.3.0, `LICENSE`; `icu_normalizer` 2.3.0, `LICENSE`; `icu_normalizer_data` 2.3.0, `LICENSE`; `icu_properties` 2.3.0, `LICENSE`; `icu_properties_data` 2.3.0, `LICENSE`; `icu_provider` 2.3.1, `LICENSE`; `icu_segmenter` 2.3.0, `LICENSE`; `icu_segmenter_data` 2.3.0, `LICENSE`; `litemap` 0.8.3, `LICENSE`; `potential_utf` 0.1.6, `LICENSE`; `tinystr` 0.8.4, `LICENSE`; `writeable` 0.6.4, `LICENSE`; `yoke` 0.8.3, `LICENSE`; `zerofrom` 0.1.8, `LICENSE`; `zerotrie` 0.2.5, `LICENSE`; `zerovec` 0.11.8, `LICENSE`.
 
@@ -3155,7 +3189,7 @@ Portions of ICU4X may have been adapted from ICU4C and/or ICU4J.
 ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation and others.
 ````
 
-### [25]
+### [26]
 
 `inotify` 0.11.5, `LICENSE`; `inotify-sys` 0.1.8, `LICENSE`.
 
@@ -3175,7 +3209,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ````
 
-### [26]
+### [27]
 
 `jpeg-encoder` 0.7.1, `LICENSE-IJG`.
 
@@ -3251,7 +3285,7 @@ commercial products, provided that all warranty or liability claims are
 assumed by the product vendor.
 ````
 
-### [27]
+### [28]
 
 `libmimalloc-sys` 0.1.49, `LICENSE.txt`; `mimalloc` 0.1.52, `LICENSE.txt`.
 
@@ -3283,7 +3317,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ````
 
-### [28]
+### [29]
 
 `mio` 1.2.4, `LICENSE`.
 
@@ -3309,7 +3343,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [29]
+### [30]
 
 `notify` 9.0.0-rc.5, `LICENSE-CC0`.
 
@@ -3357,7 +3391,7 @@ For these and/or other purposes and motivations, and without any expectation of 
      d. Affirmer understands and acknowledges that Creative Commons is not a party to this document and has no duty or obligation with respect to this CC0 or use of the Work.
 ````
 
-### [30]
+### [31]
 
 `phf` 0.11.3, `LICENSE`; `phf` 0.14.0, `LICENSE`; `phf_shared` 0.11.3, `LICENSE`; `phf_shared` 0.14.0, `LICENSE`.
 
@@ -3384,7 +3418,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [31]
+### [32]
 
 `pulldown-cmark` 0.13.4, `LICENSE`.
 
@@ -3412,7 +3446,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [32]
+### [33]
 
 `rustls-webpki` 0.103.15, `LICENSE`.
 
@@ -3438,7 +3472,7 @@ The files under third-party/chromium are licensed as described in
 third-party/chromium/LICENSE.
 ````
 
-### [33]
+### [34]
 
 `same-file` 1.0.6, `LICENSE-MIT`; `winapi-util` 0.1.11, `LICENSE-MIT`.
 
@@ -3466,7 +3500,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [34]
+### [35]
 
 `simd-adler32` 0.3.10, `LICENSE.md`.
 
@@ -3494,7 +3528,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [35]
+### [36]
 
 `slotmap` 1.1.1, `LICENSE`.
 
@@ -3520,7 +3554,7 @@ the following restrictions:
  3. This notice may not be removed or altered from any source distribution.
 ````
 
-### [36]
+### [37]
 
 `strum` 0.28.0, `LICENSE`.
 
@@ -3548,7 +3582,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [37]
+### [38]
 
 `subtle` 2.6.1, `LICENSE`.
 
@@ -3584,7 +3618,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-### [38]
+### [39]
 
 `untrusted` 0.9.0, `LICENSE.txt`.
 
@@ -3604,7 +3638,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ````
 
-### [39]
+### [40]
 
 `webpki-roots` 1.0.9, `LICENSE`.
 
@@ -3672,7 +3706,7 @@ of Data, including for example machine learning models and models'
 insights.
 ````
 
-### [40]
+### [41]
 
 `winnow` 1.0.4, `LICENSE-MIT`.
 
@@ -3697,7 +3731,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [41]
+### [42]
 
 `xxhash-rust` 0.8.19, `LICENSE`.
 
@@ -3727,7 +3761,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ````
 
-### [42]
+### [43]
 
 `zmij` 1.0.23, `LICENSE-MIT`.
 

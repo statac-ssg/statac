@@ -1,8 +1,10 @@
 base_url = "https://example.org"
 title = "Slugify on"
+taxonomies = [{ name = "tags" }]
 
 [markdown]
 smart_punctuation = true
 
 [slugify]
 paths = "on"
+taxonomies = "on"

@@ -90,13 +90,6 @@ pub(super) static SETTINGS_LEFT: FindingKind = FindingKind {
                https://statac.dev/settings/ says what Statac offers.",
 };
 
-pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
-    heading: "URLs Statac couldn't work out",
-    sentence: "Zola wrote each of these names in ASCII for its slug, and Statac doesn't know how \
-               it writes a letter of this script, so the page's old URL wasn't worked out or \
-               kept: give the page a `permalink` of the URL the old site published it at.",
-};
-
 pub(super) static ADDRESS_UNUSABLE: FindingKind = FindingKind {
     heading: "URLs Statac can't publish at",
     sentence: "Zola published each of these pages at a URL holding a character Statac's URLs \
@@ -183,8 +176,7 @@ struct Doc {
     updated: Option<Date>,
     title: String,
     weight: Option<i64>,
-    /// The name in its address, as Zola made it; none where Statac can't
-    /// tell.
+    /// The name in its address, as Zola made it; none for a list.
     made: Option<String>,
     draft: bool,
     list: ListWords,
@@ -921,49 +913,38 @@ impl Reader<'_> {
                     (true, None) => written_name.clone(),
                     (false, None) => name.clone(),
                 };
-                self.s.paths.made(&base)
+                Some(self.s.paths.made(&base))
             }
         };
         let mut own_address = false;
-        let mut unknown = false;
-        let address = match (shape, path.as_deref().filter(|p| !p.is_empty())) {
-            (Shape::List, _) => Some(format!(
+        let address = match (&made_name, path.as_deref().filter(|p| !p.is_empty())) {
+            (None, _) => format!(
                 "/{prefix}{}",
                 match dir.is_empty() {
                     true => String::new(),
                     false => format!("{dir}/"),
                 }
-            )),
-            (_, Some(path)) => {
+            ),
+            (Some(_), Some(path)) => {
                 own_address = true;
                 let path = match path.starts_with('/') {
                     true => path.to_owned(),
                     false => format!("/{path}"),
                 };
-                Some(match path.ends_with('/') {
+                match path.ends_with('/') {
                     true => path,
                     false => format!("{path}/"),
-                })
-            }
-            (_, None) => match &made_name {
-                Some(made) => Some(format!("/{prefix}{}/", joined(&dir, made))),
-                None => {
-                    unknown = true;
-                    None
                 }
-            },
+            }
+            (Some(made), None) => format!("/{prefix}{}/", joined(&dir, made)),
         };
         let address = match address {
             _ if draft => None,
-            Some(address) if Address::read(&address).is_err() => {
+            address if Address::read(&address).is_err() => {
                 self.find(&ADDRESS_UNUSABLE, &from, None, &address);
                 None
             }
-            None if unknown && !draft => {
-                self.find(&ADDRESS_UNKNOWN, &from, None, &written_name);
-                None
-            }
-            other => other,
+            address => Some(address),
         };
         let others: Vec<String> = aliases
             .iter()
@@ -1451,19 +1432,12 @@ impl Reader<'_> {
                 // the one listing them all: the shared part makes each
                 // name a tag.
                 if !plural.eq_ignore_ascii_case("tags") {
-                    let Some(list) = self
-                        .s
-                        .terms
-                        .made(&taxonomy.name)
-                        .filter(|_| taxonomy.render)
-                    else {
+                    if !taxonomy.render {
                         continue;
-                    };
-                    let whole = format!("/{prefix}{list}/");
+                    }
+                    let whole = format!("/{prefix}{}/", self.s.terms.made(&taxonomy.name));
                     for term in terms {
-                        let Some(zolas) = self.s.terms.made(term) else {
-                            continue;
-                        };
+                        let zolas = self.s.terms.made(term);
                         let page = (plural.clone(), term.clone(), format!("{whole}{zolas}/"));
                         if !term_pages.contains(&page) {
                             term_pages.push(page);
@@ -1479,9 +1453,7 @@ impl Reader<'_> {
                 if !taxonomy.render {
                     continue;
                 }
-                let Some(list) = self.s.terms.made(&taxonomy.name) else {
-                    continue;
-                };
+                let list = self.s.terms.made(&taxonomy.name);
                 if list != "tags" && permalink.is_none() {
                     permalink = Some(format!("/{list}/{{slug}}/"));
                 }
@@ -1490,9 +1462,7 @@ impl Reader<'_> {
                     term_lists.push((whole.clone(), plural.clone()));
                 }
                 for term in terms {
-                    let Some(zolas) = self.s.terms.made(term) else {
-                        continue;
-                    };
+                    let zolas = self.s.terms.made(term);
                     let address = format!("{whole}{zolas}/");
                     if !addresses.contains(&address) {
                         addresses.push(address);

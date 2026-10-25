@@ -1,10 +1,10 @@
 This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/zola-slugify-on/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/.
+It was made from `tests/import/zola-slugify-on/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/. Its pages need `templates/folder.html`.
 
 ## What came across
 
-- 1 post, into `content/posts/`.
+- 2 posts, into `content/posts/`.
 
 The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
@@ -19,15 +19,20 @@ title: Slugify on
 url: https://example.org
 language: en
 timezone: UTC
+tags.pages: true
+tags.slugs:
+  日本: ri-ben
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
 
 ## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for the one old URL there: it is published there.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 3 old URLs there: 3 are published or redirected.
 
-- Every page lands where the old site published it, with nothing added.
+- 1 page carries a `permalink` of its own, where no pattern fits.
+
+The old site published a page listing every one of its `tags` at `/tags/`, and the new site has none.
 
 ## Left for you
 
