@@ -705,6 +705,30 @@ pub fn nested(sources: &Sources, under: &str, value: &Node) -> Vec<Problem> {
     problems
 }
 
+/// A `feed:` value, on a page or in the settings: `true`, `false`, or the
+/// name or URL of the list's feed.
+pub(crate) fn feed(reader: &Reader, node: &Node) -> Result<Option<Sourced<Value>>, Problem> {
+    match reader.truth(node) {
+        Ok(truth) => Ok(truth.map(|b| b.map(Value::Bool))),
+        // `yes` is another spelling of `true` here too, not a feed's name.
+        Err(problem)
+            if matches!(
+                problem.kind,
+                Kind::WrongKind {
+                    respelt: Some(_),
+                    ..
+                }
+            ) =>
+        {
+            Err(problem)
+        }
+        Err(_) => match reader.text(node) {
+            Ok(text) => Ok(text.map(|t| t.map(Value::Text))),
+            Err(_) => Err(reader.wrong(node, Expected::TrueFalseOrAddress, None)),
+        },
+    }
+}
+
 /// Reads one of Statac's words, as `shape` where it is given. `handed`
 /// says the value is written for the pages inside, where a pattern must ask
 /// for a piece; a pattern may ask for a field `declarations` declare.
@@ -742,25 +766,7 @@ fn read_word(
             .whole(node, from)
             .map_err(one)?
             .map(|n| n.map(Value::Whole)),
-        Shape::Feed => match reader.truth(node) {
-            Ok(truth) => truth.map(|b| b.map(Value::Bool)),
-            // `yes` is another spelling of `true` here too, not a feed's name.
-            Err(problem)
-                if matches!(
-                    problem.kind,
-                    Kind::WrongKind {
-                        respelt: Some(_),
-                        ..
-                    }
-                ) =>
-            {
-                return Err(one(problem));
-            }
-            Err(_) => match reader.text(node) {
-                Ok(text) => text.map(|t| t.map(Value::Text)),
-                Err(_) => return Err(one(reader.wrong(node, Expected::TrueFalseOrAddress, None))),
-            },
-        },
+        Shape::Feed => feed(&reader, node).map_err(one)?,
         Shape::Order => match &node.value {
             Yaml::Sequence(_) => reader
                 .texts(node)

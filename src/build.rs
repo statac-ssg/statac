@@ -246,6 +246,8 @@ pub(crate) fn read_with(
         .extend(feeds::unusable(&read.site, &read.settings, &read.sources));
     read.problems
         .extend(feeds::undated(&read.site, &read.settings, &read.sources));
+    read.problems
+        .extend(feeds::unasked(&read.site, &read.settings, &templates));
     read.problems.extend(robots_beneath_path(&read));
     let (fetched, found) = crate::fetched::read(site, &mut read.sources);
     read.site.fetched = fetched;

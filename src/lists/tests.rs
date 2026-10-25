@@ -1407,7 +1407,10 @@ fn list_in<'a>(read: &'a Read, key: &ListKey, index: usize) -> &'a List {
 #[test]
 fn a_folder_list_holds_only_its_own_languages_pages() {
     let read = site(&[
-        ("statac.yaml", "language: [ar, en]\ntimezone: UTC\n"),
+        (
+            "statac.yaml",
+            "language: [ar, en]\ntimezone: UTC\npages.feed: true\n",
+        ),
         ("content/post-1.md", &post("2026-01-01")),
         ("content/blog/post-2.md", &post("2026-01-02")),
         ("content/en/post-1.md", &post("2026-01-03")),
@@ -1445,7 +1448,10 @@ fn a_folder_list_holds_only_its_own_languages_pages() {
 #[test]
 fn where_the_main_language_has_a_folder_the_top_holds_only_what_is_outside() {
     let read = site(&[
-        ("statac.yaml", "language: [ar, en]\ntimezone: UTC\n"),
+        (
+            "statac.yaml",
+            "language: [ar, en]\ntimezone: UTC\nfeed: true\n",
+        ),
         ("content/index.md", "# Home\n"),
         ("content/about.md", &post("2026-01-01")),
         ("content/ar/post-1.md", &post("2026-01-02")),
@@ -1457,7 +1463,9 @@ fn where_the_main_language_has_a_folder_the_top_holds_only_what_is_outside() {
     let site = &read.site;
     let main = site.own_list(Id::from_index(0)).unwrap();
     assert_eq!(site.lists.get(main).key, folder("ar"));
-    // The top is no language's own list: it has no feed of its own.
+    let fed = crate::feeds::wanted(site, &read.settings, main);
+    assert_eq!(fed.as_ref().map(|at| at.as_str()), Some("/ar/feed.xml"));
+    // The top is no language's own list: the setting gives it no feed.
     let top = site
         .lists
         .iter()

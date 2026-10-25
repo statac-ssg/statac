@@ -1165,6 +1165,9 @@ fn feed_value(shared: &Shared, list: ListId) -> Value {
         }
     }
     frame::read(Key::List(list));
+    if shared.site.own_list(language) == Some(list) {
+        frame::read(setting_key(shared, crate::feeds::SETTING));
+    }
     let known = list_known(shared, list);
     match known.page {
         Some((page, _)) => {

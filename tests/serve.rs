@@ -704,6 +704,12 @@ fn panel(served: &Served, address: &str) -> String {
 #[test]
 fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
     let served = served_as("panel", How::Native, true, |site| {
+        // The site's feed waits for a `url`, which the site is told of.
+        site.write(
+            "statac.yaml",
+            "title: Site\nlanguage: en\ntimezone: Europe/London\nfeed: true\n",
+        );
+        site.write("templates/feed.xml", "");
         site.write(
             "content/post-2.md",
             "---\ntitle: Post <2>\ndraft: true\n---\nA draft.\n",
@@ -1429,7 +1435,8 @@ fn the_command_after_a_build_runs_once_and_serve_says_so() {
 #[test]
 fn an_id_is_written_into_a_new_post_once_the_site_has_been_published() {
     const SETTINGS: &str = "title: Site\nlanguage: en\ntimezone: Europe/London\n\
-                            url: https://example.org\nfeed_key: key\nwrite_feed_ids: true\n";
+                            url: https://example.org\nfeed_key: key\nwrite_feed_ids: true\n\
+                            feed: true\n";
     let served = served_as("ids", How::Native, true, |site| {
         site.write("statac.yaml", SETTINGS);
         site.write(

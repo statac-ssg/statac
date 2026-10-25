@@ -323,19 +323,19 @@ fn a_page_picks_another_card_and_a_folder_hands_one_down() {
         "---\ntitle: Post 1\ncard: plain\n---\nA post.\n",
     );
     site.write(
-        "content/notes/index.md",
+        "content/notes-1/index.md",
         "---\ntitle: Notes\npages.card: notes\n---\n",
     );
     site.write(
-        "content/notes/note-1.md",
+        "content/notes-1/note-1.md",
         "---\ntitle: Note 1\n---\nA note.\n",
     );
     let said = site.build();
     assert!(said.contains("Drew 4 cards."), "{said}");
     assert_eq!(site.check(), "No problems.\n");
     let alt = |file: &str| meta(&site.html(file), "og:image:alt").unwrap();
-    assert_eq!(alt("notes/note-1/index.html"), "Note 1. Notes");
-    assert_eq!(alt("notes/index.html"), "Notes. Site");
+    assert_eq!(alt("notes-1/note-1/index.html"), "Note 1. Notes");
+    assert_eq!(alt("notes-1/index.html"), "Notes. Site");
     assert_eq!(alt("post-1/index.html"), "Post 1. Site");
 
     // The same words on another card are another picture.
@@ -640,11 +640,11 @@ fn a_card_picked_beside_a_picture_of_the_pages_own_is_set_aside() {
     );
     // Handed down, it isn't the page's own line to be told of.
     site.write(
-        "content/notes/index.md",
+        "content/notes-1/index.md",
         "---\ntitle: Notes\npages.card: plain\n---\n",
     );
     site.write(
-        "content/notes/note-1.md",
+        "content/notes-1/note-1.md",
         "---\ntitle: Note 1\nog_image: /photo-1.jpg\n---\nA note.\n",
     );
     site.put("content/photo-1.jpg", &jpeg(300, 200));
@@ -658,7 +658,7 @@ fn a_card_picked_beside_a_picture_of_the_pages_own_is_set_aside() {
         "{said}"
     );
     site.build();
-    let note = site.html("notes/note-1/index.html");
+    let note = site.html("notes-1/note-1/index.html");
     assert_eq!(
         meta(&note, "og:image").unwrap(),
         "https://example.org/photo-1.jpg"

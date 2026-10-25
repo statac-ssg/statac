@@ -1,6 +1,6 @@
 # No feed key
 
-The site has lists with feeds, and `statac.yaml` has no `feed_key`.
+Lists on the site ask for feeds, and `statac.yaml` has no `feed_key`.
 
 ## What you'll see {#what-youll-see}
 
@@ -28,8 +28,8 @@ The message offers a newly made key. Add the line it shows to
 `statac.yaml`, and build again. Once you have published a feed with the
 key, never change it, because every id would change too.
 
-If you don't want any feeds, write `pages.feed: false` in `statac.yaml`
-instead.
+If you don't want any feeds, take out the `feed:` lines that ask for
+them instead.
 
 ## Example
 

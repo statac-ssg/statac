@@ -5,4 +5,5 @@ summary: Short notes, with or without a title, newest first.
 layout: notes
 pages.layout: note
 pages.untitled: true
+feed: true
 ---

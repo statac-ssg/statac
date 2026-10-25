@@ -797,7 +797,7 @@ fn make_with(
     write: &mut Writer<'_>,
 ) -> Result<Made, Problem> {
     refusal(folder, &folder.to_string_lossy(), by)?;
-    let settings = settings(answers, timezone);
+    let settings = settings(answers, timezone, by);
     let samples = (by == Maker::New).then_some(today);
     let files = files(answers, &settings, samples, writes);
     let mut made = Written::default();
@@ -894,8 +894,10 @@ impl Written {
 const FEED_KEY_COMMENT: &str =
     "# What each post's id in a feed is made from: never change it once a feed is published.";
 
-/// `statac.yaml` for a site answered as `answers`.
-fn settings(answers: &Answers, timezone: Option<&str>) -> String {
+/// `statac.yaml` for a site answered as `answers`, made `by` a command:
+/// a new site asks for its own feed, and an imported one for the feeds the
+/// old site had, which the import writes.
+fn settings(answers: &Answers, timezone: Option<&str>, by: Maker) -> String {
     let language = match answers.languages.as_slice() {
         [one] => yaml::write::text(one),
         many => {
@@ -913,6 +915,8 @@ fn settings(answers: &Answers, timezone: Option<&str>) -> String {
     for (name, example) in shorter_dates(&answers.languages[0], &answers.date_format) {
         lines.push((name, Some(yaml::write::text(&example))));
     }
+    let fed = (by == Maker::New).then(|| "true".to_owned());
+    lines.push((crate::feeds::SETTING, fed));
     lines.push(("feed_key", Some(crate::feeds::mint_key())));
     let mut text = String::new();
     for (name, value) in lines {
@@ -1041,7 +1045,7 @@ pub fn files_of_a_new_site(cards: bool) -> Vec<(String, Vec<u8>)> {
         language: "en".to_owned(),
     };
     let answers = defaults.answers();
-    let settings = settings(&answers, None);
+    let settings = settings(&answers, None, Maker::New);
     let day = Date::day_only(2026, 1, 1);
     let writes = Writes {
         starter: true,

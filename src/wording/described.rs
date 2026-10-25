@@ -197,6 +197,15 @@ const SETTINGS: &[(&str, Described)] = &[
         ),
     ),
     (
+        "feed",
+        described(
+            "`true` gives the site's own list a feed, beside its page as `feed.xml`, and a \
+             name or a URL puts it there. On a site in several languages, each language's own \
+             list has one. A `feed:` line on the list page wins over it.",
+            FEEDS,
+        ),
+    ),
+    (
         "feed_key",
         described(
             "What each post's id in a feed is made from. `statac new` writes a new one. \
@@ -494,8 +503,8 @@ const FIELDS_OF_A_PAGE: &[(&str, Described)] = &[
     (
         "feed",
         described(
-            "Where the list's feed is published, as a name or a URL. `true` adds a \
-             feed to a list that has none by default, and `false` means no feed.",
+            "`true` gives the list a feed, beside its page as `feed.xml`, and a name or a \
+             URL puts it there. A list has no feed unless it asks for one.",
             LIST_PAGE,
         ),
     ),

@@ -62,6 +62,7 @@ Each of these pages was mostly the old site's templates at work, such as a home 
 
 Readers subscribed to the old site's feed at each of these URLs, and the template that made it didn't come across, so nothing is there now. A list's `feed:` line can put that list's feed at a URL of its own, as `feed: /index.rss`, and the starter's feed template writes Atom: see https://statac.dev/feeds/.
 
+- `feed.xml`: `/feed.xml`
 - `feeds/index.xml`: `/feeds/index.xml`
 - `feeds/posts.rss`: `/feeds/posts.rss`
 

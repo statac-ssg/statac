@@ -28,7 +28,7 @@ struct Site {
 const TODAY: &str = "2026-10-04";
 
 const SETTINGS: &str = "title: Site\nlanguage: [en, de]\nurl: https://example.org\n\
-                        feed_key: key\ntimezone: UTC\nposts_per_page: 2\n";
+                        feed_key: key\ntimezone: UTC\nposts_per_page: 2\nfeed: true\n";
 
 const BASE: &str = "<!doctype html>\n<title>{{ headline(page) }}</title>\n{{ css('site.css') }}\n\
                     <nav>{% for tag in site.tags %}<a href=\"{{ tag.url }}\">{{ tag.name }}</a>\

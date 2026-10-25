@@ -563,8 +563,8 @@ impl Site {
     }
 
     /// Whether `list` is a folder at the top of a language's pages, or one
-    /// directly inside it: one of the lists with a page and a feed where
-    /// the author writes none. The folder at the top of `content/` is one
+    /// directly inside it: one of the lists with a page where the author
+    /// writes none. The folder at the top of `content/` is one
     /// only where it is a language's top.
     pub fn outermost(&self, list: ListId) -> bool {
         let list = self.lists.get(list);

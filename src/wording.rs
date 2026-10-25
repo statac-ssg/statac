@@ -787,6 +787,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
             }
         }
         Kind::NoFeedKey { .. } => "No feed key: `statac.yaml` has no `feed_key`".into(),
+        Kind::UnusedFeedTemplate { .. } => "Unused feed template: no list asks for a feed".into(),
         Kind::NoSiteUrl { waiting } => {
             let what = match waiting {
                 Waiting::Page(path) => format!("`{path}` is"),
@@ -3011,13 +3012,13 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::FeedNotWritten { more, why, .. } => Some(match why {
             Unwritten::NoTitle => "Add `title:` to `statac.yaml`; a feed is named by it.".into(),
             Unwritten::NoTemplate(_) => {
-                let them = match more {
-                    0 => "it",
-                    _ => "them",
+                let (them, lines) = match more {
+                    0 => ("it", "line"),
+                    _ => ("them", "lines"),
                 };
                 format!(
-                    "Add the template to publish {them}, or write `pages.feed: false` in \
-                     `statac.yaml` for no feeds."
+                    "Add the template to publish {them}, or take out the `feed:` {lines} \
+                     asking for {them}."
                 )
             }
             Unwritten::PageThere { .. } => {
@@ -3030,6 +3031,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
         }),
         Kind::NoFeedKey { key } => Some(feed_key_line(key)),
+        Kind::UnusedFeedTemplate { template, line } => Some(format!(
+            "Write `{line}` in `statac.yaml` for the site's feed, built with `{template}`."
+        )),
         Kind::NoSiteUrl { .. } => {
             Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`.".into())
         }
@@ -5933,10 +5937,7 @@ mod tests {
                     Unwritten::NoTemplate("templates/feed.xml".into()),
                 ),
                 "Feed not written: the site's own list needs `templates/feed.xml`",
-                Some(
-                    "Add the template to publish it, or write `pages.feed: false` in \
-                     `statac.yaml` for no feeds.",
-                ),
+                Some("Add the template to publish it, or take out the `feed:` line asking for it."),
             ),
             (
                 not_written(
@@ -5947,8 +5948,8 @@ mod tests {
                 "Feed not written: the folder `content/posts/` and 2 other lists need \
                  `templates/feed.xml`",
                 Some(
-                    "Add the template to publish them, or write `pages.feed: false` in \
-                     `statac.yaml` for no feeds.",
+                    "Add the template to publish them, or take out the `feed:` lines asking \
+                     for them.",
                 ),
             ),
             (
@@ -5975,6 +5976,28 @@ mod tests {
                 not_written((Word::Folder, "notes".into()), 0, Unwritten::Undated),
                 "Feed not written: the folder `content/notes/` has nothing dated",
                 Some("Give a page in it a `date:`, or take the `feed:` line out."),
+            ),
+            (
+                Kind::UnusedFeedTemplate {
+                    template: "templates/feed.xml".into(),
+                    line: "feed: true".into(),
+                },
+                "Unused feed template: no list asks for a feed",
+                Some(
+                    "Write `feed: true` in `statac.yaml` for the site's feed, built with \
+                     `templates/feed.xml`.",
+                ),
+            ),
+            (
+                Kind::UnusedFeedTemplate {
+                    template: "templates/feed.json".into(),
+                    line: "feed: feed.json".into(),
+                },
+                "Unused feed template: no list asks for a feed",
+                Some(
+                    "Write `feed: feed.json` in `statac.yaml` for the site's feed, built with \
+                     `templates/feed.json`.",
+                ),
             ),
             (
                 Kind::NoFeedKey { key: "key".into() },

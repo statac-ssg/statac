@@ -2,7 +2,7 @@
 
 The site has no full URL yet (`url` in `statac.yaml`), so Statac has left
 something that needs one out of the built site: a page that says
-`needs: url`, the feeds of the site's lists, the social cards, or the
+`needs: url`, the feeds the site's lists ask for, the social cards, or the
 site's webmentions.
 
 ## What you'll see {#what-youll-see}

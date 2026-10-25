@@ -907,8 +907,8 @@ fn a_template_only_a_page_needing_the_address_uses_is_checked_as_with_one() {
 #[test]
 fn every_whole_address_follows_the_address_given_for_the_run() {
     let with_url = "title: Site\nurl: https://example.org\nlanguage: en\ntimezone: UTC\n\
-                    feed_key: key\n";
-    let without_url = "title: Site\nlanguage: en\ntimezone: UTC\nfeed_key: key\n";
+                    feed_key: key\nfeed: true\n";
+    let without_url = "title: Site\nlanguage: en\ntimezone: UTC\nfeed_key: key\nfeed: true\n";
     // The settings, the address given, and the address, its path and its
     // host as the built site writes them.
     let runs: &[(&str, Option<&str>, [&str; 3])] = &[
@@ -1108,11 +1108,11 @@ fn pages_built_without_their_own_template_are_told_once_counting_them() {
     fs::remove_file(site.root.join("templates/page.html")).unwrap();
     fs::remove_file(site.root.join("templates/home.html")).unwrap();
     site.write(
-        "content/notes/index.md",
-        "---\ntitle: Notes\nredirect_from: [/old-notes/]\n---\nThe notes, and [a note](/nope/).\n",
+        "content/diary/index.md",
+        "---\ntitle: Diary\nredirect_from: [/old-diary/]\n---\nThe diary, and [a note](/nope/).\n",
     );
     site.write(
-        "content/notes/note-1.md",
+        "content/diary/note-1.md",
         "---\ntitle: Note 1\nredirect_from: [/old-1/, /older-1/]\n---\nNote 1.\n",
     );
     let (said, code) = site.check_without_javascript(&[]);
@@ -1124,24 +1124,24 @@ note  Built without template: 4 pages are published as their content alone
   While building: content/index.md
   And while building 3 more:
     content/post-1.md
-    content/notes/index.md
-    content/notes/note-1.md
+    content/diary/index.md
+    content/diary/note-1.md
   Add `templates/page.html` to build them with a template.
   More: https://statac.dev/e/built-without-template/
 
 note  Built without template: 3 redirects are published as a refresh and a link
-  While building: content/notes/index.md, line 3
-   3 │ redirect_from: [/old-notes/]
+  While building: content/diary/index.md, line 3
+   3 │ redirect_from: [/old-diary/]
      │                 ^^^^^^^^^^^
   And while building 2 more:
-    content/notes/note-1.md, line 3
-    content/notes/note-1.md, line 3
+    content/diary/note-1.md, line 3
+    content/diary/note-1.md, line 3
   Add `templates/redirect.html` to build them with a template.
   More: https://statac.dev/e/built-without-template/
 
 warning  Broken link: nothing is published at `/nope/`
-  content/notes/index.md, line 5
-   5 │ The notes, and [a note](/nope/).
+  content/diary/index.md, line 5
+   5 │ The diary, and [a note](/nope/).
      │                         ^^^^^^
   More: https://statac.dev/e/broken-link/
 
@@ -1163,7 +1163,7 @@ note  Built with page template: `templates/page.html` builds 1 page in place of 
 ",
         "\
 note  Built with page template: `templates/page.html` builds 1 page in place of `templates/folder.html`
-  While building: content/notes/index.md
+  While building: content/diary/index.md
   Add `templates/folder.html` to give it a template of its own.
   More: https://statac.dev/e/built-with-page-template/
 ",
@@ -1646,7 +1646,7 @@ fn a_page_called_by_what_the_author_never_wrote_as_a_name_is_noted_once() {
     site.write(
         "statac.yaml",
         "title: Site\nlanguage: en\ntimezone: UTC\nurl: https://example.org/\n\
-         feed_key: 0b6d0c4e-2f7a-4d51-9a8e-3c1f5e7a9b20\n",
+         feed_key: 0b6d0c4e-2f7a-4d51-9a8e-3c1f5e7a9b20\nfeed: true\n",
     );
     site.write(
         "content/post-2.md",
@@ -1692,11 +1692,14 @@ fn a_folder_whose_pages_go_untitled_is_called_by_its_dates_and_never_noted() {
     site.write(
         "statac.yaml",
         "title: Site\nlanguage: en\ntimezone: UTC\nurl: https://example.org/\n\
-         feed_key: 0b6d0c4e-2f7a-4d51-9a8e-3c1f5e7a9b20\n",
+         feed_key: 0b6d0c4e-2f7a-4d51-9a8e-3c1f5e7a9b20\nfeed: true\n",
     );
-    site.write("content/notes/index.md", "---\npages.untitled: true\n---\n");
     site.write(
-        "content/notes/note-1.md",
+        "content/notes-1/index.md",
+        "---\npages.untitled: true\n---\n",
+    );
+    site.write(
+        "content/notes-1/note-1.md",
         "---\ndate: 2026-01-02\n---\nNote 1 opens here.\n",
     );
     let named = "{% set shown = page.content %}<title>{{ headline(page) }}</title>\n\
@@ -1713,7 +1716,7 @@ fn a_folder_whose_pages_go_untitled_is_called_by_its_dates_and_never_noted() {
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
     assert!(!said.contains("untitled-page"), "{said}");
-    let built = fs::read_to_string(site.out().join("notes/note-1/index.html")).unwrap();
+    let built = fs::read_to_string(site.out().join("notes-1/note-1/index.html")).unwrap();
     assert_eq!(
         built,
         "<title>2 January 2026</title>\n<meta property=\"og:title\" content=\"2 January 2026\">\n"
@@ -1723,7 +1726,7 @@ fn a_folder_whose_pages_go_untitled_is_called_by_its_dates_and_never_noted() {
 
     // One page of the folder says it isn't meant to go untitled.
     site.write(
-        "content/notes/note-1.md",
+        "content/notes-1/note-1.md",
         "---\ndate: 2026-01-02\nuntitled: false\n---\nNote 1 opens here.\n",
     );
     let (said, code) = site.check_without_javascript(&[]);
@@ -1731,8 +1734,8 @@ fn a_folder_whose_pages_go_untitled_is_called_by_its_dates_and_never_noted() {
     assert_eq!(
         said,
         "\
-note  Untitled page: `content/notes/note-1.md` is called by its opening words, `Note 1 opens here.`
-  content/notes/note-1.md, line 1
+note  Untitled page: `content/notes-1/note-1.md` is called by its opening words, `Note 1 opens here.`
+  content/notes-1/note-1.md, line 1
    1 │ ---
      │ ^^^
   Give it a `title`, or open its content with a `# heading`. \
@@ -1745,7 +1748,7 @@ A folder whose pages go without titles says `pages.untitled: true`.
 
     // A value that is neither stops the build.
     site.write(
-        "content/notes/index.md",
+        "content/notes-1/index.md",
         "---\npages.untitled: perhaps\n---\n",
     );
     let (said, code) = site.check_without_javascript(&[]);
@@ -2628,7 +2631,7 @@ fn writing_shown_on_another_page_links_where_it_does_on_its_own() {
     site.write(
         "statac.yaml",
         "title: Site\nlanguage: en\ntimezone: UTC\nurl: https://example.org/blog/\n\
-         feed_key: 9ec6e8ce-e7dd-8bb6-85ff-b19920a0e8b1\n",
+         feed_key: 9ec6e8ce-e7dd-8bb6-85ff-b19920a0e8b1\nfeed: true\n",
     );
     site.write(
         "templates/home.html",

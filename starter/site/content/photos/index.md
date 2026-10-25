@@ -5,4 +5,5 @@ summary: One photograph to a page, newest first.
 layout: photos
 pages.layout: photo
 posts_per_page: 30
+feed: true
 ---

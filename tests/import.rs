@@ -181,16 +181,17 @@ const NO_ADDRESS: &str = "no-site-url";
 const NO_ZONE: &str = "no-time-zone";
 const DRAFT: &str = "draft-left-out";
 const AS_TEXT: &str = "published-as-text";
+const UNUSED_FEED: &str = "unused-feed-template";
 
 #[test]
 fn each_permalink_style_keeps_every_address() {
     for (name, found) in [
-        ("permalink-date", &[][..]),
-        ("permalink-pretty", &[NO_ADDRESS, NO_ZONE]),
-        ("permalink-ordinal", &[NO_ADDRESS, NO_ZONE]),
-        ("permalink-weekdate", &[NO_ADDRESS, NO_ZONE]),
-        ("permalink-none", &[NO_ADDRESS, NO_ZONE]),
-        ("permalink-pattern", &[NO_ADDRESS, NO_ZONE]),
+        ("permalink-date", &[UNUSED_FEED][..]),
+        ("permalink-pretty", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
+        ("permalink-ordinal", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
+        ("permalink-weekdate", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
+        ("permalink-none", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
+        ("permalink-pattern", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
     ] {
         assert_eq!(fixture(name), found, "{name}");
     }
@@ -199,7 +200,7 @@ fn each_permalink_style_keeps_every_address() {
 #[test]
 fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts() {
     let (new, found) = imported("home-pages");
-    assert_eq!(found, &[] as &[&str]);
+    assert_eq!(found, [UNUSED_FEED]);
     let out = scratch("home-pages-built");
     let outcome = build::run(&Options {
         mode: Mode::Build,
@@ -231,8 +232,8 @@ fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts(
 fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
     for (name, found, posts_page) in [
         ("hugo-home-pages", &[][..], true),
-        ("zola-home-pages", &[][..], false),
-        ("eleventy-home-pages", &[NO_ADDRESS][..], true),
+        ("zola-home-pages", &[UNUSED_FEED][..], false),
+        ("eleventy-home-pages", &[NO_ADDRESS, UNUSED_FEED][..], true),
     ] {
         let (new, problems) = imported(name);
         assert_eq!(problems, found, "{name}");
@@ -277,7 +278,12 @@ fn a_site_under_a_path_keeps_its_addresses_and_links() {
     // `search: false`.
     assert_eq!(
         fixture("baseurl"),
-        [NO_ZONE, "robots-beneath-path", "update-available"]
+        [
+            NO_ZONE,
+            "robots-beneath-path",
+            UNUSED_FEED,
+            "update-available"
+        ]
     );
 }
 
@@ -313,63 +319,78 @@ fn a_404_page_of_the_old_sites_own_is_kept_out_of_search_with_its_own_words() {
 
 #[test]
 fn dates_come_across_from_names_and_front_matter() {
-    assert_eq!(fixture("dates"), [DRAFT, NO_ADDRESS]);
+    assert_eq!(fixture("dates"), [DRAFT, NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn front_matter_comes_across_in_statacs_words() {
-    assert_eq!(fixture("front-matter"), [DRAFT, NO_ADDRESS, NO_ZONE]);
+    assert_eq!(
+        fixture("front-matter"),
+        [DRAFT, NO_ADDRESS, NO_ZONE, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn tags_in_the_writing_convert_or_stay_as_written() {
-    assert_eq!(fixture("tags-in-writing"), [NO_ZONE, AS_TEXT]);
+    assert_eq!(fixture("tags-in-writing"), [NO_ZONE, AS_TEXT, UNUSED_FEED]);
 }
 
 #[test]
 fn markdown_that_reads_differently_is_counted_not_rewritten() {
-    assert_eq!(fixture("markdown-forms"), [NO_ADDRESS, NO_ZONE, AS_TEXT]);
+    assert_eq!(
+        fixture("markdown-forms"),
+        [NO_ADDRESS, NO_ZONE, AS_TEXT, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn words_statac_would_read_as_a_snippet_call_are_escaped() {
-    assert_eq!(fixture("calls-in-writing"), [NO_ADDRESS, NO_ZONE]);
+    assert_eq!(
+        fixture("calls-in-writing"),
+        [NO_ADDRESS, NO_ZONE, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn code_inside_html_is_given_a_blank_line_and_stays_code() {
-    assert_eq!(fixture("html-writing"), [NO_ADDRESS, NO_ZONE]);
+    assert_eq!(fixture("html-writing"), [NO_ADDRESS, NO_ZONE, UNUSED_FEED]);
 }
 
 #[test]
 fn markers_statac_refuses_and_dollars_it_reads_as_maths_are_settled() {
-    assert_eq!(fixture("markers-and-dollars"), [NO_ADDRESS, NO_ZONE]);
+    assert_eq!(
+        fixture("markers-and-dollars"),
+        [NO_ADDRESS, NO_ZONE, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn maths_the_old_site_set_between_dollar_signs_stays_maths() {
     assert_eq!(fixture("hugo-maths"), [] as [&str; 0]);
-    assert_eq!(fixture("eleventy-maths"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-maths"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn files_data_and_folders_of_pages_come_across() {
-    assert_eq!(fixture("files-and-data"), [DRAFT, NO_ADDRESS, NO_ZONE]);
+    assert_eq!(
+        fixture("files-and-data"),
+        [DRAFT, NO_ADDRESS, NO_ZONE, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn settings_in_toml_are_read_as_settings_in_yaml() {
-    assert_eq!(fixture("settings-toml"), [] as [&str; 0]);
+    assert_eq!(fixture("settings-toml"), [UNUSED_FEED]);
 }
 
 #[test]
 fn a_site_is_read_from_the_folder_its_settings_name() {
-    assert_eq!(fixture("source-folder"), [NO_ADDRESS, NO_ZONE]);
+    assert_eq!(fixture("source-folder"), [NO_ADDRESS, NO_ZONE, UNUSED_FEED]);
 }
 
 #[test]
 fn pages_and_feeds_of_the_old_built_output_that_nothing_answers_are_listed() {
-    assert_eq!(fixture("built-output"), [NO_ZONE]);
+    assert_eq!(fixture("built-output"), [NO_ZONE, UNUSED_FEED]);
 }
 
 #[test]
@@ -444,6 +465,66 @@ fn what_is_said_counts_what_came_across() {
              Next: `cd {shown}`, then `statac check`.\n"
         )
     );
+}
+
+/// A Jekyll site, times what its feed plugin was given: the new site asks
+/// for the site's feed at the URL the old one had, and for none where the
+/// old site had none.
+#[test]
+fn the_feed_jekylls_plugin_made_is_asked_for_at_its_url() {
+    let plugin = "plugins: [jekyll-feed]\n";
+    // (the case, what the settings add, the line asking, the feed's file)
+    let cases = [
+        ("feed-plugin", plugin, Some("feed: true"), Some("feed.xml")),
+        (
+            "feed-plugin-path",
+            "plugins: [jekyll-feed]\nfeed:\n  path: atom.xml\n",
+            Some("feed: /atom.xml"),
+            Some("atom.xml"),
+        ),
+        ("feed-none", "", None, None),
+    ];
+    for (label, added, line, file) in cases {
+        let top = scratch(label);
+        let old = top.join("old");
+        fs::create_dir_all(old.join("_posts")).unwrap();
+        let settings = format!("title: Site 1\nurl: https://example.org\ntimezone: UTC\n{added}");
+        fs::write(old.join("_config.yml"), settings).unwrap();
+        fs::write(
+            old.join("_posts/2026-01-01-post-1.md"),
+            "---\ntitle: Post 1\n---\nText.\n",
+        )
+        .unwrap();
+        let new = top.join("new");
+        let (code, said) = import(&old, &new, None);
+        assert_eq!(code, 0, "{said}");
+        let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        let asking: Vec<&str> = written.lines().filter(|l| l.starts_with("feed:")).collect();
+        assert_eq!(asking, Vec::from_iter(line), "{label}: {written}");
+        let out = top.join("out");
+        let outcome = build::run(&Options {
+            mode: Mode::Build,
+            site: new.clone(),
+            out: Some(out.clone()),
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        assert!(
+            outcome.published.is_some(),
+            "{label}: {:?}",
+            outcome.problems
+        );
+        let unused = (outcome.problems.iter()).any(|p| p.kind.name() == "unused-feed-template");
+        assert_eq!(unused, file.is_none(), "{label}");
+        for name in ["feed.xml", "atom.xml", "posts/feed.xml"] {
+            assert_eq!(
+                out.join(name).is_file(),
+                file == Some(name),
+                "{label}: {name}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -791,8 +872,10 @@ fn hugo_pages_kept_as_folders_come_across_whole() {
 
 #[test]
 fn hugo_addresses_are_kept_by_each_placeholder_and_as_files() {
-    assert_eq!(fixture("hugo-permalinks"), [] as [&str; 0]);
-    assert_eq!(fixture("hugo-ugly"), [] as [&str; 0]);
+    // The old site's notes page is nearest a past starter's, which lacks
+    // `feed: true`.
+    assert_eq!(fixture("hugo-permalinks"), ["update-available"]);
+    assert_eq!(fixture("hugo-ugly"), ["update-available"]);
 }
 
 /// Builds the site in `site` into `out`, having found no error.
@@ -2488,23 +2571,26 @@ fn an_old_address_that_cant_be_kept_is_told_of_once_though_the_built_output_hold
 
 #[test]
 fn zola_settings_are_read_from_zola_toml_or_config_toml() {
-    assert_eq!(fixture("zola-settings"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-settings"), [UNUSED_FEED]);
     assert_eq!(fixture("zola-config-toml"), [] as [&str; 0]);
 }
 
 #[test]
 fn zola_front_matter_comes_across_in_statacs_words() {
-    assert_eq!(fixture("zola-front-matter"), [DRAFT, "untitled-page"]);
+    assert_eq!(
+        fixture("zola-front-matter"),
+        [DRAFT, "untitled-page", UNUSED_FEED]
+    );
 }
 
 #[test]
 fn zola_lists_keep_their_order_pages_and_redirects() {
-    assert_eq!(fixture("zola-lists"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-lists"), [UNUSED_FEED]);
 }
 
 #[test]
 fn zola_lists_answer_the_first_page_zola_sent_on_to_them() {
-    assert_eq!(fixture("zola-first-pages"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-first-pages"), [UNUSED_FEED]);
 }
 
 /// Zola names a list's address by its folder as written, so a list in a
@@ -2572,19 +2658,19 @@ fn a_zola_list_stays_at_the_address_zola_gave_it() {
 
 #[test]
 fn zola_pages_keep_their_names_dates_and_addresses() {
-    assert_eq!(fixture("zola-pages"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-pages"), [UNUSED_FEED]);
 }
 
 #[test]
 fn zola_names_are_made_ready_by_each_slugify_setting() {
-    assert_eq!(fixture("zola-slugify-on"), [] as [&str; 0]);
-    assert_eq!(fixture("zola-slugify-safe"), [] as [&str; 0]);
-    assert_eq!(fixture("zola-slugify-off"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-slugify-on"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-slugify-safe"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-slugify-off"), [UNUSED_FEED]);
 }
 
 #[test]
 fn zola_tags_keep_the_addresses_zola_gave_them() {
-    assert_eq!(fixture("zola-tags"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-tags"), [UNUSED_FEED]);
 }
 
 #[test]
@@ -2596,7 +2682,7 @@ fn zola_languages_come_across_by_place() {
 fn zola_tags_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(
         fixture("zola-tags-in-writing"),
-        ["broken-link", DRAFT, "no-thumbnail", AS_TEXT]
+        ["broken-link", DRAFT, "no-thumbnail", AS_TEXT, UNUSED_FEED]
     );
 }
 
@@ -2605,7 +2691,10 @@ fn zola_tags_in_the_writing_convert_or_stay_as_written() {
 /// template can work out, or named with a `.`, stays as written.
 #[test]
 fn zola_components_in_the_writing_convert_or_stay_as_written() {
-    assert_eq!(fixture("zola-components"), ["no-thumbnail", AS_TEXT]);
+    assert_eq!(
+        fixture("zola-components"),
+        ["no-thumbnail", AS_TEXT, UNUSED_FEED]
+    );
 }
 
 /// Zola 0.23 runs the writing as a template: `raw` is taken out, and the
@@ -2615,9 +2704,9 @@ fn zola_components_in_the_writing_convert_or_stay_as_written() {
 /// run.
 #[test]
 fn zola_template_code_in_the_writing_is_told_by_the_version_that_ran_it() {
-    assert_eq!(fixture("zola-templated-writing"), [AS_TEXT]);
-    assert_eq!(fixture("zola-skip-templating"), [AS_TEXT]);
-    assert_eq!(fixture("zola-template-code"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-templated-writing"), [AS_TEXT, UNUSED_FEED]);
+    assert_eq!(fixture("zola-skip-templating"), [AS_TEXT, UNUSED_FEED]);
+    assert_eq!(fixture("zola-template-code"), [UNUSED_FEED]);
 }
 
 /// Zola 0.23 has no shortcodes, so a call in its writing is to one of
@@ -2625,7 +2714,7 @@ fn zola_template_code_in_the_writing_is_told_by_the_version_that_ran_it() {
 /// is told rather than made a snippet call.
 #[test]
 fn zola_functions_in_the_writing_give_their_address_or_are_told() {
-    assert_eq!(fixture("zola-functions"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-functions"), [UNUSED_FEED]);
 }
 
 /// Zola 0.23 lets an `@/` link, or `get_url`, name a file beside a page:
@@ -2634,7 +2723,7 @@ fn zola_functions_in_the_writing_give_their_address_or_are_told() {
 /// page's folder.
 #[test]
 fn a_zola_link_to_a_file_beside_a_page_reaches_it() {
-    assert_eq!(fixture("zola-beside"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-beside"), [UNUSED_FEED]);
 }
 
 #[test]
@@ -2680,12 +2769,17 @@ fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
 
 #[test]
 fn zola_site_under_a_path_keeps_its_addresses_and_links() {
-    assert_eq!(fixture("zola-under-path"), ["robots-beneath-path"]);
+    assert_eq!(
+        fixture("zola-under-path"),
+        ["robots-beneath-path", UNUSED_FEED]
+    );
 }
 
 #[test]
 fn zola_feeds_stay_at_their_old_addresses() {
-    assert_eq!(fixture("zola-feeds"), [] as [&str; 0]);
+    // The old site's notes page is nearest a past starter's, which lacks
+    // `feed: true`.
+    assert_eq!(fixture("zola-feeds"), ["update-available"]);
 }
 
 #[test]
@@ -2902,7 +2996,7 @@ fn eleventy_settings_are_read_in_either_quotes_and_assumed_where_absent() {
         "eleventy-settings-program",
         "eleventy-package-json",
     ] {
-        assert_eq!(fixture(name), [NO_ADDRESS], "{name}");
+        assert_eq!(fixture(name), [NO_ADDRESS, UNUSED_FEED], "{name}");
     }
 }
 
@@ -2910,33 +3004,39 @@ fn eleventy_settings_are_read_in_either_quotes_and_assumed_where_absent() {
 fn eleventy_front_matter_comes_across_in_statacs_words() {
     assert_eq!(
         fixture("eleventy-front-matter"),
-        [NO_ADDRESS, "untitled-page"]
+        [NO_ADDRESS, "untitled-page", UNUSED_FEED]
     );
 }
 
 #[test]
 fn eleventy_permalinks_are_kept_in_each_form() {
-    assert_eq!(fixture("eleventy-permalinks"), [DRAFT, NO_ADDRESS]);
+    assert_eq!(
+        fixture("eleventy-permalinks"),
+        [DRAFT, NO_ADDRESS, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn eleventy_data_is_handed_down_as_statac_hands_it() {
-    assert_eq!(fixture("eleventy-data"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-data"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn eleventy_folders_of_unpublished_files_with_no_title_are_left_behind() {
-    assert_eq!(fixture("eleventy-parts"), [DRAFT, NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-parts"), [DRAFT, NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn eleventy_permalinks_written_on_every_page_become_one_pattern() {
-    assert_eq!(fixture("eleventy-pattern"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-pattern"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn eleventy_addresses_through_the_url_filter_carry_the_path_the_settings_give() {
-    assert_eq!(fixture("eleventy-under-path"), ["broken-link", NO_ADDRESS]);
+    assert_eq!(
+        fixture("eleventy-under-path"),
+        ["broken-link", NO_ADDRESS, UNUSED_FEED]
+    );
 }
 
 const ADD_URL: &str = "Add the full URL as `url` in `statac.yaml`";
@@ -2956,7 +3056,12 @@ fn an_address_given_for_a_site_whose_settings_give_none_is_its_url() {
     assert!(report.contains("The site is under a path, `/blog`, as its `url` says"));
     assert_eq!(
         checked(&new),
-        ["broken-link", "missing-anchor", "robots-beneath-path"]
+        [
+            "broken-link",
+            "missing-anchor",
+            "robots-beneath-path",
+            UNUSED_FEED
+        ]
     );
 
     let new = scratch("address-given-whole");
@@ -3072,54 +3177,60 @@ fn the_sites_address_is_asked_for_of_any_tool_and_only_where_the_settings_give_n
 
 #[test]
 fn eleventy_folders_given_by_a_name_said_once_are_read() {
-    assert_eq!(fixture("eleventy-settings-named"), [NO_ADDRESS]);
+    assert_eq!(
+        fixture("eleventy-settings-named"),
+        [NO_ADDRESS, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn eleventy_markdown_options_are_read_in_a_file_the_settings_fetch() {
-    assert_eq!(fixture("eleventy-settings-fetched"), [NO_ADDRESS]);
+    assert_eq!(
+        fixture("eleventy-settings-fetched"),
+        [NO_ADDRESS, UNUSED_FEED]
+    );
 }
 
 #[test]
 fn eleventy_categories_become_tags_and_their_old_pages_send_readers_on() {
-    assert_eq!(fixture("eleventy-categories"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-categories"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn eleventy_pages_are_dated_and_named_by_their_files() {
-    assert_eq!(fixture("eleventy-dates"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-dates"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn eleventy_redirects_become_the_pages_old_addresses() {
-    assert_eq!(fixture("eleventy-redirects"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-redirects"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn eleventy_tags_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(
         fixture("eleventy-tags-in-writing"),
-        ["broken-link", NO_ADDRESS, AS_TEXT]
+        ["broken-link", NO_ADDRESS, AS_TEXT, UNUSED_FEED]
     );
 }
 
 #[test]
 fn eleventy_line_ends_are_line_breaks_where_the_settings_said() {
-    assert_eq!(fixture("eleventy-breaks"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-breaks"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 #[test]
 fn eleventy_templates_ignored_files_and_files_beside_pages() {
     assert_eq!(
         fixture("eleventy-templates"),
-        [NO_ADDRESS, AS_TEXT, "untitled-page"]
+        [NO_ADDRESS, AS_TEXT, "untitled-page", UNUSED_FEED]
     );
 }
 
 #[test]
 fn eleventy_built_output_is_looked_in_for_every_address() {
-    assert_eq!(fixture("eleventy-built-agrees"), [NO_ADDRESS]);
-    assert_eq!(fixture("eleventy-built-missing"), [NO_ADDRESS]);
+    assert_eq!(fixture("eleventy-built-agrees"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-built-missing"), [NO_ADDRESS, UNUSED_FEED]);
 }
 
 /// A folder under `top` holding `files`.

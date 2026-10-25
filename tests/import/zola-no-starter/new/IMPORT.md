@@ -1,6 +1,6 @@
 This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/zola-no-starter/old` by `statac import --no-starter`, which changed nothing there. It has none of the starter's templates, snippets, stylesheet or pages, so it won't build until you add templates of your own: see https://statac.dev/templates/. Its pages and feeds need `templates/feed.xml`.
+It was made from `tests/import/zola-no-starter/old` by `statac import --no-starter`, which changed nothing there. It has none of the starter's templates, snippets, stylesheet or pages, so it won't build until you add templates of your own: see https://statac.dev/templates/.
 
 ## What came across
 

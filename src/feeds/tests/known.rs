@@ -13,7 +13,12 @@ struct Kept {
     root: PathBuf,
 }
 
-const SETTINGS: &str =
+/// Settings asking for a feed of every list.
+const SETTINGS: &str = "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\n\
+                        timezone: UTC\npages.feed: true\n";
+
+/// The same, asking for none.
+const UNFED: &str =
     "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n";
 
 /// The id of a post at `/posts/post-1/` on a site with `feed_key: key`.
@@ -286,16 +291,13 @@ fn nothing_is_said_of_a_post_no_feed_reader_would_see_anew() {
         (
             "a site with no feed",
             SETTINGS,
-            vec![
-                (post, moved.clone()),
-                ("statac.yaml", format!("{SETTINGS}pages.feed: false\n")),
-            ],
+            vec![(post, moved.clone()), ("statac.yaml", UNFED.to_owned())],
             false,
         ),
         (
             "a post keeping another tool's id",
             "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n\
-             feed_ids_before: 2026-06-01\n",
+             pages.feed: true\nfeed_ids_before: 2026-06-01\n",
             vec![(post, moved.clone())],
             false,
         ),
@@ -404,13 +406,13 @@ fn only_a_build_that_publishes_keeps_anything() {
 
 #[test]
 fn a_site_with_no_feed_keeps_nothing_and_leaves_what_was_kept() {
-    let kept = Kept::new(&format!("{SETTINGS}pages.feed: false\n"));
+    let kept = Kept::new(UNFED);
     kept.build();
     assert_eq!(kept.kept(), None);
     kept.write("statac.yaml", SETTINGS);
     kept.build();
     let before = kept.kept().unwrap();
-    kept.write("statac.yaml", &format!("{SETTINGS}pages.feed: false\n"));
+    kept.write("statac.yaml", UNFED);
     kept.build();
     assert_eq!(kept.kept().unwrap(), before);
 }

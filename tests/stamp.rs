@@ -405,7 +405,9 @@ fn an_id_is_written_for_a_post_new_since_the_site_was_published() {
     let site = Site::new("ids");
     site.write(
         "statac.yaml",
-        &format!("{SETTINGS}url: https://example.org\nfeed_key: key\nwrite_feed_ids: true\n"),
+        &format!(
+            "{SETTINGS}url: https://example.org\nfeed_key: key\nwrite_feed_ids: true\nfeed: true\n"
+        ),
     );
     site.write(
         "templates/feed.xml",
@@ -464,7 +466,9 @@ fn no_id_is_written_for_a_post_made_from_an_item() {
     let site = Site::new("item-ids");
     site.write(
         "statac.yaml",
-        &format!("{SETTINGS}url: https://example.org\nfeed_key: key\nwrite_feed_ids: true\n"),
+        &format!(
+            "{SETTINGS}url: https://example.org\nfeed_key: key\nwrite_feed_ids: true\nfeed: true\n"
+        ),
     );
     site.write(
         "templates/feed.xml",

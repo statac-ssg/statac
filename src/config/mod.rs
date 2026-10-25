@@ -83,6 +83,9 @@ enum Shape {
     ListAddress,
     LaterAddress,
     Table,
+    /// `true`, `false`, or the name or URL of a feed, as the page word
+    /// `feed:` takes.
+    Feed,
     /// Files and folders, each of them what the test passes, told as
     /// what was expected where one isn't.
     Places(fn(&str) -> bool, PlaceIn),
@@ -152,6 +155,7 @@ const SETTINGS: &[Setting] = &[
     ),
     setting("webmentions", Shape::Truth, Some(Preset::Truth(false))),
     setting("refuse_webmentions_from", Shape::WebAddresses, None),
+    setting("feed", Shape::Feed, None),
     setting("feed_key", Shape::Text, None),
     setting("feed_ids_before", Shape::Date, None),
     setting("feed_ids_from", Shape::OneOf(&["jekyll"]), None),
@@ -199,7 +203,7 @@ pub fn setting_names() -> impl Iterator<Item = &'static str> {
 /// choose from.
 pub fn choices(name: &str) -> Vec<&'static str> {
     match SETTINGS.iter().find(|s| s.name == name).map(|s| s.shape) {
-        Some(Shape::Truth) => vec!["true", "false"],
+        Some(Shape::Truth | Shape::Feed) => vec!["true", "false"],
         Some(Shape::OneOf(words)) => words.to_vec(),
         _ => Vec::new(),
     }
@@ -809,6 +813,7 @@ fn read_setting(
             reader.texts(node)?.map(|t| t.map(Value::Texts))
         }
         Shape::Date => reader.date(node)?.map(|d| d.map(Value::Date)),
+        Shape::Feed => words::feed(&reader, node)?,
         Shape::OneOf(words) => reader.one_of(node, words)?.map(|t| t.map(Value::Text)),
         Shape::SiteAddress => text(site_address, Expected::SiteAddress)?,
         Shape::Language => text(language_code, Expected::LanguageCode)?,

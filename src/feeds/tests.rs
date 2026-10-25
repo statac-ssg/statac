@@ -14,6 +14,13 @@ type Case<'a> = (
     Option<String>,
 );
 
+/// What a case is called, what the settings add, the files it adds, and
+/// the two feeds.
+type Asking<'a> = (&'a str, &'a str, Vec<(&'a str, String)>, Feeds);
+
+/// A file under `content/` and its text.
+type File<'a> = (&'a str, &'a str);
+
 /// The site's feed and the feed of the folder `posts`, for a site of
 /// `files` beside a `statac.yaml` holding `settings`.
 fn feeds(settings: &str, files: &[(&str, &str)]) -> Feeds {
@@ -22,6 +29,40 @@ fn feeds(settings: &str, files: &[(&str, &str)]) -> Feeds {
 
 /// The same, with the feed of `folder`.
 fn feeds_of(settings: &str, files: &[(&str, &str)], folder: &str) -> Feeds {
+    let read = read(settings, files);
+    let list = read
+        .site
+        .lists
+        .iter()
+        .find(|(_, list)| list.key == ListKey::Folder(folder.into()))
+        .map(|(id, _)| id);
+    let site = own_feed(&read, 0);
+    let folder = list.and_then(|list| feed_at(&read, list));
+    (site, folder)
+}
+
+/// The feeds of the own lists of a site's first two languages.
+fn languages(settings: &str, files: &[(&str, &str)]) -> Feeds {
+    let read = read(settings, files);
+    (own_feed(&read, 0), own_feed(&read, 1))
+}
+
+/// Where `list`'s feed is published.
+fn feed_at(read: &crate::content::Read, list: ListId) -> Option<String> {
+    address(&read.site, &read.settings, list).map(|address| address.as_str().to_owned())
+}
+
+/// Where the own list of the language at `index` has its feed.
+fn own_feed(read: &crate::content::Read, index: usize) -> Option<String> {
+    let language = crate::site::Id::from_index(index);
+    read.site
+        .own_list(language)
+        .and_then(|list| feed_at(read, list))
+}
+
+/// The site of `files` under `content/` beside a `statac.yaml` holding
+/// `settings`, read, with no errors.
+fn read(settings: &str, files: &[(&str, &str)]) -> crate::content::Read {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let root: PathBuf = std::env::temp_dir().join(format!(
         "statac-feeds-{}-{}",
@@ -51,29 +92,161 @@ fn feeds_of(settings: &str, files: &[(&str, &str)], folder: &str) -> Feeds {
         "{:?}",
         read.problems
     );
-    let list = read
-        .site
-        .lists
-        .iter()
-        .find(|(_, list)| list.key == ListKey::Folder(folder.into()))
-        .map(|(id, _)| id);
-    let at = |list: ListId| {
-        address(&read.site, &read.settings, list).map(|address| address.as_str().to_owned())
-    };
-    let site = read
-        .site
-        .own_list(crate::site::Id::from_index(0))
-        .and_then(at);
-    let folder = list.and_then(at);
-    (site, folder)
+    read
 }
 
-const SETTINGS: &str = "title: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n";
+/// Settings asking for no feed.
+const UNFED: &str = "title: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n";
+
+/// Settings asking for a feed of every list.
+const SETTINGS: &str =
+    "title: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\npages.feed: true\n";
 
 const POST: (&str, &str) = ("posts/post-1.md", "---\ndate: 2026-01-01\n---\nText.\n");
 
 fn some(address: &str) -> Option<String> {
     Some(address.into())
+}
+
+/// Where each list asks, from the settings and its page, times the feeds
+/// of the site's own list and the folder `posts`: a list has a feed only
+/// where a line asks, the site's page's own line wins over the setting,
+/// and the setting over a line handed to every page.
+#[test]
+fn a_list_has_a_feed_only_where_a_line_asks() {
+    let home = |feed: &str| ("index.md", format!("---\n{feed}\n---\n"));
+    let posts = |feed: &str| ("posts/index.md", format!("---\n{feed}\n---\n"));
+    // (the case, what the settings add, the files, the two feeds)
+    let cases: Vec<Asking> = vec![
+        ("nothing asks", "", vec![], (None, None)),
+        (
+            "the setting",
+            "feed: true\n",
+            vec![],
+            (some("/feed.xml"), None),
+        ),
+        (
+            "the setting refusing",
+            "feed: false\n",
+            vec![],
+            (None, None),
+        ),
+        (
+            "the setting naming the feed",
+            "feed: index.rss\n",
+            vec![],
+            (some("/index.rss"), None),
+        ),
+        (
+            "the setting giving the feed a URL",
+            "feed: /feeds/site.xml\n",
+            vec![],
+            (some("/feeds/site.xml"), None),
+        ),
+        (
+            "the setting with a page that says nothing of it",
+            "feed: true\n",
+            vec![home("title: Home")],
+            (some("/feed.xml"), None),
+        ),
+        (
+            "the site's page",
+            "",
+            vec![home("feed: true")],
+            (some("/feed.xml"), None),
+        ),
+        (
+            "the site's page refusing the setting",
+            "feed: true\n",
+            vec![home("feed: false")],
+            (None, None),
+        ),
+        (
+            "the site's page asking over the setting",
+            "feed: false\n",
+            vec![home("feed: true")],
+            (some("/feed.xml"), None),
+        ),
+        (
+            "the site's page naming the feed over the setting",
+            "feed: index.rss\n",
+            vec![home("feed: atom.xml")],
+            (some("/atom.xml"), None),
+        ),
+        (
+            "a folder's page",
+            "",
+            vec![posts("feed: true")],
+            (None, some("/posts/feed.xml")),
+        ),
+        (
+            "a folder's page and the setting",
+            "feed: true\n",
+            vec![posts("feed: true")],
+            (some("/feed.xml"), some("/posts/feed.xml")),
+        ),
+        (
+            "a line handed to every page",
+            "pages.feed: true\n",
+            vec![],
+            (some("/feed.xml"), some("/posts/feed.xml")),
+        ),
+        (
+            "the setting refusing what is handed to every page",
+            "pages.feed: true\nfeed: false\n",
+            vec![],
+            (None, some("/posts/feed.xml")),
+        ),
+        (
+            "the setting asking where every page is refused",
+            "pages.feed: false\nfeed: true\n",
+            vec![],
+            (some("/feed.xml"), None),
+        ),
+        (
+            "the site's page refusing what is handed to every page",
+            "pages.feed: true\n",
+            vec![home("feed: false")],
+            (None, some("/posts/feed.xml")),
+        ),
+    ];
+    for (case, added, files, wanted) in cases {
+        let settings = format!("{UNFED}{added}");
+        let mut all: Vec<(&str, &str)> = vec![POST];
+        all.extend(files.iter().map(|(path, text)| (*path, text.as_str())));
+        assert_eq!(feeds(&settings, &all), wanted, "{case}");
+    }
+}
+
+/// The setting gives each language's own list a feed, on a site in several
+/// languages, and a language's page wins over it for that language alone.
+#[test]
+fn the_setting_asks_for_each_languages_own_list() {
+    let settings = "title: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n\
+                    language: [en, fr]\n";
+    let posts = [
+        ("post-1.md", "---\ndate: 2026-01-01\n---\nText.\n"),
+        ("fr/post-1.md", "---\ndate: 2026-01-01\n---\nTexte.\n"),
+    ];
+    let refused = ("fr/index.md", "---\nfeed: false\n---\n");
+    let asked = ("fr/index.md", "---\nfeed: true\n---\n");
+    // (what the settings add, the French page, the two languages' feeds)
+    let cases: Vec<(&str, Option<File>, Feeds)> = vec![
+        ("", None, (None, None)),
+        (
+            "feed: true\n",
+            None,
+            (some("/feed.xml"), some("/fr/feed.xml")),
+        ),
+        ("feed: true\n", Some(refused), (some("/feed.xml"), None)),
+        ("", Some(asked), (None, some("/fr/feed.xml"))),
+    ];
+    for (added, page, wanted) in cases {
+        let settings = format!("{settings}{added}");
+        let mut files = posts.to_vec();
+        files.extend(page);
+        assert_eq!(languages(&settings, &files), wanted, "{added}{page:?}");
+    }
 }
 
 #[test]
@@ -82,7 +255,7 @@ fn a_list_with_posts_has_its_feed_beside_its_page() {
     let posts_index = |feed: &str| ("posts/index.md", index(feed));
     let cases: Vec<Case> = vec![
         (
-            "nothing said",
+            "nothing more said",
             vec![],
             some("/feed.xml"),
             some("/posts/feed.xml"),
@@ -133,12 +306,6 @@ fn a_list_with_posts_has_its_feed_beside_its_page() {
             "a page published nowhere",
             vec![posts_index("index_page: false")],
             some("/feed.xml"),
-            None,
-        ),
-        (
-            "a page published nowhere that asks",
-            vec![posts_index("index_page: false\nfeed: true")],
-            some("/feed.xml"),
             some("/posts/feed.xml"),
         ),
         (
@@ -175,7 +342,7 @@ fn a_list_with_posts_has_its_feed_beside_its_page() {
 
 #[test]
 fn every_feed_is_held_back_by_a_line_handed_to_every_page() {
-    let settings = format!("{SETTINGS}pages.feed: false\n");
+    let settings = format!("{UNFED}pages.feed: false\n");
     assert_eq!(feeds(&settings, &[POST]), (None, None));
     let named = [POST, ("index.md", "---\nfeed: /index.rss\n---\n")];
     assert_eq!(feeds(&settings, &named), (some("/index.rss"), None));
@@ -183,7 +350,7 @@ fn every_feed_is_held_back_by_a_line_handed_to_every_page() {
 
 #[test]
 fn a_feed_needs_the_sites_address_key_and_title_and_a_post() {
-    let unkeyed = "title: Site\nurl: https://example.org\ntimezone: UTC\n";
+    let unkeyed = "title: Site\nurl: https://example.org\ntimezone: UTC\npages.feed: true\n";
     assert_eq!(feeds(unkeyed, &[POST]), (None, None));
     let undated = ("posts/post-1.md", "Text.\n");
     assert_eq!(feeds(SETTINGS, &[undated]), (None, None));
@@ -200,14 +367,11 @@ fn a_folder_below_the_top_has_a_feed_only_where_its_page_asks() {
         feeds(SETTINGS, &[POST, nested]),
         (some("/feed.xml"), some("/posts/feed.xml"))
     );
-    assert_eq!(
-        feeds_of(SETTINGS, &[POST, nested], "posts/2026"),
-        (some("/feed.xml"), None)
-    );
+    assert_eq!(feeds_of(UNFED, &[POST, nested], "posts/2026"), (None, None));
     let asks = ("posts/2026/index.md", "---\nfeed: true\n---\n");
     assert_eq!(
-        feeds_of(SETTINGS, &[POST, nested, asks], "posts/2026"),
-        (some("/feed.xml"), some("/posts/2026/feed.xml"))
+        feeds_of(UNFED, &[POST, nested, asks], "posts/2026"),
+        (None, some("/posts/2026/feed.xml"))
     );
 }
 

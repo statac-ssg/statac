@@ -1,12 +1,12 @@
 //! Where each list's feed is published, what builds it, and what is said
 //! of a feed that isn't.
 //!
-//! A feed sits beside the page that speaks for its list, as `feed.xml`,
-//! unless that page's `feed:` gives it another name, or an address of its
-//! own from the top of the site. Each language's own list and each folder
-//! directly inside its top have a feed unless their page says `feed:
-//! false`; any other list has one only where its page asks. A feed needs
-//! the site's address, its `feed_key` and its `title` in the list's
+//! A list has a feed only where a `feed:` line asks: on the page that
+//! speaks for it, handed down to that page, or for each language's own
+//! list, the site's `feed:` setting, which the page's own line wins over.
+//! The feed sits beside that page, as `feed.xml`, unless the line gives it
+//! another name, or an address of its own from the top of the site. A feed
+//! needs the site's address, its `feed_key` and its `title` in the list's
 //! language, and a list with no dated pages has nothing to carry, so has
 //! none.
 //!
@@ -20,12 +20,12 @@ pub(crate) mod known;
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::config::Settings;
 use crate::content::address::Address;
-use crate::content::words::{PageWord, Words};
-use crate::origin::Arrival;
+use crate::content::words::PageWord;
+use crate::origin::{Arrival, Sourced};
 use crate::problem::{AddressFault, Kind, Named, Problem, Unwritten, Waiting, Word};
 use crate::site::{ListId, ListKey, Page, PageId, Site};
 use crate::source::{Place, Sources, Span};
@@ -35,6 +35,9 @@ pub(crate) use ids::{entry_id, mint_key};
 pub(crate) use known::{IdsToWrite, Known, ids_to_write};
 
 pub(crate) const FILE_NAME: &str = "feed.xml";
+
+/// The site setting asking for each language's own list's feed.
+pub(crate) const SETTING: &str = "feed";
 
 /// The settings every feed needs.
 pub(crate) const NEEDS: &[&str] = &["url", "feed_key", "title"];
@@ -53,29 +56,37 @@ pub struct Feed {
 }
 
 /// What a list's feed is asked by: the page speaking for it, where it has
-/// one, and the words that page carries, or for a list no page speaks
-/// for, what `pages.` lines hand every page.
+/// one, and the `feed:` line the list goes by, where one is written.
 struct Asked<'a> {
     page: Option<&'a Page>,
-    words: &'a Words,
-    /// A language's own list or a folder directly inside its top, which
-    /// has a feed unless it says otherwise.
-    outermost: bool,
+    feed: Option<&'a Sourced<Value>>,
 }
 
+/// The `feed:` line a list goes by: its page's own, else the site's
+/// setting for a language's own list, else one handed down to the page,
+/// or for a list no page speaks for, what `pages.` lines hand every page.
 fn asked<'a>(site: &'a Site, settings: &'a Settings, id: ListId) -> Option<Asked<'a>> {
     let list = site.lists.get(id);
     let page = list.page.map(|page| site.pages.get(page));
-    let outermost = site.outermost(id);
-    if (page.is_none() && !outermost) || page.is_some_and(Page::sends_on) {
+    if (page.is_none() && !site.outermost(id)) || page.is_some_and(Page::sends_on) {
         return None;
     }
     let words = page.map_or(&settings.pages, |page| &page.words);
+    let line = words.get(PageWord::Feed);
+    let own = line.filter(|line| page.is_some() && line.origin.arrival == Arrival::Written);
+    let own_list = matches!(&list.key, ListKey::Folder(path) if path == site.top(list.language));
+    let setting = settings.get(SETTING).filter(|_| own_list);
     Some(Asked {
         page,
-        words,
-        outermost,
+        feed: own.or(setting).or(line),
     })
+}
+
+/// Whether `list` asks for a feed, whether or not it can have one.
+fn asks(site: &Site, settings: &Settings, list: ListId) -> bool {
+    asked(site, settings, list)
+        .and_then(|asked| asked.feed)
+        .is_some_and(|feed| matches!(feed.value, Value::Bool(true) | Value::Text(_)))
 }
 
 /// Where a list's page stands, or a folder's would.
@@ -96,11 +107,10 @@ fn standing(site: &Site, list: ListId, page: Option<&Page>) -> Option<Address> {
 /// None where the list has no feed, or its `feed:` gives no address.
 pub(crate) fn wanted(site: &Site, settings: &Settings, list: ListId) -> Option<Address> {
     let asked = asked(site, settings, list)?;
-    let lands = asked.page.is_none_or(Page::lands);
-    let (fed, written) = match asked.words.get(PageWord::Feed).map(|feed| &feed.value) {
+    let (fed, written) = match asked.feed.map(|feed| &feed.value) {
         Some(Value::Bool(fed)) => (*fed, None),
         Some(Value::Text(written)) => (true, Some(written.as_str())),
-        _ => (asked.outermost && lands, None),
+        _ => (false, None),
     };
     let carries = site
         .lists
@@ -118,7 +128,7 @@ pub(crate) fn wanted(site: &Site, settings: &Settings, list: ListId) -> Option<A
 /// Where the `feed:` giving `list`'s feed its address is written, where
 /// one does.
 fn placed(site: &Site, settings: &Settings, list: ListId) -> Option<Place> {
-    let feed = asked(site, settings, list)?.words.get(PageWord::Feed)?;
+    let feed = asked(site, settings, list)?.feed?;
     match feed.value {
         Value::Text(_) => feed.origin.place,
         _ => None,
@@ -216,7 +226,7 @@ pub(crate) fn unusable(site: &Site, settings: &Settings, sources: &Sources) -> V
         let Some(asked) = asked(site, settings, list) else {
             continue;
         };
-        let Some(feed) = asked.words.get(PageWord::Feed) else {
+        let Some(feed) = asked.feed else {
             continue;
         };
         let Value::Text(written) = &feed.value else {
@@ -249,13 +259,13 @@ pub(crate) fn undated(site: &Site, settings: &Settings, sources: &Sources) -> Ve
         let Some(asked) = asked(site, settings, list) else {
             continue;
         };
-        let Some(feed) = asked.words.get(PageWord::Feed) else {
+        let Some(feed) = asked.feed else {
             continue;
         };
         let Some(place) = feed.origin.place else {
             continue;
         };
-        if feed.origin.arrival == Arrival::Defaulted || told.contains(&place) {
+        if told.contains(&place) {
             continue;
         }
         // A value naming no file is told as that.
@@ -302,7 +312,7 @@ pub(crate) fn template(address: &Address, has: &dyn Fn(&str) -> bool) -> Option<
 
 /// Every feed the site publishes, in the order of its lists, and what is
 /// said of each feed a list asks for that isn't: once for the site where
-/// the site lacks what every feed needs, or the template; once for each
+/// the site lacks the template, or what every feed needs; once for each
 /// feed a page of the author's stands in the way of.
 pub(crate) fn plan(
     site: &Site,
@@ -310,37 +320,49 @@ pub(crate) fn plan(
     sources: &Sources,
     has: &dyn Fn(&str) -> bool,
 ) -> (Vec<Feed>, Vec<Problem>) {
-    let wanted: Vec<(ListId, Address)> = site
-        .lists
-        .iter()
-        .filter_map(|(list, _)| wanted(site, settings, list).map(|at| (list, at)))
-        .collect();
-    let all: Vec<ListId> = wanted.iter().map(|(list, _)| *list).collect();
-    if all.is_empty() {
-        return (Vec::new(), Vec::new());
+    let mut problems = Vec::new();
+    let mut untemplated = Vec::new();
+    let mut fed: Vec<(ListId, Address, String)> = Vec::new();
+    for (list, _) in site.lists.iter() {
+        let Some(address) = wanted(site, settings, list) else {
+            continue;
+        };
+        match template(&address, has) {
+            Some(template) => fed.push((list, address, template)),
+            None => untemplated.push(list),
+        }
     }
-    let lacking = |problem| (Vec::new(), vec![problem]);
+    if !untemplated.is_empty() {
+        let why = Unwritten::NoTemplate(format!("templates/{FILE_NAME}"));
+        problems.push(not_written(site, sources, &untemplated, why));
+    }
+    let Some((first, ..)) = fed.first() else {
+        return (Vec::new(), problems);
+    };
     match NEEDS
         .iter()
         .find(|&&name| name != "title" && settings.text(name).is_none())
     {
         Some(&"url") => {
             let waiting = Waiting::Feeds {
-                list: described(site, sources, all[0]),
-                more: all.len() - 1,
+                list: described(site, sources, *first),
+                more: fed.len() - 1,
             };
-            return lacking(Problem::nowhere(Kind::NoSiteUrl { waiting }));
+            problems.push(Problem::nowhere(Kind::NoSiteUrl { waiting }));
+            return (Vec::new(), problems);
         }
-        Some(_) => return lacking(Problem::nowhere(Kind::NoFeedKey { key: mint_key() })),
+        Some(_) => {
+            problems.push(Problem::nowhere(Kind::NoFeedKey { key: mint_key() }));
+            return (Vec::new(), problems);
+        }
         None => {}
     }
     // A site in several languages may title some of them alone.
-    let (untitled, wanted): (Vec<_>, Vec<_>) = wanted
+    let (untitled, fed): (Vec<_>, Vec<_>) = fed
         .into_iter()
-        .partition(|(list, _)| lacks(site, settings, *list).is_some());
-    let mut problems = Vec::new();
+        .partition(|(list, ..)| lacks(site, settings, *list).is_some());
     if !untitled.is_empty() {
-        let untitled: Vec<ListId> = untitled.into_iter().map(|(list, _)| list).collect();
+        let untitled: Vec<ListId> = untitled.into_iter().map(|(list, ..)| list).collect();
         problems.push(not_written(site, sources, &untitled, Unwritten::NoTitle));
     }
     let mut landed: HashMap<String, PageId> = HashMap::new();
@@ -348,8 +370,7 @@ pub(crate) fn plan(
         landed.entry(page.address.key()).or_insert(id);
     }
     let mut feeds = Vec::new();
-    let mut untemplated = Vec::new();
-    for (list, address) in wanted {
+    for (list, address, template) in fed {
         if let Some(&page) = landed.get(&address.key()) {
             let why = Unwritten::PageThere {
                 page: Box::new(site.named(page, sources)),
@@ -358,21 +379,51 @@ pub(crate) fn plan(
             problems.push(not_written(site, sources, &[list], why));
             continue;
         }
-        match template(&address, has) {
-            Some(template) => feeds.push(Feed {
-                list,
-                address,
-                template,
-                placed: placed(site, settings, list),
-            }),
-            None => untemplated.push(list),
-        }
-    }
-    if !untemplated.is_empty() {
-        let why = Unwritten::NoTemplate(format!("templates/{FILE_NAME}"));
-        problems.push(not_written(site, sources, &untemplated, why));
+        feeds.push(Feed {
+            list,
+            address,
+            template,
+            placed: placed(site, settings, list),
+        });
     }
     (feeds, problems)
+}
+
+/// The note for a site with a feed template where no list asks for a
+/// feed, so that the template builds nothing: told once, of `feed.xml`
+/// where the site has it, among `templates`, the names of the site's.
+pub(crate) fn unasked(
+    site: &Site,
+    settings: &Settings,
+    templates: &HashSet<String>,
+) -> Option<Problem> {
+    let mut named: Vec<&String> = templates
+        .iter()
+        .filter(|name| {
+            name.strip_prefix("feed.").is_some_and(|extension| {
+                !extension.is_empty()
+                    && !extension.contains('.')
+                    && !matches!(extension, "html" | "htm")
+            })
+        })
+        .collect();
+    named.sort_by_key(|name| (name.as_str() != FILE_NAME, name.as_str()));
+    let template = named.first()?;
+    if site
+        .lists
+        .iter()
+        .any(|(list, _)| asks(site, settings, list))
+    {
+        return None;
+    }
+    let line = match template.as_str() {
+        FILE_NAME => "true".to_owned(),
+        other => other.to_owned(),
+    };
+    Some(Problem::nowhere(Kind::UnusedFeedTemplate {
+        template: format!("templates/{template}"),
+        line: format!("{SETTING}: {line}"),
+    }))
 }
 
 /// The feeds of `lists` not written, for `why`, named by the first list

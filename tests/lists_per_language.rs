@@ -91,7 +91,7 @@ impl Drop for Site {
 
 #[test]
 fn each_language_has_its_own_home_posts_tags_and_feed() {
-    let site = Site::new("tops", SETTINGS);
+    let site = Site::new("tops", &format!("{SETTINGS}feed: true\n"));
     site.write("content/post-1.md", &post("2026-01-01", "Rust"));
     site.write("content/en/post-1.md", &post("2026-01-02", "Rust"));
     site.built();
@@ -111,7 +111,7 @@ fn each_language_has_its_own_home_posts_tags_and_feed() {
 
 #[test]
 fn the_main_language_in_a_folder_of_its_own_leaves_the_top_to_the_author() {
-    let site = Site::new("main-folder", SETTINGS);
+    let site = Site::new("main-folder", &format!("{SETTINGS}feed: true\n"));
     site.write("content/index.md", "---\ntitle: Welcome\n---\n");
     site.write("content/ar/post-1.md", &post("2026-01-01", "Rust"));
     site.write("content/en/post-1.md", &post("2026-01-02", "Rust"));
@@ -128,13 +128,14 @@ fn the_main_language_in_a_folder_of_its_own_leaves_the_top_to_the_author() {
     );
     assert_eq!(site.read("ar/feed.xml"), "Site 1|/ar/post-1/;");
     assert_eq!(site.read("en/feed.xml"), "Site 2|/en/post-1/;");
-    // The top of `content/` is no language's own list, so has no feed.
+    // The top of `content/` is no language's own list, so the setting gives
+    // it no feed.
     assert!(!site.has("feed.xml"));
 }
 
 #[test]
 fn a_pattern_handed_down_is_read_from_each_languages_top() {
-    let settings = format!("{SETTINGS}pages.permalink: /{{year}}/{{slug}}/\npages.feed: false\n");
+    let settings = format!("{SETTINGS}pages.permalink: /{{year}}/{{slug}}/\n");
     let site = Site::new("handed", &settings);
     site.write("content/post-1.md", &post("2026-01-01", "Rust"));
     site.write("content/en/post-1.md", &post("2026-01-02", "Rust"));
@@ -152,7 +153,7 @@ fn a_pattern_handed_down_is_read_from_each_languages_top() {
 
 #[test]
 fn a_pattern_opening_with_its_languages_folder_is_read_once_and_warned_of() {
-    let site = Site::new("doubled", &format!("{SETTINGS}pages.feed: false\n"));
+    let site = Site::new("doubled", SETTINGS);
     site.write("content/post-1.md", &post("2026-01-01", "Rust"));
     site.write(
         "content/en/index.md",
@@ -182,7 +183,7 @@ fn a_pattern_opening_with_its_languages_folder_is_read_once_and_warned_of() {
 
 #[test]
 fn neighbours_and_later_pages_stay_within_a_language() {
-    let settings = format!("{SETTINGS}posts_per_page: 1\npages.feed: false\n");
+    let settings = format!("{SETTINGS}posts_per_page: 1\n");
     let site = Site::new("paging", &settings);
     site.write("content/post-1.md", &post("2026-01-01", "Rust"));
     site.write("content/post-2.md", &post("2026-01-02", "Rust"));

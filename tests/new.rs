@@ -120,6 +120,14 @@ fn every_combination_is_written_checks_and_builds() {
                     ("unknown-language".to_owned(), line)
                 })
                 .collect();
+            // `feed: true` asks for each language's feed, and the second
+            // language has nothing dated.
+            if let Some((_, second)) = typed_languages.split_once(", ") {
+                let line = format!(
+                    "warning  Feed not written: the folder `content/{second}/` has nothing dated"
+                );
+                wanted.push(("feed-not-written".to_owned(), line));
+            }
             if address.is_empty() {
                 let waiting = [
                     "the feeds of the site's own list and 2 other lists are left out until the \
@@ -206,20 +214,31 @@ fn a_site_in_english_or_a_language_with_no_words_is_given_no_file_of_words() {
     assert_eq!(held, ["fr.yaml"]);
 }
 
+/// The feed `statac.yaml` asks for of each language's own list is warned
+/// of while that list has nothing dated: the second language's from the
+/// start, and the first's once every folder of dated samples is deleted.
 #[test]
-fn a_folder_of_sample_pages_deleted_leaves_a_site_with_no_problem() {
+fn a_folder_of_sample_pages_deleted_leaves_a_site_with_no_problem_but_its_feed() {
+    let undated = |list: &str| {
+        let line = format!("warning  Feed not written: {list} has nothing dated");
+        vec![("feed-not-written".to_owned(), line)]
+    };
     for (at, order) in [["notes", "photos", "posts"], ["posts", "photos", "notes"]]
         .iter()
         .enumerate()
     {
         let folder = scratch(&format!("without-{at}"));
         made(&folder, "Site 1\nhttps://example.org\nar, en\n\n");
-        for name in order {
+        for (deleted, name) in order.iter().enumerate() {
             fs::remove_dir_all(folder.join("content").join(name)).unwrap();
+            let wanted = match deleted {
+                2 => undated("the site's own list"),
+                _ => undated("the folder `content/en/`"),
+            };
             let (found, _) = built(&folder, Mode::Check);
-            assert_eq!(found, [], "check without {name}");
+            assert_eq!(found, wanted, "check without {name}");
             let (found, published) = built(&folder, Mode::Build);
-            assert_eq!(found, [], "build without {name}");
+            assert_eq!(found, wanted, "build without {name}");
             assert!(published, "without {name}");
             let home = read_built(&folder, "index.html");
             assert!(!home.contains(&format!("\"/{name}/\"")), "{name}: {home}");
@@ -316,7 +335,11 @@ fn a_site_naming_no_language_is_in_english() {
 
     let folder = scratch("several-languages");
     made(&folder, "Site 1\nhttps://example.org\nar, en\n\n");
-    assert_eq!(built(&folder, Mode::Build).0, []);
+    let undated = "warning  Feed not written: the folder `content/en/` has nothing dated";
+    assert_eq!(
+        built(&folder, Mode::Build).0,
+        [("feed-not-written".to_owned(), undated.to_owned())]
+    );
     let home = read_built(&folder, "index.html");
     assert!(home.contains("<html lang=\"ar\" dir=\"rtl\">"), "{home}");
     let home = read_built(&folder, "en/index.html");
@@ -540,7 +563,7 @@ fn a_feed_says_what_the_site_and_each_post_give_it() {
     fs::write(&settings, text + "tagline: A tagline\nauthor: Name\n").unwrap();
     let posts = folder.join("content/posts/index.md");
     let text = fs::read_to_string(&posts).unwrap();
-    fs::write(&posts, text.replace("feed: false\n", "")).unwrap();
+    fs::write(&posts, text.replace("feed: false\n", "feed: true\n")).unwrap();
     let post = folder.join("content/posts/first-post/index.md");
     let text = fs::read_to_string(&post).unwrap();
     let more = "tags: [Tag 1, Tag 2]\nupdated: 2026-10-07\n";

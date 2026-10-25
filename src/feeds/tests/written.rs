@@ -82,10 +82,14 @@ impl Drop for Built {
 /// Files of a site, each by its path in the site and its text.
 type Files<'a> = Vec<(&'a str, &'a str)>;
 
+/// Settings asking for the site's feed.
 const SETTINGS: (&str, &str) = (
     "statac.yaml",
-    "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+    "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n\
+     feed: true\n",
 );
+/// The page of the folder `posts`, asking for its feed.
+const POSTS: (&str, &str) = ("content/posts/index.md", "---\nfeed: true\n---\n");
 const HOME: (&str, &str) = ("content/index.md", "---\ntitle: Home\n---\n");
 const PAGE: (&str, &str) = (
     "templates/page.html",
@@ -125,7 +129,16 @@ fn a_feed_is_built_through_the_sites_template_handed_its_list_and_posts_newest_f
         "content/series/series-1.md",
         "---\ntitle: Series 1\nfeed: true\n---\n",
     );
-    let built = with_posts(&[SETTINGS, HOME, PAGE, HOME_TEMPLATE, FOLDER, FEED, series]);
+    let built = with_posts(&[
+        SETTINGS,
+        HOME,
+        POSTS,
+        PAGE,
+        HOME_TEMPLATE,
+        FOLDER,
+        FEED,
+        series,
+    ]);
     assert!(built.outcome.problems.is_empty(), "{:?}", built.kinds());
     assert_eq!(
         built.file("feed.xml").as_deref(),
@@ -183,7 +196,7 @@ fn a_feed_is_built_with_the_template_its_extension_names_or_else_feed_xml() {
     );
     let quiet = (
         "statac.yaml",
-        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\npages.feed: false\n",
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
     );
     let cases: Vec<(&str, Files, &str, &str)> = vec![
         ("only feed.xml", vec![rss], "index.rss", "site|"),
@@ -216,8 +229,8 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
     let cases: Vec<(&str, &str, Files, Vec<Kind>)> = vec![
         (
             "no address",
-            "language: en\ntitle: Site\nfeed_key: key\ntimezone: UTC\n",
-            vec![FEED],
+            "language: en\ntitle: Site\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
+            vec![FEED, POSTS],
             vec![Kind::NoSiteUrl {
                 waiting: Waiting::Feeds {
                     list: site.clone(),
@@ -227,8 +240,8 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
         ),
         (
             "no title",
-            "language: en\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
-            vec![FEED],
+            "language: en\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
+            vec![FEED, POSTS],
             vec![Kind::FeedNotWritten {
                 list: site.clone(),
                 more: 1,
@@ -238,7 +251,7 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
         (
             "no template",
             SETTINGS.1,
-            vec![],
+            vec![POSTS],
             vec![Kind::FeedNotWritten {
                 list: site.clone(),
                 more: 1,
@@ -247,8 +260,11 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
         ),
         (
             "no template for a folder's alone",
-            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
-            vec![("content/index.md", "---\ntitle: Home\nfeed: false\n---\n")],
+            SETTINGS.1,
+            vec![
+                ("content/index.md", "---\ntitle: Home\nfeed: false\n---\n"),
+                POSTS,
+            ],
             vec![Kind::FeedNotWritten {
                 list: posts,
                 more: 0,
@@ -269,11 +285,74 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
     }
 }
 
+/// The template is looked for before what every feed needs, times what
+/// the settings lack: a feed with no template is told as that alone, and
+/// one with a template is told what it lacks.
+#[test]
+fn a_feed_with_no_template_is_told_so_before_what_it_lacks() {
+    let settings = |url: bool, key: bool| {
+        let url = if url {
+            "url: https://example.org\n"
+        } else {
+            ""
+        };
+        let key = if key { "feed_key: key\n" } else { "" };
+        format!("language: en\ntitle: Site\ntimezone: UTC\nfeed: true\n{url}{key}")
+    };
+    // (whether the site has a `url`, a `feed_key` and the template, and
+    // the kinds told)
+    let cases: Vec<(bool, bool, bool, Vec<&str>)> = vec![
+        (true, true, false, vec!["feed-not-written"]),
+        (false, true, false, vec!["feed-not-written"]),
+        (true, false, false, vec!["feed-not-written"]),
+        (false, false, false, vec!["feed-not-written"]),
+        (true, true, true, vec![]),
+        (false, true, true, vec!["no-site-url"]),
+        (true, false, true, vec!["no-feed-key"]),
+        (false, false, true, vec!["no-site-url"]),
+    ];
+    for (url, key, template, wanted) in cases {
+        let settings = settings(url, key);
+        let mut files = vec![
+            ("statac.yaml", settings.as_str()),
+            HOME,
+            PAGE,
+            HOME_TEMPLATE,
+        ];
+        files.extend(template.then_some(FEED));
+        files.push(FOLDER);
+        let built = with_posts(&files);
+        let told: Vec<&str> = built.told().into_iter().map(|(name, _)| name).collect();
+        assert_eq!(told, wanted, "url {url}, key {key}, template {template}");
+        assert_eq!(
+            built.file("feed.xml").is_some(),
+            url && key && template,
+            "url {url}, key {key}, template {template}"
+        );
+    }
+    let settings = settings(true, true);
+    let built = with_posts(&[
+        ("statac.yaml", &settings),
+        HOME,
+        PAGE,
+        HOME_TEMPLATE,
+        FOLDER,
+    ]);
+    assert_eq!(
+        built.kinds(),
+        [Kind::FeedNotWritten {
+            list: (Word::Folder, String::new()),
+            more: 0,
+            why: Unwritten::NoTemplate("templates/feed.xml".into()),
+        }]
+    );
+}
+
 #[test]
 fn a_site_wanting_a_feed_with_no_key_stops_with_a_fresh_one_to_paste() {
     let settings = (
         "statac.yaml",
-        "language: en\ntitle: Site\nurl: https://example.org\ntimezone: UTC\n",
+        "language: en\ntitle: Site\nurl: https://example.org\ntimezone: UTC\nfeed: true\n",
     );
     let built = with_posts(&[settings, HOME, PAGE, HOME_TEMPLATE, FOLDER, FEED]);
     let [problem] = built.outcome.problems.as_slice() else {
@@ -289,9 +368,9 @@ fn a_site_wanting_a_feed_with_no_key_stops_with_a_fresh_one_to_paste() {
         "{suggestion}"
     );
     assert!(built.outcome.published.is_none());
-    // No list with dated posts wants a feed, so nothing asks for a key.
+    // A list with nothing dated has no feed, so nothing asks for a key.
     let undated = Built::new(&[settings, HOME, PAGE, HOME_TEMPLATE, FEED]);
-    assert!(undated.outcome.problems.is_empty(), "{:?}", undated.kinds());
+    assert_eq!(undated.told(), [("feed-not-written", Some("true".into()))]);
 }
 
 /// Where a warning is placed, the file it is in, and what it says.
@@ -300,13 +379,13 @@ type Warned<'a> = Option<(&'a str, &'a str, &'a str)>;
 /// A `feed:` line asking for the feed of a list with nothing dated, times
 /// what is said: a warning where the line is written, once for the
 /// first such list it reaches; nothing where the list has a dated page,
-/// or has a feed only by default.
+/// or where no line asks.
 #[test]
 fn a_feed_asked_of_a_list_with_nothing_dated_is_warned_of_at_the_line() {
-    const NOTES: &str = "Feed not written: the folder `content/notes/` has nothing dated";
+    const NOTES: &str = "Feed not written: the folder `content/notes-1/` has nothing dated";
     let undated = |n: u32| {
         (
-            format!("content/notes/note-{n}.md"),
+            format!("content/notes-1/note-{n}.md"),
             format!("---\ntitle: Note {n}\n---\n"),
         )
     };
@@ -321,15 +400,18 @@ fn a_feed_asked_of_a_list_with_nothing_dated_is_warned_of_at_the_line() {
     // file it is in, and what it says)
     let cases: Vec<(Files, Warned)> = vec![
         (
-            vec![("content/notes/index.md", &true_line)],
-            Some(("true", "content/notes/index.md", NOTES)),
+            vec![("content/notes-1/index.md", &true_line)],
+            Some(("true", "content/notes-1/index.md", NOTES)),
         ),
         (
-            vec![("content/notes/index.md", &address)],
-            Some(("atom.xml", "content/notes/index.md", NOTES)),
+            vec![("content/notes-1/index.md", &address)],
+            Some(("atom.xml", "content/notes-1/index.md", NOTES)),
         ),
         (
-            vec![("statac.yaml", handed), ("content/notes/index.md", &empty)],
+            vec![
+                ("statac.yaml", handed),
+                ("content/notes-1/index.md", &empty),
+            ],
             Some(("true", "statac.yaml", NOTES)),
         ),
         (
@@ -360,12 +442,12 @@ fn a_feed_asked_of_a_list_with_nothing_dated_is_warned_of_at_the_line() {
         ),
         (
             vec![
-                ("content/notes/index.md", &true_line),
-                ("content/notes/note-3.md", dated),
+                ("content/notes-1/index.md", &true_line),
+                ("content/notes-1/note-3.md", dated),
             ],
             None,
         ),
-        (vec![("content/notes/index.md", &empty)], None),
+        (vec![("content/notes-1/index.md", &empty)], None),
     ];
     for (files, warned) in cases {
         let mut all: Files = vec![
@@ -406,6 +488,127 @@ fn a_feed_asked_of_a_list_with_nothing_dated_is_warned_of_at_the_line() {
     }
 }
 
+/// The setting asking on a site in several languages where neither has
+/// anything dated: a warning once, at the setting, for the first.
+#[test]
+fn the_setting_asking_for_nothing_dated_is_warned_of_once() {
+    let settings = (
+        "statac.yaml",
+        "language: [en, fr]\ntitle: Site\nurl: https://example.org\nfeed_key: key\n\
+         timezone: UTC\nfeed: true\n",
+    );
+    let built = Built::new(&[
+        settings,
+        ("content/page-1.md", "---\ntitle: Page 1\n---\n"),
+        ("content/fr/page-1.md", "---\ntitle: Page 1\n---\n"),
+        PAGE,
+        ("templates/home.html", "{{ page.list.word }}"),
+        FEED,
+    ]);
+    assert_eq!(built.told(), [("feed-not-written", Some("true".into()))]);
+    assert_eq!(
+        crate::wording::headline(&built.kinds()[0]),
+        "Feed not written: the site's own list has nothing dated"
+    );
+}
+
+/// A site with a feed template, times what asks for a feed: a note once
+/// for the site where nothing asks, naming `feed.xml` where the site has
+/// it, and nothing where something asks, or there is no template.
+#[test]
+fn a_feed_template_no_list_asks_for_is_noted_once() {
+    let json = ("templates/feed.json", "{}");
+    let refused = ("content/index.md", "---\ntitle: Home\nfeed: false\n---\n");
+    let notes = (
+        "content/notes/index.md",
+        "---\ntitle: Notes\nfeed: true\n---\n",
+    );
+    let note = ("content/notes/note-1.md", "---\ntitle: Note 1\n---\n");
+    let unused = |template: &str, line: &str| {
+        vec![Kind::UnusedFeedTemplate {
+            template: format!("templates/{template}"),
+            line: line.into(),
+        }]
+    };
+    // (the case, what the settings add, the files, the kinds told)
+    let cases: Vec<(&str, &str, Files, Vec<Kind>)> = vec![
+        (
+            "nothing asks",
+            "",
+            vec![FEED],
+            unused("feed.xml", "feed: true"),
+        ),
+        (
+            "the setting refuses",
+            "feed: false\n",
+            vec![FEED],
+            unused("feed.xml", "feed: true"),
+        ),
+        (
+            "a page refuses",
+            "",
+            vec![FEED, refused],
+            unused("feed.xml", "feed: true"),
+        ),
+        (
+            "only another template",
+            "",
+            vec![json],
+            unused("feed.json", "feed: feed.json"),
+        ),
+        (
+            "two templates",
+            "",
+            vec![json, FEED],
+            unused("feed.xml", "feed: true"),
+        ),
+        ("no template", "", vec![], vec![]),
+        ("the setting asks", "feed: true\n", vec![FEED], vec![]),
+        ("a folder's page asks", "", vec![FEED, POSTS], vec![]),
+        (
+            "the line offered for another template",
+            "feed: feed.json\n",
+            vec![json],
+            vec![],
+        ),
+        (
+            "a list with nothing dated asks",
+            "",
+            vec![FEED, notes, note],
+            vec![Kind::FeedNotWritten {
+                list: (Word::Folder, "notes".into()),
+                more: 0,
+                why: Unwritten::Undated,
+            }],
+        ),
+    ];
+    let base =
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n";
+    for (case, added, files, wanted) in cases {
+        let settings = format!("{base}{added}");
+        let mut all = vec![
+            ("statac.yaml", settings.as_str()),
+            HOME,
+            PAGE,
+            HOME_TEMPLATE,
+        ];
+        all.push(FOLDER);
+        all.retain(|(path, _)| !files.iter().any(|(p, _)| p == path));
+        all.extend(files);
+        let built = with_posts(&all);
+        assert_eq!(built.kinds(), wanted, "{case}");
+    }
+    let built = with_posts(&[
+        ("statac.yaml", &format!("{base}feed: feed.json\n")),
+        HOME,
+        PAGE,
+        HOME_TEMPLATE,
+        FOLDER,
+        json,
+    ]);
+    assert_eq!(built.file("feed.json").as_deref(), Some("{}"));
+}
+
 /// A site whose only feed asked for is of a list with nothing dated asks
 /// for no `url` or `feed_key`.
 #[test]
@@ -435,7 +638,16 @@ fn a_page_of_the_authors_at_a_feeds_address_wins() {
         "content/feed.md",
         "---\ntitle: Feed\npermalink: /feed.xml\n---\n",
     );
-    let built = with_posts(&[SETTINGS, HOME, PAGE, HOME_TEMPLATE, FOLDER, FEED, page]);
+    let built = with_posts(&[
+        SETTINGS,
+        HOME,
+        POSTS,
+        PAGE,
+        HOME_TEMPLATE,
+        FOLDER,
+        FEED,
+        page,
+    ]);
     assert_eq!(
         built.kinds(),
         [Kind::FeedNotWritten {
@@ -534,6 +746,33 @@ fn a_feed_value_that_names_no_file_stops_at_the_value_with_the_nearest() {
     }
 }
 
+/// The setting is read as the page's line is, and a value naming no file
+/// is told where it is written in `statac.yaml`.
+#[test]
+fn the_setting_naming_no_file_stops_at_its_value() {
+    let settings = (
+        "statac.yaml",
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n\
+         feed: /feeds/\n",
+    );
+    let built = with_posts(&[settings, HOME, PAGE, HOME_TEMPLATE, FOLDER, FEED]);
+    assert_eq!(
+        built.kinds(),
+        [Kind::UnusableUrl {
+            fault: AddressFault::FeedAtFolder {
+                nearest: "/feeds/feed.xml".into(),
+            },
+        }]
+    );
+    assert_eq!(built.told(), [("unusable-url", Some("/feeds/".into()))]);
+    let sources = built.outcome.sources();
+    let place = built.outcome.problems[0].place.expect("placed");
+    assert_eq!(
+        sources.path(place.source).display().to_string(),
+        "statac.yaml"
+    );
+}
+
 /// A feed printing the id of its list's page, then each post's.
 const IDS: (&str, &str) = (
     "templates/feed.xml",
@@ -562,7 +801,8 @@ fn entry_ids_are_those_the_previous_build_published() {
             "---\ntitle: Post 4\ndate: 2026-01-04\npermalink: /posts/café 4/\n---\n",
         ),
     ];
-    let base = "language: en\ntitle: Site\nfeed_key: key\ntimezone: Europe/London\n";
+    let base = "language: en\ntitle: Site\nfeed_key: key\ntimezone: Europe/London\n\
+                pages.feed: true\n";
     let cases = [
         (
             "url: https://example.org\n",

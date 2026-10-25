@@ -2080,7 +2080,7 @@ fn a_lists_feed_is_answered_by_the_feeds_the_build_publishes() {
     let temp = TempSite::site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
         ),
         ("content/index.md", "# Home\n"),
         ("content/post-1.md", "---\ndate: 2026-10-04\n---\n"),
@@ -2134,7 +2134,7 @@ fn the_code_stylesheet_and_the_feeds_are_named_by_their_addresses() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org/blog/\nfeed_key: key\ntimezone: UTC\ncode_style: one-half\n",
+            "language: en\ntitle: Site\nurl: https://example.org/blog/\nfeed_key: key\ntimezone: UTC\ncode_style: one-half\nfeed: true\n",
         ),
         ("content/posts/post-1.md", "---\ndate: 2026-10-04\n---\n"),
         ("content/posts/index.md", "---\nfeed: atom.xml\n---\n"),
@@ -2172,7 +2172,7 @@ fn a_feed_carries_code_uncoloured_where_its_page_colours_it() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
         ),
         ("content/index.md", "# Home\n"),
         (
@@ -2202,7 +2202,7 @@ fn a_feed_carries_the_writing_built_without_colour_with_the_authors_own_spans() 
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
         ),
         (
             "content/index.md",
@@ -2307,7 +2307,7 @@ fn writing_built_again_for_a_feed_still_cannot_show_itself() {
     let built = site(&[
         (
             "statac.yaml",
-            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+            "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
         ),
         ("content/index.md", "# Home\n"),
         (

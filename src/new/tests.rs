@@ -201,6 +201,7 @@ fn every_default_is_taken_by_enter() {
              \x20 date_short: 31 Dec 2025\n\
              \x20 date_day: 31 Dec\n\
              \x20 date_stamp: 31 Dec 2025, 15:04\n\
+             \x20 feed: true\n\
              \x20 feed_key: {key}\n\
              \n\
              Next: `cd {shown}`, then `statac serve`.\n"
@@ -212,6 +213,7 @@ fn every_default_is_taken_by_enter() {
             "title: My Site\nlanguage: en\ntimezone: Europe/London\n\
              date_format: 31 December 2025\n\
              date_short: 31 Dec 2025\ndate_day: 31 Dec\ndate_stamp: 31 Dec 2025, 15:04\n\
+             feed: true\n\
              # What each post's id in a feed is made from: never change it once a feed is \
              published.\nfeed_key: {key}\n"
         )
@@ -263,6 +265,7 @@ fn each_answer_given_is_taken() {
         "title: \"Site: 1\"\nurl: https://example.org/blog\nlanguage: [fr, en]\n\
          timezone: Europe/London\ndate_format: 2025-12-31\n\
          date_short: 2025-12-31\ndate_day: 12-31\ndate_stamp: 2025-12-31 15:04\n\
+         feed: true\n\
          # What each post's id in a feed is made from: never change it once a feed is \
          published.\n"
     );
@@ -421,6 +424,7 @@ fn each_unusable_answer_is_told_and_asked_again() {
         "title: Unusable\nurl: https://example.org\nlanguage: en\ntimezone: Europe/London\n\
          date_format: 2025-12-31\n\
          date_short: 2025-12-31\ndate_day: 12-31\ndate_stamp: 2025-12-31 15:04\n\
+         feed: true\n\
          # What each post's id in a feed is made from: never change it once a feed is \
          published.\n"
     );
@@ -743,9 +747,12 @@ fn a_name_needing_quotes_reads_back_as_written() {
 fn the_settings_written_read_back_with_no_problem_for_every_combination() {
     for languages in [&["en-GB"][..], &["ar", "en"], &["sw"]] {
         for address in [None, Some("https://example.org")] {
-            for timezone in [None, Some("Europe/London")] {
+            let made = [None, Some("Europe/London")]
+                .into_iter()
+                .flat_map(|timezone| [Maker::New, Maker::Import].map(|by| (timezone, by)));
+            for (timezone, by) in made {
                 let answers = answers(languages, address);
-                let text = settings(&answers, timezone);
+                let text = settings(&answers, timezone, by);
                 let mut sources = Sources::default();
                 let source = sources.add(config::FILE_NAME, text.clone());
                 let (read, problems) = config::read_source(&sources, source);
@@ -756,6 +763,8 @@ fn the_settings_written_read_back_with_no_problem_for_every_combination() {
                 assert_eq!(read.text("url").map(|url| url.value), address);
                 assert_eq!(read.text("timezone").map(|zone| zone.value), timezone);
                 assert!(read.text("feed_key").is_some());
+                let fed = read.truth(crate::feeds::SETTING);
+                assert_eq!(fed, (by == Maker::New).then_some(true), "{text}");
             }
         }
     }
@@ -763,7 +772,7 @@ fn the_settings_written_read_back_with_no_problem_for_every_combination() {
 
 #[test]
 fn no_setting_is_written_at_statacs_own_value() {
-    let text = settings(&answers(&["en"], None), None);
+    let text = settings(&answers(&["en"], None), None, Maker::New);
     for line in text.lines().filter(|line| !line.starts_with('#')) {
         let (name, value) = line.split_once(": ").unwrap();
         assert_ne!(
@@ -1284,6 +1293,7 @@ fn nothing_asked_for_last_makes_a_site_of_its_settings_alone() {
              \x20 date_short: 31 Dec 2025\n\
              \x20 date_day: 31 Dec\n\
              \x20 date_stamp: 31 Dec 2025, 15:04\n\
+             \x20 feed: true\n\
              \x20 feed_key: {key}\n\
              \n\
              Next: `cd {shown}`, then add your own templates to `templates/`: see \

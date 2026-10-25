@@ -155,6 +155,7 @@ codes! {
     NoFeedKey "no-feed-key",
     FeedIdChanged "feed-id-changed",
     NoSiteUrl "no-site-url",
+    UnusedFeedTemplate "unused-feed-template",
     NoLanguage "no-language",
     RobotsBeneathPath "robots-beneath-path",
     RedirectToItself "redirect-to-itself",
@@ -368,6 +369,7 @@ impl Code {
             | Code::BuiltWithoutTemplate
             | Code::LocationPublished
             | Code::RobotsBeneathPath
+            | Code::UnusedFeedTemplate
             | Code::LoopOverEveryPage
             | Code::RefusedWebmentions
             | Code::UpdateAvailable => Severity::Note,
@@ -495,6 +497,7 @@ impl Code {
             | Code::FeedNotWritten
             | Code::FeedIdChanged
             | Code::RobotsBeneathPath
+            | Code::UnusedFeedTemplate
             | Code::CallInHtml
             | Code::UntitledPage
             | Code::MoreWrittenTwice
@@ -1236,6 +1239,12 @@ pub enum Kind {
     /// or the feeds lists have.
     NoSiteUrl {
         waiting: Waiting,
+    },
+    /// A feed template on a site where no list asks for a feed, by its
+    /// path, with the setting that would ask for the site's feed it builds.
+    UnusedFeedTemplate {
+        template: String,
+        line: String,
     },
     /// A post in a feed published at another address than feed readers
     /// know it at, with no `id:` of its own: where it was, with the site's
@@ -2915,6 +2924,7 @@ impl Kind {
             Kind::NoFeedKey { .. } => Code::NoFeedKey,
             Kind::FeedIdChanged { .. } => Code::FeedIdChanged,
             Kind::NoSiteUrl { .. } => Code::NoSiteUrl,
+            Kind::UnusedFeedTemplate { .. } => Code::UnusedFeedTemplate,
             Kind::NoLanguage => Code::NoLanguage,
             Kind::RobotsBeneathPath { .. } => Code::RobotsBeneathPath,
             Kind::RedirectToItself { .. }

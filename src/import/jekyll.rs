@@ -1788,9 +1788,15 @@ impl Reader<'_> {
                 .feed_path
                 .clone()
                 .unwrap_or_else(|| "feed.xml".into());
+            let address = format!("/{}", path.trim_start_matches('/'));
+            let feed = match address == format!("/{}", crate::feeds::FILE_NAME) {
+                true => Value::Truth(true),
+                false => Value::Text(address.clone()),
+            };
             self.import
-                .addresses
-                .push(format!("/{}", path.trim_start_matches('/')));
+                .settings
+                .push((crate::feeds::SETTING.into(), feed));
+            self.import.addresses.push(address);
             self.note(
                 "The old site's feed came from Jekyll's feed plugin, so `feed_ids_before` and \
                  `feed_ids_from: jekyll` keep each post's id in it as it was, and feed readers \
