@@ -238,13 +238,18 @@ pub(in crate::lsp) fn pointed(
             name: word.to_owned(),
         });
     }
-    // The fields leading to the word, back to the name they start from.
+    // The fields leading to the word, back to the name they start from,
+    // over any call or index along the way, as `page.image('a.jpg').src`.
     let mut from = at;
-    while from >= 2
-        && ahead[from - 1].token == Token::Mark(".")
-        && matches!(ahead[from - 2].token, Token::Name(_))
-    {
-        from -= 2;
+    while from >= 2 && ahead[from - 1].token == Token::Mark(".") {
+        match ahead[from - 2].token {
+            Token::Name(_) => from -= 2,
+            Token::Mark(")" | "]") => match called_from(&ahead[..from - 1]) {
+                Some(name) => from = name,
+                None => break,
+            },
+            _ => break,
+        }
     }
     let written = text[tokens[from].span.start..range.end].to_owned();
     (holds != Holds::Unknown || about.is_some()).then_some(Pointed::Value {
@@ -253,6 +258,26 @@ pub(in crate::lsp) fn pointed(
         holds,
         about,
     })
+}
+
+/// Where the name is that the call or index closing `tokens` follows:
+/// before the `(` or `[` its last bracket closes.
+fn called_from(tokens: &[Lexed]) -> Option<usize> {
+    let mut depth = 0usize;
+    for (at, lexed) in tokens.iter().enumerate().rev() {
+        match lexed.token {
+            Token::Mark(")" | "]") => depth += 1,
+            Token::Mark("(" | "[") => {
+                depth -= 1;
+                if depth == 0 {
+                    let name = at.checked_sub(1)?;
+                    return matches!(tokens[name].token, Token::Name(_)).then_some(name);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Whether a bracket follows the name `offset` is in.

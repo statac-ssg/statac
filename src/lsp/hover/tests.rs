@@ -491,9 +491,21 @@ fn a_name_or_field_in_a_template_says_what_it_holds_and_what_it_is() {
         ),
         (
             "{{ page.image('photo-1.jpg').s|rc }}",
-            "`src` holds text",
+            "`page.image('photo-1.jpg').src` holds text",
             "src",
             Some((Group::Image, "src")),
+        ),
+        (
+            "{{ page.image(page.title ~ '.jpg').a|lt }}",
+            "`page.image(page.title ~ '.jpg').alt` holds text",
+            "alt",
+            Some((Group::Image, "alt")),
+        ),
+        (
+            "{% for h in page.toc %}{{ h.headings[0].ti|tle }}{% endfor %}",
+            "`h.headings[0].title` holds text",
+            "title",
+            Some((Group::Heading, "title")),
         ),
         (
             "{{ site.search_without_javascript.act|ion }}",
