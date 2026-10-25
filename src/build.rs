@@ -25,6 +25,7 @@ use crate::report::Quiet;
 use crate::site::{Id, ListId, OutputId, PageId, PictureId};
 use crate::source::{Place, SourceId, Sources};
 use crate::templates::{self, Renderer};
+use crate::unnamed;
 use scripts::{Finding, Found};
 
 pub use javascript::Javascript;
@@ -829,11 +830,41 @@ pub(crate) fn conclude(
     // Where in `problems` the outputs built with a template other than
     // their own, or with none, are told, by the kind each page told.
     let mut templateless: Vec<(Kind, usize)> = Vec::new();
+    // Where in `problems` each element no screen reader has words for is
+    // told, by its kind and place.
+    let mut unheard: HashMap<(Code, Option<Place>), Vec<usize>> = HashMap::new();
     for built in built {
         if let Output::Page(page) = built.output
             && let Some(list) = site.pages.get(page).speaks_for
         {
             on_list.insert(list, built.problems.clone());
+        }
+        // Told once at the place it is written, with each page it is on,
+        // whatever its address there; where the writing is told on its own
+        // page, the other pages showing it are left out.
+        for problem in built
+            .problems
+            .iter()
+            .filter(|p| unnamed::finds(p.kind.code()))
+        {
+            let key = (problem.kind.code(), problem.place);
+            let alike = unheard.entry(key).or_default();
+            let told = (alike.iter()).find(|&&at| unnamed::alike(renderer, &problems[at], problem));
+            let Some(&at) = told else {
+                alike.push(problems.len());
+                problems.push(problem.clone());
+                continue;
+            };
+            let told = &mut problems[at];
+            let pages = (
+                told.built().next().is_some(),
+                problem.built().next().is_some(),
+            );
+            match pages {
+                (true, true) => told.met_building_too(problem),
+                (true, false) => *told = problem.clone(),
+                (false, _) => {}
+            }
         }
         match built.output {
             // Built after the pages, through their first page's templates:
@@ -845,7 +876,8 @@ pub(crate) fn conclude(
                     .problems
                     .iter()
                     .filter(|problem| {
-                        !problems.contains(problem)
+                        !unnamed::finds(problem.kind.code())
+                            && !problems.contains(problem)
                             && !told.iter().any(|t| t.alike_but_for_page(problem))
                     })
                     .cloned()
@@ -855,6 +887,9 @@ pub(crate) fn conclude(
             }
             _ => {
                 for problem in &built.problems {
+                    if unnamed::finds(problem.kind.code()) {
+                        continue;
+                    }
                     // Told at the template, alike for every page built
                     // through it handed the same items, or told of a page
                     // every output naming it names: told once.
@@ -1455,6 +1490,9 @@ pub(crate) fn build_output(
         if let Some((page, number)) = shown
             && file.ends_with(".html")
         {
+            let layout = rendered.layout;
+            let unnamed = unnamed::told(renderer, page, number, &rendered.own, &html, layout);
+            problems.extend(unnamed);
             let page = links::Page {
                 id: page,
                 number,

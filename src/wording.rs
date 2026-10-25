@@ -13,13 +13,13 @@ use crate::platform::{Alike, Unwritable};
 use crate::problem::{
     AddressFault, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
     Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found, Held, Hint, Holds,
-    InPlace, Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing,
-    MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault,
-    Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation,
-    Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy,
-    ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told,
-    Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting, Wanted,
-    Word, WordList, WordsFrom, WordsWanted, WrongPlace,
+    InPlace, Instead, JsonFault, Kind, LabelledBy, Lack, ListFault, Maker, Malformed, MathsFault,
+    Missing, MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own,
+    PictureFault, Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related,
+    Relation, Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape,
+    ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault,
+    Told, Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting,
+    Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 
 pub(crate) use crate::described::{
@@ -993,6 +993,34 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::MissingAltText { picture, .. } => {
             format!("Missing alt text: `{picture}`")
         }
+        Kind::MissingLinkText { href, .. } => match href {
+            Some(to) => {
+                format!(
+                    "Missing link text: the link to `{to}` has nothing a screen reader can read out"
+                )
+            }
+            None => "Missing link text: a link has nothing a screen reader can read out".into(),
+        },
+        Kind::MissingButtonText { .. } => {
+            "Missing button text: a `<button>` has nothing a screen reader can read out".into()
+        }
+        Kind::MissingIframeTitle { src } => match src {
+            Some(src) => {
+                format!("Missing iframe title: the `<iframe>` showing `{src}` has no `title`")
+            }
+            None => "Missing iframe title: an `<iframe>` has no `title`".into(),
+        },
+        Kind::MissingLabel { control, name, .. } => match name {
+            Some(name) => format!("Missing label: the `<{control}>` named `{name}` has no label"),
+            None => {
+                let a = if control == "input" { "an" } else { "a" };
+                format!("Missing label: {a} `<{control}>` has no label")
+            }
+        },
+        Kind::MissingTitle { empty } => match empty {
+            false => "Missing title: the page has no `<title>`".into(),
+            true => "Missing title: the page's `<title>` is empty".into(),
+        },
         Kind::HeicImage { path } => {
             format!("HEIC image: `{path}` is published as it is, with no resized copies made")
         }
@@ -3242,6 +3270,32 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             ShownBy::Template { beside: None } => {
                 "Describe it where it is shown, or mark it decorative.".into()
             }
+        }),
+        Kind::MissingLinkText { image, .. } => Some(match image {
+            true => "Give the `<img>` inside it an `alt` saying where the link leads.".into(),
+            false => "Put words inside it, or give it an `aria-label`.".into(),
+        }),
+        Kind::MissingButtonText { image } => Some(match image {
+            true => "Give the `<img>` inside it an `alt` saying what the button does.".into(),
+            false => "Put words inside it, or give it an `aria-label`.".into(),
+        }),
+        Kind::MissingIframeTitle { .. } => Some("Give it a `title` saying what it shows.".into()),
+        Kind::MissingLabel { id, by, .. } => Some(match (by, id) {
+            (LabelledBy::Label, Some(id)) => {
+                format!("Add `<label for=\"{id}\">` saying what it is for.")
+            }
+            (LabelledBy::Label, None) => {
+                "Put it inside a `<label>` saying what it is for, or give it an `aria-label`."
+                    .into()
+            }
+            (LabelledBy::Value, _) => "Give it a `value`, the words shown on the button.".into(),
+            (LabelledBy::Alt, _) => "Give it an `alt` saying what the button does.".into(),
+        }),
+        Kind::MissingTitle { empty } => Some(match empty {
+            false => {
+                "Add a `<title>` naming the page, such as `<title>{{ page.title }}</title>`.".into()
+            }
+            true => "Write the page's name inside it.".into(),
         }),
         Kind::HeicImage { .. } => {
             Some("Export it as a JPEG: most browsers can't show a HEIC image.".into())
@@ -5871,6 +5925,98 @@ mod tests {
                 },
                 "Broken link: nothing is published at `/about/`",
                 Some(r#"To link inside the site, write `{{ url("/about/") }}`."#),
+            ),
+            (
+                Kind::MissingLinkText {
+                    href: Some("https://example.org/".into()),
+                    image: true,
+                },
+                "Missing link text: the link to `https://example.org/` has nothing a screen \
+                 reader can read out",
+                Some("Give the `<img>` inside it an `alt` saying where the link leads."),
+            ),
+            (
+                Kind::MissingLinkText {
+                    href: None,
+                    image: false,
+                },
+                "Missing link text: a link has nothing a screen reader can read out",
+                Some("Put words inside it, or give it an `aria-label`."),
+            ),
+            (
+                Kind::MissingButtonText { image: true },
+                "Missing button text: a `<button>` has nothing a screen reader can read out",
+                Some("Give the `<img>` inside it an `alt` saying what the button does."),
+            ),
+            (
+                Kind::MissingButtonText { image: false },
+                "Missing button text: a `<button>` has nothing a screen reader can read out",
+                Some("Put words inside it, or give it an `aria-label`."),
+            ),
+            (
+                Kind::MissingIframeTitle {
+                    src: Some("https://example.org/video/1".into()),
+                },
+                "Missing iframe title: the `<iframe>` showing `https://example.org/video/1` has \
+                 no `title`",
+                Some("Give it a `title` saying what it shows."),
+            ),
+            (
+                Kind::MissingIframeTitle { src: None },
+                "Missing iframe title: an `<iframe>` has no `title`",
+                Some("Give it a `title` saying what it shows."),
+            ),
+            (
+                Kind::MissingLabel {
+                    control: "input".into(),
+                    name: Some("q".into()),
+                    id: None,
+                    by: LabelledBy::Label,
+                },
+                "Missing label: the `<input>` named `q` has no label",
+                Some(
+                    "Put it inside a `<label>` saying what it is for, or give it an `aria-label`.",
+                ),
+            ),
+            (
+                Kind::MissingLabel {
+                    control: "select".into(),
+                    name: None,
+                    id: Some("sort".into()),
+                    by: LabelledBy::Label,
+                },
+                "Missing label: a `<select>` has no label",
+                Some("Add `<label for=\"sort\">` saying what it is for."),
+            ),
+            (
+                Kind::MissingLabel {
+                    control: "input".into(),
+                    name: None,
+                    id: None,
+                    by: LabelledBy::Value,
+                },
+                "Missing label: an `<input>` has no label",
+                Some("Give it a `value`, the words shown on the button."),
+            ),
+            (
+                Kind::MissingLabel {
+                    control: "input".into(),
+                    name: Some("go".into()),
+                    id: None,
+                    by: LabelledBy::Alt,
+                },
+                "Missing label: the `<input>` named `go` has no label",
+                Some("Give it an `alt` saying what the button does."),
+            ),
+            (
+                Kind::MissingTitle { empty: false },
+                "Missing title: the page has no `<title>`",
+                Some("Add a `<title>` naming the page, such as `<title>{{ page.title }}</title>`."),
+            ),
+            (
+                Kind::MissingTitle { empty: true },
+                "Missing title: the page's `<title>` is empty",
+                Some("Write the page's name inside it."),
             ),
         ]
     }

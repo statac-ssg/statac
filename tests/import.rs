@@ -177,6 +177,7 @@ fn templated(site: &Path) {
 
 const BUILT: &str = "built-without-template";
 const NO_FEED: &str = "feed-not-written";
+const NO_LABEL: &str = "missing-label";
 
 #[test]
 fn each_permalink_style_keeps_every_address() {
@@ -307,7 +308,7 @@ fn words_statac_would_read_as_a_snippet_call_are_escaped() {
 
 #[test]
 fn code_inside_html_is_given_a_blank_line_and_stays_code() {
-    assert_eq!(fixture("html-writing"), [BUILT, NO_ZONE]);
+    assert_eq!(fixture("html-writing"), [BUILT, NO_LABEL, NO_ZONE]);
 }
 
 #[test]

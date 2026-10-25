@@ -369,7 +369,7 @@ fn a_block_with_a_line_past_five_thousand_characters_is_published_uncoloured_and
     );
     site.write(
         "templates/page.html",
-        "<!doctype html>\n{{ page.content }}\n",
+        "<!doctype html>\n<title>{{ page.title }}</title>\n{{ page.content }}\n",
     );
     // A character of two bytes, so the line is measured in characters.
     let post = |letters: usize| {
@@ -1998,7 +1998,7 @@ fn javascript_a_snippet_called_by_name_writes_is_not_listed_and_the_rest_is() {
     const CALLING: &str = "@play()\n";
     const PLAY: &str = "<button onclick=\"play()\">Play</button>\n<script>ready()</script>\n";
     const LOADING: &str = "<script src=\"https://example.org/play.js\"></script>\n\
-                           <iframe src=\"https://example.org/player\"></iframe>\n";
+                           <iframe src=\"https://example.org/player\" title=\"Player\"></iframe>\n";
     /// Where script is written, the files that write it over a site with
     /// none, whose one post is `post-1.md`, and every line `check` lists.
     type Case<'a> = (&'a str, &'a [(&'a str, &'a str)], &'a [&'a str]);
@@ -2103,7 +2103,7 @@ fn javascript_a_snippet_called_by_name_writes_is_not_listed_and_the_rest_is() {
             &[
                 (
                     "snippets/play.html",
-                    "<iframe src=\"{{ address }}\"></iframe>\n",
+                    "<iframe src=\"{{ address }}\" title=\"Player\"></iframe>\n",
                 ),
                 (
                     "content/post-1.md",
@@ -4090,4 +4090,128 @@ note  No home page: nothing is published at `/`
 1 note: 1 no-home-page.
 "
     );
+}
+
+#[test]
+fn what_a_screen_reader_has_no_words_for_is_told_once_where_it_was_written() {
+    let site = Site::new("unnamed");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\nposts_per_page: 2\n",
+    );
+    site.write(
+        "templates/page.html",
+        "<!doctype html>\n\
+         <title>{{ page.title }}</title>\n\
+         <a href=\"https://example.org/\"><img src=\"https://example.org/icon.svg\" alt=\"\"></a>\n\
+         <input type=\"search\" name=\"q\">\n\
+         {{ page.content }}\n\
+         <button class=\"menu\"><svg></svg></button>\n",
+    );
+    site.write(
+        "templates/home.html",
+        "<!doctype html>\n\
+         <html lang=\"en\">\n\
+         <head><meta charset=\"utf-8\"></head>\n\
+         {% for post in page.posts %}<a href=\"{{ post.url }}\"><svg></svg></a>{{ post.content }}{% endfor %}\n\
+         {% if page.next %}<a href=\"{{ page.next.url }}\">Next</a>{% endif %}\n\
+         {{ page.content }}\n",
+    );
+    site.write(
+        "content/post-3.md",
+        "---\ntitle: Post 3\ndate: 2026-03-01\n---\nThe third post.\n",
+    );
+    site.write(
+        "content/post-2.md",
+        "---\ntitle: Post 2\ndate: 2026-02-01\n---\nSee [](/post-1/).\n\n\
+         <iframe src=\"https://example.org/video/1\"></iframe>\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+note  Missing link text: the link to `/post-1/` has nothing a screen reader can read out
+  content/post-2.md, line 5
+   5 │ See [](/post-1/).
+     │     ^^^^^^^^^^^^
+  Put words inside it, or give it an `aria-label`.
+  More: https://statac.dev/e/missing-link-text/
+
+note  Missing iframe title: the `<iframe>` showing `https://example.org/video/1` has no `title`
+  content/post-2.md, line 7
+   7 │ <iframe src=\"https://example.org/video/1\"></iframe>
+     │ ^^^^^^^
+  Give it a `title` saying what it shows.
+  More: https://statac.dev/e/missing-iframe-title/
+
+note  Missing title: the page has no `<title>`
+  templates/home.html, line 3
+   3 │ <head><meta charset=\"utf-8\"></head>
+     │ ^^^^^
+  While building: content/index.md
+  And while building 1 more:
+    page 2 of `/`: content/index.md
+  Add a `<title>` naming the page, such as `<title>{{ page.title }}</title>`.
+  More: https://statac.dev/e/missing-title/
+
+note  Missing link text: the link to `/post-3/` has nothing a screen reader can read out
+  templates/home.html, line 4
+   4 │ {% for post in page.posts %}<a href=\"{{ post.url }}\"><svg></svg></a>{{ post.content }}{% endfor %}
+     │                             ^^
+  While building: content/index.md
+  And while building 1 more:
+    page 2 of `/`: content/index.md
+  Put words inside it, or give it an `aria-label`.
+  More: https://statac.dev/e/missing-link-text/
+
+note  Missing link text: the link to `https://example.org/` has nothing a screen reader can read out
+  templates/page.html, line 3
+   3 │ <a href=\"https://example.org/\"><img src=\"https://example.org/icon.svg\" alt=\"\"></a>
+     │ ^^
+  While building: content/post-1.md
+  And while building 2 more:
+    content/post-2.md
+    content/post-3.md
+  Give the `<img>` inside it an `alt` saying where the link leads.
+  More: https://statac.dev/e/missing-link-text/
+
+note  Missing label: the `<input>` named `q` has no label
+  templates/page.html, line 4
+   4 │ <input type=\"search\" name=\"q\">
+     │ ^^^^^^
+  While building: content/post-1.md
+  And while building 2 more:
+    content/post-2.md
+    content/post-3.md
+  Put it inside a `<label>` saying what it is for, or give it an `aria-label`.
+  More: https://statac.dev/e/missing-label/
+
+note  Missing button text: a `<button>` has nothing a screen reader can read out
+  templates/page.html, line 6
+   6 │ <button class=\"menu\"><svg></svg></button>
+     │ ^^^^^^^
+  While building: content/post-1.md
+  And while building 2 more:
+    content/post-2.md
+    content/post-3.md
+  Put words inside it, or give it an `aria-label`.
+  More: https://statac.dev/e/missing-button-text/
+
+7 notes: 3 missing-link-text, 1 missing-button-text, 1 missing-iframe-title, 1 missing-label, 1 missing-title.
+"
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("7 notes: 3 missing-link-text, "), "{said}");
+
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\nposts_per_page: 2\n\
+         quiet: [missing-link-text, missing-button-text, missing-iframe-title, missing-label, \
+         missing-title]\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(said, "7 notes, all quietened.\n");
 }

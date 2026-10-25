@@ -181,6 +181,11 @@ codes! {
     DescribesNoImage "describes-no-image",
     CacheNotWritten "cache-not-written",
     MissingAltText "missing-alt-text",
+    MissingLinkText "missing-link-text",
+    MissingButtonText "missing-button-text",
+    MissingIframeTitle "missing-iframe-title",
+    MissingLabel "missing-label",
+    MissingTitle "missing-title",
     HeicImage "heic-image",
     LocationPublished "location-published",
     ImagesOutOfProportion "images-out-of-proportion",
@@ -361,6 +366,11 @@ impl Code {
             Code::DraftLeftOut
             | Code::HookNotRun
             | Code::MissingAltText
+            | Code::MissingLinkText
+            | Code::MissingButtonText
+            | Code::MissingIframeTitle
+            | Code::MissingLabel
+            | Code::MissingTitle
             | Code::ColourConverted
             | Code::ScheduledPost
             | Code::NumberedFolder
@@ -521,6 +531,11 @@ impl Code {
             | Code::DescribesNoImage
             | Code::CacheNotWritten
             | Code::MissingAltText
+            | Code::MissingLinkText
+            | Code::MissingButtonText
+            | Code::MissingIframeTitle
+            | Code::MissingLabel
+            | Code::MissingTitle
             | Code::HeicImage
             | Code::LocationPublished
             | Code::ImagesOutOfProportion
@@ -1440,6 +1455,38 @@ pub enum Kind {
         picture: String,
         shown: ShownBy,
     },
+    /// A link on a built page with nothing a screen reader can read out as
+    /// its name: its `href` with its character references read, where that
+    /// isn't empty, and whether an image with no alt text is all it shows.
+    MissingLinkText {
+        href: Option<String>,
+        image: bool,
+    },
+    /// A `<button>` on a built page with nothing a screen reader can read
+    /// out as its name, and whether an image with no alt text is all it
+    /// shows.
+    MissingButtonText {
+        image: bool,
+    },
+    /// An `<iframe>` on a built page with no `title`: its `src`, with its
+    /// character references read, where it has one.
+    MissingIframeTitle {
+        src: Option<String>,
+    },
+    /// An `<input>`, `<select>` or `<textarea>` on a built page with no
+    /// label: the element's name, its `name` and its `id`, each with its
+    /// character references read, and what labels one of its kind.
+    MissingLabel {
+        control: String,
+        name: Option<String>,
+        id: Option<String>,
+        by: LabelledBy,
+    },
+    /// A page built with a template that has no `<title>`, or whose
+    /// `<title>` is empty.
+    MissingTitle {
+        empty: bool,
+    },
     /// A HEIC or HEIF picture a page shows, published as it is: its file.
     HeicImage {
         path: String,
@@ -1639,6 +1686,18 @@ pub enum ShownBy {
     /// By a template or a snippet, with the file that may describe it,
     /// for a picture under `content/`.
     Template { beside: Option<String> },
+}
+
+/// What gives a form control of its kind its label, where nothing else
+/// does.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum LabelledBy {
+    /// A `<label>`.
+    Label,
+    /// Its `value`, as for `<input type="button">`.
+    Value,
+    /// Its `alt`, as for `<input type="image">`.
+    Alt,
 }
 
 /// What is wrong with a picture that can't be read.
@@ -2992,6 +3051,11 @@ impl Kind {
             Kind::DescribesNoImage { .. } => Code::DescribesNoImage,
             Kind::CacheNotWritten { .. } => Code::CacheNotWritten,
             Kind::MissingAltText { .. } => Code::MissingAltText,
+            Kind::MissingLinkText { .. } => Code::MissingLinkText,
+            Kind::MissingButtonText { .. } => Code::MissingButtonText,
+            Kind::MissingIframeTitle { .. } => Code::MissingIframeTitle,
+            Kind::MissingLabel { .. } => Code::MissingLabel,
+            Kind::MissingTitle { .. } => Code::MissingTitle,
             Kind::HeicImage { .. } => Code::HeicImage,
             Kind::LocationPublished { .. } => Code::LocationPublished,
             Kind::ImagesOutOfProportion { .. } => Code::ImagesOutOfProportion,
