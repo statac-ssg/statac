@@ -68,6 +68,19 @@ impl Making {
         }
     }
 
+    /// Where Hugo publishes the page of the term `term` in the list
+    /// `plural` where no pattern places it: the two made ready as one path,
+    /// so a space at the term's start is a hyphen and one at its end is
+    /// dropped.
+    pub(super) fn listed(&self, plural: &str, term: &str) -> String {
+        let path = format!("/{plural}/{term}");
+        let path = match self.lower {
+            true => self.path(&read(&path)),
+            false => self.path(&path),
+        };
+        format!("{path}/")
+    }
+
     /// `text` made ready and then read and written again as a URL, as Hugo
     /// does with what it puts into a `[permalinks]` pattern: a `#` that
     /// opens an empty fragment is lost.
