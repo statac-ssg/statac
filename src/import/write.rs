@@ -776,7 +776,13 @@ pub(super) fn write<'a>(
             if !platform::stays_inside(&file)
                 || !super::inside::a_file(old, &format!("{built}/{file}"))
             {
-                findings.push(Finding::at(&NOT_IN_BUILT, from, None, address));
+                // An address of no one page names no file, so its spot is
+                // the report's line itself.
+                let text = match from.is_empty() {
+                    true => report::code(address),
+                    false => address.clone(),
+                };
+                findings.push(Finding::at(&NOT_IN_BUILT, from, None, &text));
             }
         }
     }
