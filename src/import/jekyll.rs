@@ -1,5 +1,5 @@
-//! The reader for sites Jekyll made: a site with `_config.yml`,
-//! `_config.yaml` or `_config.toml` at its top.
+//! The reader for sites Jekyll made: a site with `_config.yml` or
+//! `_config.yaml` at its top.
 //!
 //! Jekyll's rules are followed as its documentation gives them: which
 //! files it publishes and which it keeps to itself, where it publishes
@@ -26,8 +26,12 @@ use crate::source::{Place, Sources};
 use crate::yaml::{Node, Value as Yaml};
 use url::{Moment, Style};
 
-/// The settings files Jekyll reads, the first found.
-const SETTINGS_FILES: [&str; 3] = ["_config.yml", "_config.yaml", "_config.toml"];
+/// The settings files Jekyll reads in YAML, the first found.
+const SETTINGS_FILES: [&str; 2] = ["_config.yml", "_config.yaml"];
+
+/// The settings file Jekyll reads where neither of those is there, which
+/// Statac doesn't.
+const TOML_SETTINGS: &str = "_config.toml";
 
 /// The endings of the files Jekyll reads as writing.
 const WRITING: &[&str] = &["md", "markdown", "mkdown", "mkdn", "mkd", "html", "htm"];
@@ -50,6 +54,10 @@ const LEFT_OUT: &[&str] = &[
 /// Statac.
 const JEKYLLS_OWN: &[&str] = &[
     "cache_dir",
+    "data_dir",
+    "layouts_dir",
+    "includes_dir",
+    "plugins_dir",
     "sass_dir",
     "safe",
     "keep_files",
@@ -287,10 +295,6 @@ struct Settings {
     source: String,
     destination: String,
     gatherings_dir: String,
-    data_dir: String,
-    layouts_dir: String,
-    includes_dir: String,
-    plugins_dir: String,
 }
 
 /// A value as a list of texts: a list's scalars, or one text parted by
@@ -598,10 +602,6 @@ impl Reader<'_> {
     fn settings(&mut self) -> Result<(), Box<Failed>> {
         let s = &mut self.settings;
         s.destination = "_site".into();
-        s.data_dir = "_data".into();
-        s.layouts_dir = "_layouts".into();
-        s.includes_dir = "_includes".into();
-        s.plugins_dir = "_plugins".into();
         let found = SETTINGS_FILES
             .iter()
             .find(|name| inside::a_settings_file(self.folder, name));
@@ -620,29 +620,22 @@ impl Reader<'_> {
                 reason: Reason::of(&error),
             }))
         })?;
-        let entries = match name.ends_with(".toml") {
-            true => super::toml::read(&text)
-                .map_err(|stopped| super::toml::failed(&self.folder.join(name), text, &stopped))?,
-            false => {
-                let mut sources = Sources::default();
-                let source = sources.add(self.folder.join(name), text);
-                let node = match crate::yaml::read(&sources, source) {
-                    Ok(node) => node,
-                    Err(problem) => return Err(Box::new(Failed { sources, problem })),
-                };
-                match &node.value {
-                    Yaml::Mapping(entries) => entries
-                        .iter()
-                        .map(|entry| {
-                            let line =
-                                sources.line_number(source, entry.key.place.span.start as usize);
-                            let value = yaml::value_of(&entry.value, &plain);
-                            Field::new(&yaml::key_text(&entry.key), value, Some(line))
-                        })
-                        .collect(),
-                    _ => Vec::new(),
-                }
-            }
+        let mut sources = Sources::default();
+        let source = sources.add(self.folder.join(name), text);
+        let node = match crate::yaml::read(&sources, source) {
+            Ok(node) => node,
+            Err(problem) => return Err(Box::new(Failed { sources, problem })),
+        };
+        let entries: Vec<Field> = match &node.value {
+            Yaml::Mapping(entries) => entries
+                .iter()
+                .map(|entry| {
+                    let line = sources.line_number(source, entry.key.place.span.start as usize);
+                    let value = yaml::value_of(&entry.value, &plain);
+                    Field::new(&yaml::key_text(&entry.key), value, Some(line))
+                })
+                .collect(),
+            _ => Vec::new(),
         };
         let s = &mut self.settings;
         let mut values = Vec::new();
@@ -681,8 +674,7 @@ impl Reader<'_> {
                 "paginate_path" => s.paginate_path = text,
                 "excerpt_separator" => s.separator = text,
                 "future" => s.future = value == Value::Truth(true),
-                "source" | "destination" | "collections_dir" | "data_dir" | "layouts_dir"
-                | "includes_dir" | "plugins_dir" => {
+                "source" | "destination" | "collections_dir" => {
                     let written = text.unwrap_or_default();
                     let Some(folder) = inside::named_folder(self.folder, &written) else {
                         unread.push((format!("{key}: {written}"), line));
@@ -691,11 +683,7 @@ impl Reader<'_> {
                     match key.as_str() {
                         "source" => s.source = folder,
                         "destination" => s.destination = folder,
-                        "collections_dir" => s.gatherings_dir = folder,
-                        "data_dir" => s.data_dir = folder,
-                        "layouts_dir" => s.layouts_dir = folder,
-                        "includes_dir" => s.includes_dir = folder,
-                        _ => s.plugins_dir = folder,
+                        _ => s.gatherings_dir = folder,
                     }
                 }
                 "exclude" => s.exclude = texts_of(&value),
@@ -950,37 +938,42 @@ impl Reader<'_> {
                 continue;
             }
             if rel.is_empty() {
-                if self.settings.source.is_empty() && SETTINGS_FILES.contains(&name.as_str()) {
+                let settings = SETTINGS_FILES.contains(&name.as_str()) || name == TOML_SETTINGS;
+                if self.settings.source.is_empty() && settings {
                     if !self.read_settings_file(&name) {
-                        self.left(
-                            &shown,
-                            "another settings file, which Jekyll reads only where the one \
-                             before it isn't there",
-                        );
+                        let alone = self.import.settings_file.is_empty();
+                        let what = match name == TOML_SETTINGS && alone {
+                            true => {
+                                "the old site's settings in TOML, which Statac doesn't read for a \
+                                 Jekyll site: write them as YAML in `_config.yml` and import again"
+                            }
+                            false => {
+                                "another settings file, which Jekyll reads only where the one \
+                                 before it isn't there"
+                            }
+                        };
+                        self.left(&shown, what);
                     }
                     continue;
                 }
-                let s = &self.settings;
                 let special = [
-                    (s.layouts_dir.as_str(), "the old site's layouts".to_owned()),
+                    ("_layouts", "the old site's layouts"),
                     (
-                        s.includes_dir.as_str(),
+                        "_includes",
                         "the old site's includes; each one the content calls has a snippet of its \
-                         name standing for it"
-                            .to_owned(),
+                         name standing for it",
                     ),
-                    ("_sass", "the old site's Sass".to_owned()),
+                    ("_sass", "the old site's Sass"),
                     (
-                        s.plugins_dir.as_str(),
-                        "the old site's plugins, which Statac doesn't run".to_owned(),
+                        "_plugins",
+                        "the old site's plugins, which Statac doesn't run",
                     ),
                 ];
                 if let Some((_, what)) = special.iter().find(|(special, _)| *special == path) {
-                    let what = (*what).to_owned();
-                    self.left(&shown, &what);
+                    self.left(&shown, what);
                     continue;
                 }
-                if path == self.settings.data_dir && dir {
+                if path == "_data" && dir {
                     self.data(&path)?;
                     continue;
                 }
@@ -1124,7 +1117,6 @@ impl Reader<'_> {
             })
             .unwrap_or_default();
         names.sort();
-        let top = self.settings.data_dir.clone();
         for name in names {
             let path = format!("{rel}/{name}");
             let Ok(found) = inside::metadata(self.folder, &self.from(&path)) else {
@@ -1138,7 +1130,7 @@ impl Reader<'_> {
                 let ending = name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
                 match ending.as_deref() {
                     Some("yml" | "yaml" | "json") => {
-                        let to = format!("data/{}", path[top.len()..].trim_start_matches('/'));
+                        let to = format!("data/{}", &path["_data/".len()..]);
                         let from = self.from(&path);
                         self.import.files.push(super::File { from, to });
                     }

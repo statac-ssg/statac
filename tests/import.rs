@@ -383,11 +383,6 @@ fn files_data_and_folders_of_pages_come_across() {
 }
 
 #[test]
-fn settings_in_toml_are_read_as_settings_in_yaml() {
-    assert_eq!(fixture("settings-toml"), [BUILT]);
-}
-
-#[test]
 fn a_site_is_read_from_the_folder_its_settings_name() {
     assert_eq!(fixture("source-folder"), [BUILT, NO_ZONE]);
 }
@@ -1558,13 +1553,23 @@ fn a_site_that_cant_be_imported_is_refused_and_nothing_is_written() {
 
     let toml = top.join("toml");
     fs::create_dir_all(&toml).unwrap();
-    fs::write(toml.join("_config.toml"), "title = \"Site 1\"\nurl = \n").unwrap();
+    fs::write(toml.join("_config.toml"), "title = \"Site 1\"\n").unwrap();
     assert_eq!(
         refused(&toml, &top.join("new-3"), None),
         format!(
-            "error  Can't read `{}`: this line doesn't read as TOML",
-            toml.join("_config.toml").display()
+            "error  Can't tell what made the site: `{}` has no settings file Statac knows",
+            toml.display()
         )
+    );
+    let (code, said) = import(&toml, &top.join("new-4"), Some(Tool::Jekyll));
+    assert_eq!(code, 0, "{said}");
+    let report = fs::read_to_string(top.join("new-4/IMPORT.md")).unwrap();
+    assert!(
+        report.contains(
+            "- `_config.toml`: the old site's settings in TOML, which Statac doesn't read for a \
+             Jekyll site: write them as YAML in `_config.yml` and import again.\n"
+        ),
+        "{report}"
     );
 
     for name in ["new-1", "new-2", "new-3"] {
@@ -3036,15 +3041,7 @@ const FOLDER_UNREAD: &str = "### Settings naming a folder Statac doesn't read\n\
      read as if it weren't set: bring across by hand what the folder holds, if it is wanted.\n\
      \n";
 
-const FOLDER_SETTINGS: [&str; 7] = [
-    "source",
-    "destination",
-    "collections_dir",
-    "data_dir",
-    "layouts_dir",
-    "includes_dir",
-    "plugins_dir",
-];
+const FOLDER_SETTINGS: [&str; 3] = ["source", "destination", "collections_dir"];
 
 #[test]
 fn a_folder_the_settings_name_outside_the_old_site_is_never_read() {

@@ -18,6 +18,8 @@ A comment.
 
 Maths $$x^2$$ inside a line.
 
+*[HTML]: HyperText Markup Language
+
 ```
 {: .in-code}
 {:toc}

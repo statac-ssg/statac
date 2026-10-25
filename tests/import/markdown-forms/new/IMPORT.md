@@ -62,6 +62,12 @@ Jekyll set these inside the line, and Statac sets maths between `$$` apart on a 
 
 - `_posts/2026-01-01-post-1.md`, line 18: `Maths $$x^2$$ inside a line.`
 
+### Abbreviations
+
+Statac's Markdown has no abbreviations, so each of these lines shows on the page as words: take it out, or write each abbreviation as an `<abbr>`.
+
+- `_posts/2026-01-01-post-1.md`, line 20: `*[HTML]: HyperText Markup Language`
+
 ### Markdown inside HTML
 
 Jekyll read the Markdown inside each of these tags, as `markdown="1"` asks, and Statac's Markdown leaves what is inside HTML as it is, so the Markdown there shows as written: take off the HTML round it, or write what is inside as HTML.

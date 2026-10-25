@@ -3,8 +3,9 @@
 `statac import` reads a site made by another tool, and works out which
 tool from the site's files:
 
-- A Jekyll site has `_config.yml`, `_config.yaml` or `_config.toml` at
-  its top.
+- A Jekyll site has `_config.yml` or `_config.yaml` at its top. Statac
+  doesn't read Jekyll's settings from `_config.toml`: write them as YAML
+  in `_config.yml`.
 - A Hugo site has `hugo.toml`, `hugo.yaml` or `hugo.json`, a
   `config.toml` or similar file that sets `baseURL`, or a
   `config/_default/` folder.
