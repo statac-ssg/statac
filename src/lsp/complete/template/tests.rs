@@ -309,6 +309,11 @@ fn each_of_statacs_names_filters_and_functions_says_what_it_is() {
         ("{{ page.title | | }}", "upper", Group::Filters.of("upper")),
         ("{{ page.date | | }}", "moment", Group::Filters.of("moment")),
         (
+            "{% if page.title is | %}{% endif %}",
+            "defined",
+            Group::Tests.of("defined"),
+        ),
+        (
             "{% for post in site.posts %}{{ loop.| }}{% endfor %}",
             "index",
             Group::Loop.of("index"),

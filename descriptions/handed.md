@@ -24,6 +24,35 @@ Inside a `for` loop, where the loop has got to: `loop.index`,
 `loop.first`, `loop.last` and the rest. In a loop written with
 `recursive`, `loop(...)` goes a level deeper.
 
+## `self`
+
+The blocks of the template being built, by name: `self.title()` writes
+the `title` block again, elsewhere in the template.
+
+More: https://statac.dev/templates/#extends
+
+## `super`
+
+Inside a block of a template that `extends` another, `super()` writes
+the block as the template it extends has it.
+
+More: https://statac.dev/templates/#extends
+
+## `caller`
+
+Inside a `macro` called with a `call` block, `caller()` writes what the
+`call` block holds.
+
+## `varargs`
+
+Inside a `macro`, the values a call hands it past those the macro names,
+as a list.
+
+## `kwargs`
+
+Inside a `macro`, the values a call hands it by names the macro doesn't
+have, as a table of names and values.
+
 ## `list`
 
 In a feed's template, the list the feed is published for.

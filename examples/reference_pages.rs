@@ -37,6 +37,7 @@ const SECTIONS: &[(&str, &[Group])] = &[
             Group::SearchField,
             Group::Loop,
             Group::Filters,
+            Group::Tests,
             Group::Functions,
         ],
     ),

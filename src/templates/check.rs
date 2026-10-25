@@ -548,6 +548,10 @@ pub(super) fn asked(
     checker.answer
 }
 
+/// The names the template engine gives a template of its own: a block's
+/// `self` and `super`, and a macro's `caller`, `varargs` and `kwargs`.
+const ENGINE_NAMES: &[&str] = &["self", "super", "caller", "varargs", "kwargs"];
+
 /// What `redirect.html` is handed besides `page` and `site`.
 fn handed_to_redirect() -> Vec<(&'static str, Ty)> {
     vec![("to", Ty::Text), ("title", Ty::Text)]
@@ -567,6 +571,7 @@ fn handed_to_feed() -> Vec<(&'static str, Ty)> {
 #[cfg(test)]
 pub(super) fn handed_names() -> Vec<&'static str> {
     let mut names = vec!["page", "site", "loop"];
+    names.extend(ENGINE_NAMES);
     let typed = handed_to_redirect().into_iter().chain(handed_to_feed());
     names.extend(typed.map(|(name, _)| name));
     names.extend(super::files::SUPPLIED.iter().chain(super::files::WRAPPED));
@@ -855,7 +860,7 @@ impl<'a> Checker<'a> {
         match name {
             "page" => Some(Info::of(Ty::Record(Rec::Page))),
             "site" => Some(Info::of(Ty::Record(Rec::Site))),
-            "self" | "super" | "varargs" | "kwargs" | "caller" => Some(Info::of(Ty::Any)),
+            _ if ENGINE_NAMES.contains(&name) => Some(Info::of(Ty::Any)),
             _ if self.schema.snippets.contains_key(name) => Some(Info::of(Ty::Callable)),
             _ if guard::FUNCTIONS.contains(&name) || own::FUNCTIONS.contains(&name) => {
                 Some(Info::of(Ty::Callable))

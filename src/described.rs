@@ -55,6 +55,7 @@ groups! {
     SearchField "search-field",
     Loop "loop",
     Filters "filters",
+    Tests "tests",
     Functions "functions",
 }
 
@@ -208,6 +209,8 @@ mod tests {
         assert_eq!(names(Group::Filters), sorted(filters));
         let functions = crate::templates::function_names();
         assert_eq!(names(Group::Functions), sorted(functions));
+        let tests = crate::templates::test_names();
+        assert_eq!(names(Group::Tests), sorted(tests));
     }
 
     #[test]

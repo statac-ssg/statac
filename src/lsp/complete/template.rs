@@ -753,7 +753,10 @@ fn filters() -> Vec<Item> {
 
 fn tests() -> Vec<Item> {
     (crate::templates::test_names())
-        .map(|name| item(name, None, ItemKind::Function, name))
+        .map(|name| Item {
+            about: Group::Tests.of(name),
+            ..item(name, None, ItemKind::Function, name)
+        })
         .collect()
 }
 
