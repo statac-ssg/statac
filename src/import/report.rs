@@ -31,6 +31,11 @@ pub(super) fn code(text: &str) -> String {
     format!("{fence}{pad}{text}{pad}{fence}")
 }
 
+/// What is said where the old settings give the site no `title`.
+pub(super) const NO_TITLE: &str = "The settings give no `title`, so the new site's `title` is \
+                                   made from the old folder's name: put it right in \
+                                   `statac.yaml`.";
+
 /// What is said where the old settings give no full URL in `setting`,
 /// `written` being what they give there instead, and none was given for
 /// the site: the new site has no `url`.

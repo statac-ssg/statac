@@ -3857,6 +3857,98 @@ fn a_site_whose_settings_give_no_url_is_said_to_have_none() {
     }
 }
 
+/// A site of each tool, with and without a title in its settings: the
+/// report says where the new site's title is made from the old folder's
+/// name, once.
+#[test]
+fn a_site_whose_settings_give_no_title_is_said_to_have_one_from_the_folder() {
+    let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+    let eleventy = "Eleventy's settings hold no title, URL or language for the site, so the new \
+                    site's `title` is made from the old folder's name, it has no `url` yet, and \
+                    it is in English, `en`: put each right in `statac.yaml`.";
+    let others = "The settings give no `title`, so the new site's `title` is made from the old \
+                  folder's name: put it right in `statac.yaml`.";
+    // (the case, the settings file and what it holds, the post's file, the
+    // line said, if any)
+    let cases = [
+        (
+            "jekyll",
+            "_config.yml",
+            "url: https://example.org\n",
+            "_posts/2026-01-01-post-1.md",
+            Some(others),
+        ),
+        (
+            "jekyll-title",
+            "_config.yml",
+            "url: https://example.org\ntitle: Site 1\n",
+            "_posts/2026-01-01-post-1.md",
+            None,
+        ),
+        (
+            "hugo",
+            "hugo.toml",
+            "baseURL = \"https://example.org/\"\n",
+            "content/posts/post-1.md",
+            Some(others),
+        ),
+        (
+            "hugo-title",
+            "hugo.toml",
+            "baseURL = \"https://example.org/\"\ntitle = \"Site 1\"\n",
+            "content/posts/post-1.md",
+            None,
+        ),
+        (
+            "zola",
+            "zola.toml",
+            "base_url = \"https://example.org\"\n",
+            "content/post-1.md",
+            Some(others),
+        ),
+        (
+            "zola-title",
+            "zola.toml",
+            "base_url = \"https://example.org\"\ntitle = \"Site 1\"\n",
+            "content/post-1.md",
+            None,
+        ),
+        (
+            "eleventy",
+            "eleventy.config.js",
+            "export default function (eleventyConfig) {}\n",
+            "posts/post-1.md",
+            Some(eleventy),
+        ),
+    ];
+    for (label, settings, given, page, said) in cases {
+        let top = scratch(&format!("no-title-{label}"));
+        let old = top.join("old");
+        fs::create_dir_all(old.join(page).parent().unwrap()).unwrap();
+        fs::write(old.join(settings), given).unwrap();
+        fs::write(old.join(page), post).unwrap();
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        let title = match said {
+            Some(_) => "\ntitle: Old\n",
+            None => "\ntitle: Site 1\n",
+        };
+        assert!(format!("\n{written}").contains(title), "{label}: {written}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        let from_folder = "made from the old folder's name";
+        assert_eq!(
+            report.matches(from_folder).count(),
+            usize::from(said.is_some()),
+            "{label}: {report}"
+        );
+        if let Some(said) = said {
+            assert!(report.contains(said), "{label}: {report}");
+        }
+    }
+}
+
 #[test]
 fn the_sites_address_is_asked_for_at_a_terminal_until_it_is_one_or_enter() {
     let old = Path::new("tests/import/eleventy-under-path/old");

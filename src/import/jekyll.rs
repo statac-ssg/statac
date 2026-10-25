@@ -812,6 +812,9 @@ impl Reader<'_> {
             display: true,
         };
         let mut notes = Vec::new();
+        if s.title.is_none() {
+            notes.push(super::report::NO_TITLE.to_owned());
+        }
         match (&s.url, self.given) {
             (Some(url), _) if url.starts_with("https://") || url.starts_with("http://") => {
                 self.import.address = Some(format!("{url}{}", s.base));
