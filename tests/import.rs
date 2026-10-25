@@ -3238,13 +3238,106 @@ fn an_old_address_that_cant_be_kept_is_told_of_once_though_the_built_output_hold
     assert_eq!(report.matches("`/old/post-1-??/`").count(), 1, "{report}");
     assert!(
         report.contains(
-            "This old URL can't be kept: the new site can't redirect from it, so it was left \
-             out of its page's `redirect_from`.\n\
+            "This old URL can't be kept: the new site can't redirect from it.\n\
              \n\
              - `/old/post-1-??/`, for `content/posts/post-1.md`: `?` can't be in a name\n"
         ),
         "{report}"
     );
+}
+
+/// An old URL Statac worked out and can't publish at, a page's or a
+/// tag's, is told of once, as one that can't be kept, though the old
+/// built output holds it.
+#[test]
+fn an_old_address_the_new_site_cant_publish_at_is_told_of_once_as_unkept() {
+    let zola = [
+        (
+            "config.toml",
+            "base_url = \"https://example.org\"\ntitle = \"x\"\n\
+             taxonomies = [{ name = \"tags\" }]\n\
+             [slugify]\npaths = \"safe\"\ntaxonomies = \"safe\"\n",
+        ),
+        (
+            "content/p#q.md",
+            "+++\ntitle = \"a\"\ndate = 2026-01-01\n[taxonomies]\ntags = [\"C#\"]\n+++\na\n",
+        ),
+        (
+            "content/c%d.md",
+            "+++\ntitle = \"b\"\ndate = 2026-01-02\n+++\nb\n",
+        ),
+    ];
+    let hugo = [
+        ("hugo.toml", "baseURL = 'https://example.org/'\n"),
+        (
+            "content/posts/a.md",
+            "---\ntitle: a\ndate: 2026-01-01\ntags: [\"C#\"]\n---\na\n",
+        ),
+    ];
+    // Each site, what the tool published for it, and what can't be kept.
+    for (at, (files, built, unkept)) in [
+        (
+            &zola[..],
+            &[
+                "public/404.html",
+                "public/c%d/index.html",
+                "public/index.html",
+                "public/p#q/index.html",
+                "public/robots.txt",
+                "public/sitemap.xml",
+                "public/tags/C#/index.html",
+                "public/tags/index.html",
+            ][..],
+            "These old URLs can't be kept: the new site can't redirect from them.\n\n\
+             - `/c%d/`, for `content/c%d.md`: `%` can't be in a name\n\
+             - `/p#q/`, for `content/p#q.md`: `#` can't be in a name\n\
+             - `/tags/C#/`: `#` can't be in a name\n",
+        ),
+        (
+            &hugo[..],
+            &[
+                "public/categories/index.html",
+                "public/categories/index.xml",
+                "public/index.html",
+                "public/index.xml",
+                "public/posts/a/index.html",
+                "public/posts/index.html",
+                "public/posts/index.xml",
+                "public/sitemap.xml",
+                "public/tags/c#/index.html",
+                "public/tags/c#/index.xml",
+                "public/tags/index.html",
+                "public/tags/index.xml",
+            ][..],
+            "This old URL can't be kept: the new site can't redirect from it.\n\n\
+             - `/tags/c#/`: `#` can't be in a name\n",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let old = scratch(&format!("unpublishable-old-{at}"));
+        let new = scratch(&format!("unpublishable-new-{at}"));
+        let written = files.iter().copied();
+        for (path, text) in written.chain(built.iter().map(|path| (*path, "x"))) {
+            let path = old.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{at}: {told}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(report.contains(unkept), "{at}: {report}");
+        for line in unkept.lines().skip(2) {
+            let address = line.split('`').nth(1).unwrap();
+            let told = report.matches(&format!("`{address}`")).count();
+            assert_eq!(told, 1, "{at}: {address}: {report}");
+        }
+        assert!(
+            !report.contains("Nothing in the new site is published at these old URLs"),
+            "{at}: {report}"
+        );
+    }
 }
 
 #[test]

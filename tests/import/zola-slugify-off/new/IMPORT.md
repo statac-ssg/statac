@@ -29,13 +29,13 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
 
+This old URL can't be kept: the new site can't redirect from it.
+
+- `/posts/Post #1, Café!/`, for `content/posts/Post #1, Café!.md`: `#` can't be in a name
+
 ## Left for you
 
-### URLs Statac can't publish at
-
-Zola published each of these pages at a URL holding a character Statac's URLs can't hold, such as `%` or `?`, so the page is at Statac's own URL, and the old one isn't kept.
-
-- `content/posts/Post #1, Café!.md`: `/posts/Post #1, Café!/`
+Nothing: everything Statac read came across.
 
 ## Not converted
 

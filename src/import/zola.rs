@@ -91,13 +91,6 @@ pub(super) static SETTINGS_LEFT: FindingKind = FindingKind {
                https://statac.dev/settings/ says what Statac offers.",
 };
 
-pub(super) static ADDRESS_UNUSABLE: FindingKind = FindingKind {
-    heading: "URLs Statac can't publish at",
-    sentence: "Zola published each of these pages at a URL holding a character Statac's URLs \
-               can't hold, such as `%` or `?`, so the page is at Statac's own URL, and the old \
-               one isn't kept.",
-};
-
 pub(super) static ORDER_UNKNOWN: FindingKind = FindingKind {
     heading: "Orders Statac doesn't know",
     sentence: "Zola ordered the pages of each of these lists by a `sort_by` Statac doesn't know, \
@@ -940,15 +933,18 @@ impl Reader<'_> {
             }
             (Some(made), None) => format!("/{prefix}{}/", joined(&dir, made)),
         };
+        // Where Statac can't publish at the address, the page lands at
+        // its own, and the old one is among those it can't redirect from.
+        let mut unusable = None;
         let address = match address {
             _ if draft => None,
             address if Address::read(&address).is_err() => {
-                self.find(&ADDRESS_UNUSABLE, &from, None, &address);
+                unusable = Some(address);
                 None
             }
             address => Some(address),
         };
-        let others: Vec<String> = aliases
+        let mut others: Vec<String> = aliases
             .iter()
             .map(|alias| {
                 let alias = format!("/{}", alias.trim().trim_start_matches('/'));
@@ -975,6 +971,7 @@ impl Reader<'_> {
             && front.body.trim().is_empty()
             && fields.is_empty()
             && others.is_empty();
+        others.splice(0..0, unusable);
         self.docs.push(Doc {
             from,
             rel: within.to_owned(),

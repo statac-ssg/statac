@@ -760,6 +760,7 @@ pub(super) fn write<'a>(
     summary.kept.unanswered = checked.unanswered;
     summary.kept.lists = checked.lists;
     summary.kept.files = unanswered_files;
+    summary.kept.unkept.extend(checked.unkept);
     // An old address that can't be kept is told of once, as that.
     let unkept = &summary.kept.unkept;
     summary.kept.unworked = (checked.unworked.into_iter())

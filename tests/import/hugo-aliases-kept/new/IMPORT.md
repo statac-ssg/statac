@@ -32,7 +32,7 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 2 pages carry `redirect_from`, for the other URLs that led to them.
 
-These old URLs can't be kept: the new site can't redirect from them, so each was left out of its page's `redirect_from`.
+These old URLs can't be kept: the new site can't redirect from them.
 
 - `/tags/tag-1/`, for `content/posts/post-1.md`: the page for the tag `tag-1` is published there
 - `/old/post-1-??/`, for `content/posts/post-1.md`: `?` can't be in a name

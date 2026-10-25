@@ -552,17 +552,16 @@ fn unanswered(text: &mut String, summary: &Summary) {
     }
     if !kept.unkept.is_empty() {
         text.push_str(match kept.unkept.len() {
-            1 => {
-                "This old URL can't be kept: the new site can't redirect from it, so it was left \
-                  out of its page's `redirect_from`.\n\n"
-            }
-            _ => {
-                "These old URLs can't be kept: the new site can't redirect from them, so each \
-                  was left out of its page's `redirect_from`.\n\n"
-            }
+            1 => "This old URL can't be kept: the new site can't redirect from it.\n\n",
+            _ => "These old URLs can't be kept: the new site can't redirect from them.\n\n",
         });
         for (address, from, why) in &kept.unkept {
-            text.push_str(&format!("- {}, for {}: {why}\n", code(address), code(from)));
+            match from.is_empty() {
+                true => text.push_str(&format!("- {}: {why}\n", code(address))),
+                false => {
+                    text.push_str(&format!("- {}, for {}: {why}\n", code(address), code(from)))
+                }
+            }
         }
         text.push('\n');
     }

@@ -55,9 +55,8 @@ pub(super) struct Kept {
     /// another list of that kind, that nothing answers: each one's
     /// address and its list's name.
     pub lists: Vec<(String, String)>,
-    /// The old addresses left out of a page's `redirect_from` because the
-    /// new site can't publish a redirect there, each with the old file of
-    /// its page and why.
+    /// The old addresses the new site can't publish a redirect at, each
+    /// with the old file of its page, where it has one, and why.
     pub unkept: Vec<(String, String, String)>,
 }
 
@@ -972,6 +971,9 @@ fn pages_in(folder: &Path) -> Vec<String> {
 pub(super) struct Checked {
     pub answered: usize,
     pub unanswered: Vec<(String, String)>,
+    /// Those of `old` the new site can't publish a redirect at, each with
+    /// the old file it was for and why.
+    pub unkept: Vec<(String, String, String)>,
     /// The old feeds' addresses the new site publishes nothing at, each
     /// with the old file it was made from.
     pub feeds: Vec<(String, String)>,
@@ -1031,6 +1033,7 @@ pub(super) fn check(
     let mut checked = Checked {
         answered: 0,
         unanswered: Vec::new(),
+        unkept: Vec::new(),
         feeds: Vec::new(),
         lists: Vec::new(),
         pictures: Vec::new(),
@@ -1044,6 +1047,11 @@ pub(super) fn check(
             .is_ok_and(|address| published.contains(&crate::platform::folded(&address.file())))
     };
     for (address, from) in old {
+        if let Err((fault, _)) = Address::read(address) {
+            let why = crate::wording::address_fault(&fault);
+            checked.unkept.push((address.clone(), from.clone(), why));
+            continue;
+        }
         match answered(address) {
             true => checked.answered += 1,
             false => checked.unanswered.push((address.clone(), from.clone())),
