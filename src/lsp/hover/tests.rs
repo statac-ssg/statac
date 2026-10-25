@@ -1,6 +1,7 @@
 use super::Goes;
 use crate::build::incremental::Checking;
 use crate::build::{Mode, Options};
+use crate::described::Group;
 use crate::testing::TempSite;
 
 fn site() -> TempSite {
@@ -23,9 +24,9 @@ fn site() -> TempSite {
     ])
 }
 
-/// What is said of the character after the cursor, written `|`, in
-/// `text` as the text of the site's file at `path`, once the site is
-/// read: the hover's opening line and each paragraph after, and where
+/// What is said of the character after the cursor, written as the last
+/// `|`, in `text` as the text of the site's file at `path`, once the site
+/// is read: the hover's opening line and each paragraph after, and where
 /// the docs say more; and the text it is said of.
 fn said(site: &TempSite, path: &str, text: &str) -> Option<(Vec<String>, Option<String>, String)> {
     let mut checking = Checking::new();
@@ -38,8 +39,8 @@ fn said(site: &TempSite, path: &str, text: &str) -> Option<(Vec<String>, Option<
         url: None,
     };
     checking.check(&options);
-    let offset = text.find('|').expect("a cursor");
-    let text = text.replacen('|', "", 1);
+    let offset = text.rfind('|').expect("a cursor");
+    let text = format!("{}{}", &text[..offset], &text[offset + 1..]);
     let file = site.root.join(path);
     let hover = super::hover(&site.root, &file, &text, offset, checking.renderer())?;
     let mut lines = vec![hover.head];
@@ -412,42 +413,109 @@ fn template_site() -> TempSite {
 }
 
 #[test]
-fn a_name_or_field_in_a_template_says_what_it_holds() {
+fn a_name_or_field_in_a_template_says_what_it_holds_and_what_it_is() {
     let site = template_site();
     let page = "templates/page.html";
     let cases = [
-        ("{{ pa|ge.title }}", "`page` holds a page", "page"),
-        ("{{ page.ti|tle }}", "`page.title` holds text", "title"),
-        ("{{ page.da|te.year }}", "`page.date` holds a date", "date"),
+        (
+            "{{ pa|ge.title }}",
+            "`page` holds a page",
+            "page",
+            Some((Group::Handed, "page")),
+        ),
+        (
+            "{{ page.ti|tle }}",
+            "`page.title` holds text",
+            "title",
+            Some((Group::Page, "title")),
+        ),
+        (
+            "{{ page.da|te.year }}",
+            "`page.date` holds a date",
+            "date",
+            Some((Group::Page, "date")),
+        ),
         (
             "{{ page.date.ye|ar }}",
             "`page.date.year` holds a number",
             "year",
+            Some((Group::Date, "year")),
         ),
-        ("{{ site.po|sts }}", "`site.posts` holds pages", "posts"),
+        (
+            "{{ site.po|sts }}",
+            "`site.posts` holds pages",
+            "posts",
+            Some((Group::Site, "posts")),
+        ),
         (
             "{% set first = site.posts[0] %}{% set shown = fir|st %}",
             "`first` holds a page",
             "first",
+            None,
         ),
         (
             "{% for post in site.posts %}{{ po|st.title }}{% endfor %}",
             "`post` holds a page",
             "post",
+            None,
         ),
         (
             "{% for post in site.posts %}{% if lo|op.first %}{% endif %}{% endfor %}",
             "`loop` holds fields",
             "loop",
+            Some((Group::Handed, "loop")),
+        ),
+        (
+            "{% for post in site.posts %}{% if loop.fi|rst %}{% endif %}{% endfor %}",
+            "`loop.first` holds true or false",
+            "first",
+            Some((Group::Loop, "first")),
+        ),
+        (
+            "{{ site.da|ta }}",
+            "`site.data`, a name",
+            "data",
+            Some((Group::Site, "data")),
+        ),
+        (
+            "{{ ur|l('/about/') }}",
+            "`url`, a function",
+            "url",
+            Some((Group::Functions, "url")),
+        ),
+        (
+            "{{ page.ima|ge('photo-1.jpg') }}",
+            "`page.image`, a function",
+            "image",
+            Some((Group::Page, "image")),
+        ),
+        (
+            "{{ page.title | up|per }}",
+            "`upper`, a filter",
+            "upper",
+            Some((Group::Filters, "upper")),
+        ),
+        (
+            "{% filter up|per %}{% endfilter %}",
+            "`upper`, a filter",
+            "upper",
+            Some((Group::Filters, "upper")),
         ),
     ];
-    for (text, head, over) in cases {
-        let (lines, more, said_of) = said(&site, page, text).unwrap();
-        assert_eq!(lines, [head], "{text:?}");
-        assert_eq!((more, said_of.as_str()), (None, over), "{text:?}");
+    for (text, head, over, about) in cases {
+        let (lines, more, said_of) = said(&site, page, text).expect(text);
+        let about = about.map(|(group, name)| group.of(name).unwrap());
+        let mut said = vec![head.to_owned()];
+        said.extend(about.map(|about| about.text.clone()));
+        assert_eq!(lines, said, "{text:?}");
+        let wanted = about.and_then(|about| about.more.clone());
+        assert_eq!((more, said_of.as_str()), (wanted, over), "{text:?}");
     }
     let (lines, ..) = said(&site, "snippets/card.html", "{{ po|st.title }}").unwrap();
     assert_eq!(lines, ["`post` holds a page"], "as its calls hand it");
+    // A name the author sets is theirs, whatever it is called.
+    let (lines, ..) = said(&site, page, "{% set title = 1 %}{{ tit|le }}").unwrap();
+    assert_eq!(lines, ["`title` holds a number"]);
 }
 
 #[test]
@@ -488,10 +556,9 @@ fn nothing_is_said_in_a_template_of_what_isnt_read_there() {
         "<p>pa|ge</p>",
         "{# {{ pa|ge }} #}",
         "{% raw %}{{ pa|ge }}{% endraw %}",
-        "{{ page.title | up|per }}",
         "{% i|f page.title %}{% endif %}",
         "{% if page.title is def|ined %}{% endif %}",
-        "{{ ur|l('/about/') }}",
+        "{{ page.title | no_such_fil|ter }}",
         "{{ url(\"/mis|sing/\") }}",
         "{{ page.title.up|per() }}",
         "{{ nothi|ng }}",

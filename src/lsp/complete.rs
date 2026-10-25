@@ -20,7 +20,7 @@ use crate::problem::Code;
 use crate::site::{LanguageId, ListKey, PageId, PagePlace};
 use crate::source::{Place, Sources, Span};
 use crate::templates::{Renderer, SNIPPETS, TEMPLATES};
-use crate::wording;
+use crate::wording::{self, Described};
 
 /// What may be written in place of what is typed.
 #[derive(Debug)]
@@ -60,6 +60,8 @@ pub(super) struct Item {
     /// What the editor matches what is typed against, where it isn't the
     /// label.
     pub filter: Option<String>,
+    /// What it is, where it is one of Statac's own names.
+    pub about: Option<&'static Described>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -305,11 +307,24 @@ impl<'a> Known<'a> {
     /// each setting a language may give its own.
     fn setting_names(&self) -> Vec<Item> {
         let mut names: Vec<Item> = (crate::config::setting_names())
-            .map(|name| own_field(name, wording::OFFERED_SETTING))
+            .map(|name| {
+                own_field(
+                    name,
+                    wording::OFFERED_SETTING,
+                    wording::described_setting(name),
+                )
+            })
             .collect();
         let handed = (PageWord::all())
             .filter(|word| word.handed_down() && *word != PageWord::IndexPage)
-            .map(|word| own_field(&format!("pages.{}", word.name()), wording::OFFERED_HANDED));
+            .map(|word| {
+                let about = wording::described_field(word.name());
+                own_field(
+                    &format!("pages.{}", word.name()),
+                    wording::OFFERED_HANDED,
+                    about,
+                )
+            });
         names.extend(handed);
         names.extend(self.declared_handed());
         if let Some(renderer) = self.renderer {
@@ -319,7 +334,8 @@ impl<'a> Known<'a> {
                 for tag in tags {
                     let each = crate::config::PER_LANGUAGE.iter();
                     names.extend(each.map(|setting| {
-                        own_field(&format!("{tag}.{setting}"), wording::OFFERED_SETTING)
+                        let about = wording::described_setting(setting);
+                        own_field(&format!("{tag}.{setting}"), wording::OFFERED_SETTING, about)
                     }));
                 }
             }
@@ -335,11 +351,20 @@ impl<'a> Known<'a> {
             let words = PageWord::all().filter(|word| {
                 *word != PageWord::Numbered || matches!(self.holder, Holder::FolderPage { .. })
             });
-            names.extend(words.map(|word| own_field(word.name(), wording::OFFERED_FIELD)));
+            names.extend(words.map(|word| {
+                let about = wording::described_field(word.name());
+                own_field(word.name(), wording::OFFERED_FIELD, about)
+            }));
             if self.holder == (Holder::FolderPage { top: false }) {
                 let handed = PageWord::all().filter(|word| word.handed_down());
-                let handed = handed.map(|word| format!("pages.{}", word.name()));
-                names.extend(handed.map(|name| own_field(&name, wording::OFFERED_HANDED)));
+                names.extend(handed.map(|word| {
+                    let about = wording::described_field(word.name());
+                    own_field(
+                        &format!("pages.{}", word.name()),
+                        wording::OFFERED_HANDED,
+                        about,
+                    )
+                }));
                 names.extend(self.declared_handed());
             }
         }
@@ -370,6 +395,7 @@ impl<'a> Known<'a> {
             group: 1,
             text: false,
             filter: None,
+            about: None,
         }));
         names
     }
@@ -389,6 +415,7 @@ impl<'a> Known<'a> {
                 group: 1,
                 text: false,
                 filter: None,
+                about: None,
             })
             .collect()
     }
@@ -629,8 +656,8 @@ impl<'a> Known<'a> {
     }
 }
 
-/// One of Statac's own fields or settings.
-fn own_field(name: &str, detail: &str) -> Item {
+/// One of Statac's own fields or settings, and what it is.
+fn own_field(name: &str, detail: &str, about: Option<&'static Described>) -> Item {
     Item {
         label: name.to_owned(),
         detail: Some(detail.to_owned()),
@@ -639,6 +666,7 @@ fn own_field(name: &str, detail: &str) -> Item {
         group: 0,
         text: false,
         filter: None,
+        about,
     }
 }
 
@@ -652,5 +680,6 @@ fn own_value(value: &str) -> Item {
         group: 0,
         text: false,
         filter: None,
+        about: None,
     }
 }

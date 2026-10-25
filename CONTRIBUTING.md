@@ -26,9 +26,11 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-Every sentence Statac prints lives in `src/wording.rs`, and each kind of
-problem has an explanation under `explanations/`. A change to what Statac
-says changes both.
+Every sentence Statac prints lives in `src/wording.rs`, each kind of
+problem has an explanation under `explanations/`, and each setting, front
+matter field, template name, filter and function has a description under
+`descriptions/`. A change to what Statac says changes all of them that it
+touches.
 
 ## What Statac won't take
 

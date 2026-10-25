@@ -16,6 +16,7 @@ use minijinja::value::Value;
 
 use super::files::{Role, Snippet};
 use super::{guard, own};
+use crate::described::Group;
 use crate::markdown::Piece;
 use crate::problem::{
     ArgumentFault, Instead, Kind, Lack, Problem, TemplateFault, Unsupported, Word,
@@ -91,6 +92,21 @@ pub(super) enum Rec {
 impl Ty {
     fn list(of: Ty) -> Ty {
         Ty::List(Box::new(of))
+    }
+}
+
+impl Rec {
+    /// Where the descriptions of its fields are.
+    pub(super) fn described_in(self) -> Group {
+        match self {
+            Rec::Page => Group::Page,
+            Rec::Site => Group::Site,
+            Rec::Loop => Group::Loop,
+            Rec::List => Group::List,
+            Rec::Date | Rec::When => Group::Date,
+            Rec::Webmentions | Rec::Mention => Group::Webmentions,
+            Rec::Video => Group::Video,
+        }
     }
 }
 
@@ -256,12 +272,21 @@ pub(super) type Taken = BTreeMap<String, Vec<Ty>>;
 /// template may read there; no template reads it.
 pub(crate) const TYPED: &str = "statac_typed_";
 
+/// A name a template may read, with what it holds.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct ReadableName {
+    pub name: String,
+    pub ty: Ty,
+    /// Whether Statac hands it to the template, rather than the template
+    /// setting it, a call handing it to a snippet, or it being a snippet.
+    pub statacs: bool,
+}
+
 /// What a template may read where [`TYPED`] is written.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum Answer {
-    /// It stands as a name: every name readable there, with what each
-    /// holds.
-    Names(Vec<(String, Ty)>),
+    /// It stands as a name: every name readable there.
+    Names(Vec<ReadableName>),
     /// It stands as a field of a value: what that value holds, and the
     /// names that lead to it from the value they begin with, with what
     /// that holds, as `book` from a page for `page.book`.
@@ -436,6 +461,36 @@ pub(super) fn asked(
     checker.answer
 }
 
+/// What `redirect.html` is handed besides `page` and `site`.
+fn handed_to_redirect() -> Vec<(&'static str, Ty)> {
+    vec![("to", Ty::Text), ("title", Ty::Text)]
+}
+
+/// What a feed's template is handed besides `page` and `site`.
+fn handed_to_feed() -> Vec<(&'static str, Ty)> {
+    vec![
+        ("feed", Ty::Text),
+        ("list", Ty::Record(Rec::List)),
+        ("posts", Ty::list(Ty::Record(Rec::Page))),
+    ]
+}
+
+/// Every name Statac hands a template, a snippet or a piece's file at its
+/// top, but the functions.
+#[cfg(test)]
+pub(super) fn handed_names() -> Vec<&'static str> {
+    let mut names = vec!["page", "site", "loop"];
+    let typed = handed_to_redirect().into_iter().chain(handed_to_feed());
+    names.extend(typed.map(|(name, _)| name));
+    names.extend(super::files::SUPPLIED.iter().chain(super::files::WRAPPED));
+    for piece in Piece::ALL {
+        names.extend(piece.handed());
+    }
+    names.sort_unstable();
+    names.dedup();
+    names
+}
+
 /// What a piece's file is handed besides `page` and `site`, typed. A
 /// picture's size is any value, since it is empty words where unknown.
 fn handed_to(piece: Piece) -> Vec<(&'static str, Ty)> {
@@ -558,17 +613,11 @@ impl<'a> Checker<'a> {
         snippet: Option<(String, Vec<(String, Ty)>)>,
     ) -> Checker<'a> {
         let extra = match file.role {
-            Role::Template if file.name == super::render::REDIRECT => {
-                vec![("to", Ty::Text), ("title", Ty::Text)]
-            }
+            Role::Template if file.name == super::render::REDIRECT => handed_to_redirect(),
             Role::Template
                 if file.name.starts_with("feed.") || schema.feeds.contains(file.name) =>
             {
-                vec![
-                    ("feed", Ty::Text),
-                    ("list", Ty::Record(Rec::List)),
-                    ("posts", Ty::list(Ty::Record(Rec::Page))),
-                ]
+                handed_to_feed()
             }
             Role::Piece(piece) => handed_to(*piece),
             _ => Vec::new(),
@@ -656,38 +705,41 @@ impl<'a> Checker<'a> {
 
     /// Every name readable here, with what each holds, a name bound
     /// nearer hiding one further out.
-    fn readable(&self) -> Vec<(String, Ty)> {
-        let mut names: BTreeMap<String, Ty> = BTreeMap::new();
+    fn readable(&self) -> Vec<ReadableName> {
+        let mut names: BTreeMap<String, (Ty, bool)> = BTreeMap::new();
         for scope in &self.scopes {
             for (name, info) in scope {
-                names.insert(name.clone(), info.ty.clone());
+                // Only a loop's `loop` is bound by the engine.
+                let statacs = name == "loop" && info.ty == Ty::Record(Rec::Loop);
+                names.insert(name.clone(), (info.ty.clone(), statacs));
             }
         }
-        let mut global = |name: &str, ty: Ty| {
-            names.entry(name.to_owned()).or_insert(ty);
+        let mut global = |name: &str, ty: Ty, statacs: bool| {
+            names.entry(name.to_owned()).or_insert((ty, statacs));
         };
         if let Some((_, params)) = &self.snippet {
             for (param, ty) in params {
-                global(param, ty.clone());
+                global(param, ty.clone(), false);
             }
             for name in super::files::SUPPLIED.iter().chain(super::files::WRAPPED) {
-                global(name, Ty::Any);
+                global(name, Ty::Any, true);
             }
         }
         for (name, ty) in &self.extra {
-            global(name, ty.clone());
+            global(name, ty.clone(), true);
         }
-        global("page", Ty::Record(Rec::Page));
-        global("site", Ty::Record(Rec::Site));
-        let callables = (self.schema.snippets.keys().map(String::as_str))
-            .chain(guard::FUNCTIONS.iter().copied())
-            .chain(own::FUNCTIONS.iter().copied());
-        for name in callables {
-            global(name, Ty::Callable);
+        global("page", Ty::Record(Rec::Page), true);
+        global("site", Ty::Record(Rec::Site), true);
+        for name in self.schema.snippets.keys() {
+            global(name, Ty::Callable, false);
+        }
+        for name in guard::FUNCTIONS.iter().chain(own::FUNCTIONS) {
+            global(name, Ty::Callable, true);
         }
         names.remove(TYPED);
         (names.into_iter())
             .filter(|(name, _)| !self.imported.contains(name))
+            .map(|(name, (ty, statacs))| ReadableName { name, ty, statacs })
             .collect()
     }
 

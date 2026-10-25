@@ -58,11 +58,11 @@ struct Said {
 }
 
 impl Said {
-    fn of(head: String, described: Described) -> Said {
+    fn of(head: String, described: &Described) -> Said {
         Said {
             head,
-            body: vec![described.text.to_owned()],
-            more: Some(described.more.to_owned()),
+            body: vec![described.text.clone()],
+            more: described.more.clone(),
             to: None,
         }
     }
@@ -174,7 +174,7 @@ fn setting(site: &Known, name: &str) -> Option<Said> {
             head: wording::hover_for_a_language(name),
             body: vec![
                 wording::for_a_language(setting, tag),
-                described.text.to_owned(),
+                described.text.clone(),
             ],
             more: Some(wording::FOR_ONE_LANGUAGE.to_owned()),
             to: None,
@@ -226,7 +226,7 @@ fn handed(site: &Known, field: &str, in_folder: bool) -> Option<Said> {
         let described = wording::described_field(word.name())?;
         return word.handed_down().then(|| Said {
             head,
-            body: vec![hands, described.text.to_owned()],
+            body: vec![hands, described.text.clone()],
             more: Some(wording::HANDING_DOWN.to_owned()),
             to: None,
         });

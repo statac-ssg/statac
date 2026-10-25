@@ -10,6 +10,7 @@ pub mod content;
 mod data;
 pub mod date;
 pub mod dates;
+pub mod described;
 mod disk;
 mod elsewhere;
 mod feeds;

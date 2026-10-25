@@ -1082,7 +1082,11 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
     let title = "{\"name\":\"page.title\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"Post 3\",\
         \"empty\":false,\"has\":[],\"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2,\
         \"excerpt\":[{\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Post 3\"}]}]},\
-        \"used\":true}";
+        \"used\":true,\"about\":[{\"text\":\"The page\\u0027s title: its \"},\
+        {\"code\":\"title\"},{\"text\":\", or else the \"},{\"code\":\"# heading\"},\
+        {\"text\":\" its content opens with. A page with neither has none, so to show the \
+        names of pages write \"},{\"code\":\"headline(page)\"},{\"text\":\".\"}],\
+        \"more\":\"https://statac.dev/templates/#what-a-template-sees\"}";
     assert!(
         post.contains(title)
             && post.contains(
@@ -1090,11 +1094,11 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
                  \"empty\":false,\"has\":[\"day\",\"month\",\"weekday\",\"year\"],\
                  \"from\":{\"file\":\"content/posts/post-3.md\",\"line\":3,\"excerpt\":[\
                  {\"line\":3,\"text\":[{\"text\":\"date: \"},{\"mark\":\"2026-10-03\"}]}]},\
-                 \"used\":false}"
+                 \"used\":false,\"about\":["
             )
             && post.contains(
                 "{\"name\":\"page.summary\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"no value\",\
-                 \"empty\":true,\"has\":[],\"from\":null,\"used\":false}"
+                 \"empty\":true,\"has\":[],\"from\":null,\"used\":false,\"about\":["
             ),
         "{post}"
     );
@@ -1102,7 +1106,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
     let used = |name: &str, value: &str, used: bool| {
         format!(
             "{{\"name\":\"page.{name}\",\"kind\":\"html\",\"holds\":\"HTML\",\"value\":\"{value}\",\
-             \"empty\":false,\"has\":[],\"from\":null,\"used\":{used}}}"
+             \"empty\":false,\"has\":[],\"from\":null,\"used\":{used},\"about\":["
         )
     };
     let writing = "\\u003cp\\u003ePost 3.\\u003c/p\\u003e";
@@ -1145,10 +1149,10 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
         ) && list.contains(
             "{\"name\":\"page.title\",\"kind\":\"text\",\"holds\":\"text\",\"value\":\"Posts\",\"empty\":false,\
              \"has\":[],\"from\":{\"file\":\"content/posts/index.md\",\"line\":2,\"excerpt\":[\
-             {\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Posts\"}]}]},\"used\":true}"
+             {\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Posts\"}]}]},\"used\":true,\"about\":["
         ) && list.contains(
             "{\"name\":\"page.posts\",\"kind\":\"pages\",\"holds\":\"pages\",\"value\":\"3 pages\",\
-             \"empty\":false,\"has\":[],\"from\":null,\"used\":false}"
+             \"empty\":false,\"has\":[],\"from\":null,\"used\":false,\"about\":["
         ),
         "{list}"
     );

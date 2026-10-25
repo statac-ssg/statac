@@ -655,6 +655,7 @@
     .detail dt { color: var(--text-muted); }
     .detail dd { overflow-wrap: anywhere; }
     .detail .written-at { display: flex; flex-direction: column; gap: ${em(8)}; }
+    .detail .about { display: flex; flex-direction: column; gap: ${em(6)}; line-height: 1.55; }
     .expression { display: flex; align-items: center; gap: ${em(10)}; }
     .expression code {
       flex: 1; font-size: ${em(15)}; color: var(--text-strong); background: var(--selected);
@@ -2304,6 +2305,14 @@
         make("code", {}, expression(row.written ?? row.name)),
         copy,
       ),
+      row.about
+        ? make(
+            "div",
+            { class: "about" },
+            spoken("p", row.about),
+            row.more ? make("p", {}, link(row.more, told("readOnline"))) : null,
+          )
+        : null,
       make(
         "dl",
         {},

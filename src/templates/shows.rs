@@ -17,6 +17,7 @@ use super::frame::{self, Frame};
 use super::values::{self, Lists, PageValue, SiteValue};
 use super::{Chosen, Renderer};
 use crate::content::words::PageWord;
+use crate::described::Described;
 use crate::language::Direction;
 use crate::problem::Holds;
 use crate::site::{DataId, NameId, PageId};
@@ -88,6 +89,8 @@ pub struct Row {
     /// The names it answers in turn, as `page.date` answers `year`.
     pub has: Vec<String>,
     pub reached: Reached,
+    /// What it is, where it is one of Statac's names.
+    pub about: Option<&'static Described>,
 }
 
 /// What a template asks for on its way to a name.
@@ -256,7 +259,9 @@ impl Renderer {
                 None if rec == Rec::Page => Reached::Page(self.name_id(name)),
                 None => Reached::Site(self.name_id(name)),
             };
+            let at = rows.len();
             self.row(&mut rows, full, &field.ty, value, from, has, reached, 1);
+            rows[at].about = rec.described_in().of(name);
         }
         rows
     }
@@ -322,6 +327,7 @@ impl Renderer {
             from: None,
             has: Vec::new(),
             reached: reached.clone(),
+            about: None,
         });
         rows.push(Row {
             name,
@@ -330,6 +336,7 @@ impl Renderer {
             from,
             has,
             reached,
+            about: None,
         });
         for (name, value, reached) in inner {
             let from = frame::origin(&value);

@@ -54,6 +54,8 @@ pub(crate) use layout::Chosen;
 pub(crate) use media::fits;
 pub(crate) use render::{Renderer, developed};
 pub(crate) use shows::{Explained, Held, Neighbour, Reached, Row};
+#[cfg(test)]
+pub(crate) use typing::function_names;
 pub(crate) use typing::{Name, Readable, TYPED, filter_names, test_names};
 
 /// The site's templates and snippets, read and checked, ready to build

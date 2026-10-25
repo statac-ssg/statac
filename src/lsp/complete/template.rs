@@ -16,6 +16,7 @@ use std::ops::Range;
 
 use super::writing::{addresses, in_quote, names_left, takes_written};
 use super::{Completion, Item, ItemKind};
+use crate::described::{Described, Group};
 use crate::problem::Holds;
 use crate::templates::{Name, Readable, Renderer, TYPED};
 use crate::wording;
@@ -137,12 +138,15 @@ pub(super) fn complete(
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(in crate::lsp) enum Pointed {
     /// A name or a field the template reads, as written up to the word,
-    /// `post.title`, and what it holds.
+    /// `post.title`, what it holds, and what it is where it is Statac's.
     Value {
         range: Range<usize>,
         written: String,
         holds: Holds,
+        about: Option<&'static Described>,
     },
+    /// A filter, by its name, where it is one a template may use.
+    Filter { range: Range<usize>, name: String },
     /// A call to the site's snippet `name`.
     Snippet { range: Range<usize>, name: String },
     /// The address `url(...)` is handed.
@@ -194,10 +198,20 @@ pub(in crate::lsp) fn pointed(
         Token::Name(word) => word,
         _ => return None,
     };
+    let filter = || {
+        (crate::templates::filter_names())
+            .any(|filter| filter == word)
+            .then(|| Pointed::Filter {
+                range: range.clone(),
+                name: word.to_owned(),
+            })
+    };
     match words.as_slice() {
         [] if before.statement => return None,
-        [.., Token::Mark("|") | Token::Name("is" | "not")] => return None,
-        [Token::Name("filter" | "block" | "extends" | "macro")] if before.statement => {
+        [.., Token::Mark("|")] => return filter(),
+        [Token::Name("filter")] if before.statement => return filter(),
+        [.., Token::Name("is" | "not")] => return None,
+        [Token::Name("block" | "extends" | "macro")] if before.statement => {
             return None;
         }
         _ => {}
@@ -214,8 +228,8 @@ pub(in crate::lsp) fn pointed(
         Readable::Names(names) if words.last() != Some(&Token::Mark(".")) => names,
         _ => return None,
     };
-    let Name { holds, .. } = found.into_iter().find(|name| name.name == word)?;
-    if holds == Holds::Call {
+    let Name { holds, about, .. } = found.into_iter().find(|name| name.name == word)?;
+    if holds == Holds::Call && about.is_none() {
         let snippets = renderer.snippets();
         let called = (snippets.iter()).any(|(snippet, _)| snippet.name == word);
         let ours = words.last() != Some(&Token::Mark("."));
@@ -233,10 +247,11 @@ pub(in crate::lsp) fn pointed(
         from -= 2;
     }
     let written = text[tokens[from].span.start..range.end].to_owned();
-    (holds != Holds::Unknown).then_some(Pointed::Value {
+    (holds != Holds::Unknown || about.is_some()).then_some(Pointed::Value {
         range,
         written,
         holds,
+        about,
     })
 }
 
@@ -589,9 +604,9 @@ impl Offer<'_> {
             return None;
         };
         let snippets = self.renderer.map(Renderer::snippets).unwrap_or_default();
-        let items = names.into_iter().map(|Name { name, holds }| {
+        let items = names.into_iter().map(|Name { name, holds, about }| {
             let snippet = (snippets.iter()).find(|(snippet, _)| snippet.name == name);
-            match (holds, snippet) {
+            let item = match (holds, snippet) {
                 (Holds::Call, Some((snippet, path))) => Item {
                     label: format!("{name}({})", takes_written(snippet)),
                     filter: Some(name.clone()),
@@ -608,7 +623,8 @@ impl Offer<'_> {
                     ..item(&name, None, ItemKind::Function, &self.call(&name, opened))
                 },
                 (holds, _) => item(&name, said(holds), ItemKind::Variable, &name),
-            }
+            };
+            Item { about, ..item }
         });
         Some(items.collect())
     }
@@ -625,9 +641,12 @@ impl Offer<'_> {
         let Readable::Fields(fields) = self.readable(before, rest, typed)? else {
             return None;
         };
-        let items = fields.into_iter().map(|Name { name, holds }| match holds {
-            Holds::Call => item(&name, None, ItemKind::Function, &self.call(&name, opened)),
-            holds => item(&name, said(holds), ItemKind::Field, &name),
+        let items = fields.into_iter().map(|Name { name, holds, about }| {
+            let item = match holds {
+                Holds::Call => item(&name, None, ItemKind::Function, &self.call(&name, opened)),
+                holds => item(&name, said(holds), ItemKind::Field, &name),
+            };
+            Item { about, ..item }
         });
         Some(items.collect())
     }
@@ -719,12 +738,16 @@ fn item(label: &str, detail: Option<String>, kind: ItemKind, insert: &str) -> It
         group: 0,
         text: false,
         filter: None,
+        about: None,
     }
 }
 
 fn filters() -> Vec<Item> {
     (crate::templates::filter_names())
-        .map(|name| item(name, None, ItemKind::Function, name))
+        .map(|name| Item {
+            about: Group::Filters.of(name),
+            ..item(name, None, ItemKind::Function, name)
+        })
         .collect()
 }
 

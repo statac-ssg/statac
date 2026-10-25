@@ -1,12 +1,15 @@
 //! Hover in a template or a snippet: what a name or field it reads holds
-//! where it stands, the snippet a call names, and the page or template a
+//! where it stands and what it is where it is Statac's, what a filter or
+//! a function does, the snippet a call names, and the page or template a
 //! string it hands `url(...)` or `extends` names.
 
 use std::ops::Range;
 
 use super::writing::{Reading, snippet_said};
 use super::{Goes, Said};
+use crate::described::Group;
 use crate::lsp::complete::template::{Pointed, pointed};
+use crate::problem::Holds;
 use crate::templates::Renderer;
 use crate::wording;
 
@@ -23,14 +26,27 @@ pub(super) fn said(
             range,
             written,
             holds,
+            about,
         } => {
-            let said = Said {
-                head: wording::hover_holds(&written, holds)?,
-                body: Vec::new(),
-                more: None,
-                to: None,
+            let head = match (holds, about) {
+                (Holds::Call, Some(_)) => Some(wording::hover_function(&written)),
+                (holds, about) => wording::hover_holds(&written, holds)
+                    .or_else(|| about.map(|_| wording::hover_name(&written))),
+            };
+            let said = match about {
+                Some(about) => Said::of(head?, about),
+                None => Said {
+                    head: head?,
+                    body: Vec::new(),
+                    more: None,
+                    to: None,
+                },
             };
             Some((range, said))
+        }
+        Pointed::Filter { range, name } => {
+            let about = Group::Filters.of(&name)?;
+            Some((range, Said::of(wording::hover_filter(&name), about)))
         }
         Pointed::Snippet { range, name } => {
             let snippets = renderer.snippets();

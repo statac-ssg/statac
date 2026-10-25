@@ -3,9 +3,10 @@
 //! written at the cursor and checked as every template is, so what is
 //! offered is what the check would take.
 
-use super::check::{self, Answer, Checked, Rec, Ty};
+use super::check::{self, Answer, Checked, ReadableName, Rec, Ty};
 use super::files::Role;
 use super::{Renderer, guard, own, shows};
+use crate::described::{Described, Group};
 use crate::problem::Holds;
 use crate::source::Sources;
 
@@ -25,6 +26,8 @@ pub(crate) enum Readable {
 pub(crate) struct Name {
     pub name: String,
     pub holds: Holds,
+    /// What it is, where it is one of Statac's.
+    pub about: Option<&'static Described>,
 }
 
 impl Renderer {
@@ -63,8 +66,13 @@ impl Renderer {
         match check::asked(&schema, &checked, &sources, taken)? {
             Answer::Names(names) => Some(Readable::Names(
                 (names.into_iter())
-                    .map(|(name, ty)| Name {
+                    .map(|ReadableName { name, ty, statacs }| Name {
                         holds: shows::holds(&ty, None),
+                        about: match (statacs, &ty) {
+                            (false, _) => None,
+                            (true, Ty::Callable) => Group::Functions.of(&name),
+                            (true, _) => Group::Handed.of(&name),
+                        },
                         name,
                     })
                     .collect(),
@@ -75,6 +83,7 @@ impl Renderer {
                         .map(|(name, field)| Name {
                             name: name.clone(),
                             holds: shows::holds(&field.ty, None),
+                            about: rec.described_in().of(name),
                         })
                         .collect(),
                     (Ty::Any, Ty::Record(Rec::Page)) => self.nested(&path),
@@ -111,6 +120,7 @@ impl Renderer {
                 fields.push(Name {
                     name: name.to_owned(),
                     holds,
+                    about: None,
                 });
             }
         }
@@ -137,6 +147,7 @@ impl Renderer {
                         Entry::Folder(_) => Holds::Fields,
                         Entry::File(id) => holds(data.file(*id).node.as_ref()),
                     },
+                    about: None,
                 })
                 .collect(),
             Some(Reached::Value { node, .. }) => match &node.value {
@@ -145,6 +156,7 @@ impl Renderer {
                         Value::Scalar(name) => Some(Name {
                             name: name.clone(),
                             holds: holds(Some(&entry.value)),
+                            about: None,
                         }),
                         _ => None,
                     })
@@ -181,6 +193,13 @@ impl Renderer {
 /// The filters a template may use, Statac's own and the engine's.
 pub(crate) fn filter_names() -> impl Iterator<Item = &'static str> {
     own::FILTERS.iter().chain(guard::FILTERS).copied()
+}
+
+/// The functions a template may call by name, Statac's own and the
+/// engine's.
+#[cfg(test)]
+pub(crate) fn function_names() -> impl Iterator<Item = &'static str> {
+    own::FUNCTIONS.iter().chain(guard::FUNCTIONS).copied()
 }
 
 /// The tests a template may use after `is`, by name.

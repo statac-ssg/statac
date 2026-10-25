@@ -115,6 +115,7 @@ fn run_with(
         encoding: Encoding::Utf16,
         snippets: false,
         markdown: false,
+        described_in_markdown: false,
         nested: false,
         actions: false,
         initialised: false,
@@ -145,6 +146,8 @@ struct Server<'a> {
     snippets: bool,
     /// Whether the editor reads Markdown in what a hover says.
     markdown: bool,
+    /// Whether it reads Markdown in what a completion's item is.
+    described_in_markdown: bool,
     /// Whether the editor shows a page's headings each beneath the one
     /// above it.
     nested: bool,
@@ -382,8 +385,10 @@ impl Server<'_> {
                     self.encoding = Encoding::Utf8;
                 }
                 let item = ["params", "capabilities", "textDocument", "completion"];
-                let item = [&item[..], &["completionItem", "snippetSupport"]].concat();
-                self.snippets = message.truth(&item);
+                let item = [&item[..], &["completionItem"]].concat();
+                self.snippets = message.truth(&[&item[..], &["snippetSupport"]].concat());
+                let formats = message.texts(&[&item[..], &["documentationFormat"]].concat());
+                self.described_in_markdown = formats.contains(&"markdown");
                 let hover = ["params", "capabilities", "textDocument", "hover"];
                 let formats = message.texts(&[&hover[..], &["contentFormat"]].concat());
                 self.markdown = formats.contains(&"markdown");
@@ -637,8 +642,22 @@ impl Server<'_> {
                     true => ",\"insertTextFormat\":2",
                     false => "",
                 };
+                let about = match item.about {
+                    Some(about) => {
+                        let (kind, said) = said(
+                            vec![about.text.clone()],
+                            about.more.as_deref(),
+                            self.described_in_markdown,
+                        );
+                        format!(
+                            ",\"documentation\":{{\"kind\":\"{kind}\",\"value\":{}}}",
+                            json::string(&said)
+                        )
+                    }
+                    None => String::new(),
+                };
                 format!(
-                    "{{\"label\":{},\"kind\":{}{detail}{filter}{format},\"sortText\":{},\
+                    "{{\"label\":{},\"kind\":{}{detail}{about}{filter}{format},\"sortText\":{},\
                      \"textEdit\":{{\"range\":{range},\"newText\":{}}}}}",
                     json::string(&item.label),
                     item.kind.number(),
@@ -674,25 +693,13 @@ impl Server<'_> {
             let (line, character) = diagnostics::position_in(&text, offset, self.encoding);
             format!("{{\"line\":{line},\"character\":{character}}}")
         };
-        let mut said = vec![hover.head];
-        said.extend(hover.body);
-        let (kind, more) = match self.markdown {
-            true => (
-                "markdown",
-                hover
-                    .more
-                    .map(|more| format!("[{}]({more})", crate::wording::HOVER_MORE)),
-            ),
-            false => (
-                "plaintext",
-                hover.more.map(|more| crate::wording::more(&more)),
-            ),
-        };
-        said.extend(more);
+        let mut paragraphs = vec![hover.head];
+        paragraphs.extend(hover.body);
+        let (kind, said) = said(paragraphs, hover.more.as_deref(), self.markdown);
         Ok(format!(
             "{{\"contents\":{{\"kind\":\"{kind}\",\"value\":{}}},\
              \"range\":{{\"start\":{},\"end\":{}}}}}",
-            json::string(&said.join("\n\n")),
+            json::string(&said),
             position(hover.range.start),
             position(hover.range.end),
         ))
@@ -1128,6 +1135,20 @@ impl Server<'_> {
 
 /// The exit code where `answered` ends the server: where the editor said
 /// to stop, or can no longer be written to.
+/// `paragraphs`, then where the docs say more, as Markdown where `markdown`
+/// and as plain text otherwise: the protocol's word for which, and the text.
+fn said(mut paragraphs: Vec<String>, more: Option<&str>, markdown: bool) -> (&'static str, String) {
+    let (kind, more) = match markdown {
+        true => (
+            "markdown",
+            more.map(|more| format!("[{}]({more})", crate::wording::HOVER_MORE)),
+        ),
+        false => ("plaintext", more.map(crate::wording::more)),
+    };
+    paragraphs.extend(more);
+    (kind, paragraphs.join("\n\n"))
+}
+
 fn ended(answered: Answered) -> Option<u8> {
     match answered {
         Ok(code) => code,

@@ -688,6 +688,66 @@ fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
 }
 
 #[test]
+fn a_completion_says_what_each_of_statacs_names_is_in_markdown_where_the_editor_reads_it() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+    ]);
+    let settings = site.root.join("statac.yaml");
+    let typed = "title: Site 1\ncode_c\n";
+    let link = "https://statac.dev/settings/#writing-and-code";
+    let more = [
+        (
+            "\"markdown\",\"plaintext\"",
+            "markdown",
+            format!("[More on statac.dev]({link})"),
+        ),
+        ("\"plaintext\"", "plaintext", format!("More: {link}")),
+    ];
+    for (formats, kind, more) in more {
+        let mut editor = Editor::start();
+        editor.send(&format!(
+            "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\
+             \"params\":{{\"capabilities\":{{\"textDocument\":{{\"completion\":\
+             {{\"completionItem\":{{\"documentationFormat\":[{formats}]}}}}}}}}}}}}"
+        ));
+        let mark = editor.mark();
+        editor.send_all(&[
+            &opened(&settings),
+            &changed(&settings, typed),
+            &completion(2, &settings, 1, 6),
+        ]);
+        let at = editor.until(mark, |message| message.id() == Some("2"));
+        let (sent, _) = editor.end(true);
+        let Some(Value::Sequence(items)) = sent[at].at(&["result", "items"]).map(|n| &n.value)
+        else {
+            panic!("no items");
+        };
+        let text = |node: &Node, path: &[&str]| {
+            let found = path.iter().try_fold(node, |node, key| node.get(key));
+            match found.map(|node| &node.value) {
+                Some(Value::Scalar(text)) => Some(text.clone()),
+                _ => None,
+            }
+        };
+        let label = |item: &&Node| text(item, &["label"]);
+        let colours = items
+            .iter()
+            .find(|item| label(item).as_deref() == Some("code_colours"));
+        let colours = colours.expect("code_colours is offered");
+        let about = crate::described::setting("code_colours").unwrap();
+        assert_eq!(
+            text(colours, &["documentation", "kind"]).as_deref(),
+            Some(kind)
+        );
+        assert_eq!(
+            text(colours, &["documentation", "value"]),
+            Some(format!("{}\n\n{more}", about.text))
+        );
+    }
+}
+
+#[test]
 fn going_to_a_definition_opens_the_file_and_place_what_is_under_the_cursor_names() {
     let site = TempSite::site(&[
         ("statac.yaml", "title: Site 1\n"),

@@ -283,6 +283,11 @@ fn front_matter_refusals_are_placed_at_what_was_written() {
             "wrong-place",
             "tags.permalink",
         ),
+        (
+            "pagination.permalink: \"{list}{n}/\"",
+            "wrong-place",
+            "pagination.permalink",
+        ),
         ("site.author: Author 1", "wrong-place", "site.author"),
         ("source: a.txt", "set-aside", "source"),
         ("slug: post", "set-aside", "slug"),

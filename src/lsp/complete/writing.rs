@@ -374,6 +374,7 @@ impl Offer<'_> {
                     group: 1,
                     text: false,
                     filter: Some(snippet.name.clone()),
+                    about: None,
                 }
             })
             .collect();
@@ -389,6 +390,7 @@ impl Offer<'_> {
             group: 0,
             text: false,
             filter: Some(IN_SITE.to_owned()),
+            about: None,
         });
         items
     }
@@ -437,6 +439,7 @@ impl Offer<'_> {
                 group: 1,
                 text: false,
                 filter: None,
+                about: None,
             })
             .collect()
     }
@@ -481,6 +484,7 @@ pub(super) fn names_left(snippet: &Snippet, place: usize, given: &[String]) -> V
             group: 2,
             text: false,
             filter: None,
+            about: None,
         })
         .collect()
 }
@@ -536,6 +540,7 @@ pub(super) fn addresses(
                 group: 1,
                 text: false,
                 filter: None,
+                about: None,
             })
             .collect();
         return Completion {
@@ -572,6 +577,7 @@ pub(super) fn addresses(
                 group: 1,
                 text: false,
                 filter: None,
+                about: None,
             }
         })
         .collect();

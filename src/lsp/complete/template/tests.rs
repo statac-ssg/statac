@@ -266,3 +266,52 @@ fn nothing_is_offered_outside_a_tag_or_where_a_name_is_made() {
     let after_comment = in_page(&site, "{# {{ #}{{ pa|").unwrap();
     assert!(has(&after_comment, "page"));
 }
+
+#[test]
+fn each_of_statacs_names_filters_and_functions_says_what_it_is() {
+    use crate::described::Group;
+    let site = site();
+    let mut checking = Checking::new();
+    checking.check(&Options {
+        mode: Mode::Check,
+        site: site.root.clone(),
+        out: None,
+        today: None,
+        drafts: false,
+        url: None,
+    });
+    let file = site.root.join("templates/page.html");
+    let about = |text: &str, label: &str| {
+        let offset = text.rfind('|').expect("a cursor");
+        let text = format!("{}{}", &text[..offset], &text[offset + 1..]);
+        let renderer = checking.renderer();
+        let completion = super::super::complete(&site.root, &file, &text, offset, renderer, true);
+        let items = completion.expect("something is offered").items;
+        let item = items.into_iter().find(|item| item.label == label);
+        item.unwrap_or_else(|| panic!("`{label}` offered")).about
+    };
+    let cases = [
+        ("{{ | }}", "page", Group::Handed.of("page")),
+        ("{{ | }}", "url", Group::Functions.of("url")),
+        ("{{ | }}", "card(post)", None),
+        ("{{ page.| }}", "title", Group::Page.of("title")),
+        ("{{ page.| }}", "book", None),
+        ("{{ site.| }}", "posts", Group::Site.of("posts")),
+        ("{{ page.date.| }}", "weekday", Group::Date.of("weekday")),
+        ("{{ page.title | | }}", "upper", Group::Filters.of("upper")),
+        ("{{ page.date | | }}", "moment", Group::Filters.of("moment")),
+        (
+            "{% for post in site.posts %}{{ loop.| }}{% endfor %}",
+            "index",
+            Group::Loop.of("index"),
+        ),
+        (
+            "{% for post in site.posts %}{{ po| }}{% endfor %}",
+            "post",
+            None,
+        ),
+    ];
+    for (text, label, wanted) in cases {
+        assert_eq!(about(text, label), wanted, "{text:?}: {label}");
+    }
+}

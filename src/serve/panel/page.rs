@@ -128,8 +128,18 @@ impl On<'_> {
             }
             _ => String::new(),
         };
+        let (about, more) = match row.about {
+            Some(about) => (
+                super::pieced(&about.text),
+                about
+                    .more
+                    .as_deref()
+                    .map_or("null".to_owned(), json::string),
+            ),
+            None => ("null".to_owned(), "null".to_owned()),
+        };
         format!(
-            "{{\"name\":{}{written},\"kind\":\"{}\",\"holds\":{},\"value\":{},\"empty\":{},\"has\":[{}],\"from\":{},\"used\":{used}}}",
+            "{{\"name\":{}{written},\"kind\":\"{}\",\"holds\":{},\"value\":{},\"empty\":{},\"has\":[{}],\"from\":{},\"used\":{used},\"about\":{about},\"more\":{more}}}",
             json::string(&shown(&row.name)),
             kind(row.holds),
             json::string(wording::panel_holds(row.holds)),

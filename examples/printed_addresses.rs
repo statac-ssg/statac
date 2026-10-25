@@ -33,14 +33,14 @@ fn written(folder: &Path, found: &mut Vec<String>) {
     }
 }
 
-/// Every address, whole and sorted, each once: those written in `src/`,
-/// and the page of each kind of problem.
+/// Every address, whole and sorted, each once: those written in `src/`
+/// and in `descriptions/`, and the page of each kind of problem.
 pub fn addresses() -> Vec<String> {
     let mut found = Vec::new();
-    written(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
-        &mut found,
-    );
+    let top = Path::new(env!("CARGO_MANIFEST_DIR"));
+    for folder in ["src", "descriptions"] {
+        written(&top.join(folder), &mut found);
+    }
     for code in statac::problem::Code::ALL {
         found.push(format!("/e/{}/", code.name()));
     }

@@ -5028,3 +5028,45 @@ fn a_snippet_named_url_is_told_as_a_reserved_name() {
         Kind::ReservedName { name: "url".into() }
     );
 }
+
+#[test]
+fn every_name_statac_hands_a_template_is_described_once() {
+    use crate::described::Group;
+    use check::Rec;
+    let built = site(&[("statac.yaml", "title: Site\nurl: https://example.org/\n")]);
+    assert!(built.problems.is_empty(), "{:?}", built.problems);
+    let shared = &built.renderer.shared;
+    let schema = schema(&shared.site, &shared.settings);
+    let described = |group: Group| -> Vec<&str> {
+        let mut names: Vec<&str> = (group.described().iter())
+            .map(|described| described.name.as_str())
+            .collect();
+        names.sort_unstable();
+        names
+    };
+    let fields = |recs: &[Rec]| -> Vec<&str> {
+        let mut names: Vec<&str> = (recs.iter())
+            .flat_map(|&rec| schema.record(rec).keys().map(String::as_str))
+            .collect();
+        names.sort_unstable();
+        names.dedup();
+        names
+    };
+    for recs in [
+        &[Rec::Page][..],
+        &[Rec::Site],
+        &[Rec::List],
+        &[Rec::Date, Rec::When],
+        &[Rec::Webmentions, Rec::Mention],
+        &[Rec::Video],
+        &[Rec::Loop],
+    ] {
+        let group = recs[0].described_in();
+        assert!(recs.iter().all(|rec| rec.described_in() == group));
+        assert_eq!(described(group), fields(recs), "{group:?}");
+    }
+    // A group of two records holds no name that both have.
+    let both = fields(&[Rec::Webmentions]).len() + fields(&[Rec::Mention]).len();
+    assert_eq!(both, described(Group::Webmentions).len());
+    assert_eq!(described(Group::Handed), check::handed_names());
+}

@@ -192,9 +192,6 @@ fn ours_for(name: &str, several_languages: bool) -> Option<&'static str> {
         .map(|&(_, ours)| ours)
 }
 
-/// The settings under `tags.` and `series.`, which only the site sets.
-pub const LIST_SETTINGS: &[&str] = &["permalink", "pages", "slugs"];
-
 const ID_ALPHABET: &str = "0123456789abcdefghjkmnpqrstvwxyz";
 
 impl PageWord {
@@ -494,7 +491,7 @@ pub fn read_handed(
         }
     } else if STATAC_FILLS.contains(&rest) {
         problems.push(set_aside(rest, key));
-    } else if crate::config::is_setting(rest) || is_list_setting(rest) {
+    } else if crate::config::is_setting(rest) {
         problems.push(wrong_place(&name, WrongPlace::SiteSetting, key));
     } else if rest.starts_with("site.") {
         problems.push(wrong_place(rest, WrongPlace::SiteValue, key));
@@ -636,10 +633,12 @@ pub fn type_slips<'a>(
     problems
 }
 
+/// Whether `name` is one of the settings under `tags.`, `series.` and
+/// `pagination.`, which only the site sets.
 fn is_list_setting(name: &str) -> bool {
-    name.split_once('.').is_some_and(|(list, setting)| {
-        matches!(list, "tags" | "series") && LIST_SETTINGS.contains(&setting)
-    })
+    name.split_once('.')
+        .is_some_and(|(list, _)| matches!(list, "tags" | "series" | "pagination"))
+        && crate::config::is_setting(name)
 }
 
 fn other_spelling(written: &str, ours: &str, key: &Node) -> Problem {

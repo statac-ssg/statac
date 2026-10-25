@@ -22,12 +22,22 @@ use crate::problem::{
     Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 
-mod described;
-
-pub(crate) use described::{
-    Described, FOR_ONE_LANGUAGE, HANDING_DOWN, OWN_FIELD, OWN_VALUE, field as described_field,
-    setting as described_setting,
+pub(crate) use crate::described::{
+    Described, field as described_field, setting as described_setting,
 };
+
+/// Where the docs say more of a cascade line.
+pub(crate) const HANDING_DOWN: &str = "https://statac.dev/front-matter/#handing-down";
+
+/// Where the docs say more of a setting for one language.
+pub(crate) const FOR_ONE_LANGUAGE: &str =
+    "https://statac.dev/dates-and-languages/#settings-for-one-language";
+
+/// Where the docs say more of a custom setting.
+pub(crate) const OWN_VALUE: &str = "https://statac.dev/settings/#your-own";
+
+/// Where the docs say more of a custom field.
+pub(crate) const OWN_FIELD: &str = "https://statac.dev/front-matter/#your-own";
 
 const EXPLANATIONS: &str = "https://statac.dev/e/";
 const MONTHS: [&str; 12] = [
@@ -3898,6 +3908,21 @@ pub(crate) fn hover_holds(written: &str, holds: Holds) -> Option<String> {
         Holds::Call | Holds::Unknown => return None,
     };
     Some(format!("`{written}` holds {held}"))
+}
+
+/// What an editor's hover says a name is where what it holds isn't known.
+pub(crate) fn hover_name(written: &str) -> String {
+    format!("`{written}`, a name")
+}
+
+/// What an editor's hover says a function is, as `css` or `page.image`.
+pub(crate) fn hover_function(written: &str) -> String {
+    format!("`{written}`, a function")
+}
+
+/// What an editor's hover says a filter is.
+pub(crate) fn hover_filter(name: &str) -> String {
+    format!("`{name}`, a filter")
 }
 
 /// What an editor's hover says a page of the site is.
