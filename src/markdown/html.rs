@@ -760,9 +760,17 @@ impl<'a> Writer<'a> {
 
     /// The words of a block that ends a line.
     fn line(&mut self, nodes: &[Node]) {
+        // A task item's words are its checkbox's name.
+        let task = matches!(nodes.first().map(|n| &n.kind), Some(Kind::Task { .. }));
+        if task {
+            self.out.push_str("<label>");
+        }
         self.inlines(nodes);
         if self.after_comment.take() == Some(self.out.len()) {
             self.out.pop();
+        }
+        if task {
+            self.out.push_str("</label>");
         }
     }
 

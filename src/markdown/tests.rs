@@ -593,6 +593,38 @@ fn malformed_maths_is_placed_at_the_exact_text() {
 }
 
 #[test]
+fn a_task_items_words_label_its_checkbox() {
+    let cases = [
+        (
+            "- [ ] To do\n- [x] Done\n",
+            "<ul>\n  <li><label><input type=\"checkbox\" disabled> To do</label></li>\n  \
+             <li><label><input type=\"checkbox\" disabled checked> Done</label></li>\n</ul>",
+        ),
+        (
+            "- [ ] To do\n\n- [x] Done\n",
+            "<ul>\n  <li>\n    <p><label><input type=\"checkbox\" disabled> To do</label></p>\n  \
+             </li>\n  <li>\n    <p><label><input type=\"checkbox\" disabled checked> Done</label>\
+             </p>\n  </li>\n</ul>",
+        ),
+        (
+            "- [ ] See [the list](/list/)\n",
+            "<ul>\n  <li><label><input type=\"checkbox\" disabled> See \
+             <a href=\"/list/\">the list</a></label></li>\n</ul>",
+        ),
+        (
+            "- [ ] Outer\n  - [x] Inner\n",
+            "<ul>\n  <li><label><input type=\"checkbox\" disabled> Outer</label>\n    <ul>\n      \
+             <li><label><input type=\"checkbox\" disabled checked> Inner</label></li>\n    \
+             </ul>\n  </li>\n</ul>",
+        ),
+        ("- Not a task\n", "<ul>\n  <li>Not a task</li>\n</ul>"),
+    ];
+    for (text, html) in cases {
+        assert_eq!(html_of(text), html, "{text}");
+    }
+}
+
+#[test]
 fn a_definition_needs_a_space_after_its_colon() {
     let cases = [
         ("Line one\n::FFFF:C0A8:B67\nline three\n", false),
