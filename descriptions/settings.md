@@ -258,8 +258,10 @@ More: https://statac.dev/settings/#links
 
 ## `exclude`
 
-Names in `content/` that are never published. Setting it replaces the
-whole list. Unset, it is `.DS_Store`, `Thumbs.db` and `desktop.ini`.
+Files and folders in `content/` that are never published: a name, such as
+`drafts`, wherever it is, or a path from `content/`, such as
+`blog/one.md`. Setting it replaces the whole list. Unset, it is
+`.DS_Store`, `Thumbs.db` and `desktop.ini`.
 
 More: https://statac.dev/settings/#links
 

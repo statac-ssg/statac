@@ -715,6 +715,57 @@ fn what_a_folder_hands_down_is_checked_where_it_is_written() {
 }
 
 #[test]
+fn exclude_leaves_out_a_name_anywhere_or_a_path_from_content() {
+    // (what `exclude` lists, the pages and the files read)
+    let cases: [(&str, &[&str], &[&str]); 7] = [
+        (
+            "one.md",
+            &["blog/two.md", "notes/three.md"],
+            &["/blog/a.pdf"],
+        ),
+        ("blog", &["notes/three.md"], &[]),
+        (
+            "blog/one.md",
+            &["blog/two.md", "notes/three.md"],
+            &["/blog/a.pdf"],
+        ),
+        (
+            "/notes/three.md",
+            &["blog/one.md", "blog/two.md"],
+            &["/blog/a.pdf"],
+        ),
+        ("blog/", &["notes/three.md"], &[]),
+        (
+            "log/one.md",
+            &["blog/one.md", "blog/two.md", "notes/three.md"],
+            &["/blog/a.pdf"],
+        ),
+        (
+            "blog/one",
+            &["blog/one.md", "blog/two.md", "notes/three.md"],
+            &["/blog/a.pdf"],
+        ),
+    ];
+    for (exclude, pages, files) in cases {
+        let settings = format!("language: en\ntimezone: UTC\nexclude: [\"{exclude}\"]\n");
+        let read = site(&[
+            ("statac.yaml", &settings),
+            ("content/blog/one.md", "One.\n"),
+            ("content/blog/two.md", "Two.\n"),
+            ("content/blog/a.pdf", "pdf"),
+            ("content/notes/three.md", "Three.\n"),
+        ]);
+        let mut read_pages: Vec<&str> = (read.site.pages.iter())
+            .map(|(_, page)| page.path.as_str())
+            .collect();
+        read_pages.sort();
+        assert_eq!(read_pages, pages, "{exclude}");
+        let read_files: Vec<&str> = read.site.files.iter().map(|f| f.address.as_str()).collect();
+        assert_eq!(read_files, files, "{exclude}");
+    }
+}
+
+#[test]
 fn pages_are_found_with_their_titles_and_lists() {
     let read = site(&[
         ("statac.yaml", "language: en\ntimezone: UTC\n"),

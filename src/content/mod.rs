@@ -196,11 +196,7 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
         });
     }
     let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
-    let left_behind: HashSet<&str> = settings
-        .texts("exclude")
-        .iter()
-        .map(|name| name.value.as_str())
-        .collect();
+    let left_behind = Excluded::of(settings.texts("exclude").iter().map(|e| e.value.as_str()));
     // A folder with no `content/` has no pages; whether it is a site at
     // all is for the command to say.
     let (folders, found) = scan(root, &real, &left_behind, &run.renamed, &mut problems);
@@ -417,6 +413,41 @@ fn is_html(name: &str) -> bool {
     matches!(extension(name).as_str(), "html" | "htm")
 }
 
+/// What `exclude` leaves out of `content/`: a name with no `/` wherever a
+/// file or folder has it, and one with a `/` as a path from `content/`, a
+/// file or a folder with all it holds.
+struct Excluded<'a> {
+    names: HashSet<&'a str>,
+    paths: Vec<&'a str>,
+}
+
+impl<'a> Excluded<'a> {
+    fn of(written: impl Iterator<Item = &'a str>) -> Excluded<'a> {
+        let mut excluded = Excluded {
+            names: HashSet::new(),
+            paths: Vec::new(),
+        };
+        for entry in written {
+            match entry.contains('/') {
+                true => excluded.paths.push(entry.trim_matches('/')),
+                false => {
+                    excluded.names.insert(entry);
+                }
+            }
+        }
+        excluded
+    }
+
+    /// Whether the file at `rel` under `content/` is left out.
+    fn leaves_out(&self, rel: &str) -> bool {
+        rel.split('/').any(|piece| self.names.contains(piece))
+            || self.paths.iter().any(|path| {
+                rel.strip_prefix(path)
+                    .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+            })
+    }
+}
+
 /// The folders under `content/` and what each holds, each folder after the
 /// one it is in, and where each file really is under the site's real path
 /// `real`, by its path under `content/`. The walk is the assets' own:
@@ -425,7 +456,7 @@ fn is_html(name: &str) -> bool {
 fn scan(
     root: &Path,
     real: &Path,
-    left_behind: &HashSet<&str>,
+    left_behind: &Excluded,
     renamed: &[(String, String)],
     problems: &mut Vec<Problem>,
 ) -> (Vec<Folder>, HashMap<String, String>) {
@@ -435,10 +466,10 @@ fn scan(
     let mut found = HashMap::new();
     for (rel, at) in files {
         let rel = renamed_to(rel, renamed);
-        let pieces: Vec<&str> = rel.split('/').collect();
-        if pieces.iter().any(|piece| left_behind.contains(piece)) {
+        if left_behind.leaves_out(&rel) {
             continue;
         }
+        let pieces: Vec<&str> = rel.split('/').collect();
         let (name, inside) = pieces.split_last().expect("a file has a name");
         let mut folder = 0;
         let mut path = String::new();
