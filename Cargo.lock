@@ -1628,6 +1628,7 @@ dependencies = [
  "unicode-normalization",
  "ureq",
  "url",
+ "winapi-util",
 ]
 
 [[package]]

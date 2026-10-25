@@ -294,7 +294,8 @@ pub fn beside(name: &str) -> String {
 /// which nothing may have yet, given the file's permissions, and takes
 /// the file's name in one step; where that fails it is removed. On Unix
 /// no link is followed even where one is put in place while this runs;
-/// elsewhere each path is asked what it is before it is used.
+/// elsewhere each path is asked what it is before it is used, and the
+/// file is asked and read through one handle.
 pub fn rewrite(root: &Path, rel: &str, read: &[u8], text: &[u8]) -> Result<(), Unwritten> {
     #[cfg(unix)]
     {
@@ -302,14 +303,18 @@ pub fn rewrite(root: &Path, rel: &str, read: &[u8], text: &[u8]) -> Result<(), U
     }
     #[cfg(not(unix))]
     {
-        use std::io::Write;
+        use std::io::{Read, Write};
         no_link_to(root, rel)?;
         let path = join(root, rel);
-        let found = std::fs::symlink_metadata(&path)?;
-        if !named_once(&found) {
+        let mut file = std::fs::File::open(&path)?;
+        let found = itself(&file)?;
+        if !named_once(&file) {
             return Err(Unwritten::NamedTwice);
         }
-        if std::fs::read(&path)? != read {
+        let mut held = Vec::with_capacity(read.len());
+        file.read_to_end(&mut held)?;
+        drop(file);
+        if held != read {
             return Err(Unwritten::Changed);
         }
         let name = path.file_name().unwrap_or_default().to_string_lossy();
@@ -539,11 +544,7 @@ pub fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Resul
     {
         use std::io::Write;
         let to = join(root, rel);
-        let itself = |path: &Path| {
-            std::fs::symlink_metadata(path)
-                .is_ok_and(|found| found.file_type().is_file() && named_once(&found))
-        };
-        if std::fs::symlink_metadata(&to).is_ok() && !itself(&to) {
+        if std::fs::symlink_metadata(&to).is_ok() && !is_file_itself(&to) {
             return Err(io::Error::from(Refused::Taken));
         }
         let fresh = to.with_file_name(fresh);
@@ -554,7 +555,7 @@ pub fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Resul
             .and_then(|mut file| file.write_all(bytes))
             .and_then(|()| rename(&fresh, &to));
         written.inspect_err(|_| {
-            if itself(&fresh) {
+            if is_file_itself(&fresh) {
                 let _ = std::fs::remove_file(&fresh);
             }
         })
@@ -754,9 +755,10 @@ pub struct Measure {
 
 /// What the file `rel`, a path with forward slashes under the folder
 /// `root`, is found to be, refused as [`open_file`] refuses. The file is
-/// asked without being opened, so one that can't be read is asked too. On
-/// Unix it is asked by name in the folder above it, already open, and
-/// never through a link.
+/// asked without being opened to read, so one that can't be read is asked
+/// too. On Unix it is asked by name in the folder above it, already open,
+/// and never through a link; elsewhere through one handle, opened as
+/// itself.
 pub fn measure(root: &Path, rel: &str) -> io::Result<Measure> {
     #[cfg(unix)]
     {
@@ -765,11 +767,12 @@ pub fn measure(root: &Path, rel: &str) -> io::Result<Measure> {
     #[cfg(not(unix))]
     {
         no_link_to(root, rel)?;
-        let found = std::fs::metadata(join(root, rel))?;
+        let file = opened_as_itself(&join(root, rel))?;
+        let found = itself(&file)?;
         Ok(Measure {
             length: found.len(),
             modified: found.modified()?,
-            named_once: named_once(&found),
+            named_once: named_once(&file),
         })
     }
 }
@@ -823,18 +826,61 @@ fn no_link_on_the_way(root: &Path, rel: &str) -> io::Result<()> {
     Ok(())
 }
 
-/// Whether the file `found` describes has one name only. A file with a
-/// second name somewhere may be a file outside the site. Windows keeps
-/// the count where stable Rust can't read it, so every file passes there.
-pub fn named_once(found: &std::fs::Metadata) -> bool {
+/// `path` opened only to be asked what it is, which a file that can't be
+/// read allows, and as itself: a link there is opened as the link, never
+/// followed, so what the handle is asked is what stands at `path`. A
+/// folder doesn't open.
+#[cfg(not(unix))]
+fn opened_as_itself(path: &Path) -> io::Result<std::fs::File> {
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    std::fs::OpenOptions::new()
+        .access_mode(0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)
+}
+
+/// What the file open as `file` is found to be, refusing a link or
+/// anything else than a file.
+#[cfg(not(unix))]
+fn itself(file: &std::fs::File) -> io::Result<std::fs::Metadata> {
+    let found = file.metadata()?;
+    match found.file_type() {
+        kind if kind.is_file() => Ok(found),
+        kind if kind.is_symlink() => Err(io::Error::from(Refused::Link)),
+        _ => Err(io::Error::from(Refused::NotAFile)),
+    }
+}
+
+/// Whether the file open as `file` has one name only. A file with a
+/// second name somewhere may be a file outside the site. The count is
+/// asked of the open file, so it is of the file read through `file`, and
+/// where it can't be asked the file doesn't pass.
+pub fn named_once(file: &std::fs::File) -> bool {
     #[cfg(unix)]
     {
-        std::os::unix::fs::MetadataExt::nlink(found) == 1
+        file.metadata()
+            .is_ok_and(|found| std::os::unix::fs::MetadataExt::nlink(&found) == 1)
     }
     #[cfg(not(unix))]
     {
-        let _ = found;
-        true
+        winapi_util::file::information(file).is_ok_and(|found| found.number_of_links() == 1)
+    }
+}
+
+/// Whether a file itself stands at `path`: not a link to one, nor a
+/// folder, nor a file with another name somewhere, which may be a file
+/// outside the site.
+pub fn is_file_itself(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        std::fs::symlink_metadata(path).is_ok_and(|found| {
+            found.file_type().is_file() && std::os::unix::fs::MetadataExt::nlink(&found) == 1
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        opened_as_itself(path).is_ok_and(|file| itself(&file).is_ok() && named_once(&file))
     }
 }
 
@@ -1269,10 +1315,17 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("a.txt"), "a").unwrap();
-        assert!(named_once(&std::fs::metadata(root.join("a.txt")).unwrap()));
+        let opened = || std::fs::File::open(root.join("a.txt")).unwrap();
+        assert!(named_once(&opened()));
+        assert!(is_file_itself(&root.join("a.txt")));
+        assert!(measure(&root, "a.txt").unwrap().named_once);
         std::fs::hard_link(root.join("a.txt"), root.join("b.txt")).unwrap();
-        let twice = named_once(&std::fs::metadata(root.join("a.txt")).unwrap());
-        assert_eq!(twice, !cfg!(unix));
+        assert!(!named_once(&opened()));
+        assert!(!is_file_itself(&root.join("a.txt")));
+        assert!(!measure(&root, "a.txt").unwrap().named_once);
+        // Neither a folder nor nothing is a file itself.
+        assert!(!is_file_itself(&root));
+        assert!(!is_file_itself(&root.join("c.txt")));
         remove_folder(&root).unwrap();
     }
 

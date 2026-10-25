@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use rayon::prelude::*;
 
 use super::progress::{Counted, Making};
-use super::{KEPT, Picture, Pictures, Progress, is_file_itself, kept_in, make_kept_in, quietly};
+use super::{KEPT, Picture, Pictures, Progress, kept_in, make_kept_in, quietly};
 use crate::pictures::{self, Error, Rendition, Unreadable};
 use crate::platform;
 use crate::problem::{Kind, PictureFault, Problem, Reason};
@@ -97,7 +97,7 @@ impl Kept {
     pub(crate) fn has(&self, name: &str) -> bool {
         self.kept
             .as_ref()
-            .is_some_and(|kept| is_file_itself(&kept.join(self.sub).join(name)))
+            .is_some_and(|kept| platform::is_file_itself(&kept.join(self.sub).join(name)))
     }
 
     /// `name`'s path in `.statac`.

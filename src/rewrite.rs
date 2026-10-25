@@ -212,7 +212,6 @@ mod tests {
         assert!(fs::symlink_metadata(&link).unwrap().is_symlink());
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_file_with_a_second_name_is_left_as_it_is() {
         let scratch = scratch_with_posts("names");

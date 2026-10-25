@@ -76,10 +76,7 @@ impl Index {
         let Ok(file) = crate::platform::open_file(&site.join(super::KEPT), "pictures/index") else {
             return index;
         };
-        if !file
-            .metadata()
-            .is_ok_and(|found| crate::platform::named_once(&found))
-        {
+        if !crate::platform::named_once(&file) {
             return index;
         }
         let Ok(text) = std::io::read_to_string(file) else {
@@ -418,7 +415,7 @@ mod tests {
         assert_eq!(Index::load(&site).len(), 1);
         let kept = site.join(super::super::KEPT).join("pictures");
         fs::hard_link(kept.join("index"), site.join("index")).unwrap();
-        assert_eq!(Index::load(&site).len(), usize::from(!cfg!(unix)));
+        assert_eq!(Index::load(&site).len(), 0);
         fs::remove_file(site.join("index")).unwrap();
         #[cfg(unix)]
         {

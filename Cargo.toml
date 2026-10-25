@@ -54,6 +54,9 @@ toml = { version = "1.1", default-features = false, features = ["parse"] }
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"] }
 
+[target.'cfg(windows)'.dependencies]
+winapi-util = "0.1.11"
+
 # musl's own allocator slows to a crawl under many threads.
 [target.'cfg(target_env = "musl")'.dependencies]
 mimalloc = { version = "0.1.52", default-features = false }

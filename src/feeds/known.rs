@@ -194,7 +194,7 @@ impl Known {
         let Ok(file) = crate::platform::open_file(&at.join(KEPT), FILE) else {
             return known;
         };
-        if !(file.metadata()).is_ok_and(|found| crate::platform::named_once(&found)) {
+        if !crate::platform::named_once(&file) {
             return known;
         }
         let Ok(text) = std::io::read_to_string(file) else {

@@ -75,14 +75,6 @@ fn kept_at(site: &Path, names: &[&str]) -> std::io::Result<PathBuf> {
     Ok(folder)
 }
 
-/// Whether a file itself stands at `path`: not a link to one, nor a
-/// folder, nor on Unix a file with another name somewhere, which may be a
-/// file outside the site.
-pub(crate) fn is_file_itself(path: &Path) -> bool {
-    std::fs::symlink_metadata(path)
-        .is_ok_and(|found| found.file_type().is_file() && crate::platform::named_once(&found))
-}
-
 /// Makes the site's `.statac` where it isn't there, and gives its path.
 /// Refused where it is a link or anything else than a folder.
 pub(crate) fn make_kept(site: &Path) -> std::io::Result<PathBuf> {
