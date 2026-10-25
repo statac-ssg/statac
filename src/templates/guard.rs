@@ -679,6 +679,9 @@ fn printed(state: &State, value: &Value) -> Option<Printed> {
     let &at = shared.templates.by_name.get(state.name())?;
     let source = shared.templates.files[at].source;
     let place = super::check::place(source, span);
+    if let Some(picture) = super::media::undescribed_printed(value) {
+        return Some(Printed::Undescribed(place, picture));
+    }
     Some(Printed::Made(place, frame::written(value)))
 }
 

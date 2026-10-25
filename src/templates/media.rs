@@ -736,6 +736,15 @@ pub(super) fn own_fields(value: &Value) -> Option<&[(String, Value)]> {
     Some(&photo.own)
 }
 
+/// The picture with no description `value`, being printed, shows: the
+/// picture itself, or where it is published.
+pub(super) fn undescribed_printed(value: &Value) -> Option<PictureId> {
+    match value.downcast_object_ref::<PhotoValue>() {
+        Some(photo) => photo.undescribed.then_some(photo.id),
+        None => frame::undescribed_in(value),
+    }
+}
+
 /// Tells a picture shown with no description, once for the output being
 /// built. `key` is the picture, however it is named where it is shown.
 pub(super) fn undescribed(key: String, problem: impl FnOnce(&frame::Frame) -> Problem) {
@@ -775,9 +784,14 @@ impl Object for PhotoValue {
             return own.map(|(_, value)| value.clone());
         };
         match *name {
-            "src" | "avif" | "fallback" | "full" if self.copied => {
-                let at = self.asking.calling;
-                frame::develops(self.id, at, self.full);
+            "src" | "avif" | "fallback" | "full" => {
+                if self.copied {
+                    let at = self.asking.calling;
+                    frame::develops(self.id, at, self.full);
+                }
+                if self.undescribed {
+                    frame::undescribed_at(value, self.id);
+                }
             }
             "alt" if self.undescribed => {
                 let picture = shared.site.pictures.get(self.id);

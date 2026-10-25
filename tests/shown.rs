@@ -590,6 +590,151 @@ fn a_picture_handed_to_a_snippet_is_noted_only_where_its_description_is_read() {
     assert_eq!(said.matches("Missing alt text:").count(), 1);
 }
 
+/// A picture a template shows with no alt text, that is all a link or a
+/// button shows, is told once, as its alt text saying what the alt text
+/// should say, wherever the `<img>` is written with its alt text; a link
+/// whose `<img>` isn't, or that holds a picture marked decorative, is told
+/// as a link with no words. Another page showing the writing tells nothing
+/// more.
+#[test]
+fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_text() {
+    const ALT: &str = "  Give it alt text saying where the link to `/post-1/` leads, as the \
+        image is all the link shows.";
+    const ALONE: &str =
+        "  Describe it with `alt:` in `content/post-1/photo-1.jpg.yaml`, or mark it decorative.";
+    const LINK: &str =
+        "note  Missing link text: the link to `/post-1/` has nothing a screen reader can read out";
+    const INSIDE: &str = "  Give the `<img>` inside it an `alt` saying where the link leads.";
+    let cases: &[(&str, &str, &str, &[&str])] = &[
+        (
+            "linked",
+            "{% set p = page.image('photo-1.jpg') %}\
+             <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>",
+            "",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "two pictures, one described",
+            "{% set p = page.image('photo-1.jpg') %}{% set q = page.image('photo-2.jpg') %}\
+             <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>\
+             <a href=\"/post-2/\"><img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\"></a>",
+            "",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "printed twice",
+            "{% set p = page.image('photo-1.jpg') %}\
+             <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>\
+             <a href=\"/post-2/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>",
+            "",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "shown whole",
+            "{% set p = page.image('photo-1.jpg') %}\
+             <a href=\"/post-1/\"><img src=\"{{ p }}\" alt=\"{{ p.alt }}\"></a>",
+            "",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "outside a link",
+            "{% set p = page.image('photo-1.jpg') %}\
+             <img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\">",
+            "",
+            &[
+                "note  Missing alt text: `content/post-1/photo-1.jpg`",
+                ALONE,
+            ],
+        ),
+        (
+            "a button",
+            "{% set p = page.image('photo-1.jpg') %}\
+             <button><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></button>",
+            "",
+            &[
+                "note  Missing alt text: `content/post-1/photo-1.jpg`",
+                "  Give it alt text saying what the button does, as the image is all the \
+                 button shows.",
+            ],
+        ),
+        (
+            "in a snippet",
+            "<a href=\"/post-1/\">{{ image(photo='photo-1.jpg') }}</a>",
+            "",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "in a snippet the writing calls",
+            "{{ page.content }}",
+            "<a href=\"/post-1/\">@image(\"photo-1.jpg\")</a>\n",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "linked by a snippet the writing calls",
+            "{{ page.content }}",
+            "@figure(\"photo-1.jpg\")\n",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "its alt text written elsewhere",
+            "{% set p = page.image('photo-1.jpg') %}\
+             <a href=\"/post-1/\"><img src=\"{{ p.src }}\"></a>{{ p.alt }}",
+            "",
+            &[
+                "note  Missing alt text: `content/post-1/photo-1.jpg`",
+                ALONE,
+                LINK,
+                INSIDE,
+            ],
+        ),
+        (
+            "one decorative, written by the same line",
+            "{% for name in ['photo-1.jpg', 'photo-3.jpg'] %}{% set p = page.image(name) %}\
+             <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>{% endfor %}",
+            "",
+            &[
+                "note  Missing alt text: `content/post-1/photo-1.jpg`",
+                ALT,
+                LINK,
+                INSIDE,
+            ],
+        ),
+    ];
+    for (name, layout, writing, expected) in cases {
+        let site = Site::new("linked", layout);
+        // The home page shows the post's writing too.
+        site.write(
+            "templates/home.html",
+            &format!("{BASE}{{% for p in site.pages %}}{{{{ p.content }}}}{{% endfor %}}\n"),
+        );
+        site.write("snippets/image.html", IMAGE);
+        site.write(
+            "snippets/figure.html",
+            "{# takes photo #}\n\
+             {% set picture = page.image(photo) %}\n\
+             <a href=\"/post-1/\"><img src=\"{{ picture.src }}\" alt=\"{{ picture.alt }}\"></a>\n",
+        );
+        site.write(
+            "content/post-1/index.md",
+            &format!("---\ntitle: Post 1\n---\n{writing}"),
+        );
+        for n in [1, 2, 3] {
+            site.put(&format!("content/post-1/photo-{n}.jpg"), &jpeg(30, 20));
+        }
+        site.write("content/post-1/photo-2.jpg.yaml", "alt: Words\n");
+        site.write("content/post-1/photo-3.jpg.yaml", "decorative: true\n");
+        let said = site.check();
+        let told: Vec<&str> = (said.lines())
+            .filter(|line| {
+                ["note  ", "  Say ", "  Give ", "  Describe "]
+                    .iter()
+                    .any(|opens| line.starts_with(opens))
+            })
+            .collect();
+        assert_eq!(told, *expected, "{name}: {said}");
+    }
+}
+
 #[test]
 fn a_piece_writing_pictures_is_handed_the_picture() {
     let site = Site::new("piece", "{{ page.content }}");

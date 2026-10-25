@@ -27,7 +27,10 @@ marked `aria-hidden="true"` is never read out, so it gives a button no
 name, and a button inside one is never told. Nor is one inside a
 `<template>`, which is on no page until a script puts it there. An
 `<input type="button">` or `<input type="image">` with no words is told
-as `missing-label`.
+as `missing-label`. A button that shows only an image Statac already
+tells as `missing-alt-text` is told once, there: an image in the content,
+or one a template shows with `page.image` where its `<img>` is written
+with the image's `alt`.
 
 ## How to fix it
 

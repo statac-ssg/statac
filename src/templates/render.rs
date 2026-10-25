@@ -715,6 +715,13 @@ impl Renderer {
         }
     }
 
+    /// The picture with no description, as a problem names it, whose
+    /// address a template printed in bytes `range` of an output.
+    pub fn undescribed_in(&self, own: &Own, range: Range<usize>) -> Option<String> {
+        let picture = own.undescribed_in(range)?;
+        Some(self.shared.site.pictures.get(picture).shown())
+    }
+
     /// The outermost markup of a file's that the byte at `at` of an output
     /// is in: for a byte a snippet called in a page's writing wrote, the
     /// call.
@@ -759,6 +766,13 @@ impl Renderer {
     pub fn writing(&self, page: PageId) -> Option<&crate::links::Writing> {
         let body = self.shared.bodies[page.index()].get()?;
         Some(&body.writing)
+    }
+
+    /// What `page`'s writing told as it was built; none where no output
+    /// has built it.
+    pub fn writing_told(&self, page: PageId) -> &[Problem] {
+        let body = self.shared.bodies[page.index()].get();
+        body.map_or(&[], |body| &body.problems)
     }
 
     /// What `page`'s writing links to and hands its snippet calls, its

@@ -1498,11 +1498,6 @@ pub(crate) fn build_output(
         if let Some((page, number)) = shown
             && file.ends_with(".html")
         {
-            let layout = rendered.layout;
-            let own = &rendered.own;
-            let unnamed = unnamed::told(renderer, page, number, own, &html, layout, &mut problems);
-            problems.extend(unnamed.problems);
-            folded = unnamed.folded;
             let page = links::Page {
                 id: page,
                 number,
@@ -1516,6 +1511,9 @@ pub(crate) fn build_output(
                     .collect(),
                 own: &rendered.own,
             };
+            let unnamed = unnamed::told(renderer, &page, &html, rendered.layout, &mut problems);
+            problems.extend(unnamed.problems);
+            folded = unnamed.folded;
             let checking = std::time::Instant::now();
             checked = Some(linked.check(renderer, page, &html));
             timed.links = checking.elapsed();
