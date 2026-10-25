@@ -59,10 +59,10 @@ pub(super) struct Frame {
     /// was written, by the text's address and length, the text kept so no
     /// other takes its address.
     pub made: HashMap<(usize, usize), (Value, Arc<Own>)>,
-    /// The picture with no description each text gives where it is
-    /// published, by the text's address and length, the text kept so no
-    /// other takes its address.
-    pub undescribed_at: HashMap<(usize, usize), (Value, PictureId)>,
+    /// The picture each text gives where it is published, and whether it
+    /// has no description, by the text's address and length, the text kept
+    /// so no other takes its address.
+    pub pictures_at: HashMap<(usize, usize), (Value, PictureId, bool)>,
     /// Where the writing makes the call, or shows the picture, whose
     /// snippet or piece is being built.
     pub calling: Option<Place>,
@@ -163,7 +163,7 @@ impl Frame {
             scripts: PageScripts::default(),
             origins: HashMap::new(),
             made: HashMap::new(),
-            undescribed_at: HashMap::new(),
+            pictures_at: HashMap::new(),
             calling: None,
             undescribed: Vec::new(),
             search_boxes: 0,
@@ -426,25 +426,28 @@ pub(super) fn written(value: &Value) -> Option<Arc<Own>> {
     })
 }
 
-/// Notes that `text` is where `picture`, which has no description, is
-/// published, so that printing it is known as printing that picture.
-pub(super) fn undescribed_at(text: &Value, picture: PictureId) {
+/// Notes that `text` is where `picture` is published, `undescribed` where
+/// it has no description, so that printing it is known as printing that
+/// picture.
+pub(super) fn published_at(text: &Value, picture: PictureId, undescribed: bool) {
     if text.as_str().is_some_and(|text| !text.is_empty()) {
         with(|frame| {
-            (frame.undescribed_at)
+            (frame.pictures_at)
                 .entry(address(text))
-                .or_insert_with(|| (text.clone(), picture));
+                .or_insert_with(|| (text.clone(), picture, undescribed));
         });
     }
 }
 
-/// The picture with no description `text` is where it is published, as
-/// [`undescribed_at`] notes it.
-pub(super) fn undescribed_in(text: &Value) -> Option<PictureId> {
+/// The picture `text` is where it is published, and whether it has no
+/// description, as [`published_at`] notes it.
+pub(super) fn published_in(text: &Value) -> Option<(PictureId, bool)> {
     let key = text.as_str().map(|_| address(text))?;
     FRAMES.with_borrow(|frames| {
-        (frames.iter().rev())
-            .find_map(|frame| frame.undescribed_at.get(&key).map(|(_, picture)| *picture))
+        (frames.iter().rev()).find_map(|frame| {
+            let (_, picture, undescribed) = frame.pictures_at.get(&key)?;
+            Some((*picture, *undescribed))
+        })
     })
 }
 

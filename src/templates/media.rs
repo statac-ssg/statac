@@ -736,13 +736,23 @@ pub(super) fn own_fields(value: &Value) -> Option<&[(String, Value)]> {
     Some(&photo.own)
 }
 
-/// The picture with no description `value`, being printed, shows: the
-/// picture itself, or where it is published.
-pub(super) fn undescribed_printed(value: &Value) -> Option<PictureId> {
+/// The picture `value`, being printed, shows, and whether it has no
+/// description: the picture itself, or where it is published.
+pub(super) fn picture_printed(value: &Value) -> Option<(PictureId, bool)> {
     match value.downcast_object_ref::<PhotoValue>() {
-        Some(photo) => photo.undescribed.then_some(photo.id),
-        None => frame::undescribed_in(value),
+        Some(photo) => Some((photo.id, photo.undescribed)),
+        None => frame::published_in(value),
     }
+}
+
+/// `made`, naming the same file as `text`, as a value printing the same
+/// picture as `text` does, where `text` is a picture or where one is
+/// published.
+pub(super) fn published_as(text: &Value, made: Value) -> Value {
+    if let Some((picture, undescribed)) = picture_printed(text) {
+        frame::published_at(&made, picture, undescribed);
+    }
+    made
 }
 
 /// Tells a picture shown with no description, once for the output being
@@ -789,9 +799,7 @@ impl Object for PhotoValue {
                     let at = self.asking.calling;
                     frame::develops(self.id, at, self.full);
                 }
-                if self.undescribed {
-                    frame::undescribed_at(value, self.id);
-                }
+                frame::published_at(value, self.id, self.undescribed);
             }
             "alt" if self.undescribed => {
                 let picture = shared.site.pictures.get(self.id);

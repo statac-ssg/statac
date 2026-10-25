@@ -73,41 +73,42 @@ pub(crate) fn told(
             _ => AllOf::Button,
         };
         let at_place = (at.clone()).and_then(|at| placed(renderer, own, html, at));
-        let placed =
-            (image.as_ref()).and_then(|image| tag_placed(renderer, own, html, image.tag.clone()));
+        // A template's link is folded on this page alone: on another, or in
+        // another round of a loop, it may hold another image.
+        let across = at_place.filter(|place| renderer.template_of(place.source).is_none());
+        // The picture whose address a template printed in the `<img>`, and
+        // whether it has no alt text.
+        let picture =
+            (image.as_ref()).and_then(|image| renderer.picture_in(own, image.tag.clone()));
+        // A template's picture gives the link words only where the `<img>`
+        // is written with its alt text.
+        if let (Some(image), Some((picture, true))) = (&image, &picture)
+            && image.alt
+        {
+            if let Some(told) = shown.iter_mut().find(|problem| prints(problem, picture))
+                && let Kind::MissingAltText { all_of: at, .. } = &mut told.kind
+            {
+                at.get_or_insert(all_of);
+                folded.extend(across.map(Some));
+                continue;
+            }
+            if told_there(renderer, page, at.clone(), image.tag.clone(), picture) {
+                continue;
+            }
+        }
+        // Else by where the picture is told, inside the `<img>`, unless the
+        // `<img>` prints a picture that needs no alt text: a template's
+        // `<img>` may show another picture on each page or round.
+        let placed = (image.as_ref())
+            .filter(|_| !matches!(picture, Some((_, false))))
+            .and_then(|image| tag_placed(renderer, own, html, image.tag.clone()));
         if let Some(placed) = placed
             && let Some(told) = shown.iter_mut().find(|problem| shows(problem, placed))
             && let Kind::MissingAltText { all_of: at, .. } = &mut told.kind
         {
             *at = Some(all_of);
-            folded.push(at_place);
+            folded.extend(across.map(Some));
             continue;
-        }
-        // A template's picture gives the link words only where the `<img>`
-        // is written with its alt text.
-        let image = image.filter(|image| image.alt);
-        let picture = image.and_then(|image| {
-            let picture = renderer.undescribed_in(own, image.tag.clone())?;
-            Some((picture, image.tag))
-        });
-        if let Some((picture, tag)) = picture {
-            if let Some(told) = shown.iter_mut().find(|problem| prints(problem, &picture))
-                && let Kind::MissingAltText { all_of: at, .. } = &mut told.kind
-            {
-                at.get_or_insert(all_of);
-                // A template's link is folded on this page alone: on
-                // another, or in another round of a loop, it may hold
-                // another image.
-                if let Some(place) = at_place
-                    && renderer.template_of(place.source).is_none()
-                {
-                    folded.push(at_place);
-                }
-                continue;
-            }
-            if told_there(renderer, page, at, tag, &picture) {
-                continue;
-            }
         }
         // With nothing on the page to place it at, a missing `<title>` is
         // the layout's.
@@ -137,7 +138,8 @@ pub(crate) fn told(
 }
 
 /// What [`told`] found on a page: its problems, and where each link or
-/// button was written that is all an image told as missing alt text.
+/// button the writing holds was written that is all an image told as
+/// missing alt text.
 pub(crate) struct Told {
     pub problems: Vec<Problem>,
     pub folded: Vec<Option<Place>>,

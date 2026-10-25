@@ -715,11 +715,12 @@ impl Renderer {
         }
     }
 
-    /// The picture with no description, as a problem names it, whose
-    /// address a template printed in bytes `range` of an output.
-    pub fn undescribed_in(&self, own: &Own, range: Range<usize>) -> Option<String> {
-        let picture = own.undescribed_in(range)?;
-        Some(self.shared.site.pictures.get(picture).shown())
+    /// The picture, as a problem names it, whose address a template
+    /// printed in bytes `range` of an output, and whether it has no
+    /// description.
+    pub fn picture_in(&self, own: &Own, range: Range<usize>) -> Option<(String, bool)> {
+        let (picture, undescribed) = own.picture_in(range)?;
+        Some((self.shared.site.pictures.get(picture).shown(), undescribed))
     }
 
     /// The outermost markup of a file's that the byte at `at` of an output

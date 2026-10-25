@@ -449,8 +449,9 @@ pub(crate) struct Built {
     pub written: bool,
     /// The languages whose search index it names.
     pub indexed: Vec<crate::site::LanguageId>,
-    /// Where each link or button it shows was written that is all an image
-    /// told as missing alt text, which no page tells as missing words.
+    /// Where each link or button of the writing's it shows was written
+    /// that is all an image told as missing alt text, which no page tells
+    /// as missing words.
     pub folded: Vec<Option<Place>>,
 }
 

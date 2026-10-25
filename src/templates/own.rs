@@ -103,7 +103,7 @@ fn checked(name: &str, args: &[Value]) -> Result<(), Error> {
 pub(super) fn install(env: &mut Environment<'_>) {
     env.add_filter("absolute", |value: Value| {
         checked("absolute", std::slice::from_ref(&value))?;
-        absolute(&value)
+        Ok::<_, Error>(super::media::published_as(&value, absolute(&value)?))
     });
     env.add_filter("markdown", |state: &State, value: Value| {
         checked("markdown", std::slice::from_ref(&value))?;

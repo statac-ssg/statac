@@ -735,6 +735,129 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
     }
 }
 
+/// A link a template writes round a picture with no alt text is folded
+/// into the picture's missing alt text only on the page, and in the round
+/// of a loop, that shows that picture: the same line showing a picture
+/// marked decorative, on another page or in another round, is told as a
+/// link with no words.
+#[test]
+fn a_templates_link_is_folded_into_alt_text_only_where_it_shows_that_picture() {
+    const ONE: &str = "note  Missing alt text: `content/post-1/photo-1.jpg`";
+    const THREE: &str = "note  Missing alt text: `content/post-1/photo-3.jpg`";
+    const ALT: &str = "  Give it alt text saying where the link to `/post-1/` leads, as the \
+        image is all the link shows.";
+    const ALONE: &str =
+        "  Describe it with `alt:` in `content/post-1/photo-1.jpg.yaml`, or mark it decorative.";
+    const LINK: &str =
+        "note  Missing link text: the link to `/post-1/` has nothing a screen reader can read out";
+    const INSIDE: &str = "  Give the `<img>` inside it an `alt` saying where the link leads.";
+    let printed = |names: &str| {
+        format!(
+            "{{% for name in [{names}] %}}{{% set p = page.image(name) %}}\
+             <a href=\"/post-1/\"><img src=\"{{{{ p.src }}}}\" alt=\"{{{{ p.alt }}}}\"></a>\
+             {{% endfor %}}"
+        )
+    };
+    let read = |names: &str| {
+        format!(
+            "{{% for name in [{names}] %}}\
+             <a href=\"/post-1/\"><img src=\"/post-1/\" alt=\"{{{{ page.image(name).alt }}}}\"></a>\
+             {{% endfor %}}"
+        )
+    };
+    let filtered = |filter: &str| {
+        format!(
+            "{{% set p = page.image('photo-1.jpg') %}}\
+             <a href=\"/post-1/\"><img src=\"{{{{ p.src | {filter} }}}}\" alt=\"{{{{ p.alt }}}}\"></a>"
+        )
+    };
+    // Each case: its name, the layout, whether a second page shows its own
+    // `photo-1.jpg`, marked decorative, and what is told.
+    let cases: Vec<(&str, String, bool, &[&str])> = vec![
+        (
+            "read in the tag, decorative on another page",
+            read("'photo-1.jpg'"),
+            true,
+            &[LINK, INSIDE, ONE, ALT],
+        ),
+        (
+            "read in the tag, decorative in another round",
+            read("'photo-1.jpg', 'photo-2.jpg'"),
+            false,
+            &[LINK, INSIDE, ONE, ALT],
+        ),
+        (
+            "printed, decorative in the round between",
+            printed("'photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'"),
+            false,
+            &[ONE, ALT, THREE, ALT, LINK, INSIDE],
+        ),
+        (
+            "printed in the tag, decorative in the round between",
+            "{% for name in ['photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'] %}\
+             <a href=\"/post-1/\"><img src=\"{{ page.image(name).src }}\" \
+             alt=\"{{ page.image(name).alt }}\"></a>{% endfor %}"
+                .to_owned(),
+            false,
+            &[LINK, INSIDE, ONE, ALT, THREE, ALT],
+        ),
+        (
+            "printed in two rounds",
+            printed("'photo-1.jpg', 'photo-1.jpg'"),
+            false,
+            &[ONE, ALT],
+        ),
+        ("marked safe", filtered("safe"), false, &[ONE, ALT]),
+        ("made whole", filtered("absolute"), false, &[ONE, ALT]),
+        // What another filter makes may name another file.
+        (
+            "changed by a filter",
+            filtered("lower"),
+            false,
+            &[ONE, ALONE, LINK, INSIDE],
+        ),
+        // Without the picture's address there is nothing to tell the
+        // rounds apart by.
+        (
+            "read in the tag in two rounds",
+            read("'photo-1.jpg', 'photo-1.jpg'"),
+            false,
+            &[LINK, INSIDE, ONE, ALT],
+        ),
+    ];
+    let mut wrong = Vec::new();
+    for (name, layout, other, expected) in cases {
+        let site = Site::new("folded", &layout);
+        site.write(
+            "statac.yaml",
+            "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
+             url: https://example.org/\n",
+        );
+        site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
+        for n in [1, 2, 3] {
+            site.put(&format!("content/post-1/photo-{n}.jpg"), &jpeg(30, 20));
+        }
+        site.write("content/post-1/photo-2.jpg.yaml", "decorative: true\n");
+        if other {
+            site.write("content/post-2/index.md", "---\ntitle: Post 2\n---\n");
+            site.put("content/post-2/photo-1.jpg", &jpeg(30, 20));
+            site.write("content/post-2/photo-1.jpg.yaml", "decorative: true\n");
+        }
+        let said = site.check();
+        let told: Vec<&str> = (said.lines())
+            .filter(|line| {
+                ["note  ", "  Give ", "  Describe "]
+                    .iter()
+                    .any(|opens| line.starts_with(opens))
+            })
+            .collect();
+        if told != *expected {
+            wrong.push(format!("{name}: {told:#?}\n{said}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 #[test]
 fn a_piece_writing_pictures_is_handed_the_picture() {
     let site = Site::new("piece", "{{ page.content }}");
