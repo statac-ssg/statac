@@ -88,7 +88,7 @@ pub(crate) fn told(
             if let Some(told) = shown.iter_mut().find(|problem| prints(problem, picture))
                 && let Kind::MissingAltText { all_of: at, .. } = &mut told.kind
             {
-                at.get_or_insert(all_of);
+                AllOf::join(at, Some(&all_of));
                 folded.extend(across.map(Some));
                 continue;
             }

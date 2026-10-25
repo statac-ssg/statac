@@ -627,7 +627,11 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
              <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>\
              <a href=\"/post-2/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>",
             "",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+            &[
+                "note  Missing alt text: `content/post-1/photo-1.jpg`",
+                "  Give it alt text saying where the link leads, as the image is all the link \
+                 shows.",
+            ],
         ),
         (
             "shown whole",
@@ -856,6 +860,108 @@ fn a_templates_link_is_folded_into_alt_text_only_where_it_shows_that_picture() {
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// A picture a template shows with no alt text is told once at the place
+/// it is shown, naming each page, however each page links it: its alt
+/// text is to say where the link leads, naming the URL where every link
+/// leads to one, and wherever any page links it, since that link is told
+/// there.
+#[test]
+fn a_templates_picture_linked_differently_on_each_page_is_told_once() {
+    const TO_ONE: &str = "  Give it alt text saying where the link to `/post-1/` leads, as the \
+        image is all the link shows.";
+    const TO_TWO: &str = "  Give it alt text saying where the link to `/post-2/` leads, as the \
+        image is all the link shows.";
+    const LEADS: &str =
+        "  Give it alt text saying where the link leads, as the image is all the link shows.";
+    fn told(said: &str) -> Vec<&str> {
+        let opens = [
+            "note  ",
+            "  Give ",
+            "  Describe ",
+            "  While ",
+            "  And ",
+            "    content/",
+        ];
+        (said.lines())
+            .filter(|line| opens.iter().any(|opens| line.starts_with(opens)))
+            .collect()
+    }
+    let shown = "<img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\">";
+    let linked = |to: &str| format!("<a href=\"{to}\">{shown}</a>");
+    let only = |url: &str| {
+        format!(
+            "{{% if page.url == '{url}' %}}{}{{% else %}}{shown}{{% endif %}}",
+            linked(url)
+        )
+    };
+    let cases: Vec<(&str, String, &str)> = vec![
+        ("linked to one URL", linked("/post-1/"), TO_ONE),
+        ("linked to each page's URL", linked("{{ page.url }}"), LEADS),
+        ("linked on the first page only", only("/post-1/"), TO_ONE),
+        ("linked on the second page only", only("/post-2/"), TO_TWO),
+        (
+            "linked to two URLs on one page",
+            format!("{}{}", linked("/post-1/"), linked("/post-2/")),
+            LEADS,
+        ),
+    ];
+    let mut wrong = Vec::new();
+    for (name, layout, suggestion) in cases {
+        let layout = format!("{{% set p = page.image('/photo-1.jpg') %}}{layout}");
+        let site = Site::new("linked-differently", &layout);
+        site.put("static/photo-1.jpg", &jpeg(30, 20));
+        for n in [1, 2] {
+            site.write(
+                &format!("content/post-{n}/index.md"),
+                &format!("---\ntitle: Post {n}\n---\n"),
+            );
+        }
+        let said = site.check();
+        let expected = [
+            "note  Missing alt text: `static/photo-1.jpg`",
+            "  While building: content/post-1/index.md",
+            "  And while building 1 more:",
+            "    content/post-2/index.md",
+            suggestion,
+        ];
+        if told(&said) != expected {
+            wrong.push(format!("{name}: {:#?}\n{said}", told(&said)));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+
+    // A list's later pages are told with its first.
+    let site = Site::new("linked-later", "");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nposts_per_page: 1\n",
+    );
+    site.write(
+        "templates/home.html",
+        &format!(
+            "{BASE}{{% set p = page.image('/photo-1.jpg') %}}{}",
+            linked("{{ page.url }}")
+        ),
+    );
+    site.put("static/photo-1.jpg", &jpeg(30, 20));
+    for n in [1, 2] {
+        site.write(
+            &format!("content/post-{n}.md"),
+            &format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\n---\n"),
+        );
+    }
+    let said = site.check();
+    assert_eq!(
+        told(&said),
+        [
+            "note  Missing alt text: `static/photo-1.jpg`",
+            "  While building: content/index.md",
+            LEADS,
+        ],
+        "{said}"
+    );
 }
 
 #[test]

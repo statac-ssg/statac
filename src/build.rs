@@ -879,6 +879,21 @@ pub(crate) fn conclude(
             // what went wrong there is told once, naming the first page
             // that met it.
             Output::Later(list, _) => {
+                // What a picture is all of on a later page is joined into
+                // where the first page told it.
+                for problem in &built.problems {
+                    if matches!(
+                        problem.kind,
+                        Kind::MissingAltText {
+                            all_of: Some(_),
+                            ..
+                        }
+                    ) && let Some(first) =
+                        (problems.iter_mut()).find(|first| first.alike_but_for_page(problem))
+                    {
+                        first.all_of_too(problem);
+                    }
+                }
                 let told = on_list.entry(list).or_default();
                 let new: Vec<Problem> = built
                     .problems
