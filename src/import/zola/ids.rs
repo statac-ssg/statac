@@ -8,7 +8,6 @@ use std::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 
 use super::slug::Strategy;
-use crate::import::common::emoji_names;
 use crate::markdown::{self, Kind};
 use crate::source::{Sources, Span};
 
@@ -23,9 +22,8 @@ struct Heading {
     braced: bool,
     /// Zola's id for it, where Statac can be given one: none where the
     /// heading has an id of the author's, or an empty one, or one made
-    /// from words Zola had from template code, a tag or an emoji's name,
-    /// which Statac doesn't have, or where braces end it that Statac reads
-    /// as words.
+    /// from words Zola had from template code or a tag, which Statac
+    /// doesn't have, or where braces end it that Statac reads as words.
     id: Option<String>,
 }
 
@@ -33,8 +31,8 @@ struct Heading {
 /// another, moving each of `calls`, offsets in the writing, along with
 /// what is written before it. Gives the line each id was written on, as
 /// it now reads, in order.
-pub(super) fn keep(writing: &mut String, calls: &mut [usize], emoji: bool) -> Vec<String> {
-    let mut headings = zolas(writing, calls, emoji);
+pub(super) fn keep(writing: &mut String, calls: &mut [usize]) -> Vec<String> {
+    let mut headings = zolas(writing, calls);
     let mut kept: Vec<usize> = Vec::new();
     // Each id written takes one Statac would have given another heading,
     // so Statac is asked again until it gives every heading Zola's.
@@ -90,7 +88,7 @@ pub(super) fn keep(writing: &mut String, calls: &mut [usize], emoji: bool) -> Ve
 }
 
 /// Each heading in `writing`, with the id Zola gave it, in order.
-fn zolas(writing: &str, calls: &[usize], emoji: bool) -> Vec<Heading> {
+fn zolas(writing: &str, calls: &[usize]) -> Vec<Heading> {
     let options = Options::ENABLE_TABLES
         | Options::ENABLE_FOOTNOTES
         | Options::ENABLE_STRIKETHROUGH
@@ -136,8 +134,7 @@ fn zolas(writing: &str, calls: &[usize], emoji: bool) -> Vec<Heading> {
                 let unknown = attributes
                     || written.contains("{{")
                     || written.contains("{%")
-                    || calls.iter().any(|call| (start..end).contains(call))
-                    || (emoji && !emoji_names(written).is_empty());
+                    || calls.iter().any(|call| (start..end).contains(call));
                 let id = (!own).then(|| {
                     let id = anchor(&taken, Strategy::On.made(&words));
                     taken.insert(id.clone());

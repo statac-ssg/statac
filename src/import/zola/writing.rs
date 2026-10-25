@@ -19,8 +19,8 @@ use std::ops::Range;
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
-use super::{CODE_OPTIONS, EMOJI, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE};
-use crate::import::common::{emoji_names, ends_line, opens_line};
+use super::{CODE_OPTIONS, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE};
+use crate::import::common::{ends_line, opens_line};
 use crate::import::liquid::{self, finding, quoted, split_word, within};
 use crate::import::writing::Marked;
 use crate::import::{Finding, Spot};
@@ -60,7 +60,6 @@ pub(super) struct Context<'a> {
     pub beside: &'a dyn Fn(&str) -> Option<(String, String)>,
     /// The tags some call anywhere in the site wraps writing with.
     pub wrapping: &'a HashSet<String>,
-    pub emoji: bool,
 }
 
 /// A snippet call put in place of a tag.
@@ -778,9 +777,6 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
     let body = links_and_more(&body, cx, &spotter(&body), &mut findings);
     let body = body.as_str();
     let spot = spotter(body);
-    if cx.emoji {
-        findings.extend(emoji(body, &spot));
-    }
     let code = code_ranges(body);
     let mut calls = Vec::new();
     let mut out = Marked::default();
@@ -1066,23 +1062,6 @@ fn links_and_more(
     out
 }
 
-/// Each `:name:` outside code that Zola showed as an emoji.
-fn emoji(body: &str, spot: &dyn Fn(usize, &str) -> Spot) -> Vec<Finding> {
-    let code = code_ranges(body);
-    let mut found = Vec::new();
-    let mut at = 0;
-    for line in body.split_inclusive('\n') {
-        let start = at;
-        at += line.len();
-        for (offset, name) in emoji_names(line.trim_end_matches(['\n', '\r'])) {
-            if !within(&code, start + offset) {
-                found.push(finding(&EMOJI, spot(start + offset, name)));
-            }
-        }
-    }
-    found
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1183,7 +1162,6 @@ mod tests {
             refs: &|_| None,
             beside: &|_| None,
             wrapping: &wrapping,
-            emoji: false,
         };
         // The writing, what it becomes, and the line from each call made.
         let cases: [(&str, &str, &[&str]); 5] = [
@@ -1234,7 +1212,6 @@ mod tests {
             refs: &|_| None,
             beside: &|_| None,
             wrapping: &wrapping,
-            emoji: false,
         };
         let converted = convert(body, 1, "a.md", &cx);
         let found = (converted.findings.into_iter())
@@ -1424,7 +1401,6 @@ mod tests {
                 refs: &refs,
                 beside: &|_| None,
                 wrapping: &wrapping,
-                emoji: false,
             };
             let body = format!("{{{{ {call} }}}}\n");
             let converted = convert(&body, 1, "a.md", &cx);

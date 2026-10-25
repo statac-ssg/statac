@@ -73,13 +73,6 @@ pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
                is shown without them.",
 };
 
-pub(super) static EMOJI: FindingKind = FindingKind {
-    heading: "Emoji written by name",
-    sentence: "Zola showed each of these as its emoji, as the settings' `render_emoji` asked, and \
-               Statac shows the name as written: read each page that has one, and write the \
-               emoji itself in its place.",
-};
-
 pub(super) static FRONT_MATTER_UNREAD: FindingKind = FindingKind {
     heading: "Front matter Statac can't read",
     sentence: "Statac's reader stopped at this line in the front matter of each of these, so the \
@@ -145,7 +138,6 @@ struct ListWords {
     sort_by: Option<(String, Option<usize>)>,
     paginate_by: Option<u64>,
     paginate_path: Option<String>,
-    reversed: bool,
     transparent: bool,
     feeds: Option<bool>,
     render: bool,
@@ -168,11 +160,7 @@ struct Doc {
     /// page, that folder.
     dir: String,
     date: Option<Date>,
-    updated: Option<Date>,
-    title: String,
     weight: Option<i64>,
-    /// The name in its address, as Zola made it; none for a list.
-    made: Option<String>,
     draft: bool,
     list: ListWords,
     terms: Vec<(String, Vec<String>)>,
@@ -224,47 +212,6 @@ fn text_field(fields: &[Field], name: &str) -> Option<String> {
         .and_then(|f| text_of(&f.value))
         .map(|t| t.trim().to_owned())
         .filter(|t| !t.is_empty())
-}
-
-/// Two names compared as people read them: small letters and accents
-/// alike, and figures by the number they make.
-fn natural(a: &str, b: &str) -> std::cmp::Ordering {
-    use unicode_normalization::UnicodeNormalization;
-    use unicode_normalization::char::is_combining_mark;
-    let fold = |s: &str| -> Vec<char> {
-        s.nfd()
-            .filter(|c| !is_combining_mark(*c))
-            .flat_map(char::to_lowercase)
-            .collect()
-    };
-    let (a, b) = (fold(a), fold(b));
-    let (mut i, mut j) = (0, 0);
-    while i < a.len() && j < b.len() {
-        if a[i].is_ascii_digit() && b[j].is_ascii_digit() {
-            let (si, sj) = (i, j);
-            while i < a.len() && a[i].is_ascii_digit() {
-                i += 1;
-            }
-            while j < b.len() && b[j].is_ascii_digit() {
-                j += 1;
-            }
-            let x: String = a[si..i].iter().collect();
-            let y: String = b[sj..j].iter().collect();
-            let (x, y) = (x.trim_start_matches('0'), y.trim_start_matches('0'));
-            let order = x.len().cmp(&y.len()).then_with(|| x.cmp(y));
-            if order.is_ne() {
-                return order;
-            }
-        } else {
-            let order = a[i].cmp(&b[j]);
-            if order.is_ne() {
-                return order;
-            }
-            i += 1;
-            j += 1;
-        }
-    }
-    (a.len() - i).cmp(&(b.len() - j))
 }
 
 impl Reader<'_> {
@@ -845,7 +792,7 @@ impl Reader<'_> {
                         "sort_by" => list.sort_by = Some((text, field.line)),
                         "paginate_by" => list.paginate_by = text.parse().ok().filter(|n| *n > 0),
                         "paginate_path" => list.paginate_path = Some(text),
-                        "paginate_reversed" => list.reversed = truth,
+                        "paginate_reversed" if truth => dropped.push("paginate_reversed"),
                         "transparent" => {
                             list.transparent = truth;
                             dropped.push("transparent");
@@ -880,8 +827,6 @@ impl Reader<'_> {
         let date_of =
             |name: &str| text_field(&fields, name).and_then(|t| super::write::date_of(&t));
         let date = date_of("date");
-        let updated = date_of("updated");
-        let title = text_field(&fields, "title").unwrap_or_default();
         let weight = text_field(&fields, "weight").and_then(|w| w.parse().ok());
         let draft = fields
             .iter()
@@ -987,10 +932,7 @@ impl Reader<'_> {
             body_line: front.body_line,
             dir,
             date,
-            updated,
-            title,
             weight,
-            made: made_name,
             draft,
             list,
             terms,
@@ -1086,8 +1028,8 @@ impl Reader<'_> {
         Some(Value::Text(last(address.trim_end_matches('/')).to_owned()))
     }
 
-    /// Gives each list Zola ordered other than by date that order
-    /// Statac's way, as `order:` on its own page.
+    /// Gives each list Zola ordered by weight that order Statac's way, as
+    /// `order:` on its own page.
     fn orders(&mut self) {
         let mut unordered = Vec::new();
         for list in 0..self.docs.len() {
@@ -1099,68 +1041,15 @@ impl Reader<'_> {
             let (by, line) = words.sort_by.clone().unwrap_or(("none".into(), None));
             let folder = code(&format!("{}/", parent(&self.docs[list].from)));
             let index = code(&format!("content/{}", self.docs[list].to));
-            let mut keyed: Vec<usize> = members.clone();
-            let what = match by.as_str() {
-                "date" => {
-                    if words.reversed {
-                        self.docs[list].words.push(Field::new(
-                            "order",
-                            Value::Text("oldest first".into()),
-                            None,
-                        ));
-                        self.note(format!(
-                            "Zola listed the pages of {folder} oldest first, as its \
-                             `paginate_reversed` asked, so {index} says `order: oldest first`."
-                        ));
-                    }
-                    continue;
-                }
+            match by.as_str() {
+                "date" => continue,
                 "none" => {
                     if members.len() > 1 {
                         unordered.push(folder);
                     }
                     continue;
                 }
-                "update_date" => {
-                    keyed.retain(|at| self.docs[*at].updated.is_some());
-                    let moment = |at: &usize| {
-                        self.docs[*at].updated.map(|d| {
-                            (
-                                d.year,
-                                d.month,
-                                d.day,
-                                d.time.map(|t| (t.hour, t.minute, t.second)),
-                            )
-                        })
-                    };
-                    keyed.sort_by_key(|at| std::cmp::Reverse(moment(at)));
-                    "their `updated` dates, newest first"
-                }
-                "title" => {
-                    keyed.retain(|at| !self.docs[*at].title.is_empty());
-                    keyed.sort_by(|a, b| natural(&self.docs[*a].title, &self.docs[*b].title));
-                    "their titles, A to Z"
-                }
-                "title_bytes" => {
-                    keyed.retain(|at| !self.docs[*at].title.is_empty());
-                    keyed.sort_by(|a, b| self.docs[*a].title.cmp(&self.docs[*b].title));
-                    "their titles, A to Z"
-                }
-                "weight" => {
-                    keyed.retain(|at| self.docs[*at].weight.is_some());
-                    keyed.sort_by_key(|at| self.docs[*at].weight);
-                    "their `weight`, lightest first"
-                }
-                "slug" => {
-                    keyed.retain(|at| self.docs[*at].made.is_some());
-                    keyed.sort_by(|a, b| {
-                        natural(
-                            self.docs[*a].made.as_deref().unwrap_or_default(),
-                            self.docs[*b].made.as_deref().unwrap_or_default(),
-                        )
-                    });
-                    "their slugs, A to Z"
-                }
+                "weight" => {}
                 _ => {
                     let from = self.docs[list].from.clone();
                     self.find(
@@ -1171,10 +1060,10 @@ impl Reader<'_> {
                     );
                     continue;
                 }
-            };
-            if words.reversed {
-                keyed.reverse();
             }
+            let mut keyed = members;
+            keyed.retain(|at| self.docs[*at].weight.is_some());
+            keyed.sort_by_key(|at| self.docs[*at].weight);
             let names: Vec<Value> = keyed
                 .iter()
                 .filter_map(|at| Self::order_name(&self.docs[*at]))
@@ -1185,22 +1074,12 @@ impl Reader<'_> {
             self.docs[list]
                 .words
                 .push(Field::new("order", Value::List(names), None));
-            if by == "weight" {
-                for at in &keyed {
-                    self.docs[*at].fields.retain(|f| f.name != "weight");
-                }
+            for at in &keyed {
+                self.docs[*at].fields.retain(|f| f.name != "weight");
             }
-            let reversed = match words.reversed {
-                true => ", the other way round, as its `paginate_reversed` asked",
-                false => "",
-            };
-            let weight = match by.as_str() {
-                "weight" => ", and `weight` was taken off them",
-                _ => "",
-            };
             self.note(format!(
-                "Zola ordered the pages of {folder} by {what}{reversed}, so {index} lists them in \
-                 that order with `order:`{weight}."
+                "Zola ordered the pages of {folder} by their `weight`, lightest first, so {index} \
+                 lists them in that order with `order:`, and `weight` was taken off them."
             ));
         }
         if !unordered.is_empty() {
@@ -1245,8 +1124,6 @@ impl Reader<'_> {
                     let d = &self.docs[*at];
                     match by.as_str() {
                         "date" => d.date.is_some(),
-                        "update_date" => d.updated.is_some(),
-                        "title" | "title_bytes" => !d.title.is_empty(),
                         "weight" => d.weight.is_some(),
                         _ => true,
                     }
@@ -1539,6 +1416,10 @@ impl Reader<'_> {
                              for the list itself; `index_page: false` on the list page does \
                              that in Statac"
                     .into(),
+                "paginate_reversed" => "Zola listed the list's pages the other way round; \
+                                        `order:` on the list page sets their order in Statac, \
+                                        as https://statac.dev/lists/#order describes"
+                    .into(),
                 "in_search_index" => "it said whether Zola's search index held the page, and \
                                       Statac makes no search index"
                     .into(),
@@ -1663,7 +1544,6 @@ impl Reader<'_> {
             refs: &refs,
             beside: &beside,
             wrapping: &wrapping,
-            emoji: self.s.render_emoji,
         };
         let mut calls = Vec::new();
         let mut written = Vec::new();
@@ -1682,11 +1562,7 @@ impl Reader<'_> {
             };
             let mut converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
             if self.s.anchors == Strategy::On {
-                let kept = ids::keep(
-                    &mut converted.writing,
-                    &mut converted.called,
-                    self.s.render_emoji,
-                );
+                let kept = ids::keep(&mut converted.writing, &mut converted.called);
                 if let Some(line) = kept.first().filter(|_| ids_kept.is_none()) {
                     ids_kept = Some((line.clone(), format!("content/{}", doc.to)));
                 }
@@ -1804,12 +1680,5 @@ mod tests {
         assert!(glob_matches("**/drafts/*", "posts/drafts/post-1.md"));
         assert!(glob_matches("*.{xlsx,csv}", "data.csv"));
         assert!(glob_matches("post-?.md", "post-1.md"));
-    }
-
-    #[test]
-    fn names_are_compared_as_read() {
-        let mut names = vec!["Post 10", "post 2", "Éclair", "Post 1"];
-        names.sort_by(|a, b| natural(a, b));
-        assert_eq!(names, vec!["Éclair", "Post 1", "post 2", "Post 10"]);
     }
 }

@@ -34,14 +34,12 @@ A link to [post 2](/posts/post-2/), to [its heading](/posts/post-2/#a-heading), 
 
 [ref]: /posts/post-2/
 
-Emoji by name: :smile: at 10:30:00.
-
 A summary marker inside a line  is taken out.
 
 ```rust
 {{ youtube(id="in-code") }}
 ```
 
-A code span: `{{ youtube(id="in-span") }}` and `@/posts/post-2.md` and `:smile:`.
+A code span: `{{ youtube(id="in-span") }}` and `@/posts/post-2.md`.
 
 Words that only look like a call, \@name(1), are escaped, and the calls above and their `@end` are not.

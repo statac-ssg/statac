@@ -88,7 +88,6 @@ pub(super) struct Settings {
     /// template, where the setting is there at all.
     pub skip_content_templating: Option<Vec<String>>,
     pub smart_punctuation: bool,
-    pub render_emoji: bool,
     pub target_blank: bool,
     pub no_follow: bool,
     pub no_referrer: bool,
@@ -171,7 +170,6 @@ pub(super) fn settle(entries: &[Field]) -> Settings {
         ignored_static: Vec::new(),
         skip_content_templating: None,
         smart_punctuation: false,
-        render_emoji: false,
         target_blank: false,
         no_follow: false,
         no_referrer: false,
@@ -240,7 +238,7 @@ pub(super) fn settle(entries: &[Field]) -> Settings {
                 for (name, inner) in fields(value) {
                     match name.as_str() {
                         "smart_punctuation" => s.smart_punctuation = truth(inner),
-                        "render_emoji" => s.render_emoji = truth(inner),
+                        "render_emoji" if !truth(inner) => {}
                         "external_links_target_blank" => s.target_blank = truth(inner),
                         "external_links_no_follow" => s.no_follow = truth(inner),
                         "external_links_no_referrer" => s.no_referrer = truth(inner),

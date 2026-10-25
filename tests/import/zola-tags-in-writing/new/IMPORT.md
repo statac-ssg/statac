@@ -37,6 +37,12 @@ The old site's built output isn't in `public/`, so no old URL was checked agains
 
 ## Left for you
 
+### Settings with no equal
+
+Statac has no equal for each of these settings, so nothing came across for them: https://statac.dev/settings/ says what Statac offers.
+
+- `config.toml`, line 4: `markdown.render_emoji: true`
+
 ### Tags in the content left as written
 
 Statac's Markdown runs none of Zola's tags, and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
@@ -52,24 +58,18 @@ Each of these names a page by its file, and Statac couldn't find that file in th
 - `content/posts/post-1.md`, line 33: `@/posts/post-4.md`
 - `content/posts/post-1.md`, line 33: `@/posts/post-9.md`
 
-### Emoji written by name
-
-Zola showed each of these as its emoji, as the settings' `render_emoji` asked, and Statac shows the name as written: read each page that has one, and write the emoji itself in its place.
-
-- `content/posts/post-1.md`, line 37: `:smile:`
-
 ### Options on code taken off
 
 Statac reads the rest of a code block's first line as its caption, so Zola's options after a comma, such as `,linenos`, were taken off each of these: the code is shown without them.
 
-- `content/posts/post-1.md`, line 41: ```` ```rust,linenos,hl_lines=1 ````
+- `content/posts/post-1.md`, line 39: ```` ```rust,linenos,hl_lines=1 ````
 
 ### Tags inside code
 
 Zola ran these even inside code, and Statac shows code exactly as written, so each now shows as it stands: write by hand what it made, where that was meant.
 
-- `content/posts/post-1.md`, line 42: `{{ youtube(id="in-code") }}`
-- `content/posts/post-1.md`, line 45: `{{ youtube(id="in-span") }}`
+- `content/posts/post-1.md`, line 40: `{{ youtube(id="in-code") }}`
+- `content/posts/post-1.md`, line 43: `{{ youtube(id="in-span") }}`
 
 ### Tags now snippet calls
 
