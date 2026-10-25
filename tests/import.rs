@@ -4185,6 +4185,72 @@ fn a_site_whose_settings_give_no_url_is_said_to_have_none() {
     }
 }
 
+/// A Hugo site with one language, times where its settings name it: the
+/// new site's language is the one Hugo reads, a language's own `locale`
+/// first, then the top's, then `languageCode` in the same order, and no
+/// `locale` is listed as a setting with no equal.
+#[test]
+fn a_hugo_sites_language_is_read_from_locale_before_language_code() {
+    let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+    let cases = [
+        ("code", "languageCode = \"en-GB\"\n", "", "en-GB"),
+        ("locale", "locale = \"ja-jp\"\n", "", "ja-jp"),
+        (
+            "locale-over-code",
+            "locale = \"fr-FR\"\nlanguageCode = \"de\"\n",
+            "",
+            "fr-FR",
+        ),
+        (
+            "own-locale",
+            "locale = \"en-GB\"\n",
+            "locale = \"en-AU\"\n",
+            "en-AU",
+        ),
+        (
+            "top-locale-over-own-code",
+            "locale = \"en-GB\"\n",
+            "languageCode = \"en-CA\"\n",
+            "en-GB",
+        ),
+        (
+            "own-code-over-top-code",
+            "languageCode = \"en-GB\"\n",
+            "languageCode = \"en-CA\"\n",
+            "en-CA",
+        ),
+        ("none", "", "", "en"),
+    ];
+    for (label, top, own, wanted) in cases {
+        let site = scratch(&format!("hugo-locale-{label}"));
+        let old = site.join("old");
+        fs::create_dir_all(old.join("content/posts")).unwrap();
+        let languages = match own {
+            "" => String::new(),
+            own => format!("[languages.en]\n{own}"),
+        };
+        let settings =
+            format!("baseURL = \"https://example.org/\"\ntitle = \"Site 1\"\n{top}{languages}");
+        fs::write(old.join("hugo.toml"), settings).unwrap();
+        fs::write(old.join("content/posts/post-1.md"), post).unwrap();
+        let new = site.join("new");
+        let (code, said) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {said}");
+        let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        assert!(
+            written.contains(&format!("\nlanguage: {wanted}\n")),
+            "{label}: {written}"
+        );
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(!report.contains("`locale:"), "{label}: {report}");
+        assert_eq!(
+            report.contains("The settings name no language"),
+            label == "none",
+            "{label}: {report}"
+        );
+    }
+}
+
 /// A site of each tool, with and without a title in its settings: the
 /// report says where the new site's title is made from the old folder's
 /// name, once.

@@ -495,11 +495,15 @@ impl Reader<'_> {
             ));
         } else {
             self.main = declared.first().map_or(default.clone(), |l| l.key.clone());
-            let named = s
-                .language_code
-                .clone()
+            // Hugo's order since 0.158, where `locale` took over from
+            // `languageCode`: the language's own, then the top's.
+            let one = declared.first();
+            let named = (one.and_then(|l| l.locale.clone()))
+                .or(s.locale.clone())
+                .or(one.and_then(|l| l.language_code.clone()))
+                .or(s.language_code.clone())
                 .or(s.default_language.clone())
-                .or(declared.first().map(|l| l.key.clone()));
+                .or(one.map(|l| l.key.clone()));
             match named {
                 Some(code_) if crate::new::a_language_code(&code_) => {
                     self.import.languages = vec![code_]

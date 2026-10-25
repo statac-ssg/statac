@@ -317,6 +317,8 @@ pub(super) struct Language {
     pub title: Option<String>,
     pub content_dir: Option<String>,
     pub weight: i64,
+    pub locale: Option<String>,
+    pub language_code: Option<String>,
 }
 
 /// Which pages Hugo published as their own file rather than a folder.
@@ -341,6 +343,7 @@ pub(super) struct Settings {
     pub base_url: Option<String>,
     pub title: Option<String>,
     pub language_code: Option<String>,
+    pub locale: Option<String>,
     pub default_language: Option<String>,
     pub default_in_subdir: bool,
     pub timezone: Option<String>,
@@ -455,6 +458,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
         base_url: None,
         title: None,
         language_code: None,
+        locale: None,
         default_language: None,
         default_in_subdir: false,
         timezone: None,
@@ -518,6 +522,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
             "baseurl" => s.base_url = text.filter(|t| !t.is_empty()),
             "title" => s.title = text,
             "languagecode" => s.language_code = text,
+            "locale" => s.locale = text,
             "defaultcontentlanguage" => s.default_language = text.map(|t| t.to_lowercase()),
             "defaultcontentlanguageinsubdir" => s.default_in_subdir = truth_of(value),
             "timezone" => s.timezone = text,
@@ -613,6 +618,8 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                         title: None,
                         content_dir: None,
                         weight: 0,
+                        locale: None,
+                        language_code: None,
                     };
                     for (name, value) in table {
                         match name.to_ascii_lowercase().as_str() {
@@ -625,8 +632,9 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                                 language.weight =
                                     text_of(value).and_then(|w| w.parse().ok()).unwrap_or(0)
                             }
-                            "languagename" | "languagecode" | "languagedirection" | "label"
-                            | "direction" | "locale" => {}
+                            "locale" => language.locale = text_of(value),
+                            "languagecode" => language.language_code = text_of(value),
+                            "languagename" | "languagedirection" | "label" | "direction" => {}
                             _ => leave(format!(
                                 "languages.{key}.{name}: {}",
                                 super::super::write::shown_value(value)
