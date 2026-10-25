@@ -387,10 +387,11 @@ struct Reader<'a> {
     /// many pages.
     controls: (usize, usize),
     /// The address of each feed the settings show the RSS plugin made,
-    /// with what it was written as, where the settings say.
-    plugin_feeds: Vec<(String, Option<FeedKind>)>,
-    /// What the report says of the first `feedPlugin` call whose feed's URL
-    /// Statac didn't take.
+    /// with what it was written as, where the settings say, and the
+    /// plugin's function that made it.
+    plugin_feeds: Vec<(String, Option<FeedKind>, &'static str)>,
+    /// What the report says of the first `feedPlugin` or `getFeedTemplate`
+    /// call whose feed's URL Statac didn't take.
     unread_feed: Option<String>,
     /// The feeds in the old built output that no file of the old site
     /// makes, each by its address, with what it is written as and its path
@@ -713,9 +714,12 @@ fn feed_kind(text: &str) -> Option<FeedKind> {
     .map(|(_, kind)| kind)
 }
 
-/// The id of each entry of `text`, a feed written as Atom or RSS, as
-/// written; none for an entry that has none.
+/// The id of each entry of `text`, a feed written as Atom, RSS or a JSON
+/// Feed, as written; none for an entry that has none.
 fn entry_ids(text: &str) -> Vec<Option<String>> {
+    if feed_kind(text) == Some(FeedKind::Json) {
+        return json_entry_ids(text);
+    }
     let mut ids = Vec::new();
     for (entry, id) in [("entry", "id"), ("item", "guid")] {
         let close = format!("</{entry}>");
@@ -730,6 +734,32 @@ fn entry_ids(text: &str) -> Vec<Option<String>> {
         }
     }
     ids
+}
+
+/// The `id` of each of the `items` of `text`, a JSON Feed; none for an
+/// item whose `id` isn't text.
+fn json_entry_ids(text: &str) -> Vec<Option<String>> {
+    use crate::yaml::Value as Json;
+    let mut sources = Sources::default();
+    let source = sources.add("feed.json", text.trim_start_matches('\u{feff}').to_owned());
+    let Ok(node) = crate::yaml::read_json(&sources, source) else {
+        return Vec::new();
+    };
+    let field = |value: &Json, name: &str| match value {
+        Json::Mapping(entries) => (entries.iter())
+            .find(|entry| matches!(&entry.key.value, Json::Scalar(key) if key == name))
+            .map(|entry| entry.value.value.clone()),
+        _ => None,
+    };
+    let Some(Json::Sequence(items)) = field(&node.value, "items") else {
+        return Vec::new();
+    };
+    (items.iter())
+        .map(|item| match field(&item.value, "id") {
+            Some(Json::Scalar(id)) => Some(id),
+            _ => None,
+        })
+        .collect()
 }
 
 /// What follows the first start tag of `name` in `xml`, from just after
@@ -1405,9 +1435,8 @@ impl Reader<'_> {
     }
 
     /// Tells of a page made by a template, and keeps where it was
-    /// published.
+    /// published; or keeps where a feed a template made was published.
     fn template(&mut self, path: &str, rel: &str, ending: &str) -> Result<(), Box<Failed>> {
-        self.find(&TEMPLATE_PAGE, path, None, "");
         let stem = &last(rel)[..last(rel).len() - ending.len()];
         // A template written in JavaScript gives its address in code.
         let mut address = match ending.starts_with(".11ty.") {
@@ -1432,17 +1461,20 @@ impl Reader<'_> {
             self.addressed_by_name
                 .push((path.to_owned(), rel.to_owned()));
         }
-        if let Some(address) = address {
-            match self.built_a_feed(&address) {
-                true => self.import.feeds.push((address, path.to_owned())),
-                false => self.import.templated.push((address, path.to_owned())),
+        match address {
+            Some(address) if self.built_a_feed(&address) => {
+                self.import.feeds.push((address, path.to_owned()));
+            }
+            address => {
+                self.find(&TEMPLATE_PAGE, path, None, "");
+                (self.import.templated).extend(address.map(|a| (a, path.to_owned())));
             }
         }
         Ok(())
     }
 
     /// Whether the old built output holds a feed at `address`: a file that
-    /// opens as RSS or Atom.
+    /// is RSS, Atom or a JSON Feed.
     fn built_a_feed(&self, address: &str) -> bool {
         let Some(built) = &self.import.built else {
             return false;
@@ -1458,15 +1490,14 @@ impl Reader<'_> {
         let Ok(bytes) = std::fs::read(self.path(&path)) else {
             return false;
         };
-        matches!(
-            feed_kind(&String::from_utf8_lossy(&bytes)),
-            Some(FeedKind::Atom | FeedKind::Rss)
-        )
+        feed_kind(&String::from_utf8_lossy(&bytes)).is_some()
     }
 
-    /// The feeds the settings show the RSS plugin made, and where they show
-    /// none, the feeds in the old built output that no file of the old site
-    /// makes.
+    /// The feeds the settings show the RSS plugin made, and the feeds in
+    /// the old built output that no file of the old site makes: where the
+    /// old site used the plugin and the settings show none of its feeds,
+    /// those may be the plugin's, and otherwise they are the work of
+    /// templates Statac didn't find.
     fn plugin_feeds(&mut self) -> Result<(), Box<Failed>> {
         for feed in self.s.feeds.clone() {
             let address = (feed.path.as_ref())
@@ -1491,18 +1522,15 @@ impl Reader<'_> {
                 self.unread_feed.get_or_insert(why);
                 continue;
             };
-            if self.plugin_feeds.iter().all(|(had, _)| *had != address) {
+            if self.plugin_feeds.iter().all(|(had, ..)| *had != address) {
                 let kind = feed.kind.as_deref().and_then(FeedKind::named);
-                self.plugin_feeds.push((address, kind));
+                self.plugin_feeds.push((address, kind, feed.by));
             }
         }
         let plugin = settings::makes_feeds(self.folder) || !self.s.feeds.is_empty();
         let Some(built) = self.import.built.clone() else {
             return Ok(());
         };
-        if !plugin || !self.plugin_feeds.is_empty() {
-            return Ok(());
-        }
         let mut files = Vec::new();
         self.files_beneath(&built, false, &mut files)?;
         for path in files {
@@ -1515,15 +1543,20 @@ impl Reader<'_> {
             let copied = format!("static/{rel}");
             let made = (self.import.feeds.iter())
                 .chain(&self.import.templated)
-                .any(|(made, _)| *made == address);
+                .any(|(made, _)| *made == address)
+                || self.plugin_feeds.iter().any(|(made, ..)| *made == address);
             if made || self.import.files.iter().any(|file| file.to == copied) {
                 continue;
             }
             let Ok(bytes) = std::fs::read(self.path(&path)) else {
                 continue;
             };
-            if let Some(kind) = feed_kind(&String::from_utf8_lossy(&bytes)) {
-                self.unmade_feeds.push((address, kind, path));
+            let Some(kind) = feed_kind(&String::from_utf8_lossy(&bytes)) else {
+                continue;
+            };
+            match plugin && self.plugin_feeds.is_empty() {
+                true => self.unmade_feeds.push((address, kind, path)),
+                false => self.import.feeds.push((address, path)),
             }
         }
         Ok(())
@@ -2448,17 +2481,40 @@ impl Reader<'_> {
             ),
         });
         let base = self.s.base();
-        self.import.address = self.given.map(|given| super::under(given, &base));
-        notes.push(format!(
-            "Eleventy's settings hold no title, URL or language for the site, so the new \
-             site's `title` is made from the old folder's name, {}, and it is in English, `en`: \
-             put each right in `statac.yaml`.",
-            match self.given {
-                Some(_) => "its `url` is the URL you gave",
-                None => "it has no `url` yet",
-            }
-        ));
-        if !base.is_empty() && self.given.is_none() {
+        let feed_url = self.feed_url(&base);
+        self.import.address = match &feed_url {
+            Some((url, _)) => Some(url.clone()),
+            None => self.given.map(|given| super::under(given, &base)),
+        };
+        notes.push(match &feed_url {
+            Some(_) => "Eleventy's settings hold no title or language for the site, so the new \
+                        site's `title` is made from the old folder's name, and it is in English, \
+                        `en`: put each right in `statac.yaml`."
+                .to_owned(),
+            None => format!(
+                "Eleventy's settings hold no title, URL or language for the site, so the new \
+                 site's `title` is made from the old folder's name, {}, and it is in English, \
+                 `en`: put each right in `statac.yaml`.",
+                match self.given {
+                    Some(_) => "its `url` is the URL you gave",
+                    None => "it has no `url` yet",
+                }
+            ),
+        });
+        if let Some((url, feed)) = &feed_url {
+            notes.push(format!(
+                "The new site's `url`, {}, is made from `metadata.base` in the settings' {}, on \
+                 line {}, {}as Eleventy's RSS plugin made each post's full URL.",
+                code(url),
+                code(feed.by),
+                feed.line,
+                match base.is_empty() {
+                    true => "",
+                    false => "and from `pathPrefix`, ",
+                }
+            ));
+        }
+        if !base.is_empty() && self.import.address.is_none() {
             notes.push(format!(
                 "The settings' `pathPrefix` puts the old site under {path}, and each URL \
                  through the `url` filter is written with {path} in front, as Eleventy wrote it. \
@@ -2729,6 +2785,21 @@ impl Reader<'_> {
         self.import.notes = all;
     }
 
+    /// The site's URL as the RSS plugin's feeds wrote each post's: the
+    /// scheme and host of the first `metadata.base` the settings give as an
+    /// `https://` or `http://` URL, with `base`, the path the site is
+    /// under, after them; and the feed that gives it.
+    fn feed_url(&self, base: &str) -> Option<(String, settings::PluginFeed)> {
+        self.s.feeds.iter().find_map(|feed| {
+            let url = url::Url::parse(feed.base.as_deref()?.trim()).ok()?;
+            if !matches!(url.scheme(), "https" | "http") || url.host().is_none() {
+                return None;
+            }
+            let origin = url.origin().ascii_serialization();
+            Some((format!("{origin}{base}"), feed.clone()))
+        })
+    }
+
     /// Asks for each feed the RSS plugin made at the URL it had, and keeps
     /// each post's id in it; where the old site had no plugin, keeps the
     /// ids its own feeds gave where each was a post's full URL.
@@ -2745,13 +2816,13 @@ impl Reader<'_> {
             .settings
             .push(("feed_ids_from".into(), Value::Text("eleventy".into())));
         let why = (self.unread_feed.clone())
-            .unwrap_or_else(|| "The settings show no `feedPlugin`".to_owned());
+            .unwrap_or_else(|| "The settings show no `feedPlugin` or `getFeedTemplate`".to_owned());
         let (asked, lead) = match (self.plugin_feeds.as_slice(), self.unmade_feeds.as_slice()) {
             ([], [(address, kind, _)]) => {
                 let opening = match self.unread_feed {
                     Some(_) => why,
                     None => "The old site's `package.json` names Eleventy's RSS plugin, and the \
-                             settings show no `feedPlugin`"
+                             settings show no `feedPlugin` or `getFeedTemplate`"
                         .to_owned(),
                 };
                 let lead = format!(
@@ -2801,14 +2872,23 @@ impl Reader<'_> {
                 return;
             }
             (made, _) => {
+                let mut by: Vec<String> = Vec::new();
+                for (_, _, function) in made {
+                    if !by.contains(&code(function)) {
+                        by.push(code(function));
+                    }
+                }
                 let made: Vec<String> = (made.iter())
-                    .map(|(address, kind)| format!("{} at {}", FeedKind::a(*kind), code(address)))
+                    .map(|(address, kind, _)| {
+                        format!("{} at {}", FeedKind::a(*kind), code(address))
+                    })
                     .collect();
                 let lead = format!(
-                    "The settings' `feedPlugin`, from Eleventy's RSS plugin, made {}.",
+                    "The settings' {}, from Eleventy's RSS plugin, made {}.",
+                    listed(&by),
                     listed(&made)
                 );
-                let addresses = self.plugin_feeds.iter().map(|(address, _)| address.clone());
+                let addresses = (self.plugin_feeds.iter()).map(|(address, ..)| address.clone());
                 (addresses.collect(), lead)
             }
         };

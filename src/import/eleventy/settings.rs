@@ -223,8 +223,9 @@ pub(super) struct Copy {
     pub written: String,
 }
 
-/// A feed the RSS plugin's virtual template makes, as an
-/// `addPlugin(feedPlugin, {...})` call gives it.
+/// A feed the RSS plugin's template makes, as an
+/// `addPlugin(feedPlugin, {...})` call gives it, or a `getFeedTemplate({...})`
+/// call whose template an `addTemplate` call adds.
 #[derive(Clone, PartialEq, Debug)]
 pub(super) struct PluginFeed {
     /// `outputPath`, `/feed.xml` where the call gives none; none where it
@@ -233,6 +234,12 @@ pub(super) struct PluginFeed {
     /// `type`, `atom` where the call gives none; none where it gives one
     /// some other way than text in quotes.
     pub kind: Option<String>,
+    /// `metadata.base`, the URL each post's URL is written from, where the
+    /// call gives it as text in quotes.
+    pub base: Option<String>,
+    /// The plugin's function that made it: `feedPlugin` or
+    /// `getFeedTemplate`.
+    pub by: &'static str,
     pub line: usize,
     /// The call as the settings Statac didn't read show it.
     pub written: String,
@@ -270,7 +277,7 @@ pub(super) struct Settings {
     pub no_gitignore: Option<usize>,
     /// `pathPrefix`, as written.
     pub path_prefix: Option<Given<String>>,
-    /// The feeds `feedPlugin` makes, in order.
+    /// The feeds `feedPlugin` and `getFeedTemplate` make, in order.
     pub feeds: Vec<PluginFeed>,
     /// What the settings do that Statac didn't read, by the names it
     /// shows, each with its line.
@@ -462,7 +469,13 @@ fn scan(text: &str) -> Settings {
             _ => String::new(),
         }
     };
-    let plugin_names = feed_plugin_names(&pieces);
+    let plugin_names = names_given(&pieces, "feedPlugin");
+    let template_names = names_given(&pieces, "getFeedTemplate");
+    // Each `getFeedTemplate` call, with the names its result is handed to
+    // and where it is; and each `addTemplate` call, by its line, as
+    // written, and the pieces its values span.
+    let mut templates: Vec<(PluginFeed, Vec<String>, usize)> = Vec::new();
+    let mut added: Vec<(usize, String, std::ops::Range<usize>)> = Vec::new();
     let mut at = 0;
     while at < pieces.len() {
         let line = pieces[at].line;
@@ -578,6 +591,22 @@ fn scan(text: &str) -> Settings {
                         .push((line, text[pieces[at].start..end].to_owned()));
                 }
             }
+            Token::Word(call)
+                if mark(at + 1, '(') && gives_feed_template(&pieces, at, &template_names) =>
+            {
+                let first = at + 2;
+                let written = match shown_first(first).as_str() {
+                    "{" => format!("{call}({{ ... }})"),
+                    shown => format!("{call}({shown})"),
+                };
+                let feed = feed_of(&pieces, first, line, written, "getFeedTemplate");
+                // `pluginRss.getFeedTemplate(` starts at `pluginRss`.
+                let start = match at > 1 && mark(at - 1, '.') {
+                    true => at - 2,
+                    false => at,
+                };
+                templates.push((feed, bound(&pieces, start), at));
+            }
             Token::Word(call) if at > 0 && mark(at - 1, '.') && mark(at + 1, '(') => {
                 let first = at + 2;
                 match call.as_str() {
@@ -615,11 +644,20 @@ fn scan(text: &str) -> Settings {
                     }
                     "addPlugin" if names_feed_plugin(&pieces, first, &plugin_names) => {
                         let written = format!("addPlugin({})", shown_first(first));
-                        let feed = plugin_feed(&pieces, first, line, written);
+                        let end = value_end(&pieces, first);
+                        let options = match mark(end, ',') {
+                            true => end + 1,
+                            false => end,
+                        };
+                        let feed = feed_of(&pieces, options, line, written, "feedPlugin");
                         if feed.path.is_none() {
                             s.unread.push((line, feed.written.clone()));
                         }
                         s.feeds.push(feed);
+                    }
+                    "addTemplate" => {
+                        let written = format!("addTemplate({})", shown_first(first));
+                        added.push((line, written, first..call_end(&pieces, first)));
                     }
                     name if READ_CALLS.contains(&name) => {}
                     name if name.starts_with("add")
@@ -637,6 +675,33 @@ fn scan(text: &str) -> Settings {
         }
         at += 1;
     }
+    // A feed `getFeedTemplate` gives is made only where `addTemplate` adds
+    // it, by the names its result is handed to or by holding the call.
+    let mut adding = vec![false; templates.len()];
+    for (line, written, values) in added {
+        let mut adds = false;
+        for (i, (_, names, call)) in templates.iter().enumerate() {
+            let holds = values.contains(call)
+                || (pieces[values.clone()].iter())
+                    .any(|piece| matches!(&piece.token, Token::Word(word) if names.contains(word)));
+            adding[i] |= holds;
+            adds |= holds;
+        }
+        if !adds {
+            s.unread.push((line, written));
+        }
+    }
+    for ((feed, _, _), adds) in templates.into_iter().zip(adding) {
+        if !adds {
+            continue;
+        }
+        if feed.path.is_none() {
+            s.unread.push((feed.line, feed.written.clone()));
+        }
+        s.feeds.push(feed);
+    }
+    s.feeds.sort_by_key(|feed| feed.line);
+    s.unread.sort_by_key(|(line, _)| *line);
     s
 }
 
@@ -756,25 +821,81 @@ fn constant(pieces: &[Piece], name: &str) -> Option<String> {
     }
 }
 
-/// The names the settings give the RSS plugin's `feedPlugin`: its own, and
-/// any it is fetched as, as `import { feedPlugin as feed }` or
-/// `const { feedPlugin: feed } = require(...)`.
-fn feed_plugin_names(pieces: &[Piece]) -> Vec<String> {
-    let mut names = vec!["feedPlugin".to_owned()];
+/// The names the settings give the RSS plugin's `export`, such as
+/// `feedPlugin`: its own, and any it is fetched as, as
+/// `import { feedPlugin as feed }` or `const { feedPlugin: feed } =
+/// require(...)`.
+fn names_given(pieces: &[Piece], export: &str) -> Vec<String> {
+    let mut names = vec![export.to_owned()];
     for three in pieces.windows(3) {
         match (&three[0].token, &three[1].token, &three[2].token) {
             (Token::Word(name), Token::Word(word), Token::Word(alias))
-                if name == "feedPlugin" && word == "as" =>
+                if name == export && word == "as" =>
             {
                 names.push(alias.clone());
             }
-            (Token::Word(name), Token::Mark(':'), Token::Word(alias)) if name == "feedPlugin" => {
+            (Token::Word(name), Token::Mark(':'), Token::Word(alias)) if name == export => {
                 names.push(alias.clone());
             }
             _ => {}
         }
     }
     names
+}
+
+/// Whether the word at `at`, before a `(`, calls `getFeedTemplate`: by one
+/// of `names`, or as `pluginRss.getFeedTemplate`.
+fn gives_feed_template(pieces: &[Piece], at: usize, names: &[String]) -> bool {
+    let Token::Word(word) = &pieces[at].token else {
+        return false;
+    };
+    match at > 0 && pieces[at - 1].token == Token::Mark('.') {
+        true => word == "getFeedTemplate",
+        false => names.contains(word),
+    }
+}
+
+/// The names the result of the call whose name is at `at` is handed to:
+/// `feed` in `let feed = getFeedTemplate(...)`, and `content` and `data`
+/// in `let { content, data } = getFeedTemplate(...)`.
+fn bound(pieces: &[Piece], at: usize) -> Vec<String> {
+    let token = |i: usize| at.checked_sub(i).map(|i| &pieces[i].token);
+    if token(1) != Some(&Token::Mark('=')) {
+        return Vec::new();
+    }
+    match token(2) {
+        Some(Token::Word(name)) => vec![name.clone()],
+        Some(Token::Mark('}')) => (3..=at)
+            .map_while(|back| match token(back) {
+                Some(Token::Mark('{')) | None => None,
+                other => Some(other),
+            })
+            .filter_map(|token| match token {
+                Some(Token::Word(name)) => Some(name.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Where the values of a call, the first at `at`, end: at its `)`.
+fn call_end(pieces: &[Piece], at: usize) -> usize {
+    let mut depth = 0;
+    (at..pieces.len())
+        .find(|&i| match pieces[i].token {
+            Token::Mark('(' | '{' | '[') => {
+                depth += 1;
+                false
+            }
+            Token::Mark(')') if depth == 0 => true,
+            Token::Mark(')' | '}' | ']') => {
+                depth -= 1;
+                false
+            }
+            _ => false,
+        })
+        .unwrap_or(pieces.len())
 }
 
 /// Where the value of a call that starts at `at` ends: at the `,` or `)`
@@ -807,27 +928,59 @@ fn names_feed_plugin(pieces: &[Piece], at: usize, names: &[String]) -> bool {
     }
 }
 
-/// The feed an `addPlugin(feedPlugin, ...)` call makes, its first value at
-/// `at`.
-fn plugin_feed(pieces: &[Piece], at: usize, line: usize, written: String) -> PluginFeed {
-    let end = value_end(pieces, at);
-    let token = |i: usize| pieces.get(i).map(|p| &p.token);
-    let (path, kind) = match (token(end), token(end + 1)) {
-        (Some(Token::Mark(',')), Some(Token::Mark('{'))) => (
-            option(pieces, end + 2, "outputPath"),
-            option(pieces, end + 2, "type"),
+/// The feed the RSS plugin makes with the options at `at`: an object, or
+/// the call's `)` where it gives none.
+fn feed_of(
+    pieces: &[Piece],
+    at: usize,
+    line: usize,
+    written: String,
+    by: &'static str,
+) -> PluginFeed {
+    let (path, kind, base) = match pieces.get(at).map(|p| &p.token) {
+        Some(Token::Mark('{')) => (
+            option(pieces, at + 1, "outputPath"),
+            option(pieces, at + 1, "type"),
+            object(pieces, at + 1, "metadata").and_then(|inner| option(pieces, inner, "base")),
         ),
-        (Some(Token::Mark(',')), Some(Token::Mark(')'))) | (Some(Token::Mark(')')), _) => {
-            (None, None)
-        }
-        _ => (Some(None), Some(None)),
+        Some(Token::Mark(')')) => (None, None, None),
+        _ => (Some(None), Some(None), None),
     };
     PluginFeed {
         path: path.unwrap_or_else(|| Some("/feed.xml".to_owned())),
         kind: kind.unwrap_or_else(|| Some("atom".to_owned())),
+        base: base.flatten(),
+        by,
         line,
         written,
     }
+}
+
+/// Where the first key of the object `name` is, in an object whose first
+/// key is at `at`, where `name` is given an object written out.
+fn object(pieces: &[Piece], mut at: usize, name: &str) -> Option<usize> {
+    let mark = |i: usize, c: char| pieces.get(i).is_some_and(|p| p.token == Token::Mark(c));
+    let mut depth = 0;
+    let mut key_here = true;
+    while let Some(piece) = pieces.get(at) {
+        if depth == 0
+            && key_here
+            && matches!(&piece.token, Token::Word(key) | Token::Text(key) if key == name)
+            && mark(at + 1, ':')
+            && mark(at + 2, '{')
+        {
+            return Some(at + 3);
+        }
+        match piece.token {
+            Token::Mark('{' | '(' | '[') => depth += 1,
+            Token::Mark('}' | ')' | ']') if depth == 0 => break,
+            Token::Mark('}' | ')' | ']') => depth -= 1,
+            _ => {}
+        }
+        key_here = depth == 0 && piece.token == Token::Mark(',');
+        at += 1;
+    }
+    None
 }
 
 /// The option `name` of an object whose first key is at `at`: none where
@@ -1098,6 +1251,118 @@ mod tests {
                 .collect();
             assert_eq!(found, feeds, "{call}");
             assert_eq!(!s.unread.is_empty(), unread, "{call}: {:?}", s.unread);
+        }
+    }
+
+    #[test]
+    fn the_feeds_get_feed_template_makes_are_read_where_a_template_adds_them() {
+        let esm = "import { rssPlugin, getFeedTemplate } from \"@11ty/eleventy-plugin-rss\";\n\
+                   export default function (eleventyConfig) {\n";
+        let cjs = "const pluginRss = require(\"@11ty/eleventy-plugin-rss\");\n\
+                   module.exports = function (eleventyConfig) {\n";
+        // (what the settings open with, the calls, each feed's
+        // `outputPath`, `type` and the function that made it, whether a
+        // call is told as not read)
+        type Feed<'a> = (Option<&'a str>, Option<&'a str>, &'a str);
+        let cases: [(&str, &str, &[Feed], bool); 8] = [
+            (
+                esm,
+                "let { content, data } = getFeedTemplate({\n  type: \"rss\",\n  \
+                 outputPath: \"/posts.xml\",\n  collection: { name: \"posts\" },\n});\n\
+                 eleventyConfig.addTemplate(\"feeds/posts.njk\", content, data);",
+                &[(Some("/posts.xml"), Some("rss"), "getFeedTemplate")],
+                false,
+            ),
+            (
+                esm,
+                "const feed = getFeedTemplate({ collection: { name: \"posts\" } });\n\
+                 eleventyConfig.addTemplate(\"feed.njk\", feed.content, feed.data);",
+                &[(Some("/feed.xml"), Some("atom"), "getFeedTemplate")],
+                false,
+            ),
+            (
+                esm,
+                "const { content: c, data: d } = getFeedTemplate({ outputPath: \"/a.xml\" });\n\
+                 eleventyConfig.addTemplate(\"a.njk\", c, { ...d, eleventyNavigation: {} });",
+                &[(Some("/a.xml"), Some("atom"), "getFeedTemplate")],
+                false,
+            ),
+            (
+                cjs,
+                "const { content, data } = pluginRss.getFeedTemplate({ type: 'json', outputPath: '/feed.json' });\n\
+                 eleventyConfig.addTemplate(\"feed.njk\", content, data);",
+                &[(Some("/feed.json"), Some("json"), "getFeedTemplate")],
+                false,
+            ),
+            (
+                esm,
+                "let t = getFeedTemplate({ outputPath: `/${name}.xml` });\n\
+                 eleventyConfig.addTemplate(\"feed.njk\", t.content, t.data);",
+                &[(None, Some("atom"), "getFeedTemplate")],
+                true,
+            ),
+            // A template no `addTemplate` adds makes nothing.
+            (
+                esm,
+                "let { content, data } = getFeedTemplate({ outputPath: \"/a.xml\" });",
+                &[],
+                false,
+            ),
+            (
+                esm,
+                "eleventyConfig.addTemplate(\"a.njk\", \"text\", { permalink: \"/a.xml\" });",
+                &[],
+                true,
+            ),
+            (
+                esm,
+                "eleventyConfig.addPlugin(rssPlugin.feedPlugin, { outputPath: \"/b.xml\" });\n\
+                 let { content, data } = getFeedTemplate({ outputPath: \"/a.xml\" });\n\
+                 eleventyConfig.addTemplate(\"a.njk\", content, data);",
+                &[
+                    (Some("/b.xml"), Some("atom"), "feedPlugin"),
+                    (Some("/a.xml"), Some("atom"), "getFeedTemplate"),
+                ],
+                false,
+            ),
+        ];
+        for (opening, calls, feeds, unread) in cases {
+            let s = scan(&format!("{opening}  {calls}\n}};\n"));
+            let found: Vec<Feed> = (s.feeds.iter())
+                .map(|feed| (feed.path.as_deref(), feed.kind.as_deref(), feed.by))
+                .collect();
+            assert_eq!(found, feeds, "{calls}");
+            assert_eq!(!s.unread.is_empty(), unread, "{calls}: {:?}", s.unread);
+        }
+    }
+
+    #[test]
+    fn the_url_the_rss_plugins_feed_gives_posts_is_read_where_written_out() {
+        // (the plugin's options, the `base` read)
+        let cases = [
+            (
+                "{ metadata: { title: \"t\", base: \"https://example.org/\" } }",
+                Some("https://example.org/"),
+            ),
+            (
+                "{ metadata: { base }, outputPath: \"/a.xml\" }",
+                Some("https://example.org/a/"),
+            ),
+            ("{ metadata: { base: process.env.URL } }", None),
+            ("{ metadata, outputPath: \"/a.xml\" }", None),
+            ("{ base: \"https://example.org/\" }", None),
+            ("{}", None),
+        ];
+        for (options, base) in cases {
+            let text = format!(
+                "const base = \"https://example.org/a/\";\n\
+                 export default function (eleventyConfig) {{\n  \
+                 eleventyConfig.addPlugin(feedPlugin, {options});\n\
+                 }};\n"
+            );
+            let s = scan(&text);
+            let read: Vec<Option<&str>> = s.feeds.iter().map(|f| f.base.as_deref()).collect();
+            assert_eq!(read, [base], "{options}");
         }
     }
 

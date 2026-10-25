@@ -615,23 +615,24 @@ fn an_eleventy_site_keeps_its_posts_ids_where_they_were_their_urls() {
 /// output show, and for none where neither shows one.
 #[test]
 fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
-    let unread = "{ outputPath: process.env.FEED }";
+    let plugin = |options: &str| format!("eleventyConfig.addPlugin(feedPlugin, {options});");
+    let unread = plugin("{ outputPath: process.env.FEED }");
     let asked = "in `statac.yaml` says";
     let none = "so Statac asked for none";
-    // (the case, the plugin's options, the feeds in the old built output,
+    // (the case, the settings' calls, the feeds in the old built output,
     // the lines asking, what is said, the feed's file)
     type Case<'a> = (
         &'a str,
-        &'a str,
+        String,
         &'a [&'a str],
         &'a [&'a str],
         &'a str,
         Option<&'a str>,
     );
-    let cases: [Case; 7] = [
+    let cases: [Case; 8] = [
         (
             "path",
-            "{ outputPath: \"/feed/feed.xml\", collection: { name: \"posts\" } }",
+            plugin("{ outputPath: \"/feed/feed.xml\", collection: { name: \"posts\" } }"),
             &[],
             &["feed: /feed/feed.xml"],
             asked,
@@ -639,7 +640,7 @@ fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
         ),
         (
             "default",
-            "{ collection: { name: \"posts\" } }",
+            plugin("{ collection: { name: \"posts\" } }"),
             &[],
             &["feed: true"],
             asked,
@@ -647,7 +648,7 @@ fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
         ),
         (
             "json",
-            "{ type: \"json\", outputPath: \"/feed.json\" }",
+            plugin("{ type: \"json\", outputPath: \"/feed.json\" }"),
             &[],
             &["feed: /feed.json"],
             "built with `templates/feed.json` once you add it",
@@ -655,8 +656,11 @@ fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
         ),
         (
             "two",
-            "{ outputPath: \"/feed.xml\" });\n  \
-             eleventyConfig.addPlugin(feedPlugin, { type: \"json\", outputPath: \"/feed.json\" }",
+            format!(
+                "{}\n  {}",
+                plugin("{ outputPath: \"/feed.xml\" }"),
+                plugin("{ type: \"json\", outputPath: \"/feed.json\" }")
+            ),
             &[],
             &["feed:", "  - /feed.xml", "  - /feed.json"],
             "Each stays at the same URL",
@@ -664,7 +668,7 @@ fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
         ),
         (
             "built",
-            unread,
+            unread.clone(),
             &["blog/atom.xml"],
             &["feed: /blog/atom.xml"],
             "so Statac took it for the plugin's",
@@ -672,15 +676,26 @@ fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
         ),
         (
             "built-two",
-            unread,
+            unread.clone(),
             &["blog/atom.xml", "notes/atom.xml"],
             &[],
             "so Statac can't tell which the plugin made and asked for none",
             None,
         ),
         ("unknown", unread, &[], &[], none, None),
+        (
+            "template",
+            "let { content, data } = getFeedTemplate({ outputPath: \"/posts.xml\" });\n  \
+             eleventyConfig.addTemplate(\"feeds/posts.njk\", content, data);"
+                .to_owned(),
+            &[],
+            &["feed: /posts.xml"],
+            "The settings' `getFeedTemplate`, from Eleventy's RSS plugin, made an Atom feed at \
+             `/posts.xml`.",
+            Some("posts.xml"),
+        ),
     ];
-    for (label, options, built, lines, said, file) in cases {
+    for (label, calls, built, lines, said, file) in cases {
         let top = scratch(&format!("eleventy-feed-{label}"));
         let old = top.join("old");
         fs::create_dir_all(old.join("posts")).unwrap();
@@ -688,9 +703,8 @@ fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
                        \"@11ty/eleventy-plugin-rss\": \"^3.1.0\" } }\n";
         fs::write(old.join("package.json"), package).unwrap();
         let settings = format!(
-            "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\n\
-             export default function (eleventyConfig) {{\n  \
-             eleventyConfig.addPlugin(feedPlugin, {options});\n}}\n"
+            "import {{ feedPlugin, getFeedTemplate }} from \"@11ty/eleventy-plugin-rss\";\n\n\
+             export default function (eleventyConfig) {{\n  {calls}\n}}\n"
         );
         fs::write(old.join("eleventy.config.js"), settings).unwrap();
         let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
@@ -739,13 +753,236 @@ fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
         );
         let unused = (outcome.problems.iter()).any(|p| p.kind.name() == "unused-feed-template");
         assert_eq!(unused, file.is_none(), "{label}");
-        for name in ["feed.xml", "feed/feed.xml", "feed.json", "blog/atom.xml"] {
+        for name in [
+            "feed.xml",
+            "feed/feed.xml",
+            "feed.json",
+            "blog/atom.xml",
+            "posts.xml",
+        ] {
             assert_eq!(
                 out.join(name).is_file(),
                 file == Some(name) || (label == "two" && name == "feed.json"),
                 "{label}: {name}"
             );
         }
+    }
+}
+
+/// A JSON Feed with one entry, of the id `id`.
+fn json_feed(id: &str) -> String {
+    format!(
+        "{{\"version\": \"https://jsonfeed.org/version/1.1\", \"title\": \"Site 1\", \
+         \"items\": [{{\"id\": \"{id}\"}}]}}\n"
+    )
+}
+
+/// An Eleventy site, times a feed in its old built output that a template
+/// of the old site made, or that nothing the import found made, as Atom or
+/// a JSON Feed, alone or beside the RSS plugin's: each is listed as a feed
+/// made by a template, and not as a page, and the posts keep their ids
+/// where it gave each its full URL.
+#[test]
+fn an_eleventy_sites_feeds_the_rss_plugin_didnt_make_are_listed_and_keep_their_ids() {
+    let url = "https://example.org/posts/post-1/";
+    let plugin = "eleventyConfig.addPlugin(feedPlugin, { outputPath: \"/feed.xml\" });";
+    // (the case, the template making the feed, the settings' calls, the
+    // feed's path in the old built output and what it holds, the lines
+    // asking, the line listing it)
+    type Case<'a> = (
+        &'a str,
+        Option<(&'a str, &'a str)>,
+        Option<&'a str>,
+        &'a str,
+        String,
+        &'a [&'a str],
+        &'a str,
+    );
+    let cases: [Case; 5] = [
+        (
+            "atom",
+            Some((
+                "atom.njk",
+                "---\npermalink: /atom.xml\n---\n<feed></feed>\n",
+            )),
+            None,
+            "atom.xml",
+            atom_feed(url),
+            &[],
+            "- `atom.njk`: `/atom.xml`",
+        ),
+        (
+            "json",
+            Some(("json.njk", "---\npermalink: /feed.json\n---\n{}\n")),
+            None,
+            "feed.json",
+            json_feed(url),
+            &[],
+            "- `json.njk`: `/feed.json`",
+        ),
+        (
+            "unmade",
+            None,
+            None,
+            "atom.xml",
+            atom_feed(url),
+            &[],
+            "- `_site/atom.xml`: `/atom.xml`",
+        ),
+        (
+            "unmade-json",
+            None,
+            None,
+            "feed.json",
+            json_feed(url),
+            &[],
+            "- `_site/feed.json`: `/feed.json`",
+        ),
+        (
+            "beside-plugin",
+            None,
+            Some(plugin),
+            "feed.json",
+            json_feed(url),
+            &["feed: true"],
+            "- `_site/feed.json`: `/feed.json`",
+        ),
+    ];
+    for (label, template, calls, path, built, lines, listed) in cases {
+        let top = scratch(&format!("eleventy-feed-left-{label}"));
+        let old = top.join("old");
+        fs::create_dir_all(old.join("posts")).unwrap();
+        fs::create_dir_all(old.join("_site/posts/post-1")).unwrap();
+        let package = "{ \"devDependencies\": { \"@11ty/eleventy\": \"^3.0.0\" } }\n";
+        fs::write(old.join("package.json"), package).unwrap();
+        if let Some(calls) = calls {
+            let settings = format!(
+                "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\n\
+                 export default function (eleventyConfig) {{\n  {calls}\n}}\n"
+            );
+            fs::write(old.join("eleventy.config.js"), settings).unwrap();
+        }
+        if let Some((name, text)) = template {
+            fs::write(old.join(name), text).unwrap();
+        }
+        let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+        fs::write(old.join("posts/post-1.md"), post).unwrap();
+        fs::write(old.join("_site/posts/post-1/index.html"), "<p>Text.</p>\n").unwrap();
+        fs::write(old.join("_site").join(path), built).unwrap();
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        let asking: Vec<&str> = (settings.lines())
+            .filter(|line| line.starts_with("feed:"))
+            .collect();
+        assert_eq!(asking, lines, "{label}: {settings}");
+        assert!(
+            settings.contains("\nfeed_ids_from: eleventy\n"),
+            "{label}: {settings}"
+        );
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        let feeds = report.split("### Feeds made by templates").nth(1);
+        assert!(
+            feeds.is_some_and(|feeds| feeds.contains(&format!("\n{listed}\n"))),
+            "{label}: {report}"
+        );
+        assert!(
+            !report.contains("### Pages made by templates"),
+            "{label}: {report}"
+        );
+    }
+}
+
+/// An Eleventy site, times the `metadata.base` its RSS plugin's feed was
+/// given and the path the settings put the site under: the new site's
+/// `url` is the URL that feed made each post's full URL from, so the new
+/// site's feed gives each post the id the old one did.
+#[test]
+fn an_eleventy_sites_url_is_the_one_its_rss_plugins_feed_made_posts_urls_from() {
+    // (the case, the plugin's `metadata`, the settings' `pathPrefix`, the
+    // `url` written)
+    let cases = [
+        (
+            "base",
+            "{ base: \"https://example.org/\" }",
+            None,
+            Some("https://example.org"),
+        ),
+        (
+            "base-path",
+            "{ base: \"https://example.org/site/\" }",
+            Some("/blog/"),
+            Some("https://example.org/blog"),
+        ),
+        ("base-not-url", "{ base: \"/\" }", None, None),
+        ("no-base", "{ title: \"Site 1\" }", None, None),
+    ];
+    for (label, metadata, prefix, url) in cases {
+        let top = scratch(&format!("eleventy-feed-url-{label}"));
+        let old = top.join("old");
+        fs::create_dir_all(old.join("posts")).unwrap();
+        let package = "{ \"devDependencies\": { \"@11ty/eleventy\": \"^3.0.0\", \
+                       \"@11ty/eleventy-plugin-rss\": \"^3.1.0\" } }\n";
+        fs::write(old.join("package.json"), package).unwrap();
+        let config = match prefix {
+            Some(prefix) => format!("\nexport const config = {{ pathPrefix: \"{prefix}\" }};\n"),
+            None => String::new(),
+        };
+        let settings = format!(
+            "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\n\
+             export default function (eleventyConfig) {{\n  \
+             eleventyConfig.addPlugin(feedPlugin, {{ metadata: {metadata} }});\n}}\n{config}"
+        );
+        fs::write(old.join("eleventy.config.js"), settings).unwrap();
+        let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+        fs::write(old.join("posts/post-1.md"), post).unwrap();
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        let urls: Vec<&str> = (written.lines())
+            .filter_map(|line| line.strip_prefix("url: "))
+            .collect();
+        assert_eq!(urls, Vec::from_iter(url), "{label}: {written}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        let Some(url) = url else {
+            assert!(
+                report.contains("Eleventy's settings hold no title, URL or language"),
+                "{label}: {report}"
+            );
+            continue;
+        };
+        let said = format!(
+            "The new site's `url`, `{url}`, is made from `metadata.base` in the settings' \
+             `feedPlugin`, on line 4, {}as Eleventy's RSS plugin made each post's full URL.",
+            match prefix {
+                Some(_) => "and from `pathPrefix`, ",
+                None => "",
+            }
+        );
+        assert!(report.contains(&said), "{label}: {report}");
+
+        templated(&new);
+        let feed = "<feed>{% for post in posts %}<id>{{ feed_id(post) }}</id>{% endfor %}</feed>\n";
+        fs::write(new.join("templates/feed.xml"), feed).unwrap();
+        let out = top.join("out");
+        let outcome = build::run(&Options {
+            mode: Mode::Build,
+            site: new.clone(),
+            out: Some(out.clone()),
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        assert!(
+            outcome.published.is_some(),
+            "{label}: {:?}",
+            outcome.problems
+        );
+        let built = fs::read_to_string(out.join("feed.xml")).unwrap();
+        let id = format!("<id>{url}/posts/post-1/</id>");
+        assert!(built.contains(&id), "{label}: {built}");
     }
 }
 
