@@ -268,6 +268,9 @@ pub(super) struct Summary {
     /// The templates the new site's pages and feeds are built with that it
     /// doesn't have, by their paths.
     pub templates: Vec<String>,
+    /// Whether the new site asks for a feed and has no `url`, which every
+    /// feed needs.
+    pub feeds_need_url: bool,
     /// The lists of terms whose names became tags.
     pub terms: Terms,
     /// What was changed in the pages' writing so Statac reads it as the
@@ -778,6 +781,7 @@ pub(super) fn write<'a>(
     }
     summary.errors = checked.errors.len();
     summary.templates = checked.templates;
+    summary.feeds_need_url = checked.feeds_need_url;
     findings.extend(
         checked
             .errors

@@ -479,6 +479,127 @@ fn the_feed_jekylls_plugin_made_is_asked_for_at_its_url() {
     }
 }
 
+/// A site of each tool whose import asks for a feed, times whether its
+/// settings give its URL: with no templates yet, the feed's URL is kept,
+/// not listed as one nothing is published at, and the report names the
+/// template the feed is built with, `templates/feed.json` for a JSON Feed,
+/// and says its feeds need the site's URL where it has none.
+#[test]
+fn a_feed_the_import_asks_for_is_kept_at_its_url_with_no_template_or_site_url() {
+    let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+    let package = "{ \"devDependencies\": { \"@11ty/eleventy\": \"^3.0.0\", \
+                   \"@11ty/eleventy-plugin-rss\": \"^3.1.0\" } }\n";
+    let eleventy = |options: &str| {
+        format!(
+            "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\
+             export default function (eleventyConfig) {{\n  \
+             eleventyConfig.addPlugin(feedPlugin, {options});\n}}\n"
+        )
+    };
+    // (the case, the old site's files, the template named, whether the
+    // site has a URL)
+    type Case<'a> = (&'a str, Vec<(&'a str, String)>, &'a str, bool);
+    let cases: [Case; 6] = [
+        (
+            "jekyll",
+            vec![
+                (
+                    "_config.yml",
+                    "title: Site 1\nplugins: [jekyll-feed]\n".into(),
+                ),
+                ("_posts/2026-01-01-post-1.md", post.into()),
+            ],
+            "templates/feed.xml",
+            false,
+        ),
+        (
+            "jekyll-url",
+            vec![
+                (
+                    "_config.yml",
+                    "title: Site 1\nurl: https://example.org\nplugins: [jekyll-feed]\n".into(),
+                ),
+                ("_posts/2026-01-01-post-1.md", post.into()),
+            ],
+            "templates/feed.xml",
+            true,
+        ),
+        (
+            "hugo",
+            vec![
+                ("hugo.toml", "title = \"Site 1\"\n".into()),
+                ("content/posts/post-1.md", post.into()),
+            ],
+            "templates/feed.xml",
+            false,
+        ),
+        (
+            "zola",
+            vec![
+                (
+                    "zola.toml",
+                    "title = \"Site 1\"\ngenerate_feeds = true\n".into(),
+                ),
+                (
+                    "content/posts/_index.md",
+                    "+++\ntitle = \"Posts\"\n+++\n".into(),
+                ),
+                (
+                    "content/posts/post-1.md",
+                    "+++\ntitle = \"Post 1\"\ndate = 2026-01-01\n+++\nText.\n".into(),
+                ),
+            ],
+            "templates/feed.xml",
+            false,
+        ),
+        (
+            "eleventy",
+            vec![
+                ("package.json", package.into()),
+                ("eleventy.config.js", eleventy("{}")),
+                ("posts/post-1.md", post.into()),
+            ],
+            "templates/feed.xml",
+            false,
+        ),
+        (
+            "eleventy-json",
+            vec![
+                ("package.json", package.into()),
+                (
+                    "eleventy.config.js",
+                    eleventy("{ type: \"json\", outputPath: \"/feed.json\" }"),
+                ),
+                ("posts/post-1.md", post.into()),
+            ],
+            "templates/feed.json",
+            false,
+        ),
+    ];
+    for (label, files, template, url) in cases {
+        let top = scratch(&format!("feed-asked-{label}"));
+        let old = top.join("old");
+        for (path, text) in &files {
+            let path = old.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        assert!(!told.contains("no longer published"), "{label}: {told}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(
+            !report.contains("Nothing in the new site is published at these old URLs"),
+            "{label}: {report}"
+        );
+        let needs = format!(" Its pages and feeds need `{template}`.");
+        assert!(report.contains(&needs), "{label}: {report}");
+        let url_needed = " Its feeds also need the site's full URL, as `url` in `statac.yaml`.";
+        assert_eq!(report.contains(url_needed), !url, "{label}: {report}");
+    }
+}
+
 /// An Atom feed with one entry, of the id `id`.
 fn atom_feed(id: &str) -> String {
     format!(

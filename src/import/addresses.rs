@@ -700,10 +700,32 @@ fn settled(written: &str) -> String {
 }
 
 /// The site in `folder` read as a build reads it. It has no templates yet,
-/// so its feeds are those it will publish once it has them.
+/// and may have no `url`, so its feeds are those it will publish once it
+/// has everything a feed needs: each a list asks for, but where a page
+/// stands.
 fn read_site(folder: &Path, run: &Run) -> (content::Read, Assets, Vec<Feed>) {
     let (read, assets, _) = build::read(folder, run);
-    let (feeds, _) = crate::feeds::plan(&read.site, &read.settings, &read.sources, &|_| true);
+    let site = &read.site;
+    let landed: HashSet<String> = (site.pages.iter())
+        .filter(|(_, page)| page.lands())
+        .map(|(_, page)| page.address.key())
+        .collect();
+    let mut feeds = Vec::new();
+    for (list, _) in site.lists.iter() {
+        for address in crate::feeds::wanted(site, &read.settings, list) {
+            let Some(template) = crate::feeds::template(&address, &|_| true) else {
+                continue;
+            };
+            if !landed.contains(&address.key()) {
+                feeds.push(Feed {
+                    list,
+                    address,
+                    template,
+                    placed: None,
+                });
+            }
+        }
+    }
     (read, assets, feeds)
 }
 
@@ -967,6 +989,9 @@ pub(super) struct Checked {
     /// Each template the site's pages and feeds are built with that it
     /// doesn't have, by its path, in order.
     pub templates: Vec<String>,
+    /// Whether the site asks for a feed and has no `url`, which every feed
+    /// needs.
+    pub feeds_need_url: bool,
 }
 
 /// Reads the site in `folder` as a build of `today` does, looks for each
@@ -1012,6 +1037,7 @@ pub(super) fn check(
         unworked: Vec::new(),
         errors: Vec::new(),
         templates: Vec::new(),
+        feeds_need_url: !written.is_empty() && read.settings.text("url").is_none(),
     };
     let answered = |address: &str| {
         Address::read(address)
@@ -1066,11 +1092,15 @@ pub(super) fn check(
     for problem in &outcome.problems {
         let template = match &problem.kind {
             Kind::MissingTemplate { path, .. } => path,
-            // The last looked for, `templates/feed.xml`, builds any feed.
+            // A JSON feed is built with `templates/feed.json`, and any other
+            // with the last looked for, `templates/feed.xml`.
             Kind::FeedNotWritten {
                 why: Unwritten::NoTemplate(paths),
                 ..
-            } => match paths.last() {
+            } => match (paths.iter())
+                .find(|path| *path == "templates/feed.json")
+                .or(paths.last())
+            {
                 Some(path) => path,
                 None => continue,
             },

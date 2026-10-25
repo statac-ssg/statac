@@ -124,6 +124,9 @@ pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
             crate::wording::listed(&templates)
         ));
     }
+    if summary.feeds_need_url {
+        text.push_str(" Its feeds also need the site's full URL, as `url` in `statac.yaml`.");
+    }
     text.push_str("\n\n");
     came_across(&mut text, summary);
     addresses(&mut text, summary);
