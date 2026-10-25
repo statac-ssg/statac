@@ -23,6 +23,15 @@ after an `=`. To list the options a command takes, put
 `--help` after it, as in `statac check --help`. `statac --help` lists
 every option.
 
+Statac before 0.7.0 had `--cards`, `--update`, `--missing` and
+`--no-starter`, for writing its own templates, snippets and card files
+into a site and keeping them up to date. Statac no longer writes them, so
+these options are refused with a message saying so, and the note that
+said a newer version of those files was available, `update-available`,
+went with them. Leave the options out: a
+site's templates are its own, written as
+[Templates](https://statac.dev/templates/) describes.
+
 ## Example
 
 ```text

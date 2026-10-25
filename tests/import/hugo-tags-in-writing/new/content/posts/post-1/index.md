@@ -5,19 +5,19 @@ subtitle: A subtitle of its own
 ---
 A post with every tag in the writing.
 
-@figure('photo-1.jpg', alt='Photo 1', caption='Beside the post.')
+@figure(src='photo-1.jpg', alt='Photo 1', caption='Beside the post.')
 
-@figure('/images/photo-2.jpg', caption='**Photo 2** Kept in static.')
+@figure(src='/images/photo-2.jpg', title='Photo 2', caption='Kept in static.')
 
-<figure><img src="https://example.com/photo-3.jpg" alt="Photo 3" /></figure>
+@figure(src='https://example.com/photo-3.jpg', alt='Photo 3')
 
-<figure class="wide"><a href="/posts/post-2/"><img src="photo-1.jpg" width="300" /></a></figure>
+@figure(src='photo-1.jpg', link='/posts/post-2/', class='wide', width='300')
 
-@youtube('w7Ft2ymGmfc')
+@youtube(id='w7Ft2ymGmfc')
 
-{{< youtube id="w7Ft2ymGmfc" autoplay="true" >}}
+@youtube(id='w7Ft2ymGmfc', autoplay='true')
 
-@vimeo('146022717')
+@vimeo(id='146022717')
 
 - [Post 2](https://example.org/posts/post-2/)
 - [Post 2, relatively](/posts/post-2/)
@@ -49,7 +49,7 @@ By A subtitle of its own, and by Name, and by {{< param "missing" >}}.
 
 @qr(text='https://example.org')
 
-@old_note(text='A note of the site\'s own.')
+@note(text='A note of the site\'s own.')
 
 @line_1()
 
@@ -79,16 +79,16 @@ A tag that shows more than one value stays a call: @both(). Inside an address no
 
 [three]: {{< line-1 >}}/y/
 
-Figures the starter's snippet shows, each with something taken off or spelled another way:
+Figures with something more or spelled another way:
 
-@figure('photo-1.jpg', alt='Photo 1')
+@figure(src='./photo-1.jpg', alt='Photo 1', class='wide', width='300', height='200')
 
-@figure('Photo%203.jpg', alt='Photo 3')
+@figure(src='Photo%203.jpg', alt='Photo 3')
 
-And those it doesn't: a picture that moves, and a figure inside HTML.
+A picture that moves, and a figure inside HTML.
 
-<figure><img src="moving.gif" alt="Moving" /></figure>
+@figure(src='moving.gif', alt='Moving')
 
 <p class="centre">
-<figure><img src="photo-1.jpg" alt="Photo 1" /></figure>
+@figure(src='photo-1.jpg', alt='Photo 1')
 </p>

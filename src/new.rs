@@ -1,27 +1,17 @@
-//! `statac new`: five questions, and a whole site written from the
-//! answers into an empty folder or a new one.
+//! `statac new`: four questions, and a new site's settings written from
+//! the answers into an empty folder or a new one.
 //!
-//! The starter's files are written exactly as `starter/` keeps them, so
-//! one left untouched can be told by its bytes. What the answers shape is
-//! made here: `statac.yaml`, `.gitignore`, the words the templates show in
-//! `data/words.yaml`, the words Statac shows in `languages/` for a language
-//! it has them in English alone for, the home page, and the sample pages,
-//! which carry dates.
+//! A new site is `statac.yaml`, `.gitignore`, an empty `content/` and, for
+//! a language Statac has only some of its words for, those words in
+//! English in `languages/`. Statac writes no templates into it.
 //!
 //! Everything `new` learns from the machine comes in a [`Machine`], so
 //! that a run can be repeated exactly. [`make`] writes a site from
-//! [`Answers`] and says nothing. `statac new --update` is [`update`].
+//! [`Answers`] and says nothing.
 
-mod differ;
-mod past;
-mod samples;
-mod starter;
 #[cfg(test)]
 mod tests;
-pub mod update;
-mod words;
 
-use std::borrow::Cow;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 
@@ -36,8 +26,6 @@ use crate::report::{self, Report, shown};
 use crate::source::Sources;
 use crate::wording;
 use crate::yaml;
-pub(crate) use starter::has_snippet;
-use update::{CARD, Starter, WORDS_FILE};
 
 /// What `statac new` is asked.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -47,15 +35,6 @@ pub struct Options {
     pub folder: Option<PathBuf>,
     /// Whether every default is taken without asking.
     pub yes: bool,
-    /// What `--update` asks, where it is given: the site in the folder
-    /// brought up to date in place of a new one.
-    pub update: Option<update::Update>,
-    /// Whether `--cards` is given: the sharing card's files written, into
-    /// the site in the folder, or with a new site.
-    pub cards: bool,
-    /// Whether `--no-starter` is given: a new site made without the
-    /// starter, which is then not asked about.
-    pub no_starter: bool,
 }
 
 /// What `statac new` learns from the machine it runs on.
@@ -65,8 +44,6 @@ pub struct Machine<'a> {
     pub locale: Locale,
     /// The machine's time zone, by its name in the time zone database.
     pub timezone: Option<String>,
-    /// The day on the machine's clock, in its zone.
-    pub today: Date,
 }
 
 /// Where answers are typed.
@@ -153,18 +130,11 @@ pub struct Made {
 /// Asks for a new site and makes it, saying what it did on `out`. Gives
 /// the exit code: 0 where the site was made, 1 where it wasn't.
 pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: bool) -> u8 {
-    if let Some(asked) = options.update {
-        let folder = options.folder.as_deref().unwrap_or(Path::new("."));
-        return update::run(folder, asked, out, colour);
-    }
     let mut say = |text: &str| {
         let _ = out.write_all(text.as_bytes());
         let _ = out.flush();
     };
     let folder = options.folder.clone().unwrap_or_else(|| PathBuf::from("."));
-    if options.cards && matches!(site_mark(&folder), Ok(Some(_))) {
-        return cards_on(&folder, &Starter::OWN, out, colour);
-    }
     let shown_as = match &options.folder {
         Some(folder) => folder.to_string_lossy().into_owned(),
         None => own_name(&folder),
@@ -177,12 +147,9 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
     }
     let defaults = Defaults::of(&shown_as, &machine.locale);
     let Machine {
-        input,
-        timezone,
-        today,
-        ..
+        input, timezone, ..
     } = machine;
-    let (answers, starter) = match input.filter(|_| !options.yes) {
+    let answers = match input.filter(|_| !options.yes) {
         Some(input) => {
             if input.terminal {
                 say(&format!(
@@ -197,8 +164,8 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
                 colour,
                 terminal: input.terminal,
             };
-            match ask(&defaults, asking, !options.no_starter) {
-                Ok(asked) => asked,
+            match ask(&defaults, asking) {
+                Ok(answers) => answers,
                 Err(told) => {
                     say(&format!("{}\n", shown(&told)));
                     return 1;
@@ -213,21 +180,10 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
             if !without_words(&answers.languages).is_empty() {
                 say("\n");
             }
-            (answers, !options.no_starter)
+            answers
         }
     };
-    let made = make(
-        Maker::New,
-        &folder,
-        &answers,
-        timezone.as_deref(),
-        today,
-        Writes {
-            starter,
-            cards: options.cards,
-        },
-    );
-    let made = match made {
+    let made = match make(Maker::New, &folder, &answers, timezone.as_deref()) {
         Ok(made) => made,
         Err(problem) => {
             say(&report.problem(&problem));
@@ -247,104 +203,19 @@ pub fn run(options: &Options, machine: Machine, out: &mut dyn Write, colour: boo
         say(&format!("  {}\n", shown(line)));
     }
     say("\n");
-    // Without the starter, nothing shows words of the site's own.
     let translated: Vec<&String> = (answers.languages.iter())
-        .filter(|tag| starter && !english(tag))
+        .filter(|tag| lacks_shown_words(tag))
         .collect();
     for tag in &translated {
-        let file = lacks_shown_words(tag).then(|| language_path(tag));
-        let told = wording::translate_words(tag, file.as_deref());
-        say(&format!("{told}\n"));
+        let told = wording::translate_words(tag, &language_path(tag));
+        say(&format!("{}\n", shown(&told)));
     }
     if !translated.is_empty() {
         say("\n");
     }
     let away = options.folder.as_ref().map(|_| shown_as.as_str());
-    say(&format!("{}\n", shown(&wording::next_steps(away, starter))));
+    say(&format!("{}\n", shown(&wording::next_steps(away))));
     0
-}
-
-/// Writes the sharing card's files into the site in `folder`, held to
-/// `starter`, and says what it wrote on `out`. Nothing is written where the
-/// site describes a card already, or holds a file of the author's where one
-/// of the card's would go. The description is written last, so that a run
-/// stopped part way leaves no card described. Gives the exit code: 0, or 1
-/// where a file couldn't be read or written.
-fn cards_on(folder: &Path, starter: &Starter, out: &mut dyn Write, colour: bool) -> u8 {
-    let sources = Sources::default();
-    let report = Report::new(&sources, folder, colour);
-    let problem = |kind: Kind| report.problem(&Problem::nowhere(kind));
-    let mut said = String::new();
-    let mut failed = false;
-    let root = match std::fs::canonicalize(folder) {
-        Ok(root) => root,
-        Err(error) => {
-            let _ = out.write_all(
-                problem(Kind::CantRead {
-                    path: folder.to_path_buf(),
-                    reason: Reason::of(&error),
-                })
-                .as_bytes(),
-            );
-            return 1;
-        }
-    };
-    let mut found = update::survey(&root, starter);
-    found.retain(|found| starter.is_a_cards(found.path));
-    found.sort_by_key(|found| found.path == CARD);
-    let described = (found.iter())
-        .any(|found| found.path == CARD && !matches!(found.is, update::Is::NotHere { .. }));
-    let mut to_write = Vec::new();
-    for found in &found {
-        if described && found.path != CARD {
-            continue;
-        }
-        match &found.is {
-            update::Is::NotHere { current } => to_write.push((found.path, *current)),
-            update::Is::Linked(link) => {
-                said.push_str(&shown(&wording::left_for_a_link(found.path, link)));
-                said.push('\n');
-            }
-            update::Is::Unread(reason) => {
-                failed = true;
-                said.push_str(&problem(Kind::CantRead {
-                    path: found.path.into(),
-                    reason: reason.clone(),
-                }));
-            }
-            // A file as a starter wrote it is in nothing's way, but a
-            // description is the site's card whatever it holds.
-            update::Is::Newest | update::Is::Older { .. } if found.path != CARD => {}
-            update::Is::Newest
-            | update::Is::Older { .. }
-            | update::Is::Yours { .. }
-            | update::Is::NotText { .. } => {
-                said.push_str(&wording::yours_untouched(found.path));
-                said.push('\n');
-            }
-        }
-    }
-    if said.is_empty() {
-        for (path, bytes) in to_write {
-            match update::write_missing(&root, path, bytes) {
-                Ok(()) => {
-                    said.push_str(&wording::wrote_file(path));
-                    said.push('\n');
-                }
-                Err(error) => {
-                    failed = true;
-                    said.push_str(&problem(Kind::CantWrite {
-                        path: path.into(),
-                        reason: Reason::of(&error),
-                    }));
-                    break;
-                }
-            }
-        }
-    }
-    let _ = out.write_all(said.as_bytes());
-    let _ = out.flush();
-    u8::from(failed)
 }
 
 /// The last part of `folder`'s whole path, for a folder named as `.`.
@@ -473,14 +344,8 @@ impl Asking<'_> {
 
 /// Asks each question until it has an answer it can use, or gives what
 /// is told of an answer that can't be used where nobody is there to
-/// answer again. Gives the answers, and whether the site has the starter,
-/// which is asked last where `starter_asked` says, so that lines piped in
-/// for the questions before it still answer them.
-fn ask(
-    defaults: &Defaults,
-    mut asking: Asking,
-    starter_asked: bool,
-) -> Result<(Answers, bool), String> {
+/// answer again.
+fn ask(defaults: &Defaults, mut asking: Asking) -> Result<Answers, String> {
     asking.block(wording::ASK_TITLE, &[]);
     let title = match asking.reply(Some(&defaults.title)) {
         typed if typed.is_empty() => defaults.title.clone(),
@@ -536,35 +401,12 @@ fn ask(
         }
     };
     asking.show("\n");
-    let starter = match starter_asked {
-        true => ask_starter(&mut asking)?,
-        false => false,
-    };
-    let answers = Answers {
+    Ok(Answers {
         title,
         address,
         languages,
         date_format,
-    };
-    Ok((answers, starter))
-}
-
-/// Asks whether the site has the starter.
-fn ask_starter(asking: &mut Asking) -> Result<bool, String> {
-    let hints = [
-        wording::ask_choice(1, wording::START_STARTER),
-        wording::ask_choice(2, wording::START_NOTHING),
-    ];
-    asking.block(wording::ASK_START, &hints);
-    let starter = loop {
-        match asking.reply(Some("1")).as_str() {
-            "" | "1" => break true,
-            "2" => break false,
-            typed => asking.refused(wording::not_one_or_two(typed))?,
-        }
-    };
-    asking.show("\n");
-    Ok(starter)
+    })
 }
 
 /// What is said of a language Statac has no words for.
@@ -746,41 +588,19 @@ pub(crate) fn site_mark(folder: &Path) -> io::Result<Option<SiteMark>> {
         .then_some(SiteMark::Content))
 }
 
-/// Which of a new site's files [`make`] writes, besides `statac.yaml` and
-/// `.gitignore`, which every site gets.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Writes {
-    /// The starter's, and those made from the answers for it.
-    pub starter: bool,
-    /// The sharing card's.
-    pub cards: bool,
-}
-
 /// Writes a new site from `answers` into `folder`, which must be empty
 /// or not yet there, with `timezone` in its settings where the machine
-/// has one and its sample pages dated from `today`. A site made by an
-/// import has no sample pages: the old site's take their place. No link
-/// is followed, in the folder or inside it. Where anything stops it part
-/// way, the folder is left as it was found: every file written is
-/// removed, and every folder made, `folder` itself among them. A refusal
-/// names `by` as the command to run again. `writes` says which files.
+/// has one. No link is followed, in the folder or inside it. Where
+/// anything stops it part way, the folder is left as it was found: every
+/// file written is removed, and every folder made, `folder` itself among
+/// them. A refusal names `by` as the command to run again.
 pub(crate) fn make(
     by: Maker,
     folder: &Path,
     answers: &Answers,
     timezone: Option<&str>,
-    today: Date,
-    writes: Writes,
 ) -> Result<Made, Problem> {
-    make_with(
-        by,
-        folder,
-        answers,
-        timezone,
-        today,
-        writes,
-        &mut platform::make_file,
-    )
+    make_with(by, folder, answers, timezone, &mut platform::make_file)
 }
 
 /// Writes a file of the site's, by its path in the site's folder.
@@ -792,20 +612,18 @@ fn make_with(
     folder: &Path,
     answers: &Answers,
     timezone: Option<&str>,
-    today: Date,
-    writes: Writes,
     write: &mut Writer<'_>,
 ) -> Result<Made, Problem> {
     refusal(folder, &folder.to_string_lossy(), by)?;
-    let settings = settings(answers, timezone, by, by == Maker::New && writes.starter);
-    let samples = (by == Maker::New).then_some(today);
-    let files = files(answers, &settings, samples, writes);
+    let settings = settings(answers, timezone);
+    let files = files(answers, &settings, by);
     let mut made = Written::default();
     let written = (|| -> Result<(), (PathBuf, io::Error)> {
         made.outer(folder)?;
-        for (path, bytes) in &files {
+        made.folder(folder, CONTENT)?;
+        for (path, text) in &files {
             made.folders_to(folder, path)?;
-            write(folder, path, bytes).map_err(|error| (folder.join(path), error))?;
+            write(folder, path, text.as_bytes()).map_err(|error| (folder.join(path), error))?;
             made.files.push(path.clone());
         }
         Ok(())
@@ -824,6 +642,9 @@ fn make_with(
         }
     }
 }
+
+/// The folder a site's pages are written in, which a new site has empty.
+const CONTENT: &str = "content";
 
 /// What a run has made so far, to be undone where it stops part way.
 #[derive(Default)]
@@ -850,9 +671,25 @@ impl Written {
             at = path.parent();
         }
         for path in missing.into_iter().rev() {
-            std::fs::create_dir(path).map_err(|error| (path.to_path_buf(), error))?;
-            self.outer.push(path.to_path_buf());
+            match std::fs::create_dir(path) {
+                Ok(()) => self.outer.push(path.to_path_buf()),
+                // Made meanwhile by another run, so it isn't this one's to undo.
+                Err(error)
+                    if error.kind() == io::ErrorKind::AlreadyExists
+                        && std::fs::symlink_metadata(path).is_ok_and(|found| found.is_dir()) => {}
+                Err(error) => return Err((path.to_path_buf(), error)),
+            }
         }
+        Ok(())
+    }
+
+    /// Makes the folder `path` in `folder`, where it isn't made yet.
+    fn folder(&mut self, folder: &Path, path: &str) -> Result<(), (PathBuf, io::Error)> {
+        if self.folders.iter().any(|made| made == path) {
+            return Ok(());
+        }
+        platform::make_folder(folder, path).map_err(|error| (folder.join(path), error))?;
+        self.folders.push(path.to_owned());
         Ok(())
     }
 
@@ -864,14 +701,8 @@ impl Written {
         let mut end = 0;
         for piece in above.split('/') {
             end += piece.len();
-            let on_the_way = &above[..end];
+            self.folder(folder, &above[..end])?;
             end += 1;
-            if self.folders.iter().any(|made| made == on_the_way) {
-                continue;
-            }
-            platform::make_folder(folder, on_the_way)
-                .map_err(|error| (folder.join(on_the_way), error))?;
-            self.folders.push(on_the_way.to_owned());
         }
         Ok(())
     }
@@ -890,24 +721,12 @@ impl Written {
     }
 }
 
-/// How many posts each list page of a new site shows before its
-/// paginated pages, as the starter's templates page through them.
-const STARTER_PER_PAGE: u64 = 10;
-
 /// The comment written above a setting that needs one.
 const FEED_KEY_COMMENT: &str =
     "# What each post's id in a feed is made from: never change it once a feed is published.";
 
-/// The settings asking for the list pages the starter's templates link to
-/// and show: a page for each tag and each series.
-pub(crate) const STARTER_LIST_PAGES: &[&str] = &["tags.pages", "series.pages"];
-
-/// `statac.yaml` for a site answered as `answers`, made `by` a command:
-/// a new site asks for its own feed, and an imported one for the feeds the
-/// old site had, which the import writes. Where `statac new` writes the
-/// `starter`, it asks for what the starter's templates show: the list
-/// pages they link to, and lists paginated.
-fn settings(answers: &Answers, timezone: Option<&str>, by: Maker, starter: bool) -> String {
+/// `statac.yaml` for a site answered as `answers`.
+fn settings(answers: &Answers, timezone: Option<&str>) -> String {
     let language = match answers.languages.as_slice() {
         [one] => yaml::write::text(one),
         many => {
@@ -922,17 +741,6 @@ fn settings(answers: &Answers, timezone: Option<&str>, by: Maker, starter: bool)
         ("timezone", timezone.map(yaml::write::text)),
         ("date_format", Some(yaml::write::text(&answers.date_format))),
     ];
-    for (name, example) in shorter_dates(&answers.languages[0], &answers.date_format) {
-        lines.push((name, Some(yaml::write::text(&example))));
-    }
-    if starter {
-        for &name in STARTER_LIST_PAGES {
-            lines.push((name, Some("true".to_owned())));
-        }
-        lines.push(("posts_per_page", Some(STARTER_PER_PAGE.to_string())));
-    }
-    let fed = (by == Maker::New).then(|| "true".to_owned());
-    lines.push((crate::feeds::SETTING, fed));
     lines.push(("feed_key", Some(crate::feeds::mint_key())));
     let mut text = String::new();
     for (name, value) in lines {
@@ -951,32 +759,8 @@ fn settings(answers: &Answers, timezone: Option<&str>, by: Maker, starter: bool)
     text
 }
 
-/// The year-first date, and the shorter examples that go with it.
+/// The year-first date.
 const YEAR_FIRST: &str = "2025-12-31";
-const YEAR_FIRST_SHORTER: [&str; 3] = [YEAR_FIRST, "12-31", "2025-12-31 15:04"];
-
-/// The shorter examples of a date the starter's templates hand the `date`
-/// filter, each by the name `statac.yaml` keeps it under as a value of the
-/// author's own: the day, the month and the year, the day and the month,
-/// and the day with the time. They follow `date_format`, an example in the
-/// words of `tag`, in its order, where it comes apart into them, and are
-/// the year-first ones where it doesn't.
-fn shorter_dates(tag: &str, date_format: &str) -> [(&'static str, String); 3] {
-    let words = date_words(tag);
-    let reads = |example: &String| Format::for_a_template(example, &words).is_ok();
-    let derived = Some(date_format)
-        .filter(|example| *example != YEAR_FIRST)
-        .and_then(|example| Format::for_the_site(example, &words).ok())
-        .and_then(|format| format.shorter())
-        .map(|shorter| [shorter.short, shorter.day, shorter.stamp])
-        .filter(|examples| examples.iter().all(reads));
-    let [short, day, stamp] = derived.unwrap_or_else(|| YEAR_FIRST_SHORTER.map(str::to_owned));
-    [
-        ("date_short", short),
-        ("date_day", day),
-        ("date_stamp", stamp),
-    ]
-}
 
 /// Statac's own value for the setting `name` where `statac.yaml` doesn't
 /// write it, as text.
@@ -987,117 +771,22 @@ fn preset(name: &str) -> Option<String> {
     settings.text(name).map(|text| text.value.to_owned())
 }
 
-/// Every file of a new site `writes` asks for, by its path in the site:
-/// `statac.yaml` and `.gitignore`, the sharing card's, and the starter's
-/// with those made from the answers for it and the sample pages with what
-/// is kept beside them, dated from `samples` where it gives a day.
-fn files<'a>(
-    answers: &Answers,
-    settings: &str,
-    samples: Option<Date>,
-    writes: Writes,
-) -> Vec<(String, Cow<'a, [u8]>)> {
-    let starter_files: &[starter::File] = match writes.starter {
-        true => starter::FILES,
-        false => &[],
-    };
-    let cards: &[starter::File] = match writes.cards {
-        true => starter::CARDS,
-        false => &[],
-    };
-    let mut files: Vec<(String, Cow<[u8]>)> = (starter_files.iter().chain(cards))
-        .filter(|file| {
-            let sample = starter::is_a_samples(file.path) && file.path != starter::POSTS_PAGE;
-            samples.is_some() || !sample
-        })
-        .map(|file| (file.path.to_owned(), Cow::Borrowed(file.bytes)))
-        .collect();
-    let mut add = |path: String, text: String| files.push((path, Cow::Owned(text.into_bytes())));
-    add(config::FILE_NAME.to_owned(), settings.to_owned());
-    add(".gitignore".to_owned(), ".statac/\n_site/\n".to_owned());
-    if !writes.starter {
-        files.sort_by(|(a, _), (b, _)| a.cmp(b));
-        return files;
-    }
-    let words = words_file(&answers.languages, words::WORDS);
-    add(WORDS_FILE.to_owned(), words);
-    for (at, tag) in answers.languages.iter().enumerate() {
-        let path = match at {
-            0 => "content/index.md".to_owned(),
-            _ => format!("content/{tag}/index.md"),
-        };
-        let page = first_page(&path, samples.is_some());
-        add(path, page);
-        // Each language lists its own tags, and searches its own pages.
-        for path in starter::EACH_LANGUAGE.iter().filter(|_| at > 0) {
-            if let Some(bytes) = starter::file(path) {
-                let name = path.trim_start_matches("content/");
-                add(
-                    format!("content/{tag}/{name}"),
-                    String::from_utf8_lossy(bytes).into_owned(),
-                );
-            }
-        }
-    }
-    for (path, page) in samples.map(samples::pages).unwrap_or_default() {
-        add(path, page);
-    }
-    // A sample post has a footnote, which shows the words.
-    if samples.is_some() {
+/// Every file of a new site made `by` a command, by its path in the site:
+/// `statac.yaml`, holding `settings`, and `.gitignore`, and for a site of
+/// `statac new`, the words Statac shows beside the content in English for
+/// each language it lacks them for.
+fn files(answers: &Answers, settings: &str, by: Maker) -> Vec<(String, String)> {
+    let mut files = vec![
+        (config::FILE_NAME.to_owned(), settings.to_owned()),
+        (".gitignore".to_owned(), ".statac/\n_site/\n".to_owned()),
+    ];
+    if by == Maker::New {
         for tag in (answers.languages.iter()).filter(|tag| lacks_shown_words(tag)) {
-            add(language_path(tag), language_file());
+            files.push((language_path(tag), language_file()));
         }
     }
     files.sort_by(|(a, _), (b, _)| a.cmp(b));
     files
-}
-
-/// Every file a new site holds, by its path in the site, in the order of
-/// their paths, with the sharing card's where `cards` asks: the site
-/// `statac new` makes in English where every default is taken.
-pub fn files_of_a_new_site(cards: bool) -> Vec<(String, Vec<u8>)> {
-    let defaults = Defaults {
-        title: "Site".to_owned(),
-        language: "en".to_owned(),
-    };
-    let answers = defaults.answers();
-    let settings = settings(&answers, None, Maker::New, true);
-    let day = Date::day_only(2026, 1, 1);
-    let writes = Writes {
-        starter: true,
-        cards,
-    };
-    files(&answers, &settings, Some(day), writes)
-        .into_iter()
-        .map(|(path, bytes)| (path, bytes.into_owned()))
-        .collect()
-}
-
-/// The file a new site is given for each language but English, at its
-/// path for the language `tag`.
-pub fn language_file_of_a_new_site(tag: &str) -> (String, String) {
-    (language_path(tag), language_file())
-}
-
-/// The words the starter's templates and snippets show readers, in
-/// English, each by the name `data/words.yaml` keeps it under.
-pub fn words() -> &'static [(&'static str, &'static str)] {
-    words::WORDS
-}
-
-/// `data/words.yaml`: every one of `words` the starter reads, in English,
-/// under each of the site's languages.
-fn words_file(languages: &[impl AsRef<str>], words: &[(&str, &str)]) -> String {
-    let mut text = String::from(
-        "# The words the templates and snippets show readers, in each language: see /new/\n",
-    );
-    for tag in languages {
-        text.push_str(&format!("{}:\n", yaml::write::key(tag.as_ref())));
-        for (name, english) in words {
-            text.push_str(&format!("  {name}: {}\n", yaml::write::text(english)));
-        }
-    }
-    text
 }
 
 /// Whether Statac has words for `tag` and none for what it writes beside a
@@ -1130,73 +819,4 @@ fn language_file() -> String {
         text.push_str(&format!("callouts: [{}]\n", names.join(", ")));
     }
     text
-}
-
-/// The home page, or a language's, written at `path`, its own list kept
-/// to one page where `one_page` says.
-fn first_page(path: &str, one_page: bool) -> String {
-    let one_page = match one_page {
-        true => {
-            "# The home page shows the newest of each folder itself, so its own list is kept to \
-             one page: see /lists/\nposts_per_page: 0\n"
-        }
-        false => "",
-    };
-    home_page(
-        path,
-        one_page,
-        "a new site",
-        " Posts are in `content/posts/`, notes in `content/notes/` and photographs in \
-         `content/photos/`; delete a folder you don't want and it leaves the site.",
-    )
-}
-
-/// The home page, or a language's, of a site made by an import, written
-/// at `path`: the starter's, naming only the folders of posts that came
-/// across, each by its path under `content/`, and none where none did.
-pub(crate) fn imported_first_page(path: &str, folders: &[String]) -> String {
-    let named = |kind: &str| -> Vec<String> {
-        let last = |folder: &String| folder.rsplit('/').next().unwrap_or(folder).to_owned();
-        (folders.iter())
-            .filter(|folder| match kind {
-                "posts" => !matches!(last(folder).as_str(), "notes" | "photos"),
-                kind => last(folder) == kind,
-            })
-            .map(|folder| match folder.is_empty() {
-                true => "`content/`".to_owned(),
-                false => format!("`content/{folder}/`"),
-            })
-            .collect()
-    };
-    let kinds: Vec<String> = [
-        ("posts", "posts"),
-        ("notes", "notes"),
-        ("photos", "photographs"),
-    ]
-    .iter()
-    .map(|(kind, word)| (word, named(kind)))
-    .filter(|(_, folders)| !folders.is_empty())
-    .map(|(word, folders)| format!("{word} in {}", wording::listed(&folders)))
-    .collect();
-    let mut kept = wording::listed(&kinds).replacen(" in ", " are in ", 1);
-    if let Some(first) = kept.get_mut(..1) {
-        first.make_ascii_uppercase();
-        kept = format!(" {kept}.");
-    }
-    home_page(path, "", "an imported site", &kept)
-}
-
-/// A home page of the starter's at `path`, for `site`, with `lines` in
-/// its front matter and `kept`, where the site's writing is, in its words.
-fn home_page(path: &str, lines: &str, site: &str, kept: &str) -> String {
-    format!(
-        "---\ngreeting: Hello.\n{lines}---\n\
-         This is the home page of {site}, the file `{path}`. Write here what the site \
-         is, in place of these words.\n\
-         \n\
-         To see the site as you change it, run `statac serve` in its folder.{kept} How each \
-         page looks is in `templates/`, `snippets/` and `assets/site.css`, and the words the \
-         pages show around the writing are in `data/words.yaml`. Every file is yours to \
-         change.\n"
-    )
 }

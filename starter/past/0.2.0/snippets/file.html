@@ -1,9 +1,0 @@
-{# takes name #}
-{# A file kept beside the writing, shown as code, called as @file("example.css"): see /videos/ -#}
-{% set file = page.file(name) %}
-{% set code = file.code %}
-{% if code %}
-<figure class="code"><figcaption><a href="{{ file.url }}" download>{{ file.name }}</a></figcaption><pre><code{% if file.language %} class="language-{{ file.language }}"{% endif %}>{{ code }}</code></pre></figure>
-{% else %}
-<p><a href="{{ file.url }}" download>{{ file.name }}</a></p>
-{% endif %}

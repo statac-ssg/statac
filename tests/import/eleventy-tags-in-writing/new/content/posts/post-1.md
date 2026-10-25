@@ -10,7 +10,7 @@ A post with every tag the old site ran in the writing.
 let a = 1;
 ```
 
-@old_note(text='Note 1')
+@note(text='Note 1')
 
 @line_1()
 

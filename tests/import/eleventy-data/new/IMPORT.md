@@ -1,13 +1,13 @@
 This site was imported from an Eleventy site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/eleventy-data/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
+It was made from `tests/import/eleventy-data/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/.
 
 ## What came across
 
 - 4 posts, into `content/notes/` and `content/posts/2026/` and `content/posts/`.
 - 2 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `.eleventy.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
@@ -31,7 +31,7 @@ The settings name no plugin for attributes in braces, so Statac took `{.class}` 
 
 The settings name no `excerpt_separator`, so Statac changed no excerpt marker.
 
-`layout` was taken off 4 pages and folders: each is built with the starter's template for its kind, as https://statac.dev/templates/ describes.
+`layout` was taken off 4 pages and folders: each is built with the template for its kind, as https://statac.dev/templates/ describes.
 
 The data each folder's own file cascaded to the pages beneath it is in `pages.` lines of `content/posts/index.md`, as https://statac.dev/front-matter/#handing-down describes; what can't cascade that way, as a `title` or a field inside a folder with no page of its own, is in each page's own front matter.
 
@@ -42,11 +42,6 @@ title: Old
 language: en
 timezone: UTC
 date_format: 31 December 2025
-date_short: 31 Dec 2025
-date_day: 31 Dec
-date_stamp: 31 Dec 2025, 15:04
-tags.pages: true
-series.pages: true
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
@@ -84,6 +79,7 @@ Nothing: Statac read every file of the old site.
 
 ## What to do next
 
-1. Run `statac check` in this folder, and put right what it shows.
-2. Run `statac serve`, and read the site in a browser beside the old one.
-3. Once nothing here is left to do, delete `IMPORT.md`.
+1. Add your own templates to `templates/`.
+2. Run `statac check` in this folder, and put right what it shows.
+3. Run `statac serve`, and read the site in a browser beside the old one.
+4. Once nothing here is left to do, delete `IMPORT.md`.

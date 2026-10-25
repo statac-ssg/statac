@@ -1,6 +1,0 @@
-{# What crawlers may read, and where the sitemap is: see /feeds/ -#}
-User-agent: *
-Disallow:
-{% for entry in site.pages if entry.url is endingwith("/sitemap.xml") %}
-Sitemap: {{ entry.url | absolute }}
-{% endfor %}

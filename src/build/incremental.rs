@@ -30,7 +30,6 @@ use crate::build::{
 };
 use crate::content::Texts;
 use crate::disk::Clock;
-use crate::new::update::Starter;
 use crate::problem::Problem;
 use crate::reads::{Key, Reads, Translation};
 use crate::search::Record;
@@ -139,9 +138,7 @@ impl Checking {
         // Read before the check reads any file of the site, so that a
         // stamp it settles is of the file as the check read it.
         let disk = Clock::of_site(at);
-        let mut prepared = build::prepared_with(at, &options.run(), &mut self.texts);
-        let newer = crate::new::update::newer_starter(at, &Starter::OWN);
-        prepared.problems.extend(newer);
+        let prepared = build::prepared_with(at, &options.run(), &mut self.texts);
         let plan = Plan::of(&prepared.renderer).noting();
         let rebuilding = Rebuilding {
             options,

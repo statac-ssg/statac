@@ -1,10 +1,10 @@
-//! Prints every address of the documentation that Statac prints or writes
-//! into a new site, sorted, one to a line, for the docs to check each
-//! answers: `cargo run --example printed_addresses`.
+//! Prints every address of the documentation that Statac prints, sorted,
+//! one to a line, for the docs to check each answers: `cargo run --example
+//! printed_addresses`.
 
 use std::path::Path;
 
-#[allow(dead_code, reason = "only what the starter's files name is read")]
+#[allow(dead_code, reason = "only the kinds of problem are read")]
 #[path = "explanation_pages.rs"]
 pub mod explanation_pages;
 
@@ -34,7 +34,7 @@ fn written(folder: &Path, found: &mut Vec<String>) {
 }
 
 /// Every address, whole and sorted, each once: those written in `src/`,
-/// the page of each kind of problem, and those the starter's files name.
+/// and the page of each kind of problem.
 pub fn addresses() -> Vec<String> {
     let mut found = Vec::new();
     written(
@@ -44,7 +44,6 @@ pub fn addresses() -> Vec<String> {
     for code in statac::problem::Code::ALL {
         found.push(format!("/e/{}/", code.name()));
     }
-    found.extend(explanation_pages::starter_addresses());
     found.sort();
     found.dedup();
     found

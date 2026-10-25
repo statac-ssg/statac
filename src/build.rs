@@ -18,7 +18,6 @@ use crate::content;
 use crate::date::Date;
 use crate::feeds;
 use crate::links;
-use crate::new::update::Starter;
 use crate::problem::{Code, Kind, Named, Problem, Published, Reason, Severity};
 use crate::publish::{self, Staging};
 use crate::reads::{Asked, Key, Reads, Record};
@@ -563,11 +562,6 @@ pub fn run(options: &Options) -> Outcome {
 /// A build runs the site's own commands around it, and `check` says once
 /// that it runs neither.
 pub fn run_saying(options: &Options, progress: Progress) -> Outcome {
-    run_holding(options, progress, &Starter::OWN)
-}
-
-/// [`run_saying`], with the site's starter files held to `starter`.
-pub(crate) fn run_holding(options: &Options, progress: Progress, starter: &Starter) -> Outcome {
     if let Err(problem) = a_folder(&options.site) {
         return Outcome::unread(problem);
     }
@@ -606,7 +600,7 @@ pub(crate) fn run_holding(options: &Options, progress: Progress, starter: &Start
     if before == crate::hooks::Before::Ran {
         clock.lap(Stage::Before);
     }
-    let mut outcome = built(options, progress, starter, unheld, clock);
+    let mut outcome = built(options, progress, unheld, clock);
     outcome.hooks.before = before;
     outcome.waited = waited;
     told_once_built(&mut outcome, options);
@@ -660,13 +654,10 @@ fn locations_published(site: &crate::site::Site, held_back: &[String]) -> Vec<Pr
 fn built(
     options: &Options,
     progress: Progress,
-    starter: &Starter,
     unheld: Option<Problem>,
     mut clock: Clock,
 ) -> Outcome {
     let mut prepared = prepared(&options.site, &options.run());
-    let note = crate::new::update::newer_starter(&options.site, starter);
-    prepared.problems.extend(note);
     let staging = match options.mode {
         Mode::Build if !stops(&prepared.problems) => {
             match publish::begin(&options.site, &options.out()) {
@@ -1315,9 +1306,7 @@ pub(crate) fn publish(
         // A run with the drafts in publishes them only to be looked at.
         if remembers && !options.drafts {
             let now = crate::published::now(
-                &options.site,
                 site,
-                renderer.sources(),
                 renderer.dates(),
                 renderer.assets(),
                 renderer.feeds(),

@@ -123,12 +123,11 @@ impl Drop for Kept {
 }
 
 /// Each problem `outcome` holds, with the text it is placed at, but an
-/// address gone, which moving a post makes as well, and news of the
-/// starter's files, which the folders' short pages are taken for.
+/// address gone, which moving a post makes as well.
 fn told(outcome: &Outcome) -> Vec<(Kind, Option<String>)> {
     let sources = outcome.sources();
     (outcome.problems.iter())
-        .filter(|p| !matches!(p.kind.code(), Code::UrlGone | Code::UpdateAvailable))
+        .filter(|p| p.kind.code() != Code::UrlGone)
         .map(|p| {
             let at = p.place.map(|place| sources.spelling(place).to_owned());
             (p.kind.clone(), at)

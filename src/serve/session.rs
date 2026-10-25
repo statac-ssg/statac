@@ -18,7 +18,6 @@ use crate::build::{self, Built, Mode, Options, Output, Plan, Publishing, Remembe
 use crate::content::words::PageWord;
 use crate::disk::{Clock, Inventory};
 use crate::hooks::Before;
-use crate::new::update::Starter;
 use crate::problem::Occupant;
 use crate::problem::{Kind, Problem};
 use crate::publish::{self, Left, Staging};
@@ -55,9 +54,6 @@ pub struct Session {
     sets_after: bool,
     /// The command run on the site the folder holds, where one was.
     after: Option<String>,
-    /// The note on newer starter files, as worked out since the last
-    /// save of one of them.
-    newer: Option<Option<Problem>>,
     /// Whether each round notes the keys it found changed.
     notes: bool,
     /// The addresses serve added to `published.txt` since its first round
@@ -188,7 +184,6 @@ impl Session {
             watches: false,
             sets_after: false,
             after: None,
-            newer: None,
             notes: false,
             ours: None,
             took: Took::default(),
@@ -283,12 +278,6 @@ impl Session {
     /// [`Session::round`] once it holds the site, or knows why it can't.
     fn held(&mut self, changed: Option<&[String]>, at: &Path, unheld: Option<Problem>) -> Round {
         let began = Instant::now();
-        // A starter file changed, or what changed isn't known.
-        if changed.is_none_or(|changed| {
-            changed.is_empty() || changed.iter().any(|path| Starter::OWN.reaches(path))
-        }) {
-            self.newer = None;
-        }
         let (settings, _) = crate::config::read(at, &mut crate::source::Sources::default());
         let sets = settings.text(crate::hooks::BEFORE).is_some();
         let runs = match changed {
@@ -349,10 +338,7 @@ impl Session {
         // stamp it settles is of the file as the round read it.
         let disk = Clock::of_site(at);
         let texts = &mut self.texts;
-        let mut prepared = build::prepared_with(at, &options.run(), texts);
-        let newer = (self.newer)
-            .get_or_insert_with(|| crate::new::update::newer_starter(at, &Starter::OWN));
-        prepared.problems.extend(newer.clone());
+        let prepared = build::prepared_with(at, &options.run(), texts);
         let fixed = options.today.is_some();
         let (stamps, prepared) = stamp::write(at, &options.run(), prepared, fixed, texts);
         let plan = Plan::of(&prepared.renderer).noting();
@@ -600,9 +586,7 @@ impl Session {
         let renderer = &read.renderer;
         let site = renderer.site();
         let now = crate::published::now(
-            at,
             site,
-            renderer.sources(),
             renderer.dates(),
             renderer.assets(),
             renderer.feeds(),

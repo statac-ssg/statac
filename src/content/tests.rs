@@ -2061,7 +2061,7 @@ fn a_site_in_one_language_reads_a_folder_named_for_it_as_any_other() {
 }
 
 #[test]
-fn a_language_with_no_folder_is_warned_of_once_at_its_tag() {
+fn a_language_with_no_folder_is_warned_of_once_at_its_tag_once_the_site_has_pages() {
     let read = site(&[
         ("statac.yaml", "language: [ar, en, fr]\n"),
         ("content/post-1.md", "# Post 1\n"),
@@ -2084,6 +2084,10 @@ fn a_language_with_no_folder_is_warned_of_once_at_its_tag() {
         ("statac.yaml", "language: [ar, en]\n"),
         ("content/en/post-1.md", "# Post 1\n"),
     ]);
+    assert_eq!(problems(&read), []);
+    // A site with no pages yet, as `statac new` makes one, has nothing to
+    // be told of.
+    let read = site(&[("statac.yaml", "language: [ar, en, fr]\n")]);
     assert_eq!(problems(&read), []);
 }
 

@@ -1,6 +1,5 @@
-//! The new site written from an [`Import`]: the starter, or without it
-//! only `statac.yaml`, then what came across, then the addresses kept and
-//! checked, then the report. Where anything stops it part way, the folder
+//! The new site written from an [`Import`]: `statac.yaml`, then what came
+//! across, then the addresses kept and checked, then the report. Where anything stops it part way, the folder
 //! is left as it was found.
 
 use std::collections::HashSet;
@@ -36,15 +35,6 @@ const SAME_MEANING: &[&str] = &[
     "redirect_from",
     "redirect_to",
     "draft",
-];
-
-/// The starter's pages a page or file of the old site takes the place of,
-/// by their paths under `content/` and their addresses.
-const STARTER_PAGES: &[(&str, &str)] = &[
-    ("404.md", "/404.html"),
-    ("sitemap.md", "/sitemap.xml"),
-    ("robots.md", "/robots.txt"),
-    ("tags.md", "/tags/"),
 ];
 
 pub(super) static FIELD_RENAMED: FindingKind = FindingKind {
@@ -103,15 +93,6 @@ pub(super) static NOT_IN_BUILT: FindingKind = FindingKind {
 };
 
 pub(super) static FEED_LEFT: FindingKind = FindingKind {
-    heading: "Feeds made by templates",
-    sentence: "Readers subscribed to the old site's feed at each of these URLs, and the \
-               template that made it didn't come across, so nothing is there now. A list's \
-               `feed:` line can put that list's feed at a URL of its own, as `feed: \
-               /index.rss`, and the starter's feed template writes Atom: see \
-               https://statac.dev/feeds/.",
-};
-
-pub(super) static FEED_LEFT_NO_STARTER: FindingKind = FindingKind {
     heading: "Feeds made by templates",
     sentence: "Readers subscribed to the old site's feed at each of these URLs, and the \
                template that made it didn't come across, so nothing is there now. A list's \
@@ -277,11 +258,6 @@ pub(super) struct Summary {
     pub notes: Vec<String>,
     /// `statac.yaml` as written.
     pub settings: String,
-    /// The starter's pages left out, by their paths under `content/`, with
-    /// what stands at their addresses instead.
-    pub displaced: Vec<(String, String)>,
-    /// Whether the starter was written.
-    pub starter: bool,
     /// Whether the old site's home page came across.
     pub home: bool,
     /// The path the site is under, where it is under one.
@@ -313,26 +289,17 @@ impl Summary {
 }
 
 /// Writes the site `import` describes into `folder`, which must be empty
-/// or not there, and the report, with the starter where `starter` asks.
-/// Where anything stops it, the folder is left as it was found.
+/// or not there, and the report. Where anything stops it, the folder is
+/// left as it was found.
 pub(super) fn site(
     old: &Path,
     folder: &Path,
     import: Import,
     today: Date,
     shown: &Shown,
-    starter: bool,
 ) -> Result<Summary, Problem> {
     let undo = Undo::before(folder);
-    let written = write(
-        old,
-        folder,
-        import,
-        today,
-        shown,
-        starter,
-        &mut platform::make_file,
-    );
+    let written = write(old, folder, import, today, shown, &mut platform::make_file);
     if written.is_err() {
         undo.undo(folder);
     }
@@ -397,8 +364,6 @@ impl Undo {
 /// is the import's own, so a file is written over by removing it first.
 pub(super) struct Out<'a> {
     pub folder: &'a Path,
-    /// Whether the starter was written into it.
-    pub starter: bool,
     write: &'a mut Writer<'a>,
     made: HashSet<String>,
 }
@@ -458,7 +423,6 @@ pub(super) fn write<'a>(
     import: Import,
     today: Date,
     shown: &Shown,
-    starter: bool,
     write: &'a mut Writer<'a>,
 ) -> Result<Summary, Problem> {
     let Import {
@@ -500,21 +464,9 @@ pub(super) fn write<'a>(
         date_format: new::dates_offered(&languages[0])[0].1.clone(),
         languages,
     };
-    let writes = new::Writes {
-        starter,
-        cards: false,
-    };
-    let made = new::make(
-        Maker::Import,
-        folder,
-        &answers,
-        timezone.as_deref(),
-        today,
-        writes,
-    )?;
+    let made = new::make(Maker::Import, folder, &answers, timezone.as_deref())?;
     let mut out = Out {
         folder,
-        starter,
         write,
         made: HashSet::new(),
     };
@@ -538,7 +490,6 @@ pub(super) fn write<'a>(
         notes,
         built: built.clone(),
         base: address.as_deref().map(base_of).unwrap_or_default(),
-        starter,
         ..Summary::default()
     };
     let followed = super::inside::followed();
@@ -562,46 +513,7 @@ pub(super) fn write<'a>(
             },
         ));
     }
-    // The starter's folder of posts with nothing in it would be published
-    // as an empty list.
-    let lands_in_posts = |to: &str| to.starts_with("posts/");
-    if starter
-        && !pages.iter().any(|page| lands_in_posts(&page.to))
-        && !files
-            .iter()
-            .any(|file| file.to.starts_with("content/posts/"))
-    {
-        out.remove("content/posts/index.md")?;
-        let _ = std::fs::remove_dir(platform::join(folder, "content/posts"));
-        summary.notes.push(
-            "The starter's `content/posts/index.md` was left out: nothing of the old site lands \
-             in `content/posts/`, and it would have been an empty list."
-                .to_owned(),
-        );
-    }
     summary.home = pages.iter().any(|page| page.to == "index.md");
-    for (path, address) in STARTER_PAGES.iter().filter(|_| starter) {
-        let by_page = pages
-            .iter()
-            .find(|page| page.to == *path || page.address.as_deref() == Some(address));
-        let by_file = files
-            .iter()
-            .find(|file| file.to == format!("static{address}"));
-        let instead = match (by_page, by_file) {
-            (Some(page), _) => page.from.clone(),
-            (None, Some(file)) => file.from.clone(),
-            (None, None) => continue,
-        };
-        out.remove(&format!("content/{path}"))?;
-        summary.displaced.push(((*path).to_owned(), instead));
-    }
-    // The starter's templates link to a page for each tag and each series.
-    let mut settings = settings;
-    for &name in new::STARTER_LIST_PAGES.iter().rev().filter(|_| starter) {
-        if !settings.iter().any(|(written, _)| written == name) {
-            settings.insert(0, (name.to_owned(), Value::Truth(true)));
-        }
-    }
     let mut text = made.settings.clone();
     text.push_str(&yaml::fields(
         settings.iter().map(|(name, value)| (name.as_str(), value)),
@@ -700,46 +612,13 @@ pub(super) fn write<'a>(
         out.put(&file.to, &bytes)?;
     }
     summary.files = files.len();
-    // The starter's home page, and each other language's, names the
-    // folders of posts that came across in place of the starter's own.
-    let tops = std::iter::once("").chain(other_languages.iter().map(String::as_str));
-    for top in tops {
-        let path = match top {
-            "" => "index.md".to_owned(),
-            language => format!("{language}/index.md"),
-        };
-        if came.contains(&path) || out.text(&format!("content/{path}")).is_none() {
-            continue;
-        }
-        let mut folders: Vec<String> = Vec::new();
-        for page in placed.iter().filter(|page| page.kind == PageKind::Post) {
-            let language = (other_languages.iter())
-                .find(|language| page.to.starts_with(&format!("{language}/")))
-                .map_or("", String::as_str);
-            if language != top {
-                continue;
-            }
-            let within = page.to[language.len()..].trim_start_matches('/');
-            let folder = match within.split_once('/') {
-                Some((folder, _)) if language.is_empty() => folder.to_owned(),
-                Some((folder, _)) => format!("{language}/{folder}"),
-                None => language.to_owned(),
-            };
-            if !folders.contains(&folder) {
-                folders.push(folder);
-            }
-        }
-        folders.sort();
-        let page = new::imported_first_page(&format!("content/{path}"), &folders);
-        out.put(&format!("content/{path}"), page.as_bytes())?;
-    }
     for (path, text) in &written {
         out.put(path, text.as_bytes())?;
     }
-    // Without the starter, the home page of each language that no page
-    // came across to is written with no content, so the site has one.
+    // The home page of each language that no page came across to is
+    // written with no content, so the site has one.
     let homes = std::iter::once(String::new()).chain(other_languages.iter().cloned());
-    for language in homes.filter(|_| !starter) {
+    for language in homes {
         let path = match language.is_empty() {
             true => "index.md".to_owned(),
             false => format!("{language}/index.md"),
@@ -748,24 +627,24 @@ pub(super) fn write<'a>(
             out.put(&format!("content/{path}"), b"")?;
         }
     }
-    // Without the starter, a page the words are for that isn't there is
-    // written to hold them.
+    // A page the words are for that isn't there is written to hold them.
     for (path, field) in &words {
         if came.contains(path) {
             continue;
         }
-        let text = match out.text(&format!("content/{path}")) {
-            Some(text) => text,
-            None if !starter => String::new(),
-            None => continue,
-        };
+        let text = out.text(&format!("content/{path}")).unwrap_or_default();
         let text = with_word(&text, field);
         out.put(&format!("content/{path}"), text.as_bytes())?;
     }
 
+    // The old home page's later pages are sent on to those of the posts'
+    // list page, which is published only where the folder has a page.
+    if home_pages.is_some() && out.text("content/posts/index.md").is_none() {
+        out.put("content/posts/index.md", b"")?;
+    }
     summary.kept = addresses::keep(&mut out, &mut placed, today, &other_languages)?;
-    // `keep` counts only the pages that came across; a starter's page
-    // carries the `redirect_from` its words give it.
+    // `keep` counts only the pages that came across; a page written to
+    // hold words carries the `redirect_from` they give it.
     summary.kept.redirected += (words.iter())
         .filter(|(path, field)| field.name == "redirect_from" && !came.contains(path))
         .filter(|(path, _)| out.text(&format!("content/{path}")).is_some())
@@ -829,7 +708,8 @@ pub(super) fn write<'a>(
         summary.kept.list_pages = pages;
     }
     summary.terms = terms;
-    // The starter's page listing every tag stands where the old site's did.
+    // A page listing every tag, where one came across, stands where the
+    // old site's did.
     for (address, name) in &term_lists {
         if !name.eq_ignore_ascii_case("tags") {
             continue;
@@ -867,15 +747,10 @@ pub(super) fn write<'a>(
         &feeds,
         &term_lists,
         built_at.as_deref(),
-        starter,
     );
     summary.kept.pictures = checked.pictures;
-    let feed_left = match starter {
-        true => &FEED_LEFT,
-        false => &FEED_LEFT_NO_STARTER,
-    };
     for (address, from) in &checked.feeds {
-        findings.push(Finding::at(feed_left, from, None, address));
+        findings.push(Finding::at(&FEED_LEFT, from, None, address));
     }
     summary.kept.answered = checked.answered;
     summary.kept.unanswered = checked.unanswered;

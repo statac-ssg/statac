@@ -2,11 +2,11 @@
 title: Post 1
 date: 2026-01-01
 ---
-@old_youtube(id='abcdefghijk')
+@youtube(id='abcdefghijk')
 
-@vimeo('123456789')
+@vimeo(id='123456789')
 
-@old_quote(author='Name 1')
+@quote(author='Name 1')
 Quoted 1.
 @end
 

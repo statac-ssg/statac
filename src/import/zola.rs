@@ -19,8 +19,7 @@ use super::common::{
 use super::inside;
 use super::report::code;
 use super::{
-    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, left_behind,
-    one_home_page,
+    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, one_home_page,
 };
 use crate::content::address::{Address, name_fault};
 use crate::content::slug as statac_slug;
@@ -117,20 +116,13 @@ pub(super) fn owns(folder: &Path) -> bool {
     settings::owns(folder)
 }
 
-/// Reads the site in `folder`, for a new site with the starter where
-/// `starter` says.
-pub(super) fn read(
-    folder: &Path,
-    today: Date,
-    given: Option<&str>,
-    starter: bool,
-) -> Result<Import, Box<Failed>> {
+/// Reads the site in `folder`.
+pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
     let (file, entries) = settings::found(folder)?;
     let s = settings::settle(&entries);
     let mut reader = Reader {
         folder,
         given,
-        starter,
         import: Import::default(),
         s,
         today,
@@ -200,8 +192,8 @@ struct Doc {
     address: Option<String>,
     own_address: bool,
     others: Vec<String>,
-    /// Whether it takes nothing but words for the page the starter has
-    /// there.
+    /// Whether it takes nothing but words, which a page written for them
+    /// holds.
     words_only: bool,
 }
 
@@ -210,8 +202,6 @@ struct Reader<'a> {
     /// The site's address as the author gave it, for settings that give
     /// none.
     given: Option<&'a str>,
-    /// Whether the new site has the starter.
-    starter: bool,
     import: Import,
     s: Settings,
     today: Date,
@@ -554,7 +544,6 @@ impl Reader<'_> {
             if name == self.import.settings_file {
                 continue;
             }
-            let starter = self.starter;
             let what: String = match (name.as_str(), dir) {
                 ("content", true) => {
                     self.content("")?;
@@ -568,21 +557,9 @@ impl Reader<'_> {
                     "another settings file, which Zola reads only where `zola.toml` isn't there"
                         .into()
                 }
-                ("templates", true) => left_behind(
-                    "the old site's templates",
-                    "the starter's templates take",
-                    starter,
-                ),
-                ("themes", true) => left_behind(
-                    "the old site's themes",
-                    "the starter's templates, snippets and stylesheet take",
-                    starter,
-                ),
-                ("sass", true) => left_behind(
-                    "the old site's Sass stylesheets",
-                    "the starter's `assets/site.css` takes",
-                    starter,
-                ),
+                ("templates", true) => "the old site's templates".into(),
+                ("themes", true) => "the old site's themes".into(),
+                ("sass", true) => "the old site's Sass stylesheets".into(),
                 (name, true) if name == output_top => {
                     "the old site's built output, read only to check the URLs".into()
                 }
@@ -1343,7 +1320,7 @@ impl Reader<'_> {
         if let Some((size, later)) = home_paged {
             let mut note = format!(
                 "The old site's home page showed its posts {size} to a page. {}",
-                one_home_page(self.starter, false)
+                one_home_page(false)
             );
             if later {
                 note.push_str(
@@ -1369,7 +1346,6 @@ impl Reader<'_> {
     fn feeds(&mut self) {
         let mut feed_addresses: Vec<String> = Vec::new();
         let mut kept: Vec<String> = Vec::new();
-        let mut laid_out = Vec::new();
         let mut extra_names: Vec<String> = Vec::new();
         for at in 0..self.docs.len() {
             let doc = &self.docs[at];
@@ -1377,15 +1353,7 @@ impl Reader<'_> {
                 continue;
             }
             let language = doc.language.clone();
-            let top = !doc.dir.is_empty() && !doc.dir.contains('/');
-            let members = self.members(at);
-            let dated = members.iter().any(|m| self.docs[*m].date.is_some());
-            let undated = members.iter().any(|m| self.docs[*m].date.is_none());
             let mut words = Vec::new();
-            if self.starter && top && dated && !undated {
-                words.push(Field::new("pages.layout", Value::Text("post".into()), None));
-                laid_out.push(parent(&doc.to).to_owned());
-            }
             let (_, names) = self.feeds_of(&language);
             if doc.list.feeds == Some(true)
                 && !doc.dir.is_empty()
@@ -1430,21 +1398,13 @@ impl Reader<'_> {
                 .settings
                 .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
             let shown: Vec<String> = kept.iter().map(|a| code(a)).collect();
-            let (feeds, are) = match (shown.len(), self.starter) {
-                (1, true) => ("feed", "is now Statac's Atom feed"),
-                (_, true) => ("feeds", "are each now Statac's Atom feed"),
-                (1, false) => ("feed", "stays"),
-                (_, false) => ("feeds", "each stay"),
-            };
-            let written = match self.starter {
-                true => "written by `templates/feed.xml`, as `feed:` on each list page says",
-                false => {
-                    "as `feed:` on each list page says, built with `templates/feed.xml` once you \
-                     add it"
-                }
+            let (feeds, are) = match shown.len() {
+                1 => ("feed", "stays"),
+                _ => ("feeds", "each stay"),
             };
             self.note(format!(
-                "Zola's {feeds}, at {}, {are} at the same URL, {written}, and \
+                "Zola's {feeds}, at {}, {are} at the same URL, as `feed:` on each list page says, \
+                 built with `templates/feed.xml` once you add it, and \
                  `feed_ids_before` keeps each post's id the URL Zola gave it, so feed readers \
                  see nothing new: see https://statac.dev/feeds/#entry-ids.",
                 listed(&shown)
@@ -1459,23 +1419,6 @@ impl Reader<'_> {
                 "The settings' `feed_filenames` gave each list more than one feed, and Statac \
                  writes one: those named {} aren't made, and are listed under URLs.",
                 listed(&shown)
-            ));
-        }
-        if !laid_out.is_empty() {
-            let folders: Vec<String> = laid_out
-                .iter()
-                .map(|f| code(&format!("content/{f}/index.md")))
-                .collect();
-            self.note(format!(
-                "{} {} `pages.layout: post`, so the pages beneath {}, every one dated, are built \
-                 with the starter's template for posts.",
-                listed(&folders),
-                if folders.len() == 1 {
-                    "cascades"
-                } else {
-                    "each cascade"
-                },
-                if folders.len() == 1 { "it" } else { "them" }
             ));
         }
     }
@@ -1603,16 +1546,8 @@ impl Reader<'_> {
         let dropped = std::mem::take(&mut self.dropped);
         for (word, files) in dropped {
             let what: String = match word {
-                "template" => left_behind(
-                    "it named the old site's template for the page",
-                    "the starter's templates take",
-                    self.starter,
-                ),
-                "page_template" => left_behind(
-                    "it named the old site's template for the list's pages",
-                    "the starter's templates take",
-                    self.starter,
-                ),
+                "template" => "it named the old site's template for the page".into(),
+                "page_template" => "it named the old site's template for the list's pages".into(),
                 "transparent" => "Zola listed the folder's pages among those of the folder above \
                                   it, as Statac's list of a folder holds every post beneath it \
                                   already"
@@ -1744,10 +1679,8 @@ impl Reader<'_> {
             base: &base,
             refs: &refs,
             beside: &beside,
-            own: &self.own,
             wrapping: &wrapping,
             emoji: self.s.render_emoji,
-            starter: self.starter,
         };
         let mut calls = Vec::new();
         let mut written = Vec::new();

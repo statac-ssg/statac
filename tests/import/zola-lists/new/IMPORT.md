@@ -1,13 +1,13 @@
 This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/zola-lists/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
+It was made from `tests/import/zola-lists/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/.
 
 ## What came across
 
 - 15 posts, into `content/by-date/` and `content/by-none/` and `content/by-slug/` and `content/by-title/` and `content/by-update/` and `content/by-weight/` and `content/hidden/` and `content/outer/inner/`.
 - 10 pages, into `content/` where they stood in the old site.
 
-The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
+The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
@@ -25,23 +25,19 @@ Zola gave the pages of `content/by-none/` no order of its own, as no `sort_by` a
 
 Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`: each list page that gave it says `posts_per_page`, and the first of its paginated pages, which Zola redirected to the list, is in the list page's `redirect_from`.
 
-The old site's home page showed its posts 2 to a page. Statac's home page shows the newest of each folder itself, so `content/index.md` gives no `posts_per_page` and its own list stays on one page.
-
-`content/by-date/index.md`, `content/by-none/index.md`, `content/by-slug/index.md`, `content/by-title/index.md`, `content/by-update/index.md`, `content/by-weight/index.md`, `content/hidden/index.md` and `content/outer/index.md` each cascade `pages.layout: post`, so the pages beneath them, every one dated, are built with the starter's template for posts.
+The old site's home page showed its posts 2 to a page. `content/index.md` gives no `posts_per_page`, so its own list stays on one page.
 
 `in_search_index` was taken off 1 page, `content/by-none/_index.md`: it said whether Zola's search index held the page, and Statac makes no search index.
 
 `insert_anchor_links` was taken off 1 page, `content/by-update/_index.md`: it put a link beside each heading, which a snippet of yours in `snippets/markdown/heading.html` can do, as https://statac.dev/snippets/#pieces-of-the-writing describes.
 
-`template` was taken off 1 page, `content/by-weight/_index.md`: it named the old site's template for the page, which the starter's templates take the place of.
+`template` was taken off 1 page, `content/by-weight/_index.md`: it named the old site's template for the page.
 
-`page_template` was taken off 1 page, `content/by-weight/_index.md`: it named the old site's template for the list's pages, which the starter's templates take the place of.
+`page_template` was taken off 1 page, `content/by-weight/_index.md`: it named the old site's template for the list's pages.
 
 `render` was taken off 1 page, `content/hidden/_index.md`: with `render = false` Zola published the list's pages but no page for the list itself; `index_page: false` on the list page does that in Statac.
 
 `transparent` was taken off 1 page, `content/outer/inner/_index.md`: Zola listed the folder's pages among those of the folder above it, as Statac's list of a folder holds every post beneath it already.
-
-The starter's `content/posts/index.md` was left out: nothing of the old site lands in `content/posts/`, and it would have been an empty list.
 
 The settings written in `statac.yaml`:
 
@@ -51,11 +47,6 @@ url: https://example.org
 language: en
 timezone: UTC
 date_format: 31 December 2025
-date_short: 31 Dec 2025
-date_day: 31 Dec
-date_stamp: 31 Dec 2025, 15:04
-tags.pages: true
-series.pages: true
 pagination.permalink: "{list}p/{n}/"
 ```
 
@@ -77,6 +68,7 @@ Nothing: Statac read every file of the old site.
 
 ## What to do next
 
-1. Run `statac check` in this folder, and put right what it shows.
-2. Run `statac serve`, and read the site in a browser beside the old one.
-3. Once nothing here is left to do, delete `IMPORT.md`.
+1. Add your own templates to `templates/`.
+2. Run `statac check` in this folder, and put right what it shows.
+3. Run `statac serve`, and read the site in a browser beside the old one.
+4. Once nothing here is left to do, delete `IMPORT.md`.

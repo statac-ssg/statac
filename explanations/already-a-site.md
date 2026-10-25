@@ -9,23 +9,20 @@ content.
 
 ```text
 error  Already a site: `site-1` has a `statac.yaml`
-  To bring its starter files up to date, run `statac new --update`.
   More: https://statac.dev/e/already-a-site/
 ```
 
 ## Why Statac stops
 
-Writing a new site's files over an existing site's files would change
-how its pages look and what they say. `statac new` only ever writes into
-an empty folder, or a new one.
+Writing a new site's files over an existing site's files would replace
+its settings. `statac new` only ever writes into an empty folder, or a
+new one.
 
 ## How to fix it
 
 To build the site that is already there, run `statac build` or
-`statac serve` in its folder. To bring its starter files (the templates,
-snippets and stylesheet that `statac new` wrote) up to date, run
-`statac new --update` in that folder. To start another site, give
-`statac new` the name of a new folder.
+`statac serve` in its folder. To start another site, give `statac new`
+the name of a new folder.
 
 ## Example
 

@@ -24,8 +24,7 @@
 Statac makes a website from a folder of writing. You write pages in
 Markdown, choose how they look with templates, and run `statac build`. It
 writes a site of plain files, ready to put on any web host. Statac adds
-no JavaScript to a page unless you ask it to: in a new site, only the
-search page has any.
+no JavaScript to a page unless you ask it to.
 
 It is one program in one file, with no plugins and nothing else to
 install beside it.
@@ -49,17 +48,14 @@ stopped, and links to a page about that kind of problem.
 - **Photographs handled.** Write an ordinary Markdown
   [picture](https://statac.dev/pictures/). Readers get it in several
   sizes, as AVIF with a JPEG fallback.
-- **Search built in.** A new site has a
-  [search page](https://statac.dev/search/) that finds pages as the
-  reader types, from an index Statac writes at each build, with nothing
-  outside your site needed. `statac search` gives the same results in
+- **Search built in.** A
+  [search page](https://statac.dev/search/) finds pages as the reader
+  types, from an index Statac writes at each build, with nothing outside
+  your site needed. `statac search` gives the same results in
   the terminal.
-- **Sharing cards.** After `statac new --cards`, Statac draws a
+- **Sharing cards.** Statac draws a
   [link preview](https://statac.dev/sharing-cards/) for every page, from
-  a layout you set.
-- **Yours, kept up to date.** Every template is a file in your site.
-  [`statac new --update`](https://statac.dev/new/#update) replaces only
-  the ones you haven't changed.
+  a layout you set, in fonts and over a background of your own.
 - **Bring your site with you.** `statac import` brings a Hugo, Jekyll,
   Zola or Eleventy site across, and lists anything it couldn't bring.
   See [Arriving from another tool](https://statac.dev/import/).
@@ -104,13 +100,11 @@ cd site-1
 statac serve
 ```
 
-`statac new` asks five questions and writes a site you can change;
-`statac serve` builds it, shows it at `http://localhost:3000/` and builds
-it again on every save.
-
-<p align="center">
-  <img src=".github/readme/starter.webp" alt="The home page of a new site, headed Hello., with Home, Posts, Notes, Photos, About and Search in its menu and a list of posts beneath" width="860">
-</p>
+`statac new` asks four questions and writes the site's settings; the
+pages, templates and stylesheet are yours to write, as
+[Templates](https://statac.dev/templates/) describes. `statac serve`
+builds the site, shows it at `http://localhost:3000/` and builds it again
+on every save.
 
 ## Documentation
 

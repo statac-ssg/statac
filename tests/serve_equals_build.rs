@@ -13,7 +13,6 @@ use std::time::{Duration, SystemTime};
 use image::{ImageFormat, Rgb, RgbImage};
 use statac::build::incremental::Checking;
 use statac::build::{self, Mode, Options, Outcome};
-use statac::new::{self, Input, Locale, Machine};
 use statac::reads::Key;
 use statac::report::Report;
 use statac::serve::session::{Round, Session};
@@ -26,6 +25,9 @@ struct Site {
 }
 
 const TODAY: &str = "2026-10-04";
+
+/// The home page of [`Site::listing`].
+const HOME_PAGE: &str = "---\ntitle: Home\n---\nThe home page.\n";
 
 const SETTINGS: &str = "title: Site\nlanguage: [en, de]\nurl: https://example.org\n\
                         feed_key: key\ntimezone: UTC\nposts_per_page: 2\ntags.pages: true\n\
@@ -55,6 +57,63 @@ const PAGE: &str = "{{ page.content }}\n\
 const FEED: &str = "<feed>{% for post in posts %}<entry>{{ post.url }} {{ post.title }} \
                     {{ post.content }}</entry>{% endfor %}</feed>\n";
 
+/// The feed of [`Site::listing`], which gives each post the id a feed
+/// reader knows it by.
+const LISTED_FEED: &str = "<feed><id>{{ feed_id(page) }}</id>{% for post in posts %}\
+                           <entry><id>{{ feed_id(post) }}</id>{{ post.url }} {{ post.title }}\
+                           </entry>{% endfor %}</feed>\n";
+
+/// The frame of every page of [`Site::listing`]: a menu of each folder and
+/// each page asking into it, and the page's translations.
+const LISTED_BASE: &str = "<!doctype html>\n\
+    <html lang=\"{{ page.language }}\">\n\
+    <title>{{ headline(page) }} - {{ site.title }}</title>\n\
+    {% if site.feed %}<link rel=\"alternate\" href=\"{{ site.feed }}\">{% endif %}\n\
+    <nav><a href=\"{{ site.languages[page.language].url }}\">Home</a>\
+    {% for folder in site.folders %}<a href=\"{{ folder.url }}\">{{ headline(folder.page) }}</a>\
+    {% endfor %}\
+    {% for entry in site.pages | selectattr(\"menu\") | selectattr(\"language\", \"eq\", page.language) %}\
+    <a href=\"{{ entry.url }}\">{{ headline(entry) }}</a>{% endfor %}</nav>\n\
+    {% for other in page.translations %}<a href=\"{{ other.url }}\">{{ other.language }}</a>\
+    {% endfor %}\n";
+
+/// The rest of each page of [`Site::listing`], by its template.
+const LISTED: [(&str, &str); 5] = [
+    (
+        "home",
+        "{{ page.content }}\n\
+         {% for folder in site.folders if folder.posts %}<h2>{{ folder.title }}</h2>\
+         {% for post in folder.posts[:5] %}<a href=\"{{ post.url }}\">{{ post.title }}</a>\
+         {% endfor %}{% endfor %}\n",
+    ),
+    (
+        "folder",
+        "{{ page.content }}\n\
+         {% for post in page.posts %}<a href=\"{{ post.url }}\">{{ post.title }}</a>{% endfor %}\n\
+         {% if page.next %}<a href=\"{{ page.next.url }}\">Older</a>{% endif %}\n",
+    ),
+    (
+        "page",
+        "{{ page.content }}\n\
+         {% for tag in page.tags %}<a href=\"{{ tag.url }}\">{{ tag.name }}</a>{% endfor %}\n",
+    ),
+    (
+        "tags",
+        "{{ page.content }}\n\
+         {% for tag in site.tags %}<a href=\"{{ tag.url }}\">{{ tag }}</a>{% endfor %}\n",
+    ),
+    (
+        "search",
+        "{% set elsewhere = site.search_without_javascript %}\
+         {% if elsewhere %}<form action=\"{{ elsewhere.action }}\">\
+         <input name=\"{{ elsewhere.words }}\">{% for field in elsewhere.fields %}\
+         <input type=\"hidden\" name=\"{{ field.name }}\" value=\"{{ field.value }}\">\
+         {% endfor %}</form>{% endif %}\n\
+         {% set box = page.search_box() %}<search data-index=\"{{ box.index }}\"></search>\n\
+         {{ page.content }}\n",
+    ),
+];
+
 const LATIN: &[u8] = include_bytes!("../src/cards/fonts/test/test-latin.ttf");
 
 fn jpeg(width: u32, height: u32) -> Vec<u8> {
@@ -78,8 +137,8 @@ fn post(title: &str, date: &str, tags: &str, text: &str) -> String {
     format!("---\ntitle: {title}\ndate: {date}\ntags: [{tags}]\n---\n{text}\n")
 }
 
-/// A post in the starter's folder of posts.
-fn starter_post(n: u32, tags: &str) -> String {
+/// A post in the folder of posts of [`Site::listing`].
+fn listed_post(n: u32, tags: &str) -> String {
     let text = format!("Post {n} says this.");
     post(&format!("Post {n}"), &format!("2026-01-0{n}"), tags, &text)
 }
@@ -139,40 +198,45 @@ impl Site {
         site
     }
 
-    /// The site `statac new` makes in English and German with an address,
-    /// with eight more posts, tagged `one` and some `two`, three to a page.
-    fn starter(name: &str) -> Site {
+    /// A site in English and German with an address, a folder of posts
+    /// and one of notes, a page listing every tag, a page that searches in
+    /// each language and a menu, with eight posts, tagged `one` and some
+    /// `two`, three to a page.
+    fn listing(name: &str) -> Site {
         let site = Site::empty(name);
-        let mut typed = "Site\nhttps://example.org\nen, de\n\n".as_bytes();
-        let machine = Machine {
-            input: Some(Input {
-                reader: &mut typed,
-                terminal: false,
-            }),
-            locale: Locale::default(),
-            timezone: Some("UTC".into()),
-            today: statac::date::read(TODAY).unwrap(),
-        };
-        let options = new::Options {
-            folder: Some(site.root()),
-            yes: false,
-            update: None,
-            cards: false,
-            no_starter: false,
-        };
-        let mut said = Vec::new();
-        let code = new::run(&options, machine, &mut said, false);
-        assert_eq!(code, 0, "{}", String::from_utf8_lossy(&said));
-        let settings = fs::read_to_string(site.root().join("statac.yaml")).unwrap();
-        let paged = settings.replace("\nposts_per_page: 10\n", "\nposts_per_page: 3\n");
-        assert_ne!(paged, settings);
-        site.write("statac.yaml", &paged);
+        site.write(
+            "statac.yaml",
+            "title: Site\nurl: https://example.org\nlanguage: [en, de]\ntimezone: UTC\n\
+             feed_key: key\ntags.pages: true\nseries.pages: true\nposts_per_page: 3\n\
+             feed: true\n",
+        );
+        for (template, rest) in LISTED {
+            site.write(
+                &format!("templates/{template}.html"),
+                &format!("{LISTED_BASE}{rest}"),
+            );
+        }
+        site.write("templates/feed.xml", LISTED_FEED);
+        site.write("content/index.md", HOME_PAGE);
+        site.write(
+            "content/de/index.md",
+            "---\ntitle: Start\n---\nDie Startseite.\n",
+        );
+        site.write("content/posts/index.md", "---\ntitle: Posts\n---\n");
+        site.write("content/notes/index.md", "---\ntitle: Notes\n---\n");
+        site.write(
+            "content/notes/note-1.md",
+            "---\ntitle: Note 1\ndate: 2026-01-01\n---\nA note.\n",
+        );
+        let tags = "---\ntitle: Tags\nlayout: tags\nsearch: false\n---\n";
+        let search = "---\ntitle: Search\nmenu: true\nsearch: false\nlayout: search\n---\n";
+        for language in ["", "de/"] {
+            site.write(&format!("content/{language}tags.md"), tags);
+            site.write(&format!("content/{language}search.md"), search);
+        }
         for n in 1..=8 {
             let tags = if n % 3 == 0 { "one, two" } else { "one" };
-            site.write(
-                &format!("content/posts/post-{n}.md"),
-                &starter_post(n, tags),
-            );
+            site.write(&format!("content/posts/post-{n}.md"), &listed_post(n, tags));
         }
         site
     }
@@ -472,7 +536,7 @@ const CENSUS: &[fn()] = &[
     a_tag_or_a_series_found_by_a_spelling_follows_the_spellings_there_are,
     what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them,
     pages_chosen_from_every_page_by_a_field_follow_the_field,
-    the_starters_posts_and_tags,
+    posts_and_their_tags_listed,
 ];
 
 /// A kind of key no edit reaches is one a read serve misses could hide in.
@@ -683,7 +747,7 @@ fn search_index(session: &Session) -> Vec<(String, Vec<u8>)> {
 
 #[test]
 fn the_search_page_follows_the_engine_it_sends_a_search_to_without_javascript() {
-    let site = Site::starter("search-elsewhere");
+    let site = Site::listing("search-elsewhere");
     let changed = |site: &Site, from: &str, to: &str| {
         let settings = site.read("statac.yaml");
         let changed = settings.replace(from, to);
@@ -712,7 +776,7 @@ fn the_search_page_follows_the_engine_it_sends_a_search_to_without_javascript() 
 
 #[test]
 fn the_search_index_follows_everything_a_page_is_searched_by() {
-    let site = Site::starter("search-kept");
+    let site = Site::listing("search-kept");
     site.write("snippets/aside.html", "<aside>{{ text }}</aside>\n");
     let post_2 = |front: &str, text: &str| {
         format!("---\ntitle: Post 2\ndate: 2026-01-02\ntags: [one]\n{front}---\n{text}\n")
@@ -763,10 +827,7 @@ fn the_search_index_follows_everything_a_page_is_searched_by() {
             )
         }),
         ("a tag one post spells", &|site| {
-            site.write(
-                "content/posts/post-1.md",
-                &starter_post(1, "one, Two Words"),
-            )
+            site.write("content/posts/post-1.md", &listed_post(1, "one, Two Words"))
         }),
         // Pages that aren't searched, so only the spelling the tag is shown
         // with on the post can change the index.
@@ -3186,11 +3247,11 @@ fn a_page_that_reads_fields_past_counting_follows_every_one() {
 }
 
 #[test]
-fn the_starters_posts_and_tags() {
-    let Some(_counted) = counted(the_starters_posts_and_tags) else {
+fn posts_and_their_tags_listed() {
+    let Some(_counted) = counted(posts_and_their_tags_listed) else {
         return;
     };
-    let site = Site::starter("starter-posts");
+    let site = Site::listing("listed-posts");
     let post_2 = |title: &str, tags: &str, text: &str| post(title, "2026-01-02", tags, text);
     let built = through(
         &site,
@@ -3204,39 +3265,39 @@ fn the_starters_posts_and_tags() {
                 site.write("content/posts/post-2.md", &text)
             }),
             ("a new tag", &|site| {
-                site.write("content/posts/post-2.md", &starter_post(2, "one, three"))
+                site.write("content/posts/post-2.md", &listed_post(2, "one, three"))
             }),
             ("the new tag removed", &|site| {
-                site.write("content/posts/post-2.md", &starter_post(2, "one"))
+                site.write("content/posts/post-2.md", &listed_post(2, "one"))
             }),
             ("a tag another post has", &|site| {
-                site.write("content/posts/post-2.md", &starter_post(2, "one, two"))
+                site.write("content/posts/post-2.md", &listed_post(2, "one, two"))
             }),
             ("a post added", &|site| {
-                site.write("content/posts/post-9.md", &starter_post(9, "two"))
+                site.write("content/posts/post-9.md", &listed_post(9, "two"))
             }),
             ("the post removed", &|site| {
                 site.remove("content/posts/post-9.md")
             }),
             ("a tag no other post has", &|site| {
-                site.write("content/posts/post-2.md", &starter_post(2, "one, three"))
+                site.write("content/posts/post-2.md", &listed_post(2, "one, three"))
             }),
             ("the tag spelt with a capital", &|site| {
-                site.write("content/posts/post-2.md", &starter_post(2, "one, Three"))
+                site.write("content/posts/post-2.md", &listed_post(2, "one, Three"))
             }),
             ("the tag renamed", &|site| {
-                site.write("content/posts/post-2.md", &starter_post(2, "one, four"))
+                site.write("content/posts/post-2.md", &listed_post(2, "one, four"))
             }),
             ("a tag every post has renamed on one", &|site| {
-                site.write("content/posts/post-2.md", &starter_post(2, "five, four"))
+                site.write("content/posts/post-2.md", &listed_post(2, "five, four"))
             }),
             ("a post moved to the notes", &|site| {
                 site.remove("content/posts/post-4.md");
-                site.write("content/notes/post-4.md", &starter_post(4, "one"))
+                site.write("content/notes/post-4.md", &listed_post(4, "one"))
             }),
             ("and back", &|site| {
                 site.remove("content/notes/post-4.md");
-                site.write("content/posts/post-4.md", &starter_post(4, "one"))
+                site.write("content/posts/post-4.md", &listed_post(4, "one"))
             }),
         ],
     );
@@ -3251,8 +3312,8 @@ fn the_starters_posts_and_tags() {
 }
 
 #[test]
-fn the_starters_menu_folders_feed_and_languages() {
-    let site = Site::starter("starter-menu");
+fn the_menu_folders_feed_and_languages() {
+    let site = Site::listing("menu");
     let settings = site.read("statac.yaml");
     let tags = site.read("content/tags.md");
     let home = site.read("content/index.md");
@@ -3319,13 +3380,13 @@ fn the_starters_menu_folders_feed_and_languages() {
             ("the home's title changed", &|site| {
                 site.write(
                     "content/index.md",
-                    &home.replace("greeting:", "title: Home\ngreeting:"),
+                    &home.replace("title: Home\n", "title: Welcome\n"),
                 )
             }),
             ("the home's feed moved", &|site| {
                 site.write(
                     "content/index.md",
-                    &home.replace("greeting:", "feed: news.xml\ngreeting:"),
+                    &home.replace("title: Home\n", "title: Home\nfeed: news.xml\n"),
                 )
             }),
             ("the home as it was", &|site| {

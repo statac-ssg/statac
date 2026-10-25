@@ -1,8 +1,7 @@
 //! Zola's tags in the writing, `{{ name(a="b") }}` and `{% name(a="b") %}`
 //! up to `{% end %}`, and the components that replaced them in Zola 0.23,
 //! `{{ <name a="b" /> }}` and `{% <name a="b"> %}` up to `{% </name> %}`,
-//! each converted where the starter has an equal and otherwise a snippet
-//! call, or left exactly as written; links to a page
+//! each made a snippet call, or left exactly as written; links to a page
 //! by its file, `@/folder/page.md`, made the page's address; and the forms
 //! of Zola's Markdown that Statac's reads differently, counted. Nothing
 //! inside a code block or a code span is converted, but `{{/* name() */}}`,
@@ -49,9 +48,6 @@ pub(super) struct Context<'a> {
     pub main_language: &'a str,
     /// The names the settings give the feeds.
     pub feeds: &'a [String],
-    /// Whether the new site has the starter, whose snippets a call names
-    /// or is kept clear of.
-    pub starter: bool,
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
     pub base: &'a str,
@@ -62,8 +58,6 @@ pub(super) struct Context<'a> {
     /// page, as an `@/` link names it, and the file's path from the page's
     /// folder.
     pub beside: &'a dyn Fn(&str) -> Option<(String, String)>,
-    /// The names of the site's own tags, from its templates.
-    pub own: &'a [String],
     /// The tags some call anywhere in the site wraps writing with.
     pub wrapping: &'a HashSet<String>,
     pub emoji: bool,
@@ -884,32 +878,21 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
                 }
             }
             _ => {
-                // Without the starter there is no snippet for a video to
-                // call, so it is called as any other tag is.
-                let starters = cx.starter && !cx.own.contains(&tag.name);
-                let video = match (starters, tag.name.as_str(), tag.args.as_slice()) {
-                    (true, "youtube" | "vimeo", [(name, Given::Text(id))]) if name == "id" => {
-                        Some(Marked::call(format!("@{}({})", tag.name, quoted(id))))
+                let wraps = cx.wrapping.contains(&tag.name);
+                let alone = opens_line(body, start) && ends_line(body, tag.end);
+                let made = snippet_call(&tag, cx).filter(|_| !wraps || alone);
+                let made = made.map(|(mut text, call)| {
+                    calls.push(Call {
+                        spot: spot(start, written),
+                        ..call
+                    });
+                    if wraps {
+                        text.push_str("\n");
+                        text.push(Marked::call("@end"));
                     }
-                    (true, "youtube" | "vimeo", _) => None,
-                    _ => {
-                        let wraps = cx.wrapping.contains(&tag.name);
-                        let alone = opens_line(body, start) && ends_line(body, tag.end);
-                        let made = snippet_call(&tag, cx).filter(|_| !wraps || alone);
-                        made.map(|(mut text, call)| {
-                            calls.push(Call {
-                                spot: spot(start, written),
-                                ..call
-                            });
-                            if wraps {
-                                text.push_str("\n");
-                                text.push(Marked::call("@end"));
-                            }
-                            text
-                        })
-                    }
-                };
-                match video {
+                    text
+                });
+                match made {
                     Some(text) => replace(&mut out, text, tag.end),
                     None => left(&mut findings),
                 }
@@ -926,10 +909,10 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
     }
 }
 
-/// The snippet a tag's call names: its own name, kept clear of the
-/// starter's where the new site has it.
-pub(super) fn snippet_name(tag: &str, starter: bool) -> String {
-    match (starter && crate::new::has_snippet(tag)) || tag.starts_with('_') {
+/// The snippet a tag's call names: its own name, with `old_` before one
+/// that starts with `_`.
+pub(super) fn snippet_name(tag: &str) -> String {
+    match tag.starts_with('_') {
         true => format!("old_{tag}"),
         false => tag.to_owned(),
     }
@@ -956,7 +939,7 @@ fn snippet_call(tag: &Written, cx: &Context) -> Option<(Marked, Call)> {
         handed.push(format!("{name}={value}"));
         names.push(name.clone());
     }
-    let snippet = snippet_name(&tag.name, cx.starter);
+    let snippet = snippet_name(&tag.name);
     Some((
         Marked::call(format!("@{snippet}({})", handed.join(", "))),
         Call {
@@ -1196,11 +1179,9 @@ mod tests {
             language: "en",
             main_language: "en",
             feeds: &[],
-            starter: true,
             base: "",
             refs: &|_| None,
             beside: &|_| None,
-            own: &[],
             wrapping: &wrapping,
             emoji: false,
         };
@@ -1218,8 +1199,8 @@ mod tests {
             ),
             (
                 "\u{E000}{{ youtube(id=\"\u{E000}\") }}\n",
-                "\u{E000}@youtube('\u{E000}')\n",
-                &["@youtube('\u{E000}')"],
+                "\u{E000}@youtube(id='\u{E000}')\n",
+                &["@youtube(id='\u{E000}')"],
             ),
             (
                 "{% aside(a=\"\u{E001}\") %}\n\u{E000}\n{% end %}\n",
@@ -1249,11 +1230,9 @@ mod tests {
             language: "en",
             main_language: "en",
             feeds: &[],
-            starter: true,
             base: "",
             refs: &|_| None,
             beside: &|_| None,
-            own: &[],
             wrapping: &wrapping,
             emoji: false,
         };
@@ -1323,7 +1302,7 @@ mod tests {
         for reading in [Reading::Tags, Reading::AsWritten] {
             let (writing, found) = converted(body, reading);
             let expected = match reading {
-                Reading::Tags => body.replace("{{ <youtube id=\"a\" /> }}", "@youtube('a')"),
+                Reading::Tags => body.replace("{{ <youtube id=\"a\" /> }}", "@youtube(id='a')"),
                 _ => body.to_owned(),
             };
             assert_eq!(writing, expected, "{reading:?}");
@@ -1332,7 +1311,7 @@ mod tests {
         let (writing, found) = converted(body, Reading::Unknown);
         assert_eq!(
             writing,
-            body.replace("{{ <youtube id=\"a\" /> }}", "@youtube('a')")
+            body.replace("{{ <youtube id=\"a\" /> }}", "@youtube(id='a')")
         );
         let may = TEMPLATE_CODE.heading;
         assert_eq!(
@@ -1441,11 +1420,9 @@ mod tests {
                 language,
                 main_language: "en",
                 feeds: &feeds,
-                starter: true,
                 base,
                 refs: &refs,
                 beside: &|_| None,
-                own: &[],
                 wrapping: &wrapping,
                 emoji: false,
             };

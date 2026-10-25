@@ -85,18 +85,17 @@ const OPTIONS: [(&str, &[&str]); 8] = [
 const WAYS: [&str; 3] = ["auto", "native", "poll"];
 
 /// Options that take no value, and the commands that take each.
-const FLAGS: [(&str, &[&str]); 10] = [
+const FLAGS: [(&str, &[&str]); 6] = [
     ("--drafts", &["build", "check", "search"]),
     ("--json", &["check"]),
     ("--timings", &["build"]),
     ("--no-drafts", &["serve"]),
     ("--offline", &["serve"]),
     ("--yes", &["new"]),
-    ("--cards", &["new"]),
-    ("--update", &["new"]),
-    ("--missing", &["new"]),
-    ("--no-starter", &["new", "import"]),
 ];
+
+/// Options Statac once had for writing its own files into a site.
+const RETIRED_OPTIONS: [&str; 4] = ["--cards", "--update", "--missing", "--no-starter"];
 
 /// Options any command takes, which take no value.
 const QUESTIONS: [&str; 2] = ["--help", "--version"];
@@ -116,7 +115,7 @@ const OTHER_SPELLINGS: [(&str, &str); 7] = [
 const INTRO: &str = "Statac builds a website from a folder of Markdown.\n";
 
 /// Each command's entry on the usage screen, as the screen sets it.
-const USAGE: [(&str, &str); 12] = [
+const USAGE: [(&str, &str); 10] = [
     (
         "build",
         "  statac build [folder]  Read the site and write it out, ready to publish.\n",
@@ -149,25 +148,9 @@ const USAGE: [(&str, &str); 12] = [
     ),
     (
         "new",
-        "  statac new [folder]    Ask five questions and write a new site from the
-                         answers into the folder, which must be empty or
-                         not there yet.
-",
-    ),
-    (
-        "new",
-        "  statac new --cards [folder]
-                         Write the sharing card's settings, background
-                         and fonts into the site, so a card is drawn
-                         for each page.
-",
-    ),
-    (
-        "new",
-        "  statac new --update [folder]
-                         Put the newest version in place of each file
-                         statac new wrote that was never changed, and
-                         show what is new in the others.
+        "  statac new [folder]    Ask four questions and write a new site's settings
+                         from the answers into the folder, which must be
+                         empty or not there yet.
 ",
     ),
     (
@@ -202,7 +185,7 @@ const USAGE: [(&str, &str); 12] = [
 ];
 
 /// Each option's entry on the usage screen, as the screen sets it.
-const OPTION_LINES: [(&str, &str); 18] = [
+const OPTION_LINES: [(&str, &str); 16] = [
     (
         "--site",
         "  --site=<folder>        The site's folder, as the folder after the command
@@ -267,23 +250,10 @@ const OPTION_LINES: [(&str, &str); 18] = [
         "  --yes                  Take every answer statac new offers without asking.\n",
     ),
     (
-        "--missing",
-        "  --missing              For statac new --update, write the files statac
-                         new writes that the site doesn't have.
-",
-    ),
-    (
         "--from",
         "  --from=<tool>          The tool that made the site statac import reads:
                          jekyll, hugo, zola or eleventy. Without it, told
                          from the site's files.
-",
-    ),
-    (
-        "--no-starter",
-        "  --no-starter           For statac new and statac import, leave out the
-                         starter's templates, snippets, stylesheet and
-                         pages, for a site you design yourself.
 ",
     ),
     (
@@ -566,15 +536,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             };
             return import::run(&options, Some(input), terminal.out, terminal.colour_out);
         }
-        Request::New(mut options) => {
-            // A site to write the card's files into is found as the site of
-            // any other command is; where there is none, a new one is made.
-            if options.cards && options.folder.is_none() {
-                let mut site = PathBuf::new();
-                if find_site(&mut site).is_ok() {
-                    options.folder = Some(site);
-                }
-            }
+        Request::New(options) => {
             let stdin = std::io::stdin();
             let answering = std::io::IsTerminal::is_terminal(&stdin);
             let mut reader = stdin.lock();
@@ -585,7 +547,6 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
                 }),
                 locale: new::Locale::of_this_machine(),
                 timezone: new::zone_of_this_machine(),
-                today: new::today_on_this_machine(),
             };
             return new::run(&options, machine, terminal.out, terminal.colour_out);
         }
@@ -733,10 +694,6 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     let mut no_drafts = false;
     let mut offline = false;
     let mut yes = false;
-    let mut update = false;
-    let mut cards = false;
-    let mut missing = false;
-    let mut no_starter = false;
     let mut port = None;
     let mut watch = None;
     let mut language = None;
@@ -818,6 +775,13 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             Some((written_name, value)) => (written_name, Some(value)),
             None => (arg, None),
         };
+        if RETIRED_OPTIONS.contains(&written_name) {
+            mistake(Kind::UnknownOption {
+                written: arg.into(),
+                hint: OptionHint::Retired,
+            });
+            continue;
+        }
         if let Some(&(flag, takers)) = FLAGS.iter().find(|(f, _)| *f == written_name) {
             if value.is_some() {
                 mistake(Kind::UnknownOption {
@@ -846,10 +810,6 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                     "--timings" => &mut timings,
                     "--no-drafts" => &mut no_drafts,
                     "--yes" => &mut yes,
-                    "--update" => &mut update,
-                    "--cards" => &mut cards,
-                    "--missing" => &mut missing,
-                    "--no-starter" => &mut no_starter,
                     _ => &mut offline,
                 };
                 if std::mem::replace(given, true) {
@@ -1010,30 +970,6 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     if known == Some("search") && words.is_none_or(|words| words.trim().is_empty()) {
         problems.push(Problem::nowhere(Kind::NothingToSearch));
     }
-    if missing && !update {
-        problems.push(Problem::nowhere(Kind::UnknownOption {
-            written: "--missing".into(),
-            hint: OptionHint::OnlyWithUpdate,
-        }));
-    }
-    if update && yes {
-        problems.push(Problem::nowhere(Kind::UnknownOption {
-            written: "--yes".into(),
-            hint: OptionHint::NotWithUpdate,
-        }));
-    }
-    if update && cards {
-        problems.push(Problem::nowhere(Kind::UnknownOption {
-            written: "--cards".into(),
-            hint: OptionHint::CardsWithUpdate,
-        }));
-    }
-    if update && no_starter {
-        problems.push(Problem::nowhere(Kind::UnknownOption {
-            written: "--no-starter".into(),
-            hint: OptionHint::NewSiteOnly,
-        }));
-    }
     if known == Some("import") && !old_named {
         problems.push(Problem::nowhere(Kind::MissingFolder));
     }
@@ -1080,19 +1016,12 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             today,
             token: None,
         }),
-        Some("new") => Request::New(new::Options {
-            folder,
-            yes,
-            update: update.then_some(new::update::Update { missing }),
-            cards,
-            no_starter,
-        }),
+        Some("new") => Request::New(new::Options { folder, yes }),
         Some("import") => Request::Import(import::Options {
             old: old.expect("checked above"),
             new: new_folder,
             from,
             today,
-            starter: !no_starter,
         }),
         Some("search") => Request::Search(search::Options {
             site: site.unwrap_or_default(),

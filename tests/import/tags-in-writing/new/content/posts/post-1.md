@@ -24,9 +24,9 @@ puts 1
 - [Relative](/page-1.html)
 - [Absolute](/page-1.html)
 
-@old_note(text='one')
+@note(text='one')
 
-@old_note(kind='two')
+@note(kind='two')
 
 @line_1()
 

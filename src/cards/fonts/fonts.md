@@ -6,77 +6,6 @@ under. Every font here is under the SIL Open Font License, Version 1.1.
 Built with fonttools 4.60.2. Building again from the same upstream files gives
 the same bytes.
 
-## The starter's fonts
-
-The two fonts `statac new --cards` writes into a site as the fonts of its
-sharing cards, each with its licence text beside it. They are in
-`starter/site/templates/og/`, not in this folder.
-
-### starter/site/templates/og/NotoSans-Regular.ttf
-
-Noto Sans Regular, version 2.007, a static font. The upstream file,
-unmodified. 560,092 bytes, 4,702 glyphs, 3,053 mapped characters. Its name
-table gives the version as "Version 2.007" and its unique name as
-"2.007;GOOG;NotoSans-Regular".
-
-- Source: `ofl/notosans/NotoSans-Regular.ttf` in
-  <https://github.com/google/fonts>, at commit
-  `a970ecbe0bf1e6ae5cb22d6abdea672448655f0c`, "Noto Sans: 2.007 added".
-- URL: <https://raw.githubusercontent.com/google/fonts/a970ecbe0bf1e6ae5cb22d6abdea672448655f0c/ofl/notosans/NotoSans-Regular.ttf>
-- SHA-256, upstream and here:
-  `a3c4b14201354e76f360300cccf688162280b90ea1639092f1e76706a040fab4`
-- Copyright: "Copyright 2015-2021 Google LLC. All Rights Reserved."
-- Licence: SIL OFL 1.1, as the font's name table says. The text is
-  `starter/site/templates/og/OFL.txt`, which `statac new --cards` writes
-  beside the font.
-- Reserved Font Name: none declared. The licence file's only notice is that
-  copyright line.
-
-The font's own name table says "Noto is a trademark of Google LLC."
-
-### starter/site/templates/og/OFL.txt
-
-The licence text published beside Noto Sans 2.007, unmodified.
-
-- Source: `ofl/notosans/OFL.txt` at the same commit of
-  <https://github.com/google/fonts>.
-- SHA-256, upstream and here:
-  `3a579abd469a5b75b779f244e4cebcb74451e32154503fce2c8e004d15bc7e98`
-
-### starter/site/templates/og/NotoEmoji.ttf
-
-Noto Emoji, the monochrome emoji font, version 3.002. The upstream file,
-unmodified: only the file name differs. It is a variable font with one axis,
-weight, from 300 to 700 with 400 as the default. 1,891 glyphs, 1,489 mapped
-characters.
-
-- Source: `ofl/notoemoji/NotoEmoji[wght].ttf` in
-  <https://github.com/google/fonts>, at commit
-  `9710da1eacb3be272583c3224dcb70f9da6eadbb`. The file last changed in commit
-  `b979dba422e445492b0eb9951ac52ee0b4d648c3`, "Update Noto Emoji to the 3.002
-  release".
-- URL: <https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/notoemoji/NotoEmoji%5Bwght%5D.ttf>
-- SHA-256, upstream and here:
-  `de6c18832938afc99caf132b39d6a30a19bac7f2e812e28db2535b4608d27551`
-- Copyright: "Copyright 2013 Google LLC"
-- Licence: SIL OFL 1.1. The text is
-  `starter/site/templates/og/NotoEmoji-OFL.txt`, which `statac new --cards`
-  writes beside the font.
-- Reserved Font Name: none declared. The licence file's only notice is
-  "Copyright 2013 Google LLC".
-
-The font's own name table says "Noto is a trademark of Google Inc."
-
-### starter/site/templates/og/NotoEmoji-OFL.txt
-
-The licence text published beside the emoji font, unmodified: only the file
-name differs.
-
-- Source: `ofl/notoemoji/OFL.txt` at the same commit of
-  <https://github.com/google/fonts>.
-- SHA-256, upstream and here:
-  `500bb1ccf43df7bbb522112f9133a52b16e1c35e809632f5d8609b179152de5b`
-
 ## The test fonts
 
 Small subsets of Noto fonts for automated tests. Each is a Modified Version
@@ -97,8 +26,8 @@ pyftsubset SOURCE --output-file=OUTPUT --layout-features=FEATURES \
 Afterwards the names were replaced, the `STAT` table was removed, and name
 records no longer referred to by anything were dropped.
 
-The Japanese and Korean sources are variable fonts. After subsetting, each was
-fixed at weight 400 to make a static font:
+The Japanese, Korean and emoji sources are variable fonts. After subsetting,
+each was fixed at weight 400 to make a static font:
 
 ```
 fonttools varLib.instancer INPUT wght=400 --output=OUTPUT --no-recalc-timestamp
@@ -242,15 +171,46 @@ Family name "Statac Test Korean". 25,844 bytes, 203 glyphs.
   and the conjoining jamo those syllables decompose to:
   `U+1100,U+1103,U+1107,U+1109,U+110B,U+110C,U+1112,U+1161,U+1165,U+1167,U+1169,U+116A,U+116D,U+116E,U+1171,U+1173,U+11A8,U+11AB,U+11AF,U+11BC`
 
+### test/test-emoji.ttf
+
+Family name "Statac Test Emoji". 8,524 bytes, 33 glyphs.
+
+- Source: `ofl/notoemoji/NotoEmoji[wght].ttf`, Noto Emoji version 3.002, the
+  monochrome emoji font, in <https://github.com/google/fonts> at commit
+  `9710da1eacb3be272583c3224dcb70f9da6eadbb`. The file last changed in commit
+  `b979dba422e445492b0eb9951ac52ee0b4d648c3`, "Update Noto Emoji to the 3.002
+  release".
+- URL: <https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/notoemoji/NotoEmoji%5Bwght%5D.ttf>
+- SHA-256 of the upstream font:
+  `de6c18832938afc99caf132b39d6a30a19bac7f2e812e28db2535b4608d27551`
+- SHA-256 of this file:
+  `ec0a0fa426524c766ae9f2efa19187b7f10da2055c152c89421053f4ae17f62f`
+- Copyright: "Copyright 2013 Google LLC"
+- Licence: SIL OFL 1.1. The text is `test/OFL.txt`. The upstream text is
+  `ofl/notoemoji/OFL.txt` at the same commit, SHA-256
+  `500bb1ccf43df7bbb522112f9133a52b16e1c35e809632f5d8609b179152de5b`.
+- Reserved Font Name: none declared. The licence file's only notice is that
+  copyright line.
+- Layout features: `*`. The subset keeps the `ccmp` substitutions that make
+  a keycap of a digit, `#` or `*` and the keycap mark.
+- Characters:
+  `U+0020,U+0023,U+002A,U+0030-0039,U+200D,U+20E3,U+2764,U+FE0E,U+FE0F,U+1F600,U+1F97E`.
+  That is the space; `#`, `*` and the digits, which the font has only as the
+  bases of keycaps; the zero-width joiner; the combining keycap mark; the
+  heavy black heart; the two variation selectors; the grinning face; and the
+  hiking boot.
+
+The font's own name table says "Noto is a trademark of Google Inc."
+
 ### test/OFL.txt
 
-One licence file for the five test fonts. It is the first line of each of the
-three upstream licence files, which are their copyright notices, followed by
+One licence file for the six test fonts. It is the first line of each of the
+four upstream licence files, which are their copyright notices, followed by
 the Noto Sans licence file from its second line on.
 
-SHA-256: `af84472f3fd4e9846284fc10db42e03c2b79db740c38aca5daf02ebcf662a5e5`
+SHA-256: `fca69e23ed111974f41b421df664e245b82d7bc4a0fbcbc65627177819336e09`
 
-The three upstream files are the same from the second line on, except that
+The four upstream files are the same from the second line on, except that
 the Noto Sans Arabic one gives the address of the FAQ as
 `https://openfontlicense.org` where the others give
 `https://scripts.sil.org/OFL`.
@@ -260,3 +220,4 @@ the Noto Sans Arabic one gives the address of the FAQ as
 | `OFL.txt` in `NotoSans-v2.015.zip` | `cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a` |
 | `OFL.txt` in `NotoSansArabic-v2.013.zip` | `a7a5a25eb188bf1cd96982030d53e23c33485c69b1044a562254226857ee13af` |
 | `ofl/notosansjp/OFL.txt` and `ofl/notosanskr/OFL.txt` | `1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9` |
+| `ofl/notoemoji/OFL.txt` | `500bb1ccf43df7bbb522112f9133a52b16e1c35e809632f5d8609b179152de5b` |

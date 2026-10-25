@@ -17,4 +17,4 @@ A post linking to others by ref and relref, in a site under a path.
 
 The heading a link on this page lands on.
 
-@figure('/images/photo-1.jpg', alt='A picture named with the path the site is under')
+@figure(src='/blog/images/photo-1.jpg', alt='A picture named with the path the site is under')

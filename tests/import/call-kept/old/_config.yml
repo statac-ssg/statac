@@ -1,0 +1,4 @@
+title: Site 1
+url: https://example.org
+timezone: UTC
+plugins: [jekyll-redirect-from, jekyll-sitemap]

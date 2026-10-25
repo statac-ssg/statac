@@ -306,17 +306,6 @@ pub struct Format {
     words: DateWords,
 }
 
-/// A format's day written shorter, each an example for the `date` filter.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Shorter {
-    /// The day, the month and the year.
-    pub short: String,
-    /// The day and the month.
-    pub day: String,
-    /// The day, the month and the year, then the time.
-    pub stamp: String,
-}
-
 impl Format {
     /// Reads an example a template hands the `date` filter. It may ask for
     /// any piece alone, but a day and a year with no month between them is
@@ -781,62 +770,6 @@ impl Format {
             weekday: WEEKDAY,
             time: None,
         })
-    }
-
-    /// This format's day three shorter ways, in its own order, or none
-    /// where it writes a time or the pieces don't come apart cleanly. No
-    /// weekday is written, and a month in words is in the language's short
-    /// ones where it has them.
-    pub fn shorter(&self) -> Option<Shorter> {
-        if self.wants_time() {
-            return None;
-        }
-        let mut short = self.clone();
-        short.leave_out(Piece::Weekday)?;
-        let shortened = Component::Month {
-            form: MonthForm::Short,
-            case: Case::Kept,
-        };
-        if shortened.unwritable(true, &self.words.words).is_none() {
-            for part in &mut short.parts {
-                if let Part::Component(Component::Month { form, .. }) = part
-                    && *form == MonthForm::Full
-                {
-                    *form = MonthForm::Short;
-                }
-            }
-        }
-        let mut day = short.clone();
-        day.leave_out(Piece::Year)?;
-        let clock = in_digits(&format!("{HOUR}:{MINUTE:02}"), short.digits());
-        let stamp = match short.day_padded() {
-            true => format!("{} {clock}", short.shown()),
-            false => format!("{}, {clock}", short.shown()),
-        };
-        Some(Shorter {
-            short: short.shown(),
-            day: day.shown(),
-            stamp,
-        })
-    }
-
-    /// Takes `piece` out where it opens or closes the format, with the
-    /// text between it and the rest. None where it stands inside.
-    fn leave_out(&mut self, piece: Piece) -> Option<()> {
-        let is = |part: &Part| matches!(part, Part::Component(c) if c.piece() == piece);
-        let Some(at) = self.parts.iter().position(is) else {
-            return Some(());
-        };
-        let literal = |at: usize| matches!(self.parts.get(at), Some(Part::Literal(_)));
-        let range = match at {
-            0 if literal(1) => 0..2,
-            0 => 0..1,
-            _ if at + 1 == self.parts.len() && literal(at - 1) => at - 1..at + 1,
-            _ if at + 1 == self.parts.len() => at..at + 1,
-            _ => return None,
-        };
-        self.parts.drain(range);
-        Some(())
     }
 
     /// Which parts a date with no time of day leaves out: every piece of

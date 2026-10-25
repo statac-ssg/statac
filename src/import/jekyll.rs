@@ -17,7 +17,7 @@ use super::inside;
 use super::report::code;
 use super::{
     Failed, Field, Finding, FindingKind, HomePages, Import, Left, Page, PageKind, Value,
-    left_behind, one_home_page, yaml,
+    one_home_page, yaml,
 };
 use crate::date::{self, Date};
 use crate::origin::Style as Written;
@@ -91,9 +91,6 @@ const JEKYLLS_OWN: &[&str] = &[
 /// The plugins whose work Statac does.
 const PLUGINS_WITH_AN_EQUAL: &[&str] = &["jekyll-feed", "jekyll-redirect-from", "jekyll-paginate"];
 
-/// The plugins whose work the starter's pages and templates do.
-const PLUGINS_THE_STARTER_DOES: &[&str] = &["jekyll-sitemap", "jekyll-seo-tag"];
-
 /// The names a template's loop over the site's writing reads, which mark a
 /// page as the templates' work rather than writing.
 const LISTING: &[&str] = &[
@@ -162,13 +159,6 @@ pub(super) static ATTRIBUTE_LINES: FindingKind = FindingKind {
 };
 
 pub(super) static TOC: FindingKind = FindingKind {
-    heading: "Tables of contents written in Markdown",
-    sentence: "Statac's Markdown reads `{:toc}` as words: take it and the list above it out, and \
-               write `contents: true` in the page's front matter, which the starter's post \
-               template reads to show a table of contents.",
-};
-
-pub(super) static TOC_NO_STARTER: FindingKind = FindingKind {
     heading: "Tables of contents written in Markdown",
     sentence: "Statac's Markdown reads `{:toc}` as words: take it and the list above it out. A \
                template can show the page's headings from `page.toc`, as \
@@ -489,26 +479,18 @@ fn has_front_matter(bytes: &[u8]) -> bool {
     bytes.starts_with(b"---") && line.trim_ascii_end() == b"---" && bytes.len() > line.len()
 }
 
-/// Reads the site in `folder`, for a new site with the starter where
-/// `starter` says.
-pub(super) fn read(
-    folder: &Path,
-    today: Date,
-    given: Option<&str>,
-    starter: bool,
-) -> Result<Import, Box<Failed>> {
+/// Reads the site in `folder`.
+pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
     let mut import = Import::default();
     let mut reader = Reader {
         folder,
         given,
-        starter,
         import: &mut import,
         settings: Settings::default(),
         docs: Vec::new(),
         today,
         layouts: 0,
         utc_dates: 0,
-        contents: 0,
     };
     reader.settings()?;
     reader.walk("")?;
@@ -554,8 +536,6 @@ struct Reader<'a> {
     /// The site's address as the author gave it, for settings that give
     /// none.
     given: Option<&'a str>,
-    /// Whether the new site has the starter.
-    starter: bool,
     import: &'a mut Import,
     settings: Settings,
     docs: Vec<Doc>,
@@ -564,8 +544,6 @@ struct Reader<'a> {
     layouts: usize,
     /// How many dates were written with a time and no offset.
     utc_dates: usize,
-    /// How many pages had `toc: true` made `contents: true`.
-    contents: usize,
 }
 
 impl Reader<'_> {
@@ -666,7 +644,6 @@ impl Reader<'_> {
                 }
             }
         };
-        let starter = self.starter;
         let s = &mut self.settings;
         let mut values = Vec::new();
         let mut left = Vec::new();
@@ -737,9 +714,7 @@ impl Reader<'_> {
                         if plugin == "jekyll-feed" {
                             s.feed = true;
                         }
-                        let equal = PLUGINS_WITH_AN_EQUAL.contains(&plugin.as_str())
-                            || starter && PLUGINS_THE_STARTER_DOES.contains(&plugin.as_str());
-                        if !equal {
+                        if !PLUGINS_WITH_AN_EQUAL.contains(&plugin.as_str()) {
                             left.push((format!("{key}: {plugin}"), line));
                         }
                     }
@@ -987,30 +962,15 @@ impl Reader<'_> {
                     continue;
                 }
                 let s = &self.settings;
-                let starter = self.starter;
                 let special = [
-                    (
-                        s.layouts_dir.as_str(),
-                        left_behind(
-                            "the old site's layouts",
-                            "the starter's templates take",
-                            starter,
-                        ),
-                    ),
+                    (s.layouts_dir.as_str(), "the old site's layouts".to_owned()),
                     (
                         s.includes_dir.as_str(),
                         "the old site's includes; each one the content calls has a snippet of its \
                          name standing for it"
                             .to_owned(),
                     ),
-                    (
-                        "_sass",
-                        left_behind(
-                            "the old site's Sass",
-                            "the starter's `assets/site.css` takes",
-                            starter,
-                        ),
-                    ),
+                    ("_sass", "the old site's Sass".to_owned()),
                     (
                         s.plugins_dir.as_str(),
                         "the old site's plugins, which Statac doesn't run".to_owned(),
@@ -1539,7 +1499,6 @@ impl Reader<'_> {
         let mut has_summary = fields.iter().any(|(n, _, _)| n == "summary");
         let has_description = fields.iter().any(|(n, _, _)| n == "description");
         let has_updated = fields.iter().any(|(n, _, _)| n == "updated");
-        let has_contents = fields.iter().any(|(n, _, _)| n == "contents");
         let mut layout = false;
         let mut draft_written = false;
         for (name, value, line) in fields {
@@ -1547,10 +1506,6 @@ impl Reader<'_> {
                 "layout" => layout = true,
                 // Its work is done once the separators are converted.
                 "excerpt_separator" => {}
-                "toc" if self.starter && value == Value::Truth(true) && !has_contents => {
-                    out.push(Field::new("contents", value, line));
-                    self.contents += 1;
-                }
                 "permalink" => {}
                 "redirect_from" => others.extend(texts_of(&value)),
                 "published" => {
@@ -1679,7 +1634,6 @@ impl Reader<'_> {
                 links: &links,
                 separator: doc.separator.as_deref(),
                 page: &doc.plain,
-                starter: self.starter,
             };
             let converted = liquid::convert(&doc.body, doc.body_line, &doc.from, &cx);
             self.import.findings.extend(converted.findings);
@@ -1753,23 +1707,9 @@ impl Reader<'_> {
         let layouts = self.layouts;
         if layouts > 0 {
             self.note(format!(
-                "`layout` was taken off {}: each is built with the {}template for its kind, as \
+                "`layout` was taken off {}: each is built with the template for its kind, as \
                  https://statac.dev/templates/ describes.",
                 match layouts {
-                    1 => "1 page".to_owned(),
-                    n => format!("{n} pages"),
-                },
-                match self.starter {
-                    true => "starter's ",
-                    false => "",
-                }
-            ));
-        }
-        if self.contents > 0 {
-            self.note(format!(
-                "`toc: true` is now `contents: true` on {}, which the starter's post template \
-                 reads to show a table of contents.",
-                match self.contents {
                     1 => "1 page".to_owned(),
                     n => format!("{n} pages"),
                 }
@@ -1847,7 +1787,7 @@ impl Reader<'_> {
             "The old site's home page showed its posts {per_page} to a page. {}, and the posts' \
              list page shows them {per_page} to a page, as `posts_per_page` in `statac.yaml` says \
              for every list: see https://statac.dev/lists/#pages-of-a-list.",
-            one_home_page(self.starter, true)
+            one_home_page(true)
         ));
         self.import.home_pages = Some(HomePages {
             per_page,

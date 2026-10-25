@@ -549,17 +549,9 @@ Usage:
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
                          the site's .statac/token.
-  statac new [folder]    Ask five questions and write a new site from the
-                         answers into the folder, which must be empty or
-                         not there yet.
-  statac new --cards [folder]
-                         Write the sharing card's settings, background
-                         and fonts into the site, so a card is drawn
-                         for each page.
-  statac new --update [folder]
-                         Put the newest version in place of each file
-                         statac new wrote that was never changed, and
-                         show what is new in the others.
+  statac new [folder]    Ask four questions and write a new site's settings
+                         from the answers into the folder, which must be
+                         empty or not there yet.
   statac import <folder> [new folder]
                          Write a new site from a site another tool made,
                          into the new folder, which must be empty or not
@@ -599,14 +591,9 @@ Options:
                          refresh does, after the first build with no
                          errors.
   --yes                  Take every answer statac new offers without asking.
-  --missing              For statac new --update, write the files statac
-                         new writes that the site doesn't have.
   --from=<tool>          The tool that made the site statac import reads:
                          jekyll, hugo, zola or eleventy. Without it, told
                          from the site's files.
-  --no-starter           For statac new and statac import, leave out the
-                         starter's templates, snippets, stylesheet and
-                         pages, for a site you design yourself.
   --port=<number>        The port statac serve answers on. Without it,
                          3000, or the next port that is free.
   --watch=<way>          How statac serve learns of a save: native, by
@@ -703,9 +690,7 @@ fn each_commands_screen_is_the_whole_screens_lines_for_it() {
         }
     }
     let (new, _, _) = ran(&["new", "--help"]);
-    assert!(new.contains("  statac new --update [folder]\n"), "{new}");
-    assert!(new.contains("  statac new --cards [folder]\n"), "{new}");
-    assert!(new.contains("  --missing  "), "{new}");
+    assert!(new.contains("  --yes  "), "{new}");
     assert!(!new.contains("  --site="), "{new}");
 }
 
@@ -921,175 +906,77 @@ error  Option given twice: `--port`
 }
 
 #[test]
-fn new_takes_update_for_and_missing_alone_and_together() {
-    let new = |folder: Option<&str>, update| {
-        Ok(Request::New(new::Options {
-            folder: folder.map(PathBuf::from),
-            yes: false,
-            update,
-            cards: false,
-            no_starter: false,
-        }))
-    };
-    let update = |missing| Some(new::update::Update { missing });
-    assert_eq!(parsed(&["new", "--update"]), new(None, update(false)));
-    assert_eq!(
-        parsed(&["new", "site-1", "--update"]),
-        new(Some("site-1"), update(false))
-    );
-    assert_eq!(
-        parsed(&["new", "--update", "--missing"]),
-        new(None, update(true))
-    );
-    assert_eq!(
-        parsed(&["--update", "new", "--missing", "site-1"]),
-        new(Some("site-1"), update(true))
-    );
-    assert_eq!(parsed(&["new", "site-1"]), new(Some("site-1"), None));
-}
-
-#[test]
-fn missing_without_update_and_yes_with_it_are_refused() {
-    assert_eq!(
-        refused(&["new", "--missing", "--yes"]),
-        "\
-error  Unknown option: `statac new` takes `--missing` only with `--update`
-  Add `--update`, or leave `--missing` out.
-  More: https://statac.dev/e/unknown-option/
-"
-    );
-    assert_eq!(
-        refused(&["new", "--update", "--yes"]),
-        "\
-error  Unknown option: `statac new --update` has no `--yes`
-  `--update` asks nothing, so leave `--yes` out.
-  More: https://statac.dev/e/unknown-option/
-"
-    );
-    assert_eq!(
-        parsed(&["new", "--update", "--update"]),
-        Err(vec![Kind::OptionGivenTwice {
-            option: "--update".into()
-        }])
-    );
-    for (option, takers) in [
-        ("--update", ["new"]),
-        ("--missing", ["new"]),
-        ("--cards", ["new"]),
-    ] {
-        assert_eq!(
-            parsed(&["build", option]),
-            Err(vec![Kind::UnknownOption {
-                written: option.into(),
-                hint: OptionHint::ForOther {
-                    command: "build".into(),
-                    option: option.into(),
-                    takers: Box::new(takers),
-                },
-            }])
-        );
-    }
-}
-
-#[test]
-fn new_takes_cards_with_a_folder_or_none_and_never_with_update() {
+fn new_takes_a_folder_and_yes() {
     let new = |folder: Option<&str>, yes| {
         Ok(Request::New(new::Options {
             folder: folder.map(PathBuf::from),
             yes,
-            update: None,
-            cards: true,
-            no_starter: false,
         }))
     };
-    assert_eq!(parsed(&["new", "--cards"]), new(None, false));
+    assert_eq!(parsed(&["new"]), new(None, false));
+    assert_eq!(parsed(&["new", "site-1"]), new(Some("site-1"), false));
     assert_eq!(
-        parsed(&["--cards", "new", "site-1", "--yes"]),
+        parsed(&["--yes", "new", "site-1"]),
         new(Some("site-1"), true)
     );
     assert_eq!(
-        refused(&["new", "--cards", "--update"]),
-        "\
-error  Unknown option: `statac new --update` has no `--cards`
-  Run `statac new --cards` by itself.
-  More: https://statac.dev/e/unknown-option/
-"
-    );
-    assert_eq!(
-        refused(&["new", "--cards", "--missing"]),
-        "\
-error  Unknown option: `statac new` takes `--missing` only with `--update`
-  Add `--update`, or leave `--missing` out.
-  More: https://statac.dev/e/unknown-option/
-"
-    );
-    assert_eq!(
-        parsed(&["new", "--cards", "--cards"]),
-        Err(vec![Kind::OptionGivenTwice {
-            option: "--cards".into()
-        }])
-    );
-}
-
-#[test]
-fn new_and_import_take_no_starter_and_no_other_command_does() {
-    let import = |starter| {
+        parsed(&["import", "old-1", "new-1"]),
         Ok(Request::Import(import::Options {
             old: PathBuf::from("old-1"),
             new: Some(PathBuf::from("new-1")),
             from: None,
             today: None,
-            starter,
         }))
-    };
-    assert_eq!(parsed(&["import", "old-1", "new-1"]), import(true));
-    assert_eq!(
-        parsed(&["import", "--no-starter", "old-1", "new-1"]),
-        import(false)
     );
-    assert_eq!(
-        parsed(&["--no-starter", "import", "old-1", "new-1"]),
-        import(false)
-    );
-    assert_eq!(
-        parsed(&["import", "old-1", "--no-starter", "--no-starter"]),
-        Err(vec![Kind::OptionGivenTwice {
-            option: "--no-starter".into()
+}
+
+#[test]
+fn the_options_for_writing_statacs_own_files_into_a_site_are_refused_with_why() {
+    let retired = |option: &str| {
+        Err(vec![Kind::UnknownOption {
+            written: option.into(),
+            hint: OptionHint::Retired,
         }])
-    );
+    };
+    for option in ["--update", "--missing", "--cards", "--no-starter"] {
+        for args in [
+            &["new", option][..],
+            &[option, "new", "site-1"],
+            &["import", "old-1", option],
+            &["build", option],
+        ] {
+            assert_eq!(parsed(args), retired(option), "{args:?}");
+        }
+    }
+    assert_eq!(parsed(&["new", "--update=yes"]), retired("--update=yes"));
     assert_eq!(
-        parsed(&["new", "--no-starter", "site-1"]),
-        Ok(Request::New(new::Options {
-            folder: Some(PathBuf::from("site-1")),
-            yes: false,
-            update: None,
-            cards: false,
-            no_starter: true,
-        }))
-    );
-    assert_eq!(
-        refused(&["build", "--no-starter"]),
+        refused(&["new", "--update"]),
         "\
-error  Unknown option: `statac build` has no `--no-starter`
-  `--no-starter` is for `statac new` and `statac import`.
+error  Unknown option: `--update`
+  Statac no longer writes templates into a site: see https://statac.dev/templates/.
   More: https://statac.dev/e/unknown-option/
 "
     );
     assert_eq!(
-        refused(&["new", "--update", "--no-starter"]),
+        refused(&["import", "old-1", "--no-starter"]),
         "\
 error  Unknown option: `--no-starter`
-  `--update` works on the site that is here, so leave `--no-starter` out.
+  Statac no longer writes templates into a site, so leave `--no-starter` out.
   More: https://statac.dev/e/unknown-option/
 "
     );
     assert_eq!(
-        refused(&["import", "old-1", "--no-starter=true"]),
-        "\
-error  Unknown option: `--no-starter=true`
-  Did you mean `--no-starter`?
-  More: https://statac.dev/e/unknown-option/
-"
+        parsed(&["new", "--cards", "--missing"]),
+        Err(vec![
+            Kind::UnknownOption {
+                written: "--cards".into(),
+                hint: OptionHint::Retired,
+            },
+            Kind::UnknownOption {
+                written: "--missing".into(),
+                hint: OptionHint::Retired,
+            },
+        ])
     );
 }
 

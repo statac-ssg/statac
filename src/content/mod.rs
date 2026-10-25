@@ -484,7 +484,8 @@ pub(crate) fn renamed_to(rel: String, renamed: &[(String, String)]) -> String {
 
 /// The folders at the top of `content/` that hold a language's pages, on a
 /// site in several languages: each named exactly by a declared tag. A
-/// language other than the main one with no folder is warned of, at its tag.
+/// language other than the main one with no folder is warned of, at its
+/// tag, once the site has a page to be published in some language.
 fn language_folders(
     site: &Site,
     settings: &Settings,
@@ -494,6 +495,7 @@ fn language_folders(
     if site.languages.len() < 2 {
         return Vec::new();
     }
+    let has_pages = folders.iter().any(|folder| !folder.writing.is_empty());
     let mut found = Vec::new();
     for ((id, language), written) in site.languages.iter().zip(settings.languages()) {
         let Some(tag) = &language.tag else {
@@ -502,7 +504,7 @@ fn language_folders(
         let rel = format!("{tag}/");
         if folders.iter().any(|folder| folder.rel == rel) {
             found.push((rel, id));
-        } else if id.index() > 0 {
+        } else if id.index() > 0 && has_pages {
             let kind = Kind::NoPagesInLanguage { tag: tag.clone() };
             problems.push(match written.origin.place {
                 Some(place) => Problem::at(kind, place),

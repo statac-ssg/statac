@@ -381,50 +381,11 @@ fn list() -> String {
         "# What Statac carries\n\n\
          Written by `cargo run --example third_party`.\n\n\
          Statac's own code is offered under MIT or Apache-2.0, at your choice. \
-         A built `statac` and a site `statac new` makes also carry other \
-         people's work, and each piece keeps its own licence. This is all of \
+         A built `statac` also carries other people's work, and each piece \
+         keeps its own licence. This is all of \
          it. A number in square brackets is a text under \
          [Licence texts](#licence-texts), where each text is given once.\n",
     );
-
-    out.push_str(
-        "\n## In every new site\n\n\
-         - The sample photographs, the recording and the video a new site \
-         starts with, kept here under `starter/site/content/`, are Statac's \
-         own. Each was made for it by a program: none is a picture or a \
-         recording of anything, and none holds anyone else's work. They are \
-         offered as Statac is, under MIT or Apache-2.0.\n",
-    );
-
-    out.push_str("\n## In a site that turns sharing cards on\n\n");
-    let font = texts.file(
-        "Noto Sans, `templates/og/OFL.txt` in a site that turns sharing cards on".to_owned(),
-        &root().join("starter/site/templates/og/OFL.txt"),
-    );
-    writeln!(
-        out,
-        "- Noto Sans, the font of the sharing cards, written as \
-         `templates/og/NotoSans-Regular.ttf`: SIL Open Font License 1.1. \
-         `statac new --cards` writes the licence beside the font, as \
-         `templates/og/OFL.txt`. [{font}] Its source is recorded in \
-         `src/cards/fonts/fonts.md`."
-    )
-    .unwrap();
-
-    let emoji = texts.file(
-        "Noto Emoji, `templates/og/NotoEmoji-OFL.txt` in a site that turns sharing cards on"
-            .to_owned(),
-        &root().join("starter/site/templates/og/NotoEmoji-OFL.txt"),
-    );
-    writeln!(
-        out,
-        "- Noto Emoji, the font of the emoji on the sharing cards, written as \
-         `templates/og/NotoEmoji.ttf`: SIL Open Font License 1.1. \
-         `statac new --cards` writes the licence beside the font, as \
-         `templates/og/NotoEmoji-OFL.txt`. [{emoji}] Its source is recorded in \
-         `src/cards/fonts/fonts.md`."
-    )
-    .unwrap();
 
     out.push_str("\n## In the binary\n");
     out.push_str("\n### Words for dates\n\n");

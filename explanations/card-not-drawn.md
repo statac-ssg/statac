@@ -42,11 +42,10 @@ at the top and bottom.
 
 If no font has a character, add a font that has it to the fonts the
 message names: the card's `font`, or a text's own, such as `title.font`.
-Fonts are tried in the order they are written. `statac new --cards`
-writes two: Noto Sans for text and Noto Emoji for emoji. If one of these
-has the character but isn't in `templates/og/`, the message says so. Run
-`statac new --update --missing` to write the font again, then add it to
-those fonts.
+Fonts are tried in the order they are written. If a font in
+`templates/og/` that the list doesn't name has every character missing,
+the message names it. Otherwise, put the file of a font that has them in
+`templates/og/`, such as an emoji font for emoji, and add it to the list.
 
 To share a page with an image of your own instead, give that image in
 the page's `og_image`.

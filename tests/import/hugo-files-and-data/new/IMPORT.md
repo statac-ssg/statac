@@ -1,21 +1,17 @@
 This site was imported from a Hugo site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/hugo-files-and-data/old` by `statac import`, which changed nothing there. The templates, snippets and stylesheet are Statac's starter, as `statac new` writes it: see https://statac.dev/new/.
+It was made from `tests/import/hugo-files-and-data/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/. Its pages and feeds need `templates/feed.xml`.
 
 ## What came across
 
 - 1 post, into `content/posts/`.
 - 5 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page had no content of its own, so the starter's home page stays, listing the posts: `content/index.md`.
-
-The starter's `content/robots.md` was left out: the old site's `static/robots.txt` is published at its URL.
+The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
 `data/links.toml` was written in TOML, which Statac doesn't read in `data/`, so it is written as YAML, holding the same values, in `data/links.yaml`.
 
-Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each is now an Atom feed at the same URL, written by `templates/feed.xml`, as `feed: index.xml` on each list page says, and `feed_ids_before` keeps each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
-
-`content/posts/index.md` cascades `pages.layout: post`, so the pages beneath it, every one dated, are built with the starter's template for posts.
+Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each stays at the same URL, as `feed: index.xml` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` keeps each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
 
 Hugo made a list of each folder at the top of the content folder, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
 
@@ -27,11 +23,6 @@ url: https://example.org
 language: en
 timezone: UTC
 date_format: 31 December 2025
-date_short: 31 Dec 2025
-date_day: 31 Dec
-date_stamp: 31 Dec 2025, 15:04
-tags.pages: true
-series.pages: true
 feed_ids_before: 2026-10-06
 posts_per_page: 10
 ```
@@ -64,15 +55,16 @@ Statac reads data files written in YAML or JSON, and writes those in TOML as YAM
 Statac left these behind, and the new site has nothing of them:
 
 - `archetypes/`: the old site's patterns for new pages, which Statac has no equal for.
-- `assets/`: the files Hugo's templates worked on, such as stylesheets, which the starter's `assets/site.css` takes the place of.
+- `assets/`: the files Hugo's templates worked on, such as stylesheets.
 - `go.mod`: a file Hugo doesn't publish.
-- `i18n/`: the translations the old site's templates showed in each language, which the starter's `data/words.yaml` takes the place of.
-- `layouts/`: the old site's layouts, which the starter's templates take the place of.
+- `i18n/`: the translations the old site's templates showed in each language.
+- `layouts/`: the old site's layouts.
 - `resources/`: the files Hugo kept from earlier builds.
-- `themes/`: the old site's themes, which the starter's templates, snippets and stylesheet take the place of.
+- `themes/`: the old site's themes.
 
 ## What to do next
 
-1. Run `statac check` in this folder, and put right what it shows.
-2. Run `statac serve`, and read the site in a browser beside the old one.
-3. Once nothing here is left to do, delete `IMPORT.md`.
+1. Add your own templates to `templates/`.
+2. Run `statac check` in this folder, and put right what it shows.
+3. Run `statac serve`, and read the site in a browser beside the old one.
+4. Once nothing here is left to do, delete `IMPORT.md`.

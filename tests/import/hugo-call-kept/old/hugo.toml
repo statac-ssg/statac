@@ -1,0 +1,4 @@
+baseURL = "https://example.org/"
+title = "Site 1"
+languageCode = "en"
+timeZone = "UTC"

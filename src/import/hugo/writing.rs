@@ -1,6 +1,6 @@
 //! Hugo's tags in the writing, `{{< name >}}` and `{{% name %}}`, each
-//! converted where Statac's writing or the starter has an equal and
-//! otherwise left exactly as written, and the forms of Hugo's Markdown that
+//! converted where Statac's writing has an equal, made a snippet call
+//! where it can be, and otherwise left exactly as written, and the forms of Hugo's Markdown that
 //! Statac's reads differently, counted. Nothing inside a code block or a
 //! code span is converted, but `{{</* name */>}}`, Hugo's way of showing a
 //! tag as text, is the tag as text wherever it stands.
@@ -11,8 +11,8 @@ use std::ops::Range;
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 
 use super::{
-    ATTRIBUTE_LINES, CODE_OPTIONS, EMOJI, FIGURE_HTML, LINK_NOWHERE, RAW_HTML, SUMMARY_CUT,
-    TAG_IN_ADDRESS, TAG_IN_CODE, TAG_LEFT,
+    ATTRIBUTE_LINES, CODE_OPTIONS, EMOJI, LINK_NOWHERE, RAW_HTML, SUMMARY_CUT, TAG_IN_ADDRESS,
+    TAG_IN_CODE, TAG_LEFT,
 };
 use crate::html::escaped;
 use crate::import::common::{emoji_names, ends_line, opens_line};
@@ -22,9 +22,6 @@ use crate::import::{Finding, Spot};
 
 /// What the writing's tags are converted with.
 pub(super) struct Context<'a> {
-    /// Whether the new site has the starter, whose snippets a call names
-    /// or is kept clear of.
-    pub starter: bool,
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
     pub base: &'a str,
@@ -35,9 +32,6 @@ pub(super) struct Context<'a> {
     pub refs: &'a dyn Fn(&str, Option<&str>) -> Option<String>,
     /// A value of the page's own, or else the site's, by its name.
     pub param: &'a dyn Fn(&str) -> Option<String>,
-    /// Whether a picture a `figure` names is one of the site's, and a
-    /// photograph, which the starter's `figure` snippet shows.
-    pub picture: &'a dyn Fn(&str) -> bool,
     /// The names of the site's own tags, from its layouts.
     pub own: &'a [String],
     /// The site's own tags that are nothing but one of the site's values,
@@ -181,12 +175,6 @@ pub(super) struct Converted {
     /// Where each snippet call written here starts, and each `@end`, in
     /// order.
     pub called: Vec<usize>,
-    /// How many figures had a title, now at the start of the caption.
-    pub titles: usize,
-    /// How many figures became calls.
-    pub figures: usize,
-    /// How many of those had a class or a size taken off.
-    pub plainer: usize,
     /// How many tags of the site's own were written as the site value
     /// they stand for.
     pub valued: usize,
@@ -199,6 +187,8 @@ const POSITIONS: &[(&str, &[&str])] = &[
     ("tweet", &["id"]),
     ("x", &["user", "id"]),
     ("qr", &["text"]),
+    ("vimeo", &["id"]),
+    ("youtube", &["id"]),
 ];
 
 /// A tag as written.
@@ -378,15 +368,6 @@ pub(super) fn paired(body: &str) -> Vec<String> {
     names
 }
 
-/// The ranges of `text` Markdown reads as blocks of HTML.
-fn html_ranges(text: &str) -> Vec<Range<usize>> {
-    Parser::new_ext(text, options())
-        .into_offset_iter()
-        .filter(|(event, _)| matches!(event, Event::Start(Tag::HtmlBlock)))
-        .map(|(_, range)| range)
-        .collect()
-}
-
 /// What a tag left open stands for when its closing tag comes.
 enum Open {
     End,
@@ -424,13 +405,6 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
         false => code_ranges(body),
     };
     let mut calls = Vec::new();
-    let html_blocks = match cx.html {
-        true => Vec::new(),
-        false => html_ranges(body),
-    };
-    let mut titles = 0;
-    let mut figures = 0;
-    let mut plainer = 0;
     let mut valued = 0;
     let mut out = Marked::default();
     let mut open: Vec<(String, Open)> = Vec::new();
@@ -482,9 +456,6 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
         let own = cx.own.contains(&tag.name);
         let builtin = match tag.name.as_str() {
             _ if own => "",
-            // Without the starter there is no snippet for these to call, so
-            // each is called as any other tag is.
-            "figure" | "youtube" | "vimeo" if !cx.starter => "",
             name => name,
         };
         let value = cx.values.iter().find(|(name, _)| *name == tag.name);
@@ -512,28 +483,6 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
             continue;
         }
         let done = match builtin {
-            "figure" if closing.is_none() => {
-                figure(&tag, cx, within(&html_blocks, start)).map(|figure| {
-                    titles += usize::from(figure.titled);
-                    plainer += usize::from(figure.plainer);
-                    match figure.html {
-                        true => findings.push(finding(&FIGURE_HTML, spot(start, written))),
-                        false => figures += 1,
-                    }
-                    (figure.text, tag.end)
-                })
-            }
-            "youtube" | "vimeo" if closing.is_none() => {
-                let id = match tag.args.as_slice() {
-                    [(None, id)] => Some(id),
-                    [(Some(name), id)] if name == "id" => Some(id),
-                    _ => None,
-                };
-                id.map(|id| {
-                    let call = format!("@{}({})", tag.name, quoted(id));
-                    (Marked::call(call), tag.end)
-                })
-            }
             "ref" | "relref" if closing.is_none() => match referred(&tag, cx) {
                 Some(Some(address)) => Some((address.into(), tag.end)),
                 Some(None) => {
@@ -577,7 +526,7 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
                 [(None | Some(_), name)] => (cx.param)(name).map(|value| (value.into(), tag.end)),
                 _ => None,
             },
-            "figure" | "youtube" | "vimeo" | "ref" | "relref" | "param" => None,
+            "ref" | "relref" | "param" => None,
             _ => snippet_call(&tag, body, closing.as_ref(), cx).map(|(text, call)| {
                 calls.push(Call {
                     spot: spot(start, written),
@@ -611,175 +560,8 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
         called: out.called,
         findings,
         calls,
-        titles,
-        figures,
-        plainer,
         valued,
     }
-}
-
-/// What became of a `figure`.
-struct Figure {
-    text: Marked,
-    /// Whether it had a title, now opening the caption.
-    titled: bool,
-    /// Whether it is the HTML Hugo wrote, not a call.
-    html: bool,
-    /// Whether a class or a size was taken off it.
-    plainer: bool,
-}
-
-/// `src` as the site's own picture it names, where it names one: without
-/// `./` before it or the path the site is under, and with each `%` and
-/// two figures as the character they spell where only that names a file.
-fn own_picture(src: &str, cx: &Context) -> Option<String> {
-    if src.contains("://") || src.starts_with("//") {
-        return None;
-    }
-    let mut src = src;
-    while let Some(rest) = src.strip_prefix("./") {
-        src = rest;
-    }
-    if !cx.base.is_empty()
-        && let Some(rest) = src.strip_prefix(cx.base)
-        && rest.starts_with('/')
-    {
-        src = rest;
-    }
-    // Statac reads a file as a picture only under a picture's name; what
-    // kind it is, its bytes say.
-    if !crate::album::is_picture(src) {
-        return None;
-    }
-    if (cx.picture)(src) {
-        return Some(src.to_owned());
-    }
-    let bytes = src.as_bytes();
-    let mut spelled = Vec::with_capacity(bytes.len());
-    let mut at = 0;
-    while at < bytes.len() {
-        let figure = |i: usize| bytes.get(i).and_then(|b| char::from(*b).to_digit(16));
-        match (bytes[at], figure(at + 1), figure(at + 2)) {
-            (b'%', Some(high), Some(low)) => {
-                spelled.push((high * 16 + low) as u8);
-                at += 3;
-            }
-            (byte, _, _) => {
-                spelled.push(byte);
-                at += 1;
-            }
-        }
-    }
-    let spelled = String::from_utf8(spelled).ok()?;
-    (spelled != src && (cx.picture)(&spelled)).then_some(spelled)
-}
-
-/// A `figure` as a call to the starter's, where the picture is one of the
-/// site's that the snippet shows, the figure stands outside HTML, and it
-/// asks for nothing the snippet has no equal for but a class or a size,
-/// which are taken off; or else as the HTML Hugo wrote.
-fn figure(tag: &Written, cx: &Context, in_html: bool) -> Option<Figure> {
-    let get = |name: &str| {
-        tag.args
-            .iter()
-            .find(|(n, _)| n.as_deref() == Some(name))
-            .map(|(_, v)| v.as_str())
-    };
-    if tag.args.iter().any(|(name, _)| name.is_none()) {
-        return None;
-    }
-    let src = get("src")?;
-    let known = ["src", "alt", "caption", "title"];
-    let taken_off = ["class", "width", "height"];
-    let named = |names: &[&str], name: &Option<String>| {
-        names.contains(&name.as_deref().unwrap_or_default())
-    };
-    let plain = (tag.args.iter()).all(|(name, _)| named(&known, name) || named(&taken_off, name));
-    let plainer = tag.args.iter().any(|(name, _)| named(&taken_off, name));
-    let title = get("title").filter(|t| !t.is_empty());
-    let own = match plain && !in_html {
-        true => own_picture(src, cx),
-        false => None,
-    };
-    if let Some(src) = own {
-        let mut call = format!("@figure({}", quoted(&src));
-        if let Some(alt) = get("alt") {
-            call.push_str(&format!(", alt={}", quoted(alt)));
-        }
-        let caption = match (title, get("caption").filter(|c| !c.is_empty())) {
-            (Some(title), Some(caption)) => Some(format!("**{title}** {caption}")),
-            (Some(title), None) => Some(format!("**{title}**")),
-            (None, caption) => caption.map(str::to_owned),
-        };
-        if let Some(caption) = caption {
-            call.push_str(&format!(", caption={}", quoted(&caption)));
-        }
-        call.push(')');
-        return Some(Figure {
-            text: Marked::call(call),
-            titled: title.is_some(),
-            html: false,
-            plainer,
-        });
-    }
-    let mut html = String::from("<figure");
-    if let Some(class) = get("class") {
-        html.push_str(&format!(" class=\"{}\"", escaped(class)));
-    }
-    html.push('>');
-    if let Some(link) = get("link") {
-        html.push_str(&format!("<a href=\"{}\"", escaped(link)));
-        for name in ["target", "rel"] {
-            if let Some(value) = get(name) {
-                html.push_str(&format!(" {name}=\"{}\"", escaped(value)));
-            }
-        }
-        html.push('>');
-    }
-    html.push_str(&format!("<img src=\"{}\"", escaped(src)));
-    if let Some(alt) = get("alt").or(get("caption")) {
-        html.push_str(&format!(" alt=\"{}\"", escaped(alt)));
-    }
-    for name in ["width", "height", "loading"] {
-        if let Some(value) = get(name) {
-            html.push_str(&format!(" {name}=\"{}\"", escaped(value)));
-        }
-    }
-    html.push_str(" />");
-    if get("link").is_some() {
-        html.push_str("</a>");
-    }
-    let caption = get("caption");
-    let attr = get("attr");
-    if title.is_some() || caption.is_some() || attr.is_some() {
-        html.push_str("<figcaption>");
-        if let Some(title) = title {
-            html.push_str(&format!("<h4>{}</h4>", escaped(title)));
-        }
-        if caption.is_some() || attr.is_some() {
-            html.push_str("<p>");
-            html.push_str(&escaped(caption.unwrap_or_default()));
-            if let Some(attr) = attr {
-                match get("attrlink") {
-                    Some(link) => html.push_str(&format!(
-                        "<a href=\"{}\">{}</a>",
-                        escaped(link),
-                        escaped(attr)
-                    )),
-                    None => html.push_str(&escaped(attr)),
-                }
-            }
-            html.push_str("</p>");
-        }
-        html.push_str("</figcaption>");
-    }
-    html.push_str("</figure>");
-    Some(Figure {
-        text: html.into(),
-        titled: false,
-        html: true,
-        plainer: false,
-    })
 }
 
 /// The code `highlight` wraps as a fenced code block.
@@ -826,15 +608,13 @@ fn details(tag: &Written) -> Option<String> {
 }
 
 /// The snippet a tag's call names: its own name, made one a call can
-/// name, and kept clear of the starter's where the new site has it.
-pub(super) fn snippet_name(tag: &str, starter: bool) -> String {
+/// name.
+pub(super) fn snippet_name(tag: &str) -> String {
     let mut name: String = tag
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
-    if !name.starts_with(|c: char| c.is_ascii_alphabetic())
-        || (starter && crate::new::has_snippet(&name))
-    {
+    if !name.starts_with(|c: char| c.is_ascii_alphabetic()) {
         name = format!("old_{name}");
     }
     name
@@ -886,7 +666,7 @@ fn snippet_call(
         handed.push(format!("{name}={}", quoted(value)));
         names.push(name);
     }
-    let snippet = snippet_name(&tag.name, cx.starter);
+    let snippet = snippet_name(&tag.name);
     let mut text = Marked::call(format!("@{snippet}({})", handed.join(", ")));
     if wraps && closing.is_none() {
         text.push_str("\n");
@@ -1083,12 +863,10 @@ mod tests {
     fn private_use_characters_are_kept_and_never_taken_for_a_call_or_a_fence() {
         let wrapping = HashSet::from(["aside".to_owned()]);
         let cx = Context {
-            starter: true,
             base: "",
             whole: None,
             refs: &|_, _| None,
             param: &|_| None,
-            picture: &|src| src == "a.jpg",
             own: &[],
             values: &[],
             wrapping: &wrapping,
@@ -1121,8 +899,12 @@ mod tests {
             ),
             (
                 "\u{E000}{{< youtube \"\u{E000}\" >}}\n\n{{< aside \"\u{E001}\" >}}\n",
-                "\u{E000}@youtube('\u{E000}')\n\n@aside(value_1='\u{E001}')\n@end\n",
-                &["@youtube('\u{E000}')", "@aside(value_1='\u{E001}')", "@end"],
+                "\u{E000}@youtube(id='\u{E000}')\n\n@aside(value_1='\u{E001}')\n@end\n",
+                &[
+                    "@youtube(id='\u{E000}')",
+                    "@aside(value_1='\u{E001}')",
+                    "@end",
+                ],
                 &[],
             ),
             (
@@ -1133,8 +915,8 @@ mod tests {
             ),
             (
                 "{{< figure src=\"a.jpg\" caption=\"\u{E000}\" >}}\n",
-                "@figure('a.jpg', caption='\u{E000}')\n",
-                &["@figure('a.jpg', caption='\u{E000}')"],
+                "@figure(src='a.jpg', caption='\u{E000}')\n",
+                &["@figure(src='a.jpg', caption='\u{E000}')"],
                 &[],
             ),
         ];

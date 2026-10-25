@@ -327,19 +327,16 @@ impl Written {
     }
 }
 
-/// Every address of the author's the site at `root` publishes, besides
+/// Every address of the author's `site` publishes, besides
 /// the files beside the writing in `held_back`, each its path in the built
 /// site, which no page links: each page from a file, each old address
 /// sending readers on, the feed of each folder carrying a page of theirs,
 /// and each file published as it is. A list's page Statac made, its pages
 /// after the first, and a tag's or a series' feed come and go with what is
 /// listed, and the site's assets are named by what they hold, so none of
-/// them is kept; nor is a page or a file as `statac new` wrote it, which
-/// the author may clear away before publishing anything.
+/// them is kept.
 pub(crate) fn now(
-    root: &Path,
     site: &Site,
-    sources: &Sources,
     dates: &Dates,
     assets: &Assets,
     feeds: &[Feed],
@@ -354,21 +351,8 @@ pub(crate) fn now(
             && (page.date.as_ref()).is_some_and(|date| dates.after_today(&date.value));
         draft || waiting
     };
-    let untouched = |path: &str, bytes: &dyn Fn() -> Option<Vec<u8>>| {
-        crate::new::update::writes(path)
-            && bytes().is_some_and(|bytes| crate::new::update::untouched(path, &bytes))
-    };
-    let on_disk = |path: &str| crate::platform::read_file(root, path).ok().flatten();
     let theirs: HashSet<PageId> = (site.pages.iter())
-        .filter(|(_, page)| page.lands() && !left_out(page))
-        .filter(|(_, page)| {
-            let Some(source) = page.source else {
-                return false;
-            };
-            let path = sources.path(source).to_string_lossy().replace('\\', "/");
-            let text = || Some(sources.text(source).as_bytes().to_vec());
-            page.made.is_some() || !untouched(&path, &text)
-        })
+        .filter(|(_, page)| page.lands() && !left_out(page) && page.source.is_some())
         .map(|(id, _)| id)
         .collect();
     let pages = theirs.iter().map(|&id| site.pages.get(id).address.clone());
@@ -385,16 +369,8 @@ pub(crate) fn now(
     let files = (site.files.iter())
         .filter(|file| !held_back.contains(&file.address.file()))
         .filter(|file| !file.page.is_some_and(|page| left_out(site.pages.get(page))))
-        .filter(|file| {
-            let path = format!("content/{}", file.path);
-            !untouched(&path, &|| on_disk(&path))
-        })
         .map(|file| file.address.clone());
     let statics = (assets.statics().iter())
-        .filter(|file| {
-            let path = format!("static/{}", file.name);
-            !untouched(&path, &|| on_disk(&path))
-        })
         .filter_map(|file| Address::read_file(&format!("/{}", file.name)).ok());
     pages
         .chain(redirects)

@@ -18,8 +18,7 @@ use super::common::{dated_name, front, joined, last, names_in, parent, text_of, 
 use super::inside;
 use super::report::code;
 use super::{
-    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, left_behind,
-    one_home_page,
+    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, one_home_page,
 };
 use crate::content::slug;
 use crate::date::{self, Date};
@@ -120,14 +119,6 @@ pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
     sentence: "Each of these tags is now a call to a snippet of its name, and the snippet holds \
                only a comment saying it wasn't converted: write the snippet, as \
                https://statac.dev/snippets/ describes, or take the calls out.",
-};
-
-pub(super) static FIGURE_HTML: FindingKind = FindingKind {
-    heading: "Figures written as HTML",
-    sentence: "Each of these figures shows an image kept elsewhere or one the starter's `figure` \
-               snippet can't show, such as a GIF, stands inside HTML, or asks for what the \
-               snippet has no equal for, such as a link, so Statac wrote the HTML Hugo made for \
-               it.",
 };
 
 pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
@@ -232,20 +223,13 @@ pub(super) fn owns(folder: &Path) -> bool {
     settings::owns(folder)
 }
 
-/// Reads the site in `folder`, for a new site with the starter where
-/// `starter` says.
-pub(super) fn read(
-    folder: &Path,
-    today: Date,
-    given: Option<&str>,
-    starter: bool,
-) -> Result<Import, Box<Failed>> {
+/// Reads the site in `folder`.
+pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
     let found = settings::found(folder)?;
     let s = settings::settle(folder, &found.entries);
     let mut reader = Reader {
         folder,
         given,
-        starter,
         import: Import::default(),
         making: Making {
             lower: s.lower,
@@ -328,8 +312,6 @@ struct Reader<'a> {
     /// The site's address as the author gave it, for settings that give
     /// none.
     given: Option<&'a str>,
-    /// Whether the new site has the starter.
-    starter: bool,
     import: Import,
     s: Settings,
     making: Making,
@@ -368,12 +350,6 @@ fn split_name(name: &str) -> (&str, String) {
 impl Reader<'_> {
     fn path(&self, rel: &str) -> std::path::PathBuf {
         inside::path(self.folder, rel)
-    }
-
-    /// Whether `rel`, a path the writing names, is a file inside the old
-    /// site, reached through no link that leads outside it.
-    fn a_file_named(&self, rel: &str) -> bool {
-        crate::platform::stays_inside(rel) && inside::a_file(self.folder, rel)
     }
 
     fn left(&mut self, path: &str, what: &str) {
@@ -619,35 +595,16 @@ impl Reader<'_> {
             if dir && name == top_of(&s.data_dir) {
                 continue;
             }
-            let starter = self.starter;
             let special = [
                 (
                     s.publish_dir.as_str(),
                     "the old site's built output, read only to check the URLs".to_owned(),
                 ),
-                (
-                    s.layout_dir.as_str(),
-                    left_behind(
-                        "the old site's layouts",
-                        "the starter's templates take",
-                        starter,
-                    ),
-                ),
-                (
-                    s.themes_dir.as_str(),
-                    left_behind(
-                        "the old site's themes",
-                        "the starter's templates, snippets and stylesheet take",
-                        starter,
-                    ),
-                ),
+                (s.layout_dir.as_str(), "the old site's layouts".to_owned()),
+                (s.themes_dir.as_str(), "the old site's themes".to_owned()),
                 (
                     s.asset_dir.as_str(),
-                    left_behind(
-                        "the files Hugo's templates worked on, such as stylesheets",
-                        "the starter's `assets/site.css` takes",
-                        starter,
-                    ),
+                    "the files Hugo's templates worked on, such as stylesheets".to_owned(),
                 ),
                 (
                     s.archetype_dir.as_str(),
@@ -656,11 +613,7 @@ impl Reader<'_> {
                 ),
                 (
                     s.i18n_dir.as_str(),
-                    left_behind(
-                        "the translations the old site's templates showed in each language",
-                        "the starter's `data/words.yaml` takes",
-                        starter,
-                    ),
+                    "the translations the old site's templates showed in each language".to_owned(),
                 ),
                 (
                     s.resource_dir.as_str(),
@@ -1564,9 +1517,6 @@ impl Reader<'_> {
             .flat_map(|d| writing::paired(&d.body))
             .collect();
         let mut calls: Vec<writing::Call> = Vec::new();
-        let mut titles = 0;
-        let mut figures = 0;
-        let mut plainer = 0;
         let mut valued = 0;
         let site_params: Vec<(String, Value)> = (self.s.params.iter())
             .map(|f| (f.name.to_lowercase(), f.value.clone()))
@@ -1613,13 +1563,11 @@ impl Reader<'_> {
                     value_at(&site, &lower)
                 })
             };
-            let picture = |src: &str| self.picture(doc, src);
             let cx = writing::Context {
                 base: &base,
                 whole: whole.as_deref(),
                 refs: &refs,
                 param: &param,
-                picture: &picture,
                 own: &self.own,
                 values: &values,
                 wrapping: &wrapping,
@@ -1628,7 +1576,6 @@ impl Reader<'_> {
                 emoji: self.s.emoji,
                 block_attributes: self.s.block_attributes,
                 summary_length: doc.summary_cut.then_some(self.s.summary_length),
-                starter: self.starter,
             };
             let converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
             for finding in converted.findings {
@@ -1646,9 +1593,6 @@ impl Reader<'_> {
                 }
             }
             calls.extend(converted.calls);
-            titles += converted.titles;
-            figures += converted.figures;
-            plainer += converted.plainer;
             valued += converted.valued;
             written.push((converted.writing, converted.fences, converted.called));
         }
@@ -1736,43 +1680,13 @@ impl Reader<'_> {
                 }
             ));
         }
-        if figures > 0 {
-            self.note(format!(
-                "{} to the starter's `figure` snippet.{}",
-                match figures {
-                    1 => "1 figure is now a call".to_owned(),
-                    n => format!("{n} figures are now calls"),
-                },
-                match plainer {
-                    0 => String::new(),
-                    n => format!(
-                        " `class`, `width` and `height` were taken off {n} of them, which the \
-                         snippet doesn't take: each shows at the size the starter gives an image."
-                    ),
-                }
-            ));
-        }
-        if titles > 0 {
-            self.note(format!(
-                "{} a `title`, which the starter's `figure` snippet doesn't take, so it opens the \
-                 caption, in bold.",
-                match titles {
-                    1 => "1 figure had".to_owned(),
-                    n => format!("{n} figures had"),
-                }
-            ));
-        }
         if self.taken_off > 0 {
             self.note(format!(
-                "`layout` and `type` were taken off {}: each is built with the {}template for its \
+                "`layout` and `type` were taken off {}: each is built with the template for its \
                  kind, as https://statac.dev/templates/ describes.",
                 match self.taken_off {
                     1 => "1 page".to_owned(),
                     n => format!("{n} pages"),
-                },
-                match self.starter {
-                    true => "starter's ",
-                    false => "",
                 }
             ));
         }
@@ -1904,47 +1818,6 @@ fn refer(docs: &[Doc], doc: &Doc, path: &str, language: Option<&str>) -> Option<
 }
 
 impl Reader<'_> {
-    /// Whether the picture `src` a figure on `doc` names is one of the
-    /// site's that Statac finds from the page, and a photograph.
-    fn picture(&self, doc: &Doc, src: &str) -> bool {
-        if src.contains("://") || src.starts_with("//") {
-            return false;
-        }
-        match src.strip_prefix('/') {
-            Some(rest) => self
-                .s
-                .static_dirs
-                .iter()
-                .chain(std::iter::once(&self.s.content_dir))
-                .map(|dir| joined(dir, rest))
-                .find(|file| self.a_file_named(file))
-                .is_some_and(|file| self.a_photograph(&file)),
-            None => {
-                let file = joined(parent(&doc.from), src);
-                doc.shape == Shape::Bundle && self.a_file_named(&file) && self.a_photograph(&file)
-            }
-        }
-    }
-
-    /// Whether the file at `rel` in the old site is a photograph, by what
-    /// it holds: a JPEG, a PNG or a WebP that doesn't move. One that
-    /// begins as a picture and doesn't read is told by its name's ending,
-    /// so the new site's build says what is wrong with it.
-    fn a_photograph(&self, rel: &str) -> bool {
-        use crate::pictures::{Header, Unreadable, read_header};
-        let Ok(bytes) = std::fs::read(inside::path(self.folder, rel)) else {
-            return false;
-        };
-        match read_header(&bytes) {
-            Ok(Header::Photograph(_)) => true,
-            Ok(Header::Plain(_)) | Err(Unreadable::NotAPicture) => false,
-            Err(Unreadable::CutShort | Unreadable::Unsupported(_)) => {
-                let ending = rel.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
-                matches!(ending.as_deref(), Some("jpg" | "jpeg" | "png" | "webp"))
-            }
-        }
-    }
-
     /// The feed and layout each list's own page keeps.
     fn lists_and_feeds(&mut self) {
         let (home, lists, tags) = match self.s.feeds {
@@ -1953,7 +1826,6 @@ impl Reader<'_> {
         };
         let name = self.s.feed_name.clone();
         let off = || Field::new("feed", Value::Truth(false), None);
-        let mut laid_out = Vec::new();
         let mut homes: Vec<String> = Vec::new();
         let mut feed_addresses = Vec::new();
         let mut whole: Vec<(String, String, String)> = Vec::new();
@@ -1963,8 +1835,6 @@ impl Reader<'_> {
             if !matches!(doc.shape, Shape::List | Shape::Made) || doc.draft {
                 continue;
             }
-            let folder = parent(&doc.to).to_owned();
-            let top = !doc.dir.is_empty() && !doc.dir.contains('/');
             let dated = self.docs.iter().any(|d| {
                 d.date.is_some()
                     && !d.draft
@@ -1974,17 +1844,7 @@ impl Reader<'_> {
                         || d.dir == doc.dir
                         || d.dir.starts_with(&format!("{}/", doc.dir)))
             });
-            let undated = self.docs.iter().any(|d| {
-                d.date.is_none()
-                    && matches!(d.shape, Shape::Single | Shape::Bundle)
-                    && d.language == doc.language
-                    && (d.dir == doc.dir || d.dir.starts_with(&format!("{}/", doc.dir)))
-            });
             let mut words = Vec::new();
-            if self.starter && top && dated && !undated {
-                words.push(Field::new("pages.layout", Value::Text("post".into()), None));
-                laid_out.push(folder.clone());
-            }
             if doc.dir.is_empty() {
                 homes.push(doc.language.clone());
             }
@@ -2051,25 +1911,15 @@ impl Reader<'_> {
             (true, false) => "the home page",
             _ => "each list page",
         };
-        let (now, kept) = match self.starter {
-            true => (
-                "is now an Atom feed",
-                format!(
-                    "at the same URL, written by `templates/feed.xml`, as `feed: {name}` on {on} \
-                     says, and `feed_ids_before` keeps each post's id the URL Hugo gave it, so \
-                     feed readers see nothing new: see https://statac.dev/feeds/#entry-ids."
-                ),
-            ),
-            false => (
-                "stays",
-                format!(
-                    "at the same URL, as `feed: {name}` on {on} says, built with \
+        let (now, kept) = (
+            "stays",
+            format!(
+                "at the same URL, as `feed: {name}` on {on} says, built with \
                      `templates/feed.xml` once you add it, and `feed_ids_before` keeps each \
                      post's id the URL Hugo gave it, so feed readers see nothing new: see \
                      https://statac.dev/feeds/#entry-ids."
-                ),
             ),
-        };
+        );
         let mut said = match (fed, home, lists) {
             (false, ..) => String::new(),
             (true, true, true) => format!(
@@ -2122,23 +1972,6 @@ impl Reader<'_> {
         }
         if !said.is_empty() {
             self.note(said);
-        }
-        if !laid_out.is_empty() {
-            let folders: Vec<String> = laid_out
-                .iter()
-                .map(|f| code(&format!("content/{f}/index.md")))
-                .collect();
-            self.note(format!(
-                "{} {} `pages.layout: post`, so the pages beneath {}, every one dated, are built \
-                 with the starter's template for posts.",
-                folders.join(", "),
-                if folders.len() == 1 {
-                    "cascades"
-                } else {
-                    "each cascade"
-                },
-                if folders.len() == 1 { "it" } else { "them" }
-            ));
         }
         let made: Vec<String> = self
             .docs
@@ -2296,7 +2129,7 @@ impl Reader<'_> {
                 });
             if let (Some(pattern), Some(statacs)) = (pattern, statacs) {
                 match kept {
-                    false if self.starter => {
+                    false => {
                         let one = match plural {
                             "tags" => "A tag's",
                             _ => "A series'",
@@ -2319,12 +2152,6 @@ impl Reader<'_> {
                             code(&pattern)
                         ))
                     }
-                    false => self.note(format!(
-                        "The settings' `[permalinks]` put the page of each of the `{plural}` at \
-                         {}, which Statac has no pattern for, so each is at Statac's own URL: \
-                         those Hugo used are listed under URLs.",
-                        code(&pattern)
-                    )),
                     true => self
                         .import
                         .settings
@@ -2390,23 +2217,6 @@ impl Reader<'_> {
                         (self.import.addresses).push(format!("{address}{path}/{n}/"));
                     }
                 }
-            }
-        }
-        // Hugo before 0.148 published the page listing every tag under
-        // `uglyURLs` as a file; since, as a folder. The old built output,
-        // where it is there, tells which, and the shared part keeps it.
-        if self.s.ugly.of("tags") && self.import.built.is_none() && self.starter {
-            for (list, plural) in &self.import.term_lists {
-                if plural != "tags" {
-                    continue;
-                }
-                let within = list.trim_start_matches('/').trim_end_matches('/');
-                let path = match within.strip_suffix("tags") {
-                    Some(language) => format!("{language}tags.md"),
-                    None => continue,
-                };
-                let from = Value::List(vec![Value::Text(format!("/{within}.html"))]);
-                (self.import.words).push((path, Field::new("redirect_from", from, None)));
             }
         }
         // The page Hugo made for each name in any other list, and the one
@@ -2619,7 +2429,7 @@ impl Reader<'_> {
             self.note(format!(
                 "Where the old home page was paginated, nothing is published at page 2 onwards \
                  now: {}, and Statac can't tell from the content which pages Hugo made.",
-                one_home_page(self.starter, true)
+                one_home_page(true)
             ));
         }
     }
@@ -2693,7 +2503,7 @@ mod tests {
                 let post = format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\ntags: [a]\n---\n");
                 std::fs::write(folder.join(format!("content/posts/post-{n}.md")), post).unwrap();
             }
-            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None, true) else {
+            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None) else {
                 panic!("{at}: the site wasn't read");
             };
             let has = |address: &str| import.addresses.iter().any(|a| a == address);

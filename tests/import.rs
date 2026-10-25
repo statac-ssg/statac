@@ -1,9 +1,7 @@
 //! `statac import` reads each made site in `tests/import/*/old` and
 //! writes the new site kept beside it in `new/`, file for file and byte
-//! for byte. Files written exactly as `starter/` holds them aren't kept
-//! again: each is compared with the starter's own. The old site is the
-//! same after as before, and the new one passes `statac check` with no
-//! error.
+//! for byte. The old site is the same after as before, and the new one
+//! passes `statac check` with no error but the templates it lacks.
 
 mod scratch;
 
@@ -15,7 +13,7 @@ use std::path::{Path, PathBuf};
 use statac::build::{self, Mode, Options};
 use statac::date::Date;
 use statac::import::{self, Tool};
-use statac::problem::Severity;
+use statac::problem::{Kind, Problem, Severity};
 
 const KEY: &str = "0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20";
 
@@ -50,18 +48,12 @@ fn files(folder: &Path) -> BTreeMap<String, Vec<u8>> {
 /// Imports `old` into `new` with the day fixed, giving the exit code and
 /// what was said.
 fn import(old: &Path, new: &Path, from: Option<Tool>) -> (u8, String) {
-    import_with(old, new, from, true)
-}
-
-/// [`import`], with the starter where `starter` says.
-fn import_with(old: &Path, new: &Path, from: Option<Tool>, starter: bool) -> (u8, String) {
     let mut said = Vec::new();
     let options = import::Options {
         old: old.to_path_buf(),
         new: Some(new.to_path_buf()),
         from,
         today: Some(today()),
-        starter,
     };
     let code = import::run(&options, None, &mut said, false);
     (code, String::from_utf8(said).unwrap())
@@ -76,7 +68,6 @@ fn import_answering(old: &Path, new: &Path, typed: &str, terminal: bool) -> (u8,
         new: Some(new.to_path_buf()),
         from: None,
         today: Some(today()),
-        starter: true,
     };
     let mut reader = typed.as_bytes();
     let input = statac::new::Input {
@@ -87,14 +78,9 @@ fn import_answering(old: &Path, new: &Path, typed: &str, terminal: bool) -> (u8,
     (code, String::from_utf8(said).unwrap())
 }
 
-/// The starter's own file at `path`, where it has one.
-fn starter(path: &str) -> Option<Vec<u8>> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("starter/site");
-    fs::read(root.join(path)).ok()
-}
-
 /// The name of each warning and note `statac check` finds in `site`, in
-/// order, having found no error.
+/// order, having found no error but a missing template, which an imported
+/// site has none of.
 fn checked(site: &Path) -> Vec<String> {
     let outcome = build::run(&Options {
         mode: Mode::Check,
@@ -105,12 +91,15 @@ fn checked(site: &Path) -> Vec<String> {
         url: None,
     });
     let report = statac::report::Report::new(outcome.sources(), site, false);
+    let template = |problem: &&Problem| matches!(problem.kind, Kind::MissingTemplate { .. });
     let errors: Vec<_> = (outcome.problems.iter())
         .filter(|problem| problem.kind.severity() == Severity::Error)
+        .filter(|problem| !template(problem))
         .cloned()
         .collect();
     assert!(errors.is_empty(), "{}", report.problems(&errors));
     let mut names: Vec<String> = (outcome.problems.iter())
+        .filter(|problem| !template(problem))
         .map(|problem| problem.kind.name().to_owned())
         .collect();
     names.sort();
@@ -151,47 +140,54 @@ fn imported(name: &str) -> (Scratch, Vec<String>) {
     let made = with_key(files(&new));
     let kept = files(&wanted);
     for (path, bytes) in &made {
-        let held = kept.get(path).cloned().or_else(|| starter(path));
         let shown = String::from_utf8_lossy(bytes);
         assert!(
-            held.as_ref() == Some(bytes),
+            kept.get(path) == Some(bytes),
             "{name}: `{path}` is now:\n{shown}"
         );
     }
     for path in kept.keys() {
         assert!(made.contains_key(path), "{name}: `{path}` wasn't written");
     }
-    let samples = [
-        "content/notes/",
-        "content/photos/",
-        "content/posts/first-post/",
-        "content/posts/what-a-post-can-hold/",
-    ];
-    let sample = (made.keys())
-        .filter(|path| !kept.contains_key(*path))
-        .find(|path| samples.iter().any(|folder| path.starts_with(folder)));
-    assert_eq!(sample, None, "{name}: a sample page's file was written");
-    let card = made.keys().find(|path| path.starts_with("templates/og"));
-    assert_eq!(card, None, "{name}: a sharing card's file was written");
+    let template = made.keys().find(|path| path.starts_with("templates/"));
+    assert_eq!(template, None, "{name}: a template was written");
     let found = checked(&new);
     (new, found)
 }
 
-const NO_ADDRESS: &str = "no-site-url";
 const NO_ZONE: &str = "no-time-zone";
 const DRAFT: &str = "draft-left-out";
 const AS_TEXT: &str = "published-as-text";
-const UNUSED_FEED: &str = "unused-feed-template";
+/// Gives the new site in `site` the templates its pages, its lists and its
+/// feeds are built with, which an imported site has none of, so that what
+/// it publishes can be looked at.
+fn templated(site: &Path) {
+    let page = "<title>{{ headline(page) }}</title>\n{{ page.content }}\n";
+    let list = "{% for post in page.posts %}<a href=\"{{ post.url }}\">{{ post.title }}</a>\n\
+                {% endfor %}";
+    fs::create_dir_all(site.join("templates")).unwrap();
+    fs::write(site.join("templates/page.html"), page).unwrap();
+    for name in ["home", "folder"] {
+        let path = site.join(format!("templates/{name}.html"));
+        fs::write(path, format!("{page}{list}")).unwrap();
+    }
+    let feed = "<feed>{% for post in posts %}<entry>{{ post.url }}</entry>{% endfor %}</feed>\n";
+    fs::write(site.join("templates/feed.xml"), feed).unwrap();
+}
+
+const BUILT: &str = "built-without-template";
+const NO_FEED: &str = "feed-not-written";
+const NO_COLOURS: &str = "code-colours-not-loaded";
 
 #[test]
 fn each_permalink_style_keeps_every_address() {
     for (name, found) in [
-        ("permalink-date", &[UNUSED_FEED][..]),
-        ("permalink-pretty", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
-        ("permalink-ordinal", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
-        ("permalink-weekdate", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
-        ("permalink-none", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
-        ("permalink-pattern", &[NO_ADDRESS, NO_ZONE, UNUSED_FEED]),
+        ("permalink-date", &[BUILT][..]),
+        ("permalink-pretty", &[BUILT, NO_ZONE]),
+        ("permalink-ordinal", &[BUILT, NO_ZONE]),
+        ("permalink-weekdate", &[BUILT, NO_ZONE]),
+        ("permalink-none", &[BUILT, NO_ZONE]),
+        ("permalink-pattern", &[BUILT, NO_ZONE]),
     ] {
         assert_eq!(fixture(name), found, "{name}");
     }
@@ -200,7 +196,8 @@ fn each_permalink_style_keeps_every_address() {
 #[test]
 fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts() {
     let (new, found) = imported("home-pages");
-    assert_eq!(found, [UNUSED_FEED]);
+    assert_eq!(found, [BUILT]);
+    templated(&new);
     let out = scratch("home-pages-built");
     let outcome = build::run(&Options {
         mode: Mode::Build,
@@ -233,12 +230,13 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
     // Only Hugo paginated every list, so only its site asks for
     // pagination, and its home page says `0`.
     for (name, found, paged) in [
-        ("hugo-home-pages", &[][..], true),
-        ("zola-home-pages", &[UNUSED_FEED][..], false),
-        ("eleventy-home-pages", &[NO_ADDRESS, UNUSED_FEED][..], false),
+        ("hugo-home-pages", &[BUILT, NO_FEED][..], true),
+        ("zola-home-pages", &[BUILT][..], false),
+        ("eleventy-home-pages", &[BUILT][..], false),
     ] {
         let (new, problems) = imported(name);
         assert_eq!(problems, found, "{name}");
+        templated(&new);
         let out = scratch(&format!("{name}-built"));
         let outcome = build::run(&Options {
             mode: Mode::Build,
@@ -268,7 +266,7 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
     };
     assert!(report("hugo-home-pages").contains(
         "Where the old home page was paginated, nothing is published at page 2 onwards now: \
-         Statac's home page shows the newest of each folder itself"
+         `content/index.md` keeps its own list to one page with `posts_per_page: 0`"
     ));
     let zola = report("zola-home-pages");
     assert!(zola.contains(
@@ -280,123 +278,71 @@ fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
 
 #[test]
 fn a_site_under_a_path_keeps_its_addresses_and_links() {
-    // The old site's own 404 page is nearest a past starter's, which lacks
-    // `search: false`.
-    assert_eq!(
-        fixture("baseurl"),
-        [
-            NO_ZONE,
-            "robots-beneath-path",
-            UNUSED_FEED,
-            "update-available"
-        ]
-    );
-}
-
-#[test]
-fn a_404_page_of_the_old_sites_own_is_kept_out_of_search_with_its_own_words() {
-    let new = scratch("baseurl-built");
-    let (code, said) = import(Path::new("tests/import/baseurl/old"), &new, None);
-    assert_eq!(code, 0, "{said}");
-    let outcome = build::run(&Options {
-        mode: Mode::Build,
-        site: new.clone(),
-        out: None,
-        today: Some(today()),
-        drafts: false,
-        url: None,
-    });
-    assert!(outcome.published.is_some());
-    let page = fs::read_to_string(new.join("_site/404.html")).unwrap();
-    assert!(
-        page.contains("<meta name=\"robots\" content=\"noindex\">\n</head>"),
-        "{page}"
-    );
-    assert!(!page.contains("og:"), "{page}");
-    assert!(
-        page.contains(">Not found</h1>")
-            && page.contains("for an address where nothing is published.</p>"),
-        "{page}"
-    );
-    // A page anywhere else is shared as it was.
-    let about = fs::read_to_string(new.join("_site/about.html")).unwrap();
-    assert!(about.contains("og:title") && !about.contains("noindex"));
+    assert_eq!(fixture("baseurl"), [BUILT, NO_ZONE]);
 }
 
 #[test]
 fn dates_come_across_from_names_and_front_matter() {
-    assert_eq!(fixture("dates"), [DRAFT, NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("dates"), [BUILT, DRAFT]);
 }
 
 #[test]
 fn front_matter_comes_across_in_statacs_words() {
-    assert_eq!(
-        fixture("front-matter"),
-        [DRAFT, NO_ADDRESS, NO_ZONE, UNUSED_FEED]
-    );
+    assert_eq!(fixture("front-matter"), [BUILT, DRAFT, NO_ZONE]);
 }
 
 #[test]
 fn tags_in_the_writing_convert_or_stay_as_written() {
-    assert_eq!(fixture("tags-in-writing"), [NO_ZONE, AS_TEXT, UNUSED_FEED]);
+    assert_eq!(
+        fixture("tags-in-writing"),
+        [BUILT, NO_COLOURS, NO_ZONE, AS_TEXT]
+    );
 }
 
 #[test]
 fn markdown_that_reads_differently_is_counted_not_rewritten() {
-    assert_eq!(
-        fixture("markdown-forms"),
-        [NO_ADDRESS, NO_ZONE, AS_TEXT, UNUSED_FEED]
-    );
+    assert_eq!(fixture("markdown-forms"), [BUILT, NO_ZONE, AS_TEXT]);
 }
 
 #[test]
 fn words_statac_would_read_as_a_snippet_call_are_escaped() {
-    assert_eq!(
-        fixture("calls-in-writing"),
-        [NO_ADDRESS, NO_ZONE, UNUSED_FEED]
-    );
+    assert_eq!(fixture("calls-in-writing"), [BUILT, NO_ZONE]);
 }
 
 #[test]
 fn code_inside_html_is_given_a_blank_line_and_stays_code() {
-    assert_eq!(fixture("html-writing"), [NO_ADDRESS, NO_ZONE, UNUSED_FEED]);
+    assert_eq!(fixture("html-writing"), [BUILT, NO_COLOURS, NO_ZONE]);
 }
 
 #[test]
 fn markers_statac_refuses_and_dollars_it_reads_as_maths_are_settled() {
-    assert_eq!(
-        fixture("markers-and-dollars"),
-        [NO_ADDRESS, NO_ZONE, UNUSED_FEED]
-    );
+    assert_eq!(fixture("markers-and-dollars"), [BUILT, NO_ZONE]);
 }
 
 #[test]
 fn maths_the_old_site_set_between_dollar_signs_stays_maths() {
-    assert_eq!(fixture("hugo-maths"), [] as [&str; 0]);
-    assert_eq!(fixture("eleventy-maths"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("hugo-maths"), [BUILT, NO_FEED]);
+    assert_eq!(fixture("eleventy-maths"), [BUILT]);
 }
 
 #[test]
 fn files_data_and_folders_of_pages_come_across() {
-    assert_eq!(
-        fixture("files-and-data"),
-        [DRAFT, NO_ADDRESS, NO_ZONE, UNUSED_FEED]
-    );
+    assert_eq!(fixture("files-and-data"), [BUILT, DRAFT, NO_ZONE]);
 }
 
 #[test]
 fn settings_in_toml_are_read_as_settings_in_yaml() {
-    assert_eq!(fixture("settings-toml"), [UNUSED_FEED]);
+    assert_eq!(fixture("settings-toml"), [BUILT]);
 }
 
 #[test]
 fn a_site_is_read_from_the_folder_its_settings_name() {
-    assert_eq!(fixture("source-folder"), [NO_ADDRESS, NO_ZONE, UNUSED_FEED]);
+    assert_eq!(fixture("source-folder"), [BUILT, NO_ZONE]);
 }
 
 #[test]
 fn pages_and_feeds_of_the_old_built_output_that_nothing_answers_are_listed() {
-    assert_eq!(fixture("built-output"), [NO_ZONE, UNUSED_FEED]);
+    assert_eq!(fixture("built-output"), [BUILT, NO_ZONE]);
 }
 
 #[test]
@@ -406,31 +352,31 @@ fn what_is_said_counts_the_old_built_pages_nothing_answers() {
     let (code, said) = import(old, &new, None);
     assert_eq!(code, 0);
     assert!(
-        said.contains("\nURLs: 5 kept, 8 no longer published.\n"),
+        said.contains("\nURLs: 2 kept, 11 no longer published.\n"),
         "{said}"
     );
 }
 
 #[test]
 fn a_file_whose_name_cant_be_published_is_given_one_that_can() {
-    assert_eq!(fixture("hugo-file-names"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-file-names"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn an_old_address_the_new_site_cant_keep_is_left_out_and_listed() {
-    assert_eq!(fixture("hugo-aliases-kept"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-aliases-kept"), [BUILT, NO_FEED]);
     let old = Path::new("tests/import/hugo-aliases-kept/old");
     let (code, said) = import(old, &scratch("said-aliases"), None);
     assert_eq!(code, 0);
     assert!(
-        said.contains("\nURLs: 8 kept, 5 that can't be kept.\n"),
+        said.contains("\nURLs: 8 kept, 1 no longer published, 5 that can't be kept.\n"),
         "{said}"
     );
 }
 
 #[test]
-fn the_starters_posts_folder_is_left_out_where_nothing_lands_in_it() {
-    assert_eq!(fixture("hugo-no-posts"), [] as [&str; 0]);
+fn a_site_with_no_posts_has_no_folder_of_posts() {
+    assert_eq!(fixture("hugo-no-posts"), [BUILT, NO_FEED]);
     let new = scratch("no-posts");
     let (code, said) = import(Path::new("tests/import/hugo-no-posts/old"), &new, None);
     assert_eq!(code, 0, "{said}");
@@ -439,7 +385,7 @@ fn the_starters_posts_folder_is_left_out_where_nothing_lands_in_it() {
 
 #[test]
 fn a_pattern_goes_in_the_highest_folders_own_page_and_no_page_is_made_for_it() {
-    assert_eq!(fixture("hugo-nested-folders"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-nested-folders"), [BUILT, NO_FEED]);
     let new = scratch("nested");
     let old = Path::new("tests/import/hugo-nested-folders/old");
     let (code, said) = import(old, &new, None);
@@ -466,9 +412,11 @@ fn what_is_said_counts_what_came_across() {
              \n\
              Converted: 2 posts, 1 draft, 2 pages.\n\
              URLs: 6 kept.\n\
-             Left for you: 6 things of 3 kinds.\n\
+             Left for you: 7 things of 3 kinds.\n\
+             The new site has no templates, so each page is published as its content alone \
+             until you add your own: see https://statac.dev/templates/.\n\
              \n\
-             Next: `cd {shown}`, then `statac check`.\n"
+             Next: `cd {shown}`, add your own templates to `templates/`, then `statac check`.\n"
         )
     );
 }
@@ -507,6 +455,7 @@ fn the_feed_jekylls_plugin_made_is_asked_for_at_its_url() {
         let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
         let asking: Vec<&str> = written.lines().filter(|l| l.starts_with("feed:")).collect();
         assert_eq!(asking, Vec::from_iter(line), "{label}: {written}");
+        templated(&new);
         let out = top.join("out");
         let outcome = build::run(&Options {
             mode: Mode::Build,
@@ -557,9 +506,11 @@ fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
     assert!(
         said.ends_with(&format!(
             "Left for you: 4 things of 3 kinds.\n\
-             The new site doesn't build yet: 2 errors, listed in `{shown}/IMPORT.md`.\n\
+             The new site has no templates, so each page is published as its content alone \
+             until you add your own: see https://statac.dev/templates/.\n\
+             The new site also has 2 errors, listed in `{shown}/IMPORT.md`.\n\
              \n\
-             Next: `cd {shown}`, then `statac check`.\n"
+             Next: `cd {shown}`, add your own templates to `templates/`, then `statac check`.\n"
         )),
         "{said}"
     );
@@ -574,25 +525,6 @@ fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
                   \n";
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
     assert!(report.contains(listed), "{report}");
-    // Without the starter, the templates it lacks are said once and the
-    // rest are listed as they are.
-    let bare = top.join("new-without");
-    let (code, said) = import_with(&old, &bare, None, false);
-    assert_eq!(code, 0, "{said}");
-    let shown = bare.to_string_lossy();
-    assert!(
-        said.ends_with(&format!(
-            "Left for you: 4 things of 3 kinds.\n\
-             The new site has no templates, so it won't build until you add your own: see \
-             https://statac.dev/templates/.\n\
-             The new site also has 2 errors, listed in `{shown}/IMPORT.md`.\n\
-             \n\
-             Next: `cd {shown}`, add your own templates to `templates/`, then `statac check`.\n"
-        )),
-        "{said}"
-    );
-    let report = fs::read_to_string(bare.join("IMPORT.md")).unwrap();
-    assert!(report.contains(listed), "{report}");
     assert!(!report.contains("Missing template"), "{report}");
     let outcome = build::run(&Options {
         mode: Mode::Check,
@@ -604,24 +536,24 @@ fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
     });
     let errors = (outcome.problems.iter())
         .filter(|problem| problem.kind.severity() == Severity::Error)
+        .filter(|problem| !matches!(problem.kind, Kind::MissingTemplate { .. }))
         .count();
     assert_eq!(errors, 2);
 }
 
 #[test]
-fn a_site_imported_without_the_starter_has_its_settings_and_what_came_across_alone() {
-    let starter = statac::new::files_of_a_new_site(true);
-    let addressed = "title: No starter\nurl: https://example.org\n";
+fn a_site_imported_has_its_settings_and_what_came_across_alone() {
+    let addressed = "title: Site 1\nurl: https://example.org\n";
     for (name, settings_start) in [
-        ("no-starter", addressed),
-        ("hugo-no-starter", addressed),
-        ("zola-no-starter", addressed),
-        ("eleventy-no-starter", "title: Old\nlanguage: en\n"),
+        ("call-kept", addressed),
+        ("hugo-call-kept", addressed),
+        ("zola-call-kept", addressed),
+        ("eleventy-call-kept", "title: Old\nlanguage: en\n"),
     ] {
         let old = PathBuf::from(format!("tests/import/{name}/old"));
         let before = files(&old);
         let new = scratch(&format!("{name}-without"));
-        let (code, said) = import_with(&old, &new, None, false);
+        let (code, said) = import(&old, &new, None);
         assert_eq!(code, 0, "{said}");
         assert_eq!(files(&old), before, "{name}: the old site changed");
         let made = with_key(files(&new));
@@ -636,20 +568,14 @@ fn a_site_imported_without_the_starter_has_its_settings_and_what_came_across_alo
         for path in kept.keys() {
             assert!(made.contains_key(path), "{name}: `{path}` wasn't written");
         }
-        // Every site gets the same `.gitignore`, with the starter or not.
         assert!(made.contains_key(".gitignore"), "{name}");
-        for (path, bytes) in starter.iter().filter(|(path, _)| path != ".gitignore") {
-            assert_ne!(
-                made.get(path),
-                Some(bytes),
-                "{name}: `{path}` is the starter's"
+        for path in made.keys() {
+            let came = ["content/", "snippets/", "static/"];
+            assert!(
+                came.iter().any(|folder| path.starts_with(folder))
+                    || [".gitignore", "statac.yaml", "IMPORT.md"].contains(&path.as_str()),
+                "{name}: `{path}` was written"
             );
-            if !path.starts_with("content/") && !path.starts_with("snippets/") {
-                assert!(
-                    path == "statac.yaml" || !made.contains_key(path),
-                    "{name}: `{path}` was written"
-                );
-            }
         }
         let text = |path: &str| String::from_utf8(made[path].clone()).unwrap();
         let post = text("content/posts/post-1.md");
@@ -663,15 +589,14 @@ fn a_site_imported_without_the_starter_has_its_settings_and_what_came_across_alo
         let settings = text("statac.yaml");
         assert!(settings.starts_with(settings_start), "{name}: {settings}");
         let report = text("IMPORT.md");
-        let templates = "It has none of the starter's templates, snippets, stylesheet or pages, \
-                         so it won't build until you add templates of your own: see \
-                         https://statac.dev/templates/.";
+        let templates = "It has no templates, so each page is published as its content alone \
+                         until you add templates of your own: see https://statac.dev/templates/.";
         assert_eq!(report.matches(templates).count(), 1, "{name}: {report}");
         assert!(!report.contains("Missing template"), "{name}: {report}");
         assert!(
             said.contains(
-                "The new site has no templates, so it won't build until you add your own: see \
-                 https://statac.dev/templates/.\n"
+                "The new site has no templates, so each page is published as its content alone \
+                 until you add your own: see https://statac.dev/templates/.\n"
             ),
             "{name}: {said}"
         );
@@ -692,12 +617,6 @@ fn a_site_imported_without_the_starter_has_its_settings_and_what_came_across_alo
             errors.iter().all(|error| *error == "missing-template"),
             "{name}: {errors:?}"
         );
-        // With the starter, the call is kept clear of its `note`.
-        let with = scratch(&format!("{name}-with"));
-        let (code, said) = import(&old, &with, None);
-        assert_eq!(code, 0, "{said}");
-        let post = fs::read_to_string(with.join("content/posts/post-1.md")).unwrap();
-        assert!(post.contains("\n@old_note()\n"), "{name}: {post}");
     }
 }
 
@@ -852,8 +771,6 @@ fn the_command_line_asks_for_a_folder_and_a_tool_statac_knows() {
     assert!(said.contains("`hugo`"), "{said}");
 }
 
-const PICTURE: &str = "missing-alt-text";
-
 #[test]
 fn hugo_settings_are_read_in_each_format_and_split_over_a_folder() {
     for name in [
@@ -862,30 +779,29 @@ fn hugo_settings_are_read_in_each_format_and_split_over_a_folder() {
         "hugo-settings-split",
         "hugo-config-toml",
     ] {
-        assert_eq!(fixture(name), [] as [&str; 0], "{name}");
+        assert_eq!(fixture(name), [BUILT, NO_FEED], "{name}");
     }
 }
 
 #[test]
 fn hugo_front_matter_comes_across_in_statacs_words() {
-    assert_eq!(fixture("hugo-front-matter"), [DRAFT]);
+    assert_eq!(fixture("hugo-front-matter"), [BUILT, DRAFT, NO_FEED]);
 }
 
 #[test]
 fn hugo_pages_kept_as_folders_come_across_whole() {
-    assert_eq!(fixture("hugo-bundles"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-bundles"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn hugo_addresses_are_kept_by_each_placeholder_and_as_files() {
-    // The old site's notes page is nearest a past starter's, which lacks
-    // `feed: true`.
-    assert_eq!(fixture("hugo-permalinks"), ["update-available"]);
-    assert_eq!(fixture("hugo-ugly"), ["update-available"]);
+    assert_eq!(fixture("hugo-permalinks"), [BUILT, NO_FEED]);
+    assert_eq!(fixture("hugo-ugly"), [BUILT, NO_FEED]);
 }
 
 /// Builds the site in `site` into `out`, having found no error.
 fn build_into(site: &Path, out: &Path) {
+    templated(site);
     let outcome = build::run(&Options {
         mode: Mode::Build,
         site: site.to_path_buf(),
@@ -1098,9 +1014,9 @@ fn later_pages_in_the_old_built_output_send_readers_on() {
 }
 
 /// Without the old built output, a tag's page Hugo published under
-/// `uglyURLs` as a file sends readers on, as does the page listing every
-/// tag where Hugo before 0.148 published it, and the report says what
-/// nothing answers.
+/// `uglyURLs` as a file sends readers on, and the report says what
+/// nothing answers: the page listing every tag, which the new site
+/// doesn't have, among them.
 #[test]
 fn hugo_tags_published_as_files_are_kept_without_the_built_output() {
     let old = scratch("hugo-ugly-tags-old");
@@ -1116,11 +1032,7 @@ fn hugo_tags_published_as_files_are_kept_without_the_built_output() {
     }
     let (code, told) = import(&old, &new, None);
     assert_eq!(code, 0, "{told}");
-    let tags = fs::read_to_string(new.join("content/tags.md")).unwrap();
-    assert!(
-        tags.contains("\nredirect_from:\n  - /tags.html\n"),
-        "{tags}"
-    );
+    assert!(!new.join("content/tags.md").exists());
     let tag = fs::read_to_string(new.join("content/tags-a.md")).unwrap();
     assert_eq!(
         tag,
@@ -1142,8 +1054,15 @@ fn hugo_tags_published_as_files_are_kept_without_the_built_output() {
         !report.contains("Nothing in the new site is published"),
         "{report}"
     );
+    assert!(
+        report.contains(
+            "The old site published a page listing every one of its `tags` at `/tags/`, and the \
+             new site has none."
+        ),
+        "{report}"
+    );
     build_into(&new, &out);
-    for file in ["tags.html", "tags/a.html", "posts.html"] {
+    for file in ["tags/a.html", "posts.html"] {
         assert!(out.join(file).is_file(), "nothing at {file}");
     }
 }
@@ -1457,7 +1376,7 @@ fn hugo_later_pages_count_what_hugo_listed() {
 
 #[test]
 fn hugo_site_under_a_path_keeps_its_addresses_and_links() {
-    assert_eq!(fixture("hugo-under-path"), [AS_TEXT]);
+    assert_eq!(fixture("hugo-under-path"), [BUILT, NO_FEED, AS_TEXT]);
 }
 
 #[test]
@@ -1491,9 +1410,9 @@ fn hugo_later_pages_are_spoken_of_wherever_the_old_site_could_have_had_them() {
 #[test]
 fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
     let both = "Hugo's feeds were RSS, at `index.xml` beside the home page and each list page";
-    let home = "Hugo's feed was RSS, at `feed.xml` beside the home page. It is now an Atom feed \
-                at the same URL, written by `templates/feed.xml`, as `feed: feed.xml` on the home \
-                page says";
+    let home = "Hugo's feed was RSS, at `feed.xml` beside the home page. It stays at the same \
+                URL, as `feed: feed.xml` on the home page says, built with `templates/feed.xml` \
+                once you add it";
     let lists = "Hugo's feeds were RSS, at `index.xml` beside each list page";
     let others =
         "Hugo made no feed for the other lists, so the list page of each says `feed: false`.";
@@ -1571,6 +1490,7 @@ fn hugo_feeds_keep_the_kinds_and_the_name_the_settings_gave_them() {
         assert!(!report.contains("`outputs"), "{settings}: {report}");
         assert!(!report.contains("`outputFormats"), "{settings}: {report}");
 
+        templated(&new);
         let out = scratch(&format!("hugo-feeds-built-{at}"));
         let outcome = build::run(&Options {
             mode: Mode::Build,
@@ -1644,18 +1564,18 @@ fn a_hugo_feeds_name_that_isnt_a_plain_one_is_left_and_listed() {
 
 #[test]
 fn hugo_tags_keep_the_addresses_hugo_gave_them() {
-    assert_eq!(fixture("hugo-tags"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-tags"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn hugo_languages_come_across_by_folder_and_by_name() {
-    assert_eq!(fixture("hugo-languages-folders"), [] as [&str; 0]);
-    assert_eq!(fixture("hugo-languages-names"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-languages-folders"), [BUILT, NO_FEED]);
+    assert_eq!(fixture("hugo-languages-names"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn hugo_dates_come_across_from_names_and_front_matter() {
-    assert_eq!(fixture("hugo-dates"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-dates"), [BUILT, NO_FEED]);
 }
 
 #[test]
@@ -1664,9 +1584,11 @@ fn hugo_tags_in_the_writing_convert_or_stay_as_written() {
         fixture("hugo-tags-in-writing"),
         [
             "broken-link",
-            PICTURE,
+            BUILT,
+            "call-in-html",
+            NO_COLOURS,
+            NO_FEED,
             "missing-definition",
-            "no-thumbnail",
             AS_TEXT
         ]
     );
@@ -1674,12 +1596,12 @@ fn hugo_tags_in_the_writing_convert_or_stay_as_written() {
 
 #[test]
 fn hugo_markdown_that_reads_differently_is_counted_not_rewritten() {
-    assert_eq!(fixture("hugo-markdown-forms"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-markdown-forms"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn hugo_files_data_and_folders_left_come_across_or_are_listed() {
-    assert_eq!(fixture("hugo-files-and-data"), [] as [&str; 0]);
+    assert_eq!(fixture("hugo-files-and-data"), [BUILT, NO_FEED]);
 }
 
 #[test]
@@ -2486,37 +2408,6 @@ fn hugo_folders_the_settings_name_through_a_link_are_never_read() {
 }
 
 #[test]
-fn a_hugo_figure_is_a_call_where_its_file_holds_a_photograph_whatever_its_ending() {
-    let old = scratch("hugo-figure-kinds");
-    let post = old.join("content/posts/post-1");
-    fs::create_dir_all(&post).unwrap();
-    fs::write(old.join("hugo.yaml"), "baseURL: https://example.org/\n").unwrap();
-    let jpeg = fs::read("tests/import/hugo-tags-in-writing/old/static/images/photo-2.jpg").unwrap();
-    let gif = b"GIF89a\x28\x00\x1e\x00\x00\x00\x00\x3b";
-    fs::write(post.join("photo-1.gif"), &jpeg).unwrap();
-    fs::write(post.join("picture-1.jpg"), gif).unwrap();
-    fs::write(post.join("photo-2.jfif"), &jpeg).unwrap();
-    fs::write(
-        post.join("index.md"),
-        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n{{< figure src=\"photo-1.gif\" >}}\n\n\
-         {{< figure src=\"picture-1.jpg\" >}}\n\n{{< figure src=\"photo-2.jfif\" >}}\n",
-    )
-    .unwrap();
-    let new = scratch("hugo-figure-kinds-new");
-    let (code, said) = import(&old, &new, None);
-    assert_eq!(code, 0, "{said}");
-    let post = fs::read_to_string(new.join("content/posts/post-1/index.md")).unwrap();
-    // A JPEG is a photograph under a GIF's name, and a GIF is none under
-    // a JPEG's.
-    assert!(post.contains("@figure('photo-1.gif')"), "{post}");
-    assert!(post.contains("<img src=\"picture-1.jpg\""), "{post}");
-    // Statac reads no file as a picture under this name.
-    assert!(post.contains("<img src=\"photo-2.jfif\""), "{post}");
-    // The new site builds: the call's picture is one Statac shows.
-    assert_eq!(checked(&new), ["missing-alt-text", NO_ZONE]);
-}
-
-#[test]
 fn a_picture_a_hugo_tag_names_outside_the_old_site_is_never_looked_for() {
     let (_folder, old, outside) = hugo_beside_files_of_others("hugo-figure");
     fs::write(outside.join("photo-9.jpg"), OUTSIDE).unwrap();
@@ -2530,9 +2421,9 @@ fn a_picture_a_hugo_tag_names_outside_the_old_site_is_never_looked_for() {
     let new = outside.parent().unwrap().join("new");
     let (code, said) = import(&old, &new, None);
     assert_eq!(code, 0, "{said}");
-    // One there and one not are told of alike: neither was looked for.
+    // Each is a call as written, of a snippet the site supplies.
     let post = fs::read_to_string(new.join("content/posts/post-1.md")).unwrap();
-    assert!(!post.contains("@figure("), "{post}");
+    assert!(post.contains("@figure(src='/../../photo-9.jpg')"), "{post}");
     for (path, bytes) in files(&new) {
         let text = String::from_utf8_lossy(&bytes);
         assert!(!text.contains(OUTSIDE), "`{path}`:\n{text}");
@@ -2577,26 +2468,23 @@ fn an_old_address_that_cant_be_kept_is_told_of_once_though_the_built_output_hold
 
 #[test]
 fn zola_settings_are_read_from_zola_toml_or_config_toml() {
-    assert_eq!(fixture("zola-settings"), [UNUSED_FEED]);
-    assert_eq!(fixture("zola-config-toml"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-settings"), [BUILT]);
+    assert_eq!(fixture("zola-config-toml"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn zola_front_matter_comes_across_in_statacs_words() {
-    assert_eq!(
-        fixture("zola-front-matter"),
-        [DRAFT, "untitled-page", UNUSED_FEED]
-    );
+    assert_eq!(fixture("zola-front-matter"), [BUILT, DRAFT]);
 }
 
 #[test]
 fn zola_lists_keep_their_order_pages_and_redirects() {
-    assert_eq!(fixture("zola-lists"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-lists"), [BUILT]);
 }
 
 #[test]
 fn zola_lists_answer_the_first_page_zola_sent_on_to_them() {
-    assert_eq!(fixture("zola-first-pages"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-first-pages"), [BUILT]);
 }
 
 /// Zola names a list's address by its folder as written, so a list in a
@@ -2664,31 +2552,31 @@ fn a_zola_list_stays_at_the_address_zola_gave_it() {
 
 #[test]
 fn zola_pages_keep_their_names_dates_and_addresses() {
-    assert_eq!(fixture("zola-pages"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-pages"), [BUILT]);
 }
 
 #[test]
 fn zola_names_are_made_ready_by_each_slugify_setting() {
-    assert_eq!(fixture("zola-slugify-on"), [UNUSED_FEED]);
-    assert_eq!(fixture("zola-slugify-safe"), [UNUSED_FEED]);
-    assert_eq!(fixture("zola-slugify-off"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-slugify-on"), [BUILT]);
+    assert_eq!(fixture("zola-slugify-safe"), [BUILT]);
+    assert_eq!(fixture("zola-slugify-off"), [BUILT]);
 }
 
 #[test]
 fn zola_tags_keep_the_addresses_zola_gave_them() {
-    assert_eq!(fixture("zola-tags"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-tags"), [BUILT]);
 }
 
 #[test]
 fn zola_languages_come_across_by_place() {
-    assert_eq!(fixture("zola-languages"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-languages"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn zola_tags_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(
         fixture("zola-tags-in-writing"),
-        ["broken-link", DRAFT, "no-thumbnail", AS_TEXT, UNUSED_FEED]
+        ["broken-link", BUILT, NO_COLOURS, DRAFT, AS_TEXT]
     );
 }
 
@@ -2697,10 +2585,7 @@ fn zola_tags_in_the_writing_convert_or_stay_as_written() {
 /// template can work out, or named with a `.`, stays as written.
 #[test]
 fn zola_components_in_the_writing_convert_or_stay_as_written() {
-    assert_eq!(
-        fixture("zola-components"),
-        ["no-thumbnail", AS_TEXT, UNUSED_FEED]
-    );
+    assert_eq!(fixture("zola-components"), [BUILT, AS_TEXT]);
 }
 
 /// Zola 0.23 runs the writing as a template: `raw` is taken out, and the
@@ -2710,9 +2595,9 @@ fn zola_components_in_the_writing_convert_or_stay_as_written() {
 /// run.
 #[test]
 fn zola_template_code_in_the_writing_is_told_by_the_version_that_ran_it() {
-    assert_eq!(fixture("zola-templated-writing"), [AS_TEXT, UNUSED_FEED]);
-    assert_eq!(fixture("zola-skip-templating"), [AS_TEXT, UNUSED_FEED]);
-    assert_eq!(fixture("zola-template-code"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-templated-writing"), [BUILT, AS_TEXT]);
+    assert_eq!(fixture("zola-skip-templating"), [BUILT, AS_TEXT]);
+    assert_eq!(fixture("zola-template-code"), [BUILT]);
 }
 
 /// Zola 0.23 has no shortcodes, so a call in its writing is to one of
@@ -2720,7 +2605,7 @@ fn zola_template_code_in_the_writing_is_told_by_the_version_that_ran_it() {
 /// is told rather than made a snippet call.
 #[test]
 fn zola_functions_in_the_writing_give_their_address_or_are_told() {
-    assert_eq!(fixture("zola-functions"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-functions"), [BUILT]);
 }
 
 /// Zola 0.23 lets an `@/` link, or `get_url`, name a file beside a page:
@@ -2729,7 +2614,7 @@ fn zola_functions_in_the_writing_give_their_address_or_are_told() {
 /// page's folder.
 #[test]
 fn a_zola_link_to_a_file_beside_a_page_reaches_it() {
-    assert_eq!(fixture("zola-beside"), [UNUSED_FEED]);
+    assert_eq!(fixture("zola-beside"), [BUILT]);
 }
 
 #[test]
@@ -2767,7 +2652,7 @@ fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
         assert_eq!(code, 0, "{tool}: {said}");
         let post = fs::read_to_string(new.join("content/posts/post-1.md")).unwrap();
         assert!(
-            post.ends_with(&format!("\n---\n{words}@youtube('\u{E000}')\n")),
+            post.ends_with(&format!("\n---\n{words}@youtube(id='\u{E000}')\n")),
             "{tool}: {post:?}"
         );
     }
@@ -2775,23 +2660,18 @@ fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
 
 #[test]
 fn zola_site_under_a_path_keeps_its_addresses_and_links() {
-    assert_eq!(
-        fixture("zola-under-path"),
-        ["robots-beneath-path", UNUSED_FEED]
-    );
+    assert_eq!(fixture("zola-under-path"), [BUILT]);
 }
 
 #[test]
 fn zola_feeds_stay_at_their_old_addresses() {
-    // The old site's notes page is nearest a past starter's, which lacks
-    // `feed: true`.
-    assert_eq!(fixture("zola-feeds"), ["update-available"]);
+    assert_eq!(fixture("zola-feeds"), [BUILT, NO_FEED]);
 }
 
 #[test]
 fn zola_built_output_is_looked_in_for_every_address() {
-    assert_eq!(fixture("zola-built-agrees"), [] as [&str; 0]);
-    assert_eq!(fixture("zola-built-missing"), [] as [&str; 0]);
+    assert_eq!(fixture("zola-built-agrees"), [BUILT, NO_FEED]);
+    assert_eq!(fixture("zola-built-missing"), [BUILT, NO_FEED]);
 }
 
 #[test]
@@ -2876,7 +2756,7 @@ fn zola_outside(top: &Path, setting: &str) -> (String, BTreeMap<String, Vec<u8>>
         );
     }
     let post = String::from_utf8(made["content/posts/post-1.md"].clone()).unwrap();
-    assert!(post.contains("@youtube('abcdefghijk')"), "{post}");
+    assert!(post.contains("@youtube(id='abcdefghijk')"), "{post}");
     (report, made)
 }
 
@@ -3002,51 +2882,39 @@ fn eleventy_settings_are_read_in_either_quotes_and_assumed_where_absent() {
         "eleventy-settings-program",
         "eleventy-package-json",
     ] {
-        assert_eq!(fixture(name), [NO_ADDRESS, UNUSED_FEED], "{name}");
+        assert_eq!(fixture(name), [BUILT], "{name}");
     }
 }
 
 #[test]
 fn eleventy_front_matter_comes_across_in_statacs_words() {
-    assert_eq!(
-        fixture("eleventy-front-matter"),
-        [NO_ADDRESS, "untitled-page", UNUSED_FEED]
-    );
+    assert_eq!(fixture("eleventy-front-matter"), [BUILT]);
 }
 
 #[test]
 fn eleventy_permalinks_are_kept_in_each_form() {
-    assert_eq!(
-        fixture("eleventy-permalinks"),
-        [DRAFT, NO_ADDRESS, UNUSED_FEED]
-    );
+    assert_eq!(fixture("eleventy-permalinks"), [BUILT, DRAFT]);
 }
 
 #[test]
 fn eleventy_data_is_handed_down_as_statac_hands_it() {
     // Eleventy published no page listing `notes/`, and nothing asks for one.
-    assert_eq!(
-        fixture("eleventy-data"),
-        ["no-list-page", NO_ADDRESS, UNUSED_FEED]
-    );
+    assert_eq!(fixture("eleventy-data"), [BUILT]);
 }
 
 #[test]
 fn eleventy_folders_of_unpublished_files_with_no_title_are_left_behind() {
-    assert_eq!(fixture("eleventy-parts"), [DRAFT, NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-parts"), [BUILT, DRAFT]);
 }
 
 #[test]
 fn eleventy_permalinks_written_on_every_page_become_one_pattern() {
-    assert_eq!(fixture("eleventy-pattern"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-pattern"), [BUILT]);
 }
 
 #[test]
 fn eleventy_addresses_through_the_url_filter_carry_the_path_the_settings_give() {
-    assert_eq!(
-        fixture("eleventy-under-path"),
-        ["broken-link", NO_ADDRESS, UNUSED_FEED]
-    );
+    assert_eq!(fixture("eleventy-under-path"), ["broken-link", BUILT]);
 }
 
 const ADD_URL: &str = "Add the full URL as `url` in `statac.yaml`";
@@ -3064,15 +2932,7 @@ fn an_address_given_for_a_site_whose_settings_give_none_is_its_url() {
     assert!(report.contains("its `url` is the URL you gave"), "{report}");
     assert!(!report.contains(ADD_URL), "{report}");
     assert!(report.contains("The site is under a path, `/blog`, as its `url` says"));
-    assert_eq!(
-        checked(&new),
-        [
-            "broken-link",
-            "missing-anchor",
-            "robots-beneath-path",
-            UNUSED_FEED
-        ]
-    );
+    assert_eq!(checked(&new), ["broken-link", BUILT, "missing-anchor"]);
 
     let new = scratch("address-given-whole");
     let (code, said) = import_answering(old, &new, "https://example.org/blog/\n", false);
@@ -3171,7 +3031,6 @@ fn the_sites_address_is_asked_for_of_any_tool_and_only_where_the_settings_give_n
         assert!(settings.contains("\nurl: https://example.org\n"), "{label}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         assert!(!report.contains("no `url`"), "{label}: {report}");
-        assert!(!checked(&new).contains(&NO_ADDRESS.to_owned()), "{label}");
     }
     let old = Path::new("tests/import/hugo-home-pages/old");
     let new = scratch("address-known");
@@ -3187,60 +3046,51 @@ fn the_sites_address_is_asked_for_of_any_tool_and_only_where_the_settings_give_n
 
 #[test]
 fn eleventy_folders_given_by_a_name_said_once_are_read() {
-    assert_eq!(
-        fixture("eleventy-settings-named"),
-        [NO_ADDRESS, UNUSED_FEED]
-    );
+    assert_eq!(fixture("eleventy-settings-named"), [BUILT]);
 }
 
 #[test]
 fn eleventy_markdown_options_are_read_in_a_file_the_settings_fetch() {
-    assert_eq!(
-        fixture("eleventy-settings-fetched"),
-        [NO_ADDRESS, UNUSED_FEED]
-    );
+    assert_eq!(fixture("eleventy-settings-fetched"), [BUILT]);
 }
 
 #[test]
 fn eleventy_categories_become_tags_and_their_old_pages_send_readers_on() {
-    assert_eq!(fixture("eleventy-categories"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-categories"), [BUILT]);
 }
 
 #[test]
 fn eleventy_pages_are_dated_and_named_by_their_files() {
-    assert_eq!(fixture("eleventy-dates"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-dates"), [BUILT]);
 }
 
 #[test]
 fn eleventy_redirects_become_the_pages_old_addresses() {
-    assert_eq!(fixture("eleventy-redirects"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-redirects"), [BUILT]);
 }
 
 #[test]
 fn eleventy_tags_in_the_writing_convert_or_stay_as_written() {
     assert_eq!(
         fixture("eleventy-tags-in-writing"),
-        ["broken-link", NO_ADDRESS, AS_TEXT, UNUSED_FEED]
+        ["broken-link", BUILT, NO_COLOURS, AS_TEXT]
     );
 }
 
 #[test]
 fn eleventy_line_ends_are_line_breaks_where_the_settings_said() {
-    assert_eq!(fixture("eleventy-breaks"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-breaks"), [BUILT]);
 }
 
 #[test]
 fn eleventy_templates_ignored_files_and_files_beside_pages() {
-    assert_eq!(
-        fixture("eleventy-templates"),
-        [NO_ADDRESS, AS_TEXT, "untitled-page", UNUSED_FEED]
-    );
+    assert_eq!(fixture("eleventy-templates"), [BUILT, AS_TEXT]);
 }
 
 #[test]
 fn eleventy_built_output_is_looked_in_for_every_address() {
-    assert_eq!(fixture("eleventy-built-agrees"), [NO_ADDRESS, UNUSED_FEED]);
-    assert_eq!(fixture("eleventy-built-missing"), [NO_ADDRESS, UNUSED_FEED]);
+    assert_eq!(fixture("eleventy-built-agrees"), [BUILT]);
+    assert_eq!(fixture("eleventy-built-missing"), [BUILT]);
 }
 
 /// A folder under `top` holding `files`.

@@ -76,13 +76,13 @@ A tag that shows more than one value stays a call: {{< both >}}. Inside an addre
 
 [three]: {{< line-1 >}}/y/
 
-Figures the starter's snippet shows, each with something taken off or spelled another way:
+Figures with something more or spelled another way:
 
 {{< figure src="./photo-1.jpg" alt="Photo 1" class="wide" width="300" height="200" >}}
 
 {{< figure src="Photo%25203.jpg" alt="Photo 3" >}}
 
-And those it doesn't: a picture that moves, and a figure inside HTML.
+A picture that moves, and a figure inside HTML.
 
 {{< figure src="moving.gif" alt="Moving" >}}
 

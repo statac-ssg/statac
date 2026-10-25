@@ -197,7 +197,6 @@ codes! {
     FolderNotEmpty "folder-not-empty",
     AlreadyASite "already-a-site",
     NoSiteHere "no-site-here",
-    UpdateAvailable "update-available",
     CantTellWhatMade "cant-tell-what-made",
     MissingFolder "missing-folder",
 }
@@ -214,7 +213,6 @@ const FORMER_NAMES: &[(&str, Code)] = &[
     ("pictures-out-of-proportion", Code::ImagesOutOfProportion),
     ("undescribed-picture", Code::MissingAltText),
     ("unreadable-picture", Code::UnreadableImage),
-    ("newer-starter", Code::UpdateAvailable),
     ("waiting-for-its-day", Code::ScheduledPost),
     ("writing-never-shown", Code::ContentNeverShown),
     ("writing-not-published", Code::ContentNotPublished),
@@ -229,6 +227,8 @@ const RETIRED_NAMES: &[(&str, Code)] = &[
     ("missing-url", Code::RefusedWebmentions),
     ("not-a-url", Code::RefusedWebmentions),
     ("not-a-web-address", Code::RefusedWebmentions),
+    ("newer-starter", Code::UnknownOption),
+    ("update-available", Code::UnknownOption),
 ];
 
 impl Code {
@@ -375,8 +375,7 @@ impl Code {
             | Code::RobotsBeneathPath
             | Code::UnusedFeedTemplate
             | Code::LoopOverEveryPage
-            | Code::RefusedWebmentions
-            | Code::UpdateAvailable => Severity::Note,
+            | Code::RefusedWebmentions => Severity::Note,
             Code::OtherSpelling
             | Code::CantWrite
             | Code::MalformedYaml
@@ -529,8 +528,7 @@ impl Code {
             | Code::WebmentionsOff
             | Code::MentionOfNoPage
             | Code::RefusedWebmentions
-            | Code::LoopOverEveryPage
-            | Code::UpdateAvailable => false,
+            | Code::LoopOverEveryPage => false,
             Code::OtherSpelling
             | Code::CantWrite
             | Code::MalformedYaml
@@ -1521,11 +1519,6 @@ pub enum Kind {
     NoSiteHere {
         folder: String,
     },
-    /// Starter files `statac new` wrote with a newer version, by how
-    /// many: those never changed, and the author's with something new.
-    UpdateAvailable {
-        files: usize,
-    },
     /// A site `statac import` was given whose files no reader, or more
     /// than one, says are its tool's: the folder as given, whether it was
     /// more than one, and the tools there are readers for.
@@ -1593,28 +1586,18 @@ pub enum CardFileFault {
     Font,
 }
 
-/// A font with every character a card lacks, by its name in
-/// `templates/og/`.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum FontWithThem {
-    /// One whose file is there, which the list lacking them doesn't name.
-    Here(String),
-    /// One of the starter's that `statac new --update --missing` would
-    /// write, with the path it would be written to.
-    Brought { font: String, path: String },
-}
-
 /// Why a page's card can't be drawn.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum NotDrawn {
     /// Characters no font of a list has: those the most pages need
-    /// first, how many more there are than are named, a font with all of
-    /// them, where one is known, and the text's own field naming the
+    /// first, how many more there are than are named, a font in
+    /// `templates/og/` with all of them that the list doesn't name, by its
+    /// name there, where there is one, and the text's own field naming the
     /// list, such as `title.font`, or none for the card's `font`.
     NoFont {
         characters: Vec<char>,
         more: usize,
-        font: Option<Box<FontWithThem>>,
+        font: Option<Box<String>>,
         field: Option<Box<String>>,
     },
     /// A text in the middle too tall for its room at the size tried, by
@@ -2722,14 +2705,8 @@ pub enum OptionHint {
     },
     /// Nothing close, and no command to list the options of.
     None,
-    /// An option `statac new` takes only with `--update`.
-    OnlyWithUpdate,
-    /// An option `statac new --update` doesn't take.
-    NotWithUpdate,
-    /// `--cards`, given with `--update`.
-    CardsWithUpdate,
-    /// An option for a new site alone, given with `--update`.
-    NewSiteOnly,
+    /// An option Statac once had for writing its own files into a site.
+    Retired,
 }
 
 /// Something published, or an item a template handled, as a problem
@@ -2988,7 +2965,6 @@ impl Kind {
             Kind::FolderNotEmpty { .. } => Code::FolderNotEmpty,
             Kind::AlreadyASite { .. } => Code::AlreadyASite,
             Kind::NoSiteHere { .. } => Code::NoSiteHere,
-            Kind::UpdateAvailable { .. } => Code::UpdateAvailable,
             Kind::CantTellWhatMade { .. } => Code::CantTellWhatMade,
             Kind::MissingFolder => Code::MissingFolder,
         }

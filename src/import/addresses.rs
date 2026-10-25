@@ -97,17 +97,16 @@ pub(super) fn keep(
         .collect();
     // A pattern goes only into a folder's page that is there already, the
     // highest first, so one line covers the most pages; a folder beneath
-    // gets one of its own only where it puts more pages right. Without the
-    // starter, the posts' folder has no page of its own, so one is written
-    // for it where a pattern is kept.
+    // gets one of its own only where it puts more pages right. The posts'
+    // folder has no page of its own, so one is written for it where a
+    // pattern is kept.
     let first = landing(out.folder, today);
     let mut folders: Vec<String> = Vec::new();
     for page in pages.iter() {
         let mut above = page.to.as_str();
         while let Some((folder, _)) = above.rsplit_once('/') {
             if !folders.iter().any(|known| known == folder)
-                && (out.text(&format!("content/{folder}/index.md")).is_some()
-                    || (!out.starter && folder == POSTS))
+                && (out.text(&format!("content/{folder}/index.md")).is_some() || folder == POSTS)
             {
                 folders.push(folder.to_owned());
             }
@@ -200,7 +199,7 @@ pub(super) fn keep(
     // An old address the new site can't publish a redirect at would stop
     // the build, so each is looked for among what the site publishes,
     // every page at its kept address, before it is written.
-    let mut taken = published(out.folder, today, out.starter);
+    let mut taken = published(out.folder, today);
     for page in pages.iter_mut() {
         let own = page.address.as_deref().map(settled);
         let mut others: Vec<String> = Vec::new();
@@ -250,7 +249,7 @@ pub(super) fn keep(
 /// Each file the site in `folder` publishes, by its path in the built
 /// site as a disk holds it, with why no redirect can stand there: what
 /// is published there.
-fn published(folder: &Path, today: Date, starter: bool) -> HashMap<String, String> {
+fn published(folder: &Path, today: Date) -> HashMap<String, String> {
     let (read, assets, feeds) = read_site(
         folder,
         &Run {
@@ -259,7 +258,6 @@ fn published(folder: &Path, today: Date, starter: bool) -> HashMap<String, Strin
             url: None,
             renamed: Vec::new(),
         },
-        starter,
     );
     assets
         .claims()
@@ -310,7 +308,6 @@ pub(super) fn send_on_to_tags_and_series(
             url: None,
             renamed: Vec::new(),
         },
-        out.starter,
     );
     let mut taken: HashSet<String> = HashSet::new();
     let mut list_pages: Vec<(Word, String, String)> = Vec::new();
@@ -471,7 +468,6 @@ pub(super) fn send_on_to_later_pages(
             url: None,
             renamed: Vec::new(),
         },
-        out.starter,
     );
     let site = &read.site;
     let posts = ListKey::Folder(POSTS.to_owned());
@@ -582,7 +578,6 @@ pub(super) fn send_on_to_list_pages(
             url: None,
             renamed: Vec::new(),
         },
-        out.starter,
     );
     let site = &read.site;
     let mut taken: HashSet<String> = assets
@@ -704,14 +699,10 @@ fn settled(written: &str) -> String {
     }
 }
 
-/// The site in `folder` read as a build reads it. Without the `starter`
-/// it has no templates yet, so its feeds are those it will publish once it
-/// has them.
-fn read_site(folder: &Path, run: &Run, starter: bool) -> (content::Read, Assets, Vec<Feed>) {
-    let (read, assets, feeds) = build::read(folder, run);
-    if starter {
-        return (read, assets, feeds);
-    }
+/// The site in `folder` read as a build reads it. It has no templates yet,
+/// so its feeds are those it will publish once it has them.
+fn read_site(folder: &Path, run: &Run) -> (content::Read, Assets, Vec<Feed>) {
+    let (read, assets, _) = build::read(folder, run);
     let (feeds, _) = crate::feeds::plan(&read.site, &read.settings, &read.sources, &|_| true);
     (read, assets, feeds)
 }
@@ -982,9 +973,9 @@ pub(super) struct Checked {
 /// old address, each address in `feeds` and in `lists`, and each page in
 /// `built`, the
 /// old site's built output where it is there, among what it publishes and
-/// sends on from, and checks it as `statac check` does. Without the
-/// `starter` the site has no templates yet, so a missing one is told of
-/// in [`Checked::templates`] and not among the errors.
+/// sends on from, and checks it as `statac check` does. The site has no
+/// templates yet, so a missing one is told of in [`Checked::templates`]
+/// and not among the errors.
 pub(super) fn check(
     folder: &Path,
     today: Date,
@@ -992,7 +983,6 @@ pub(super) fn check(
     feeds: &[(String, String)],
     lists: &[(String, String)],
     built: Option<&Path>,
-    starter: bool,
 ) -> Checked {
     let (read, assets, written) = read_site(
         folder,
@@ -1002,7 +992,6 @@ pub(super) fn check(
             url: None,
             renamed: Vec::new(),
         },
-        starter,
     );
     let mut published: HashSet<String> = HashSet::new();
     let claims = assets
@@ -1092,7 +1081,7 @@ pub(super) fn check(
         .problems
         .iter()
         .filter(|p| p.kind.severity() == Severity::Error)
-        .filter(|p| starter || !matches!(p.kind, Kind::MissingTemplate { .. }))
+        .filter(|p| !matches!(p.kind, Kind::MissingTemplate { .. }))
     {
         let (file, line) = match problem.place {
             Some(place) => (

@@ -729,8 +729,17 @@ fn a_file_beside_the_page_gives_its_address_its_size_and_its_text() {
     );
 }
 
-/// The snippet `statac new` writes for a file shown as code.
-const FILE: &str = include_str!("../starter/site/snippets/file.html");
+/// A snippet showing a file kept beside the writing as code, where it is
+/// text, and as a link where it isn't.
+const FILE: &str = "{% set file = page.file(name) %}\n\
+{% set code = file.code %}\n\
+{% if code %}\n\
+<figure class=\"code\"><figcaption><a href=\"{{ file.url }}\" download>{{ file.name }}</a>\
+</figcaption><pre><code{% if file.language %} class=\"language-{{ file.language }}\"{% endif %}>\
+{{ code }}</code></pre></figure>\n\
+{% else %}\n\
+<p><a href=\"{{ file.url }}\" download>{{ file.name }}</a></p>\n\
+{% endif %}\n";
 
 #[test]
 fn a_file_beside_the_page_is_shown_as_code_coloured_by_its_name() {

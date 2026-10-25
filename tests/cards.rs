@@ -9,7 +9,7 @@ use image::{Rgb, RgbImage};
 
 const LATIN: &[u8] = include_bytes!("../src/cards/fonts/test/test-latin.ttf");
 const LETTERS: &[u8] = include_bytes!("../src/cards/fonts/test/test-latin-letters-only.ttf");
-const EMOJI: &[u8] = include_bytes!("../starter/site/templates/og/NotoEmoji.ttf");
+const EMOJI: &[u8] = include_bytes!("../src/cards/fonts/test/test-emoji.ttf");
 
 /// A layout writing what a link preview reads of a page.
 const LAYOUT: &str = "<!doctype html>
@@ -864,7 +864,7 @@ fn texts_at_the_top_and_bottom_that_meet_leave_a_page_without_a_card() {
 }
 
 #[test]
-fn an_emoji_is_drawn_by_the_starters_emoji_font_and_missed_without_it() {
+fn an_emoji_is_missed_without_a_font_that_has_it_and_drawn_with_one() {
     let site = Site::new("emoji");
     site.write(
         "content/post-2.md",
@@ -875,21 +875,20 @@ fn an_emoji_is_drawn_by_the_starters_emoji_font_and_missed_without_it() {
         told(&said),
         ["warning  Card not drawn: `content/post-2.md` needs `\u{1f97e}`, which no font has"]
     );
-    let hint = "  Run `statac new --update --missing` to write `templates/og/NotoEmoji.ttf`, \
-                which has it, then add `NotoEmoji.ttf` to the card's `font`.\n";
+    let hint = "  Add a font that has it to the card's `font`.\n";
     assert!(said.contains(hint), "{said}");
 
     // Once its file is there, the font is named for the card's `font`.
-    site.put("templates/og/NotoEmoji.ttf", EMOJI);
+    site.put("templates/og/emoji.ttf", EMOJI);
     let said = site.check();
     assert!(
-        said.contains("  Add `NotoEmoji.ttf`, which has it, to the card's `font`.\n"),
+        said.contains("  Add `emoji.ttf`, which has it, to the card's `font`.\n"),
         "{said}"
     );
 
     site.write(
         "templates/og.yaml",
-        &CARD.replace("font: text.ttf", "font: [text.ttf, NotoEmoji.ttf]"),
+        &CARD.replace("font: text.ttf", "font: [text.ttf, emoji.ttf]"),
     );
     assert_eq!(site.check(), "No problems.\n");
     let said = site.build();
@@ -897,36 +896,19 @@ fn an_emoji_is_drawn_by_the_starters_emoji_font_and_missed_without_it() {
 }
 
 #[test]
-fn a_character_the_starters_fonts_lack_is_not_said_to_be_brought() {
-    let site = Site::new("no-font-to-bring");
-    site.write(
-        "content/post-2.md",
-        "---\ntitle: Boots \u{1f97e} \u{4e2d}\n---\nA post.\n",
-    );
-    let said = site.check();
-    assert!(
-        said.contains("  Add a font that has them to the card's `font`.\n"),
-        "{said}"
-    );
-}
-
-#[test]
 fn a_digit_is_drawn_by_a_second_text_font_and_never_by_an_emoji_font() {
     let site = Site::new("second-font");
     site.write(
         "templates/og.yaml",
-        &CARD.replace(
-            "font: text.ttf",
-            "font: [letters.ttf, NotoEmoji.ttf, text.ttf]",
-        ),
+        &CARD.replace("font: text.ttf", "font: [letters.ttf, emoji.ttf, text.ttf]"),
     );
     site.put("templates/og/letters.ttf", LETTERS);
-    site.put("templates/og/NotoEmoji.ttf", EMOJI);
+    site.put("templates/og/emoji.ttf", EMOJI);
     site.write("content/post-1.md", "---\ntitle: Post 2024\n---\nA post.\n");
     assert_eq!(site.check(), "No problems.\n");
     site.write(
         "templates/og.yaml",
-        &CARD.replace("font: text.ttf", "font: [letters.ttf, NotoEmoji.ttf]"),
+        &CARD.replace("font: text.ttf", "font: [letters.ttf, emoji.ttf]"),
     );
     assert_eq!(
         told(&site.check()),
@@ -938,10 +920,10 @@ fn a_digit_is_drawn_by_a_second_text_font_and_never_by_an_emoji_font() {
 fn a_text_drawn_in_fonts_of_its_own_is_told_of_what_they_lack() {
     let site = Site::new("own-fonts");
     site.put("templates/og/letters.ttf", LETTERS);
-    site.put("templates/og/NotoEmoji.ttf", EMOJI);
+    site.put("templates/og/emoji.ttf", EMOJI);
     site.write(
         "templates/og.yaml",
-        &format!("{CARD}title.font: [letters.ttf, NotoEmoji.ttf]\n"),
+        &format!("{CARD}title.font: [letters.ttf, emoji.ttf]\n"),
     );
     site.write(
         "content/post-2.md",
@@ -967,7 +949,7 @@ fn a_text_drawn_in_fonts_of_its_own_is_told_of_what_they_lack() {
     // title's have.
     site.write(
         "templates/og.yaml",
-        &format!("{CARD}title.font: [text.ttf, NotoEmoji.ttf]\n"),
+        &format!("{CARD}title.font: [text.ttf, emoji.ttf]\n"),
     );
     site.write(
         "statac.yaml",
@@ -983,7 +965,7 @@ fn a_text_drawn_in_fonts_of_its_own_is_told_of_what_they_lack() {
         ]
     );
     assert!(
-        said.contains("  Add `NotoEmoji.ttf`, which has it, to the card's `font`.\n"),
+        said.contains("  Add `emoji.ttf`, which has it, to the card's `font`.\n"),
         "{said}"
     );
 }

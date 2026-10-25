@@ -1,7 +1,0 @@
-{# A callout, written in Markdown as > [!NOTE], with its kind written out as a word: see /writing/ -#}
-{% set words = site.data.words[page.language] %}
-{% set titles = {"note": words.note, "tip": words.tip, "important": words.important, "warning": words.warning, "caution": words.caution} %}
-<aside class="callout {{ kind }}">
-  <p class="callout-title">{{ titles[kind] }}</p>
-  {{ body }}
-</aside>

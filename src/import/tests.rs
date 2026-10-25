@@ -146,10 +146,9 @@ fn a_site() -> Import {
     }
 }
 
-/// Imports `a_site` into `folder`, with the starter where `starter` says,
-/// with every file after the first `allowed` refused, and undoes what it
-/// wrote, as `write::site` does.
-fn stopped_after(old: &Path, folder: &Path, allowed: usize, starter: bool) -> bool {
+/// Imports `a_site` into `folder`, with every file after the first
+/// `allowed` refused, and undoes what it wrote, as `write::site` does.
+fn stopped_after(old: &Path, folder: &Path, allowed: usize) -> bool {
     let shown = Shown {
         tool: "Jekyll",
         old: "old",
@@ -170,7 +169,6 @@ fn stopped_after(old: &Path, folder: &Path, allowed: usize, starter: bool) -> bo
         a_site(),
         Date::day_only(2026, 10, 6),
         &shown,
-        starter,
         &mut refusing,
     );
     if made.is_err() {
@@ -184,18 +182,16 @@ fn a_site_stopped_part_way_leaves_nothing() {
     let top = scratch("stopped");
     let old = top.join("old");
     std::fs::create_dir_all(&old).unwrap();
-    for starter in [true, false] {
-        for allowed in [0, 1, 2, 3] {
-            let outer = top.join(format!("new-{allowed}-{starter}"));
-            assert!(
-                stopped_after(&old, &outer.join("site"), allowed, starter),
-                "{allowed}"
-            );
-            assert!(!outer.exists(), "{allowed}");
-        }
-        let empty = top.join(format!("empty-{starter}"));
-        std::fs::create_dir_all(&empty).unwrap();
-        assert!(stopped_after(&old, &empty, 2, starter));
-        assert_eq!(std::fs::read_dir(&empty).unwrap().count(), 0);
+    for allowed in [0, 1, 2, 3] {
+        let outer = top.join(format!("new-{allowed}"));
+        assert!(
+            stopped_after(&old, &outer.join("site"), allowed),
+            "{allowed}"
+        );
+        assert!(!outer.exists(), "{allowed}");
     }
+    let empty = top.join("empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    assert!(stopped_after(&old, &empty, 2));
+    assert_eq!(std::fs::read_dir(&empty).unwrap().count(), 0);
 }

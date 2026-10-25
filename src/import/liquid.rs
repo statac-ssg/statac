@@ -151,9 +151,8 @@ pub(super) fn highlight(
 }
 
 /// The snippet standing for the include `file`: its name with each
-/// character a snippet's name can't hold as `_`, kept clear of the
-/// starter's where the new site has it.
-pub(super) fn include_snippet(file: &str, starter: bool) -> String {
+/// character a snippet's name can't hold as `_`.
+pub(super) fn include_snippet(file: &str) -> String {
     let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem);
     let mut snippet: String = stem
         .chars()
@@ -161,9 +160,6 @@ pub(super) fn include_snippet(file: &str, starter: bool) -> String {
         .collect();
     if !snippet.starts_with(|c: char| c.is_ascii_alphabetic()) {
         snippet = format!("include_{snippet}");
-    }
-    if starter && crate::new::has_snippet(&snippet) {
-        snippet = format!("old_{snippet}");
     }
     snippet
 }
@@ -198,7 +194,7 @@ pub(super) fn quoted_value(text: &str) -> Option<(String, &str)> {
 /// An include as a snippet call: the snippet's name, the names handed,
 /// and the call. None where a value is a variable, or a name can't be one
 /// of a call's.
-pub(super) fn include(rest: &str, starter: bool) -> Option<(String, Vec<String>, String)> {
+pub(super) fn include(rest: &str) -> Option<(String, Vec<String>, String)> {
     let (file, mut params) = match rest.split_once(char::is_whitespace) {
         Some((file, params)) => (file, params.trim()),
         None => (rest, ""),
@@ -206,7 +202,7 @@ pub(super) fn include(rest: &str, starter: bool) -> Option<(String, Vec<String>,
     if file.contains(['{', '}']) || file.is_empty() {
         return None;
     }
-    let snippet = include_snippet(file, starter);
+    let snippet = include_snippet(file);
     let mut names = Vec::new();
     let mut handed = Vec::new();
     while !params.is_empty() {
@@ -305,18 +301,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_include_named_as_a_starter_snippet_is_kept_clear_of_it() {
-        for (file, with, without) in [
-            ("figure.html", "old_figure", "figure"),
-            ("called.html", "old_called", "called"),
-            ("thumb.html", "old_thumb", "thumb"),
-            ("file.md", "old_file", "file"),
-            ("card.html", "card", "card"),
-            ("callout.html", "callout", "callout"),
-            ("post-meta.html", "post_meta", "post_meta"),
+    fn an_include_is_a_snippet_of_its_name_as_a_call_can_name_it() {
+        for (file, snippet) in [
+            ("figure.html", "figure"),
+            ("file.md", "file"),
+            ("post-meta.html", "post_meta"),
+            ("1-column.html", "include_1_column"),
         ] {
-            assert_eq!(include_snippet(file, true), with, "{file}");
-            assert_eq!(include_snippet(file, false), without, "{file}");
+            assert_eq!(include_snippet(file), snippet, "{file}");
         }
     }
 }

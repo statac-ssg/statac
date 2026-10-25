@@ -38,7 +38,7 @@ pub(crate) fn rewrite(
 
 /// Puts `with` in place of the whole file at `rel`, refused as
 /// [`rewrite`] is. Where it is refused or fails, the file is as it was.
-pub(crate) fn replace(root: &Path, rel: &str, read: &[u8], with: &[u8]) -> Result<(), Reason> {
+fn replace(root: &Path, rel: &str, read: &[u8], with: &[u8]) -> Result<(), Reason> {
     match platform::rewrite(root, rel, read, with) {
         Ok(()) => Ok(()),
         Err(Unwritten::Changed) => Err(Reason::Changed),

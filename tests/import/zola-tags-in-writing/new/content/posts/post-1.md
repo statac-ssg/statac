@@ -6,17 +6,17 @@ A post with every tag Zola runs in the writing.
 
 <!--more-->
 
-@youtube('abcdefghijk')
+@youtube(id='abcdefghijk')
 
-@vimeo('123456789')
+@vimeo(id='123456789')
 
-{{ youtube(id="abcdefghijk", autoplay=true) }}
+@youtube(id='abcdefghijk', autoplay=true)
 
 @gist(url='https://gist.github.com/user/0123456789abcdef', file='a.rs')
 
 @streamable(id='92ok4')
 
-@old_note(text='A note of the site\'s own.')
+@note(text='A note of the site\'s own.')
 
 A line with @line_1(n=3, on=false) inside it.
 

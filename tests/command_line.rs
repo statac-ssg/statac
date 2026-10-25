@@ -97,95 +97,29 @@ fn made(folder: &std::path::Path) {
 }
 
 #[test]
-fn update_brings_a_site_up_to_date_in_the_folder_given_or_the_one_run_in() {
-    let folder = scratch("update");
+fn the_options_that_wrote_statacs_own_files_into_a_site_are_refused_and_write_nothing() {
+    let folder = scratch("retired");
     made(&folder);
-    let nothing = "Nothing to update: every starter file here is the newest, or yours with \
-                   nothing new.\n";
-    let output = statac(&["new", "--update", &folder.to_string_lossy()]);
-    assert_eq!(output.status.code(), Some(0), "{output:?}");
-    assert_eq!(String::from_utf8(output.stdout).unwrap(), nothing);
-
-    std::fs::remove_file(folder.join("snippets/note.html")).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_statac"))
-        .args(["new", "--update", "--missing"])
-        .current_dir(&folder)
-        .env("NO_COLOR", "1")
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(0), "{output:?}");
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap(),
-        "Wrote `snippets/note.html`.\nUpdated 1 file.\n"
-    );
-
-    let output = statac(&["check", &folder.to_string_lossy()]);
-    let said = String::from_utf8(output.stdout).unwrap();
-    assert!(!said.contains("update-available"), "{said}");
-}
-
-#[test]
-fn cards_finds_the_site_it_is_run_inside_and_makes_one_where_there_is_none() {
-    let run_in = |folder: &std::path::Path, args: &[&str]| {
-        let output = Command::new(env!("CARGO_BIN_EXE_statac"))
-            .args(args)
-            .current_dir(folder)
-            .env("NO_COLOR", "1")
-            .output()
-            .unwrap();
-        assert_eq!(output.status.code(), Some(0), "{output:?}");
-        String::from_utf8(output.stdout).unwrap()
-    };
-    let folder = scratch("cards");
-    made(&folder);
-    assert!(!folder.join("templates/og.yaml").exists());
-    assert_eq!(
-        run_in(&folder.join("content/posts"), &["new", "--cards"]),
-        "Wrote `templates/og/NotoEmoji-OFL.txt`.\n\
-         Wrote `templates/og/NotoEmoji.ttf`.\n\
-         Wrote `templates/og/NotoSans-Regular.ttf`.\n\
-         Wrote `templates/og/OFL.txt`.\n\
-         Wrote `templates/og/background.png`.\n\
-         Wrote `templates/og.yaml`.\n"
-    );
-    assert!(folder.join("templates/og.yaml").is_file());
-    assert!(!folder.join("content/posts/templates").exists());
-    let output = statac(&["new", "--cards", &folder.to_string_lossy()]);
-    assert_eq!(output.status.code(), Some(0), "{output:?}");
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap(),
-        "`templates/og.yaml` is yours and wasn't touched.\n"
-    );
-
-    let empty = scratch("cards-no-site");
-    std::fs::create_dir_all(&empty).unwrap();
-    let said = run_in(&empty, &["new", "--cards", "--yes"]);
-    assert!(
-        said.starts_with("Made a new site in `cards-no-site`: 95 files.\n"),
-        "{said}"
-    );
-    assert!(empty.join("templates/og.yaml").is_file());
-
-    let output = statac(&["new", "--cards", "--update", &folder.to_string_lossy()]);
-    assert_eq!(output.status.code(), Some(2), "{output:?}");
-}
-
-#[test]
-fn update_of_a_folder_that_isnt_a_site_exits_with_1() {
-    let folder = scratch("update-no-site");
-    std::fs::create_dir_all(&folder).unwrap();
-    let output = statac(&["new", "--update", &folder.to_string_lossy()]);
-    assert_eq!(output.status.code(), Some(1));
-    let said = String::from_utf8(output.stdout).unwrap();
-    assert!(
-        said.ends_with(
-            ": it has no `statac.yaml`, so it isn't a site\n  \
-             More: https://statac.dev/e/cant-read/\n"
-        ),
-        "{said}"
-    );
-    let output = statac(&["new", "--update", "--yes", &folder.to_string_lossy()]);
-    assert_eq!(output.status.code(), Some(2));
+    let before: Vec<_> = std::fs::read_dir(&folder)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    for option in ["--update", "--missing", "--cards", "--no-starter"] {
+        let output = statac(&["new", option, &folder.to_string_lossy()]);
+        assert_eq!(output.status.code(), Some(2), "{option}: {output:?}");
+        assert!(output.stdout.is_empty(), "{option}: {output:?}");
+        let said = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            said.starts_with(&format!("error  Unknown option: `{option}`\n")),
+            "{said}"
+        );
+        assert!(said.contains("Statac no longer writes templates into a site"));
+    }
+    let after: Vec<_> = std::fs::read_dir(&folder)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(after, before);
 }
 
 #[test]
@@ -469,6 +403,7 @@ fn serve_says_nothing_of_a_connection_closed_before_its_answer() {
     made(&site);
     // More than the system holds for a connection nobody reads from, so
     // the answer is still being written when the connection closes.
+    std::fs::create_dir_all(site.join("assets")).unwrap();
     std::fs::write(site.join("assets/large.bin"), vec![0; 8 << 20]).unwrap();
     let mut serving = Command::new(env!("CARGO_BIN_EXE_statac"))
         .args(["serve", "--offline"])

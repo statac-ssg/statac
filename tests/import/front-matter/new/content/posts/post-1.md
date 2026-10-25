@@ -9,7 +9,7 @@ tags:
   - category_category-1
   - category_category-2
 old_order: 3
-contents: true
+old_toc: true
 old_slug: post-1
 book:
   author: Name

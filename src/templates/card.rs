@@ -31,8 +31,8 @@ use crate::content::words::{self, PageWord};
 use crate::origin::{Arrival, Sourced};
 use crate::pictures::{self, Kind as PictureKind};
 use crate::problem::{
-    CardFileFault, Expected, FontWithThem, Found, Kind, NotDrawn, Problem, Reason, SetAside,
-    Stopped, Waiting, Word,
+    CardFileFault, Expected, Found, Kind, NotDrawn, Problem, Reason, SetAside, Stopped, Waiting,
+    Word,
 };
 use crate::reads::{Key, Reads};
 use crate::site::{Id, PageId, PictureId, Site};
@@ -981,17 +981,7 @@ pub(super) fn told(shared: &Shared, asked: &Gathered) -> Vec<Problem> {
                     .sort_by_key(|&(_, pages)| std::cmp::Reverse(pages));
                 let characters: Vec<char> = cause.needed.iter().map(|&(c, _)| c).collect();
                 let named = characters.len().min(NAMED);
-                let starter = &crate::new::update::Starter::OWN;
-                let font = font_here(&cards.root, &characters)
-                    .map(FontWithThem::Here)
-                    .or_else(|| {
-                        crate::new::update::font_to_bring(&cards.root, starter, &characters).map(
-                            |font| FontWithThem::Brought {
-                                font: font.to_owned(),
-                                path: format!("{}/{font}", crate::cards::FOLDER),
-                            },
-                        )
-                    });
+                let font = font_here(&cards.root, &characters);
                 NotDrawn::NoFont {
                     more: characters.len() - named,
                     characters: characters[..named].to_vec(),

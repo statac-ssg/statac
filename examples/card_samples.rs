@@ -14,7 +14,7 @@ const LATIN: &[u8] = include_bytes!("../src/cards/fonts/test/test-latin.ttf");
 const ARABIC: &[u8] = include_bytes!("../src/cards/fonts/test/test-arabic.ttf");
 const JAPANESE: &[u8] = include_bytes!("../src/cards/fonts/test/test-japanese.ttf");
 const KOREAN: &[u8] = include_bytes!("../src/cards/fonts/test/test-korean.ttf");
-const EMOJI: &[u8] = include_bytes!("../starter/site/templates/og/NotoEmoji.ttf");
+const EMOJI: &[u8] = include_bytes!("../src/cards/fonts/test/test-emoji.ttf");
 
 /// A diagonal gradient from one colour to another, as a PNG.
 fn gradient(from: [u8; 3], to: [u8; 3]) -> Vec<u8> {

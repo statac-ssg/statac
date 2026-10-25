@@ -76,32 +76,21 @@ pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
             counted(kinds, "kind", "kinds")
         ));
     }
-    if !summary.starter {
-        text.push_str(
-            "The new site has no templates, so it won't build until you add your own: see \
-             https://statac.dev/templates/.\n",
-        );
-    }
+    text.push_str(
+        "The new site has no templates, so each page is published as its content alone until \
+         you add your own: see https://statac.dev/templates/.\n",
+    );
     if summary.errors > 0 {
         let errors = counted(summary.errors, "error", "errors");
-        text.push_str(&match summary.starter {
-            true => format!(
-                "The new site doesn't build yet: {errors}, listed in `{}/{REPORT}`.\n",
-                shown.new
-            ),
-            false => format!(
-                "The new site also has {errors}, listed in `{}/{REPORT}`.\n",
-                shown.new
-            ),
-        });
-    }
-    text.push_str(&match summary.starter {
-        true => format!("\nNext: `cd {}`, then `statac check`.\n", shown.new),
-        false => format!(
-            "\nNext: `cd {}`, add your own templates to `templates/`, then `statac check`.\n",
+        text.push_str(&format!(
+            "The new site also has {errors}, listed in `{}/{REPORT}`.\n",
             shown.new
-        ),
-    });
+        ));
+    }
+    text.push_str(&format!(
+        "\nNext: `cd {}`, add your own templates to `templates/`, then `statac check`.\n",
+        shown.new
+    ));
     text
 }
 
@@ -117,55 +106,36 @@ pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
         },
         tool = shown.tool
     );
-    match summary.starter {
-        true => text.push_str(&format!(
-            "It was made from `{}` by `statac import`, which changed nothing there. The templates, \
-             snippets and stylesheet are Statac's starter, as `statac new` writes it: see \
-             https://statac.dev/new/.\n\n",
-            shown.old
-        )),
-        false => {
-            text.push_str(&format!(
-                "It was made from `{}` by `statac import --no-starter`, which changed nothing \
-                 there. It has none of the starter's templates, snippets, stylesheet or pages, \
-                 so it won't build until you add templates of your own: see \
-                 https://statac.dev/templates/.",
-                shown.old
-            ));
-            if !summary.templates.is_empty() {
-                let templates: Vec<String> = summary.templates.iter().map(|t| code(t)).collect();
-                let feeds = summary
-                    .templates
-                    .iter()
-                    .any(|t| t.starts_with("templates/feed."));
-                text.push_str(&format!(
-                    " Its pages{} need {}.",
-                    if feeds { " and feeds" } else { "" },
-                    crate::wording::listed(&templates)
-                ));
-            }
-            text.push_str("\n\n");
-        }
+    text.push_str(&format!(
+        "It was made from `{}` by `statac import`, which changed nothing there. It has no \
+         templates, so each page is published as its content alone until you add templates of \
+         your own: see https://statac.dev/templates/.",
+        shown.old
+    ));
+    if !summary.templates.is_empty() {
+        let templates: Vec<String> = summary.templates.iter().map(|t| code(t)).collect();
+        let feeds = summary
+            .templates
+            .iter()
+            .any(|t| t.starts_with("templates/feed."));
+        text.push_str(&format!(
+            " Its pages{} need {}.",
+            if feeds { " and feeds" } else { "" },
+            crate::wording::listed(&templates)
+        ));
     }
+    text.push_str("\n\n");
     came_across(&mut text, summary);
     addresses(&mut text, summary);
     left_for_you(&mut text, summary);
     not_converted(&mut text, summary);
-    text.push_str(match summary.starter {
-        true => {
-            "## What to do next\n\n\
-             1. Run `statac check` in this folder, and put right what it shows.\n\
-             2. Run `statac serve`, and read the site in a browser beside the old one.\n\
-             3. Once nothing here is left to do, delete `IMPORT.md`.\n"
-        }
-        false => {
-            "## What to do next\n\n\
-             1. Add your own templates to `templates/`.\n\
-             2. Run `statac check` in this folder, and put right what it shows.\n\
-             3. Run `statac serve`, and read the site in a browser beside the old one.\n\
-             4. Once nothing here is left to do, delete `IMPORT.md`.\n"
-        }
-    });
+    text.push_str(
+        "## What to do next\n\n\
+         1. Add your own templates to `templates/`.\n\
+         2. Run `statac check` in this folder, and put right what it shows.\n\
+         3. Run `statac serve`, and read the site in a browser beside the old one.\n\
+         4. Once nothing here is left to do, delete `IMPORT.md`.\n",
+    );
     text
 }
 
@@ -221,28 +191,13 @@ fn came_across(text: &mut String, summary: &Summary) {
         text.push_str(&format!("- {line}\n"));
     }
     text.push('\n');
-    match (summary.starter, summary.home) {
-        (true, false) => text.push_str(
-            "The old site's home page had no content of its own, so the starter's home page \
-             stays, listing the posts: `content/index.md`.\n\n",
-        ),
-        (true, true) => text.push_str(
-            "The old site's home page is `content/index.md`, built with \
-             `templates/home.html`, which lists the posts below its content.\n\n",
-        ),
-        (false, false) => text.push_str(
+    text.push_str(match summary.home {
+        false => {
             "The old site's home page had no content of its own, so `content/index.md` has \
-             none: write the home page there.\n\n",
-        ),
-        (false, true) => text.push_str("The old site's home page is `content/index.md`.\n\n"),
-    }
-    for (path, instead) in &summary.displaced {
-        text.push_str(&format!(
-            "The starter's {} was left out: the old site's {} is published at its URL.\n\n",
-            code(&format!("content/{path}")),
-            code(instead)
-        ));
-    }
+             none: write the home page there.\n\n"
+        }
+        true => "The old site's home page is `content/index.md`.\n\n",
+    });
     for note in (summary.notes.iter())
         .chain(&terms(summary))
         .chain(&settled(summary))
@@ -590,14 +545,10 @@ fn unanswered(text: &mut String, summary: &Summary) {
     }
     for (address, list) in &kept.lists {
         text.push_str(&format!(
-            "The old site published a page listing every one of its {} at {}, and the {} has \
-             none.\n\n",
+            "The old site published a page listing every one of its {} at {}, and the new site \
+             has none.\n\n",
             code(list),
             code(address),
-            match summary.starter {
-                true => "starter",
-                false => "new site",
-            }
         ));
     }
     if let Some(example) = kept.pictures.first() {

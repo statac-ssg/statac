@@ -10,9 +10,7 @@ const LETTERS: &[u8] = include_bytes!("../fonts/test/test-latin-letters-only.ttf
 const ARABIC: &[u8] = include_bytes!("../fonts/test/test-arabic.ttf");
 const JAPANESE: &[u8] = include_bytes!("../fonts/test/test-japanese.ttf");
 const KOREAN: &[u8] = include_bytes!("../fonts/test/test-korean.ttf");
-const EMOJI: &[u8] = include_bytes!("../../../starter/site/templates/og/NotoEmoji.ttf");
-const STARTER_TEXT: &[u8] =
-    include_bytes!("../../../starter/site/templates/og/NotoSans-Regular.ttf");
+const EMOJI: &[u8] = include_bytes!("../fonts/test/test-emoji.ttf");
 
 const INK: [u8; 3] = [250, 240, 200];
 
@@ -325,7 +323,7 @@ fn an_emoji_font_is_known_by_what_it_holds() {
         faces.iter().all(|face| face.keycaps_only)
     };
     assert!(known(EMOJI));
-    for font in [STARTER_TEXT, LATIN, LETTERS, ARABIC, JAPANESE, KOREAN] {
+    for font in [LATIN, LETTERS, ARABIC, JAPANESE, KOREAN] {
         assert!(!known(font));
     }
 }
@@ -710,7 +708,7 @@ fn a_card_drawn_in_the_cards_own_fonts_keeps_its_key() {
     ];
     assert_eq!(
         kit.key(&texts).hex(),
-        "63bce9322c6778d3a0394d9ef3b97aa697f1d6a861c60ab395787577023d0de5"
+        "13aa36400a3ef5b82fb61b9f29e5dab50f1640bda91fdcab73c5c9398c500964"
     );
     let other = Kit::new(&flat(), &[LATIN, EMOJI, KOREAN], &[vec![0, 1], vec![2]], 60);
     assert_eq!(other.unwrap().key(&texts), kit.key(&texts));

@@ -50,14 +50,12 @@
 //!   sites come out alike;
 //! - escape a call in the writing, or put blank lines round HTML: how
 //!   Statac's Markdown reads writing is the shared part's to know;
-//! - copy the tool's templates or theme: the new site has Statac's
-//!   starter, as `statac new` writes it, or with `--no-starter` none;
+//! - copy the tool's templates or theme: the new site has none;
 //! - guess silently: where the tool's rule is unclear, it says so as a
 //!   finding or a note.
 //!
-//! The shared part makes the site with `new::make`, takes out the
-//! starter's first post, and its home page where the old site has one of
-//! its own, makes each page's writing read in Statac as it showed in the
+//! The shared part makes the site with `new::make`, makes each page's
+//! writing read in Statac as it showed in the
 //! old site where a blank line or a backslash does it (see `writing`),
 //! writes every page, file and setting, keeps each old address
 //! by a `pages.permalink` pattern in a folder's `index.md`, a page's own
@@ -111,10 +109,6 @@ pub struct Options {
     /// The day the import is made on; today on this machine's clock where
     /// none is given.
     pub today: Option<Date>,
-    /// Whether the new site has the starter's templates, snippets,
-    /// stylesheet and pages, or `--no-starter` leaves it only `statac.yaml`
-    /// and what came across.
-    pub starter: bool,
 }
 
 /// A tool Statac has a reader for.
@@ -164,20 +158,13 @@ impl Tool {
     }
 
     /// Reads the old site in `folder`, taking `given` for its address
-    /// where its settings give none, for a new site with the starter where
-    /// `starter` says.
-    fn read(
-        self,
-        folder: &Path,
-        today: Date,
-        given: Option<&str>,
-        starter: bool,
-    ) -> Result<Import, Box<Failed>> {
+    /// where its settings give none.
+    fn read(self, folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
         match self {
-            Tool::Jekyll => jekyll::read(folder, today, given, starter),
-            Tool::Hugo => hugo::read(folder, today, given, starter),
-            Tool::Zola => zola::read(folder, today, given, starter),
-            Tool::Eleventy => eleventy::read(folder, today, given, starter),
+            Tool::Jekyll => jekyll::read(folder, today, given),
+            Tool::Hugo => hugo::read(folder, today, given),
+            Tool::Zola => zola::read(folder, today, given),
+            Tool::Eleventy => eleventy::read(folder, today, given),
         }
     }
 }
@@ -242,9 +229,9 @@ pub struct Import {
     pub notes: Vec<String>,
     /// Lines of front matter in Statac's own words, meant as Statac means
     /// them, such as a list's `feed` or `order`, by the path under
-    /// `content/` of the page they go on: one that came across, or else
-    /// one of the starter's, which without the starter is written to hold
-    /// them. They are written as they are, after the page's own.
+    /// `content/` of the page they go on: one that came across, or else one
+    /// written to hold them. They are written as they are, after the
+    /// page's own.
     pub words: Vec<(String, Field)>,
 }
 
@@ -400,36 +387,13 @@ pub struct Left {
     pub what: String,
 }
 
-/// What a reader says of `what`, something of the old site's it leaves
-/// behind, as a sentence's end: with what of the starter's takes its
-/// place, `by`, where the new site has the `starter`.
-fn left_behind(what: &str, by: &str, starter: bool) -> String {
-    match starter {
-        true => format!("{what}, which {by} the place of"),
-        false => what.to_owned(),
-    }
-}
-
-/// What a reader says of the new home page's own list, kept to one page:
-/// with why, where the new site has the `starter`'s home page. Where the
-/// settings give the lists `posts_per_page`, the home page says `0`, and
-/// otherwise nothing.
-fn one_home_page(starter: bool, paged: bool) -> &'static str {
-    match (starter, paged) {
-        (true, true) => {
-            "Statac's home page shows the newest of each folder itself, so `content/index.md` \
-             keeps its own list to one page with `posts_per_page: 0`"
-        }
-        (false, true) => {
-            "`content/index.md` keeps its own list to one page with `posts_per_page: 0`"
-        }
-        (true, false) => {
-            "Statac's home page shows the newest of each folder itself, so `content/index.md` \
-             gives no `posts_per_page` and its own list stays on one page"
-        }
-        (false, false) => {
-            "`content/index.md` gives no `posts_per_page`, so its own list stays on one page"
-        }
+/// What a reader says of the new home page's own list, kept to one page.
+/// Where the settings give the lists `posts_per_page`, the home page says
+/// `0`, and otherwise nothing.
+fn one_home_page(paged: bool) -> &'static str {
+    match paged {
+        true => "`content/index.md` keeps its own list to one page with `posts_per_page: 0`",
+        false => "`content/index.md` gives no `posts_per_page`, so its own list stays on one page",
     }
 }
 
@@ -459,7 +423,7 @@ pub fn run(options: &Options, input: Option<Input>, out: &mut dyn Write, colour:
     };
     // The old site is read once with no link followed, which says what
     // it published; where a link waits on that, it is read again.
-    let mut read = tool.read(&options.old, today, None, options.starter);
+    let mut read = tool.read(&options.old, today, None);
     if let Ok(first) = &read
         && inside::waiting()
     {
@@ -471,7 +435,7 @@ pub fn run(options: &Options, input: Option<Input>, out: &mut dyn Write, colour:
             .map(|file| file.from.as_str());
         let published: Vec<&str> = pages.chain(files).collect();
         inside::read_once(&options.old, &published);
-        read = tool.read(&options.old, today, None, options.starter);
+        read = tool.read(&options.old, today, None);
     }
     if let (Ok(import), Some(input)) = (&read, input)
         && import.address.is_none()
@@ -487,9 +451,7 @@ pub fn run(options: &Options, input: Option<Input>, out: &mut dyn Write, colour:
             wording::ASK_ADDRESS_HINT.to_owned(),
         ];
         match asking.address(wording::ASK_OLD_ADDRESS, &hints) {
-            Ok(Some(address)) => {
-                read = tool.read(&options.old, today, Some(&address), options.starter)
-            }
+            Ok(Some(address)) => read = tool.read(&options.old, today, Some(&address)),
             Ok(None) => {}
             Err(told) => {
                 say(&format!("{}\n", crate::report::shown(&told)));
@@ -511,7 +473,7 @@ pub fn run(options: &Options, input: Option<Input>, out: &mut dyn Write, colour:
         old: &old_shown,
         new: &new_shown,
     };
-    match write::site(&options.old, &new, import, today, &shown, options.starter) {
+    match write::site(&options.old, &new, import, today, &shown) {
         Ok(summary) => {
             for line in report::said(&shown, &summary).lines() {
                 say(&format!("{}\n", crate::report::shown(line)));

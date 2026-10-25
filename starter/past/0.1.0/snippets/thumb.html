@@ -1,3 +1,0 @@
-{# takes post #}
-{# A photograph in a grid: its picture, cut square, as a link to its page: see /pictures/ -#}
-<li><a href="{{ post.url }}" aria-label="{{ called(post) }}">{% if post.cover %}{{ picture(post.photo(post.cover, decorative=true, sizes="(max-width: 58rem) 33vw, 19rem"), alt="") }}{% else %}{{ called(post) }}{% endif %}</a></li>

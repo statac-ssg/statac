@@ -2,22 +2,13 @@
 
 Written by `cargo run --example third_party`.
 
-Statac's own code is offered under MIT or Apache-2.0, at your choice. A built `statac` and a site `statac new` makes also carry other people's work, and each piece keeps its own licence. This is all of it. A number in square brackets is a text under [Licence texts](#licence-texts), where each text is given once.
-
-## In every new site
-
-- The sample photographs, the recording and the video a new site starts with, kept here under `starter/site/content/`, are Statac's own. Each was made for it by a program: none is a picture or a recording of anything, and none holds anyone else's work. They are offered as Statac is, under MIT or Apache-2.0.
-
-## In a site that turns sharing cards on
-
-- Noto Sans, the font of the sharing cards, written as `templates/og/NotoSans-Regular.ttf`: SIL Open Font License 1.1. `statac new --cards` writes the licence beside the font, as `templates/og/OFL.txt`. [2] Its source is recorded in `src/cards/fonts/fonts.md`.
-- Noto Emoji, the font of the emoji on the sharing cards, written as `templates/og/NotoEmoji.ttf`: SIL Open Font License 1.1. `statac new --cards` writes the licence beside the font, as `templates/og/NotoEmoji-OFL.txt`. [3] Its source is recorded in `src/cards/fonts/fonts.md`.
+Statac's own code is offered under MIT or Apache-2.0, at your choice. A built `statac` also carries other people's work, and each piece keeps its own licence. This is all of it. A number in square brackets is a text under [Licence texts](#licence-texts), where each text is given once.
 
 ## In the binary
 
 ### Words for dates
 
-- What Statac has for every language but English, in `src/language/bundled/`, is from the Unicode CLDR: the names of the months and the weekdays, the words for am and pm, the quotation marks, the direction of writing and the digits. So is the usual form of a date in each of those languages, in `src/dates/format.rs`, so are English's months, weekdays and quotation marks, and so is the direction of a language Statac has no words for, in `src/language/direction.rs`: Unicode License V3. [4]
+- What Statac has for every language but English, in `src/language/bundled/`, is from the Unicode CLDR: the names of the months and the weekdays, the words for am and pm, the quotation marks, the direction of writing and the digits. So is the usual form of a date in each of those languages, in `src/dates/format.rs`, so are English's months, weekdays and quotation marks, and so is the direction of a language Statac has no words for, in `src/language/direction.rs`: Unicode License V3. [2]
 
 ### Grammars and themes
 
@@ -35,15 +26,15 @@ Statac's own code is offered under MIT or Apache-2.0, at your choice. A built `s
 
 The paths are in `crates/avif-aom-sys/`.
 
-- libavif 1.4.2: BSD-2-Clause. https://github.com/AOMediaCodec/libavif/archive/refs/tags/v1.4.2.tar.gz. Licence: `vendor/avif/LICENSE`, which also gives the licences of the files below. [5]
-- `vendor/avif/src/obu.c`, from dav1d: BSD-2-Clause. `vendor/avif/LICENSE` [5]
-- `vendor/avif/third_party/libyuv`, part of libyuv: BSD-3-Clause. `vendor/avif/LICENSE` [5]
-- `vendor/avif/contrib/gdk-pixbuf`: BSD-2-Clause. `vendor/avif/LICENSE` [5]
-- libaom 3.15.1: BSD-2-Clause. https://storage.googleapis.com/aom-releases/libaom-3.15.1.tar.gz. Licence: `vendor/avif/ext/aom/LICENSE`. Patents: Alliance for Open Media Patent License 1.0, `vendor/avif/ext/aom/PATENTS`. [6] [7]
-- `third_party/fastfeat`, FAST feature detectors: BSD-3-Clause. https://github.com/edrosten/fast-C-src. `vendor/avif/ext/aom/third_party/fastfeat/LICENSE` [8]
-- `third_party/libyuv`: BSD-3-Clause. https://chromium.googlesource.com/libyuv/libyuv/. `vendor/avif/ext/aom/third_party/libyuv/LICENSE` [9]
-- `third_party/vector`: MIT. https://github.com/goldsborough/vector. `vendor/avif/ext/aom/third_party/vector/LICENSE` [10]
-- `third_party/x86inc`, from x264: ISC. https://git.videolan.org/git/x264.git. `vendor/avif/ext/aom/third_party/x86inc/LICENSE` [11]
+- libavif 1.4.2: BSD-2-Clause. https://github.com/AOMediaCodec/libavif/archive/refs/tags/v1.4.2.tar.gz. Licence: `vendor/avif/LICENSE`, which also gives the licences of the files below. [3]
+- `vendor/avif/src/obu.c`, from dav1d: BSD-2-Clause. `vendor/avif/LICENSE` [3]
+- `vendor/avif/third_party/libyuv`, part of libyuv: BSD-3-Clause. `vendor/avif/LICENSE` [3]
+- `vendor/avif/contrib/gdk-pixbuf`: BSD-2-Clause. `vendor/avif/LICENSE` [3]
+- libaom 3.15.1: BSD-2-Clause. https://storage.googleapis.com/aom-releases/libaom-3.15.1.tar.gz. Licence: `vendor/avif/ext/aom/LICENSE`. Patents: Alliance for Open Media Patent License 1.0, `vendor/avif/ext/aom/PATENTS`. [4] [5]
+- `third_party/fastfeat`, FAST feature detectors: BSD-3-Clause. https://github.com/edrosten/fast-C-src. `vendor/avif/ext/aom/third_party/fastfeat/LICENSE` [6]
+- `third_party/libyuv`: BSD-3-Clause. https://chromium.googlesource.com/libyuv/libyuv/. `vendor/avif/ext/aom/third_party/libyuv/LICENSE` [7]
+- `third_party/vector`: MIT. https://github.com/goldsborough/vector. `vendor/avif/ext/aom/third_party/vector/LICENSE` [8]
+- `third_party/x86inc`, from x264: ISC. https://git.videolan.org/git/x264.git. `vendor/avif/ext/aom/third_party/x86inc/LICENSE` [9]
 
 ### C libraries a crate carries
 
@@ -60,20 +51,20 @@ Each is built from the source its crate holds, under the crate's entry below.
 A binary links the standard library of the Rust that builds it. What that carries is recorded in `licences/rust-std/licences.md`, with the texts beside it. Neither Rust nor any crate here has a `NOTICE` file, so what is taken under Apache-2.0 asks for the licence's text alone.
 
 - Rust's standard library 1.99.0, which is `std`, `core`, `alloc` and the Rust project's other crates built with them: MIT OR Apache-2.0, taken under Apache-2.0. Copyright (c) The Rust Project Contributors. https://github.com/rust-lang/rust. [1]
-- In `core`, the tables of Unicode's character properties, `library/core/src/unicode/unicode_data.rs`: Unicode-3.0. Copyright 1991-2024 Unicode, Inc. `LICENSE-Unicode-3.0.txt` [12]
+- In `core`, the tables of Unicode's character properties, `library/core/src/unicode/unicode_data.rs`: Unicode-3.0. Copyright 1991-2024 Unicode, Inc. `LICENSE-Unicode-3.0.txt` [10]
 - In `std`, the backtrace crate, `library/backtrace`: MIT OR Apache-2.0, taken under Apache-2.0. Copyright 2014 Alex Crichton. [1]
 - In `std`, the channels of `library/std/src/sync/mpmc`, from crossbeam: MIT OR Apache-2.0, taken under Apache-2.0. Copyright 2019 The Crossbeam Project Developers. [1]
-- `compiler_builtins` 0.1.160, in `library/compiler-builtins`: MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0). `LICENSE-compiler-builtins.txt` [13]
-- In `compiler_builtins`, the `math` module, from the libm crate: MIT. `LICENSE-libm.txt` [14]
+- `compiler_builtins` 0.1.160, in `library/compiler-builtins`: MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0). `LICENSE-compiler-builtins.txt` [11]
+- In `compiler_builtins`, the `math` module, from the libm crate: MIT. `LICENSE-libm.txt` [12]
 - `addr2line` 0.27.1, `adler2` 2.0.1, `cfg-if` 1.0.4, `gimli` 0.34.0, `hashbrown` 0.17.1, `libc` 0.2.189, `miniz_oxide` 0.9.1, `object` 0.39.1 and `rustc-demangle` 0.1.28, from crates.io: each offers Apache-2.0, taken under Apache-2.0. [1]
-- `memchr` 2.8.3, from crates.io: Unlicense OR MIT, taken under MIT. `COPYING-memchr` `LICENSE-MIT-memchr` [15] [16]
+- `memchr` 2.8.3, from crates.io: Unlicense OR MIT, taken under MIT. `COPYING-memchr` `LICENSE-MIT-memchr` [13] [14]
 
 ### What the toolchain adds
 
 A binary for Linux that asks nothing of the system's C library links a C library and an unwinder that come with Rust's standard library, recorded in `licences/toolchain/licences.md`, with the texts beside it. No other binary links either. A binary for Windows links Microsoft's C runtime, which asks for no notice.
 
-- musl 1.2.5, the C library of a static Linux binary: MIT. Copyright (c) 2005-2020 Rich Felker, et al. https://musl.libc.org. `LICENSE-musl.txt` [17]
-- libunwind, from LLVM as Rust 1.99.0 builds it, the unwinder of a static Linux binary: Apache-2.0 WITH LLVM-exception. Copyright (c) 2009-2019 by the contributors listed in LLVM's `CREDITS.TXT`. https://github.com/rust-lang/llvm-project. `LICENSE-libunwind.txt` [18]
+- musl 1.2.5, the C library of a static Linux binary: MIT. Copyright (c) 2005-2020 Rich Felker, et al. https://musl.libc.org. `LICENSE-musl.txt` [15]
+- libunwind, from LLVM as Rust 1.99.0 builds it, the unwinder of a static Linux binary: Apache-2.0 WITH LLVM-exception. Copyright (c) 2009-2019 by the contributors listed in LLVM's `CREDITS.TXT`. https://github.com/rust-lang/llvm-project. `LICENSE-libunwind.txt` [16]
 
 ### Rust crates
 
@@ -83,22 +74,22 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | --- | --- | --- | --- | --- |
 | `adler2` | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `ahash` | 0.8.12 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `aho-corasick` | 1.1.5 | Unlicense OR MIT | MIT | [15] [16] |
+| `aho-corasick` | 1.1.5 | Unlicense OR MIT | MIT | [13] [14] |
 | `allocator-api2` | 0.2.21 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `arraydeque` | 0.5.1 | MIT/Apache-2.0 | Apache-2.0 | [1] |
 | `arrayvec` | 0.7.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `aws-lc-rs` | 1.18.1 | ISC AND (Apache-2.0 OR ISC) | Apache-2.0, ISC | [1] [19] |
-| `aws-lc-sys` | 0.45.0 | ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) | Apache-2.0, BSD-3-Clause, ISC, MIT | [1] [20] |
+| `aws-lc-rs` | 1.18.1 | ISC AND (Apache-2.0 OR ISC) | Apache-2.0, ISC | [1] [17] |
+| `aws-lc-sys` | 0.45.0 | ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) | Apache-2.0, BSD-3-Clause, ISC, MIT | [1] [18] |
 | `base64` | 0.23.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `bitflags` | 2.13.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `blake3` | 1.8.7 | CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception | Apache-2.0 | [1] |
 | `bytemuck` | 1.25.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `byteorder-lite` | 0.1.0 | Unlicense OR MIT | MIT | [16] |
-| `bytes` | 1.12.1 | MIT | MIT | [21] |
+| `byteorder-lite` | 0.1.0 | Unlicense OR MIT | MIT | [14] |
+| `bytes` | 1.12.1 | MIT | MIT | [19] |
 | `cfg-if` | 1.0.5 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `codemap` | 0.1.3 | MIT/Apache-2.0 | Apache-2.0 | [1] |
 | `constant_time_eq` | 0.4.2 | CC0-1.0 OR MIT-0 OR Apache-2.0 | Apache-2.0 | [1] |
-| `core_maths` | 0.1.1 | MIT | MIT | [22] |
+| `core_maths` | 0.1.1 | MIT | MIT | [20] |
 | `cosmic-text` | 0.19.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `cpufeatures` | 0.3.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `crc32fast` | 1.5.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
@@ -110,11 +101,11 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `equivalent` | 1.0.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `errno` | 0.3.14 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `fdeflate` | 0.3.7 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `ferriki-textmate` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] [23] |
-| `ferroni` | 2.2.2 | BSD-2-Clause | BSD-2-Clause | [24] |
+| `ferriki-textmate` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] [21] |
+| `ferroni` | 2.2.2 | BSD-2-Clause | BSD-2-Clause | [22] |
 | `flate2` | 1.1.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `font-types` | 0.11.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `fontdb` | 0.23.0 | MIT | MIT | [25] |
+| `fontdb` | 0.23.0 | MIT | MIT | [23] |
 | `form_urlencoded` | 1.2.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `getrandom` | 0.2.17 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `granit-parser` | 1.3.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
@@ -125,48 +116,48 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `hashbrown` | 0.17.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `http` | 1.5.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `httparse` | 1.10.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `icu_collections` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_locale_core` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_locale_fallback` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_locale_fallback_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_normalizer` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_normalizer_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_properties` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_properties_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_provider` | 2.3.1 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_segmenter` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `icu_segmenter_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `icu_collections` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_locale_core` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_locale_fallback` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_locale_fallback_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_normalizer` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_normalizer_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_properties` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_properties_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_provider` | 2.3.1 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_segmenter` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `icu_segmenter_data` | 2.3.0 | Unicode-3.0 | Unicode-3.0 | [24] |
 | `idna` | 1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `idna_adapter` | 1.2.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `image` | 0.25.10 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `image-webp` | 0.2.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `indexmap` | 2.14.2 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `inotify` | 0.11.5 | ISC | ISC | [27] |
-| `inotify-sys` | 0.1.8 | ISC | ISC | [27] |
+| `inotify` | 0.11.5 | ISC | ISC | [25] |
+| `inotify-sys` | 0.1.8 | ISC | ISC | [25] |
 | `itoa` | 1.0.18 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `jiff` | 0.2.37 | Unlicense OR MIT | MIT | [15] [16] |
-| `jiff-core` | 0.1.1 | Unlicense OR MIT | MIT | [15] [16] |
-| `jiff-tzdb` | 0.1.8 | Unlicense OR MIT | MIT | [15] [16] |
-| `jpeg-encoder` | 0.7.1 | (MIT OR Apache-2.0) AND IJG | Apache-2.0, IJG | [1] [28] |
+| `jiff` | 0.2.37 | Unlicense OR MIT | MIT | [13] [14] |
+| `jiff-core` | 0.1.1 | Unlicense OR MIT | MIT | [13] [14] |
+| `jiff-tzdb` | 0.1.8 | Unlicense OR MIT | MIT | [13] [14] |
+| `jpeg-encoder` | 0.7.1 | (MIT OR Apache-2.0) AND IJG | Apache-2.0, IJG | [1] [26] |
 | `kstring` | 2.0.5 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `lasso` | 0.7.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `libc` | 0.2.190 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `libm` | 0.2.16 | MIT | MIT | [14] |
-| `libmimalloc-sys` | 0.1.49 | MIT | MIT | [29] |
+| `libm` | 0.2.16 | MIT | MIT | [12] |
+| `libmimalloc-sys` | 0.1.49 | MIT | MIT | [27] |
 | `linebender_resource_handle` | 0.1.1 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `linux-raw-sys` | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `litemap` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `litemap` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [24] |
 | `log` | 0.4.34 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `math-core` | 0.8.2 | MIT | MIT | none in the crate |
 | `math-core-renderer-internal` | 0.8.2 | MIT | MIT | none in the crate |
-| `memchr` | 2.8.3 | Unlicense OR MIT | MIT | [15] [16] |
+| `memchr` | 2.8.3 | Unlicense OR MIT | MIT | [13] [14] |
 | `memmap2` | 0.9.11 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `mimalloc` | 0.1.52 | MIT | MIT | [29] |
+| `mimalloc` | 0.1.52 | MIT | MIT | [27] |
 | `miniz_oxide` | 0.8.9 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
 | `miniz_oxide` | 0.9.1 | MIT OR Zlib OR Apache-2.0 | Apache-2.0 | [1] |
-| `mio` | 1.2.4 | MIT | MIT | [30] |
+| `mio` | 1.2.4 | MIT | MIT | [28] |
 | `moxcms` | 0.8.1 | BSD-3-Clause OR Apache-2.0 | Apache-2.0 | [1] |
-| `notify` | 9.0.0-rc.5 | CC0-1.0 | CC0-1.0 | [31] |
+| `notify` | 9.0.0-rc.5 | CC0-1.0 | CC0-1.0 | [29] |
 | `notify-types` | 2.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `num-traits` | 0.2.19 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `objc2-core-foundation` | 0.3.2 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
@@ -174,13 +165,13 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `once_cell` | 1.21.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `pagefind_stem` | 1.0.0 | MIT | MIT | none in the crate |
 | `percent-encoding` | 2.3.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `phf` | 0.11.3 | MIT | MIT | [32] |
-| `phf` | 0.14.0 | MIT | MIT | [32] |
-| `phf_shared` | 0.11.3 | MIT | MIT | [32] |
-| `phf_shared` | 0.14.0 | MIT | MIT | [32] |
+| `phf` | 0.11.3 | MIT | MIT | [30] |
+| `phf` | 0.14.0 | MIT | MIT | [30] |
+| `phf_shared` | 0.11.3 | MIT | MIT | [30] |
+| `phf_shared` | 0.14.0 | MIT | MIT | [30] |
 | `png` | 0.18.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `potential_utf` | 0.1.6 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `pulldown-cmark` | 0.13.4 | MIT | MIT | [33] |
+| `potential_utf` | 0.1.6 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `pulldown-cmark` | 0.13.4 | MIT | MIT | [31] |
 | `pxfm` | 0.1.30 | BSD-3-Clause OR Apache-2.0 | Apache-2.0 | [1] |
 | `quick-error` | 2.0.1 | MIT/Apache-2.0 | Apache-2.0 | [1] |
 | `rangemap` | 1.8.0 | MIT/Apache-2.0 | Apache-2.0 | [1] |
@@ -193,27 +184,27 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `rustix` | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `rustls` | 0.23.45 | Apache-2.0 OR ISC OR MIT | Apache-2.0 | [1] |
 | `rustls-pki-types` | 1.15.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `rustls-webpki` | 0.103.15 | ISC | ISC | [34] |
-| `same-file` | 1.0.6 | Unlicense/MIT | MIT | [15] [35] |
+| `rustls-webpki` | 0.103.15 | ISC | ISC | [32] |
+| `same-file` | 1.0.6 | Unlicense/MIT | MIT | [13] [33] |
 | `self_cell` | 1.3.0 | Apache-2.0 OR GPL-2.0-only | Apache-2.0 | [1] |
 | `serde` | 1.0.229 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_core` | 1.0.229 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_json` | 1.0.151 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `serde_spanned` | 1.1.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `simd-adler32` | 0.3.10 | MIT | MIT | [36] |
+| `simd-adler32` | 0.3.10 | MIT | MIT | [34] |
 | `siphasher` | 1.0.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `skrifa` | 0.40.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `slotmap` | 1.1.1 | Zlib | Zlib | [37] |
+| `slotmap` | 1.1.1 | Zlib | Zlib | [35] |
 | `smallvec` | 1.16.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `smol_str` | 0.3.6 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `stable-arena` | 0.3.0 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `stable_deref_trait` | 1.2.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `static_assertions` | 1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `strum` | 0.28.0 | MIT | MIT | [38] |
-| `subtle` | 2.6.1 | BSD-3-Clause | BSD-3-Clause | [39] |
+| `strum` | 0.28.0 | MIT | MIT | [36] |
+| `subtle` | 2.6.1 | BSD-3-Clause | BSD-3-Clause | [37] |
 | `swash` | 0.2.10 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `sys-locale` | 0.3.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `tinystr` | 0.8.4 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `tinystr` | 0.8.4 | Unicode-3.0 | Unicode-3.0 | [24] |
 | `tinyvec` | 1.13.3 | Zlib OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `toml` | 1.1.6+spec-1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `toml_datetime` | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
@@ -225,29 +216,29 @@ The 169 crates a binary links on macOS, Linux or Windows; some are linked on one
 | `unicode-normalization` | 0.1.25 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `unicode-script` | 0.5.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `unicode-segmentation` | 1.13.3 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `untrusted` | 0.9.0 | ISC | ISC | [40] |
+| `untrusted` | 0.9.0 | ISC | ISC | [38] |
 | `ureq` | 3.4.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `ureq-proto` | 0.6.4 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `url` | 2.5.8 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `utf8-zero` | 0.8.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `utf8_iter` | 1.0.4 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `walkdir` | 2.5.0 | Unlicense/MIT | MIT | [15] [16] |
-| `webpki-roots` | 1.0.9 | CDLA-Permissive-2.0 | CDLA-Permissive-2.0 | [41] |
-| `winapi-util` | 0.1.11 | Unlicense OR MIT | MIT | [15] [35] |
+| `walkdir` | 2.5.0 | Unlicense/MIT | MIT | [13] [14] |
+| `webpki-roots` | 1.0.9 | CDLA-Permissive-2.0 | CDLA-Permissive-2.0 | [39] |
+| `winapi-util` | 0.1.11 | Unlicense OR MIT | MIT | [13] [33] |
 | `windows-link` | 0.2.1 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
 | `windows-sys` | 0.61.2 | MIT OR Apache-2.0 | Apache-2.0 | [1] |
-| `winnow` | 1.0.4 | MIT | MIT | [42] |
-| `writeable` | 0.6.4 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `xxhash-rust` | 0.8.19 | BSL-1.0 | BSL-1.0 | [43] |
+| `winnow` | 1.0.4 | MIT | MIT | [40] |
+| `writeable` | 0.6.4 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `xxhash-rust` | 0.8.19 | BSL-1.0 | BSL-1.0 | [41] |
 | `yazi` | 0.2.1 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `yoke` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `yoke` | 0.8.3 | Unicode-3.0 | Unicode-3.0 | [24] |
 | `zeno` | 0.3.3 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
 | `zerocopy` | 0.8.59 | BSD-2-Clause OR Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `zerofrom` | 0.1.8 | Unicode-3.0 | Unicode-3.0 | [26] |
+| `zerofrom` | 0.1.8 | Unicode-3.0 | Unicode-3.0 | [24] |
 | `zeroize` | 1.9.0 | Apache-2.0 OR MIT | Apache-2.0 | [1] |
-| `zerotrie` | 0.2.5 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `zerovec` | 0.11.8 | Unicode-3.0 | Unicode-3.0 | [26] |
-| `zmij` | 1.0.23 | MIT | MIT | [44] |
+| `zerotrie` | 0.2.5 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `zerovec` | 0.11.8 | Unicode-3.0 | Unicode-3.0 | [24] |
+| `zmij` | 1.0.23 | MIT | MIT | [42] |
 | `zune-core` | 0.5.3 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 | `zune-jpeg` | 0.5.15 | MIT OR Apache-2.0 OR Zlib | Apache-2.0 | [1] |
 
@@ -543,206 +534,6 @@ The Apache License 2.0.
 
 ### [2]
 
-Noto Sans, `templates/og/OFL.txt` in a site that turns sharing cards on.
-
-````text
-Copyright 2015-2021 Google LLC. All Rights Reserved.
-
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is copied below, and is also available with a FAQ at:
-https://scripts.sil.org/OFL
-
-
------------------------------------------------------------
-SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
------------------------------------------------------------
-
-PREAMBLE
-The goals of the Open Font License (OFL) are to stimulate worldwide
-development of collaborative font projects, to support the font creation
-efforts of academic and linguistic communities, and to provide a free and
-open framework in which fonts may be shared and improved in partnership
-with others.
-
-The OFL allows the licensed fonts to be used, studied, modified and
-redistributed freely as long as they are not sold by themselves. The
-fonts, including any derivative works, can be bundled, embedded,
-redistributed and/or sold with any software provided that any reserved
-names are not used by derivative works. The fonts and derivatives,
-however, cannot be released under any other type of license. The
-requirement for fonts to remain under this license does not apply
-to any document created using the fonts or their derivatives.
-
-DEFINITIONS
-"Font Software" refers to the set of files released by the Copyright
-Holder(s) under this license and clearly marked as such. This may
-include source files, build scripts and documentation.
-
-"Reserved Font Name" refers to any names specified as such after the
-copyright statement(s).
-
-"Original Version" refers to the collection of Font Software components as
-distributed by the Copyright Holder(s).
-
-"Modified Version" refers to any derivative made by adding to, deleting,
-or substituting -- in part or in whole -- any of the components of the
-Original Version, by changing formats or by porting the Font Software to a
-new environment.
-
-"Author" refers to any designer, engineer, programmer, technical
-writer or other person who contributed to the Font Software.
-
-PERMISSION & CONDITIONS
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of the Font Software, to use, study, copy, merge, embed, modify,
-redistribute, and sell modified and unmodified copies of the Font
-Software, subject to the following conditions:
-
-1) Neither the Font Software nor any of its individual components,
-in Original or Modified Versions, may be sold by itself.
-
-2) Original or Modified Versions of the Font Software may be bundled,
-redistributed and/or sold with any software, provided that each copy
-contains the above copyright notice and this license. These can be
-included either as stand-alone text files, human-readable headers or
-in the appropriate machine-readable metadata fields within text or
-binary files as long as those fields can be easily viewed by the user.
-
-3) No Modified Version of the Font Software may use the Reserved Font
-Name(s) unless explicit written permission is granted by the corresponding
-Copyright Holder. This restriction only applies to the primary font name as
-presented to the users.
-
-4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
-Software shall not be used to promote, endorse or advertise any
-Modified Version, except to acknowledge the contribution(s) of the
-Copyright Holder(s) and the Author(s) or with their explicit written
-permission.
-
-5) The Font Software, modified or unmodified, in part or in whole,
-must be distributed entirely under this license, and must not be
-distributed under any other license. The requirement for fonts to
-remain under this license does not apply to any document created
-using the Font Software.
-
-TERMINATION
-This license becomes null and void if any of the above conditions are
-not met.
-
-DISCLAIMER
-THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
-OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
-DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
-OTHER DEALINGS IN THE FONT SOFTWARE.
-````
-
-### [3]
-
-Noto Emoji, `templates/og/NotoEmoji-OFL.txt` in a site that turns sharing cards on.
-
-````text
-Copyright 2013 Google LLC
-
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is copied below, and is also available with a FAQ at:
-https://scripts.sil.org/OFL
-
-
------------------------------------------------------------
-SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
------------------------------------------------------------
-
-PREAMBLE
-The goals of the Open Font License (OFL) are to stimulate worldwide
-development of collaborative font projects, to support the font creation
-efforts of academic and linguistic communities, and to provide a free and
-open framework in which fonts may be shared and improved in partnership
-with others.
-
-The OFL allows the licensed fonts to be used, studied, modified and
-redistributed freely as long as they are not sold by themselves. The
-fonts, including any derivative works, can be bundled, embedded,
-redistributed and/or sold with any software provided that any reserved
-names are not used by derivative works. The fonts and derivatives,
-however, cannot be released under any other type of license. The
-requirement for fonts to remain under this license does not apply
-to any document created using the fonts or their derivatives.
-
-DEFINITIONS
-"Font Software" refers to the set of files released by the Copyright
-Holder(s) under this license and clearly marked as such. This may
-include source files, build scripts and documentation.
-
-"Reserved Font Name" refers to any names specified as such after the
-copyright statement(s).
-
-"Original Version" refers to the collection of Font Software components as
-distributed by the Copyright Holder(s).
-
-"Modified Version" refers to any derivative made by adding to, deleting,
-or substituting -- in part or in whole -- any of the components of the
-Original Version, by changing formats or by porting the Font Software to a
-new environment.
-
-"Author" refers to any designer, engineer, programmer, technical
-writer or other person who contributed to the Font Software.
-
-PERMISSION & CONDITIONS
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of the Font Software, to use, study, copy, merge, embed, modify,
-redistribute, and sell modified and unmodified copies of the Font
-Software, subject to the following conditions:
-
-1) Neither the Font Software nor any of its individual components,
-in Original or Modified Versions, may be sold by itself.
-
-2) Original or Modified Versions of the Font Software may be bundled,
-redistributed and/or sold with any software, provided that each copy
-contains the above copyright notice and this license. These can be
-included either as stand-alone text files, human-readable headers or
-in the appropriate machine-readable metadata fields within text or
-binary files as long as those fields can be easily viewed by the user.
-
-3) No Modified Version of the Font Software may use the Reserved Font
-Name(s) unless explicit written permission is granted by the corresponding
-Copyright Holder. This restriction only applies to the primary font name as
-presented to the users.
-
-4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
-Software shall not be used to promote, endorse or advertise any
-Modified Version, except to acknowledge the contribution(s) of the
-Copyright Holder(s) and the Author(s) or with their explicit written
-permission.
-
-5) The Font Software, modified or unmodified, in part or in whole,
-must be distributed entirely under this license, and must not be
-distributed under any other license. The requirement for fonts to
-remain under this license does not apply to any document created
-using the Font Software.
-
-TERMINATION
-This license becomes null and void if any of the above conditions are
-not met.
-
-DISCLAIMER
-THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
-OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
-DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
-OTHER DEALINGS IN THE FONT SOFTWARE.
-````
-
-### [4]
-
 The Unicode CLDR data, `src/language/bundled/LICENSE-CLDR.txt`.
 
 ````text
@@ -789,7 +580,7 @@ authorization of the copyright holder.
 SPDX-License-Identifier: Unicode-3.0
 ````
 
-### [5]
+### [3]
 
 `crates/avif-aom-sys/vendor/avif/LICENSE`.
 
@@ -1183,7 +974,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-### [6]
+### [4]
 
 `crates/avif-aom-sys/vendor/avif/ext/aom/LICENSE`.
 
@@ -1216,7 +1007,7 @@ ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 ````
 
-### [7]
+### [5]
 
 `crates/avif-aom-sys/vendor/avif/ext/aom/PATENTS`.
 
@@ -1330,7 +1121,7 @@ Alliance for Open Media Patent License 1.0
       License was issued.
 ````
 
-### [8]
+### [6]
 
 `crates/avif-aom-sys/vendor/avif/ext/aom/third_party/fastfeat/LICENSE`.
 
@@ -1367,7 +1158,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-### [9]
+### [7]
 
 `crates/avif-aom-sys/vendor/avif/ext/aom/third_party/libyuv/LICENSE`.
 
@@ -1403,7 +1194,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-### [10]
+### [8]
 
 `crates/avif-aom-sys/vendor/avif/ext/aom/third_party/vector/LICENSE`.
 
@@ -1429,7 +1220,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [11]
+### [9]
 
 `crates/avif-aom-sys/vendor/avif/ext/aom/third_party/x86inc/LICENSE`.
 
@@ -1454,7 +1245,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ````
 
-### [12]
+### [10]
 
 `licences/rust-std/LICENSE-Unicode-3.0.txt`.
 
@@ -1500,7 +1291,7 @@ dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 ````
 
-### [13]
+### [11]
 
 `licences/rust-std/LICENSE-compiler-builtins.txt`.
 
@@ -1782,7 +1573,7 @@ Additionally, some source files may contain comments with specific copyrights
 or licenses.
 ````
 
-### [14]
+### [12]
 
 `licences/rust-std/LICENSE-libm.txt`; `libm` 0.2.16, `LICENSE.txt`.
 
@@ -2047,7 +1838,7 @@ have been licensed under extremely permissive terms.
 Copyright notices are retained in src/* files where relevant.
 ````
 
-### [15]
+### [13]
 
 `licences/rust-std/COPYING-memchr`; `aho-corasick` 1.1.5, `COPYING`; `jiff` 0.2.37, `COPYING`; `jiff-core` 0.1.1, `COPYING`; `jiff-tzdb` 0.1.8, `COPYING`; `memchr` 2.8.3, `COPYING`; `same-file` 1.0.6, `COPYING`; `walkdir` 2.5.0, `COPYING`; `winapi-util` 0.1.11, `COPYING`.
 
@@ -2057,7 +1848,7 @@ This project is dual-licensed under the Unlicense and MIT licenses.
 You may use this code under the terms of either license.
 ````
 
-### [16]
+### [14]
 
 `licences/rust-std/LICENSE-MIT-memchr`; `aho-corasick` 1.1.5, `LICENSE-MIT`; `byteorder-lite` 0.1.0, `LICENSE-MIT`; `jiff` 0.2.37, `LICENSE-MIT`; `jiff-core` 0.1.1, `LICENSE-MIT`; `jiff-tzdb` 0.1.8, `LICENSE-MIT`; `memchr` 2.8.3, `LICENSE-MIT`; `walkdir` 2.5.0, `LICENSE-MIT`.
 
@@ -2085,7 +1876,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [17]
+### [15]
 
 `licences/toolchain/LICENSE-musl.txt`.
 
@@ -2285,7 +2076,7 @@ permissive licensing, and of not having licensing issues being an
 obstacle to adoption, that text has been removed.
 ````
 
-### [18]
+### [16]
 
 `licences/toolchain/LICENSE-libunwind.txt`.
 
@@ -2603,7 +2394,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [19]
+### [17]
 
 `aws-lc-rs` 1.18.1, `LICENSE`.
 
@@ -2812,7 +2603,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ````
 
-### [20]
+### [18]
 
 `aws-lc-sys` 0.45.0, `LICENSE`.
 
@@ -3135,7 +2926,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [21]
+### [19]
 
 `bytes` 1.12.1, `LICENSE`.
 
@@ -3167,7 +2958,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ````
 
-### [22]
+### [20]
 
 `core_maths` 0.1.1, `LICENSE`.
 
@@ -3195,7 +2986,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [23]
+### [21]
 
 `ferriki-textmate` 1.1.1, `LICENSE-vscode-textmate.md`.
 
@@ -3223,7 +3014,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [24]
+### [22]
 
 `ferroni` 2.2.2, `LICENSE`.
 
@@ -3283,7 +3074,7 @@ from vscode-oniguruma, used under the MIT License:
   DEALINGS IN THE SOFTWARE.
 ````
 
-### [25]
+### [23]
 
 `fontdb` 0.23.0, `LICENSE`.
 
@@ -3311,7 +3102,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [26]
+### [24]
 
 `icu_collections` 2.3.0, `LICENSE`; `icu_locale_core` 2.3.0, `LICENSE`; `icu_locale_fallback` 2.3.0, `LICENSE`; `icu_locale_fallback_data` 2.3.0, `LICENSE`; `icu_normalizer` 2.3.0, `LICENSE`; `icu_normalizer_data` 2.3.0, `LICENSE`; `icu_properties` 2.3.0, `LICENSE`; `icu_properties_data` 2.3.0, `LICENSE`; `icu_provider` 2.3.1, `LICENSE`; `icu_segmenter` 2.3.0, `LICENSE`; `icu_segmenter_data` 2.3.0, `LICENSE`; `litemap` 0.8.3, `LICENSE`; `potential_utf` 0.1.6, `LICENSE`; `tinystr` 0.8.4, `LICENSE`; `writeable` 0.6.4, `LICENSE`; `yoke` 0.8.3, `LICENSE`; `zerofrom` 0.1.8, `LICENSE`; `zerotrie` 0.2.5, `LICENSE`; `zerovec` 0.11.8, `LICENSE`.
 
@@ -3364,7 +3155,7 @@ Portions of ICU4X may have been adapted from ICU4C and/or ICU4J.
 ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation and others.
 ````
 
-### [27]
+### [25]
 
 `inotify` 0.11.5, `LICENSE`; `inotify-sys` 0.1.8, `LICENSE`.
 
@@ -3384,7 +3175,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ````
 
-### [28]
+### [26]
 
 `jpeg-encoder` 0.7.1, `LICENSE-IJG`.
 
@@ -3460,7 +3251,7 @@ commercial products, provided that all warranty or liability claims are
 assumed by the product vendor.
 ````
 
-### [29]
+### [27]
 
 `libmimalloc-sys` 0.1.49, `LICENSE.txt`; `mimalloc` 0.1.52, `LICENSE.txt`.
 
@@ -3492,7 +3283,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ````
 
-### [30]
+### [28]
 
 `mio` 1.2.4, `LICENSE`.
 
@@ -3518,7 +3309,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [31]
+### [29]
 
 `notify` 9.0.0-rc.5, `LICENSE-CC0`.
 
@@ -3566,7 +3357,7 @@ For these and/or other purposes and motivations, and without any expectation of 
      d. Affirmer understands and acknowledges that Creative Commons is not a party to this document and has no duty or obligation with respect to this CC0 or use of the Work.
 ````
 
-### [32]
+### [30]
 
 `phf` 0.11.3, `LICENSE`; `phf` 0.14.0, `LICENSE`; `phf_shared` 0.11.3, `LICENSE`; `phf_shared` 0.14.0, `LICENSE`.
 
@@ -3593,7 +3384,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [33]
+### [31]
 
 `pulldown-cmark` 0.13.4, `LICENSE`.
 
@@ -3621,7 +3412,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [34]
+### [32]
 
 `rustls-webpki` 0.103.15, `LICENSE`.
 
@@ -3647,7 +3438,7 @@ The files under third-party/chromium are licensed as described in
 third-party/chromium/LICENSE.
 ````
 
-### [35]
+### [33]
 
 `same-file` 1.0.6, `LICENSE-MIT`; `winapi-util` 0.1.11, `LICENSE-MIT`.
 
@@ -3675,7 +3466,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ````
 
-### [36]
+### [34]
 
 `simd-adler32` 0.3.10, `LICENSE.md`.
 
@@ -3703,7 +3494,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [37]
+### [35]
 
 `slotmap` 1.1.1, `LICENSE`.
 
@@ -3729,7 +3520,7 @@ the following restrictions:
  3. This notice may not be removed or altered from any source distribution.
 ````
 
-### [38]
+### [36]
 
 `strum` 0.28.0, `LICENSE`.
 
@@ -3757,7 +3548,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### [39]
+### [37]
 
 `subtle` 2.6.1, `LICENSE`.
 
@@ -3793,7 +3584,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
-### [40]
+### [38]
 
 `untrusted` 0.9.0, `LICENSE.txt`.
 
@@ -3813,7 +3604,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ````
 
-### [41]
+### [39]
 
 `webpki-roots` 1.0.9, `LICENSE`.
 
@@ -3881,7 +3672,7 @@ of Data, including for example machine learning models and models'
 insights.
 ````
 
-### [42]
+### [40]
 
 `winnow` 1.0.4, `LICENSE-MIT`.
 
@@ -3906,7 +3697,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ````
 
-### [43]
+### [41]
 
 `xxhash-rust` 0.8.19, `LICENSE`.
 
@@ -3936,7 +3727,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ````
 
-### [44]
+### [42]
 
 `zmij` 1.0.23, `LICENSE-MIT`.
 

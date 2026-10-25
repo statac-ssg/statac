@@ -12,14 +12,14 @@ use crate::fetch::Refusal;
 use crate::platform::{Alike, Unwritable};
 use crate::problem::{
     AddressFault, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
-    Carried, Chooser, CommandHint, Ended, Expected, FontWithThem, FormatFault, Former, Found, Held,
-    Hint, Holds, Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing,
-    MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault,
-    Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation,
-    Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy,
-    ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told,
-    Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting, Wanted,
-    Word, WordList, WordsFrom, WordsWanted, WrongPlace,
+    Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found, Held, Hint, Holds,
+    Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing, MoreAt,
+    Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault, Piece,
+    Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation, Repeated,
+    Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy, ShownWords,
+    SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told, Translated,
+    Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting, Wanted, Word,
+    WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 
 mod described;
@@ -106,14 +106,6 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 command, option, ..
             } => format!("Unknown option: `statac {command}` has no `{option}`"),
             OptionHint::ShownAlready => "Unknown option: `statac serve` has no `--drafts`".into(),
-            OptionHint::OnlyWithUpdate => format!(
-                "Unknown option: `statac new` takes `{}` only with `--update`",
-                option_name(written)
-            ),
-            OptionHint::NotWithUpdate | OptionHint::CardsWithUpdate => format!(
-                "Unknown option: `statac new --update` has no `{}`",
-                option_name(written)
-            ),
             _ => format!("Unknown option: `{written}`"),
         },
         Kind::MissingValue {
@@ -1057,15 +1049,6 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::NoSiteHere { folder } => {
             format!("No site here: `{folder}` has no `content/` folder and no `statac.yaml`")
         }
-        Kind::UpdateAvailable { files } => match files {
-            1 => {
-                "Newer starter files: 1 of the files `statac new` wrote has a newer version".into()
-            }
-            _ => format!(
-                "Newer starter files: {} of the files `statac new` wrote have a newer version",
-                grouped(*files)
-            ),
-        },
         Kind::UnusableCardFile { path, fault } => match fault {
             CardFileFault::BackgroundSize { width, height } => format!(
                 "Unusable card file: `{path}` is {} by {} pixels, not 1,200 by 630",
@@ -2403,18 +2386,14 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 }
             }
             OptionHint::None => "Run `statac --help` to see the options.".into(),
-            OptionHint::OnlyWithUpdate => {
-                format!("Add `--update`, or leave `{}` out.", option_name(written))
-            }
-            OptionHint::NotWithUpdate => format!(
-                "`--update` asks nothing, so leave `{}` out.",
-                option_name(written)
-            ),
-            OptionHint::CardsWithUpdate => "Run `statac new --cards` by itself.".into(),
-            OptionHint::NewSiteOnly => format!(
-                "`--update` works on the site that is here, so leave `{}` out.",
-                option_name(written)
-            ),
+            OptionHint::Retired => match option_name(written) {
+                "--no-starter" => "Statac no longer writes templates into a site, so leave \
+                                   `--no-starter` out."
+                    .into(),
+                _ => "Statac no longer writes templates into a site: see \
+                      https://statac.dev/templates/."
+                    .into(),
+            },
         }),
         Kind::MissingValue { option, value, .. } => Some(match value {
             Some(value) => format!("Write it as `{option}={value}`."),
@@ -3268,20 +3247,10 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Give `statac import` an empty folder, or the name of a new one.".into()
             }
         }),
-        Kind::AlreadyASite { by, has, .. } => match (by, has) {
-            (Maker::New, SiteMark::Settings) => {
-                Some("To bring its starter files up to date, run `statac new --update`.".into())
-            }
-            (Maker::New, SiteMark::Content) | (Maker::Import, _) => None,
-        },
+        Kind::AlreadyASite { .. } => None,
         Kind::NoSiteHere { .. } => {
             Some("Run it in a site's folder, or make one with `statac new`.".into())
         }
-        Kind::UpdateAvailable { .. } => Some(
-            "Run `statac new --update`: it replaces those you never changed and shows what is \
-             new in the rest."
-                .into(),
-        ),
         Kind::CantTellWhatMade { tools, .. } => {
             let options: Vec<String> = tools
                 .iter()
@@ -3322,13 +3291,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                     None => "the card's `font`".into(),
                 };
                 match font.as_deref() {
-                    Some(FontWithThem::Here(font)) => {
-                        format!("Add `{font}`, which has {them}, to {list}.")
-                    }
-                    Some(FontWithThem::Brought { font, path }) => format!(
-                        "Run `statac new --update --missing` to write `{path}`, which has \
-                         {them}, then add `{font}` to {list}."
-                    ),
+                    Some(font) => format!("Add `{font}`, which has {them}, to {list}."),
                     None => format!("Add a font that has {them} to {list}."),
                 }
             }
@@ -4840,18 +4803,10 @@ pub(crate) const ASK_LANGUAGE: &str = "What language is it written in?";
 pub(crate) const ASK_LANGUAGE_HINT: &str = "For more than one, the main one first, as `en, fr`.";
 pub(crate) const ASK_DATES: &str = "How should dates look?";
 pub(crate) const ASK_DATES_OWN: &str = "Or type an example of your own.";
-pub(crate) const ASK_START: &str = "What should the site start with?";
-pub(crate) const START_STARTER: &str = "The starter: templates, a stylesheet and sample pages";
-pub(crate) const START_NOTHING: &str = "Nothing: you write the templates yourself";
 
 /// One answer offered, by its number.
 pub(crate) fn ask_choice(number: u8, offered: &str) -> String {
     format!("{number}  {offered}")
-}
-
-/// What is told of `written` typed where 1 and 2 are offered.
-pub(crate) fn not_one_or_two(written: &str) -> String {
-    format!("`{written}` isn't one of the choices. Type 1 or 2.")
 }
 
 /// The answer Enter gives, as the line the answer is typed on shows it.
@@ -4898,156 +4853,21 @@ pub(crate) fn times_in(zone: &str) -> String {
 pub(crate) const NO_ZONE_HERE: &str = "This machine doesn't say where it is: add \
      `timezone: Europe/London`, with your own, to `statac.yaml`.";
 
-/// Where a new site's words in `tag` wait in English: the site's own, and
-/// Statac's where `file` is the site's file holding them.
-pub(crate) fn translate_words(tag: &str, file: Option<&str>) -> String {
-    match file {
-        Some(file) => format!(
-            "The site's own words are in English in `data/words.yaml`, under `{tag}`, and \
-             Statac's in `{file}`. Translate them there."
-        ),
-        None => format!(
-            "The site's own words are in English in `data/words.yaml`, under `{tag}`. \
-             Translate them there."
-        ),
-    }
+/// Where the translations Statac has only in English for `tag` wait in a
+/// new site, in `file`.
+pub(crate) fn translate_words(tag: &str, file: &str) -> String {
+    format!("Statac has some translations for `{tag}` only in English: translate them in `{file}`.")
 }
 
 /// The last thing `statac new` says, with the way to the site's folder
-/// where it isn't the folder Statac was run in, for a site with the
-/// `starter` or without it.
-pub(crate) fn next_steps(folder: Option<&str>, starter: bool) -> String {
-    let then = match starter {
-        true => "`statac serve`",
-        false => "add your own templates to `templates/`: see https://statac.dev/templates/",
-    };
+/// where it isn't the folder Statac was run in.
+pub(crate) fn next_steps(folder: Option<&str>) -> String {
+    let then = "write a page in `content/`, such as `content/hello.md`, and run `statac serve`";
     match folder {
         Some(folder) => format!("Next: `cd {folder}`, then {then}."),
         None => format!("Next: {then}."),
     }
 }
-
-pub(crate) fn updated_file(path: &str) -> String {
-    format!("Updated `{path}`.")
-}
-
-pub(crate) fn yours_with_new(path: &str) -> String {
-    format!(
-        "`{path}` is yours and wasn't touched. The starter's file has \
-         changed since the version nearest to yours:"
-    )
-}
-
-/// What `statac new --update` says of a file of the author's that isn't
-/// text, where the starter's file there has changed in some release.
-pub(crate) fn yours_not_text(path: &str) -> String {
-    format!("`{path}` is yours; the starter has a newer one.")
-}
-
-/// What `statac new --cards` says of a file the site has where one of the
-/// sharing card's would go.
-pub(crate) fn yours_untouched(path: &str) -> String {
-    format!("`{path}` is yours and wasn't touched.")
-}
-
-/// The head of a run of changed lines, by its first line's number.
-pub(crate) fn changed_at(line: usize) -> String {
-    format!("@@ line {line}")
-}
-
-/// Shown after a changed line that is the last and has no line break.
-pub(crate) const NO_LINE_BREAK: &str = "(no line break at the end)";
-
-pub(crate) fn added_words(names: &[&str], tag: &str) -> String {
-    let named: Vec<String> = names.iter().map(|name| format!("`{name}`")).collect();
-    format!(
-        "Added {} to `data/words.yaml` under `{tag}`: {}.",
-        how_many(names.len(), "word", "words"),
-        named.join(", ")
-    )
-}
-
-pub(crate) const NO_WORDS_FILE: &str = "No words were added: `data/words.yaml` isn't here.";
-
-/// What `statac new --update` says of a site with nothing of the
-/// starter's in it, in place of every starter file it lacks.
-pub(crate) const NONE_OF_THE_STARTER: &str = "This site has none of the starter's files. To add \
-     them, run `statac new --update --missing`.";
-
-pub(crate) const WORDS_UNREADABLE: &str =
-    "No words were added: Statac can't read `data/words.yaml`. Run `statac check` to see why.";
-
-pub(crate) fn no_words_under(tag: &str) -> String {
-    format!("No words were added under `{tag}`: `data/words.yaml` has no words under it.")
-}
-
-pub(crate) fn words_not_one_to_a_line(tag: &str) -> String {
-    format!(
-        "No words were added under `{tag}`: its words in `data/words.yaml` aren't one to a line."
-    )
-}
-
-/// The starter files not in a site, the first few by name and the rest
-/// counted.
-pub(crate) fn not_here(named: &[&str], more: usize) -> String {
-    let listed: Vec<String> = named.iter().map(|path| format!("`{path}`")).collect();
-    let all = named.len() + more;
-    let mut list = listed.join(", ");
-    if more > 0 {
-        list = format!("{list} and {} more", grouped(more));
-    }
-    match all {
-        1 => format!(
-            "1 starter file isn't here: {list}. To write it, run `statac new --update --missing`."
-        ),
-        _ => format!(
-            "{} starter files aren't here: {list}. To write them, run \
-             `statac new --update --missing`.",
-            grouped(all)
-        ),
-    }
-}
-
-pub(crate) fn wrote_file(path: &str) -> String {
-    format!("Wrote `{path}`.")
-}
-
-/// What `statac new --update` says of a starter file at or behind a
-/// link, `link` being the link's own path.
-pub(crate) fn left_for_a_link(path: &str, link: &str) -> String {
-    match path == link {
-        true => format!("`{path}` was left alone: it is a link, which Statac never goes through."),
-        false => {
-            format!("`{path}` was left alone: `{link}` is a link, which Statac never goes through.")
-        }
-    }
-}
-
-/// The last line of `statac new --update`, by how many files it updated
-/// and how many of the author's have something new; none where both are
-/// none.
-pub(crate) fn updated_files(updated: usize, new: usize) -> Option<String> {
-    let updated = match updated {
-        0 => None,
-        n => Some(format!("Updated {}.", how_many(n, "file", "files"))),
-    };
-    let new = match new {
-        0 => None,
-        1 => Some("1 of yours has something new, shown above.".to_owned()),
-        n => Some(format!(
-            "{} of yours have something new, shown above.",
-            grouped(n)
-        )),
-    };
-    match (updated, new) {
-        (None, None) => None,
-        (Some(one), None) | (None, Some(one)) => Some(one),
-        (Some(updated), Some(new)) => Some(format!("{updated} {new}")),
-    }
-}
-
-pub(crate) const NOTHING_TO_UPDATE: &str =
-    "Nothing to update: every starter file here is the newest, or yours with nothing new.";
 
 /// An option as written, without the value given it.
 fn option_name(written: &str) -> &str {
@@ -7459,28 +7279,7 @@ mod tests {
                     why: NotDrawn::NoFont {
                         characters: vec!['😀'],
                         more: 0,
-                        font: Some(Box::new(FontWithThem::Brought {
-                            font: "NotoEmoji.ttf".into(),
-                            path: "templates/og/NotoEmoji.ttf".into(),
-                        })),
-                        field: None,
-                    },
-                    pages: 1,
-                    first: Named::File("content/post-1.md".into()),
-                },
-                "Card not drawn: `content/post-1.md` needs `😀`, which no font has",
-                Some(
-                    "Run `statac new --update --missing` to write \
-                     `templates/og/NotoEmoji.ttf`, which has it, then add `NotoEmoji.ttf` to \
-                     the card's `font`.",
-                ),
-            ),
-            (
-                Kind::CardNotDrawn {
-                    why: NotDrawn::NoFont {
-                        characters: vec!['😀'],
-                        more: 0,
-                        font: Some(Box::new(FontWithThem::Here("NotoEmoji.ttf".into()))),
+                        font: Some(Box::new("NotoEmoji.ttf".into())),
                         field: None,
                     },
                     pages: 1,
@@ -7494,7 +7293,7 @@ mod tests {
                     why: NotDrawn::NoFont {
                         characters: vec!['😀'],
                         more: 0,
-                        font: Some(Box::new(FontWithThem::Here("NotoEmoji.ttf".into()))),
+                        font: Some(Box::new("NotoEmoji.ttf".into())),
                         field: Some(Box::new("title.font".into())),
                     },
                     pages: 1,
@@ -7981,27 +7780,22 @@ mod tests {
             ),
             (
                 Kind::UnknownOption {
-                    written: "--missing".into(),
-                    hint: OptionHint::OnlyWithUpdate,
+                    written: "--update".into(),
+                    hint: OptionHint::Retired,
                 },
-                "Unknown option: `statac new` takes `--missing` only with `--update`",
-                Some("Add `--update`, or leave `--missing` out."),
+                "Unknown option: `--update`",
+                Some(
+                    "Statac no longer writes templates into a site: see \
+                     https://statac.dev/templates/.",
+                ),
             ),
             (
                 Kind::UnknownOption {
-                    written: "--yes".into(),
-                    hint: OptionHint::NotWithUpdate,
+                    written: "--no-starter".into(),
+                    hint: OptionHint::Retired,
                 },
-                "Unknown option: `statac new --update` has no `--yes`",
-                Some("`--update` asks nothing, so leave `--yes` out."),
-            ),
-            (
-                Kind::UnknownOption {
-                    written: "--cards".into(),
-                    hint: OptionHint::CardsWithUpdate,
-                },
-                "Unknown option: `statac new --update` has no `--cards`",
-                Some("Run `statac new --cards` by itself."),
+                "Unknown option: `--no-starter`",
+                Some("Statac no longer writes templates into a site, so leave `--no-starter` out."),
             ),
             (
                 Kind::UnknownOption {
@@ -8120,7 +7914,7 @@ mod tests {
                     has: SiteMark::Settings,
                 },
                 "Already a site: `site-1` has a `statac.yaml`",
-                Some("To bring its starter files up to date, run `statac new --update`."),
+                None,
             ),
             (
                 Kind::AlreadyASite {
@@ -8161,22 +7955,6 @@ mod tests {
                 },
                 "No site here: `notes` has no `content/` folder and no `statac.yaml`",
                 Some("Run it in a site's folder, or make one with `statac new`."),
-            ),
-            (
-                Kind::UpdateAvailable { files: 1 },
-                "Newer starter files: 1 of the files `statac new` wrote has a newer version",
-                Some(
-                    "Run `statac new --update`: it replaces those you never changed and shows \
-                     what is new in the rest.",
-                ),
-            ),
-            (
-                Kind::UpdateAvailable { files: 3 },
-                "Newer starter files: 3 of the files `statac new` wrote have a newer version",
-                Some(
-                    "Run `statac new --update`: it replaces those you never changed and shows \
-                     what is new in the rest.",
-                ),
             ),
             (
                 Kind::CantTellWhatMade {
