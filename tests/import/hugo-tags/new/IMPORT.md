@@ -57,7 +57,7 @@ The old site published a page listing every one of its `authors` at `/authors/`,
 
 Readers subscribed to the old site's feed at each of these URLs, and the template that made it didn't come across, so nothing is there now. A list's `feed:` line can put that list's feed at a URL of its own, as `feed: /index.rss`: see https://statac.dev/feeds/.
 
-- Hugo's feed for each tag and each list of that kind, 8 of them, such as `/tags/c++/index.xml`: Statac gives such a list a feed only where a list page of yours asks for one with `feed:`.
+- Hugo's feed for each tag and each list of that kind, 8 of them, such as `/topics/c/index.xml`: Statac gives such a list a feed only where a list page of yours asks for one with `feed:`.
 
 ### URLs the old built site doesn't have
 

@@ -2394,11 +2394,15 @@ impl Reader<'_> {
                 let prefix = format!("/{}", self.prefix(&doc.language));
                 let prefix = prefix.trim_end_matches('/');
                 for (plural, terms) in &doc.terms {
+                    let pattern = self.s.permalinks.term(plural);
                     for term in terms {
                         let named = stand_ins.of(prefix, plural, term);
+                        // A feed takes no ugly address: a term's page at
+                        // `/tags/rust.html` has its feed in `/tags/rust/`.
+                        let path = self.term_path(plural, pattern, named);
                         let feed = format!(
                             "{prefix}{}{}",
-                            self.making.listed(plural, named),
+                            url::finished(&path, false),
                             self.s.feed_name
                         );
                         if !feeds.contains(&feed) {
@@ -2936,6 +2940,67 @@ mod tests {
                 .filter(|address| address.starts_with("/tt/"))
                 .collect();
             assert_eq!(tags, wanted, "{at}");
+        }
+    }
+
+    /// Each term's feed is named where Hugo 0.166 wrote it: in the folder
+    /// of the term's page, wherever a pattern put that, and as a folder
+    /// under `uglyURLs` too.
+    #[test]
+    fn a_terms_feed_is_named_beside_its_page() {
+        let top = crate::testing::Scratch::new("hugo-term-feeds");
+        let patterns = "[permalinks.term]\ntags = '/tt/:slug'\ncategories = '/cc/:title/'\n";
+        // The settings, then the feeds of the tags `C++ & C#` and `a b`
+        // and of the category `x y`.
+        let cases = [
+            (
+                patterns.to_owned(),
+                [
+                    "/tt/c-c/index.xml",
+                    "/tt/a-b/index.xml",
+                    "/cc/x-y/index.xml",
+                ],
+            ),
+            (
+                format!("uglyURLs = true\n{patterns}"),
+                [
+                    "/tt/c-c/index.xml",
+                    "/tt/a-b/index.xml",
+                    "/cc/x-y/index.xml",
+                ],
+            ),
+            (
+                String::new(),
+                [
+                    "/tags/c++--c#/index.xml",
+                    "/tags/a-b/index.xml",
+                    "/categories/x-y/index.xml",
+                ],
+            ),
+        ];
+        let terms = ["tags: ['C++ & C#']", "tags: ['a b']", "categories: ['x y']"];
+        for (at, (settings, feeds)) in cases.into_iter().enumerate() {
+            for (terms, feed) in terms.into_iter().zip(feeds) {
+                let folder = top.join(format!("{at}-{}", feed.replace('/', "-")));
+                std::fs::create_dir_all(folder.join("content/posts")).unwrap();
+                let toml = format!("baseURL = 'https://example.org/'\n{settings}");
+                std::fs::write(folder.join("hugo.toml"), toml).unwrap();
+                let page = format!("---\ntitle: p\ndate: 2026-01-01\n{terms}\n---\nx\n");
+                std::fs::write(folder.join("content/posts/p.md"), page).unwrap();
+                let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None) else {
+                    panic!("{at}: the site wasn't read");
+                };
+                let said = (import.findings.iter())
+                    .find(|finding| std::ptr::eq(finding.kind, &super::super::write::FEED_LEFT))
+                    .and_then(|finding| finding.spots.first())
+                    .map(|spot| spot.text.as_str());
+                let wanted = format!(
+                    "Hugo's feed for each tag and each list of that kind, 1 of them, such as \
+                     `{feed}`: Statac gives such a list a feed only where a list page of yours \
+                     asks for one with `feed:`."
+                );
+                assert_eq!(said, Some(wanted.as_str()), "{at}: {terms}");
+            }
         }
     }
 
