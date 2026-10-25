@@ -291,7 +291,7 @@ fn a_script_loading_modules_as_it_runs_brings_the_map_too() {
 #[test]
 fn a_name_in_the_map_is_safe_inside_its_element() {
     let site = Site::new(
-        "modules",
+        "module-names",
         &[
             ("assets/app.js", "import './a&b\\'c.js';\n"),
             ("assets/a&b'c.js", "export const a = 1;\n"),
