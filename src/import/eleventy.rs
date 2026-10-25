@@ -668,6 +668,53 @@ impl FeedKind {
             None => "a feed",
         }
     }
+
+    /// The RSS plugin writes an Atom or JSON feed's post URL into a
+    /// `{% set %}` block and prints it again, so a `'` or `&` in it is
+    /// escaped twice in the post's id.
+    fn escapes_ids_twice(self) -> bool {
+        self != FeedKind::Rss
+    }
+}
+
+/// `posts`, the old URLs of the posts whose ids an RSS plugin feed escaped
+/// twice, or may have: one sentence naming each, and `feeds`, the plugin's
+/// feeds that did, each by its URL; none of those where it isn't known
+/// which kind of feed the plugin made.
+fn escaped_twice(posts: &[String], feeds: &[(String, FeedKind)]) -> String {
+    let shown: Vec<String> = posts.iter().map(|post| code(post)).collect();
+    let (posts, ids) = match posts.len() {
+        1 => (format!("1 post, {}, ", shown[0]), "an id"),
+        n => (format!("{n} posts, {}, ", listed(&shown)), "ids"),
+    };
+    let how = "escaped twice, as Eleventy's RSS plugin does with a `'` or `&` in an Atom or JSON \
+               feed";
+    let each = match shown.len() {
+        1 => "it",
+        _ => "each",
+    };
+    match feeds {
+        [] => format!(
+            "The old site's feed may have given {posts}{ids} {how}, so feed readers may show \
+             {each} once as new after the move: Statac couldn't read which kind of feed it was."
+        ),
+        _ => {
+            let feeds: Vec<String> = (feeds.iter())
+                .map(|(address, kind)| {
+                    let kind = match kind {
+                        FeedKind::Json => "JSON feed",
+                        _ => "Atom feed",
+                    };
+                    format!("{kind} at {}", code(address))
+                })
+                .collect();
+            format!(
+                "The old site's {} gave {posts}{ids} {how}, so feed readers will show {each} once \
+                 as new after the move.",
+                listed(&feeds)
+            )
+        }
+    }
 }
 
 /// What `text` is written as where it is a feed: XML whose root is RSS's or
@@ -2887,6 +2934,45 @@ impl Reader<'_> {
         self.import
             .settings
             .push(("feed_ids_from".into(), Value::Text("eleventy".into())));
+        let base = self.s.base();
+        let posts: Vec<String> = (self.import.pages.iter())
+            .filter(|page| page.kind == PageKind::Post)
+            .filter_map(|page| page.address.as_ref())
+            .filter(|address| address.contains(['\'', '&']))
+            .map(|address| format!("{base}{address}"))
+            .collect();
+        // The plugin's feeds that escape ids twice, each with its kind; none
+        // where it may have made such a feed of a kind not known.
+        let twice: Option<Vec<(String, FeedKind)>> =
+            match (self.plugin_feeds.as_slice(), self.unmade_feeds.as_slice()) {
+                ([], [(address, kind, _)]) => Some(vec![(address.clone(), *kind)]),
+                ([], unmade)
+                    if !unmade.is_empty() && unmade.iter().all(|f| f.1 == FeedKind::Rss) =>
+                {
+                    Some(Vec::new())
+                }
+                ([], _) => None,
+                (made, _) => {
+                    let known: Vec<(String, FeedKind)> = (made.iter())
+                        .filter_map(|(address, kind, _)| Some((address.clone(), (*kind)?)))
+                        .collect();
+                    match known.len() < made.len() && !known.iter().any(|f| f.1.escapes_ids_twice())
+                    {
+                        true => None,
+                        false => Some(known),
+                    }
+                }
+            };
+        let twice = match twice {
+            _ if posts.is_empty() => None,
+            None => Some(escaped_twice(&posts, &[])),
+            Some(feeds) => {
+                let feeds: Vec<(String, FeedKind)> = (feeds.into_iter())
+                    .filter(|(_, kind)| kind.escapes_ids_twice())
+                    .collect();
+                (!feeds.is_empty()).then(|| escaped_twice(&posts, &feeds))
+            }
+        };
         let why = (self.unread_feed.clone())
             .unwrap_or_else(|| "The settings show no `feedPlugin` or `getFeedTemplate`".to_owned());
         let (asked, lead) = match (self.plugin_feeds.as_slice(), self.unmade_feeds.as_slice()) {
@@ -2938,6 +3024,7 @@ impl Reader<'_> {
                      `feed_ids_before` and `feed_ids_from: eleventy` keep that id for each post. \
                      {rest}"
                 ));
+                notes.extend(twice);
                 for (address, _, path) in std::mem::take(&mut self.unmade_feeds) {
                     self.import.feeds.push((address, path));
                 }
@@ -2980,6 +3067,7 @@ impl Reader<'_> {
                 _ => "them",
             }
         ));
+        notes.extend(twice);
     }
 
     /// Asks for the site's feed at each of `addresses`, the first being the

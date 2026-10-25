@@ -1015,6 +1015,83 @@ fn an_eleventy_sites_feeds_the_rss_plugin_didnt_make_are_listed_and_keep_their_i
     }
 }
 
+/// An Eleventy site with posts whose URLs hold `'` and `&`, times the
+/// feeds its RSS plugin made: the report names those posts where a feed
+/// was Atom or JSON, whose ids the plugin escaped twice, says they may be
+/// where it can't tell the feed's kind, and says nothing of RSS.
+#[test]
+fn an_eleventy_sites_posts_whose_ids_the_rss_plugin_escaped_twice_are_named() {
+    let posts = "2 posts, `/posts/a-'-b/` and `/posts/c-&-d/`, ids escaped twice, as Eleventy's \
+                 RSS plugin does with a `'` or `&` in an Atom or JSON feed";
+    let sure = |feeds: &str| {
+        format!(
+            "The old site's {feeds} gave {posts}, so feed readers will show each once as new \
+             after the move."
+        )
+    };
+    let unsure = format!(
+        "The old site's feed may have given {posts}, so feed readers may show each once as new \
+         after the move: Statac couldn't read which kind of feed it was."
+    );
+    let plugin = |options: &str| format!("eleventyConfig.addPlugin(feedPlugin, {options});");
+    // (the case, the settings' calls, what is said)
+    let cases = [
+        ("atom", plugin("{}"), Some(sure("Atom feed at `/feed.xml`"))),
+        (
+            "json",
+            plugin("{ type: \"json\", outputPath: \"/feed.json\" }"),
+            Some(sure("JSON feed at `/feed.json`")),
+        ),
+        ("rss", plugin("{ type: \"rss\" }"), None),
+        (
+            "rss-and-atom",
+            format!(
+                "{}\n  {}",
+                plugin("{ type: \"rss\", outputPath: \"/rss.xml\" }"),
+                plugin("{ type: \"atom\", outputPath: \"/atom.xml\" }")
+            ),
+            Some(sure("Atom feed at `/atom.xml`")),
+        ),
+        (
+            "unknown",
+            plugin("{ type: process.env.TYPE }"),
+            Some(unsure),
+        ),
+    ];
+    for (label, calls, said) in cases {
+        let top = scratch(&format!("eleventy-feed-twice-{label}"));
+        let old = top.join("old");
+        fs::create_dir_all(old.join("posts")).unwrap();
+        let package = "{ \"devDependencies\": { \"@11ty/eleventy\": \"^3.0.0\", \
+                       \"@11ty/eleventy-plugin-rss\": \"^3.1.0\" } }\n";
+        fs::write(old.join("package.json"), package).unwrap();
+        let settings = format!(
+            "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\n\
+             export default function (eleventyConfig) {{\n  {calls}\n}}\n"
+        );
+        fs::write(old.join("eleventy.config.js"), settings).unwrap();
+        for (n, permalink) in [(1, "/posts/a-'-b/"), (2, "/posts/c-&-d/"), (3, "/posts/e/")] {
+            let post = format!(
+                "---\ntitle: Post {n}\ndate: 2026-01-0{n}\npermalink: \"{permalink}\"\n---\nText.\n"
+            );
+            fs::write(old.join(format!("posts/post-{n}.md")), post).unwrap();
+        }
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        match &said {
+            Some(said) => assert!(report.contains(said.as_str()), "{label}: {report}"),
+            None => assert!(!report.contains("escaped twice"), "{label}: {report}"),
+        }
+        assert_eq!(
+            report.matches("escaped twice").count(),
+            usize::from(said.is_some()),
+            "{label}: {report}"
+        );
+    }
+}
+
 /// An Eleventy site, times the `metadata.base` its RSS plugin's feed was
 /// given and the path the settings put the site under: the new site's
 /// `url` is the URL that feed made each post's full URL from, so the new
