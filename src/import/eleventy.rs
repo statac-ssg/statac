@@ -246,11 +246,7 @@ const DATES_FROM_FILE: &[&str] = &[
 ];
 
 /// Reads the site in `folder`.
-pub(super) fn read(
-    folder: &Path,
-    _today: Date,
-    given: Option<&str>,
-) -> Result<Import, Box<Failed>> {
+pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
     let found = settings::FILES
         .iter()
         .find(|name| inside::a_settings_file(folder, name));
@@ -268,6 +264,7 @@ pub(super) fn read(
         given,
         import: Import::default(),
         s,
+        today,
         input: String::new(),
         output: "_site".into(),
         includes: "_includes".into(),
@@ -340,6 +337,7 @@ struct Reader<'a> {
     given: Option<&'a str>,
     import: Import,
     s: Settings,
+    today: Date,
     /// The folders, by their paths in the old folder, `""` for its top.
     input: String,
     output: String,
@@ -2532,6 +2530,18 @@ impl Reader<'_> {
                     "each is"
                 }
             ));
+        }
+        if settings::makes_feeds(self.folder) {
+            self.import
+                .settings
+                .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
+            notes.push(
+                "The old site's `package.json` names Eleventy's RSS plugin, whose feed templates \
+                 give each post its full URL as its id, so `feed_ids_before` keeps that id for \
+                 each post. Feed readers see nothing new once a list's `feed:` line puts its \
+                 feed at the old feed's URL: see https://statac.dev/feeds/#entry-ids."
+                    .to_owned(),
+            );
         }
         let mut all = notes;
         all.append(&mut self.import.notes);

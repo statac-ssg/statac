@@ -44,6 +44,13 @@ pub(super) fn sets_maths(folder: &Path) -> bool {
     })
 }
 
+/// Whether the folder's `package.json` names among its dependencies
+/// Eleventy's RSS plugin, whose feed templates give each post its full URL
+/// as its id.
+pub(super) fn makes_feeds(folder: &Path) -> bool {
+    needs(folder, &|name| name == "@11ty/eleventy-plugin-rss")
+}
+
 /// Whether the folder's `package.json` names among its dependencies a
 /// package `wanted` picks out.
 fn needs(folder: &Path, wanted: &dyn Fn(&str) -> bool) -> bool {

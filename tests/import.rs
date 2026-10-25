@@ -479,6 +479,64 @@ fn the_feed_jekylls_plugin_made_is_asked_for_at_its_url() {
     }
 }
 
+/// An Eleventy site with its RSS plugin and one without: the posts from
+/// before the import keep their full URL as their id in a feed, as the
+/// plugin's feed templates gave them, and keep no other.
+#[test]
+fn an_eleventy_site_with_the_rss_plugin_keeps_its_posts_ids() {
+    let said = "The old site's `package.json` names Eleventy's RSS plugin, whose feed templates \
+                give each post its full URL as its id, so `feed_ids_before` keeps that id for \
+                each post.";
+    for plugin in [true, false] {
+        let top = scratch(&format!("eleventy-feed-ids-{plugin}"));
+        let old = top.join("old");
+        fs::create_dir_all(old.join("posts")).unwrap();
+        let needed = match plugin {
+            true => ", \"@11ty/eleventy-plugin-rss\": \"^3.0.0\"",
+            false => "",
+        };
+        let package =
+            format!("{{ \"devDependencies\": {{ \"@11ty/eleventy\": \"^3.0.0\"{needed} }} }}\n");
+        fs::write(old.join("package.json"), package).unwrap();
+        let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+        fs::write(old.join("posts/post-1.md"), post).unwrap();
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{told}");
+        let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        let kept: Vec<&str> = (settings.lines())
+            .filter(|line| line.starts_with("feed_ids_before:"))
+            .collect();
+        let wanted = Vec::from_iter(plugin.then_some("feed_ids_before: 2026-10-06"));
+        assert_eq!(kept, wanted, "{settings}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert_eq!(report.contains(said), plugin, "{report}");
+
+        let added = "url: https://example.org\nfeed: true\n";
+        fs::write(new.join("statac.yaml"), format!("{settings}{added}")).unwrap();
+        templated(&new);
+        let feed = "<feed>{% for post in posts %}<id>{{ feed_id(post) }}</id>{% endfor %}</feed>\n";
+        fs::write(new.join("templates/feed.xml"), feed).unwrap();
+        let out = top.join("out");
+        let outcome = build::run(&Options {
+            mode: Mode::Build,
+            site: new.clone(),
+            out: Some(out.clone()),
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        assert!(outcome.published.is_some(), "{:?}", outcome.problems);
+        let built = fs::read_to_string(out.join("feed.xml")).unwrap();
+        assert_eq!(
+            built.contains("<id>https://example.org/posts/post-1/</id>"),
+            plugin,
+            "{built}"
+        );
+        assert_eq!(built.contains("<id>urn:uuid:"), !plugin, "{built}");
+    }
+}
+
 #[test]
 fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
     let top = scratch("errors");
