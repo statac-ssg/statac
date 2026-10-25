@@ -504,6 +504,21 @@ pub(crate) fn headline(kind: &Kind) -> String {
             }
         ),
         Kind::MissingTemplate { path, .. } => format!("Missing template: there is no `{path}`"),
+        Kind::BuiltWithPageTemplate { path, pages } => format!(
+            "Built with page template: `templates/page.html` builds {} in place of `{path}`",
+            how_many(*pages, "page", "pages")
+        ),
+        Kind::BuiltWithoutTemplate { redirects, count } => {
+            let (one, many, published) = match (redirects, count) {
+                (false, 1) => ("page is", "pages are", "its content alone"),
+                (false, _) => ("page is", "pages are", "their content alone"),
+                (true, _) => ("redirect is", "redirects are", "a refresh and a link"),
+            };
+            format!(
+                "Built without template: {} published as {published}",
+                how_many(*count, one, many)
+            )
+        }
         Kind::NoValue { written, lack, .. } => match lack {
             Lack::OnPage(page) => format!("No value: `{written}` isn't set on {}", named(page)),
             Lack::Unset => format!("No value: nothing is set for `{written}`"),
@@ -2799,6 +2814,16 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
             (None, Chooser::Written) => None,
         },
+        Kind::BuiltWithPageTemplate { path, pages } => Some(format!(
+            "Add `{path}` to give {} a template of {} own.",
+            if *pages == 1 { "it" } else { "them" },
+            if *pages == 1 { "its" } else { "their" },
+        )),
+        Kind::BuiltWithoutTemplate { redirects, count } => Some(format!(
+            "Add `templates/{}.html` to build {} with a template.",
+            if *redirects { "redirect" } else { "page" },
+            if *count == 1 { "it" } else { "them" },
+        )),
         Kind::NoValue { instead, .. } => match instead {
             Instead::Handed(name) => Some(format!("Did you mean `{name}`?")),
             Instead::Default(written) => Some(format!(
@@ -9105,6 +9130,56 @@ mod tests {
                 },
                 "Missing template: there is no `templates/psot.html`",
                 Some("Did you mean `post`?"),
+            ),
+            (
+                Kind::BuiltWithPageTemplate {
+                    path: "templates/home.html".into(),
+                    pages: 1,
+                },
+                "Built with page template: `templates/page.html` builds 1 page in place of \
+                 `templates/home.html`",
+                Some("Add `templates/home.html` to give it a template of its own."),
+            ),
+            (
+                Kind::BuiltWithPageTemplate {
+                    path: "templates/folder.html".into(),
+                    pages: 2,
+                },
+                "Built with page template: `templates/page.html` builds 2 pages in place of \
+                 `templates/folder.html`",
+                Some("Add `templates/folder.html` to give them a template of their own."),
+            ),
+            (
+                Kind::BuiltWithoutTemplate {
+                    redirects: false,
+                    count: 2,
+                },
+                "Built without template: 2 pages are published as their content alone",
+                Some("Add `templates/page.html` to build them with a template."),
+            ),
+            (
+                Kind::BuiltWithoutTemplate {
+                    redirects: false,
+                    count: 1,
+                },
+                "Built without template: 1 page is published as its content alone",
+                Some("Add `templates/page.html` to build it with a template."),
+            ),
+            (
+                Kind::BuiltWithoutTemplate {
+                    redirects: true,
+                    count: 1,
+                },
+                "Built without template: 1 redirect is published as a refresh and a link",
+                Some("Add `templates/redirect.html` to build it with a template."),
+            ),
+            (
+                Kind::BuiltWithoutTemplate {
+                    redirects: true,
+                    count: 1_200,
+                },
+                "Built without template: 1,200 redirects are published as a refresh and a link",
+                Some("Add `templates/redirect.html` to build them with a template."),
             ),
             (
                 no_value(

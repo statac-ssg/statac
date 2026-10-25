@@ -200,7 +200,7 @@ impl Renderer {
             .filter(|(_, list)| list.members.contains(&page))
             .filter_map(|(id, _)| self.feeds().iter().find(|feed| feed.list == id))
             .map(|feed| format!("{}{}", shared.base, feed.address.as_str()));
-        let layout = self.layout_of(page).ok();
+        let layout = self.layout_of(page).ok().flatten();
         let templates = &shared.templates;
         let chain = layout.as_ref().map(|chosen| templates.chain(&chosen.name));
         Explained {

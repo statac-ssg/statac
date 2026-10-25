@@ -354,8 +354,8 @@ impl Session {
             .get_or_insert_with(|| crate::new::update::newer_starter(at, &Starter::OWN));
         prepared.problems.extend(newer.clone());
         let fixed = options.today.is_some();
-        let (stamps, mut prepared) = stamp::write(at, &options.run(), prepared, fixed, texts);
-        let plan = Plan::of(&prepared.renderer, &mut prepared.problems).noting();
+        let (stamps, prepared) = stamp::write(at, &options.run(), prepared, fixed, texts);
+        let plan = Plan::of(&prepared.renderer).noting();
         took.reading = began.elapsed();
 
         let settings = prepared.renderer.settings();

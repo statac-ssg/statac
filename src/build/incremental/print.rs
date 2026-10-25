@@ -938,7 +938,9 @@ impl Taken<'_> {
         }
         if asking.choosing {
             print = match renderer.layout_of(id) {
-                Ok(chosen) => (print.with((5u8, &chosen.name))).origin(sources, &chosen.origin),
+                Ok(Some(chosen)) => (print.with((5u8, &chosen.name, chosen.instead_of)))
+                    .origin(sources, &chosen.origin),
+                Ok(None) => print.with(7u8),
                 Err(problem) => (print.with(6u8))
                     .shown(&problem.kind)
                     .place(sources, problem.place),

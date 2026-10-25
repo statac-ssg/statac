@@ -526,9 +526,8 @@ impl Plan {
         }
     }
 
-    /// Every output of the site `renderer` holds, adding to `problems`
-    /// what leaves any out.
-    pub(crate) fn of(renderer: &Renderer, problems: &mut Vec<Problem>) -> Plan {
+    /// Every output of the site `renderer` holds.
+    pub(crate) fn of(renderer: &Renderer) -> Plan {
         let site = renderer.site();
         let mut outputs: Vec<Output> = site
             .pages
@@ -539,10 +538,7 @@ impl Plan {
         for (id, list) in site.lists.iter() {
             outputs.extend((2..list.later.len() + 2).map(|number| Output::Later(id, number)));
         }
-        match renderer.without_redirect_template() {
-            Some(problem) => problems.push(problem),
-            None => outputs.extend((0..site.redirects.len()).map(Output::Redirect)),
-        }
+        outputs.extend((0..site.redirects.len()).map(Output::Redirect));
         let feeds = renderer.feeds();
         outputs.extend((0..feeds.len()).map(Output::Feed));
         let mut published: Vec<String> = renderer
@@ -700,7 +696,7 @@ fn built(
         }
         _ => None,
     };
-    let plan = Plan::of(&prepared.renderer, &mut prepared.problems);
+    let plan = Plan::of(&prepared.renderer);
     clock.lap(Stage::Reading);
     let renderer = &prepared.renderer;
     let writes = match &staging {
@@ -862,6 +858,9 @@ pub(crate) fn conclude(
     // Where in `problems` the words a language lacks are told, by the
     // language and the words.
     let mut wordless: HashMap<(String, crate::problem::ShownWords), usize> = HashMap::new();
+    // Where in `problems` the outputs built with a template other than
+    // their own, or with none, are told, by the kind each page told.
+    let mut templateless: Vec<(Kind, usize)> = Vec::new();
     for built in built {
         if let Output::Page(page) = built.output
             && let Some(list) = site.pages.get(page).speaks_for
@@ -949,6 +948,29 @@ pub(crate) fn conclude(
                             }
                             None => {
                                 wordless.insert((tag.clone(), *words), problems.len());
+                                problems.push(problem.clone());
+                            }
+                        }
+                        continue;
+                    }
+                    // Each page, or redirect, says what it was built with in
+                    // place of its template; that is told once, counting
+                    // them.
+                    if matches!(
+                        problem.kind,
+                        Kind::BuiltWithPageTemplate { .. } | Kind::BuiltWithoutTemplate { .. }
+                    ) {
+                        match templateless.iter().find(|(kind, _)| *kind == problem.kind) {
+                            Some(&(_, at)) => {
+                                problems[at].met_building_too(problem);
+                                match &mut problems[at].kind {
+                                    Kind::BuiltWithPageTemplate { pages: count, .. }
+                                    | Kind::BuiltWithoutTemplate { count, .. } => *count += 1,
+                                    _ => unreachable!("matched above"),
+                                }
+                            }
+                            None => {
+                                templateless.push((problem.kind.clone(), problems.len()));
                                 problems.push(problem.clone());
                             }
                         }

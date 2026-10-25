@@ -601,7 +601,6 @@ fn a_site_imported_without_the_starter_has_its_settings_and_what_came_across_alo
             .filter(|problem| problem.kind.severity() == Severity::Error)
             .map(|problem| problem.kind.name())
             .collect();
-        assert!(!errors.is_empty(), "{name}");
         assert!(
             errors.iter().all(|error| *error == "missing-template"),
             "{name}: {errors:?}"

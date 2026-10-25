@@ -598,7 +598,7 @@ pub(super) fn ran_on(frame: &mut Frame, file: usize) -> Kind {
         let page = frame.page?;
         super::layout::read_choice(&shared, page, |key| frame.reads.read(key));
         let p = shared.site.pages.get(page);
-        let chosen = super::layout::choose(templates, &shared.sources, &shared.site, p).ok()?;
+        let chosen = super::layout::choose(templates, &shared.sources, &shared.site, p).ok()??;
         templates.by_name.get(&chosen.name).copied()
     });
     let path = shared

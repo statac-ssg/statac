@@ -250,7 +250,10 @@ fn the_layout_is_chosen_as_written_handed_down_typed_or_by_default() {
         ("templates/note.html", "{% extends \"page\" %}"),
         ("templates/folder.html", "{% extends \"page\" %}"),
     ]);
-    let layout = |path: &str| built.renderer.layout_of(built.id(path));
+    let layout = |path: &str| {
+        let chosen = built.renderer.layout_of(built.id(path));
+        chosen.map(|chosen| chosen.expect("a template"))
+    };
     let chosen = layout("post-1.md").unwrap();
     assert_eq!(chosen.name, "post");
     assert_eq!(chosen.origin.arrival, Arrival::Written);
@@ -288,21 +291,138 @@ fn the_names_said_to_choose_a_template_are_the_words_it_is_chosen_by() {
 }
 
 #[test]
-fn a_default_layout_the_site_lacks_is_told_at_the_page() {
-    let built = site(&[("content/post-1.md", "---\ntitle: Post 1\n---\n"), BASE]);
-    let rendered = built.render("post-1.md");
-    assert_eq!(rendered.html, None);
-    assert_eq!(
-        built.told(&rendered.problems),
-        [("missing-template", "content/post-1.md".into(), "---".into())]
-    );
-    assert!(matches!(
-        rendered.problems[0].kind,
-        Kind::MissingTemplate {
-            chosen: Chooser::Default,
-            ..
+fn a_default_template_the_site_lacks_gives_way_to_page_then_to_the_content_alone() {
+    let notes = [
+        (
+            "content/notes/index.md",
+            "---\ntitle: Notes\n---\nThe notes.\n",
+        ),
+        (
+            "content/notes/note-1.md",
+            "---\ntitle: Note 1\ndate: 2026-10-01\ntags: [Rust]\n---\nNote 1.\n",
+        ),
+        ("content/about.md", "---\nlayout: psot\n---\nAbout.\n"),
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+    ];
+    for index in [true, false] {
+        for templates in 0..8 {
+            let (home, folder, page) = (templates & 1 > 0, templates & 2 > 0, templates & 4 > 0);
+            let mut files = notes.to_vec();
+            if index {
+                files.push((
+                    "content/index.md",
+                    "---\ntitle: Home\n---\nThe home page.\n",
+                ));
+            }
+            for (has, path) in [
+                (home, "templates/home.html"),
+                (folder, "templates/folder.html"),
+                (page, "templates/page.html"),
+            ] {
+                if has {
+                    files.push((path, "{{ page.content }}"));
+                }
+            }
+            let built = site(&files);
+            let chosen = |address: &str| match built.renderer.layout_of(built.at(address)) {
+                Ok(Some(chosen)) => match chosen.instead_of {
+                    Some(instead_of) => format!("{} for {instead_of}", chosen.name),
+                    None => chosen.name,
+                },
+                Ok(None) => "content alone".to_owned(),
+                Err(Problem {
+                    kind: Kind::MissingTemplate { path, chosen, .. },
+                    ..
+                }) => format!("missing {path}, {chosen:?}"),
+                Err(problem) => panic!("{problem:?}"),
+            };
+            let own = |template: &str, has: bool| match (has, page) {
+                (true, _) => template.to_owned(),
+                (false, true) => format!("page for {template}"),
+                (false, false) => "content alone".to_owned(),
+            };
+            let made = |template: &str, has: bool| match has {
+                true => template.to_owned(),
+                false => format!("missing templates/{template}.html, Default"),
+            };
+            let home_page = match index {
+                true => own("home", home),
+                false => made("home", home),
+            };
+            let wanted = [
+                ("/", home_page),
+                ("/notes/", own("folder", folder)),
+                ("/notes/note-1/", own("page", page)),
+                ("/tags/rust/", made("folder", folder)),
+                ("/about/", "missing templates/psot.html, Written".to_owned()),
+            ];
+            for (address, wanted) in wanted {
+                let given = format!("index {index}, home {home}, folder {folder}, page {page}");
+                assert_eq!(chosen(address), wanted, "{address}, {given}");
+            }
         }
-    ));
+    }
+}
+
+#[test]
+fn a_page_with_no_template_is_its_content_alone() {
+    let built = site(&[
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\n# Post 1\n\nSee [it](/post-1/).\n",
+        ),
+        BASE,
+    ]);
+    let rendered = built.render("post-1.md");
+    assert_eq!(
+        rendered.html.as_deref(),
+        Some("<h1 id=\"post-1\">Post 1</h1>\n<p>See <a href=\"/post-1/\">it</a>.</p>")
+    );
+    assert_eq!(rendered.layout, None);
+    let [problem] = &rendered.problems[..] else {
+        panic!("{:?}", rendered.problems);
+    };
+    assert_eq!(
+        problem.kind,
+        Kind::BuiltWithoutTemplate {
+            redirects: false,
+            count: 1,
+        }
+    );
+    assert_eq!(problem.place, None);
+    let sources = built.renderer.sources();
+    let built_at: Vec<_> = (problem.built())
+        .map(|(named, place)| (named.cloned(), place.map(|at| sources.spelling(at))))
+        .collect();
+    assert_eq!(built_at, [(None, Some("---"))]);
+}
+
+#[test]
+fn a_list_page_with_content_and_no_template_of_its_own_is_built_with_page() {
+    let built = site(&[
+        (
+            "content/index.md",
+            "---\ntitle: Home\n---\nThe home page.\n",
+        ),
+        PAGE,
+        BASE,
+    ]);
+    let rendered = built.render("index.md");
+    assert_eq!(
+        rendered.html.as_deref(),
+        Some("<title>Home</title><p>The home page.</p>")
+    );
+    let kinds: Vec<_> = rendered.problems.iter().map(|p| &p.kind).collect();
+    assert_eq!(
+        kinds,
+        [&Kind::BuiltWithPageTemplate {
+            path: "templates/home.html".into(),
+            pages: 1,
+        }]
+    );
 }
 
 #[test]

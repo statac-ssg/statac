@@ -142,7 +142,7 @@ impl Checking {
         let mut prepared = build::prepared_with(at, &options.run(), &mut self.texts);
         let newer = crate::new::update::newer_starter(at, &Starter::OWN);
         prepared.problems.extend(newer);
-        let plan = Plan::of(&prepared.renderer, &mut prepared.problems).noting();
+        let plan = Plan::of(&prepared.renderer).noting();
         let rebuilding = Rebuilding {
             options,
             prepared,

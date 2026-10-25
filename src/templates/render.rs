@@ -23,8 +23,7 @@ use crate::dates::Dates;
 use crate::highlight::{self, Highlighter, Language};
 use crate::markdown::{self, Piece, PieceValue, Placement, Within};
 use crate::problem::{
-    ArgumentFault, Chooser, Kind, Named, NamedFeed, Problem, Relation, ShownBy, ShownWords,
-    Stopped, Word,
+    ArgumentFault, Kind, Named, NamedFeed, Problem, Relation, ShownBy, ShownWords, Stopped, Word,
 };
 use crate::reads::{Asked, Key, Reads};
 use crate::site::{
@@ -828,8 +827,9 @@ impl Renderer {
         building(&frame)
     }
 
-    /// The template `page` is built with.
-    pub fn layout_of(&self, page: PageId) -> Result<Chosen, Problem> {
+    /// The template `page` is built with: none for a page built as its
+    /// content alone.
+    pub fn layout_of(&self, page: PageId) -> Result<Option<Chosen>, Problem> {
         let shared = &self.shared;
         layout::choose(
             &shared.templates,
@@ -874,7 +874,8 @@ impl Renderer {
         };
         layout::read_choice(shared, page, frame::read);
         let chosen = match self.layout_of(page) {
-            Ok(chosen) => chosen,
+            Ok(Some(chosen)) => chosen,
+            Ok(None) => return self.content_alone(page, problems),
             Err(problem) => {
                 let frame = frame::pop();
                 // Placed in a file, it is one problem for every page built so.
@@ -885,6 +886,15 @@ impl Renderer {
                 return Rendered::of(None, frame, problems);
             }
         };
+        if let Some(instead_of) = chosen.instead_of {
+            let kind = Kind::BuiltWithPageTemplate {
+                path: super::files::template_path(instead_of),
+                pages: 1,
+            };
+            problems.extend(frame::with(|frame| {
+                met_building(Problem::nowhere(kind), frame)
+            }));
+        }
         let context = minijinja::context! {
             page => PageValue::numbered(shared, page, number),
             site => SiteValue::value(shared, frame::language()),
@@ -892,22 +902,32 @@ impl Renderer {
         self.finish(&chosen.name, context, problems)
     }
 
-    /// The problem with a site that sends readers on from old addresses
-    /// and has no template to build the pages left at them: one for the
-    /// site, placed at the first old address.
-    pub fn without_redirect_template(&self) -> Option<Problem> {
-        let first = self.shared.site.redirects.first()?;
-        if self.shared.templates.is_layout(REDIRECT) {
-            return None;
+    /// Builds `page`, on the frame pushed for it, as its content alone, as
+    /// `{{ page.content }}` shows it, and pops the frame.
+    fn content_alone(&self, page: PageId, mut problems: Vec<Problem>) -> Rendered {
+        let content = html_of(&self.shared, page, Part::Content);
+        let html = (content.as_ref())
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let own = (content.as_ref())
+            .and_then(frame::written)
+            .map_or_else(Own::default, Arc::unwrap_or_clone);
+        let mut frame = frame::pop();
+        problems.append(&mut frame.problems);
+        let kind = Kind::BuiltWithoutTemplate {
+            redirects: false,
+            count: 1,
+        };
+        problems.push(met_building(Problem::nowhere(kind), &frame));
+        let html = html.filter(|_| {
+            !problems
+                .iter()
+                .any(|p| p.kind.severity() == crate::problem::Severity::Error)
+        });
+        Rendered {
+            own,
+            ..Rendered::of(html, frame, problems)
         }
-        Some(Problem::at(
-            Kind::MissingTemplate {
-                path: super::files::template_path(REDIRECT),
-                chosen: Chooser::Written,
-                nearest: None,
-            },
-            first.place,
-        ))
     }
 
     /// Builds the page left at an address that sends a reader on, with the
@@ -916,7 +936,8 @@ impl Renderer {
     /// what the tab says meanwhile: the `title` of the page writing the
     /// redirect, or else what `headline` calls the page the reader is sent
     /// to, where one on the site is, or else `to`; and the page writing
-    /// the redirect as `page`.
+    /// the redirect as `page`. A site with no such template has a refresh
+    /// to `to` and a link to it written, and nothing else.
     pub fn render_redirect(&self, redirect: &Redirect) -> Rendered {
         let shared = &self.shared;
         let page = redirect.page;
@@ -926,7 +947,6 @@ impl Renderer {
         });
         frame::read(Key::Setting(shared.name_id("url")));
         frame::read(Key::Field(page, shared.name_id("url")));
-        frame::read(Key::Field(page, shared.name_id("title")));
         let on_site = |address: String| match shared.settings.text("url") {
             Some(url) => crate::content::address::whole(&address, super::own::origin_of(url.value)),
             None => address,
@@ -941,6 +961,10 @@ impl Renderer {
             ),
             SentTo::Elsewhere(written) => (written.clone(), None),
         };
+        if !shared.templates.is_layout(REDIRECT) {
+            return refresh_alone(&to, redirect);
+        }
+        frame::read(Key::Field(page, shared.name_id("title")));
         let p = shared.site.pages.get(page);
         let title = match (&p.title, sent_to) {
             (Some(title), _) if p.words.get(PageWord::Title).is_some() => title.value.clone(),
@@ -1078,6 +1102,25 @@ impl Renderer {
 
 /// The template that builds the page left at an old address.
 pub(crate) const REDIRECT: &str = "redirect";
+
+/// Builds the page left at `redirect`'s address where the site has no
+/// template for it, on the frame pushed for it, which it pops: a refresh
+/// to `to` and a link to it.
+fn refresh_alone(to: &str, redirect: &Redirect) -> Rendered {
+    let mut html = String::from("<meta http-equiv=\"refresh\" content=\"0; url=");
+    crate::html::escape(to, &mut html);
+    html.push_str("\">\n<a href=\"");
+    crate::html::escape(to, &mut html);
+    html.push_str("\">");
+    crate::html::escape(to, &mut html);
+    html.push_str("</a>\n");
+    let kind = Kind::BuiltWithoutTemplate {
+        redirects: true,
+        count: 1,
+    };
+    let problem = Problem::nowhere(kind).met(Relation::Building(None), Some(redirect.place));
+    Rendered::of(Some(html), frame::pop(), vec![problem])
+}
 
 /// Every name a build can be told before it starts that a page or the site
 /// may be asked for: Statac's own words and settings, and every field the

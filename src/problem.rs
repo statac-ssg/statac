@@ -136,6 +136,8 @@ codes! {
     CodeColoursNotLoaded "code-colours-not-loaded",
     MalformedTemplate "malformed-template",
     MissingTemplate "missing-template",
+    BuiltWithPageTemplate "built-with-page-template",
+    BuiltWithoutTemplate "built-without-template",
     NoValue "no-value",
     NotSupported "not-supported",
     WrongArgument "wrong-argument",
@@ -345,6 +347,8 @@ impl Code {
             | Code::NoSiteUrl
             | Code::NoLanguage
             | Code::MissingWords
+            | Code::BuiltWithPageTemplate
+            | Code::BuiltWithoutTemplate
             | Code::LocationPublished
             | Code::RobotsBeneathPath
             | Code::LoopOverEveryPage
@@ -452,6 +456,8 @@ impl Code {
             | Code::UnknownLanguage
             | Code::NoPagesInLanguage
             | Code::MissingWords
+            | Code::BuiltWithPageTemplate
+            | Code::BuiltWithoutTemplate
             | Code::LanguageFolderInPattern
             | Code::UnmatchedTranslationKey
             | Code::NotLinkedByPlace
@@ -1112,6 +1118,21 @@ pub enum Kind {
         path: String,
         chosen: Chooser,
         nearest: Option<String>,
+    },
+    /// Pages with content of their own whose default template the site
+    /// lacks, by its file (`templates/home.html`), built with
+    /// `templates/page.html` instead: how many.
+    BuiltWithPageTemplate {
+        path: String,
+        pages: usize,
+    },
+    /// Pages with content of their own published as that content alone,
+    /// as the site has no template to build them with, or pages left at
+    /// old URLs published as a refresh and a link, as it has no
+    /// `templates/redirect.html`: how many.
+    BuiltWithoutTemplate {
+        redirects: bool,
+        count: usize,
     },
     /// A value a template asked for that isn't there, as written in the
     /// template.
@@ -2840,6 +2861,8 @@ impl Kind {
             Kind::CodeColoursNotLoaded => Code::CodeColoursNotLoaded,
             Kind::MalformedTemplate { .. } => Code::MalformedTemplate,
             Kind::MissingTemplate { .. } => Code::MissingTemplate,
+            Kind::BuiltWithPageTemplate { .. } => Code::BuiltWithPageTemplate,
+            Kind::BuiltWithoutTemplate { .. } => Code::BuiltWithoutTemplate,
             Kind::NoValue { .. } => Code::NoValue,
             Kind::NotSupported { .. } => Code::NotSupported,
             Kind::WrongArgument { .. } => Code::WrongArgument,

@@ -103,7 +103,7 @@ pub(crate) enum Origin {
 
 /// Where what a template wrote is its own text, and where each value it
 /// printed was written, in the order written.
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Own {
     runs: Vec<Run>,
     prints: Vec<Print>,

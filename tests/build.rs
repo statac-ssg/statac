@@ -977,16 +977,32 @@ fn an_old_address_sends_readers_on() {
         "content/post-1.md",
         "---\ntitle: Post 1\nredirect_from: [/old/post-1/]\n---\nThe first post.\n",
     );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+note  Built without template: 1 redirect is published as a refresh and a link
+  While building: content/post-1.md, line 3
+   3 │ redirect_from: [/old/post-1/]
+     │                 ^^^^^^^^^^^^
+  Add `templates/redirect.html` to build it with a template.
+  More: https://statac.dev/e/built-without-template/
+
+1 note: 1 built-without-template.
+"
+    );
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
-    assert_eq!(code, 1, "{said}");
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        fs::read_to_string(site.out().join("old/post-1/index.html")).unwrap(),
+        "<meta http-equiv=\"refresh\" content=\"0; url=/post-1/\">\n\
+         <a href=\"/post-1/\">/post-1/</a>\n"
+    );
     assert!(
-        said.starts_with(
-            "error  Missing template: there is no `templates/redirect.html`\n  \
-             content/post-1.md, line 3\n"
-        ),
+        said.starts_with("1 note: 1 built-without-template. Run `statac check` to see it.\n"),
         "{said}"
     );
-    assert!(!site.out().exists());
 
     site.write(
         "templates/redirect.html",
@@ -1002,6 +1018,182 @@ fn an_old_address_sends_readers_on() {
         last_line(&said),
         "Wrote 2 pages, 1 redirect and 3 other files to `SITE/_site` in a moment."
     );
+}
+
+#[test]
+fn a_redirect_with_no_template_escapes_where_it_sends_readers() {
+    let site = Site::new("redirect-escaped");
+    site.write(
+        "content/away.md",
+        "---\nredirect_to: 'https://example.org/?a=1&b=\"<2>\"'\n---\n",
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let to = "https://example.org/?a=1&amp;b=&quot;&lt;2&gt;&quot;";
+    assert_eq!(
+        fs::read_to_string(site.out().join("away/index.html")).unwrap(),
+        format!(
+            "<meta http-equiv=\"refresh\" content=\"0; url={to}\">\n<a href=\"{to}\">{to}</a>\n"
+        )
+    );
+}
+
+#[test]
+fn a_site_of_two_pages_and_no_templates_publishes_their_content_alone() {
+    let site = Site {
+        root: std::env::temp_dir()
+            .join(format!("statac-build-no-templates-{}", std::process::id())),
+    };
+    let _ = fs::remove_dir_all(&site.root);
+    site.write(
+        "content/index.md",
+        "# Home\n\nThe home page, and [hello](/hello/).\n",
+    );
+    site.write(
+        "content/hello.md",
+        "---\ntitle: Hello\n---\nHello, and [home](../).\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+note  No language set: the site is read as English
+  Add the site's language to `statac.yaml`, as `language: en`.
+  More: https://statac.dev/e/no-language/
+
+note  Built without template: 2 pages are published as their content alone
+  While building: content/hello.md
+  And while building 1 more:
+    content/index.md
+  Add `templates/page.html` to build them with a template.
+  More: https://statac.dev/e/built-without-template/
+
+2 notes: 1 built-without-template, 1 no-language.
+"
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(
+        said.starts_with(
+            "2 notes: 1 built-without-template, 1 no-language. Run `statac check` to see them.\n"
+        ),
+        "{said}"
+    );
+    let pages: Vec<(String, String)> = files(&site.out())
+        .into_iter()
+        .filter(|(path, _)| path.ends_with(".html"))
+        .map(|(path, bytes)| (path, String::from_utf8(bytes).unwrap()))
+        .collect();
+    let page = |path: &str, html: &str| (path.to_owned(), html.to_owned());
+    assert_eq!(
+        pages,
+        [
+            page(
+                "hello/index.html",
+                "<p>Hello, and <a href=\"../\">home</a>.</p>"
+            ),
+            page(
+                "index.html",
+                "<h1 id=\"home\">Home</h1>\n\
+                 <p>The home page, and <a href=\"/hello/\">hello</a>.</p>"
+            ),
+        ]
+    );
+}
+
+#[test]
+fn pages_built_without_their_own_template_are_told_once_counting_them() {
+    let site = Site::new("without-template");
+    fs::remove_file(site.root.join("templates/page.html")).unwrap();
+    fs::remove_file(site.root.join("templates/home.html")).unwrap();
+    site.write(
+        "content/notes/index.md",
+        "---\ntitle: Notes\nredirect_from: [/old-notes/]\n---\nThe notes, and [a note](/nope/).\n",
+    );
+    site.write(
+        "content/notes/note-1.md",
+        "---\ntitle: Note 1\nredirect_from: [/old-1/, /older-1/]\n---\nNote 1.\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        "\
+note  Built without template: 4 pages are published as their content alone
+  While building: content/index.md
+  And while building 3 more:
+    content/post-1.md
+    content/notes/index.md
+    content/notes/note-1.md
+  Add `templates/page.html` to build them with a template.
+  More: https://statac.dev/e/built-without-template/
+
+note  Built without template: 3 redirects are published as a refresh and a link
+  While building: content/notes/index.md, line 3
+   3 │ redirect_from: [/old-notes/]
+     │                 ^^^^^^^^^^^
+  And while building 2 more:
+    content/notes/note-1.md, line 3
+    content/notes/note-1.md, line 3
+  Add `templates/redirect.html` to build them with a template.
+  More: https://statac.dev/e/built-without-template/
+
+warning  Broken link: nothing is published at `/nope/`
+  content/notes/index.md, line 5
+   5 │ The notes, and [a note](/nope/).
+     │                         ^^^^^^
+  More: https://statac.dev/e/broken-link/
+
+1 warning: 1 broken-link.
+2 notes: 2 built-without-template.
+"
+    );
+
+    // Where the site has `page.html`, it builds the list pages too.
+    site.write("templates/page.html", "<main>{{ page.content }}</main>\n");
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    for told in [
+        "\
+note  Built with page template: `templates/page.html` builds 1 page in place of `templates/home.html`
+  While building: content/index.md
+  Add `templates/home.html` to give it a template of its own.
+  More: https://statac.dev/e/built-with-page-template/
+",
+        "\
+note  Built with page template: `templates/page.html` builds 1 page in place of `templates/folder.html`
+  While building: content/notes/index.md
+  Add `templates/folder.html` to give it a template of its own.
+  More: https://statac.dev/e/built-with-page-template/
+",
+    ] {
+        assert!(said.contains(told), "{said}");
+    }
+    assert!(!said.contains("published as their content alone"), "{said}");
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(
+        said.starts_with(
+            "1 warning: 1 broken-link.\n\
+             3 notes: 2 built-with-page-template, 1 built-without-template. \
+             Run `statac check` to see them.\n"
+        ),
+        "{said}"
+    );
+    assert_eq!(
+        fs::read_to_string(site.out().join("index.html")).unwrap(),
+        "<main><p>The home page.</p></main>\n"
+    );
+
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
+         quiet: [built-with-page-template, built-without-template]\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.ends_with("3 notes, all quietened.\n"), "{said}");
 }
 
 #[test]

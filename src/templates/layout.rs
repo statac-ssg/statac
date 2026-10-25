@@ -8,6 +8,10 @@
 //! speaks for any other list, the pages Statac makes for tags and series
 //! among them, and `page` for any other. A page making pages from a table
 //! speaks for their list: its `layout:` builds the pages it makes.
+//!
+//! Where the site lacks the template so chosen, a page with content of
+//! its own is built with `page`, and where the site lacks that too, as its
+//! content alone. A page Statac made, which has none, needs its template.
 
 use super::Templates;
 use super::files::{Role, template_path};
@@ -26,6 +30,9 @@ pub struct Chosen {
     pub name: String,
     /// Where the name is written; a default where nothing named it.
     pub origin: Origin,
+    /// The template a default choice would have been, `home` or
+    /// `folder`, where the site lacks it and `page` builds in its place.
+    pub instead_of: Option<&'static str>,
 }
 
 /// The names a page's template is chosen by. What it chooses turns on more
@@ -40,17 +47,20 @@ pub(super) fn read_choice(shared: &Shared, page: PageId, mut read: impl FnMut(Ke
     }
 }
 
-/// Chooses the template for `page`, or says why it can't be had.
+/// Chooses the template for `page`, or says why it can't be had: none
+/// for a page with content of its own that the site has no template for,
+/// which is built as that content alone.
 pub(super) fn choose(
     templates: &Templates,
     sources: &Sources,
     site: &Site,
     page: &Page,
-) -> Result<Chosen, Problem> {
+) -> Result<Option<Chosen>, Problem> {
     let named = |word: PageWord| {
         page.words.text(word).map(|text| Chosen {
             name: super::files::named(text.value).to_owned(),
             origin: text.origin,
+            instead_of: None,
         })
     };
     let makes = page.makes_pages();
@@ -60,10 +70,9 @@ pub(super) fn choose(
         .filter(|chosen| chosen.origin.arrival == Arrival::Written && !makes);
     let typed = named(PageWord::Type).filter(|chosen| templates.is_layout(&chosen.name));
     let face = page.speaks_for_a_list();
-    let chosen = written
-        .or(typed)
-        .or(layout.filter(|_| !face))
-        .unwrap_or_else(|| {
+    let chosen = match written.or(typed).or(layout.filter(|_| !face)) {
+        Some(chosen) => chosen,
+        None => {
             let home = |list| site.is_home(list);
             let top = (page.place == crate::site::PagePlace::Folder && home(page.folder))
                 || page.speaks_for.is_some_and(home);
@@ -72,13 +81,24 @@ pub(super) fn choose(
                 (true, false) => "folder",
                 (false, _) => "page",
             };
-            Chosen {
+            let defaulted = |name: &str, instead_of| Chosen {
                 name: name.to_owned(),
                 origin: Origin::defaulted(),
+                instead_of,
+            };
+            // A list's page Statac made has no file, and a page made from
+            // a table or for a post has no content of its own.
+            let own_content = page.source.is_some() && page.made.is_none();
+            match (templates.is_layout(name), templates.is_layout("page")) {
+                (true, _) => return Ok(Some(defaulted(name, None))),
+                _ if !own_content => defaulted(name, None),
+                (false, true) => return Ok(Some(defaulted("page", Some(name)))),
+                (false, false) => return Ok(None),
             }
-        });
+        }
+    };
     if templates.is_layout(&chosen.name) {
-        return Ok(chosen);
+        return Ok(Some(chosen));
     }
     let layouts = templates
         .files

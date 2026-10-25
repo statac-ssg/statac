@@ -1012,6 +1012,59 @@ fn a_template_a_snippet_and_a_stylesheet() {
 }
 
 #[test]
+fn templates_removed_until_pages_are_their_content_alone_and_added_back() {
+    let site = Site::new("no-template");
+    let page = format!("{BASE}{PAGE}");
+    let redirect = site.read("templates/redirect.html");
+    through(
+        &site,
+        &[
+            ("the home template removed", &|site| {
+                site.remove("templates/home.html")
+            }),
+            ("the page template removed", &|site| {
+                site.remove("templates/page.html")
+            }),
+            ("the redirect template removed", &|site| {
+                site.remove("templates/redirect.html")
+            }),
+        ],
+    );
+    let fresh = |path: &str| fs::read_to_string(site.top.join("fresh").join(path)).unwrap();
+    assert_eq!(
+        fresh("post-1/index.html"),
+        "<p>Post 1 says this.</p>\n<p>And <a href=\"/post-1/\">the first</a>.</p>"
+    );
+    assert_eq!(
+        fresh("old-6/index.html"),
+        "<meta http-equiv=\"refresh\" content=\"0; url=https://example.org/post-6/\">\n\
+         <a href=\"https://example.org/post-6/\">https://example.org/post-6/</a>\n"
+    );
+    through(
+        &site,
+        &[
+            ("a page edited", &|site| {
+                site.write(
+                    "content/post-1.md",
+                    &post(
+                        "Post 1",
+                        "2026-01-01",
+                        "one",
+                        "Post 1, and [post 2](/post-2/).",
+                    ),
+                )
+            }),
+            ("the page template added", &|site| {
+                site.write("templates/page.html", &page)
+            }),
+            ("the redirect template added", &|site| {
+                site.write("templates/redirect.html", &redirect)
+            }),
+        ],
+    );
+}
+
+#[test]
 fn a_pieces_file_added_and_removed() {
     let site = Site::new("pieces");
     let text = "Post 1 has a table.\n\n| a |\n|---|\n| 1 |\n{#x .wide}";

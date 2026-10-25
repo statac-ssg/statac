@@ -1,7 +1,9 @@
 # Missing template
 
 A page needs a template that isn't in `templates/`. The message gives the
-name of the file Statac looked for.
+name of the file Statac looked for. The template was named by `layout:`
+or `extends`, or the page is a list page Statac makes itself, such as a
+tag's page.
 
 Statac builds a page with the first of these that applies:
 
@@ -11,6 +13,12 @@ Statac builds a page with the first of these that applies:
    `pages.layout: post`, unless the page is a list page;
 4. `home` for the home page, `folder` for any other list page, and `page`
    for the rest.
+
+A page with content of its own that names no template doesn't need the
+one Statac chose for it. A home page or list page without its template is
+built with `page`, and the `built-with-page-template` note says so. A page
+the site has no template for at all is published as its content alone,
+and the `built-without-template` note says so.
 
 A template's `{% extends "base" %}` refers to another template in the same
 way. Each name is the file's name in `templates/`, with or without
@@ -26,7 +34,9 @@ error  Missing template: there is no `templates/folder.html`
 
 ## Why Statac stops
 
-With no template, there is nothing to build the page with.
+A template named by `layout:` or `extends` is the one you chose, so Statac
+doesn't build the page another way. A list page Statac makes itself has no
+content of its own, so without its template there is nothing to publish.
 
 ## How to fix it
 
