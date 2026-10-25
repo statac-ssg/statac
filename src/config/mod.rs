@@ -733,12 +733,13 @@ fn read_web_addresses(
 
 /// Whether `tag` names a language, so that a setting written for it is
 /// meant for a language rather than being one of the author's own: one
-/// the site declares in other capitals, or one Statac has words for.
+/// the site declares in other capitals, or one Statac has words for, its
+/// own or those of a tag it inherits from.
 fn names_a_language(tag: &str, declared: &[String]) -> bool {
     declared
         .iter()
         .any(|declared| declared.eq_ignore_ascii_case(tag))
-        || (language_code(tag) && crate::language::bundled(tag).is_some())
+        || (language_code(tag) && crate::language::statacs(tag).is_some())
 }
 
 /// A setting written for a language the site doesn't declare, or one that

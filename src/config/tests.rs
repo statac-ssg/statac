@@ -932,6 +932,34 @@ fn a_setting_for_a_language_not_declared_or_that_no_language_has_is_unknown() {
     assert!(settings.own("og.title").is_some());
 }
 
+/// A setting for a tag the site doesn't declare is told as meant for a
+/// language wherever Statac has words for the tag, its own or those of a
+/// tag it inherits from, and is the author's own otherwise.
+#[test]
+fn a_tag_names_a_language_as_statac_finds_its_words() {
+    let cases = [
+        ("en-GB", true),
+        ("es-MX", true),
+        ("en-NZ", true),
+        ("es-CU", true),
+        ("fr", true),
+        ("sw", false),
+    ];
+    for (tag, told) in cases {
+        let name = format!("{tag}.title");
+        let text = format!("language: [ar, en]\n{name}: Site 1\n");
+        let unknown = Kind::UnknownWord {
+            word: Word::Setting,
+            written: name.clone(),
+            nearest: None,
+        };
+        let expected = told.then(|| (unknown, name.clone()));
+        assert_eq!(found(&text), Vec::from_iter(expected), "{tag}");
+        let (_, settings, _) = read_settings(&text);
+        assert_eq!(settings.own(&name).is_some(), !told, "{tag}");
+    }
+}
+
 #[test]
 fn a_site_in_one_language_writes_no_setting_for_one() {
     let (_, settings, problems) =
