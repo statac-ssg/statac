@@ -273,7 +273,9 @@ fn piece(name: &str, slice: Option<&str>, pieces: &Pieces, making: &Making) -> O
         i8::try_from(date.day).ok()?,
     )
     .ok()?;
-    let title = || making.urlized(pieces.title);
+    // A page's title gives one piece of the path, so a slash in it is
+    // not a slash in the path.
+    let title = || making.urlized(&pieces.title.replace(['/', '\\'], "-"));
     let slug = || pieces.slug.map(|slug| making.urlized(slug));
     let file_name = || making.urlized(pieces.file_name);
     if slice.is_some() && name != "sections" {
@@ -457,6 +459,36 @@ mod tests {
         ] {
             for pattern in ["/tt/:slug/", "/tt/:title/"] {
                 assert_eq!(term(pattern, name, &HUGO), made, "{pattern} {name:?}");
+            }
+        }
+    }
+
+    /// Each as Hugo 0.166 published a page titled `<title>` with
+    /// `/t/:title/` as the pattern for its list, and with `/t/:slug/` for a
+    /// page without a slug.
+    #[test]
+    fn a_slash_in_a_title_is_a_hyphen() {
+        for (title, made) in [
+            ("a/b", "/t/a-b/"),
+            ("a\\b", "/t/a-b/"),
+            ("a / b", "/t/a-b/"),
+            ("a \\ b", "/t/a-b/"),
+            ("/a", "/t/-a/"),
+            ("a/", "/t/a-/"),
+            ("C/C++", "/t/c-c/"),
+            ("a//b", "/t/a--b/"),
+            ("A/B\\C", "/t/a-b-c/"),
+        ] {
+            let pieces = Pieces {
+                date: None,
+                title,
+                slug: None,
+                file_name: "x",
+                sections: &[],
+            };
+            for pattern in ["/t/:title/", "/t/:slug/"] {
+                let got = expand(pattern, &pieces, &HUGO);
+                assert_eq!(got.as_deref(), Ok(made), "{pattern} {title:?}");
             }
         }
     }
