@@ -8,8 +8,9 @@
 //! character that needs it escaped, so it reads back as it was sent; an
 //! address is kept only where it is `http` or `https`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
+use super::refused::{Refused, SETTING};
 use crate::config::Settings;
 use crate::content::address::{Address, decoded};
 use crate::content::words::key_name;
@@ -243,6 +244,11 @@ fn spelt(address: &Address) -> String {
 #[derive(Default, Debug)]
 pub struct Mentions {
     by_page: HashMap<PageId, Vec<Mention>>,
+    /// The mentions `refuse_webmentions_from` leaves out, by path under
+    /// `fetched/`, in order of id.
+    pub refused: Vec<(String, Mention)>,
+    /// The faces the mentions not refused name, by path under `fetched/`.
+    pub faces_named: BTreeSet<String>,
 }
 
 impl Mentions {
@@ -269,7 +275,8 @@ pub(crate) fn mention_file(path: &str) -> bool {
 
 /// Reads every mention in `fetched/mentions/` into its page, telling each
 /// value that doesn't read as Statac writes it, and each mention of an
-/// address no page stands at. A site without a `url` reads none.
+/// address no page stands at. What `refuse_webmentions_from` refuses is
+/// left out, and counted once. A site without a `url` reads none.
 pub(crate) fn read(
     site: &Site,
     settings: &Settings,
@@ -291,7 +298,18 @@ pub(crate) fn read(
         return (mentions, problems);
     };
     let pages = pages_by_address(site);
-    for (_, mention, target_at) in kept(&site.fetched, sources, &mut problems) {
+    let refused = Refused::of(settings);
+    for (path, mention, target_at) in kept(&site.fetched, sources, &mut problems) {
+        if refused
+            .refusing(&mention.url, mention.author_url.as_deref())
+            .is_some()
+        {
+            mentions.refused.push((path, mention));
+            continue;
+        }
+        if let Some(face) = &mention.face {
+            mentions.faces_named.insert(format!("{FACES}/{face}"));
+        }
         let found = on_site(&mention.target, &url)
             .and_then(|path| Address::read(&decoded(&path)).ok())
             .and_then(|address| pages.get(&spelt(&address)).copied());
@@ -312,6 +330,13 @@ pub(crate) fn read(
             let day = mention.published.map(|day| (day.year, day.month, day.day));
             (day.is_none(), day, mention.id)
         });
+    }
+    if !mentions.refused.is_empty() {
+        let kind = Kind::RefusedWebmentions {
+            count: mentions.refused.len(),
+        };
+        let at = settings.get(SETTING).and_then(|line| line.origin.place);
+        problems.push(Problem::placed(kind, at));
     }
     (mentions, problems)
 }

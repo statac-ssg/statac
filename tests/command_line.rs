@@ -287,11 +287,6 @@ fn a_command_run_inside_a_site_works_on_the_site_and_names_files_from_it() {
         String::from_utf8(output.stdout).unwrap(),
         "Nothing to fetch.\n"
     );
-    let output = statac_in(&three_down, &["refuse", "https://a.example/"]);
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap(),
-        "Nothing refused: no webmention kept here is from `https://a.example/`.\n"
-    );
     assert!(everything(&three_down).is_empty());
 }
 
@@ -365,7 +360,6 @@ fn a_folder_named_is_taken_as_named_and_never_looked_above() {
     assert_eq!(refused(&["serve", "notes", "--offline"]), stopped);
     assert_eq!(refused(&["check", "notes"]), counted);
     assert_eq!(refused(&["refresh", "notes"]), counted);
-    assert_eq!(refused(&["refuse", "https://a.example/", "notes"]), counted);
     assert_eq!(refused(&["stamp", "notes"]), format!("{headline}{NO_SITE}"));
     assert_eq!(
         refused(&["search", "post", "notes"]),

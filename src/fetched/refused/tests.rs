@@ -1,18 +1,17 @@
 use super::*;
+use crate::source::Sources;
 
 fn spot(address: &str) -> Spot {
     Spot::of(address).unwrap()
 }
 
-fn day(written: &str) -> Date {
-    crate::date::read(written).unwrap()
-}
-
-fn read_text(text: &str) -> (Sources, List, Vec<Problem>) {
+/// What `statac.yaml` holding `text` refuses.
+fn refused(text: &str) -> Refused {
     let mut sources = Sources::default();
-    let source = sources.add(shown(), text.to_owned());
-    let (list, problems) = List::read(&sources, source);
-    (sources, list, problems)
+    let source = sources.add(crate::config::FILE_NAME, text.to_owned());
+    let (settings, problems) = crate::config::read_source(&sources, source);
+    assert_eq!(problems, [], "{text}");
+    Refused::of(&settings)
 }
 
 #[test]
@@ -61,55 +60,20 @@ fn an_address_is_under_another_at_a_path_boundary_on_the_same_host_and_port() {
 }
 
 #[test]
-fn a_list_written_reads_back_the_same_sorted_by_address() {
-    let mut list = List::default();
-    for (reach, address) in [
-        (Reach::Sender, "https://b.example/"),
-        (Reach::Mention, "https://a.example/post-1/"),
-        (Reach::Mention, "https://a.example/post-2/"),
-    ] {
-        list.set(Entry {
-            reach,
-            address: address.into(),
-            day: day("2026-10-06"),
-        });
-    }
-    // The same address again replaces the line.
-    list.set(Entry {
-        reach: Reach::Sender,
-        address: "http://www.a.example/post-2".into(),
-        day: day("2026-10-07"),
-    });
-    let text = list.text();
-    assert_eq!(
-        text,
-        "statac refused 1\n\
-         sender\thttp://www.a.example/post-2\t2026-10-07\n\
-         mention\thttps://a.example/post-1/\t2026-10-06\n\
-         sender\thttps://b.example/\t2026-10-06\n"
+fn a_mention_is_refused_by_its_own_url_or_its_senders_at_or_under_a_line() {
+    let list = refused(
+        "refuse_webmentions_from:\n  - https://a.example/post-1/\n  - https://b.example/c/\n",
     );
-    let (_, again, problems) = read_text(&text);
-    assert_eq!(problems, []);
-    assert_eq!(again.text(), text);
-}
-
-#[test]
-fn a_mention_is_refused_by_its_address_and_by_its_senders() {
-    let (_, list, problems) = read_text(
-        "statac refused 1\n\
-         mention\thttps://a.example/post-1/\t2026-10-06\n\
-         sender\thttps://b.example/c/\t2026-10-06\n",
-    );
-    assert_eq!(problems, []);
-    let refusing = |url: &str, author: Option<&str>| {
-        list.refusing(url, author)
-            .map(|entry| entry.address.as_str())
-    };
+    let refusing = |url: &str, author: Option<&str>| list.refusing(url, author);
     assert_eq!(
         refusing("http://A.example/post-1", None),
         Some("https://a.example/post-1/")
     );
-    assert_eq!(refusing("https://a.example/post-1/reply-2", None), None);
+    assert_eq!(
+        refusing("https://a.example/post-1/reply-2", None),
+        Some("https://a.example/post-1/")
+    );
+    assert_eq!(refusing("https://a.example/post-2", None), None);
     assert_eq!(
         refusing("https://b.example/c/post-1", None),
         Some("https://b.example/c/")
@@ -123,70 +87,49 @@ fn a_mention_is_refused_by_its_address_and_by_its_senders() {
         None
     );
     assert_eq!(refusing("https://e.example/", Some("javascript:a")), None);
+
+    // One URL stands for a list of one; none refuses nothing.
+    let one = refused("refuse_webmentions_from: https://a.example/\n");
+    assert_eq!(
+        one.refusing("https://a.example/post-1/", None),
+        Some("https://a.example/")
+    );
+    let none = refused("title: Site\n");
+    assert_eq!(none.refusing("https://a.example/", None), None);
 }
 
 #[test]
-fn each_line_that_doesnt_read_is_told_where_it_is() {
-    let (sources, list, problems) = read_text(
-        "statac refused 1\n\
-         mention\thttps://a.example/post-1/\n\
-         site\thttps://a.example/\t2026-10-06\n\
-         sender\ta.example\t2026-10-06\n\
-         sender\thttps://b.example/\t6 October\n\
-         sender\thttps://c.example/\t2026-10-06\n\
-         mention\thttp://www.C.example\t2026-10-06\n",
-    );
-    let told: Vec<(RecordFault, String)> = problems
-        .iter()
-        .map(|problem| {
-            let Kind::MalformedRecord { fault } = &problem.kind else {
-                panic!("{problem:?}");
-            };
-            let place = problem.place.unwrap();
-            (fault.clone(), sources.spelling(place).to_owned())
-        })
-        .collect();
+fn the_retired_list_gives_its_urls_and_counts_the_lines_that_dont_read() {
     assert_eq!(
-        told,
-        [
-            (
-                RecordFault::RefusedFields(2),
-                "mention\thttps://a.example/post-1/".into()
-            ),
-            (RecordFault::Reach("site".into()), "site".into()),
-            (RecordFault::Address("a.example".into()), "a.example".into()),
-            (RecordFault::Day("6 October".into()), "6 October".into()),
-            (
-                RecordFault::Twice("http://www.C.example".into()),
-                "http://www.C.example".into()
-            ),
-        ]
+        carried(
+            "statac refused 1\n\
+             mention\thttps://a.example/post-1/\t2026-10-06\n\
+             sender\thttps://b.example/\t2026-10-06\n"
+        ),
+        (
+            vec![
+                "https://a.example/post-1/".to_owned(),
+                "https://b.example/".to_owned()
+            ],
+            0
+        )
     );
     assert_eq!(
-        list.text(),
-        "statac refused 1\nsender\thttps://c.example/\t2026-10-06\n"
+        carried(
+            "statac refused 1\n\
+             mention\thttps://a.example/post-1/\n\
+             sender\ta.example\t2026-10-06\n\
+             \n\
+             sender\thttps://c.example/\t2026-10-06\n"
+        ),
+        (vec!["https://c.example/".to_owned()], 2)
     );
-}
-
-#[test]
-fn a_list_opening_with_another_line_is_told_at_it_and_read_no_further() {
-    for text in [
-        "",
-        "statac fetched 1\nsender\thttps://a.example/\t2026-10-06\n",
-    ] {
-        let (_, list, problems) = read_text(text);
-        assert!(list.is_empty());
-        assert!(
-            matches!(
-                &problems[..],
-                [Problem {
-                    kind: Kind::MalformedRecord {
-                        fault: RecordFault::RefusedOpening
-                    },
-                    ..
-                }]
-            ),
-            "{problems:?}"
-        );
-    }
+    // A line in the opening's place is a line like any other.
+    assert_eq!(
+        carried("sender\thttps://a.example/\t2026-10-06\n"),
+        (vec!["https://a.example/".to_owned()], 0)
+    );
+    assert_eq!(carried("statac fetched 1\n"), (Vec::new(), 1));
+    assert_eq!(carried(""), (Vec::new(), 0));
+    assert_eq!(carried("statac refused 1\n"), (Vec::new(), 0));
 }

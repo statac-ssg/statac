@@ -12,14 +12,14 @@ use crate::fetch::Refusal;
 use crate::platform::{Alike, Unwritable};
 use crate::problem::{
     AddressFault, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
-    Carried, Chooser, Ended, Expected, FontWithThem, FormatFault, Found, Held, Hint, Holds,
-    Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing, MoreAt,
-    Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault, Piece,
-    Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation, Repeated,
-    Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy, ShownWords,
-    SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told, Translated,
-    Unheard, Unmatched, Unquietenable, Unsupported, Unwritten, Waiting, Wanted, Word, WordList,
-    WordsFrom, WordsWanted, WrongPlace,
+    Carried, Chooser, CommandHint, Ended, Expected, FontWithThem, FormatFault, Former, Found, Held,
+    Hint, Holds, Instead, JsonFault, Kind, Lack, ListFault, Maker, Malformed, MathsFault, Missing,
+    MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own, PictureFault,
+    Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related, Relation,
+    Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape, ShownBy,
+    ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault, Told,
+    Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting, Wanted,
+    Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 
 mod described;
@@ -97,8 +97,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
         },
         Kind::UnknownCommand { written, .. } => format!("Unknown command: `{written}`"),
         Kind::MissingCommand => {
-            "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, \
-             `import` or `explain`"
+            "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `new`, `import` or \
+             `explain`"
                 .into()
         }
         Kind::UnknownOption { written, hint } => match hint {
@@ -122,17 +122,8 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::OptionGivenTwice { option } => format!("Option given twice: `{option}`"),
         Kind::UnexpectedArgument { written, .. } => format!("Unexpected argument: `{written}`"),
         Kind::MissingName => "Missing name: `statac explain` needs the name of a problem".into(),
-        Kind::MissingUrl => {
-            "Missing URL: `statac refuse` needs the full URL of a webmention or a sender".into()
-        }
         Kind::NothingToSearch => {
             "Nothing to search for: `statac search` needs the words to look for".into()
-        }
-        Kind::NotAUrl { written, .. } => {
-            format!(
-                "Not a URL: `statac refuse` takes a full URL starting `https://` or `http://`, \
-                 not `{written}`"
-            )
         }
         Kind::UnreadableName { written } => {
             format!("Unreadable name: `{written}` holds bytes that aren't UTF-8")
@@ -979,16 +970,6 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 RecordFault::Held(held) => format!("`{held}` is neither a hash nor `absent`"),
                 RecordFault::Day(day) => format!("`{day}` isn't a day"),
                 RecordFault::Twice(path) => format!("`{path}` has two lines"),
-                RecordFault::RefusedOpening => "the first line isn't `statac refused 1`".into(),
-                RecordFault::RefusedFields(n) => {
-                    format!("a line has {}, not 3", how_many(*n, "field", "fields"))
-                }
-                RecordFault::Reach(reach) => {
-                    format!("`{reach}` is neither `mention` nor `sender`")
-                }
-                RecordFault::Address(address) => {
-                    format!("`{address}` isn't an `https://` or `http://` URL")
-                }
                 RecordFault::NotAnAddress(written) => {
                     format!("`{written}` isn't a URL starting with `/`")
                 }
@@ -999,9 +980,17 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 .into()
         }
         Kind::WebmentionsOff => "Webmentions off: `webmention()` writes nothing here".into(),
+        Kind::RetiredFile { .. } => "Retired file: Statac no longer reads `fetched/refused`".into(),
         Kind::MentionOfNoPage { target } => {
             format!("Mention of no page: nothing is published at `{target}`")
         }
+        Kind::RefusedWebmentions { count } => match count {
+            1 => "Refused webmentions: 1 in `fetched/mentions/` is left out".into(),
+            _ => format!(
+                "Refused webmentions: {} in `fetched/mentions/` are left out",
+                grouped(count)
+            ),
+        },
         Kind::FolderNotEmpty {
             folder,
             names,
@@ -2344,17 +2333,24 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::UnclosedFrontMatter => Some("Add a `---` line after the last field.".into()),
         Kind::UnknownProblemName {
             suggestion: Some(ours),
-            renamed: true,
+            former: Former::Renamed,
             ..
         } => Some(format!("Statac calls this `{ours}`.")),
+        Kind::UnknownProblemName {
+            former: Former::Retired,
+            ..
+        } => Some("This kind of problem no longer exists.".into()),
         Kind::UnknownProblemName { suggestion, .. }
         | Kind::UnexpectedArgument { suggestion, .. } => {
             suggestion.as_ref().map(|s| format!("Did you mean `{s}`?"))
         }
         Kind::CantQuieten { .. } => Some("Take it out of `quiet:`.".into()),
-        Kind::UnknownCommand { suggestion, .. } => Some(match suggestion {
-            Some(s) => format!("Did you mean `statac {s}`?"),
-            None => "Run `statac --help` to see the commands.".into(),
+        Kind::UnknownCommand { hint, .. } => Some(match hint {
+            CommandHint::Similar(s) => format!("Did you mean `statac {s}`?"),
+            CommandHint::Setting(setting) => {
+                format!("Statac does this with `{setting}:` in `statac.yaml`.")
+            }
+            CommandHint::None => "Run `statac --help` to see the commands.".into(),
         }),
         Kind::MissingCommand => Some("Run `statac --help` to see the commands.".into()),
         Kind::UnknownOption { written, hint } => Some(match hint {
@@ -2393,17 +2389,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }),
         Kind::OptionGivenTwice { .. } => Some("Keep one of them.".into()),
         Kind::MissingName => Some("The name is the last part of a problem's `More:` link.".into()),
-        Kind::MissingUrl => Some(
-            "Give the full URL after the command, as `statac refuse https://a.example/post-1/`."
-                .into(),
-        ),
         Kind::NothingToSearch => {
             Some("Give them after the command, as `statac search \"raspberry pi\"`.".into())
         }
-        Kind::NotAUrl { respelt, .. } => Some(match respelt {
-            Some(address) => format!("Did you mean `{address}`?"),
-            None => "Give the full URL, as the browser shows it.".into(),
-        }),
         Kind::UnreadableName { .. } => None,
         Kind::UnusableName { .. } => Some("Name the folder without it.".into()),
         Kind::MissingFile { hint, .. } => hint.as_ref().map(|hint| match hint {
@@ -3184,16 +3172,6 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             }
             RecordFault::Day(_) => Some("Write the day as `2026-10-06`.".into()),
             RecordFault::Twice(_) => Some("Keep one of them.".into()),
-            RecordFault::RefusedOpening => {
-                Some("Write `statac refused 1` as its first line.".into())
-            }
-            RecordFault::RefusedFields(_) => {
-                Some("Write `mention` or `sender`, the URL, and the day, parted by tabs.".into())
-            }
-            RecordFault::Reach(_) => Some("Write `mention` or `sender`.".into()),
-            RecordFault::Address(_) => {
-                Some("Write the full URL, starting `https://` or `http://`.".into())
-            }
             RecordFault::NotAnAddress(_) => Some(
                 "Write it as a URL starting with `/`, such as `/about/`, or take the line out."
                     .into(),
@@ -3207,9 +3185,29 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::WebmentionsOff => {
             Some("Add `webmentions: true` to `statac.yaml`, or remove the call.".into())
         }
+        Kind::RetiredFile { urls, unread } => Some(match (urls.is_empty(), unread) {
+            (false, Unread::Nothing) => "Delete `fetched/refused` after adding them.".into(),
+            (false, Unread::Lines(1)) => "Delete `fetched/refused` after adding them, and the URL \
+                                          on the line that couldn't be read."
+                .into(),
+            (false, Unread::Lines(lines)) => format!(
+                "Delete `fetched/refused` after adding them, and the URLs on the {} lines that \
+                 couldn't be read.",
+                grouped(lines)
+            ),
+            (true, Unread::Nothing) => "Delete it: it lists no URLs.".into(),
+            (_, Unread::Lines(_) | Unread::File(_)) => {
+                "Copy its URLs to `refuse_webmentions_from:` in `statac.yaml`, then delete it."
+                    .into()
+            }
+        }),
         Kind::MentionOfNoPage { .. } => {
             Some("If the page moved, add the old URL to its `redirect_from`.".into())
         }
+        Kind::RefusedWebmentions { count } => Some(match count {
+            1 => "Run `statac refresh` to delete its file.".into(),
+            _ => "Run `statac refresh` to delete their files.".into(),
+        }),
         Kind::FolderNotEmpty { by, .. } => Some(match by {
             Maker::New => "Give `statac new` an empty folder, or the name of a new one.".into(),
             Maker::Import => {
@@ -3564,13 +3562,19 @@ pub(crate) fn drawing_cards(done: usize, of: usize) -> String {
 /// How many of the last lines a command printed are shown.
 const LINES_SHOWN: usize = 40;
 
-/// What a hook printed before it stopped, as a heading and the lines under
-/// it, the last of them where there are many; none for a kind that carries
-/// no such thing.
-pub(crate) fn printed(kind: &Kind) -> Option<(String, Vec<&str>)> {
-    let Kind::HookStopped { said, ended, .. } = kind else {
-        return None;
-    };
+/// What a problem shows beneath its headline, as a heading and the lines
+/// under it: what a hook printed before it stopped, the last of it where
+/// there is much, or the lines of `statac.yaml` that carry a retired
+/// file's URLs over. None for a kind that carries no such thing.
+pub(crate) fn printed(kind: &Kind) -> Option<(String, Vec<String>)> {
+    match kind {
+        Kind::HookStopped { said, ended, .. } => hook_printed(said, ended),
+        Kind::RetiredFile { urls, unread } => carried_over(urls, unread),
+        _ => None,
+    }
+}
+
+fn hook_printed(said: &str, ended: &Ended) -> Option<(String, Vec<String>)> {
     if matches!(ended, Ended::NotStarted(_)) {
         return None;
     }
@@ -3586,7 +3590,32 @@ pub(crate) fn printed(kind: &Kind) -> Option<(String, Vec<&str>)> {
         _ => "What it printed:".into(),
     };
     let from = lines.len().saturating_sub(LINES_SHOWN);
-    Some((heading, lines[from..].to_vec()))
+    let lines = lines[from..].iter().map(|line| (*line).to_owned());
+    Some((heading, lines.collect()))
+}
+
+/// The lines that carry the URLs of `fetched/refused` over into
+/// `statac.yaml`, or why there are none.
+fn carried_over(urls: &[String], unread: &Unread) -> Option<(String, Vec<String>)> {
+    match unread {
+        _ if !urls.is_empty() => {
+            let mut lines = vec!["refuse_webmentions_from:".to_owned()];
+            lines.extend(
+                urls.iter()
+                    .map(|url| format!("  - {}", crate::yaml::write::text(url))),
+            );
+            Some((
+                "To keep refusing what it lists, add these lines to `statac.yaml`:".into(),
+                lines,
+            ))
+        }
+        Unread::Nothing => None,
+        Unread::Lines(lines) => Some((
+            format!("Its {} can't be read.", how_many(*lines, "line", "lines")),
+            Vec::new(),
+        )),
+        Unread::File(reason) => Some((format!("It can't be read: {reason}."), Vec::new())),
+    }
 }
 
 /// What `build` says on a terminal while a hook runs.
@@ -4028,44 +4057,27 @@ pub(crate) fn not_on_site(id: u64, target: &str) -> String {
     format!("Webmention `{id}` not kept: `{target}` isn't on this site.")
 }
 
-/// What `refuse` says first where it turned one mention away, with how
-/// many it removed.
-pub(crate) fn refused_one(address: &str, removed: usize) -> String {
-    let removed = how_many(removed, "webmention", "webmentions");
-    format!("Refused `{address}`: {removed} removed.")
-}
-
-/// What `refuse` says first where it turned a sender away, with how many
-/// mentions it removed.
-pub(crate) fn refused_sender(address: &str, removed: usize) -> String {
-    let removed = how_many(removed, "webmention", "webmentions");
-    format!("Refused everything from `{address}`: {removed} removed.")
-}
-
-/// What `refuse` says of each file it removed, by its path from the
-/// site's folder.
+/// What `refresh` says of each file of a refused mention it removed, by
+/// its path from the site's folder.
 pub(crate) fn removed_file(file: &str) -> String {
     format!("Removed `{file}`.")
 }
 
-/// What `refuse` says of a URL its list holds, where nothing kept is from
-/// it.
-pub(crate) fn refused_already(address: &str) -> String {
-    format!("`{address}` is refused already.")
+/// `refresh`'s line for the refused mentions it removed, with the avatars
+/// no mention kept names any more.
+pub(crate) fn removed_refused(mentions: usize, faces: usize) -> String {
+    let mentions = how_many(mentions, "refused webmention", "refused webmentions");
+    match faces {
+        0 => format!("Removed {mentions}."),
+        faces => format!(
+            "Removed {mentions} and {}.",
+            how_many(faces, "avatar", "avatars")
+        ),
+    }
 }
 
-/// What `refuse` says where nothing kept is from the URL.
-pub(crate) fn nothing_refused(address: &str) -> String {
-    format!("Nothing refused: no webmention kept here is from `{address}`.")
-}
-
-/// What `refuse` says after [`nothing_refused`] of a kept mention's URL
-/// close to the one given.
-pub(crate) fn did_you_mean(address: &str) -> String {
-    format!("Did you mean `{address}`?")
-}
-
-/// What `refresh` says of a mention `statac refuse` turned away.
+/// What `refresh` says of a new mention a line of
+/// `refuse_webmentions_from` refuses, by the line as written.
 pub(crate) fn refused_here(id: u64, address: &str) -> String {
     format!("Webmention `{id}` not kept: `{address}` is refused.")
 }
@@ -5033,6 +5045,10 @@ mod tests {
             absent,
         };
         let record = |fault| Kind::MalformedRecord { fault };
+        let retired = |urls: &[&str], unread| Kind::RetiredFile {
+            urls: urls.iter().map(|url| (*url).to_owned()).collect(),
+            unread,
+        };
         vec![
             (
                 no_still(Host::YouTube, false),
@@ -5085,26 +5101,6 @@ mod tests {
                 Some("Keep one of them."),
             ),
             (
-                record(RecordFault::RefusedOpening),
-                "Malformed record: the first line isn't `statac refused 1`",
-                Some("Write `statac refused 1` as its first line."),
-            ),
-            (
-                record(RecordFault::RefusedFields(2)),
-                "Malformed record: a line has 2 fields, not 3",
-                Some("Write `mention` or `sender`, the URL, and the day, parted by tabs."),
-            ),
-            (
-                record(RecordFault::Reach("site".into())),
-                "Malformed record: `site` is neither `mention` nor `sender`",
-                Some("Write `mention` or `sender`."),
-            ),
-            (
-                record(RecordFault::Address("a.example".into())),
-                "Malformed record: `a.example` isn't an `https://` or `http://` URL",
-                Some("Write the full URL, starting `https://` or `http://`."),
-            ),
-            (
                 record(RecordFault::NotAnAddress("about/".into())),
                 "Malformed record: `about/` isn't a URL starting with `/`",
                 Some(
@@ -5139,6 +5135,56 @@ mod tests {
                 },
                 "Mention of no page: nothing is published at `https://example.org/post-1/`",
                 Some("If the page moved, add the old URL to its `redirect_from`."),
+            ),
+            (
+                Kind::RefusedWebmentions { count: 2 },
+                "Refused webmentions: 2 in `fetched/mentions/` are left out",
+                Some("Run `statac refresh` to delete their files."),
+            ),
+            (
+                Kind::RefusedWebmentions { count: 1 },
+                "Refused webmentions: 1 in `fetched/mentions/` is left out",
+                Some("Run `statac refresh` to delete its file."),
+            ),
+            (
+                retired(&["https://a.example/"], Unread::Nothing),
+                "Retired file: Statac no longer reads `fetched/refused`",
+                Some("Delete `fetched/refused` after adding them."),
+            ),
+            (
+                retired(&["https://a.example/"], Unread::Lines(1)),
+                "Retired file: Statac no longer reads `fetched/refused`",
+                Some(
+                    "Delete `fetched/refused` after adding them, and the URL on the line that \
+                     couldn't be read.",
+                ),
+            ),
+            (
+                retired(&["https://a.example/"], Unread::Lines(2)),
+                "Retired file: Statac no longer reads `fetched/refused`",
+                Some(
+                    "Delete `fetched/refused` after adding them, and the URLs on the 2 lines \
+                     that couldn't be read.",
+                ),
+            ),
+            (
+                retired(&[], Unread::Lines(2)),
+                "Retired file: Statac no longer reads `fetched/refused`",
+                Some(
+                    "Copy its URLs to `refuse_webmentions_from:` in `statac.yaml`, then delete it.",
+                ),
+            ),
+            (
+                retired(&[], Unread::File(Reason::Denied)),
+                "Retired file: Statac no longer reads `fetched/refused`",
+                Some(
+                    "Copy its URLs to `refuse_webmentions_from:` in `statac.yaml`, then delete it.",
+                ),
+            ),
+            (
+                retired(&[], Unread::Nothing),
+                "Retired file: Statac no longer reads `fetched/refused`",
+                Some("Delete it: it lists no URLs."),
             ),
             (
                 Kind::NoSiteUrl {
@@ -7675,7 +7721,7 @@ mod tests {
                 Kind::UnknownProblemName {
                     written: "brokn-link".into(),
                     suggestion: Some("broken-link".into()),
-                    renamed: false,
+                    former: Former::Nothing,
                 },
                 "Unknown problem name: `brokn-link`",
                 Some("Did you mean `broken-link`?"),
@@ -7684,10 +7730,19 @@ mod tests {
                 Kind::UnknownProblemName {
                     written: "undescribed-picture".into(),
                     suggestion: Some("missing-alt-text".into()),
-                    renamed: true,
+                    former: Former::Renamed,
                 },
                 "Unknown problem name: `undescribed-picture`",
                 Some("Statac calls this `missing-alt-text`."),
+            ),
+            (
+                Kind::UnknownProblemName {
+                    written: "missing-url".into(),
+                    suggestion: None,
+                    former: Former::Retired,
+                },
+                "Unknown problem name: `missing-url`",
+                Some("This kind of problem no longer exists."),
             ),
             (
                 Kind::CantQuieten {
@@ -7708,7 +7763,7 @@ mod tests {
             (
                 Kind::UnknownCommand {
                     written: "biuld".into(),
-                    suggestion: Some("build".into()),
+                    hint: CommandHint::Similar("build".into()),
                 },
                 "Unknown command: `biuld`",
                 Some("Did you mean `statac build`?"),
@@ -7716,15 +7771,23 @@ mod tests {
             (
                 Kind::UnknownCommand {
                     written: "post-1".into(),
-                    suggestion: None,
+                    hint: CommandHint::None,
                 },
                 "Unknown command: `post-1`",
                 Some("Run `statac --help` to see the commands."),
             ),
             (
+                Kind::UnknownCommand {
+                    written: "refuse".into(),
+                    hint: CommandHint::Setting("refuse_webmentions_from".into()),
+                },
+                "Unknown command: `refuse`",
+                Some("Statac does this with `refuse_webmentions_from:` in `statac.yaml`."),
+            ),
+            (
                 Kind::MissingCommand,
-                "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, \
-                 `new`, `import` or `explain`",
+                "Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `new`, \
+                 `import` or `explain`",
                 Some("Run `statac --help` to see the commands."),
             ),
             (
@@ -7872,35 +7935,9 @@ mod tests {
                 Some("The name is the last part of a problem's `More:` link."),
             ),
             (
-                Kind::MissingUrl,
-                "Missing URL: `statac refuse` needs the full URL of a webmention or a sender",
-                Some(
-                    "Give the full URL after the command, as `statac refuse \
-                     https://a.example/post-1/`.",
-                ),
-            ),
-            (
                 Kind::NothingToSearch,
                 "Nothing to search for: `statac search` needs the words to look for",
                 Some("Give them after the command, as `statac search \"raspberry pi\"`."),
-            ),
-            (
-                Kind::NotAUrl {
-                    written: "a.example".into(),
-                    respelt: Some("https://a.example".into()),
-                },
-                "Not a URL: `statac refuse` takes a full URL starting `https://` or \
-                 `http://`, not `a.example`",
-                Some("Did you mean `https://a.example`?"),
-            ),
-            (
-                Kind::NotAUrl {
-                    written: "ftp://a.example/post-1".into(),
-                    respelt: None,
-                },
-                "Not a URL: `statac refuse` takes a full URL starting `https://` or \
-                 `http://`, not `ftp://a.example/post-1`",
-                Some("Give the full URL, as the browser shows it."),
             ),
             (
                 Kind::UnreadableName {
@@ -9546,6 +9583,40 @@ mod tests {
     }
 
     #[test]
+    fn a_retired_list_is_shown_with_the_lines_that_carry_it_over() {
+        let retired = |urls: &[&str], unread| Kind::RetiredFile {
+            urls: urls.iter().map(|url| (*url).to_owned()).collect(),
+            unread,
+        };
+        let urls = ["https://a.example/post-1/", "https://b.example/a b"];
+        assert_eq!(
+            printed(&retired(&urls, Unread::Lines(1))),
+            Some((
+                "To keep refusing what it lists, add these lines to `statac.yaml`:".into(),
+                vec![
+                    "refuse_webmentions_from:".into(),
+                    "  - https://a.example/post-1/".into(),
+                    "  - https://b.example/a b".into(),
+                ]
+            ))
+        );
+        assert_eq!(
+            printed(&retired(&[], Unread::Lines(2))),
+            Some(("Its 2 lines can't be read.".into(), Vec::new()))
+        );
+        assert_eq!(
+            printed(&retired(&[], Unread::File(Reason::Denied))),
+            Some(("It can't be read: permission denied.".into(), Vec::new()))
+        );
+        assert_eq!(printed(&retired(&[], Unread::Nothing)), None);
+        assert_eq!(removed_refused(1, 0), "Removed 1 refused webmention.");
+        assert_eq!(
+            removed_refused(3, 2),
+            "Removed 3 refused webmentions and 2 avatars."
+        );
+    }
+
+    #[test]
     fn what_a_command_printed_is_shown_whole_or_by_its_last_lines() {
         let stopped = |said: &str, ended| Kind::HookStopped {
             hook: "after_build".into(),
@@ -9554,7 +9625,7 @@ mod tests {
         };
         assert_eq!(
             printed(&stopped("one\r\ntwo\n\n", Ended::Code(1))),
-            Some(("What it printed:".into(), vec!["one", "two"]))
+            Some(("What it printed:".into(), vec!["one".into(), "two".into()]))
         );
         assert_eq!(
             printed(&stopped(" \n", Ended::Cut)),

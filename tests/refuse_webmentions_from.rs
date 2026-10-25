@@ -1,8 +1,8 @@
-//! `statac refuse` turns away a webmention kept in `fetched/mentions/`, or
-//! everything from a sender, and lists it in `fetched/refused`, so that
-//! `statac refresh` never keeps it again. Each test runs the program on a
-//! small site of its own in the system's temporary folder; none touches
-//! the network.
+//! `refuse_webmentions_from:` in `statac.yaml` turns away the webmentions
+//! sent from a URL, or by a sender, at or under each line: a build leaves
+//! them out at once, and `statac refresh` removes their files for good.
+//! Each test runs the program on a small site of its own in the system's
+//! temporary folder; none touches the network.
 
 use std::fs;
 use std::path::PathBuf;
@@ -18,8 +18,12 @@ const LAYOUT: &str = "<!doctype html>\n<title>{{ headline(page) }}</title>\n{{ p
 const SETTINGS: &str = "title: Site\nlanguage: en\ntimezone: Europe/London\npages.feed: false\n\
                         url: https://example.org/\nwebmentions: true\n";
 
+/// What `refresh` says where it asks the webmention service nothing.
+const NO_TOKEN: &str =
+    "Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n";
+
 /// One mention of `post-1`, as its file holds it: its id, the page that
-/// sent it, the sender's own address, and the name of its face.
+/// sent it, the sender's own URL, and the name of its face.
 struct Sent<'a> {
     id: u64,
     url: &'a str,
@@ -72,13 +76,16 @@ struct Site(PathBuf);
 
 impl Site {
     /// A site with one post, `post-1`, and `mentions` of it kept as
-    /// `statac refresh` keeps them, each with its line in the record.
-    fn new(label: &str, mentions: &[Sent<'_>]) -> Site {
-        let path =
-            std::env::temp_dir().join(format!("statac-refuse-{label}-{}", std::process::id()));
+    /// `statac refresh` keeps them, each with its line in the record, and
+    /// `refused` listed in `refuse_webmentions_from:`.
+    fn new(label: &str, mentions: &[Sent<'_>], refused: &[&str]) -> Site {
+        let path = std::env::temp_dir().join(format!(
+            "statac-refuse-webmentions-{label}-{}",
+            std::process::id()
+        ));
         let _ = fs::remove_dir_all(&path);
         let site = Site(path);
-        site.write("statac.yaml", SETTINGS);
+        site.refuse(refused);
         site.write("templates/page.html", LAYOUT);
         site.write("templates/home.html", LAYOUT);
         site.write("content/index.md", "---\ntitle: Home\n---\nHome.\n");
@@ -102,11 +109,22 @@ impl Site {
             ));
         }
         lines.sort_unstable();
-        site.write(
-            "fetched/record",
-            &format!("statac fetched 1\n{}\n", lines.join("\n")),
-        );
+        let lines: String = lines.iter().map(|line| format!("{line}\n")).collect();
+        site.write("fetched/record", &format!("statac fetched 1\n{lines}"));
         site
+    }
+
+    /// Writes the settings, listing `refused` in `refuse_webmentions_from:`
+    /// where there are any.
+    fn refuse(&self, refused: &[&str]) {
+        let mut settings = SETTINGS.to_owned();
+        if !refused.is_empty() {
+            settings.push_str("refuse_webmentions_from:\n");
+            for line in refused {
+                settings.push_str(&format!("  - {line}\n"));
+            }
+        }
+        self.write("statac.yaml", &settings);
     }
 
     fn path(&self, relative: &str) -> PathBuf {
@@ -151,13 +169,16 @@ impl Site {
         names
     }
 
-    /// What the program says of the site, run with `args` after it, and
-    /// its exit code. Nothing is ever said on standard error.
+    /// What the program says of the site, run with `args` after it on
+    /// Tuesday 6 October 2026, and its exit code, with no token for the
+    /// webmention service. Nothing is ever said on standard error.
     fn run(&self, args: &[&str]) -> (String, Option<i32>) {
         let output = Command::new(env!("CARGO_BIN_EXE_statac"))
             .args(args)
             .arg(format!("--site={}", self.0.display()))
+            .arg("--today=2026-10-06")
             .env("NO_COLOR", "1")
+            .env_remove("STATAC_WEBMENTION_TOKEN")
             .output()
             .unwrap();
         let said = String::from_utf8(output.stdout).unwrap();
@@ -166,9 +187,11 @@ impl Site {
         (said.replace(&shown, "SITE"), output.status.code())
     }
 
-    /// `statac refuse address` on Tuesday 6 October 2026.
-    fn refuse(&self, address: &str) -> (String, Option<i32>) {
-        self.run(&["refuse", address, "--today=2026-10-06"])
+    /// The built `post-1`.
+    fn page(&self) -> String {
+        let (said, code) = self.run(&["build"]);
+        assert_eq!(code, Some(0), "{said}");
+        self.read("_site/post-1/index.html")
     }
 }
 
@@ -217,8 +240,8 @@ fn three() -> Vec<Sent<'static>> {
 }
 
 #[test]
-fn one_mention_is_refused_by_its_address_however_it_is_spelt() {
-    for (n, address) in [
+fn a_mention_is_refused_by_its_own_url_however_it_is_spelt() {
+    for (n, line) in [
         "https://a.example/post-1/",
         "http://a.example/post-1/",
         "https://www.a.example/post-1",
@@ -228,20 +251,22 @@ fn one_mention_is_refused_by_its_address_however_it_is_spelt() {
     .into_iter()
     .enumerate()
     {
-        let site = Site::new(&format!("one-{n}"), &three());
-        let (said, code) = site.refuse(address);
+        let site = Site::new(&format!("one-{n}"), &three(), &[line]);
+        // Left out at once, its file still there.
+        let page = site.page();
+        assert!(!page.contains("https://a.example/post-1/"), "{line}");
+        assert!(page.contains("https://a.example/post-2/"), "{line}");
+        assert!(site.holds("fetched/mentions/11.yaml"));
+
+        let (said, code) = site.run(&["refresh"]);
         assert_eq!(
             said,
             format!(
-                "Refused `{address}`: 1 webmention removed.\n\
-                 Removed `fetched/mentions/11.yaml`.\n"
+                "Removed `fetched/mentions/11.yaml`.\n\
+                 Removed 1 refused webmention.\n{NO_TOKEN}"
             )
         );
         assert_eq!(code, Some(0));
-        assert_eq!(
-            site.read("fetched/refused"),
-            format!("statac refused 1\nmention\t{address}\t2026-10-06\n")
-        );
         // The face it shares with a mention kept stays.
         assert_eq!(
             site.fetched(),
@@ -251,7 +276,6 @@ fn one_mention_is_refused_by_its_address_however_it_is_spelt() {
                 "mentions/12.yaml".into(),
                 "mentions/13.yaml".into(),
                 "record".into(),
-                "refused".into(),
             ]
         );
         assert_eq!(
@@ -264,11 +288,12 @@ fn one_mention_is_refused_by_its_address_however_it_is_spelt() {
                 "mentions/13.yaml\t2026-10-05".into(),
             ]
         );
+        assert!(!site.page().contains("https://a.example/post-1/"));
     }
 }
 
 #[test]
-fn a_sender_is_refused_with_everything_at_or_under_its_address() {
+fn a_sender_is_refused_with_everything_at_or_under_its_url() {
     let mentions = [
         sent(
             11,
@@ -277,7 +302,7 @@ fn a_sender_is_refused_with_everything_at_or_under_its_address() {
             Some(FACE_1),
         ),
         sent(12, "https://a.example/post-2/", None, Some(FACE_1)),
-        // From a page elsewhere, by its sender's address alone.
+        // From a page elsewhere, by its sender's URL alone.
         sent(
             13,
             "https://c.example/post-3/",
@@ -299,23 +324,19 @@ fn a_sender_is_refused_with_everything_at_or_under_its_address() {
             None,
         ),
     ];
-    let site = Site::new("sender", &mentions);
-    let (said, code) = site.refuse("HTTP://A.example");
+    let site = Site::new("sender", &mentions, &["HTTP://A.example"]);
+    let (said, code) = site.run(&["refresh"]);
     assert_eq!(
         said,
         format!(
-            "Refused everything from `HTTP://A.example`: 3 webmentions removed.\n\
-             Removed `fetched/mentions/11.yaml`.\n\
+            "Removed `fetched/mentions/11.yaml`.\n\
              Removed `fetched/mentions/12.yaml`.\n\
              Removed `fetched/mentions/13.yaml`.\n\
-             Removed `fetched/faces/{FACE_1}`.\n"
+             Removed `fetched/faces/{FACE_1}`.\n\
+             Removed 3 refused webmentions and 1 avatar.\n{NO_TOKEN}"
         )
     );
     assert_eq!(code, Some(0));
-    assert_eq!(
-        site.read("fetched/refused"),
-        "statac refused 1\nsender\tHTTP://A.example\t2026-10-06\n"
-    );
     assert_eq!(
         site.fetched(),
         [
@@ -324,7 +345,6 @@ fn a_sender_is_refused_with_everything_at_or_under_its_address() {
             "mentions/15.yaml".into(),
             "mentions/16.yaml".into(),
             "record".into(),
-            "refused".into(),
         ]
     );
     assert_eq!(
@@ -341,200 +361,224 @@ fn a_sender_is_refused_with_everything_at_or_under_its_address() {
     );
     let (said, code) = site.run(&["check"]);
     assert_eq!((said.as_str(), code), ("No problems.\n", Some(0)));
+
+    // Nothing more is left to remove.
+    let (said, code) = site.run(&["refresh"]);
+    assert_eq!((said, code), (NO_TOKEN.to_owned(), Some(0)));
 }
 
 #[test]
-fn a_page_with_another_under_it_is_refused_as_a_sender_and_only_at_a_boundary() {
+fn a_url_is_refused_with_what_is_under_it_only_at_a_boundary() {
     let mentions = [
         sent(11, "https://a.example/a/", None, None),
         sent(12, "https://a.example/a/post-2/", None, None),
         sent(13, "https://a.example/ab/post-3/", None, None),
     ];
-    let site = Site::new("boundary", &mentions);
-    let (said, code) = site.refuse("https://a.example/a");
+    let site = Site::new("boundary", &mentions, &["https://a.example/a"]);
+    let (said, code) = site.run(&["refresh"]);
     assert_eq!(
         said,
-        "Refused everything from `https://a.example/a`: 2 webmentions removed.\n\
-         Removed `fetched/mentions/11.yaml`.\n\
-         Removed `fetched/mentions/12.yaml`.\n"
-    );
-    assert_eq!(code, Some(0));
-    assert_eq!(site.fetched(), ["mentions/13.yaml", "record", "refused"]);
-
-    // Two mentions sent from one page are refused as a sender, both.
-    let mentions = [
-        sent(11, "https://a.example/post-1/", None, None),
-        sent(12, "https://a.example/post-1", None, None),
-    ];
-    let site = Site::new("twice", &mentions);
-    let (said, _) = site.refuse("https://a.example/post-1");
-    assert_eq!(
-        said,
-        "Refused everything from `https://a.example/post-1`: 2 webmentions removed.\n\
-         Removed `fetched/mentions/11.yaml`.\n\
-         Removed `fetched/mentions/12.yaml`.\n"
-    );
-    assert_eq!(
-        site.read("fetched/refused"),
-        "statac refused 1\nsender\thttps://a.example/post-1\t2026-10-06\n"
-    );
-}
-
-#[test]
-fn an_address_refused_already_is_said_and_nothing_changes() {
-    let site = Site::new("already", &three());
-    site.refuse("https://a.example/post-1/");
-    let (list, kept) = (site.read("fetched/refused"), site.read("fetched/record"));
-    for address in ["https://a.example/post-1/", "http://www.a.example/post-1"] {
-        let (said, code) = site.refuse(address);
-        assert_eq!(said, format!("`{address}` is refused already.\n"));
-        assert_eq!(code, Some(0));
-    }
-    // A sender takes in what is listed under it, and is listed with it.
-    site.refuse("https://a.example/");
-    let (said, code) = site.refuse("https://a.example/post-9/");
-    assert_eq!(
-        (said.as_str(), code),
-        ("`https://a.example/post-9/` is refused already.\n", Some(0))
-    );
-    assert_ne!(site.read("fetched/record"), kept);
-    assert_eq!(
-        site.read("fetched/refused"),
-        list.replace("1\n", "1\nsender\thttps://a.example/\t2026-10-06\n")
-    );
-}
-
-#[test]
-fn nothing_is_refused_where_nothing_kept_is_from_the_address() {
-    let site = Site::new("nothing", &three());
-    let kept = site.read("fetched/record");
-    let (said, code) = site.refuse("https://a.example/post-3/");
-    assert_eq!(
-        said,
-        "Nothing refused: no webmention kept here is from `https://a.example/post-3/`.\n\
-         Did you mean `https://a.example/post-1/`?\n"
-    );
-    assert_eq!(code, Some(1));
-    let (said, code) = site.refuse("https://d.example/");
-    assert_eq!(
-        said,
-        "Nothing refused: no webmention kept here is from `https://d.example/`.\n"
-    );
-    assert_eq!(code, Some(1));
-    assert!(!site.holds("fetched/refused"));
-    assert_eq!(site.read("fetched/record"), kept);
-
-    // A site with nothing fetched has nothing to refuse, and is left so.
-    let site = Site::new("none", &[]);
-    fs::remove_dir_all(site.path("fetched")).unwrap();
-    let (said, code) = site.refuse("https://a.example/");
-    assert_eq!(
-        (said.as_str(), code),
-        (
-            "Nothing refused: no webmention kept here is from `https://a.example/`.\n",
-            Some(1)
+        format!(
+            "Removed `fetched/mentions/11.yaml`.\n\
+             Removed `fetched/mentions/12.yaml`.\n\
+             Removed 2 refused webmentions.\n{NO_TOKEN}"
         )
     );
-    assert!(!site.holds("fetched"));
+    assert_eq!(code, Some(0));
+    assert_eq!(site.fetched(), ["mentions/13.yaml", "record"]);
 }
 
 #[test]
-fn a_mention_that_doesnt_read_is_told_as_check_tells_it_and_nothing_is_refused() {
-    let site = Site::new("unread", &three());
-    site.write("fetched/mentions/13.yaml", "kind: \"waved\"\n");
-    // An error elsewhere in the site is no concern of this command's.
-    site.write("content/post-2.md", "---\ntitle: [\n---\n");
-    let (said, code) = site.refuse("https://a.example/post-1/");
-    assert_eq!(code, Some(1));
-    assert!(said.starts_with("error  "), "{said}");
+fn check_notes_once_how_many_the_list_leaves_out() {
+    let site = Site::new(
+        "noted",
+        &three(),
+        &["https://a.example/", "https://d.example/"],
+    );
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(
+        said,
+        "note  Refused webmentions: 2 in `fetched/mentions/` are left out\n  \
+         statac.yaml, line 8\n   \
+         8 │   - https://a.example/\n     \
+         │   ^^^^^^^^^^^^^^^^^^^^ runs to line 9\n  \
+         Run `statac refresh` to delete their files.\n  \
+         More: https://statac.dev/e/refused-webmentions/\n\n\
+         1 note: 1 refused-webmentions.\n"
+    );
+    assert_eq!(code, Some(0));
+    let (said, _) = site.run(&["build"]);
     assert!(
-        said.contains("  fetched/mentions/13.yaml, line 1\n"),
+        said.starts_with("1 note: 1 refused-webmentions. Run `statac check` to see it.\n"),
         "{said}"
     );
-    assert!(!said.contains("post-2"), "{said}");
-    assert!(
-        said.ends_with("4 errors: 3 missing-field, 1 wrong-kind-of-value.\n"),
-        "{said}"
-    );
-    assert!(site.holds("fetched/mentions/11.yaml"));
-    assert!(!site.holds("fetched/refused"));
-}
 
-#[test]
-fn a_list_that_doesnt_read_is_told_by_check_and_build() {
-    let site = Site::new("malformed", &three());
     site.write(
-        "fetched/refused",
-        "statac refused 1\nsite\thttps://a.example/\t2026-10-06\n",
+        "statac.yaml",
+        &format!(
+            "{SETTINGS}refuse_webmentions_from: https://b.example/post-3/\n\
+             quiet: [refused-webmentions]\n"
+        ),
     );
-    for command in ["check", "build"] {
-        let (said, code) = site.run(&[command, "--today=2026-10-06"]);
-        assert_eq!(code, Some(1), "{said}");
-        assert!(
-            said.starts_with(
-                "error  Malformed record: `site` is neither `mention` nor `sender`\n  \
-                 fetched/refused, line 2\n"
-            ),
-            "{said}"
-        );
-        assert!(said.contains("  Write `mention` or `sender`.\n"), "{said}");
-    }
-    let (said, code) = site.refuse("https://a.example/post-1/");
-    assert_eq!(code, Some(1));
-    assert!(
-        said.starts_with("error  Malformed record: `site`"),
-        "{said}"
-    );
-    assert!(site.holds("fetched/mentions/11.yaml"));
+    let (said, code) = site.run(&["check"]);
+    assert_eq!((said.as_str(), code), ("1 note, quietened.\n", Some(0)));
+    assert!(!site.page().contains("https://b.example/post-3/"));
 }
 
-/// What `build` says of `site`, its time aside, and every file it
-/// writes, by its path, in order.
-fn built(site: &Site) -> (String, Vec<(PathBuf, Vec<u8>)>) {
-    let (said, code) = site.run(&["build", "--today=2026-10-06"]);
-    assert_eq!(code, Some(0), "{said}");
-    let said = said.split(" in ").next().unwrap().to_owned();
-    let root = site.path("_site");
-    let mut files = Vec::new();
-    let mut folders = vec![root.clone()];
-    while let Some(folder) = folders.pop() {
-        for entry in fs::read_dir(folder).unwrap() {
-            let path = entry.unwrap().path();
-            match path.is_dir() {
-                true => folders.push(path),
-                false => files.push((
-                    path.strip_prefix(&root).unwrap().to_owned(),
-                    fs::read(&path).unwrap(),
-                )),
+#[test]
+fn a_line_that_isnt_a_full_url_is_told_where_it_is() {
+    let site = Site::new(
+        "not-a-url",
+        &three(),
+        &["a.example", "https://b.example/", "ftp://c.example/"],
+    );
+    let (said, code) = site.run(&["check"]);
+    // The line that is a URL refuses what it refuses.
+    assert_eq!(
+        said,
+        "note  Refused webmentions: 1 in `fetched/mentions/` is left out\n  \
+         statac.yaml, line 8\n   \
+         8 │   - a.example\n     \
+         │   ^^^^^^^^^^^ runs to line 10\n  \
+         Run `statac refresh` to delete its file.\n  \
+         More: https://statac.dev/e/refused-webmentions/\n\n\
+         error  Wrong kind of value: `refuse_webmentions_from` is a full URL, such as \
+         `https://example.org`, not `a.example`\n  \
+         statac.yaml, line 8\n   \
+         8 │   - a.example\n     \
+         │     ^^^^^^^^^\n  \
+         Write it as `https://a.example`.\n  \
+         More: https://statac.dev/e/wrong-kind-of-value/\n\n\
+         error  Wrong kind of value: `refuse_webmentions_from` is a full URL, such as \
+         `https://example.org`, not `ftp://c.example/`\n  \
+         statac.yaml, line 10\n  \
+         10 │   - ftp://c.example/\n     \
+         │     ^^^^^^^^^^^^^^^^\n  \
+         More: https://statac.dev/e/wrong-kind-of-value/\n\n\
+         2 errors: 2 wrong-kind-of-value.\n\
+         1 note: 1 refused-webmentions.\n"
+    );
+    assert_eq!(code, Some(1));
+    let (_, code) = site.run(&["refresh"]);
+    assert_eq!(code, Some(1));
+    assert!(site.holds("fetched/mentions/13.yaml"));
+}
+
+#[test]
+fn a_list_that_refuses_nothing_kept_changes_nothing_built() {
+    let built = |site: &Site| {
+        let (said, code) = site.run(&["build"]);
+        assert_eq!(code, Some(0), "{said}");
+        let said = said.split(" in ").next().unwrap().to_owned();
+        let root = site.path("_site");
+        let mut files = Vec::new();
+        let mut folders = vec![root.clone()];
+        while let Some(folder) = folders.pop() {
+            for entry in fs::read_dir(folder).unwrap() {
+                let path = entry.unwrap().path();
+                match path.is_dir() {
+                    true => folders.push(path),
+                    false => files.push((
+                        path.strip_prefix(&root).unwrap().to_owned(),
+                        fs::read(&path).unwrap(),
+                    )),
+                }
             }
         }
-    }
-    files.sort();
-    (said, files)
+        files.sort();
+        (said, files)
+    };
+    let unlisted = Site::new("unlisted", &three(), &[]);
+    let listed = Site::new("listed", &three(), &["https://d.example/"]);
+    assert!(built(&unlisted) == built(&listed));
 }
 
 #[test]
-fn a_list_that_turns_nothing_away_changes_nothing_built() {
-    let unlisted = Site::new("unlisted", &three());
-    let listed = Site::new("listed", &three());
-    listed.write(
-        "fetched/refused",
-        "statac refused 1\nsender\thttps://d.example/\t2026-10-06\n",
-    );
-    assert!(built(&unlisted) == built(&listed));
+fn an_old_list_of_refused_is_told_with_the_lines_that_carry_it_over() {
+    let site = Site::new("retired", &three(), &[]);
+    let list = "statac refused 1\n\
+                mention\thttps://a.example/post-1/\t2026-10-06\n\
+                sender\thttps://b.example/\t2026-10-06\n";
+    site.write("fetched/refused", list);
+    let told = "error  Retired file: Statac no longer reads `fetched/refused`\n  \
+                To keep refusing what it lists, add these lines to `statac.yaml`:\n    \
+                refuse_webmentions_from:\n      \
+                - https://a.example/post-1/\n      \
+                - https://b.example/\n  \
+                Delete `fetched/refused` after adding them.\n  \
+                More: https://statac.dev/e/retired-file/\n";
+    let told = format!("{told}\n1 error: 1 retired-file.\n");
+    for command in ["check", "refresh"] {
+        assert_eq!(site.run(&[command]), (told.clone(), Some(1)), "{command}");
+    }
+    assert_eq!(site.read("fetched/refused"), list);
+    assert!(site.holds("fetched/mentions/11.yaml"));
 
-    // A page shows what is refused no longer.
-    let page = || listed.read("_site/post-1/index.html");
-    assert!(page().contains("https://a.example/post-1/"));
-    listed.refuse("https://a.example/post-1/");
-    built(&listed);
-    assert!(!page().contains("https://a.example/post-1/"));
-    assert!(page().contains("https://a.example/post-2/"));
+    // A line that doesn't read is counted, and its URL left to the author.
+    site.write("fetched/refused", &format!("{list}sender\tb.example\n"));
+    let (said, _) = site.run(&["check"]);
+    assert!(
+        said.contains(
+            "  Delete `fetched/refused` after adding them, and the URL on the line that \
+             couldn't be read.\n"
+        ),
+        "{said}"
+    );
+
+    // With the lines added and the file deleted, the site builds.
+    site.refuse(&["https://a.example/post-1/", "https://b.example/"]);
+    fs::remove_file(site.path("fetched/refused")).unwrap();
+    let (said, code) = site.run(&["refresh"]);
+    assert_eq!(code, Some(0), "{said}");
+    assert!(
+        said.starts_with("Removed `fetched/mentions/11.yaml`.\n"),
+        "{said}"
+    );
+}
+
+#[test]
+fn statac_refuse_is_refused_with_the_setting_named() {
+    let site = Site::new("command", &three(), &[]);
+    let output = Command::new(env!("CARGO_BIN_EXE_statac"))
+        .args(["refuse", "https://a.example/post-1/"])
+        .arg(&site.0)
+        .env("NO_COLOR", "1")
+        .output()
+        .unwrap();
+    let said = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        said.starts_with(
+            "error  Unknown command: `refuse`\n  \
+             Statac does this with `refuse_webmentions_from:` in `statac.yaml`.\n  \
+             More: https://statac.dev/e/unknown-command/\n"
+        ),
+        "{said}"
+    );
+    assert_eq!(output.status.code(), Some(2));
+    assert!(site.holds("fetched/mentions/11.yaml"));
+}
+
+#[test]
+fn a_retired_problems_name_is_told_it_no_longer_exists() {
+    let site = Site::new("retired-name", &[], &[]);
+    site.write("statac.yaml", &format!("{SETTINGS}quiet: [missing-url]\n"));
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(
+        said,
+        "error  Unknown problem name: `missing-url`\n  \
+         statac.yaml, line 7\n   \
+         7 │ quiet: [missing-url]\n     \
+         │         ^^^^^^^^^^^\n  \
+         This kind of problem no longer exists.\n  \
+         More: https://statac.dev/e/unknown-problem-name/\n\n\
+         1 error: 1 unknown-problem-name.\n"
+    );
+    assert_eq!(code, Some(1));
 }
 
 #[cfg(unix)]
 #[test]
-fn nothing_outside_fetched_is_removed_or_written_through_a_link() {
+fn nothing_outside_fetched_is_removed_through_a_link() {
     use std::os::unix::fs::symlink;
     let outside = |site: &Site, from: &str, to: &str| {
         fs::rename(site.path(from), site.path(to)).unwrap();
@@ -547,10 +591,10 @@ fn nothing_outside_fetched_is_removed_or_written_through_a_link() {
     };
 
     // A link in a mention's place, out of `fetched/` and within it.
-    let site = Site::new("link-mention", &three());
+    let site = Site::new("link-mention", &three(), &["https://a.example/post-1/"]);
     let mention = site.read("fetched/mentions/11.yaml");
     outside(&site, "fetched/mentions/11.yaml", "mention.yaml");
-    let (said, code) = site.refuse("https://a.example/post-1/");
+    let (said, code) = site.run(&["refresh"]);
     assert!(out_of_fetched(&said, "fetched/mentions/11.yaml"), "{said}");
     assert_eq!(code, Some(1));
     fs::remove_file(site.path("fetched/mentions/11.yaml")).unwrap();
@@ -560,36 +604,39 @@ fn nothing_outside_fetched_is_removed_or_written_through_a_link() {
         site.path("fetched/mentions/11.yaml"),
     )
     .unwrap();
-    let (said, code) = site.refuse("https://a.example/post-1/");
+    let (said, code) = site.run(&["refresh"]);
     assert_eq!(
         (said.as_str(), code),
         (
-            "error  Can't remove `fetched/mentions/11.yaml`: it is a link\n  \
-             More: https://statac.dev/e/cant-remove/\n",
+            format!(
+                "error  Can't remove `fetched/mentions/11.yaml`: it is a link\n  \
+                 More: https://statac.dev/e/cant-remove/\n{NO_TOKEN}"
+            )
+            .as_str(),
             Some(1)
         )
     );
     assert_eq!(site.read("fetched/mention.yaml"), mention);
     assert!(site.holds("fetched/mentions/11.yaml"));
-    assert!(!site.holds("fetched/refused"));
+    assert!(!site.read("fetched/record").contains("absent"));
 
     // A link in a face's place, out of `fetched/` and within it.
-    let site = Site::new("link-face", &three());
+    let site = Site::new("link-face", &three(), &["https://b.example/post-3/"]);
     let face = format!("fetched/faces/{FACE_2}");
     outside(&site, &face, "face.jpg");
-    let (said, code) = site.refuse("https://b.example/post-3/");
+    let (said, code) = site.run(&["refresh"]);
     assert!(out_of_fetched(&said, &face), "{said}");
     assert_eq!(code, Some(1));
     fs::remove_file(site.path(&face)).unwrap();
     fs::rename(site.path("face.jpg"), site.path("fetched/face.jpg")).unwrap();
     symlink(site.path("fetched/face.jpg"), site.path(&face)).unwrap();
-    let (said, code) = site.refuse("https://b.example/post-3/");
+    let (said, code) = site.run(&["refresh"]);
     assert_eq!(
         (said.as_str(), code),
         (
             format!(
                 "error  Can't remove `{face}`: it is a link\n  \
-                 More: https://statac.dev/e/cant-remove/\n"
+                 More: https://statac.dev/e/cant-remove/\n{NO_TOKEN}"
             )
             .as_str(),
             Some(1)
@@ -597,42 +644,4 @@ fn nothing_outside_fetched_is_removed_or_written_through_a_link() {
     );
     assert!(site.path("fetched/face.jpg").is_file());
     assert!(site.holds("fetched/mentions/13.yaml"));
-    assert!(!site.holds("fetched/refused"));
-
-    // A link in the list's place, out of `fetched/` and within it.
-    let site = Site::new("link-list", &three());
-    site.write("refused.txt", "statac refused 1\n");
-    symlink(site.path("refused.txt"), site.path("fetched/refused")).unwrap();
-    let (said, code) = site.refuse("https://a.example/post-1/");
-    assert!(out_of_fetched(&said, "fetched/refused"), "{said}");
-    assert_eq!(code, Some(1));
-    fs::remove_file(site.path("fetched/refused")).unwrap();
-    fs::rename(site.path("refused.txt"), site.path("fetched/list.txt")).unwrap();
-    symlink(site.path("fetched/list.txt"), site.path("fetched/refused")).unwrap();
-    let (said, code) = site.refuse("https://a.example/post-1/");
-    assert_eq!(
-        (said.as_str(), code),
-        (
-            "error  Can't write `fetched/refused`: it is a link\n  \
-             More: https://statac.dev/e/cant-write/\n",
-            Some(1)
-        )
-    );
-    assert_eq!(site.read("fetched/list.txt"), "statac refused 1\n");
-    assert!(site.holds("fetched/mentions/11.yaml"));
-}
-
-#[test]
-fn the_help_names_the_command() {
-    let output = Command::new(env!("CARGO_BIN_EXE_statac"))
-        .arg("--help")
-        .output()
-        .unwrap();
-    let help = String::from_utf8(output.stdout).unwrap();
-    assert!(
-        help.contains(
-            "  statac refuse <url> [folder]\n                         Remove the webmention"
-        ),
-        "{help}"
-    );
 }

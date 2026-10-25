@@ -34,7 +34,6 @@ pub mod publish;
 mod published;
 pub mod reads;
 pub mod refresh;
-mod refuse;
 pub mod report;
 mod rewrite;
 pub mod search;

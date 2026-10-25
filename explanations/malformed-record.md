@@ -23,16 +23,6 @@ line after that describes one file, in three parts separated by tabs:
   if the other site replied that it has no such file
 - the date it was fetched, such as `2026-10-06`
 
-`fetched/refused` lists the webmentions and senders that `statac refuse`
-turned away, and is written the same way. Its first line is
-`statac refused 1`, and each line after that describes one URL, in three
-parts separated by tabs:
-
-- `mention`, for the single webmention sent from the URL, or `sender`,
-  for everything sent from that URL or any URL under it
-- the URL, such as `https://a.example/post-1/`
-- the date it was refused, such as `2026-10-06`
-
 A line written any other way, usually by hand or by a merge that went
 wrong, isn't something Statac can rely on, so the build stops at that line
 rather than guess.
@@ -43,10 +33,6 @@ Put the line back as Statac wrote it, which you can find in your history
 of the file. Or delete the line. Statac then counts the file as your own,
 with no fetch date. If the line marked the file `absent`, the next
 `statac refresh` asks for it again.
-
-In `fetched/refused`, put the line back as Statac wrote it, or delete it.
-If you delete it, `statac refresh` keeps what is sent from that URL
-again.
 
 ## Example
 

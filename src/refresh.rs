@@ -11,16 +11,21 @@
 //! On a site with `webmentions: true` and a `url`, the webmention relay is
 //! then asked for what it received since, with the token the command line
 //! takes from the environment or from the site's `.statac/token`.
+//!
+//! First, each mention `refuse_webmentions_from` refuses is removed and
+//! recorded `absent`, so it is never fetched again, with each face no
+//! mention kept names.
 
 mod mentions;
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::build::{self, Mode};
 use crate::date::Date;
 use crate::fetch::{Fetched, Refusal};
+use crate::fetched::refused::Refused;
 use crate::fetched::stills;
 use crate::fetched::{self as kept, Held, Line, Record};
 use crate::problem::Host;
@@ -139,8 +144,8 @@ enum Unfetched {
 /// lacks, and writes them and the record, saying each on `out` as it
 /// goes. Gives the exit code: 1 where the site has an error, where a still
 /// couldn't be fetched for any reason but the video site having none,
-/// where the relay couldn't be asked, or where what was fetched couldn't be
-/// kept.
+/// where the relay couldn't be asked, where what was fetched couldn't be
+/// kept, or where what is refused couldn't be removed.
 pub fn run(options: &Options, fetcher: &dyn Fetch, out: &mut dyn Write, colour: bool) -> u8 {
     let mut say = |line: &str| {
         let _ = out.write_all(line.as_bytes());
@@ -239,12 +244,28 @@ fn refresh(
         say(&report.problem(problem));
     }
     let url = url.filter(|_| webmentions);
+    let folder = options.site.join(kept::FOLDER);
+    let mut record = site.fetched.record.clone();
+    let mut standing: HashSet<String> = (site.fetched.files.iter())
+        .map(|(path, _)| path.clone())
+        .collect();
+    let mut code = remove_refused(
+        &folder,
+        &site.mentions,
+        (&mut record, &mut standing, today),
+        &report,
+        say,
+    );
     if missing.is_empty() && url.is_none() {
+        if let Err(error) = keep_record(&folder, &site.fetched.record, &record, &standing) {
+            say(&unwritten(&report, &kept::record_shown(), &error));
+            code = 1;
+        }
         if nothing_said {
             say(&format!("{}\n", wording::NOTHING_TO_FETCH));
             drafts_left_out(say);
         }
-        return 0;
+        return code;
     }
     missing.sort_unstable();
     missing.dedup();
@@ -262,11 +283,6 @@ fn refresh(
         })
         .count();
 
-    let folder = options.site.join(kept::FOLDER);
-    let mut record = site.fetched.record.clone();
-    let mut standing: HashSet<String> = (site.fetched.files.iter())
-        .map(|(path, _)| path.clone())
-        .collect();
     let (mut fetched, mut failed) = (0, 0);
     for (_, host, id) in missing {
         let path = stills::path(host, id);
@@ -297,7 +313,7 @@ fn refresh(
             }
         }
     }
-    let mut code = u8::from(failed > 0);
+    code |= u8::from(failed > 0);
     if stills_missing {
         say(&format!("{}\n", wording::refreshed(fetched, here, failed)));
     }
@@ -312,7 +328,7 @@ fn refresh(
                     standing: &mut standing,
                     today,
                     url,
-                    refused: &site.fetched.refused,
+                    refused: &Refused::of(settings),
                     report: &report,
                 };
                 let answer = mentions::ask(fetcher, token, &mut keeping, say);
@@ -332,6 +348,89 @@ fn refresh(
         ));
     }
     drafts_left_out(say);
+    code
+}
+
+/// Removes the file of each mention `refuse_webmentions_from` refuses,
+/// recording it `absent` so it is never fetched again, and each face no
+/// mention kept names, saying each on `say`. Each file is asked what it is
+/// before any is removed, so a link in a mention's place leaves every one
+/// where it is. Gives 1 where something couldn't be removed.
+fn remove_refused(
+    folder: &Path,
+    mentions: &crate::fetched::mentions::Mentions,
+    (record, standing, today): (&mut Record, &mut HashSet<String>, Date),
+    report: &Report,
+    say: &mut dyn FnMut(&str),
+) -> u8 {
+    if mentions.refused.is_empty() {
+        return 0;
+    }
+    let faces: BTreeSet<String> = (mentions.refused.iter())
+        .filter_map(|(_, mention)| mention.face.as_deref())
+        .map(|face| format!("{}/{face}", crate::fetched::mentions::FACES))
+        .filter(|face| !mentions.faces_named.contains(face) && standing.contains(face))
+        .collect();
+    let paths = (mentions.refused.iter()).map(|(path, _)| path);
+    let files: Vec<&String> = paths.chain(&faces).collect();
+    let unremoved = |path: &str, error: &std::io::Error| {
+        report.problem(&Problem::nowhere(Kind::CantRemove {
+            path: format!("{}/{path}", kept::FOLDER).into(),
+            reason: Reason::of(error),
+        }))
+    };
+    let links: Vec<String> = (files.iter())
+        .filter_map(|path| {
+            let error = crate::platform::no_link_to(folder, path).err()?;
+            Some(unremoved(path, &error))
+        })
+        .collect();
+    if !links.is_empty() {
+        links.iter().for_each(|told| say(told));
+        return 1;
+    }
+    let mut code = 0;
+    let mut remove =
+        |path: &str, say: &mut dyn FnMut(&str)| match crate::platform::remove_file(folder, path) {
+            Ok(()) => {
+                let file = format!("{}/{path}", kept::FOLDER);
+                say(&format!("{}\n", shown(&wording::removed_file(&file))));
+                true
+            }
+            Err(error) => {
+                say(&unremoved(path, &error));
+                code = 1;
+                false
+            }
+        };
+    let mut removed = 0;
+    for (path, _) in &mentions.refused {
+        if remove(path, say) {
+            standing.remove(path);
+            let held = Held::Absent;
+            record.set(path, Line { held, day: today });
+            removed += 1;
+        }
+    }
+    // A mention left where it was still names its face.
+    let left: BTreeSet<String> = (mentions.refused.iter())
+        .filter(|(path, _)| standing.contains(path))
+        .filter_map(|(_, mention)| mention.face.as_deref())
+        .map(|face| format!("{}/{face}", crate::fetched::mentions::FACES))
+        .collect();
+    let mut faces_removed = 0;
+    for face in faces.difference(&left) {
+        if remove(face, say) {
+            standing.remove(face);
+            faces_removed += 1;
+        }
+    }
+    if removed + faces_removed > 0 {
+        say(&format!(
+            "{}\n",
+            wording::removed_refused(removed, faces_removed)
+        ));
+    }
     code
 }
 

@@ -72,9 +72,7 @@ codes! {
     OptionGivenTwice "option-given-twice",
     UnexpectedArgument "unexpected-argument",
     MissingName "missing-name",
-    MissingUrl "missing-url",
     NothingToSearch "nothing-to-search",
-    NotAUrl "not-a-url",
     UnreadableName "unreadable-name",
     UnusableName "unusable-name",
     MissingFile "missing-file",
@@ -191,6 +189,8 @@ codes! {
     TokenInSettings "token-in-settings",
     WebmentionsOff "webmentions-off",
     MentionOfNoPage "mention-of-no-page",
+    RefusedWebmentions "refused-webmentions",
+    RetiredFile "retired-file",
     FolderNotEmpty "folder-not-empty",
     AlreadyASite "already-a-site",
     NoSiteHere "no-site-here",
@@ -203,9 +203,7 @@ codes! {
 const FORMER_NAMES: &[(&str, Code)] = &[
     ("address-gone", Code::UrlGone),
     ("address-taken", Code::UrlTaken),
-    ("missing-address", Code::MissingUrl),
     ("no-site-address", Code::NoSiteUrl),
-    ("not-a-web-address", Code::NotAUrl),
     ("same-address", Code::SameUrl),
     ("unusable-address", Code::UnusableUrl),
     ("describes-no-picture", Code::DescribesNoImage),
@@ -219,6 +217,15 @@ const FORMER_NAMES: &[(&str, Code)] = &[
     ("writing-not-published", Code::ContentNotPublished),
     ("read-as-your-own", Code::ReadAsCustom),
     ("no-still", Code::NoThumbnail),
+];
+
+/// Names of kinds of problem Statac no longer has, each with the kind
+/// whose page on the docs site its page sends readers on to.
+const RETIRED_NAMES: &[(&str, Code)] = &[
+    ("missing-address", Code::RefusedWebmentions),
+    ("missing-url", Code::RefusedWebmentions),
+    ("not-a-url", Code::RefusedWebmentions),
+    ("not-a-web-address", Code::RefusedWebmentions),
 ];
 
 impl Code {
@@ -235,24 +242,34 @@ impl Code {
             .map(|&(_, code)| code)
     }
 
+    /// Whether `name` named a kind Statac no longer has.
+    pub fn retired(name: &str) -> bool {
+        RETIRED_NAMES.iter().any(|(retired, _)| *retired == name)
+    }
+
     /// The problem with `written`, a name given to `quiet:` or `statac
     /// explain` that names no kind.
     pub fn unknown(written: &str) -> Kind {
-        let renamed = Code::renamed(written).map(Code::name);
+        let (former, suggestion) = match Code::renamed(written) {
+            _ if Code::retired(written) => (Former::Retired, None),
+            Some(code) => (Former::Renamed, Some(code.name())),
+            None => (
+                Former::Nothing,
+                crate::suggest::nearest(written, Code::ALL.iter().map(|c| c.name())),
+            ),
+        };
         Kind::UnknownProblemName {
             written: written.to_owned(),
-            renamed: renamed.is_some(),
-            suggestion: renamed
-                .or_else(|| crate::suggest::nearest(written, Code::ALL.iter().map(|c| c.name())))
-                .map(str::to_owned),
+            suggestion: suggestion.map(str::to_owned),
+            former,
         }
     }
 
-    /// The names this kind was known by before, each of whose pages on
-    /// the docs site sends readers on to this one.
+    /// The names this kind was known by before, and those of kinds
+    /// retired in its favour, each of whose pages on the docs site sends
+    /// readers on to this one.
     pub fn former_names(self) -> impl Iterator<Item = &'static str> {
-        FORMER_NAMES
-            .iter()
+        (FORMER_NAMES.iter().chain(RETIRED_NAMES))
             .filter(move |(_, code)| *code == self)
             .map(|&(former, _)| former)
     }
@@ -352,6 +369,7 @@ impl Code {
             | Code::LocationPublished
             | Code::RobotsBeneathPath
             | Code::LoopOverEveryPage
+            | Code::RefusedWebmentions
             | Code::UpdateAvailable => Severity::Note,
             Code::OtherSpelling
             | Code::CantWrite
@@ -375,9 +393,7 @@ impl Code {
             | Code::OptionGivenTwice
             | Code::UnexpectedArgument
             | Code::MissingName
-            | Code::MissingUrl
             | Code::NothingToSearch
-            | Code::NotAUrl
             | Code::UnreadableName
             | Code::UnusableName
             | Code::MissingFile
@@ -424,6 +440,7 @@ impl Code {
             | Code::UnusableCardFile
             | Code::HookStopped
             | Code::MalformedRecord
+            | Code::RetiredFile
             | Code::TokenInSettings
             | Code::FolderNotEmpty
             | Code::AlreadyASite
@@ -502,6 +519,7 @@ impl Code {
             | Code::NoThumbnail
             | Code::WebmentionsOff
             | Code::MentionOfNoPage
+            | Code::RefusedWebmentions
             | Code::LoopOverEveryPage
             | Code::UpdateAvailable => false,
             Code::OtherSpelling
@@ -526,9 +544,7 @@ impl Code {
             | Code::OptionGivenTwice
             | Code::UnexpectedArgument
             | Code::MissingName
-            | Code::MissingUrl
             | Code::NothingToSearch
-            | Code::NotAUrl
             | Code::UnreadableName
             | Code::UnusableName
             | Code::MissingFile
@@ -578,6 +594,7 @@ impl Code {
             | Code::UnusableCardFile
             | Code::HookStopped
             | Code::MalformedRecord
+            | Code::RetiredFile
             | Code::TokenInSettings
             | Code::FolderNotEmpty
             | Code::AlreadyASite
@@ -685,9 +702,7 @@ pub enum Kind {
     UnknownProblemName {
         written: String,
         suggestion: Option<String>,
-        /// Whether `suggestion` is the name the kind once called
-        /// `written` has now.
-        renamed: bool,
+        former: Former,
     },
     /// A kind given to `quiet:` that can never be quietened.
     CantQuieten {
@@ -696,8 +711,7 @@ pub enum Kind {
     },
     UnknownCommand {
         written: String,
-        /// A command, or an option such as `--help`.
-        suggestion: Option<String>,
+        hint: CommandHint,
     },
     /// Options with no command to apply them to.
     MissingCommand,
@@ -722,17 +736,8 @@ pub enum Kind {
     },
     /// `statac explain` with no name after it.
     MissingName,
-    /// `statac refuse` given no address.
-    MissingUrl,
     /// `statac search` given no words to search for.
     NothingToSearch,
-    /// `statac refuse` given an address that isn't `http` or `https`, as
-    /// written, and the address with `https://` before it where that is
-    /// one.
-    NotAUrl {
-        written: String,
-        respelt: Option<String>,
-    },
     /// A folder or path given on the command line that holds bytes that
     /// aren't UTF-8, as the system's reading of it shows them replaced.
     UnreadableName {
@@ -1440,10 +1445,15 @@ pub enum Kind {
         id: String,
         absent: bool,
     },
-    /// A line of `fetched/record` or `fetched/refused` that doesn't read as
-    /// Statac writes it.
+    /// A line of `fetched/record` that doesn't read as Statac writes it.
     MalformedRecord {
         fault: RecordFault,
+    },
+    /// `fetched/refused`, which Statac once kept the refused webmentions
+    /// in: the URLs it lists, as written, and what of it couldn't be read.
+    RetiredFile {
+        urls: Vec<String>,
+        unread: Unread,
     },
     /// `webmention_token:` in `statac.yaml`, whose value is never drawn.
     TokenInSettings,
@@ -1453,6 +1463,11 @@ pub enum Kind {
     /// no page is, nor any page's `redirect_from`, as kept.
     MentionOfNoPage {
         target: String,
+    },
+    /// Mentions in `fetched/mentions/` that `refuse_webmentions_from`
+    /// leaves out, by how many.
+    RefusedWebmentions {
+        count: usize,
     },
     /// A folder a command that makes a site was given that holds something:
     /// the folder as given, the first few names in it in order, and how
@@ -1507,7 +1522,17 @@ pub enum SiteMark {
     Content,
 }
 
-/// What is wrong with a line of `fetched/record` or `fetched/refused`.
+/// What of a retired file couldn't be read.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Unread {
+    Nothing,
+    /// Lines that don't read as Statac wrote them, by how many.
+    Lines(usize),
+    /// The whole file, and why.
+    File(Reason),
+}
+
+/// What is wrong with a line of `fetched/record`.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum RecordFault {
     /// The first line isn't the one Statac writes.
@@ -1520,18 +1545,8 @@ pub enum RecordFault {
     Held(String),
     /// What is written where the day goes.
     Day(String),
-    /// A path written on a line before, or in `fetched/refused` an
-    /// address.
+    /// A path written on a line before.
     Twice(String),
-    /// The first line of `fetched/refused` isn't the one Statac writes.
-    RefusedOpening,
-    /// A line of `fetched/refused` of other than three fields.
-    RefusedFields(usize),
-    /// What is written in `fetched/refused` where `mention` or `sender`
-    /// goes.
-    Reach(String),
-    /// What is written in `fetched/refused` where the address goes.
-    Address(String),
     /// A line of `published.txt` that is no address from the top of the
     /// site, as written.
     NotAnAddress(String),
@@ -2636,6 +2651,27 @@ pub enum Unquietenable {
     LeavesAPageOut,
 }
 
+/// What can be said to help with an unknown command.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum CommandHint {
+    /// A command spelt nearly so, or an option such as `--help`.
+    Similar(String),
+    /// A command Statac once had, and the setting that does its work now.
+    Setting(String),
+    None,
+}
+
+/// What a name given for a kind of problem that names none once was.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Former {
+    Nothing,
+    /// The name of a kind before it was renamed, which the suggestion
+    /// gives now.
+    Renamed,
+    /// The name of a kind Statac no longer has.
+    Retired,
+}
+
 /// What can be said to help with an unknown option.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum OptionHint {
@@ -2797,9 +2833,7 @@ impl Kind {
             Kind::OptionGivenTwice { .. } => Code::OptionGivenTwice,
             Kind::UnexpectedArgument { .. } => Code::UnexpectedArgument,
             Kind::MissingName => Code::MissingName,
-            Kind::MissingUrl => Code::MissingUrl,
             Kind::NothingToSearch => Code::NothingToSearch,
-            Kind::NotAUrl { .. } => Code::NotAUrl,
             Kind::UnreadableName { .. } => Code::UnreadableName,
             Kind::UnusableName { .. } => Code::UnusableName,
             Kind::MissingFile { .. } => Code::MissingFile,
@@ -2913,9 +2947,11 @@ impl Kind {
             Kind::ImageMayNotShow { .. } => Code::ImageMayNotShow,
             Kind::NoThumbnail { .. } => Code::NoThumbnail,
             Kind::MalformedRecord { .. } => Code::MalformedRecord,
+            Kind::RetiredFile { .. } => Code::RetiredFile,
             Kind::TokenInSettings => Code::TokenInSettings,
             Kind::WebmentionsOff => Code::WebmentionsOff,
             Kind::MentionOfNoPage { .. } => Code::MentionOfNoPage,
+            Kind::RefusedWebmentions { .. } => Code::RefusedWebmentions,
             Kind::FolderNotEmpty { .. } => Code::FolderNotEmpty,
             Kind::AlreadyASite { .. } => Code::AlreadyASite,
             Kind::NoSiteHere { .. } => Code::NoSiteHere,
@@ -3622,9 +3658,26 @@ mod tests {
             Kind::UnknownProblemName {
                 written: "undescribed-picture".into(),
                 suggestion: Some("missing-alt-text".into()),
-                renamed: true,
+                former: Former::Renamed,
             }
         );
+    }
+
+    #[test]
+    fn a_retired_name_is_no_kind_now_nor_a_former_name() {
+        for &(retired, code) in RETIRED_NAMES {
+            assert_eq!(Code::from_name(retired), None, "{retired}");
+            assert_eq!(Code::renamed(retired), None, "{retired}");
+            assert!(code.former_names().any(|name| name == retired));
+            assert_eq!(
+                Code::unknown(retired),
+                Kind::UnknownProblemName {
+                    written: retired.into(),
+                    suggestion: None,
+                    former: Former::Retired,
+                }
+            );
+        }
     }
 
     #[test]

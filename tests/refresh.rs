@@ -1322,32 +1322,16 @@ fn webmentions_on_a_site_without_url_are_not_asked_for() {
     assert!(asked.is_empty());
 }
 
-impl Site {
-    /// What `statac refuse address` says of the site on Tuesday 6 October
-    /// 2026, and its exit code.
-    fn refuse(&self, address: &str) -> (String, Option<i32>) {
-        let output = Command::new(env!("CARGO_BIN_EXE_statac"))
-            .args(["refuse", address, "--today=2026-10-06"])
-            .arg(&self.0)
-            .env("NO_COLOR", "1")
-            .output()
-            .unwrap();
-        assert!(output.stderr.is_empty());
-        (
-            String::from_utf8(output.stdout).unwrap(),
-            output.status.code(),
-        )
-    }
-}
-
 #[test]
 fn a_refused_mention_and_anything_from_a_refused_sender_is_not_kept() {
     let site = Site::mentioned("refused-list");
+    let settings = site.read("statac.yaml");
     site.write(
-        "fetched/refused",
-        "statac refused 1\n\
-         sender\thttps://a.example/\t2026-10-06\n\
-         mention\thttps://b.example/post-12/\t2026-10-06\n",
+        "statac.yaml",
+        &format!(
+            "{settings}refuse_webmentions_from:\n  - https://a.example/\n  \
+             - https://b.example/post-12/\n"
+        ),
     );
     let from = |id: &str, url: &str, author: &str| {
         sent(
@@ -1402,8 +1386,8 @@ fn a_refused_mention_and_anything_from_a_refused_sender_is_not_kept() {
 }
 
 #[test]
-fn a_refusal_undone_brings_a_mention_back_only_while_none_kept_is_newer() {
-    let site = Site::mentioned("undone");
+fn a_mention_kept_and_then_refused_is_removed_for_good() {
+    let site = Site::mentioned("refused-later");
     let other = sent(
         "10",
         &[
@@ -1412,50 +1396,35 @@ fn a_refusal_undone_brings_a_mention_back_only_while_none_kept_is_newer() {
         ],
     );
     let refused = sent("11", &[]);
-    site.ask(&|address| answer(address, &feed(&[other.clone(), refused.clone()])));
-    let (said, code) = site.refuse("https://a.example/post-1/");
-    assert_eq!(
-        (said.as_str(), code),
-        (
-            "Refused `https://a.example/post-1/`: 1 webmention removed.\n\
-             Removed `fetched/mentions/11.yaml`.\n",
-            Some(0)
-        )
+    let both = [other.clone(), refused.clone()];
+    site.ask(&|address| answer(address, &feed(&both)));
+    assert!(site.holds("fetched/mentions/11.yaml"));
+    let settings = site.read("statac.yaml");
+    site.write(
+        "statac.yaml",
+        &format!("{settings}refuse_webmentions_from: [https://a.example/post-1/]\n"),
     );
-    let undo = || {
-        site.write("fetched/refused", "statac refused 1\n");
-        let record = site.read("fetched/record");
-        let kept: Vec<&str> = (record.lines())
-            .filter(|line| !line.starts_with("mentions/11.yaml\t"))
-            .collect();
-        site.write("fetched/record", &format!("{}\n", kept.join("\n")));
-    };
 
-    // The newest the record holds, it is asked for again.
-    undo();
-    let (said, _, asked) = site.ask(&|address| match address {
-        _ if address == relay(10) => answer(address, &feed(std::slice::from_ref(&refused))),
-        _ => answer(address, &feed(&[])),
-    });
-    assert_eq!(asked, [relay(10)]);
+    let (said, code, asked) = site.ask(&|address| answer(address, &feed(&[])));
     assert_eq!(
         said,
-        "Fetched `fetched/mentions/11.yaml`.\nFetched 1 webmention.\n"
+        "Removed `fetched/mentions/11.yaml`.\n\
+         Removed 1 refused webmention.\n\
+         No new webmentions.\n"
+    );
+    assert_eq!((code, asked), (0, vec![relay(11)]));
+    assert!(!site.holds("fetched/mentions/11.yaml"));
+    assert!(site.holds("fetched/mentions/10.yaml"));
+    assert!(
+        (site.read("fetched/record").lines())
+            .any(|line| line == "mentions/11.yaml\tabsent\t2026-10-06")
     );
 
-    // With a newer one kept, the relay is asked only for what is newer.
-    let newer = sent(
-        "12",
-        &[
-            ("url", Some(&json("https://c.example/post-12/"))),
-            ("author.url", Some(&json("https://c.example/"))),
-        ],
-    );
-    site.ask(&|address| answer(address, &feed(std::slice::from_ref(&newer))));
-    site.refuse("https://a.example/post-1/");
-    undo();
-    let (said, _, asked) = site.ask(&|address| answer(address, &feed(&[])));
-    assert_eq!(asked, [relay(12)]);
+    // Taken out of the list, it isn't asked for again, nor kept if sent.
+    site.write("statac.yaml", &settings);
+    let (said, _, asked) =
+        site.ask(&|address| answer(address, &feed(std::slice::from_ref(&refused))));
     assert_eq!(said, "No new webmentions.\n");
+    assert_eq!(asked, [relay(11)]);
     assert!(!site.holds("fetched/mentions/11.yaml"));
 }

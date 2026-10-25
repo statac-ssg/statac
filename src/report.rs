@@ -547,7 +547,7 @@ impl<'a> Report<'a> {
         if let Some((heading, lines)) = wording::printed(&problem.kind) {
             out.push_str(&format!("  {heading}\n"));
             for line in lines {
-                out.push_str(&format!("    {}\n", shown(line)));
+                out.push_str(&format!("    {}\n", shown(&line)));
             }
         }
         if let Some(suggestion) = problem.suggestion() {

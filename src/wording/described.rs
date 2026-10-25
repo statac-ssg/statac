@@ -238,6 +238,15 @@ const SETTINGS: &[(&str, Described)] = &[
         ),
     ),
     (
+        "refuse_webmentions_from",
+        described(
+            "Full URLs whose webmentions are left out: one sent from a page at or under a \
+             URL listed, or by a sender whose own URL is. `statac refresh` deletes their \
+             files for good.",
+            "https://statac.dev/settings/#webmentions",
+        ),
+    ),
+    (
         "search_without_javascript",
         described(
             "`duckduckgo` gives a reader whose browser runs no JavaScript a box on the \

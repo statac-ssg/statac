@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::date::Date;
-use crate::problem::{Kind, Problem, Reason, RecordFault};
+use crate::problem::{Kind, Problem, Reason, RecordFault, Unread};
 use crate::source::{Place, SourceId, Sources, Span};
 
 /// The folder at the top of the site.
@@ -185,11 +185,9 @@ impl Record {
 #[derive(Default, Debug)]
 pub struct Fetched {
     pub record: Record,
-    /// The webmentions and senders the author turned away.
-    pub refused: refused::List,
-    /// Every file in the folder but the record and the list of refused, by its path under it with
-    /// forward slashes, with where it really is: its path past every link
-    /// under `real`.
+    /// Every file in the folder but the record and the retired list of
+    /// refused webmentions, by its path under it with forward slashes,
+    /// with where it really is: its path past every link under `real`.
     pub files: Vec<(String, String)>,
     /// The site's real path.
     pub real: PathBuf,
@@ -271,37 +269,47 @@ pub(crate) fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>
     let real = std::fs::canonicalize(site).unwrap_or_else(|_| site.to_path_buf());
     let mut fetched = Fetched::default();
     for (path, at) in crate::assets::walk(site, &real, FOLDER, false, &mut problems) {
-        let shown = match path.as_str() {
-            RECORD => record_shown(),
-            refused::NAME => refused::shown(),
+        match path.as_str() {
+            RECORD => {}
+            refused::NAME => {
+                problems.push(retired(sources, &real, &at));
+                continue;
+            }
             _ => {
                 fetched.files.push((path, at));
                 continue;
             }
-        };
+        }
         let text = match sources.unsaved().read(&real, &at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {
-                    path: shown.into(),
+                    path: record_shown().into(),
                     reason: Reason::of(&error),
                 }));
                 continue;
             }
         };
-        let source = sources.add(shown, text);
-        if path == RECORD {
-            let (record, found) = Record::read(sources, source);
-            fetched.record = record;
-            problems.extend(found);
-        } else {
-            let (list, found) = refused::List::read(sources, source);
-            fetched.refused = list;
-            problems.extend(found);
-        }
+        let source = sources.add(record_shown(), text);
+        let (record, found) = Record::read(sources, source);
+        fetched.record = record;
+        problems.extend(found);
     }
     fetched.real = real;
     (fetched, problems)
+}
+
+/// The problem with the retired list of refused webmentions at `at`,
+/// carrying the URLs it holds.
+fn retired(sources: &Sources, real: &Path, at: &str) -> Problem {
+    let (urls, unread) = match sources.unsaved().read(real, at) {
+        Ok(text) => match refused::carried(&text) {
+            (urls, 0) => (urls, Unread::Nothing),
+            (urls, lines) => (urls, Unread::Lines(lines)),
+        },
+        Err(error) => (Vec::new(), Unread::File(Reason::of(&error))),
+    };
+    Problem::nowhere(Kind::RetiredFile { urls, unread })
 }
 
 #[cfg(test)]

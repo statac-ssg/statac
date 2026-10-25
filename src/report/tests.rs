@@ -3,7 +3,7 @@ use std::path::Path;
 use super::*;
 use crate::origin::{Origin, Style};
 use crate::problem::Malformed;
-use crate::problem::{OptionHint, Reason};
+use crate::problem::{Former, OptionHint, Reason};
 use crate::source::Span;
 
 const SITE: &str = "site";
@@ -648,7 +648,13 @@ fn check_leaves_quietened_kinds_out_and_counts_them() {
 
 #[test]
 fn quiet_names_are_checked() {
-    let (quiet, problems) = quiet(&["broken-link", "brokn-link", "duplicate-key", "post-1"]);
+    let (quiet, problems) = quiet(&[
+        "broken-link",
+        "brokn-link",
+        "duplicate-key",
+        "post-1",
+        "missing-url",
+    ]);
     assert!(quiet.quietens(&broken_link()));
     let kinds: Vec<_> = problems.into_iter().map(|p| p.kind).collect();
     assert_eq!(
@@ -657,7 +663,7 @@ fn quiet_names_are_checked() {
             Kind::UnknownProblemName {
                 written: "brokn-link".into(),
                 suggestion: Some("broken-link".into()),
-                renamed: false,
+                former: Former::Nothing,
             },
             Kind::CantQuieten {
                 name: "duplicate-key".into(),
@@ -666,7 +672,12 @@ fn quiet_names_are_checked() {
             Kind::UnknownProblemName {
                 written: "post-1".into(),
                 suggestion: None,
-                renamed: false,
+                former: Former::Nothing,
+            },
+            Kind::UnknownProblemName {
+                written: "missing-url".into(),
+                suggestion: None,
+                former: Former::Retired,
             },
         ]
     );

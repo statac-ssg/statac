@@ -78,6 +78,8 @@ enum Shape {
     SiteAddress,
     OneOf(&'static [&'static str]),
     Language,
+    /// Full URLs, each told where it isn't one.
+    WebAddresses,
     ListAddress,
     LaterAddress,
     Table,
@@ -149,6 +151,7 @@ const SETTINGS: &[Setting] = &[
         None,
     ),
     setting("webmentions", Shape::Truth, Some(Preset::Truth(false))),
+    setting("refuse_webmentions_from", Shape::WebAddresses, None),
     setting("feed_key", Shape::Text, None),
     setting("feed_ids_before", Shape::Date, None),
     setting("feed_ids_from", Shape::OneOf(&["jekyll"]), None),
@@ -513,6 +516,9 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
                 (Shape::Language, Yaml::Sequence(items)) => {
                     Ok(read_languages(sources, value, items, problems))
                 }
+                (Shape::WebAddresses, _) => {
+                    read_web_addresses(&Reader::new(sources, setting.name), value, problems)
+                }
                 _ => read_setting(sources, setting, value),
             };
             match read {
@@ -690,6 +696,36 @@ fn read_languages(
     (!tags.is_empty()).then(|| Sourced::new(Value::Texts(tags), node.origin()))
 }
 
+/// Full URLs, as a list or one standing for a list of one, each that
+/// isn't one told and left out.
+fn read_web_addresses(
+    reader: &Reader,
+    node: &Node,
+    problems: &mut Vec<Problem>,
+) -> Result<Option<Sourced<Value>>, Problem> {
+    let items = match &node.value {
+        Yaml::Sequence(items) => items.iter().collect(),
+        Yaml::Mapping(_) => return Err(reader.wrong(node, Expected::List, None)),
+        Yaml::Scalar(_) if node.resolved() == Some(crate::yaml::Resolved::Null) => return Ok(None),
+        Yaml::Scalar(_) => vec![node],
+    };
+    let a_url = |text: &str| crate::fetched::refused::Spot::of(text).is_some();
+    let mut urls = Vec::with_capacity(items.len());
+    for item in items {
+        match reader.text(item) {
+            Ok(Some(url)) if a_url(&url.value) => urls.push(url),
+            Ok(Some(url)) => {
+                let https = format!("https://{}", url.value);
+                let respelt = (!url.value.contains("://") && a_url(&https)).then_some(https);
+                problems.push(reader.wrong(item, Expected::SiteAddress, respelt));
+            }
+            Ok(None) => {}
+            Err(problem) => problems.push(problem),
+        }
+    }
+    Ok(Some(Sourced::new(Value::Texts(urls), node.origin())))
+}
+
 /// Whether `tag` names a language, so that a setting written for it is
 /// meant for a language rather than being one of the author's own: one
 /// the site declares in other capitals, or one Statac has words for.
@@ -776,6 +812,14 @@ fn read_setting(
         Shape::OneOf(words) => reader.one_of(node, words)?.map(|t| t.map(Value::Text)),
         Shape::SiteAddress => text(site_address, Expected::SiteAddress)?,
         Shape::Language => text(language_code, Expected::LanguageCode)?,
+        Shape::WebAddresses => {
+            let mut told = Vec::new();
+            let read = read_web_addresses(&reader, node, &mut told)?;
+            match told.into_iter().next() {
+                Some(problem) => return Err(problem),
+                None => read,
+            }
+        }
         Shape::ListAddress => text(list_address, Expected::ListAddress)?,
         Shape::LaterAddress => text(later_address, Expected::LaterAddress)?,
         Shape::Table => {

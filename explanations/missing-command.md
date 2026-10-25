@@ -5,7 +5,7 @@ The command line has options, but no command for them to apply to.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, `import` or `explain`
+error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `new`, `import` or `explain`
   Run `statac --help` to see the commands.
   More: https://statac.dev/e/missing-command/
 ```
@@ -17,8 +17,8 @@ which command you meant.
 
 ## How to fix it
 
-Add `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`,
-`import` or `explain` after `statac`. `statac --help` lists the commands
+Add `build`, `check`, `serve`, `stamp`, `refresh`, `new`, `import` or
+`explain` after `statac`. `statac --help` lists the commands
 and what each does, and `statac check --help` shows only the options `check`
 takes.
 

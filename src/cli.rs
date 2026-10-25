@@ -12,9 +12,8 @@ use crate::build::{self, Mode, Options, Outcome};
 use crate::date::{self, Date, Fault};
 use crate::import;
 use crate::new;
-use crate::problem::{Code, Expected, Found, Kind, Missing, OptionHint, Problem};
+use crate::problem::{Code, CommandHint, Expected, Found, Kind, Missing, OptionHint, Problem};
 use crate::refresh;
-use crate::refuse;
 use crate::report::{Quiet, Report};
 use crate::search;
 use crate::serve;
@@ -44,7 +43,6 @@ pub enum Request {
     },
     Stamp(stamp::Options),
     Refresh(refresh::Options),
-    Refuse(refuse::Options),
     New(new::Options),
     Import(import::Options),
     Search(search::Options),
@@ -56,25 +54,25 @@ pub enum Request {
     Version,
 }
 
-const COMMANDS: [&str; 11] = [
-    "build", "check", "serve", "stamp", "refresh", "refuse", "new", "import", "search", "explain",
-    "lsp",
+const COMMANDS: [&str; 10] = [
+    "build", "check", "serve", "stamp", "refresh", "new", "import", "search", "explain", "lsp",
 ];
+
+/// Commands Statac once had, each with the setting that does its work now.
+const FORMER_COMMANDS: [(&str, &str); 1] = [("refuse", crate::fetched::refused::SETTING)];
 
 /// The options that take a value, and the commands that take each.
 const OPTIONS: [(&str, &[&str]); 8] = [
     (
         "--site",
-        &[
-            "build", "check", "serve", "stamp", "refresh", "refuse", "search",
-        ],
+        &["build", "check", "serve", "stamp", "refresh", "search"],
     ),
     ("--out", &["build"]),
     ("--url", &["build", "check"]),
     (
         "--today",
         &[
-            "build", "check", "serve", "stamp", "refresh", "refuse", "import", "search",
+            "build", "check", "serve", "stamp", "refresh", "import", "search",
         ],
     ),
     ("--port", &["serve"]),
@@ -118,7 +116,7 @@ const OTHER_SPELLINGS: [(&str, &str); 7] = [
 const INTRO: &str = "Statac builds a website from a folder of Markdown.\n";
 
 /// Each command's entry on the usage screen, as the screen sets it.
-const USAGE: [(&str, &str); 13] = [
+const USAGE: [(&str, &str); 12] = [
     (
         "build",
         "  statac build [folder]  Read the site and write it out, ready to publish.\n",
@@ -147,14 +145,6 @@ const USAGE: [(&str, &str); 13] = [
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
                          the site's .statac/token.
-",
-    ),
-    (
-        "refuse",
-        "  statac refuse <url> [folder]
-                         Remove the webmention sent from the URL, or
-                         every one from a sender at or under it, and never
-                         keep it again.
 ",
     ),
     (
@@ -236,9 +226,8 @@ const OPTION_LINES: [(&str, &str); 18] = [
         "--today",
         "  --today=<date>         The day the site is built on, as 2026-10-04, for
                          site.today, the day stamps are counted from, and
-                         the day statac refresh and statac refuse record.
-                         Without it, today in the site's zone, or for
-                         statac refuse, on this computer's clock.
+                         the day statac refresh records. Without it, today
+                         in the site's zone.
 ",
     ),
     (
@@ -395,7 +384,6 @@ pub fn run(args: impl IntoIterator<Item = OsString>, terminal: &mut Terminal) ->
         Request::Check { .. } => Some("check"),
         Request::Stamp(_) => Some("stamp"),
         Request::Refresh(_) => Some("refresh"),
-        Request::Refuse(_) => Some("refuse"),
         Request::Import(_) => Some("import"),
         Request::New(_) => Some("new"),
         Request::Serve { .. } => Some("serve"),
@@ -547,9 +535,6 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
                 terminal.colour_out,
             );
         }
-        Request::Refuse(options) => {
-            return refuse::run(&options, terminal.out, terminal.colour_out);
-        }
         Request::Search(options) => {
             let outcome = search::run(&options);
             let nowhere = Sources::default();
@@ -630,7 +615,6 @@ fn site_of(request: &mut Request) -> Option<&mut PathBuf> {
         Request::Serve { options, .. } => Some(&mut options.site),
         Request::Stamp(options) => Some(&mut options.site),
         Request::Refresh(options) => Some(&mut options.site),
-        Request::Refuse(options) => Some(&mut options.site),
         Request::Search(options) => Some(&mut options.site),
         Request::New(_)
         | Request::Import(_)
@@ -763,7 +747,6 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
         respelt: None,
     };
     let mut name = None;
-    let mut address = None;
     // The words `search` looks for.
     let mut words = None;
     // The folder `new` makes the site in.
@@ -783,27 +766,13 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                 if known.is_none() {
                     mistake(Kind::UnknownCommand {
                         written: arg.into(),
-                        suggestion: suggest::nearest(arg, COMMANDS)
-                            .or_else(|| other_spelling(arg))
-                            .map(str::to_owned),
+                        hint: command_hint(arg),
                     });
                 }
             } else if known == Some("explain") && name.is_none() {
                 name = Some(arg);
                 if Code::from_name(arg).is_none() {
                     mistake(Code::unknown(arg));
-                }
-            } else if known == Some("refuse") && address.is_none() {
-                address = Some(arg);
-                if !crate::fetched::mentions::web_address(arg) {
-                    let https = format!("https://{arg}");
-                    let respelt = (!arg.contains("://")
-                        && crate::fetched::mentions::web_address(&https))
-                    .then_some(https);
-                    mistake(Kind::NotAUrl {
-                        written: arg.into(),
-                        respelt,
-                    });
                 }
             } else if known == Some("search") && words.is_none() {
                 words = Some(arg);
@@ -825,7 +794,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                 }
             } else if matches!(
                 known,
-                Some("build" | "check" | "serve" | "stamp" | "refresh" | "refuse" | "search")
+                Some("build" | "check" | "serve" | "stamp" | "refresh" | "search")
             ) && !site_bare
             {
                 site_bare = true;
@@ -1038,9 +1007,6 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     if known == Some("explain") && name.is_none() {
         problems.push(Problem::nowhere(Kind::MissingName));
     }
-    if known == Some("refuse") && address.is_none() {
-        problems.push(Problem::nowhere(Kind::MissingUrl));
-    }
     if known == Some("search") && words.is_none_or(|words| words.trim().is_empty()) {
         problems.push(Problem::nowhere(Kind::NothingToSearch));
     }
@@ -1135,11 +1101,6 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             drafts,
             language,
         }),
-        Some("refuse") => Request::Refuse(refuse::Options {
-            site: site.unwrap_or_default(),
-            address: address.expect("checked above").to_owned(),
-            today,
-        }),
         Some("lsp") => Request::Lsp,
         _ => Request::Explain(name.and_then(Code::from_name).expect("checked above")),
     })
@@ -1201,6 +1162,20 @@ fn command_at(args: &[String]) -> Option<usize> {
 /// Whether the argument at `i` reads as the value of the option before it.
 fn takes_apart(args: &[String], i: usize, command: Option<usize>) -> bool {
     args.get(i).is_some_and(|next| !is_option(next)) && command != Some(i)
+}
+
+/// What to say of `written`, which names no command.
+fn command_hint(written: &str) -> CommandHint {
+    if let Some(&(_, setting)) = FORMER_COMMANDS
+        .iter()
+        .find(|(former, _)| *former == written)
+    {
+        return CommandHint::Setting(setting.into());
+    }
+    match suggest::nearest(written, COMMANDS).or_else(|| other_spelling(written)) {
+        Some(near) => CommandHint::Similar(near.into()),
+        None => CommandHint::None,
+    }
 }
 
 fn other_spelling(written: &str) -> Option<&'static str> {

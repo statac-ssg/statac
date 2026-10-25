@@ -12,7 +12,7 @@ use super::{Fetch, Token, keep, unwritten};
 use crate::date::Date;
 use crate::fetch::Refusal;
 use crate::fetched::mentions::{self, Mention, Said};
-use crate::fetched::refused::List;
+use crate::fetched::refused::Refused;
 use crate::fetched::{Held, Line, Record};
 use crate::pictures::Bounds;
 use crate::report::{Report, shown};
@@ -65,7 +65,7 @@ pub(super) struct Keeping<'a> {
     pub today: Date,
     /// The site's `url`.
     pub url: &'a str,
-    pub refused: &'a List,
+    pub refused: &'a Refused,
     pub report: &'a Report<'a>,
 }
 
@@ -287,7 +287,7 @@ fn keep_child(
         (None, _) => Some(wording::not_read(id, &property)),
         (_, Some(url)) if !mentions::web_address(url) => Some(wording::not_a_web_address(id, url)),
         (_, None) => Some(wording::no_address_named(id)),
-        _ if let Some(entry) = refused => Some(wording::refused_here(id, &entry.address)),
+        _ if let Some(line) = refused => Some(wording::refused_here(id, line)),
         _ if mentions::on_site(&target, kept.url).is_none() => {
             Some(wording::not_on_site(id, &target))
         }

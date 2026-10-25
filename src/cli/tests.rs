@@ -464,8 +464,8 @@ fn every_mistake_is_said_in_order() {
     assert_eq!(
         refused(&["--sit=docs", "--out=a", "--out=b"]),
         "\
-error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `refuse`, `new`, \
-`import` or `explain`
+error  Missing command: no `build`, `check`, `serve`, `stamp`, `refresh`, `new`, `import` or \
+`explain`
   Run `statac --help` to see the commands.
   More: https://statac.dev/e/missing-command/
 
@@ -505,9 +505,7 @@ error  Unknown problem name: `brokn-link`
             hint: OptionHint::ForOther {
                 command: "explain".into(),
                 option: "--site".into(),
-                takers: Box::new([
-                    "build", "check", "serve", "stamp", "refresh", "refuse", "search",
-                ]),
+                takers: Box::new(["build", "check", "serve", "stamp", "refresh", "search"]),
             },
         }])
     );
@@ -551,10 +549,6 @@ Usage:
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
                          the site's .statac/token.
-  statac refuse <url> [folder]
-                         Remove the webmention sent from the URL, or
-                         every one from a sender at or under it, and never
-                         keep it again.
   statac new [folder]    Ask five questions and write a new site from the
                          answers into the folder, which must be empty or
                          not there yet.
@@ -590,9 +584,8 @@ Options:
                          in statac.yaml, as a preview of the site needs.
   --today=<date>         The day the site is built on, as 2026-10-04, for
                          site.today, the day stamps are counted from, and
-                         the day statac refresh and statac refuse record.
-                         Without it, today in the site's zone, or for
-                         statac refuse, on this computer's clock.
+                         the day statac refresh records. Without it, today
+                         in the site's zone.
   --drafts               Build drafts and scheduled posts as if they were
                          published.
   --json                 Show every problem as JSON, for an editor or another
@@ -663,9 +656,8 @@ Options:
                          in statac.yaml, as a preview of the site needs.
   --today=<date>         The day the site is built on, as 2026-10-04, for
                          site.today, the day stamps are counted from, and
-                         the day statac refresh and statac refuse record.
-                         Without it, today in the site's zone, or for
-                         statac refuse, on this computer's clock.
+                         the day statac refresh records. Without it, today
+                         in the site's zone.
   --drafts               Build drafts and scheduled posts as if they were
                          published.
   --timings              Show where statac build spent its time, once it
@@ -1248,107 +1240,22 @@ error  Can't read `site-that-isnt-there`: it doesn't exist
 }
 
 #[test]
-fn refuse_is_read_with_its_address_and_options() {
-    let refusing = |address: &str, site: &str, today: Option<&str>| {
-        Ok(Request::Refuse(refuse::Options {
-            site: site.into(),
-            address: address.into(),
-            today: today.map(|day| date::read(day).unwrap()),
-        }))
-    };
-    let post = "https://a.example/post-1/";
-    assert_eq!(parsed(&["refuse", post]), refusing(post, UNNAMED, None));
-    assert_eq!(
-        parsed(&["refuse", post, "docs"]),
-        refusing(post, "docs", None)
-    );
-    assert_eq!(
-        parsed(&[
-            "--site=docs",
-            "refuse",
-            "http://a.example",
-            "--today=2026-10-06"
-        ]),
-        refusing("http://a.example", "docs", Some("2026-10-06"))
-    );
+fn refuse_is_refused_with_the_setting_that_does_its_work() {
     assert_eq!(
         refused(&["refuse"]),
         "\
-error  Missing URL: `statac refuse` needs the full URL of a webmention or a sender
-  Give the full URL after the command, as `statac refuse https://a.example/post-1/`.
-  More: https://statac.dev/e/missing-url/
+error  Unknown command: `refuse`
+  Statac does this with `refuse_webmentions_from:` in `statac.yaml`.
+  More: https://statac.dev/e/unknown-command/
 "
     );
+    // A command spelt nearly so is still offered for a near spelling.
     assert_eq!(
-        refused(&["refuse", "--site=docs"]),
-        "\
-error  Missing URL: `statac refuse` needs the full URL of a webmention or a sender
-  Give the full URL after the command, as `statac refuse https://a.example/post-1/`.
-  More: https://statac.dev/e/missing-url/
-"
-    );
-    assert_eq!(
-        refused(&["refuse", "a.example/post-1/"]),
-        "\
-error  Not a URL: `statac refuse` takes a full URL starting `https://` or `http://`, \
-not `a.example/post-1/`
-  Did you mean `https://a.example/post-1/`?
-  More: https://statac.dev/e/not-a-url/
-"
-    );
-    for written in ["ftp://a.example/post-1/", "https://", "post 1"] {
-        assert_eq!(
-            refused(&["refuse", written]),
-            format!(
-                "\
-error  Not a URL: `statac refuse` takes a full URL starting `https://` or `http://`, \
-not `{written}`
-  Give the full URL, as the browser shows it.
-  More: https://statac.dev/e/not-a-url/
-"
-            )
-        );
-    }
-    assert_eq!(
-        refused(&["refuse", post, "docs", "fetched"]),
-        "\
-error  Unexpected argument: `fetched`
-  More: https://statac.dev/e/unexpected-argument/
-"
-    );
-    assert_eq!(
-        refused(&["refuse", post, "--drafts"]),
-        "\
-error  Unknown option: `statac refuse` has no `--drafts`
-  `--drafts` is for `statac build`, `statac check` and `statac search`.
-  More: https://statac.dev/e/unknown-option/
-"
-    );
-    assert_eq!(
-        refused(&["refuse", post, "--all"]),
-        "\
-error  Unknown option: `--all`
-  `statac refuse` takes `--site` and `--today`.
-  More: https://statac.dev/e/unknown-option/
-"
-    );
-}
-
-#[test]
-fn a_site_to_refuse_in_that_isnt_there_is_said_to_be_missing() {
-    let (out, err, code) = ran(&["refuse", "https://a.example/", "site-that-isnt-there"]);
-    assert_eq!(
-        (out.as_str(), err.as_str(), code),
-        (
-            "\
-error  Can't read `site-that-isnt-there`: it doesn't exist
-  More: https://statac.dev/e/cant-read/
-
-1 error: 1 cant-read.
-",
-            "",
-            1
-        )
+        parsed(&["refesh"]),
+        Err(vec![Kind::UnknownCommand {
+            written: "refesh".into(),
+            hint: CommandHint::Similar("refresh".into()),
+        }])
     );
 }
 
@@ -1452,13 +1359,12 @@ error  Unreadable name: `folder-1-\u{FFFD}` holds bytes that aren't UTF-8
         written.push(&name);
         written
     };
-    let commands: [&[OsString]; 10] = [
+    let commands: [&[OsString]; 9] = [
         &["build".into(), name.clone()],
         &["check".into(), option("--site=")],
         &["serve".into(), name.clone()],
         &["stamp".into(), name.clone()],
         &["refresh".into(), name.clone()],
-        &["refuse".into(), "https://a.example".into(), name.clone()],
         &["new".into(), name.clone()],
         &["import".into(), name.clone()],
         &["import".into(), "old-1".into(), name.clone()],
@@ -1476,15 +1382,12 @@ error  Unreadable name: `folder-1-\u{FFFD}` holds bytes that aren't UTF-8
 
 #[cfg(unix)]
 #[test]
-fn a_command_or_address_that_isnt_utf8_is_not_a_name() {
+fn a_command_that_isnt_utf8_is_not_a_name() {
     use std::os::unix::ffi::OsStringExt;
     let command = OsString::from_vec(b"buil\xff".to_vec());
     let (_, err, code) = ran_with(&[command]);
     assert_eq!(code, 2);
     assert!(err.starts_with("error  Unknown command: `buil\u{FFFD}`"));
-    let (_, err, code) = ran_with(&["refuse".into(), OsString::from_vec(b"a\xff".to_vec())]);
-    assert_eq!(code, 2);
-    assert!(err.starts_with("error  Not a URL:"), "{err}");
 }
 
 #[test]
@@ -1495,13 +1398,12 @@ error  Unusable name: `folder-1\u{241b}` holds a character that can't be shown
   More: https://statac.dev/e/unusable-name/
 ";
     let name = "folder-1\u{1b}";
-    let commands: [&[&str]; 10] = [
+    let commands: [&[&str]; 9] = [
         &["build", name],
         &["check", "--site=folder-1\u{1b}"],
         &["serve", name],
         &["stamp", name],
         &["refresh", name],
-        &["refuse", "https://a.example", name],
         &["new", name],
         &["import", name],
         &["import", "old-1", name],
