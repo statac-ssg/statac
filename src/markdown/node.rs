@@ -59,10 +59,12 @@ pub enum Kind {
     },
     TableCell,
     /// `number` counts from 1, in the order the writing first points at
-    /// each note.
+    /// each note. `id` is the note's, and `back` its first marker's.
     FootnoteDefinition {
         label: String,
         number: u32,
+        id: String,
+        back: String,
     },
     Text(String),
     /// Text that reaches the page exactly as typed: an escaped call, a
@@ -95,11 +97,14 @@ pub enum Kind {
         destination: String,
         title: String,
     },
-    /// `repeat` counts the markers pointing at one note, from 1.
+    /// `repeat` counts the markers pointing at one note, from 1. `id` is
+    /// the marker's, and `note` the id of the note it points at.
     FootnoteReference {
         label: String,
         number: u32,
         repeat: u32,
+        id: String,
+        note: String,
     },
     /// A task list's checkbox.
     Task {

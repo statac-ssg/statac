@@ -942,7 +942,6 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::IdUsedTwice { id, taken, .. } => match taken {
             Taken::Heading(_) => format!("Id used twice: a heading above has the id `{id}`"),
             Taken::Table(_) => format!("Id used twice: a table above has the id `{id}`"),
-            Taken::Footnote => format!("Id used twice: a footnote has the id `{id}`"),
         },
         Kind::UnmatchedTag { unmatched } => match unmatched {
             Unmatched::NeverClosed(name) => format!("Unmatched tag: `<{name}>` is never closed"),
@@ -5857,15 +5856,6 @@ mod tests {
                     on: Braced::Heading,
                 },
                 "Id used twice: a heading above has the id `rust`",
-                Some("Give this heading an id of its own."),
-            ),
-            (
-                Kind::IdUsedTwice {
-                    id: "note-1".into(),
-                    taken: Taken::Footnote,
-                    on: Braced::Heading,
-                },
-                "Id used twice: a footnote has the id `note-1`",
                 Some("Give this heading an id of its own."),
             ),
             (

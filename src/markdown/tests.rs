@@ -1639,7 +1639,7 @@ fn footnotes_are_numbered_by_first_use_and_gathered_at_the_foot() {
         .notes
         .iter()
         .map(|note| match &note.kind {
-            Kind::FootnoteDefinition { label, number } => (label.clone(), *number),
+            Kind::FootnoteDefinition { label, number, .. } => (label.clone(), *number),
             _ => unreachable!(),
         })
         .collect();
@@ -1949,9 +1949,8 @@ fn a_tables_id_and_classes_are_written_on_it() {
 /// A written id something above already has is told at the second, the
 /// first heading shown; an id made from words steps aside instead.
 #[test]
-fn an_id_written_twice_or_a_footnotes_is_told() {
-    let text = "## One {#route}\n\n## Two {#route}\n\n## Route\n\n\
-                ## Three {#note-1}\n\nA claim.[^a]\n\n[^a]: Because.\n";
+fn an_id_written_twice_is_told() {
+    let text = "## One {#route}\n\n## Two {#route}\n\n## Route\n";
     let (sources, mut document) = read_text(text);
     give_heading_ids(&mut document, "content/post-1.md", text);
     let told: Vec<(String, String, Option<String>)> = document
@@ -1974,24 +1973,105 @@ fn an_id_written_twice_or_a_footnotes_is_told() {
         .collect();
     assert_eq!(
         told,
-        [
-            (
-                "Id used twice: a heading above has the id `route`".to_owned(),
-                "#route".to_owned(),
-                Some("## One {#route}".to_owned())
-            ),
-            (
-                "Id used twice: a footnote has the id `note-1`".to_owned(),
-                "#note-1".to_owned(),
-                None
-            ),
-        ]
+        [(
+            "Id used twice: a heading above has the id `route`".to_owned(),
+            "#route".to_owned(),
+            Some("## One {#route}".to_owned())
+        )]
     );
     let ids: Vec<String> = headings(&document)
         .into_iter()
         .map(|h| h.id.unwrap().to_owned())
         .collect();
-    assert_eq!(ids, ["route", "route", "route-1", "note-1"]);
+    assert_eq!(ids, ["route", "route", "route-1"]);
+}
+
+/// A note or marker whose id the author gave a heading or a table takes a
+/// number, as an id made from a heading's words does, and the note and its
+/// markers still point at each other.
+#[test]
+fn a_footnote_steps_aside_for_an_id_the_author_gave() {
+    let cases: [(&str, &[&str]); 6] = [
+        (
+            "## A {#note-1}\n\nA claim.[^a]\n\n[^a]: Because.\n",
+            &[
+                "<h2 id=\"note-1\">A</h2>",
+                "<a href=\"#note-1-1\" id=\"back-1\">1</a>",
+                "<li id=\"note-1-1\">",
+                "<a href=\"#back-1\" class=\"back\">",
+            ],
+        ),
+        (
+            "## A {#back-1}\n\nA claim.[^a] Again.[^a]\n\n[^a]: Because.\n",
+            &[
+                "<h2 id=\"back-1\">A</h2>",
+                "<a href=\"#note-1\" id=\"back-1-1\">1</a>",
+                "<a href=\"#note-1\" id=\"back-1-2\">1</a>",
+                "<li id=\"note-1\">",
+                "<a href=\"#back-1-1\" class=\"back\">",
+            ],
+        ),
+        (
+            "## A {#back-1-2}\n\nA claim.[^a] Again.[^a]\n\n[^a]: Because.\n",
+            &[
+                "<a href=\"#note-1\" id=\"back-1\">1</a>",
+                "<a href=\"#note-1\" id=\"back-1-2-1\">1</a>",
+                "<a href=\"#back-1\" class=\"back\">",
+            ],
+        ),
+        (
+            "| a |\n|---|\n{#note-2}\n\nOne.[^a] Two.[^b]\n\n[^a]: A.\n\n[^b]: B.\n",
+            &[
+                "<table id=\"note-2\">",
+                "<a href=\"#note-1\" id=\"back-1\">1</a>",
+                "<a href=\"#note-2-1\" id=\"back-2\">2</a>",
+                "<li id=\"note-1\">",
+                "<li id=\"note-2-1\">",
+            ],
+        ),
+        (
+            "## Note 1\n\n## B {#note-1}\n\nA claim.[^a]\n\n[^a]: Because.\n",
+            &[
+                "<h2 id=\"note-1-2\">Note 1</h2>",
+                "<h2 id=\"note-1\">B</h2>",
+                "<a href=\"#note-1-1\" id=\"back-1\">1</a>",
+                "<li id=\"note-1-1\">",
+            ],
+        ),
+        (
+            "A claim.[^a]\n\n[^a]: Because.\n\n    ## B {#note-1}\n",
+            &[
+                "<a href=\"#note-1-1\" id=\"back-1\">1</a>",
+                "<li id=\"note-1-1\">",
+                "<h2 id=\"note-1\">B</h2>",
+            ],
+        ),
+    ];
+    for (text, written) in cases {
+        let (_, mut document) = read_text(text);
+        give_heading_ids(&mut document, "content/post-1.md", text);
+        assert!(
+            document.problems.is_empty(),
+            "{text:?}: {:?}",
+            document.problems
+        );
+        let html = to_html(
+            &document,
+            &Options {
+                snippets: &StandIn,
+                back_to_the_text: None,
+                digits: None,
+                right_to_left: false,
+                highlighter: None,
+            },
+        );
+        for written in written {
+            assert!(
+                html.contains(written),
+                "{text:?}: {written:?} not in\n{html}"
+            );
+        }
+    }
 }
 
 /// A table's id takes part as a heading's does: told where something above
@@ -2000,8 +2080,7 @@ fn an_id_written_twice_or_a_footnotes_is_told() {
 #[test]
 fn a_tables_id_written_twice_is_told() {
     let text = "## A {#x}\n\n| a |\n|---|\n| 1 |\n{#x}\n\n| b |\n|---|\n| 2 |\n{#y}\n\n\
-                ## Y\n\n## B {#y}\n\n| c |\n|---|\n| 3 |\n{#note-1}\n\nA claim.[^a]\n\n\
-                [^a]: Because.\n";
+                ## Y\n\n## B {#y}\n";
     let (sources, mut document) = read_text(text);
     give_heading_ids(&mut document, "content/post-1.md", text);
     let told: Vec<(String, Option<String>, String, Option<String>)> = document
@@ -2046,12 +2125,6 @@ fn a_tables_id_written_twice_is_told() {
                 "Give this heading an id of its own.",
                 "#y",
                 Some("#y")
-            ),
-            line(
-                "Id used twice: a footnote has the id `note-1`",
-                "Give this table an id of its own.",
-                "#note-1",
-                None
             ),
         ]
     );

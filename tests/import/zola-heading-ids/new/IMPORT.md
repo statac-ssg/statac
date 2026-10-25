@@ -14,7 +14,7 @@ Zola's settings left straight quotes, `--` and `...` as typed, so `typography: f
 
 Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
-Statac wrote the id Zola gave 6 headings after each in braces, as `## C++ & C# {#c-c}` in `content/page-1.md`, where Statac's own id would differ, so a link to one by its old id still lands.
+Statac wrote the id Zola gave 7 headings after each in braces, as `## C++ & C# {#c-c}` in `content/page-1.md`, where Statac's own id would differ, so a link to one by its old id still lands.
 
 The settings written in `statac.yaml`:
 

@@ -672,12 +672,14 @@ impl<'a> Writer<'a> {
         if self.writes(Piece::Footnotes) {
             let listed = notes
                 .iter()
-                .filter_map(|note| match note.kind {
-                    Kind::FootnoteDefinition { number, .. } => Some(PieceValue::Record(vec![
-                        ("number", PieceValue::Number(u64::from(number))),
-                        ("shown", PieceValue::Text(self.shown(number))),
-                        ("id", PieceValue::Text(format!("note-{number}"))),
-                        ("back", PieceValue::Text(format!("back-{number}"))),
+                .filter_map(|note| match &note.kind {
+                    Kind::FootnoteDefinition {
+                        number, id, back, ..
+                    } => Some(PieceValue::Record(vec![
+                        ("number", PieceValue::Number(u64::from(*number))),
+                        ("shown", PieceValue::Text(self.shown(*number))),
+                        ("id", PieceValue::Text(id.clone())),
+                        ("back", PieceValue::Text(back.clone())),
                         (
                             "body",
                             PieceValue::Html(self.block_html(&note.children).trim().to_owned()),
@@ -700,14 +702,14 @@ impl<'a> Writer<'a> {
         self.open("<section class=\"footnotes\">");
         self.open("<ol>");
         for note in notes {
-            let Kind::FootnoteDefinition { number, .. } = note.kind else {
+            let Kind::FootnoteDefinition { id, back, .. } = &note.kind else {
                 continue;
             };
-            self.open(&format!("<li id=\"note-{number}\">"));
+            self.open(&format!("<li id=\"{id}\">"));
             let mut inside = Writer::new(self.options, vec![false; 3]);
             inside.blocks(&note.children);
             let written = inside.out.trim();
-            let mut back = format!(" <a href=\"#back-{number}\" class=\"back\"");
+            let mut back = format!(" <a href=\"#{back}\" class=\"back\"");
             if let Some(label) = self.options.back_to_the_text {
                 back.push_str(" aria-label=\"");
                 escape(label, &mut back);
@@ -913,18 +915,16 @@ impl<'a> Writer<'a> {
                     self.out.push_str("</picture>");
                 }
             }
-            Kind::FootnoteReference { number, repeat, .. } => {
-                let back = match repeat {
-                    0 | 1 => format!("back-{number}"),
-                    n => format!("back-{number}-{n}"),
-                };
+            Kind::FootnoteReference {
+                number, id, note, ..
+            } => {
                 let start = self.out.len();
                 if self.writes(Piece::Footnote) {
                     let values = vec![
                         ("number", PieceValue::Number(u64::from(*number))),
                         ("shown", PieceValue::Text(self.shown(*number))),
-                        ("id", PieceValue::Text(back.clone())),
-                        ("note", PieceValue::Text(format!("note-{number}"))),
+                        ("id", PieceValue::Text(id.clone())),
+                        ("note", PieceValue::Text(note.clone())),
                     ];
                     if let Some(html) = self.piece(Piece::Footnote, values, node) {
                         self.out.push_str(&html);
@@ -935,7 +935,7 @@ impl<'a> Writer<'a> {
                 let shown = self.shown(*number);
                 self.out.push_str(&format!(
                     "<sup class=\"footnote\">\
-                     <a href=\"#note-{number}\" id=\"{back}\">{shown}</a></sup>"
+                     <a href=\"#{note}\" id=\"{id}\">{shown}</a></sup>"
                 ));
                 self.cuts.push(start..self.out.len());
             }

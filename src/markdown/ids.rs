@@ -15,28 +15,14 @@ use crate::source::{Place, Span};
 /// headings with the same words are told apart by a number, and none takes
 /// an id a footnote has or the author gave another heading or a table. An
 /// id the author gave is theirs and kept as written, given twice or not,
-/// and told where an earlier heading, table or footnote has it, as links
-/// to it land on that. Words that make no id, a heading of punctuation
-/// alone, are named from `path`, the file the writing is in, and the
-/// heading's place among them. `text` is that file's.
+/// and told where an earlier heading or table has it, as links to it land
+/// on that. A footnote or its marker whose id the author gave something
+/// takes a number, as a heading does. Words that make no id, a heading of
+/// punctuation alone, are named from `path`, the file the writing is in,
+/// and the heading's place among them. `text` is that file's.
 pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
     let mut ids = Ids::default();
     let tops = || std::iter::once(&document.root).chain(&document.notes);
-    for top in tops() {
-        top.walk(&mut |node| match &node.kind {
-            Kind::FootnoteDefinition { number, .. } => {
-                ids.taken.insert(format!("note-{number}"));
-            }
-            Kind::FootnoteReference { number, repeat, .. } => {
-                ids.taken.insert(match repeat {
-                    0 | 1 => format!("back-{number}"),
-                    n => format!("back-{number}-{n}"),
-                });
-            }
-            _ => {}
-        });
-    }
-    let footnotes = ids.taken.clone();
     let mut written: HashMap<String, (Place, Braced)> = HashMap::new();
     let mut twice = Vec::new();
     for top in tops() {
@@ -49,7 +35,6 @@ pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
             let taken = match written.get(id) {
                 Some(&(first, Braced::Heading)) => Some(Taken::Heading(first)),
                 Some(&(first, Braced::Table)) => Some(Taken::Table(first)),
-                None if footnotes.contains(id) => Some(Taken::Footnote),
                 None => None,
             };
             // A table as the first holder is shown by its braces alone.
@@ -75,6 +60,7 @@ pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
             .problems
             .sort_by_key(|p| p.place.map(|place| place.span.start));
     }
+    give_footnote_ids(document, &mut ids);
     let mut count = 0;
     let mut give = |node: &mut Node| {
         let Kind::Heading { id, .. } = &node.kind else {
@@ -92,6 +78,38 @@ pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
         let minted = ids.mint(wanted);
         if let Kind::Heading { id, .. } = &mut node.kind {
             *id = Some(minted);
+        }
+    };
+    document.root.walk_mut(&mut give);
+    for note in &mut document.notes {
+        note.walk_mut(&mut give);
+    }
+}
+
+/// Numbers the id of each note and marker that the author gave something,
+/// as a heading's is numbered.
+fn give_footnote_ids(document: &mut Document, ids: &mut Ids) {
+    if document.notes.is_empty() {
+        return;
+    }
+    // Each id given, by the one it was: a note and its markers each hold
+    // the other's, which must change with it.
+    let mut given: HashMap<String, String> = HashMap::new();
+    let mut give = |node: &mut Node| {
+        let (Kind::FootnoteReference {
+            id, note: other, ..
+        }
+        | Kind::FootnoteDefinition {
+            id, back: other, ..
+        }) = &mut node.kind
+        else {
+            return;
+        };
+        for id in [id, other] {
+            let wanted = std::mem::take(id);
+            *id = (given.entry(wanted))
+                .or_insert_with_key(|wanted| ids.mint(wanted.clone()))
+                .clone();
         }
     };
     document.root.walk_mut(&mut give);

@@ -31,18 +31,22 @@ pub(super) fn number(document: &mut Document, text: &str) {
             label,
             number,
             repeat,
+            id,
+            note,
         } = &mut node.kind
         else {
             return;
         };
-        let Some(&note) = defined.get(&label.to_lowercase()) else {
+        let Some(&at) = defined.get(&label.to_lowercase()) else {
             return;
         };
         let next = u32::try_from(numbers.len() + 1).expect("too many footnotes");
-        let (n, seen) = numbers.entry(note).or_insert((next, 0));
+        let (n, seen) = numbers.entry(at).or_insert((next, 0));
         *seen += 1;
         *number = *n;
         *repeat = *seen;
+        *id = back_id(*n, *seen);
+        *note = format!("note-{n}");
     });
 
     let mut definitions = Vec::new();
@@ -53,8 +57,13 @@ pub(super) fn number(document: &mut Document, text: &str) {
         .enumerate()
         .filter_map(|(i, mut note)| {
             let (n, _) = numbers.get(&i)?;
-            if let Kind::FootnoteDefinition { number, .. } = &mut note.kind {
+            if let Kind::FootnoteDefinition {
+                number, id, back, ..
+            } = &mut note.kind
+            {
                 *number = *n;
+                *id = format!("note-{n}");
+                *back = back_id(*n, 1);
             }
             Some(note)
         })
@@ -64,6 +73,14 @@ pub(super) fn number(document: &mut Document, text: &str) {
         _ => 0,
     });
     document.notes = notes;
+}
+
+/// The id of the `repeat`th marker pointing at note `number`.
+fn back_id(number: u32, repeat: u32) -> String {
+    match repeat {
+        1 => format!("back-{number}"),
+        n => format!("back-{number}-{n}"),
+    }
 }
 
 /// A warning at each note nothing points at, offering a marker that has no

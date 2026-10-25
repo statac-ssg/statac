@@ -1745,8 +1745,6 @@ pub enum Taken {
     Heading(Place),
     /// A table, where its id is written.
     Table(Place),
-    /// A footnote or its marker, whose ids Statac writes.
-    Footnote,
 }
 
 /// What the author gives an id in braces.

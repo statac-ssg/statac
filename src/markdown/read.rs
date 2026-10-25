@@ -457,6 +457,8 @@ impl<'a> Builder<'a> {
                     label,
                     number: 0,
                     repeat: 0,
+                    id: String::new(),
+                    note: String::new(),
                 };
                 self.push(Node::new(kind, self.place(span)));
             }
@@ -519,6 +521,8 @@ impl<'a> Builder<'a> {
                     label,
                     number: 0,
                     repeat: 0,
+                    id: String::new(),
+                    note: String::new(),
                 };
                 self.push(Node::new(kind, self.place(marker)));
                 if text.len() > 1 {
@@ -598,7 +602,12 @@ impl<'a> Builder<'a> {
             Tag::FootnoteDefinition(label) => {
                 let label = self.restored(&label);
                 self.notes.insert(label.to_lowercase());
-                Kind::FootnoteDefinition { label, number: 0 }
+                Kind::FootnoteDefinition {
+                    label,
+                    number: 0,
+                    id: String::new(),
+                    back: String::new(),
+                }
             }
             Tag::DefinitionList => Kind::DefinitionList,
             Tag::DefinitionListTitle => Kind::Term,
