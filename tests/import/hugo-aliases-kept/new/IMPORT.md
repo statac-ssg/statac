@@ -32,6 +32,8 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 2 pages carry `redirect_from`, for the other URLs that led to them.
 
+The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 These old URLs can't be kept: the new site can't redirect from them.
 
 - `/tags/tag-1/`, for `content/posts/post-1.md`: the page for the tag `tag-1` is published there

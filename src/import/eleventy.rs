@@ -977,6 +977,7 @@ impl Reader<'_> {
                 listed(&unplain)
             ));
         }
+        self.import.output = self.output.clone();
         if inside::a_folder(self.folder, &self.output) && !self.output.is_empty() {
             self.import.built = Some(self.output.clone());
         }

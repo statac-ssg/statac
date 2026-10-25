@@ -35,6 +35,8 @@ Statac worked out where the old site published each page, read the new site, and
 - 2 pages carry a `permalink` of their own, where no pattern fits.
 - 1 page at the top of `content/`, `content/page-2.md`, redirects from an old paginated page of the home page to the page of `content/posts/` that holds the same posts, with `permalink` and `redirect_to`.
 
+The old site's built output isn't in `_site/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 ## Left for you
 
 ### Pages made by templates

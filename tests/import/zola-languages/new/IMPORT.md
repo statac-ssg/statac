@@ -39,6 +39,8 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
 
+The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 The old site published a page listing every one of its `tags` at `/fr/tags/`, and the new site has none.
 
 The old site published a page listing every one of its `tags` at `/tags/`, and the new site has none.

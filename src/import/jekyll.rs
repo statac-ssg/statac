@@ -871,6 +871,7 @@ impl Reader<'_> {
             self.note(note);
         }
         let destination = self.settings.destination.clone();
+        self.import.output = destination.clone();
         if !destination.is_empty() && inside::a_folder(self.folder, &destination) {
             self.import.built = Some(destination);
         }

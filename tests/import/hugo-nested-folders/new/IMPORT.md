@@ -33,6 +33,8 @@ Statac worked out where the old site published each page, read the new site, and
 - `content/post/index.md` cascades `pages.permalink: /{year}/{month}/{day}/{slug}/` to every page in `content/post/`, which puts 4 of them at their old URLs.
 - 2 pages carry a `permalink` of their own, where no pattern fits.
 
+The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 ## Left for you
 
 Nothing: everything Statac read came across.

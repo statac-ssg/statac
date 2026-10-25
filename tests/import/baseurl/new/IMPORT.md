@@ -32,6 +32,8 @@ Statac worked out where the old site published each page, read the new site, and
 - 2 pages carry a `permalink` of their own, where no pattern fits.
 - The site is under a path, `/blog`, as its `url` says, so every URL starts with it, and links in the content were written with it: see https://statac.dev/addresses/.
 
+The old site's built output isn't in `_site/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 ## Left for you
 
 Nothing: everything Statac read came across.

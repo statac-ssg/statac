@@ -222,6 +222,9 @@ pub struct Import {
     /// The tool's own built output, by its path in the old site, where
     /// it is there.
     pub built: Option<String>,
+    /// The folder the tool builds the site into, by its path in the old
+    /// site, whether it is there or not.
+    pub output: String,
     pub findings: Vec<Finding>,
     pub left: Vec<Left>,
     /// Sentences for the report on what the reader did with the settings

@@ -263,6 +263,9 @@ pub(super) struct Summary {
     /// The path the site is under, where it is under one.
     pub base: String,
     pub built: Option<String>,
+    /// The folder the old tool builds the site into, whether it is there
+    /// or not.
+    pub output: String,
     /// How many errors `statac check` finds in the new site.
     pub errors: usize,
     /// The templates the new site's pages and feeds are built with that it
@@ -447,6 +450,7 @@ pub(super) fn write<'a>(
         term_lists,
         feeds,
         built,
+        output,
         mut findings,
         left,
         notes,
@@ -493,6 +497,7 @@ pub(super) fn write<'a>(
         left,
         notes,
         built: built.clone(),
+        output,
         base: address.as_deref().map(base_of).unwrap_or_default(),
         ..Summary::default()
     };

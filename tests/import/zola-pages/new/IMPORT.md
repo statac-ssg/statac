@@ -32,6 +32,8 @@ Statac worked out where the old site published each page, read the new site, and
 - 2 pages carry a `permalink` of their own, where no pattern fits.
 - 2 pages carry `redirect_from`, for the other URLs that led to them.
 
+The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 1 image beside a page is shown as resized copies Statac makes, and the file itself isn't published, so its old URL, `/posts/post-1/photo-1.jpg`, is no longer published. An image's own file is published where a page links to it, or where its sidecar file, such as `photo-1.jpg.yaml`, holds `optimise: false`; `optimise_images: false` in `statac.yaml` leaves every image as it is: see https://statac.dev/pictures/.
 
 ## Left for you

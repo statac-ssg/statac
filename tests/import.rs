@@ -409,6 +409,8 @@ fn what_is_said_counts_what_came_across() {
              \n\
              Converted: 2 posts, 1 draft, 2 pages.\n\
              URLs: 6 kept.\n\
+             The old site's built output isn't in `_site/`, so no URL was checked against it: \
+             see `{shown}/IMPORT.md`.\n\
              Left for you: 7 things of 3 kinds.\n\
              The new site has no templates, so each page is published as its content alone \
              until you add your own: see https://statac.dev/templates/.\n\

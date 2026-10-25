@@ -29,6 +29,8 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 1 page carries a `permalink` of its own, where no pattern fits.
 
+The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 This old URL can't be kept: the new site can't redirect from it.
 
 - `/posts/Post #1, Café!/`, for `content/posts/Post #1, Café!.md`: `#` can't be in a name

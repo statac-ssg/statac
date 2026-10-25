@@ -65,6 +65,18 @@ fn converted(summary: &Summary) -> Vec<String> {
     .collect()
 }
 
+/// That the old site's built output isn't there, naming the folder the
+/// old tool builds into where it has one.
+fn no_built_output(summary: &Summary) -> String {
+    match summary.output.trim_end_matches('/') {
+        "" => "The old site's built output isn't there".to_owned(),
+        output => format!(
+            "The old site's built output isn't in {}",
+            code(&format!("{output}/"))
+        ),
+    }
+}
+
 /// What is printed once the site is made.
 pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
     let mut text = format!(
@@ -87,6 +99,13 @@ pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
     .collect();
     if !urls.is_empty() {
         text.push_str(&format!("URLs: {}.\n", urls.join(", ")));
+        if summary.built.is_none() {
+            text.push_str(&format!(
+                "{}, so no URL was checked against it: see `{}/{REPORT}`.\n",
+                no_built_output(summary),
+                shown.new
+            ));
+        }
     }
     let (things, kinds) = summary.left_for_you();
     if things > 0 {
@@ -517,17 +536,28 @@ fn addresses(text: &mut String, summary: &Summary) {
         ));
     }
     if ways.is_empty() {
-        ways.push("Every page lands where the old site published it, with nothing added.".into());
+        ways.push(
+            match summary.built {
+                Some(_) => "Every page lands where the old site published it, with nothing added.",
+                None => "Every page lands at the URL Statac worked out for it, with nothing added.",
+            }
+            .into(),
+        );
     }
     for way in ways {
         text.push_str(&format!("- {way}\n"));
     }
     text.push('\n');
-    if let Some(built) = &summary.built {
-        text.push_str(&format!(
+    match &summary.built {
+        Some(built) => text.push_str(&format!(
             "Each URL was also looked for in the old site's own built output, {}.\n\n",
             code(&format!("{built}/"))
-        ));
+        )),
+        None => text.push_str(&format!(
+            "{}, so no old URL was checked against the pages the old site built: build the old \
+             site and import again to check each one.\n\n",
+            no_built_output(summary)
+        )),
     }
     unanswered(text, summary);
 }

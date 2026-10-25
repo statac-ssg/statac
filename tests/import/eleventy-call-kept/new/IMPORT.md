@@ -52,6 +52,8 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 1 page carries `redirect_from`, for the other URLs that led to it.
 
+The old site's built output isn't in `_site/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 ## Left for you
 
 ### Includes now snippet calls

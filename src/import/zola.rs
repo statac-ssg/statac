@@ -499,6 +499,7 @@ impl Reader<'_> {
             output = "public".to_owned();
             self.s.output_dir = output.clone();
         }
+        self.import.output = output.clone();
         if inside::a_folder(self.folder, &output) {
             self.import.built = Some(output);
         }

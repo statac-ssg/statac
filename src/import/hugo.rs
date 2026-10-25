@@ -547,6 +547,7 @@ impl Reader<'_> {
         for (file, line, text) in unread {
             self.find(&inside::FOLDER_UNREAD, &file, line, &text);
         }
+        self.import.output = self.s.publish_dir.clone();
         if inside::a_folder(self.folder, &self.s.publish_dir) {
             self.import.built = Some(self.s.publish_dir.clone());
         }

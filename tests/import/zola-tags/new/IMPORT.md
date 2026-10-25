@@ -42,6 +42,8 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 4 pages at the top of `content/`, such as `content/categories-Notes.md`, redirect from the old page of a tag, a category or a series to the page Statac makes for it, each with `permalink` and `redirect_to`.
 
+The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 The old site published a page listing every one of its `Tags` at `/Tags/`, and the new site has none.
 
 The old site published a page listing every one of its `categories` at `/categories/`, and the new site has none.

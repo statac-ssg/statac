@@ -34,6 +34,8 @@ Statac worked out where the old site published each page, read the new site, and
 
 - 2 pages carry a `permalink` of their own, where no pattern fits.
 
+The old site's built output isn't in `_site/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 Nothing in the new site is published at these old URLs. Give the page each should lead to a `redirect_from` naming it, or a `permalink`:
 
 - `/archive.html`, for `archive.html`

@@ -32,6 +32,8 @@ Statac worked out where the old site published each page, read the new site, and
 - 1 page at the top of `content/`, `content/page3.md`, redirects from an old paginated page of the home page to the page of `content/posts/` that holds the same posts, with `permalink` and `redirect_to`.
 - 1 page at the top of `content/`, `content/page2.md`, redirects from `/page2/`, an old paginated page of the home page, to the page of `content/posts/` with the same number, which doesn't hold exactly the same posts, as happens where posts share a date.
 
+The old site's built output isn't in `_site/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
+
 ## Left for you
 
 ### Pages made by templates
