@@ -4,7 +4,7 @@ It was made from `tests/import/zola-slugify-safe/old` by `statac import`, which 
 
 ## What came across
 
-- 1 post, into `content/posts/`.
+- 2 posts, into `content/posts/`.
 
 The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
@@ -31,7 +31,11 @@ Statac worked out where the old site published each page, read the new site, and
 
 ## Left for you
 
-Nothing: everything Statac read came across.
+### URLs Statac can't publish at
+
+Zola published each of these pages at a URL holding a character Statac's URLs can't hold, such as `%` or `?`, so the page is at Statac's own URL, and the old one isn't kept.
+
+- `content/posts/Post #1, Café!.md`: `/posts/Post #1, Café!/`
 
 ## Not converted
 

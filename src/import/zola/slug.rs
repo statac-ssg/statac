@@ -10,8 +10,8 @@ pub(super) enum Strategy {
     /// hyphen, none at either end; a character outside ASCII spelled in
     /// ASCII by `deunicode` first, as the `slug` crate Zola uses does.
     On,
-    /// As written, with the characters no file name may hold on Windows,
-    /// and `#`, taken out, and spaces and full stops taken off the end.
+    /// As written, with the characters no file name may hold on Windows
+    /// taken out, and spaces and full stops taken off the end.
     Safe,
     /// As written.
     Off,
@@ -34,7 +34,7 @@ impl Strategy {
             Strategy::Safe => text
                 .trim_end_matches([' ', '.'])
                 .chars()
-                .filter(|c| !"<>:\"/\\|?*#".contains(*c))
+                .filter(|c| !"<>:\"/\\|?*".contains(*c))
                 .collect(),
             Strategy::Off => text.to_owned(),
         }
@@ -77,7 +77,7 @@ mod tests {
         assert_eq!(Strategy::On.made(name), "post-1-cafe-deja-vu");
         assert_eq!(Strategy::Safe.made(name), "Post 1 Café, Déjà Vu");
         assert_eq!(Strategy::Off.made(name), name);
-        assert_eq!(Strategy::Safe.made("a<b>#c. ."), "abc");
+        assert_eq!(Strategy::Safe.made("a<b>#c. ."), "ab#c");
     }
 
     #[test]
