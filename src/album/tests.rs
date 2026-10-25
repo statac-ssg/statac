@@ -274,3 +274,36 @@ fn a_kept_folder_swapped_for_a_link_is_neither_read_nor_written() {
     drop(staging);
     let _ = std::fs::remove_dir_all(&scratch);
 }
+
+#[test]
+fn a_kept_copy_given_a_second_name_once_found_kept_is_not_published() {
+    use crate::problem::Kind as Told;
+    use crate::problem::Reason;
+    let scratch = crate::testing::Scratch::new("album-named-twice");
+    let site = scratch.join("site");
+    let outside = scratch.write("outside.avif", "outside");
+    std::fs::create_dir_all(&site).unwrap();
+    let kept = Kept::new(&site, "pictures");
+    kept.make_ready(&site);
+    let staging = crate::publish::begin(&site, &scratch.join("out")).unwrap();
+    for name in ["copy-1.avif", "copy-2.avif"] {
+        kept.keep(name, b"copy", name, &staging).unwrap();
+    }
+    assert!(kept.has("copy-1.avif"));
+    let copy = site.join(KEPT).join("pictures").join("copy-1.avif");
+    std::fs::remove_file(&copy).unwrap();
+    std::fs::hard_link(&outside, &copy).unwrap();
+    let wanted = ["copy-1.avif", "copy-2.avif"].map(|name| (name.to_owned(), name.to_owned()));
+    let (published, problems) = kept.publish(wanted.into(), &staging);
+    assert_eq!(published, 1);
+    assert_eq!(
+        problems,
+        [Problem::nowhere(Told::CantRead {
+            path: std::path::Path::new(KEPT)
+                .join("pictures")
+                .join("copy-1.avif"),
+            reason: Reason::NamedTwice,
+        })]
+    );
+    drop(staging);
+}

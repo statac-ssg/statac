@@ -3336,8 +3336,9 @@ pub enum Reason {
     Taken,
     /// A file of the author's that no longer holds what was read.
     Changed,
-    /// A file of the author's with a second name, which writing it would
-    /// part it from.
+    /// A file with a second name somewhere: one of the author's, which
+    /// writing it would part it from, or one Statac keeps, which may be a
+    /// file outside the site.
     NamedTwice,
     /// A path that ends in no folder's name.
     NamesNoFolder,

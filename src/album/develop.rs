@@ -105,11 +105,17 @@ impl Kept {
         format!("{}/{name}", self.sub)
     }
 
-    /// What is kept as `name`, opened to read through no link.
+    /// What is kept as `name`, opened to read through no link, and asked
+    /// through that handle whether it has a second name somewhere, which
+    /// may be a file outside the site.
     fn open(&self, name: &str) -> std::io::Result<fs::File> {
         let gone = || std::io::Error::from(std::io::ErrorKind::NotFound);
         let kept = self.kept.as_ref().ok_or_else(gone)?;
-        platform::open_file(kept, &self.rel(name))
+        let file = platform::open_file(kept, &self.rel(name))?;
+        if !platform::named_once(&file) {
+            return Err(Reason::NamedTwice.into());
+        }
+        Ok(file)
     }
 
     /// Makes the folder ready to keep something new in.
