@@ -68,6 +68,10 @@ pub(super) struct Frame {
     pub calling: Option<Place>,
     /// The pictures told as shown with no description, each told once.
     pub undescribed: Vec<String>,
+    /// Each picture with no description whose alt text a snippet or piece
+    /// the writing calls read: the call, where the snippet or piece asked
+    /// for the picture, and the picture as a problem names it.
+    pub asked_at_calls: Vec<(Place, Place, String)>,
     /// How many search boxes what is built has asked for, those of its
     /// own page's writing counted once it shows that whole.
     pub search_boxes: usize,
@@ -166,6 +170,7 @@ impl Frame {
             pictures_at: HashMap::new(),
             calling: None,
             undescribed: Vec::new(),
+            asked_at_calls: Vec::new(),
             search_boxes: 0,
             boxes_before_writing: None,
             indexed: Vec::new(),
@@ -298,6 +303,18 @@ pub(super) fn develops(id: crate::site::PictureId, place: Option<Place>, full: b
         frame
             .developed
             .push(crate::album::Shown { id, place, full })
+    });
+}
+
+/// Notes that the snippet or piece the writing's call at `call` builds
+/// read the alt text of `picture`, which has none, asking for it at
+/// `asked`.
+pub(super) fn asked_at_call(call: Place, asked: Place, picture: String) {
+    with(|frame| {
+        let asked = (call, asked, picture);
+        if !frame.asked_at_calls.contains(&asked) {
+            frame.asked_at_calls.push(asked);
+        }
     });
 }
 

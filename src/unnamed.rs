@@ -77,9 +77,12 @@ pub(crate) fn told(
         // another round of a loop, it may hold another image.
         let across = at_place.filter(|place| renderer.template_of(place.source).is_none());
         // The picture whose address a template printed in the `<img>`, and
-        // whether it has no alt text.
-        let picture =
-            (image.as_ref()).and_then(|image| renderer.picture_in(own, image.tag.clone()));
+        // whether it has no alt text; else the one with none a snippet the
+        // writing calls asked for inside it.
+        let picture = (image.as_ref()).and_then(|image| {
+            (renderer.picture_in(own, image.tag.clone()))
+                .or_else(|| Some((asked_inside(renderer, page, html, image.tag.clone())?, true)))
+        });
         // A template's picture gives the link words only where the `<img>`
         // is written with its alt text.
         if let (Some(image), Some((picture, true))) = (&image, &picture)
@@ -158,11 +161,37 @@ pub(crate) fn of_an_image(problem: &Problem) -> bool {
 /// written at `image`, not yet named as all of a link or a button.
 fn shows(problem: &Problem, image: Place) -> bool {
     matches!(problem.kind, Kind::MissingAltText { all_of: None, .. })
-        && problem.place.is_some_and(|place| {
-            place.source == image.source
-                && image.span.start <= place.span.start
-                && place.span.end <= image.span.end
-        })
+        && problem.place.is_some_and(|place| within(place, image))
+}
+
+/// Whether `place` is within `tag`.
+fn within(place: Place, tag: Place) -> bool {
+    place.source == tag.source
+        && tag.span.start <= place.span.start
+        && place.span.end <= tag.span.end
+}
+
+/// The picture with no alt text, as a problem names it, that the snippet
+/// or piece a call in the writing builds asked for within the tag at
+/// `image` on `page`, which that snippet or piece writes whole: told at
+/// the call, it isn't told within the tag.
+fn asked_inside(
+    renderer: &Renderer,
+    page: &Page,
+    html: &str,
+    image: Range<usize>,
+) -> Option<String> {
+    let call = renderer.in_text(page.own, image.start)?;
+    let tag = tag_placed(renderer, page.own, html, image)?;
+    let pages = &renderer.site().pages;
+    page.reads.keys().iter().find_map(|key| match *key {
+        Key::Body(other) if pages.get(other).source == Some(call.source) => {
+            (renderer.asked_at_calls(other).iter())
+                .find(|(at, asked, _)| *at == call && within(*asked, tag))
+                .map(|(.., picture)| picture.clone())
+        }
+        _ => None,
+    })
 }
 
 /// Whether `problem` is the missing alt text of `picture`, as a problem

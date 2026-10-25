@@ -78,12 +78,15 @@ impl Asking {
     }
 
     /// Where the asking is written: the call in the writing, or else the
-    /// call in the template, as the engine places it or, where it doesn't,
-    /// where the template makes only one such.
+    /// call in the template.
     fn place(&self, shared: &Shared) -> Option<Place> {
-        if self.calling.is_some() {
-            return self.calling;
-        }
+        self.calling.or_else(|| self.in_template(shared))
+    }
+
+    /// Where the asking is written in the template: the call as the engine
+    /// places it or, where it doesn't, where the template makes only one
+    /// such.
+    fn in_template(&self, shared: &Shared) -> Option<Place> {
         let &at = shared.templates.by_name.get(&self.template)?;
         if let Some(found) = self.written_in(shared, at) {
             return Some(found);
@@ -811,6 +814,11 @@ impl Object for PhotoValue {
                     all_of: None,
                 };
                 let at = self.asking.place(shared);
+                if let Some(call) = self.asking.calling
+                    && let Some(asked) = self.asking.in_template(shared)
+                {
+                    frame::asked_at_call(call, asked, picture.shown());
+                }
                 undescribed(picture.shown(), |frame| {
                     let problem = match at {
                         Some(at) => Problem::at(kind, at),

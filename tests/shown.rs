@@ -680,6 +680,34 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
             &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
         ),
         (
+            "its alt text read by a snippet the writing calls",
+            "{{ page.content }}",
+            "@read(\"photo-1.jpg\")\n",
+            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+        ),
+        (
+            "its alt text read by a snippet the writing calls, and one decorative",
+            "{{ page.content }}",
+            "@read(\"photo-1.jpg\")\n\n@read(\"photo-3.jpg\")\n",
+            &[
+                "note  Missing alt text: `content/post-1/photo-1.jpg`",
+                ALT,
+                LINK,
+                INSIDE,
+            ],
+        ),
+        (
+            "its alt text read by a snippet the writing calls, outside the `<img>`",
+            "{{ page.content }}",
+            "@apart(\"photo-1.jpg\")\n",
+            &[
+                "note  Missing alt text: `content/post-1/photo-1.jpg`",
+                ALONE,
+                LINK,
+                INSIDE,
+            ],
+        ),
+        (
             "its alt text written elsewhere",
             "{% set p = page.image('photo-1.jpg') %}\
              <a href=\"/post-1/\"><img src=\"{{ p.src }}\"></a>{{ p.alt }}",
@@ -717,6 +745,16 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
             "{# takes photo #}\n\
              {% set picture = page.image(photo) %}\n\
              <a href=\"/post-1/\"><img src=\"{{ picture.src }}\" alt=\"{{ picture.alt }}\"></a>\n",
+        );
+        site.write(
+            "snippets/read.html",
+            "{# takes photo #}\n\
+             <a href=\"/post-1/\"><img src=\"/post-1/\" alt=\"{{ page.image(photo).alt }}\"></a>\n",
+        );
+        site.write(
+            "snippets/apart.html",
+            "{# takes photo #}\n\
+             <a href=\"/post-1/\"><img src=\"/post-1/\" alt=\"\"></a>{{ page.image(photo).alt }}\n",
         );
         site.write(
             "content/post-1/index.md",
