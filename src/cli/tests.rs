@@ -84,6 +84,28 @@ fn commands_are_read_with_their_options() {
 }
 
 #[test]
+fn only_an_unknown_command_is_told_not_what_follows_it() {
+    let biuld = Kind::UnknownCommand {
+        written: "biuld".into(),
+        hint: CommandHint::Similar("build".into()),
+    };
+    let cases: [(&[&str], Vec<Kind>); 3] = [
+        (&["biuld", "site"], vec![biuld.clone()]),
+        (&["biuld", "site", "extra", "--out=out"], vec![biuld]),
+        (
+            &["build", "site", "extra"],
+            vec![Kind::UnexpectedArgument {
+                written: "extra".into(),
+                suggestion: None,
+            }],
+        ),
+    ];
+    for (args, told) in cases {
+        assert_eq!(parsed(args), Err(told), "{args:?}");
+    }
+}
+
+#[test]
 fn an_unknown_command_is_offered_the_nearest() {
     assert_eq!(
         refused(&["biuld"]),

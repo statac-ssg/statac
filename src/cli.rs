@@ -761,12 +761,13 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                     Some(kind) => mistake(kind),
                     None => site = Some(PathBuf::from(arg)),
                 }
-            } else {
+            } else if known.is_some() {
                 mistake(Kind::UnexpectedArgument {
                     written: arg.into(),
                     suggestion: None,
                 });
             }
+            // After an unknown command, what follows can't be judged.
             continue;
         }
 
