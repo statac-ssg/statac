@@ -2486,21 +2486,81 @@ impl Reader<'_> {
             Some((url, _)) => Some(url.clone()),
             None => self.given.map(|given| super::under(given, &base)),
         };
-        notes.push(match &feed_url {
-            Some(_) => "Eleventy's settings hold no title or language for the site, so the new \
-                        site's `title` is made from the old folder's name, and it is in English, \
-                        `en`: put each right in `statac.yaml`."
-                .to_owned(),
-            None => format!(
-                "Eleventy's settings hold no title, URL or language for the site, so the new \
-                 site's `title` is made from the old folder's name, {}, and it is in English, \
-                 `en`: put each right in `statac.yaml`.",
-                match self.given {
-                    Some(_) => "its `url` is the URL you gave",
-                    None => "it has no `url` yet",
-                }
-            ),
-        });
+        let title = self.feed_gives(|feed| &feed.title);
+        let language = self.feed_gives(|feed| &feed.language);
+        self.import.title = title.as_ref().map(|(title, _)| title.clone());
+        if let Some((written, _)) = &language
+            && crate::new::a_language_code(written)
+        {
+            self.import.languages = vec![written.clone()];
+        }
+        let mut missing = Vec::new();
+        let mut so = Vec::new();
+        if title.is_none() {
+            missing.push("title");
+            so.push("the new site's `title` is made from the old folder's name");
+        }
+        if feed_url.is_none() {
+            missing.push("URL");
+            so.push(match (self.given, so.is_empty()) {
+                (Some(_), true) => "the new site's `url` is the URL you gave",
+                (Some(_), false) => "its `url` is the URL you gave",
+                (None, true) => "the new site has no `url` yet",
+                (None, false) => "it has no `url` yet",
+            });
+        }
+        if language.is_none() {
+            missing.push("language");
+            so.push(match so.is_empty() {
+                true => "the new site is in English, `en`",
+                false => "it is in English, `en`",
+            });
+        }
+        if let ([rest @ .., last], [first_so @ .., last_so]) = (missing.as_slice(), so.as_slice()) {
+            let (missing_shown, so) = match rest {
+                [] => ((*last).to_owned(), (*last_so).to_owned()),
+                _ => (
+                    format!("{} or {last}", rest.join(", ")),
+                    format!("{}, and {last_so}", first_so.join(", ")),
+                ),
+            };
+            let then = match (missing.as_slice(), self.given) {
+                (["URL"], Some(_)) => "",
+                (["URL"], None) => ": add it to `statac.yaml` once it is known",
+                ([_], _) => ": put it right in `statac.yaml`",
+                _ => ": put each right in `statac.yaml`",
+            };
+            notes.push(format!(
+                "Eleventy's settings hold no {missing_shown} for the site, so {so}{then}."
+            ));
+        }
+        if let Some((written, feed)) = &title {
+            notes.push(format!(
+                "The new site's `title`, {}, is taken from `metadata.title` in the settings' {}, \
+                 on line {}.",
+                code(written),
+                code(feed.by),
+                feed.line
+            ));
+        }
+        match &language {
+            Some((written, feed)) if crate::new::a_language_code(written) => notes.push(format!(
+                "The new site's `language`, {}, is taken from `metadata.language` in the \
+                 settings' {}, on line {}.",
+                code(written),
+                code(feed.by),
+                feed.line
+            )),
+            Some((written, feed)) => notes.push(format!(
+                "The settings' {}, on line {}, gives `metadata.language` as {}, which isn't a \
+                 code Statac reads, so the site is in English, `en`: write its code in \
+                 `language` in `statac.yaml`.",
+                code(feed.by),
+                feed.line,
+                code(written)
+            )),
+            None => {}
+        }
         if let Some((url, feed)) = &feed_url {
             notes.push(format!(
                 "The new site's `url`, {}, is made from `metadata.base` in the settings' {}, on \
@@ -2797,6 +2857,18 @@ impl Reader<'_> {
             }
             let origin = url.origin().ascii_serialization();
             Some((format!("{origin}{base}"), feed.clone()))
+        })
+    }
+
+    /// The first value `read` finds in the RSS plugin's feeds' `metadata`,
+    /// trimmed, that isn't empty; and the feed that gives it.
+    fn feed_gives(
+        &self,
+        read: impl Fn(&settings::PluginFeed) -> &Option<String>,
+    ) -> Option<(String, settings::PluginFeed)> {
+        self.s.feeds.iter().find_map(|feed| {
+            let written = read(feed).as_deref()?.trim();
+            (!written.is_empty()).then(|| (written.to_owned(), feed.clone()))
         })
     }
 

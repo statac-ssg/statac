@@ -1068,10 +1068,7 @@ fn an_eleventy_sites_url_is_the_one_its_rss_plugins_feed_made_posts_urls_from() 
         assert_eq!(urls, Vec::from_iter(url), "{label}: {written}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         let Some(url) = url else {
-            assert!(
-                report.contains("Eleventy's settings hold no title, URL or language"),
-                "{label}: {report}"
-            );
+            assert!(report.contains("has no `url` yet"), "{label}: {report}");
             continue;
         };
         let said = format!(
@@ -1104,6 +1101,98 @@ fn an_eleventy_sites_url_is_the_one_its_rss_plugins_feed_made_posts_urls_from() 
         let built = fs::read_to_string(out.join("feed.xml")).unwrap();
         let id = format!("<id>{url}/posts/post-1/</id>");
         assert!(built.contains(&id), "{label}: {built}");
+    }
+}
+
+/// An Eleventy site, times the `metadata` its RSS plugin's feed was
+/// given: the new site's title and language are the feed's where it gives
+/// them, and the report says where each came from and what it assumed for
+/// the rest.
+#[test]
+fn an_eleventy_sites_title_and_language_are_the_ones_its_rss_plugins_feed_was_given() {
+    // (the case, the plugin's `metadata`, the title and language written,
+    // what is said)
+    let cases: [(&str, &str, [&str; 2], &[&str]); 5] = [
+        (
+            "both",
+            "{ title: \"Site 1\", language: \"fr\", base: \"https://example.org/\" }",
+            ["title: Site 1", "language: fr"],
+            &[
+                "The new site's `title`, `Site 1`, is taken from `metadata.title` in the \
+                 settings' `feedPlugin`, on line 4.",
+                "The new site's `language`, `fr`, is taken from `metadata.language` in the \
+                 settings' `feedPlugin`, on line 4.",
+            ],
+        ),
+        (
+            "title",
+            "{ title: \"Site 1\" }",
+            ["title: Site 1", "language: en"],
+            &[
+                "Eleventy's settings hold no URL or language for the site, so the new site has \
+               no `url` yet, and it is in English, `en`: put each right in `statac.yaml`.",
+            ],
+        ),
+        (
+            "language",
+            "{ language: \"fr\", base: \"https://example.org/\" }",
+            ["title: Old", "language: fr"],
+            &[
+                "Eleventy's settings hold no title for the site, so the new site's `title` is \
+               made from the old folder's name: put it right in `statac.yaml`.",
+            ],
+        ),
+        (
+            "not-a-code",
+            "{ title: \"Site 1\", language: \"not a code\", base: \"https://example.org/\" }",
+            ["title: Site 1", "language: en"],
+            &[
+                "The settings' `feedPlugin`, on line 4, gives `metadata.language` as \
+               `not a code`, which isn't a code Statac reads, so the site is in English, \
+               `en`: write its code in `language` in `statac.yaml`.",
+            ],
+        ),
+        (
+            "neither",
+            "{ title: \"\", base: \"https://example.org/\" }",
+            ["title: Old", "language: en"],
+            &[
+                "Eleventy's settings hold no title or language for the site, so the new site's \
+               `title` is made from the old folder's name, and it is in English, `en`: put \
+               each right in `statac.yaml`.",
+            ],
+        ),
+    ];
+    for (label, metadata, lines, said) in cases {
+        let top = scratch(&format!("eleventy-feed-title-{label}"));
+        let old = top.join("old");
+        fs::create_dir_all(old.join("posts")).unwrap();
+        let package = "{ \"devDependencies\": { \"@11ty/eleventy\": \"^3.0.0\", \
+                       \"@11ty/eleventy-plugin-rss\": \"^3.1.0\" } }\n";
+        fs::write(old.join("package.json"), package).unwrap();
+        let settings = format!(
+            "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\n\
+             export default function (eleventyConfig) {{\n  \
+             eleventyConfig.addPlugin(feedPlugin, {{ metadata: {metadata} }});\n}}\n"
+        );
+        fs::write(old.join("eleventy.config.js"), settings).unwrap();
+        let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+        fs::write(old.join("posts/post-1.md"), post).unwrap();
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        let read: Vec<&str> = (written.lines())
+            .filter(|line| line.starts_with("title: ") || line.starts_with("language: "))
+            .collect();
+        assert_eq!(read, lines, "{label}: {written}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        for said in said {
+            assert!(report.contains(said), "{label}: {said}\n{report}");
+        }
+        let holds_no = report.matches("Eleventy's settings hold no").count();
+        let holds = !matches!(label, "both" | "not-a-code");
+        assert_eq!(holds_no, usize::from(holds), "{label}: {report}");
     }
 }
 

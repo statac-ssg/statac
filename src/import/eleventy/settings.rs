@@ -237,6 +237,10 @@ pub(super) struct PluginFeed {
     /// `metadata.base`, the URL each post's URL is written from, where the
     /// call gives it as text in quotes.
     pub base: Option<String>,
+    /// `metadata.title` and `metadata.language`, the feed's own, each where
+    /// the call gives it as text in quotes.
+    pub title: Option<String>,
+    pub language: Option<String>,
     /// The plugin's function that made it: `feedPlugin` or
     /// `getFeedTemplate`.
     pub by: &'static str,
@@ -937,19 +941,22 @@ fn feed_of(
     written: String,
     by: &'static str,
 ) -> PluginFeed {
-    let (path, kind, base) = match pieces.get(at).map(|p| &p.token) {
+    let (path, kind, metadata) = match pieces.get(at).map(|p| &p.token) {
         Some(Token::Mark('{')) => (
             option(pieces, at + 1, "outputPath"),
             option(pieces, at + 1, "type"),
-            object(pieces, at + 1, "metadata").and_then(|inner| option(pieces, inner, "base")),
+            object(pieces, at + 1, "metadata"),
         ),
         Some(Token::Mark(')')) => (None, None, None),
         _ => (Some(None), Some(None), None),
     };
+    let metadata = |name: &str| metadata.and_then(|inner| option(pieces, inner, name)?);
     PluginFeed {
         path: path.unwrap_or_else(|| Some("/feed.xml".to_owned())),
         kind: kind.unwrap_or_else(|| Some("atom".to_owned())),
-        base: base.flatten(),
+        base: metadata("base"),
+        title: metadata("title"),
+        language: metadata("language"),
         by,
         line,
         written,
@@ -1337,23 +1344,33 @@ mod tests {
     }
 
     #[test]
-    fn the_url_the_rss_plugins_feed_gives_posts_is_read_where_written_out() {
-        // (the plugin's options, the `base` read)
+    fn the_url_title_and_language_the_rss_plugins_feed_is_given_are_read_where_written_out() {
+        // (the plugin's options, the `base`, `title` and `language` read)
         let cases = [
             (
                 "{ metadata: { title: \"t\", base: \"https://example.org/\" } }",
-                Some("https://example.org/"),
+                (Some("https://example.org/"), Some("t"), None),
             ),
             (
                 "{ metadata: { base }, outputPath: \"/a.xml\" }",
-                Some("https://example.org/a/"),
+                (Some("https://example.org/a/"), None, None),
             ),
-            ("{ metadata: { base: process.env.URL } }", None),
-            ("{ metadata, outputPath: \"/a.xml\" }", None),
-            ("{ base: \"https://example.org/\" }", None),
-            ("{}", None),
+            (
+                "{ metadata: { language: \"fr\", title: base } }",
+                (None, Some("https://example.org/a/"), Some("fr")),
+            ),
+            (
+                "{ metadata: { base: process.env.URL, language: lang } }",
+                (None, None, None),
+            ),
+            ("{ metadata, outputPath: \"/a.xml\" }", (None, None, None)),
+            (
+                "{ base: \"https://example.org/\", title: \"t\", language: \"fr\" }",
+                (None, None, None),
+            ),
+            ("{}", (None, None, None)),
         ];
-        for (options, base) in cases {
+        for (options, given) in cases {
             let text = format!(
                 "const base = \"https://example.org/a/\";\n\
                  export default function (eleventyConfig) {{\n  \
@@ -1361,8 +1378,10 @@ mod tests {
                  }};\n"
             );
             let s = scan(&text);
-            let read: Vec<Option<&str>> = s.feeds.iter().map(|f| f.base.as_deref()).collect();
-            assert_eq!(read, [base], "{options}");
+            let read: Vec<_> = (s.feeds.iter())
+                .map(|f| (f.base.as_deref(), f.title.as_deref(), f.language.as_deref()))
+                .collect();
+            assert_eq!(read, [given], "{options}");
         }
     }
 
