@@ -2049,36 +2049,49 @@ impl Reader<'_> {
                     continue;
                 }
                 for term in terms {
-                    // A pattern's `:slug` is the term's title, not its
-                    // place in the content folder.
-                    let hugos = match &pattern {
-                        Some(_) => self.making.made(term),
-                        None => self.making.named(term),
+                    // The URL Hugo published, and the slug that has
+                    // Statac publish the term there too.
+                    let (path, hugos) = match (&pattern, &statacs) {
+                        // A pattern's `:slug` is the term's title, not its
+                        // place in the content folder.
+                        (Some(pattern), Some(statacs)) => {
+                            let path = url::term(pattern, term, &self.making);
+                            let hugos = (statacs.strip_suffix("{slug}/"))
+                                .filter(|before| kept && !before.contains("{slug}"))
+                                .and_then(|before| {
+                                    let bare = path.trim_end_matches('/');
+                                    bare.strip_prefix(&self.making.path(before))
+                                })
+                                .map(str::to_owned);
+                            (path, hugos)
+                        }
+                        _ => {
+                            let hugos = self.making.named(term);
+                            let path = self.making.path(&format!("/{plural}/{hugos}/"));
+                            (path, Some(hugos))
+                        }
                     };
-                    let path = match &pattern {
-                        Some(pattern) => pattern.replace(":slug", &hugos).replace(":title", &hugos),
-                        None => format!("/{plural}/{hugos}/"),
-                    };
-                    let path = url::finished(&self.making.path(&path), ugly);
+                    let path = url::finished(&path, ugly);
                     let address = format!("{prefix}{path}");
                     match counts.iter_mut().find(|(at, _)| *at == address) {
                         Some((_, pages)) => *pages += 1,
                         None => counts.push((address.clone(), 1)),
                     }
+                    let told =
+                        hugos.filter(|hugos| crate::content::address::name_fault(hugos).is_none());
                     // A page that isn't where Statac's stands sends readers
                     // on.
                     let page = (plural.to_owned(), term.clone(), address.clone());
-                    if (ugly || !kept) && !self.import.term_pages.contains(&page) {
+                    if (ugly || told.is_none()) && !self.import.term_pages.contains(&page) {
                         self.import.term_pages.push(page);
                     }
                     if !addresses.contains(&address) {
                         addresses.push(address);
                     }
-                    if hugos != slug::slugify(term)
-                        && crate::content::address::name_fault(&hugos).is_none()
+                    if let Some(told) = told.filter(|told| *told != slug::slugify(term))
                         && !slugs.iter().any(|(t, _)| t == term)
                     {
-                        slugs.push((term.clone(), Value::Text(hugos)));
+                        slugs.push((term.clone(), Value::Text(told)));
                     }
                 }
                 let list = format!("{prefix}/{plural}/");
@@ -2576,5 +2589,38 @@ mod tests {
                 import.addresses
             );
         }
+    }
+
+    /// Each tag is looked for where Hugo 0.166 published it by a
+    /// `[permalinks]` pattern, and Statac is told the slug that keeps it
+    /// there; one Statac can't be told is sent on from there.
+    #[test]
+    fn a_tag_is_looked_for_where_hugo_published_it_by_a_pattern() {
+        let top = crate::testing::Scratch::new("hugo-term-pattern");
+        let toml = "baseURL = 'https://example.org/'\ntitle = 'Tags'\n\
+                    [permalinks.term]\ntags = '/tt/:slug/'\n";
+        std::fs::create_dir_all(top.join("content/posts")).unwrap();
+        std::fs::write(top.join("hugo.toml"), toml).unwrap();
+        let page = "---\ntitle: Post\ndate: 2026-01-01\ntags: ['C++ & C#', '+y', 'a+b#c']\n---\n";
+        std::fs::write(top.join("content/posts/post.md"), page).unwrap();
+        let Ok(import) = read(&top, Date::day_only(2026, 10, 6), None) else {
+            panic!("the site wasn't read");
+        };
+        for address in ["/tt/c-c/", "/tt/-y/", "/tt/a-b#c/"] {
+            assert!(
+                import.addresses.iter().any(|a| a == address),
+                "{address}: {:?}",
+                import.addresses
+            );
+        }
+        let slugs = (import.settings.iter()).find(|(name, _)| name == "tags.slugs");
+        let Some((_, Value::Fields(slugs))) = slugs else {
+            panic!("no slugs: {:?}", import.settings);
+        };
+        assert_eq!(slugs, &[("+y".to_owned(), Value::Text("-y".to_owned()))]);
+        let sent_on: Vec<&str> = (import.term_pages.iter())
+            .map(|(_, _, address)| address.as_str())
+            .collect();
+        assert_eq!(sent_on, ["/tt/a-b#c/"]);
     }
 }

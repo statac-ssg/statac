@@ -28,7 +28,6 @@ timezone: UTC
 feed_ids_before: 2026-10-06
 feed_ids_from: hugo
 tags.slugs:
-  C++: c++
   Café: café
 tags.pages: true
 tags.permalink: /topics/{slug}/
@@ -69,7 +68,7 @@ Statac worked these URLs out by the old tool's rules, but the old site's built o
 - `content/posts/post-3.md`: `/posts/post-3/`
 - /posts/index.xml
 - /index.xml
-- /topics/c++/
+- /topics/c/
 - /topics/café/
 - /topics/tag-1/
 - /series/series-1/

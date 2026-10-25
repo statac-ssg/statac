@@ -180,9 +180,32 @@ const DAYS: [&str; 7] = [
     "Saturday",
 ];
 
-/// `pattern` filled in from `pieces`, read as Go's `QueryUnescape` reads
-/// it, then made ready as a whole. The placeholder Statac doesn't know
-/// where it holds one.
+/// Where Hugo publishes the page of the term `term` by the `[permalinks]`
+/// pattern `pattern`: its `:slug` and `:title` are the term's name, put in
+/// as a page's are.
+pub(super) fn term(pattern: &str, term: &str, making: &Making) -> String {
+    let urlized = making.urlized(term);
+    let filled = pattern
+        .replace(":slug", &urlized)
+        .replace(":title", &urlized);
+    cleaned(&filled, making)
+}
+
+/// A filled-in pattern read as Go's `QueryUnescape` reads it, then made
+/// ready as a whole. Hugo makes it ready without the slash at its end, so
+/// a space left before that is dropped rather than made a hyphen.
+fn cleaned(filled: &str, making: &Making) -> String {
+    let read = unescaped(filled);
+    let bare = read.trim_end_matches('/');
+    let made = making.path(bare);
+    match bare.len() < read.len() {
+        true => format!("{}/", made.trim_end_matches('/')),
+        false => made,
+    }
+}
+
+/// `pattern` filled in from `pieces`, as [`cleaned`] gives it. The
+/// placeholder Statac doesn't know where it holds one.
 pub(super) fn expand(pattern: &str, pieces: &Pieces, making: &Making) -> Result<String, String> {
     let mut out = String::with_capacity(pattern.len());
     let mut rest = pattern;
@@ -215,7 +238,7 @@ pub(super) fn expand(pattern: &str, pieces: &Pieces, making: &Making) -> Result<
         rest = &after[length..];
     }
     out.push_str(rest);
-    Ok(making.path(&unescaped(&out)))
+    Ok(cleaned(&out, making))
 }
 
 /// One placeholder's value.
@@ -368,6 +391,10 @@ mod tests {
             ("a%20b", "/a-b/", "/a-b/"),
             ("UPPER Case", "/upper-case/", "/UPPER-Case/"),
             ("İstanbul", "/istanbul/", "/İstanbul/"),
+            ("x+", "/x/", "/x/"),
+            ("+y", "/-y/", "/-y/"),
+            ("z%20", "/z/", "/z/"),
+            ("w %20", "/w-/", "/w-/"),
         ] {
             let pieces = Pieces {
                 date: None,
@@ -381,6 +408,28 @@ mod tests {
                 assert_eq!(got.as_deref(), Ok(made), "{pattern} {name:?}");
                 let got = expand(pattern, &pieces, &AS_IT_IS);
                 assert_eq!(got.as_deref(), Ok(as_it_is), "{pattern} {name:?}");
+            }
+        }
+    }
+
+    /// Each as Hugo 0.166 published the tag `<name>` with `/tt/:slug/` as
+    /// the pattern for tags.
+    #[test]
+    fn a_term_in_a_pattern_is_made_ready_as_a_pages_name_is() {
+        for (name, made) in [
+            ("p04- - q", "/tt/p04--q/"),
+            ("a & b", "/tt/a-b/"),
+            ("C++ & C#", "/tt/c-c/"),
+            ("C++ & C# 2", "/tt/c-c#-2/"),
+            ("a~b@c+d#e", "/tt/a~b@c-d#e/"),
+            ("a%20b", "/tt/a-b/"),
+            ("100%", "/tt/100/"),
+            ("a/b", "/tt/a/b/"),
+            ("x+", "/tt/x/"),
+            ("+y", "/tt/-y/"),
+        ] {
+            for pattern in ["/tt/:slug/", "/tt/:title/"] {
+                assert_eq!(term(pattern, name, &HUGO), made, "{pattern} {name:?}");
             }
         }
     }
