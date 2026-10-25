@@ -1,0 +1,227 @@
+name: Release packages
+run-name: ${{ inputs.reason }}
+
+# By hand only. Every package is built, tested and packaged from one
+# commit and staged in a private storage zone under v<version>/<commit>/.
+# Nothing is published, tagged or released here: that is a person's step.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this run, as "Release 0.9.0"
+        required: true
+        type: string
+      version:
+        description: The version in Cargo.toml, as 0.9.0
+        required: true
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  VERSION: ${{ inputs.version }}
+  STAGE: https://storage.bunnycdn.com/statac-staging/v${{ inputs.version }}/${{ github.sha }}
+
+jobs:
+  macos:
+    name: ${{ matrix.target }}
+    runs-on: macos-arm64
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # The Intel tests run under Rosetta.
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: |
+          set -euo pipefail
+          sh tools/release-version.sh "$VERSION"
+          rust=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)
+          target=${{ matrix.target }}
+          rustup toolchain install "$rust" --profile minimal --target $target
+          cargo "+$rust" build --release --locked --target $target
+          # --release reuses the C libraries the build above compiled.
+          cargo "+$rust" test --release --locked --no-fail-fast --target $target
+          # What the binary asks of the system it runs on.
+          otool -L "target/$target/release/statac"
+          vtool -show-build "target/$target/release/statac"
+          sh tools/package.sh "$VERSION" $target packages
+      # The key only once the build, whose dependencies run code of their
+      # own, is done.
+      - env:
+          STAGING_KEY: ${{ secrets.STATAC_STAGING_KEY }}
+        run: sh tools/stage.sh packages/*
+
+  # Linux on Arm runs natively in Apple's `container` on the Mac. The
+  # source is copied into each container's own disk first: built in a
+  # folder shared from macOS, the tests fail to compile.
+  linux-arm64:
+    name: aarch64-unknown-linux-${{ matrix.libc }}
+    runs-on: macos-arm64
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        libc: [gnu, musl]
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: |
+          set -euo pipefail
+          export PATH="/usr/local/bin:$PATH"
+          sh tools/release-version.sh "$VERSION"
+          container system status > /dev/null 2>&1 || container system start
+          rust=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)
+          uid=$(id -u)
+          rm -rf packages
+          if [ "${{ matrix.libc }}" = musl ]; then
+            # Alpine 3.24.2, whose compiler links musl.
+            container run --rm --memory 8G --cpus 6 --volume "$PWD:/statac" \
+              alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
+              sh -euc "cp -a /statac /build && chown -R $uid /build && cd /build &&
+                sh tools/build-static.sh '$VERSION' '$rust' aarch64-unknown-linux-musl $uid packages &&
+                cp -a packages /statac/"
+          else
+            # Ubuntu 22.04, for the oldest glibc a release supports.
+            container run --rm --memory 8G --cpus 6 --volume "$PWD:/statac" \
+              ubuntu@sha256:88881eb36da489f9ff8746ece8048ca16cc94f80e8cd3ae7e8335d8822631591 \
+              bash -euo pipefail -c "
+                apt-get update -qq
+                DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+                  ca-certificates curl build-essential cmake perl binutils > /dev/null
+                useradd -m -u $uid packager
+                cp -a /statac /build && chown -R $uid /build
+                runuser -u packager -- env HOME=/home/packager bash -euo pipefail -c '
+                  cd /build
+                  curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs |
+                    sh -s -- -y -q --profile minimal --default-toolchain $rust
+                  . \$HOME/.cargo/env
+                  target=aarch64-unknown-linux-gnu
+                  cargo build --release --locked --target \$target
+                  cargo test --release --locked --no-fail-fast --target \$target
+                  ldd target/\$target/release/statac
+                  echo \"The newest glibc symbol it needs:\"
+                  objdump -T target/\$target/release/statac | grep -o \"GLIBC_[0-9.]*\" | sort -uV | tail -n 1
+                  sh tools/package.sh $VERSION \$target packages'
+                cp -a /build/packages /statac/"
+          fi
+      - env:
+          STAGING_KEY: ${{ secrets.STATAC_STAGING_KEY }}
+        run: sh tools/stage.sh packages/*
+
+  linux-x86_64:
+    name: x86_64-unknown-linux-${{ matrix.libc }}
+    # Steps run as root in Ubuntu 22.04, with the runner's Podman socket at
+    # /var/run/docker.sock.
+    runs-on: linux-x86_64
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        libc: [gnu, musl]
+    steps:
+      # The image has no Node.js for a JavaScript action, so git fetches
+      # the source.
+      - env:
+          FETCH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tools="git ca-certificates curl binutils"
+          if [ "${{ matrix.libc }}" = musl ]; then tools="$tools docker.io"
+          else tools="$tools build-essential cmake nasm perl"; fi
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends $tools > /dev/null
+          git init -q .
+          auth=$(printf 'x:%s' "$FETCH_TOKEN" | base64 -w0)
+          git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+          sh tools/release-version.sh "$VERSION"
+          # Root may read anything, and the tests of a file Statac may not
+          # read need a user who may not.
+          useradd -m -u 1000 packager
+          chown -R 1000:1000 "$PWD"
+      - run: |
+          set -euo pipefail
+          rust=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)
+          if [ "${{ matrix.libc }}" = musl ]; then
+            # Alpine 3.24.2, whose compiler links musl. --volumes-from
+            # gives it this job's files, which a --volume of $PWD would not.
+            docker run --rm --volumes-from "$(hostname)" --workdir "$PWD" \
+              alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
+              sh tools/build-static.sh "$VERSION" "$rust" x86_64-unknown-linux-musl 1000 packages
+            # Outside Alpine, on a system with no musl of its own.
+            said=$(target/x86_64-unknown-linux-musl/release/statac --version)
+            echo "$said"; test "$said" = "Statac $VERSION"
+          else
+            runuser -u packager -- env HOME=/home/packager bash -euo pipefail -c "
+              curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs |
+                sh -s -- -y -q --profile minimal --default-toolchain $rust
+              . \$HOME/.cargo/env
+              target=x86_64-unknown-linux-gnu
+              cargo build --release --locked --target \$target
+              cargo test --release --locked --no-fail-fast --target \$target
+              ldd target/\$target/release/statac
+              echo 'The newest glibc symbol it needs:'
+              objdump -T target/\$target/release/statac | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -n 1
+              sh tools/package.sh $VERSION \$target packages"
+          fi
+      - env:
+          STAGING_KEY: ${{ secrets.STATAC_STAGING_KEY }}
+        run: sh tools/stage.sh packages/*
+
+  # The Mac's runner drives a Windows machine over SSH, which the runner's
+  # account knows as `statac-windows`, and stages what it packaged. The
+  # machine runs no runner of its own and never holds the staging key.
+  windows:
+    name: x86_64-pc-windows-msvc
+    runs-on: macos-arm64
+    timeout-minutes: 60
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: |
+          set -euo pipefail
+          sh tools/release-version.sh "$VERSION"
+          ssh statac-windows exit || {
+            echo "::error::The Windows machine can't be reached. Is it switched on?"
+            exit 1
+          }
+          rust=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)
+          git archive --format=tar HEAD > ../source.tar
+          cat > ../release.ps1 <<'SCRIPT'
+          param([string]$rust, [string]$version)
+          $env:Path = "$env:USERPROFILE\.cargo\bin;C:\Program Files\Git\cmd;C:\Program Files\Git\usr\bin;C:\Program Files\CMake\bin;C:\Program Files\NASM;" + $env:Path
+          # The C runtime is linked in, so the binary asks for no
+          # redistributable to be installed first.
+          $env:RUSTFLAGS = '-C target-feature=+crt-static'
+          # A release builds afresh, in a folder no other run uses.
+          $release = "$env:USERPROFILE\release"
+          if (Test-Path $release) { Remove-Item -Recurse -Force $release }
+          $source = "$release\source"
+          $env:CARGO_TARGET_DIR = "$release\target"
+          New-Item -ItemType Directory -Force $source | Out-Null
+          # Windows' own tar: Git's, first on the path, reads C: as a host.
+          & "$env:SystemRoot\System32\tar.exe" -xf "$env:USERPROFILE\source.tar" -C $source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item "$env:USERPROFILE\source.tar"
+          Set-Location $source
+          $target = 'x86_64-pc-windows-msvc'
+          cmd /c "rustup toolchain install $rust --profile minimal 2>&1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmd /c "cargo +$rust build --release --locked --target $target 2>&1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          (Get-Item "$env:CARGO_TARGET_DIR\$target\release\statac.exe").Length
+          cmd /c "cargo +$rust test --release --locked --no-fail-fast --target $target 2>&1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmd /c "sh tools/package.sh $version $target packages 2>&1"
+          exit $LASTEXITCODE
+          SCRIPT
+          scp -q ../source.tar ../release.ps1 statac-windows:
+          ssh statac-windows powershell -NoProfile -ExecutionPolicy Bypass -File release.ps1 "$rust" "$VERSION"
+          rm -rf packages && mkdir packages
+          scp -q 'statac-windows:release/source/packages/*' packages/
+      - env:
+          STAGING_KEY: ${{ secrets.STATAC_STAGING_KEY }}
+        run: sh tools/stage.sh packages/*
