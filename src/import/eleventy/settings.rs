@@ -223,6 +223,21 @@ pub(super) struct Copy {
     pub written: String,
 }
 
+/// A feed the RSS plugin's virtual template makes, as an
+/// `addPlugin(feedPlugin, {...})` call gives it.
+#[derive(Clone, PartialEq, Debug)]
+pub(super) struct PluginFeed {
+    /// `outputPath`, `/feed.xml` where the call gives none; none where it
+    /// gives one some other way than text in quotes.
+    pub path: Option<String>,
+    /// `type`, `atom` where the call gives none; none where it gives one
+    /// some other way than text in quotes.
+    pub kind: Option<String>,
+    pub line: usize,
+    /// The call as the settings Statac didn't read show it.
+    pub written: String,
+}
+
 /// What the settings' text shows.
 #[derive(Default, Debug)]
 pub(super) struct Settings {
@@ -255,6 +270,8 @@ pub(super) struct Settings {
     pub no_gitignore: Option<usize>,
     /// `pathPrefix`, as written.
     pub path_prefix: Option<Given<String>>,
+    /// The feeds `feedPlugin` makes, in order.
+    pub feeds: Vec<PluginFeed>,
     /// What the settings do that Statac didn't read, by the names it
     /// shows, each with its line.
     pub unread: Vec<(usize, String)>,
@@ -445,6 +462,7 @@ fn scan(text: &str) -> Settings {
             _ => String::new(),
         }
     };
+    let plugin_names = feed_plugin_names(&pieces);
     let mut at = 0;
     while at < pieces.len() {
         let line = pieces[at].line;
@@ -595,6 +613,14 @@ fn scan(text: &str) -> Settings {
                                 .push((line, format!("use({})", shown_first(first))));
                         }
                     }
+                    "addPlugin" if names_feed_plugin(&pieces, first, &plugin_names) => {
+                        let written = format!("addPlugin({})", shown_first(first));
+                        let feed = plugin_feed(&pieces, first, line, written);
+                        if feed.path.is_none() {
+                            s.unread.push((line, feed.written.clone()));
+                        }
+                        s.feeds.push(feed);
+                    }
                     name if READ_CALLS.contains(&name) => {}
                     name if name.starts_with("add")
                         || name.starts_with("set")
@@ -728,6 +754,123 @@ fn constant(pieces: &[Piece], name: &str) -> Option<String> {
         Some(p) if p.line == line && p.token != Token::Mark(';') => None,
         _ => Some(text.clone()),
     }
+}
+
+/// The names the settings give the RSS plugin's `feedPlugin`: its own, and
+/// any it is fetched as, as `import { feedPlugin as feed }` or
+/// `const { feedPlugin: feed } = require(...)`.
+fn feed_plugin_names(pieces: &[Piece]) -> Vec<String> {
+    let mut names = vec!["feedPlugin".to_owned()];
+    for three in pieces.windows(3) {
+        match (&three[0].token, &three[1].token, &three[2].token) {
+            (Token::Word(name), Token::Word(word), Token::Word(alias))
+                if name == "feedPlugin" && word == "as" =>
+            {
+                names.push(alias.clone());
+            }
+            (Token::Word(name), Token::Mark(':'), Token::Word(alias)) if name == "feedPlugin" => {
+                names.push(alias.clone());
+            }
+            _ => {}
+        }
+    }
+    names
+}
+
+/// Where the value of a call that starts at `at` ends: at the `,` or `)`
+/// after it.
+fn value_end(pieces: &[Piece], mut at: usize) -> usize {
+    let mut depth = 0;
+    while let Some(piece) = pieces.get(at) {
+        match piece.token {
+            Token::Mark(',' | ')') if depth == 0 => break,
+            Token::Mark('(' | '{' | '[') => depth += 1,
+            Token::Mark(')' | '}' | ']') => depth -= 1,
+            _ => {}
+        }
+        at += 1;
+    }
+    at
+}
+
+/// Whether the `addPlugin` call whose first value is at `at` adds
+/// `feedPlugin`, by one of `names` or as `pluginRss.feedPlugin`.
+fn names_feed_plugin(pieces: &[Piece], at: usize, names: &[String]) -> bool {
+    let end = value_end(pieces, at);
+    match pieces.get(at..end).unwrap_or_default() {
+        [one] => matches!(&one.token, Token::Word(word) if names.contains(word)),
+        [.., dot, last] => {
+            dot.token == Token::Mark('.')
+                && matches!(&last.token, Token::Word(word) if word == "feedPlugin")
+        }
+        [] => false,
+    }
+}
+
+/// The feed an `addPlugin(feedPlugin, ...)` call makes, its first value at
+/// `at`.
+fn plugin_feed(pieces: &[Piece], at: usize, line: usize, written: String) -> PluginFeed {
+    let end = value_end(pieces, at);
+    let token = |i: usize| pieces.get(i).map(|p| &p.token);
+    let (path, kind) = match (token(end), token(end + 1)) {
+        (Some(Token::Mark(',')), Some(Token::Mark('{'))) => (
+            option(pieces, end + 2, "outputPath"),
+            option(pieces, end + 2, "type"),
+        ),
+        (Some(Token::Mark(',')), Some(Token::Mark(')'))) | (Some(Token::Mark(')')), _) => {
+            (None, None)
+        }
+        _ => (Some(None), Some(None)),
+    };
+    PluginFeed {
+        path: path.unwrap_or_else(|| Some("/feed.xml".to_owned())),
+        kind: kind.unwrap_or_else(|| Some("atom".to_owned())),
+        line,
+        written,
+    }
+}
+
+/// The option `name` of an object whose first key is at `at`: none where
+/// it isn't given, and its text where it is given as text in quotes, or
+/// by a name said once as that; where something else gives it, or a
+/// `...` might, none within.
+fn option(pieces: &[Piece], mut at: usize, name: &str) -> Option<Option<String>> {
+    let mark = |i: usize, c: char| pieces.get(i).is_some_and(|p| p.token == Token::Mark(c));
+    let ends = |i: usize| mark(i, ',') || mark(i, '}');
+    let mut given = None;
+    let mut depth = 0;
+    let mut key_here = true;
+    while let Some(piece) = pieces.get(at) {
+        if depth == 0 && key_here {
+            if (0..3).all(|i| mark(at + i, '.')) {
+                given = Some(None);
+            }
+            if let Token::Word(key) | Token::Text(key) = &piece.token
+                && key == name
+            {
+                let value = match (mark(at + 1, ':'), &piece.token) {
+                    (true, _) => match pieces.get(at + 2).map(|p| &p.token) {
+                        Some(Token::Text(text)) if ends(at + 3) => Some(text.clone()),
+                        Some(Token::Word(word)) if ends(at + 3) => constant(pieces, word),
+                        _ => None,
+                    },
+                    // `outputPath,` alone is short for `outputPath: outputPath`.
+                    (false, Token::Word(word)) if ends(at + 1) => constant(pieces, word),
+                    _ => None,
+                };
+                given = Some(value);
+            }
+        }
+        match piece.token {
+            Token::Mark('{' | '(' | '[') => depth += 1,
+            Token::Mark('}' | ')' | ']') if depth == 0 => break,
+            Token::Mark('}' | ')' | ']') => depth -= 1,
+            _ => {}
+        }
+        key_here = depth == 0 && piece.token == Token::Mark(',');
+        at += 1;
+    }
+    given
 }
 
 /// Reads `addPassthroughCopy(` from its first value at `at`: text in
@@ -877,6 +1020,84 @@ mod tests {
         ] {
             let text = format!("return {{ pathPrefix: {other} }};");
             assert_eq!(base(&text), (String::new(), vec![(1, shown.to_owned())]));
+        }
+    }
+
+    #[test]
+    fn the_feeds_the_rss_plugin_makes_are_read_where_written_out() {
+        let esm = "import { feedPlugin } from \"@11ty/eleventy-plugin-rss\";\n\
+                   export default function (eleventyConfig) {\n";
+        let cjs = "const pluginRss = require(\"@11ty/eleventy-plugin-rss\");\n\
+                   module.exports = function (eleventyConfig) {\n";
+        let renamed = "import { feedPlugin as feed } from \"@11ty/eleventy-plugin-rss\";\n\
+                       const path = \"/atom.xml\";\n\
+                       export default function (eleventyConfig) {\n";
+        // (what the settings open with, the call, each feed's
+        // `outputPath` and `type`, whether the call is told as not read)
+        type Feed<'a> = (Option<&'a str>, Option<&'a str>);
+        let cases: [(&str, &str, &[Feed], bool); 9] = [
+            (
+                esm,
+                "eleventyConfig.addPlugin(feedPlugin, {\n  type: \"atom\",\n  \
+                 outputPath: \"/feed/feed.xml\",\n  collection: { name: \"posts\", limit: 10 },\n});",
+                &[(Some("/feed/feed.xml"), Some("atom"))],
+                false,
+            ),
+            (
+                esm,
+                "eleventyConfig.addPlugin(feedPlugin);",
+                &[(Some("/feed.xml"), Some("atom"))],
+                false,
+            ),
+            (
+                cjs,
+                "eleventyConfig.addPlugin(pluginRss.feedPlugin, { type: 'json', outputPath: 'feed.json' });",
+                &[(Some("feed.json"), Some("json"))],
+                false,
+            ),
+            (
+                renamed,
+                "eleventyConfig.addPlugin(feed, { outputPath: path, metadata: { type: \"x\" } });",
+                &[(Some("/atom.xml"), Some("atom"))],
+                false,
+            ),
+            (
+                esm,
+                "eleventyConfig.addPlugin(feedPlugin, { outputPath: `/${name}.xml`, type });",
+                &[(None, None)],
+                true,
+            ),
+            (
+                esm,
+                "eleventyConfig.addPlugin(feedPlugin, options);",
+                &[(None, None)],
+                true,
+            ),
+            (
+                esm,
+                "eleventyConfig.addPlugin(feedPlugin, { ...shared, outputPath: \"/a.xml\" });",
+                &[(Some("/a.xml"), None)],
+                false,
+            ),
+            (
+                esm,
+                "eleventyConfig.addPlugin(feedPlugin, { type: \"rss\", outputPath: \"/rss.xml\" });\n\
+                 eleventyConfig.addPlugin(feedPlugin, { type: \"json\", outputPath: \"/feed.json\" });",
+                &[
+                    (Some("/rss.xml"), Some("rss")),
+                    (Some("/feed.json"), Some("json")),
+                ],
+                false,
+            ),
+            (cjs, "eleventyConfig.addPlugin(pluginRss);", &[], true),
+        ];
+        for (opening, call, feeds, unread) in cases {
+            let s = scan(&format!("{opening}  {call}\n}};\n"));
+            let found: Vec<(Option<&str>, Option<&str>)> = (s.feeds.iter())
+                .map(|feed| (feed.path.as_deref(), feed.kind.as_deref()))
+                .collect();
+            assert_eq!(found, feeds, "{call}");
+            assert_eq!(!s.unread.is_empty(), unread, "{call}: {:?}", s.unread);
         }
     }
 

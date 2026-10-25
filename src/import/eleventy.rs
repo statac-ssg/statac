@@ -22,6 +22,7 @@ use super::common::{
 use super::inside;
 use super::report::code;
 use super::{Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Value};
+use crate::content::address::{Address, on_the_wire};
 use crate::date::{self, Date};
 use crate::platform;
 use crate::problem::{Kind, Problem, Reason};
@@ -290,6 +291,9 @@ pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Im
         category_pages: Vec::new(),
         addressed_by_name: Vec::new(),
         controls: (0, 0),
+        plugin_feeds: Vec::new(),
+        unread_feed: None,
+        unmade_feeds: Vec::new(),
     };
     reader.import.settings_file = reader.s.file.clone().unwrap_or_default();
     reader.folders();
@@ -299,6 +303,7 @@ pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Im
     reader.outside("")?;
     let input = reader.input.clone();
     reader.walk(&input)?;
+    reader.plugin_feeds()?;
     reader.finish();
     Ok(reader.import)
 }
@@ -381,6 +386,17 @@ struct Reader<'a> {
     /// The control characters taken out of front matter, and from how
     /// many pages.
     controls: (usize, usize),
+    /// The address of each feed the settings show the RSS plugin made,
+    /// with what it was written as, where the settings say.
+    plugin_feeds: Vec<(String, Option<FeedKind>)>,
+    /// What the report says of the first `feedPlugin` call whose feed's URL
+    /// Statac didn't take.
+    unread_feed: Option<String>,
+    /// The feeds in the old built output that no file of the old site
+    /// makes, each by its address, with what it is written as and its path
+    /// in the old folder, looked for where the settings show none of the
+    /// plugin's.
+    unmade_feeds: Vec<(String, FeedKind, String)>,
 }
 
 /// Whether `path` is `folder` or inside it.
@@ -621,6 +637,130 @@ fn names_file(writing: &str, name: &str) -> bool {
         Event::Html(html) | Event::InlineHtml(html) => in_html(&html),
         _ => false,
     })
+}
+
+/// What a feed is written as.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum FeedKind {
+    Atom,
+    Rss,
+    Json,
+}
+
+impl FeedKind {
+    /// The kind the RSS plugin's `type` names.
+    fn named(name: &str) -> Option<FeedKind> {
+        match name {
+            "atom" => Some(FeedKind::Atom),
+            "rss" => Some(FeedKind::Rss),
+            "json" => Some(FeedKind::Json),
+            _ => None,
+        }
+    }
+
+    /// A feed of this kind, in words.
+    fn a(kind: Option<FeedKind>) -> &'static str {
+        match kind {
+            Some(FeedKind::Atom) => "an Atom feed",
+            Some(FeedKind::Rss) => "an RSS feed",
+            Some(FeedKind::Json) => "a JSON feed",
+            None => "a feed",
+        }
+    }
+}
+
+/// What `text` is written as where it is a feed: XML whose root is RSS's or
+/// Atom's, or a JSON Feed.
+fn feed_kind(text: &str) -> Option<FeedKind> {
+    let mut rest = text.trim_start_matches('\u{feff}').trim_start();
+    if rest.starts_with('{') {
+        if !rest.contains("jsonfeed.org/version/") {
+            return None;
+        }
+        let mut sources = Sources::default();
+        let source = sources.add("feed.json", rest.to_owned());
+        let node = crate::yaml::read_json(&sources, source).ok()?;
+        let crate::yaml::Value::Mapping(entries) = &node.value else {
+            return None;
+        };
+        return entries
+            .iter()
+            .any(|entry| {
+                matches!(&entry.key.value, crate::yaml::Value::Scalar(key) if key == "version")
+                    && matches!(&entry.value.value, crate::yaml::Value::Scalar(version)
+                        if version.starts_with("https://jsonfeed.org/version/"))
+            })
+            .then_some(FeedKind::Json);
+    }
+    // The XML declaration and any comment come before the root.
+    while let Some(close) = ["<?", "<!--"]
+        .iter()
+        .zip(["?>", "-->"])
+        .find_map(|(open, close)| rest.starts_with(open).then_some(close))
+    {
+        rest = rest[rest.find(close)? + close.len()..].trim_start();
+    }
+    [
+        ("<rss", FeedKind::Rss),
+        ("<feed", FeedKind::Atom),
+        ("<rdf:RDF", FeedKind::Rss),
+    ]
+    .into_iter()
+    .find(|(root, _)| {
+        rest.strip_prefix(root)
+            .is_some_and(|after| after.starts_with([' ', '\t', '\r', '\n', '>']))
+    })
+    .map(|(_, kind)| kind)
+}
+
+/// The id of each entry of `text`, a feed written as Atom or RSS, as
+/// written; none for an entry that has none.
+fn entry_ids(text: &str) -> Vec<Option<String>> {
+    let mut ids = Vec::new();
+    for (entry, id) in [("entry", "id"), ("item", "guid")] {
+        let close = format!("</{entry}>");
+        let mut rest = text;
+        while let Some(inner) = element(rest, entry) {
+            let end = inner.find(&close).unwrap_or(inner.len());
+            ids.push(element(&inner[..end], id).and_then(|inner| {
+                let end = inner.find(&format!("</{id}>"))?;
+                Some(xml_text(&inner[..end]))
+            }));
+            rest = &inner[end..];
+        }
+    }
+    ids
+}
+
+/// What follows the first start tag of `name` in `xml`, from just after
+/// its `>`.
+fn element<'a>(xml: &'a str, name: &str) -> Option<&'a str> {
+    let open = format!("<{name}");
+    let mut rest = xml;
+    loop {
+        let after = &rest[rest.find(&open)? + open.len()..];
+        if after.starts_with([' ', '\t', '\r', '\n', '>']) {
+            return Some(&after[after.find('>')? + 1..]);
+        }
+        rest = after;
+    }
+}
+
+/// The text an XML element holds, written as `inner`.
+fn xml_text(inner: &str) -> String {
+    let inner = inner.trim();
+    if let Some(data) = inner
+        .strip_prefix("<![CDATA[")
+        .and_then(|data| data.strip_suffix("]]>"))
+    {
+        return data.trim().to_owned();
+    }
+    inner
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 }
 
 impl Reader<'_> {
@@ -1318,23 +1458,75 @@ impl Reader<'_> {
         let Ok(bytes) = std::fs::read(self.path(&path)) else {
             return false;
         };
-        let text = String::from_utf8_lossy(&bytes);
-        let mut rest = text.trim_start_matches('\u{feff}').trim_start();
-        // The XML declaration and any comment come before the root.
-        while let Some(close) = ["<?", "<!--"]
-            .iter()
-            .zip(["?>", "-->"])
-            .find_map(|(open, close)| rest.starts_with(open).then_some(close))
-        {
-            match rest.find(close) {
-                Some(end) => rest = rest[end + close.len()..].trim_start(),
-                None => return false,
+        matches!(
+            feed_kind(&String::from_utf8_lossy(&bytes)),
+            Some(FeedKind::Atom | FeedKind::Rss)
+        )
+    }
+
+    /// The feeds the settings show the RSS plugin made, and where they show
+    /// none, the feeds in the old built output that no file of the old site
+    /// makes.
+    fn plugin_feeds(&mut self) -> Result<(), Box<Failed>> {
+        for feed in self.s.feeds.clone() {
+            let address = (feed.path.as_ref())
+                .map(|path| format!("/{}", path.trim().trim_start_matches('/')))
+                .filter(|address| Address::read(address).is_ok_and(|address| address.is_file()));
+            let Some(address) = address else {
+                let call = format!(
+                    "The settings' {}, on line {},",
+                    code(&feed.written),
+                    feed.line
+                );
+                let why = match &feed.path {
+                    Some(path) => {
+                        self.s.unread.push((feed.line, feed.written.clone()));
+                        format!(
+                            "{call} gives its feed the URL {}, which Statac can't give a feed",
+                            code(path)
+                        )
+                    }
+                    None => format!("{call} doesn't give its feed's URL as text in quotes"),
+                };
+                self.unread_feed.get_or_insert(why);
+                continue;
+            };
+            if self.plugin_feeds.iter().all(|(had, _)| *had != address) {
+                let kind = feed.kind.as_deref().and_then(FeedKind::named);
+                self.plugin_feeds.push((address, kind));
             }
         }
-        ["<rss", "<feed", "<rdf:RDF"].iter().any(|root| {
-            rest.strip_prefix(root)
-                .is_some_and(|after| after.starts_with([' ', '\t', '\r', '\n', '>']))
-        })
+        let plugin = settings::makes_feeds(self.folder) || !self.s.feeds.is_empty();
+        let Some(built) = self.import.built.clone() else {
+            return Ok(());
+        };
+        if !plugin || !self.plugin_feeds.is_empty() {
+            return Ok(());
+        }
+        let mut files = Vec::new();
+        self.files_beneath(&built, false, &mut files)?;
+        for path in files {
+            let rel = path[built.len()..].trim_start_matches('/');
+            let ending = rel.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
+            if !matches!(ending.as_deref(), Some("xml" | "rss" | "atom" | "json")) {
+                continue;
+            }
+            let address = format!("/{rel}");
+            let copied = format!("static/{rel}");
+            let made = (self.import.feeds.iter())
+                .chain(&self.import.templated)
+                .any(|(made, _)| *made == address);
+            if made || self.import.files.iter().any(|file| file.to == copied) {
+                continue;
+            }
+            let Ok(bytes) = std::fs::read(self.path(&path)) else {
+                continue;
+            };
+            if let Some(kind) = feed_kind(&String::from_utf8_lossy(&bytes)) {
+                self.unmade_feeds.push((address, kind, path));
+            }
+        }
+        Ok(())
     }
 
     /// A `permalink` written out as an address: opening with `/`, a
@@ -2531,20 +2723,189 @@ impl Reader<'_> {
                 }
             ));
         }
-        if settings::makes_feeds(self.folder) {
-            self.import
-                .settings
-                .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
-            notes.push(
-                "The old site's `package.json` names Eleventy's RSS plugin, whose feed templates \
-                 give each post its full URL as its id, so `feed_ids_before` keeps that id for \
-                 each post. Feed readers see nothing new once a list's `feed:` line puts its \
-                 feed at the old feed's URL: see https://statac.dev/feeds/#entry-ids."
-                    .to_owned(),
-            );
-        }
+        self.feeds(&mut notes);
         let mut all = notes;
         all.append(&mut self.import.notes);
         self.import.notes = all;
+    }
+
+    /// Asks for each feed the RSS plugin made at the URL it had, and keeps
+    /// each post's id in it; where the old site had no plugin, keeps the
+    /// ids its own feeds gave where each was a post's full URL.
+    fn feeds(&mut self, notes: &mut Vec<String>) {
+        let named = settings::makes_feeds(self.folder);
+        if !named && self.s.feeds.is_empty() {
+            self.own_feeds_ids(notes);
+            return;
+        }
+        self.import
+            .settings
+            .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
+        let why = (self.unread_feed.clone())
+            .unwrap_or_else(|| "The settings show no `feedPlugin`".to_owned());
+        let (asked, lead) = match (self.plugin_feeds.as_slice(), self.unmade_feeds.as_slice()) {
+            ([], [(address, kind, _)]) => {
+                let opening = match self.unread_feed {
+                    Some(_) => why,
+                    None => "The old site's `package.json` names Eleventy's RSS plugin, and the \
+                             settings show no `feedPlugin`"
+                        .to_owned(),
+                };
+                let lead = format!(
+                    "{opening}. The old built output holds {} at {} that no file of the old site \
+                     makes, so Statac took it for the plugin's.",
+                    FeedKind::a(Some(*kind)),
+                    code(address)
+                );
+                (vec![address.clone()], lead)
+            }
+            ([], unmade) => {
+                let ids = match named {
+                    true => "The old site's `package.json` names Eleventy's RSS plugin",
+                    false => "The settings use Eleventy's RSS plugin",
+                };
+                let rest = if unmade.len() > 1 {
+                    format!(
+                        "{why}, and the old built output holds {} feeds that no file of the old \
+                         site makes, so Statac can't tell which the plugin made and asked for \
+                         none: each is listed under Feeds made by templates.",
+                        unmade.len()
+                    )
+                } else if self.unread_feed.is_none() && !self.import.feeds.is_empty() {
+                    "Feed readers see nothing new once a list's `feed:` line puts its feed at the \
+                     old feed's URL: see https://statac.dev/feeds/#entry-ids."
+                        .to_owned()
+                } else {
+                    format!(
+                        "{why}, and {}, so Statac asked for none: a `feed:` line in \
+                         `statac.yaml` puts the site's feed at the old feed's URL, as \
+                         `feed: /feed.xml`, and feed readers see nothing new: see \
+                         https://statac.dev/feeds/#entry-ids.",
+                        match self.import.built {
+                            Some(_) => "nothing in the old built output shows where its feed was",
+                            None => "the old site has no built output to show where its feed was",
+                        }
+                    )
+                };
+                notes.push(format!(
+                    "{ids}, whose feed templates give each post its full URL as its id, so \
+                     `feed_ids_before` keeps that id for each post. {rest}"
+                ));
+                for (address, _, path) in std::mem::take(&mut self.unmade_feeds) {
+                    self.import.feeds.push((address, path));
+                }
+                return;
+            }
+            (made, _) => {
+                let made: Vec<String> = (made.iter())
+                    .map(|(address, kind)| format!("{} at {}", FeedKind::a(*kind), code(address)))
+                    .collect();
+                let lead = format!(
+                    "The settings' `feedPlugin`, from Eleventy's RSS plugin, made {}.",
+                    listed(&made)
+                );
+                let addresses = self.plugin_feeds.iter().map(|(address, _)| address.clone());
+                (addresses.collect(), lead)
+            }
+        };
+        let (shown, templates) = self.ask(&asked);
+        notes.push(format!(
+            "{lead} {} at the same URL, as {shown} in `statac.yaml` says, built with {} once you \
+             add {}, and `feed_ids_before` keeps each post's id the URL Eleventy gave it, so feed \
+             readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
+            match asked.len() {
+                1 => "It stays",
+                _ => "Each stays",
+            },
+            listed(&templates),
+            match templates.len() {
+                1 => "it",
+                _ => "them",
+            }
+        ));
+    }
+
+    /// Asks for the site's feed at each of `addresses`, the first being the
+    /// one its pages link to, giving the setting as shown and the templates
+    /// the feeds are built with.
+    fn ask(&mut self, addresses: &[String]) -> (String, Vec<String>) {
+        let (value, shown) = match addresses {
+            [only] if *only == format!("/{}", crate::feeds::FILE_NAME) => {
+                (Value::Truth(true), code("feed: true"))
+            }
+            [only] => (Value::Text(only.clone()), code(&format!("feed: {only}"))),
+            _ => (
+                Value::List(addresses.iter().cloned().map(Value::Text).collect()),
+                "`feed:`".to_owned(),
+            ),
+        };
+        self.import
+            .settings
+            .push((crate::feeds::SETTING.into(), value));
+        let mut templates = Vec::new();
+        for address in addresses {
+            let template = match address.to_ascii_lowercase().ends_with(".json") {
+                true => code("templates/feed.json"),
+                false => code("templates/feed.xml"),
+            };
+            if !templates.contains(&template) {
+                templates.push(template);
+            }
+        }
+        self.import.addresses.extend_from_slice(addresses);
+        (shown, templates)
+    }
+
+    /// Keeps the id the old site's own feed templates gave each post, where
+    /// the old built output shows every entry of each feed they made given
+    /// its post's full URL.
+    fn own_feeds_ids(&mut self, notes: &mut Vec<String>) {
+        let Some(built) = &self.import.built else {
+            return;
+        };
+        if self.import.feeds.is_empty() {
+            return;
+        }
+        let base = self.s.base();
+        let posts: HashSet<String> = (self.import.pages.iter())
+            .filter(|page| page.kind == PageKind::Post)
+            .filter_map(|page| page.address.as_ref())
+            .map(|address| on_the_wire(&format!("{base}{address}")))
+            .collect();
+        let full = |id: &str| {
+            url::Url::parse(id).is_ok_and(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && url.query().is_none()
+                    && url.fragment().is_none()
+                    && posts.contains(url.path())
+            })
+        };
+        for (address, _) in &self.import.feeds {
+            let path = joined(built, address.trim_start_matches('/'));
+            let Ok(bytes) = std::fs::read(self.path(&path)) else {
+                return;
+            };
+            let ids = entry_ids(&String::from_utf8_lossy(&bytes));
+            if ids.is_empty() || !ids.iter().all(|id| id.as_deref().is_some_and(full)) {
+                return;
+            }
+        }
+        let feeds: Vec<String> = (self.import.feeds.iter())
+            .map(|(address, _)| code(address))
+            .collect();
+        self.import
+            .settings
+            .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
+        notes.push(format!(
+            "The old site's {} at {} gave each post its full URL as its id, so \
+             `feed_ids_before` keeps that id for each post. Feed readers see nothing new once a \
+             list's `feed:` line puts its feed at the old feed's URL: see \
+             https://statac.dev/feeds/#entry-ids.",
+            match feeds.len() {
+                1 => "feed",
+                _ => "feeds",
+            },
+            listed(&feeds)
+        ));
     }
 }

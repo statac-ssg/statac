@@ -479,38 +479,99 @@ fn the_feed_jekylls_plugin_made_is_asked_for_at_its_url() {
     }
 }
 
-/// An Eleventy site with its RSS plugin and one without: the posts from
-/// before the import keep their full URL as their id in a feed, as the
-/// plugin's feed templates gave them, and keep no other.
+/// An Atom feed with one entry, of the id `id`.
+fn atom_feed(id: &str) -> String {
+    format!(
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\
+         <feed xmlns=\"http://www.w3.org/2005/Atom\">\n  <id>https://example.org/</id>\n  \
+         <entry>\n    <id>{id}</id>\n  </entry>\n</feed>\n"
+    )
+}
+
+/// An Eleventy site with its RSS plugin, ones whose own feed template
+/// gave each post its full URL as its id, and ones whose ids were other or
+/// unknown: the posts from before the import keep their full URL as their
+/// id in a feed where the old site gave them that, and keep no other.
 #[test]
-fn an_eleventy_site_with_the_rss_plugin_keeps_its_posts_ids() {
-    let said = "The old site's `package.json` names Eleventy's RSS plugin, whose feed templates \
-                give each post its full URL as its id, so `feed_ids_before` keeps that id for \
-                each post.";
-    for plugin in [true, false] {
-        let top = scratch(&format!("eleventy-feed-ids-{plugin}"));
+fn an_eleventy_site_keeps_its_posts_ids_where_they_were_their_urls() {
+    let plugin = ", \"@11ty/eleventy-plugin-rss\": \"^3.0.0\"";
+    let url = "https://example.org/posts/post-1/";
+    let rss = |id: &str| {
+        format!(
+            "<rss version=\"2.0\"><channel><item><guid isPermaLink=\"false\">{id}</guid></item>\
+             </channel></rss>\n"
+        )
+    };
+    let by_plugin = "The old site's `package.json` names Eleventy's RSS plugin, whose feed \
+                     templates give each post its full URL as its id, so `feed_ids_before` \
+                     keeps that id for each post.";
+    let by_template = "The old site's feed at `/feed.xml` gave each post its full URL as its id, \
+                       so `feed_ids_before` keeps that id for each post.";
+    // (the case, what `package.json` adds, the feed the old site's own
+    // template built, what is said)
+    let cases = [
+        ("plugin", plugin, None, Some(by_plugin)),
+        ("none", "", None, None),
+        ("atom-urls", "", Some(atom_feed(url)), Some(by_template)),
+        ("rss-urls", "", Some(rss(url)), Some(by_template)),
+        (
+            "rss-cdata",
+            "",
+            Some(rss(&format!("<![CDATA[{url}]]>"))),
+            Some(by_template),
+        ),
+        (
+            "atom-uuids",
+            "",
+            Some(atom_feed("urn:uuid:0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20")),
+            None,
+        ),
+        (
+            "atom-other",
+            "",
+            Some(atom_feed("https://example.org/posts/post-2/")),
+            None,
+        ),
+        (
+            "rss-none",
+            "",
+            Some(rss("").replace("<guid isPermaLink=\"false\"></guid>", "")),
+            None,
+        ),
+    ];
+    for (label, needed, built, said) in cases {
+        let top = scratch(&format!("eleventy-feed-ids-{label}"));
         let old = top.join("old");
         fs::create_dir_all(old.join("posts")).unwrap();
-        let needed = match plugin {
-            true => ", \"@11ty/eleventy-plugin-rss\": \"^3.0.0\"",
-            false => "",
-        };
         let package =
             format!("{{ \"devDependencies\": {{ \"@11ty/eleventy\": \"^3.0.0\"{needed} }} }}\n");
         fs::write(old.join("package.json"), package).unwrap();
         let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
         fs::write(old.join("posts/post-1.md"), post).unwrap();
+        if let Some(built) = &built {
+            let template = "---\npermalink: /feed.xml\n---\n<feed></feed>\n";
+            fs::write(old.join("feed.njk"), template).unwrap();
+            fs::create_dir_all(old.join("_site/posts/post-1")).unwrap();
+            fs::write(old.join("_site/posts/post-1/index.html"), "<p>Text.</p>\n").unwrap();
+            fs::write(old.join("_site/feed.xml"), built).unwrap();
+        }
         let new = top.join("new");
         let (code, told) = import(&old, &new, None);
-        assert_eq!(code, 0, "{told}");
+        assert_eq!(code, 0, "{label}: {told}");
         let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
         let kept: Vec<&str> = (settings.lines())
             .filter(|line| line.starts_with("feed_ids_before:"))
             .collect();
-        let wanted = Vec::from_iter(plugin.then_some("feed_ids_before: 2026-10-06"));
-        assert_eq!(kept, wanted, "{settings}");
+        let wanted = Vec::from_iter(said.map(|_| "feed_ids_before: 2026-10-06"));
+        assert_eq!(kept, wanted, "{label}: {settings}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
-        assert_eq!(report.contains(said), plugin, "{report}");
+        for sentence in [by_plugin, by_template] {
+            assert_eq!(
+                report.contains(sentence),
+                said == Some(sentence),
+                "{label}: {report}"
+            );
+        }
 
         let added = "url: https://example.org\nfeed: true\n";
         fs::write(new.join("statac.yaml"), format!("{settings}{added}")).unwrap();
@@ -526,14 +587,161 @@ fn an_eleventy_site_with_the_rss_plugin_keeps_its_posts_ids() {
             drafts: false,
             url: None,
         });
-        assert!(outcome.published.is_some(), "{:?}", outcome.problems);
+        assert!(
+            outcome.published.is_some(),
+            "{label}: {:?}",
+            outcome.problems
+        );
         let built = fs::read_to_string(out.join("feed.xml")).unwrap();
         assert_eq!(
-            built.contains("<id>https://example.org/posts/post-1/</id>"),
-            plugin,
-            "{built}"
+            built.contains(&format!("<id>{url}</id>")),
+            said.is_some(),
+            "{label}: {built}"
         );
-        assert_eq!(built.contains("<id>urn:uuid:"), !plugin, "{built}");
+        assert_eq!(
+            built.contains("<id>urn:uuid:"),
+            said.is_none(),
+            "{label}: {built}"
+        );
+    }
+}
+
+/// An Eleventy site, times where its RSS plugin's feed was: the new site
+/// asks for the site's feed at the URL the settings or the old built
+/// output show, and for none where neither shows one.
+#[test]
+fn the_feed_eleventys_rss_plugin_made_is_asked_for_at_its_url() {
+    let unread = "{ outputPath: process.env.FEED }";
+    let asked = "in `statac.yaml` says";
+    let none = "so Statac asked for none";
+    // (the case, the plugin's options, the feeds in the old built output,
+    // the lines asking, what is said, the feed's file)
+    type Case<'a> = (
+        &'a str,
+        &'a str,
+        &'a [&'a str],
+        &'a [&'a str],
+        &'a str,
+        Option<&'a str>,
+    );
+    let cases: [Case; 7] = [
+        (
+            "path",
+            "{ outputPath: \"/feed/feed.xml\", collection: { name: \"posts\" } }",
+            &[],
+            &["feed: /feed/feed.xml"],
+            asked,
+            Some("feed/feed.xml"),
+        ),
+        (
+            "default",
+            "{ collection: { name: \"posts\" } }",
+            &[],
+            &["feed: true"],
+            asked,
+            Some("feed.xml"),
+        ),
+        (
+            "json",
+            "{ type: \"json\", outputPath: \"/feed.json\" }",
+            &[],
+            &["feed: /feed.json"],
+            "built with `templates/feed.json` once you add it",
+            Some("feed.json"),
+        ),
+        (
+            "two",
+            "{ outputPath: \"/feed.xml\" });\n  \
+             eleventyConfig.addPlugin(feedPlugin, { type: \"json\", outputPath: \"/feed.json\" }",
+            &[],
+            &["feed:", "  - /feed.xml", "  - /feed.json"],
+            "Each stays at the same URL",
+            Some("feed.xml"),
+        ),
+        (
+            "built",
+            unread,
+            &["blog/atom.xml"],
+            &["feed: /blog/atom.xml"],
+            "so Statac took it for the plugin's",
+            Some("blog/atom.xml"),
+        ),
+        (
+            "built-two",
+            unread,
+            &["blog/atom.xml", "notes/atom.xml"],
+            &[],
+            "so Statac can't tell which the plugin made and asked for none",
+            None,
+        ),
+        ("unknown", unread, &[], &[], none, None),
+    ];
+    for (label, options, built, lines, said, file) in cases {
+        let top = scratch(&format!("eleventy-feed-{label}"));
+        let old = top.join("old");
+        fs::create_dir_all(old.join("posts")).unwrap();
+        let package = "{ \"devDependencies\": { \"@11ty/eleventy\": \"^3.0.0\", \
+                       \"@11ty/eleventy-plugin-rss\": \"^3.1.0\" } }\n";
+        fs::write(old.join("package.json"), package).unwrap();
+        let settings = format!(
+            "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\n\
+             export default function (eleventyConfig) {{\n  \
+             eleventyConfig.addPlugin(feedPlugin, {options});\n}}\n"
+        );
+        fs::write(old.join("eleventy.config.js"), settings).unwrap();
+        let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+        fs::write(old.join("posts/post-1.md"), post).unwrap();
+        for path in built.iter() {
+            let path = old.join("_site").join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, atom_feed("https://example.org/posts/post-1/")).unwrap();
+        }
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        let asking: Vec<&str> = (written.lines())
+            .skip_while(|line| !line.starts_with("feed:"))
+            .take_while(|line| line.starts_with("feed:") || line.starts_with("  - "))
+            .collect();
+        assert_eq!(asking, lines, "{label}: {written}");
+        assert!(written.contains("feed_ids_before: 2026-10-06"), "{label}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(report.contains(said), "{label}: {report}");
+        for path in built.iter().filter(|_| lines.is_empty()) {
+            let listed = format!("- `_site/{path}`: `/{path}`");
+            assert!(report.contains(&listed), "{label}: {report}");
+        }
+
+        fs::write(
+            new.join("statac.yaml"),
+            format!("{written}url: https://example.org\n"),
+        )
+        .unwrap();
+        templated(&new);
+        let out = top.join("out");
+        let outcome = build::run(&Options {
+            mode: Mode::Build,
+            site: new.clone(),
+            out: Some(out.clone()),
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        assert!(
+            outcome.published.is_some(),
+            "{label}: {:?}",
+            outcome.problems
+        );
+        let unused = (outcome.problems.iter()).any(|p| p.kind.name() == "unused-feed-template");
+        assert_eq!(unused, file.is_none(), "{label}");
+        for name in ["feed.xml", "feed/feed.xml", "feed.json", "blog/atom.xml"] {
+            assert_eq!(
+                out.join(name).is_file(),
+                file == Some(name) || (label == "two" && name == "feed.json"),
+                "{label}: {name}"
+            );
+        }
     }
 }
 
