@@ -1878,7 +1878,7 @@ fn an_example_that_is_no_look_is_offered_the_looks() {
 fn a_format_that_cant_be_read_is_told_why_at_the_text() {
     let english = english();
     let reference = "Wednesday 31 December 2025, 3.04PM";
-    let examples = || vec!["31/12/2025".to_owned(), "December 31, 2025".to_owned()];
+    let examples = || vec!["12/31/2025".to_owned(), "December 31, 2025".to_owned()];
     let not_in = |written: &str, corrected: Option<&str>| FormatFault::NotInReference {
         written: written.into(),
         reference: reference.into(),
@@ -1985,7 +1985,7 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
             "Wednesday",
             FormatFault::OnlyAWeekday {
                 example: "Wednesday".into(),
-                with_date: Some("Wednesday December 31, 2025".into()),
+                with_date: Some("Wednesday, December 31, 2025".into()),
             },
         ),
         (
@@ -2032,6 +2032,90 @@ fn a_format_that_cant_be_read_is_told_why_at_the_text() {
         let refusal = refused(example, &english);
         assert_eq!(refusal.fault, fault, "{example}");
         assert_eq!(&example[refusal.at], at, "{example}");
+    }
+}
+
+/// What a `date_format` in `words` is offered: the reference day in
+/// figures, refusing an empty one, and with its weekday, refusing a
+/// weekday alone.
+fn offered(words: &DateWords) -> (String, Option<String>) {
+    let FormatFault::Empty { examples, .. } = refused("", words).fault else {
+        panic!("{words:?}");
+    };
+    let Some(weekdays) = &words.words.weekdays else {
+        return (examples[0].clone(), None);
+    };
+    let FormatFault::OnlyAWeekday { with_date, .. } = refused(&weekdays[2], words).fault else {
+        panic!("{words:?}");
+    };
+    (examples[0].clone(), with_date)
+}
+
+fn statacs(tag: &str) -> DateWords {
+    let (known, words) = crate::language::statacs(tag).unwrap();
+    DateWords {
+        words,
+        from: WordsFrom::Statac(known.into()),
+        zeros: true,
+    }
+}
+
+/// A `date_format` that can't be read is offered the reference day in
+/// figures as the language's short date writes it, with the year in full,
+/// and a weekday alone is offered the day as its full date writes it,
+/// where that reads back.
+#[test]
+fn the_examples_offered_are_the_languages_own() {
+    let cases = [
+        ("en", "12/31/2025", "Wednesday, December 31, 2025"),
+        ("en-US", "12/31/2025", "Wednesday, December 31, 2025"),
+        ("en-GB", "31/12/2025", "Wednesday, 31 December 2025"),
+        ("en-AU", "31/12/2025", "Wednesday, 31 December 2025"),
+        ("en-CA", "2025-12-31", "Wednesday, December 31, 2025"),
+        ("en-IE", "31/12/2025", "Wednesday 31 December 2025"),
+        ("en-CH", "31.12.2025", "Wednesday, 31 December 2025"),
+        ("en-MV", "31-12-2025", "Wednesday 31 December 2025"),
+        ("de", "31.12.2025", "Mittwoch, 31. Dezember 2025"),
+        ("fr", "31/12/2025", "mercredi 31 décembre 2025"),
+        ("ja", "2025/12/31", "水曜日 2025年12月31日"),
+        ("ko", "2025. 12. 31.", "2025년 12월 31일 수요일"),
+        (
+            "ar",
+            "31\u{200f}/12\u{200f}/2025",
+            "الأربعاء، 31 ديسمبر 2025",
+        ),
+    ];
+    for (tag, figures, full) in cases {
+        let offered = offered(&statacs(tag));
+        assert_eq!(offered, (figures.into(), Some(full.into())), "{tag}");
+    }
+    // Words with months but no patterns, and words with neither.
+    let welsh = offered(&welsh());
+    assert_eq!(welsh.0, "31/12/2025");
+    assert_eq!(welsh.1.as_deref(), Some("Mercher 31 Rhagfyr 2025"));
+    assert_eq!(
+        offered(&words(Words::default())),
+        ("2025-12-31".into(), None)
+    );
+}
+
+/// Each example offered in every language Statac has words for reads
+/// back as a `date_format` writing the reference day so.
+#[test]
+fn every_example_offered_reads_back() {
+    let folder = format!("{}/src/language/bundled", env!("CARGO_MANIFEST_DIR"));
+    let tags = std::fs::read_dir(folder).unwrap().filter_map(|entry| {
+        let name = entry.unwrap().file_name().into_string().unwrap();
+        name.strip_suffix(".yaml").map(str::to_owned)
+    });
+    for tag in tags {
+        let words = statacs(&tag);
+        let (figures, full) = offered(&words);
+        for example in std::iter::once(figures).chain(full) {
+            let shown = Format::for_the_site(&example, &words).map(|format| format.shown());
+            let digits = words.words.digits.as_ref();
+            assert_eq!(shown, Ok(format::in_digits(&example, digits)), "{tag}");
+        }
     }
 }
 

@@ -2,3 +2,5 @@
 # patterns it takes otherwise. Every line is from the Unicode CLDR, release
 # 48.2.3: see LICENSE-CLDR.txt.
 am_pm: [a.m., p.m.]
+dates:
+  figures: y-MM-dd

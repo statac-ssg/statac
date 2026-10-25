@@ -18,8 +18,10 @@ callouts: [Note, Tip, Important, Warning, Caution]
 # How dates are written, in the CLDR's own patterns. These are Statac's alone:
 # a site's file for the language can't change them.
 dates:
+  full: EEEE, MMMM d, y
   long: MMMM d, y
   short: MMM d, y
+  figures: M/d/yy
   day: MMM d
   time: "h:mm\u202Fa"
   date_and_time: "{1}, {0}"

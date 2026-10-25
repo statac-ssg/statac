@@ -165,15 +165,20 @@ pub(crate) fn example(code: crate::problem::Code) -> &'static str {
 /// The CLDR's patterns for the dates of the language `tag`.
 pub(crate) fn patterns(tag: &str) -> Patterns {
     let calendar = calendar(tag);
-    let [long, short] = texts(under(&calendar, &["dateFormats"]), ["long", "medium"]);
+    let [full, long, short, figures] = texts(
+        under(&calendar, &["dateFormats"]),
+        ["full", "long", "medium", "short"],
+    );
     let [time] = texts(under(&calendar, &["timeFormats"]), ["short"]);
     let [date_and_time] = texts(under(&calendar, &["dateTimeFormats"]), ["medium"]);
     let available = under(&calendar, &["dateTimeFormats", "availableFormats"]);
     let [day, month_and_year, month_short_and_year, year] =
         texts(available, ["MMMd", "yMMMM", "yMMM", "y"]);
     Patterns {
+        full,
         long,
         short,
+        figures,
         day,
         time,
         date_and_time,
@@ -354,8 +359,10 @@ fn english_and_its_regions_write_dates_as_the_cldr_does() {
         .collect();
         let (own, theirs) = (own.dates.unwrap(), theirs.dates.unwrap());
         let patterns: Vec<&str> = [
+            differ("full", own.full != theirs.full),
             differ("long", own.long != theirs.long),
             differ("short", own.short != theirs.short),
+            differ("figures", own.figures != theirs.figures),
             differ("day", own.day != theirs.day),
             differ("time", own.time != theirs.time),
             differ("date_and_time", own.date_and_time != theirs.date_and_time),
@@ -749,7 +756,7 @@ fn a_sites_own_file_adds_to_statacs_words_key_by_key() {
         english.words.months_short,
         bundled("en-AU").unwrap().1.months_short
     );
-    assert_eq!(english.words.dates, bundled("en-001").unwrap().1.dates);
+    assert_eq!(english.words.dates, bundled("en-AU").unwrap().1.dates);
     assert_eq!(english.words.am_pm, None);
 
     // A key whose value can't be read keeps Statac's.

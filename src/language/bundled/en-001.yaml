@@ -4,6 +4,8 @@
 months_short: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sept, Oct, Nov, Dec]
 am_pm: [am, pm]
 dates:
+  full: EEEE, d MMMM y
   long: d MMMM y
   short: d MMM y
+  figures: dd/MM/y
   day: d MMM

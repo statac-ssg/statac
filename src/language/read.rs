@@ -31,8 +31,10 @@ pub(crate) const KEYS: &[&str] = &[
 
 /// The keys of the `dates` of Statac's own files, each a pattern.
 const PATTERNS: &[&str] = &[
+    "full",
     "long",
     "short",
+    "figures",
     "day",
     "time",
     "date_and_time",
@@ -352,8 +354,10 @@ impl File<'_> {
             let key = crate::content::words::key_name(&entry.key);
             let reader = Reader::new(self.sources, &key);
             let pattern = match key.as_str() {
+                "full" => &mut onto.full,
                 "long" => &mut onto.long,
                 "short" => &mut onto.short,
+                "figures" => &mut onto.figures,
                 "day" => &mut onto.day,
                 "time" => &mut onto.time,
                 "date_and_time" => &mut onto.date_and_time,

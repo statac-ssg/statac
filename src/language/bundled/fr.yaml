@@ -11,8 +11,10 @@ quotes: « » « »
 # How dates are written, in the CLDR's own patterns. These are Statac's alone:
 # a site's file for the language can't change them.
 dates:
+  full: EEEE d MMMM y
   long: d MMMM y
   short: d MMM y
+  figures: dd/MM/y
   day: d MMM
   time: HH:mm
   date_and_time: "{1}, {0}"

@@ -3,3 +3,5 @@
 # 48.2.3: see LICENSE-CLDR.txt.
 months_short: [Jan, Feb, Mar, Apr, May, June, July, Aug, Sept, Oct, Nov, Dec]
 months_short_alone: [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sept, Oct, Nov, Dec]
+dates:
+  figures: d/M/yy

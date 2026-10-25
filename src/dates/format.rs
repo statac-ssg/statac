@@ -29,7 +29,8 @@ const WEEKDAY: usize = 2;
 const MONTH_LISTED: usize = 11;
 /// The reference day in figures, for a site with no words for months.
 const YEAR_FIRST: &str = "2025-12-31";
-/// The reference day in figures, offered beside its spelling in words.
+/// The reference day in figures, for a site with words for months but no
+/// patterns.
 const IN_FIGURES: &str = "31/12/2025";
 
 /// A look a template names a date by, each written as the language's
@@ -169,16 +170,45 @@ impl DateWords {
         self.in_words().unwrap_or_else(|| YEAR_FIRST.into())
     }
 
-    fn in_figures(&self) -> &'static str {
-        match self.words.months {
-            Some(_) => IN_FIGURES,
-            None => YEAR_FIRST,
+    /// The reference day in figures, as the language's short date writes
+    /// it but with the year in full, as a site's `date_format` must.
+    fn in_figures(&self) -> String {
+        let figures = (self.words.dates.as_ref()).and_then(|p| Format::patterned(&p.figures, self));
+        match (figures, &self.words.months) {
+            (Some(mut figures), _) => {
+                for part in &mut figures.parts {
+                    if let Part::Component(Component::Year { short }) = part {
+                        *short = false;
+                    }
+                }
+                figures.written(&REFERENCE_DAY, false)
+            }
+            (None, Some(_)) => IN_FIGURES.into(),
+            (None, None) => YEAR_FIRST.into(),
         }
+    }
+
+    /// The reference day with its weekday, as the language's full date
+    /// writes it in 0 to 9 where an example written so is read back, else
+    /// the weekday before the day. Japanese runs the weekday into the day,
+    /// `31日水曜日`, which an example can't.
+    fn with_weekday(&self) -> Option<String> {
+        let full = (self.words.dates.as_ref())
+            .and_then(|p| Format::patterned(&p.full, self))
+            .map(|full| full.written(&REFERENCE_DAY, false))
+            .filter(|full| {
+                Format::read(full, self)
+                    .is_ok_and(|read| read.written(&REFERENCE_DAY, false) == *full)
+            });
+        full.or_else(|| {
+            (self.words.weekdays.as_ref())
+                .map(|weekdays| format!("{} {}", weekdays[WEEKDAY], self.day()))
+        })
     }
 
     /// Spellings of the reference day to offer as examples.
     fn examples(&self) -> Vec<String> {
-        std::iter::once(self.in_figures().to_owned())
+        std::iter::once(self.in_figures())
             .chain(self.in_words())
             .collect()
     }
@@ -413,11 +443,7 @@ impl Format {
                 },
                 false => FormatFault::OnlyAWeekday {
                     example: example.to_owned(),
-                    with_date: words
-                        .words
-                        .weekdays
-                        .as_ref()
-                        .map(|weekdays| format!("{} {}", weekdays[WEEKDAY], words.day())),
+                    with_date: words.with_weekday(),
                 },
             };
             return Err(whole(example, fault));
@@ -473,6 +499,17 @@ impl Format {
         };
         format.writable(look.name())?;
         Ok(format)
+    }
+
+    /// The Unicode CLDR pattern `written`, where `words` can write it.
+    fn patterned(written: &str, words: &DateWords) -> Option<Format> {
+        let format = Format {
+            parts: pattern(written)?,
+            words: words.clone(),
+            of_a_look: true,
+        };
+        format.writable("").ok()?;
+        Some(format)
     }
 
     /// Every look of a language Statac has no patterns for: the reference

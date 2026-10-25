@@ -101,10 +101,14 @@ pub struct Words {
 /// `d MMMM y`.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Patterns {
+    /// The CLDR's full date, with its weekday.
+    pub full: String,
     /// The CLDR's long date.
     pub long: String,
     /// The CLDR's medium date.
     pub short: String,
+    /// The CLDR's short date, in figures.
+    pub figures: String,
     /// The day and the month, `MMMd`.
     pub day: String,
     /// The CLDR's short time.
@@ -169,6 +173,7 @@ const BUNDLED: &[(&str, &str)] = &[
     ("en-BZ", include_str!("bundled/en-BZ.yaml")),
     ("en-CA", include_str!("bundled/en-CA.yaml")),
     ("en-CC", include_str!("bundled/en-CC.yaml")),
+    ("en-CH", include_str!("bundled/en-CH.yaml")),
     ("en-CK", include_str!("bundled/en-CK.yaml")),
     ("en-CM", include_str!("bundled/en-CM.yaml")),
     ("en-CX", include_str!("bundled/en-CX.yaml")),
@@ -180,10 +185,12 @@ const BUNDLED: &[(&str, &str)] = &[
     ("en-GG", include_str!("bundled/en-GG.yaml")),
     ("en-GI", include_str!("bundled/en-GI.yaml")),
     ("en-GS", include_str!("bundled/en-GS.yaml")),
+    ("en-HK", include_str!("bundled/en-HK.yaml")),
     ("en-ID", include_str!("bundled/en-ID.yaml")),
     ("en-IE", include_str!("bundled/en-IE.yaml")),
     ("en-IL", include_str!("bundled/en-IL.yaml")),
     ("en-IM", include_str!("bundled/en-IM.yaml")),
+    ("en-IN", include_str!("bundled/en-IN.yaml")),
     ("en-IO", include_str!("bundled/en-IO.yaml")),
     ("en-JE", include_str!("bundled/en-JE.yaml")),
     ("en-JP", include_str!("bundled/en-JP.yaml")),
@@ -201,6 +208,8 @@ const BUNDLED: &[(&str, &str)] = &[
     ("en-PN", include_str!("bundled/en-PN.yaml")),
     ("en-RW", include_str!("bundled/en-RW.yaml")),
     ("en-SC", include_str!("bundled/en-SC.yaml")),
+    ("en-SE", include_str!("bundled/en-SE.yaml")),
+    ("en-SG", include_str!("bundled/en-SG.yaml")),
     ("en-SH", include_str!("bundled/en-SH.yaml")),
     ("en-SX", include_str!("bundled/en-SX.yaml")),
     ("en-TK", include_str!("bundled/en-TK.yaml")),

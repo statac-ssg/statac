@@ -2,6 +2,8 @@
 # patterns it takes otherwise. Every line is from the Unicode CLDR, release
 # 48.2.3: see LICENSE-CLDR.txt.
 dates:
+  full: EEEE, d MMMM y
   long: d MMMM y
   short: d MMM y
+  figures: dd/MM/y
   day: d MMM

@@ -3,3 +3,4 @@
 # 48.2.3: see LICENSE-CLDR.txt.
 dates:
   short: dd MMM y
+  figures: dd/MM/yy
