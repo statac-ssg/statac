@@ -39,6 +39,14 @@ pub(super) static TEMPLATE_PAGE: FindingKind = FindingKind {
                and each tag itself, as https://statac.dev/lists/ describes.",
 };
 
+pub(super) static COLLECTIONS: FindingKind = FindingKind {
+    heading: "Collections left out of tags",
+    sentence: "Eleventy reads the `tags` in a folder's data file as the collections the folder's \
+               pages belong to, as `\"tags\": \"posts\"` puts them in `collections.posts`, so \
+               these didn't become tags. Statac needs no collection to list a folder's pages: \
+               where one is also a tag readers should see, add it to the `tags` of each page.",
+};
+
 pub(super) static PARTS: FindingKind = FindingKind {
     heading: "Files that were parts of other pages",
     sentence: "Eleventy made no page of a file with `permalink: false`, and these had no title \
@@ -285,6 +293,7 @@ pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Im
         others: Vec::new(),
         words: Vec::new(),
         layouts_taken: 0,
+        collections: Vec::new(),
         overrides: 0,
         unpublished: 0,
         undated: 0,
@@ -372,6 +381,8 @@ struct Reader<'a> {
     /// Each of Eleventy's words kept as a field, with where it is.
     words: Vec<(String, Vec<Spot>)>,
     layouts_taken: usize,
+    /// The folders' data files whose `tags` were taken as collections.
+    collections: Vec<String>,
     overrides: usize,
     unpublished: usize,
     undated: usize,
@@ -1824,14 +1835,21 @@ impl Reader<'_> {
                 .find(|(f, _)| f.name == name)
                 .map(|(f, file)| ((*f).clone(), file.to_string()))
         };
-        // Tags gather from every level, the folders' first.
+        // A folder's data names collections with `tags`, which become no
+        // tags; the page's own and the data beside it gather, the data's
+        // first.
+        for (field, file, _) in &handed {
+            if field.name == "tags" && !self.collections.contains(file) {
+                self.collections.push(file.clone());
+                let shown = format!("tags: {}", super::write::shown_value(&field.value));
+                self.find(&COLLECTIONS, file, field.line, &shown);
+            }
+        }
         let mut tags: Vec<String> = Vec::new();
         let mut categories: Vec<String> = Vec::new();
-        for (field, _) in handed
+        for (field, _) in beside
             .iter()
-            .rev()
-            .map(|(f, file, _)| (f, file))
-            .chain(beside.iter().map(|(f, file)| (f, file)))
+            .map(|(f, file)| (f, file))
             .chain(own.iter().map(|(f, file)| (f, file)))
         {
             if field.name != "tags" {

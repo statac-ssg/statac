@@ -74,6 +74,12 @@ Each of these data files is a program that names `permalink`, so it may have giv
 
 - `notes/notes.11tydata.js`, line 3: ``permalink: (data) => `/n/${data.page.fileSlug}/`,``
 
+### Collections left out of tags
+
+Eleventy reads the `tags` in a folder's data file as the collections the folder's pages belong to, as `"tags": "posts"` puts them in `collections.posts`, so these didn't become tags. Statac needs no collection to list a folder's pages: where one is also a tag readers should see, add it to the `tags` of each page.
+
+- `posts/posts.json`, line 3: `tags: posts`
+
 ## Not converted
 
 Nothing: Statac read every file of the old site.
