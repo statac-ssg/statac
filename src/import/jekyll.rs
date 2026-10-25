@@ -1057,18 +1057,13 @@ impl Reader<'_> {
                     Some(rest) if !gatherings_dir.is_empty() => rest,
                     _ => above,
                 };
-                let mut dirs: Vec<String> = above
+                // Only the folders above `_posts` are categories, as
+                // Jekyll takes them, never those inside it.
+                let dirs: Vec<String> = above
                     .split('/')
                     .filter(|d| !d.is_empty())
                     .map(str::to_owned)
                     .collect();
-                let within = rel[top.len()..].trim_start_matches('/');
-                dirs.extend(
-                    within
-                        .split('/')
-                        .filter(|d| !d.is_empty())
-                        .map(str::to_owned),
-                );
                 let found = match posts {
                     true => Found::Post { dirs },
                     false => Found::Draft { dirs },

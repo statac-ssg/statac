@@ -193,6 +193,61 @@ fn each_permalink_style_keeps_every_address() {
     }
 }
 
+/// A Jekyll site with posts in folders inside `_posts`, at the top and
+/// beneath a folder: only a folder above `_posts` is a category, as
+/// Jekyll takes them, so each post is published at the URL Jekyll gave it.
+#[test]
+fn a_folder_inside_jekylls_posts_is_no_category() {
+    let site = scratch("jekyll-posts-folders");
+    let old = site.join("old");
+    let posts = [
+        ("_posts/2019/2019-01-01-post-1.md", "2019/01/01/post-1.html"),
+        ("_posts/2019-02-01-post-2.md", "2019/02/01/post-2.html"),
+        (
+            "blog/_posts/2019/2019-03-01-post-3.md",
+            "blog/2019/03/01/post-3.html",
+        ),
+    ];
+    fs::create_dir_all(&old).unwrap();
+    fs::write(
+        old.join("_config.yml"),
+        "title: Site 1\nurl: https://example.org\n",
+    )
+    .unwrap();
+    for (n, (path, _)) in posts.iter().enumerate() {
+        fs::create_dir_all(old.join(path).parent().unwrap()).unwrap();
+        let post = format!("---\ntitle: Post {}\n---\nText.\n", n + 1);
+        fs::write(old.join(path), post).unwrap();
+    }
+    let new = site.join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    templated(&new);
+    let out = site.join("built");
+    let outcome = build::run(&Options {
+        mode: Mode::Build,
+        site: new.to_path_buf(),
+        out: Some(out.clone()),
+        today: Some(today()),
+        drafts: false,
+        url: None,
+    });
+    let stopped = |problem: &&statac::problem::Problem| problem.kind.severity() == Severity::Error;
+    assert_eq!(outcome.problems.iter().filter(stopped).count(), 0);
+    for (path, url) in posts {
+        assert!(out.join(url).is_file(), "{path}: nothing at /{url}");
+    }
+    let tags = |path: &str| {
+        let text = fs::read_to_string(new.join("content").join(path)).unwrap();
+        text.lines()
+            .filter(|l| l.contains("category_"))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(tags("posts/post-1.md"), Vec::<String>::new());
+    assert_eq!(tags("posts/post-3.md"), ["  - category_blog"]);
+}
+
 #[test]
 fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts() {
     let (new, found) = imported("home-pages");
