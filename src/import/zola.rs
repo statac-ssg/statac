@@ -367,12 +367,10 @@ impl Reader<'_> {
                 self.import.address = Some(url.trim_end_matches('/').to_owned());
             }
             (_, Some(given)) => self.import.address = Some(given.to_owned()),
-            (Some(url), None) => notes.push(format!(
-                "The settings' `base_url`, {}, isn't an `https://` or `http://` URL, so the new \
-                 site has no `url` yet: add it to `statac.yaml` once it is known.",
-                code(url)
+            (url, None) => notes.push(super::report::no_url(
+                "base_url",
+                url.as_deref().filter(|url| !url.trim().is_empty()),
             )),
-            (None, None) => {}
         }
         let main = s.default_language.clone();
         self.languages = std::iter::once(main.clone())

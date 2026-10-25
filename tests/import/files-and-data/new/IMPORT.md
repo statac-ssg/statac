@@ -11,6 +11,8 @@ It was made from `tests/import/files-and-data/old` by `statac import`, which cha
 
 The old site's home page is `content/index.md`.
 
+The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
+
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
 The settings name no time zone, so none is written, and Statac reads a date written without an offset as UTC, and says so: add `timezone` to `statac.yaml`, as `Europe/London`.

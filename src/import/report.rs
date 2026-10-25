@@ -31,6 +31,21 @@ pub(super) fn code(text: &str) -> String {
     format!("{fence}{pad}{text}{pad}{fence}")
 }
 
+/// What is said where the old settings give no full URL in `setting`,
+/// `written` being what they give there instead, and none was given for
+/// the site: the new site has no `url`.
+pub(super) fn no_url(setting: &str, written: Option<&str>) -> String {
+    let why = match written {
+        Some(written) => format!(
+            "The settings' {}, {}, isn't an `https://` or `http://` URL",
+            code(setting),
+            code(written)
+        ),
+        None => format!("The settings give no {}", code(setting)),
+    };
+    format!("{why}, so the new site has no `url` yet: add it to `statac.yaml` once it is known.")
+}
+
 /// The counts of what converted, those that are none left out.
 fn converted(summary: &Summary) -> Vec<String> {
     [

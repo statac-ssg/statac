@@ -9,6 +9,8 @@ It was made from `tests/import/dates/old` by `statac import`, which changed noth
 
 The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
 
+The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
+
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
 1 date had a time and no offset, which Jekyll read as UTC whatever the site's time zone: it is written with `Z`, so it means the same moment.

@@ -401,13 +401,10 @@ impl Reader<'_> {
                 self.import.address = Some(url.trim_end_matches('/').to_owned());
             }
             (_, Some(given)) => self.import.address = Some(given.to_owned()),
-            (Some(url), None) if url.trim_matches('/').is_empty() => {}
-            (Some(url), None) => notes.push(format!(
-                "The settings' `baseURL`, {}, isn't an `https://` or `http://` URL, so the new \
-                 site has no `url` yet: add it to `statac.yaml` once it is known.",
-                code(url)
+            (url, None) => notes.push(super::report::no_url(
+                "baseURL",
+                url.as_deref().filter(|url| !url.trim().is_empty()),
             )),
-            (None, None) => {}
         }
         let mut declared = s.languages.clone();
         declared.sort_by(|a, b| a.weight.cmp(&b.weight).then_with(|| a.key.cmp(&b.key)));

@@ -3662,6 +3662,119 @@ fn a_site_whose_settings_give_no_address_has_no_url_where_none_is_given() {
     }
 }
 
+/// A Jekyll, Hugo or Zola site, times the URL its settings give, and
+/// asked for one with Enter pressed: the report says the new site has no
+/// `url` wherever it has none.
+#[test]
+fn a_site_whose_settings_give_no_url_is_said_to_have_none() {
+    let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+    let none = "so the new site has no `url` yet: add it to `statac.yaml` once it is known.";
+    // (the case, the settings file and what it holds, the post's file, the
+    // reason said)
+    let cases = [
+        (
+            "jekyll",
+            "_config.yml",
+            "",
+            "_posts/2026-01-01-post-1.md",
+            "The settings give no `url`",
+        ),
+        (
+            "jekyll-host",
+            "_config.yml",
+            "url: example.org\n",
+            "_posts/2026-01-01-post-1.md",
+            "The settings' `url`, `example.org`, isn't an `https://` or `http://` URL",
+        ),
+        (
+            "jekyll-url",
+            "_config.yml",
+            "url: https://example.org\n",
+            "_posts/2026-01-01-post-1.md",
+            "",
+        ),
+        (
+            "hugo",
+            "hugo.toml",
+            "",
+            "content/posts/post-1.md",
+            "The settings give no `baseURL`",
+        ),
+        (
+            "hugo-path",
+            "hugo.toml",
+            "baseURL = \"/\"\n",
+            "content/posts/post-1.md",
+            "The settings' `baseURL`, `/`, isn't an `https://` or `http://` URL",
+        ),
+        (
+            "hugo-empty",
+            "hugo.toml",
+            "baseURL = \"\"\n",
+            "content/posts/post-1.md",
+            "The settings give no `baseURL`",
+        ),
+        (
+            "hugo-url",
+            "hugo.toml",
+            "baseURL = \"https://example.org/\"\n",
+            "content/posts/post-1.md",
+            "",
+        ),
+        (
+            "zola",
+            "zola.toml",
+            "",
+            "content/post-1.md",
+            "The settings give no `base_url`",
+        ),
+        (
+            "zola-path",
+            "zola.toml",
+            "base_url = \"/\"\n",
+            "content/post-1.md",
+            "The settings' `base_url`, `/`, isn't an `https://` or `http://` URL",
+        ),
+        (
+            "zola-url",
+            "zola.toml",
+            "base_url = \"https://example.org\"\n",
+            "content/post-1.md",
+            "",
+        ),
+    ];
+    for (label, settings, given, page, why) in cases {
+        for (asked, typed) in [("", None), ("-asked", Some("\n"))] {
+            let label = format!("{label}{asked}");
+            let top = scratch(&format!("no-url-{label}"));
+            let old = top.join("old");
+            fs::create_dir_all(old.join(page).parent().unwrap()).unwrap();
+            let title = match settings.ends_with(".yml") {
+                true => "title: Site 1\n",
+                false => "title = \"Site 1\"\n",
+            };
+            fs::write(old.join(settings), format!("{given}{title}")).unwrap();
+            fs::write(old.join(page), post).unwrap();
+            let new = top.join("new");
+            let (code, told) = match typed {
+                Some(typed) => import_answering(&old, &new, typed, false),
+                None => import(&old, &new, None),
+            };
+            assert_eq!(code, 0, "{label}: {told}");
+            let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+            assert_eq!(
+                written.contains("\nurl: "),
+                why.is_empty(),
+                "{label}: {written}"
+            );
+            let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+            let said = format!("{why}, {none}");
+            assert_eq!(report.contains(&said), !why.is_empty(), "{label}: {report}");
+            assert_eq!(report.contains(none), !why.is_empty(), "{label}: {report}");
+        }
+    }
+}
+
 #[test]
 fn the_sites_address_is_asked_for_at_a_terminal_until_it_is_one_or_enter() {
     let old = Path::new("tests/import/eleventy-under-path/old");

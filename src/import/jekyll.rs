@@ -817,18 +817,13 @@ impl Reader<'_> {
                 self.import.address = Some(format!("{url}{}", s.base));
             }
             (_, Some(given)) => self.import.address = Some(super::under(given, &s.base)),
-            (Some(url), None) => notes.push(format!(
-                "The settings' `url`, {}, isn't an `https://` or `http://` URL, so the new site \
-                 has no `url` yet: add it to `statac.yaml` once it is known.",
-                code(url)
-            )),
             (None, None) if !s.base.is_empty() => notes.push(format!(
                 "The settings give a `baseurl`, {}, but no `url`, and Statac puts a site under a \
                  path only by its `url`: the links that named it were written without it, so add \
                  the full URL as `url` in `statac.yaml`, and put the path back in those links.",
                 code(&s.base)
             )),
-            (None, None) => {}
+            (url, None) => notes.push(super::report::no_url("url", url.as_deref())),
         }
         match &s.language {
             Some(code_) if crate::new::a_language_code(code_) => {
