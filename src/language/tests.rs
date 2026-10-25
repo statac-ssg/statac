@@ -792,7 +792,7 @@ type Pairs<'a> = &'a [(&'a str, &'a str)];
 #[test]
 fn a_tag_is_looked_for_whole_and_then_broader() {
     let own = "months: [a, b, c, d, e, f, g, h, i, j, k, l]\n";
-    let cases: [(&str, Pairs, Whence, Pairs); 23] = [
+    let cases: [(&str, Pairs, Whence, Pairs); 42] = [
         ("fr", &[], Whence::Statac("fr"), &[]),
         ("en-US", &[], Whence::Statac("en"), &[]),
         ("fr-SN", &[], Whence::Statac("fr"), &[]),
@@ -846,9 +846,119 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
             Whence::Site("languages/zh-Hant.yaml".into()),
             &[],
         ),
+        // The site's own file is looked for by the tags Statac's words are,
+        // in their order, so the narrowest the site has wins.
+        (
+            "en-Latn-GB",
+            &[("languages/en-GB.yaml", own)],
+            Whence::Site("languages/en-GB.yaml".into()),
+            &[],
+        ),
+        (
+            "en-latn-gb",
+            &[("languages/en-GB.yaml", own)],
+            Whence::Site("languages/en-GB.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn-GB",
+            &[
+                ("languages/en-GB.yaml", own),
+                ("languages/en-Latn-GB.yaml", own),
+            ],
+            Whence::Site("languages/en-Latn-GB.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn-GB",
+            &[("languages/en.yaml", own), ("languages/en-GB.yaml", own)],
+            Whence::Site("languages/en-GB.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn-GB",
+            &[("languages/en.yaml", own), ("languages/en-001.yaml", own)],
+            Whence::Site("languages/en-001.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn-GB",
+            &[("languages/en.yaml", own)],
+            Whence::Site("languages/en.yaml".into()),
+            &[],
+        ),
+        // `en-Latn` is no tag `en-Latn-GB` inherits from, nor is
+        // `en-Latn-GB` one that `en-Latn-GB-oxendict` does.
+        (
+            "en-Latn-GB",
+            &[("languages/en-Latn.yaml", own)],
+            Whence::Statac("en-GB"),
+            &[],
+        ),
+        (
+            "en-Latn-GB",
+            &[("languages/en-Latn.yaml", own), ("languages/en.yaml", own)],
+            Whence::Site("languages/en.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn-GB-oxendict",
+            &[
+                ("languages/en-Latn-GB.yaml", own),
+                ("languages/en-GB.yaml", own),
+            ],
+            Whence::Site("languages/en-GB.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn",
+            &[("languages/en-Latn.yaml", own), ("languages/en.yaml", own)],
+            Whence::Site("languages/en-Latn.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Latn",
+            &[("languages/en.yaml", own)],
+            Whence::Site("languages/en.yaml".into()),
+            &[],
+        ),
+        (
+            "en-GB",
+            &[("languages/en.yaml", own), ("languages/en-001.yaml", own)],
+            Whence::Site("languages/en-001.yaml".into()),
+            &[],
+        ),
+        (
+            "en-AT",
+            &[
+                ("languages/en-001.yaml", own),
+                ("languages/en-150.yaml", own),
+            ],
+            Whence::Site("languages/en-150.yaml".into()),
+            &[],
+        ),
+        (
+            "es-Latn-MX",
+            &[("languages/es.yaml", own), ("languages/es-419.yaml", own)],
+            Whence::Site("languages/es-419.yaml".into()),
+            &[],
+        ),
+        (
+            "fr-Latn-CA",
+            &[("languages/fr.yaml", own), ("languages/fr-CA.yaml", own)],
+            Whence::Site("languages/fr-CA.yaml".into()),
+            &[],
+        ),
+        (
+            "ko-Kore-KR",
+            &[("languages/ko-KR.yaml", own)],
+            Whence::Site("languages/ko-KR.yaml".into()),
+            &[],
+        ),
         ("sw", &[], Whence::Nothing, &[("unknown-language", "sw")]),
         // A language in a script other than its usual one takes none of
-        // Statac's words for the language, though a site's file for it may.
+        // Statac's words for the language nor the site's file for it, only
+        // the site's file for the language in that script.
         (
             "en-Dsrt",
             &[],
@@ -864,7 +974,28 @@ fn a_tag_is_looked_for_whole_and_then_broader() {
         (
             "en-Shaw",
             &[("languages/en.yaml", own)],
-            Whence::Site("languages/en.yaml".into()),
+            Whence::Nothing,
+            &[("unknown-language", "en-Shaw")],
+        ),
+        (
+            "ar-Latn",
+            &[("languages/ar.yaml", own)],
+            Whence::Nothing,
+            &[("unknown-language", "ar-Latn")],
+        ),
+        (
+            "en-Shaw",
+            &[("languages/en-Shaw.yaml", own)],
+            Whence::Site("languages/en-Shaw.yaml".into()),
+            &[],
+        ),
+        (
+            "en-Shaw-GB",
+            &[
+                ("languages/en-GB.yaml", own),
+                ("languages/en-Shaw.yaml", own),
+            ],
+            Whence::Site("languages/en-Shaw.yaml".into()),
             &[],
         ),
     ];
@@ -915,6 +1046,11 @@ fn a_sites_own_file_adds_to_statacs_words_key_by_key() {
         bundled("en-AU").unwrap().1.months_short
     );
     assert_eq!(english.words.dates, bundled("en-AU").unwrap().1.dates);
+    assert_eq!(english.words.am_pm, None);
+    // A file for the tag without its usual script adds to Statac's words
+    // for the tag.
+    let (english, _) = language("en-Latn-GB", &[("languages/en-GB.yaml", text)]);
+    assert_eq!(english.words.dates, bundled("en-GB").unwrap().1.dates);
     assert_eq!(english.words.am_pm, None);
 
     // A key whose value can't be read keeps Statac's.

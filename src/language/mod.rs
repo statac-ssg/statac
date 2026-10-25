@@ -6,13 +6,15 @@
 //! `languages/<tag>.yaml` adds to them key by key: a key it writes takes
 //! the place of Statac's, and a key it leaves out keeps Statac's. For a
 //! language Statac has no words for, the file is the language whole, on
-//! lines running the way its script does. A tag neither has is looked for
-//! again without its last part, `en-US` as `en`, as the Unicode CLDR's own
-//! data inherits; a region is looked for first as the broader form of its
+//! lines running the way its script does. The site's file and Statac's
+//! words are each looked for by one rule, as the Unicode CLDR's own data
+//! inherits: a tag neither has is looked for again without its last part,
+//! `en-US` as `en`; a tag naming its language's usual script first without
+//! it, `en-Latn-GB` as `en-GB`; a region first as the broader form of its
 //! language the CLDR writes it as, `en-GB` as `en-001` and `es-MX` as
-//! `es-419`. Statac's words for a language don't reach it written in a
-//! script other than its usual one, `en-Dsrt`, whose CLDR data inherits
-//! from no language.
+//! `es-419`. Neither the words for a language nor its file reach it
+//! written in a script other than its usual one, `en-Dsrt`, whose CLDR
+//! data inherits from no language.
 //!
 //! Statac's own words for a language come with the CLDR's patterns for
 //! writing a date in it, which a site's file can't change.
@@ -383,9 +385,9 @@ impl Languages {
     }
 
     /// The language a site names by `tag`, its file read into `sources`:
-    /// the site's file for the tag or a broader one, over Statac's words
-    /// for the tag, or else Statac's alone. A tag with no words at all is
-    /// said once, at the tag.
+    /// the site's file for the tag or one it inherits from, over Statac's
+    /// words for the tag, or else Statac's alone. A tag with no words at
+    /// all is said once, at the tag.
     pub(crate) fn language(
         &self,
         tag: Option<Sourced<&str>>,
@@ -395,7 +397,7 @@ impl Languages {
         let Some(tag) = tag else {
             return Language::unnamed();
         };
-        let file = broader(tag.value).find_map(|wanted| self.file(wanted));
+        let file = parents::inherited(tag.value).find_map(|wanted| self.file(&wanted));
         let found = match file {
             Some((name, at)) => {
                 let shown = format!("{FOLDER}/{name}");
@@ -456,10 +458,4 @@ impl Languages {
 fn is_yaml(name: &str) -> bool {
     name.rsplit_once('.')
         .is_some_and(|(stem, ext)| !stem.is_empty() && ext.eq_ignore_ascii_case("yaml"))
-}
-
-/// The tag, then each broader tag left by taking off its last part:
-/// `zh-Hant-TW`, `zh-Hant`, `zh`.
-fn broader(tag: &str) -> impl Iterator<Item = &str> {
-    std::iter::successors(Some(tag), |tag| tag.rsplit_once('-').map(|(less, _)| less))
 }

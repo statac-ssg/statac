@@ -349,6 +349,15 @@ fn words_a_language_lacks_are_told_only_where_the_page_would_show_them() {
     // The site's own file for the language is where the words go.
     let quotes = ("languages/fr.yaml", "quotes: « » “ ”\n");
     assert_eq!(told(french, &[quotes]), way_back("languages/fr.yaml"));
+    // A tag naming its language's usual script is told of in its own file,
+    // or in the site's file it takes its words from.
+    let scripted = "language: fr-Latn-CA\npages.feed: false\n";
+    assert_eq!(told(scripted, &[]), way_back("languages/fr-Latn-CA.yaml"));
+    let canadian = ("languages/fr-CA.yaml", "quotes: « » “ ”\n");
+    assert_eq!(
+        told(scripted, &[quotes, canadian]),
+        way_back("languages/fr-CA.yaml")
+    );
     // A file of the site's that reads what Statac hands it shows them.
     let reading = [
         ("snippets/markdown/callout.html", "{{ title }}{{ body }}"),
