@@ -2278,6 +2278,129 @@ fn letters_run_together_part_at_the_languages_marks() {
     );
 }
 
+fn chinese() -> DateWords {
+    words(Words {
+        months: list("一月, 二月, 三月, 四月, 五月, 六月, 七月, 八月, 九月, 十月, 十一月, 十二月"),
+        weekdays: list("星期一, 星期二, 星期三, 星期四, 星期五, 星期六, 星期日"),
+        weekdays_short: list("周一, 周二, 周三, 周四, 周五, 周六, 周日"),
+        am_pm: list("上午, 下午"),
+        ..Words::default()
+    })
+}
+
+/// A letter of Han, kana or Hangul is a syllable or more: one slip from
+/// the reference moment's word of three letters is told, however short
+/// the word written, and other text between the pieces is kept.
+#[test]
+fn a_slip_in_a_word_of_syllables_is_told_and_other_text_kept() {
+    let (japanese, korean, chinese) = (statacs("ja"), statacs("ko"), chinese());
+    let slips = [
+        (
+            "2025年12月31日水曜目",
+            &japanese,
+            "水曜目",
+            "2025年12月31日水曜日",
+        ),
+        (
+            "2025年12月31日水曜",
+            &japanese,
+            "水曜",
+            "2025年12月31日水曜日",
+        ),
+        (
+            "2025年12月31日 水曜目",
+            &japanese,
+            "水曜目",
+            "2025年12月31日 水曜日",
+        ),
+        (
+            "2025年12月31日(曜日)",
+            &japanese,
+            "曜日",
+            "2025年12月31日(水曜日)",
+        ),
+        (
+            "2025년 12월 31일 수요알",
+            &korean,
+            "수요알",
+            "2025년 12월 31일 수요일",
+        ),
+        (
+            "2025년12월31일수요알",
+            &korean,
+            "수요알",
+            "2025년12월31일수요일",
+        ),
+        ("31 十二目 2025", &chinese, "十二目", "31 十二月 2025"),
+        (
+            "31 十二月 2025 星朝三",
+            &chinese,
+            "星朝三",
+            "31 十二月 2025 星期三",
+        ),
+    ];
+    for (example, words, at, corrected) in slips {
+        let refusal = refused(example, words);
+        let fault = FormatFault::NotInReference {
+            written: at.into(),
+            reference: words.moment(),
+            corrected: Some(corrected.into()),
+        };
+        assert_eq!(refusal.fault, fault, "{example}");
+        assert_eq!(&example[refusal.at], at, "{example}");
+    }
+    let kept = [
+        ("2025年12月31日更新", &japanese, "2026年3月7日更新"),
+        ("更新 2025年12月31日", &japanese, "更新 2026年3月7日"),
+        ("2025年12月31日付", &japanese, "2026年3月7日付"),
+        (
+            "2025年12月31日 15:04以後",
+            &japanese,
+            "2026年3月7日 09:05以後",
+        ),
+        ("2025년 12월 31일 기준", &korean, "2026년 3월 7일 기준"),
+        ("31 十二月 2025 更新", &chinese, "7 三月 2026 更新"),
+    ];
+    for (example, words, saturday) in kept {
+        assert_eq!(written(example, words, &timed(2026, 3, 7, 9, 5)), saturday);
+    }
+}
+
+/// Two of the language's words of Han or kana run together part with no
+/// mark between them, as the script writes no spaces between words. A
+/// single letter, and words of a script with spaces, stay one word.
+#[test]
+fn words_of_a_script_without_spaces_part_where_they_run_together() {
+    let (japanese, korean, arabic, chinese) =
+        (statacs("ja"), statacs("ko"), statacs("ar"), chinese());
+    let parted = [
+        (
+            "2025年12月31日水曜日午後3:04",
+            &japanese,
+            "2026年3月7日土曜日午前9:05",
+        ),
+        ("水曜日午後3:04", &japanese, "土曜日午前9:05"),
+        ("星期三下午3:04", &chinese, "星期六上午9:05"),
+        ("周三下午3:04", &chinese, "周六上午9:05"),
+    ];
+    for (example, words, saturday) in parted {
+        assert_eq!(written(example, words, &timed(2026, 3, 7, 9, 5)), saturday);
+    }
+    let one_word = [
+        ("2025年12月31日 水午後3:04", &japanese, "午前", "午後"),
+        ("2025년 12월 31일 수요일오후 3:04", &korean, "오전", "오후"),
+        ("31 ديسمبر 2025 3:04 صم", &arabic, "ص", "م"),
+    ];
+    for (example, words, am, pm) in one_word {
+        let fault = FormatFault::LoneHour {
+            written: "3".into(),
+            am: am.into(),
+            pm: pm.into(),
+        };
+        assert_eq!(refused(example, words).fault, fault, "{example}");
+    }
+}
+
 #[test]
 fn a_sites_format_is_told_at_its_text_in_the_settings() {
     for (line, at) in [

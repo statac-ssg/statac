@@ -40,6 +40,7 @@ pub(crate) use html::escape_href;
 pub use html::{Copies, Options, Picture, Placement, Snippets, to_html, write};
 pub use ids::give_heading_ids;
 pub use node::{Alignment, CalloutKind, Kind, Node};
+pub(crate) use opening::runs_without_spaces;
 pub use opening::{Called, Written, as_written, closed_up, lines_of, references_read, words_of};
 pub use pieces::{Piece, PieceValue, language_word};
 pub use questions::{Heading, Link, has_callout, headings, links, plain_text, uses_maths};

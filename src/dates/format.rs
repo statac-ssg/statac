@@ -1675,7 +1675,7 @@ fn class(c: char) -> Class {
 
 /// Runs of figures, runs of letters, and each other character alone. A
 /// run of letters is parted into the `pieces` it is wholly written in.
-fn runs(s: &str, pieces: &[(&str, bool)]) -> Vec<(Range<usize>, Class)> {
+fn runs(s: &str, pieces: &[(&str, Joins)]) -> Vec<(Range<usize>, Class)> {
     let mut runs: Vec<(Range<usize>, Class)> = Vec::new();
     for (at, c) in s.char_indices() {
         let class = class(c);
@@ -1686,15 +1686,17 @@ fn runs(s: &str, pieces: &[(&str, bool)]) -> Vec<(Range<usize>, Class)> {
         }
     }
     let mut parted = Vec::with_capacity(runs.len());
+    let mut after_figures = false;
     for (span, class) in runs {
         let mut start = span.start;
         if class == Class::Letter {
-            for at in partings(&s[span.clone()], pieces) {
+            for at in partings(&s[span.clone()], pieces, after_figures) {
                 parted.push((start..span.start + at, class));
                 start = span.start + at;
             }
         }
         parted.push((start..span.end, class));
+        after_figures = class == Class::Figure;
     }
     parted
 }
@@ -1731,64 +1733,121 @@ fn marks(words: &Words) -> Vec<String> {
     marks
 }
 
+/// How a word a run of letters may be parted into meets the word beside
+/// it.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+enum Joins {
+    /// One of the language's patterns' marks, as `日`.
+    Mark,
+    /// A word of two letters or more in a script written without spaces
+    /// between words, as `水曜日` and `午後`.
+    Unspaced,
+    Word,
+}
+
+impl Joins {
+    const ALL: [Joins; 3] = [Joins::Mark, Joins::Unspaced, Joins::Word];
+
+    fn of(word: &str, mark: bool) -> Joins {
+        let unspaced =
+            word.chars().nth(1).is_some() && word.chars().all(crate::markdown::runs_without_spaces);
+        match (mark, unspaced) {
+            (true, _) => Joins::Mark,
+            (false, true) => Joins::Unspaced,
+            (false, false) => Joins::Word,
+        }
+    }
+
+    /// Whether letters part between a word joining so and the `next`: at
+    /// a mark, and between two words of a script written without spaces.
+    /// A single letter of such a script stays in the word it is written
+    /// in, as `水` is in `水木`.
+    fn parts_from(self, next: Joins) -> bool {
+        matches!(
+            (self, next),
+            (Joins::Mark, _) | (_, Joins::Mark) | (Joins::Unspaced, Joins::Unspaced)
+        )
+    }
+}
+
 /// The words a run of letters may be parted into, the language's own and
-/// its patterns' marks, each with whether it is a mark.
-fn pieces<'a>(listed: &[(&'a str, Listed)], marks: &'a [String]) -> Vec<(&'a str, bool)> {
+/// its patterns' marks, each with how it joins the word beside it.
+fn pieces<'a>(listed: &[(&'a str, Listed)], marks: &'a [String]) -> Vec<(&'a str, Joins)> {
     let own = listed
         .iter()
         .filter(|(_, list)| !matches!(list, Listed::Unworded(_)))
         .map(|(word, _)| *word);
-    let mut pieces: Vec<(&str, bool)> = Vec::new();
+    let mut pieces: Vec<(&str, Joins)> = Vec::new();
     for word in own.chain(marks.iter().map(String::as_str)) {
         if !word.is_empty() && !pieces.iter().any(|(piece, _)| *piece == word) {
-            pieces.push((word, marks.iter().any(|mark| mark == word)));
+            let mark = marks.iter().any(|mark| mark == word);
+            pieces.push((word, Joins::of(word, mark)));
         }
     }
     pieces
 }
 
 /// Where a run of letters parts into words: nowhere, unless it is wholly
-/// `pieces` with a mark beside every parting, as `日水曜日` is the day's
-/// `日` and the weekday `水曜日`. Where it parts more than one way, the
-/// longest piece comes first. Without a mark, letters stay one word, so
-/// Arabic's `م`, its afternoon, is never parted out of a longer word.
-fn partings(run: &str, pieces: &[(&str, bool)]) -> Vec<usize> {
+/// `pieces` and parts between each two, as `日水曜日` is the day's `日`
+/// and the weekday `水曜日`, and `水曜日午後` the weekday and the
+/// afternoon. Where it parts more than one way, the longest piece comes
+/// first. In a script with spaces between words, letters with no mark
+/// between them stay one word, so Arabic's `م`, its afternoon, is never
+/// parted out of a longer word.
+///
+/// A run of Han, kana or Hangul straight `after_figures` that doesn't
+/// part wholly still parts after the mark it opens with, the figures' own,
+/// as `日` in `31日水曜目`, so the word after it is read alone.
+fn partings(run: &str, pieces: &[(&str, Joins)], after_figures: bool) -> Vec<usize> {
     let pieces_at = |from: usize| {
-        pieces.iter().filter_map(move |(piece, mark)| {
-            begins_with(&run[from..], piece).map(|len| (from + len, *mark))
+        pieces.iter().filter_map(move |(piece, joins)| {
+            begins_with(&run[from..], piece).map(|len| (from + len, *joins))
         })
     };
+    let parts = |from: usize, before: Joins, joins: Joins| from == 0 || before.parts_from(joins);
     // Whether the letters from each point on part wholly, after a piece
-    // that is a mark and after one that isn't.
-    let mut whole = vec![[false; 2]; run.len() + 1];
-    whole[run.len()] = [true; 2];
+    // joining each way.
+    let mut whole = vec![[false; Joins::ALL.len()]; run.len() + 1];
+    whole[run.len()] = [true; Joins::ALL.len()];
     for from in (0..run.len())
         .rev()
         .filter(|from| run.is_char_boundary(*from))
     {
-        for after_a_mark in [false, true] {
-            whole[from][usize::from(after_a_mark)] = pieces_at(from).any(|(end, mark)| {
-                (from == 0 || after_a_mark || mark) && whole[end][usize::from(mark)]
-            });
+        for before in Joins::ALL {
+            whole[from][before as usize] = pieces_at(from)
+                .any(|(end, joins)| parts(from, before, joins) && whole[end][joins as usize]);
         }
     }
-    let mut partings = Vec::new();
-    let (mut from, mut after_a_mark) = (0, false);
-    while from < run.len() {
-        let next = pieces_at(from)
-            .filter(|(end, mark)| {
-                (from == 0 || after_a_mark || *mark) && whole[*end][usize::from(*mark)]
-            })
-            .max_by_key(|(end, _)| *end);
-        let Some((end, mark)) = next else {
-            return Vec::new();
+    if !whole[0][Joins::Mark as usize] {
+        let mark = (pieces.iter())
+            .filter(|(_, joins)| *joins == Joins::Mark)
+            .filter_map(|(mark, _)| begins_with(run, mark))
+            .max();
+        return match mark {
+            Some(end) if after_figures && end < run.len() && syllabic(run) => vec![end],
+            _ => Vec::new(),
         };
+    }
+    let mut partings = Vec::new();
+    let (mut from, mut before) = (0, Joins::Mark);
+    while from < run.len() {
+        let (end, joins) = pieces_at(from)
+            .filter(|(end, joins)| parts(from, before, *joins) && whole[*end][*joins as usize])
+            .max_by_key(|(end, _)| *end)
+            .expect("a run that parts wholly parts at each step");
         if end < run.len() {
             partings.push(end);
         }
-        (from, after_a_mark) = (end, mark);
+        (from, before) = (end, joins);
     }
     partings
+}
+
+/// Whether every letter of `word` is Han, kana or Hangul, each a syllable
+/// or more.
+fn syllabic(word: &str) -> bool {
+    word.chars()
+        .all(|c| crate::markdown::runs_without_spaces(c) || matches!(c, '\u{ac00}'..='\u{d7af}'))
 }
 
 /// Every word an example may name, with its list: the language's own,
@@ -2092,6 +2151,17 @@ fn resolve(token: &Token, words: &Words) -> Resolution {
             }
             if let Some(component) = begun(text, words) {
                 return Resolution::Component(component);
+            }
+            // A letter of Han, kana or Hangul is a syllable or more, so one
+            // slip from a word of three is a typo however short the word
+            // written, where one from a word of two leaves half of it.
+            if syllabic(text) {
+                let mut known =
+                    known_words(words).filter(|word| syllabic(word) && word.chars().count() >= 3);
+                return match known.find(|word| crate::suggest::is_one_slip(text, word)) {
+                    Some(word) => Resolution::Typo(word.to_owned()),
+                    None => Resolution::Literal,
+                };
             }
             // A short word near a known one is left alone: "on" is a
             // letter from "Mon".

@@ -385,7 +385,7 @@ pub(super) fn count_words(html: &str) -> usize {
 }
 
 /// Whether `c` is written in Han, hiragana or katakana.
-fn runs_without_spaces(c: char) -> bool {
+pub(crate) fn runs_without_spaces(c: char) -> bool {
     matches!(
         c,
         '\u{2e80}'..='\u{2fdf}'
