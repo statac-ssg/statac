@@ -1377,6 +1377,44 @@ fn a_sharing_card_and_what_it_is_drawn_from() {
 }
 
 #[test]
+fn a_file_cards_are_drawn_with_written_within_the_step_is_known_by_its_bytes() {
+    let site = Site::new("card-same-step");
+    site.write("templates/og.yaml", CARD);
+    site.put("templates/og/text.ttf", LATIN);
+    site.write("templates/page.html", &format!("{BASE}{ANNOUNCED}{PAGE}"));
+    // A time the round's clock is before, as a file written within the
+    // step a disk's times were in as the round began has.
+    let later = SystemTime::now() + Duration::from_secs(3600);
+    let background = |site: &Site, grey| {
+        site.put("templates/og/background.png", &png(1200, 630, grey));
+        let path = site.root().join("templates/og/background.png");
+        let file = fs::File::options().write(true).open(path).unwrap();
+        file.set_modified(later).unwrap();
+    };
+    background(&site, 40);
+    let built = through(
+        &site,
+        &[
+            ("a title a card shows", &|site| {
+                site.write(
+                    "content/post-2.md",
+                    &post("Post 2 again", "2026-01-02", "one", "Post 2 says this."),
+                )
+            }),
+            ("no edit", &|_| {}),
+            ("the background written again within the step", &|site| {
+                background(site, 60)
+            }),
+            ("no edit", &|_| {}),
+        ],
+    );
+    assert!(built[1].0 < built[1].1, "{built:?}");
+    assert_eq!(built[2].0, 0, "{built:?}");
+    assert_eq!(built[3].0, built[3].1, "{built:?}");
+    assert_eq!(built[4].0, 0, "{built:?}");
+}
+
+#[test]
 fn the_photographs_a_page_lists_follow_one_added_and_removed() {
     let Some(_counted) = counted(the_photographs_a_page_lists_follow_one_added_and_removed) else {
         return;

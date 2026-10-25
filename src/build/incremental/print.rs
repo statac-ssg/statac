@@ -334,6 +334,9 @@ pub(super) struct Prints {
     fetched: OnceLock<HashMap<u64, u64>>,
     mentions: Slots,
     today: OnceLock<u64>,
+    /// What each file the cards are drawn with held, by its path, with
+    /// the stamp that settles it, where one did.
+    drawn_with: OnceLock<HashMap<String, (Stamp, blake3::Hash)>>,
 }
 
 impl Prints {
@@ -371,6 +374,7 @@ impl Prints {
             fetched: OnceLock::new(),
             mentions: slots(pages),
             today: OnceLock::new(),
+            drawn_with: OnceLock::new(),
         }
     }
 }
@@ -415,12 +419,13 @@ impl Taken<'_> {
     /// settings, its languages and its cards; which templates, data
     /// files, assets and languages the site has; what its cards are drawn
     /// with; which files a link publishes; and how it is asked to build.
-    pub(super) fn whole(&self, plan: &Plan, options: &Options) -> u64 {
+    /// What `last`, the reading before, found the cards drawn with is
+    /// taken where a file is found as it was then.
+    pub(super) fn whole(&self, plan: &Plan, options: &Options, last: Option<&Prints>) -> u64 {
         let reading = self.reading;
         let renderer = &reading.renderer;
         let sources = renderer.sources();
         let site = renderer.site();
-        let clock = self.prints.clock.as_ref();
         let templates: HashSet<SourceId> =
             (reading.template_files.iter().map(|(source, _)| *source)).collect();
         let mut print = Print::default();
@@ -443,15 +448,43 @@ impl Taken<'_> {
         for (_, language) in site.languages.iter() {
             print = print.with((&language.tag, &language.folder));
         }
+        let was = last.and_then(|last| last.drawn_with.get());
+        let mut drawn_with = HashMap::new();
         for file in renderer.card_files() {
-            print = print
-                .on_disk(stamp_of(renderer.open_card_file(&file)), clock)
-                .with(file);
+            let held = self.drawn_with(&file, was, &mut drawn_with);
+            print = print.with((held.map(|hash| *hash.as_bytes()), file));
         }
+        let _ = self.prints.drawn_with.set(drawn_with);
         print
             .with(plan.linked.watches())
             .with(options.drafts)
             .done()
+    }
+
+    /// What the file the cards are drawn with at `path` holds, where it
+    /// can be read: as `was` found it, where the file is found as it was
+    /// then, or else as read now. Kept in `kept` where this reading's
+    /// clock settles it. A file is known by its bytes, as a file whose
+    /// stamp isn't settled can be known by nothing else, and every output
+    /// is built again where this differs.
+    fn drawn_with(
+        &self,
+        path: &str,
+        was: Option<&HashMap<String, (Stamp, blake3::Hash)>>,
+        kept: &mut HashMap<String, (Stamp, blake3::Hash)>,
+    ) -> Option<blake3::Hash> {
+        let file = self.reading.renderer.open_card_file(path).ok()?;
+        let stamp = file.metadata().ok().as_ref().and_then(Stamp::of);
+        let found = was.and_then(|was| was.get(path));
+        let hash = match (stamp, found) {
+            (Some(stamp), Some((then, hash))) if stamp == *then => *hash,
+            _ => blake3::Hasher::new().update_reader(file).ok()?.finalize(),
+        };
+        let clock = self.prints.clock.as_ref();
+        if let Some(stamp) = stamp.filter(|stamp| clock.is_some_and(|clock| stamp.settled(clock))) {
+            kept.insert(path.to_owned(), (stamp, hash));
+        }
+        Some(hash)
     }
 
     /// What `output` is built from besides what it reads.
