@@ -2326,6 +2326,61 @@ fn letters_run_together_part_at_the_languages_marks() {
     );
 }
 
+/// With words and no patterns, as a site's own file gives, the letter
+/// straight after figures parts from the language's words after it.
+#[test]
+fn letters_run_together_part_after_the_figures_mark_with_no_patterns() {
+    let without_patterns = |tag: &str| {
+        words(Words {
+            dates: None,
+            ..(*crate::language::statacs(tag).unwrap().1).clone()
+        })
+    };
+    let (japanese, korean, chinese) = (without_patterns("ja"), without_patterns("ko"), chinese());
+    let cases = [
+        ("2025年12月31日星期三", &chinese, "2026年03月07日星期六"),
+        ("2025年12月31号星期三", &chinese, "2026年03月07号星期六"),
+        ("2025年12月31日周三", &chinese, "2026年03月07日周六"),
+        (
+            "2025年12月31日星期三下午3:04",
+            &chinese,
+            "2026年03月07日星期六上午9:05",
+        ),
+        ("2025年12月31日水曜日", &japanese, "2026年3月7日土曜日"),
+        ("2025년12월31일수요일", &korean, "2026년3월7일토요일"),
+        // A letter none of the language's patterns write is kept as text.
+        ("2025年12月31号水曜日", &statacs("ja"), "2026年3月7号土曜日"),
+    ];
+    for (example, words, saturday) in cases {
+        let written = written(example, words, &timed(2026, 3, 7, 9, 5));
+        assert_eq!(written, saturday, "{example}");
+    }
+    let slips = [
+        (
+            "2025年12月31日星朝三",
+            &chinese,
+            "星朝三",
+            "2025年12月31日星期三",
+        ),
+        (
+            "2025年12月31星朝三",
+            &chinese,
+            "星朝三",
+            "2025年12月31星期三",
+        ),
+    ];
+    for (example, words, at, corrected) in slips {
+        let refusal = refused(example, words);
+        let fault = FormatFault::NotInReference {
+            written: at.into(),
+            reference: words.moment(),
+            corrected: Some(corrected.into()),
+        };
+        assert_eq!(refusal.fault, fault, "{example}");
+        assert_eq!(&example[refusal.at], at, "{example}");
+    }
+}
+
 fn chinese() -> DateWords {
     words(Words {
         months: list("一月, 二月, 三月, 四月, 五月, 六月, 七月, 八月, 九月, 十月, 十一月, 十二月"),

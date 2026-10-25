@@ -1797,8 +1797,47 @@ fn pieces<'a>(listed: &[(&'a str, Listed)], marks: &'a [String]) -> Vec<(&'a str
 ///
 /// A run of Han, kana or Hangul straight `after_figures` that doesn't
 /// part wholly still parts after the mark it opens with, the figures' own,
-/// as `日` in `31日水曜目`, so the word after it is read alone.
+/// as `日` in `31日水曜目`, so the word after it is read alone. Where no
+/// mark of the language's patterns opens it, as with a site's own words,
+/// which carry no patterns, its first letter is taken as the figures' own
+/// where the letters after it part wholly or are a slip from one of the
+/// language's words: `日` in `31日星期三`, and `号` in `31号星期三`.
 fn partings(run: &str, pieces: &[(&str, Joins)], after_figures: bool) -> Vec<usize> {
+    if let Some(partings) = wholly(run, pieces) {
+        return partings;
+    }
+    if !after_figures || !syllabic(run) {
+        return Vec::new();
+    }
+    let mark = (pieces.iter())
+        .filter(|(_, joins)| *joins == Joins::Mark)
+        .filter_map(|(mark, _)| begins_with(run, mark))
+        .max();
+    let first = run.chars().next().map_or(0, char::len_utf8);
+    let end = mark.unwrap_or(first);
+    let rest = &run[end..];
+    if rest.is_empty() {
+        return Vec::new();
+    }
+    if mark.is_some() {
+        return vec![end];
+    }
+    if let Some(after) = wholly(rest, pieces) {
+        return std::iter::once(end)
+            .chain(after.into_iter().map(|at| end + at))
+            .collect();
+    }
+    let slip = pieces.iter().any(|(word, _)| {
+        syllabic(word) && word.chars().count() >= 3 && crate::suggest::is_one_slip(rest, word)
+    });
+    match slip {
+        true => vec![end],
+        false => Vec::new(),
+    }
+}
+
+/// Where `run` parts, if it is wholly `pieces` parting between each two.
+fn wholly(run: &str, pieces: &[(&str, Joins)]) -> Option<Vec<usize>> {
     let pieces_at = |from: usize| {
         pieces.iter().filter_map(move |(piece, joins)| {
             begins_with(&run[from..], piece).map(|len| (from + len, *joins))
@@ -1819,14 +1858,7 @@ fn partings(run: &str, pieces: &[(&str, Joins)], after_figures: bool) -> Vec<usi
         }
     }
     if !whole[0][Joins::Mark as usize] {
-        let mark = (pieces.iter())
-            .filter(|(_, joins)| *joins == Joins::Mark)
-            .filter_map(|(mark, _)| begins_with(run, mark))
-            .max();
-        return match mark {
-            Some(end) if after_figures && end < run.len() && syllabic(run) => vec![end],
-            _ => Vec::new(),
-        };
+        return None;
     }
     let mut partings = Vec::new();
     let (mut from, mut before) = (0, Joins::Mark);
@@ -1840,7 +1872,7 @@ fn partings(run: &str, pieces: &[(&str, Joins)], after_figures: bool) -> Vec<usi
         }
         (from, before) = (end, joins);
     }
-    partings
+    Some(partings)
 }
 
 /// Whether every letter of `word` is Han, kana or Hangul, each a syllable
