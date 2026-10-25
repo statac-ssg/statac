@@ -8,7 +8,8 @@
 //! fields parted by tabs: the file's path under `fetched/`, the first 16
 //! hex digits of the BLAKE3 hash of its bytes or `absent`, and the day it
 //! was fetched. `absent` is a file the site asked for that the other site
-//! answered it has none of, which is not asked for again. A file with no
+//! answered it has none of, or that `statac refresh` chose not to keep,
+//! such as a refused mention, which is not asked for again. A file with no
 //! line is the author's own; a line whose file has gone is dropped the
 //! next time the record is written.
 
