@@ -13,7 +13,7 @@ Zola has no setting for a time zone, and reads a date written without an offset 
 
 Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
-Zola's feed, at `/atom.xml`, stays at the same URL, as `feed:` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` keeps each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids.
+Zola's feed, at `/atom.xml`, stays at the same URL, as `feed:` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` and `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids.
 
 The settings written in `statac.yaml`:
 
@@ -23,6 +23,7 @@ url: https://example.org
 language: en
 timezone: UTC
 feed_ids_before: 2026-10-06
+feed_ids_from: zola
 ```
 
 and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.

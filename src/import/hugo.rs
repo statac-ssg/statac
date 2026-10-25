@@ -1895,6 +1895,9 @@ impl Reader<'_> {
             self.import
                 .settings
                 .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
+            self.import
+                .settings
+                .push(("feed_ids_from".into(), Value::Text("hugo".into())));
         }
         let on = match (home, lists) {
             (true, false) => "the home page",
@@ -1904,9 +1907,9 @@ impl Reader<'_> {
             "stays",
             format!(
                 "at the same URL, as `feed: {name}` on {on} says, built with \
-                     `templates/feed.xml` once you add it, and `feed_ids_before` keeps each \
-                     post's id the URL Hugo gave it, so feed readers see nothing new: see \
-                     https://statac.dev/feeds/#entry-ids."
+                     `templates/feed.xml` once you add it, and `feed_ids_before` and \
+                     `feed_ids_from: hugo` keep each post's id the URL Hugo gave it, so feed \
+                     readers see nothing new: see https://statac.dev/feeds/#entry-ids."
             ),
         );
         let mut said = match (fed, home, lists) {

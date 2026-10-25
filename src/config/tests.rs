@@ -63,6 +63,9 @@ fn every_setting_the_sites_write_is_read() {
         ("tags.permalink", "/tag/{slug}/", "/tag/{slug}/"),
         ("series.permalink", "/runs/{slug}/", "/runs/{slug}/"),
         ("feed_ids_from", "jekyll", "jekyll"),
+        ("feed_ids_from", "hugo", "hugo"),
+        ("feed_ids_from", "zola", "zola"),
+        ("feed_ids_from", "eleventy", "eleventy"),
         ("search_without_javascript", "duckduckgo", "duckduckgo"),
     ];
     for (name, written, value) in cases {
@@ -437,6 +440,19 @@ fn settings_of_the_wrong_kind_are_refused_at_the_value() {
                 "search_without_javascript",
                 Expected::OneOf(vec!["duckduckgo".into()]),
                 "google",
+                None,
+            ),
+        ),
+        (
+            "feed_ids_from: gatsby",
+            wrong(
+                "feed_ids_from",
+                Expected::OneOf(
+                    ["jekyll", "hugo", "zola", "eleventy"]
+                        .map(Into::into)
+                        .to_vec(),
+                ),
+                "gatsby",
                 None,
             ),
         ),

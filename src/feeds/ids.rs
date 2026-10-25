@@ -7,7 +7,7 @@
 //!
 //! A site moving from another tool keeps that tool's ids for the posts
 //! dated before `feed_ids_before`: each post's whole address, or with
-//! `feed_ids_from: jekyll`, the id Jekyll's feed gave it. On such a site a
+//! `feed_ids_from`, the id that tool's feed gave it. On such a site a
 //! list's own page, asked for the feed's id, is known by the feed's whole
 //! address, as those tools knew their feeds.
 
@@ -53,7 +53,7 @@ pub(crate) fn entry_id(
 /// The id a site moving from another tool keeps for `page`, whatever
 /// `id:` the page writes: the feed's whole address for a list's page, and
 /// for a post dated before `feed_ids_before`, both days read in the site's
-/// zone, its whole address, or Jekyll's id for it.
+/// zone, its whole address, or the id the tool in `feed_ids_from` gave it.
 pub(super) fn kept_id(
     site: &Site,
     settings: &Settings,
@@ -76,11 +76,15 @@ pub(super) fn kept_id(
     if dates.instant(date) >= dates.instant(before) {
         return None;
     }
+    let address = p.address.as_str();
     let old = match settings.text("feed_ids_from").map(|from| from.value) {
-        Some("jekyll") => jekyll_id(p.address.as_str(), &jekyll_name(p)),
-        _ => p.address.as_str().to_owned(),
+        Some("jekyll") => jekyll_id(address, &jekyll_name(p)),
+        Some("hugo") => hugo_id(address),
+        Some("zola") => address.to_owned(),
+        Some("eleventy") => eleventy_id(address),
+        _ => on_the_wire(address),
     };
-    Some(whole(&old, url))
+    Some(format!("{}{old}", url.trim_end_matches('/')))
 }
 
 /// Whether an id is written as a feed's entry id is: lower-case hex in runs
@@ -186,14 +190,80 @@ fn jekyll_id(address: &str, name: &str) -> String {
         Some(at) => &trimmed[..at],
     };
     let (name, after) = name.split_at(name.find(['?', '#']).unwrap_or(name.len()));
-    let mut id = on_the_wire(&format!("{folder}/{name}"));
+    let mut id = on_the_wire(&jekyll_percents(&format!("{folder}/{name}")));
     if let Some((mark, rest)) = after.split_at_checked(1)
         && !rest.is_empty()
     {
         id.push_str(mark);
-        id.push_str(&on_the_wire(rest));
+        id.push_str(&on_the_wire(&jekyll_percents(rest)));
     }
     id
+}
+
+/// Each `%` in `text` as Jekyll's feed wrote it, normalised by Ruby's
+/// Addressable: an escape of a byte a path may hold as it is becomes that
+/// byte, any other escape is in capitals, and a `%` starting no escape is
+/// itself escaped.
+fn jekyll_percents(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('%') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + 1..];
+        let hex = after
+            .get(..2)
+            .filter(|hex| hex.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        match hex.and_then(|hex| u8::from_str_radix(hex, 16).ok()) {
+            Some(byte) if byte.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:@".contains(&byte) => {
+                out.push(char::from(byte));
+            }
+            Some(byte) => write!(out, "%{byte:02X}").expect("writing to a string can't fail"),
+            None => out.push_str("%25"),
+        }
+        rest = match hex {
+            Some(_) => &after[2..],
+            None => after,
+        };
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Hugo's feed's entry id, short of the site's own address: the path as
+/// Go's `URL.EscapedPath` writes it. A path whose every byte may stand in
+/// a path is kept as it is; any other is escaped whole, by Go's narrower
+/// set, which escapes `!`, `'`, `(`, `)`, `*`, `[` and `]` too.
+fn hugo_id(address: &str) -> String {
+    let anywhere =
+        |byte: u8| byte.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:@/[]".contains(&byte);
+    if address.bytes().all(anywhere) {
+        return address.to_owned();
+    }
+    escaped(address, |byte| {
+        byte.is_ascii_alphanumeric() || b"-._~$&+,;=:@/".contains(&byte)
+    })
+}
+
+/// Eleventy's feed's entry id, short of the site's own address: the path
+/// as `new URL()` writes it, escaping the WHATWG URL standard's path
+/// percent-encode set. That set holds `^`, which Node 22 and earlier left
+/// as it was.
+pub(crate) fn eleventy_id(address: &str) -> String {
+    escaped(address, |byte| {
+        byte > b' ' && byte < 0x7f && !b"\"#<>?^`{}".contains(&byte)
+    })
+}
+
+/// `text` with each byte that isn't `kept` escaped as `%XX`.
+fn escaped(text: &str, kept: impl Fn(u8) -> bool) -> String {
+    let mut out = String::with_capacity(text.len());
+    for byte in text.bytes() {
+        match kept(byte) {
+            true => out.push(char::from(byte)),
+            false => write!(out, "%{byte:02X}").expect("writing to a string can't fail"),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -282,6 +352,15 @@ mod tests {
                 "2026-09-14-Post-9/index.md",
                 "/2026/09/14/Post-9",
             ),
+            ("/a/x/", "p-%-q.md", "/a/p-%25-q"),
+            ("/a/x/", "p-%20-q.md", "/a/p-%20-q"),
+            ("/a/x/", "p-%41-q.md", "/a/p-A-q"),
+            ("/a/x/", "p-%7e-q.md", "/a/p-~-q"),
+            ("/a/x/", "p-%c3%a9-q.md", "/a/p-%C3%A9-q"),
+            ("/a/x/", "p-%2f-q.md", "/a/p-%2F-q"),
+            ("/a/x/", "p-%5b-q.md", "/a/p-%5B-q"),
+            ("/a/x/", "p-%zz-q.md", "/a/p-%25zz-q"),
+            ("/a/x/", "p-100%.md", "/a/p-100%25"),
         ] {
             let name = jekyll_file_name(Path::new("posts").join(file).as_path());
             assert_eq!(jekyll_id(address, &name), id, "{file} at {address}");

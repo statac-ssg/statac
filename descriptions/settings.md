@@ -169,8 +169,12 @@ More: https://statac.dev/settings/#feeds
 
 ## `feed_ids_from`
 
-`jekyll`. With `feed_ids_before`, the posts dated before it keep the ids
-that tool's feed gave them.
+`jekyll`, `hugo`, `zola` or `eleventy`. With `feed_ids_before`, the
+posts dated before it keep the ids that tool's feed gave them. `jekyll`
+makes each from the post's folder and file name, as Jekyll did. `hugo`,
+`zola` and `eleventy` keep the post's full URL as that tool wrote it,
+since each escapes a space, `é` or `[` its own way. Unset, the full URL
+is written as Statac writes it.
 
 More: https://statac.dev/settings/#feeds
 

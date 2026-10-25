@@ -6,5 +6,6 @@ timezone: UTC
 feed_key: 0b6d0c4e-2f7a-8d51-9a8e-3c1f5e7a9b20
 fr.title: Langues par dossier
 feed_ids_before: 2026-10-06
+feed_ids_from: hugo
 tags.pages: true
 posts_per_page: 10

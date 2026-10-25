@@ -11,7 +11,7 @@ The old site's home page had no content of its own, so `content/index.md` has no
 
 `data/links.toml` was written in TOML, which Statac doesn't read in `data/`, so it is written as YAML, holding the same values, in `data/links.yaml`.
 
-Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each stays at the same URL, as `feed: index.xml` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` keeps each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
+Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each stays at the same URL, as `feed: index.xml` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` and `feed_ids_from: hugo` keep each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
 
 Hugo made a list of each folder at the top of the content folder, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
 
@@ -23,6 +23,7 @@ url: https://example.org
 language: en
 timezone: UTC
 feed_ids_before: 2026-10-06
+feed_ids_from: hugo
 posts_per_page: 10
 ```
 

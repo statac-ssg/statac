@@ -1099,6 +1099,184 @@ fn entry_ids_are_those_the_previous_build_published() {
     }
 }
 
+/// A post moved from another tool keeps the id that tool's feed gave it,
+/// as Hugo 0.166.0, Zola 0.23.6 and Eleventy 3.1.7 with its RSS plugin
+/// 3.1.0 wrote it for a post at that URL; with no `feed_ids_from`, its URL
+/// as Statac writes one.
+#[test]
+fn a_moved_post_keeps_the_id_the_old_tools_feed_gave_it() {
+    // (the post's URL, then its id short of the site's: with no
+    // `feed_ids_from`, then `hugo`, `zola` and `eleventy`)
+    let rows = [
+        (
+            "/u/a-[-b/",
+            ["/u/a-%5B-b/", "/u/a-[-b/", "/u/a-[-b/", "/u/a-[-b/"],
+        ),
+        (
+            "/u/a-]-b/",
+            ["/u/a-%5D-b/", "/u/a-]-b/", "/u/a-]-b/", "/u/a-]-b/"],
+        ),
+        (
+            "/u/a-^-b/",
+            ["/u/a-%5E-b/", "/u/a-%5E-b/", "/u/a-^-b/", "/u/a-%5E-b/"],
+        ),
+        (
+            "/u/a- -b/",
+            ["/u/a-%20-b/", "/u/a-%20-b/", "/u/a- -b/", "/u/a-%20-b/"],
+        ),
+        (
+            "/u/a-`-b/",
+            ["/u/a-%60-b/", "/u/a-%60-b/", "/u/a-`-b/", "/u/a-%60-b/"],
+        ),
+        (
+            "/u/a-é-b/",
+            [
+                "/u/a-%C3%A9-b/",
+                "/u/a-%C3%A9-b/",
+                "/u/a-é-b/",
+                "/u/a-%C3%A9-b/",
+            ],
+        ),
+        (
+            "/u/b-É-b/",
+            [
+                "/u/b-%C3%89-b/",
+                "/u/b-%C3%89-b/",
+                "/u/b-É-b/",
+                "/u/b-%C3%89-b/",
+            ],
+        ),
+        (
+            "/u/a-ß-b/",
+            [
+                "/u/a-%C3%9F-b/",
+                "/u/a-%C3%9F-b/",
+                "/u/a-ß-b/",
+                "/u/a-%C3%9F-b/",
+            ],
+        ),
+        (
+            "/u/a-日本-b/",
+            [
+                "/u/a-%E6%97%A5%E6%9C%AC-b/",
+                "/u/a-%E6%97%A5%E6%9C%AC-b/",
+                "/u/a-日本-b/",
+                "/u/a-%E6%97%A5%E6%9C%AC-b/",
+            ],
+        ),
+        ("/u/a-'-b/", ["/u/a-'-b/"; 4]),
+        ("/u/a-(-b/", ["/u/a-(-b/"; 4]),
+        ("/u/a-)-b/", ["/u/a-)-b/"; 4]),
+        ("/u/a-!-b/", ["/u/a-!-b/"; 4]),
+        ("/u/a-~-b/", ["/u/a-~-b/"; 4]),
+        ("/u/a-@-b/", ["/u/a-@-b/"; 4]),
+        ("/u/a-+-b/", ["/u/a-+-b/"; 4]),
+        ("/u/a-,-b/", ["/u/a-,-b/"; 4]),
+        ("/u/a-;-b/", ["/u/a-;-b/"; 4]),
+        ("/u/a-=-b/", ["/u/a-=-b/"; 4]),
+        ("/u/a-&-b/", ["/u/a-&-b/"; 4]),
+        ("/u/a-$-b/", ["/u/a-$-b/"; 4]),
+        // Go keeps a path as written only where it needs no escape at all,
+        // and otherwise escapes `[`, `]`, `(`, `)`, `!` and `'` too.
+        (
+            "/c/a[b]-é/",
+            [
+                "/c/a%5Bb%5D-%C3%A9/",
+                "/c/a%5Bb%5D-%C3%A9/",
+                "/c/a[b]-é/",
+                "/c/a[b]-%C3%A9/",
+            ],
+        ),
+        (
+            "/c/x(1) y/",
+            [
+                "/c/x(1)%20y/",
+                "/c/x%281%29%20y/",
+                "/c/x(1) y/",
+                "/c/x(1)%20y/",
+            ],
+        ),
+        (
+            "/c/x(1)!'^/",
+            [
+                "/c/x(1)!'%5E/",
+                "/c/x%281%29%21%27%5E/",
+                "/c/x(1)!'^/",
+                "/c/x(1)!'%5E/",
+            ],
+        ),
+        (
+            "/c/é/x[1]/",
+            [
+                "/c/%C3%A9/x%5B1%5D/",
+                "/c/%C3%A9/x%5B1%5D/",
+                "/c/é/x[1]/",
+                "/c/%C3%A9/x[1]/",
+            ],
+        ),
+        (
+            "/c/ok-$&+,;=@~ é/",
+            [
+                "/c/ok-$&+,;=@~%20%C3%A9/",
+                "/c/ok-$&+,;=@~%20%C3%A9/",
+                "/c/ok-$&+,;=@~ é/",
+                "/c/ok-$&+,;=@~%20%C3%A9/",
+            ],
+        ),
+    ];
+    let template = (
+        "templates/feed.xml",
+        "{% for post in posts %}{{ feed_id(post) | safe }}\n{% endfor %}",
+    );
+    let posts: Vec<(String, String)> = (rows.iter().enumerate())
+        .map(|(n, (url, _))| {
+            (
+                format!("content/posts/post-{n}.md"),
+                format!(
+                    "---\ntitle: Post {n}\ndate: 2026-01-{:02}\npermalink: \"{url}\"\n---\n",
+                    n + 1
+                ),
+            )
+        })
+        .collect();
+    for (at, from) in ["", "hugo", "zola", "eleventy"].into_iter().enumerate() {
+        let mut settings = "language: en\ntitle: Site\nfeed_key: key\ntimezone: UTC\n\
+                            url: https://example.org/\nfeed_ids_before: 2026-02-01\n"
+            .to_owned();
+        if !from.is_empty() {
+            settings.push_str(&format!("feed_ids_from: {from}\n"));
+        }
+        let mut files = vec![
+            ("statac.yaml", settings.as_str()),
+            HOME,
+            POSTS,
+            PAGE,
+            HOME_TEMPLATE,
+            FOLDER,
+            template,
+        ];
+        files.extend(
+            posts
+                .iter()
+                .map(|(path, text)| (path.as_str(), text.as_str())),
+        );
+        let built = Built::new(&files);
+        assert!(
+            built.outcome.problems.is_empty(),
+            "{from}: {:?}",
+            built.kinds()
+        );
+        let wanted: String = (rows.iter().rev())
+            .map(|(_, ids)| format!("https://example.org{}\n", ids[at]))
+            .collect();
+        assert_eq!(
+            built.file("posts/feed.xml").as_deref(),
+            Some(wanted.as_str()),
+            "{from}"
+        );
+    }
+}
+
 #[test]
 fn feed_id_without_a_key_stops_the_template_with_one_to_paste() {
     let settings = ("statac.yaml", "language: en\ntitle: Site\ntimezone: UTC\n");

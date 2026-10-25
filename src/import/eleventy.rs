@@ -22,7 +22,7 @@ use super::common::{
 use super::inside;
 use super::report::code;
 use super::{Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Value};
-use crate::content::address::{Address, on_the_wire};
+use crate::content::address::Address;
 use crate::date::{self, Date};
 use crate::platform;
 use crate::problem::{Kind, Problem, Reason};
@@ -2741,6 +2741,9 @@ impl Reader<'_> {
         self.import
             .settings
             .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
+        self.import
+            .settings
+            .push(("feed_ids_from".into(), Value::Text("eleventy".into())));
         let why = (self.unread_feed.clone())
             .unwrap_or_else(|| "The settings show no `feedPlugin`".to_owned());
         let (asked, lead) = match (self.plugin_feeds.as_slice(), self.unmade_feeds.as_slice()) {
@@ -2789,7 +2792,8 @@ impl Reader<'_> {
                 };
                 notes.push(format!(
                     "{ids}, whose feed templates give each post its full URL as its id, so \
-                     `feed_ids_before` keeps that id for each post. {rest}"
+                     `feed_ids_before` and `feed_ids_from: eleventy` keep that id for each post. \
+                     {rest}"
                 ));
                 for (address, _, path) in std::mem::take(&mut self.unmade_feeds) {
                     self.import.feeds.push((address, path));
@@ -2811,8 +2815,9 @@ impl Reader<'_> {
         let (shown, templates) = self.ask(&asked);
         notes.push(format!(
             "{lead} {} at the same URL, as {shown} in `statac.yaml` says, built with {} once you \
-             add {}, and `feed_ids_before` keeps each post's id the URL Eleventy gave it, so feed \
-             readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
+             add {}, and `feed_ids_before` and `feed_ids_from: eleventy` keep each post's id the \
+             URL Eleventy gave it, so feed readers see nothing new: see \
+             https://statac.dev/feeds/#entry-ids.",
             match asked.len() {
                 1 => "It stays",
                 _ => "Each stays",
@@ -2870,7 +2875,7 @@ impl Reader<'_> {
         let posts: HashSet<String> = (self.import.pages.iter())
             .filter(|page| page.kind == PageKind::Post)
             .filter_map(|page| page.address.as_ref())
-            .map(|address| on_the_wire(&format!("{base}{address}")))
+            .map(|address| crate::feeds::eleventy_id(&format!("{base}{address}")))
             .collect();
         let full = |id: &str| {
             url::Url::parse(id).is_ok_and(|url| {
@@ -2896,11 +2901,14 @@ impl Reader<'_> {
         self.import
             .settings
             .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
+        self.import
+            .settings
+            .push(("feed_ids_from".into(), Value::Text("eleventy".into())));
         notes.push(format!(
             "The old site's {} at {} gave each post its full URL as its id, so \
-             `feed_ids_before` keeps that id for each post. Feed readers see nothing new once a \
-             list's `feed:` line puts its feed at the old feed's URL: see \
-             https://statac.dev/feeds/#entry-ids.",
+             `feed_ids_before` and `feed_ids_from: eleventy` keep that id for each post. Feed \
+             readers see nothing new once a list's `feed:` line puts its feed at the old feed's \
+             URL: see https://statac.dev/feeds/#entry-ids.",
             match feeds.len() {
                 1 => "feed",
                 _ => "feeds",

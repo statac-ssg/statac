@@ -504,9 +504,10 @@ fn an_eleventy_site_keeps_its_posts_ids_where_they_were_their_urls() {
     };
     let by_plugin = "The old site's `package.json` names Eleventy's RSS plugin, whose feed \
                      templates give each post its full URL as its id, so `feed_ids_before` \
-                     keeps that id for each post.";
+                     and `feed_ids_from: eleventy` keep that id for each post.";
     let by_template = "The old site's feed at `/feed.xml` gave each post its full URL as its id, \
-                       so `feed_ids_before` keeps that id for each post.";
+                       so `feed_ids_before` and `feed_ids_from: eleventy` keep that id for each \
+                       post.";
     // (the case, what `package.json` adds, the feed the old site's own
     // template built, what is said)
     let cases = [
@@ -560,9 +561,12 @@ fn an_eleventy_site_keeps_its_posts_ids_where_they_were_their_urls() {
         assert_eq!(code, 0, "{label}: {told}");
         let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
         let kept: Vec<&str> = (settings.lines())
-            .filter(|line| line.starts_with("feed_ids_before:"))
+            .filter(|line| line.starts_with("feed_ids_"))
             .collect();
-        let wanted = Vec::from_iter(said.map(|_| "feed_ids_before: 2026-10-06"));
+        let wanted = Vec::from_iter(
+            said.into_iter()
+                .flat_map(|_| ["feed_ids_before: 2026-10-06", "feed_ids_from: eleventy"]),
+        );
         assert_eq!(kept, wanted, "{label}: {settings}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         for sentence in [by_plugin, by_template] {

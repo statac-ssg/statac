@@ -1397,6 +1397,9 @@ impl Reader<'_> {
             self.import
                 .settings
                 .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
+            self.import
+                .settings
+                .push(("feed_ids_from".into(), Value::Text("zola".into())));
             let shown: Vec<String> = kept.iter().map(|a| code(a)).collect();
             let (feeds, are) = match shown.len() {
                 1 => ("feed", "stays"),
@@ -1404,9 +1407,9 @@ impl Reader<'_> {
             };
             self.note(format!(
                 "Zola's {feeds}, at {}, {are} at the same URL, as `feed:` on each list page says, \
-                 built with `templates/feed.xml` once you add it, and \
-                 `feed_ids_before` keeps each post's id the URL Zola gave it, so feed readers \
-                 see nothing new: see https://statac.dev/feeds/#entry-ids.",
+                 built with `templates/feed.xml` once you add it, and `feed_ids_before` and \
+                 `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed \
+                 readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
                 listed(&shown)
             ));
             self.import.addresses.extend(feed_addresses);

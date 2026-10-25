@@ -157,7 +157,11 @@ const SETTINGS: &[Setting] = &[
     setting("feed", Shape::Feed, None),
     setting("feed_key", Shape::Text, None),
     setting("feed_ids_before", Shape::Date, None),
-    setting("feed_ids_from", Shape::OneOf(&["jekyll"]), None),
+    setting(
+        "feed_ids_from",
+        Shape::OneOf(&["jekyll", "hugo", "zola", "eleventy"]),
+        None,
+    ),
     setting("write_feed_ids", Shape::Truth, Some(Preset::Truth(false))),
     setting(
         "tags.permalink",
