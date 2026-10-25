@@ -189,17 +189,11 @@ impl DateWords {
     }
 
     /// The reference day with its weekday, as the language's full date
-    /// writes it in 0 to 9 where an example written so is read back, else
-    /// the weekday before the day. Japanese runs the weekday into the day,
-    /// `31日水曜日`, which an example can't.
+    /// writes it in 0 to 9, else the weekday before the day.
     fn with_weekday(&self) -> Option<String> {
         let full = (self.words.dates.as_ref())
             .and_then(|p| Format::patterned(&p.full, self))
-            .map(|full| full.written(&REFERENCE_DAY, false))
-            .filter(|full| {
-                Format::read(full, self)
-                    .is_ok_and(|read| read.written(&REFERENCE_DAY, false) == *full)
-            });
+            .map(|full| full.written(&REFERENCE_DAY, false));
         full.or_else(|| {
             (self.words.weekdays.as_ref())
                 .map(|weekdays| format!("{} {}", weekdays[WEEKDAY], self.day()))
@@ -1679,8 +1673,9 @@ fn class(c: char) -> Class {
     }
 }
 
-/// Runs of figures, runs of letters, and each other character alone.
-fn runs(s: &str) -> Vec<(Range<usize>, Class)> {
+/// Runs of figures, runs of letters, and each other character alone. A
+/// run of letters is parted into the `pieces` it is wholly written in.
+fn runs(s: &str, pieces: &[(&str, bool)]) -> Vec<(Range<usize>, Class)> {
     let mut runs: Vec<(Range<usize>, Class)> = Vec::new();
     for (at, c) in s.char_indices() {
         let class = class(c);
@@ -1690,7 +1685,110 @@ fn runs(s: &str) -> Vec<(Range<usize>, Class)> {
             _ => runs.push((at..end, class)),
         }
     }
-    runs
+    let mut parted = Vec::with_capacity(runs.len());
+    for (span, class) in runs {
+        let mut start = span.start;
+        if class == Class::Letter {
+            for at in partings(&s[span.clone()], pieces) {
+                parted.push((start..span.start + at, class));
+                start = span.start + at;
+            }
+        }
+        parted.push((start..span.end, class));
+    }
+    parted
+}
+
+/// The letters the language's Unicode CLDR patterns write between pieces,
+/// as `日` in `y年M月d日EEEE`.
+fn marks(words: &Words) -> Vec<String> {
+    let Some(p) = &words.dates else {
+        return Vec::new();
+    };
+    let patterns = [
+        &p.full,
+        &p.long,
+        &p.short,
+        &p.figures,
+        &p.day,
+        &p.time,
+        &p.date_and_time,
+        &p.month_and_year,
+        &p.month_short_and_year,
+        &p.year,
+    ];
+    let mut marks: Vec<String> = Vec::new();
+    for part in patterns.into_iter().filter_map(|p| pattern(p)).flatten() {
+        let Part::Literal(text) = part else {
+            continue;
+        };
+        for (span, class) in runs(&text, &[]) {
+            if class == Class::Letter && !marks.iter().any(|mark| *mark == text[span.clone()]) {
+                marks.push(text[span].to_owned());
+            }
+        }
+    }
+    marks
+}
+
+/// The words a run of letters may be parted into, the language's own and
+/// its patterns' marks, each with whether it is a mark.
+fn pieces<'a>(listed: &[(&'a str, Listed)], marks: &'a [String]) -> Vec<(&'a str, bool)> {
+    let own = listed
+        .iter()
+        .filter(|(_, list)| !matches!(list, Listed::Unworded(_)))
+        .map(|(word, _)| *word);
+    let mut pieces: Vec<(&str, bool)> = Vec::new();
+    for word in own.chain(marks.iter().map(String::as_str)) {
+        if !word.is_empty() && !pieces.iter().any(|(piece, _)| *piece == word) {
+            pieces.push((word, marks.iter().any(|mark| mark == word)));
+        }
+    }
+    pieces
+}
+
+/// Where a run of letters parts into words: nowhere, unless it is wholly
+/// `pieces` with a mark beside every parting, as `日水曜日` is the day's
+/// `日` and the weekday `水曜日`. Where it parts more than one way, the
+/// longest piece comes first. Without a mark, letters stay one word, so
+/// Arabic's `م`, its afternoon, is never parted out of a longer word.
+fn partings(run: &str, pieces: &[(&str, bool)]) -> Vec<usize> {
+    let pieces_at = |from: usize| {
+        pieces.iter().filter_map(move |(piece, mark)| {
+            begins_with(&run[from..], piece).map(|len| (from + len, *mark))
+        })
+    };
+    // Whether the letters from each point on part wholly, after a piece
+    // that is a mark and after one that isn't.
+    let mut whole = vec![[false; 2]; run.len() + 1];
+    whole[run.len()] = [true; 2];
+    for from in (0..run.len())
+        .rev()
+        .filter(|from| run.is_char_boundary(*from))
+    {
+        for after_a_mark in [false, true] {
+            whole[from][usize::from(after_a_mark)] = pieces_at(from).any(|(end, mark)| {
+                (from == 0 || after_a_mark || mark) && whole[end][usize::from(mark)]
+            });
+        }
+    }
+    let mut partings = Vec::new();
+    let (mut from, mut after_a_mark) = (0, false);
+    while from < run.len() {
+        let next = pieces_at(from)
+            .filter(|(end, mark)| {
+                (from == 0 || after_a_mark || *mark) && whole[*end][usize::from(*mark)]
+            })
+            .max_by_key(|(end, _)| *end);
+        let Some((end, mark)) = next else {
+            return Vec::new();
+        };
+        if end < run.len() {
+            partings.push(end);
+        }
+        (from, after_a_mark) = (end, mark);
+    }
+    partings
 }
 
 /// Every word an example may name, with its list: the language's own,
@@ -1761,17 +1859,25 @@ fn listed<'a>(words: &'a Words, english: &'a Words) -> Vec<(&'a str, Listed)> {
 /// The longest listed word written at `at`, and where it ends. A tie goes
 /// to the list named first, so a French `mai`, a month long and short, is
 /// the month.
-fn named_at(s: &str, at: usize, listed: &[(&str, Listed)]) -> Option<(usize, Named)> {
+fn named_at(
+    s: &str,
+    at: usize,
+    listed: &[(&str, Listed)],
+    partings: &[usize],
+) -> Option<(usize, Named)> {
     let rest = &s[at..];
+    let parted = |len: usize| partings.contains(&(at + len));
     let mut longest: Option<(usize, &str, Listed, bool)> = None;
     for (word, list) in listed {
         let clock = matches!(list, Listed::AmPm | Listed::Unworded(WordsWanted::AmPm));
-        let found = spelled(rest, word).map(|len| (len, false)).or_else(|| {
-            clock
-                .then(|| dotted(rest, word))
-                .flatten()
-                .map(|len| (len, true))
-        });
+        let found = spelled(rest, word, parted)
+            .map(|len| (len, false))
+            .or_else(|| {
+                clock
+                    .then(|| dotted(rest, word))
+                    .flatten()
+                    .map(|len| (len, true))
+            });
         if let Some((len, dots)) = found
             && longest.is_none_or(|(so_far, ..)| len > so_far)
         {
@@ -1803,10 +1909,8 @@ fn same_letter(one: char, other: char) -> bool {
     one == other || one.to_lowercase().eq(other.to_lowercase())
 }
 
-/// How far `word` runs at the start of `rest`, in any case, where it ends
-/// there: a word ending in a letter isn't the start of a longer word, nor
-/// one ending in a figure the start of a longer number.
-fn spelled(rest: &str, word: &str) -> Option<usize> {
+/// How far `word` runs at the start of `rest`, in any case.
+fn begins_with(rest: &str, word: &str) -> Option<usize> {
     let mut len = 0;
     let mut chars = rest.chars();
     for wanted in word.chars() {
@@ -1816,9 +1920,19 @@ fn spelled(rest: &str, word: &str) -> Option<usize> {
         }
         len += c.len_utf8();
     }
+    Some(len)
+}
+
+/// How far `word` runs at the start of `rest`, in any case, where it ends
+/// there: a word ending in a letter isn't the start of a longer word, save
+/// where the letters are `parted` after it, nor one ending in a figure the
+/// start of a longer number.
+fn spelled(rest: &str, word: &str, parted: impl Fn(usize) -> bool) -> Option<usize> {
+    let len = begins_with(rest, word)?;
     let last = word.chars().last()?;
     let ends = match rest[len..].chars().next() {
         None => true,
+        Some(_) if parted(len) => true,
         Some(next) if last.is_alphabetic() => !next.is_alphabetic(),
         Some(next) if last.is_ascii_digit() => !next.is_alphanumeric(),
         Some(_) => true,
@@ -1859,7 +1973,13 @@ fn dotted(rest: &str, word: &str) -> Option<usize> {
 fn tokenize(s: &str, words: &Words) -> Vec<Token> {
     let english = crate::language::english();
     let listed = listed(words, &english);
-    let runs = runs(s);
+    let marks = marks(words);
+    let runs = runs(s, &pieces(&listed, &marks));
+    let partings: Vec<usize> = runs
+        .windows(2)
+        .filter(|pair| pair.iter().all(|(_, class)| *class == Class::Letter))
+        .map(|pair| pair[1].0.start)
+        .collect();
     let mut tokens = Vec::new();
     let mut i = 0;
     while i < runs.len() {
@@ -1869,7 +1989,7 @@ fn tokenize(s: &str, words: &Words) -> Vec<Token> {
         let after_figures =
             i > 0 && runs[i - 1].1 == Class::Figure && runs[i - 1].0.end == span.start;
         if class != Class::Other
-            && let Some((end, named)) = named_at(s, span.start, &listed)
+            && let Some((end, named)) = named_at(s, span.start, &listed, &partings)
             && !(after_figures && matches!(named, Named::OtherWeekday { .. }))
         {
             tokens.push(Token {

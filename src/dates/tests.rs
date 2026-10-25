@@ -2062,8 +2062,7 @@ fn statacs(tag: &str) -> DateWords {
 
 /// A `date_format` that can't be read is offered the reference day in
 /// figures as the language's short date writes it, with the year in full,
-/// and a weekday alone is offered the day as its full date writes it,
-/// where that reads back.
+/// and a weekday alone is offered the day as its full date writes it.
 #[test]
 fn the_examples_offered_are_the_languages_own() {
     let cases = [
@@ -2077,7 +2076,7 @@ fn the_examples_offered_are_the_languages_own() {
         ("en-MV", "31-12-2025", "Wednesday 31 December 2025"),
         ("de", "31.12.2025", "Mittwoch, 31. Dezember 2025"),
         ("fr", "31/12/2025", "mercredi 31 décembre 2025"),
-        ("ja", "2025/12/31", "水曜日 2025年12月31日"),
+        ("ja", "2025/12/31", "2025年12月31日水曜日"),
         ("ko", "2025. 12. 31.", "2025년 12월 31일 수요일"),
         (
             "ar",
@@ -2099,24 +2098,46 @@ fn the_examples_offered_are_the_languages_own() {
     );
 }
 
-/// Each example offered in every language Statac has words for reads
-/// back as a `date_format` writing the reference day so.
+/// Each example offered and each look of every language Statac has words
+/// for, written for the reference moment, reads back as an example writing
+/// the same: as a `date_format` where it writes the day, the month and the
+/// year in full.
 #[test]
-fn every_example_offered_reads_back() {
+fn every_languages_own_dates_read_back() {
     let folder = format!("{}/src/language/bundled", env!("CARGO_MANIFEST_DIR"));
     let tags = std::fs::read_dir(folder).unwrap().filter_map(|entry| {
         let name = entry.unwrap().file_name().into_string().unwrap();
         name.strip_suffix(".yaml").map(str::to_owned)
     });
+    let moment = timed(2025, 12, 31, 15, 4);
+    let mut unread = Vec::new();
     for tag in tags {
         let words = statacs(&tag);
-        let (figures, full) = offered(&words);
-        for example in std::iter::once(figures).chain(full) {
-            let shown = Format::for_the_site(&example, &words).map(|format| format.shown());
-            let digits = words.words.digits.as_ref();
-            assert_eq!(shown, Ok(format::in_digits(&example, digits)), "{tag}");
+        let digits = words.words.digits.as_ref();
+        let FormatFault::Empty { examples, .. } = refused("", &words).fault else {
+            panic!("{tag}");
+        };
+        let (_, full) = offered(&words);
+        let offered = examples.into_iter().chain(full).map(|example| {
+            let written = format::in_digits(&example, digits);
+            ("offered", example, written, true)
+        });
+        let looks = Look::ALL.into_iter().map(|look| {
+            let written = Format::look(look, &words).unwrap().write(&moment);
+            (look.name(), written.clone(), written, look != Look::Day)
+        });
+        for (what, example, written, for_the_site) in offered.chain(looks) {
+            let read = match for_the_site {
+                true => Format::for_the_site(&example, &words),
+                false => Format::for_a_template(&example, &words),
+            };
+            let rewritten = read.map(|format| format.write(&moment));
+            if rewritten.as_ref() != Ok(&written) {
+                unread.push(format!("{tag} {what} {example:?}: {rewritten:?}"));
+            }
         }
     }
+    assert_eq!(unread, Vec::<String>::new());
 }
 
 #[test]
@@ -2214,6 +2235,36 @@ fn another_weekday_after_figures_is_the_languages_word_for_them() {
             day: "2025년 12월 31일".into(),
             month: "12월".into(),
             corrected: "2025년 12월 31일".into(),
+        }
+    );
+}
+
+/// Letters run together part where they are wholly the language's words
+/// with its patterns' marks between them: `日` after the day.
+#[test]
+fn letters_run_together_part_at_the_languages_marks() {
+    let japanese = statacs("ja");
+    let korean = statacs("ko");
+    let cases = [
+        ("2025年12月31日水曜日", &japanese, "2026年3月7日土曜日"),
+        (
+            "2025年12月31日水曜日 15:04",
+            &japanese,
+            "2026年3月7日土曜日",
+        ),
+        ("2025년12월31일수요일", &korean, "2026년3월7일토요일"),
+    ];
+    for (example, words, saturday) in cases {
+        assert_eq!(written(example, words, &at(2026, 3, 7)), saturday);
+    }
+    let refusal = refused("2025年12月31日火曜日", &japanese);
+    assert_eq!(
+        refusal.fault,
+        FormatFault::OtherWeekday {
+            written: "火曜日".into(),
+            day: "2025年12月31日".into(),
+            weekday: "水曜日".into(),
+            corrected: "2025年12月31日水曜日".into(),
         }
     );
 }
