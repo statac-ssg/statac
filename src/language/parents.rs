@@ -1,10 +1,11 @@
 //! Where a tag's data comes from when Statac has none of its own for the
 //! tag itself: the tag the Unicode CLDR's data inherits from.
 
-/// The English regions the CLDR writes as one of its two broader forms of
-/// English rather than as `en`: `en-001`, English beyond the United
-/// States, and `en-150`, English in Europe.
-pub(super) const ENGLISHES: &[(&str, &[&str])] = &[
+/// The regions the CLDR writes as a broader form of their language rather
+/// than as the language itself, by that form: `en-001`, English beyond the
+/// United States, `en-150`, English in Europe, and `es-419`, Spanish in
+/// Latin America.
+pub(super) const PARENTS: &[(&str, &[&str])] = &[
     (
         "en-001",
         &[
@@ -28,12 +29,20 @@ pub(super) const ENGLISHES: &[(&str, &[&str])] = &[
             "en-PT", "en-RO", "en-SE", "en-SI", "en-SK", "en-UA",
         ],
     ),
+    (
+        "es-419",
+        &[
+            "es-AR", "es-BO", "es-BR", "es-BZ", "es-CL", "es-CO", "es-CR", "es-CU", "es-DO",
+            "es-EC", "es-GT", "es-HN", "es-JP", "es-MX", "es-NI", "es-PA", "es-PE", "es-PR",
+            "es-PY", "es-SV", "es-US", "es-UY", "es-VE",
+        ],
+    ),
 ];
 
-/// The tag `tag` inherits from: the broader English the CLDR names for an
-/// English region, else the tag without its last part.
+/// The tag `tag` inherits from: the broader form of its language the CLDR
+/// names for a region, else the tag without its last part.
 pub(super) fn parent(tag: &str) -> Option<&str> {
-    let named = ENGLISHES.iter().find(|(_, regions)| {
+    let named = PARENTS.iter().find(|(_, regions)| {
         regions
             .iter()
             .any(|region| region.eq_ignore_ascii_case(tag))

@@ -1,0 +1,8 @@
+# German as de-IT writes it, where that differs from de, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+months: [Jänner, Februar, März, April, Mai, Juni, Juli, August, September,
+  Oktober, November, Dezember]
+months_short: [Jän., Feb., März, Apr., Mai, Juni, Juli, Aug., Sep., Okt., Nov.,
+  Dez.]
+months_short_alone: [Jän, Feb, Mär, Apr, Mai, Jun, Jul, Aug, Sep, Okt, Nov, Dez]

@@ -1537,19 +1537,28 @@ fn in_the_cldrs_pattern(
     out
 }
 
-/// A site in each language Statac has words for, and in English regions
-/// among them, naming no `date_format`: each look a template names, a
-/// date written with only a month and a year or a year alone, and a date
-/// shown by default, written as the Unicode CLDR's patterns for the
-/// language write them.
+/// A site in each language and region Statac has words for, and in
+/// regions that take theirs from a broader tag, naming no `date_format`:
+/// each look a template names, a date written with only a month and a
+/// year or a year alone, and a date shown by default, written as the
+/// Unicode CLDR's patterns for the language write them.
 #[test]
 fn every_look_of_every_language_is_the_cldrs() {
     use crate::language::tests::{calendar, patterns};
-    let mut tags = vec!["ar", "de", "es", "fa", "fr", "ja", "ko"];
-    tags.extend(["en", "en-US", "en-GB", "en-AU", "en-CA", "en-IE", "en-IN"]);
-    tags.extend([
-        "en-001", "en-150", "en-BE", "en-BZ", "en-MV", "en-NZ", "en-DE", "en-JP",
-    ]);
+    let folder = format!("{}/src/language/bundled", env!("CARGO_MANIFEST_DIR"));
+    let mut tags: Vec<String> = std::fs::read_dir(folder)
+        .unwrap()
+        .filter_map(|entry| {
+            let name = entry.unwrap().file_name().into_string().unwrap();
+            name.strip_suffix(".yaml").map(str::to_owned)
+        })
+        .collect();
+    tags.sort();
+    let inheriting = [
+        "en-US", "en-NZ", "en-DE", "es-ES", "es-CU", "fr-SN", "de-CH", "ar-AE",
+    ];
+    tags.extend(inheriting.map(str::to_owned));
+    let tags = tags.iter().map(String::as_str);
     let readings = [
         timed(2025, 12, 31, 15, 4),
         timed(2024, 3, 5, 9, 7),

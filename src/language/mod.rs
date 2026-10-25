@@ -8,8 +8,9 @@
 //! language Statac has no words for, the file is the language whole, on
 //! lines running the way its script does. A tag neither has is looked for
 //! again without its last part, `en-US` as `en`, as the Unicode CLDR's own
-//! data inherits; an English region is looked for first as the broader
-//! English the CLDR writes it as, `en-GB` as `en-001`.
+//! data inherits; a region is looked for first as the broader form of its
+//! language the CLDR writes it as, `en-GB` as `en-001` and `es-MX` as
+//! `es-419`.
 //!
 //! Statac's own words for a language come with the CLDR's patterns for
 //! writing a date in it, which a site's file can't change.
@@ -160,7 +161,33 @@ impl Words {
 /// A region's file holds only where it differs from that tag's.
 const BUNDLED: &[(&str, &str)] = &[
     ("ar", include_str!("bundled/ar.yaml")),
+    ("ar-BH", include_str!("bundled/ar-BH.yaml")),
+    ("ar-DJ", include_str!("bundled/ar-DJ.yaml")),
+    ("ar-DZ", include_str!("bundled/ar-DZ.yaml")),
+    ("ar-EG", include_str!("bundled/ar-EG.yaml")),
+    ("ar-ER", include_str!("bundled/ar-ER.yaml")),
+    ("ar-IL", include_str!("bundled/ar-IL.yaml")),
+    ("ar-IQ", include_str!("bundled/ar-IQ.yaml")),
+    ("ar-JO", include_str!("bundled/ar-JO.yaml")),
+    ("ar-KM", include_str!("bundled/ar-KM.yaml")),
+    ("ar-KW", include_str!("bundled/ar-KW.yaml")),
+    ("ar-LB", include_str!("bundled/ar-LB.yaml")),
+    ("ar-MA", include_str!("bundled/ar-MA.yaml")),
+    ("ar-MR", include_str!("bundled/ar-MR.yaml")),
+    ("ar-OM", include_str!("bundled/ar-OM.yaml")),
+    ("ar-PS", include_str!("bundled/ar-PS.yaml")),
+    ("ar-QA", include_str!("bundled/ar-QA.yaml")),
+    ("ar-SA", include_str!("bundled/ar-SA.yaml")),
+    ("ar-SD", include_str!("bundled/ar-SD.yaml")),
+    ("ar-SO", include_str!("bundled/ar-SO.yaml")),
+    ("ar-SS", include_str!("bundled/ar-SS.yaml")),
+    ("ar-SY", include_str!("bundled/ar-SY.yaml")),
+    ("ar-TD", include_str!("bundled/ar-TD.yaml")),
+    ("ar-TN", include_str!("bundled/ar-TN.yaml")),
+    ("ar-YE", include_str!("bundled/ar-YE.yaml")),
     ("de", include_str!("bundled/de.yaml")),
+    ("de-AT", include_str!("bundled/de-AT.yaml")),
+    ("de-IT", include_str!("bundled/de-IT.yaml")),
     ("en", include_str!("bundled/en.yaml")),
     ("en-001", include_str!("bundled/en-001.yaml")),
     ("en-150", include_str!("bundled/en-150.yaml")),
@@ -219,10 +246,47 @@ const BUNDLED: &[(&str, &str)] = &[
     ("en-ZA", include_str!("bundled/en-ZA.yaml")),
     ("en-ZW", include_str!("bundled/en-ZW.yaml")),
     ("es", include_str!("bundled/es.yaml")),
+    ("es-419", include_str!("bundled/es-419.yaml")),
+    ("es-AR", include_str!("bundled/es-AR.yaml")),
+    ("es-BO", include_str!("bundled/es-BO.yaml")),
+    ("es-BR", include_str!("bundled/es-BR.yaml")),
+    ("es-BZ", include_str!("bundled/es-BZ.yaml")),
+    ("es-CL", include_str!("bundled/es-CL.yaml")),
+    ("es-CO", include_str!("bundled/es-CO.yaml")),
+    ("es-CR", include_str!("bundled/es-CR.yaml")),
+    ("es-DO", include_str!("bundled/es-DO.yaml")),
+    ("es-EC", include_str!("bundled/es-EC.yaml")),
+    ("es-GT", include_str!("bundled/es-GT.yaml")),
+    ("es-HN", include_str!("bundled/es-HN.yaml")),
+    ("es-MX", include_str!("bundled/es-MX.yaml")),
+    ("es-NI", include_str!("bundled/es-NI.yaml")),
+    ("es-PA", include_str!("bundled/es-PA.yaml")),
+    ("es-PE", include_str!("bundled/es-PE.yaml")),
+    ("es-PH", include_str!("bundled/es-PH.yaml")),
+    ("es-PR", include_str!("bundled/es-PR.yaml")),
+    ("es-PY", include_str!("bundled/es-PY.yaml")),
+    ("es-SV", include_str!("bundled/es-SV.yaml")),
+    ("es-US", include_str!("bundled/es-US.yaml")),
+    ("es-UY", include_str!("bundled/es-UY.yaml")),
+    ("es-VE", include_str!("bundled/es-VE.yaml")),
     ("fa", include_str!("bundled/fa.yaml")),
+    ("fa-AF", include_str!("bundled/fa-AF.yaml")),
     ("fr", include_str!("bundled/fr.yaml")),
+    ("fr-BE", include_str!("bundled/fr-BE.yaml")),
+    ("fr-CA", include_str!("bundled/fr-CA.yaml")),
+    ("fr-CH", include_str!("bundled/fr-CH.yaml")),
+    ("fr-CM", include_str!("bundled/fr-CM.yaml")),
+    ("fr-DJ", include_str!("bundled/fr-DJ.yaml")),
+    ("fr-DZ", include_str!("bundled/fr-DZ.yaml")),
+    ("fr-MA", include_str!("bundled/fr-MA.yaml")),
+    ("fr-MR", include_str!("bundled/fr-MR.yaml")),
+    ("fr-SY", include_str!("bundled/fr-SY.yaml")),
+    ("fr-TD", include_str!("bundled/fr-TD.yaml")),
+    ("fr-TN", include_str!("bundled/fr-TN.yaml")),
+    ("fr-VU", include_str!("bundled/fr-VU.yaml")),
     ("ja", include_str!("bundled/ja.yaml")),
     ("ko", include_str!("bundled/ko.yaml")),
+    ("ko-CN", include_str!("bundled/ko-CN.yaml")),
 ];
 
 /// Statac's own words for `tag`, matched whole and ignoring case.

@@ -1,0 +1,8 @@
+# Arabic as ar-MR writes it, where that differs from ar, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+months: [يناير, فبراير, مارس, إبريل, مايو, يونيو, يوليو, أغشت, شتمبر, أكتوبر,
+  نوفمبر, دجمبر]
+months_short: [يناير, فبراير, مارس, إبريل, مايو, يونيو, يوليو, أغشت, شتمبر,
+  أكتوبر, نوفمبر, دجمبر]
+digits: [٠, ١, ٢, ٣, ٤, ٥, ٦, ٧, ٨, ٩]

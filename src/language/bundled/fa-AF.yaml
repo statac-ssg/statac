@@ -1,0 +1,12 @@
+# Persian as fa-AF writes it, where that differs from fa, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+months: [جنوری, فبروری, مارچ, اپریل, می, جون, جولای, اگست, سپتمبر, اکتوبر,
+  نومبر, دسمبر]
+months_alone:
+months_short: [جنو, فبروری, مارچ, اپریل, می, جون, جول, اگست, سپتمبر, اکتوبر,
+  نومبر, دسم]
+months_short_alone: [جنوری, فبروری, مارچ, اپریل, می, جون, جولای, اگست, سپتمبر,
+  اکتوبر, نومبر, دسمبر]
+dates:
+  day: MMM d

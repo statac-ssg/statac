@@ -1,0 +1,9 @@
+# Spanish as es-CL writes it, where that differs from es-419, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+months_short_alone: [ene., feb., mar., abr., may., jun., jul., ago., sept.,
+  oct., nov., dic.]
+am_pm: ["a.\u202Fm.", "p.\u202Fm."]
+dates:
+  short: dd-MM-y
+  figures: dd-MM-yy

@@ -1,0 +1,4 @@
+# Arabic as ar-KW writes it, where that differs from ar, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+digits: [٠, ١, ٢, ٣, ٤, ٥, ٦, ٧, ٨, ٩]

@@ -71,6 +71,8 @@ fn every_bundled_language_reads_whole() {
     assert_eq!(bundled_parent("en-GB"), Some("en-001"));
     assert_eq!(bundled_parent("en-BE"), Some("en-150"));
     assert_eq!(bundled_parent("en-CA"), Some("en"));
+    assert_eq!(bundled_parent("es-MX"), Some("es-419"));
+    assert_eq!(bundled_parent("es-419"), Some("es"));
     assert_eq!(bundled_parent("en"), None);
     let english = english();
     assert_eq!(english.months.as_ref().unwrap()[11], "December");
@@ -188,11 +190,21 @@ pub(crate) fn patterns(tag: &str) -> Patterns {
     }
 }
 
-/// The words for dates of the language `tag` as the CLDR has them, and
-/// its patterns. A month alone is left out where it is written as it is
-/// in a date, as a file leaves it out.
+/// The words for dates of the language `tag` as the CLDR has them, the
+/// digits it writes figures in and its patterns. A month alone is left
+/// out where it is written as it is in a date, and so are Western
+/// digits, as a file leaves them out.
 fn the_cldrs_dates(tag: &str) -> Words {
     let calendar = calendar(tag);
+    let [system] = texts(
+        &main(tag, "cldr-numbers-full", "numbers", &["numbers"]),
+        ["defaultNumberingSystem"],
+    );
+    let systems = cldr("cldr-core/supplemental/numberingSystems.json");
+    let [digits] = texts(
+        under(&systems, &["supplemental", "numberingSystems", &system]),
+        ["_digits"],
+    );
     let months = |form, width| texts(under(&calendar, &["months", form, width]), MONTHS);
     let weekdays = |width| texts(under(&calendar, &["days", "format", width]), WEEKDAYS);
     let mut words = Words {
@@ -204,6 +216,7 @@ fn the_cldrs_dates(tag: &str) -> Words {
             under(&calendar, &["dayPeriods", "format", "abbreviated"]),
             ["am", "pm"],
         )),
+        digits: (system != "latn").then(|| characters(&digits)),
         dates: Some(patterns(tag)),
         ..Words::default()
     };
@@ -219,25 +232,15 @@ fn the_cldrs_dates(tag: &str) -> Words {
 /// Unicode CLDR has them. A line is left out where it would say what
 /// Statac takes a file without it to mean: a month alone written as it is
 /// in a date, Western digits, lines running left to right.
-fn the_cldrs(tag: &str, systems: &Node) -> (Vec<&'static str>, Words) {
+fn the_cldrs(tag: &str) -> (Vec<&'static str>, Words) {
     let [order] = texts(
         &main(tag, "cldr-misc-full", "layout", &["layout", "orientation"]),
         ["characterOrder"],
     );
-    let [system] = texts(
-        &main(tag, "cldr-numbers-full", "numbers", &["numbers"]),
-        ["defaultNumberingSystem"],
-    );
-    let [digits] = texts(
-        under(systems, &["supplemental", "numberingSystems", &system]),
-        ["_digits"],
-    );
-
     let mut words = Words {
         quotes: Some(quotes(tag)),
         ..the_cldrs_dates(tag)
     };
-    words.digits = (system != "latn").then(|| characters(&digits));
     words.direction = match order.as_str() {
         "right-to-left" => Direction::RightToLeft,
         "left-to-right" => Direction::LeftToRight,
@@ -261,16 +264,17 @@ fn the_cldrs(tag: &str, systems: &Node) -> (Vec<&'static str>, Words) {
 }
 
 /// Statac's words for every language but English are the Unicode CLDR's
-/// and nothing else: each file holds the lines the CLDR's own data gives
-/// the language, with its values, and no other line.
+/// and nothing else: each language's file holds the lines the CLDR's own
+/// data gives the language, with its values, and no other line. A
+/// region's file is held to the CLDR as English's regions are.
 #[test]
 fn every_bundled_line_outside_english_is_the_cldrs() {
-    let systems = cldr("cldr-core/supplemental/numberingSystems.json");
-    let english = |tag: &str| tag.split('-').next() == Some(ENGLISH);
-    let others: Vec<_> = BUNDLED.iter().filter(|(tag, _)| !english(tag)).collect();
+    let others: Vec<_> = (BUNDLED.iter())
+        .filter(|(tag, _)| !tag.contains('-') && *tag != ENGLISH)
+        .collect();
     assert_eq!(others.len(), 7);
     for (tag, text) in others {
-        let (lines, words) = the_cldrs(tag, &systems);
+        let (lines, words) = the_cldrs(tag);
         let mut sources = Sources::default();
         let id = sources.add(format!("languages/{tag}.yaml"), (*text).to_owned());
         let Yaml::Mapping(entries) = crate::yaml::read(&sources, id).unwrap().value else {
@@ -287,8 +291,8 @@ fn every_bundled_line_outside_english_is_the_cldrs() {
     }
 }
 
-/// English's months, weekdays, words for morning and afternoon and
-/// patterns, as `words` holds them.
+/// A language's months, weekdays, words for morning and afternoon, digits
+/// and patterns, as `words` holds them.
 fn dated(words: &Words) -> Words {
     Words {
         months: words.months.clone(),
@@ -298,14 +302,16 @@ fn dated(words: &Words) -> Words {
         weekdays: words.weekdays.clone(),
         weekdays_short: words.weekdays_short.clone(),
         am_pm: words.am_pm.clone(),
+        digits: words.digits,
         dates: words.dates.clone(),
         ..Words::default()
     }
 }
 
-/// The English tags the CLDR's files here are for: `en`, and each region
-/// written otherwise than the tag it inherits from.
-fn englishes_held() -> Vec<String> {
+/// The tags the CLDR's calendars here are for in the languages Statac has
+/// words for: each language, and each region written otherwise than the
+/// tag it inherits from.
+fn tags_held() -> Vec<String> {
     let folder = format!(
         "{}/tests/cldr/cldr-dates-full/main",
         env!("CARGO_MANIFEST_DIR")
@@ -313,23 +319,20 @@ fn englishes_held() -> Vec<String> {
     let mut tags: Vec<String> = std::fs::read_dir(folder)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
-        .filter(|tag| tag.split('-').next() == Some(ENGLISH))
+        .filter(|tag| tag.split('-').next().and_then(bundled).is_some())
         .collect();
     tags.sort();
     tags
 }
 
-/// English's words for dates are the Unicode CLDR's, region by region:
-/// Statac has a file for `en` and for each region the CLDR writes
-/// otherwise than the tag it inherits from, holding only the lines that
-/// differ, with the CLDR's values.
+/// Every language's words for dates are the Unicode CLDR's, region by
+/// region: Statac has a file for the language and for each region the
+/// CLDR writes otherwise than the tag it inherits from, holding only the
+/// lines that differ, with the CLDR's values.
 #[test]
-fn english_and_its_regions_write_dates_as_the_cldr_does() {
-    let held = englishes_held();
-    let files: Vec<&str> = (BUNDLED.iter())
-        .map(|(tag, _)| *tag)
-        .filter(|tag| tag.split('-').next() == Some(ENGLISH))
-        .collect();
+fn every_language_and_its_regions_write_dates_as_the_cldr_does() {
+    let held = tags_held();
+    let files: Vec<&str> = BUNDLED.iter().map(|(tag, _)| *tag).collect();
     assert_eq!(files, held);
     for tag in &held {
         let words = bundled(tag).unwrap().1;
@@ -353,6 +356,7 @@ fn english_and_its_regions_write_dates_as_the_cldr_does() {
                 own.weekdays_short != theirs.weekdays_short,
             ),
             differ("am_pm", own.am_pm != theirs.am_pm),
+            differ("digits", own.digits != theirs.digits),
         ]
         .into_iter()
         .flatten()
@@ -404,10 +408,10 @@ fn english_and_its_regions_write_dates_as_the_cldr_does() {
     }
 }
 
-/// The broader English each English region is written as is the
-/// Unicode CLDR's.
+/// The broader form of its language each region is written as is the
+/// Unicode CLDR's, in every language Statac has words for.
 #[test]
-fn the_broader_english_of_each_english_region_is_the_cldrs() {
+fn the_broader_form_of_each_region_is_the_cldrs() {
     let parents = cldr("cldr-core/supplemental/parentLocales.json");
     let Yaml::Mapping(parents) =
         &under(&parents, &["supplemental", "parentLocales", "parentLocale"]).value
@@ -422,8 +426,10 @@ fn the_broader_english_of_each_english_region_is_the_cldrs() {
             (crate::content::words::key_name(&entry.key), parent.clone())
         })
         .collect();
-    the_cldrs.retain(|(tag, parent)| tag.starts_with("en-") && parent != "und");
-    let mut statacs: Vec<(String, String)> = (parents::ENGLISHES.iter())
+    the_cldrs.retain(|(tag, parent)| {
+        tag.split('-').next().and_then(bundled).is_some() && parent != "und"
+    });
+    let mut statacs: Vec<(String, String)> = (parents::PARENTS.iter())
         .flat_map(|(parent, regions)| {
             regions
                 .iter()
@@ -437,6 +443,8 @@ fn the_broader_english_of_each_english_region_is_the_cldrs() {
     assert_eq!(inherited, ["en-GB-oxendict", "en-GB", "en-001", "en"]);
     let inherited: Vec<&str> = parents::inherited("EN-at").collect();
     assert_eq!(inherited, ["EN-at", "en-150", "en-001", "en"]);
+    let inherited: Vec<&str> = parents::inherited("es-MX").collect();
+    assert_eq!(inherited, ["es-MX", "es-419", "es"]);
 }
 
 /// The explanation of a language Statac has no words for shows a file of
@@ -668,15 +676,19 @@ type Pairs<'a> = &'a [(&'a str, &'a str)];
 #[test]
 fn a_tag_is_looked_for_whole_and_then_broader() {
     let own = "months: [a, b, c, d, e, f, g, h, i, j, k, l]\n";
-    let cases: [(&str, Pairs, Whence, Pairs); 13] = [
+    let cases: [(&str, Pairs, Whence, Pairs); 17] = [
         ("fr", &[], Whence::Statac("fr"), &[]),
         ("en-US", &[], Whence::Statac("en"), &[]),
-        // An English region is looked for as the broader English the CLDR
-        // writes it as.
+        ("fr-SN", &[], Whence::Statac("fr"), &[]),
+        ("fr-CA", &[], Whence::Statac("fr-CA"), &[]),
+        // A region is looked for as the broader form of its language the
+        // CLDR writes it as.
         ("en-GB", &[], Whence::Statac("en-GB"), &[]),
         ("en-NZ", &[], Whence::Statac("en-001"), &[]),
         ("en-AT", &[], Whence::Statac("en-150"), &[]),
         ("en-GB-oxendict", &[], Whence::Statac("en-GB"), &[]),
+        ("es-MX", &[], Whence::Statac("es-MX"), &[]),
+        ("es-CU", &[], Whence::Statac("es-419"), &[]),
         // The site's own file wins over Statac's for a narrower tag.
         (
             "en-GB",
@@ -741,14 +753,20 @@ fn a_sites_own_file_adds_to_statacs_words_key_by_key() {
     assert_eq!(words.months_short, french.months_short);
     assert_eq!(own.whence, Whence::Site("languages/fr.yaml".into()));
 
-    // A file for a region adds to Statac's words for its language.
+    // A file for a region adds to Statac's words for its language, or for
+    // the region where Statac has its own.
     let (regional, _) = language(
-        "fr-CA",
-        &[("languages/fr-CA.yaml", "am_pm: [a.m., p.m.]\n")],
+        "fr-SN",
+        &[("languages/fr-SN.yaml", "am_pm: [a.m., p.m.]\n")],
     );
     assert_eq!(regional.words.am_pm.as_ref().unwrap()[0], "a.m.");
     assert_eq!(regional.words.months, french.months);
     assert_eq!(regional.words.dates, french.dates);
+    let canadian = bundled("fr-CA").unwrap().1;
+    let (regional, _) = language("fr-CA", &[("languages/fr-CA.yaml", "am_pm:\n")]);
+    assert_eq!(regional.words.am_pm, None);
+    assert_eq!(regional.words.months_short, canadian.months_short);
+    assert_eq!(regional.words.dates, canadian.dates);
 
     // A file for the language adds to Statac's words for the region.
     let (english, _) = language("en-AU", &[("languages/en.yaml", text)]);

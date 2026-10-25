@@ -1,0 +1,4 @@
+# Spanish as es-EC writes it, where that differs from es-419, whose words and
+# patterns it takes otherwise. Every line is from the Unicode CLDR, release
+# 48.2.3: see LICENSE-CLDR.txt.
+am_pm: ["a.\u202Fm.", "p.\u202Fm."]
