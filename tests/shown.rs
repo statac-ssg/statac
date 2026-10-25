@@ -590,16 +590,14 @@ fn a_picture_handed_to_a_snippet_is_noted_only_where_its_description_is_read() {
     assert_eq!(said.matches("Missing alt text:").count(), 1);
 }
 
-/// A picture a template shows with no alt text, that is all a link or a
-/// button shows, is told once, as its alt text saying what the alt text
-/// should say, wherever the `<img>` is written with its alt text; a link
-/// whose `<img>` isn't, or that holds a picture marked decorative, is told
-/// as a link with no words. Another page showing the writing tells nothing
-/// more.
+/// A picture with no alt text that a template shows inside a link or a
+/// button is told at the call that asks for it, and the link or the button
+/// is told as having no words: a template's `<a>` may hold another picture
+/// on another page. So is a link a template writes round an image in the
+/// writing.
 #[test]
-fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_text() {
-    const ALT: &str = "  Give it alt text saying where the link to `/post-1/` leads, as the \
-        image is all the link shows.";
+fn a_picture_a_template_shows_inside_a_link_is_told_and_so_is_the_link() {
+    const ALT: &str = "note  Missing alt text: `content/post-1/photo-1.jpg`";
     const ALONE: &str =
         "  Describe it with `alt:` in `content/post-1/photo-1.jpg.yaml`, or mark it decorative.";
     const LINK: &str =
@@ -611,44 +609,7 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
             "{% set p = page.image('photo-1.jpg') %}\
              <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>",
             "",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
-        ),
-        (
-            "two pictures, one described",
-            "{% set p = page.image('photo-1.jpg') %}{% set q = page.image('photo-2.jpg') %}\
-             <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>\
-             <a href=\"/post-2/\"><img src=\"{{ q.src }}\" alt=\"{{ q.alt }}\"></a>",
-            "",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
-        ),
-        (
-            "printed twice",
-            "{% set p = page.image('photo-1.jpg') %}\
-             <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>\
-             <a href=\"/post-2/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>",
-            "",
-            &[
-                "note  Missing alt text: `content/post-1/photo-1.jpg`",
-                "  Give it alt text saying where the link leads, as the image is all the link \
-                 shows.",
-            ],
-        ),
-        (
-            "shown whole",
-            "{% set p = page.image('photo-1.jpg') %}\
-             <a href=\"/post-1/\"><img src=\"{{ p }}\" alt=\"{{ p.alt }}\"></a>",
-            "",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
-        ),
-        (
-            "outside a link",
-            "{% set p = page.image('photo-1.jpg') %}\
-             <img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\">",
-            "",
-            &[
-                "note  Missing alt text: `content/post-1/photo-1.jpg`",
-                ALONE,
-            ],
+            &[ALT, ALONE, LINK, INSIDE],
         ),
         (
             "a button",
@@ -656,77 +617,31 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
              <button><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></button>",
             "",
             &[
-                "note  Missing alt text: `content/post-1/photo-1.jpg`",
-                "  Give it alt text saying what the button does, as the image is all the \
-                 button shows.",
+                ALT,
+                ALONE,
+                "note  Missing button text: a `<button>` has nothing a screen reader can read out",
+                "  Give the `<img>` inside it an `alt` saying what the button does.",
             ],
-        ),
-        (
-            "in a snippet",
-            "<a href=\"/post-1/\">{{ image(photo='photo-1.jpg') }}</a>",
-            "",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
         ),
         (
             "in a snippet the writing calls",
             "{{ page.content }}",
             "<a href=\"/post-1/\">@image(\"photo-1.jpg\")</a>\n",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+            &[LINK, INSIDE, ALT, ALONE],
         ),
         (
             "linked by a snippet the writing calls",
             "{{ page.content }}",
             "@figure(\"photo-1.jpg\")\n",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
+            &[ALT, ALONE, LINK, INSIDE],
         ),
         (
-            "its alt text read by a snippet the writing calls",
-            "{{ page.content }}",
-            "@read(\"photo-1.jpg\")\n",
-            &["note  Missing alt text: `content/post-1/photo-1.jpg`", ALT],
-        ),
-        (
-            "its alt text read by a snippet the writing calls, and one decorative",
-            "{{ page.content }}",
-            "@read(\"photo-1.jpg\")\n\n@read(\"photo-3.jpg\")\n",
+            "the writing's image in a template's link",
+            "<a href=\"/post-1/\">{{ page.content }}</a>",
+            "![](photo-1.jpg)\n",
             &[
-                "note  Missing alt text: `content/post-1/photo-1.jpg`",
-                ALT,
-                LINK,
-                INSIDE,
-            ],
-        ),
-        (
-            "its alt text read by a snippet the writing calls, outside the `<img>`",
-            "{{ page.content }}",
-            "@apart(\"photo-1.jpg\")\n",
-            &[
-                "note  Missing alt text: `content/post-1/photo-1.jpg`",
-                ALONE,
-                LINK,
-                INSIDE,
-            ],
-        ),
-        (
-            "its alt text written elsewhere",
-            "{% set p = page.image('photo-1.jpg') %}\
-             <a href=\"/post-1/\"><img src=\"{{ p.src }}\"></a>{{ p.alt }}",
-            "",
-            &[
-                "note  Missing alt text: `content/post-1/photo-1.jpg`",
-                ALONE,
-                LINK,
-                INSIDE,
-            ],
-        ),
-        (
-            "one decorative, written by the same line",
-            "{% for name in ['photo-1.jpg', 'photo-3.jpg'] %}{% set p = page.image(name) %}\
-             <a href=\"/post-1/\"><img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\"></a>{% endfor %}",
-            "",
-            &[
-                "note  Missing alt text: `content/post-1/photo-1.jpg`",
-                ALT,
+                "note  Missing alt text: `photo-1.jpg`",
+                "  Describe it in the brackets, or mark it decorative.",
                 LINK,
                 INSIDE,
             ],
@@ -734,11 +649,6 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
     ];
     for (name, layout, writing, expected) in cases {
         let site = Site::new("linked", layout);
-        // The home page shows the post's writing too.
-        site.write(
-            "templates/home.html",
-            &format!("{BASE}{{% for p in site.pages %}}{{{{ p.content }}}}{{% endfor %}}\n"),
-        );
         site.write("snippets/image.html", IMAGE);
         site.write(
             "snippets/figure.html",
@@ -747,24 +657,10 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
              <a href=\"/post-1/\"><img src=\"{{ picture.src }}\" alt=\"{{ picture.alt }}\"></a>\n",
         );
         site.write(
-            "snippets/read.html",
-            "{# takes photo #}\n\
-             <a href=\"/post-1/\"><img src=\"/post-1/\" alt=\"{{ page.image(photo).alt }}\"></a>\n",
-        );
-        site.write(
-            "snippets/apart.html",
-            "{# takes photo #}\n\
-             <a href=\"/post-1/\"><img src=\"/post-1/\" alt=\"\"></a>{{ page.image(photo).alt }}\n",
-        );
-        site.write(
             "content/post-1/index.md",
             &format!("---\ntitle: Post 1\n---\n{writing}"),
         );
-        for n in [1, 2, 3] {
-            site.put(&format!("content/post-1/photo-{n}.jpg"), &jpeg(30, 20));
-        }
-        site.write("content/post-1/photo-2.jpg.yaml", "alt: Words\n");
-        site.write("content/post-1/photo-3.jpg.yaml", "decorative: true\n");
+        site.put("content/post-1/photo-1.jpg", &jpeg(30, 20));
         let said = site.check();
         let told: Vec<&str> = (said.lines())
             .filter(|line| {
@@ -775,231 +671,6 @@ fn a_picture_a_template_shows_that_is_all_a_link_shows_is_told_once_as_its_alt_t
             .collect();
         assert_eq!(told, *expected, "{name}: {said}");
     }
-}
-
-/// A link a template writes round a picture with no alt text is folded
-/// into the picture's missing alt text only on the page, and in the round
-/// of a loop, that shows that picture: the same line showing a picture
-/// marked decorative, on another page or in another round, is told as a
-/// link with no words.
-#[test]
-fn a_templates_link_is_folded_into_alt_text_only_where_it_shows_that_picture() {
-    const ONE: &str = "note  Missing alt text: `content/post-1/photo-1.jpg`";
-    const THREE: &str = "note  Missing alt text: `content/post-1/photo-3.jpg`";
-    const ALT: &str = "  Give it alt text saying where the link to `/post-1/` leads, as the \
-        image is all the link shows.";
-    const ALONE: &str =
-        "  Describe it with `alt:` in `content/post-1/photo-1.jpg.yaml`, or mark it decorative.";
-    const LINK: &str =
-        "note  Missing link text: the link to `/post-1/` has nothing a screen reader can read out";
-    const INSIDE: &str = "  Give the `<img>` inside it an `alt` saying where the link leads.";
-    let printed = |names: &str| {
-        format!(
-            "{{% for name in [{names}] %}}{{% set p = page.image(name) %}}\
-             <a href=\"/post-1/\"><img src=\"{{{{ p.src }}}}\" alt=\"{{{{ p.alt }}}}\"></a>\
-             {{% endfor %}}"
-        )
-    };
-    let read = |names: &str| {
-        format!(
-            "{{% for name in [{names}] %}}\
-             <a href=\"/post-1/\"><img src=\"/post-1/\" alt=\"{{{{ page.image(name).alt }}}}\"></a>\
-             {{% endfor %}}"
-        )
-    };
-    let filtered = |filter: &str| {
-        format!(
-            "{{% set p = page.image('photo-1.jpg') %}}\
-             <a href=\"/post-1/\"><img src=\"{{{{ p.src | {filter} }}}}\" alt=\"{{{{ p.alt }}}}\"></a>"
-        )
-    };
-    // Each case: its name, the layout, whether a second page shows its own
-    // `photo-1.jpg`, marked decorative, and what is told.
-    let cases: Vec<(&str, String, bool, &[&str])> = vec![
-        (
-            "read in the tag, decorative on another page",
-            read("'photo-1.jpg'"),
-            true,
-            &[LINK, INSIDE, ONE, ALT],
-        ),
-        (
-            "read in the tag, decorative in another round",
-            read("'photo-1.jpg', 'photo-2.jpg'"),
-            false,
-            &[LINK, INSIDE, ONE, ALT],
-        ),
-        (
-            "printed, decorative in the round between",
-            printed("'photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'"),
-            false,
-            &[ONE, ALT, THREE, ALT, LINK, INSIDE],
-        ),
-        (
-            "printed in the tag, decorative in the round between",
-            "{% for name in ['photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'] %}\
-             <a href=\"/post-1/\"><img src=\"{{ page.image(name).src }}\" \
-             alt=\"{{ page.image(name).alt }}\"></a>{% endfor %}"
-                .to_owned(),
-            false,
-            &[LINK, INSIDE, ONE, ALT, THREE, ALT],
-        ),
-        (
-            "printed in two rounds",
-            printed("'photo-1.jpg', 'photo-1.jpg'"),
-            false,
-            &[ONE, ALT],
-        ),
-        ("marked safe", filtered("safe"), false, &[ONE, ALT]),
-        ("made whole", filtered("absolute"), false, &[ONE, ALT]),
-        // What another filter makes may name another file.
-        (
-            "changed by a filter",
-            filtered("lower"),
-            false,
-            &[ONE, ALONE, LINK, INSIDE],
-        ),
-        // Without the picture's address there is nothing to tell the
-        // rounds apart by.
-        (
-            "read in the tag in two rounds",
-            read("'photo-1.jpg', 'photo-1.jpg'"),
-            false,
-            &[LINK, INSIDE, ONE, ALT],
-        ),
-    ];
-    let mut wrong = Vec::new();
-    for (name, layout, other, expected) in cases {
-        let site = Site::new("folded", &layout);
-        site.write(
-            "statac.yaml",
-            "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
-             url: https://example.org/\n",
-        );
-        site.write("content/post-1/index.md", "---\ntitle: Post 1\n---\n");
-        for n in [1, 2, 3] {
-            site.put(&format!("content/post-1/photo-{n}.jpg"), &jpeg(30, 20));
-        }
-        site.write("content/post-1/photo-2.jpg.yaml", "decorative: true\n");
-        if other {
-            site.write("content/post-2/index.md", "---\ntitle: Post 2\n---\n");
-            site.put("content/post-2/photo-1.jpg", &jpeg(30, 20));
-            site.write("content/post-2/photo-1.jpg.yaml", "decorative: true\n");
-        }
-        let said = site.check();
-        let told: Vec<&str> = (said.lines())
-            .filter(|line| {
-                ["note  ", "  Give ", "  Describe "]
-                    .iter()
-                    .any(|opens| line.starts_with(opens))
-            })
-            .collect();
-        if told != *expected {
-            wrong.push(format!("{name}: {told:#?}\n{said}"));
-        }
-    }
-    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
-}
-
-/// A picture a template shows with no alt text is told once at the place
-/// it is shown, naming each page, however each page links it: its alt
-/// text is to say where the link leads, naming the URL where every link
-/// leads to one, and wherever any page links it, since that link is told
-/// there.
-#[test]
-fn a_templates_picture_linked_differently_on_each_page_is_told_once() {
-    const TO_ONE: &str = "  Give it alt text saying where the link to `/post-1/` leads, as the \
-        image is all the link shows.";
-    const TO_TWO: &str = "  Give it alt text saying where the link to `/post-2/` leads, as the \
-        image is all the link shows.";
-    const LEADS: &str =
-        "  Give it alt text saying where the link leads, as the image is all the link shows.";
-    fn told(said: &str) -> Vec<&str> {
-        let opens = [
-            "note  ",
-            "  Give ",
-            "  Describe ",
-            "  While ",
-            "  And ",
-            "    content/",
-        ];
-        (said.lines())
-            .filter(|line| opens.iter().any(|opens| line.starts_with(opens)))
-            .collect()
-    }
-    let shown = "<img src=\"{{ p.src }}\" alt=\"{{ p.alt }}\">";
-    let linked = |to: &str| format!("<a href=\"{to}\">{shown}</a>");
-    let only = |url: &str| {
-        format!(
-            "{{% if page.url == '{url}' %}}{}{{% else %}}{shown}{{% endif %}}",
-            linked(url)
-        )
-    };
-    let cases: Vec<(&str, String, &str)> = vec![
-        ("linked to one URL", linked("/post-1/"), TO_ONE),
-        ("linked to each page's URL", linked("{{ page.url }}"), LEADS),
-        ("linked on the first page only", only("/post-1/"), TO_ONE),
-        ("linked on the second page only", only("/post-2/"), TO_TWO),
-        (
-            "linked to two URLs on one page",
-            format!("{}{}", linked("/post-1/"), linked("/post-2/")),
-            LEADS,
-        ),
-    ];
-    let mut wrong = Vec::new();
-    for (name, layout, suggestion) in cases {
-        let layout = format!("{{% set p = page.image('/photo-1.jpg') %}}{layout}");
-        let site = Site::new("linked-differently", &layout);
-        site.put("static/photo-1.jpg", &jpeg(30, 20));
-        for n in [1, 2] {
-            site.write(
-                &format!("content/post-{n}/index.md"),
-                &format!("---\ntitle: Post {n}\n---\n"),
-            );
-        }
-        let said = site.check();
-        let expected = [
-            "note  Missing alt text: `static/photo-1.jpg`",
-            "  While building: content/post-1/index.md",
-            "  And while building 1 more:",
-            "    content/post-2/index.md",
-            suggestion,
-        ];
-        if told(&said) != expected {
-            wrong.push(format!("{name}: {:#?}\n{said}", told(&said)));
-        }
-    }
-    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
-
-    // A list's later pages are told with its first.
-    let site = Site::new("linked-later", "");
-    site.write(
-        "statac.yaml",
-        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nposts_per_page: 1\n",
-    );
-    site.write(
-        "templates/home.html",
-        &format!(
-            "{BASE}{{% set p = page.image('/photo-1.jpg') %}}{}",
-            linked("{{ page.url }}")
-        ),
-    );
-    site.put("static/photo-1.jpg", &jpeg(30, 20));
-    for n in [1, 2] {
-        site.write(
-            &format!("content/post-{n}.md"),
-            &format!("---\ntitle: Post {n}\ndate: 2026-01-0{n}\n---\n"),
-        );
-    }
-    let said = site.check();
-    assert_eq!(
-        told(&said),
-        [
-            "note  Missing alt text: `static/photo-1.jpg`",
-            "  While building: content/index.md",
-            LEADS,
-        ],
-        "{said}"
-    );
 }
 
 #[test]

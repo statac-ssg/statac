@@ -17,10 +17,8 @@
 use std::ops::Range;
 
 use crate::html::{self, Markup, Tag};
-use crate::links::Page;
-use crate::problem::{AllOf, Code, Kind, LabelledBy, Problem, ShownBy};
-use crate::reads::Key;
-use crate::site::{Id, TemplateId};
+use crate::problem::{AllOf, Code, Kind, LabelledBy, Problem};
+use crate::site::{Id, PageId, TemplateId};
 use crate::source::{Place, Span};
 use crate::templates::{Own, Renderer};
 
@@ -46,24 +44,24 @@ pub(crate) fn alike(renderer: &Renderer, a: &Problem, b: &Problem) -> bool {
         && (a.kind == b.kind || a.place.is_some_and(templates))
 }
 
-/// Each element of `html`, `page` as built with the template `layout`,
-/// that a screen reader has no words for, told where it was written. A
-/// link or a button that is all an image with no alt text, where `shown`,
-/// the page's problems, tells that image, is told there instead: an image
-/// of the writing's, or one a template shows that its tag is written with
-/// the alt text of.
+/// Each element of `html`, the page `number` of `page`'s list counted from
+/// 1, built with the template `layout`, that a screen reader has no words
+/// for, told where it was written. A link or a button that is all an image
+/// with no alt text, where `shown`, the page's problems, tells that image,
+/// is told there instead, unless a template writes the link or the button.
 pub(crate) fn told(
     renderer: &Renderer,
-    page: &Page,
+    page: PageId,
+    number: usize,
+    own: &Own,
     html: &str,
     layout: Option<usize>,
     shown: &mut [Problem],
 ) -> Told {
-    let (own, number) = (page.own, page.number);
-    let source = renderer.site().pages.get(page.id).source;
+    let source = renderer.site().pages.get(page).source;
     let found = unnamed(html, layout.is_some());
     let building = (!found.is_empty())
-        .then(|| renderer.building(page.id, number))
+        .then(|| renderer.building(page, number))
         .flatten();
     let mut told = Vec::with_capacity(found.len());
     let mut folded = Vec::new();
@@ -72,45 +70,19 @@ pub(crate) fn told(
             Kind::MissingLinkText { href, .. } => AllOf::Link(href.clone()),
             _ => AllOf::Button,
         };
-        let at_place = (at.clone()).and_then(|at| placed(renderer, own, html, at));
-        // A template's link is folded on this page alone: on another, or in
-        // another round of a loop, it may hold another image.
-        let across = at_place.filter(|place| renderer.template_of(place.source).is_none());
-        // The picture whose address a template printed in the `<img>`, and
-        // whether it has no alt text; else the one with none a snippet the
-        // writing calls asked for inside it.
-        let picture = (image.as_ref()).and_then(|image| {
-            (renderer.picture_in(own, image.tag.clone()))
-                .or_else(|| Some((asked_inside(renderer, page, html, image.tag.clone())?, true)))
-        });
-        // A template's picture gives the link words only where the `<img>`
-        // is written with its alt text.
-        if let (Some(image), Some((picture, true))) = (&image, &picture)
-            && image.alt
-        {
-            if let Some(told) = shown.iter_mut().find(|problem| prints(problem, picture))
-                && let Kind::MissingAltText { all_of: at, .. } = &mut told.kind
-            {
-                AllOf::join(at, Some(&all_of));
-                folded.extend(across.map(Some));
-                continue;
-            }
-            if told_there(renderer, page, at.clone(), image.tag.clone(), picture) {
-                continue;
-            }
-        }
-        // Else by where the picture is told, inside the `<img>`, unless the
-        // `<img>` prints a picture that needs no alt text: a template's
-        // `<img>` may show another picture on each page or round.
-        let placed = (image.as_ref())
-            .filter(|_| !matches!(picture, Some((_, false))))
-            .and_then(|image| tag_placed(renderer, own, html, image.tag.clone()));
-        if let Some(placed) = placed
-            && let Some(told) = shown.iter_mut().find(|problem| shows(problem, placed))
+        let at_place = at.and_then(|at| placed(renderer, own, html, at));
+        // A link or a button a template writes may hold another image on
+        // another page, or in another round of a loop, so it is never
+        // folded.
+        let folds = at_place.filter(|place| renderer.template_of(place.source).is_none());
+        let image = (image.filter(|_| folds.is_some()))
+            .and_then(|image| tag_placed(renderer, own, html, image));
+        if let Some(image) = image
+            && let Some(told) = shown.iter_mut().find(|problem| shows(problem, image))
             && let Kind::MissingAltText { all_of: at, .. } = &mut told.kind
         {
             *at = Some(all_of);
-            folded.extend(across.map(Some));
+            folded.push(folds);
             continue;
         }
         // With nothing on the page to place it at, a missing `<title>` is
@@ -141,8 +113,7 @@ pub(crate) fn told(
 }
 
 /// What [`told`] found on a page: its problems, and where each link or
-/// button the writing holds was written that is all an image told as
-/// missing alt text.
+/// button was written that is all an image told as missing alt text.
 pub(crate) struct Told {
     pub problems: Vec<Problem>,
     pub folded: Vec<Option<Place>>,
@@ -161,73 +132,11 @@ pub(crate) fn of_an_image(problem: &Problem) -> bool {
 /// written at `image`, not yet named as all of a link or a button.
 fn shows(problem: &Problem, image: Place) -> bool {
     matches!(problem.kind, Kind::MissingAltText { all_of: None, .. })
-        && problem.place.is_some_and(|place| within(place, image))
-}
-
-/// Whether `place` is within `tag`.
-fn within(place: Place, tag: Place) -> bool {
-    place.source == tag.source
-        && tag.span.start <= place.span.start
-        && place.span.end <= tag.span.end
-}
-
-/// The picture with no alt text, as a problem names it, that the snippet
-/// or piece a call in the writing builds asked for within the tag at
-/// `image` on `page`, which that snippet or piece writes whole: told at
-/// the call, it isn't told within the tag.
-fn asked_inside(
-    renderer: &Renderer,
-    page: &Page,
-    html: &str,
-    image: Range<usize>,
-) -> Option<String> {
-    let call = renderer.in_text(page.own, image.start)?;
-    let tag = tag_placed(renderer, page.own, html, image)?;
-    let pages = &renderer.site().pages;
-    page.reads.keys().iter().find_map(|key| match *key {
-        Key::Body(other) if pages.get(other).source == Some(call.source) => {
-            (renderer.asked_at_calls(other).iter())
-                .find(|(at, asked, _)| *at == call && within(*asked, tag))
-                .map(|(.., picture)| picture.clone())
-        }
-        _ => None,
-    })
-}
-
-/// Whether `problem` is the missing alt text of `picture`, as a problem
-/// names it, where a template shows it.
-fn prints(problem: &Problem, picture: &str) -> bool {
-    matches!(
-        &problem.kind,
-        Kind::MissingAltText { picture: told, shown: ShownBy::Template { .. }, .. } if told == picture
-    )
-}
-
-/// Whether the link or button whose tag opens at `at` on `page`, holding
-/// the tag `image` that prints `picture`, is all of a snippet's call in
-/// another page's writing shown there, whose writing told that picture:
-/// it is told on that page, as it is the same there.
-fn told_there(
-    renderer: &Renderer,
-    page: &Page,
-    at: Option<Range<usize>>,
-    image: Range<usize>,
-    picture: &str,
-) -> bool {
-    let Some(call) = renderer.in_text(page.own, image.start) else {
-        return false;
-    };
-    if at.and_then(|at| renderer.in_text(page.own, at.start)) != Some(call) {
-        return false;
-    }
-    let pages = &renderer.site().pages;
-    page.reads.keys().iter().any(|key| match *key {
-        Key::Body(other) => {
-            pages.get(other).source == Some(call.source)
-                && (renderer.writing_told(other).iter()).any(|problem| prints(problem, picture))
-        }
-        _ => false,
-    })
+        && problem.place.is_some_and(|place| {
+            place.source == image.source
+                && image.span.start <= place.span.start
+                && place.span.end <= image.span.end
+        })
 }
 
 /// Where the whole tag at `at` on a built page was written: in a
@@ -274,24 +183,17 @@ struct Open {
     at: Range<usize>,
     /// Whether anything inside it, or on its tag, gives it words.
     named: bool,
-    /// The first image with no alt text it holds.
-    image: Option<Image>,
+    /// The whole tag of the first image with no alt text it holds.
+    image: Option<Range<usize>>,
 }
 
 /// An element a screen reader has no words for, with where its tag opens,
-/// `<` and its name, and for a link or a button, the first image with no
-/// alt text it holds.
+/// `<` and its name, and for a link or a button, the whole tag of the
+/// first image with no alt text it holds.
 pub(crate) struct Unnamed {
     pub kind: Kind,
     pub at: Option<Range<usize>>,
-    pub image: Option<Image>,
-}
-
-/// An image with no alt text: its whole tag, and whether the tag has an
-/// `alt`, empty.
-pub(crate) struct Image {
-    pub tag: Range<usize>,
-    pub alt: bool,
+    pub image: Option<Range<usize>>,
 }
 
 /// A form control with no label but perhaps a `<label for>` further on.
@@ -424,10 +326,7 @@ pub(crate) fn unnamed(html: &str, titled: bool) -> Vec<Unnamed> {
             if names_itself || name == "img" && alt {
                 open.named = true;
             } else if name == "img" {
-                open.image.get_or_insert_with(|| Image {
-                    tag: range.clone(),
-                    alt: tag.get("alt").is_some(),
-                });
+                open.image.get_or_insert(range.clone());
             }
         }
         match name {

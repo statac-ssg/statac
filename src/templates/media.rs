@@ -78,15 +78,12 @@ impl Asking {
     }
 
     /// Where the asking is written: the call in the writing, or else the
-    /// call in the template.
+    /// call in the template, as the engine places it or, where it doesn't,
+    /// where the template makes only one such.
     fn place(&self, shared: &Shared) -> Option<Place> {
-        self.calling.or_else(|| self.in_template(shared))
-    }
-
-    /// Where the asking is written in the template: the call as the engine
-    /// places it or, where it doesn't, where the template makes only one
-    /// such.
-    fn in_template(&self, shared: &Shared) -> Option<Place> {
+        if self.calling.is_some() {
+            return self.calling;
+        }
         let &at = shared.templates.by_name.get(&self.template)?;
         if let Some(found) = self.written_in(shared, at) {
             return Some(found);
@@ -739,25 +736,6 @@ pub(super) fn own_fields(value: &Value) -> Option<&[(String, Value)]> {
     Some(&photo.own)
 }
 
-/// The picture `value`, being printed, shows, and whether it has no
-/// description: the picture itself, or where it is published.
-pub(super) fn picture_printed(value: &Value) -> Option<(PictureId, bool)> {
-    match value.downcast_object_ref::<PhotoValue>() {
-        Some(photo) => Some((photo.id, photo.undescribed)),
-        None => frame::published_in(value),
-    }
-}
-
-/// `made`, naming the same file as `text`, as a value printing the same
-/// picture as `text` does, where `text` is a picture or where one is
-/// published.
-pub(super) fn published_as(text: &Value, made: Value) -> Value {
-    if let Some((picture, undescribed)) = picture_printed(text) {
-        frame::published_at(&made, picture, undescribed);
-    }
-    made
-}
-
 /// Tells a picture shown with no description, once for the output being
 /// built. `key` is the picture, however it is named where it is shown.
 pub(super) fn undescribed(key: String, problem: impl FnOnce(&frame::Frame) -> Problem) {
@@ -797,12 +775,9 @@ impl Object for PhotoValue {
             return own.map(|(_, value)| value.clone());
         };
         match *name {
-            "src" | "avif" | "fallback" | "full" => {
-                if self.copied {
-                    let at = self.asking.calling;
-                    frame::develops(self.id, at, self.full);
-                }
-                frame::published_at(value, self.id, self.undescribed);
+            "src" | "avif" | "fallback" | "full" if self.copied => {
+                let at = self.asking.calling;
+                frame::develops(self.id, at, self.full);
             }
             "alt" if self.undescribed => {
                 let picture = shared.site.pictures.get(self.id);
@@ -814,11 +789,6 @@ impl Object for PhotoValue {
                     all_of: None,
                 };
                 let at = self.asking.place(shared);
-                if let Some(call) = self.asking.calling
-                    && let Some(asked) = self.asking.in_template(shared)
-                {
-                    frame::asked_at_call(call, asked, picture.shown());
-                }
                 undescribed(picture.shown(), |frame| {
                     let problem = match at {
                         Some(at) => Problem::at(kind, at),

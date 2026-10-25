@@ -20,7 +20,6 @@ use minijinja::{Captured, Error, Held, Output, Template, Value};
 use super::dedent::Head;
 use super::landing::{Deeper, Landing, Place, Placing};
 use crate::html::{Markup, PREFORMATTED};
-use crate::site::PictureId;
 use crate::source::Place as SourcePlace;
 
 /// The line a template, or a body the engine holds back, is writing.
@@ -88,9 +87,6 @@ pub(crate) enum Printed {
     /// what `{{ ... }}` holds; with where its text was written, where a
     /// body the engine held back or a snippet wrote it.
     Made(SourcePlace, Option<Arc<Own>>),
-    /// Where a picture is published, printed at this place: what `{{ ... }}`
-    /// holds; with whether the picture has no description.
-    Picture(SourcePlace, PictureId, bool),
 }
 
 /// Where a byte of an output was written.
@@ -139,28 +135,7 @@ impl Own {
             Printed::Made(place, inner) => (inner.as_ref().zip(within))
                 .and_then(|(inner, within)| inner.origin(within))
                 .unwrap_or(Origin::Made(*place)),
-            Printed::Picture(place, ..) => Origin::Made(*place),
         })
-    }
-
-    /// The picture whose address is printed in bytes `range` of the
-    /// output, and whether it has no description, followed into the text
-    /// of a body or snippet as [`Own::origin`] follows it.
-    pub(super) fn picture_in(&self, range: Range<usize>) -> Option<(PictureId, bool)> {
-        let first = (self.prints).partition_point(|print| print.at + print.len <= range.start);
-        self.prints[first..]
-            .iter()
-            .take_while(|print| print.at < range.end)
-            .find_map(|print| match &print.from {
-                Printed::Picture(_, picture, undescribed) => Some((*picture, *undescribed)),
-                Printed::Text(_, Some(inner)) | Printed::Made(_, Some(inner)) => {
-                    let within = print.within?;
-                    let start = range.start.max(print.at) - print.at + within;
-                    let end = range.end.min(print.at + print.len) - print.at + within;
-                    inner.picture_in(start..end)
-                }
-                Printed::Text(_, None) | Printed::Made(_, None) => None,
-            })
     }
 
     /// The value printed holding the byte at `at`, and where in its text
@@ -193,13 +168,6 @@ impl Own {
                 },
                 within,
             ) => inner.as_ref()?.in_text(within?),
-            (
-                Print {
-                    from: Printed::Picture(..),
-                    ..
-                },
-                _,
-            ) => None,
         }
     }
 

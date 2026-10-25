@@ -26,10 +26,9 @@ written in the content is told in the content. What is inside an element
 marked `aria-hidden="true"` is never read out, so it gives a link no
 name, and a link inside one is never told. Nor is one inside a
 `<template>`, which is on no page until a script puts it there. A
-`<button>` with no words is told as `missing-button-text`. A link that
-shows only an image Statac already tells as `missing-alt-text` is told
-once, there: an image in the content, or one a template shows with
-`page.image` where its `<img>` is written with the image's `alt`.
+`<button>` with no words is told as `missing-button-text`. A link in the
+content that shows only an image Statac already tells as
+`missing-alt-text` is told once, there.
 
 ## How to fix it
 

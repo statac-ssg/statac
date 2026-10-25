@@ -263,9 +263,6 @@ pub(super) struct Body {
     problems: Vec<Problem>,
     /// The pictures the writing was told to show with no description.
     undescribed: Vec<String>,
-    /// Where the snippets and pieces its calls build asked for each
-    /// picture with no description, as [`Frame::asked_at_calls`] notes.
-    asked_at_calls: Vec<(Place, Place, String)>,
     /// The photographs whose copies the writing names.
     developed: Vec<crate::album::Shown>,
     /// Whether the writing shows any code coloured, its own or another
@@ -718,14 +715,6 @@ impl Renderer {
         }
     }
 
-    /// The picture, as a problem names it, whose address a template
-    /// printed in bytes `range` of an output, and whether it has no
-    /// description.
-    pub fn picture_in(&self, own: &Own, range: Range<usize>) -> Option<(String, bool)> {
-        let (picture, undescribed) = own.picture_in(range)?;
-        Some((self.shared.site.pictures.get(picture).shown(), undescribed))
-    }
-
     /// The outermost markup of a file's that the byte at `at` of an output
     /// is in: for a byte a snippet called in a page's writing wrote, the
     /// call.
@@ -770,22 +759,6 @@ impl Renderer {
     pub fn writing(&self, page: PageId) -> Option<&crate::links::Writing> {
         let body = self.shared.bodies[page.index()].get()?;
         Some(&body.writing)
-    }
-
-    /// What `page`'s writing told as it was built; none where no output
-    /// has built it.
-    pub fn writing_told(&self, page: PageId) -> &[Problem] {
-        let body = self.shared.bodies[page.index()].get();
-        body.map_or(&[], |body| &body.problems)
-    }
-
-    /// Each picture with no description whose alt text a snippet or piece
-    /// `page`'s writing calls read: the call, where the snippet or piece
-    /// asked for the picture, and the picture as a problem names it. None
-    /// where no output has built the writing.
-    pub fn asked_at_calls(&self, page: PageId) -> &[(Place, Place, String)] {
-        let body = self.shared.bodies[page.index()].get();
-        body.map_or(&[], |body| &body.asked_at_calls)
     }
 
     /// What `page`'s writing links to and hands its snippet calls, its
@@ -1491,7 +1464,6 @@ fn build_body_untimed(
         traced,
         excerpt_traced,
         undescribed: frame.undescribed,
-        asked_at_calls: frame.asked_at_calls,
         reads: frame.reads,
         reading,
         asked: frame.asked,

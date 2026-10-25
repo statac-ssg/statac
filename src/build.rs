@@ -449,9 +449,8 @@ pub(crate) struct Built {
     pub written: bool,
     /// The languages whose search index it names.
     pub indexed: Vec<crate::site::LanguageId>,
-    /// Where each link or button of the writing's it shows was written
-    /// that is all an image told as missing alt text, which no page tells
-    /// as missing words.
+    /// Where each link or button it shows was written that is all an image
+    /// told as missing alt text, which no page tells as missing words.
     pub folded: Vec<Option<Place>>,
 }
 
@@ -879,21 +878,6 @@ pub(crate) fn conclude(
             // what went wrong there is told once, naming the first page
             // that met it.
             Output::Later(list, _) => {
-                // What a picture is all of on a later page is joined into
-                // where the first page told it.
-                for problem in &built.problems {
-                    if matches!(
-                        problem.kind,
-                        Kind::MissingAltText {
-                            all_of: Some(_),
-                            ..
-                        }
-                    ) && let Some(first) =
-                        (problems.iter_mut()).find(|first| first.alike_but_for_page(problem))
-                    {
-                        first.all_of_too(problem);
-                    }
-                }
                 let told = on_list.entry(list).or_default();
                 let new: Vec<Problem> = built
                     .problems
@@ -1514,6 +1498,11 @@ pub(crate) fn build_output(
         if let Some((page, number)) = shown
             && file.ends_with(".html")
         {
+            let layout = rendered.layout;
+            let own = &rendered.own;
+            let unnamed = unnamed::told(renderer, page, number, own, &html, layout, &mut problems);
+            problems.extend(unnamed.problems);
+            folded = unnamed.folded;
             let page = links::Page {
                 id: page,
                 number,
@@ -1527,9 +1516,6 @@ pub(crate) fn build_output(
                     .collect(),
                 own: &rendered.own,
             };
-            let unnamed = unnamed::told(renderer, &page, &html, rendered.layout, &mut problems);
-            problems.extend(unnamed.problems);
-            folded = unnamed.folded;
             let checking = std::time::Instant::now();
             checked = Some(linked.check(renderer, page, &html));
             timed.links = checking.elapsed();

@@ -1697,20 +1697,6 @@ pub enum AllOf {
     Button,
 }
 
-impl AllOf {
-    /// Joins into `all_of`, what an image told once is all of where it is
-    /// first shown, what it is all of where it is shown again: a link
-    /// wherever one is, as that link is told there, with its `href` only
-    /// where every link has that one; of a link and a button, the first.
-    pub fn join(all_of: &mut Option<AllOf>, again: Option<&AllOf>) {
-        match (all_of.as_mut(), again) {
-            (None, Some(again)) => *all_of = Some(again.clone()),
-            (Some(AllOf::Link(href)), Some(AllOf::Link(again))) if href != again => *href = None,
-            _ => {}
-        }
-    }
-}
-
 /// What gives a form control of its kind its label, where nothing else
 /// does.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -3238,8 +3224,7 @@ impl Problem {
     }
 
     /// Whether `other` is this problem met building another page: alike in
-    /// all but the page it names, and what an image with no alt text is all
-    /// of there, which [`Problem::met_building_too`] joins.
+    /// all but the page it names.
     pub fn alike_but_for_page(&self, other: &Problem) -> bool {
         let rest = |problem: &Problem| {
             problem
@@ -3249,18 +3234,7 @@ impl Problem {
                 .cloned()
                 .collect::<Vec<_>>()
         };
-        let kind = match (&self.kind, &other.kind) {
-            (
-                Kind::MissingAltText { picture, shown, .. },
-                Kind::MissingAltText {
-                    picture: other_picture,
-                    shown: other_shown,
-                    ..
-                },
-            ) => picture == other_picture && shown == other_shown,
-            (kind, other) => kind == other,
-        };
-        self.place == other.place && kind && rest(self) == rest(other)
+        self.place == other.place && self.kind == other.kind && rest(self) == rest(other)
     }
 
     /// The pages whose builds met the problem, the first to meet it first.
@@ -3274,23 +3248,12 @@ impl Problem {
     }
 
     /// Adds the pages whose builds met `other`, which is this problem met
-    /// building them, and what an image is all of there.
+    /// building them.
     pub fn met_building_too(&mut self, other: &Problem) {
         for (relation, place) in other.context.iter() {
             if matches!(relation, Relation::Building(_)) {
                 self.context.push(relation.clone(), *place);
             }
-        }
-        self.all_of_too(other);
-    }
-
-    /// Joins into this image's missing alt text what the image is all of
-    /// in `other`, this problem met again.
-    pub fn all_of_too(&mut self, other: &Problem) {
-        if let Kind::MissingAltText { all_of, .. } = &mut self.kind
-            && let Kind::MissingAltText { all_of: again, .. } = &other.kind
-        {
-            AllOf::join(all_of, again.as_ref());
         }
     }
 }

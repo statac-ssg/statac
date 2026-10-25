@@ -16,7 +16,7 @@ use super::render::Shared;
 use crate::assets::PageScripts;
 use crate::problem::{Kind, Problem, Stopped};
 use crate::reads::{Asked, Key, Reads};
-use crate::site::{DataId, Id, LanguageId, PageId, PictureId};
+use crate::site::{DataId, Id, LanguageId, PageId};
 use crate::source::Place;
 
 pub(super) struct Frame {
@@ -59,19 +59,11 @@ pub(super) struct Frame {
     /// was written, by the text's address and length, the text kept so no
     /// other takes its address.
     pub made: HashMap<(usize, usize), (Value, Arc<Own>)>,
-    /// The picture each text gives where it is published, and whether it
-    /// has no description, by the text's address and length, the text kept
-    /// so no other takes its address.
-    pub pictures_at: HashMap<(usize, usize), (Value, PictureId, bool)>,
     /// Where the writing makes the call, or shows the picture, whose
     /// snippet or piece is being built.
     pub calling: Option<Place>,
     /// The pictures told as shown with no description, each told once.
     pub undescribed: Vec<String>,
-    /// Each picture with no description whose alt text a snippet or piece
-    /// the writing calls read: the call, where the snippet or piece asked
-    /// for the picture, and the picture as a problem names it.
-    pub asked_at_calls: Vec<(Place, Place, String)>,
     /// How many search boxes what is built has asked for, those of its
     /// own page's writing counted once it shows that whole.
     pub search_boxes: usize,
@@ -167,10 +159,8 @@ impl Frame {
             scripts: PageScripts::default(),
             origins: HashMap::new(),
             made: HashMap::new(),
-            pictures_at: HashMap::new(),
             calling: None,
             undescribed: Vec::new(),
-            asked_at_calls: Vec::new(),
             search_boxes: 0,
             boxes_before_writing: None,
             indexed: Vec::new(),
@@ -306,18 +296,6 @@ pub(super) fn develops(id: crate::site::PictureId, place: Option<Place>, full: b
     });
 }
 
-/// Notes that the snippet or piece the writing's call at `call` builds
-/// read the alt text of `picture`, which has none, asking for it at
-/// `asked`.
-pub(super) fn asked_at_call(call: Place, asked: Place, picture: String) {
-    with(|frame| {
-        let asked = (call, asked, picture);
-        if !frame.asked_at_calls.contains(&asked) {
-            frame.asked_at_calls.push(asked);
-        }
-    });
-}
-
 pub(super) fn missed(page: Option<PageId>, name: &str) {
     if UNRECORDED.get() {
         return;
@@ -440,31 +418,6 @@ pub(super) fn written(value: &Value) -> Option<Arc<Own>> {
     let key = value.as_str().map(|_| address(value))?;
     FRAMES.with_borrow(|frames| {
         (frames.iter().rev()).find_map(|frame| frame.made.get(&key).map(|(_, own)| own.clone()))
-    })
-}
-
-/// Notes that `text` is where `picture` is published, `undescribed` where
-/// it has no description, so that printing it is known as printing that
-/// picture.
-pub(super) fn published_at(text: &Value, picture: PictureId, undescribed: bool) {
-    if text.as_str().is_some_and(|text| !text.is_empty()) {
-        with(|frame| {
-            (frame.pictures_at)
-                .entry(address(text))
-                .or_insert_with(|| (text.clone(), picture, undescribed));
-        });
-    }
-}
-
-/// The picture `text` is where it is published, and whether it has no
-/// description, as [`published_at`] notes it.
-pub(super) fn published_in(text: &Value) -> Option<(PictureId, bool)> {
-    let key = text.as_str().map(|_| address(text))?;
-    FRAMES.with_borrow(|frames| {
-        (frames.iter().rev()).find_map(|frame| {
-            let (_, picture, undescribed) = frame.pictures_at.get(&key)?;
-            Some((*picture, *undescribed))
-        })
     })
 }
 
