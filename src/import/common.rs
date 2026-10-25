@@ -4,7 +4,9 @@
 
 use std::path::Path;
 
+use super::report::code;
 use super::{Failed, Field, Value};
+use crate::content::address::Address;
 use crate::date::{self, Date};
 use crate::problem::{Kind, Problem, Reason};
 use crate::source::{Place, Sources};
@@ -305,4 +307,67 @@ pub(super) fn listed(items: &[String]) -> String {
         Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
         None => String::new(),
     }
+}
+
+/// What a feed is written as.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) enum FeedKind {
+    Atom,
+    Rss,
+    Json,
+}
+
+/// What is said of each feed of a list in `lists`, each feed by its file
+/// name and its kind where known, that is built with the template another
+/// of the list's feeds is, of another kind or of a kind not known, until
+/// the site has a template named for it; none where no feed is. A template
+/// so shared is taken to be for the feed named as it, or else the first
+/// of the kind the docs' template of that name is, Atom for `feed.xml` and
+/// JSON for `feed.json`, or else the first.
+pub(super) fn feeds_built_alike(lists: &[Vec<(String, Option<FeedKind>)>]) -> Option<String> {
+    // The template a feed is built with where the site has only
+    // `templates/feed.xml` and `templates/feed.json`.
+    let general = |name: &str| {
+        let address = Address::read_file(&format!("/{name}")).ok()?;
+        crate::feeds::template(&address, &|t| matches!(t, "feed.xml" | "feed.json"))
+    };
+    let mut sentences: Vec<String> = Vec::new();
+    for feeds in lists {
+        let built: Vec<(&str, Option<FeedKind>, String)> = (feeds.iter())
+            .filter_map(|(name, kind)| Some((name.as_str(), *kind, general(name)?)))
+            .collect();
+        for (name, kind, template) in &built {
+            let alike: Vec<_> = built.iter().filter(|(.., t)| t == template).collect();
+            let docs = match template.as_str() {
+                "feed.json" => FeedKind::Json,
+                _ => FeedKind::Atom,
+            };
+            let Some(&&(kept, kept_kind, _)) = (alike.iter().find(|(n, ..)| n == template))
+                .or_else(|| alike.iter().find(|(_, k, _)| *k == Some(docs)))
+                .or(alike.first())
+            else {
+                continue;
+            };
+            if *name == kept || (kept_kind.is_some() && *kind == kept_kind) {
+                continue;
+            }
+            let sentence = format!(
+                "{} needs {}: until you add it, it is built with {}, in the same format as {}.",
+                code(name),
+                code(&format!("templates/{name}")),
+                code(&format!("templates/{template}")),
+                code(kept)
+            );
+            if !sentences.contains(&sentence) {
+                sentences.push(sentence);
+            }
+        }
+    }
+    (!sentences.is_empty()).then(|| {
+        format!(
+            "{} The docs have an Atom template and an RSS template to copy: see \
+             https://statac.dev/feeds/#the-template.",
+            sentences.join(" ")
+        )
+    })
 }

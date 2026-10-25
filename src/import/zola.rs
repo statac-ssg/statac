@@ -15,7 +15,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::common::{
-    counted, fields, front, glob_matches, joined, last, listed, names_in, parent, text_of, texts_of,
+    FeedKind, counted, feeds_built_alike, fields, front, glob_matches, joined, last, listed,
+    names_in, parent, text_of, texts_of,
 };
 use super::inside;
 use super::report::code;
@@ -1331,6 +1332,18 @@ impl Reader<'_> {
             [name] => Value::Text(name.clone()),
             _ => Value::List(names.iter().cloned().map(Value::Text).collect()),
         };
+        // Zola builds `atom.xml` and `rss.xml` with templates of its own,
+        // and any other name with the site's.
+        let kinds = |names: &[String]| -> Vec<(String, Option<FeedKind>)> {
+            (names.iter())
+                .map(|name| match name.as_str() {
+                    "atom.xml" => (name.clone(), Some(FeedKind::Atom)),
+                    "rss.xml" => (name.clone(), Some(FeedKind::Rss)),
+                    _ => (name.clone(), None),
+                })
+                .collect()
+        };
+        let mut lists = Vec::new();
         for at in 0..self.docs.len() {
             let doc = &self.docs[at];
             if doc.shape != Shape::List || doc.draft {
@@ -1344,6 +1357,7 @@ impl Reader<'_> {
                 && let Some(base) = doc.address.clone()
             {
                 words.push(Field::new("feed", asked(&names), None));
+                lists.push(kinds(&names));
                 for name in &names {
                     feed_addresses.push(format!("{base}{name}"));
                 }
@@ -1355,6 +1369,7 @@ impl Reader<'_> {
             if !on {
                 continue;
             }
+            lists.push(kinds(&names));
             let prefix = self.prefix(&language);
             let index = format!("{prefix}index.md");
             let word = Field::new("feed", asked(&names), None);
@@ -1385,13 +1400,18 @@ impl Reader<'_> {
                 1 => ("feed", "stays"),
                 _ => ("feeds", "each stay"),
             };
-            self.note(format!(
+            let mut note = format!(
                 "Zola's {feeds}, at {}, {are} at the same URL, as `feed:` on each list page says, \
                  built with `templates/feed.xml` once you add it, and `feed_ids_before` and \
                  `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed \
                  readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
                 listed(&shown)
-            ));
+            );
+            if let Some(alike) = feeds_built_alike(&lists) {
+                note.push(' ');
+                note.push_str(&alike);
+            }
+            self.note(note);
             self.import.addresses.extend(feed_addresses);
         }
     }

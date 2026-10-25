@@ -17,7 +17,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::common::{
-    counted, glob_matches, joined, last, listed, mapping, names_in, parent, text_of,
+    FeedKind, counted, feeds_built_alike, glob_matches, joined, last, listed, mapping, names_in,
+    parent, text_of,
 };
 use super::inside;
 use super::report::code;
@@ -638,14 +639,6 @@ fn names_file(writing: &str, name: &str) -> bool {
         Event::Html(html) | Event::InlineHtml(html) => in_html(&html),
         _ => false,
     })
-}
-
-/// What a feed is written as.
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum FeedKind {
-    Atom,
-    Rss,
-    Json,
 }
 
 impl FeedKind {
@@ -3052,7 +3045,7 @@ impl Reader<'_> {
             }
         };
         let (shown, templates) = self.ask(&asked);
-        notes.push(format!(
+        let mut note = format!(
             "{lead} {} at the same URL, as {shown} in `statac.yaml` says, built with {} once you \
              add {}, and `feed_ids_before` and `feed_ids_from: eleventy` keep each post's id the \
              URL Eleventy gave it, so feed readers see nothing new: see \
@@ -3066,7 +3059,15 @@ impl Reader<'_> {
                 1 => "it",
                 _ => "them",
             }
-        ));
+        );
+        let feeds: Vec<(String, Option<FeedKind>)> = (self.plugin_feeds.iter())
+            .map(|(address, kind, _)| (last(address).to_owned(), *kind))
+            .collect();
+        if let Some(alike) = feeds_built_alike(&[feeds]) {
+            note.push(' ');
+            note.push_str(&alike);
+        }
+        notes.push(note);
         notes.extend(twice);
     }
 

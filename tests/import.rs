@@ -3547,6 +3547,148 @@ fn zola_feeds_stay_at_their_old_addresses() {
     assert_eq!(fixture("zola-feeds"), [BUILT, NO_FEED]);
 }
 
+/// A list asking for several feeds, from Zola's `feed_filenames` or from
+/// Eleventy's RSS plugin: the report names each feed that is built with
+/// the template another feed of another kind is built with, until the site
+/// has a template named for it.
+#[test]
+fn a_feed_built_with_the_template_of_another_kind_is_named() {
+    let needs = |name: &str, kept: &str| {
+        format!(
+            "`{name}` needs `templates/{name}`: until you add it, it is built with \
+             `templates/feed.xml`, in the same format as `{kept}`."
+        )
+    };
+    let zola = |names: &str| {
+        vec![
+            (
+                "config.toml",
+                format!(
+                    "base_url = \"https://example.org\"\ntitle = \"Feeds\"\n\
+                     generate_feeds = true\nfeed_filenames = [{names}]\n"
+                ),
+            ),
+            (
+                "content/_index.md",
+                "+++\nsort_by = \"date\"\n+++\n".to_owned(),
+            ),
+            (
+                "content/a.md",
+                "+++\ntitle = \"A\"\ndate = 2026-01-01\n+++\nText.\n".to_owned(),
+            ),
+        ]
+    };
+    let eleventy = |calls: &[&str]| {
+        let calls: Vec<String> = (calls.iter())
+            .map(|options| format!("  eleventyConfig.addPlugin(feedPlugin, {options});\n"))
+            .collect();
+        vec![
+            (
+                "package.json",
+                "{ \"devDependencies\": { \"@11ty/eleventy\": \"^3.0.0\", \
+                 \"@11ty/eleventy-plugin-rss\": \"^3.1.0\" } }\n"
+                    .to_owned(),
+            ),
+            (
+                "eleventy.config.js",
+                format!(
+                    "import {{ feedPlugin }} from \"@11ty/eleventy-plugin-rss\";\n\n\
+                     export default function (eleventyConfig) {{\n{}}}\n",
+                    calls.concat()
+                ),
+            ),
+            (
+                "posts/a.md",
+                "---\ntitle: A\ndate: 2026-01-01\n---\nText.\n".to_owned(),
+            ),
+        ]
+    };
+    // (the case, the old site's files, what is said of each feed so built)
+    type Case<'a> = (&'a str, Vec<(&'a str, String)>, &'a [String]);
+    let cases: [Case; 9] = [
+        (
+            "zola-atom-rss",
+            zola("\"atom.xml\", \"rss.xml\""),
+            &[needs("rss.xml", "atom.xml")],
+        ),
+        (
+            "zola-rss-atom",
+            zola("\"rss.xml\", \"atom.xml\""),
+            &[needs("rss.xml", "atom.xml")],
+        ),
+        ("zola-atom", zola("\"atom.xml\""), &[]),
+        ("zola-rss", zola("\"rss.xml\""), &[]),
+        (
+            "eleventy-rss-atom",
+            eleventy(&[
+                "{ type: \"rss\", outputPath: \"/rss.xml\" }",
+                "{ type: \"atom\", outputPath: \"/atom.xml\" }",
+            ]),
+            &[needs("rss.xml", "atom.xml")],
+        ),
+        (
+            "eleventy-feed-xml",
+            eleventy(&[
+                "{ type: \"rss\", outputPath: \"/feed.xml\" }",
+                "{ type: \"atom\", outputPath: \"/atom.xml\" }",
+            ]),
+            &[needs("atom.xml", "feed.xml")],
+        ),
+        (
+            "eleventy-atom-json",
+            eleventy(&[
+                "{ outputPath: \"/feed.xml\" }",
+                "{ type: \"json\", outputPath: \"/feed.json\" }",
+            ]),
+            &[],
+        ),
+        (
+            "eleventy-atom-atom",
+            eleventy(&[
+                "{ outputPath: \"/feed.xml\" }",
+                "{ type: \"atom\", outputPath: \"/atom.xml\" }",
+            ]),
+            &[],
+        ),
+        (
+            "eleventy-unknown",
+            eleventy(&[
+                "{ outputPath: \"/feed.xml\" }",
+                "{ type: process.env.TYPE, outputPath: \"/other.xml\" }",
+            ]),
+            &[needs("other.xml", "feed.xml")],
+        ),
+    ];
+    let docs = "The docs have an Atom template and an RSS template to copy: see \
+                https://statac.dev/feeds/#the-template.";
+    for (label, files, said) in cases {
+        let top = scratch(&format!("feed-built-alike-{label}"));
+        let old = top.join("old");
+        for (path, text) in files {
+            let path = old.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        for sentence in said {
+            assert_eq!(
+                report.matches(sentence.as_str()).count(),
+                1,
+                "{label}: {report}"
+            );
+        }
+        assert_eq!(
+            report.matches(" needs `templates/").count(),
+            said.len(),
+            "{label}: {report}"
+        );
+        assert_eq!(report.contains(docs), !said.is_empty(), "{label}: {report}");
+    }
+}
+
 #[test]
 fn zola_built_output_is_looked_in_for_every_address() {
     assert_eq!(fixture("zola-built-agrees"), [BUILT, NO_FEED]);
