@@ -12,10 +12,10 @@ mod title;
 mod url;
 mod writing;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 
-use super::common::{dated_name, front, joined, last, listed, names_in, parent, text_of, texts_of};
+use super::common::{front, joined, last, names_in, parent, text_of, texts_of};
 use super::inside;
 use super::report::code;
 use super::{
@@ -25,7 +25,7 @@ use crate::content::slug;
 use crate::date::{self, Date};
 use crate::problem::{Kind, Problem, Reason};
 use settings::{Settings, get, truth_of};
-use url::{Making, Pieces};
+use url::Pieces;
 
 /// The endings of the files Hugo reads as Markdown.
 const MARKDOWN: &[&str] = &["md", "markdown", "mdown", "mkdn", "mkd", "mdwn"];
@@ -172,35 +172,11 @@ pub(super) static EXPIRY_DATE: FindingKind = FindingKind {
                the same.",
 };
 
-pub(super) static DATE_ELSEWHERE: FindingKind = FindingKind {
-    heading: "Dates Hugo took from the file or from Git",
-    sentence: "Hugo's settings took the date of each of these pages from the time its file was \
-               saved or from Git, which Statac doesn't read, so none was written: write its \
-               `date`.",
-};
-
 pub(super) static UNPUBLISHED: FindingKind = FindingKind {
     heading: "Pages Hugo didn't publish",
     sentence: "Each of these pages was `headless`, or its `build` kept it from being published, \
                so it came across with `draft: true`: take that line out of each you want \
                published.",
-};
-
-pub(super) static SAME_NAME: FindingKind = FindingKind {
-    heading: "Pages Hugo left out for another of the same name",
-    sentence: "Hugo publishes one page for each name in a folder, reading each in small letters \
-               with its spaces as hyphens, so it published each page named here and not those \
-               beneath it, which came across with `draft: true`: to publish one, rename its \
-               file and take that line out.",
-};
-
-pub(super) static SAME_NAME_EITHER: FindingKind = FindingKind {
-    heading: "Pages of the same name Hugo chose between",
-    sentence: "Hugo publishes one page for each path, reading each in small letters with its \
-               spaces as hyphens, and which of these it published could change from one build \
-               to the next. Statac publishes each page named here, and those beneath it came \
-               across with `draft: true`: to publish one, rename its file and take that line \
-               out.",
 };
 
 pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
@@ -249,21 +225,13 @@ pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Im
         folder,
         given,
         import: Import::default(),
-        making: Making {
-            lower: s.lower,
-            accents_removed: s.accents_removed,
-        },
         s,
         today,
         main: String::new(),
         languages: Vec::new(),
         docs: Vec::new(),
         own: Vec::new(),
-        own_files: Vec::new(),
         taken_off: 0,
-        updated_elsewhere: 0,
-        older_lists: None,
-        files_later: None,
     };
     reader.import.settings_file = found.file;
     reader.import.left = found.left;
@@ -285,21 +253,6 @@ enum Shape {
     /// A folder's own page Hugo made, which Statac writes to keep what
     /// Hugo gave the list.
     Made,
-}
-
-/// A name of a list, after its language's prefix and its list.
-type Term = (String, String, String);
-
-/// For each name of a list that Hugo made one page of with others, the
-/// name whose URL that page has.
-struct StandIns(Vec<(Term, String)>);
-
-impl StandIns {
-    fn of<'a>(&'a self, prefix: &str, plural: &str, term: &'a str) -> &'a str {
-        (self.0.iter())
-            .find(|((p, l, t), _)| p == prefix && l == plural && t == term)
-            .map_or(term, |(_, chosen)| chosen)
-    }
 }
 
 /// A page as found, before its writing is converted.
@@ -347,7 +300,6 @@ struct Reader<'a> {
     given: Option<&'a str>,
     import: Import,
     s: Settings,
-    making: Making,
     today: Date,
     /// The main language.
     main: String,
@@ -357,19 +309,8 @@ struct Reader<'a> {
     docs: Vec<Doc>,
     /// The names of the site's own tags.
     own: Vec<String>,
-    /// What the file of each of the site's own tags holds, by the tag's
-    /// name.
-    own_files: Vec<(String, String)>,
     /// How many pages had `layout` or `type` taken off.
     taken_off: usize,
-    /// How many pages had their last change from the file or Git.
-    updated_elsewhere: usize,
-    /// A list Hugo before 0.148 may have published as a file, and one of
-    /// its later pages, where some such list had them.
-    older_lists: Option<(String, String)>,
-    /// One of the later pages of a tag's page that Hugo published as
-    /// files, where some tag had them.
-    files_later: Option<String>,
 }
 
 /// A file's name split into its stem and its ending, in small letters.
@@ -591,11 +532,8 @@ impl Reader<'_> {
         let top_of = |path: &str| path.split('/').next().unwrap_or(path).to_owned();
         let mut content_tops: Vec<String> = roots.iter().map(|(dir, _)| top_of(dir)).collect();
         content_tops.dedup();
-        for shortcodes in [
-            format!("{}/shortcodes", self.s.layout_dir),
-            format!("{}/_shortcodes", self.s.layout_dir),
-        ] {
-            self.own_tags(&shortcodes, "");
+        for shortcodes in ["layouts/shortcodes", "layouts/_shortcodes"] {
+            self.own_tags(shortcodes, "");
         }
         let themes = match inside::a_folder(self.folder, &self.s.themes_dir) {
             true => names_in(&self.path(&self.s.themes_dir)),
@@ -636,33 +574,29 @@ impl Reader<'_> {
             let special = [
                 (
                     s.publish_dir.as_str(),
-                    "the old site's built output, read only to check the URLs".to_owned(),
+                    "the old site's built output, read only to check the URLs",
                 ),
-                (s.layout_dir.as_str(), "the old site's layouts".to_owned()),
-                (s.themes_dir.as_str(), "the old site's themes".to_owned()),
+                ("layouts", "the old site's layouts"),
+                (s.themes_dir.as_str(), "the old site's themes"),
                 (
-                    s.asset_dir.as_str(),
-                    "the files Hugo's templates worked on, such as stylesheets".to_owned(),
-                ),
-                (
-                    s.archetype_dir.as_str(),
-                    "the old site's patterns for new pages, which Statac has no equal for"
-                        .to_owned(),
+                    "assets",
+                    "the files Hugo's templates worked on, such as stylesheets",
                 ),
                 (
-                    s.i18n_dir.as_str(),
-                    "the translations the old site's templates showed in each language".to_owned(),
+                    "archetypes",
+                    "the old site's patterns for new pages, which Statac has no equal for",
                 ),
                 (
-                    s.resource_dir.as_str(),
-                    "the files Hugo kept from earlier builds".to_owned(),
+                    "i18n",
+                    "the translations the old site's templates showed in each language",
                 ),
+                ("resources", "the files Hugo kept from earlier builds"),
             ];
-            match special.iter().find(|(special, _)| *special == name) {
-                Some((_, what)) if dir => {
-                    let what = what.clone();
-                    self.left(&shown, &what);
-                }
+            let what = (special.iter())
+                .find(|(special, _)| *special == name)
+                .map(|(_, what)| *what);
+            match what {
+                Some(what) if dir => self.left(&shown, what),
                 _ => {
                     let what = match dir {
                         true => "a folder Hugo doesn't publish",
@@ -729,12 +663,6 @@ impl Reader<'_> {
             let stem = name.split('.').next().unwrap_or(&name);
             let tag = joined(within, stem);
             if !self.own.contains(&tag) {
-                let file = joined(dir, &rel);
-                if inside::a_file(self.folder, &file)
-                    && let Ok(text) = std::fs::read_to_string(self.path(&file))
-                {
-                    self.own_files.push((tag.clone(), text));
-                }
                 self.own.push(tag);
             }
         }
@@ -923,32 +851,16 @@ impl Reader<'_> {
                 .collect(),
             false => vec![(from, name.to_owned())],
         };
-        let folder = self.new_folder(rel);
         for language in languages {
             let prefix = self.prefix(&language);
             for (from, within) in &files {
                 self.import.files.push(File {
                     from: from.clone(),
-                    to: format!("content/{prefix}{}", joined(&folder, within)),
+                    to: format!("content/{prefix}{}", joined(rel, within)),
                 });
             }
         }
         Ok(())
-    }
-
-    /// The folder `rel` of the writing as the new site names it: a page
-    /// kept as a folder whose name opens with the date Hugo read from it,
-    /// without that date.
-    fn new_folder(&self, rel: &str) -> String {
-        let reads_names = self.s.date_sources("date").iter().any(|s| s == ":filename");
-        rel.split('/')
-            .filter(|piece| !piece.is_empty())
-            .map(|piece| match (reads_names, dated_name(piece)) {
-                (true, Some((_, rest))) => rest,
-                _ => piece,
-            })
-            .collect::<Vec<_>>()
-            .join("/")
     }
 
     /// Reads one page.
@@ -1039,39 +951,19 @@ impl Reader<'_> {
                 .map_or(field.name.as_str(), |(_, written)| written.as_str());
             format!("{name}: {}", super::write::shown_value(&field.value))
         };
-        let reads_names = self.s.date_sources("date").iter().any(|s| s == ":filename");
-        let name_date = dated_name(&name).filter(|_| reads_names && shape != Shape::List);
-        let date_got = self.date_from("date", &fields, name_date.map(|(d, _)| d));
-        let mut date_field: Option<Field> = None;
-        let mut date = None;
-        match &date_got {
-            Got::Field(field) => {
-                date = text_of(&field.value).and_then(|t| date::read(&t).ok());
-                date_field = Some(Field::new("date", field.value.clone(), field.line));
-            }
-            Got::Name(day) => {
-                date = Some(*day);
-                date_field = Some(Field::new("date", Value::Text(day.iso_day()), None));
-            }
-            Got::Elsewhere(source) => {
-                self.find(&DATE_ELSEWHERE, &from, None, source);
-            }
-            Got::Nothing => {}
-        }
-        let updated = match self.date_from("lastmod", &fields, None) {
-            Got::Field(field) if matches!(field.name.as_str(), "lastmod" | "modified") => {
-                Some(Field::new("updated", field.value.clone(), field.line))
-            }
-            Got::Elsewhere(_) => {
-                self.updated_elsewhere += 1;
-                None
-            }
-            _ => None,
-        };
-        if let Got::Field(published) = self.date_from("publishdate", &fields, None)
+        let date_got = date_from("date", &fields);
+        let date = (date_got.as_ref())
+            .and_then(|field| text_of(&field.value))
+            .and_then(|t| date::read(&t).ok());
+        let mut date_field =
+            (date_got.as_ref()).map(|field| Field::new("date", field.value.clone(), field.line));
+        let updated = date_from("lastmod", &fields)
+            .filter(|field| matches!(field.name.as_str(), "lastmod" | "modified"))
+            .map(|field| Field::new("updated", field.value, field.line));
+        if let Some(published) = date_from("publishdate", &fields)
             && published.name != "date"
             && date_field.as_ref().map(|f| &f.value) != Some(&published.value)
-            && !matches!(&date_got, Got::Field(f) if f.name == published.name)
+            && date_got.as_ref().is_none_or(|f| f.name != published.name)
         {
             self.find(
                 &PUBLISH_DATE,
@@ -1081,7 +973,7 @@ impl Reader<'_> {
             );
         }
         let mut draft = get("draft").is_some_and(|f| truth_of(&f.value));
-        if let Got::Field(expiry) = self.date_from("expirydate", &fields, None) {
+        if let Some(expiry) = date_from("expirydate", &fields) {
             self.find(&EXPIRY_DATE, &from, expiry.line, &as_written(&expiry));
             let past = text_of(&expiry.value)
                 .and_then(|t| date::read(&t).ok())
@@ -1107,11 +999,7 @@ impl Reader<'_> {
         let slug = get("slug")
             .and_then(|f| text_of(&f.value))
             .map(|s| s.trim_matches('-').to_owned())
-            .filter(|s| !s.is_empty())
-            .or_else(|| match &date_got {
-                Got::Name(_) => name_date.map(|(_, rest)| rest.to_owned()),
-                _ => None,
-            });
+            .filter(|s| !s.is_empty());
         let url = get("url")
             .and_then(|f| text_of(&f.value))
             .filter(|u| !u.is_empty());
@@ -1195,25 +1083,15 @@ impl Reader<'_> {
             self.taken_off += 1;
         }
         let prefix = self.prefix(&language);
-        let folder = self.new_folder(&dir);
         let ending = if html && shape == Shape::Single {
             "html"
         } else {
             "md"
         };
         let to = match shape {
-            Shape::Single => {
-                let name = match (&date_got, name_date) {
-                    (Got::Name(_), Some((_, rest))) => rest,
-                    _ => name.as_str(),
-                };
-                format!("{prefix}{}", joined(&folder, &format!("{name}.{ending}")))
-            }
-            Shape::Bundle => {
-                let bundle = self.new_folder(&joined(&dir, &name));
-                format!("{prefix}{bundle}/index.md")
-            }
-            Shape::List | Shape::Made => format!("{prefix}{}", joined(&folder, "index.md")),
+            Shape::Single => format!("{prefix}{}", joined(&dir, &format!("{name}.{ending}"))),
+            Shape::Bundle => format!("{prefix}{}/index.md", joined(&dir, &name)),
+            Shape::List | Shape::Made => format!("{prefix}{}", joined(&dir, "index.md")),
         };
         let kind = match (draft, date.is_some(), shape) {
             (true, _, _) => PageKind::Draft,
@@ -1250,30 +1128,6 @@ impl Reader<'_> {
             others: Vec::new(),
         });
         Ok(())
-    }
-
-    /// Where the date `which` of a page comes from, by the settings.
-    fn date_from(&self, which: &str, fields: &[Field], name_date: Option<Date>) -> Got {
-        for source in self.s.date_sources(which) {
-            match source.as_str() {
-                ":filename" => {
-                    if let Some(day) = name_date {
-                        return Got::Name(day);
-                    }
-                }
-                ":filemodtime" => return Got::Elsewhere(source),
-                ":git" if self.s.git => return Got::Elsewhere(source),
-                ":git" => {}
-                name => {
-                    if let Some(field) = fields.iter().find(|f| f.name == name)
-                        && text_of(&field.value).is_some_and(|t| !t.is_empty())
-                    {
-                        return Got::Field(field.clone());
-                    }
-                }
-            }
-        }
-        Got::Nothing
     }
 
     /// The folders that are lists to Hugo, by language: the top folders,
@@ -1337,46 +1191,24 @@ impl Reader<'_> {
                     false => format!("{}/", whole.trim_end_matches('/')),
                 }
             });
-            let mut older = None;
             let made: Result<String, String> = match doc.shape {
                 Shape::Single | Shape::Bundle => match self.s.permalinks.page(&section) {
-                    Some(pattern) => url::expand(pattern, &pieces, &self.making)
-                        .map(|path| url::finished(&path, ugly)),
+                    Some(pattern) => {
+                        url::expand(pattern, &pieces).map(|path| url::finished(&path, ugly))
+                    }
                     None => {
                         // Hugo makes the folder and the name ready apart.
                         let base = match &doc.slug {
-                            Some(slug) => self.making.made(slug),
-                            None => self.making.named(&doc.name),
+                            Some(slug) => url::made(slug),
+                            None => url::named(&doc.name),
                         };
-                        let path = self
-                            .making
-                            .path(&joined(&self.making.named(&doc.dir), &base));
+                        let path = url::path(&joined(&url::named(&doc.dir), &base));
                         Ok(url::finished(&path, ugly))
                     }
                 },
-                // Hugo before 0.148 published a folder's list under
-                // `uglyURLs` as a file, `/posts.html`; since, as a folder.
+                // A folder's list is a folder under `uglyURLs` too.
                 Shape::List | Shape::Made => {
-                    let path = match self.s.permalinks.section(&section) {
-                        Some(pattern) if !doc.dir.is_empty() => {
-                            url::expand(pattern, &pieces, &self.making)
-                        }
-                        _ => Ok(self.making.path(&self.making.named(&doc.dir))),
-                    };
-                    path.map(|path| {
-                        if ugly && !doc.dir.is_empty() && own_url.is_none() && !doc.draft {
-                            let file = format!("{prefix}{}", url::finished(&path, true));
-                            // The old built output, where it is there,
-                            // tells which Hugo built the site.
-                            let built = (self.import.built.as_deref()).map(|built| {
-                                inside::a_file(self.folder, &format!("{built}{file}"))
-                            });
-                            if built != Some(false) {
-                                older = Some(file);
-                            }
-                        }
-                        url::finished(&path, false)
-                    })
+                    Ok(url::finished(&url::path(&url::named(&doc.dir)), false))
                 }
             };
             let hugos = match (&own_url, made) {
@@ -1391,7 +1223,7 @@ impl Reader<'_> {
                 }
             };
             let base = hugos.clone().unwrap_or_default();
-            let mut others: Vec<String> = older.into_iter().collect();
+            let mut others: Vec<String> = Vec::new();
             for alias in &doc.aliases {
                 let alias = match alias.starts_with('/') {
                     true => alias.clone(),
@@ -1413,77 +1245,6 @@ impl Reader<'_> {
         }
         for (from, piece) in unknown {
             self.find(&ADDRESS_UNKNOWN, &from, None, &piece);
-        }
-    }
-
-    /// Makes a draft of each page Hugo left out because another's path is
-    /// the same once read as Hugo reads paths, keeping the one Hugo
-    /// published: of files in one folder, the first in the order Hugo reads
-    /// them, by their endings last to first and then by their names.
-    /// Elsewhere Hugo takes any of them, most often a page kept as a folder
-    /// over a file and then the last by path, and Statac takes that one.
-    fn same_names(&mut self) {
-        let mut groups: HashMap<(&str, String), Vec<usize>> = HashMap::new();
-        for (at, doc) in self.docs.iter().enumerate() {
-            if matches!(doc.shape, Shape::Single | Shape::Bundle) {
-                let key = (
-                    doc.language.as_str(),
-                    url::read(&joined(&doc.dir, &doc.name)),
-                );
-                groups.entry(key).or_default().push(at);
-            }
-        }
-        let mut groups: Vec<Vec<usize>> = (groups.into_values())
-            .filter(|group| group.len() > 1)
-            .collect();
-        groups.sort();
-        for mut group in groups {
-            let first = &self.docs[group[0]];
-            let one_folder = group.iter().all(|&at| {
-                let doc = &self.docs[at];
-                doc.shape == Shape::Single && doc.root == first.root && doc.dir == first.dir
-            });
-            let docs = &self.docs;
-            match one_folder {
-                true => group.sort_by(|&a, &b| {
-                    let (a, b) = (last(&docs[a].from), last(&docs[b].from));
-                    let (_, a_ending) = split_name(a);
-                    let (_, b_ending) = split_name(b);
-                    b_ending.cmp(&a_ending).then_with(|| a.cmp(b))
-                }),
-                false => group.sort_by(|&a, &b| {
-                    let single = |at: usize| docs[at].shape == Shape::Single;
-                    (single(a).cmp(&single(b))).then_with(|| docs[b].from.cmp(&docs[a].from))
-                }),
-            }
-            let mut spots = Vec::new();
-            for &at in &group[1..] {
-                let doc = &mut self.docs[at];
-                if doc.draft {
-                    continue;
-                }
-                doc.draft = true;
-                doc.kind = PageKind::Draft;
-                doc.fields.retain(|field| field.name != "draft");
-                doc.fields
-                    .push(Field::new("draft", Value::Truth(true), None));
-                spots.push(super::Spot {
-                    file: doc.from.clone(),
-                    line: None,
-                    text: String::new(),
-                    times: None,
-                });
-            }
-            if !spots.is_empty() {
-                self.import.findings.push(Finding {
-                    kind: match one_folder {
-                        true => &SAME_NAME,
-                        false => &SAME_NAME_EITHER,
-                    },
-                    about: Some(self.docs[group[0]].from.clone()),
-                    spots,
-                });
-            }
         }
     }
 
@@ -1518,7 +1279,7 @@ impl Reader<'_> {
             self.docs.push(Doc {
                 root: String::new(),
                 from,
-                to: format!("{prefix}{}/index.md", self.new_folder(&top)),
+                to: format!("{prefix}{top}/index.md"),
                 language,
                 shape: Shape::Made,
                 kind: PageKind::Page,
@@ -1622,7 +1383,6 @@ impl Reader<'_> {
     /// and hands the pages, the snippets standing for tags, and the
     /// settings to the import.
     fn finish(&mut self) {
-        self.same_names();
         self.made_lists();
         self.addresses();
         self.weights();
@@ -1635,19 +1395,6 @@ impl Reader<'_> {
             .flat_map(|d| writing::paired(&d.body))
             .collect();
         let mut calls: Vec<writing::Call> = Vec::new();
-        let mut valued = 0;
-        let site_params: Vec<(String, Value)> = (self.s.params.iter())
-            .map(|f| (f.name.to_lowercase(), f.value.clone()))
-            .collect();
-        let site_param = |name: &str| value_at(&site_params, name);
-        let values: Vec<(String, writing::SiteValue)> = self
-            .own_files
-            .iter()
-            .filter_map(|(tag, file)| {
-                let value = writing::site_value(file, self.s.title.as_deref(), &site_param)?;
-                Some((tag.clone(), value))
-            })
-            .collect();
         let mut cut = 0;
         let mut emoji: Vec<(String, usize)> = Vec::new();
         let mut written = Vec::new();
@@ -1687,7 +1434,6 @@ impl Reader<'_> {
                 refs: &refs,
                 param: &param,
                 own: &self.own,
-                values: &values,
                 wrapping: &wrapping,
                 html: doc.html,
                 unsafe_html: self.s.unsafe_html,
@@ -1711,14 +1457,11 @@ impl Reader<'_> {
                 }
             }
             calls.extend(converted.calls);
-            valued += converted.valued;
             written.push((converted.writing, converted.fences, converted.called));
         }
         for (doc, (writing, fences, called)) in docs.into_iter().zip(written) {
             if doc.shape == Shape::Made {
-                let permalink = (self.made_permalink(&doc))
-                    .map(|within| Field::new("permalink", Value::Text(within), None));
-                let fields = doc.fields.iter().chain(&doc.words).chain(&permalink);
+                let fields = doc.fields.iter().chain(&doc.words);
                 let front = super::yaml::fields(fields.map(|f| (f.name.as_str(), &f.value)));
                 self.import
                     .written
@@ -1778,26 +1521,6 @@ impl Reader<'_> {
                 }
             ));
         }
-        if valued > 0 {
-            let example = values
-                .first()
-                .map(|(tag, _)| tag.as_str())
-                .unwrap_or_default();
-            self.note(format!(
-                "{} a tag of the site's own that showed one of the site's values and nothing \
-                 else, such as {}: {} the value itself now, the site's URL as a path starting with \
-                 `/`.",
-                match valued {
-                    1 => "1 place held".to_owned(),
-                    n => format!("{n} places held"),
-                },
-                code(&format!("{{{{< {example} >}}}}")),
-                match valued {
-                    1 => "it holds",
-                    _ => "each holds",
-                }
-            ));
-        }
         if self.taken_off > 0 {
             self.note(format!(
                 "`layout` and `type` were taken off {}: each is built with the template for its \
@@ -1808,26 +1531,16 @@ impl Reader<'_> {
                 }
             ));
         }
-        if self.updated_elsewhere > 0 {
-            self.note(format!(
-                "Hugo took when {} last changed from the file or from Git, which Statac doesn't \
-                 read, so no `updated` was written from there.",
-                match self.updated_elsewhere {
-                    1 => "1 page".to_owned(),
-                    n => format!("{n} pages"),
-                }
-            ));
-        }
         self.paging(posts, firsts);
     }
 }
 
-/// What a date was found as.
-enum Got {
-    Field(Field),
-    Name(Date),
-    Elsewhere(String),
-    Nothing,
+/// The field the date `which` of a page is read from, where one gives it.
+fn date_from(which: &str, fields: &[Field]) -> Option<Field> {
+    let given = |f: &&Field| text_of(&f.value).is_some_and(|t| !t.is_empty());
+    (settings::date_sources(which).iter())
+        .find_map(|name| fields.iter().filter(given).find(|f| f.name == *name))
+        .cloned()
 }
 
 /// A text field of a table, in any capitals.
@@ -1945,7 +1658,6 @@ impl Reader<'_> {
         let name = self.s.feed_name.clone();
         let mut homes: Vec<String> = Vec::new();
         let mut feed_addresses = Vec::new();
-        let mut whole: Vec<(String, String, String)> = Vec::new();
         for at in 0..self.docs.len() {
             let doc = &self.docs[at];
             if !matches!(doc.shape, Shape::List | Shape::Made) || doc.draft {
@@ -1972,19 +1684,8 @@ impl Reader<'_> {
                 let prefix = self.prefix(&doc.language);
                 let page = (doc.address.clone())
                     .unwrap_or_else(|| format!("/{prefix}{}", slug::tidied_path(&doc.dir)));
-                // Hugo's feeds take no ugly address: a list at `/posts.html`
-                // has its feed at `/posts/index.xml`, not beside its page.
-                let (feed, word) = match page.ends_with('/') {
-                    true => (format!("{page}{name}"), name.clone()),
-                    false => {
-                        let folder = page.rsplit_once('.').map_or(page.as_str(), |(f, _)| f);
-                        let feed = format!("{folder}/{name}");
-                        whole.push((page.clone(), doc.to.clone(), feed.clone()));
-                        (feed.clone(), feed)
-                    }
-                };
-                feed_addresses.push(feed);
-                words.push(Field::new("feed", Value::Text(word), None));
+                feed_addresses.push(format!("{}/{name}", page.trim_end_matches('/')));
+                words.push(Field::new("feed", Value::Text(name.clone()), None));
             }
             self.docs[at].words.extend(words);
         }
@@ -2043,28 +1744,6 @@ impl Reader<'_> {
                 "Hugo's feeds were RSS, at `{name}` beside each list page. Each {now} {kept}"
             ),
         };
-        match whole.as_slice() {
-            [] => {}
-            [(page, to, feed)] => {
-                said += &format!(
-                    " A list published as its own file, {}, had its feed in the folder of the \
-                     same name, so {} gives its feed's URL: {}.",
-                    code(page),
-                    code(&format!("content/{to}")),
-                    code(&format!("feed: {feed}"))
-                );
-            }
-            [(page, to, feed), ..] => {
-                said += &format!(
-                    " The lists published as their own files, such as {}, had their feeds in \
-                     the folders of the same names, so the list page of each gives its feed's \
-                     URL, as {} does: {}.",
-                    code(page),
-                    code(&format!("content/{to}")),
-                    code(&format!("feed: {feed}"))
-                );
-            }
-        }
         if fed && tags && self.s.terms {
             said += " The feed Hugo made for each tag has no equal.";
         }
@@ -2083,51 +1762,14 @@ impl Reader<'_> {
                 )
             })
             .collect();
-        let moved: Vec<(String, String)> = (self.docs.iter())
-            .filter(|d| d.shape == Shape::Made)
-            .filter_map(|d| Some((d.to.clone(), self.made_permalink(d)?)))
-            .collect();
         if !made.is_empty() {
-            let mut said = format!(
+            self.note(format!(
                 "Hugo made a list of each folder at the top of the content folder, and these had \
                  no `_index.md` of their own, so Statac wrote one to keep what the list was \
                  given: {}.",
                 made.join(", ")
-            );
-            match moved.as_slice() {
-                [] => {}
-                [(to, permalink)] => {
-                    said += &format!(
-                        " {} keeps its list where Hugo published it, with {}.",
-                        code(&format!("content/{to}")),
-                        code(&format!("permalink: {permalink}"))
-                    );
-                }
-                [(to, permalink), ..] => {
-                    said += &format!(
-                        " {} of them keep their lists where Hugo published them, each with a \
-                         `permalink`, as {} does with {}.",
-                        moved.len(),
-                        code(&format!("content/{to}")),
-                        code(&format!("permalink: {permalink}"))
-                    );
-                }
-            }
-            self.note(said);
+            ));
         }
-    }
-
-    /// The `permalink` that keeps a list Hugo made at the address Hugo
-    /// published it at, where that isn't its folder's. No page of it came
-    /// across, so the shared part keeps no address of it.
-    fn made_permalink(&self, doc: &Doc) -> Option<String> {
-        let folder = format!("/{}", slug::tidied_path(parent(&doc.to)));
-        let address = doc
-            .address
-            .as_deref()
-            .filter(|address| *address != folder)?;
-        let others = self.import.languages.get(1..).unwrap_or_default();
-        super::addresses::from_its_language(&doc.to, address, others)
     }
 
     /// The path of the page Hugo made for the term `term` of the list
@@ -2136,131 +1778,17 @@ impl Reader<'_> {
         match pattern {
             // A pattern's `:slug` is the term's title, not its place in the
             // content folder.
-            Some(pattern) => url::term(pattern, &self.s.titles.titled(term), &self.making),
-            None => self.making.listed(plural, term),
+            Some(pattern) => url::term(pattern, &self.s.titles.titled(term)),
+            None => url::listed(plural, term),
         }
-    }
-
-    /// The name whose URL Hugo gave each term, where Hugo made one page of
-    /// several names that are the same once in small letters with each
-    /// space a hyphen. Its URL is made from whichever name Hugo read first,
-    /// which can change from one build to the next; the old built output,
-    /// where it is there, tells which, and otherwise Statac takes the name
-    /// it shows the tag by, and says so.
-    fn stand_ins(&mut self) -> StandIns {
-        // Each name of each list, by language and as Hugo reads it, with
-        // how many pages give it.
-        let mut groups: Vec<(Term, Vec<(String, usize)>)> = Vec::new();
-        let mut at: HashMap<Term, usize> = HashMap::new();
-        for doc in self.docs.iter().filter(|d| !d.draft) {
-            let prefix = format!("/{}", self.prefix(&doc.language));
-            let prefix = prefix.trim_end_matches('/');
-            for (plural, terms) in &doc.terms {
-                for term in terms {
-                    let key = (prefix.to_owned(), plural.clone(), url::read(term));
-                    let n = *at.entry(key.clone()).or_insert_with(|| {
-                        groups.push((key, Vec::new()));
-                        groups.len() - 1
-                    });
-                    let names = &mut groups[n].1;
-                    match names.iter_mut().find(|(name, _)| name == term) {
-                        Some((_, pages)) => *pages += 1,
-                        None => names.push((term.clone(), 1)),
-                    }
-                }
-            }
-        }
-        let mut stand_ins = StandIns(Vec::new());
-        let mut notes = Vec::new();
-        for ((prefix, plural, _), mut names) in groups {
-            if names.len() < 2 {
-                continue;
-            }
-            let pattern = match plural.as_str() {
-                "tags" | "series" => self.s.permalinks.term(&plural),
-                _ => None,
-            };
-            let ugly = self.s.ugly.of(&plural);
-            // The name Statac shows the tag by: the commoner, and of two
-            // as common, the first in the order of their characters.
-            names.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-            let named: Vec<(String, String)> = (names.into_iter())
-                .map(|(name, _)| {
-                    let path = self.term_path(&plural, pattern, &name);
-                    let address = format!("{prefix}{}", url::finished(&path, ugly));
-                    (name, address)
-                })
-                .collect();
-            let mut addresses: Vec<&str> = Vec::new();
-            for (_, address) in &named {
-                if !addresses.contains(&address.as_str()) {
-                    addresses.push(address);
-                }
-            }
-            let found = (self.import.built.as_deref()).and_then(|built| {
-                addresses.iter().copied().find(|address| {
-                    let file = match address.ends_with('/') {
-                        true => format!("{address}index.html"),
-                        false => (*address).to_owned(),
-                    };
-                    // A disk that ignores capitals finds `Rust/` at
-                    // `rust/`, so the name is looked for as written too.
-                    let bare = address.trim_end_matches('/');
-                    let (above, name) = bare.rsplit_once('/').unwrap_or(("", bare));
-                    let spelled = std::fs::read_dir(
-                        self.folder.join(built).join(above.trim_start_matches('/')),
-                    )
-                    .is_ok_and(|mut entries| {
-                        entries.any(|entry| entry.is_ok_and(|entry| entry.file_name() == name))
-                    });
-                    spelled && inside::a_file(self.folder, &format!("{built}{file}"))
-                })
-            });
-            let chosen = match found {
-                Some(found) => (named.iter())
-                    .find(|(_, address)| address == found)
-                    .map_or(&named[0].0, |(name, _)| name),
-                None => &named[0].0,
-            };
-            if found.is_none() && addresses.len() > 1 {
-                let names: Vec<String> = named.iter().map(|(name, _)| code(name)).collect();
-                let others: Vec<String> = addresses[1..].iter().map(|a| code(a)).collect();
-                let advice = match &self.import.built {
-                    Some(_) => String::new(),
-                    None => format!(
-                        " With the old site's built output in {}, `statac import` takes the URL \
-                         from there.",
-                        code(&format!("{}/", self.s.publish_dir))
-                    ),
-                };
-                notes.push(format!(
-                    "Hugo published the `{plural}` {} as one, at a URL made from whichever of \
-                     the names it read first, which can change from one build to the next: \
-                     Statac publishes it at {}, and nothing at {}.{advice}",
-                    listed(&names),
-                    code(addresses[0]),
-                    listed(&others),
-                ));
-            }
-            for (name, _) in &named {
-                let key = (prefix.clone(), plural.clone(), name.clone());
-                stand_ins.0.push((key, chosen.clone()));
-            }
-        }
-        for note in notes {
-            self.note(note);
-        }
-        stand_ins
     }
 
     /// The addresses of the pages Hugo made for each term, and the
     /// settings that keep those of tags and of a series.
     fn terms(&mut self) {
-        let stand_ins = self.stand_ins();
         let mut addresses: Vec<String> = Vec::new();
-        // How many pages each tag's page listed, by its address, where
-        // Statac's tag pages follow Hugo's, and whether it is a file.
-        let mut held: Vec<(String, usize, bool)> = Vec::new();
+        // How many pages each tag's page or series' listed, by its address.
+        let mut held: Vec<(String, usize)> = Vec::new();
         for plural in ["tags", "series"] {
             let pattern = self.s.permalinks.term(plural).map(str::to_owned);
             let statacs = pattern.as_ref().map(|pattern| {
@@ -2288,15 +1816,14 @@ impl Reader<'_> {
                 for term in terms {
                     // The URL Hugo published, and the slug that has
                     // Statac publish the term there too.
-                    let named = stand_ins.of(prefix, plural, term);
-                    let path = self.term_path(plural, pattern.as_deref(), named);
+                    let path = self.term_path(plural, pattern.as_deref(), term);
                     let bare = path.trim_end_matches('/');
                     let hugos = match &statacs {
                         Some(statacs) => (statacs.strip_suffix("{slug}/"))
                             .filter(|before| kept && !before.contains("{slug}"))
-                            .and_then(|before| bare.strip_prefix(&self.making.path(before))),
+                            .and_then(|before| bare.strip_prefix(&url::path(before))),
                         None => bare
-                            .strip_prefix(&self.making.path(&format!("/{plural}/")))
+                            .strip_prefix(&url::path(&format!("/{plural}/")))
                             .filter(|hugos| !hugos.is_empty()),
                     }
                     .map(str::to_owned);
@@ -2308,10 +1835,10 @@ impl Reader<'_> {
                     }
                     let told =
                         hugos.filter(|hugos| crate::content::address::name_fault(hugos).is_none());
-                    // A page that isn't where Statac's stands sends readers
-                    // on.
+                    // A page whose name Statac can't take as a slug sends
+                    // readers on from where it was.
                     let page = (plural.to_owned(), term.clone(), address.clone());
-                    if (ugly || told.is_none()) && !self.import.term_pages.contains(&page) {
+                    if kept && told.is_none() && !self.import.term_pages.contains(&page) {
                         self.import.term_pages.push(page);
                     }
                     if !addresses.contains(&address) {
@@ -2340,50 +1867,15 @@ impl Reader<'_> {
                     .settings
                     .push((format!("{plural}.pages"), Value::Truth(true)));
             }
-            if kept {
-                held.extend(
-                    counts
-                        .iter()
-                        .map(|(address, pages)| (address.clone(), *pages, ugly)),
-                );
-            }
-            // Hugo put the later pages of a tag's page or a series' beneath
-            // it, whatever the pattern; the old built output, where it is there, shows
-            // which there were, and the shared part sends readers on.
-            let size = self.pager_size();
-            let path = self.pager_path();
-            let later = (counts.iter())
-                .find(|(_, pages)| *pages > size)
-                .filter(|_| self.import.built.is_none())
-                .map(|(address, _)| match address.strip_suffix(".html") {
-                    Some(folder) => format!("{folder}/{path}/2.html"),
-                    None => format!("{address}{path}/2/"),
-                });
+            held.extend(counts.iter().cloned());
             if let (Some(pattern), Some(statacs)) = (pattern, statacs) {
                 match kept {
-                    false => {
-                        let one = match plural {
-                            "tags" => "A tag's",
-                            _ => "A series'",
-                        };
-                        let later = match later {
-                            Some(later) => format!(
-                                " {one} paginated pages were published beneath its list page, \
-                                 such as {}: nothing is published at those now. With the old \
-                                 site's built output in {}, `statac import` redirects from each it \
-                                 finds there.",
-                                code(&later),
-                                code(&format!("{}/", self.s.publish_dir))
-                            ),
-                            None => String::new(),
-                        };
-                        self.note(format!(
-                            "The settings' `[permalinks]` put the page of each of the `{plural}` \
-                             at {}, which Statac has no pattern for, so each is at Statac's own \
-                             URL, and a page at the old one redirects to it.{later}",
-                            code(&pattern)
-                        ))
-                    }
+                    false => self.note(format!(
+                        "The settings' `[permalinks]` put the page of each of the `{plural}` at \
+                         {}, which Statac has no pattern for, so each is at Statac's own URL, \
+                         and nothing is published at the old ones: they are listed below.",
+                        code(&pattern)
+                    )),
                     true => self
                         .import
                         .settings
@@ -2401,10 +1893,9 @@ impl Reader<'_> {
                 for (plural, terms) in &doc.terms {
                     let pattern = self.s.permalinks.term(plural);
                     for term in terms {
-                        let named = stand_ins.of(prefix, plural, term);
                         // A feed takes no ugly address: a term's page at
                         // `/tags/rust.html` has its feed in `/tags/rust/`.
-                        let path = self.term_path(plural, pattern, named);
+                        let path = self.term_path(plural, pattern, term);
                         let feed = format!(
                             "{prefix}{}{}",
                             url::finished(&path, false),
@@ -2437,41 +1928,31 @@ impl Reader<'_> {
             }
         }
         self.import.addresses.extend(addresses);
+        // Hugo put the later pages of a tag's page or a series' beneath it,
+        // whatever the pattern, and under `uglyURLs` as files.
         let path = self.pager_path();
-        for (address, pages, file) in held {
-            let pages = pages.div_ceil(self.pager_size());
-            match file {
-                // Hugo published a tag's page under `uglyURLs` as a file,
-                // `/tags/rust.html`, and its later pages as files beneath
-                // `/tags/rust/`, in every version.
-                true if pages > 1 && self.files_later.is_none() => {
-                    let folder = address.strip_suffix(".html").unwrap_or(&address);
-                    self.files_later = Some(format!("{folder}/{path}/2.html"));
-                }
-                true => {}
-                false => {
-                    for n in 2..=pages {
-                        (self.import.addresses).push(format!("{address}{path}/{n}/"));
-                    }
-                }
+        for (address, pages) in held {
+            for n in 2..=pages.div_ceil(self.pager_size()) {
+                let later = match address.strip_suffix(".html") {
+                    Some(folder) => format!("{folder}/{path}/{n}.html"),
+                    None => format!("{address}{path}/{n}/"),
+                };
+                self.import.addresses.push(later);
             }
         }
         // The page Hugo made for each name in any other list, and the one
-        // listing them all, which for tags under `uglyURLs` was a file.
+        // listing them all.
         if self.s.terms {
             for doc in self.docs.iter().filter(|d| !d.draft) {
                 let prefix = format!("/{}", self.prefix(&doc.language));
                 let prefix = prefix.trim_end_matches('/');
                 for (plural, terms) in &doc.terms {
-                    if (plural == "tags" && !self.s.ugly.of(plural))
-                        || (plural == "series" && terms.len() < 2)
-                    {
+                    if plural == "tags" || (plural == "series" && terms.len() < 2) {
                         continue;
                     }
                     let ugly = self.s.ugly.of(plural);
-                    for term in terms.iter().filter(|_| plural != "tags") {
-                        let named = stand_ins.of(prefix, plural, term);
-                        let path = url::finished(&self.making.listed(plural, named), ugly);
+                    for term in terms {
+                        let path = url::finished(&url::listed(plural, term), ugly);
                         let page = (plural.clone(), term.clone(), format!("{prefix}{path}"));
                         if !self.import.term_pages.contains(&page) {
                             self.import.term_pages.push(page);
@@ -2564,10 +2045,6 @@ impl Reader<'_> {
                 continue;
             }
             any = true;
-            let file = format!("{}.html", address.trim_end_matches('/'));
-            if self.older_lists.is_none() && list.others.contains(&file) {
-                self.older_lists = Some((file, format!("{address}{path}/2.html")));
-            }
             self.docs[at].others.push(format!("{address}{path}/1/"));
             for n in 2..=pages {
                 self.import.addresses.push(format!("{address}{path}/{n}/"));
@@ -2628,40 +2105,6 @@ impl Reader<'_> {
                  shows: see https://statac.dev/lists/#pages-of-a-list.{firsts}"
             ));
         }
-        // The old built output, where it is there, shows which of these
-        // there were, and the shared part sends readers on from them.
-        let files = match (&self.older_lists, &self.files_later) {
-            _ if self.import.built.is_some() => None,
-            (Some((list, later)), None) => Some(format!(
-                "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
-                 {}, which now redirects to the list, and its paginated pages as files too, such \
-                 as {}: nothing is published at those now.",
-                code(list),
-                code(later)
-            )),
-            (Some((list, later)), Some(tags)) => Some(format!(
-                "Hugo before version 0.148 published a list under `uglyURLs` as a file, such as \
-                 {}, which now redirects to the list, and its paginated pages as files too, such \
-                 as {}; and every version published a tag's paginated pages as files, such as {}: \
-                 nothing is published at those now.",
-                code(list),
-                code(later),
-                code(tags)
-            )),
-            (None, Some(tags)) => Some(format!(
-                "Hugo published a tag's paginated pages under `uglyURLs` as files, such as {}: \
-                 nothing is published at those now.",
-                code(tags)
-            )),
-            (None, None) => None,
-        };
-        if let Some(files) = files {
-            self.note(format!(
-                "{files} With the old site's built output in {}, `statac import` redirects from \
-                 each it finds there.",
-                code(&format!("{}/", self.s.publish_dir))
-            ));
-        }
         if self.s.pager_size.is_some() || more {
             self.note(format!(
                 "Where the old home page was paginated, nothing is published at page 2 onwards \
@@ -2718,16 +2161,22 @@ mod tests {
         );
     }
 
-    /// A tag's later pages are looked for where Statac's tag pages stand
-    /// where Hugo's did; under `uglyURLs` Hugo's were files, and are
-    /// spoken of instead.
+    /// A tag's later pages are looked for where Hugo published them: under
+    /// `uglyURLs`, as files.
     #[test]
-    fn the_later_pages_of_a_tag_are_looked_for_where_statac_publishes_them() {
+    fn the_later_pages_of_a_tag_are_looked_for_where_hugo_published_them() {
         let top = crate::testing::Scratch::new("hugo");
-        // The settings, and whether a tag's second page is looked for.
-        for (at, (settings, looked_for)) in [("", true), ("uglyURLs = true\n", false)]
-            .into_iter()
-            .enumerate()
+        // The settings, and where a tag's second page and third would be.
+        for (at, (settings, second, third)) in [
+            ("", "/tags/a/page/2/", "/tags/a/page/3/"),
+            (
+                "uglyURLs = true\n",
+                "/tags/a/page/2.html",
+                "/tags/a/page/3.html",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
         {
             let folder = top.join(at.to_string());
             let _ = std::fs::remove_dir_all(&folder);
@@ -2744,90 +2193,58 @@ mod tests {
                 panic!("{at}: the site wasn't read");
             };
             let has = |address: &str| import.addresses.iter().any(|a| a == address);
-            assert_eq!(
-                has("/tags/a/page/2/"),
-                looked_for,
-                "{at}: {:?}",
-                import.addresses
-            );
-            assert!(!has("/tags/a/page/3/"), "{at}: {:?}", import.addresses);
-            assert_eq!(
-                import
-                    .notes
-                    .iter()
-                    .any(|note| note.contains("`/tags/a/page/2.html`")),
-                !looked_for,
-                "{at}: {:?}",
-                import.notes
-            );
+            assert!(has(second), "{at}: {:?}", import.addresses);
+            assert!(!has(third), "{at}: {:?}", import.addresses);
         }
     }
 
-    /// Each page is looked for where Hugo 0.166 published it, its folders'
-    /// names and its own made ready as Hugo makes a name from the content
-    /// folder.
+    /// Each page is looked for where Hugo published it, its folders' names
+    /// and its own made ready as Hugo makes a name from the content folder.
     #[test]
     fn a_page_is_looked_for_where_hugo_published_its_file() {
         let top = crate::testing::Scratch::new("hugo-names");
-        // The file, then where Hugo published it by default and under
-        // `disablePathToLower`.
+        // The file, then where Hugo published it.
         let pages = [
-            ("posts/p04- - q.md", "/posts/p04----q/", "/posts/p04--q/"),
-            ("posts/ lead.md", "/posts/-lead/", "/posts/lead/"),
-            ("posts/C++ & C#.md", "/posts/c++--c#/", "/posts/C++-C#/"),
-            ("posts/x - y/index.md", "/posts/x---y/", "/posts/x-y/"),
-            ("My Notes/_index.md", "/my-notes/", "/My-Notes/"),
-            (
-                "My Notes/Sub - Folder/_index.md",
-                "/my-notes/sub---folder/",
-                "/My-Notes/Sub-Folder/",
-            ),
+            ("posts/p04- - q.md", "/posts/p04----q/"),
+            ("posts/C++ & C#.md", "/posts/c++--c#/"),
+            ("posts/x - y/index.md", "/posts/x---y/"),
+            ("My Notes/_index.md", "/my-notes/"),
+            ("My Notes/Sub - Folder/_index.md", "/my-notes/sub---folder/"),
             (
                 "My Notes/Sub - Folder/A b.md",
                 "/m/my-notes/my-notes/sub---folder/a-b/",
-                "/m/my-notes/my-notes/sub---folder/A-b/",
             ),
         ];
-        // The address of the tag `p04- - q` by default and under
-        // `disablePathToLower`.
-        let tags = ["/tags/p04----q/", "/tags/p04--q/"];
-        for (at, settings) in ["", "disablePathToLower = true\n"].into_iter().enumerate() {
-            let folder = top.join(at.to_string());
-            let _ = std::fs::remove_dir_all(&folder);
-            let patterns = "[permalinks.page]\n'my-notes' = '/m/:section/:sections/:filename/'\n";
-            let toml =
-                format!("baseURL = 'https://example.org/'\ntitle = 'Names'\n{settings}{patterns}");
-            std::fs::create_dir_all(&folder).unwrap();
-            std::fs::write(folder.join("hugo.toml"), toml).unwrap();
-            for (file, _, _) in pages {
-                let path = folder.join("content").join(file);
-                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-                let page = "---\ntitle: Post\ndate: 2026-01-01\ntags: ['p04- - q']\n---\n";
-                std::fs::write(path, page).unwrap();
-            }
-            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None) else {
-                panic!("{at}: the site wasn't read");
-            };
-            for (file, made, as_it_is) in pages {
-                let page =
-                    (import.pages.iter()).find(|page| page.from == format!("content/{file}"));
-                assert_eq!(
-                    page.and_then(|page| page.address.as_deref()),
-                    Some([made, as_it_is][at]),
-                    "{at}: {file}"
-                );
-            }
-            assert!(
-                import.addresses.iter().any(|a| a == tags[at]),
-                "{at}: {:?}",
-                import.addresses
+        let patterns = "[permalinks.page]\n'my-notes' = '/m/:section/:sections/:filename/'\n";
+        let toml = format!("baseURL = 'https://example.org/'\ntitle = 'Names'\n{patterns}");
+        std::fs::write(top.join("hugo.toml"), toml).unwrap();
+        for (file, _) in pages {
+            let path = top.join("content").join(file);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let page = "---\ntitle: Post\ndate: 2026-01-01\ntags: ['p04- - q']\n---\n";
+            std::fs::write(path, page).unwrap();
+        }
+        let Ok(import) = read(&top, Date::day_only(2026, 10, 6), None) else {
+            panic!("the site wasn't read");
+        };
+        for (file, made) in pages {
+            let page = (import.pages.iter()).find(|page| page.from == format!("content/{file}"));
+            assert_eq!(
+                page.and_then(|page| page.address.as_deref()),
+                Some(made),
+                "{file}"
             );
         }
+        assert!(
+            import.addresses.iter().any(|a| a == "/tags/p04----q/"),
+            "{:?}",
+            import.addresses
+        );
     }
 
-    /// Each tag is looked for where Hugo 0.166 published it by a
-    /// `[permalinks]` pattern, and Statac is told the slug that keeps it
-    /// there; one Statac can't be told is sent on from there.
+    /// Each tag is looked for where Hugo published it by a `[permalinks]`
+    /// pattern, and Statac is told the slug that keeps it there; one Statac
+    /// can't be told is sent on from there.
     #[test]
     fn a_tag_is_looked_for_where_hugo_published_it_by_a_pattern() {
         let top = crate::testing::Scratch::new("hugo-term-pattern");
@@ -2835,12 +2252,12 @@ mod tests {
                     [permalinks.term]\ntags = '/tt/:slug/'\n";
         std::fs::create_dir_all(top.join("content/posts")).unwrap();
         std::fs::write(top.join("hugo.toml"), toml).unwrap();
-        let page = "---\ntitle: Post\ndate: 2026-01-01\ntags: ['C++ & C#', '+y', 'a+b#c']\n---\n";
+        let page = "---\ntitle: Post\ndate: 2026-01-01\ntags: ['C & D', 'node.js', 'a+b#c']\n---\n";
         std::fs::write(top.join("content/posts/post.md"), page).unwrap();
         let Ok(import) = read(&top, Date::day_only(2026, 10, 6), None) else {
             panic!("the site wasn't read");
         };
-        for address in ["/tt/c-c/", "/tt/-y/", "/tt/a-b#c/"] {
+        for address in ["/tt/c-d/", "/tt/node.js/", "/tt/a+b#c/"] {
             assert!(
                 import.addresses.iter().any(|a| a == address),
                 "{address}: {:?}",
@@ -2851,101 +2268,14 @@ mod tests {
         let Some((_, Value::Fields(slugs))) = slugs else {
             panic!("no slugs: {:?}", import.settings);
         };
-        assert_eq!(slugs, &[("+y".to_owned(), Value::Text("-y".to_owned()))]);
+        assert_eq!(
+            slugs,
+            &[("node.js".to_owned(), Value::Text("node.js".to_owned()))]
+        );
         let sent_on: Vec<&str> = (import.term_pages.iter())
             .map(|(_, _, address)| address.as_str())
             .collect();
-        assert_eq!(sent_on, ["/tt/a-b#c/"]);
-    }
-
-    /// A pattern's `:slug` is a tag's title, which Hugo 0.166 made from its
-    /// name in capitals by the settings, and published the tag by.
-    #[test]
-    fn a_tags_slug_in_a_pattern_is_its_title_in_capitals() {
-        let top = crate::testing::Scratch::new("hugo-term-title");
-        let upper = "disablePathToLower = true\n";
-        // The settings, then the URL of each of the tags `a & b`,
-        // `What? Why!`, `the art of war`, `x from y` and `ςx`.
-        let cases = [
-            (
-                upper.to_owned(),
-                [
-                    "/tt/A-B/",
-                    "/tt/What-Why/",
-                    "/tt/The-Art-of-War/",
-                    "/tt/X-From-Y/",
-                    "/tt/Σx/",
-                ],
-            ),
-            (
-                format!("{upper}titleCaseStyle = 'Chicago'\n"),
-                [
-                    "/tt/A-B/",
-                    "/tt/What-Why/",
-                    "/tt/The-Art-of-War/",
-                    "/tt/X-from-Y/",
-                    "/tt/Σx/",
-                ],
-            ),
-            (
-                format!("{upper}titleCaseStyle = 'go'\n"),
-                [
-                    "/tt/A-B/",
-                    "/tt/What-Why/",
-                    "/tt/The-Art-Of-War/",
-                    "/tt/X-From-Y/",
-                    "/tt/Σx/",
-                ],
-            ),
-            (
-                format!("{upper}titleCaseStyle = 'firstupper'\n"),
-                [
-                    "/tt/A-b/",
-                    "/tt/What-why/",
-                    "/tt/The-art-of-war/",
-                    "/tt/X-from-y/",
-                    "/tt/Σx/",
-                ],
-            ),
-            (
-                format!("{upper}capitalizeListTitles = false\n"),
-                [
-                    "/tt/a-b/",
-                    "/tt/What-why/",
-                    "/tt/the-art-of-war/",
-                    "/tt/x-from-y/",
-                    "/tt/ςx/",
-                ],
-            ),
-            (
-                String::new(),
-                [
-                    "/tt/a-b/",
-                    "/tt/what-why/",
-                    "/tt/the-art-of-war/",
-                    "/tt/x-from-y/",
-                    "/tt/σx/",
-                ],
-            ),
-        ];
-        for (at, (settings, wanted)) in cases.into_iter().enumerate() {
-            let folder = top.join(at.to_string());
-            std::fs::create_dir_all(folder.join("content/posts")).unwrap();
-            let toml = format!(
-                "baseURL = 'https://example.org/'\n{settings}[permalinks.term]\ntags = '/tt/:slug/'\n"
-            );
-            std::fs::write(folder.join("hugo.toml"), toml).unwrap();
-            let tags = "['a & b', 'What? why!', 'the art of war', 'x from y', 'ςx']";
-            let page = format!("---\ntitle: Post\ndate: 2026-01-01\ntags: {tags}\n---\n");
-            std::fs::write(folder.join("content/posts/post.md"), page).unwrap();
-            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None) else {
-                panic!("{at}: the site wasn't read");
-            };
-            let tags: Vec<&String> = (import.addresses.iter())
-                .filter(|address| address.starts_with("/tt/"))
-                .collect();
-            assert_eq!(tags, wanted, "{at}");
-        }
+        assert_eq!(sent_on, ["/tt/a+b#c/"]);
     }
 
     /// Each term's feed is named where Hugo 0.166 wrote it: in the folder
@@ -2961,7 +2291,7 @@ mod tests {
             (
                 patterns.to_owned(),
                 [
-                    "/tt/c-c/index.xml",
+                    "/tt/c++-c#/index.xml",
                     "/tt/a-b/index.xml",
                     "/cc/x-y/index.xml",
                 ],
@@ -2969,7 +2299,7 @@ mod tests {
             (
                 format!("uglyURLs = true\n{patterns}"),
                 [
-                    "/tt/c-c/index.xml",
+                    "/tt/c++-c#/index.xml",
                     "/tt/a-b/index.xml",
                     "/cc/x-y/index.xml",
                 ],
@@ -3006,124 +2336,6 @@ mod tests {
                 );
                 assert_eq!(said, Some(wanted.as_str()), "{at}: {terms}");
             }
-        }
-    }
-
-    /// Of pages whose paths are the same as Hugo reads paths, the one Hugo
-    /// 0.166 published comes across, and the others as drafts, each told.
-    #[test]
-    fn of_pages_hugo_reads_as_one_the_one_it_published_comes_across() {
-        let top = crate::testing::Scratch::new("hugo-same-names");
-        // The file, whether Hugo published it, and whether it was one of
-        // pages in one folder.
-        let pages = [
-            ("posts/ lead.md", true, true),
-            ("posts/-lead.md", false, true),
-            ("posts/a  b.md", true, true),
-            ("posts/a--b.md", false, true),
-            ("posts/a  b  c.md", false, true),
-            ("posts/A--B--C.md", true, true),
-            ("posts/e f.md", true, true),
-            ("posts/e-f.markdown", false, true),
-            ("posts/g h.html", false, true),
-            ("posts/g-h.md", true, true),
-            ("posts/m n.md", true, true),
-            ("posts/m-n.md", false, true),
-            ("bundles/d e/index.md", false, false),
-            ("bundles/d-e/index.md", true, false),
-            ("bundles/b c.md", false, false),
-            ("bundles/b-c/index.md", true, false),
-            ("folders/a b/x.md", false, false),
-            ("folders/a-b/x.md", true, false),
-        ];
-        std::fs::write(top.join("hugo.toml"), "baseURL = 'https://example.org/'\n").unwrap();
-        for (file, _, _) in pages {
-            let path = top.join("content").join(file);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            // A slug of its own takes no page out of the reckoning.
-            let slug = match file {
-                "posts/m n.md" => "slug: one\n",
-                "posts/m-n.md" => "slug: two\n",
-                _ => "",
-            };
-            std::fs::write(path, format!("---\ntitle: Page\n{slug}---\n")).unwrap();
-        }
-        let Ok(import) = read(&top, Date::day_only(2026, 10, 6), None) else {
-            panic!("the site wasn't read");
-        };
-        for (file, published, _) in pages {
-            let from = format!("content/{file}");
-            let Some(page) = import.pages.iter().find(|page| page.from == from) else {
-                panic!("{file}: didn't come across");
-            };
-            let draft =
-                (page.front.iter()).any(|f| f.name == "draft" && f.value == Value::Truth(true));
-            assert_eq!(page.kind == PageKind::Draft, !published, "{file}");
-            assert_eq!(draft, !published, "{file}");
-            assert_eq!(page.address.is_some(), published, "{file}");
-            let kind = match pages.iter().find(|(f, _, _)| *f == file) {
-                Some((_, _, true)) => &SAME_NAME,
-                _ => &SAME_NAME_EITHER,
-            };
-            let told = (import.findings.iter())
-                .filter(|finding| std::ptr::eq(finding.kind, kind))
-                .any(|finding| finding.spots.iter().any(|spot| spot.file == from));
-            assert_eq!(told, !published, "{file}");
-        }
-    }
-
-    /// A tag is looked for where Hugo 0.166 published it, its name and its
-    /// list's made ready as one path; and the names Hugo made one page of
-    /// are one tag, at the URL the old built output shows, or else at the
-    /// commoner's, which the report says.
-    #[test]
-    fn names_hugo_made_one_tag_of_are_one_tag_at_its_url() {
-        let top = crate::testing::Scratch::new("hugo-same-tags");
-        // The settings, whether the old built output holds `/tags/rust/`,
-        // the URLs looked for, and whether the report says which was taken.
-        let cases = [
-            ("", false, ["/tags/-lead/", "/tags/rust/"], false),
-            (
-                "disablePathToLower = true\n",
-                false,
-                ["/tags/-lead/", "/tags/Rust/"],
-                true,
-            ),
-            (
-                "disablePathToLower = true\n",
-                true,
-                ["/tags/-lead/", "/tags/rust/"],
-                false,
-            ),
-        ];
-        for (at, (settings, built, wanted, said)) in cases.into_iter().enumerate() {
-            let folder = top.join(at.to_string());
-            std::fs::create_dir_all(folder.join("content/posts")).unwrap();
-            let toml = format!("baseURL = 'https://example.org/'\n{settings}");
-            std::fs::write(folder.join("hugo.toml"), toml).unwrap();
-            if built {
-                std::fs::create_dir_all(folder.join("public/tags/rust")).unwrap();
-                std::fs::write(folder.join("public/tags/rust/index.html"), "").unwrap();
-            }
-            for (n, tags) in ["[\"\\tlead\", Rust]", "[' lead', Rust]", "[rust]"]
-                .iter()
-                .enumerate()
-            {
-                let page = format!("---\ntitle: Post\ndate: 2026-01-01\ntags: {tags}\n---\n");
-                std::fs::write(folder.join(format!("content/posts/p{n}.md")), page).unwrap();
-            }
-            let Ok(import) = read(&folder, Date::day_only(2026, 10, 6), None) else {
-                panic!("{at}: the site wasn't read");
-            };
-            let tags: Vec<&String> = (import.addresses.iter())
-                .filter(|address| address.starts_with("/tags/"))
-                .collect();
-            assert_eq!(tags, wanted, "{at}");
-            let told = import
-                .notes
-                .iter()
-                .any(|note| note.contains("`Rust` and `rust`"));
-            assert_eq!(told, said, "{at}: {:?}", import.notes);
         }
     }
 }

@@ -1,4 +1,4 @@
 ---
 title: Docs
 ---
-A list at an address of its own.
+A list whose pages are at a pattern of their own.

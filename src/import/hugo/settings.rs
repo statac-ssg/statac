@@ -281,7 +281,6 @@ pub(super) struct Permalinks {
     /// list of terms.
     pub any: Vec<(String, String)>,
     pub page: Vec<(String, String)>,
-    pub section: Vec<(String, String)>,
     pub term: Vec<(String, String)>,
 }
 
@@ -289,11 +288,6 @@ impl Permalinks {
     /// The pattern for a page in the folder `section`.
     pub(super) fn page(&self, section: &str) -> Option<&str> {
         find(&self.page, section).or_else(|| find(&self.any, section))
-    }
-
-    /// The pattern for a folder's own page.
-    pub(super) fn section(&self, section: &str) -> Option<&str> {
-        find(&self.section, section)
     }
 
     /// The pattern for a term of the list `plural`.
@@ -353,12 +347,8 @@ pub(super) struct Settings {
     pub pager_size: Option<u64>,
     pub pager_path: Option<String>,
     pub ugly: Ugly,
-    pub lower: bool,
-    pub accents_removed: bool,
     /// How Hugo put the name of a term in capitals for its title.
     pub titles: Style,
-    /// Where each date of a page is taken from, by the date's name.
-    pub dates: Vec<(String, Vec<String>)>,
     pub languages: Vec<Language>,
     pub params: Vec<Field>,
     pub params_file: String,
@@ -366,12 +356,7 @@ pub(super) struct Settings {
     pub static_dirs: Vec<String>,
     pub data_dir: String,
     pub publish_dir: String,
-    pub layout_dir: String,
-    pub asset_dir: String,
-    pub i18n_dir: String,
-    pub archetype_dir: String,
     pub themes_dir: String,
-    pub resource_dir: String,
     pub summary_length: usize,
     pub emoji: bool,
     pub unsafe_html: bool,
@@ -386,7 +371,6 @@ pub(super) struct Settings {
     /// The name of a feed's file, which `outputFormats` can change.
     pub feed_name: String,
     pub terms: bool,
-    pub git: bool,
     /// Settings Statac has no equal for, each with its file, line and text.
     pub left: Vec<(String, Option<usize>, String)>,
     /// Settings naming a folder outside the old site or through a link,
@@ -394,8 +378,9 @@ pub(super) struct Settings {
     pub unread: Vec<(String, Option<usize>, String)>,
 }
 
-/// Hugo's lists of where each date is found, unless the settings say.
-pub(super) const DEFAULT_DATES: &[(&str, &[&str])] = &[
+/// Hugo's lists of which fields each date is read from, unless its
+/// settings' `[frontmatter]` says otherwise, which Statac doesn't read.
+const DEFAULT_DATES: &[(&str, &[&str])] = &[
     (
         "date",
         &[
@@ -410,7 +395,6 @@ pub(super) const DEFAULT_DATES: &[(&str, &[&str])] = &[
     (
         "lastmod",
         &[
-            ":git",
             "lastmod",
             "modified",
             "date",
@@ -426,26 +410,15 @@ pub(super) const DEFAULT_DATES: &[(&str, &[&str])] = &[
     ("expirydate", &["expirydate", "unpublishdate"]),
 ];
 
-impl Settings {
-    /// Where the date `name` is found, in order.
-    pub(super) fn date_sources(&self, name: &str) -> Vec<String> {
-        let default: Vec<String> = DEFAULT_DATES
-            .iter()
-            .find(|(n, _)| *n == name)
-            .map(|(_, list)| list.iter().map(|s| (*s).to_owned()).collect())
-            .unwrap_or_default();
-        match self.dates.iter().find(|(n, _)| n == name) {
-            None => default,
-            Some((_, list)) => list
-                .iter()
-                .flat_map(|source| match source.as_str() {
-                    ":default" => default.clone(),
-                    other => vec![other.to_owned()],
-                })
-                .collect(),
-        }
-    }
+/// The fields the date `name` is read from, in order.
+pub(super) fn date_sources(name: &str) -> &'static [&'static str] {
+    DEFAULT_DATES
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map_or(&[], |(_, list)| list)
+}
 
+impl Settings {
     /// The plural names of the lists of terms.
     pub(super) fn plurals(&self) -> Vec<&str> {
         self.taxonomies.iter().map(|(_, p)| p.as_str()).collect()
@@ -470,10 +443,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
         pager_size: None,
         pager_path: None,
         ugly: Ugly::default(),
-        lower: true,
-        accents_removed: false,
         titles: Style::Ap,
-        dates: Vec::new(),
         languages: Vec::new(),
         params: Vec::new(),
         params_file: String::new(),
@@ -481,12 +451,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
         static_dirs: vec!["static".into()],
         data_dir: "data".into(),
         publish_dir: "public".into(),
-        layout_dir: "layouts".into(),
-        asset_dir: "assets".into(),
-        i18n_dir: "i18n".into(),
-        archetype_dir: "archetypes".into(),
         themes_dir: "themes".into(),
-        resource_dir: "resources".into(),
         summary_length: 70,
         emoji: false,
         unsafe_html: false,
@@ -496,7 +461,6 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
         feeds_for: (true, true, true),
         feed_name: "index.xml".into(),
         terms: true,
-        git: false,
         left: Vec::new(),
         unread: Vec::new(),
     };
@@ -530,11 +494,10 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                 for (name, pattern) in fields(value) {
                     let list = match name.to_ascii_lowercase().as_str() {
                         "page" => &mut s.permalinks.page,
-                        "section" => &mut s.permalinks.section,
                         "term" => &mut s.permalinks.term,
-                        "taxonomy" => {
+                        "section" | "taxonomy" => {
                             leave(format!(
-                                "permalinks.taxonomy: {}",
+                                "permalinks.{name}: {}",
                                 super::super::write::shown_value(pattern)
                             ));
                             continue;
@@ -581,8 +544,6 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                 }
                 other => s.ugly.all = truth_of(other),
             },
-            "disablepathtolower" => s.lower = !truth_of(value),
-            "removepathaccents" => s.accents_removed = truth_of(value),
             // Each also has Hugo put the titles of the pages it makes in
             // capitals, which Statac has no equal for.
             "titlecasestyle" => {
@@ -600,15 +561,6 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                     field.name,
                     super::super::write::shown_value(value)
                 ));
-            }
-            "frontmatter" => {
-                s.dates = fields(value)
-                    .iter()
-                    .map(|(name, list)| {
-                        let list = texts_of(list).iter().map(|t| t.to_lowercase()).collect();
-                        (name.to_lowercase(), list)
-                    })
-                    .collect();
             }
             "languages" => {
                 for (key, table) in fields(value) {
@@ -664,23 +616,11 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
             "publishdir" => {
                 s.publish_dir = folder(&field.name, value).unwrap_or(s.publish_dir.clone())
             }
-            "layoutdir" => {
-                s.layout_dir = folder(&field.name, value).unwrap_or(s.layout_dir.clone())
-            }
-            "assetdir" => s.asset_dir = folder(&field.name, value).unwrap_or(s.asset_dir.clone()),
-            "i18ndir" => s.i18n_dir = folder(&field.name, value).unwrap_or(s.i18n_dir.clone()),
-            "archetypedir" => {
-                s.archetype_dir = folder(&field.name, value).unwrap_or(s.archetype_dir.clone())
-            }
             "themesdir" => {
                 s.themes_dir = folder(&field.name, value).unwrap_or(s.themes_dir.clone())
             }
-            "resourcedir" => {
-                s.resource_dir = folder(&field.name, value).unwrap_or(s.resource_dir.clone())
-            }
             "summarylength" => s.summary_length = text.and_then(|n| n.parse().ok()).unwrap_or(70),
             "enableemoji" => s.emoji = truth_of(value),
-            "enablegitinfo" => s.git = truth_of(value),
             "disablekinds" => {
                 for kind in texts_of(value) {
                     match kind.to_ascii_lowercase().as_str() {

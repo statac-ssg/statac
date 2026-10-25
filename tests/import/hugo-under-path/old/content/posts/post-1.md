@@ -9,9 +9,6 @@ A post linking to others by ref and relref, in a site under a path.
 - [About]({{< relref "/about.md#team" >}})
 - [This place]({{< relref "#notes" >}})
 - [Post 9]({{< ref "post-9.md" >}})
-- [About, after the site's address]({{< baseurl >}}about/)
-- [Post 2, after the site's address]({{< baseurl >}}{{< relref "post-2" >}})
-- [Post 2, wholly, after the site's address]({{< baseurl >}}{{< ref "post-2.md" >}})
 
 ## Notes
 

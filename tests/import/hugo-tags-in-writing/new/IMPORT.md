@@ -15,8 +15,6 @@ Hugo made a list of each folder at the top of the content folder, and these had 
 
 Hugo summed up 1 page with its opening paragraphs, as many as made its `summaryLength` of words, and Statac takes the first paragraph alone: where a summary should run further, put `<!--more-->` on a line of its own where it should end.
 
-5 places held a tag of the site's own that showed one of the site's values and nothing else, such as `{{< by >}}`: each holds the value itself now, the site's URL as a path starting with `/`.
-
 The settings written in `statac.yaml`:
 
 ```yaml
@@ -72,20 +70,23 @@ Hugo ran these even inside code, and Statac shows code exactly as written, so ea
 - `content/posts/post-1/index.md`, line 65: `{{< youtube w7Ft2ymGmfc >}}`
 - `content/posts/post-1/index.md`, line 69: `{{< param "author" >}}`
 
+### Tags inside a URL
+
+Each of these tags stands inside a link's URL, where Statac runs no snippet, so it is left as written and the link leads nowhere: write the URL the tag made in its place.
+
+- `content/posts/post-1/index.md`, line 71: `{{< top >}}`
+- `content/posts/post-1/index.md`, line 71: `{{< top >}}`
+- `content/posts/post-1/index.md`, line 73: `{{< top >}}`
+- `content/posts/post-1/index.md`, line 75: `{{< both >}}`
+- `content/posts/post-1/index.md`, line 75: `{{< note >}}`
+- `content/posts/post-1/index.md`, line 77: `{{< line-1 >}}`
+
 ### HTML Hugo left out
 
 Hugo's settings left HTML in Markdown out of the page, and Statac publishes it as it is, so each of these now shows: read each page that has one, and take out what wasn't meant to show.
 
 - `content/posts/post-1/index.md`, line 75: `<a href="{{< note >}}">`
 - `content/posts/post-1/index.md`, line 89: `<p class="centre">`
-
-### Tags inside a URL
-
-Each of these tags stands inside a link's URL, where Statac runs no snippet, so it is left as written and the link leads nowhere: write the URL the tag made in its place.
-
-- `content/posts/post-1/index.md`, line 75: `{{< both >}}`
-- `content/posts/post-1/index.md`, line 75: `{{< note >}}`
-- `content/posts/post-1/index.md`, line 77: `{{< line-1 >}}`
 
 ### Tags now snippet calls
 
@@ -124,6 +125,10 @@ Each of these tags is now a call to a snippet of its name, and the snippet holds
   - `content/posts/post-1/index.md`, line 58: `{{< aside />}}`
 - `snippets/unknown_1.html`:
   - `content/posts/post-1/index.md`, line 60: `{{< unknown-1 "value" >}}`
+- `snippets/site_title.html`:
+  - `content/posts/post-1/index.md`, line 71: `{{< site-title >}}`
+- `snippets/by.html`:
+  - `content/posts/post-1/index.md`, line 71: `{{< by >}}`
 - `snippets/both.html`:
   - `content/posts/post-1/index.md`, line 75: `{{< both >}}`
 

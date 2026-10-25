@@ -34,9 +34,6 @@ pub(super) struct Context<'a> {
     pub param: &'a dyn Fn(&str) -> Option<String>,
     /// The names of the site's own tags, from its layouts.
     pub own: &'a [String],
-    /// The site's own tags that are nothing but one of the site's values,
-    /// each with the value.
-    pub values: &'a [(String, SiteValue)],
     /// The tags some call anywhere in the site wraps writing with.
     pub wrapping: &'a HashSet<String>,
     pub html: bool,
@@ -46,46 +43,6 @@ pub(super) struct Context<'a> {
     /// The words Hugo cut a summary at, where the page's summary is one
     /// Hugo cut.
     pub summary_length: Option<usize>,
-}
-
-/// One of the site's values, as a tag of the site's own shows it.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(super) enum SiteValue {
-    /// The site's address, written as the path the site is under.
-    Base,
-    Text(String),
-}
-
-/// The value a tag of the site's own stands for, where its file is one
-/// action showing one site value and nothing else: `{{ .Site.BaseURL }}`,
-/// `{{ site.Title }}`, `{{ .Site.Params.name | safeURL }}`. `param`
-/// gives one of the site's own values by its name.
-pub(super) fn site_value(
-    file: &str,
-    title: Option<&str>,
-    param: &dyn Fn(&str) -> Option<String>,
-) -> Option<SiteValue> {
-    let inner = file.trim().strip_prefix("{{")?.strip_suffix("}}")?;
-    if inner.contains("{{") || inner.contains("}}") {
-        return None;
-    }
-    let inner = inner.trim_matches('-').trim();
-    let mut parts = inner.split('|').map(str::trim);
-    let named = parts.next()?.to_ascii_lowercase();
-    if !parts.all(|filter| matches!(filter, "relURL" | "absURL" | "safeURL")) {
-        return None;
-    }
-    let named = named.strip_prefix('$').unwrap_or(&named);
-    let named = named.strip_prefix(".page").unwrap_or(named);
-    let named = named
-        .strip_prefix('.')
-        .unwrap_or(named)
-        .strip_prefix("site.")?;
-    match named {
-        "baseurl" => Some(SiteValue::Base),
-        "title" => title.map(|title| SiteValue::Text(title.to_owned())),
-        named => param(named.strip_prefix("params.")?).map(SiteValue::Text),
-    }
 }
 
 /// The address a `ref` or `relref` tag is written as: from the top of the
@@ -109,20 +66,6 @@ fn referred(tag: &Written, cx: &Context) -> Option<Option<String>> {
         ("ref", Some(whole)) => format!("{whole}{address}"),
         _ => format!("{}{address}", cx.base),
     }))
-}
-
-/// Whether a `ref` or `relref` to a page stands at `at`, which is written
-/// from the top of the site's host.
-fn refers(body: &str, at: usize, cx: &Context) -> bool {
-    let Some(tag) = tag_at(body, at) else {
-        return false;
-    };
-    let builtin = !cx.own.contains(&tag.name) && matches!(tag.name.as_str(), "ref" | "relref");
-    let alone = tag.shown.is_none() && !tag.closing;
-    builtin
-        && alone
-        && referred(&tag, cx)
-            .is_some_and(|address| address.is_some_and(|address| !address.starts_with('#')))
 }
 
 /// Whether the tag at `at` stands inside an address: a link's, after
@@ -175,9 +118,6 @@ pub(super) struct Converted {
     /// Where each snippet call written here starts, and each `@end`, in
     /// order.
     pub called: Vec<usize>,
-    /// How many tags of the site's own were written as the site value
-    /// they stand for.
-    pub valued: usize,
 }
 
 /// The names Hugo's own tags give the values they take without one.
@@ -405,7 +345,6 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
         false => code_ranges(body),
     };
     let mut calls = Vec::new();
-    let mut valued = 0;
     let mut out = Marked::default();
     let mut open: Vec<(String, Open)> = Vec::new();
     let mut copied = 0;
@@ -458,20 +397,6 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
             _ if own => "",
             name => name,
         };
-        let value = cx.values.iter().find(|(name, _)| *name == tag.name);
-        if let (Some((_, value)), true, None) = (value, own, &closing) {
-            let shown = match value {
-                SiteValue::Text(text) => text.clone(),
-                SiteValue::Base if body[tag.end..].starts_with('/') => cx.base.to_owned(),
-                // A link to a page is written with the path already.
-                SiteValue::Base if refers(body, tag.end, cx) => String::new(),
-                SiteValue::Base => format!("{}/", cx.base),
-            };
-            replace(&mut out, shown.into(), tag.end);
-            valued += 1;
-            at = tag.end;
-            continue;
-        }
         // A call can't run inside an address, so a tag there that would
         // become one is left for the author.
         if !matches!(builtin, "ref" | "relref" | "param") && in_address(body, start) {
@@ -560,7 +485,6 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
         called: out.called,
         findings,
         calls,
-        valued,
     }
 }
 
@@ -868,7 +792,6 @@ mod tests {
             refs: &|_, _| None,
             param: &|_| None,
             own: &[],
-            values: &[],
             wrapping: &wrapping,
             html: false,
             unsafe_html: true,

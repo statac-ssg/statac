@@ -3,13 +3,28 @@
 //! capitals by the settings' `titleCaseStyle`, or as it is written under
 //! `capitalizeListTitles = false`.
 
-use icu_properties::props::GeneralCategoryGroup;
-
-use super::url::{is, lowered};
+use icu_properties::CodePointMapData;
+use icu_properties::props::{GeneralCategory, GeneralCategoryGroup};
 
 /// What a word starts with.
 const LETTERS_AND_NUMBERS: GeneralCategoryGroup =
     GeneralCategoryGroup::Letter.union(GeneralCategoryGroup::Number);
+
+/// Whether `c` is in `group`, by its Unicode general category.
+fn is(group: GeneralCategoryGroup, c: char) -> bool {
+    group.contains(CodePointMapData::<GeneralCategory>::new().get(c))
+}
+
+/// `text` in small letters as Go makes them, a letter at a time: `Σ` is
+/// `σ` wherever it stands, and `İ` is `i`.
+fn lowered(text: &str) -> String {
+    text.chars()
+        .flat_map(|c| match c {
+            'İ' => 'i'.to_lowercase(),
+            c => c.to_lowercase(),
+        })
+        .collect()
+}
 
 /// The words AP's style leaves in small letters within a title.
 const SMALL_WORDS: &[&str] = &[

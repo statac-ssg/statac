@@ -4,7 +4,7 @@ It was made from `tests/import/hugo-dates/old` by `statac import`, which changed
 
 ## What came across
 
-- 4 posts, into `content/posts/`.
+- 1 post, into `content/posts/`.
 - 1 page, into `content/` where it stood in the old site.
 
 The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
@@ -12,8 +12,6 @@ The old site's home page had no content of its own, so `content/index.md` has no
 Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each stays at the same URL, as `feed: index.xml` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` and `feed_ids_from: hugo` keep each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. The feed Hugo made for each tag has no equal.
 
 Hugo made a list of each folder at the top of the content folder, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
-
-Hugo took when 5 pages last changed from the file or from Git, which Statac doesn't read, so no `updated` was written from there.
 
 The settings written in `statac.yaml`:
 
@@ -31,19 +29,20 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 8 old URLs there: 8 are published or redirected.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 5 old URLs there: 5 are published or redirected.
 
-- 1 page carries a `permalink` of its own, where no pattern fits.
+- `content/posts/index.md` cascades `pages.permalink: /posts/{name}/` to every page in `content/posts/`, which puts 2 of them at their old URLs.
 
 The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
 
 ## Left for you
 
-### Dates Hugo took from the file or from Git
+### Settings with no equal
 
-Hugo's settings took the date of each of these pages from the time its file was saved or from Git, which Statac doesn't read, so none was written: write its `date`.
+Statac has no equal for each of these settings, so nothing came across for them: https://statac.dev/settings/ says what Statac offers.
 
-- `content/posts/post-5.md`: `:git`
+- `hugo.toml`, line 5: `enableGitInfo: true`
+- `hugo.toml`, line 7: `frontmatter: {date: [:filename, :default, :git], lastmod: [:fileModTime, lastmod]}`
 
 ## Not converted
 

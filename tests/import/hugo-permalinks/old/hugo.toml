@@ -10,5 +10,3 @@ timeZone = "UTC"
   essays = "/:year/:title/"
   [permalinks.page]
     docs = "/manual/:sections[1:]/:filename/"
-  [permalinks.section]
-    docs = "/manual/:sections[1:]/"

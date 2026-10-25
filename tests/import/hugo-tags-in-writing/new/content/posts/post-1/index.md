@@ -71,9 +71,9 @@ To show a tag as text: {{< figure src="photo-1.jpg" >}}.
 
 In a code span: `{{< param "author" >}}`.
 
-Tags of the site's own that show one of its values: [Post 2](/posts/post-2/), [the top](/), Tags in the writing, written by Name, and a link defined below, [Post 2 again][two].
+Tags of the site's own that show one of its values: [Post 2]({{< top >}}/posts/post-2/), [the top]({{< top >}}), @site_title(), written by @by(), and a link defined below, [Post 2 again][two].
 
-[two]: /posts/post-2/
+[two]: {{< top >}}/posts/post-2/
 
 A tag that shows more than one value stays a call: @both(). Inside an address no tag becomes a call: [a link]({{< both >}}/x/), <a href="{{< note >}}">another</a>, and [a third][three].
 

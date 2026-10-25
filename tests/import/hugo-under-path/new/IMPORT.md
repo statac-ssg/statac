@@ -16,8 +16,6 @@ Hugo made a list of each folder at the top of the content folder, and these had 
 
 Hugo summed up 1 page with its opening paragraphs, as many as made its `summaryLength` of words, and Statac takes the first paragraph alone: where a summary should run further, put `<!--more-->` on a line of its own where it should end.
 
-3 places held a tag of the site's own that showed one of the site's values and nothing else, such as `{{< baseurl >}}`: each holds the value itself now, the site's URL as a path starting with `/`.
-
 The settings written in `statac.yaml`:
 
 ```yaml
@@ -53,7 +51,7 @@ Each of these names a page Statac couldn't find in the old site, so it is left a
 Each of these tags is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
 
 - `snippets/figure.html`:
-  - `content/posts/post-1.md`, line 20: `{{< figure src="/blog/images/photo-1.jpg" alt="A picture named with the path the site is under" >}}`
+  - `content/posts/post-1.md`, line 17: `{{< figure src="/blog/images/photo-1.jpg" alt="A picture named with the path the site is under" >}}`
 
 ### URLs the old built site doesn't have
 
@@ -65,7 +63,6 @@ Statac worked these URLs out by the old tool's rules, but the old site's built o
 
 Statac left these behind, and the new site has nothing of them:
 
-- `layouts/`: the old site's layouts.
 - `public/`: the old site's built output, read only to check the URLs.
 
 ## What to do next

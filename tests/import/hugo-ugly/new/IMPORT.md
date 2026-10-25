@@ -29,11 +29,11 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 11 old URLs there: 11 are published or redirected.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 9 old URLs there: 9 are published or redirected.
 
 - `content/posts/index.md` cascades `pages.permalink: /posts/{slug}.html` to every page in `content/posts/`, which puts 3 of them at their old URLs.
 - 1 page carries a `permalink` of its own, where no pattern fits.
-- 3 pages carry `redirect_from`, for the other URLs that led to them.
+- 1 page carries `redirect_from`, for the other URLs that led to it.
 
 The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
 
