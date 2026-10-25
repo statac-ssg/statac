@@ -33,7 +33,7 @@ use crate::site::{ListId, ListKey, Page, PageId, Site};
 use crate::source::{Place, Sources, Span};
 use crate::value::Value;
 
-pub(crate) use ids::{eleventy_id, entry_id, mint_key};
+pub(crate) use ids::{entry_id, mint_key};
 pub(crate) use known::{IdsToWrite, Known, ids_to_write};
 
 pub(crate) const FILE_NAME: &str = "feed.xml";

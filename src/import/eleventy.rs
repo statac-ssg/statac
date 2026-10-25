@@ -143,15 +143,6 @@ pub(super) static ELEVENTYS_WORD: FindingKind = FindingKind {
                as a custom field and does nothing: take it out, or show it from a template.",
 };
 
-pub(super) static ADDRESS_PROGRAM: FindingKind = FindingKind {
-    heading: "URLs a program gave",
-    sentence: "Each of these data files is a program that names `permalink`, so it may have given \
-               pages their URLs, and Statac runs none: for those pages it took the URL Eleventy \
-               gives a file by its name, which may not be where the old site published them. \
-               Compare the old site's URLs with the new site's, and give each page that differs \
-               its old URL as a `permalink`.",
-};
-
 pub(super) static DATA_PROGRAM: FindingKind = FindingKind {
     heading: "Data written as a program",
     sentence: "Eleventy ran each of these JavaScript files for data, and Statac runs none, so what \
@@ -298,12 +289,10 @@ pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Im
         unpublished: 0,
         undated: 0,
         html_pages: 0,
-        category_pages: Vec::new(),
         addressed_by_name: Vec::new(),
         controls: (0, 0),
         plugin_feeds: Vec::new(),
         unread_feed: None,
-        unmade_feeds: Vec::new(),
     };
     reader.import.settings_file = reader.s.file.clone().unwrap_or_default();
     reader.folders();
@@ -387,10 +376,6 @@ struct Reader<'a> {
     unpublished: usize,
     undated: usize,
     html_pages: usize,
-    /// The address a template gives the page of each category, as what
-    /// stands before the name, the filter the name goes through, and
-    /// what stands after.
-    category_pages: Vec<(String, Option<String>, String)>,
     /// The pages made by templates whose address is taken from the file's
     /// name, each by its path and its path in the input folder: a
     /// folder's data can give it another, or none.
@@ -399,17 +384,11 @@ struct Reader<'a> {
     /// many pages.
     controls: (usize, usize),
     /// The address of each feed the settings show the RSS plugin made,
-    /// with what it was written as, where the settings say, and the
-    /// plugin's function that made it.
-    plugin_feeds: Vec<(String, Option<FeedKind>, &'static str)>,
-    /// What the report says of the first `feedPlugin` or `getFeedTemplate`
-    /// call whose feed's URL Statac didn't take.
+    /// with what it was written as, where the settings say.
+    plugin_feeds: Vec<(String, Option<FeedKind>)>,
+    /// What the report says of the first `feedPlugin` call whose feed's
+    /// URL Statac didn't take.
     unread_feed: Option<String>,
-    /// The feeds in the old built output that no file of the old site
-    /// makes, each by its address, with what it is written as and its path
-    /// in the old folder, looked for where the settings show none of the
-    /// plugin's.
-    unmade_feeds: Vec<(String, FeedKind, String)>,
 }
 
 /// Whether `path` is `folder` or inside it.
@@ -454,8 +433,8 @@ struct Front {
 }
 
 /// Reads `text`'s front matter, written in YAML after `---` or `---yaml`,
-/// or in JSON after `---json`, up to a line of `---`; or gives the line
-/// it stopped at and that line's text.
+/// up to a line of `---`; or gives the line it stopped at and that line's
+/// text.
 fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     // Eleventy publishes a control character in front matter as nothing,
@@ -499,25 +478,6 @@ fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
                     (line, line_text(line))
                 })?;
             mapping(&sources, &node)
-        }
-        "json" => {
-            // Spaces in place of the opening line keep each line where it is.
-            let padded = format!("{}{}", " ".repeat(start), &text[start..end]);
-            let source = sources.add(path, padded);
-            let node = crate::yaml::read_json(&sources, source).map_err(|problem| {
-                let line = problem.place.map_or(1, |place| {
-                    sources.line_number(place.source, place.span.start as usize)
-                });
-                (line, line_text(line))
-            })?;
-            let node_line = |field: Field| Field {
-                line: field.line.map(|line| line + 1),
-                ..field
-            };
-            mapping(&sources, &node)
-                .into_iter()
-                .map(node_line)
-                .collect()
         }
         "js" | "javascript" => {
             return Ok(Front {
@@ -572,46 +532,6 @@ fn listing(body: &str) -> Option<(usize, String)> {
         at = end;
     }
     None
-}
-
-/// The address a template gives each category's page, where its front
-/// matter makes one page for each of `collections.categories` and its
-/// `permalink` is text around the name alone, or the name through
-/// `slugify` or `slug`: what stands before, the filter, and what stands
-/// after. A filter of the site's own is code, and gives none.
-fn category_page(fields: &[Field]) -> Option<(String, Option<String>, String)> {
-    let Value::Fields(paging) = &fields.iter().find(|f| f.name == "pagination")?.value else {
-        return None;
-    };
-    let of = |name: &str| {
-        (paging.iter())
-            .find(|(known, _)| known == name)
-            .and_then(|(_, value)| text_of(value))
-    };
-    if of("data")?.trim() != "collections.categories" {
-        return None;
-    }
-    let alias = of("alias")?;
-    let permalink = text_of(&fields.iter().find(|f| f.name == "permalink")?.value)?;
-    let (before, rest) = permalink.split_once("{{")?;
-    let (tag, after) = rest.split_once("}}")?;
-    if before.contains(['{', '}']) || after.contains(['{', '}']) {
-        return None;
-    }
-    let mut pieces = tag.split('|').map(str::trim);
-    if pieces.next()? != alias.trim() {
-        return None;
-    }
-    let filter = match (pieces.next(), pieces.next()) {
-        (None, _) => None,
-        (Some(filter @ ("slugify" | "slug")), None) => Some(filter.to_owned()),
-        _ => return None,
-    };
-    let before = match before.starts_with('/') {
-        true => before.to_owned(),
-        false => format!("/{before}"),
-    };
-    Some((before, filter, after.to_owned()))
 }
 
 /// The engine a page's `templateEngineOverride` names: the first of the
@@ -672,53 +592,24 @@ impl FeedKind {
             None => "a feed",
         }
     }
-
-    /// The RSS plugin writes an Atom or JSON feed's post URL into a
-    /// `{% set %}` block and prints it again, so a `'` or `&` in it is
-    /// escaped twice in the post's id.
-    fn escapes_ids_twice(self) -> bool {
-        self != FeedKind::Rss
-    }
 }
 
-/// `posts`, the old URLs of the posts whose ids an RSS plugin feed escaped
-/// twice, or may have: one sentence naming each, and `feeds`, the plugin's
-/// feeds that did, each by its URL; none of those where it isn't known
-/// which kind of feed the plugin made.
-fn escaped_twice(posts: &[String], feeds: &[(String, FeedKind)]) -> String {
+/// One sentence naming `posts`, the old URLs of the posts whose ids the
+/// RSS plugin's Atom and JSON feeds escape twice.
+fn escaped_twice(posts: &[String]) -> String {
     let shown: Vec<String> = posts.iter().map(|post| code(post)).collect();
-    let (posts, ids) = match posts.len() {
-        1 => (format!("1 post, {}, ", shown[0]), "an id"),
-        n => (format!("{n} posts, {}, ", listed(&shown)), "ids"),
-    };
-    let how = "escaped twice, as Eleventy's RSS plugin does with a `'` or `&` in an Atom or JSON \
-               feed";
-    let each = match shown.len() {
-        1 => "it",
-        _ => "each",
-    };
-    match feeds {
-        [] => format!(
-            "The old site's feed may have given {posts}{ids} {how}, so feed readers may show \
-             {each} once as new after the move: Statac couldn't read which kind of feed it was."
+    let (posts, each) = match shown.as_slice() {
+        [one] => (format!("1 post, {one}, an id"), "it"),
+        _ => (
+            format!("{} posts, {}, ids", shown.len(), listed(&shown)),
+            "each",
         ),
-        _ => {
-            let feeds: Vec<String> = (feeds.iter())
-                .map(|(address, kind)| {
-                    let kind = match kind {
-                        FeedKind::Json => "JSON feed",
-                        _ => "Atom feed",
-                    };
-                    format!("{kind} at {}", code(address))
-                })
-                .collect();
-            format!(
-                "The old site's {} gave {posts}{ids} {how}, so feed readers will show {each} once \
-                 as new after the move.",
-                listed(&feeds)
-            )
-        }
-    }
+    };
+    format!(
+        "The old site's feed may have given {posts} escaped twice, as Eleventy's RSS plugin does \
+         with a `'` or `&` in an Atom or JSON feed, so feed readers may show {each} once as new \
+         after the move."
+    )
 }
 
 /// What `text` is written as where it is a feed: XML whose root is RSS's or
@@ -763,85 +654,6 @@ fn feed_kind(text: &str) -> Option<FeedKind> {
             .is_some_and(|after| after.starts_with([' ', '\t', '\r', '\n', '>']))
     })
     .map(|(_, kind)| kind)
-}
-
-/// The id of each entry of `text`, a feed written as Atom, RSS or a JSON
-/// Feed, as written; none for an entry that has none.
-fn entry_ids(text: &str) -> Vec<Option<String>> {
-    if feed_kind(text) == Some(FeedKind::Json) {
-        return json_entry_ids(text);
-    }
-    let mut ids = Vec::new();
-    for (entry, id) in [("entry", "id"), ("item", "guid")] {
-        let close = format!("</{entry}>");
-        let mut rest = text;
-        while let Some(inner) = element(rest, entry) {
-            let end = inner.find(&close).unwrap_or(inner.len());
-            ids.push(element(&inner[..end], id).and_then(|inner| {
-                let end = inner.find(&format!("</{id}>"))?;
-                Some(xml_text(&inner[..end]))
-            }));
-            rest = &inner[end..];
-        }
-    }
-    ids
-}
-
-/// The `id` of each of the `items` of `text`, a JSON Feed; none for an
-/// item whose `id` isn't text.
-fn json_entry_ids(text: &str) -> Vec<Option<String>> {
-    use crate::yaml::Value as Json;
-    let mut sources = Sources::default();
-    let source = sources.add("feed.json", text.trim_start_matches('\u{feff}').to_owned());
-    let Ok(node) = crate::yaml::read_json(&sources, source) else {
-        return Vec::new();
-    };
-    let field = |value: &Json, name: &str| match value {
-        Json::Mapping(entries) => (entries.iter())
-            .find(|entry| matches!(&entry.key.value, Json::Scalar(key) if key == name))
-            .map(|entry| entry.value.value.clone()),
-        _ => None,
-    };
-    let Some(Json::Sequence(items)) = field(&node.value, "items") else {
-        return Vec::new();
-    };
-    (items.iter())
-        .map(|item| match field(&item.value, "id") {
-            Some(Json::Scalar(id)) => Some(id),
-            _ => None,
-        })
-        .collect()
-}
-
-/// What follows the first start tag of `name` in `xml`, from just after
-/// its `>`.
-fn element<'a>(xml: &'a str, name: &str) -> Option<&'a str> {
-    let open = format!("<{name}");
-    let mut rest = xml;
-    loop {
-        let after = &rest[rest.find(&open)? + open.len()..];
-        if after.starts_with([' ', '\t', '\r', '\n', '>']) {
-            return Some(&after[after.find('>')? + 1..]);
-        }
-        rest = after;
-    }
-}
-
-/// The text an XML element holds, written as `inner`.
-fn xml_text(inner: &str) -> String {
-    let inner = inner.trim();
-    if let Some(data) = inner
-        .strip_prefix("<![CDATA[")
-        .and_then(|data| data.strip_suffix("]]>"))
-    {
-        return data.trim().to_owned();
-    }
-    inner
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&amp;", "&")
 }
 
 impl Reader<'_> {
@@ -1362,7 +1174,7 @@ impl Reader<'_> {
                             format!("data/{}", inner[self.data.len()..].trim_start_matches('/'));
                         self.import.files.push(File { from: inner, to });
                     }
-                    Some("js" | "cjs" | "mjs") => self.data_program(&inner),
+                    Some("js" | "cjs" | "mjs") => self.find(&DATA_PROGRAM, &inner, None, ""),
                     _ => self.find(&DATA_LEFT, &inner, None, ""),
                 }
             }
@@ -1382,7 +1194,7 @@ impl Reader<'_> {
             .iter()
             .any(|ending| name.ends_with(ending))
         {
-            self.data_program(path);
+            self.find(&DATA_PROGRAM, path, None, "");
             return Ok(());
         }
         let data_stem = name.strip_suffix(".11tydata.json").or_else(|| {
@@ -1456,22 +1268,6 @@ impl Reader<'_> {
         Ok(())
     }
 
-    /// Tells of a data file that is a program, and of the first place it
-    /// names `permalink`, where it does.
-    fn data_program(&mut self, path: &str) {
-        self.find(&DATA_PROGRAM, path, None, "");
-        if !inside::a_file(self.folder, path) {
-            return;
-        }
-        let Ok(text) = std::fs::read_to_string(self.path(path)) else {
-            return;
-        };
-        if let Some((at, line)) = (text.lines().enumerate()).find(|(_, l)| l.contains("permalink"))
-        {
-            self.find(&ADDRESS_PROGRAM, path, Some(at + 1), line.trim());
-        }
-    }
-
     /// The address Eleventy gives a file by its name, at `rel` from the
     /// top of the input folder, with its ending taken off as `stem`.
     fn default_address(rel: &str, stem: &str) -> String {
@@ -1500,7 +1296,6 @@ impl Reader<'_> {
             && let Ok(front) = front(&text, path)
             && let Some(field) = front.fields.iter().find(|f| f.name == "permalink")
         {
-            self.category_pages.extend(category_page(&front.fields));
             by_name = false;
             address = match &field.value {
                 Value::Text(text) if !text.contains(['{', '}']) => {
@@ -1546,10 +1341,8 @@ impl Reader<'_> {
     }
 
     /// The feeds the settings show the RSS plugin made, and the feeds in
-    /// the old built output that no file of the old site makes: where the
-    /// old site used the plugin and the settings show none of its feeds,
-    /// those may be the plugin's, and otherwise they are the work of
-    /// templates Statac didn't find.
+    /// the old built output that no file of the old site makes, the work
+    /// of the plugin or of templates Statac didn't find.
     fn plugin_feeds(&mut self) -> Result<(), Box<Failed>> {
         for feed in self.s.feeds.clone() {
             let address = (feed.path.as_ref())
@@ -1574,12 +1367,11 @@ impl Reader<'_> {
                 self.unread_feed.get_or_insert(why);
                 continue;
             };
-            if self.plugin_feeds.iter().all(|(had, ..)| *had != address) {
+            if self.plugin_feeds.iter().all(|(had, _)| *had != address) {
                 let kind = feed.kind.as_deref().and_then(FeedKind::named);
-                self.plugin_feeds.push((address, kind, feed.by));
+                self.plugin_feeds.push((address, kind));
             }
         }
-        let plugin = settings::makes_feeds(self.folder) || !self.s.feeds.is_empty();
         let Some(built) = self.import.built.clone() else {
             return Ok(());
         };
@@ -1596,19 +1388,15 @@ impl Reader<'_> {
             let made = (self.import.feeds.iter())
                 .chain(&self.import.templated)
                 .any(|(made, _)| *made == address)
-                || self.plugin_feeds.iter().any(|(made, ..)| *made == address);
+                || self.plugin_feeds.iter().any(|(made, _)| *made == address);
             if made || self.import.files.iter().any(|file| file.to == copied) {
                 continue;
             }
             let Ok(bytes) = std::fs::read(self.path(&path)) else {
                 continue;
             };
-            let Some(kind) = feed_kind(&String::from_utf8_lossy(&bytes)) else {
-                continue;
-            };
-            match plugin && self.plugin_feeds.is_empty() {
-                true => self.unmade_feeds.push((address, kind, path)),
-                false => self.import.feeds.push((address, path)),
+            if feed_kind(&String::from_utf8_lossy(&bytes)).is_some() {
+                self.import.feeds.push((address, path));
             }
         }
         Ok(())
@@ -2128,28 +1916,6 @@ impl Reader<'_> {
             made.push(self.made(at, &placements));
         }
         let parts = self.parts(&made);
-        // The page a template made for each category, where its address
-        // is the name alone or run through one of Eleventy's own filters.
-        let mut names: Vec<&String> = Vec::new();
-        for (name, _) in (made.iter().zip(&parts))
-            .filter(|(_, part)| !**part)
-            .flat_map(|(made, part)| made.categories.iter().map(move |name| (name, part)))
-        {
-            if !names.contains(&name) {
-                names.push(name);
-            }
-        }
-        for (before, filter, after) in std::mem::take(&mut self.category_pages) {
-            for name in &names {
-                let filled = match filter.as_deref() {
-                    Some("slugify") => permalink::slugify(name),
-                    Some(_) => permalink::slug(name),
-                    None => (*name).clone(),
-                };
-                let (address, _) = Self::settled_address(&format!("{before}{filled}{after}"));
-                (self.import.term_pages).push(("categories".to_owned(), (*name).clone(), address));
-            }
-        }
         let wrapping: HashSet<String> = self
             .docs
             .iter()
@@ -2595,26 +2361,23 @@ impl Reader<'_> {
         }
         if let Some((written, feed)) = &title {
             notes.push(format!(
-                "The new site's `title`, {}, is taken from `metadata.title` in the settings' {}, \
-                 on line {}.",
+                "The new site's `title`, {}, is taken from `metadata.title` in the settings' \
+                 `feedPlugin`, on line {}.",
                 code(written),
-                code(feed.by),
                 feed.line
             ));
         }
         match &language {
             Some((written, feed)) if crate::new::a_language_code(written) => notes.push(format!(
                 "The new site's `language`, {}, is taken from `metadata.language` in the \
-                 settings' {}, on line {}.",
+                 settings' `feedPlugin`, on line {}.",
                 code(written),
-                code(feed.by),
                 feed.line
             )),
             Some((written, feed)) => notes.push(format!(
-                "The settings' {}, on line {}, gives `metadata.language` as {}, which isn't a \
-                 code Statac reads, so the site is in English, `en`: write its code in \
+                "The settings' `feedPlugin`, on line {}, gives `metadata.language` as {}, which \
+                 isn't a code Statac reads, so the site is in English, `en`: write its code in \
                  `language` in `statac.yaml`.",
-                code(feed.by),
                 feed.line,
                 code(written)
             )),
@@ -2622,10 +2385,9 @@ impl Reader<'_> {
         }
         if let Some((url, feed)) = &feed_url {
             notes.push(format!(
-                "The new site's `url`, {}, is made from `metadata.base` in the settings' {}, on \
-                 line {}, {}as Eleventy's RSS plugin made each post's full URL.",
+                "The new site's `url`, {}, is made from `metadata.base` in the settings' \
+                 `feedPlugin`, on line {}, {}as Eleventy's RSS plugin made each post's full URL.",
                 code(url),
-                code(feed.by),
                 feed.line,
                 match base.is_empty() {
                     true => "",
@@ -2932,12 +2694,26 @@ impl Reader<'_> {
     }
 
     /// Asks for each feed the RSS plugin made at the URL it had, and keeps
-    /// each post's id in it; where the old site had no plugin, keeps the
-    /// ids its own feeds gave where each was a post's full URL.
+    /// each post's id in it; where the old site had no plugin, says that
+    /// the ids its own feeds gave aren't kept.
     fn feeds(&mut self, notes: &mut Vec<String>) {
         let named = settings::makes_feeds(self.folder);
         if !named && self.s.feeds.is_empty() {
-            self.own_feeds_ids(notes);
+            let feeds: Vec<String> = (self.import.feeds.iter())
+                .map(|(address, _)| code(address))
+                .collect();
+            if !feeds.is_empty() {
+                notes.push(format!(
+                    "Each post's id in the old site's {} at {} changes after the move, so feed \
+                     readers may show each post once as new: see \
+                     https://statac.dev/feeds/#entry-ids.",
+                    match feeds.len() {
+                        1 => "feed",
+                        _ => "feeds",
+                    },
+                    listed(&feeds)
+                ));
+            }
             return;
         }
         self.import
@@ -2953,116 +2729,47 @@ impl Reader<'_> {
             .filter(|address| address.contains(['\'', '&']))
             .map(|address| format!("{base}{address}"))
             .collect();
-        // The plugin's feeds that escape ids twice, each with its kind; none
-        // where it may have made such a feed of a kind not known.
-        let twice: Option<Vec<(String, FeedKind)>> =
-            match (self.plugin_feeds.as_slice(), self.unmade_feeds.as_slice()) {
-                ([], [(address, kind, _)]) => Some(vec![(address.clone(), *kind)]),
-                ([], unmade)
-                    if !unmade.is_empty() && unmade.iter().all(|f| f.1 == FeedKind::Rss) =>
-                {
-                    Some(Vec::new())
-                }
-                ([], _) => None,
-                (made, _) => {
-                    let known: Vec<(String, FeedKind)> = (made.iter())
-                        .filter_map(|(address, kind, _)| Some((address.clone(), (*kind)?)))
-                        .collect();
-                    match known.len() < made.len() && !known.iter().any(|f| f.1.escapes_ids_twice())
-                    {
-                        true => None,
-                        false => Some(known),
-                    }
-                }
+        let twice = (!posts.is_empty()).then(|| escaped_twice(&posts));
+        if self.plugin_feeds.is_empty() {
+            let ids = match named {
+                true => "The old site's `package.json` names Eleventy's RSS plugin",
+                false => "The settings use Eleventy's RSS plugin",
             };
-        let twice = match twice {
-            _ if posts.is_empty() => None,
-            None => Some(escaped_twice(&posts, &[])),
-            Some(feeds) => {
-                let feeds: Vec<(String, FeedKind)> = (feeds.into_iter())
-                    .filter(|(_, kind)| kind.escapes_ids_twice())
-                    .collect();
-                (!feeds.is_empty()).then(|| escaped_twice(&posts, &feeds))
-            }
-        };
-        let why = (self.unread_feed.clone())
-            .unwrap_or_else(|| "The settings show no `feedPlugin` or `getFeedTemplate`".to_owned());
-        let (asked, lead) = match (self.plugin_feeds.as_slice(), self.unmade_feeds.as_slice()) {
-            ([], [(address, kind, _)]) => {
-                let opening = match self.unread_feed {
-                    Some(_) => why,
-                    None => "The old site's `package.json` names Eleventy's RSS plugin, and the \
-                             settings show no `feedPlugin` or `getFeedTemplate`"
-                        .to_owned(),
-                };
-                let lead = format!(
-                    "{opening}. The old built output holds {} at {} that no file of the old site \
-                     makes, so Statac took it for the plugin's.",
-                    FeedKind::a(Some(*kind)),
-                    code(address)
-                );
-                (vec![address.clone()], lead)
-            }
-            ([], unmade) => {
-                let ids = match named {
-                    true => "The old site's `package.json` names Eleventy's RSS plugin",
-                    false => "The settings use Eleventy's RSS plugin",
-                };
-                let rest = if unmade.len() > 1 {
-                    format!(
-                        "{why}, and the old built output holds {} feeds that no file of the old \
-                         site makes, so Statac can't tell which the plugin made and asked for \
-                         none: each is listed under Feeds made by templates.",
-                        unmade.len()
-                    )
-                } else if self.unread_feed.is_none() && !self.import.feeds.is_empty() {
-                    "Feed readers see nothing new once a list's `feed:` line puts its feed at the \
-                     old feed's URL: see https://statac.dev/feeds/#entry-ids."
-                        .to_owned()
-                } else {
-                    format!(
-                        "{why}, and {}, so Statac asked for none: a `feed:` line in \
-                         `statac.yaml` puts the site's feed at the old feed's URL, as \
-                         `feed: /feed.xml`, and feed readers see nothing new: see \
-                         https://statac.dev/feeds/#entry-ids.",
-                        match self.import.built {
-                            Some(_) => "nothing in the old built output shows where its feed was",
-                            None => "the old site has no built output to show where its feed was",
-                        }
-                    )
-                };
-                notes.push(format!(
-                    "{ids}, whose feed templates give each post its full URL as its id, so \
-                     `feed_ids_before` and `feed_ids_from: eleventy` keep that id for each post. \
-                     {rest}"
-                ));
-                notes.extend(twice);
-                for (address, _, path) in std::mem::take(&mut self.unmade_feeds) {
-                    self.import.feeds.push((address, path));
-                }
-                return;
-            }
-            (made, _) => {
-                let mut by: Vec<String> = Vec::new();
-                for (_, _, function) in made {
-                    if !by.contains(&code(function)) {
-                        by.push(code(function));
+            let why = (self.unread_feed.clone())
+                .unwrap_or_else(|| "The settings show no `feedPlugin`".to_owned());
+            let see = "Feed readers see nothing new once a list's `feed:` line puts its feed at \
+                       the old feed's URL: see https://statac.dev/feeds/#entry-ids.";
+            let rest = match (&self.unread_feed, self.import.feeds.is_empty()) {
+                (None, false) => see.to_owned(),
+                (Some(_), false) => format!("{why}, so Statac asked for none. {see}"),
+                (_, true) => format!(
+                    "{why}, and {}, so Statac asked for none: a `feed:` line in `statac.yaml` \
+                     puts the site's feed at the old feed's URL, as `feed: /feed.xml`, and feed \
+                     readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
+                    match self.import.built {
+                        Some(_) => "nothing in the old built output shows where its feed was",
+                        None => "the old site has no built output to show where its feed was",
                     }
-                }
-                let made: Vec<String> = (made.iter())
-                    .map(|(address, kind, _)| {
-                        format!("{} at {}", FeedKind::a(*kind), code(address))
-                    })
-                    .collect();
-                let lead = format!(
-                    "The settings' {}, from Eleventy's RSS plugin, made {}.",
-                    listed(&by),
-                    listed(&made)
-                );
-                let addresses = (self.plugin_feeds.iter()).map(|(address, ..)| address.clone());
-                (addresses.collect(), lead)
-            }
-        };
+                ),
+            };
+            notes.push(format!(
+                "{ids}, whose feed templates give each post its full URL as its id, so \
+                 `feed_ids_before` and `feed_ids_from: eleventy` keep that id for each post. \
+                 {rest}"
+            ));
+            notes.extend(twice);
+            return;
+        }
+        let made: Vec<String> = (self.plugin_feeds.iter())
+            .map(|(address, kind)| format!("{} at {}", FeedKind::a(*kind), code(address)))
+            .collect();
+        let lead = format!(
+            "The settings' `feedPlugin`, from Eleventy's RSS plugin, made {}.",
+            listed(&made)
+        );
+        let asked: Vec<String> = (self.plugin_feeds.iter())
+            .map(|(address, _)| address.clone())
+            .collect();
         let (shown, templates) = self.ask(&asked);
         let mut note = format!(
             "{lead} {} at the same URL, as {shown} in `statac.yaml` says, built with {} once you \
@@ -3080,7 +2787,7 @@ impl Reader<'_> {
             }
         );
         let feeds: Vec<(String, Option<FeedKind>)> = (self.plugin_feeds.iter())
-            .map(|(address, kind, _)| (last(address).to_owned(), *kind))
+            .map(|(address, kind)| (last(address).to_owned(), *kind))
             .collect();
         if let Some(alike) = feeds_built_alike(&[feeds]) {
             note.push(' ');
@@ -3119,61 +2826,5 @@ impl Reader<'_> {
         }
         self.import.addresses.extend_from_slice(addresses);
         (shown, templates)
-    }
-
-    /// Keeps the id the old site's own feed templates gave each post, where
-    /// the old built output shows every entry of each feed they made given
-    /// its post's full URL.
-    fn own_feeds_ids(&mut self, notes: &mut Vec<String>) {
-        let Some(built) = &self.import.built else {
-            return;
-        };
-        if self.import.feeds.is_empty() {
-            return;
-        }
-        let base = self.s.base();
-        let posts: HashSet<String> = (self.import.pages.iter())
-            .filter(|page| page.kind == PageKind::Post)
-            .filter_map(|page| page.address.as_ref())
-            .map(|address| crate::feeds::eleventy_id(&format!("{base}{address}")))
-            .collect();
-        let full = |id: &str| {
-            url::Url::parse(id).is_ok_and(|url| {
-                matches!(url.scheme(), "http" | "https")
-                    && url.query().is_none()
-                    && url.fragment().is_none()
-                    && posts.contains(url.path())
-            })
-        };
-        for (address, _) in &self.import.feeds {
-            let path = joined(built, address.trim_start_matches('/'));
-            let Ok(bytes) = std::fs::read(self.path(&path)) else {
-                return;
-            };
-            let ids = entry_ids(&String::from_utf8_lossy(&bytes));
-            if ids.is_empty() || !ids.iter().all(|id| id.as_deref().is_some_and(full)) {
-                return;
-            }
-        }
-        let feeds: Vec<String> = (self.import.feeds.iter())
-            .map(|(address, _)| code(address))
-            .collect();
-        self.import
-            .settings
-            .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
-        self.import
-            .settings
-            .push(("feed_ids_from".into(), Value::Text("eleventy".into())));
-        notes.push(format!(
-            "The old site's {} at {} gave each post its full URL as its id, so \
-             `feed_ids_before` and `feed_ids_from: eleventy` keep that id for each post. Feed \
-             readers see nothing new once a list's `feed:` line puts its feed at the old feed's \
-             URL: see https://statac.dev/feeds/#entry-ids.",
-            match feeds.len() {
-                1 => "feed",
-                _ => "feeds",
-            },
-            listed(&feeds)
-        ));
     }
 }

@@ -199,7 +199,7 @@ fn plain_letters(text: &str) -> String {
 /// Eleventy's `slugify` filter: accents off, `&` as `and`, apostrophes
 /// dropped, small letters, and every other run of characters but letters
 /// and figures one hyphen.
-pub(super) fn slugify(text: &str) -> String {
+fn slugify(text: &str) -> String {
     let text = plain_letters(text)
         .replace('&', " and ")
         .replace(['\'', '’'], "");
@@ -222,7 +222,7 @@ pub(super) fn slugify(text: &str) -> String {
 /// Eleventy's older `slug` filter: accents off, `&` as `and`, every
 /// character but ASCII letters, figures, spaces and `$*_+~.()'"!-:@`
 /// dropped, runs of spaces and hyphens one hyphen, and small letters.
-pub(super) fn slug(text: &str) -> String {
+fn slug(text: &str) -> String {
     let kept: String = plain_letters(text)
         .replace('&', "and")
         .chars()

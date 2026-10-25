@@ -8,4 +8,4 @@ summary: Its own summary.
 description: Kept as it is.
 updated: 2026-01-06
 ---
-A post with front matter in JSON.
+A post with a summary of its own beside its description.

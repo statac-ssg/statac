@@ -68,12 +68,6 @@ Statac reads data files written in YAML or JSON only, so these weren't copied: w
 
 - `_data/notes.csv`
 
-### URLs a program gave
-
-Each of these data files is a program that names `permalink`, so it may have given pages their URLs, and Statac runs none: for those pages it took the URL Eleventy gives a file by its name, which may not be where the old site published them. Compare the old site's URLs with the new site's, and give each page that differs its old URL as a `permalink`.
-
-- `notes/notes.11tydata.js`, line 3: ``permalink: (data) => `/n/${data.page.fileSlug}/`,``
-
 ### Collections left out of tags
 
 Eleventy reads the `tags` in a folder's data file as the collections the folder's pages belong to, as `"tags": "posts"` puts them in `collections.posts`, so these didn't become tags. Statac needs no collection to list a folder's pages: where one is also a tag readers should see, add it to the `tags` of each page.
