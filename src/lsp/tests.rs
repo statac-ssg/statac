@@ -644,7 +644,7 @@ fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
     ]);
     let settings = site.root.join("statac.yaml");
     let page = site.root.join("content/post-1.md");
-    let link = "https://statac.dev/settings/#writing-and-code";
+    let link = "https://statac.dev/code-colours/";
     let more = [
         (
             "\"markdown\",\"plaintext\"",
@@ -695,7 +695,7 @@ fn a_completion_says_what_each_of_statacs_names_is_in_markdown_where_the_editor_
     ]);
     let settings = site.root.join("statac.yaml");
     let typed = "title: Site 1\ncode_c\n";
-    let link = "https://statac.dev/settings/#writing-and-code";
+    let link = "https://statac.dev/code-colours/";
     let more = [
         (
             "\"markdown\",\"plaintext\"",

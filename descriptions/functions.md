@@ -31,15 +31,13 @@ Turns a URL written from the top of the site into one that works
 wherever the site is published. On a site at
 `https://example.org/blog/`, `url("/about/")` returns `/blog/about/`.
 
-More: https://statac.dev/templates/#functions
+More: https://statac.dev/addresses/#a-site-in-a-folder-of-its-domain
 
 ## `headline`
 
 A page's name, as text with no markup. It is the page's title if it has
 one. Otherwise, Statac uses the best name it can find, down to the
 page's URL, so every page has a headline.
-
-More: https://statac.dev/templates/#headline
 
 ## `related`
 

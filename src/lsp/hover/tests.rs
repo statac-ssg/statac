@@ -74,14 +74,14 @@ fn a_setting_says_what_it_does() {
              default is `false`, and Statac writes code exactly as typed.",
         ]
     );
-    assert_eq!(
-        more.unwrap(),
-        "https://statac.dev/settings/#writing-and-code"
-    );
+    assert_eq!(more.unwrap(), "https://statac.dev/code-colours/");
     let (lines, more, _) = settings(&site, "fields.book.au|thor: text\n").unwrap();
     assert_eq!(lines[0], "`fields.book.author`, a setting");
     assert!(lines[1].starts_with("The kind of value a custom field takes"));
-    assert_eq!(more.unwrap(), "https://statac.dev/settings/#fields");
+    assert_eq!(
+        more.unwrap(),
+        "https://statac.dev/front-matter/#declaring-your-fields"
+    );
     let (lines, more, _) = settings(&site, "pages.lay|out: post\n").unwrap();
     assert_eq!(
         lines,
@@ -120,7 +120,7 @@ fn a_value_of_the_sites_own_says_how_templates_show_it() {
             "Templates show it as `site.tagline`."
         ]
     );
-    assert_eq!(more.unwrap(), "https://statac.dev/settings/#your-own");
+    assert_eq!(more.unwrap(), "https://statac.dev/settings/");
     let nested = "tagline: Notes\nbook:\n  auth|or: Author 1\n";
     let (lines, ..) = settings(&site, nested).unwrap();
     assert_eq!(lines[0], "`book.author`, a custom setting");
@@ -153,10 +153,7 @@ fn a_field_says_what_it_does() {
             "The page's title. Without it, the page's opening `# heading` is its title.",
         ]
     );
-    assert_eq!(
-        more.unwrap(),
-        "https://statac.dev/front-matter/#page-fields"
-    );
+    assert_eq!(more.unwrap(), "https://statac.dev/writing/#page");
     let (lines, more, _) = post(&site, "title: Post 1\nis|bn: 0-000-00000-0").unwrap();
     assert_eq!(
         lines,

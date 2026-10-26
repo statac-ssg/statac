@@ -10,7 +10,7 @@ the site's `url` in front of it. If it is given HTML, it does this to
 each URL in an `href`, `src`, `srcset` or `poster`. It needs the site's
 `url`.
 
-More: https://statac.dev/templates/#filters
+More: https://statac.dev/feeds/#the-template
 
 ## `date`
 
@@ -27,14 +27,14 @@ Writes a date in the form machines read, such as
 `2026-10-04T15:04:00+01:00`, for `<time datetime>`. `moment("rss")`
 writes it in the form RSS uses.
 
-More: https://statac.dev/templates/#filters
+More: https://statac.dev/feeds/#the-template
 
 ## `markdown`
 
 Builds text into HTML as Markdown, such as a `summary` with emphasis in
 it.
 
-More: https://statac.dev/templates/#markdown
+More: https://statac.dev/writing/#markdown
 
 ## `highlight`
 
@@ -43,13 +43,11 @@ on each piece for what kind of piece it is. It takes the language the
 way a code block names it: `highlight("rust")`. If `code_colours` isn't
 `true`, and in a feed, it leaves the text as written.
 
-More: https://statac.dev/templates/#filters
+More: https://statac.dev/code-colours/
 
 ## `plain`
 
 Takes the markup out of some HTML, leaving its words on one line.
-
-More: https://statac.dev/templates/#filters
 
 ## `truncate`
 
@@ -57,27 +55,21 @@ Cuts text, or the words of some HTML, at a word so that it fits in the
 number of characters given, and adds the ending given if it cuts
 anything: `truncate(160, "…")`.
 
-More: https://statac.dev/templates/#filters
-
 ## `digits`
 
 Writes a number, or the numbers in a text, in the digits of the page's
 language: `۱۲` for 12 on a Persian page. Only `0` to `9` change.
 
-More: https://statac.dev/templates/#filters
+More: https://statac.dev/dates-and-languages/#language-files
 
 ## `json`
 
 Writes a value as JSON. It is safe inside a `<script>`, and inside an
 attribute in single quotes.
 
-More: https://statac.dev/templates/#filters
-
 ## `urlencode`
 
 Makes text safe to use as part of a URL.
-
-More: https://statac.dev/templates/#filters
 
 ## `tagged`
 
@@ -104,14 +96,14 @@ More: https://statac.dev/lists/#lists-of-your-own
 
 A list of pages in date order, the newest first.
 
-More: https://statac.dev/templates/#filters
+More: https://statac.dev/lists/#lists-of-your-own
 
 ## `newest_date`
 
 The newest date among a list of pages. If no page in the list has a
 date, it has no value.
 
-More: https://statac.dev/templates/#filters
+More: https://statac.dev/feeds/#the-template
 
 ## `sort`
 

@@ -8,20 +8,20 @@ is a custom field, which templates read as `page.<name>`.
 The page's title. Without it, the page's opening `# heading` is its
 title.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/writing/#page
 
 ## `untitled`
 
 `true` if the page is meant to have no title, such as a short note.
 Statac then names it by its date.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/lists/#pages-without-titles
 
 ## `summary`
 
 A line about the page.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/writing/#page
 
 ## `date`
 
@@ -29,27 +29,27 @@ The page's date, year first: `2026-10-04`, or `2026-10-04 09:30` with a
 time. If you write `=today`, `statac serve` or `statac stamp` replaces
 it with the day's date.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/dates-and-languages/#writing-a-date
 
 ## `updated`
 
 When the page last changed, written the same way as `date`.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/dates-and-languages/#writing-a-date
 
 ## `draft`
 
 `true` leaves the page out of the build. `statac serve` still shows it,
 marked as a draft.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/lists/#drafts-and-posts-waiting-for-their-day
 
 ## `layout`
 
 The template the page is built with, by its name in `templates/`. On a
 page with `each:`, the template for the pages it makes.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/templates/#which
 
 ## `type`
 
@@ -57,100 +57,100 @@ What kind of page this is, in a word of your own. If `templates/` has a
 template of that name and the page sets no `layout`, Statac builds the
 page with that template.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/templates/#which
 
 ## `permalink`
 
 The page's URL, or a pattern such as `/{year}/{slug}/`.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/addresses/#permalink
 
 ## `redirect_from`
 
 Old URLs of the page. Each one redirects to it.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/addresses/#redirect-from
 
 ## `redirect_to`
 
 The URL the page redirects to. Statac publishes nothing else for the
 page.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/addresses/#sending-readers-on
 
 ## `needs`
 
 `needs: url` leaves the page out until the site has a `url`.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
 
 ## `translation_key`
 
 Links the page to its translations if their names differ. Pages with the
 same key are translations of each other.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/dates-and-languages/#translations
 
 ## `tags`
 
 The page's tags, as a list in brackets: `[Rust, Go]`.
 
-More: https://statac.dev/front-matter/#list-fields
+More: https://statac.dev/lists/#tags
 
 ## `series`
 
 The one series the page is part of.
 
-More: https://statac.dev/front-matter/#list-fields
+More: https://statac.dev/lists/#series
 
 ## `neighbours`
 
 Which list `page.previous` and `page.next` move through: `site`,
 `folder`, `series`, or `false` for none.
 
-More: https://statac.dev/front-matter/#list-fields
+More: https://statac.dev/lists/#previous-and-next
 
 ## `posts`
 
 A list the page makes of its own, chosen from all the posts, such as
 `site.posts | tagged("Rust")`.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#lists-of-your-own
 
 ## `each`
 
 Makes a page for each item of a table in `data/`, as in `each:
 data.people`, or for each post, as in `each: site.posts`.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/data/#pages-made-from-data
 
 ## `order`
 
 The list's order: `newest first`, `oldest first`, or the names of its
 pages in the order you want.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#order
 
 ## `numbered`
 
 In a folder's `index.md`, `false` says that the numbers at the start of
 its pages' names are part of the names.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#numbered-folders
 
 ## `posts_per_page`
 
 How many posts each page of the list shows. `0` shows them all on one
 page.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#pages-of-a-list
 
 ## `index_page`
 
 `false` stops Statac publishing the list's page and its paginated pages.
 Templates can still use the list.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#a-lists-page
 
 ## `feed`
 
@@ -159,42 +159,42 @@ More: https://statac.dev/front-matter/#list-page-fields
 list of them gives the list a feed at each, and templates link to the
 first. A list has no feed unless a `feed:` line asks for one.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/feeds/#which-lists-have-a-feed
 
 ## `id`
 
 What identifies a post in a feed, even if the post moves.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/feeds/#entry-ids
 
 ## `search`
 
 `false` leaves the page out of the site's search.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/search/#leave-out
 
 ## `card`
 
 Which of the site's social cards Statac draws for the page, if the site
 has cards turned on.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/sharing-cards/#other-cards
 
 ## `og_image`
 
 The page's social image, in place of a card.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/sharing-cards/#a-picture-of-your-own
 
 ## `og_title`
 
 The page's title on a card and in a link preview.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/sharing-cards/#what-a-preview-says
 
 ## `mentions`
 
 `true` if the page shows its webmentions. A template reads it as
 `page.mentions`.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/webmentions/#webmentions-in-a-layout

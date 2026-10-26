@@ -1087,7 +1087,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
         {\"text\":\" its content opens with. If the page has neither, \"},{\"code\":\"title\"},\
         {\"text\":\" has no value, so to show the name of any page, write \"},\
         {\"code\":\"headline(page)\"},{\"text\":\".\"}],\
-        \"more\":\"https://statac.dev/templates/#what-a-template-sees\"}";
+        \"more\":\"https://statac.dev/templates/#write\"}";
     assert!(
         post.contains(title)
             && post.contains(

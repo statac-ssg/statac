@@ -9,14 +9,10 @@ several languages, each value is the one for the page's language.
 The site's `title`. On a site in several languages, it is the title for
 the page's language. If the site has no `title`, it has no value.
 
-More: https://statac.dev/templates/#site
-
 ## `url`
 
 The site's `url`, without the `/` at the end. A build run with `--url`
 uses that URL instead. If the site has no `url`, it has no value.
-
-More: https://statac.dev/templates/#site
 
 ## `host`
 
@@ -24,14 +20,12 @@ The host in the site's `url`: `example.org` for
 `https://example.org/blog/`. If the site has no `url`, it has no
 value.
 
-More: https://statac.dev/templates/#site
-
 ## `language`
 
 The page's language as a code, such as `en`. If the site sets no
 `language`, it is `en`.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/dates-and-languages/#each-language-in-templates
 
 ## `languages`
 
@@ -45,13 +39,13 @@ More: https://statac.dev/dates-and-languages/#each-language-in-templates
 The day the site is built on: today in the site's `timezone`, or the day
 given with `--today`.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/build/#options
 
 ## `posts`
 
 Every post, newest first, unless the home page's `order` says otherwise.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/lists/#lists-in-templates
 
 ## `pages`
 
@@ -59,40 +53,40 @@ Every page the site publishes, in URL order. It includes a list's
 paginated pages and pages that aren't HTML, such as the site's own
 `sitemap.xml`, but not redirects.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/feeds/#sitemap
 
 ## `tags`
 
 Every tag, A to Z, each a list with its `name`, `url` and `posts`.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/lists/#lists-in-templates
 
 ## `series`
 
 Every series, A to Z, each a list with its `name`, `url` and `posts`.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/lists/#lists-in-templates
 
 ## `folders`
 
 Every folder that has a page of its own, in URL order, each a list with
 its `name`, `url` and `posts`.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/lists/#lists-in-templates
 
 ## `feed`
 
 The URL of the site's own feed. Empty if the site's own list has no
 feed.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/feeds/#the-template
 
 ## `feeds`
 
 The URL of each of the site's own feeds, in the order `feed:` names
 them. Empty if the site's own list has no feeds.
 
-More: https://statac.dev/templates/#site
+More: https://statac.dev/feeds/#the-template
 
 ## `data`
 
@@ -104,8 +98,6 @@ More: https://statac.dev/data/#in-templates
 ## `webmentions`
 
 `true` if the site has `webmentions: true`, and otherwise `false`.
-
-More: https://statac.dev/templates/#site
 
 ## `search_without_javascript`
 

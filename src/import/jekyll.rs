@@ -170,7 +170,7 @@ pub(super) static TOC: FindingKind = FindingKind {
     heading: "Tables of contents written in Markdown",
     sentence: "Statac's Markdown reads `{:toc}` as words: take it and the list above it out. A \
                template can show the page's headings from `page.toc`, as \
-               https://statac.dev/templates/#what-a-template-sees describes.",
+               https://statac.dev/reference/page/#toc describes.",
 };
 
 pub(super) static EXTENSIONS: FindingKind = FindingKind {

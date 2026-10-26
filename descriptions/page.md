@@ -10,7 +10,7 @@ The page's title: its `title`, or if it has none, the `# heading` its
 content opens with. If the page has neither, `title` has no value, so to
 show the name of any page, write `headline(page)`.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/templates/#write
 
 ## `url`
 
@@ -18,13 +18,13 @@ The URL the page is published at, starting with `/`, such as
 `/posts/post-1/`. If the site's `url` has a path, such as
 `https://example.org/blog/`, the URL starts with that path, `/blog/`.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/addresses/#made
 
 ## `slug`
 
 The last part of the page's URL: `post-1` for `/posts/post-1/`.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/addresses/#name
 
 ## `date`
 
@@ -32,7 +32,7 @@ The page's `date`, with its `year`, `month`, `day` and `weekday`. On its
 own, it shows in the site's date format. If the page has no `date`, it
 has no value, and neither does a list's paginated page.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/dates-and-languages/#how-dates-look
 
 ## `updated`
 
@@ -40,7 +40,7 @@ The page's `updated` date. On its own, it shows in the site's date
 format. If the page has no `updated`, it has no value, and neither does
 a list's paginated page.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/dates-and-languages/#how-dates-look
 
 ## `summary`
 
@@ -48,15 +48,13 @@ The page's `summary`, as written. If the page has none, `summary` has no
 value, and `page.opening` has the words of its first paragraph
 instead.
 
-More: https://statac.dev/templates/#what-a-template-sees
-
 ## `content`
 
 The page's content, built into HTML. It is empty on a list's paginated
 page. When another page shows it, such as a list or a feed, Statac
 writes its relative URLs in full.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/templates/#write
 
 ## `excerpt`
 
@@ -64,21 +62,19 @@ The start of the page's content, built into HTML: everything before its
 `<!--more-->` line, or if it has none, its first paragraph. If the page
 has neither, `excerpt` has no value.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/writing/#excerpts
 
 ## `excerpt_marked`
 
 `true` if the page's excerpt ends at a `<!--more-->` line, and `false`
 if it is the first paragraph.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/writing/#excerpts
 
 ## `opening`
 
 The words of the page's first paragraph, as text with no markup. If the
 page has no paragraph, `opening` has no value.
-
-More: https://statac.dev/templates/#what-a-template-sees
 
 ## `word_count`
 
@@ -86,21 +82,17 @@ The number of words in the page's content, not counting code blocks and
 footnote markers. In Chinese and Japanese, each character
 counts as a word.
 
-More: https://statac.dev/templates/#what-a-template-sees
-
 ## `maths`
 
 `true` if the page's content has maths in it, so a layout can add the
 maths stylesheet only where it is needed.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/writing/#maths
 
 ## `toc`
 
 The page's headings, each with its `title`, `id`, `url`, `level` and the
 headings under it as `headings`. Empty if the page has no headings.
-
-More: https://statac.dev/templates/#what-a-template-sees
 
 ## `language`
 
@@ -128,21 +120,21 @@ The page's tags, each a list with its `name`, `url` and `posts`.
 `"Rust" in page.tags` is `true` if the page has that tag, whatever
 capitals it is written with.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/lists/#lists-in-templates
 
 ## `series`
 
 The series the page is in, as a list with its `name`, `url` and `posts`.
 If the page isn't in a series, `series` has no value.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/lists/#lists-in-templates
 
 ## `folder`
 
 The folder the page is in, as a list with its `name`, `url` and
 `posts`.
 
-More: https://statac.dev/templates/#what-a-template-sees
+More: https://statac.dev/lists/#lists-in-templates
 
 ## `list`
 
@@ -199,8 +191,6 @@ The file Statac read the page from, starting from the site's folder:
 `content/posts/post-1.md`. A page Statac makes, such as a tag's page,
 has no `source`.
 
-More: https://statac.dev/templates/#what-a-template-sees
-
 ## `og_title`
 
 The page's name where it is shared: its `og_title`, or if it has none,
@@ -239,7 +229,7 @@ Called as `page.image("photo-1.jpg")`, an image beside the page, with
 needs. The call also takes `sizes`, `full=true` and
 `decorative=true`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/pictures/#pictures-in-templates-and-snippets
 
 ## `images`
 
@@ -249,28 +239,28 @@ as `page.images()`, every JPEG, PNG and WebP beside a page that has a
 folder of its own, in file name order. Animated images and other kinds,
 such as GIFs and SVGs, are left out.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/pictures/#pictures-in-templates-and-snippets
 
 ## `file`
 
 Called as `page.file("notes-1.pdf")`, any file beside the page, with
 `url`, `name`, `size` in bytes, `text`, `code` and `language`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#files-videos-and-recordings
 
 ## `video`
 
 Called as `page.video("video-1.mp4")`, a video beside the page, with
 `src` and `type`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#video
 
 ## `audio`
 
 Called as `page.audio("recording-1.m4a")`, a recording beside the page,
 with `src` and `type`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#video
 
 ## `youtube`
 
@@ -278,7 +268,7 @@ Called as `page.youtube(url)`, where `url` is a YouTube video's URL or
 its id on its own: the video, with `id`, `start`, `embed` and
 `thumbnail`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#youtube
 
 ## `vimeo`
 
@@ -286,134 +276,134 @@ Called as `page.vimeo(url)`, where `url` is a Vimeo video's URL or its
 id on its own: the video, with `id`, `start`, `embed` and
 `thumbnail`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#youtube
 
 ## `untitled`
 
 `true` if the page's `untitled` says it is meant to have no title.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/lists/#pages-without-titles
 
 ## `draft`
 
 `true` if the page is a draft. Only `statac serve` builds drafts.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/lists/#drafts-and-posts-waiting-for-their-day
 
 ## `layout`
 
 The `layout` the page names, or the one cascaded to it, as written. If
 neither names one, `layout` has no value.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/templates/#which
 
 ## `type`
 
 The page's `type`, as written. If the page has no `type`, it has no
 value.
 
-More: https://statac.dev/front-matter/#page-fields
+More: https://statac.dev/templates/#which
 
 ## `permalink`
 
 The page's `permalink`, as written: a URL or a pattern. `page.url` is
 where the page is published.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/addresses/#permalink
 
 ## `redirect_from`
 
 The old URLs the page's `redirect_from` lists, as written.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/addresses/#redirect-from
 
 ## `redirect_to`
 
 The URL the page's `redirect_to` names, as written.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/addresses/#sending-readers-on
 
 ## `needs`
 
 `url` if the page's front matter has `needs: url`.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
 
 ## `translation_key`
 
 The page's `translation_key`, as written.
 
-More: https://statac.dev/front-matter/#address-fields
+More: https://statac.dev/dates-and-languages/#translations
 
 ## `neighbours`
 
 The page's `neighbours`, as written: `site`, `folder`, `series` or
 `false`. If the page has none, it has no value.
 
-More: https://statac.dev/front-matter/#list-fields
+More: https://statac.dev/lists/#previous-and-next
 
 ## `each`
 
 On a page that makes pages, its `each`, as written: `data.people` or
 `site.posts`.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/data/#pages-made-from-data
 
 ## `order`
 
 On a list page, its `order`, as written. `page.list.order` is the order
 the list runs in.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#order
 
 ## `numbered`
 
 On a folder's page, its `numbered`, as written.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#numbered-folders
 
 ## `posts_per_page`
 
 On a list page, its `posts_per_page`, as written. If the page doesn't
 write one, it has no value.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#pages-of-a-list
 
 ## `index_page`
 
 On a list page, its `index_page`, as written.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/lists/#a-lists-page
 
 ## `feed`
 
 On a list page, its `feed`, as written: `true`, `false`, or the name or
 URL of a feed. `page.list.feed` is the URL of the list's feed.
 
-More: https://statac.dev/front-matter/#list-page-fields
+More: https://statac.dev/feeds/#which-lists-have-a-feed
 
 ## `id`
 
 The post's `id` in a feed, as written. `feed_id(page)` returns the id
 every post has, whether or not it writes one.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/feeds/#entry-ids
 
 ## `search`
 
 `false` if the page's `search` leaves it out of the site's search.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/search/#leave-out
 
 ## `og_image`
 
 The page's `og_image`, as written: the social image used in place of a
 card.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/sharing-cards/#a-picture-of-your-own
 
 ## `mentions`
 
 `true` if the page's `mentions` asks for its webmentions to be shown.
 
-More: https://statac.dev/front-matter/#sharing-fields
+More: https://statac.dev/webmentions/#webmentions-in-a-layout

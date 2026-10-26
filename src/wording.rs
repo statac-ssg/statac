@@ -35,7 +35,7 @@ pub(crate) const FOR_ONE_LANGUAGE: &str =
     "https://statac.dev/dates-and-languages/#settings-for-one-language";
 
 /// Where the docs say more of a custom setting.
-pub(crate) const OWN_VALUE: &str = "https://statac.dev/settings/#your-own";
+pub(crate) const OWN_VALUE: &str = "https://statac.dev/settings/";
 
 /// Where the docs say more of a custom field.
 pub(crate) const OWN_FIELD: &str = "https://statac.dev/front-matter/#your-own";

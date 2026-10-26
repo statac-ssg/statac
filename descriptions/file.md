@@ -8,26 +8,26 @@ video or recording that `page.video` or `page.audio` returns.
 
 The file's URL, to link to.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#files-videos-and-recordings
 
 ## `name`
 
 The file's name, such as `notes-1.pdf`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#files-videos-and-recordings
 
 ## `size`
 
 The file's size in bytes.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#files-videos-and-recordings
 
 ## `text`
 
 The file's contents as text, for a file of UTF-8 text. With `safe`, an
 SVG's markup goes into the page itself.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#files-videos-and-recordings
 
 ## `code`
 
@@ -37,24 +37,24 @@ file's language, which Statac works out from the file's name. If `code_colours` 
 the text as written. Empty for a file over 200,000 bytes or one that
 isn't UTF-8 text.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#a-file-shown-as-code
 
 ## `language`
 
 The file's language, worked out from its name and written the way a code
 block names it. Empty if Statac has no colours for that language.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#a-file-shown-as-code
 
 ## `src`
 
 The URL of the video or recording, for the `src` of a `<source>`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#files-videos-and-recordings
 
 ## `type`
 
 The media type of the video or recording, for the `type` of a
 `<source>`: `video/mp4` for `video-1.mp4`.
 
-More: https://statac.dev/templates/#files
+More: https://statac.dev/videos/#files-videos-and-recordings
