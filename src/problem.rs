@@ -774,7 +774,11 @@ pub enum Kind {
     /// `statac explain` with no name after it.
     MissingName,
     /// `statac search` given no words to search for.
-    NothingToSearch,
+    /// `statac search` given no words, or only a site's folder, by its
+    /// path as written, which reads as the words.
+    NothingToSearch {
+        site: Option<String>,
+    },
     /// A folder or path given on the command line that holds bytes that
     /// aren't UTF-8, as the system's reading of it shows them replaced.
     UnreadableName {
@@ -2999,7 +3003,7 @@ impl Kind {
             Kind::OptionGivenTwice { .. } => Code::OptionGivenTwice,
             Kind::UnexpectedArgument { .. } => Code::UnexpectedArgument,
             Kind::MissingName => Code::MissingName,
-            Kind::NothingToSearch => Code::NothingToSearch,
+            Kind::NothingToSearch { .. } => Code::NothingToSearch,
             Kind::UnreadableName { .. } => Code::UnreadableName,
             Kind::UnusableName { .. } => Code::UnusableName,
             Kind::MissingFile { .. } => Code::MissingFile,

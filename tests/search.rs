@@ -869,3 +869,22 @@ fn a_link_to_the_script_reading_an_index_some_page_asks_for_lands() {
         "{said}"
     );
 }
+
+/// A site's folder given alone would be read as the words, so it is told,
+/// with the words first, in the order every other command takes the
+/// folder.
+#[test]
+fn a_sites_folder_given_alone_is_told_to_come_after_the_words() {
+    let site = Site::new("folder-alone");
+    let (said, code) = site.run(&["search"]);
+    assert_eq!(code, 1, "{said}");
+    let folder = site.root.display().to_string();
+    assert_eq!(
+        said,
+        format!(
+            "error  Nothing to search for: `{folder}` is a site's folder, not words\n  \
+             Give the words first, then the folder, as `statac search \"raspberry pi\" \
+             {folder}`.\n  More: https://statac.dev/e/nothing-to-search/\n"
+        )
+    );
+}

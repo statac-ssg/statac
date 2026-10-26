@@ -128,8 +128,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::OptionGivenTwice { option } => format!("Option given twice: `{option}`"),
         Kind::UnexpectedArgument { written, .. } => format!("Unexpected argument: `{written}`"),
         Kind::MissingName => "Missing name: `statac explain` needs the name of a problem".into(),
-        Kind::NothingToSearch => {
+        Kind::NothingToSearch { site: None } => {
             "Nothing to search for: `statac search` needs the words to look for".into()
+        }
+        Kind::NothingToSearch { site: Some(site) } => {
+            format!("Nothing to search for: `{site}` is a site's folder, not words")
         }
         Kind::UnreadableName { written } => {
             format!("Unreadable name: `{written}` holds bytes that aren't UTF-8")
@@ -2530,9 +2533,12 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }),
         Kind::OptionGivenTwice { .. } => Some("Keep one of them.".into()),
         Kind::MissingName => Some("The name is the last part of a problem's `More:` link.".into()),
-        Kind::NothingToSearch => {
+        Kind::NothingToSearch { site: None } => {
             Some("Give them after the command, as `statac search \"raspberry pi\"`.".into())
         }
+        Kind::NothingToSearch { site: Some(site) } => Some(format!(
+            "Give the words first, then the folder, as `statac search \"raspberry pi\" {site}`."
+        )),
         Kind::UnreadableName { .. } => None,
         Kind::UnusableName { .. } => Some("Name the folder without it.".into()),
         Kind::MissingFile { hint, .. } => hint.as_ref().map(|hint| match hint {
@@ -8373,9 +8379,18 @@ mod tests {
                 Some("The name is the last part of a problem's `More:` link."),
             ),
             (
-                Kind::NothingToSearch,
+                Kind::NothingToSearch { site: None },
                 "Nothing to search for: `statac search` needs the words to look for",
                 Some("Give them after the command, as `statac search \"raspberry pi\"`."),
+            ),
+            (
+                Kind::NothingToSearch {
+                    site: Some("sites/blog".into()),
+                },
+                "Nothing to search for: `sites/blog` is a site's folder, not words",
+                Some(
+                    "Give the words first, then the folder, as `statac search \"raspberry pi\" sites/blog`.",
+                ),
             ),
             (
                 Kind::UnreadableName {

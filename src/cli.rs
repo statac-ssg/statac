@@ -404,6 +404,16 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
         let badge = crate::report::badge(terminal.colour_out, command);
         say(terminal.out, &badge);
     }
+    let given_alone = match &request {
+        Request::Search(options) => search::folder_for_words(options),
+        _ => None,
+    };
+    if let Some(problem) = given_alone {
+        let sources = Sources::default();
+        let report = Report::new(&sources, Path::new(""), terminal.colour_out);
+        say(terminal.out, &report.problems(&[problem]));
+        return 1;
+    }
     if let Some(site) = site_of(&mut request)
         && let Err(problem) = find_site(site)
     {
@@ -984,7 +994,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
         problems.push(Problem::nowhere(Kind::MissingName));
     }
     if known == Some("search") && words.is_none_or(|words| words.trim().is_empty()) {
-        problems.push(Problem::nowhere(Kind::NothingToSearch));
+        problems.push(Problem::nowhere(Kind::NothingToSearch { site: None }));
     }
     if known == Some("import") && !old_named {
         problems.push(Problem::nowhere(Kind::MissingFolder));

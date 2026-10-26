@@ -31,7 +31,9 @@ use crate::html::{Markup, markup};
 use crate::site::{LanguageId, ListKey, Page, PageId, Site};
 use crate::templates::Renderer;
 
-pub use command::{Options, Outcome, Results, SHOWN, Shown, code, excerpt, results, run};
+pub use command::{
+    Options, Outcome, Results, SHOWN, Shown, code, excerpt, folder_for_words, results, run,
+};
 pub use files::{File, claims, entry, folder};
 pub use kept::Kept;
 pub use why::{Counted, Stands, Why};

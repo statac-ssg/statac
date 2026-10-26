@@ -20,6 +20,12 @@ Without words, there is nothing to look for.
 Give the words after `statac search`. Put them in quotes when there are
 several, so they arrive as one search.
 
+To search a site in another folder, give the words first and the folder
+after them: `statac search "raspberry pi" ~/sites/blog`. Every other
+command takes the folder straight after its name, so `statac search
+~/sites/blog` reads naturally, but there the folder is the words, and
+Statac says so.
+
 ## Example
 
 ```text

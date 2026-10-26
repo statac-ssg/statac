@@ -69,6 +69,18 @@ impl Outcome {
     }
 }
 
+/// Where `options` name no folder and the words are a site's folder, as
+/// every other command takes it, what says the words go first.
+pub fn folder_for_words(options: &Options) -> Option<Problem> {
+    let words = options.words.trim();
+    let site = std::path::Path::new(words).join(crate::config::FILE_NAME);
+    (options.site.as_os_str().is_empty() && site.is_file()).then(|| {
+        Problem::nowhere(Kind::NothingToSearch {
+            site: Some(words.to_owned()),
+        })
+    })
+}
+
 pub fn run(options: &Options) -> Outcome {
     if let Err(problem) = crate::build::a_folder(&options.site) {
         return Outcome {
