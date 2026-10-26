@@ -200,7 +200,12 @@ mod tests {
             assert_eq!(sorted(names(group).into_iter()).len(), all, "{group:?}");
             assert!(!group.title().is_empty() && !group.about().is_empty());
         }
-        let lines = ["fields.<name>", "types.<type>.<name>", "pages.<field>"];
+        let lines = [
+            "fields.<name>",
+            "types.<type>.<name>",
+            "pages.<field>",
+            "<language>.<setting>",
+        ];
         let settings = crate::config::setting_names().chain(lines);
         assert_eq!(names(Group::Settings), sorted(settings));
         let fields = PageWord::all().map(PageWord::name);

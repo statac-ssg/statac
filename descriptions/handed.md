@@ -186,15 +186,16 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 In `code.html`, the first word after the opening fence, or if a file's
 name is there, the language its name stands for. Empty if the fence
-names neither.
+names neither, and if the line after the fence starts with a quote.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `caption`
 
 In `code.html`, the rest of the opening fence's line after the language,
-or the whole line if it starts with a file's name. Empty if there is
-nothing more.
+or the whole line if it starts with a file's name or a quote. A caption
+in quotes, such as `rust "The example"`, is handed without them. Empty if
+there is nothing more.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
@@ -228,7 +229,8 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 In `footnotes.html`, what a screen reader says for the link back to the
 text: `back to the text` in English, or else the language's
-`back_to_the_text` line.
+`back_to_the_text` line. Empty in another language whose file has no
+such line.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 

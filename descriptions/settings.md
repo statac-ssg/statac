@@ -289,6 +289,15 @@ it.
 
 More: https://statac.dev/front-matter/#handing-down
 
+## `<language>.<setting>`
+
+On a site in several languages, `title` or `date_format` for one of them
+alone: the language's code as `language` lists it, a dot, then the
+setting, such as `en.title: Notes` or `en-NZ.date_format: 31 Dec 2025`.
+The setting without a language holds for the others.
+
+More: https://statac.dev/dates-and-languages/#settings-for-one-language
+
 ## `fields.<name>`
 
 The kind of value a custom field takes, with `required` before it if
