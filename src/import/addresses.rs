@@ -771,6 +771,8 @@ pub(super) struct Checked {
     /// Each template the site's pages and feeds are built with that it
     /// doesn't have, by its path, in order.
     pub templates: Vec<String>,
+    /// Whether any of `templates` is one a feed is built with.
+    pub for_feeds: bool,
     /// Whether the site asks for a feed and has no `url`, which every feed
     /// needs.
     pub feeds_need_url: bool,
@@ -782,12 +784,14 @@ pub(super) struct Checked {
 /// old site's built output where it is there, among what it publishes and
 /// sends on from, and checks it as `statac check` does. The site has no
 /// templates yet, so a missing one is told of in [`Checked::templates`]
-/// and not among the errors.
+/// and not among the errors, a feed's by the one in `feed_templates`
+/// where it is among those the feed looks for.
 pub(super) fn check(
     folder: &Path,
     today: Date,
     old: &[(String, String)],
     feeds: &[(String, String)],
+    feed_templates: &[String],
     lists: &[(String, String)],
     built: Option<&Path>,
 ) -> Checked {
@@ -820,6 +824,7 @@ pub(super) fn check(
         unworked: Vec::new(),
         errors: Vec::new(),
         templates: Vec::new(),
+        for_feeds: false,
         feeds_need_url: !written.is_empty() && read.settings.text("url").is_none(),
     };
     let answered = |address: &str| {
@@ -884,16 +889,21 @@ pub(super) fn check(
     for problem in &outcome.problems {
         let template = match &problem.kind {
             Kind::MissingTemplate { path, .. } => path,
-            // A JSON feed is built with `templates/feed.json`, and any other
-            // with the last looked for, `templates/feed.xml`.
+            // A feed is built with the template the reader named for its
+            // format, a JSON feed otherwise with `templates/feed.json`, and
+            // any other with the last looked for, `templates/feed.xml`.
             Kind::FeedNotWritten {
                 why: Unwritten::NoTemplate(paths),
                 ..
             } => match (paths.iter())
-                .find(|path| *path == "templates/feed.json")
+                .find(|path| feed_templates.contains(path))
+                .or_else(|| paths.iter().find(|path| *path == "templates/feed.json"))
                 .or(paths.last())
             {
-                Some(path) => path,
+                Some(path) => {
+                    checked.for_feeds = true;
+                    path
+                }
                 None => continue,
             },
             _ => continue,

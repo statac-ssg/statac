@@ -218,6 +218,10 @@ pub struct Import {
     /// Addresses the old site published a feed at that its templates
     /// made, each with the old file it was made from.
     pub feeds: Vec<(String, String)>,
+    /// The template the report names for each feed asked for whose format
+    /// the reader knows, by its path, as `templates/index.xml` for an RSS
+    /// feed at `index.xml`.
+    pub feed_templates: Vec<String>,
     /// The tool's own built output, by its path in the old site, where
     /// it is there.
     pub built: Option<String>,

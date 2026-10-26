@@ -1,6 +1,6 @@
 This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/zola-feeds/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/. Its pages and feeds need `templates/feed.xml`.
+It was made from `tests/import/zola-feeds/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/. Its pages and feeds need `templates/feed.xml` and `templates/rss.xml`.
 
 ## What came across
 
@@ -13,7 +13,7 @@ Zola has no setting for a time zone, and reads a date written without an offset 
 
 Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
-Zola's feeds, at `/posts/atom.xml`, `/posts/rss.xml`, `/atom.xml` and `/rss.xml`, each stay at the same URL, as `feed:` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` and `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. `rss.xml` needs `templates/rss.xml`: until you add it, it is built with `templates/feed.xml`, in the same format as `atom.xml`. The docs have an Atom template and an RSS template to copy: see https://statac.dev/feeds/#the-template.
+Zola's feeds, at `/posts/atom.xml`, `/posts/rss.xml`, `/atom.xml` and `/rss.xml`, each stay at the same URL, as `feed:` on each list page says, built with `templates/feed.xml` and `templates/rss.xml` once you add them, and `feed_ids_before` and `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. Copy the docs' Atom template as `templates/feed.xml` and its RSS template as `templates/rss.xml`: see https://statac.dev/feeds/#the-template.
 
 The settings written in `statac.yaml`:
 

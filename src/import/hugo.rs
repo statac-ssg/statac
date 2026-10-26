@@ -15,7 +15,9 @@ mod writing;
 use std::collections::HashSet;
 use std::path::Path;
 
-use super::common::{front, joined, last, names_in, parent, text_of, texts_of};
+use super::common::{
+    feed_templates, feed_templates_said, front, joined, last, names_in, parent, text_of, texts_of,
+};
 use super::inside;
 use super::report::code;
 use super::{
@@ -23,7 +25,7 @@ use super::{
 };
 use crate::content::slug;
 use crate::date::{self, Date};
-use crate::problem::{Kind, Problem, Reason};
+use crate::problem::{FeedFormat, Kind, Problem, Reason};
 use settings::{Settings, get, truth_of};
 use url::Pieces;
 
@@ -1710,9 +1712,13 @@ impl Reader<'_> {
             self.import.words.push((format!("{prefix}index.md"), word));
             feed_addresses.push(format!("/{prefix}{name}"));
         }
+        // Hugo's feeds are RSS.
+        let feeds = vec![(name.clone(), Some(FeedFormat::Rss))];
+        let template = feed_templates(&feeds).swap_remove(0);
         let fed = !feed_addresses.is_empty();
         if fed {
             self.import.addresses.extend(feed_addresses);
+            self.import.feed_templates.push(template.clone());
             self.import
                 .settings
                 .push(("feed_ids_before".into(), Value::Text(self.today.iso_day())));
@@ -1724,13 +1730,16 @@ impl Reader<'_> {
             (true, false) => "the home page",
             _ => "each list page",
         };
+        let copies =
+            (feed_templates_said(&[feeds])).map_or(String::new(), |said| format!(" {said}"));
         let (now, kept) = (
             "stays",
             format!(
-                "at the same URL, as `feed: {name}` on {on} says, built with \
-                     `templates/feed.xml` once you add it, and `feed_ids_before` and \
-                     `feed_ids_from: hugo` keep each post's id the URL Hugo gave it, so feed \
-                     readers see nothing new: see https://statac.dev/feeds/#entry-ids."
+                "at the same URL, as `feed: {name}` on {on} says, built with {} once you add \
+                 it, and `feed_ids_before` and `feed_ids_from: hugo` keep each post's id the URL \
+                 Hugo gave it, so feed readers see nothing new: see \
+                 https://statac.dev/feeds/#entry-ids.{copies}",
+                code(&template)
             ),
         );
         let mut said = match (fed, home, lists) {

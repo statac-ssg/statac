@@ -1,6 +1,6 @@
 This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/zola-config-toml/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/. Its pages and feeds need `templates/feed.xml`.
+It was made from `tests/import/zola-config-toml/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/. Its pages and feeds need `templates/rss.xml`.
 
 ## What came across
 
@@ -14,7 +14,7 @@ Zola's settings left straight quotes, `--` and `...` as typed, so `typography: f
 
 Zola shows all of a list's pages on one page unless its list page gives `paginate_by`, and Statac does the same unless it gives `posts_per_page`.
 
-Zola's feed, at `/rss.xml`, stays at the same URL, as `feed:` on each list page says, built with `templates/feed.xml` once you add it, and `feed_ids_before` and `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids.
+Zola's feed, at `/rss.xml`, stays at the same URL, as `feed:` on each list page says, built with `templates/rss.xml` once you add it, and `feed_ids_before` and `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. Copy the docs' RSS template as `templates/rss.xml`: see https://statac.dev/feeds/#the-template.
 
 The settings written in `statac.yaml`:
 

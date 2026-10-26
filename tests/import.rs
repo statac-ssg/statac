@@ -616,7 +616,7 @@ fn a_feed_the_import_asks_for_is_kept_at_its_url_with_no_template_or_site_url() 
                 ("hugo.toml", "title = \"Site 1\"\n".into()),
                 ("content/posts/post-1.md", post.into()),
             ],
-            "templates/feed.xml",
+            "templates/index.xml",
             false,
         ),
         (
@@ -3083,12 +3083,13 @@ fn zola_feeds_stay_at_their_old_addresses() {
     assert_eq!(fixture("zola-feeds"), [BUILT, NO_FEED]);
 }
 
-/// A list asking for several feeds, from Zola's `feed_filenames` or from
-/// Eleventy's RSS plugin: the report names each feed that is built with
-/// the template another feed of another kind is built with, until the site
-/// has a template named for it.
+/// Feeds from Zola's `feed_filenames` or from Eleventy's RSS plugin: the
+/// report names the template for each feed's format, an RSS feed's named
+/// as its file, and each feed built with the template another feed of
+/// another format is, until the site has a template named for it; and
+/// where either is, or a feed is RSS, where the docs' templates are.
 #[test]
-fn a_feed_built_with_the_template_of_another_kind_is_named() {
+fn each_feed_is_told_the_template_for_its_format() {
     let needs = |name: &str, kept: &str| {
         format!(
             "`{name}` needs `templates/{name}`: until you add it, it is built with \
@@ -3139,36 +3140,67 @@ fn a_feed_built_with_the_template_of_another_kind_is_named() {
             ),
         ]
     };
-    // (the case, the old site's files, what is said of each feed so built)
-    type Case<'a> = (&'a str, Vec<(&'a str, String)>, &'a [String]);
+    let see = "see https://statac.dev/feeds/#the-template.";
+    let both = |atom: &str, rss: &str| {
+        format!(
+            "Copy the docs' Atom template as `templates/{atom}` and its RSS template as \
+             `templates/{rss}`: {see}"
+        )
+    };
+    let rss = format!("Copy the docs' RSS template as `templates/rss.xml`: {see}");
+    let docs = format!("The docs have an Atom template and an RSS template to copy: {see}");
+    // (the case, the old site's files, the templates named for the feeds,
+    // what is said of each feed built with another's, and what is said of
+    // the docs' templates)
+    type Case<'a> = (
+        &'a str,
+        Vec<(&'a str, String)>,
+        &'a [&'a str],
+        &'a [String],
+        Option<String>,
+    );
     let cases: [Case; 9] = [
         (
             "zola-atom-rss",
             zola("\"atom.xml\", \"rss.xml\""),
-            &[needs("rss.xml", "atom.xml")],
+            &["feed.xml", "rss.xml"],
+            &[],
+            Some(both("feed.xml", "rss.xml")),
         ),
         (
             "zola-rss-atom",
             zola("\"rss.xml\", \"atom.xml\""),
-            &[needs("rss.xml", "atom.xml")],
+            &["rss.xml", "feed.xml"],
+            &[],
+            Some(both("feed.xml", "rss.xml")),
         ),
-        ("zola-atom", zola("\"atom.xml\""), &[]),
-        ("zola-rss", zola("\"rss.xml\""), &[]),
+        ("zola-atom", zola("\"atom.xml\""), &["feed.xml"], &[], None),
+        (
+            "zola-rss",
+            zola("\"rss.xml\""),
+            &["rss.xml"],
+            &[],
+            Some(rss.clone()),
+        ),
         (
             "eleventy-rss-atom",
             eleventy(&[
                 "{ type: \"rss\", outputPath: \"/rss.xml\" }",
                 "{ type: \"atom\", outputPath: \"/atom.xml\" }",
             ]),
-            &[needs("rss.xml", "atom.xml")],
+            &["rss.xml", "feed.xml"],
+            &[],
+            Some(both("feed.xml", "rss.xml")),
         ),
         (
-            "eleventy-feed-xml",
+            "eleventy-rss-feed-xml",
             eleventy(&[
                 "{ type: \"rss\", outputPath: \"/feed.xml\" }",
                 "{ type: \"atom\", outputPath: \"/atom.xml\" }",
             ]),
-            &[needs("atom.xml", "feed.xml")],
+            &["feed.xml", "atom.xml"],
+            &[],
+            Some(both("atom.xml", "feed.xml")),
         ),
         (
             "eleventy-atom-json",
@@ -3176,7 +3208,9 @@ fn a_feed_built_with_the_template_of_another_kind_is_named() {
                 "{ outputPath: \"/feed.xml\" }",
                 "{ type: \"json\", outputPath: \"/feed.json\" }",
             ]),
+            &["feed.xml", "feed.json"],
             &[],
+            None,
         ),
         (
             "eleventy-atom-atom",
@@ -3184,7 +3218,9 @@ fn a_feed_built_with_the_template_of_another_kind_is_named() {
                 "{ outputPath: \"/feed.xml\" }",
                 "{ type: \"atom\", outputPath: \"/atom.xml\" }",
             ]),
+            &["feed.xml"],
             &[],
+            None,
         ),
         (
             "eleventy-unknown",
@@ -3192,12 +3228,12 @@ fn a_feed_built_with_the_template_of_another_kind_is_named() {
                 "{ outputPath: \"/feed.xml\" }",
                 "{ type: process.env.TYPE, outputPath: \"/other.xml\" }",
             ]),
+            &["feed.xml"],
             &[needs("other.xml", "feed.xml")],
+            Some(docs.clone()),
         ),
     ];
-    let docs = "The docs have an Atom template and an RSS template to copy: see \
-                https://statac.dev/feeds/#the-template.";
-    for (label, files, said) in cases {
+    for (label, files, templates, said, end) in cases {
         let top = scratch(&format!("feed-built-alike-{label}"));
         let old = top.join("old");
         for (path, text) in files {
@@ -3209,6 +3245,15 @@ fn a_feed_built_with_the_template_of_another_kind_is_named() {
         let (code, told) = import(&old, &new, None);
         assert_eq!(code, 0, "{label}: {told}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        let named: Vec<String> = (templates.iter())
+            .map(|name| format!("`templates/{name}`"))
+            .collect();
+        let added = match named.len() {
+            1 => "it",
+            _ => "them",
+        };
+        let built = format!("built with {} once you add {added},", named.join(" and "));
+        assert!(report.contains(&built), "{label}: {built}\n{report}");
         for sentence in said {
             assert_eq!(
                 report.matches(sentence.as_str()).count(),
@@ -3221,7 +3266,14 @@ fn a_feed_built_with_the_template_of_another_kind_is_named() {
             said.len(),
             "{label}: {report}"
         );
-        assert_eq!(report.contains(docs), !said.is_empty(), "{label}: {report}");
+        let copies = report.matches(see).count();
+        match end {
+            Some(end) => {
+                assert_eq!(report.matches(end.as_str()).count(), 1, "{label}: {report}");
+                assert_eq!(copies, 1, "{label}: {report}");
+            }
+            None => assert_eq!(copies, 0, "{label}: {report}"),
+        }
     }
 }
 

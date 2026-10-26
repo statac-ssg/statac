@@ -17,8 +17,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::common::{
-    counted, feeds_built_alike, glob_matches, joined, last, listed, mapping, names_in, parent,
-    text_of,
+    counted, feed_templates, feed_templates_said, glob_matches, joined, last, listed, mapping,
+    names_in, parent, text_of,
 };
 use super::inside;
 use super::report::code;
@@ -2722,9 +2722,7 @@ impl Reader<'_> {
             "The settings' `feedPlugin`, from Eleventy's RSS plugin, made {}.",
             listed(&made)
         );
-        let asked: Vec<String> = (self.plugin_feeds.iter())
-            .map(|(address, _)| address.clone())
-            .collect();
+        let asked = self.plugin_feeds.clone();
         let (shown, templates) = self.ask(&asked);
         let mut note = format!(
             "{lead} {} at the same URL, as {shown} in `statac.yaml` says, built with {} once you \
@@ -2744,7 +2742,7 @@ impl Reader<'_> {
         let feeds: Vec<(String, Option<FeedFormat>)> = (self.plugin_feeds.iter())
             .map(|(address, kind)| (last(address).to_owned(), *kind))
             .collect();
-        if let Some(alike) = feeds_built_alike(&[feeds]) {
+        if let Some(alike) = feed_templates_said(&[feeds]) {
             note.push(' ');
             note.push_str(&alike);
         }
@@ -2752,11 +2750,12 @@ impl Reader<'_> {
         notes.extend(twice);
     }
 
-    /// Asks for the site's feed at each of `addresses`, the first being the
-    /// one its pages link to, giving the setting as shown and the templates
-    /// the feeds are built with.
-    fn ask(&mut self, addresses: &[String]) -> (String, Vec<String>) {
-        let (value, shown) = match addresses {
+    /// Asks for the site's feed at each address of `feeds`, the first being
+    /// the one its pages link to, each with its format where known, giving
+    /// the setting as shown and the templates the feeds are built with.
+    fn ask(&mut self, feeds: &[(String, Option<FeedFormat>)]) -> (String, Vec<String>) {
+        let addresses: Vec<String> = feeds.iter().map(|(address, _)| address.clone()).collect();
+        let (value, shown) = match addresses.as_slice() {
             [only] if *only == format!("/{}", crate::feeds::FILE_NAME) => {
                 (Value::Truth(true), code("feed: true"))
             }
@@ -2769,17 +2768,17 @@ impl Reader<'_> {
         self.import
             .settings
             .push((crate::feeds::SETTING.into(), value));
+        let named: Vec<(String, Option<FeedFormat>)> = (feeds.iter())
+            .map(|(address, format)| (last(address).to_owned(), *format))
+            .collect();
         let mut templates = Vec::new();
-        for address in addresses {
-            let template = match address.to_ascii_lowercase().ends_with(".json") {
-                true => code("templates/feed.json"),
-                false => code("templates/feed.xml"),
-            };
+        for template in feed_templates(&named) {
             if !templates.contains(&template) {
                 templates.push(template);
             }
         }
-        self.import.addresses.extend_from_slice(addresses);
-        (shown, templates)
+        self.import.feed_templates.extend(templates.iter().cloned());
+        self.import.addresses.extend(addresses);
+        (shown, templates.iter().map(|t| code(t)).collect())
     }
 }

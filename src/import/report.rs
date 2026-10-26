@@ -153,13 +153,9 @@ pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
     ));
     if !summary.templates.is_empty() {
         let templates: Vec<String> = summary.templates.iter().map(|t| code(t)).collect();
-        let feeds = summary
-            .templates
-            .iter()
-            .any(|t| t.starts_with("templates/feed."));
         text.push_str(&format!(
             " Its pages{} need {}.",
-            if feeds { " and feeds" } else { "" },
+            if summary.for_feeds { " and feeds" } else { "" },
             crate::wording::listed(&templates)
         ));
     }

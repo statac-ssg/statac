@@ -15,8 +15,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::common::{
-    counted, feeds_built_alike, fields, front, glob_matches, joined, last, listed, names_in,
-    parent, text_of, texts_of,
+    counted, feed_templates, feed_templates_said, fields, front, glob_matches, joined, last,
+    listed, names_in, parent, text_of, texts_of,
 };
 use super::inside;
 use super::report::code;
@@ -1281,14 +1281,27 @@ impl Reader<'_> {
                 1 => ("feed", "stays"),
                 _ => ("feeds", "each stay"),
             };
+            let mut templates: Vec<String> = Vec::new();
+            for template in lists.iter().flat_map(|feeds| feed_templates(feeds)) {
+                if !templates.contains(&template) {
+                    templates.push(template);
+                }
+            }
+            let shown_templates: Vec<String> = templates.iter().map(|t| code(t)).collect();
             let mut note = format!(
                 "Zola's {feeds}, at {}, {are} at the same URL, as `feed:` on each list page says, \
-                 built with `templates/feed.xml` once you add it, and `feed_ids_before` and \
-                 `feed_ids_from: zola` keep each post's id the URL Zola gave it, so feed \
-                 readers see nothing new: see https://statac.dev/feeds/#entry-ids.",
-                listed(&shown)
+                 built with {} once you add {}, and `feed_ids_before` and `feed_ids_from: zola` \
+                 keep each post's id the URL Zola gave it, so feed readers see nothing new: see \
+                 https://statac.dev/feeds/#entry-ids.",
+                listed(&shown),
+                listed(&shown_templates),
+                match templates.len() {
+                    1 => "it",
+                    _ => "them",
+                }
             );
-            if let Some(alike) = feeds_built_alike(&lists) {
+            self.import.feed_templates.extend(templates);
+            if let Some(alike) = feed_templates_said(&lists) {
                 note.push(' ');
                 note.push_str(&alike);
             }

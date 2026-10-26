@@ -327,45 +327,88 @@ pub(super) fn listed(items: &[String]) -> String {
     }
 }
 
-/// What is said of each feed of a list in `lists`, each feed by its file
-/// name and its kind where known, that is built with the template another
-/// of the list's feeds is, of another kind or of a kind not known, until
-/// the site has a template named for it; none where no feed is. A template
-/// so shared is taken to be for the feed named as it, or else the first
-/// of the kind the docs' template of that name is, Atom for `feed.xml` and
-/// JSON for `feed.json`, or else the first.
-pub(super) fn feeds_built_alike(lists: &[Vec<(String, Option<FeedFormat>)>]) -> Option<String> {
-    // The template a feed is built with where the site has only
-    // `templates/feed.xml` and `templates/feed.json`.
-    let general = |name: &str| {
+/// The template the report names for each of `feeds`, a list's feeds by
+/// their file names and their formats where known: for an RSS feed the one
+/// named as its file, as `templates/rss.xml`, and for any other the one
+/// `templates/feed.xml` or `templates/feed.json` would be where the site has
+/// only those, the docs' `feed.xml` being Atom, unless an RSS feed's is
+/// that one, when it too is the one named as its file.
+pub(super) fn feed_templates(feeds: &[(String, Option<FeedFormat>)]) -> Vec<String> {
+    let looked = |name: &str, has: &dyn Fn(&str) -> bool| {
         let address = Address::read_file(&format!("/{name}")).ok()?;
-        crate::feeds::template(&address, &|t| matches!(t, "feed.xml" | "feed.json"))
+        crate::feeds::template(&address, has)
     };
+    let own = |name: &str| looked(name, &|_| true);
+    let rss: Vec<String> = (feeds.iter())
+        .filter(|(_, format)| *format == Some(FeedFormat::Rss))
+        .filter_map(|(name, _)| own(name))
+        .collect();
+    (feeds.iter())
+        .map(|(name, format)| {
+            let template = match format {
+                Some(FeedFormat::Rss) => own(name),
+                _ => looked(name, &|t| matches!(t, "feed.xml" | "feed.json"))
+                    .filter(|template| !rss.contains(template))
+                    .or_else(|| own(name)),
+            };
+            format!(
+                "templates/{}",
+                template.as_deref().unwrap_or(crate::feeds::FILE_NAME)
+            )
+        })
+        .collect()
+}
+
+/// What is said of the templates for the feeds of each list in `lists`,
+/// each feed by its file name and its format where known, as
+/// [`feed_templates`] names them: of each feed built with the template
+/// another of the list's feeds is, of another format or of one not known,
+/// until the site has a template named for it; and which of the docs'
+/// templates to copy as which where any feed is RSS, or else where they
+/// are where any feed is so built; none where nothing is. A template so
+/// shared is taken to be for the feed named as it, or else the first of
+/// the format the docs' template of that name is, Atom for `feed.xml` and
+/// JSON for `feed.json`, or else the first.
+pub(super) fn feed_templates_said(lists: &[Vec<(String, Option<FeedFormat>)>]) -> Option<String> {
     let mut sentences: Vec<String> = Vec::new();
+    // The templates to copy from the docs' Atom and RSS templates.
+    let (mut atom, mut rss): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
     for feeds in lists {
-        let built: Vec<(&str, Option<FeedFormat>, String)> = (feeds.iter())
-            .filter_map(|(name, kind)| Some((name.as_str(), *kind, general(name)?)))
+        let templates = feed_templates(feeds);
+        let built: Vec<(&str, Option<FeedFormat>, &String)> = (feeds.iter().zip(&templates))
+            .map(|((name, format), template)| (name.as_str(), *format, template))
             .collect();
-        for (name, kind, template) in &built {
-            let alike: Vec<_> = built.iter().filter(|(.., t)| t == template).collect();
+        for &(name, format, template) in &built {
+            let copies = match format {
+                Some(FeedFormat::Atom) => Some(&mut atom),
+                Some(FeedFormat::Rss) => Some(&mut rss),
+                _ => None,
+            };
+            if let Some(copies) = copies
+                && !copies.contains(template)
+            {
+                copies.push(template.clone());
+            }
+            let alike: Vec<_> = built.iter().filter(|(.., t)| *t == template).collect();
             let docs = match template.as_str() {
-                "feed.json" => FeedFormat::Json,
+                "templates/feed.json" => FeedFormat::Json,
                 _ => FeedFormat::Atom,
             };
-            let Some(&&(kept, kept_kind, _)) = (alike.iter().find(|(n, ..)| n == template))
-                .or_else(|| alike.iter().find(|(_, k, _)| *k == Some(docs)))
+            let Some(&&(kept, kept_format, _)) = (alike.iter())
+                .find(|(n, ..)| format!("templates/{n}") == *template)
+                .or_else(|| alike.iter().find(|(_, f, _)| *f == Some(docs)))
                 .or(alike.first())
             else {
                 continue;
             };
-            if *name == kept || (kept_kind.is_some() && *kind == kept_kind) {
+            if name == kept || (kept_format.is_some() && format == kept_format) {
                 continue;
             }
             let sentence = format!(
                 "{} needs {}: until you add it, it is built with {}, in the same format as {}.",
                 code(name),
                 code(&format!("templates/{name}")),
-                code(&format!("templates/{template}")),
+                code(template),
                 code(kept)
             );
             if !sentences.contains(&sentence) {
@@ -373,11 +416,24 @@ pub(super) fn feeds_built_alike(lists: &[Vec<(String, Option<FeedFormat>)>]) -> 
             }
         }
     }
-    (!sentences.is_empty()).then(|| {
-        format!(
-            "{} The docs have an Atom template and an RSS template to copy: see \
-             https://statac.dev/feeds/#the-template.",
-            sentences.join(" ")
-        )
-    })
+    let shown = |templates: &[String]| {
+        let shown: Vec<String> = templates.iter().map(|t| code(t)).collect();
+        listed(&shown)
+    };
+    let see = "https://statac.dev/feeds/#the-template";
+    match (atom.is_empty(), rss.is_empty()) {
+        (_, false) => sentences.push(match atom.is_empty() {
+            true => format!("Copy the docs' RSS template as {}: see {see}.", shown(&rss)),
+            false => format!(
+                "Copy the docs' Atom template as {} and its RSS template as {}: see {see}.",
+                shown(&atom),
+                shown(&rss)
+            ),
+        }),
+        _ if !sentences.is_empty() => sentences.push(format!(
+            "The docs have an Atom template and an RSS template to copy: see {see}."
+        )),
+        _ => {}
+    }
+    (!sentences.is_empty()).then(|| sentences.join(" "))
 }

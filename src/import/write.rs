@@ -256,6 +256,8 @@ pub(super) struct Summary {
     /// The templates the new site's pages and feeds are built with that it
     /// doesn't have, by their paths.
     pub templates: Vec<String>,
+    /// Whether any of `templates` is one a feed is built with.
+    pub for_feeds: bool,
     /// Whether the new site asks for a feed and has no `url`, which every
     /// feed needs.
     pub feeds_need_url: bool,
@@ -434,6 +436,7 @@ pub(super) fn write<'a>(
         term_pages,
         term_lists,
         feeds,
+        feed_templates,
         built,
         output,
         mut findings,
@@ -682,6 +685,7 @@ pub(super) fn write<'a>(
         today,
         &worked_out,
         &feeds,
+        &feed_templates,
         &term_lists,
         built_at.as_deref(),
     );
@@ -721,6 +725,7 @@ pub(super) fn write<'a>(
     }
     summary.errors = checked.errors.len();
     summary.templates = checked.templates;
+    summary.for_feeds = checked.for_feeds;
     summary.feeds_need_url = checked.feeds_need_url;
     findings.extend(
         checked
