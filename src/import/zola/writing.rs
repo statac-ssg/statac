@@ -735,7 +735,8 @@ pub(super) fn paired(body: &str) -> Vec<String> {
     names
 }
 
-fn options() -> Options {
+/// The Markdown Zola reads.
+pub(super) fn options() -> Options {
     Options::ENABLE_TABLES
         | Options::ENABLE_FOOTNOTES
         | Options::ENABLE_STRIKETHROUGH

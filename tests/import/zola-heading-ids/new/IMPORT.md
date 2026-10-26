@@ -16,6 +16,8 @@ Zola shows all of a list's pages on one page unless its list page gives `paginat
 
 Statac wrote the id Zola gave 7 headings after each in braces, as `## C++ & C# {#c-c}` in `content/page-1.md`, where Statac's own id would differ, so a link to one by its old id still lands.
 
+Zola gave each footnote its label as its id, as `#1` for `[^1]`, or `#fn-1` under `bottom_footnotes`, and Statac numbers them, as `#note-1`, so a link from elsewhere to a footnote in 1 page, `content/page-2.md`, lands at the top of the page.
+
 The settings written in `statac.yaml`:
 
 ```yaml

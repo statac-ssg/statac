@@ -3005,6 +3005,44 @@ fn an_old_address_the_new_site_cant_publish_at_is_told_of_once_as_unkept() {
     }
 }
 
+/// The report says Zola's footnote ids aren't kept where a page has a
+/// footnote, naming the first, and says nothing of them where none has.
+#[test]
+fn zolas_footnote_ids_are_said_not_to_be_kept() {
+    let config = (
+        "config.toml",
+        "base_url = \"https://example.org\"\ntitle = \"x\"\n",
+    );
+    let footnoted = "+++\ntitle = \"a\"\ndate = 2026-01-01\n+++\nA claim.[^1]\n\n[^1]: A source.\n";
+    let plain = "+++\ntitle = \"b\"\ndate = 2026-01-02\n+++\nNo notes.\n";
+    let said = "Zola gave each footnote its label as its id, as `#1` for `[^1]`, or `#fn-1` under \
+                `bottom_footnotes`, and Statac numbers them, as `#note-1`, so a link from \
+                elsewhere to a footnote in 1 page, `content/a.md`, lands at the top of the page.";
+    for (label, pages, told) in [
+        (
+            "footnoted",
+            vec![("content/a.md", footnoted), ("content/b.md", plain)],
+            true,
+        ),
+        ("plain", vec![("content/b.md", plain)], false),
+    ] {
+        let top = scratch(&format!("zola-footnotes-{label}"));
+        let old = top.join("old");
+        for (path, text) in std::iter::once(config).chain(pages) {
+            let path = old.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let new = top.join("new");
+        let (code, said_out) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {said_out}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert_eq!(report.contains(said), told, "{label}: {report}");
+        let any = report.contains("Zola gave each footnote");
+        assert_eq!(any, told, "{label}: {report}");
+    }
+}
+
 #[test]
 fn zola_settings_are_read_from_zola_toml_or_config_toml() {
     assert_eq!(fixture("zola-settings"), [BUILT]);

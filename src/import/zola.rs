@@ -1566,7 +1566,13 @@ impl Reader<'_> {
         let mut headings_kept = 0;
         // The first heading given Zola's id, and its file.
         let mut ids_kept: Option<(String, String)> = None;
+        // The files of the pages with footnotes.
+        let mut footnoted: Vec<String> = Vec::new();
         for doc in &docs {
+            let mut events = pulldown_cmark::Parser::new_ext(&doc.body, writing::options());
+            if events.any(|event| matches!(event, pulldown_cmark::Event::FootnoteReference(_))) {
+                footnoted.push(format!("content/{}", doc.to));
+            }
             let reading = match reading {
                 Reading::Template if self.ignored(&skip, &doc.rel) => Reading::AsWritten,
                 reading => reading,
@@ -1599,6 +1605,17 @@ impl Reader<'_> {
                 counted(headings_kept, "heading", "headings"),
                 code(&line),
                 code(&file),
+            ));
+        }
+        if let Some(first) = footnoted.first() {
+            let pages = match footnoted.len() {
+                1 => format!("1 page, {},", code(first)),
+                n => format!("{n} pages, such as {},", code(first)),
+            };
+            self.note(format!(
+                "Zola gave each footnote its label as its id, as `#1` for `[^1]`, or `#fn-1` \
+                 under `bottom_footnotes`, and Statac numbers them, as `#note-1`, so a link from \
+                 elsewhere to a footnote in {pages} lands at the top of the page."
             ));
         }
         for (doc, (writing, called)) in docs.into_iter().zip(written) {
