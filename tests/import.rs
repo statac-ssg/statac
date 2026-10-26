@@ -2855,6 +2855,10 @@ fn an_old_address_the_new_site_cant_publish_at_is_told_of_once_as_unkept() {
             "content/posts/a.md",
             "---\ntitle: a\ndate: 2026-01-01\ntags: [\"C#\"]\n---\na\n",
         ),
+        (
+            "content/posts/p#q.md",
+            "---\ntitle: b\ndate: 2026-01-02\n---\nb\n",
+        ),
     ];
     // Each site, what the tool published for it, and what can't be kept.
     for (at, (files, built, unkept)) in [
@@ -2885,13 +2889,15 @@ fn an_old_address_the_new_site_cant_publish_at_is_told_of_once_as_unkept() {
                 "public/posts/a/index.html",
                 "public/posts/index.html",
                 "public/posts/index.xml",
+                "public/posts/p#q/index.html",
                 "public/sitemap.xml",
                 "public/tags/c#/index.html",
                 "public/tags/c#/index.xml",
                 "public/tags/index.html",
                 "public/tags/index.xml",
             ][..],
-            "This old URL can't be kept: the new site can't redirect from it.\n\n\
+            "These old URLs can't be kept: the new site can't redirect from them.\n\n\
+             - `/posts/p#q/`, for `content/posts/p#q.md`: `#` can't be in a name\n\
              - `/tags/c#/`: `#` can't be in a name\n",
         ),
     ]
@@ -2919,6 +2925,7 @@ fn an_old_address_the_new_site_cant_publish_at_is_told_of_once_as_unkept() {
             !report.contains("Nothing in the new site is published at these old URLs"),
             "{at}: {report}"
         );
+        checked(&new);
     }
 }
 

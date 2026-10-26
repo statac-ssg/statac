@@ -177,6 +177,11 @@ pub(super) fn keep(
             && landed.get(&page.to).map(|(at, _)| at) != Some(old)
         {
             let whole = page.address.clone().unwrap_or_default();
+            // An address the new site can't publish at leaves the page at
+            // its own, and the check tells the old one as unkept.
+            if Address::read(&whole).is_err() {
+                continue;
+            }
             match from_its_language(&page.to, &whole, others) {
                 Some(written) => {
                     page.front
