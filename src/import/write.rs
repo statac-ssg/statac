@@ -471,6 +471,7 @@ pub(super) fn write<'a>(
         address: address.clone(),
         languages,
         timezone,
+        feeds: !feeds.is_empty() || asks_for_feeds(&settings, &pages, &words, &written),
     };
     let made = new::make(Maker::Import, folder, &answers)?;
     let mut out = Out {
@@ -764,6 +765,42 @@ pub(super) fn write<'a>(
     let document = report::document(shown, &summary);
     out.put(REPORT, document.as_bytes())?;
     Ok(summary)
+}
+
+/// Whether feeds come across with the new site: it asks for one anywhere,
+/// in its settings, on a page, in the lines a folder's page cascades or in
+/// a page written whole, or keeps the ids an old feed gave its posts.
+fn asks_for_feeds(
+    settings: &[(String, Value)],
+    pages: &[Page],
+    words: &[(String, Field)],
+    written: &[(String, String)],
+) -> bool {
+    let asks = |name: &str, value: &Value| {
+        matches!(name, "feed" | "pages.feed")
+            && !matches!(value, Value::Truth(false) | Value::Nothing)
+    };
+    let front_asks = |text: &str| {
+        let front = text
+            .strip_prefix("---\n")
+            .and_then(|rest| rest.split("\n---").next());
+        front.is_some_and(|front| {
+            front.lines().any(|line| {
+                let value = line
+                    .strip_prefix("feed:")
+                    .or_else(|| line.strip_prefix("pages.feed:"));
+                value.is_some_and(|value| !matches!(value.trim(), "" | "false"))
+            })
+        })
+    };
+    let kept_ids = settings.iter().any(|(name, _)| name == "feed_ids_before");
+    kept_ids
+        || settings.iter().any(|(name, value)| asks(name, value))
+        || (pages.iter().flat_map(|page| &page.front)).any(|field| asks(&field.name, &field.value))
+        || words
+            .iter()
+            .any(|(_, field)| asks(&field.name, &field.value))
+        || (written.iter()).any(|(path, text)| path.ends_with(".md") && front_asks(text))
 }
 
 /// Whether an author's own value reads in `statac.yaml` as one of the

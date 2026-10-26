@@ -119,6 +119,9 @@ pub struct Answers {
     /// The zone the site's times are in, by its name in the time zone
     /// database.
     pub timezone: Option<String>,
+    /// Whether feeds came across with an imported site, whose ids are made
+    /// from the key it is then given.
+    pub feeds: bool,
 }
 
 /// What [`make`] wrote.
@@ -253,6 +256,7 @@ impl Defaults {
             address: None,
             languages: vec![self.language.clone()],
             timezone: self.timezone.clone(),
+            feeds: false,
         }
     }
 }
@@ -410,6 +414,7 @@ fn ask(defaults: &Defaults, mut asking: Asking) -> Result<Answers, String> {
         address,
         languages,
         timezone,
+        feeds: false,
     })
 }
 
@@ -698,7 +703,7 @@ const FEED_KEY_COMMENT: &str =
     "# What each post's id in a feed is made from: never change it once a feed is published.";
 
 /// `statac.yaml` for a site answered as `answers`, made `by` a command:
-/// what was answered, and for an imported site, whose feeds came across
+/// what was answered, and for an imported site whose feeds came across
 /// with it, the key its feeds' ids are made from.
 fn settings(answers: &Answers, by: Maker) -> String {
     let language = match answers.languages.as_slice() {
@@ -718,7 +723,7 @@ fn settings(answers: &Answers, by: Maker) -> String {
             answers.timezone.as_deref().map(yaml::write::text),
         ),
     ];
-    if by == Maker::Import {
+    if by == Maker::Import && answers.feeds {
         lines.push(("feed_key", Some(crate::feeds::mint_key())));
     }
     let mut text = String::new();

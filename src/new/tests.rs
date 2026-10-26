@@ -77,6 +77,7 @@ fn answers(languages: &[&str], address: Option<&str>) -> Answers {
         address: address.map(str::to_owned),
         languages: languages.iter().map(|tag| (*tag).to_owned()).collect(),
         timezone: None,
+        feeds: false,
     }
 }
 
@@ -465,10 +466,15 @@ fn the_settings_written_read_back_with_no_problem_for_every_combination() {
         for address in [None, Some("https://example.org")] {
             for timezone in [None, Some("Europe/London")] {
                 for author in [None, Some("A. Author: 1")] {
-                    for by in [Maker::New, Maker::Import] {
+                    for (by, feeds) in [
+                        (Maker::New, false),
+                        (Maker::Import, false),
+                        (Maker::Import, true),
+                    ] {
                         let mut answers = answers(languages, address);
                         answers.timezone = timezone.map(str::to_owned);
                         answers.author = author.map(str::to_owned);
+                        answers.feeds = feeds;
                         let text = settings(&answers, by);
                         let mut sources = Sources::default();
                         let source = sources.add(config::FILE_NAME, text.clone());
@@ -489,7 +495,7 @@ fn the_settings_written_read_back_with_no_problem_for_every_combination() {
                         assert_eq!(read.text("timezone").map(|zone| zone.value), timezone);
                         // Only an imported site's feeds came with it.
                         let keyed = read.text("feed_key").is_some();
-                        assert_eq!(keyed, by == Maker::Import, "{text}");
+                        assert_eq!(keyed, by == Maker::Import && feeds, "{text}");
                     }
                 }
             }
@@ -516,7 +522,8 @@ fn no_setting_is_written_at_statacs_own_value() {
 #[test]
 fn two_imported_sites_have_different_feed_keys() {
     let (one, two) = (scratch("key-1"), scratch("key-2"));
-    let answers = answers(&["en"], None);
+    let mut answers = answers(&["en"], None);
+    answers.feeds = true;
     make(Maker::Import, &one, &answers).unwrap();
     make(Maker::Import, &two, &answers).unwrap();
     assert_ne!(feed_key(&one), feed_key(&two));

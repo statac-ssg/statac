@@ -755,7 +755,11 @@ fn an_eleventy_site_keeps_its_posts_ids_where_its_rss_plugin_gave_them() {
             );
         }
 
-        let added = "url: https://example.org\nfeed: true\n";
+        // A site whose feed didn't come across is given no key.
+        let keyed = settings.contains("\nfeed_key: ");
+        assert_eq!(keyed, label != "none", "{label}: {settings}");
+        let key = if keyed { "" } else { "feed_key: key\n" };
+        let added = format!("url: https://example.org\nfeed: true\n{key}");
         fs::write(new.join("statac.yaml"), format!("{settings}{added}")).unwrap();
         templated(&new);
         let feed = "<feed>{% for post in posts %}<id>{{ feed_id(post) }}</id>{% endfor %}</feed>\n";
