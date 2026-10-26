@@ -30,7 +30,7 @@ use super::Feed;
 use super::ids::{entry_id, is_a_feed_id, kept_id};
 use crate::album::{KEPT, escaped, make_kept, unescaped};
 use crate::config::Settings;
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::dates::Dates;
 use crate::problem::{Kind, Problem};
 use crate::site::{Item, Made, Page, PageId, SentTo, Site};

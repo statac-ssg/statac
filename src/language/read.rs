@@ -93,7 +93,7 @@ fn read_file(
         }
     };
     for entry in entries {
-        let key = crate::content::words::key_name(&entry.key);
+        let key = crate::config::words::key_name(&entry.key);
         let file = File {
             sources,
             key: &key,
@@ -358,7 +358,7 @@ impl File<'_> {
         };
         let mut problems = Vec::new();
         for entry in entries {
-            let key = crate::content::words::key_name(&entry.key);
+            let key = crate::config::words::key_name(&entry.key);
             let reader = Reader::new(self.sources, &key);
             let pattern = match key.as_str() {
                 "full" => &mut onto.full,

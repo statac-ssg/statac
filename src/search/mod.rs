@@ -26,7 +26,7 @@ use std::sync::{Arc, OnceLock};
 
 use rayon::prelude::*;
 
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::html::{Markup, markup};
 use crate::site::{LanguageId, ListKey, Page, PageId, Site};
 use crate::templates::Renderer;

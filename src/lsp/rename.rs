@@ -13,8 +13,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::references;
-use crate::content::address::{Address, is_full};
-use crate::content::words::PageWord;
+use crate::address::{Address, is_full};
+use crate::config::words::PageWord;
 use crate::content::{self, Run, Texts};
 use crate::links;
 use crate::origin::{Arrival, Sourced};

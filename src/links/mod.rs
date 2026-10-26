@@ -36,11 +36,11 @@ use std::collections::{HashMap, HashSet};
 pub(crate) use resolve::Site;
 pub(crate) use scan::{Attribute, Linked, handed, written, written_in_html};
 
-use crate::content::address::{self, Address};
-use crate::content::slug;
+use crate::address::{self, Address};
 use crate::problem::{Kind, Problem};
 use crate::reads::{Key, Reads, Translation};
 use crate::site::{PageId, TemplateId};
+use crate::slug;
 use crate::source::Place;
 use crate::templates::{Own, Renderer};
 use resolve::{Arrival, Leads};

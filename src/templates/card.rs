@@ -21,13 +21,13 @@ use super::frame::{self, Frame, Making};
 use super::render::{Shared, met_building};
 use super::values::{Ordered, PageValue, SiteValue};
 use super::{Templates, explain, media};
+use crate::address::is_full;
 use crate::album::Seen;
 use crate::cards::draw::{Failure, Key as CardKey, Kit, KitFailure, Plan, Text};
 use crate::cards::keep::{Store, Wanted, kept_as};
 use crate::cards::layout::{self, FLOOR};
 use crate::cards::{self, Colour, HEIGHT, Placement, Size, WIDTH};
-use crate::content::address::is_full;
-use crate::content::words::{self, PageWord};
+use crate::config::words::{self, PageWord};
 use crate::origin::{Arrival, Sourced};
 use crate::pictures::{self, Kind as PictureKind};
 use crate::problem::{

@@ -293,12 +293,12 @@ impl Pictures {
     /// from the page. None for an address elsewhere, or one that reaches
     /// no picture.
     pub fn find(&self, written: &str, from: &From<'_>) -> Option<Found> {
-        if written.is_empty() || content::address::is_full(written) || written.starts_with('#') {
+        if written.is_empty() || crate::address::is_full(written) || written.starts_with('#') {
             return None;
         }
         let end = written.find(['?', '#']).unwrap_or(written.len());
         let (path, rest) = written.split_at(end);
-        let name = content::address::decoded(path);
+        let name = crate::address::decoded(path);
         let source = match name.strip_prefix('/') {
             Some(_) => {
                 let inside = match from.base.is_empty() {
@@ -353,7 +353,7 @@ impl Pictures {
             if !is_picture(word) {
                 continue;
             }
-            let word = content::address::decoded(word);
+            let word = crate::address::decoded(word);
             let name = word.rsplit('/').next().unwrap_or(&word);
             found.extend(self.by_name.get(name).into_iter().flatten());
         }
@@ -600,7 +600,7 @@ pub fn read(
                         picture: format!("content/{picture}"),
                         nearest,
                     },
-                    content::words::head(&read.sources, source),
+                    crate::config::words::head(&read.sources, source),
                 ));
             }
         }

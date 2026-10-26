@@ -4,8 +4,8 @@
 
 use std::marker::PhantomData;
 
-use crate::content::address::Address;
-use crate::content::words::Words;
+use crate::address::Address;
+use crate::config::words::Words;
 use crate::date::Date;
 use crate::origin::Sourced;
 use crate::problem::{Held, Named, Word};
@@ -222,7 +222,7 @@ impl Page {
     pub fn head(&self, sources: &crate::source::Sources) -> Option<Place> {
         match &self.made {
             Some(made) => Some(made.head),
-            None => Some(crate::content::words::head(sources, self.source?)),
+            None => Some(crate::config::words::head(sources, self.source?)),
         }
     }
 
@@ -231,7 +231,7 @@ impl Page {
         !self.sends_on()
             && self
                 .words
-                .get(crate::content::words::PageWord::Each)
+                .get(crate::config::words::PageWord::Each)
                 .is_some_and(|each| each.origin.arrival == crate::origin::Arrival::Written)
     }
 
@@ -239,7 +239,7 @@ impl Page {
     /// standing at a list's address, or one naming the posts it lists or
     /// making a page per item.
     pub fn speaks_for_a_list(&self) -> bool {
-        use crate::content::words::PageWord;
+        use crate::config::words::PageWord;
         self.speaks_for.is_some()
             || matches!(self.place, PagePlace::Folder | PagePlace::Made)
             || [PageWord::Posts, PageWord::Each].into_iter().any(|word| {
@@ -255,14 +255,14 @@ impl Page {
     pub fn lands(&self) -> bool {
         !self.sends_on()
             && !(self.speaks_for_a_list()
-                && self.words.truth(crate::content::words::PageWord::IndexPage) == Some(false))
+                && self.words.truth(crate::config::words::PageWord::IndexPage) == Some(false))
     }
 
     /// Whether the page sends readers on with `redirect_to`, publishing
     /// a redirect at its address and nothing else.
     pub fn sends_on(&self) -> bool {
         self.words
-            .text(crate::content::words::PageWord::RedirectTo)
+            .text(crate::config::words::PageWord::RedirectTo)
             .is_some()
     }
 }

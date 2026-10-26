@@ -11,9 +11,9 @@ use super::writing::{self, Settled};
 use super::{
     Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Value, addresses, yaml,
 };
+use crate::address;
 use crate::config;
-use crate::content::address;
-use crate::content::words::{self, OTHER_SPELLINGS, STATAC_FILLS};
+use crate::config::words::{self, OTHER_SPELLINGS, STATAC_FILLS};
 use crate::date::Date;
 use crate::new::{self, Answers};
 use crate::platform;

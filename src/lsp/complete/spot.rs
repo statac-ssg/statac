@@ -4,7 +4,7 @@
 
 use std::ops::Range;
 
-use crate::content::words::key_name;
+use crate::config::words::key_name;
 use crate::source::{Place, Sources};
 use crate::yaml::{Node, Value};
 

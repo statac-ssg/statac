@@ -16,7 +16,7 @@ use super::data::FolderValue;
 use super::frame::{self, Frame};
 use super::values::{self, Lists, PageValue, SiteValue};
 use super::{Chosen, Renderer};
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::described::Described;
 use crate::language::Direction;
 use crate::problem::Holds;

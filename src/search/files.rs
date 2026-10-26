@@ -33,7 +33,7 @@ use std::fmt::Write as _;
 use rayon::prelude::*;
 
 use super::{Index, Kept, Place, Times};
-use crate::content::address::Top;
+use crate::address::Top;
 use crate::problem::Named;
 use crate::site::{LanguageId, Site};
 use crate::templates::Renderer;

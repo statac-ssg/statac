@@ -14,7 +14,7 @@ use super::frame;
 use super::guard::{self, Callee, Input};
 use super::render::Shared;
 use super::values::{DateValue, Group, ListValue, Lists, Over, PageValue, Pages, Which};
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::date::Date;
 use crate::dates::ShowDates;
 use crate::highlight::{self, Language};
@@ -806,7 +806,7 @@ pub(super) fn origin_of(url: &str) -> &str {
 /// An address in the site made whole, its path spelled as it travels.
 fn absolute_one(address: &str, origin: &str) -> String {
     match address.starts_with('/') && !address.starts_with("//") {
-        true => crate::content::address::whole(address, origin),
+        true => crate::address::whole(address, origin),
         false => address.to_owned(),
     }
 }

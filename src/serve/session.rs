@@ -15,7 +15,7 @@ use rayon::prelude::*;
 use crate::album::{KEPT, Progress};
 use crate::build::incremental::{self, Kept, Reading, Rebuilding, Rebuilt};
 use crate::build::{self, Built, Mode, Options, Output, Plan, Publishing, Remembered, Writes};
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::disk::{Clock, Inventory};
 use crate::hooks::Before;
 use crate::problem::Occupant;

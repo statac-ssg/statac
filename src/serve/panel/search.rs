@@ -4,7 +4,7 @@
 use rayon::prelude::*;
 
 use super::{Built, VERSION};
-use crate::content::address::on_the_wire;
+use crate::address::on_the_wire;
 use crate::json;
 use crate::report::{Report, shown};
 use crate::search::{self, Asked, Index, Shown};

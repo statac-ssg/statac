@@ -209,7 +209,7 @@ pub(crate) fn read(
         // The writing's `@url(...)` is Statac's own, and calls no snippet.
         if name == crate::markdown::IN_SITE {
             let kind = crate::problem::Kind::ReservedName { name: name.clone() };
-            let head = crate::content::words::head(sources, file.source);
+            let head = crate::config::words::head(sources, file.source);
             told.push((at, Problem::at(kind, head)));
         }
         let (wrapped, params): (Vec<String>, Vec<String>) = ast
@@ -610,7 +610,7 @@ fn never_shown(
 /// has an address, and of no page that is built. The templates a page
 /// naming none is built with are left out, being any page's.
 fn layouts_only_needing_url(site: &Site) -> BTreeSet<String> {
-    use crate::content::words::PageWord;
+    use crate::config::words::PageWord;
     let name = |layout: &str| files::named(layout).to_owned();
     let mut waiting: BTreeSet<String> = site
         .layouts_needing_url
@@ -629,7 +629,7 @@ fn layouts_only_needing_url(site: &Site) -> BTreeSet<String> {
 }
 
 fn schema(site: &Site, settings: &Settings) -> Schema {
-    use crate::content::words::PageWord;
+    use crate::config::words::PageWord;
     let mut schema = Schema::new();
     let pages = Ty::List(Box::new(Ty::Record(Rec::Page)));
     let total = site.pages.len();

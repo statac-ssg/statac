@@ -13,7 +13,7 @@ use rayon::prelude::*;
 
 use super::complete::template::{Pointed, pointed};
 use super::hover::Goes;
-use crate::content::address;
+use crate::address;
 use crate::links;
 use crate::site::{PageId, SentTo};
 use crate::source::{Place, Span};

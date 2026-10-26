@@ -20,7 +20,7 @@ mod tests;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::problem::{Kind, Problem, Translated};
 use crate::site::{Id, Item, LanguageId, ListKey, PageId, PagePlace, Site};
 use crate::source::{Place, Sources};

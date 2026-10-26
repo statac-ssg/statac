@@ -18,7 +18,7 @@ use super::values::{ListValue, PageValue, SiteValue};
 use super::{Templates, explain};
 use crate::assets::Assets;
 use crate::config::Settings;
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::dates::Dates;
 use crate::highlight::{self, Highlighter, Language};
 use crate::markdown::{self, Piece, PieceValue, Placement, Within};
@@ -209,7 +209,7 @@ impl Shared {
     /// The page published at `address`, or the page whose list's later
     /// page is published there. Which page stands where is known from the
     /// site's pages, which is recorded as read.
-    pub(super) fn standing_at(&self, address: &crate::content::address::Address) -> Option<PageId> {
+    pub(super) fn standing_at(&self, address: &crate::address::Address) -> Option<PageId> {
         frame::read(Key::Pages);
         let standing = self.standing.get_or_init(|| {
             let mut standing = HashMap::new();
@@ -358,7 +358,7 @@ impl Rendered {
                 layout: path.replace('\\', "/"),
                 pages: 1,
             };
-            let head = crate::content::words::head(&shared.sources, source);
+            let head = crate::config::words::head(&shared.sources, source);
             problems.push(met_building(Problem::at(kind, head), &frame));
         }
         let mut pages: Vec<PageId> = frame.reads.cards().collect();
@@ -945,7 +945,7 @@ impl Renderer {
         frame::read(Key::Setting(shared.name_id("url")));
         frame::read(Key::Field(page, shared.name_id("url")));
         let on_site = |address: String| match shared.settings.text("url") {
-            Some(url) => crate::content::address::whole(&address, super::own::origin_of(url.value)),
+            Some(url) => crate::address::whole(&address, super::own::origin_of(url.value)),
             None => address,
         };
         let (to, sent_to) = match &redirect.to {
@@ -1125,7 +1125,7 @@ fn refresh_alone(to: &str, redirect: &Redirect) -> Rendered {
 /// may be asked for: Statac's own words and settings, and every field the
 /// pages and settings write.
 fn known_names(settings: &Settings, site: &Site) -> Names {
-    use crate::content::words::PageWord;
+    use crate::config::words::PageWord;
     let mut names = Names::default();
     for word in PageWord::all() {
         names.intern(word.name());

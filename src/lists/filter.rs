@@ -5,7 +5,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeSet, HashSet};
 
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::problem::{Kind, Word};
 use crate::site::{Id, LanguageId, ListId, ListKey, Page, PageId, Site};
 use crate::value::Value;

@@ -1,10 +1,10 @@
 //! Where things land: addresses, the names a disk will write in them, and
 //! the pattern language `permalink` is written in.
 
-use super::slug::nfc;
 use crate::date::Date;
 use crate::platform::Unwritable;
 use crate::problem::{AddressFault, Kind, Problem, Word};
+use crate::slug::nfc;
 use crate::source::{Place, Span};
 
 /// The pieces a `permalink` pattern may ask for.
@@ -71,7 +71,7 @@ impl Address {
     /// else will stand, while the rest of the site is read.
     pub fn made(path: &str) -> Address {
         Address {
-            path: format!("/{}/", super::slug::made_slug(path)),
+            path: format!("/{}/", crate::slug::made_slug(path)),
             file: false,
         }
     }
@@ -444,7 +444,7 @@ impl Top {
             true => filled.to_owned(),
             false => format!(
                 "/{}{}",
-                super::slug::tidied_path(&self.folder),
+                crate::slug::tidied_path(&self.folder),
                 filled.trim_start_matches('/')
             ),
         }

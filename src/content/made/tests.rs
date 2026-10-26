@@ -1,5 +1,5 @@
 use super::super::{Read, Run, read};
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::origin::Arrival;
 use crate::problem::{AddressFault, Kind};
 use crate::site::{Item, ListKey, Page};

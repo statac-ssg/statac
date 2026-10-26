@@ -17,8 +17,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use super::session::{Read, Round, Took, held_back, is_page};
+use crate::address::on_the_wire;
 use crate::build::Outcome;
-use crate::content::address::on_the_wire;
 use crate::json;
 use crate::problem::Holds;
 use crate::problem::{Code, Kind, Problem, Severity};

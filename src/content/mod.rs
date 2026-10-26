@@ -6,20 +6,19 @@
 //! listed in the folder above, and its files travel with it. Other files
 //! are published beside the writing.
 
-pub mod address;
 mod made;
-pub mod slug;
 #[cfg(test)]
 mod tests;
 mod texts;
 mod translations;
-pub mod words;
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use rayon::prelude::*;
 
+use crate::address::{Address, Pieces, Top};
+use crate::config::words::{self, Holder, PageWord, Words};
 use crate::config::{self, Settings};
 use crate::date::{self, Date};
 use crate::dates::Dates;
@@ -34,9 +33,8 @@ use crate::site::{
 use crate::source::{Place, SourceId, Sources, Span};
 use crate::value::Value;
 use crate::yaml::Node;
-use address::{Address, Pieces, Top};
+use crate::{address, slug};
 pub(crate) use texts::Texts;
-use words::{Holder, PageWord, Words};
 
 /// What a run asks of reading the site.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]

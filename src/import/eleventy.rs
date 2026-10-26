@@ -25,7 +25,7 @@ use super::report::code;
 use super::{
     Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Unread, Value,
 };
-use crate::content::address::Address;
+use crate::address::Address;
 use crate::date::{self, Date};
 use crate::platform;
 use crate::problem::{FeedFormat, Kind, Problem, Reason};

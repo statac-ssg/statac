@@ -619,7 +619,7 @@ impl<'a> Report<'a> {
     /// Whether `place` is the whole first line of its file, which says no
     /// more than the file's name.
     pub(crate) fn whole(&self, place: Place) -> bool {
-        place == crate::content::words::head(self.sources, place.source)
+        place == crate::config::words::head(self.sources, place.source)
     }
 
     fn path(&self, id: SourceId) -> String {

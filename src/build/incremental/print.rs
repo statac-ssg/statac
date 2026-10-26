@@ -23,7 +23,7 @@ use rayon::prelude::*;
 
 use crate::album::Root;
 use crate::build::{Options, Output, Plan};
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::disk::{Clock, Stamp};
 use crate::origin::{Origin, Sourced};
 use crate::reads::{Key, Translation};

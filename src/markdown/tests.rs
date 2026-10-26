@@ -1784,7 +1784,7 @@ fn every_heading_is_given_an_id_a_link_can_land_on() {
             "parts-1-1",
             "привет-мир",
             "a----b_c",
-            &crate::content::slug::made_slug("content/post-1.md#7"),
+            &crate::slug::made_slug("content/post-1.md#7"),
             "note-1-1",
         ]
     );

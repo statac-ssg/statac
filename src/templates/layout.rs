@@ -16,7 +16,7 @@
 use super::Templates;
 use super::files::{Role, template_path};
 use super::render::Shared;
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::origin::{Arrival, Origin};
 use crate::problem::{Chooser, Kind, Problem};
 use crate::reads::Key;

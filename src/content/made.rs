@@ -15,9 +15,9 @@
 
 use std::collections::HashMap;
 
-use super::address::{self, Address, Pieces, Top};
-use super::words::{self, Holder, PageWord, Words};
 use super::{Reader, slug, writes_other_than_html};
+use crate::address::{self, Address, Pieces, Top};
+use crate::config::words::{self, Holder, PageWord, Words};
 use crate::data::{Data, Reached};
 use crate::origin::{Arrival, Sourced};
 use crate::problem::{AddressFault, Expected, Found, Kind, Problem, Requirer, Word, WrongPlace};

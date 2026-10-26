@@ -14,9 +14,9 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
+use crate::address::{on_the_wire, whole};
 use crate::config::Settings;
-use crate::content::address::{on_the_wire, whole};
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::dates::Dates;
 use crate::site::{Page, PageId, PagePlace, Site};
 

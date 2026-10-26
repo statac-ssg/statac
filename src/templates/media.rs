@@ -16,8 +16,8 @@ use super::check::{full_span, parse_template, place, visit_exprs};
 use super::frame;
 use super::render::{Shared, met_building};
 use super::values::node_value;
+use crate::address::{is_full, on_the_wire};
 use crate::album::{Picture, Root, Seen};
-use crate::content::address::{is_full, on_the_wire};
 use crate::fetched::stills;
 use crate::highlight::{self, Language};
 use crate::origin::Sourced;
@@ -427,7 +427,7 @@ fn missing<'a>(
     written: &str,
     beside: impl Iterator<Item = &'a str>,
 ) -> Kind {
-    let name = crate::content::address::decoded(written);
+    let name = crate::address::decoded(written);
     let folder = folder_of(shared, of).filter(|_| !name.starts_with('/'));
     let near = folder.and_then(|_| crate::suggest::nearest(&name, beside));
     let hint = near.map(|near| Hint::Closest(near.to_owned()));
@@ -850,7 +850,7 @@ impl OnDisk {
 /// in `static/`.
 pub(super) fn named(shared: &Shared, of: PageId, written: &str) -> Option<Named> {
     let site = &shared.site;
-    let name = crate::content::address::decoded(written);
+    let name = crate::address::decoded(written);
     let name = &name[..name.find(['?', '#']).unwrap_or(name.len())];
     let beside = |path: &str| {
         let at = shared.file_at(path)?;

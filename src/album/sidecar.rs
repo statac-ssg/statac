@@ -1,7 +1,7 @@
 //! The file describing a picture, beside it under `content/` and named
 //! after it: `photo-1.jpg.yaml` for `photo-1.jpg`.
 
-use crate::content::words::{Field, key_name};
+use crate::config::words::{Field, key_name};
 use crate::origin::Sourced;
 use crate::problem::{Expected, Problem};
 use crate::source::{SourceId, Sources};

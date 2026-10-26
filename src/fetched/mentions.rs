@@ -11,9 +11,9 @@
 use std::collections::{BTreeSet, HashMap};
 
 use super::refused::{Refused, SETTING};
+use crate::address::{Address, decoded};
 use crate::config::Settings;
-use crate::content::address::{Address, decoded};
-use crate::content::words::key_name;
+use crate::config::words::key_name;
 use crate::date::Date;
 use crate::problem::{Expected, Kind, Problem, Requirer, Waiting, Word};
 use crate::site::{PageId, Site};
@@ -479,7 +479,7 @@ fn mention(
             problems.push(problem);
         }
     }
-    let head = crate::content::words::head(sources, source);
+    let head = crate::config::words::head(sources, source);
     for (field, there) in [
         ("kind", kind.is_some()),
         ("url", texts.contains_key("url")),

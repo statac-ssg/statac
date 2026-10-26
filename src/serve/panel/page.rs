@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use super::pieced;
 use super::problems::lines;
-use crate::content::address::on_the_wire;
+use crate::address::on_the_wire;
 use crate::json;
 use crate::origin::Arrival;
 use crate::problem::Holds;

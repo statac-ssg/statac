@@ -1,5 +1,6 @@
 #![warn(unreachable_pub)]
 
+pub mod address;
 pub mod album;
 pub mod assets;
 pub mod build;
@@ -40,6 +41,7 @@ mod rewrite;
 pub mod search;
 pub mod serve;
 pub mod site;
+pub mod slug;
 pub mod source;
 pub mod stamp;
 mod suggest;

@@ -111,7 +111,7 @@ impl Declarations {
             && self.nests(name)
         {
             for entry in entries {
-                let path = format!("{name}.{}", crate::content::words::key_name(&entry.key));
+                let path = format!("{name}.{}", crate::config::words::key_name(&entry.key));
                 found.extend(self.naming_in(&path, &entry.value));
             }
         }
@@ -164,7 +164,7 @@ impl Declarations {
             self.types.entry(page_type.to_owned()).or_default();
         }
         let head = name.split('.').next().unwrap_or(name);
-        if name.is_empty() || crate::content::words::is_statacs(head) {
+        if name.is_empty() || crate::config::words::is_statacs(head) {
             return vec![Problem::at(
                 Kind::ReservedName {
                     name: format!("page.{head}"),
@@ -221,7 +221,7 @@ impl Declarations {
             && self.nests(name)
         {
             for entry in entries {
-                let path = format!("{name}.{}", crate::content::words::key_name(&entry.key));
+                let path = format!("{name}.{}", crate::config::words::key_name(&entry.key));
                 problems.extend(self.check_all(sources, &path, &entry.value));
             }
         }

@@ -283,7 +283,7 @@ fn the_layout_is_chosen_as_written_handed_down_typed_or_by_default() {
 
 #[test]
 fn the_names_said_to_choose_a_template_are_the_words_it_is_chosen_by() {
-    use crate::content::words::PageWord;
+    use crate::config::words::PageWord;
     let words: Vec<_> = (layout::CHOOSING.iter())
         .map(|name| PageWord::named(name))
         .collect();

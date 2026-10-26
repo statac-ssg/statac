@@ -81,7 +81,7 @@ pub(super) fn explain(error: &Error, frame: &mut Frame, callers: &[Place]) -> Ve
             && let Some(layout) = frame.layout
         {
             let source = shared.templates.files[layout].source;
-            let head = crate::content::words::head(&shared.sources, source);
+            let head = crate::config::words::head(&shared.sources, source);
             let kind = super::frame::ran_on(frame, layout);
             return vec![met_building(Problem::at(kind, head), frame)];
         }
@@ -423,7 +423,7 @@ fn instead(written: &str, frame: &Frame, handed: Option<&Handed>, miss: Option<&
             let page = value.downcast_object_ref::<PageValue>()?;
             let has = page.shared.site.pages.get(page.id);
             let found = has.words.field(field).is_some()
-                || crate::content::words::PageWord::named(field)
+                || crate::config::words::PageWord::named(field)
                     .is_some_and(|w| has.words.get(w).is_some())
                 || (field == "title" && has.title.is_some())
                 || (field == "date" && has.date.is_some());

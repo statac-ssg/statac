@@ -23,9 +23,9 @@ use super::report::code;
 use super::{
     Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, one_home_page,
 };
-use crate::content::slug;
 use crate::date::{self, Date};
 use crate::problem::{FeedFormat, Kind, Problem, Reason};
+use crate::slug;
 use settings::{Settings, get, truth_of};
 use url::Pieces;
 
@@ -1871,8 +1871,7 @@ impl Reader<'_> {
                         Some((_, pages)) => *pages += 1,
                         None => counts.push((address.clone(), 1)),
                     }
-                    let told =
-                        hugos.filter(|hugos| crate::content::address::name_fault(hugos).is_none());
+                    let told = hugos.filter(|hugos| crate::address::name_fault(hugos).is_none());
                     // A page whose name Statac can't take as a slug sends
                     // readers on from where it was.
                     let page = (plural.to_owned(), term.clone(), address.clone());

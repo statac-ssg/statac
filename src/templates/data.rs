@@ -161,7 +161,7 @@ fn value(node: &Node, file: DataId, origins: &mut frame::Origins) -> Value {
                 .iter()
                 .map(|entry| {
                     (
-                        crate::content::words::key_name(&entry.key),
+                        crate::config::words::key_name(&entry.key),
                         value(&entry.value, file, origins),
                     )
                 })

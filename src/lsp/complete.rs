@@ -15,7 +15,7 @@ use std::path::Path;
 use spot::Spot;
 
 use crate::config::declarations::{Declarations, FieldKind, KIND_WORDS, Names};
-use crate::content::words::{Holder, PageWord};
+use crate::config::words::{Holder, PageWord};
 use crate::problem::Code;
 use crate::site::{LanguageId, ListKey, PageId, PagePlace};
 use crate::source::{Place, Sources, Span};

@@ -5,8 +5,8 @@ use std::sync::OnceLock;
 
 use url::Url;
 
+use crate::address;
 use crate::config::Settings;
-use crate::content::address;
 
 /// What the built site holds, and what counts as the site, for following
 /// links.

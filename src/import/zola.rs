@@ -23,10 +23,10 @@ use super::report::code;
 use super::{
     Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Value, one_home_page,
 };
-use crate::content::address::{Address, name_fault};
-use crate::content::slug as statac_slug;
+use crate::address::{Address, name_fault};
 use crate::date::{self, Date};
 use crate::problem::{FeedFormat, Kind, Problem, Reason};
+use crate::slug as statac_slug;
 use settings::{Settings, Taxonomy};
 use slug::Strategy;
 use writing::Reading;

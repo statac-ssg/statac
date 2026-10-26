@@ -2,7 +2,7 @@
 //! as placed YAML. Each value carries its origin, so a value handed down
 //! from a folder still says where it was written.
 
-use super::address::{item_pattern_faults, pattern_faults};
+use crate::address::{item_pattern_faults, pattern_faults};
 use crate::config::declarations::Declarations;
 use crate::origin::{Origin, Sourced};
 use crate::problem::{Expected, Kind, Own, Problem, Root, SetAside, Word, WrongPlace};

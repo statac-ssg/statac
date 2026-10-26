@@ -25,9 +25,9 @@ mod tests;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use crate::address::Address;
 use crate::config::Settings;
-use crate::content::address::Address;
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::origin::{Arrival, Origin, Sourced};
 use crate::problem::{AddressFault, Kind, Named, Problem, Unwritten, Waiting, Word};
 use crate::site::{ListId, ListKey, Page, PageId, Site};
@@ -112,7 +112,7 @@ fn standing(site: &Site, list: ListId, page: Option<&Page>) -> Option<Address> {
         (Some(page), _) => Some(page.address.clone()),
         (None, ListKey::Folder(path)) => Address::read(&format!(
             "/{}",
-            crate::content::slug::tidied_path(&format!("{path}/"))
+            crate::slug::tidied_path(&format!("{path}/"))
         ))
         .ok(),
         (None, _) => None,

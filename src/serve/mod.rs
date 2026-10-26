@@ -16,8 +16,8 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
+use crate::address::on_the_wire;
 use crate::build::{self, Mode};
-use crate::content::address::on_the_wire;
 use crate::date::Date;
 use crate::problem::Told;
 use crate::problem::{Kind, Problem, Reason, Severity};

@@ -33,14 +33,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub(crate) use filter::{DATE_PARTS, Filter, in_site_order, related, tags_of};
 
+use crate::address::{Address, Top};
 use crate::config::Settings;
-use crate::content::address::{Address, Top};
-use crate::content::slug;
-use crate::content::words::{PageWord, Words};
+use crate::config::words::{PageWord, Words};
 use crate::dates::Dates;
 use crate::origin::{Arrival, Sourced};
 use crate::problem::{Kind, Problem, Word};
 use crate::site::{Id, List, ListId, ListKey, Page, PageId, PagePlace, Site};
+use crate::slug;
 use crate::source::{Place, Sources, Span};
 use crate::value::Value;
 

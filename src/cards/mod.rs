@@ -20,7 +20,7 @@ pub mod layout;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::content::words::{self, key_name};
+use crate::config::words::{self, key_name};
 use crate::origin::{Origin, Sourced};
 use crate::problem::{
     Expected, Found, Hint, Kind, Problem, Reach, Requirer, SetAside, Severity, Word,

@@ -16,10 +16,10 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io;
 use std::path::Path;
 
+use crate::address::Address;
 use crate::assets::Assets;
 use crate::config::Settings;
-use crate::content::address::Address;
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::dates::Dates;
 use crate::feeds::Feed;
 use crate::problem::{Kind, Named, Problem, Reason, RecordFault};

@@ -8,16 +8,17 @@
 //! templates as `site.<name>`, and may nest.
 
 pub mod declarations;
+pub mod words;
 
 use std::path::Path;
 
-use crate::content::words::{self, Field, Words};
 use crate::origin::{Origin, Sourced};
 use crate::problem::{Expected, InPlace, Kind, Own, Problem, Root, Word, WrongPlace};
 use crate::source::{SourceId, Sources};
 use crate::value::{Reader, Value};
 use crate::yaml::{Node, Value as Yaml};
 use declarations::Declarations;
+use words::{Field, Words};
 
 pub const FILE_NAME: &str = "statac.yaml";
 
@@ -937,7 +938,7 @@ fn later_address(text: &str) -> bool {
     rest.matches("{n}").count() == 1
         && rest.replace("{n}", "").find(['{', '}']).is_none()
         && text.ends_with('/')
-        && crate::content::address::Address::read(&format!("/{}", rest.replace("{n}", "2"))).is_ok()
+        && crate::address::Address::read(&format!("/{}", rest.replace("{n}", "2"))).is_ok()
 }
 
 #[cfg(test)]

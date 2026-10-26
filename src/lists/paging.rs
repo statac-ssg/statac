@@ -8,9 +8,9 @@
 
 use std::collections::HashMap;
 
+use crate::address::Address;
 use crate::config::Settings;
-use crate::content::address::Address;
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::problem::{Kind, Problem};
 use crate::site::{Id, ListId, ListKey, Page, PageId, Site};
 use crate::source::Sources;

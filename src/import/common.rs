@@ -6,7 +6,7 @@ use std::path::Path;
 
 use super::report::code;
 use super::{Failed, Field, Unread, Value};
-use crate::content::address::Address;
+use crate::address::Address;
 use crate::date::{self, Date};
 use crate::problem::{FeedFormat, Kind, Problem, Reason};
 use crate::source::{Place, Sources};

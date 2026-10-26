@@ -177,7 +177,7 @@ pub(crate) fn field(name: &str) -> Option<&'static Described> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::content::words::PageWord;
+    use crate::config::words::PageWord;
 
     /// The names `group` describes, sorted.
     fn names(group: Group) -> Vec<&'static str> {

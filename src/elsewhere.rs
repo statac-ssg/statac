@@ -6,7 +6,7 @@
 
 use std::ops::Range;
 
-use crate::content::address;
+use crate::address;
 use crate::html::{self, start_tags};
 
 /// `html`, writing published at `page`, with each address in it read from

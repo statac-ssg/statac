@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use super::Document;
 use super::node::{Kind, Node};
 use super::questions::plain_text;
-use crate::content::slug::{anchor, made_slug};
 use crate::problem::{Braced, Kind as ProblemKind, Problem, Taken};
+use crate::slug::{anchor, made_slug};
 use crate::source::{Place, Span};
 
 /// Gives each heading without an id of the author's an id from its words,

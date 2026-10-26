@@ -289,7 +289,7 @@ fn robots_beneath_path(read: &content::Read) -> Option<Problem> {
     let origin = site_origin(url.value);
     let place = page
         .words
-        .get(crate::content::words::PageWord::Permalink)
+        .get(crate::config::words::PageWord::Permalink)
         .and_then(|permalink| permalink.origin.place)
         .or_else(|| read.site.head(id, &read.sources));
     let kind = Kind::RobotsBeneathPath {

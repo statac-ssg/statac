@@ -19,7 +19,7 @@ use minijinja::{Error, State};
 use super::frame;
 use super::render::{Part, Shared, SomePages};
 use crate::config::declarations::FieldKind;
-use crate::content::words::PageWord;
+use crate::config::words::PageWord;
 use crate::date::{Date, When};
 use crate::dates::ShowDates;
 use crate::lists::Order;
@@ -1232,7 +1232,7 @@ pub(crate) struct ListKnown<'a> {
     /// The page that speaks for it, and whether that is published.
     pub page: Option<(PageId, bool)>,
     /// Where its feeds are published, in the order its `feed:` names them.
-    pub feeds: Vec<&'a crate::content::address::Address>,
+    pub feeds: Vec<&'a crate::address::Address>,
     pub order: Option<Order>,
 }
 
@@ -1680,7 +1680,7 @@ pub(super) fn node_value(shared: &Arc<Shared>, node: &Node, path: Option<&str>) 
                 entries
                     .iter()
                     .map(|entry| {
-                        let key = crate::content::words::key_name(&entry.key);
+                        let key = crate::config::words::key_name(&entry.key);
                         let inner = nests.map(|path| format!("{path}.{key}"));
                         let value = node_value(shared, &entry.value, inner.as_deref());
                         (key, value)

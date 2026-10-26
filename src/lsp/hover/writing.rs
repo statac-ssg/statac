@@ -6,7 +6,7 @@
 use std::ops::Range;
 
 use super::{Goes, Said};
-use crate::content::address::Address;
+use crate::address::Address;
 use crate::lsp::complete::Known;
 use crate::lsp::complete::writing::{takes_written, unnamed};
 use crate::markdown::{self, Call, Document, Kind, Node};

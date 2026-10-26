@@ -282,7 +282,7 @@ fn every_bundled_line_outside_english_is_the_cldrs() {
         };
         let written: Vec<String> = entries
             .iter()
-            .map(|entry| crate::content::words::key_name(&entry.key))
+            .map(|entry| crate::config::words::key_name(&entry.key))
             .collect();
         assert_eq!(written, lines, "{tag}");
         let (read, problems) = read_statacs(&sources, id, Words::default());
@@ -431,7 +431,7 @@ fn every_language_and_its_regions_write_dates_and_quotes_as_the_cldr_does() {
         };
         let keys = |entries: &[crate::yaml::Entry]| -> Vec<String> {
             (entries.iter())
-                .map(|entry| crate::content::words::key_name(&entry.key))
+                .map(|entry| crate::config::words::key_name(&entry.key))
                 .collect()
         };
         assert_eq!(keys(&entries), lines, "{tag}");
@@ -463,7 +463,7 @@ fn the_broader_form_of_each_region_is_the_cldrs() {
             let Yaml::Scalar(parent) = &entry.value.value else {
                 panic!("{entry:?}");
             };
-            (crate::content::words::key_name(&entry.key), parent.clone())
+            (crate::config::words::key_name(&entry.key), parent.clone())
         })
         .collect();
     the_cldrs.retain(|(tag, _)| tag.split('-').next().and_then(bundled).is_some());
@@ -1095,7 +1095,7 @@ fn the_cldrs_directions() -> (Vec<(String, bool)>, Vec<String>) {
     let right_to_left: Vec<String> = scripts
         .iter()
         .filter(|entry| texts(&entry.value, ["rtl"]) == ["YES"])
-        .map(|entry| crate::content::words::key_name(&entry.key))
+        .map(|entry| crate::config::words::key_name(&entry.key))
         .collect();
     let likely = cldr("cldr-core/supplemental/likelySubtags.json");
     let Yaml::Mapping(likely) = &under(&likely, &["supplemental", "likelySubtags"]).value else {
@@ -1108,7 +1108,7 @@ fn the_cldrs_directions() -> (Vec<(String, bool)>, Vec<String>) {
                 panic!("{entry:?}");
             };
             let script = full.split('-').nth(1).expect("a script");
-            let tag = crate::content::words::key_name(&entry.key);
+            let tag = crate::config::words::key_name(&entry.key);
             (tag, right_to_left.iter().any(|known| known == script))
         })
         // `und` is no language: the CLDR's guess from a script or a region alone.

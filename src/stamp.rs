@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use jiff::civil;
 
 use crate::build;
-use crate::content::words::key_name;
+use crate::config::words::key_name;
 use crate::date::{Date, Time};
 use crate::dates::{Dates, ShowDates};
 use crate::feeds::{self, IdsToWrite};

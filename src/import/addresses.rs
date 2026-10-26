@@ -9,9 +9,9 @@ use std::path::Path;
 
 use super::write::{Out, built_file, page_text};
 use super::{Field, HomePages, Page, Value};
+use crate::address::{self, Address, Pieces};
 use crate::assets::Assets;
 use crate::build::{self, Mode, Options};
-use crate::content::address::{self, Address, Pieces};
 use crate::content::{self, Run};
 use crate::date::Date;
 use crate::feeds::Feed;

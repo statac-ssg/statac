@@ -18,7 +18,7 @@ use std::path::Path;
 
 use super::complete::Known;
 use super::complete::spot::{self, Under};
-use crate::content::words::{Holder, PageWord, is_statacs};
+use crate::config::words::{Holder, PageWord, is_statacs};
 use crate::problem::Code;
 use crate::site::ListKey;
 use crate::source::{Place, Sources, Span};

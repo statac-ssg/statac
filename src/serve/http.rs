@@ -15,7 +15,7 @@ use super::live::Hub;
 use super::panel::Listed;
 use super::server::Server;
 use super::server::model::{Body, HeaderValue, Method, Request, Response, StatusCode, header};
-use crate::content::address::on_the_wire;
+use crate::address::on_the_wire;
 use crate::html::escaped;
 use crate::problem::{Kind, Problem, Reason, Unheard};
 use crate::{platform, wording};

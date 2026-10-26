@@ -90,7 +90,7 @@ pub(crate) fn told(
         let place = at_place.or_else(|| {
             let layout = layout.filter(|_| matches!(kind, Kind::MissingTitle { .. }))?;
             let template = renderer.template_source(TemplateId::from_index(layout));
-            Some(crate::content::words::head(renderer.sources(), template))
+            Some(crate::config::words::head(renderer.sources(), template))
         });
         // What the page's own writing holds is told at the writing, naming
         // no page: it is the writing's wherever the writing is shown.

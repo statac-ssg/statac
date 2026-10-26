@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use super::pieced;
-use crate::content::address::on_the_wire;
+use crate::address::on_the_wire;
 use crate::json;
 use crate::problem::{Code, Kind, Named, Problem, Severity, Word, unanchored};
 use crate::report::{Excerpt, NAMED, Quiet, Report, shown};
