@@ -2,8 +2,8 @@
 
 Sass printed a message while compiling a stylesheet in `assets/`. The
 message comes from an `@warn` or `@debug` in your Sass, or is a warning
-from Sass itself. Statac quotes it as Sass gave it, and points
-at the line that produced it.
+from Sass itself. Statac quotes it exactly as Sass printed it, and
+points at the line that produced it.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,7 +14,8 @@ warning  Sass warning: `$columns is deprecated`
 
 ## Why Statac warns
 
-The stylesheet compiled and is published. Statac passes on the message
+The stylesheet compiled, and Statac publishes it. Statac passes on the
+message
 so it isn't lost, because an `@warn` is usually there to point out
 something you want to know about.
 

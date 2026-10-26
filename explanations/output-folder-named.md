@@ -1,9 +1,9 @@
 # Output folder named
 
 The site's `after_build` hook contains the name of the folder the
-built site is published in. That folder is `_site` unless the build was
-told to use another. While the command runs, the folder still holds the
-site built last time.
+built site is published in. That folder is `_site` unless `--out` names
+another. While the command runs, the folder still has the site built
+last time in it.
 
 ## What you'll see {#what-youll-see}
 
@@ -19,8 +19,8 @@ Statac builds into a separate folder, and puts it in place of the
 published site only after the whole build, including `after_build`, has
 succeeded. So a command that names `_site` works on the previous build. It
 makes an index of the old pages, or compresses old files or sends them
-to the server, and anything it writes there is replaced a moment later by
-the new site. On a first build, the folder doesn't exist at all.
+to the server, and the new site replaces anything it writes there a
+moment later. On a first build, the folder doesn't exist at all.
 
 The command's output may show no sign of this, so Statac warns you.
 

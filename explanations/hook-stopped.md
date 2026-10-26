@@ -31,10 +31,10 @@ output.
 
 Exit code 127 (9009 on Windows) means the shell couldn't find a command.
 Check that the command is installed and on the `PATH` Statac was started
-with. The command runs in the site's folder, so a path such as
-`./tools/make.sh` is read from there.
+with. The command runs in the site's folder, so the shell looks for a
+path such as `./tools/make.sh` in that folder.
 
-A command is handed five values:
+Statac hands the command five values:
 
 - `STATAC_SITE`: the site's folder.
 - `STATAC_OUT`: the folder to work on.
@@ -43,9 +43,9 @@ A command is handed five values:
   otherwise.
 - `STATAC_HOOK`: the hook the command is written in.
 
-An `after_build` hook runs before the built site is moved into place,
-so it must work on `STATAC_OUT`, not on `_site`. At that point `_site`
-still holds the site from the last build.
+An `after_build` hook runs before Statac moves the built site into
+place, so it must work on `STATAC_OUT`, not on `_site`. At that point,
+`_site` still has the site from the last build in it.
 
 ## Example
 

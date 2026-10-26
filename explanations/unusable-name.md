@@ -15,9 +15,8 @@ error  Unusable name: `site-1␛` holds a character that can't be shown
 
 ## Why Statac stops
 
-A control character can't be shown as it is, because a terminal acts on it
-instead of displaying it. So Statac couldn't show you the folder's name in
-its messages. Statac stops before it creates a folder with such a name.
+A terminal acts on a control character instead of showing it, so Statac
+couldn't show you the folder's name in its messages. Statac stops before it creates a folder with such a name.
 
 ## How to fix it
 

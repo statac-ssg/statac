@@ -26,15 +26,15 @@ every option.
 Statac before 0.7.0 had `--cards`, `--update`, `--missing` and
 `--no-starter`, for writing its own templates, snippets and card files
 into a site and keeping them up to date. Statac no longer writes them, so
-these options are refused with a message saying so, and the note that
+it refuses these options with a message saying so, and the note that
 said a newer version of those files was available, `update-available`,
 went with them. Leave the options out: a
 site's templates are its own, written as
 [Templates](https://statac.dev/templates/) describes.
 
 Statac before 0.7.0 also had `--site`, for naming the site's folder. The
-folder written after the command names it now, so `--site` is refused
-with a message saying how to write it: `statac build docs`, not
+folder written after the command names it now, so Statac refuses
+`--site` with a message saying how to write it: `statac build docs`, not
 `statac build --site=docs`.
 
 ## Example

@@ -19,7 +19,8 @@ note  Hook not run: `check` doesn't run `before_build` or `after_build`
 A hook may write files, send the site somewhere or take a long time,
 and an `after_build` hook has no built site to work on.
 
-So `check` reports on the site as it is now. If a `before_build` command
+So `check` reports on the site's files in their current state. If a
+`before_build` command
 makes files that the site is built from, `check` reads the files left by
 the last time the command ran, and reports any that are missing.
 

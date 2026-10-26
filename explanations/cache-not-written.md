@@ -19,8 +19,8 @@ warning  Cache not written: can't write `.statac/pictures`: permission denied
 ## Why Statac warns
 
 Resizing images is the slowest part of a build, so Statac keeps each
-resized copy and makes it only once. If it can't keep them, the site is
-still built in full and published, with every copy in it, but the next
+resized copy and makes it only once. If it can't keep them, Statac still
+builds and publishes the whole site, with every copy in it, but the next
 build makes them all again and takes as long as this one did. If it can't
 keep the spare, `.statac/spare`, each build rewrites every file of the
 site and removes the old ones, instead of writing only the files that

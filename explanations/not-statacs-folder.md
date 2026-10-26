@@ -17,8 +17,8 @@ error  Not Statac's folder: `docs` already holds 2 files and 1 folder
 Each build replaces the whole output folder, so nothing from an earlier
 build is left behind. Statac leaves a `.statac-built` file in every
 folder it builds, and only replaces a folder that has this file, or an
-empty folder. Any other folder could hold your own files, with the build
-pointed at it by a mistyped folder name.
+empty folder. Any other folder could have your own files in it, and a
+mistyped folder name could point the build at it.
 
 ## How to fix it
 
