@@ -4245,6 +4245,32 @@ fn a_missing_data_value_names_the_file_or_folder() {
     }
 }
 
+/// `page.key` is the item's name on a page made from one, and on any other
+/// page a value it hasn't got, as `page.post` is on a page made for none.
+#[test]
+fn a_page_made_from_no_item_has_no_key() {
+    let built = site(&[
+        (
+            "content/people.md",
+            "---\ntitle: People\neach: data.people\npermalink: /people/{key}/\nlayout: person\n---\n",
+        ),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\nlayout: person\n---\n",
+        ),
+        ("data/people.yaml", "person-1:\n  title: Person 1\n"),
+        ("templates/person.html", "{{ page.key }}"),
+        ("templates/folder.html", "{{ page.title }}"),
+    ]);
+    assert_eq!(built.html("people.md/person-1"), "person-1");
+    let rendered = built.render("post-1.md");
+    let kinds: Vec<&Kind> = rendered.problems.iter().map(|p| &p.kind).collect();
+    assert!(
+        matches!(kinds[..], [Kind::NoValue { written, .. }] if written == "page.key"),
+        "{kinds:?}"
+    );
+}
+
 #[test]
 fn pages_made_from_data_are_built_with_the_layout_their_page_names() {
     let built = site(&[

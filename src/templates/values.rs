@@ -23,15 +23,12 @@ use crate::content::words::PageWord;
 use crate::date::{Date, When};
 use crate::dates::ShowDates;
 use crate::lists::Order;
-use crate::problem::{ArgumentFault, Kind, Needed, Unsupported};
+use crate::problem::{ArgumentFault, Kind, Needed};
 use crate::reads::Key;
 use crate::site::{Id, LanguageId, ListId, ListKey, NameId, PageId};
 use crate::source::Place;
 use crate::value::Value as Statacs;
 use crate::yaml::{Node, Resolved, Tag, Value as Yaml};
-
-/// Names Statac answers on a page whose work isn't built yet.
-pub(super) const PAGE_NOT_YET: &[&str] = &["key"];
 
 /// The names a page answers to besides its words and fields.
 pub(super) const PAGE_ANSWERS: &[&str] = &[
@@ -58,6 +55,7 @@ pub(super) const PAGE_ANSWERS: &[&str] = &[
     "previous",
     "translations",
     "post",
+    "key",
 ];
 
 /// What a page is asked for a search box by.
@@ -184,14 +182,6 @@ pub(super) fn opaque(value: &Value) -> bool {
             .is_some()
 }
 
-/// A value refused because Statac hasn't built what it names yet. Looking
-/// it up stops the template there.
-pub(super) fn not_yet(name: String) -> Value {
-    Value::from(frame::raise(Kind::NotSupported {
-        what: Unsupported::NotYet(name),
-    }))
-}
-
 fn field_key(shared: &Shared, page: PageId, name: &str) -> Key {
     Key::Field(page, shared.name_id(name))
 }
@@ -304,9 +294,6 @@ impl PageValue {
         {
             field(key);
             return Some(PageValue::value(shared, post));
-        }
-        if PAGE_NOT_YET.contains(&key) {
-            return Some(not_yet(format!("page.{key}")));
         }
         if key == SEARCH_BOX {
             return Some(Value::from(search_box_given(false)));
@@ -494,6 +481,13 @@ impl PageValue {
         }
         if made_for(page).is_some() {
             names.push("post");
+        }
+        if page
+            .made
+            .as_ref()
+            .is_some_and(|made| matches!(made.item, crate::site::Item::Key(_)))
+        {
+            names.push("key");
         }
         for (word, _) in &page.words.words {
             if !(later && FIRST_PAGES_OWN.contains(word)) {

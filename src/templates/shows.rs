@@ -234,9 +234,6 @@ impl Renderer {
     ) -> Vec<Row> {
         let mut rows = Vec::new();
         for (name, field) in schema.record(rec) {
-            if rec == Rec::Page && values::PAGE_NOT_YET.contains(&name.as_str()) {
-                continue;
-            }
             let value = record.get_attr(name).ok().filter(|value| !nothing(value));
             let written = match page {
                 Some(page) => self.page_written(page, name),

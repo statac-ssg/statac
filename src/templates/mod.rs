@@ -735,14 +735,24 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
             page.entry("post".to_owned()).or_insert(post);
         }
     }
-    for name in values::PAGE_NOT_YET {
-        page.insert(
-            (*name).to_owned(),
-            Field {
-                ty: Ty::Any,
-                always: true,
-            },
-        );
+    // The name of the item a page was made from; a page made from none may
+    // write a field of its own by that name.
+    let made_from_items = site.pages.iter().any(|(_, p)| {
+        p.made
+            .as_ref()
+            .is_some_and(|made| matches!(made.item, crate::site::Item::Key(_)))
+    });
+    let key = Field {
+        ty: Ty::Text,
+        always: false,
+    };
+    match made_from_items {
+        true => {
+            page.insert("key".to_owned(), key);
+        }
+        false => {
+            page.entry("key".to_owned()).or_insert(key);
+        }
     }
     for name in [values::SEARCH_BOX].iter().chain(media::CALLS) {
         page.insert(
