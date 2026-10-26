@@ -883,6 +883,13 @@ fn the_setting_asking_for_nothing_dated_is_warned_of_once() {
 #[test]
 fn a_feed_template_no_list_asks_for_is_noted_once() {
     let json = ("templates/feed.json", "{}");
+    // Written as a feed, it is a feed's template whatever it is named, and
+    // reads what a feed's template is handed.
+    let rss = (
+        "templates/rss.xml",
+        "<?xml version=\"1.0\"?>\n<rss version=\"2.0\">{{ feed }}|{{ list.url }}|\
+         {% for post in posts %}{{ post.title }};{% endfor %}</rss>",
+    );
     let refused = ("content/index.md", "---\ntitle: Home\nfeed: false\n---\n");
     let notes = (
         "content/notes/index.md",
@@ -926,6 +933,24 @@ fn a_feed_template_no_list_asks_for_is_noted_once() {
             "",
             vec![json, FEED],
             unused("feed.xml", "feed: true"),
+        ),
+        (
+            "only a template written as a feed",
+            "",
+            vec![rss],
+            unused("rss.xml", "feed: rss.xml"),
+        ),
+        (
+            "a template written as a feed beside feed.xml",
+            "",
+            vec![rss, FEED],
+            unused("feed.xml", "feed: true"),
+        ),
+        (
+            "a template written as a feed no feed is built with",
+            "feed: true\n",
+            vec![rss, FEED],
+            vec![],
         ),
         ("no template", "", vec![], vec![]),
         ("the setting asks", "feed: true\n", vec![FEED], vec![]),

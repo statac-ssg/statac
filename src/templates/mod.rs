@@ -87,6 +87,9 @@ pub struct Templates {
     /// How many pages of lists of the whole site the outputs running one
     /// loop reach before it is noted.
     many_walked: u64,
+    /// The templates whose text is a feed, as `templates/rss.xml` opening
+    /// `<rss` is, by name.
+    pub(crate) written_as_feeds: BTreeSet<String>,
 }
 
 impl Templates {
@@ -265,7 +268,16 @@ pub(crate) fn read(
         .filter(|f| f.role == Role::Template)
         .map(|f| f.name.clone())
         .collect();
+    // A template written as a feed is checked as one whether or not a
+    // feed is built with it, as one named `feed.` is.
+    let written_as_feeds: BTreeSet<String> = files
+        .iter()
+        .filter(|f| f.role == Role::Template)
+        .filter(|f| crate::feeds::format::of(sources.text(f.source)).is_some())
+        .map(|f| f.name.clone())
+        .collect();
     schema.feeds = crate::feeds::templates(site, settings, &|name| schema.templates.contains(name));
+    schema.feeds.extend(written_as_feeds.iter().cloned());
     let checked: Vec<Checked> = files
         .iter()
         .map(|f| Checked {
@@ -358,6 +370,7 @@ pub(crate) fn read(
         texts: Vec::new(),
         steps,
         many_walked: lowered_walked(root).unwrap_or(walks::MANY),
+        written_as_feeds,
     };
     templates.landings = Arc::new(landings(&templates, &facts, &dropped, sources));
     templates.texts = texts(&templates);

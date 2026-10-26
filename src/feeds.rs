@@ -530,20 +530,23 @@ fn lists_of(fed: &[(ListId, Address, String, Option<Place>)]) -> Vec<ListId> {
 
 /// The note for a site with a feed template where no list asks for a
 /// feed, so that the template builds nothing: told once, of `feed.xml`
-/// where the site has it, among `templates`, the names of the site's.
+/// where the site has it, among `templates`, the names of the site's, and
+/// `written_as_feeds`, those whose text is a feed whatever their names.
 pub(crate) fn unasked(
     site: &Site,
     settings: &Settings,
     templates: &HashSet<String>,
+    written_as_feeds: &BTreeSet<String>,
 ) -> Option<Problem> {
     let mut named: Vec<&String> = templates
         .iter()
         .filter(|name| {
-            name.strip_prefix("feed.").is_some_and(|extension| {
-                !extension.is_empty()
-                    && !extension.contains('.')
-                    && !matches!(extension, "html" | "htm")
-            })
+            written_as_feeds.contains(*name)
+                || name.strip_prefix("feed.").is_some_and(|extension| {
+                    !extension.is_empty()
+                        && !extension.contains('.')
+                        && !matches!(extension, "html" | "htm")
+                })
         })
         .collect();
     named.sort_by_key(|name| (name.as_str() != FILE_NAME, name.as_str()));

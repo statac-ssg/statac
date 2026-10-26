@@ -1,7 +1,9 @@
 # Unused feed template
 
 The site has a feed template, such as `templates/feed.xml`, but no list
-asks for a feed, so the template builds nothing.
+asks for a feed, so the template builds nothing. A template is a feed
+template if its name starts with `feed.`, or if it is written as a feed,
+such as `templates/rss.xml` opening with `<rss`.
 
 ## What you'll see {#what-youll-see}
 

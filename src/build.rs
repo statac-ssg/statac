@@ -242,8 +242,6 @@ pub(crate) fn read_with(
         .extend(feeds::twice(&read.site, &read.settings));
     read.problems
         .extend(feeds::undated(&read.site, &read.settings, &read.sources));
-    read.problems
-        .extend(feeds::unasked(&read.site, &read.settings, &read.templates));
     read.problems.extend(robots_beneath_path(&read));
     let (fetched, found) = crate::fetched::read(site, &mut read.sources);
     read.site.fetched = fetched;
@@ -364,6 +362,12 @@ pub(crate) fn prepared_with(
         .collect();
     let (templates, told) =
         templates::read(site, &mut read.sources, &read.site, &read.settings, cards);
+    read.problems.extend(feeds::unasked(
+        &read.site,
+        &read.settings,
+        &read.templates,
+        &templates.written_as_feeds,
+    ));
     // Read last, so whether the site has the file moves no other file's
     // place among those read.
     let (published, unread) = crate::published::Record::read(site, &mut read.sources);
