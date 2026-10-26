@@ -1976,6 +1976,40 @@ impl Reader<'_> {
                 }
             }
         }
+        // Hugo made a page listing every name of each list of terms, one
+        // listing none where no page has any, which is told where the old
+        // built output holds it.
+        if let Some(built) = self.import.built.clone() {
+            let languages = match self.several() {
+                true => self.languages.clone(),
+                false => vec![self.main.clone()],
+            };
+            for language in languages {
+                let prefix = format!("/{}", self.prefix(&language));
+                let prefix = prefix.trim_end_matches('/');
+                for plural in self.s.plurals() {
+                    let used = (self.docs.iter()).any(|d| {
+                        !d.draft
+                            && d.language == language
+                            && d.terms
+                                .iter()
+                                .any(|(p, terms)| p == plural && !terms.is_empty())
+                    });
+                    let address = format!(
+                        "{prefix}{}",
+                        url::finished(&format!("/{plural}/"), self.s.ugly.of(plural))
+                    );
+                    let file = match address.ends_with('/') {
+                        true => format!("{built}{address}index.html"),
+                        false => format!("{built}{address}"),
+                    };
+                    let known = (self.import.term_lists.iter()).any(|(at, _)| *at == address);
+                    if !used && !known && inside::a_file(self.folder, &file) {
+                        (self.import.term_lists).push((address, plural.to_owned()));
+                    }
+                }
+            }
+        }
     }
 
     /// The snippets standing for tags that became calls, each with one

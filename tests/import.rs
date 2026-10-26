@@ -2782,6 +2782,52 @@ fn an_old_address_that_cant_be_kept_is_told_of_once_though_the_built_output_hold
     );
 }
 
+/// The page Hugo makes listing a list of terms no page uses, as
+/// `/categories/` on a site with no categories, is told of as a list page
+/// the new site has none of where the old built output holds it, not as a
+/// page at a URL Statac didn't work out, and isn't told of where it
+/// doesn't.
+#[test]
+fn hugos_page_listing_a_list_of_terms_no_page_uses_is_told_as_a_list() {
+    let top = scratch("hugo-empty-terms-list");
+    let old = top.join("old");
+    let files = [
+        (
+            "hugo.toml",
+            "baseURL = \"https://example.org/\"\ntitle = \"x\"\n",
+        ),
+        (
+            "content/posts/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-01\ntags: [rust]\n---\nA post.\n",
+        ),
+        ("public/index.html", "<p>Home.</p>\n"),
+        ("public/posts/index.html", "<p>Posts.</p>\n"),
+        ("public/posts/post-1/index.html", "<p>A post.</p>\n"),
+        ("public/tags/index.html", "<p>Tags.</p>\n"),
+        ("public/tags/rust/index.html", "<p>Rust.</p>\n"),
+        ("public/categories/index.html", "<p>Categories.</p>\n"),
+    ];
+    for (path, text) in files {
+        let path = old.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    let told = "The old site published a page listing every one of its `categories` at \
+                `/categories/`, and the new site has none.";
+    let new = top.join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert_eq!(report.matches(told).count(), 1, "{report}");
+    assert_eq!(report.matches("`/categories/`").count(), 1, "{report}");
+    fs::remove_file(old.join("public/categories/index.html")).unwrap();
+    let new = top.join("new-without");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(!report.contains("/categories/"), "{report}");
+}
+
 /// An old URL Statac worked out and can't publish at, a page's or a
 /// tag's, is told of once, as one that can't be kept, though the old
 /// built output holds it.
