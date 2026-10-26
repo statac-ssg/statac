@@ -1242,7 +1242,7 @@ fn a_colon_names_an_argument_with_a_warning() {
 
 #[test]
 fn malformed_calls_are_placed_at_the_exact_text() {
-    let cases: [(&str, CallFault, &str); 9] = [
+    let cases: [(&str, CallFault, &str); 10] = [
         (
             "A @image('a.jpg' and on.\n",
             CallFault::Unclosed("@image(".into()),
@@ -1275,6 +1275,12 @@ fn malformed_calls_are_placed_at_the_exact_text() {
             "Une @café(a) ici.\n",
             CallFault::Name("café".into()),
             "@café",
+        ),
+        // A snippet's file may be named so; no call can name it.
+        (
+            "@my-book(title=\"x\")\n",
+            CallFault::Name("my-book".into()),
+            "@my-book",
         ),
     ];
     for (text, found, spelling) in cases {

@@ -117,13 +117,13 @@ pub(super) fn read(
     let b = text.as_bytes();
     let name_start = at + 1;
     let after = &text[name_start..];
+    // A snippet's file may be named with a hyphen, which no call can name.
     let word = after
-        .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .find(|c: char| !(c.is_alphanumeric() || c == '_' || c == '-'))
         .unwrap_or(after.len());
-    if !after[..word].is_ascii()
-        && after.starts_with(char::is_alphabetic)
-        && after[word..].starts_with('(')
-    {
+    let unnameable =
+        !after[..word].is_ascii() || (after[..word].contains('-') && !after[..word].ends_with('-'));
+    if unnameable && after.starts_with(char::is_alphabetic) && after[word..].starts_with('(') {
         let name = &after[..word];
         return Some(Err((
             Span::new(at, name_start + word),

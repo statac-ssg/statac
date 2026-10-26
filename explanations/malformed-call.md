@@ -28,8 +28,10 @@ Look at the place the caret points to. Common causes:
   value with the same quote it opened with.
 - Text after a value's closing quote. Put the whole value inside the
   quotes.
-- A snippet name with letters other than a to z. Name the snippet using
-  only the letters a to z, digits and `_`.
+- A snippet name with letters other than a to z, or with a hyphen, such
+  as `@my-book(...)` for `snippets/my-book.html`. Name the snippet using
+  only the letters a to z, digits and `_`, such as
+  `snippets/my_book.html`, and call it by that name.
 - A call to a snippet that shows `body`, with no `@end` after it. A call
   like this wraps the content below it, and an `@end` on a line of its own
   marks where that content ends.
