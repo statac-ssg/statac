@@ -16,8 +16,8 @@ error  Unknown YAML tag: `!local`
 ## Why Statac stops
 
 Any other tag gives the value a meaning that only the program that
-defined the tag knows. Reading the value without that meaning could give
-the wrong value.
+defined the tag knows. If Statac read the value without that meaning, it
+could get the value wrong.
 
 ## How to fix it
 

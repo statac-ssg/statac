@@ -15,8 +15,8 @@ error  Data named twice: `data/people.json` and `data/people.yaml` are both `sit
 
 ## Why Statac stops
 
-Templates read `data/people.yaml` as `site.data.people`, and a folder
-`data/people/` under the same name. If two things share a name, Statac
+Templates read `data/people.yaml` as `site.data.people`, and read a
+folder `data/people/` under the same name. If two things share a name, Statac
 can't tell which one you meant, and using either would quietly hide the
 other.
 

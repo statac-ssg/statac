@@ -1,7 +1,7 @@
 # One tag, not two
 
 A page's `tags` are written on one line with commas between them and no
-brackets around them, as `tags: hills, water`. To YAML, that is a single
+brackets around them, such as `tags: hills, water`. To YAML, that is a single
 piece of text, so the page has one tag, called `hills, water`. The same
 applies to `pages.tags` in a cascade, and to `tags` on an item in a table.
 
@@ -18,7 +18,7 @@ warning  One tag, not two: `tags: hills, water` makes a single tag called `hills
 Statac reads the line the same way YAML does, and makes the single tag,
 with its own page and its own place in the list of tags. That is rarely
 what was meant, and nothing on the page shows the mistake until someone
-looks for the tag. Text in quotes, as in `tags: "hills, water"`, is
+looks for the tag. Text in quotes, such as `tags: "hills, water"`, is
 clearly meant as one tag, so Statac never warns about it.
 
 ## How to fix it

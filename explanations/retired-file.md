@@ -2,8 +2,8 @@
 
 The site still has `fetched/refused`, which Statac no longer reads. It
 listed the webmentions turned away by `statac refuse`, a command Statac
-no longer has. The URLs to refuse are listed in `statac.yaml` now, as
-`refuse_webmentions_from`.
+no longer has. You now list the URLs to refuse in `statac.yaml`,
+under `refuse_webmentions_from`.
 
 ## What you'll see {#what-youll-see}
 
@@ -19,15 +19,15 @@ Statac no longer refuses what the file lists. Left alone, `statac
 refresh` would keep new webmentions from the pages and senders in it, so
 Statac stops until they are listed in `statac.yaml`.
 
-`statac check` gives the lines of `statac.yaml` that carry the file's URLs
-over, between the headline and the suggestion. A line of the file that
-doesn't read as Statac wrote it, usually because it was changed by hand,
-has no URL among them, and the suggestion says how many such lines there
+`statac check` prints the lines of `statac.yaml` that carry the file's
+URLs over, between the headline and the suggestion. A line of the file
+that isn't in the form Statac wrote, usually because someone changed it
+by hand, has no URL among them, and the suggestion says how many such lines there
 are.
 
 ## How to fix it
 
-Add the lines `statac check` gives to `statac.yaml`, then delete
+Add the lines `statac check` prints to `statac.yaml`, then delete
 `fetched/refused`. Statac never deletes it.
 
 A URL in `refuse_webmentions_from` refuses everything sent from a page at

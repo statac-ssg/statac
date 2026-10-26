@@ -23,7 +23,7 @@ warning  Control character: U+000B is left out of the page
 
 A reader sees nothing where a control character is, and HTML treats one
 as an error in the page, so leaving it out makes no difference a reader
-can see. It is left out of code too, because a reader copying the code
+can see. Statac leaves it out of code too, because a reader copying the code
 would copy a character they can't see. Statac tells you because the
 character may stand in for one you meant to type.
 

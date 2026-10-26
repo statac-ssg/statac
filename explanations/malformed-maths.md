@@ -32,7 +32,7 @@ Look at the place the caret points to. Common causes:
   `\begin{...}` it closes.
 - A command followed by fewer parts than it needs, such as `\frac{1}`
   with no second part.
-- Two `^` or two `_` on the same thing, as in `x^a^b`. Put braces round
+- Two `^` or two `_` on the same thing, such as `x^a^b`. Put braces round
   the parts that belong together: `x^{a^b}`.
 - An `\eqref` to a label that no equation on the page has.
 

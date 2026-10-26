@@ -20,9 +20,9 @@ So when `statac refresh` asks the webmention service for webmentions,
 Statac reads the token from only two places: the variable
 `STATAC_WEBMENTION_TOKEN`, or else the single line of the file
 `.statac/token`. A new site's `.gitignore` keeps
-that folder out of commits. If both have a token, the variable's is used.
+that folder out of commits. If both have a token, Statac uses the variable's.
 A token line in `statac.yaml` stops the build, so the token goes no
-further than it already has. Its value is never shown: wherever Statac
+further than it already has. Statac never shows its value: wherever it
 prints the line, it prints dots in place of the token.
 
 `statac build` and `statac check` never need the token at all.

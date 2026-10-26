@@ -13,7 +13,7 @@ error  Merge key: Statac doesn't copy fields in with `<<`
 
 ## Why Statac stops
 
-Statac reads a data file exactly as it is written, so templates get what
+Statac reads a data file exactly as you wrote it, so templates get what
 you see in the file. The merge key isn't part of the current version of
 YAML, and programs that read YAML disagree about it. Some copy the fields
 in, and others read `<<` as an ordinary field. Statac doesn't guess which

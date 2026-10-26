@@ -17,11 +17,11 @@ Both spellings would be published at the same URL, `/tags/rust/`, so
 they can only be one tag. Statac merges them into one tag under the
 spelling most pages use, and carries on. If two spellings are used by the
 same number of pages, Statac uses the one that sorts first, which puts
-capitals first. Statac never changes the capitals of a tag on its own: the
-tag is shown the way most of your pages spell it.
+capitals first. Statac never changes the capitals of a tag on its own: it
+shows the tag the way most of your pages spell it.
 
-Statac warns you because a page that shows its tags uses the spelling the
-tag is shown as, which may not be the one written on that page.
+Statac warns you because a page that shows its tags shows this one
+spelling, which may not be the one written on that page.
 
 ## How to fix it
 

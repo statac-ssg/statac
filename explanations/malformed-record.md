@@ -20,8 +20,8 @@ line after that describes one file, in three parts separated by tabs:
 - the file's path under `fetched/`, such as
   `stills/youtube-abcdefghijk.jpg`
 - the first 16 hex digits of the BLAKE3 hash of the file, or `absent`
-  where there is no file: the other site replied that it has none, or
-  `statac refresh` chose not to keep it, as with a refused webmention
+  if there is no file: the other site replied that it has none, or
+  `statac refresh` chose not to keep it, such as for a refused webmention
 - the date it was fetched, such as `2026-10-06`
 
 A line written any other way, usually by hand or by a merge that went

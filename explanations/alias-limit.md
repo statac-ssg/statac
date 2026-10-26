@@ -20,7 +20,8 @@ Statac stops at the alias that goes over the limit.
 ## How to fix it
 
 Write the values out where you need them, or repeat fewer of them. If a file
-needs this many repeats, it is usually better split into data files.
+needs this many repeats, it is usually better to split it into several
+data files.
 
 ## Example
 

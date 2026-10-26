@@ -19,7 +19,7 @@ A page's `card` is set aside if the page also names its own social
 image with `og_image`, because `og_image` takes priority.
 
 A built-in field, a setting, or a field that `statac.yaml` declares is
-set aside if nothing at all is written after its colon, as in `title:`.
+set aside if nothing at all is written after its colon, such as `title:`.
 Statac treats it as though the line weren't there. `~` and `null` are
 written on purpose, so Statac never reports them. Nor does it report an
 empty custom field that isn't declared, because a template may test for
@@ -45,11 +45,11 @@ fields do nothing.
 
 Give the field a name of your own if you want to use it in your
 templates. A page that writes `image:` or `images:` keeps its value under
-another name: rename the field, to `cover:` say, and change the templates
+another name: rename the field, for example to `cover:`, and change the templates
 that read it to `page.cover`. To choose where a page is published, write
 `permalink:`. On a page that redirects, remove the field, or remove
 `redirect_to` to publish the page. In the card's settings, correct the
-name to one a card uses. Statac suggests the nearest. On a page with both `card` and
+name to one a card uses. Statac suggests the nearest one. On a page with both `card` and
 `og_image`, remove one of them. If nothing is written after the colon,
 give the line a value, or remove it.
 

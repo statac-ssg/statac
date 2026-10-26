@@ -21,8 +21,8 @@ until the line is gone.
 
 ## How to fix it
 
-With `code_style: none`, delete the line. Code is written as it is,
-with its language in its class, such as `language-rust`, which is what
+With `code_style: none`, delete the line. Statac writes code exactly as
+typed, with its language in its class, such as `language-rust`, which is what
 `none` asked for.
 
 With a theme, write `code_colours: true` in its place. Statac then marks

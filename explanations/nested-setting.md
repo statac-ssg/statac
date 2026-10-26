@@ -2,7 +2,7 @@
 
 One of Statac's settings is written nested under its first part, such as
 `layout:` indented under `pages:`, or a text on a card is written as
-`title:` with `text:` beneath it. Statac's own settings have only one
+`title:` with `text:` under it. Statac's own settings have only one
 spelling, written flat on one line: `pages.layout: post`, `title.text:`.
 
 ## What you'll see {#what-youll-see}

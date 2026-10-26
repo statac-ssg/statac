@@ -23,8 +23,8 @@ it.
 
 ## How to fix it
 
-Write the folder's path as it is under `content/`, with `/` between a
-folder and a folder inside it. Or create the folder and its pages.
+Write the folder's path from `content/`, with `/` between a folder and
+a folder inside it. Or create the folder and its pages.
 
 ## Example
 

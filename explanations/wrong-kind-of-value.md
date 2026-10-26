@@ -33,7 +33,7 @@ shows how to write it.
 ## How to fix it
 
 Write the kind of value the message asks for. Write dates as year, month
-and day, as in `2026-10-04`, with a time after them if you want one.
+and day, such as `2026-10-04`, with a time after them if you want one.
 
 ## Example
 

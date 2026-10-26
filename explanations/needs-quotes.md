@@ -3,7 +3,7 @@
 A text field has a value that YAML reads as something else, and reading it
 that way would change what you wrote. To YAML, `3.10` is the number 3.1,
 `0x10` is 16, and `1e3` is 1000. A colour such as `#F2E9D3` written
-without quotes is a comment to YAML, so the line is left with no value.
+without quotes is a comment to YAML, so the field has no value.
 
 ## What you'll see {#what-youll-see}
 
