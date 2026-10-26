@@ -444,6 +444,11 @@ impl Languages {
         }
     }
 
+    /// The path in the site of each file, as `languages/en-GB.yaml`.
+    pub(crate) fn paths(&self) -> impl Iterator<Item = String> + '_ {
+        (self.files.iter()).map(|(name, _)| format!("{FOLDER}/{name}"))
+    }
+
     /// The file named `<tag>.yaml`, ignoring case, its own spelling first.
     fn file(&self, tag: &str) -> Option<(&str, &str)> {
         let wanted = format!("{tag}.yaml");

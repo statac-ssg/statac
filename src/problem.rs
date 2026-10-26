@@ -158,6 +158,7 @@ codes! {
     FeedIdChanged "feed-id-changed",
     NoSiteUrl "no-site-url",
     UnusedFeedTemplate "unused-feed-template",
+    UnusedLanguageFile "unused-language-file",
     NoLanguage "no-language",
     NoListPage "no-list-page",
     NoHomePage "no-home-page",
@@ -388,6 +389,7 @@ impl Code {
             | Code::LocationPublished
             | Code::RobotsBeneathPath
             | Code::UnusedFeedTemplate
+            | Code::UnusedLanguageFile
             | Code::LoopOverEveryPage
             | Code::RefusedWebmentions => Severity::Note,
             Code::OtherSpelling
@@ -519,6 +521,7 @@ impl Code {
             | Code::FeedIdChanged
             | Code::RobotsBeneathPath
             | Code::UnusedFeedTemplate
+            | Code::UnusedLanguageFile
             | Code::CallInHtml
             | Code::UntitledPage
             | Code::MoreWrittenTwice
@@ -1292,6 +1295,12 @@ pub enum Kind {
     UnusedFeedTemplate {
         template: String,
         line: String,
+    },
+    /// A file in `languages/`, by its path, that no language of the site
+    /// reads, with the site's languages as `language:` names them.
+    UnusedLanguageFile {
+        path: String,
+        languages: Vec<String>,
     },
     /// A post in a feed published at another address than feed readers
     /// know it at, with no `id:` of its own: where it was, with the site's
@@ -3055,6 +3064,7 @@ impl Kind {
             Kind::FeedIdChanged { .. } => Code::FeedIdChanged,
             Kind::NoSiteUrl { .. } => Code::NoSiteUrl,
             Kind::UnusedFeedTemplate { .. } => Code::UnusedFeedTemplate,
+            Kind::UnusedLanguageFile { .. } => Code::UnusedLanguageFile,
             Kind::NoLanguage => Code::NoLanguage,
             Kind::NoListPage { .. } => Code::NoListPage,
             Kind::NoHomePage { .. } => Code::NoHomePage,

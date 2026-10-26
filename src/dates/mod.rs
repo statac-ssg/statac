@@ -235,6 +235,22 @@ impl Dates {
                 .map(|tag| languages.language(Some(tag), sources, &mut problems))
                 .collect(),
         };
+        let read: Vec<&str> = (found.iter())
+            .filter_map(|language| match &language.whence {
+                Whence::Site(path) => Some(path.as_str()),
+                _ => None,
+            })
+            .collect();
+        for path in languages
+            .paths()
+            .filter(|path| !read.contains(&path.as_str()))
+        {
+            let kind = Kind::UnusedLanguageFile {
+                path,
+                languages: found.iter().filter_map(|l| l.tag.clone()).collect(),
+            };
+            problems.push(Problem::nowhere(kind));
+        }
         let zone = settings
             .text("timezone")
             .and_then(|name| match TimeZone::get(name.value) {

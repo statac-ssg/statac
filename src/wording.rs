@@ -811,6 +811,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
         }
         Kind::NoFeedKey { .. } => "No feed key: `statac.yaml` has no `feed_key`".into(),
         Kind::UnusedFeedTemplate { .. } => "Unused feed template: no list asks for a feed".into(),
+        Kind::UnusedLanguageFile { path, .. } => {
+            format!("Unused language file: no language of the site reads `{path}`")
+        }
         Kind::NoSiteUrl { waiting } => {
             let what = match waiting {
                 Waiting::Page(path) => format!("`{path}` is"),
@@ -3172,6 +3175,18 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::UnusedFeedTemplate { template, line } => Some(format!(
             "Write `{line}` in `statac.yaml` for the site's feed, built with `{template}`."
         )),
+        Kind::UnusedLanguageFile { languages, .. } => Some(match languages.as_slice() {
+            [] => "The site names no `language`; write one in `statac.yaml` for the file to be \
+                   read."
+                .into(),
+            [one] => format!(
+                "Name it for the site's language, as `languages/{one}.yaml`, or take it out."
+            ),
+            _ => format!(
+                "Name it for one of the site's languages, {}, or take it out.",
+                quoted_either(languages)
+            ),
+        }),
         Kind::NoSiteUrl { .. } => {
             Some("Add the site's full URL to `statac.yaml`, as `url: https://example.org/`.".into())
         }
@@ -6198,6 +6213,33 @@ mod tests {
                 Some(
                     "Write `feed: true` in `statac.yaml` for the site's feed, built with \
                      `templates/feed.xml`.",
+                ),
+            ),
+            (
+                Kind::UnusedLanguageFile {
+                    path: "languages/en-US.yaml".into(),
+                    languages: vec!["en-GB".into()],
+                },
+                "Unused language file: no language of the site reads `languages/en-US.yaml`",
+                Some("Name it for the site's language, as `languages/en-GB.yaml`, or take it out."),
+            ),
+            (
+                Kind::UnusedLanguageFile {
+                    path: "languages/de.yaml".into(),
+                    languages: vec!["en".into(), "fr".into()],
+                },
+                "Unused language file: no language of the site reads `languages/de.yaml`",
+                Some("Name it for one of the site's languages, `en` or `fr`, or take it out."),
+            ),
+            (
+                Kind::UnusedLanguageFile {
+                    path: "languages/en.yaml".into(),
+                    languages: Vec::new(),
+                },
+                "Unused language file: no language of the site reads `languages/en.yaml`",
+                Some(
+                    "The site names no `language`; write one in `statac.yaml` for the file to be \
+                     read.",
                 ),
             ),
             (

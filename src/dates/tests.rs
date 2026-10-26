@@ -2729,3 +2729,54 @@ fn a_stamp_written_as_the_clocks_change_names_the_day_and_time_asked_for() {
     assert_eq!(dates.moment(&date(&morning)), "2026-10-25T00:30:00+01:00");
     assert_eq!(dates.moment(&date(&evening)), "2026-10-25T18:30:00+00:00");
 }
+
+/// A file in `languages/` that no language of the site reads is noted
+/// once, with the site's languages; one a language reads, its own or one
+/// it inherits from, isn't.
+#[test]
+fn a_language_file_no_language_reads_is_noted() {
+    let months = "months: [a, b, c, d, e, f, g, h, i, j, k, l]\n";
+    let cases: [(&str, &[&str], Vec<Kind>); 4] = [
+        (
+            "language: en-GB\n",
+            &["en-GB", "en-US"],
+            vec![Kind::UnusedLanguageFile {
+                path: "languages/en-US.yaml".into(),
+                languages: vec!["en-GB".into()],
+            }],
+        ),
+        ("language: en-GB\n", &["en"], vec![]),
+        (
+            "language: [en, fr]\n",
+            &["de", "en", "fr"],
+            vec![Kind::UnusedLanguageFile {
+                path: "languages/de.yaml".into(),
+                languages: vec!["en".into(), "fr".into()],
+            }],
+        ),
+        (
+            "title: Site\n",
+            &["en"],
+            vec![Kind::UnusedLanguageFile {
+                path: "languages/en.yaml".into(),
+                languages: vec![],
+            }],
+        ),
+    ];
+    for (written, files, wanted) in cases {
+        let paths: Vec<String> = (files.iter())
+            .map(|tag| format!("languages/{tag}.yaml"))
+            .collect();
+        let mut all = vec![("statac.yaml", written)];
+        all.extend(paths.iter().map(|path| (path.as_str(), months)));
+        let site = TempSite::new(&all);
+        let mut sources = Sources::default();
+        let (settings, _) = crate::config::read(&site.root, &mut sources);
+        let (_, problems) = Dates::read(&site.root, &settings, &mut sources);
+        let told: Vec<Kind> = (problems.into_iter())
+            .map(|problem| problem.kind)
+            .filter(|kind| matches!(kind, Kind::UnusedLanguageFile { .. }))
+            .collect();
+        assert_eq!(told, wanted, "{written} {files:?}");
+    }
+}
