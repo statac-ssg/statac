@@ -2828,6 +2828,82 @@ fn hugos_page_listing_a_list_of_terms_no_page_uses_is_told_as_a_list() {
     assert!(!report.contains("/categories/"), "{report}");
 }
 
+/// An empty `title` in the old settings is no title, in each tool's
+/// settings: the new site's is made from the old folder's name, and the
+/// report says so.
+#[test]
+fn an_empty_title_in_the_old_settings_is_none() {
+    let post = (
+        "posts/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n",
+    );
+    let sites: [(&str, Vec<(&str, &str)>); 4] = [
+        (
+            "jekyll",
+            vec![
+                ("_config.yml", "title: \"\"\nurl: https://example.org\n"),
+                ("_posts/2026-01-01-post-1.md", post.1),
+            ],
+        ),
+        (
+            "hugo",
+            vec![
+                (
+                    "hugo.toml",
+                    "baseURL = \"https://example.org/\"\ntitle = \"\"\n",
+                ),
+                ("content/posts/post-1.md", post.1),
+            ],
+        ),
+        (
+            "zola",
+            vec![
+                (
+                    "config.toml",
+                    "base_url = \"https://example.org\"\ntitle = \"\"\n",
+                ),
+                (
+                    "content/post-1.md",
+                    "+++\ntitle = \"Post 1\"\ndate = 2026-01-01\n+++\nText.\n",
+                ),
+            ],
+        ),
+        (
+            "hugo-languages",
+            vec![
+                (
+                    "hugo.toml",
+                    "baseURL = \"https://example.org/\"\ndefaultContentLanguage = \"en\"\n\
+                     [languages.en]\ntitle = \"\"\n[languages.fr]\ntitle = \"Site\"\n",
+                ),
+                ("content/posts/post-1.md", post.1),
+                ("content/posts/post-1.fr.md", post.1),
+            ],
+        ),
+    ];
+    for (label, files) in sites {
+        let top = scratch(&format!("empty-title-{label}"));
+        let old = top.join("old");
+        for (path, text) in files {
+            let path = old.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let new = top.join("new");
+        let (code, told) = import(&old, &new, None);
+        assert_eq!(code, 0, "{label}: {told}");
+        let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+        assert!(!written.contains("title: \"\""), "{label}: {written}");
+        assert!(!written.contains("title: ''"), "{label}: {written}");
+        assert!(written.starts_with("title: Old\n"), "{label}: {written}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        let said = "The settings give no `title`, so the new site's `title` is made from the old \
+                    folder's name: put it right in `statac.yaml`.";
+        assert!(report.contains(said), "{label}: {report}");
+        checked(&new);
+    }
+}
+
 /// An old URL Statac worked out and can't publish at, a page's or a
 /// tag's, is told of once, as one that can't be kept, though the old
 /// built output holds it.

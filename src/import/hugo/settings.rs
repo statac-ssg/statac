@@ -482,7 +482,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
         let mut leave = |text: String| s.left.push((file.clone(), field.line, text));
         match field.name.to_ascii_lowercase().as_str() {
             "baseurl" => s.base_url = text.filter(|t| !t.is_empty()),
-            "title" => s.title = text,
+            "title" => s.title = text.filter(|t| !t.is_empty()),
             "languagecode" => s.language_code = text,
             "locale" => s.locale = text,
             "defaultcontentlanguage" => s.default_language = text.map(|t| t.to_lowercase()),
@@ -573,7 +573,7 @@ pub(super) fn settle(folder: &Path, entries: &[Entry]) -> Settings {
                     };
                     for (name, value) in table {
                         match name.to_ascii_lowercase().as_str() {
-                            "title" => language.title = text_of(value),
+                            "title" => language.title = text_of(value).filter(|t| !t.is_empty()),
                             "contentdir" => {
                                 language.content_dir =
                                     folder(&format!("languages.{key}.{name}"), value)

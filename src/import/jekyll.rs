@@ -656,7 +656,7 @@ impl Reader<'_> {
             let line = field.line.unwrap_or_default();
             let text = text_of(&value);
             match key.as_str() {
-                "title" => s.title = text,
+                "title" => s.title = text.filter(|t| !t.is_empty()),
                 "url" => {
                     s.url = text
                         .map(|url| url.trim_end_matches('/').to_owned())
