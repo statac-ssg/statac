@@ -8,7 +8,7 @@ It was made from `tests/import/front-matter/old` by `statac import`, which chang
 - 1 draft, with `draft: true`, so it isn't published by accident.
 - 2 pages, into `content/` where they stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
 
@@ -18,7 +18,7 @@ The settings name no time zone, so none is written, and Statac reads a date writ
 
 The settings' `defaults` were written into each page they reached, as fields of its own.
 
-`layout` was taken off 2 pages: each is built with the template for its kind, as https://statac.dev/templates/ describes.
+`layout` was taken off 2 pages: once you add templates, each is built with the one for its kind, as https://statac.dev/templates/ describes.
 
 2 names in the old site's `categories` are now tags, each with `category_` before it, as `category_category-1`, so they can still be told from the site's own tags. To rename one across the site, change it on each page that has it.
 

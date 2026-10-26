@@ -1,6 +1,6 @@
 This site was imported from a Hugo site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/hugo-front-matter/old` by `statac import`, which changed nothing there. It has no templates, and doesn't build until you add `templates/folder.html`: see https://statac.dev/templates/. Its pages and feeds need `templates/folder.html` and `templates/index.xml`.
+It was made from `tests/import/hugo-front-matter/old` by `statac import`, which changed nothing there. It has no templates, and doesn't build until you add `templates/folder.html`: see https://statac.dev/templates/. Adding `templates/folder.html` and `templates/index.xml` builds its pages and feeds.
 
 ## What came across
 
@@ -8,7 +8,7 @@ It was made from `tests/import/hugo-front-matter/old` by `statac import`, which 
 - 2 drafts, each with `draft: true`, so none is published by accident.
 - 1 page, into `content/` where it stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Hugo ordered the pages of `content/posts/` by their `weight`, so `content/posts/index.md` lists them in that order with `order:`, and `weight` was taken off them.
 

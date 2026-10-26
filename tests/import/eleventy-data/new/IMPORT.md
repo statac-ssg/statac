@@ -7,7 +7,7 @@ It was made from `tests/import/eleventy-data/old` by `statac import`, which chan
 - 5 posts, into `content/links/` and `content/notes/` and `content/posts/2026/` and `content/posts/`.
 - 2 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `.eleventy.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
@@ -17,7 +17,7 @@ Eleventy reads a date written without an offset as UTC, so `timezone` is `UTC`: 
 
 The settings name no folder in a `dir` Statac can read, so Statac took Eleventy's own: `input` as `.`, `output` as `_site`, `includes` as `_includes` and `data` as `_data`.
 
-The settings copy nothing as it is with an `addPassthroughCopy` Statac can read, so Statac copied only the files beside a page that its content names.
+The settings have no `addPassthroughCopy` Statac can read, so Statac copied only the files beside a page that its content names.
 
 The settings name no `markdownTemplateEngine`, so Statac read the template tags in the Markdown files as Liquid, as Eleventy does unless told otherwise.
 
@@ -25,13 +25,13 @@ The settings don't set `breaks: true`, so Statac read a line end inside a paragr
 
 The settings don't set `linkify: true`, so Eleventy left bare URLs as words, and Statac links those starting `www.`, `http://` or `https://`, as https://statac.dev/writing/#addresses-written-bare describes.
 
-The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown as it is, as Statac does.
+The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown unchanged, as Statac does.
 
 The settings name no plugin for attributes in braces, so Statac took `{.class}` and the like for words, as Eleventy did.
 
 The settings name no `excerpt_separator`, so Statac changed no excerpt marker.
 
-`layout` was taken off 4 pages and folders: each is built with the template for its kind, as https://statac.dev/templates/ describes.
+`layout` was taken off 4 pages and folders: once you add templates, each is built with the one for its kind, as https://statac.dev/templates/ describes.
 
 The data each folder's own file cascaded to the pages beneath it is in `pages.` lines of `content/links/index.md` and `content/posts/index.md`, as https://statac.dev/front-matter/#handing-down describes; what can't cascade that way, as a `title` or a field inside a folder with no page of its own, is in each page's own front matter.
 

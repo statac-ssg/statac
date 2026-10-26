@@ -7,7 +7,7 @@ It was made from `tests/import/zola-lists/old` by `statac import`, which changed
 - 11 posts, into `content/by-date/` and `content/by-none/` and `content/by-title/` and `content/by-weight/` and `content/hidden/` and `content/outer/inner/`.
 - 8 pages, into `content/` where they stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 

@@ -6,7 +6,7 @@ It was made from `tests/import/eleventy-tags-in-writing/old` by `statac import`,
 
 - 1 post, into `content/posts/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `.eleventy.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
@@ -16,7 +16,7 @@ Eleventy reads a date written without an offset as UTC, so `timezone` is `UTC`: 
 
 The settings name no folder in a `dir` Statac can read, so Statac took Eleventy's own: `input` as `.`, `output` as `_site`, `includes` as `_includes` and `data` as `_data`.
 
-The settings copy nothing as it is with an `addPassthroughCopy` Statac can read, so Statac copied only the files beside a page that its content names.
+The settings have no `addPassthroughCopy` Statac can read, so Statac copied only the files beside a page that its content names.
 
 The settings name no `markdownTemplateEngine`, so Statac read the template tags in the Markdown files as Liquid, as Eleventy does unless told otherwise.
 
@@ -24,7 +24,7 @@ The settings don't set `breaks: true`, so Statac read a line end inside a paragr
 
 The settings don't set `linkify: true`, so Eleventy left bare URLs as words, and Statac links those starting `www.`, `http://` or `https://`, as https://statac.dev/writing/#addresses-written-bare describes.
 
-The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown as it is, as Statac does.
+The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown unchanged, as Statac does.
 
 The settings name no plugin for attributes in braces, so Statac took `{.class}` and the like for words, as Eleventy did.
 
@@ -54,7 +54,7 @@ The old site's built output isn't in `_site/`, so no old URL was checked against
 
 ### Template tags left as written
 
-Statac's Markdown runs no template tags and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
+Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
 - `posts/post-1.md`, line 29: `{% aside "note" %}`
 - `posts/post-1.md`, line 29: `{% endaside %}`
@@ -65,7 +65,7 @@ Statac's Markdown runs no template tags and these have no equal in it, so each i
 
 ### Template tags inside code
 
-Eleventy ran these even inside code, and Statac shows code exactly as written, so each now shows as it stands: write by hand what it made, where that was meant.
+Eleventy ran these even inside code, and Statac shows code exactly as written, so each now shows as written: write by hand what it made, where that was meant.
 
 - `posts/post-1.md`, line 36: `{% image "in-code.jpg" %}`
 - `posts/post-1.md`, line 40: `{% image "in-span.jpg" %}`
@@ -80,9 +80,9 @@ Each include is now a call to a snippet of its name, and the snippet holds only 
 - `snippets/line_1.html`:
   - `posts/post-1.md`, line 17: `{% render 'line-1.liquid' %}`
 
-### Tags now snippet calls
+### Shortcodes now snippet calls
 
-Each of these tags of the old site's own is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
+Each of these shortcodes of the old site's own is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
 
 - `snippets/image.html`:
   - `posts/post-1.md`, line 21: `{% image "photo-1.jpg", "A photo" %}`

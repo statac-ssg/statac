@@ -7,7 +7,7 @@ It was made from `tests/import/tags-in-writing/old` by `statac import`, which ch
 - 2 posts, into `content/posts/`.
 - 1 page, into `content/` where it stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -42,7 +42,7 @@ Each of these names a page Statac couldn't find in the old site, or one Jekyll d
 
 ### Template tags left as written
 
-Statac's Markdown runs no template tags and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
+Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
 - `_posts/2026-01-01-post-1.md`, line 30: `{% if page.title %}`
 - `_posts/2026-01-01-post-1.md`, line 30: `{% endif %}`
@@ -53,7 +53,7 @@ Statac's Markdown runs no template tags and these have no equal in it, so each i
 
 ### Template tags inside code
 
-Jekyll filled these in even inside code, and Statac shows code exactly as written, so each now shows as it stands: write by hand what it made, where that was meant.
+Jekyll filled these in even inside code, and Statac shows code exactly as written, so each now shows as written: write by hand what it made, where that was meant.
 
 - `_posts/2026-01-01-post-1.md`, line 34: `{% highlight ruby %}`
 - `_posts/2026-01-01-post-1.md`, line 35: `{% post_url 2026-01-02-post-2 %}`

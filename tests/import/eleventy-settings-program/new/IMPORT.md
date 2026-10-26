@@ -6,7 +6,7 @@ It was made from `tests/import/eleventy-settings-program/old` by `statac import`
 
 - 1 post, into `content/posts/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `eleventy.config.mjs` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
@@ -18,7 +18,7 @@ The settings name no folder in a `dir` Statac can read, so Statac took Eleventy'
 
 The settings' `dir` gives `input`, `output`, `includes` and `data` as something other than text in quotes, which Statac can't know without running the settings, so it took Eleventy's own.
 
-The settings copy nothing as it is with an `addPassthroughCopy` Statac can read, so Statac copied only the files beside a page that its content names.
+The settings have no `addPassthroughCopy` Statac can read, so Statac copied only the files beside a page that its content names.
 
 The settings name no `markdownTemplateEngine`, so Statac read the template tags in the Markdown files as Liquid, as Eleventy does unless told otherwise.
 
@@ -26,7 +26,7 @@ The settings don't set `breaks: true`, so Statac read a line end inside a paragr
 
 The settings don't set `linkify: true`, so Eleventy left bare URLs as words, and Statac links those starting `www.`, `http://` or `https://`, as https://statac.dev/writing/#addresses-written-bare describes.
 
-The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown as it is, as Statac does.
+The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown unchanged, as Statac does.
 
 The settings name no plugin for attributes in braces, so Statac took `{.class}` and the like for words, as Eleventy did.
 

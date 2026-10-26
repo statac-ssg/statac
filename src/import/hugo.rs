@@ -92,22 +92,21 @@ const DATE_NAMES: &[&str] = &[
 ];
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
-    heading: "Tags in the content left as written",
-    sentence: "Statac's Markdown runs none of Hugo's tags, and these have no equal in it, so each \
-               is left as written and shows on the page as it stands: write by hand what it \
+    heading: "Shortcodes left as written",
+    sentence: "Statac's Markdown runs none of Hugo's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
 pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
-    heading: "Tags inside code",
+    heading: "Shortcodes inside code",
     sentence: "Hugo ran these even inside code, and Statac shows code exactly as written, so each \
-               now shows as it stands: write by hand what it made, where that was meant.",
+               now shows as written: write by hand what it made, where that was meant.",
 };
 
 pub(super) static TAG_IN_ADDRESS: FindingKind = FindingKind {
-    heading: "Tags inside a URL",
-    sentence: "Each of these tags stands inside a link's URL, where Statac runs no snippet, so it \
-               is left as written and the link leads nowhere: write the URL the tag made in its \
+    heading: "Shortcodes inside a URL",
+    sentence: "Each of these shortcodes stands inside a link's URL, where Statac runs no snippet, so it \
+               is left as written and the link leads nowhere: write the URL the shortcode made in its \
                place.",
 };
 
@@ -118,8 +117,8 @@ pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
 };
 
 pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
-    heading: "Tags now snippet calls",
-    sentence: "Each of these tags is now a call to a snippet of its name, and the snippet holds \
+    heading: "Shortcodes now snippet calls",
+    sentence: "Each of these shortcodes is now a call to a snippet of its name, and the snippet holds \
                only a comment saying it wasn't converted: write the snippet, as \
                https://statac.dev/snippets/ describes, or take the calls out.",
 };
@@ -134,7 +133,7 @@ pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
 pub(super) static RAW_HTML: FindingKind = FindingKind {
     heading: "HTML Hugo left out",
     sentence: "Hugo's settings left HTML in Markdown out of the page, and Statac \
-               publishes it as it is, so each of these now shows: read each page that has one, \
+               publishes it unchanged, so each of these now shows: read each page that has one, \
                and take out what wasn't meant to show.",
 };
 
@@ -1761,7 +1760,10 @@ impl Reader<'_> {
                 "Hugo's feeds were RSS, at `{name}` beside each list page. Each {now} {kept}"
             ),
         };
-        if fed && tags && self.s.terms {
+        let tagged = (self.docs.iter().filter(|doc| !doc.draft)).any(|doc| {
+            (doc.terms.iter()).any(|(plural, terms)| plural == "tags" && !terms.is_empty())
+        });
+        if fed && tags && self.s.terms && tagged {
             said += " The feed Hugo made for each tag has no equal.";
         }
         if !said.is_empty() {
@@ -2152,8 +2154,8 @@ impl Reader<'_> {
             };
             self.note(format!(
                 "Hugo paginated only the lists whose templates asked for it, which Statac can't \
-                 tell from the content; Statac paginates every list with more posts than a page \
-                 shows: see https://statac.dev/lists/#pages-of-a-list.{firsts}"
+                 tell from the content; the new site's `posts_per_page` paginates every list with \
+                 more posts than that: see https://statac.dev/lists/#pages-of-a-list.{firsts}"
             ));
         }
         if self.s.pager_size.is_some() || more {

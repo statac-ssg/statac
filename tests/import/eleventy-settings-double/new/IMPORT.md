@@ -7,7 +7,7 @@ It was made from `tests/import/eleventy-settings-double/old` by `statac import`,
 - 1 post, into `content/posts/`.
 - 3 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `.eleventy.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
@@ -25,7 +25,7 @@ The settings' Markdown had `breaks: true`, which made each line end inside a par
 
 The settings' Markdown had `linkify: true`, which linked bare URLs; Statac links those starting `www.`, `http://` or `https://` too, and 1 other is no longer linked, listed under Left for you.
 
-The settings' Markdown had `html: true`, so Eleventy published HTML in Markdown as it is, as Statac does.
+The settings' Markdown had `html: true`, so Eleventy published HTML in Markdown unchanged, as Statac does.
 
 The settings use `markdown-it-attrs`, which read attributes in braces, as `{.class}`; Statac reads them only at the end of a heading, so 1 elsewhere shows as written, listed under Left for you.
 
@@ -65,7 +65,7 @@ The old site's Markdown read each of these as attributes of what stands before i
 
 ### Template tags left as written
 
-Statac's Markdown runs no template tags and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
+Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
 - `src/posts/post-1.md`, line 14: `{# A Nunjucks comment. #}`
 

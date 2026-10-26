@@ -679,7 +679,7 @@ fn a_feed_the_import_asks_for_is_kept_at_its_url_with_no_template_or_site_url() 
             !report.contains("Nothing in the new site is published at these old URLs"),
             "{label}: {report}"
         );
-        let needs = format!(" Its pages and feeds need `{template}`.");
+        let needs = format!(" Adding `{template}` builds its feeds.");
         assert!(report.contains(&needs), "{label}: {report}");
         let url_needed = " Its feeds also need the site's full URL, as `url` in `statac.yaml`.";
         assert_eq!(report.contains(url_needed), !url, "{label}: {report}");

@@ -32,24 +32,22 @@ use slug::Strategy;
 use writing::Reading;
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
-    heading: "Tags in the content left as written",
-    sentence: "Statac's Markdown runs none of Zola's tags, and these have no equal in it, so each \
-               is left as written and shows on the page as it stands: write by hand what it \
+    heading: "Shortcodes left as written",
+    sentence: "Statac's Markdown runs none of Zola's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
 pub(super) static TEMPLATE_CODE: FindingKind = FindingKind {
     heading: "Template code Zola may have run",
     sentence: "Nothing in the old site says which version of Zola made it: 0.23 and later run \
-               these as template code, and earlier versions show them as written. Each is left \
-               as written and shows on the page as it stands: where the old site ran it, write \
-               by hand what it made.",
+               these as template code, and earlier versions show them as written. Each appears \
+               on the page as written: where the old site ran it, write by hand what it made.",
 };
 
 pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
-    heading: "Tags inside code",
+    heading: "Shortcodes inside code",
     sentence: "Zola ran these even inside code, and Statac shows code exactly as written, so each \
-               now shows as it stands: write by hand what it made, where that was meant.",
+               now shows as written: write by hand what it made, where that was meant.",
 };
 
 pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
@@ -60,8 +58,8 @@ pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
 };
 
 pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
-    heading: "Tags now snippet calls",
-    sentence: "Each of these tags is now a call to a snippet of its name, and the snippet holds \
+    heading: "Shortcodes now snippet calls",
+    sentence: "Each of these shortcodes is now a call to a snippet of its name, and the snippet holds \
                only a comment saying it wasn't converted: write the snippet, as \
                https://statac.dev/snippets/ describes, or take the calls out.",
 };

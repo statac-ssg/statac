@@ -6,7 +6,7 @@ It was made from `tests/import/eleventy-redirects/old` by `statac import`, which
 
 - 2 posts, into `content/posts/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `.eleventy.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
@@ -24,7 +24,7 @@ The settings don't set `breaks: true`, so Statac read a line end inside a paragr
 
 The settings don't set `linkify: true`, so Eleventy left bare URLs as words, and Statac links those starting `www.`, `http://` or `https://`, as https://statac.dev/writing/#addresses-written-bare describes.
 
-The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown as it is, as Statac does.
+The settings give Markdown no library of their own, so Statac took Eleventy's own, which publishes HTML in Markdown unchanged, as Statac does.
 
 The settings name no plugin for attributes in braces, so Statac took `{.class}` and the like for words, as Eleventy did.
 

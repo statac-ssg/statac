@@ -7,7 +7,7 @@ It was made from `tests/import/permalink-date/old` by `statac import`, which cha
 - 4 posts, into `content/posts/`.
 - 1 page, into `content/` where it stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -36,7 +36,7 @@ Each URL was also looked for in the old site's own built output, `_site/`.
 
 ### Pages written in HTML
 
-Each of these was written in HTML and came across as a Markdown file holding that HTML, which Statac publishes as it is: read each, since Markdown reads a line indented by four spaces after a blank line as code.
+Each of these was written in HTML and came across as a Markdown file holding that HTML, which Statac publishes unchanged: read each, since Markdown reads a line indented by four spaces after a blank line as code.
 
 - `_posts/2026-01-04-post-4.html`
 

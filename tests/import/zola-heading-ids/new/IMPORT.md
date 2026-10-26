@@ -6,7 +6,7 @@ It was made from `tests/import/zola-heading-ids/old` by `statac import`, which c
 
 - 2 pages, into `content/` where they stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
@@ -40,9 +40,9 @@ The old site's built output isn't in `public/`, so no old URL was checked agains
 
 ## Left for you
 
-### Tags now snippet calls
+### Shortcodes now snippet calls
 
-Each of these tags is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
+Each of these shortcodes is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
 
 - `snippets/youtube.html`:
   - `content/page-1.md`, line 8: `{{ <youtube id="abcdefghijk" /> }}`

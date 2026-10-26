@@ -174,10 +174,15 @@ pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
     });
     if !summary.templates.is_empty() {
         let templates: Vec<String> = summary.templates.iter().map(|t| code(t)).collect();
+        let pages = summary.templates.iter().any(|t| t.ends_with(".html"));
         text.push_str(&format!(
-            " Its pages{} need {}.",
-            if summary.for_feeds { " and feeds" } else { "" },
-            crate::wording::listed(&templates)
+            " Adding {} builds its {}.",
+            crate::wording::listed(&templates),
+            match (pages, summary.for_feeds) {
+                (true, true) => "pages and feeds",
+                (false, true) => "feeds",
+                _ => "pages",
+            },
         ));
     }
     if summary.feeds_need_url {
@@ -252,8 +257,8 @@ fn came_across(text: &mut String, summary: &Summary) {
     text.push('\n');
     text.push_str(match summary.home {
         false => {
-            "The old site's home page had no content of its own, so `content/index.md` has \
-             none: write the home page there.\n\n"
+            "No page of the old site's came across as its home page, so `content/index.md` \
+             is empty: write the home page there.\n\n"
         }
         true => "The old site's home page is `content/index.md`.\n\n",
     });

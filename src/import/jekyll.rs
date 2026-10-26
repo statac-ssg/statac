@@ -117,28 +117,28 @@ pub(super) static TEMPLATE_PAGE: FindingKind = FindingKind {
     heading: "Pages made by templates",
     sentence: "Each of these pages was mostly the old site's templates at work, such as a home \
                page or an archive listing the posts, so Statac didn't bring it across: Statac \
-               makes the home page and a page for each folder of posts and each tag itself, as \
+               makes a list page where the site asks for one, with an `index.md` in a folder, \
+               `templates/home.html` for the home page, or `tags.pages: true`, as \
                https://statac.dev/lists/ describes.",
 };
 
 pub(super) static HTML_WRITING: FindingKind = FindingKind {
     heading: "Pages written in HTML",
     sentence: "Each of these was written in HTML and came across as a Markdown file holding that \
-               HTML, which Statac publishes as it is: read each, since Markdown reads a line \
+               HTML, which Statac publishes unchanged: read each, since Markdown reads a line \
                indented by four spaces after a blank line as code.",
 };
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Template tags left as written",
-    sentence: "Statac's Markdown runs no template tags and these have no equal in it, so each is \
-               left as written and shows on the page as it stands: write by hand what it made, \
+    sentence: "Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, \
                or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
 pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
     heading: "Template tags inside code",
     sentence: "Jekyll filled these in even inside code, and Statac shows code exactly as written, \
-               so each now shows as it stands: write by hand what it made, where that was meant.",
+               so each now shows as written: write by hand what it made, where that was meant.",
 };
 
 pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
@@ -189,7 +189,7 @@ pub(super) static ABBREVIATIONS: FindingKind = FindingKind {
 pub(super) static MARKDOWN_IN_HTML: FindingKind = FindingKind {
     heading: "Markdown inside HTML",
     sentence: "Jekyll read the Markdown inside each of these tags, as `markdown=\"1\"` asks, and \
-               Statac's Markdown leaves what is inside HTML as it is, so the Markdown there shows \
+               Statac's Markdown leaves what is inside HTML unchanged, so the Markdown there shows \
                as written: take off the HTML round it, or write what is inside as HTML.",
 };
 
@@ -1713,8 +1713,8 @@ impl Reader<'_> {
         let layouts = self.layouts;
         if layouts > 0 {
             self.note(format!(
-                "`layout` was taken off {}: each is built with the template for its kind, as \
-                 https://statac.dev/templates/ describes.",
+                "`layout` was taken off {}: once you add templates, each is built with the \
+                 one for its kind, as https://statac.dev/templates/ describes.",
                 match layouts {
                     1 => "1 page".to_owned(),
                     n => format!("{n} pages"),

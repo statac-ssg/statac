@@ -6,7 +6,7 @@ It was made from `tests/import/html-writing/old` by `statac import`, which chang
 
 - 2 posts, into `content/posts/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
 
@@ -39,7 +39,7 @@ The old site's built output isn't in `_site/`, so no old URL was checked against
 
 ### Pages written in HTML
 
-Each of these was written in HTML and came across as a Markdown file holding that HTML, which Statac publishes as it is: read each, since Markdown reads a line indented by four spaces after a blank line as code.
+Each of these was written in HTML and came across as a Markdown file holding that HTML, which Statac publishes unchanged: read each, since Markdown reads a line indented by four spaces after a blank line as code.
 
 - `_posts/2026-01-01-post-1.html`
 

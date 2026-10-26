@@ -17,7 +17,7 @@ The settings name no language, so the site is in English, `en`: change `language
 
 The settings name no time zone, so none is written, and Statac reads a date written without an offset as UTC, and says so: add `timezone` to `statac.yaml`, as `Europe/London`.
 
-`layout` was taken off 1 page: each is built with the template for its kind, as https://statac.dev/templates/ describes.
+`layout` was taken off 1 page: once you add templates, each is built with the one for its kind, as https://statac.dev/templates/ describes.
 
 The settings written in `statac.yaml`:
 
@@ -62,7 +62,7 @@ Jekyll publishes a post only from a file with front matter named as `2026-10-04-
 
 ### Pages made by templates
 
-Each of these pages was mostly the old site's templates at work, such as a home page or an archive listing the posts, so Statac didn't bring it across: Statac makes the home page and a page for each folder of posts and each tag itself, as https://statac.dev/lists/ describes.
+Each of these pages was mostly the old site's templates at work, such as a home page or an archive listing the posts, so Statac didn't bring it across: Statac makes a list page where the site asks for one, with an `index.md` in a folder, `templates/home.html` for the home page, or `tags.pages: true`, as https://statac.dev/lists/ describes.
 
 - `archive.html`, line 5: `{% for post in site.posts %}`
 

@@ -37,8 +37,9 @@ pub(super) static TEMPLATE_PAGE: FindingKind = FindingKind {
     heading: "Pages made by templates",
     sentence: "Each of these was the old site's templates at work, a page written in a template \
                language such as Nunjucks or one listing the old site's pages, so Statac didn't \
-               bring it across: Statac makes the home page and a page for each folder of posts \
-               and each tag itself, as https://statac.dev/lists/ describes.",
+               bring it across: Statac makes a list page where the site asks for one, with an \
+               `index.md` in a folder, `templates/home.html` for the home page, or \
+               `tags.pages: true`, as https://statac.dev/lists/ describes.",
 };
 
 pub(super) static COLLECTIONS: FindingKind = FindingKind {
@@ -62,21 +63,20 @@ pub(super) static PARTS: FindingKind = FindingKind {
 pub(super) static HTML_WRITING: FindingKind = FindingKind {
     heading: "Pages written in HTML",
     sentence: "Each of these was written in HTML and came across as a Markdown file holding that \
-               HTML, which Statac publishes as it is: read each, since Markdown reads a line \
+               HTML, which Statac publishes unchanged: read each, since Markdown reads a line \
                indented by four spaces after a blank line as code.",
 };
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
     heading: "Template tags left as written",
-    sentence: "Statac's Markdown runs no template tags and these have no equal in it, so each is \
-               left as written and shows on the page as it stands: write by hand what it made, \
+    sentence: "Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, \
                or call a snippet, as https://statac.dev/snippets/ describes.",
 };
 
 pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
     heading: "Template tags inside code",
     sentence: "Eleventy ran these even inside code, and Statac shows code exactly as written, so \
-               each now shows as it stands: write by hand what it made, where that was meant.",
+               each now shows as written: write by hand what it made, where that was meant.",
 };
 
 pub(super) static INCLUDE: FindingKind = FindingKind {
@@ -87,8 +87,8 @@ pub(super) static INCLUDE: FindingKind = FindingKind {
 };
 
 pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
-    heading: "Tags now snippet calls",
-    sentence: "Each of these tags of the old site's own is now a call to a snippet of its name, \
+    heading: "Shortcodes now snippet calls",
+    sentence: "Each of these shortcodes of the old site's own is now a call to a snippet of its name, \
                and the snippet holds only a comment saying it wasn't converted: write the \
                snippet, as https://statac.dev/snippets/ describes, or take the calls out.",
 };
@@ -116,7 +116,7 @@ pub(super) static LINK_NOT_MADE: FindingKind = FindingKind {
 pub(super) static HTML_SHOWN: FindingKind = FindingKind {
     heading: "HTML the old site showed as text",
     sentence: "The old site's Markdown had HTML turned off and showed each of these as text, and \
-               Statac publishes HTML in Markdown as it is: write each as you mean it, or put a \
+               Statac publishes HTML in Markdown unchanged: write each as you mean it, or put a \
                backslash before its `<` to show it as text.",
 };
 
@@ -2387,8 +2387,8 @@ impl Reader<'_> {
             },
         );
         notes.push(match copies.is_empty() {
-            true => "The settings copy nothing as it is with an `addPassthroughCopy` Statac can \
-                     read, so Statac copied only the files beside a page that its content names."
+            true => "The settings have no `addPassthroughCopy` Statac can read, so Statac \
+                     copied only the files beside a page that its content names."
                 .to_owned(),
             false => format!(
                 "The settings copy {} as {} with `addPassthroughCopy`, so Statac copied {} into \
@@ -2486,7 +2486,7 @@ impl Reader<'_> {
         }
         notes.push(match (&self.s.html, self.s.library) {
             (Some(given), _) if given.value => "The settings' Markdown had `html: true`, so \
-                 Eleventy published HTML in Markdown as it is, as Statac does."
+                 Eleventy published HTML in Markdown unchanged, as Statac does."
                 .to_owned(),
             (Some(_), _) => format!(
                 "The settings' Markdown had `html: false`, so Eleventy showed HTML in Markdown as \
@@ -2511,7 +2511,7 @@ impl Reader<'_> {
                 }
             ),
             (None, None) => "The settings give Markdown no library of their own, so Statac took \
-                 Eleventy's own, which publishes HTML in Markdown as it is, as Statac does."
+                 Eleventy's own, which publishes HTML in Markdown unchanged, as Statac does."
                 .to_owned(),
         });
         notes.push(match &self.s.attributes {
@@ -2537,7 +2537,7 @@ impl Reader<'_> {
                 counted(separators, "place", "places")
             ),
             (None, Some(_)) => "The settings ask for excerpts and name no `excerpt_separator`, \
-                 so Eleventy ended each at the first line of `---`, which Statac leaves as it is: \
+                 so Eleventy ended each at the first line of `---`, which Statac leaves as written: \
                  put `<!--more-->` where an excerpt should end."
                 .to_owned(),
             (None, None) => "The settings name no `excerpt_separator`, so Statac changed no \
@@ -2561,8 +2561,8 @@ impl Reader<'_> {
         }
         if self.layouts_taken > 0 {
             notes.push(format!(
-                "`layout` was taken off {}: each is built with the template for its kind, as \
-                 https://statac.dev/templates/ describes.",
+                "`layout` was taken off {}: once you add templates, each is built with the \
+                 one for its kind, as https://statac.dev/templates/ describes.",
                 counted(self.layouts_taken, "page or folder", "pages and folders"),
             ));
         }

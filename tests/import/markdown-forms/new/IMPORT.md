@@ -6,7 +6,7 @@ It was made from `tests/import/markdown-forms/old` by `statac import`, which cha
 
 - 2 posts, into `content/posts/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
 
@@ -70,7 +70,7 @@ Statac's Markdown has no abbreviations, so each of these lines shows on the page
 
 ### Markdown inside HTML
 
-Jekyll read the Markdown inside each of these tags, as `markdown="1"` asks, and Statac's Markdown leaves what is inside HTML as it is, so the Markdown there shows as written: take off the HTML round it, or write what is inside as HTML.
+Jekyll read the Markdown inside each of these tags, as `markdown="1"` asks, and Statac's Markdown leaves what is inside HTML unchanged, so the Markdown there shows as written: take off the HTML round it, or write what is inside as HTML.
 
 - `_posts/2026-01-02-post-2.md`, line 7: `<div markdown="1">`
 - `_posts/2026-01-02-post-2.md`, line 11: `<figure class="a" markdown='block'>`

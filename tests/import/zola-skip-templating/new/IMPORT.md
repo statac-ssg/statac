@@ -7,7 +7,7 @@ It was made from `tests/import/zola-skip-templating/old` by `statac import`, whi
 - 2 posts, into `content/posts/`.
 - 1 page, into `content/` where it stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
@@ -37,9 +37,9 @@ The old site's built output isn't in `public/`, so no old URL was checked agains
 
 ## Left for you
 
-### Tags in the content left as written
+### Shortcodes left as written
 
-Statac's Markdown runs none of Zola's tags, and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
+Statac's Markdown runs none of Zola's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
 - `content/posts/post-1.md`, line 5: `{{ page.title }}`
 

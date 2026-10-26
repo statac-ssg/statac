@@ -7,7 +7,7 @@ It was made from `tests/import/zola-template-code/old` by `statac import`, which
 - 1 post, into `content/posts/`.
 - 1 page, into `content/` where it stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
@@ -39,7 +39,7 @@ The old site's built output isn't in `public/`, so no old URL was checked agains
 
 ### Template code Zola may have run
 
-Nothing in the old site says which version of Zola made it: 0.23 and later run these as template code, and earlier versions show them as written. Each is left as written and shows on the page as it stands: where the old site ran it, write by hand what it made.
+Nothing in the old site says which version of Zola made it: 0.23 and later run these as template code, and earlier versions show them as written. Each appears on the page as written: where the old site ran it, write by hand what it made.
 
 - `content/posts/post-1.md`, line 5: `{{ page.title }}`
 

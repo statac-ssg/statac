@@ -8,7 +8,7 @@ It was made from `tests/import/zola-tags-in-writing/old` by `statac import`, whi
 - 1 draft, with `draft: true`, so it isn't published by accident.
 - 1 page, into `content/` where it stood in the old site.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 
@@ -43,9 +43,9 @@ Statac has no equal for each of these settings, so nothing came across for them:
 
 - `config.toml`, line 4: `markdown.render_emoji: true`
 
-### Tags in the content left as written
+### Shortcodes left as written
 
-Statac's Markdown runs none of Zola's tags, and these have no equal in it, so each is left as written and shows on the page as it stands: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
+Statac's Markdown runs none of Zola's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
 - `content/posts/post-1.md`, line 27: `{% aside(kind='tip') %}`
 - `content/posts/post-1.md`, line 27: `{% end %}`
@@ -64,16 +64,16 @@ Statac reads the rest of a code block's first line as its caption, so Zola's opt
 
 - `content/posts/post-1.md`, line 39: ```` ```rust,linenos,hl_lines=1 ````
 
-### Tags inside code
+### Shortcodes inside code
 
-Zola ran these even inside code, and Statac shows code exactly as written, so each now shows as it stands: write by hand what it made, where that was meant.
+Zola ran these even inside code, and Statac shows code exactly as written, so each now shows as written: write by hand what it made, where that was meant.
 
 - `content/posts/post-1.md`, line 40: `{{ youtube(id="in-code") }}`
 - `content/posts/post-1.md`, line 43: `{{ youtube(id="in-span") }}`
 
-### Tags now snippet calls
+### Shortcodes now snippet calls
 
-Each of these tags is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
+Each of these shortcodes is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
 
 - `snippets/youtube.html`:
   - `content/posts/post-1.md`, line 9: `{{ youtube(id="abcdefghijk") }}`

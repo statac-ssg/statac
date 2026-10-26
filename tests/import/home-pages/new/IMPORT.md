@@ -6,7 +6,7 @@ It was made from `tests/import/home-pages/old` by `statac import`, which changed
 
 - 5 posts, into `content/posts/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 
@@ -37,7 +37,7 @@ The old site's built output isn't in `_site/`, so no old URL was checked against
 
 ### Pages made by templates
 
-Each of these pages was mostly the old site's templates at work, such as a home page or an archive listing the posts, so Statac didn't bring it across: Statac makes the home page and a page for each folder of posts and each tag itself, as https://statac.dev/lists/ describes.
+Each of these pages was mostly the old site's templates at work, such as a home page or an archive listing the posts, so Statac didn't bring it across: Statac makes a list page where the site asks for one, with an `index.md` in a folder, `templates/home.html` for the home page, or `tags.pages: true`, as https://statac.dev/lists/ describes.
 
 - `index.html`, line 4: `{% for post in paginator.posts %}`
 

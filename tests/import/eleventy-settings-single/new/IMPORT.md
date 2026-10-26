@@ -7,7 +7,7 @@ It was made from `tests/import/eleventy-settings-single/old` by `statac import`,
 - 1 post, into `content/`.
 - 2 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `eleventy.config.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 
@@ -53,15 +53,15 @@ The old site's built output isn't in `built/`, so no old URL was checked against
 
 ### HTML the old site showed as text
 
-The old site's Markdown had HTML turned off and showed each of these as text, and Statac publishes HTML in Markdown as it is: write each as you mean it, or put a backslash before its `<` to show it as text.
+The old site's Markdown had HTML turned off and showed each of these as text, and Statac publishes HTML in Markdown unchanged: write each as you mean it, or put a backslash before its `<` to show it as text.
 
 - `site/post-1.md`, line 8: `<b>`
 - `site/post-1.md`, line 8: `</b>`
 - `site/post-1.md`, line 10: `<div>A block of HTML.</div>`
 
-### Tags now snippet calls
+### Shortcodes now snippet calls
 
-Each of these tags of the old site's own is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
+Each of these shortcodes of the old site's own is now a call to a snippet of its name, and the snippet holds only a comment saying it wasn't converted: write the snippet, as https://statac.dev/snippets/ describes, or take the calls out.
 
 - `snippets/year.html`:
   - `site/post-1.md`, line 12: `{% year %}`
