@@ -801,6 +801,18 @@ fn a_folder_is_numbered_only_when_every_page_in_it_is() {
             "{names:?}"
         );
     }
+    // `numbered: true` says the numbering is meant: the folder is numbered,
+    // and not noted.
+    let read = site(&[
+        ("content/days/01-day-one.md", "# Day\n"),
+        ("content/days/02-day-two.md", "# Day\n"),
+        ("content/days/index.md", "---\nnumbered: true\n---\n"),
+    ]);
+    assert!(list(&read, &folder("days")).numbered);
+    let noted = problems(&read)
+        .into_iter()
+        .any(|(name, _, _)| name == "numbered-folder");
+    assert!(!noted);
 }
 
 #[test]

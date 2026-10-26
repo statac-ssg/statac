@@ -31,7 +31,9 @@ quieten it.
 
 ## How to fix it
 
-If you meant the numbers to order the folder, nothing is wrong.
+If you meant the numbers to order the folder, nothing is wrong. To say
+so, write `numbered: true` in the folder's `index.md`, and the note no
+longer appears for that folder.
 
 If the numbers are part of the names, such as in a folder of years, write
 this in the folder's `index.md`. The names and URLs then keep the

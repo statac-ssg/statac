@@ -903,7 +903,11 @@ impl Reader<'_> {
                 });
                 self.folders[at].list = Some(list);
                 self.folders[at].numbered = numbered;
-                if numbered {
+                // `numbered: true` says the numbering is meant.
+                let confirmed = self.folders[at].index.is_some_and(|index| {
+                    self.docs[index].words.own.truth(PageWord::Numbered) == Some(true)
+                });
+                if numbered && !confirmed {
                     self.problems.push(Problem::nowhere(Kind::NumberedFolder {
                         folder: format!("content/{}", self.folders[at].rel),
                     }));
