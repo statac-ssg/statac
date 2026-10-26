@@ -6,15 +6,13 @@ It was made from `tests/import/hugo-front-matter/old` by `statac import`, which 
 
 - 2 posts, into `content/posts/`.
 - 2 drafts, each with `draft: true`, so none is published by accident.
-- 1 page, into `content/` where it stood in the old site.
+- 2 pages, into `content/` where they stood in the old site.
 
 No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
 Hugo ordered the pages of `content/posts/` by their `weight`, so `content/posts/index.md` lists them in that order with `order:`, and `weight` was taken off them.
 
 Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each stays at the same URL, as `feed: index.xml` on each list page says, built with `templates/index.xml` once you add it, and `feed_ids_before` and `feed_ids_from: hugo` keep each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. Copy the docs' RSS template as `templates/index.xml`: see https://statac.dev/feeds/#the-template. The feed Hugo made for each tag has no equal.
-
-Hugo made a list of each folder at the top of the content folder, and these had no `_index.md` of their own, so Statac wrote one to keep what the list was given: `content/posts/index.md` for `content/posts/`.
 
 `layout` and `type` were taken off 1 page: each is built with the template for its kind, as https://statac.dev/templates/ describes.
 
@@ -50,6 +48,12 @@ The old site published a page listing every one of its `tags` at `/tags/`, and t
 The old site published a page listing every one of its `categories` at `/categories/`, and the new site has none.
 
 ## Left for you
+
+### Cascades not converted
+
+Hugo's `cascade:` on each of these handed its fields to the pages beneath, and Statac reads no `cascade:`, so it was left out: write each field as a `pages.` line in the folder's `index.md`, as https://statac.dev/front-matter/#handing-down describes.
+
+- `content/posts/_index.md`, line 3: `cascade: {author: Name}`
 
 ### Pages with a different `publishDate`
 

@@ -173,6 +173,14 @@ pub(super) static EXPIRY_DATE: FindingKind = FindingKind {
                the same.",
 };
 
+pub(super) static CASCADE: FindingKind = FindingKind {
+    heading: "Cascades not converted",
+    sentence: "Hugo's `cascade:` on each of these handed its fields to the pages beneath, and \
+               Statac reads no `cascade:`, so it was left out: write each field as a `pages.` \
+               line in the folder's `index.md`, as \
+               https://statac.dev/front-matter/#handing-down describes.",
+};
+
 pub(super) static UNPUBLISHED: FindingKind = FindingKind {
     heading: "Pages Hugo didn't publish",
     sentence: "Each of these pages was `headless`, or its `build` kept it from being published, \
@@ -946,6 +954,17 @@ impl Reader<'_> {
                 continue;
             }
             fields.push(field);
+        }
+        // Statac would keep it as a field of the author's own that hands
+        // nothing down.
+        if let Some(at) = fields.iter().position(|f| f.name == "cascade") {
+            let cascade = fields.remove(at);
+            let written = spelled
+                .iter()
+                .find(|(lower, _)| *lower == cascade.name)
+                .map_or("cascade", |(_, written)| written.as_str());
+            let text = format!("{written}: {}", super::write::shown_value(&cascade.value));
+            self.find(&CASCADE, &from, cascade.line, &text);
         }
         let params: Vec<(String, Value)> = fields
             .iter()
