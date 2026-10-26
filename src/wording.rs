@@ -379,6 +379,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         ),
         Kind::WrongPlace { key, why } => match why {
             WrongPlace::EachPagesOwn => format!("Wrong place: `{key}` can't cascade"),
+            WrongPlace::OrderNames => format!("Wrong place: `{key}` can't cascade a list of names"),
             WrongPlace::SiteSetting => format!("Wrong place: `{key}` is a site setting"),
             WrongPlace::TopFolder => {
                 format!("Wrong place: `{key}` at the top of `content/` reaches every page")
@@ -2814,6 +2815,10 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 let bare = key.strip_prefix("pages.").unwrap_or(key);
                 Some(format!("Write `{bare}:` on each page instead."))
             }
+            WrongPlace::OrderNames => Some(
+                "Write it as `order:` in the `index.md` of the folder whose pages it names instead."
+                    .into(),
+            ),
             WrongPlace::SiteSetting | WrongPlace::TopFolder => {
                 Some("Write it in `statac.yaml` instead.".into())
             }
@@ -8919,6 +8924,16 @@ mod tests {
                 },
                 "Wrong place: `pages.layout` cascades only from a folder's `index.md`",
                 Some("Move it to the folder's `index.md`."),
+            ),
+            (
+                Kind::WrongPlace {
+                    key: "pages.order".into(),
+                    why: WrongPlace::OrderNames,
+                },
+                "Wrong place: `pages.order` can't cascade a list of names",
+                Some(
+                    "Write it as `order:` in the `index.md` of the folder whose pages it names instead.",
+                ),
             ),
             (
                 Kind::WrongPlace {

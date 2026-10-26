@@ -141,9 +141,10 @@ More: https://statac.dev/data/#pages-made-from-data
 ## `order`
 
 The list's order: `newest first`, `oldest first`, or the names of its
-pages in the order you want. Cascaded with `pages.order`, it reaches the
-lists of the folders inside, but not the folder's own list, and a list
-of names works only on the list's own page.
+pages in the order you want. Cascaded with `pages.order`, `newest first`
+or `oldest first` reaches the lists of the folders inside, but not the
+folder's own list. A list of names works only on the list's own page, and
+`pages.order` can't cascade one.
 
 More: https://statac.dev/lists/#order
 

@@ -677,6 +677,32 @@ fn a_word_handed_down_with_nothing_after_its_colon_is_set_aside_at_its_name() {
 }
 
 #[test]
+fn a_folder_hands_down_an_order_but_not_a_list_of_names() {
+    for (line, found) in [
+        ("pages.order: oldest first", vec![]),
+        (
+            "pages.order: [post-2, post-1]",
+            vec![(
+                "wrong-place",
+                "content/a/index.md".to_owned(),
+                "pages.order".to_owned(),
+            )],
+        ),
+    ] {
+        let read = site(&[
+            (
+                "content/a/index.md",
+                &format!("---\ntitle: A\n{line}\n---\n"),
+            ),
+            ("content/a/b/index.md", "---\ntitle: B\n---\n"),
+            ("content/a/b/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("content/a/b/post-2.md", "---\ntitle: Post 2\n---\n"),
+        ]);
+        assert_eq!(problems(&read), found, "{line}");
+    }
+}
+
+#[test]
 fn what_a_folder_hands_down_is_checked_where_it_is_written() {
     let place = |key: &str, why| Kind::WrongPlace {
         key: key.into(),

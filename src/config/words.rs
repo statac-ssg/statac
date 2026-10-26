@@ -480,6 +480,10 @@ pub(crate) fn read_handed(
             problems.push(wrong_place(&name, WrongPlace::EachPagesOwn, key));
             return;
         }
+        if word == PageWord::Order && matches!(value.value, Yaml::Sequence(_)) {
+            problems.push(wrong_place(&name, WrongPlace::OrderNames, key));
+            return;
+        }
         problems.extend(empty(&name, Word::Field, key, value));
         problems.extend(one_tag(sources, word, key, value));
         match read_word(sources, word, value, (true, declarations), None) {

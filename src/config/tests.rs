@@ -551,6 +551,10 @@ fn pages_lines_that_cant_be_handed_down_are_refused() {
             place("pages.redirect_from", WrongPlace::EachPagesOwn),
         ),
         (
+            "pages.order: [post-2, post-1]",
+            place("pages.order", WrongPlace::OrderNames),
+        ),
+        (
             "pages.index_page: false",
             place("pages.index_page", WrongPlace::WholeSite),
         ),

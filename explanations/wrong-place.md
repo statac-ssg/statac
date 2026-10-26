@@ -4,6 +4,8 @@ A setting is written somewhere it can't take effect. A `pages.` line in a
 folder's `index.md` cascades a field to the pages in that folder. So it
 can't cascade a field that each page has of its own, such as `title` or
 `date`, and it can't be written on a page that has no pages inside it.
+`pages.order` can cascade `newest first` or `oldest first`, but not a
+list of names, because a list of names orders the pages of one folder.
 `pages.index_page` can't cascade from `statac.yaml`, because there
 it would apply to every list on the site, including the home page. Site
 settings, such as `tags.permalink`, and `site.` values belong in

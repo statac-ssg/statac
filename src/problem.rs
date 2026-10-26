@@ -2473,6 +2473,9 @@ pub enum Unmatched {
 pub enum WrongPlace {
     /// Handed down, though each page has its own.
     EachPagesOwn,
+    /// An `order:` list of names handed down, though it names one list's
+    /// pages.
+    OrderNames,
     /// A site setting written for pages.
     SiteSetting,
     /// Handed down from the top of `content/`, which is the whole site.
