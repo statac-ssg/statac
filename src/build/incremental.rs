@@ -180,54 +180,54 @@ impl Checking {
 
 /// What a round to rebuild is handed.
 pub(crate) struct Rebuilding<'a> {
-    pub options: &'a Options,
+    pub(crate) options: &'a Options,
     /// The site as the round read it.
-    pub prepared: Prepared,
+    pub(crate) prepared: Prepared,
     /// What it is about to build, each page noting what its links ask the
     /// site for.
-    pub plan: Plan,
+    pub(crate) plan: Plan,
     /// The clock of the site's disk, read before the round read any file
     /// of the site.
-    pub disk: Option<Clock>,
+    pub(crate) disk: Option<Clock>,
     /// Where each output built goes: held to be written later, or nowhere.
-    pub writes: Writes<'a>,
+    pub(crate) writes: Writes<'a>,
     /// What each file published as it is was found to hold, where that is
     /// known.
-    pub remembered: Option<&'a Remembered>,
+    pub(crate) remembered: Option<&'a Remembered>,
     /// Whether the round notes the keys it found changed.
-    pub notes: bool,
+    pub(crate) notes: bool,
 }
 
 /// A round rebuilt.
 pub(crate) struct Rebuilt {
-    pub reading: Reading,
+    pub(crate) reading: Reading,
     /// The site as the round read it, its problems taken into
     /// [`Rebuilt::concluded`].
-    pub prepared: Prepared,
-    pub plan: Plan,
+    pub(crate) prepared: Prepared,
+    pub(crate) plan: Plan,
     /// Every output, in the order `plan` has them.
-    pub built: Vec<Built>,
-    pub concluded: Concluded,
+    pub(crate) built: Vec<Built>,
+    pub(crate) concluded: Concluded,
     /// Outputs built this round, the rest being kept.
-    pub fresh: usize,
+    pub(crate) fresh: usize,
     /// Every key an output of the kept round read that this round found
     /// holding something else, as the kept round names it, in order;
     /// noted only where the round was asked to note them.
-    pub changed: Vec<Key>,
-    pub took: Took,
+    pub(crate) changed: Vec<Key>,
+    pub(crate) took: Took,
     /// What [`Kept::new`] keeps of the round.
-    pub keep: Keep,
+    pub(crate) keep: Keep,
 }
 
 /// How long each part of [`rebuild`] took.
 #[derive(Copy, Clone, Default, Debug)]
 pub(crate) struct Took {
     /// Finding which outputs of the kept round still stand.
-    pub comparing: Duration,
+    pub(crate) comparing: Duration,
     /// Building the others.
-    pub building: Duration,
+    pub(crate) building: Duration,
     /// Concluding over them all.
-    pub concluding: Duration,
+    pub(crate) concluding: Duration,
 }
 
 /// What a round leaves to keep besides the site it read and its outputs.

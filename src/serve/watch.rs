@@ -32,7 +32,7 @@ pub enum How {
 }
 
 /// How often a polled folder is looked at, unless asked otherwise.
-pub const POLL: Duration = Duration::from_millis(500);
+pub(crate) const POLL: Duration = Duration::from_millis(500);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Settle {
@@ -52,23 +52,21 @@ impl Default for Settle {
 }
 
 #[derive(Clone, Debug)]
-pub struct Batch {
+pub(crate) struct Batch {
     /// Files written, made or removed, from the site's folder, with
     /// forward slashes, in order.
-    pub changed: Vec<String>,
+    pub(crate) changed: Vec<String>,
     /// The system lost reports, so anything may have changed.
-    pub rescan: bool,
-    pub first_event: Instant,
-    pub settled: Instant,
+    pub(crate) rescan: bool,
 }
 
 /// The watcher in use. Watching ends when this is dropped.
-pub struct Watching {
+pub(crate) struct Watching {
     _native: Option<RecommendedWatcher>,
     _awake: Option<Awake>,
     /// How often the folder is looked at, where it is polled.
-    pub polling: Option<Duration>,
-    pub because: Option<Because>,
+    pub(crate) polling: Option<Duration>,
+    pub(crate) because: Option<Because>,
 }
 
 /// Where the system's reports of changes come late after a quiet spell
@@ -106,7 +104,7 @@ enum Source {
 /// Watches the folder at `root`, sending each settled batch to `batches`.
 /// Fails only where the folder can't be watched even by polling, with the
 /// system's reason.
-pub fn start(
+pub(crate) fn start(
     root: &Path,
     how: How,
     settle: Settle,
@@ -230,7 +228,7 @@ impl Settler {
                     Err(RecvTimeoutError::Disconnected) => return,
                 }
             }
-            if !self.emit(first_event) {
+            if !self.emit() {
                 return;
             }
         }
@@ -264,8 +262,8 @@ impl Settler {
                 Some(began) if found && began.elapsed() < settle.longest => {
                     std::thread::sleep(settle.quiet);
                 }
-                Some(began) => {
-                    if !self.emit(began) {
+                Some(_) => {
+                    if !self.emit() {
                         return;
                     }
                     first_event = None;
@@ -308,7 +306,7 @@ impl Settler {
 
     /// Sends what the burst changed, if anything; gives whether anyone is
     /// still listening.
-    fn emit(&mut self, first_event: Instant) -> bool {
+    fn emit(&mut self) -> bool {
         let rescan = std::mem::take(&mut self.rescan);
         let hints = std::mem::take(&mut self.hints);
         let changed = match rescan {
@@ -318,12 +316,7 @@ impl Settler {
         if changed.is_empty() && !rescan {
             return true;
         }
-        let batch = Batch {
-            changed,
-            rescan,
-            first_event,
-            settled: Instant::now(),
-        };
+        let batch = Batch { changed, rescan };
         self.batches.send(batch).is_ok()
     }
 }
@@ -346,7 +339,7 @@ fn relative(roots: &[PathBuf; 2], path: &Path) -> Option<String> {
 /// What an editor or the system leaves beside a file while it works, and
 /// anything named with a dot, which also hides what Statac keeps in the
 /// site's folder.
-pub fn is_ignored(relative: &str) -> bool {
+pub(crate) fn is_ignored(relative: &str) -> bool {
     relative.split('/').any(|name| {
         name.starts_with('.')
             || name.ends_with('~')
@@ -455,7 +448,7 @@ fn look_at(
 
 /// Every file in the site at `root` that is watched, by its path from
 /// there with forward slashes.
-pub fn files(root: &Path) -> BTreeSet<String> {
+pub(crate) fn files(root: &Path) -> BTreeSet<String> {
     let mut found = BTreeSet::new();
     walk(root, root, &mut found);
     found

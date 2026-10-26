@@ -23,13 +23,8 @@ use super::{
 /// of copies can be made, from several threads at once.
 pub struct Opened {
     pub(super) pixels: Pixels,
-    /// Whether the pixels were converted to sRGB from an embedded profile.
-    pub converted: bool,
     /// The formats its copies are made in.
     formats: [Format; 2],
-    /// Present where a colour profile is embedded, holding its description
-    /// where it has one.
-    pub profile: Option<Option<String>>,
 }
 
 pub(super) enum Pixels {
@@ -156,10 +151,11 @@ fn opened(
     if let Some(orientation) = Orientation::from_exif(photograph.orientation) {
         image.apply_orientation(orientation);
     }
-    let converted;
     let pixels = if transparent {
         let mut straight = image.into_rgba8();
-        converted = profile.is_some_and(|profile| convert(profile, &mut straight, true));
+        if let Some(profile) = profile {
+            convert(profile, &mut straight, true);
+        }
         let mut premultiplied = straight.clone();
         for pixel in premultiplied.pixels_mut() {
             let a = u32::from(pixel[3]);
@@ -173,14 +169,14 @@ fn opened(
         }
     } else {
         let mut image = image.into_rgb8();
-        converted = profile.is_some_and(|profile| convert(profile, &mut image, false));
+        if let Some(profile) = profile {
+            convert(profile, &mut image, false);
+        }
         Pixels::Rgb(image)
     };
     Ok(Opened {
         pixels,
-        converted,
         formats: super::formats(transparent),
-        profile: photograph.profile,
     })
 }
 
@@ -237,9 +233,10 @@ pub fn remade(
     opened.make(width, Format::Jpeg, settings)
 }
 
-/// [`to_srgb`], answering false where reading the profile panics.
-fn convert(profile: &[u8], pixels: &mut [u8], alpha: bool) -> bool {
-    catch_unwind(AssertUnwindSafe(|| to_srgb(profile, pixels, alpha))).unwrap_or(false)
+/// [`to_srgb`], leaving the pixels as they are where reading the profile
+/// panics.
+fn convert(profile: &[u8], pixels: &mut [u8], alpha: bool) {
+    let _ = catch_unwind(AssertUnwindSafe(|| to_srgb(profile, pixels, alpha)));
 }
 
 /// Whether [`open`] converts the photograph in `bytes` to sRGB: it embeds a
@@ -290,10 +287,10 @@ fn transform(profile: &[u8], alpha: bool) -> Option<(Transform, bool)> {
 }
 
 /// Converts `pixels` to sRGB from `profile`, unless the profile is sRGB in
-/// all but name. Answers whether they were converted.
-fn to_srgb(profile: &[u8], pixels: &mut [u8], alpha: bool) -> bool {
+/// all but name, leaving them as they are where converting fails.
+fn to_srgb(profile: &[u8], pixels: &mut [u8], alpha: bool) {
     let Some((transform, grey)) = transform(profile, alpha) else {
-        return false;
+        return;
     };
     // A grey profile describes one channel; the decoder has copied it into
     // red, green and blue alike.
@@ -308,11 +305,9 @@ fn to_srgb(profile: &[u8], pixels: &mut [u8], alpha: bool) -> bool {
             .collect(),
     };
     let mut output = vec![0; pixels.len()];
-    if transform.transform(&input, &mut output).is_err() {
-        return false;
+    if transform.transform(&input, &mut output).is_ok() {
+        pixels.copy_from_slice(&output);
     }
-    pixels.copy_from_slice(&output);
-    true
 }
 
 /// Whether `profile` maps every sample to sRGB within one 8-bit level: 1,024
@@ -358,7 +353,7 @@ fn is_srgb(profile: &ColorProfile, grey: bool) -> Option<bool> {
 
 impl Opened {
     /// The photograph's size as shown.
-    pub fn size(&self) -> Size {
+    pub(crate) fn size(&self) -> Size {
         let (width, height) = match &self.pixels {
             Pixels::Rgb(image) => image.dimensions(),
             Pixels::Rgba { straight, .. } => straight.dimensions(),
@@ -367,13 +362,18 @@ impl Opened {
     }
 
     /// Whether it is transparent anywhere, and so held with its alpha.
-    pub fn alpha(&self) -> bool {
+    pub(crate) fn alpha(&self) -> bool {
         matches!(self.pixels, Pixels::Rgba { .. })
     }
 
     /// Makes the copy `width` wide in `format`, without any colour profile
     /// or metadata.
-    pub fn make(&self, width: u32, format: Format, settings: &Settings) -> Result<Vec<u8>, Error> {
+    pub(crate) fn make(
+        &self,
+        width: u32,
+        format: Format,
+        settings: &Settings,
+    ) -> Result<Vec<u8>, Error> {
         self.resize(width, settings)
             .map_err(|_| Error::NotOffered { width, format })?
             .encode(format, settings)

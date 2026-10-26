@@ -84,11 +84,11 @@ pub struct Round {
     /// build wrote or removed this round, with what it now holds.
     pub hooked: Vec<(String, Option<blake3::Hash>)>,
     /// What the round wrote into `published.txt`, where it wrote it.
-    pub recorded: Option<blake3::Hash>,
+    pub(crate) recorded: Option<blake3::Hash>,
     /// The pages there is something to say of.
     pub noted: Vec<Noted>,
     /// The site as the round read it, where it built.
-    pub read: Option<Read>,
+    pub(crate) read: Option<Read>,
     /// Every key an output of the last round read that this round found
     /// holding something else, as the last round names it, in order;
     /// noted only where the session was asked to note them.
@@ -96,11 +96,11 @@ pub struct Round {
 }
 
 /// A site as a round read it, to be asked about a page afterwards.
-pub struct Read {
-    pub renderer: crate::templates::Renderer,
+pub(crate) struct Read {
+    pub(crate) renderer: crate::templates::Renderer,
     /// The page each built file is, and which of its list's pages, counted
     /// from 1.
-    pub pages: HashMap<String, (crate::ids::PageId, usize)>,
+    pub(crate) pages: HashMap<String, (crate::ids::PageId, usize)>,
     /// Every output of the round, with what each read.
     pub(crate) built: Arc<Vec<Built>>,
 }
@@ -111,31 +111,31 @@ pub struct Noted {
     /// The file it is published as, from the top of the built site.
     pub file: String,
     /// Its address, without the path the site is published under.
-    pub address: String,
-    pub title: Option<String>,
+    pub(crate) address: String,
+    pub(crate) title: Option<String>,
     pub draft: bool,
     /// The day it waits for, where that is after today.
     pub waiting: Option<String>,
     /// The problems placed in its file, and those building it told.
-    pub problems: Vec<Problem>,
+    pub(crate) problems: Vec<Problem>,
 }
 
 /// How long each part of a round took.
 #[derive(Copy, Clone, Default, Debug)]
-pub struct Took {
+pub(crate) struct Took {
     /// Reading the settings to find whether the site's command runs
     /// before this round, and running it where it does.
-    pub before: Duration,
+    pub(crate) before: Duration,
     /// Reading the site.
-    pub reading: Duration,
+    pub(crate) reading: Duration,
     /// Finding which outputs of the last round still stand.
-    pub comparing: Duration,
+    pub(crate) comparing: Duration,
     /// Building the others.
-    pub building: Duration,
+    pub(crate) building: Duration,
     /// Concluding over them all.
-    pub concluding: Duration,
+    pub(crate) concluding: Duration,
     /// Writing what changed.
-    pub writing: Duration,
+    pub(crate) writing: Duration,
 }
 
 /// A round that built the site, as the next round finds it.
@@ -158,7 +158,7 @@ impl Session {
 
     /// [`Session::start`], calling `waiting` where the round waits for
     /// another build of the site to end.
-    pub fn start_saying(options: &Options, waiting: &mut dyn FnMut()) -> (Session, Round) {
+    pub(crate) fn start_saying(options: &Options, waiting: &mut dyn FnMut()) -> (Session, Round) {
         // Two sessions building into one folder would each serve what the
         // other wrote.
         let (name, claim) = match build::a_folder(&options.site) {
@@ -230,7 +230,7 @@ impl Session {
     }
 
     /// How long each part of the last round took.
-    pub fn took(&self) -> Took {
+    pub(crate) fn took(&self) -> Took {
         self.took
     }
 
@@ -257,7 +257,11 @@ impl Session {
 
     /// [`Session::rebuild_for`], calling `waiting` where the round waits
     /// for another build of the site to end.
-    pub fn rebuild_for_saying(&mut self, changed: &[String], waiting: &mut dyn FnMut()) -> Round {
+    pub(crate) fn rebuild_for_saying(
+        &mut self,
+        changed: &[String],
+        waiting: &mut dyn FnMut(),
+    ) -> Round {
         self.round(Some(changed), waiting)
     }
 

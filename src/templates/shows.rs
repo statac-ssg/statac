@@ -34,68 +34,68 @@ const LONGEST: usize = 120;
 const DATA: &str = "site.data";
 
 /// One page, as its template meets it.
-pub struct Explained {
+pub(crate) struct Explained {
     /// The file it is written in; none for a page Statac made.
-    pub source: Option<SourceId>,
-    pub title: Option<String>,
-    pub address: String,
+    pub(crate) source: Option<SourceId>,
+    pub(crate) title: Option<String>,
+    pub(crate) address: String,
     /// Its language's tag, as a template is handed it, and which way its
     /// lines run.
-    pub language: String,
-    pub direction: Direction,
+    pub(crate) language: String,
+    pub(crate) direction: Direction,
     /// The template that builds it; none where there isn't one to.
-    pub layout: Option<Chosen>,
+    pub(crate) layout: Option<Chosen>,
     /// The files of that template and of each it extends, in turn.
-    pub templates: Vec<SourceId>,
-    pub lists: Vec<Member>,
+    pub(crate) templates: Vec<SourceId>,
+    pub(crate) lists: Vec<Member>,
     /// Where each feed carrying it is published.
-    pub feeds: Vec<String>,
+    pub(crate) feeds: Vec<String>,
     /// `page`, `site`, then `site.data` where the site has any.
-    pub groups: Vec<Group>,
+    pub(crate) groups: Vec<Group>,
 }
 
 /// A list the page is in, and its place among the list's posts.
-pub struct Member {
+pub(crate) struct Member {
     /// The kind of list it is, and its name.
-    pub word: crate::problem::Word,
-    pub list: String,
-    pub at: usize,
-    pub of: usize,
+    pub(crate) word: crate::problem::Word,
+    pub(crate) list: String,
+    pub(crate) at: usize,
+    pub(crate) of: usize,
     /// The posts before and after it in the list.
-    pub previous: Option<Neighbour>,
-    pub next: Option<Neighbour>,
+    pub(crate) previous: Option<Neighbour>,
+    pub(crate) next: Option<Neighbour>,
 }
 
 /// A post beside the page in a list: what it is called, a title or the
 /// name Statac gives a page without one, and where it stands.
-pub struct Neighbour {
-    pub called: String,
-    pub address: String,
+pub(crate) struct Neighbour {
+    pub(crate) called: String,
+    pub(crate) address: String,
 }
 
-pub struct Group {
-    pub of: &'static str,
-    pub rows: Vec<Row>,
+pub(crate) struct Group {
+    pub(crate) of: &'static str,
+    pub(crate) rows: Vec<Row>,
 }
 
 /// One name a template can write.
-pub struct Row {
+pub(crate) struct Row {
     /// As a template writes it: `page.book.author`.
-    pub name: String,
-    pub holds: Holds,
-    pub held: Held,
+    pub(crate) name: String,
+    pub(crate) holds: Holds,
+    pub(crate) held: Held,
     /// Where the value is written, where it is written anywhere.
-    pub from: Option<Place>,
+    pub(crate) from: Option<Place>,
     /// The names it answers in turn, as `page.date` answers `year`.
-    pub has: Vec<String>,
-    pub reached: Reached,
+    pub(crate) has: Vec<String>,
+    pub(crate) reached: Reached,
     /// What it is, where it is one of Statac's names.
-    pub about: Option<&'static Described>,
+    pub(crate) about: Option<&'static Described>,
 }
 
 /// What a template asks for on its way to a name.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Reached {
+pub(crate) enum Reached {
     /// A name of the page's at the top, as `page.book` is for
     /// `page.book.author`.
     Page(NameId),
@@ -106,7 +106,7 @@ pub enum Reached {
 }
 
 impl Holds {
-    pub const ALL: [Holds; 14] = [
+    pub(crate) const ALL: [Holds; 14] = [
         Holds::Text,
         Holds::Html,
         Holds::Number,
@@ -126,7 +126,7 @@ impl Holds {
 
 /// What a name holds on this page.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Held {
+pub(crate) enum Held {
     /// As a template would print it.
     Shown(String),
     /// A list, by how many it holds.
@@ -143,7 +143,7 @@ pub enum Held {
 impl Renderer {
     /// What there is to say of the page `number`, counted from 1, of the
     /// list `page` speaks for, or of `page` itself.
-    pub fn explained(&self, page: PageId, number: usize) -> Explained {
+    pub(crate) fn explained(&self, page: PageId, number: usize) -> Explained {
         let shared = &self.shared;
         let site = &shared.site;
         let held = site.pages.get(page);

@@ -8,7 +8,7 @@ pub struct Node {
     pub kind: Kind,
     /// Where it is written. A block ends at its last character, not the
     /// line ending after it.
-    pub place: Place,
+    pub(crate) place: Place,
     pub children: Vec<Node>,
 }
 
@@ -126,7 +126,7 @@ pub enum CalloutKind {
 }
 
 impl CalloutKind {
-    pub fn word(self) -> &'static str {
+    pub(crate) fn word(self) -> &'static str {
         match self {
             CalloutKind::Note => "note",
             CalloutKind::Tip => "tip",
@@ -146,7 +146,7 @@ pub enum Alignment {
 }
 
 impl Node {
-    pub fn new(kind: Kind, place: Place) -> Self {
+    pub(crate) fn new(kind: Kind, place: Place) -> Self {
         Node {
             kind,
             place,
@@ -155,7 +155,7 @@ impl Node {
     }
 
     /// Whether the node sits among the words rather than standing as a block.
-    pub fn is_inline(&self) -> bool {
+    pub(crate) fn is_inline(&self) -> bool {
         if let Kind::Call(call) = &self.kind {
             return !call.wraps();
         }
@@ -187,7 +187,7 @@ impl Node {
     }
 
     /// The same, for a pass that changes the tree.
-    pub fn walk_mut(&mut self, f: &mut impl FnMut(&mut Node)) {
+    pub(crate) fn walk_mut(&mut self, f: &mut impl FnMut(&mut Node)) {
         f(self);
         for child in &mut self.children {
             child.walk_mut(f);

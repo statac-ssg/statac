@@ -18,13 +18,13 @@ use crate::wording;
 
 /// The page as the last round to build it left it.
 pub(super) struct On<'a> {
-    pub report: &'a Report<'a>,
-    pub renderer: &'a Renderer,
-    pub explained: &'a Explained,
+    pub(crate) report: &'a Report<'a>,
+    pub(crate) renderer: &'a Renderer,
+    pub(crate) explained: &'a Explained,
     /// What its output read while it was built, where that is known.
-    pub reads: Option<&'a Reads>,
+    pub(crate) reads: Option<&'a Reads>,
     /// What its output asked for by name while it was built.
-    pub asked: Option<&'a Asked>,
+    pub(crate) asked: Option<&'a Asked>,
 }
 
 impl On<'_> {

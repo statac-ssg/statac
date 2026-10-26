@@ -14,8 +14,8 @@
 //! where they were written, for building with each page.
 
 pub mod draw;
-pub mod keep;
-pub mod layout;
+pub(crate) mod keep;
+pub(crate) mod layout;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -31,7 +31,7 @@ use crate::yaml::key_name;
 use crate::yaml::{Node, Resolved, Value as Yaml};
 
 /// The folder in `templates/` a description's files are named in.
-pub const FOLDER: &str = "templates/og";
+pub(crate) const FOLDER: &str = "templates/og";
 
 pub const WIDTH: u32 = 1200;
 pub const HEIGHT: u32 = 630;
@@ -48,21 +48,22 @@ const FONT_ENDINGS: &[&str] = &["ttf", "otf", "ttc"];
 
 /// The cards a site describes, by the files describing them.
 #[derive(Default, Debug)]
-pub struct Cards {
-    pub described: Vec<Described>,
+pub(crate) struct Cards {
+    pub(crate) described: Vec<Described>,
     /// The cards that pages left out of the build pick by name.
-    pub picked_elsewhere: Vec<String>,
+    pub(crate) picked_elsewhere: Vec<String>,
     /// Where each file in `templates/og/` really is, by its path in the
     /// site: its path past every link under `real`.
-    pub found: HashMap<String, String>,
+    pub(crate) found: HashMap<String, String>,
     /// The site's real path.
-    pub real: PathBuf,
+    pub(crate) real: PathBuf,
 }
 
 impl Cards {
     /// The card called `name`, or the site's own card for none. None
     /// where nothing describes it, or its description has an error.
-    pub fn card(&self, name: Option<&str>) -> Option<&Card> {
+    #[cfg(test)]
+    pub(crate) fn card(&self, name: Option<&str>) -> Option<&Card> {
         self.described
             .iter()
             .find(|described| described.name.as_deref() == name)
@@ -72,45 +73,45 @@ impl Cards {
 
 /// One description file.
 #[derive(Debug)]
-pub struct Described {
+pub(crate) struct Described {
     /// None for the site's own card, `templates/og.yaml`.
-    pub name: Option<String>,
+    pub(crate) name: Option<String>,
     /// Its path in the site, `templates/og.yaml`.
-    pub path: String,
+    pub(crate) path: String,
     /// None where it couldn't be read, which a problem has said.
-    pub source: Option<SourceId>,
+    pub(crate) source: Option<SourceId>,
     /// None where an error stops it describing a card.
-    pub card: Option<Card>,
+    pub(crate) card: Option<Card>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Card {
+pub(crate) struct Card {
     /// A name in `templates/og/`.
-    pub background: Sourced<String>,
+    pub(crate) background: Sourced<String>,
     /// Names in `templates/og/`, tried in this order.
-    pub fonts: Vec<Sourced<String>>,
-    pub padding: Sourced<u32>,
-    pub blocks: Vec<Block>,
+    pub(crate) fonts: Vec<Sourced<String>>,
+    pub(crate) padding: Sourced<u32>,
+    pub(crate) blocks: Vec<Block>,
 }
 
 /// A text drawn on a card.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Block {
+pub(crate) struct Block {
     /// The name the author gave it, where its first field is written.
-    pub name: Sourced<String>,
+    pub(crate) name: Sourced<String>,
     /// A template over `page` and `site`, as written.
-    pub text: Sourced<String>,
-    pub placement: Sourced<Placement>,
-    pub size: Sourced<Size>,
-    pub colour: Sourced<Colour>,
+    pub(crate) text: Sourced<String>,
+    pub(crate) placement: Sourced<Placement>,
+    pub(crate) size: Sourced<Size>,
+    pub(crate) colour: Sourced<Colour>,
     /// Names in `templates/og/`, tried in this order; none for the card's.
-    pub fonts: Option<Vec<Sourced<String>>>,
+    pub(crate) fonts: Option<Vec<Sourced<String>>>,
 }
 
 impl Card {
     /// The lists of fonts the texts are drawn in: the card's first, then
     /// each text's own, in the order of the texts.
-    pub fn font_lists(&self) -> Vec<&[Sourced<String>]> {
+    pub(crate) fn font_lists(&self) -> Vec<&[Sourced<String>]> {
         let own = self
             .blocks
             .iter()
@@ -119,7 +120,7 @@ impl Card {
     }
 
     /// Which of [`Card::font_lists`] each text is drawn in.
-    pub fn drawn_in(&self) -> Vec<usize> {
+    pub(crate) fn drawn_in(&self) -> Vec<usize> {
         let mut own = 0;
         let lists = self.blocks.iter().map(|block| match block.fonts {
             Some(_) => {
@@ -148,7 +149,7 @@ pub enum Placement {
 
 /// The row of the card a placement is in.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Row {
+pub(crate) enum Row {
     Top,
     Middle,
     Bottom,
@@ -156,14 +157,14 @@ pub enum Row {
 
 /// How a placement lines a text up across the card.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Align {
+pub(crate) enum Align {
     Left,
     Centre,
     Right,
 }
 
 impl Placement {
-    pub const ALL: [Placement; 9] = [
+    pub(crate) const ALL: [Placement; 9] = [
         Placement::TopLeft,
         Placement::Top,
         Placement::TopRight,
@@ -176,7 +177,7 @@ impl Placement {
     ];
 
     /// How the author writes it.
-    pub fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Placement::TopLeft => "top left",
             Placement::Top => "top",
@@ -190,7 +191,7 @@ impl Placement {
         }
     }
 
-    pub fn row(self) -> Row {
+    pub(crate) fn row(self) -> Row {
         match self {
             Placement::TopLeft | Placement::Top | Placement::TopRight => Row::Top,
             Placement::Left | Placement::Centre | Placement::Right => Row::Middle,
@@ -198,7 +199,7 @@ impl Placement {
         }
     }
 
-    pub fn align(self) -> Align {
+    pub(crate) fn align(self) -> Align {
         match self {
             Placement::TopLeft | Placement::Left | Placement::BottomLeft => Align::Left,
             Placement::Top | Placement::Centre | Placement::Bottom => Align::Centre,
@@ -217,7 +218,7 @@ pub enum Size {
 
 impl Size {
     /// The size written, whether fixed or the most.
-    pub fn most(self) -> u32 {
+    pub(crate) fn most(self) -> u32 {
         match self {
             Size::Fixed(n) | Size::UpTo(n) => n,
         }
@@ -225,7 +226,7 @@ impl Size {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Colour {
+pub(crate) enum Colour {
     Rgb([u8; 3]),
     /// A template over `page` and `site`, as written.
     Template(String),
@@ -234,7 +235,7 @@ pub enum Colour {
 /// The card a description file in `templates/` describes, by its path
 /// there: `Some(None)` for `og.yaml`, `Some(Some(name))` for
 /// `og.<name>.yaml`, and None for any other file.
-pub fn description(rel: &str) -> Option<Option<&str>> {
+pub(crate) fn description(rel: &str) -> Option<Option<&str>> {
     let name = rel.strip_prefix("og.")?.strip_suffix("yaml")?;
     match name {
         "" => Some(None),
@@ -247,7 +248,7 @@ pub fn description(rel: &str) -> Option<Option<&str>> {
 
 /// The cards the front matter of a page written as `text` picks with
 /// `card:`, read without reading the page.
-pub fn picked_in(text: &str) -> impl Iterator<Item = String> + '_ {
+pub(crate) fn picked_in(text: &str) -> impl Iterator<Item = String> + '_ {
     text.lines()
         .filter_map(|line| line.trim_start().strip_prefix("card:"))
         .map(|name| name.trim().trim_matches(['"', '\'']).to_owned())
@@ -256,12 +257,12 @@ pub fn picked_in(text: &str) -> impl Iterator<Item = String> + '_ {
 
 /// Whether a file in `templates/`, by its path there, is a card's rather
 /// than a template: a description, or a file in `templates/og/`.
-pub fn owns(rel: &str) -> bool {
+pub(crate) fn owns(rel: &str) -> bool {
     description(rel).is_some() || rel.starts_with("og/")
 }
 
 /// Reads every card description of the site at `root`.
-pub fn read(root: &Path, sources: &mut Sources) -> (Cards, Vec<Problem>) {
+pub(crate) fn read(root: &Path, sources: &mut Sources) -> (Cards, Vec<Problem>) {
     let mut problems = Vec::new();
     let mut cards = Cards::default();
     let real = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
@@ -347,7 +348,7 @@ struct Pending {
 /// Reads a description from a source already added, given the names of
 /// the files in `templates/og/`. None where something it needs is missing
 /// or refused; warnings leave it whole.
-pub fn read_source(
+pub(crate) fn read_source(
     sources: &Sources,
     source: SourceId,
     in_folder: &[&str],
@@ -764,7 +765,7 @@ fn read_colour(
 }
 
 /// The colour `text` writes as `#RGB` or `#RRGGBB`.
-pub fn hex(text: &str) -> Option<[u8; 3]> {
+pub(crate) fn hex(text: &str) -> Option<[u8; 3]> {
     let digits = text.strip_prefix('#')?;
     if !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
@@ -810,12 +811,12 @@ fn parts(written: &str) -> Vec<&str> {
 }
 
 /// The path in the site of the file a description names as `written`.
-pub fn file_named(written: &str) -> String {
+pub(crate) fn file_named(written: &str) -> String {
     format!("{FOLDER}/{}", parts(written).join("/"))
 }
 
 /// Whether a file's name ends as a font Statac reads does.
-pub fn is_a_font(name: &str) -> bool {
+pub(crate) fn is_a_font(name: &str) -> bool {
     let ending = name.rsplit_once('.').map(|(_, ending)| ending);
     ending.is_some_and(|ending| FONT_ENDINGS.iter().any(|f| f.eq_ignore_ascii_case(ending)))
 }

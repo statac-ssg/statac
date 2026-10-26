@@ -48,9 +48,9 @@ pub(super) enum Role {
 #[derive(Debug)]
 pub(super) struct File {
     /// The name the engine holds it under.
-    pub name: String,
-    pub source: SourceId,
-    pub role: Role,
+    pub(crate) name: String,
+    pub(crate) source: SourceId,
+    pub(crate) role: Role,
 }
 
 /// What a call's values without names fill.
@@ -64,25 +64,25 @@ pub(crate) enum Takes {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Snippet {
-    pub name: String,
+    pub(crate) name: String,
     /// The file's index among the site's template files.
-    pub file: usize,
+    pub(crate) file: usize,
     /// The names the snippet reads, in the order first read.
-    pub params: Vec<String>,
+    pub(crate) params: Vec<String>,
     /// The names of the writing a block call wraps that the snippet reads,
     /// which a call in a template hands by name.
-    pub wrapped: Vec<String>,
-    pub takes: Option<Takes>,
+    pub(crate) wrapped: Vec<String>,
+    pub(crate) takes: Option<Takes>,
     /// The names it hands a page to find a file beside it by, as
     /// `page.photo(photo)` does, each with the sort of file found.
-    pub files: Vec<(String, Sort)>,
+    pub(crate) files: Vec<(String, Sort)>,
     /// The names it reads fields of, as `post.title`, which a call in the
     /// writing, handing only text, numbers and `true` or `false`, can't
     /// give.
-    pub records: Vec<String>,
+    pub(crate) records: Vec<String>,
     /// Whether the engine could read the file. Where it couldn't, what the
     /// snippet reads is unknown, and no call is held to it.
-    pub readable: bool,
+    pub(crate) readable: bool,
 }
 
 impl Snippet {
@@ -264,8 +264,8 @@ pub(super) fn gather(root: &Path, sources: &mut Sources, problems: &mut Vec<Prob
 /// A `{# takes #}` line as read, with where each name sits.
 #[derive(Debug)]
 pub(super) struct Line {
-    pub takes: Takes,
-    pub names: Vec<(String, Span)>,
+    pub(crate) takes: Takes,
+    pub(crate) names: Vec<(String, Span)>,
 }
 
 const TAKES: &str = "takes";

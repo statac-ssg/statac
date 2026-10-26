@@ -7,10 +7,10 @@
 //! one language. Every other key is the author's own value, reaching
 //! templates as `site.<name>`, and may nest.
 
-pub mod declarations;
+pub(crate) mod declarations;
 pub(crate) mod hooks;
 pub(crate) mod refused;
-pub mod words;
+pub(crate) mod words;
 
 use std::path::Path;
 
@@ -22,7 +22,7 @@ use crate::yaml::{Node, Value as Yaml};
 use declarations::Declarations;
 use words::{Field, Words};
 
-pub const FILE_NAME: &str = "statac.yaml";
+pub(crate) const FILE_NAME: &str = "statac.yaml";
 
 /// Names the settings were once read under, refused by name.
 const FORMER_NAMES: &[&str] = &["statac.yml", "statac.conf"];
@@ -48,7 +48,7 @@ const RESERVED: &[&str] = &[
 
 /// The settings readers see that a site in several languages may write for
 /// one of them, as `<tag>.<setting>`.
-pub const PER_LANGUAGE: &[&str] = &["title", "date_format"];
+pub(crate) const PER_LANGUAGE: &[&str] = &["title", "date_format"];
 
 /// The settings that hold a credential: never quoted in a problem, and
 /// hidden wherever their line is drawn.
@@ -201,13 +201,13 @@ const SETTINGS: &[Setting] = &[
 ];
 
 /// The names of Statac's own site settings.
-pub fn setting_names() -> impl Iterator<Item = &'static str> {
+pub(crate) fn setting_names() -> impl Iterator<Item = &'static str> {
     SETTINGS.iter().map(|s| s.name)
 }
 
 /// The values the setting `name` takes where they are a few words to
 /// choose from.
-pub fn choices(name: &str) -> Vec<&'static str> {
+pub(crate) fn choices(name: &str) -> Vec<&'static str> {
     match SETTINGS.iter().find(|s| s.name == name).map(|s| s.shape) {
         Some(Shape::Truth | Shape::Feed) => vec!["true", "false"],
         Some(Shape::OneOf(words)) => words.to_vec(),
@@ -216,7 +216,7 @@ pub fn choices(name: &str) -> Vec<&'static str> {
 }
 
 /// Whether `name` is one of Statac's own site settings.
-pub fn is_setting(name: &str) -> bool {
+pub(crate) fn is_setting(name: &str) -> bool {
     SETTINGS.iter().any(|s| s.name == name)
 }
 
@@ -227,27 +227,27 @@ pub struct Settings {
     /// Settings written for one language, by its tag as declared.
     for_languages: Vec<(String, &'static str, Sourced<Value>)>,
     /// What `pages.` lines hand to every page.
-    pub pages: Words,
-    pub declarations: Declarations,
+    pub(crate) pages: Words,
+    pub(crate) declarations: Declarations,
     /// The author's own values, as `site.<name>`.
-    pub own: Vec<Field>,
+    pub(crate) own: Vec<Field>,
     /// `statac.yaml`, where there is one.
-    pub source: Option<SourceId>,
+    pub(crate) source: Option<SourceId>,
     /// Whether something was told of the `language` line as written.
-    pub language_told: bool,
+    pub(crate) language_told: bool,
     /// Where secrets are written, to be hidden from every drawn line.
-    pub secrets: Vec<crate::source::Place>,
+    pub(crate) secrets: Vec<crate::source::Place>,
     /// The `url` the settings wrote, where the run was given another
     /// address; `None` within where they wrote none.
     replaced: Option<Option<Sourced<Value>>>,
 }
 
 impl Settings {
-    pub fn get(&self, name: &str) -> Option<&Sourced<Value>> {
+    pub(crate) fn get(&self, name: &str) -> Option<&Sourced<Value>> {
         self.values.iter().find(|(n, _)| *n == name).map(|(_, v)| v)
     }
 
-    pub fn text(&self, name: &str) -> Option<Sourced<&str>> {
+    pub(crate) fn text(&self, name: &str) -> Option<Sourced<&str>> {
         let value = self.get(name)?;
         Some(Sourced::new(value.value.as_text()?, value.origin.clone()))
     }
@@ -256,18 +256,18 @@ impl Settings {
         self.get(name)?.value.as_bool()
     }
 
-    pub fn whole(&self, name: &str) -> Option<u64> {
+    pub(crate) fn whole(&self, name: &str) -> Option<u64> {
         self.get(name)?.value.as_whole()
     }
 
-    pub fn texts(&self, name: &str) -> &[Sourced<String>] {
+    pub(crate) fn texts(&self, name: &str) -> &[Sourced<String>] {
         self.get(name)
             .and_then(|v| v.value.as_texts())
             .unwrap_or_default()
     }
 
     /// The languages the site declares, main first, each as written.
-    pub fn languages(&self) -> Vec<Sourced<&str>> {
+    pub(crate) fn languages(&self) -> Vec<Sourced<&str>> {
         let Some(language) = self.get("language") else {
             return Vec::new();
         };
@@ -283,7 +283,7 @@ impl Settings {
 
     /// The setting `name` as written for the language `tag` alone, as
     /// `<tag>.<name>`.
-    pub fn for_language(&self, tag: &str, name: &str) -> Option<&Sourced<Value>> {
+    pub(crate) fn for_language(&self, tag: &str, name: &str) -> Option<&Sourced<Value>> {
         self.for_languages
             .iter()
             .find(|(t, n, _)| t == tag && *n == name)
@@ -292,7 +292,7 @@ impl Settings {
 
     /// The text setting `name` as the language `tag` reads it: its own
     /// line where it has one, else the setting for every language.
-    pub fn text_for(&self, tag: Option<&str>, name: &str) -> Option<Sourced<&str>> {
+    pub(crate) fn text_for(&self, tag: Option<&str>, name: &str) -> Option<Sourced<&str>> {
         match tag.and_then(|tag| self.for_language(tag, name)) {
             Some(value) => Some(Sourced::new(value.value.as_text()?, value.origin.clone())),
             None => self.text(name),
@@ -300,13 +300,13 @@ impl Settings {
     }
 
     /// The names in `quiet:`, as written.
-    pub fn quiet(&self) -> Vec<Sourced<String>> {
+    pub(crate) fn quiet(&self) -> Vec<Sourced<String>> {
         self.texts("quiet").to_vec()
     }
 
     /// The path the site is published under, from `url`: `/blog` for
     /// `https://example.org/blog/`, and empty at the top of its domain.
-    pub fn base(&self) -> String {
+    pub(crate) fn base(&self) -> String {
         self.text("url")
             .map(|url| path_of(url.value))
             .unwrap_or_default()
@@ -314,7 +314,7 @@ impl Settings {
 
     /// Takes `address`, given on the command line, as the site's address
     /// for this run, in place of `url`.
-    pub fn at(&mut self, address: &str) {
+    pub(crate) fn at(&mut self, address: &str) {
         let given = Sourced::new(Value::Text(address.to_owned()), Origin::command_line());
         let written = match self.values.iter_mut().find(|(name, _)| *name == "url") {
             Some((_, url)) => Some(std::mem::replace(url, given)),
@@ -330,7 +330,7 @@ impl Settings {
     /// sites and feed readers hold of it names: `url` as the settings
     /// write it, whatever address the run was given, and the run's where
     /// they write none.
-    pub fn home(&self) -> Option<&str> {
+    pub(crate) fn home(&self) -> Option<&str> {
         match &self.replaced {
             Some(Some(written)) => written.value.as_text(),
             _ => Some(self.text("url")?.value),
@@ -338,11 +338,11 @@ impl Settings {
     }
 
     /// Whether the run was given its address on the command line.
-    pub fn elsewhere(&self) -> bool {
+    pub(crate) fn elsewhere(&self) -> bool {
         self.replaced.is_some()
     }
 
-    pub fn own(&self, name: &str) -> Option<&Field> {
+    pub(crate) fn own(&self, name: &str) -> Option<&Field> {
         self.own.iter().find(|field| field.name == name)
     }
 
@@ -446,7 +446,7 @@ fn secret_lines(sources: &Sources, source: SourceId) -> Vec<crate::source::Place
 }
 
 /// Reads settings from a source already added.
-pub fn read_source(sources: &Sources, source: SourceId) -> (Settings, Vec<Problem>) {
+pub(crate) fn read_source(sources: &Sources, source: SourceId) -> (Settings, Vec<Problem>) {
     let mut settings = Settings {
         source: Some(source),
         ..Settings::default()
@@ -883,7 +883,7 @@ fn read_setting(
 
 /// The path a site at `address` is published under: `/blog` for
 /// `https://example.org/blog/`, and empty at the top of its domain.
-pub fn path_of(address: &str) -> String {
+pub(crate) fn path_of(address: &str) -> String {
     let past = address.split_once("//").map_or(address, |(_, rest)| rest);
     match past.split_once('/') {
         Some((_, path)) if !path.trim_matches('/').is_empty() => {
@@ -894,7 +894,7 @@ pub fn path_of(address: &str) -> String {
 }
 
 /// `https://` or `http://`, then a host with a dot or `localhost`.
-pub fn site_address(text: &str) -> bool {
+pub(crate) fn site_address(text: &str) -> bool {
     let Some(rest) = text
         .strip_prefix("https://")
         .or_else(|| text.strip_prefix("http://"))

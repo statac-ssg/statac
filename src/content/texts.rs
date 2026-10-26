@@ -35,8 +35,8 @@ struct Kept {
 
 /// A file read, with where its lines start.
 pub(super) struct Text {
-    pub text: String,
-    pub lines: Vec<usize>,
+    pub(crate) text: String,
+    pub(crate) lines: Vec<usize>,
     kept: Option<Arc<Kept>>,
 }
 

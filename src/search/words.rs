@@ -20,7 +20,7 @@ static SEGMENTER: LazyLock<WordSegmenterBorrowed<'static>> =
     LazyLock::new(|| WordSegmenter::new_dictionary(WordBreakInvariantOptions::default()));
 
 /// Where each word of `text` is.
-pub fn spans(text: &str) -> impl Iterator<Item = Range<usize>> + '_ {
+pub(crate) fn spans(text: &str) -> impl Iterator<Item = Range<usize>> + '_ {
     let mut from = 0;
     let boundaries = SEGMENTER.segment_str(text).iter_with_word_type();
     boundaries.filter_map(move |(at, kind)| {
@@ -34,7 +34,7 @@ pub fn spans(text: &str) -> impl Iterator<Item = Range<usize>> + '_ {
 /// off, in its compatibility form and small letters: `Ｃafé` is `cafe`.
 /// Marks other scripts need, such as the kana's voicing, are kept. A
 /// typographic apostrophe is the plain one, so `don’t` is `don't`.
-pub fn fold(word: &str) -> String {
+pub(crate) fn fold(word: &str) -> String {
     let mut folded = String::new();
     fold_into(word, &mut folded);
     folded
@@ -69,12 +69,12 @@ fn diacritic(c: char) -> bool {
 
 /// How words of one language are cut to their stems; for a language
 /// with no rules, not at all.
-pub struct Stemmer(Option<pagefind_stem::Stemmer>);
+pub(crate) struct Stemmer(Option<pagefind_stem::Stemmer>);
 
 impl Stemmer {
     /// The rules for the language `tag` names, by its first part; English
     /// where there is no tag, as a site that names no language is.
-    pub fn of(tag: Option<&str>) -> Stemmer {
+    pub(crate) fn of(tag: Option<&str>) -> Stemmer {
         let tag = tag.unwrap_or("en");
         let language = tag
             .split(['-', '_'])
@@ -85,12 +85,13 @@ impl Stemmer {
     }
 
     /// The form `word` is indexed by.
-    pub fn term(&self, word: &str) -> String {
+    #[cfg(test)]
+    pub(crate) fn term(&self, word: &str) -> String {
         self.stem(&fold(word))
     }
 
     /// The stem of `folded`, a word as [`fold`] leaves it.
-    pub fn stem(&self, folded: &str) -> String {
+    pub(crate) fn stem(&self, folded: &str) -> String {
         match &self.0 {
             Some(stemmer) => stemmer.stem(folded).into_owned(),
             None => folded.to_owned(),

@@ -49,14 +49,14 @@ pub(crate) const NEEDS: &[&str] = &["url", "feed_key", "title"];
 /// A feed the build writes.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Feed {
-    pub list: ListId,
+    pub(crate) list: ListId,
     /// Where it is published, from the top of the site and without the
     /// site's own path.
-    pub address: Address,
+    pub(crate) address: Address,
     /// The template it is built with, by its name.
-    pub template: String,
+    pub(crate) template: String,
     /// Where the `feed:` giving its address is written, where one does.
-    pub placed: Option<Place>,
+    pub(crate) placed: Option<Place>,
 }
 
 /// What a list's feed is asked by: the page speaking for it, where it has

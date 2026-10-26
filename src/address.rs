@@ -8,7 +8,7 @@ use crate::slug::nfc;
 use crate::source::{Place, Span};
 
 /// The pieces a `permalink` pattern may ask for.
-pub const PIECES: &[&str] = &["year", "month", "day", "slug", "folder", "name"];
+pub(crate) const PIECES: &[&str] = &["year", "month", "day", "slug", "folder", "name"];
 
 /// Where something lands, its pieces composed the one way.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -20,21 +20,21 @@ pub struct Address {
 }
 
 /// A fault in a written address, and the range of the text it is in.
-pub type Fault = (AddressFault, Span);
+pub(crate) type Fault = (AddressFault, Span);
 
 impl Address {
     /// Reads an address. A trailing slash is a folder; with none, a dot in
     /// the last piece is a file and anything else a folder, so `/v2.0/` is a
     /// folder, `/404.html` a file and `/notes` a folder. Empty pieces are
     /// dropped, as the disk drops them.
-    pub fn read(written: &str) -> Result<Address, Fault> {
+    pub(crate) fn read(written: &str) -> Result<Address, Fault> {
         let (path, last) = Address::pieces(written)?;
         let file = !written.ends_with('/') && last.contains('.');
         Ok(Address::settled(path, file))
     }
 
     /// Reads an address that names a file whatever it is called.
-    pub fn read_file(written: &str) -> Result<Address, Fault> {
+    pub(crate) fn read_file(written: &str) -> Result<Address, Fault> {
         let (path, _) = Address::pieces(written)?;
         Ok(Address::settled(path, true))
     }
@@ -69,18 +69,18 @@ impl Address {
 
     /// An address for a page whose own could not be made, where nothing
     /// else will stand, while the rest of the site is read.
-    pub fn made(path: &str) -> Address {
+    pub(crate) fn made(path: &str) -> Address {
         Address {
             path: format!("/{}/", crate::slug::made_slug(path)),
             file: false,
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         &self.path
     }
 
-    pub fn is_file(&self) -> bool {
+    pub(crate) fn is_file(&self) -> bool {
         self.file
     }
 
@@ -94,12 +94,12 @@ impl Address {
     }
 
     /// One spelling for every address a common disk holds as one file.
-    pub fn key(&self) -> String {
+    pub(crate) fn key(&self) -> String {
         crate::platform::folded(&self.file())
     }
 
     /// The folder something beside this page lands in.
-    pub fn folder(&self) -> &str {
+    pub(crate) fn folder(&self) -> &str {
         match self.file {
             true => &self.path[..=self.path.rfind('/').unwrap_or(0)],
             false => &self.path,
@@ -112,7 +112,7 @@ impl Address {
 /// itself written as `%` and the byte, so a letter outside ASCII is the
 /// bytes of its UTF-8. A `%` already there is left as written, and so is
 /// what follows a `?` or a `#`.
-pub fn on_the_wire(address: &str) -> String {
+pub(crate) fn on_the_wire(address: &str) -> String {
     let (path, rest) = address.split_at(address.find(['?', '#']).unwrap_or(address.len()));
     let mut out = String::with_capacity(address.len());
     for byte in path.bytes() {
@@ -131,14 +131,14 @@ pub fn on_the_wire(address: &str) -> String {
 
 /// An address from the top of the site made whole with the site's `url`,
 /// its path and all, and spelled as it travels.
-pub fn whole(address: &str, url: &str) -> String {
+pub(crate) fn whole(address: &str, url: &str) -> String {
     format!("{}{}", url.trim_end_matches('/'), on_the_wire(address))
 }
 
 /// Why one piece of an address is no name every disk will write, or no
 /// name an address can carry. The disk's rules are `platform`'s, held on
 /// every machine.
-pub fn name_fault(piece: &str) -> Option<AddressFault> {
+pub(crate) fn name_fault(piece: &str) -> Option<AddressFault> {
     if piece == "." || piece == ".." {
         return Some(AddressFault::Dots(piece.to_owned()));
     }
@@ -166,13 +166,13 @@ pub fn name_fault(piece: &str) -> Option<AddressFault> {
 /// [`PIECES`] and the fields `declared` for the site's pages. A pattern
 /// `handed` to many pages must ask for at least one piece, or every page
 /// lands at one address.
-pub fn pattern_faults(pattern: &str, handed: bool, declared: &[&str]) -> Vec<(Kind, Span)> {
+pub(crate) fn pattern_faults(pattern: &str, handed: bool, declared: &[&str]) -> Vec<(Kind, Span)> {
     faults(pattern, handed, Fields::Declared(declared))
 }
 
 /// Everything wrong with the pattern a page making pages gives its items,
 /// whose pieces are the items' own fields, so any name in braces is one.
-pub fn item_pattern_faults(pattern: &str) -> Vec<(Kind, Span)> {
+pub(crate) fn item_pattern_faults(pattern: &str) -> Vec<(Kind, Span)> {
     faults(pattern, true, Fields::Any)
 }
 
@@ -329,7 +329,7 @@ fn is_field_name(token: &str) -> bool {
 
 /// A pattern with each `{name}` in it filled in by `fill`, in turn. The
 /// pattern's braces are known to pair.
-pub fn filled<E>(
+pub(crate) fn filled<E>(
     pattern: &str,
     mut fill: impl FnMut(&str) -> Result<String, E>,
 ) -> Result<String, E> {
@@ -348,18 +348,18 @@ pub fn filled<E>(
 }
 
 /// What one page fills a pattern with.
-pub struct Pieces<'a> {
-    pub date: Option<&'a Date>,
-    pub slug: &'a str,
+pub(crate) struct Pieces<'a> {
+    pub(crate) date: Option<&'a Date>,
+    pub(crate) slug: &'a str,
     /// The last piece of the page's folder's address.
-    pub folder: &'a str,
+    pub(crate) folder: &'a str,
     /// The page's name exactly as written, any date included.
-    pub name: &'a str,
+    pub(crate) name: &'a str,
 }
 
 /// Fills a well-formed pattern in for one page, or names the piece of a
 /// date it asks for and the page hasn't got.
-pub fn expand(pattern: &str, pieces: &Pieces) -> Result<String, AddressFault> {
+pub(crate) fn expand(pattern: &str, pieces: &Pieces) -> Result<String, AddressFault> {
     let mut out = pattern.to_owned();
     for (token, width) in [("{year}", 4), ("{month}", 2), ("{day}", 2)] {
         if !out.contains(token) {
@@ -387,7 +387,7 @@ pub fn expand(pattern: &str, pieces: &Pieces) -> Result<String, AddressFault> {
 /// Where a pattern is read from: the top of the pages of the language it
 /// is written for. A language's folder is its top, and its patterns land
 /// beneath that folder's address; anywhere else, they land as written.
-pub struct Top {
+pub(crate) struct Top {
     /// The folder's path under `content/`; empty at the top of `content/`.
     folder: String,
 }
@@ -395,7 +395,7 @@ pub struct Top {
 impl Top {
     /// The top at `folder`, its path under `content/`, with or without a
     /// closing `/`.
-    pub fn new(folder: &str) -> Top {
+    pub(crate) fn new(folder: &str) -> Top {
         Top {
             folder: folder.trim_end_matches('/').to_owned(),
         }
@@ -403,7 +403,7 @@ impl Top {
 
     /// The pattern to fill in: as written, or where it already opens with
     /// the top's folder, without it, warned of once at `place`.
-    pub fn pattern<'a>(
+    pub(crate) fn pattern<'a>(
         &self,
         pattern: &'a str,
         place: Option<Place>,
@@ -439,7 +439,7 @@ impl Top {
 
     /// A pattern filled in, read from the top: beneath the folder's
     /// address, or as it is at the top of `content/`.
-    pub fn address(&self, filled: &str) -> String {
+    pub(crate) fn address(&self, filled: &str) -> String {
         match self.folder.is_empty() {
             true => filled.to_owned(),
             false => format!(
@@ -453,7 +453,7 @@ impl Top {
 
 /// Whether `written` is a full address, opening with a scheme such as
 /// `https:` or `mailto:`, or with `//`, rather than an address on the site.
-pub fn is_full(written: &str) -> bool {
+pub(crate) fn is_full(written: &str) -> bool {
     if written.starts_with("//") {
         return true;
     }
@@ -468,7 +468,7 @@ pub fn is_full(written: &str) -> bool {
 
 /// `written` with each `%XX` read as the byte it stands for, where the
 /// bytes read are text; else as written.
-pub fn decoded(written: &str) -> String {
+pub(crate) fn decoded(written: &str) -> String {
     let bytes = written.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut at = 0;

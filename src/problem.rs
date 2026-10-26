@@ -242,13 +242,13 @@ const RETIRED_NAMES: &[(&str, Code)] = &[
 ];
 
 impl Code {
-    pub fn from_name(name: &str) -> Option<Code> {
+    pub(crate) fn from_name(name: &str) -> Option<Code> {
         Code::ALL.iter().copied().find(|code| code.name() == name)
     }
 
     /// The kind once called `name`, which is refused with the name it
     /// has now.
-    pub fn renamed(name: &str) -> Option<Code> {
+    pub(crate) fn renamed(name: &str) -> Option<Code> {
         FORMER_NAMES
             .iter()
             .find(|(former, _)| *former == name)
@@ -256,13 +256,13 @@ impl Code {
     }
 
     /// Whether `name` named a kind Statac no longer has.
-    pub fn retired(name: &str) -> bool {
+    pub(crate) fn retired(name: &str) -> bool {
         RETIRED_NAMES.iter().any(|(retired, _)| *retired == name)
     }
 
     /// The problem with `written`, a name given to `quiet:` or `statac
     /// explain` that names no kind.
-    pub fn unknown(written: &str) -> Kind {
+    pub(crate) fn unknown(written: &str) -> Kind {
         let (former, suggestion) = match Code::renamed(written) {
             _ if Code::retired(written) => (Former::Retired, None),
             Some(code) => (Former::Renamed, Some(code.name())),
@@ -289,7 +289,7 @@ impl Code {
 
     /// The explanation as a terminal shows it: a heading's `{#id}`, which
     /// only a page can use, is left out.
-    pub fn explained(self) -> String {
+    pub(crate) fn explained(self) -> String {
         let mut out = String::new();
         // The backticks that opened the code block a line is in.
         let mut fence = 0;
@@ -474,7 +474,7 @@ impl Code {
     }
 
     /// Whether this kind leaves a page out of the published site.
-    pub fn leaves_a_page_out(self) -> bool {
+    pub(crate) fn leaves_a_page_out(self) -> bool {
         match self {
             Code::BrokenLink
             | Code::WorkerOutsideImportMap
@@ -645,7 +645,7 @@ impl Code {
 
     /// Whether only a build can find this kind, so that `check` has
     /// nothing to show of it: what comes of running the site's commands.
-    pub fn found_by_build_alone(self) -> bool {
+    pub(crate) fn found_by_build_alone(self) -> bool {
         matches!(self, Code::NothingMade)
     }
 }
@@ -1811,7 +1811,7 @@ pub struct Quiet {
 impl Quiet {
     /// Takes the names as written, and gives a problem for each that names
     /// no kind or a kind that can't be quietened.
-    pub fn new(names: &[Sourced<String>]) -> (Quiet, Vec<Problem>) {
+    pub(crate) fn new(names: &[Sourced<String>]) -> (Quiet, Vec<Problem>) {
         let mut quiet = Quiet::default();
         let mut problems = Vec::new();
         for name in names {
@@ -1839,7 +1839,7 @@ impl Quiet {
         (quiet, problems)
     }
 
-    pub fn quietens(&self, kind: &Kind) -> bool {
+    pub(crate) fn quietens(&self, kind: &Kind) -> bool {
         self.codes.contains(&kind.code())
     }
 }
@@ -2056,9 +2056,9 @@ pub enum Lack {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ByField {
-    pub item: Named,
-    pub field: String,
-    pub filter: String,
+    pub(crate) item: Named,
+    pub(crate) field: String,
+    pub(crate) filter: String,
 }
 
 /// What a missing value's suggestion offers.
@@ -2826,7 +2826,7 @@ pub enum FormatFault {
 /// A look a template names a date by, each written as the language's
 /// Unicode CLDR data has it.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Look {
+pub(crate) enum Look {
     /// The CLDR's long date: `31 December 2025`.
     Long,
     /// Its medium date: `31 Dec 2025`.
@@ -2838,10 +2838,10 @@ pub enum Look {
 }
 
 impl Look {
-    pub const ALL: [Look; 4] = [Look::Long, Look::Short, Look::Day, Look::Stamp];
+    pub(crate) const ALL: [Look; 4] = [Look::Long, Look::Short, Look::Day, Look::Stamp];
 
     /// As a template names it.
-    pub fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Look::Long => "long",
             Look::Short => "short",
@@ -2850,7 +2850,7 @@ impl Look {
         }
     }
 
-    pub fn named(name: &str) -> Option<Look> {
+    pub(crate) fn named(name: &str) -> Option<Look> {
         Look::ALL.into_iter().find(|look| look.name() == name)
     }
 }
@@ -2978,7 +2978,7 @@ pub enum Named {
 impl Named {
     /// Where what gives this its address is written, where a problem with
     /// the address is best told.
-    pub fn given_at(&self) -> Option<Place> {
+    pub(crate) fn given_at(&self) -> Option<Place> {
         match self {
             Named::Redirect { at, .. } | Named::Permalink { at, .. } => Some(*at),
             _ => None,
@@ -2986,7 +2986,7 @@ impl Named {
     }
 
     /// A list's page `number`, counted from 2, by where its first stands.
-    pub fn later(number: usize, list: String) -> Named {
+    pub(crate) fn later(number: usize, list: String) -> Named {
         Named::Later {
             number: u32::try_from(number).expect("fewer pages than a u32 counts"),
             list,
@@ -3025,14 +3025,14 @@ impl From<String> for Box<Named> {
 /// A list's feed as a problem names it.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct NamedFeed {
-    pub word: Word,
-    pub name: String,
-    pub address: String,
+    pub(crate) word: Word,
+    pub(crate) name: String,
+    pub(crate) address: String,
 }
 
 /// How a second place bears on a problem.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Relation {
+pub(crate) enum Relation {
     FirstWritten,
     /// What is shown in place of the problem's own.
     Shown,
@@ -3226,7 +3226,7 @@ impl Kind {
 
     /// Whether the problem is about the whole of the file it is placed
     /// in, so it is shown by the file's name with no line of it marked.
-    pub fn of_a_whole_file(&self) -> bool {
+    pub(crate) fn of_a_whole_file(&self) -> bool {
         matches!(
             self,
             Kind::UnusedCard { .. }
@@ -3238,13 +3238,14 @@ impl Kind {
 
     /// Whether an author may quieten this kind by name. Errors, and anything
     /// that leaves a page out, never can be.
-    pub fn quietenable(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn quietenable(&self) -> bool {
         self.code().quietenable()
     }
 
     /// Other places that bear on the problem, such as where a duplicate key
     /// was first written.
-    pub fn related(&self) -> Vec<(Relation, Option<Place>)> {
+    pub(crate) fn related(&self) -> Vec<(Relation, Option<Place>)> {
         match self {
             Kind::DuplicateKey { first, .. }
             | Kind::MoreWrittenTwice { first, .. }
@@ -3280,19 +3281,19 @@ pub struct Problem {
     pub place: Option<Place>,
     /// Where the problem was met from, where that isn't where it is
     /// written: the page being built, and the calls that led there.
-    pub context: Context,
+    pub(crate) context: Context,
 }
 
 /// The places a problem was met from, held apart since most problems
 /// have none.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
-pub struct Context(Option<Box<Places>>);
+pub(crate) struct Context(Option<Box<Places>>);
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 struct Places(Vec<(Relation, Option<Place>)>);
 
 impl Context {
-    pub fn iter(&self) -> impl Iterator<Item = &(Relation, Option<Place>)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &(Relation, Option<Place>)> {
         self.0.iter().flat_map(|places| places.0.iter())
     }
 
@@ -3310,7 +3311,7 @@ pub struct Related {
 }
 
 impl Problem {
-    pub fn at(kind: Kind, place: Place) -> Self {
+    pub(crate) fn at(kind: Kind, place: Place) -> Self {
         Problem {
             kind,
             place: Some(place),
@@ -3319,7 +3320,7 @@ impl Problem {
     }
 
     /// The problem at `place`, or in no file where there is none.
-    pub fn placed(kind: Kind, place: Option<Place>) -> Self {
+    pub(crate) fn placed(kind: Kind, place: Option<Place>) -> Self {
         Problem {
             kind,
             place,
@@ -3327,7 +3328,7 @@ impl Problem {
         }
     }
 
-    pub fn nowhere(kind: Kind) -> Self {
+    pub(crate) fn nowhere(kind: Kind) -> Self {
         Problem {
             kind,
             place: None,
@@ -3336,14 +3337,14 @@ impl Problem {
     }
 
     /// The same problem, met from `place` as `relation` says.
-    pub fn met(mut self, relation: Relation, place: Option<Place>) -> Self {
+    pub(crate) fn met(mut self, relation: Relation, place: Option<Place>) -> Self {
         self.context.push(relation, place);
         self
     }
 
     /// The same problem with its own place, and each place it was met
     /// from, as `to` gives it.
-    pub fn moved(mut self, to: impl Fn(Place) -> Place) -> Self {
+    pub(crate) fn moved(mut self, to: impl Fn(Place) -> Place) -> Self {
         self.place = self.place.map(&to);
         if let Some(places) = self.context.0.as_mut() {
             for (_, place) in &mut places.0 {
@@ -3355,7 +3356,7 @@ impl Problem {
 
     /// Whether `other` is this problem met building another page: alike in
     /// all but the page it names.
-    pub fn alike_but_for_page(&self, other: &Problem) -> bool {
+    pub(crate) fn alike_but_for_page(&self, other: &Problem) -> bool {
         let rest = |problem: &Problem| {
             problem
                 .context
@@ -3368,7 +3369,7 @@ impl Problem {
     }
 
     /// The pages whose builds met the problem, the first to meet it first.
-    pub fn built(&self) -> impl Iterator<Item = (Option<&Named>, Option<Place>)> {
+    pub(crate) fn built(&self) -> impl Iterator<Item = (Option<&Named>, Option<Place>)> {
         self.context
             .iter()
             .filter_map(|(relation, place)| match relation {
@@ -3379,7 +3380,7 @@ impl Problem {
 
     /// Adds the pages whose builds met `other`, which is this problem met
     /// building them.
-    pub fn met_building_too(&mut self, other: &Problem) {
+    pub(crate) fn met_building_too(&mut self, other: &Problem) {
         for (relation, place) in other.context.iter() {
             if matches!(relation, Relation::Building(_)) {
                 self.context.push(relation.clone(), *place);
@@ -3460,7 +3461,7 @@ pub enum Reason {
 impl Reason {
     /// The reason `error` gives: Statac's own where it carries one, else
     /// the system's.
-    pub fn of(error: &io::Error) -> Reason {
+    pub(crate) fn of(error: &io::Error) -> Reason {
         if let Some(reason) = error.get_ref().and_then(|inner| inner.downcast_ref()) {
             return Reason::clone(reason);
         }
@@ -3494,7 +3495,7 @@ impl From<Reason> for io::Error {
 
 /// What the system said, to follow a colon: without its error number, and
 /// with no capital to open it.
-pub fn system_words(text: &str) -> String {
+pub(crate) fn system_words(text: &str) -> String {
     let text = match text.rfind(" (os error ") {
         Some(i) => &text[..i],
         None => text,
@@ -3781,17 +3782,17 @@ pub enum Host {
 /// What a build wrote.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Published {
-    pub pages: usize,
+    pub(crate) pages: usize,
     /// The pages left at old addresses, sending readers on.
-    pub redirects: usize,
-    pub feeds: usize,
+    pub(crate) redirects: usize,
+    pub(crate) feeds: usize,
     /// Everything else: assets, static files and the files beside the writing.
-    pub files: usize,
+    pub(crate) files: usize,
 }
 
 /// Where JavaScript the built pages carry comes from.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum Carried {
+pub(crate) enum Carried {
     /// A script the site publishes, at its address, from its file.
     Published { address: String, from: String },
     /// A script loaded from an address the site doesn't publish.
@@ -3805,7 +3806,7 @@ pub enum Carried {
 
 /// What one round asks of the pages already open.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Told {
+pub(crate) enum Told {
     /// No built file changed.
     Nothing,
     /// Only stylesheets changed: the address each was at, and is at now.
@@ -3815,7 +3816,7 @@ pub enum Told {
 
 /// Why a folder is polled when polling wasn't asked for.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Because {
+pub(crate) enum Because {
     /// The folder is on a disk of this kind, which may not report changes.
     Remote(String),
     /// The system's reports couldn't be had, for this reason.
@@ -3824,7 +3825,7 @@ pub enum Because {
 
 /// The kind of thing a name holds.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Holds {
+pub(crate) enum Holds {
     Text,
     Html,
     Number,
@@ -3845,7 +3846,7 @@ pub enum Holds {
 
 /// The most levels of writing, quotations, lists, emphasis and the like,
 /// one inside another, that are read.
-pub const DEEPEST_NESTING: usize = 200;
+pub(crate) const DEEPEST_NESTING: usize = 200;
 
 #[cfg(test)]
 mod tests {

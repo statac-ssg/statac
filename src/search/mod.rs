@@ -32,10 +32,11 @@ use crate::site::{ListKey, Page, Site};
 use crate::templates::Renderer;
 
 pub use command::{Options, Results, SHOWN, Shown, code, excerpt, folder_for_words, results};
-pub use files::{File, claims};
-pub use kept::Kept;
-pub use why::{Counted, Stands, Why};
-pub use words::{Stemmer, fold, spans};
+pub(crate) use files::{File, claims};
+pub(crate) use kept::Kept;
+#[cfg(test)]
+pub(crate) use why::{Counted, Stands};
+pub(crate) use words::{Stemmer, fold, spans};
 
 /// How much a word counts where it stands, at most. A page's title counts
 /// in every part of the page, most in its opening.
@@ -57,17 +58,17 @@ const B: f64 = 0.75;
 /// One part of a page as search reads it.
 #[derive(Debug)]
 pub struct Record {
-    pub page: PageId,
+    pub(crate) page: PageId,
     /// The heading the part starts with, by its id and its words; none for
     /// the part before the first heading.
-    pub heading: Option<(String, String)>,
+    pub(crate) heading: Option<(String, String)>,
     /// Whether it opens the page: the part before the first heading, or
     /// the first heading's part where nothing stands before it.
-    pub opening: bool,
+    pub(crate) opening: bool,
     /// Its words as a reader reads them, the heading's left out.
-    pub text: String,
+    pub(crate) text: String,
     /// The descriptions of the pictures it shows.
-    pub described: Vec<String>,
+    pub(crate) described: Vec<String>,
 }
 
 impl Record {
@@ -85,7 +86,7 @@ impl Record {
 
 /// Whether `page` is searched: published as a page of the site's own,
 /// from a file, and not left out with `search: false`.
-pub fn searched(page: &Page) -> bool {
+pub(crate) fn searched(page: &Page) -> bool {
     let address = &page.address;
     let html = !address.is_file() || address.as_str().ends_with(".html");
     page.lands()
@@ -149,7 +150,7 @@ fn records_of(renderer: &Renderer, page: PageId) -> impl Iterator<Item = Record>
 /// The files a reader's browser searches the site `renderer` read with,
 /// each of `languages` its own, taking from `kept` what an earlier build
 /// made from the same.
-pub fn files(renderer: &Renderer, languages: &[LanguageId], kept: &mut Kept) -> Vec<File> {
+pub(crate) fn files(renderer: &Renderer, languages: &[LanguageId], kept: &mut Kept) -> Vec<File> {
     let standing = kept.standing();
     let taking = &*kept;
     let made: Vec<(Vec<File>, Vec<PageSearched>)> = (languages.par_iter())
@@ -312,7 +313,7 @@ fn tag_names(site: &Site, page: PageId) -> Vec<String> {
 
 /// Where in a record a word stands, as search weighs it.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum Place {
+pub(crate) enum Place {
     Title,
     Heading,
     Tags,
@@ -346,7 +347,7 @@ impl Place {
         }
     }
 
-    pub fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Place::Title => "title",
             Place::Heading => "heading",
@@ -455,7 +456,7 @@ fn weighed(said: &Said, record: &Record) -> Weighed {
 /// with its stem's entry, so a word is looked up as it is typed, with no
 /// stemming: what a reader's browser does with the index files.
 pub struct Index {
-    pub records: Vec<Record>,
+    pub(crate) records: Vec<Record>,
     /// The length of each record's text, in words.
     lengths: Vec<u32>,
     average: f64,
@@ -502,11 +503,11 @@ impl Assembled {
 
 /// A record found, and how well it matched.
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Found {
-    pub record: usize,
+pub(crate) struct Found {
+    pub(crate) record: usize,
     /// How many of the words asked for it holds.
-    pub matched: usize,
-    pub score: f64,
+    pub(crate) matched: usize,
+    pub(crate) score: f64,
 }
 
 impl Index {
@@ -587,7 +588,7 @@ impl Index {
 
     /// The entry `word`, folded, is listed with; none for a word no record
     /// holds.
-    pub fn entry_of(&self, word: &str) -> Option<u32> {
+    pub(crate) fn entry_of(&self, word: &str) -> Option<u32> {
         let at = (self.words).binary_search_by(|(listed, _)| in_utf16(listed, word));
         at.ok().map(|at| self.words[at].1)
     }
@@ -626,7 +627,7 @@ impl Index {
     }
 
     /// Every entry `asked` looks in.
-    pub fn matched(&self, asked: &Asked) -> HashSet<u32> {
+    pub(crate) fn matched(&self, asked: &Asked) -> HashSet<u32> {
         let looked = self.looked_in(asked).into_iter().flatten();
         looked.map(|(entry, _)| entry).collect()
     }
@@ -635,7 +636,7 @@ impl Index {
     /// words first, then the best matched, then in order. A word being
     /// typed counts as one word across the words it starts, as rare as
     /// the records holding any of them, in each at the best of them.
-    pub fn search(&self, asked: &Asked) -> Vec<Found> {
+    pub(crate) fn search(&self, asked: &Asked) -> Vec<Found> {
         let mut found: HashMap<u32, (usize, f64)> = HashMap::new();
         for entries in self.looked_in(asked) {
             let rarity = self.rarity(self.holding(&entries));
@@ -711,19 +712,20 @@ impl Index {
     }
 
     /// The average length of the records' text, in words.
-    pub fn average(&self) -> f64 {
+    pub(crate) fn average(&self) -> f64 {
         self.average
     }
 
     /// The average length of the titles of the records' pages, in words,
     /// of the records whose page has one.
-    pub fn title_average(&self) -> f64 {
+    pub(crate) fn title_average(&self) -> f64 {
         self.title_average
     }
 
     /// Every word the records hold, folded, in the order of their UTF-16
     /// code units.
-    pub fn words(&self) -> impl Iterator<Item = &str> {
+    #[cfg(test)]
+    pub(crate) fn words(&self) -> impl Iterator<Item = &str> {
         self.words.iter().map(|(word, _)| word.as_str())
     }
 }
@@ -756,9 +758,9 @@ fn saturated(times: f64) -> f64 {
 /// their UTF-16 code units, and the one being typed, if any, which is
 /// looked for as the start of longer words too.
 #[derive(Debug, PartialEq)]
-pub struct Asked {
-    pub words: Vec<String>,
-    pub typing: Option<String>,
+pub(crate) struct Asked {
+    pub(crate) words: Vec<String>,
+    pub(crate) typing: Option<String>,
 }
 
 impl Asked {
@@ -766,7 +768,7 @@ impl Asked {
     /// Korean next to each other read by the words `index` lists, its last
     /// being typed where `typing` and nothing follows it, and it is two
     /// letters or more, or one of a script written without spaces.
-    pub fn of(query: &str, typing: bool, index: &Index) -> Asked {
+    pub(crate) fn of(query: &str, typing: bool, index: &Index) -> Asked {
         let spans: Vec<_> = spans(query).collect();
         let ending = typing && spans.last().is_some_and(|span| span.end == query.len());
         let folded = |span: &Range<usize>| fold(&query[span.clone()]);
@@ -825,6 +827,6 @@ fn unspaced(c: char) -> bool {
 }
 
 /// `a` against `b` by their UTF-16 code units, as a browser orders strings.
-pub fn in_utf16(a: &str, b: &str) -> std::cmp::Ordering {
+pub(crate) fn in_utf16(a: &str, b: &str) -> std::cmp::Ordering {
     a.encode_utf16().cmp(b.encode_utf16())
 }

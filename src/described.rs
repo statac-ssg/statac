@@ -100,7 +100,7 @@ impl Group {
     }
 
     /// What `name` is, where the group describes it.
-    pub fn of(self, name: &str) -> Option<&'static Described> {
+    pub(crate) fn of(self, name: &str) -> Option<&'static Described> {
         (self.described().iter()).find(|described| described.name == name)
     }
 }

@@ -41,21 +41,21 @@ pub(super) type Position = (usize, usize);
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Told {
     /// The protocol's diagnostic.
-    pub diagnostic: String,
-    pub from: Position,
-    pub to: Position,
-    pub fixes: Vec<Offered>,
+    pub(crate) diagnostic: String,
+    pub(crate) from: Position,
+    pub(crate) to: Position,
+    pub(crate) fixes: Vec<Offered>,
 }
 
 /// A fix as it is offered: `text` in place of `was`, written from `from`
 /// to `to` in the file the problem is told in.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Offered {
-    pub title: String,
-    pub from: Position,
-    pub to: Position,
-    pub was: String,
-    pub text: String,
+    pub(crate) title: String,
+    pub(crate) from: Position,
+    pub(crate) to: Position,
+    pub(crate) was: String,
+    pub(crate) text: String,
 }
 
 /// Every problem `outcome` holds that isn't quietened, as diagnostics by

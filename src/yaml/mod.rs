@@ -12,7 +12,7 @@ mod schema;
 #[cfg(test)]
 mod tests;
 mod tree;
-pub mod write;
+pub(crate) mod write;
 
 pub use front_matter::{Split, Unclosed, split};
 pub use schema::{Resolved, keeps_characters, resolve};
@@ -41,7 +41,7 @@ pub(crate) fn reads_as_text(line: &str, spaces: usize) -> bool {
 }
 
 /// The name of a mapping's key as written.
-pub fn key_name(key: &Node) -> String {
+pub(crate) fn key_name(key: &Node) -> String {
     match &key.value {
         Value::Scalar(text) => text.clone(),
         _ => String::new(),
@@ -49,7 +49,7 @@ pub fn key_name(key: &Node) -> String {
 }
 
 /// Reads the whole of a source as one YAML document.
-pub fn read(sources: &Sources, source: SourceId) -> Result<Node, Problem> {
+pub(crate) fn read(sources: &Sources, source: SourceId) -> Result<Node, Problem> {
     let span = Span::new(0, sources.text(source).len());
     read_at(sources, Place { source, span })
 }
@@ -67,20 +67,21 @@ pub fn read_json(sources: &Sources, source: SourceId) -> Result<Node, Problem> {
 
 /// Reads the YAML at `place`, one document, placing every node in the
 /// whole source.
-pub fn read_at(sources: &Sources, place: Place) -> Result<Node, Problem> {
+pub(crate) fn read_at(sources: &Sources, place: Place) -> Result<Node, Problem> {
     tree::build(sources, place)
 }
 
 /// Reads the YAML at `place` as an editor holds it while the author
 /// types, reading on past each fault rather than stopping at the first.
-pub fn read_partial(sources: &Sources, place: Place) -> Partial {
+pub(crate) fn read_partial(sources: &Sources, place: Place) -> Partial {
     tree::build_partial(sources, place)
 }
 
 /// Reads a Markdown file's front matter as an editor holds it while the
 /// author types: front matter not yet closed runs to the end of the file.
 /// None where the file has none.
-pub fn front_matter_partial(sources: &Sources, source: SourceId) -> Option<Partial> {
+#[cfg(test)]
+pub(crate) fn front_matter_partial(sources: &Sources, source: SourceId) -> Option<Partial> {
     let (span, unclosed) = match split(sources.text(source)) {
         Ok(Split {
             front_matter: Some(span),
@@ -107,7 +108,10 @@ pub fn front_matter_partial(sources: &Sources, source: SourceId) -> Option<Parti
 
 /// Reads a Markdown file's front matter, if it has any, and gives the span
 /// of its body.
-pub fn front_matter(sources: &Sources, source: SourceId) -> Result<(Option<Node>, Span), Problem> {
+pub(crate) fn front_matter(
+    sources: &Sources,
+    source: SourceId,
+) -> Result<(Option<Node>, Span), Problem> {
     let split = split(sources.text(source)).map_err(|unclosed| {
         Problem::at(
             Kind::UnclosedFrontMatter,

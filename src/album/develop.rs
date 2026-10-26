@@ -26,27 +26,27 @@ use crate::source::Place;
 
 /// What making and publishing the copies came to.
 #[derive(Default, Debug)]
-pub struct Developed {
+pub(crate) struct Developed {
     /// The copies made, the rest being kept from an earlier build.
-    pub made: usize,
+    pub(crate) made: usize,
     /// The photographs those were made from.
-    pub from: usize,
+    pub(crate) from: usize,
     /// The copies written into the built site.
-    pub published: usize,
-    pub problems: Vec<Problem>,
+    pub(crate) published: usize,
+    pub(crate) problems: Vec<Problem>,
     /// Each photograph whose copies were made, with how long making them
     /// took and how many there were, in the order of their paths.
-    pub timed: Vec<(String, Duration, usize)>,
+    pub(crate) timed: Vec<(String, Duration, usize)>,
 }
 
 /// A photograph some page shows.
 #[derive(Copy, Clone, Debug)]
-pub struct Shown {
-    pub id: PictureId,
+pub(crate) struct Shown {
+    pub(crate) id: PictureId,
     /// Where the writing first shows it; none where only a template does.
-    pub place: Option<Place>,
+    pub(crate) place: Option<Place>,
     /// Whether its copy at its own width is asked for.
-    pub full: bool,
+    pub(crate) full: bool,
 }
 
 /// The folder of `.statac` copies are kept in.
@@ -254,7 +254,7 @@ pub(crate) fn fault(error: Error) -> PictureFault {
 /// Makes the copies of `shown`, each a photograph with where the writing
 /// first shows it, that no earlier build kept, and publishes every copy of
 /// each beside where the photograph is published.
-pub fn develop(
+pub(crate) fn develop(
     site: &Path,
     all: &Pictures,
     shown: &[Shown],
@@ -403,7 +403,7 @@ pub fn develop(
 /// Only files themselves, directly in the folder of copies, are removed: a
 /// link or a folder found there is left alone, and nothing is removed
 /// where the folder of copies is not a folder of the site's own.
-pub fn sweep(
+pub(crate) fn sweep(
     site: &Path,
     all: &Pictures,
     asked: impl IntoIterator<Item = (PictureId, bool)>,

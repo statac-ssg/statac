@@ -12,7 +12,7 @@ use crate::source::Sources;
 const TRUTHS_ELSEWHERE: &[&str] = &["yes", "no", "on", "off", "y", "n"];
 
 /// `text` as a value that reads back as that text.
-pub fn text(text: &str) -> String {
+pub(crate) fn text(text: &str) -> String {
     let plain = plain_anywhere(text)
         && one_entry(&format!("value: {text}\n")).is_some_and(|(_, value)| {
             value.resolved() == Some(Resolved::Str)
@@ -25,7 +25,7 @@ pub fn text(text: &str) -> String {
 }
 
 /// A field's name, plain where it reads back as written.
-pub fn key(name: &str) -> String {
+pub(crate) fn key(name: &str) -> String {
     let plain = plain_anywhere(name)
         && one_entry(&format!("{name}: x\n")).is_some_and(|(key, _)| {
             key.style == Style::Plain && matches!(&key.value, Value::Scalar(read) if read == name)
@@ -38,7 +38,7 @@ pub fn key(name: &str) -> String {
 
 /// `text` in double quotes, every character a reader would take as other
 /// than itself escaped.
-pub fn quoted(text: &str) -> String {
+pub(crate) fn quoted(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + 2);
     out.push('"');
     for c in text.chars() {

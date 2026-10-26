@@ -15,7 +15,7 @@ use crate::source::{Place, Span};
 
 /// What writes a snippet call's HTML, and the pieces of the writing the
 /// site writes itself.
-pub trait Snippets {
+pub(crate) trait Snippets {
     /// `place` is the call as written, as far as its `)`. `body` is the
     /// writing a call that wraps writing wraps, as HTML.
     fn html(&self, call: &Call, place: Place, placement: Placement, body: Option<&str>) -> String;
@@ -63,60 +63,60 @@ pub trait Snippets {
 
 /// A picture the site has, as its tag is written.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Picture {
+pub(crate) struct Picture {
     /// The address that reaches the file from the page.
-    pub address: String,
+    pub(crate) address: String,
     /// Its width and height, where its header gives them.
-    pub size: Option<(u32, u32)>,
+    pub(crate) size: Option<(u32, u32)>,
     /// A photograph's copies, where it is published as copies.
-    pub copies: Option<Copies>,
+    pub(crate) copies: Option<Copies>,
     /// What the file describing it says for a reader who can't see it, or
     /// empty.
-    pub alt: String,
+    pub(crate) alt: String,
     /// Whether the file describing it marks it as decoration.
-    pub decorative: bool,
+    pub(crate) decorative: bool,
     /// The file, as a problem names it.
-    pub file: Option<String>,
+    pub(crate) file: Option<String>,
     /// Whether a file beside it may describe it.
-    pub described_beside: bool,
+    pub(crate) described_beside: bool,
 }
 
 /// The copies of a photograph, as a tag names them. Each address is
 /// written as an attribute carries it.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Copies {
+pub(crate) struct Copies {
     /// The AVIF copies, as a `srcset`.
-    pub avif: String,
+    pub(crate) avif: String,
     /// The JPEG or PNG copies, as a `srcset`.
-    pub fallback: String,
+    pub(crate) fallback: String,
     /// The copy a browser without `srcset` shows.
-    pub src: String,
+    pub(crate) src: String,
     /// How wide the picture is shown, as a `sizes`.
-    pub sizes: String,
+    pub(crate) sizes: String,
 }
 
 /// Where a call stands, which decides the HTML that suits it: a picture in
 /// a sentence is an image, the same picture standing alone a figure.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Placement {
+pub(crate) enum Placement {
     Inline,
     /// In place of a paragraph.
     Standalone,
 }
 
-pub struct Options<'a> {
-    pub snippets: &'a dyn Snippets,
+pub(crate) struct Options<'a> {
+    pub(crate) snippets: &'a dyn Snippets,
     /// What a screen reader says for a footnote's way back to the text, in
     /// the site's words.
-    pub back_to_the_text: Option<&'a str>,
+    pub(crate) back_to_the_text: Option<&'a str>,
     /// The ten digits the page's language writes a footnote's number in,
     /// zero first; none where it writes 0 to 9.
-    pub digits: Option<&'a [char; 10]>,
+    pub(crate) digits: Option<&'a [char; 10]>,
     /// Whether the page's language is written right to left, which turns
     /// the arrow of a footnote's way back.
-    pub right_to_left: bool,
+    pub(crate) right_to_left: bool,
     /// What colours code; none leaves every block as it is.
-    pub highlighter: Option<&'a Highlighter>,
+    pub(crate) highlighter: Option<&'a Highlighter>,
 }
 
 /// Past this depth the nesting is still the page's; only the indentation
@@ -124,13 +124,13 @@ pub struct Options<'a> {
 /// than its length.
 const INDENT_DEPTH: usize = 32;
 
-pub fn to_html(document: &Document, options: &Options<'_>) -> String {
+pub(crate) fn to_html(document: &Document, options: &Options<'_>) -> String {
     write(document, options).html
 }
 
 /// The writing as HTML, with its excerpt, its opening words and how many
 /// words a reader reads in it.
-pub fn write(document: &Document, options: &Options<'_>) -> Written {
+pub(crate) fn write(document: &Document, options: &Options<'_>) -> Written {
     let mut writer = Writer::new(options, Vec::new());
     writer.main = true;
     let more = opening::more_marker(document);

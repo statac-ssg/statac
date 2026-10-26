@@ -146,7 +146,7 @@ impl Renderer {
     /// that reached fewer than [`LONG`] runs none. Where the templates an
     /// output was built from write no such loop, or more than one, the
     /// note is of the build.
-    pub fn loops_over_every_page<'a>(
+    pub(crate) fn loops_over_every_page<'a>(
         &self,
         outputs: impl Iterator<Item = (u64, &'a Reads)>,
     ) -> Vec<Problem> {

@@ -129,11 +129,11 @@ pub(super) static NEW_SITE_ERRORS: FindingKind = FindingKind {
 pub(super) struct Terms {
     /// Each list by its name, with each of its names in the order met and
     /// the tag it became.
-    pub lists: Vec<(String, Vec<(String, String)>)>,
+    pub(crate) lists: Vec<(String, Vec<(String, String)>)>,
     /// Each tag the pages had of their own, in the order met.
-    pub tags: Vec<String>,
+    pub(crate) tags: Vec<String>,
     /// How many pages named more than one series.
-    pub several_series: usize,
+    pub(crate) several_series: usize,
 }
 
 impl Terms {
@@ -240,43 +240,43 @@ impl Terms {
 /// What was written, for the report.
 #[derive(Default, Debug)]
 pub(super) struct Summary {
-    pub posts: usize,
-    pub drafts: usize,
-    pub pages: usize,
-    pub files: usize,
+    pub(crate) posts: usize,
+    pub(crate) drafts: usize,
+    pub(crate) pages: usize,
+    pub(crate) files: usize,
     /// Where the posts went, by their folder under `content/`.
-    pub post_folders: Vec<String>,
-    pub kept: addresses::Kept,
-    pub findings: Vec<Finding>,
-    pub left: Vec<Left>,
-    pub notes: Vec<String>,
+    pub(crate) post_folders: Vec<String>,
+    pub(crate) kept: addresses::Kept,
+    pub(crate) findings: Vec<Finding>,
+    pub(crate) left: Vec<Left>,
+    pub(crate) notes: Vec<String>,
     /// `statac.yaml` as written.
-    pub settings: String,
+    pub(crate) settings: String,
     /// Whether the old site's home page came across.
-    pub home: bool,
+    pub(crate) home: bool,
     /// The path the site is under, where it is under one.
-    pub base: String,
-    pub built: Option<String>,
+    pub(crate) base: String,
+    pub(crate) built: Option<String>,
     /// The folder the old tool builds the site into, whether it is there
     /// or not.
-    pub output: String,
+    pub(crate) output: String,
     /// How many errors `statac check` finds in the new site.
-    pub errors: usize,
+    pub(crate) errors: usize,
     /// The templates the new site's pages and feeds are built with that it
     /// doesn't have, by their paths.
-    pub templates: Vec<String>,
+    pub(crate) templates: Vec<String>,
     /// Whether any of `templates` is one a feed is built with.
-    pub for_feeds: bool,
+    pub(crate) for_feeds: bool,
     /// Those of `templates` the new site doesn't build without.
-    pub stopping: Vec<String>,
+    pub(crate) stopping: Vec<String>,
     /// Whether the new site asks for a feed and has no `url`, which every
     /// feed needs.
-    pub feeds_need_url: bool,
+    pub(crate) feeds_need_url: bool,
     /// The lists of terms whose names became tags.
-    pub terms: Terms,
+    pub(crate) terms: Terms,
     /// What was changed in the pages' writing so Statac reads it as the
     /// old site showed it.
-    pub settled: Settled,
+    pub(crate) settled: Settled,
 }
 
 impl Summary {
@@ -367,7 +367,7 @@ impl Undo {
 /// The new site's folder, written into a file at a time. Everything in it
 /// is the import's own, so a file is written over by removing it first.
 pub(super) struct Out<'a> {
-    pub folder: &'a Path,
+    pub(crate) folder: &'a Path,
     write: &'a mut Writer<'a>,
     made: HashSet<String>,
 }

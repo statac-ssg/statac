@@ -20,82 +20,82 @@ use crate::reads::{Asked, Key, Reads};
 use crate::source::Place;
 
 pub(super) struct Frame {
-    pub shared: Arc<Shared>,
+    pub(crate) shared: Arc<Shared>,
     /// The page being built, or whose writing is, or the page speaking for
     /// the list whose feed is; none for the feed of a list no page speaks
     /// for.
-    pub page: Option<PageId>,
+    pub(crate) page: Option<PageId>,
     /// The language of what is built: its page's, or for a feed its list's.
     /// Dates, words and `site` answer in it.
-    pub language: LanguageId,
+    pub(crate) language: LanguageId,
     /// Which of the page's list's pages is being built, counted from 1.
-    pub number: usize,
+    pub(crate) number: usize,
     /// The feed being built, where it is one.
-    pub feed: Option<crate::feeds::Feed>,
+    pub(crate) feed: Option<crate::feeds::Feed>,
     /// Whether code is shown without colour: in a feed, as a feed reader
     /// loads no stylesheet, and in writing built for one.
-    pub colourless: bool,
+    pub(crate) colourless: bool,
     /// Whether what is built is the page left at one of the page's old
     /// addresses.
-    pub redirect: bool,
-    pub reads: Reads,
+    pub(crate) redirect: bool,
+    pub(crate) reads: Reads,
     /// What it asked of its own page and of the site, by name.
-    pub asked: Asked,
+    pub(crate) asked: Asked,
     /// Problems met along the way that didn't stop the template, such as a
     /// snippet call in the writing that couldn't be built.
-    pub problems: Vec<Problem>,
+    pub(crate) problems: Vec<Problem>,
     /// Lookups that found nothing, most recent last.
-    pub misses: Vec<Miss>,
+    pub(crate) misses: Vec<Miss>,
     /// The innermost of the engine's own filters, tests and functions to
     /// stop, and what it was handed.
-    pub failed: Option<Failed>,
+    pub(crate) failed: Option<Failed>,
     /// The snippets being built, outermost first.
-    pub snippets: Vec<String>,
-    pub scripts: PageScripts,
+    pub(crate) snippets: Vec<String>,
+    pub(crate) scripts: PageScripts,
     /// Where each text the output was handed is written, by its bytes'
     /// address and length, the text kept so no other takes its address.
-    pub origins: HashMap<(usize, usize), (Value, Place)>,
+    pub(crate) origins: HashMap<(usize, usize), (Value, Place)>,
     /// Where what each text a body the engine held back or a snippet made
     /// was written, by the text's address and length, the text kept so no
     /// other takes its address.
-    pub made: HashMap<(usize, usize), (Value, Arc<Own>)>,
+    pub(crate) made: HashMap<(usize, usize), (Value, Arc<Own>)>,
     /// Where the writing makes the call, or shows the picture, whose
     /// snippet or piece is being built.
-    pub calling: Option<Place>,
+    pub(crate) calling: Option<Place>,
     /// The pictures told as shown with no description, each told once.
-    pub undescribed: Vec<String>,
+    pub(crate) undescribed: Vec<String>,
     /// How many search boxes what is built has asked for, those of its
     /// own page's writing counted once it shows that whole.
-    pub search_boxes: usize,
+    pub(crate) search_boxes: usize,
     /// How many search boxes the output had asked for when it first showed
     /// its own page's writing whole.
-    pub boxes_before_writing: Option<usize>,
+    pub(crate) boxes_before_writing: Option<usize>,
     /// The languages whose search index what is built names, each once, in
     /// any page's writing it shows too.
-    pub indexed: Vec<LanguageId>,
+    pub(crate) indexed: Vec<LanguageId>,
     /// The photographs whose copies what is built names, as each was
     /// named.
-    pub developed: Vec<crate::album::Shown>,
+    pub(crate) developed: Vec<crate::album::Shown>,
     /// Whether what is built shows any code coloured, its own or in the
     /// writing of a page it shows, whole or as its excerpt.
-    pub colours: bool,
-    pub making: Making,
+    pub(crate) colours: bool,
+    pub(crate) making: Making,
     /// The template the output is built with, by its index among the
     /// files; none for a page's writing, which is built for its page's.
-    pub layout: Option<usize>,
+    pub(crate) layout: Option<usize>,
     /// The steps the engine took in the runs for the output that have
     /// ended, its page's writing counted.
-    pub steps: u64,
+    pub(crate) steps: u64,
     /// The steps each run still going had taken when it called the run
     /// inside it, outermost first.
-    pub running: Vec<u64>,
+    pub(crate) running: Vec<u64>,
     /// Whether the output's steps were told spent.
-    pub spent: bool,
+    pub(crate) spent: bool,
     /// Whether what is built asked the page published where it is for its
     /// writing, whole or as its excerpt.
-    pub shows_writing: bool,
+    pub(crate) shows_writing: bool,
     /// How many pages of lists of the whole site what is built reached.
-    pub walked: u64,
+    pub(crate) walked: u64,
 }
 
 /// What a frame is the build of.
@@ -116,17 +116,17 @@ pub(super) type Origins = HashMap<(usize, usize), Place>;
 /// A snippet's name and what one call handed it.
 #[derive(Clone, Debug)]
 pub(super) struct Handed {
-    pub snippet: String,
-    pub values: Vec<(String, Value)>,
+    pub(crate) snippet: String,
+    pub(crate) values: Vec<(String, Value)>,
 }
 
 /// A lookup that found nothing: the name, and the page or the part of
 /// `data/` it was asked of where it was asked of one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Miss {
-    pub page: Option<PageId>,
-    pub data: Option<InData>,
-    pub name: String,
+    pub(crate) page: Option<PageId>,
+    pub(crate) data: Option<InData>,
+    pub(crate) name: String,
 }
 
 /// Where in `data/` a lookup found nothing.

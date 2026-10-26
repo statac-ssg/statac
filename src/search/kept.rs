@@ -12,7 +12,7 @@ use crate::ids::PageId;
 /// everything it is made from. The default keeps nothing, and everything
 /// is made anew.
 #[derive(Default)]
-pub struct Kept {
+pub(crate) struct Kept {
     keeps: bool,
     /// Each page's records weighed, by everything weighing them reads.
     weighed: HashMap<blake3::Hash, Arc<[Weighed]>>,
@@ -36,7 +36,7 @@ struct Taken {
 
 impl Kept {
     /// Kept search that keeps what each build made for the next.
-    pub fn keeping() -> Kept {
+    pub(crate) fn keeping() -> Kept {
         Kept {
             keeps: true,
             ..Kept::default()

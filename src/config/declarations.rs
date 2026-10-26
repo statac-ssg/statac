@@ -18,7 +18,7 @@ use crate::yaml::{Node, Value as Yaml};
 
 /// What a declared field holds.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum FieldKind {
+pub(crate) enum FieldKind {
     Text,
     Number,
     TrueFalse,
@@ -34,7 +34,7 @@ pub enum FieldKind {
 
 /// What holds the names a field's value must be one of.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Names {
+pub(crate) enum Names {
     /// A table in `data/`, by its name after `data.`: `people`.
     Data(String),
     /// A folder of pages, by its path after `folder.`: `books`.
@@ -42,7 +42,7 @@ pub enum Names {
 }
 
 /// The kinds as the author writes them.
-pub const KIND_WORDS: &[&str] = &[
+pub(crate) const KIND_WORDS: &[&str] = &[
     "text",
     "number",
     "true/false",
@@ -54,16 +54,16 @@ pub const KIND_WORDS: &[&str] = &[
 ];
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Declared {
-    pub kind: FieldKind,
+pub(crate) struct Declared {
+    pub(crate) kind: FieldKind,
     /// Where the kind is written.
-    pub place: Place,
+    pub(crate) place: Place,
     /// The declaration's name as written: `types.review.book`.
-    pub written: String,
+    pub(crate) written: String,
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
-pub struct Declarations {
+pub(crate) struct Declarations {
     fields: BTreeMap<String, Declared>,
     /// Fields every page must carry.
     everywhere: Vec<String>,
@@ -72,23 +72,23 @@ pub struct Declarations {
 }
 
 impl Declarations {
-    pub fn kind(&self, field: &str) -> Option<&FieldKind> {
+    pub(crate) fn kind(&self, field: &str) -> Option<&FieldKind> {
         self.fields.get(field).map(|declared| &declared.kind)
     }
 
     /// How the field `name` is declared, where it is.
-    pub fn declared(&self, field: &str) -> Option<&Declared> {
+    pub(crate) fn declared(&self, field: &str) -> Option<&Declared> {
         self.fields.get(field)
     }
 
     /// Every field declared, by name.
-    pub fn names(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
         self.fields.keys().map(String::as_str)
     }
 
     /// Every field declared to be one of the names something holds, by
     /// name.
-    pub fn naming(&self) -> impl Iterator<Item = (&str, &Declared, &Names)> {
+    pub(crate) fn naming(&self) -> impl Iterator<Item = (&str, &Declared, &Names)> {
         self.fields
             .iter()
             .filter_map(|(name, declared)| match &declared.kind {
@@ -100,7 +100,7 @@ impl Declarations {
     /// The field `name` and the fields nested inside `value`, each
     /// declared to be one of the names something holds: its name as
     /// declared, with what is written for it.
-    pub fn naming_in<'a>(&'a self, name: &str, value: &'a Node) -> Vec<(&'a str, &'a Node)> {
+    pub(crate) fn naming_in<'a>(&'a self, name: &str, value: &'a Node) -> Vec<(&'a str, &'a Node)> {
         let mut found = Vec::new();
         if let Some((declared, _)) = (self.fields.get_key_value(name))
             .filter(|(_, declared)| matches!(declared.kind, FieldKind::Named(_)))
@@ -119,13 +119,13 @@ impl Declarations {
     }
 
     /// Every type a field is declared for, by name.
-    pub fn types(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn types(&self) -> impl Iterator<Item = &str> {
         self.types.keys().map(String::as_str)
     }
 
     /// Whether a field is declared nested under `name`, as `book.author`
     /// is under `book`.
-    pub fn nests(&self, name: &str) -> bool {
+    pub(crate) fn nests(&self, name: &str) -> bool {
         let prefix = format!("{name}.");
         self.fields
             .range(prefix.clone()..)
@@ -135,7 +135,7 @@ impl Declarations {
 
     /// The fields a page of `type` must carry, and whether each is required
     /// of every page or of the type.
-    pub fn required<'a>(
+    pub(crate) fn required<'a>(
         &'a self,
         page_type: Option<&'a str>,
     ) -> impl Iterator<Item = (&'a str, Option<&'a str>)> {
@@ -151,7 +151,7 @@ impl Declarations {
 
     /// Reads `fields.<name>: [required] <kind>`, or with `type` from
     /// `types.<type>.<name>`.
-    pub fn declare(
+    pub(crate) fn declare(
         &mut self,
         sources: &Sources,
         key: &Node,
@@ -215,7 +215,7 @@ impl Declarations {
 
     /// The problems with `value` for the field `name` and the fields
     /// declared nested inside it, each declared and not its kind.
-    pub fn check_all(&self, sources: &Sources, name: &str, value: &Node) -> Vec<Problem> {
+    pub(crate) fn check_all(&self, sources: &Sources, name: &str, value: &Node) -> Vec<Problem> {
         let mut problems: Vec<Problem> = self.check(sources, name, value).into_iter().collect();
         if let Yaml::Mapping(entries) = &value.value
             && self.nests(name)
@@ -230,7 +230,7 @@ impl Declarations {
 
     /// The problem with `value` for the field `name`, if it is declared and
     /// the value isn't its kind.
-    pub fn check(&self, sources: &Sources, name: &str, value: &Node) -> Option<Problem> {
+    pub(crate) fn check(&self, sources: &Sources, name: &str, value: &Node) -> Option<Problem> {
         let kind = self.kind(name)?;
         let reader = Reader::new(sources, name);
         let checked = match kind {

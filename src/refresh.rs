@@ -51,18 +51,18 @@ pub struct Options {
 }
 
 /// The environment variable the command line reads the relay's token from.
-pub const TOKEN_VARIABLE: &str = "STATAC_WEBMENTION_TOKEN";
+pub(crate) const TOKEN_VARIABLE: &str = "STATAC_WEBMENTION_TOKEN";
 
 /// The file in a site the relay's token is read from where the variable
 /// isn't set: kept out of the site's history by its `.gitignore`.
-pub const TOKEN_FILE: &str = ".statac/token";
+pub(crate) const TOKEN_FILE: &str = ".statac/token";
 
 /// The relay's token: `variable`, the value of [`TOKEN_VARIABLE`], where
 /// it is set, and else the one line of [`TOKEN_FILE`] in the site at
 /// `site`, spaces and line breaks around it taken off. With it, what to
 /// say of a file that is there and isn't used: one that is empty, holds
 /// more than one line, is a link or can't be read.
-pub fn token(site: &Path, variable: Option<String>) -> (Option<Token>, Option<String>) {
+pub(crate) fn token(site: &Path, variable: Option<String>) -> (Option<Token>, Option<String>) {
     if let Some(token) = variable.and_then(Token::new) {
         return (Some(token), None);
     }
@@ -120,7 +120,7 @@ impl std::fmt::Debug for Token {
 }
 
 /// The most bytes one answer may hold.
-pub const LIMIT: u64 = 20_000_000;
+pub(crate) const LIMIT: u64 = 20_000_000;
 
 /// What fetches an address within a limit: [`crate::fetch::fetch`], or
 /// whatever a test stands in with.
@@ -159,7 +159,7 @@ pub fn run(options: &Options, fetcher: &dyn Fetch, out: &mut dyn Write, colour: 
 
 /// [`run`], as `serve` fetches: each line is handed to `say` as it is
 /// said, and nothing is said where there is nothing to fetch.
-pub fn fetch_new(
+pub(crate) fn fetch_new(
     options: &Options,
     fetcher: &dyn Fetch,
     say: &mut dyn FnMut(&str),
@@ -170,7 +170,7 @@ pub fn fetch_new(
 
 /// Whether the site built as `outcome` has something to fetch: the still
 /// of a video a page reads one for, or webmentions.
-pub fn wanted(outcome: &build::Outcome) -> bool {
+pub(crate) fn wanted(outcome: &build::Outcome) -> bool {
     let lacks = |problem: &Problem| matches!(problem.kind, Kind::NoThumbnail { absent: false, .. });
     let webmentions = outcome
         .settings()

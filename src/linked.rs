@@ -7,9 +7,9 @@ use crate::source::{Place, SourceId, Sources, Span};
 
 /// What a page's writing links to, and what it hands its snippet calls.
 #[derive(Default, Debug)]
-pub struct Writing {
-    pub written: Vec<Linked>,
-    pub handed: Vec<Linked>,
+pub(crate) struct Writing {
+    pub(crate) written: Vec<Linked>,
+    pub(crate) handed: Vec<Linked>,
 }
 
 /// The attribute a link is written in.
@@ -40,13 +40,13 @@ impl Attribute {
 /// An address a built page links to.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Found {
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
     /// As written in the HTML, its character references undecoded.
-    pub raw: String,
+    pub(crate) raw: String,
     /// Where it starts on the page.
-    pub at: usize,
+    pub(crate) at: usize,
     /// Where the attribute's value starts on the page.
-    pub value: usize,
+    pub(crate) value: usize,
 }
 
 impl Found {
@@ -59,11 +59,11 @@ impl Found {
 /// What a built page links to, and the ids a link can land on in it.
 #[derive(Default, Debug)]
 pub(crate) struct Scanned {
-    pub links: Vec<Found>,
+    pub(crate) links: Vec<Found>,
     /// Sorted, each once.
-    pub ids: Vec<String>,
+    pub(crate) ids: Vec<String>,
     /// The page's `<base href>`, which relative links are read from.
-    pub base: Option<String>,
+    pub(crate) base: Option<String>,
 }
 
 /// Every link on a built page and every id on it.
@@ -101,15 +101,15 @@ pub(crate) fn scan(html: &str) -> Scanned {
 
 /// An address the writing links to, and where it is written.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Linked {
+pub(crate) struct Linked {
     /// As a browser follows it: a link's address as Markdown reads it, or
     /// an attribute's with its character references decoded.
-    pub address: String,
+    pub(crate) address: String,
     /// The address itself where it can be found, else the whole link.
-    pub place: Place,
+    pub(crate) place: Place,
     /// Whether it is a value handed to a snippet call, where an
     /// `@url(...)` is not read.
-    pub handed: bool,
+    pub(crate) handed: bool,
 }
 
 /// Every address the writing links to: each link's and picture's, placed

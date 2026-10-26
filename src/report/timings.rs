@@ -36,7 +36,7 @@ enum Align {
 impl Report<'_> {
     /// What `build --timings` adds after what the build said; nothing
     /// where nothing was timed.
-    pub fn timings(&self, timings: &Timings) -> String {
+    pub(crate) fn timings(&self, timings: &Timings) -> String {
         let mut sections = Vec::new();
         let whole: Duration = timings.stages.iter().map(|(_, took)| *took).sum();
         let seconds = in_seconds(timings.stages.iter().map(|(_, took)| *took));

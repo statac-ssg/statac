@@ -9,50 +9,50 @@ use crate::site::Site;
 
 /// Why a record scores what it does.
 #[derive(Debug, PartialEq)]
-pub struct Why {
+pub(crate) struct Why {
     /// The length of its text, in words, and the records' average.
-    pub length: u32,
-    pub average: f64,
+    pub(crate) length: u32,
+    pub(crate) average: f64,
     /// The length of its page's title, in words, and the average of the
     /// records whose page has one.
-    pub title: u32,
-    pub title_average: f64,
+    pub(crate) title: u32,
+    pub(crate) title_average: f64,
     /// What each word asked counted, in the order of the words.
-    pub words: Vec<Counted>,
+    pub(crate) words: Vec<Counted>,
 }
 
 /// What one word asked counted in a record.
 #[derive(Debug, PartialEq)]
-pub struct Counted {
-    pub word: String,
+pub(crate) struct Counted {
+    pub(crate) word: String,
     /// The forms of it the record holds, folded, each once, in the order
     /// of their UTF-16 code units; none where it holds none.
-    pub forms: Vec<String>,
+    pub(crate) forms: Vec<String>,
     /// Whether they matched as the start of a longer word, which counts
     /// less than a whole one.
-    pub starting: bool,
+    pub(crate) starting: bool,
     /// Where the forms stand, in the order of the places.
-    pub places: Vec<Stands>,
+    pub(crate) places: Vec<Stands>,
     /// How many records hold any form the word finds.
-    pub holding: usize,
+    pub(crate) holding: usize,
     /// What it adds to the record's score.
-    pub score: f64,
+    pub(crate) score: f64,
 }
 
 /// How many times a word's forms stand in one place in a record, and what
 /// they add to its score there.
 #[derive(Debug, PartialEq)]
-pub struct Stands {
-    pub place: Place,
-    pub times: u32,
-    pub adds: f64,
+pub(crate) struct Stands {
+    pub(crate) place: Place,
+    pub(crate) times: u32,
+    pub(crate) adds: f64,
 }
 
 impl Index {
     /// Why the record at `record`, of a page of `site`, scores what
     /// [`Index::search`] gives it for `asked`: what each word adds sums to
     /// its score.
-    pub fn why(&self, site: &Site, record: usize, asked: &Asked) -> Why {
+    pub(crate) fn why(&self, site: &Site, record: usize, asked: &Asked) -> Why {
         // The record's words by their entries, each where it stands.
         let mut held: HashMap<u32, Vec<(String, Place)>> = HashMap::new();
         let mut length = 0;

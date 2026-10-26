@@ -29,7 +29,7 @@ const CLASS_PREFIX: &str = "hl-";
 /// `hl-`. Sites' stylesheets, and the themes the docs give, colour the
 /// classes by name, so the list is a contract kept from one release to
 /// the next.
-pub const KINDS: [&str; 19] = [
+pub(crate) const KINDS: [&str; 19] = [
     "comment",
     "keyword",
     "string",
@@ -169,7 +169,7 @@ const SCOPES: &[(&str, Option<&str>)] = &[
 
 /// The longest line, in characters, a block may hold and be coloured: the
 /// time colouring a line takes grows with the square of its length.
-pub const LONGEST_LINE: usize = 5_000;
+pub(crate) const LONGEST_LINE: usize = 5_000;
 
 /// Words that ask for code to be shown as it is.
 const PLAIN: &[&str] = &["text", "txt", "plain", "plaintext"];
@@ -302,7 +302,7 @@ static CARRIED: LazyLock<Carried> = LazyLock::new(|| {
 
 /// What a fence's first word names.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Language {
+pub(crate) enum Language {
     /// Code shown as it is, as asked.
     Plain,
     /// A grammar, by a name of it Statac carries.
@@ -313,7 +313,7 @@ pub enum Language {
 }
 
 /// The language a fence's first word names.
-pub fn language(word: &str) -> Language {
+pub(crate) fn language(word: &str) -> Language {
     let word = word.to_lowercase();
     if PLAIN.contains(&word.as_str()) {
         return Language::Plain;
@@ -341,14 +341,14 @@ pub fn language(word: &str) -> Language {
 
 /// What a fence's first word is.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum FirstWord {
+pub(crate) enum FirstWord {
     Language(Language),
     /// A file's name, with the language its name gives.
     File(Language),
 }
 
 impl FirstWord {
-    pub fn language(self) -> Language {
+    pub(crate) fn language(self) -> Language {
         match self {
             FirstWord::Language(language) | FirstWord::File(language) => language,
         }
@@ -359,7 +359,7 @@ impl FirstWord {
 /// is, in any capitals; else a file whose name gives a language, by its
 /// whole name as it is usually written, `Gemfile`, or by its ending,
 /// `example.rs`; else a language Statac doesn't know.
-pub fn first_word(word: &str) -> FirstWord {
+pub(crate) fn first_word(word: &str) -> FirstWord {
     match language(word) {
         unknown @ Language::Unknown { .. } => {
             let named = match file_shaped(word) {
@@ -374,7 +374,7 @@ pub fn first_word(word: &str) -> FirstWord {
 
 /// The language the name of a file on disk gives: by its whole name, in
 /// any capitals, or else by its ending. Plain where neither names one.
-pub fn file_language(name: &str) -> Language {
+pub(crate) fn file_language(name: &str) -> Language {
     let name = last_part(name);
     let own = || {
         NAMED_AS_THEIR_FILES
@@ -423,7 +423,7 @@ fn by_ending(name: &str) -> Option<Language> {
 
 /// How long the longest line of `code` is, in characters, where it is too
 /// long for the block to be coloured.
-pub fn too_long(code: &str) -> Option<usize> {
+pub(crate) fn too_long(code: &str) -> Option<usize> {
     // A line holds no more characters than bytes.
     if code.len() <= LONGEST_LINE {
         return None;
@@ -578,14 +578,14 @@ type Done = HashMap<(&'static str, Box<str>), Arc<str>>;
 
 /// Colours code.
 #[derive(Default)]
-pub struct Highlighter {
+pub(crate) struct Highlighter {
     /// Each block once coloured, so a block written twice is coloured once.
     done: Mutex<Done>,
 }
 
 impl Highlighter {
     /// The inside of a `<code>` holding `code`, coloured as `language`.
-    pub fn html(&self, language: &'static str, code: &str) -> Arc<str> {
+    pub(crate) fn html(&self, language: &'static str, code: &str) -> Arc<str> {
         let key = (language, Box::from(code));
         if let Some(done) = self.done.lock().expect("never poisoned").get(&key) {
             return Arc::clone(done);
@@ -607,7 +607,7 @@ fn coloured(language: &str, code: &str) -> String {
 }
 
 /// The inside of a `<code>` holding `code` as it is, without colour.
-pub fn plain(code: &str) -> String {
+pub(crate) fn plain(code: &str) -> String {
     let mut out = String::with_capacity(code.len());
     escape(code, &mut out);
     out

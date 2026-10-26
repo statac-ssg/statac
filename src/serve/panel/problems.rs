@@ -18,12 +18,12 @@ use crate::wording;
 
 /// What turns a round's problems into their parts.
 pub(super) struct Parts<'a> {
-    pub report: &'a Report<'a>,
-    pub quiet: &'a Quiet,
+    pub(crate) report: &'a Report<'a>,
+    pub(crate) quiet: &'a Quiet,
     /// The site as the round read it, where it was, to find where the
     /// pages a problem was met building are published.
-    pub read: Option<&'a Read>,
-    pub addresses: &'a OnceLock<Addresses>,
+    pub(crate) read: Option<&'a Read>,
+    pub(crate) addresses: &'a OnceLock<Addresses>,
 }
 
 impl Parts<'_> {

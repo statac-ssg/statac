@@ -100,7 +100,7 @@ pub enum Refusal {
 
 /// Fetches the bytes at `address`, judging the host before anything is
 /// sent and each hop of a redirect the same way, or refuses.
-pub fn fetch(address: &str, limit: u64) -> Result<Fetched, Refusal> {
+pub(crate) fn fetch(address: &str, limit: u64) -> Result<Fetched, Refusal> {
     run(&Plan::for_a_fetch(), address, limit)
 }
 

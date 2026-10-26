@@ -20,7 +20,7 @@ use crate::source::{Place, Span};
 /// takes a number, as a heading does. Words that make no id, a heading of
 /// punctuation alone, are named from `path`, the file the writing is in,
 /// and the heading's place among them. `text` is that file's.
-pub fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
+pub(crate) fn give_heading_ids(document: &mut Document, path: &str, text: &str) {
     let mut ids = Ids::default();
     let tops = || std::iter::once(&document.root).chain(&document.notes);
     let mut written: HashMap<String, (Place, Braced)> = HashMap::new();

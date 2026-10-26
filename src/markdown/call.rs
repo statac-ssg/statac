@@ -12,22 +12,23 @@ use crate::source::{Place, SourceId, Span};
 #[derive(Clone, PartialEq, Debug)]
 pub struct Call {
     /// The name after the `@`, placed without it.
-    pub name: Sourced<String>,
-    pub arguments: Vec<Argument>,
-    pub within: Within,
+    pub(crate) name: Sourced<String>,
+    pub(crate) arguments: Vec<Argument>,
+    pub(crate) within: Within,
     /// For a call that wraps the writing below it up to an `@end`, the call
     /// itself as far as its `)`. Its node is placed at the whole, `@end`
     /// and all, and holds the writing as its children.
-    pub head: Option<Span>,
+    pub(crate) head: Option<Span>,
 }
 
 impl Call {
-    pub fn wraps(&self) -> bool {
+    pub(crate) fn wraps(&self) -> bool {
         self.head.is_some()
     }
 
     /// The value given under `name`.
-    pub fn named(&self, name: &str) -> Option<&Sourced<Value>> {
+    #[cfg(test)]
+    pub(crate) fn named(&self, name: &str) -> Option<&Sourced<Value>> {
         self.arguments
             .iter()
             .find(|argument| argument.name.as_ref().is_some_and(|n| n.value == name))
@@ -35,7 +36,8 @@ impl Call {
     }
 
     /// The values given without a name, in order.
-    pub fn unnamed(&self) -> impl Iterator<Item = &Sourced<Value>> {
+    #[cfg(test)]
+    pub(crate) fn unnamed(&self) -> impl Iterator<Item = &Sourced<Value>> {
         self.arguments
             .iter()
             .filter(|argument| argument.name.is_none())
@@ -45,7 +47,7 @@ impl Call {
 
 /// The call that stands for an address inside the site, wherever the site
 /// is published. It is Statac's own, and no snippet's.
-pub const IN_SITE: &str = "url";
+pub(crate) const IN_SITE: &str = "url";
 
 impl Call {
     /// The address an `@url(...)` is handed: one value with no name, from
@@ -63,13 +65,13 @@ impl Call {
 
 /// Whether an address starts at the top of a site: with one `/`. A browser
 /// reads `/\` as it reads `//`, the start of another site's name.
-pub fn from_the_top(address: &str) -> bool {
+pub(crate) fn from_the_top(address: &str) -> bool {
     address.starts_with('/') && !address[1..].starts_with(['/', '\\'])
 }
 
 /// What surrounds a call, which decides what its HTML may be.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Within {
+pub(crate) enum Within {
     Prose,
     /// Raw HTML, between its tags.
     Html,
@@ -78,17 +80,17 @@ pub enum Within {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Argument {
+pub(crate) struct Argument {
     /// The name of a value given as `name=value`.
-    pub name: Option<Sourced<String>>,
+    pub(crate) name: Option<Sourced<String>>,
     /// Placed at the value as written, quotes included.
-    pub value: Sourced<Value>,
+    pub(crate) value: Sourced<Value>,
 }
 
 /// A quoted value is always text. An unquoted one is a number or `true` or
 /// `false` where it reads as one, and otherwise text as written.
 #[derive(Clone, PartialEq, Debug)]
-pub enum Value {
+pub(crate) enum Value {
     Text(String),
     Number(f64),
     Bool(bool),
@@ -96,11 +98,11 @@ pub enum Value {
 
 /// A call read from the text, before Markdown decides where it landed.
 pub(super) struct Read {
-    pub call: Call,
+    pub(crate) call: Call,
     /// Just past the closing `)`.
-    pub end: usize,
+    pub(crate) end: usize,
     /// Said only where the call turns out to be a call, not text in code.
-    pub problems: Vec<Problem>,
+    pub(crate) problems: Vec<Problem>,
 }
 
 /// Where a call can't be read: the place to point at and what is wrong.

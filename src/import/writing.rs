@@ -26,26 +26,26 @@ const ENDS_AT_ITS_TAG: [&str; 4] = ["pre", "script", "style", "textarea"];
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 pub(super) struct Settled {
     /// The tags inside other HTML given a blank line before them.
-    pub tags: usize,
+    pub(crate) tags: usize,
     /// The code fences inside HTML given a blank line before them.
-    pub fences: usize,
+    pub(crate) fences: usize,
     /// The places Statac would read as a snippet call, escaped.
-    pub escaped: usize,
+    pub(crate) escaped: usize,
     /// The `<!--more-->` markers given a line of their own.
-    pub markers_moved: usize,
+    pub(crate) markers_moved: usize,
     /// The `<!--more-->` markers taken out.
-    pub markers_out: usize,
+    pub(crate) markers_out: usize,
     /// The dollar signs Statac would read as opening maths, escaped.
-    pub dollars: usize,
+    pub(crate) dollars: usize,
 }
 
 /// Whether the old site set maths written between dollar signs.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub struct Maths {
+pub(crate) struct Maths {
     /// Between one dollar sign and the next, inside a line.
-    pub inline: bool,
+    pub(crate) inline: bool,
     /// Between `$$` and `$$`.
-    pub display: bool,
+    pub(crate) display: bool,
 }
 
 impl Settled {
@@ -64,9 +64,9 @@ impl Settled {
 /// nothing the author wrote can be taken for one.
 #[derive(Default, Debug)]
 pub(super) struct Marked {
-    pub text: String,
-    pub called: Vec<usize>,
-    pub fences: Vec<usize>,
+    pub(crate) text: String,
+    pub(crate) called: Vec<usize>,
+    pub(crate) fences: Vec<usize>,
 }
 
 impl Marked {

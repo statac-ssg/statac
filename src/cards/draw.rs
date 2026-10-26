@@ -32,11 +32,11 @@ use measure::Engine;
 
 /// Raised by hand whenever a change here draws the same card differently,
 /// so that its key changes with it.
-pub const DRAWING: u32 = 2;
+pub(crate) const DRAWING: u32 = 2;
 
 /// The largest a background may be as a PNG for cards drawn over it to be
 /// PNGs; past it they are JPEGs.
-pub const MOST_PNG: usize = 600 * 1024;
+pub(crate) const MOST_PNG: usize = 600 * 1024;
 
 /// How far past its line's ends a glyph may be drawn, in ems.
 const OVERHANG: f32 = 0.25;
@@ -85,15 +85,15 @@ impl Format {
 /// Every choice that decides a card's bytes besides its description and
 /// texts. Each goes into the card's [`Key`].
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Settings {
-    pub drawing: u32,
-    pub png_compression: CompressionType,
-    pub png_filter: FilterType,
+pub(crate) struct Settings {
+    pub(crate) drawing: u32,
+    pub(crate) png_compression: CompressionType,
+    pub(crate) png_filter: FilterType,
     /// On `jpeg-encoder`'s scale, 1 to 100.
-    pub jpeg_quality: u8,
-    pub jpeg_subsampling: SamplingFactor,
-    pub jpeg_progressive: bool,
-    pub jpeg_optimised_huffman: bool,
+    pub(crate) jpeg_quality: u8,
+    pub(crate) jpeg_subsampling: SamplingFactor,
+    pub(crate) jpeg_progressive: bool,
+    pub(crate) jpeg_optimised_huffman: bool,
 }
 
 impl Default for Settings {
@@ -152,7 +152,7 @@ pub struct Text<'a> {
 
 /// A card's texts placed, ready to draw.
 #[derive(Clone, Debug)]
-pub struct Plan {
+pub(crate) struct Plan {
     placed: Vec<layout::Placed>,
     /// Each text's colour, by its index among those planned.
     colours: Vec<[u8; 3]>,
@@ -161,9 +161,9 @@ pub struct Plan {
 }
 
 /// A card drawn, before encoding.
-pub struct Drawn {
+pub(crate) struct Drawn {
     /// 1200 by 630.
-    pub pixels: RgbImage,
+    pub(crate) pixels: RgbImage,
 }
 
 /// A card drawn and encoded.
@@ -178,7 +178,7 @@ pub struct Key(blake3::Hash);
 
 impl Key {
     /// The whole key, as 64 hex digits.
-    pub fn hex(&self) -> String {
+    pub(crate) fn hex(&self) -> String {
         self.0.to_hex().to_string()
     }
 
@@ -464,7 +464,7 @@ impl Kit {
     }
 
     /// The format every card from this kit is encoded in.
-    pub fn format(&self) -> Format {
+    pub(crate) fn format(&self) -> Format {
         self.format
     }
 
@@ -507,7 +507,7 @@ impl Kit {
 
     /// Places `texts`, given in the description's order, or says why no
     /// card of them can be drawn.
-    pub fn plan(&self, texts: &[Text]) -> Result<Plan, Failure> {
+    pub(crate) fn plan(&self, texts: &[Text]) -> Result<Plan, Failure> {
         let mut engines = Engines::new(self);
         let mut missing = vec![Vec::new(); self.lists.len()];
         let mut first = None;
@@ -542,7 +542,7 @@ impl Kit {
     }
 
     /// Draws a card's texts as planned over the background.
-    pub fn paint(&self, plan: &Plan) -> Drawn {
+    pub(crate) fn paint(&self, plan: &Plan) -> Drawn {
         let mut pixels = self.background.clone();
         let mut engines = Engines::new(self);
         for text in &plan.placed {
@@ -558,13 +558,13 @@ impl Kit {
 
     /// Draws `texts`, given in the description's order, over the
     /// background.
-    pub fn draw(&self, texts: &[Text]) -> Result<Drawn, Failure> {
+    pub(crate) fn draw(&self, texts: &[Text]) -> Result<Drawn, Failure> {
         Ok(self.paint(&self.plan(texts)?))
     }
 
     /// Encodes a drawn card in the kit's format, without any colour
     /// profile or metadata.
-    pub fn encode(&self, pixels: &RgbImage) -> Result<Vec<u8>, Failure> {
+    pub(crate) fn encode(&self, pixels: &RgbImage) -> Result<Vec<u8>, Failure> {
         match self.format {
             Format::Png => encode_png(pixels, &self.settings),
             Format::Jpeg => {
@@ -599,7 +599,7 @@ impl Kit {
 
 /// Whether the font file `font` draws every one of `characters`, each
 /// written alone.
-pub fn draws_all(font: &[u8], characters: &[char]) -> bool {
+pub(crate) fn draws_all(font: &[u8], characters: &[char]) -> bool {
     let Ok(faces) = fonts::load(&[font], &mut Database::new()) else {
         return false;
     };

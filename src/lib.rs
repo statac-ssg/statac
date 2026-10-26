@@ -1,6 +1,6 @@
 #![warn(unreachable_pub)]
 
-pub mod address;
+mod address;
 pub mod album;
 pub mod assets;
 pub mod build;
@@ -14,11 +14,11 @@ pub mod dates;
 pub mod described;
 mod disk;
 mod elsewhere;
-pub mod engines;
+mod engines;
 mod feeds;
 pub mod fetch;
 mod fetched;
-pub mod highlight;
+mod highlight;
 mod hooks;
 mod html;
 pub mod ids;
@@ -43,8 +43,8 @@ pub mod report;
 mod rewrite;
 pub mod search;
 pub mod serve;
-pub mod site;
-pub mod slug;
+mod site;
+mod slug;
 pub mod source;
 pub mod stamp;
 mod suggest;

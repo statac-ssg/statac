@@ -12,13 +12,13 @@ use crate::date::Date;
 pub(super) struct Facts<'a> {
     /// The file's name without its ending or the date it opens with, or
     /// its folder's name where the file is `index`.
-    pub file_slug: &'a str,
+    pub(crate) file_slug: &'a str,
     /// The file's path from the top of the input folder, with `/` before
     /// it and no ending: `/posts/post-1`.
-    pub file_path_stem: &'a str,
-    pub date: Option<&'a Date>,
+    pub(crate) file_path_stem: &'a str,
+    pub(crate) date: Option<&'a Date>,
     /// The page's fields that hold text or a number, as text.
-    pub fields: &'a [(String, String)],
+    pub(crate) fields: &'a [(String, String)],
 }
 
 /// `permalink` with each `{{ }}` worked out; or, where one can't be, that

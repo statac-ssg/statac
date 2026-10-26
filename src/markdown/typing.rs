@@ -16,7 +16,7 @@ const TYPED: &str = "x";
 /// such as a quote and the bracket, where its bracket is open. An `@url(...)` is asked as one
 /// handed an address, which it is wherever a call is read, a link's
 /// address among them; any other call as a call to a snippet.
-pub fn reads_a_call(
+pub(crate) fn reads_a_call(
     text: &str,
     body: Span,
     at: usize,
@@ -48,7 +48,7 @@ pub fn reads_a_call(
 /// Whether a link or picture whose address opens after the bracket at
 /// `open`, typed as far as `offset`, is read as one there, and whether
 /// it is a picture.
-pub fn reads_a_link(
+pub(crate) fn reads_a_link(
     text: &str,
     body: Span,
     open: usize,
@@ -73,7 +73,7 @@ pub fn reads_a_link(
 
 /// Whether `offset` is in the address of a line defining a link
 /// reference, `[label]: /address`.
-pub fn in_a_definition(text: &str, body: Span, offset: usize, wraps: Wraps<'_>) -> bool {
+pub(crate) fn in_a_definition(text: &str, body: Span, offset: usize, wraps: Wraps<'_>) -> bool {
     let mut sources = Sources::default();
     let source = sources.add("typed", text.to_owned());
     let document = super::read(&sources, source, body, wraps, "");

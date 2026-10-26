@@ -12,8 +12,8 @@ use crate::source::Span;
 /// One span of a file and what is written in its place.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Edit {
-    pub span: Span,
-    pub with: String,
+    pub(crate) span: Span,
+    pub(crate) with: String,
 }
 
 /// Replaces each of `edits` in the file at `rel`, a path with forward

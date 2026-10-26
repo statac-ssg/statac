@@ -7,7 +7,7 @@ use crate::highlight::{self, FirstWord, Language};
 /// Nothing calls a piece's file by name: Statac writes every such element
 /// through it.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub enum Piece {
+pub(crate) enum Piece {
     Heading,
     Link,
     Image,
@@ -24,7 +24,7 @@ pub enum Piece {
 }
 
 impl Piece {
-    pub const ALL: [Piece; 9] = [
+    pub(crate) const ALL: [Piece; 9] = [
         Piece::Heading,
         Piece::Link,
         Piece::Image,
@@ -37,7 +37,7 @@ impl Piece {
     ];
 
     /// Its file's name in `snippets/markdown/`, without `.html`.
-    pub fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Piece::Heading => "heading",
             Piece::Link => "link",
@@ -51,14 +51,14 @@ impl Piece {
         }
     }
 
-    pub fn of_name(name: &str) -> Option<Piece> {
+    pub(crate) fn of_name(name: &str) -> Option<Piece> {
         Piece::ALL.into_iter().find(|piece| piece.name() == name)
     }
 
     /// Every name its file is handed besides `page` and `site`. The writing
     /// hands all but a link's `external`, a callout's `title` and an
     /// image's `image`, which are the site's to say.
-    pub fn handed(self) -> &'static [&'static str] {
+    pub(crate) fn handed(self) -> &'static [&'static str] {
         match self {
             Piece::Heading => &["level", "id", "classes", "body"],
             Piece::Link => &["url", "title", "body", "external"],
@@ -75,7 +75,7 @@ impl Piece {
     /// The piece a file that isn't one was most likely meant as: near it
     /// in spelling, or opening with its name, as `codeblock` does `code`.
     /// Where it opens with two, as `footnotes-old` does, the longer.
-    pub fn meant_by(name: &str) -> Option<Piece> {
+    pub(crate) fn meant_by(name: &str) -> Option<Piece> {
         if let Some(near) = crate::suggest::nearest(name, Piece::ALL.map(Piece::name)) {
             return Piece::of_name(near);
         }
@@ -89,12 +89,11 @@ impl Piece {
 
 /// A value a piece's file is handed.
 #[derive(Clone, PartialEq, Debug)]
-pub enum PieceValue {
+pub(crate) enum PieceValue {
     /// Words, printed escaped. Nothing to give is empty words, which print
     /// nothing and are false in an `{% if %}`.
     Text(String),
     Number(u64),
-    Truth(bool),
     /// HTML Statac wrote, printed as it is.
     Html(String),
     List(Vec<PieceValue>),
@@ -130,7 +129,7 @@ pub(super) fn fence(info: &str) -> (&str, &str) {
 
 /// The word of a fence's opening line that names its language or its
 /// file: the first, and none where the line opens with a quoted caption.
-pub fn language_word(info: &str) -> Option<&str> {
+pub(crate) fn language_word(info: &str) -> Option<&str> {
     let info = info.trim_start();
     match info.starts_with(['"', '\'']) {
         true => None,

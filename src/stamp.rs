@@ -33,7 +33,7 @@ pub struct Pass {
     /// The files given an `id:` line, each as [`Stamped`] names it.
     pub ids: Vec<String>,
     /// Each file written, as [`Stamped`] names it, and what it now holds.
-    pub files: Vec<(String, blake3::Hash)>,
+    pub(crate) files: Vec<(String, blake3::Hash)>,
     /// The files that weren't written, each as a problem in no file
     /// saying why.
     pub refused: Vec<Problem>,
@@ -288,7 +288,7 @@ pub struct Outcome {
 
 impl Outcome {
     /// The files the problems are placed in.
-    pub fn sources(&self) -> Option<&Sources> {
+    pub(crate) fn sources(&self) -> Option<&Sources> {
         let held = self.held.as_ref()?;
         Some(held.renderer.sources())
     }

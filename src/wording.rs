@@ -1871,7 +1871,7 @@ impl Problem {
         suggestion(&self.kind)
     }
 
-    pub fn explanation_link(&self) -> String {
+    pub(crate) fn explanation_link(&self) -> String {
         explanation_link(self.kind.name())
     }
 

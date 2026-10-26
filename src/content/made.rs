@@ -542,7 +542,7 @@ fn asked<'a>(
     let (file, node) = match data.reach(&names) {
         Some(Reached::Value { file, node }) => (file, node),
         // Told already, where the file was read.
-        Some(Reached::Unread(_)) => return None,
+        Some(Reached::Unread) => return None,
         Some(Reached::Folder(_)) => {
             problems.push(not_a_table());
             return None;

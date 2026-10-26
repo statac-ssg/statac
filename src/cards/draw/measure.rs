@@ -15,9 +15,9 @@ use super::fonts::{self, Faces};
 /// What drawing changes as it works: the text engine and what it has
 /// shaped and drawn.
 pub(super) struct Engine {
-    pub system: FontSystem,
-    pub faces: Faces,
-    pub glyphs: SwashCache,
+    pub(crate) system: FontSystem,
+    pub(crate) faces: Faces,
+    pub(crate) glyphs: SwashCache,
     shaped: HashMap<String, ShapeLine>,
 }
 

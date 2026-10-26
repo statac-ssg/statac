@@ -260,17 +260,17 @@ fn is_name_char(c: char) -> bool {
 /// What may be written at the spot, where the writing reads it as a call
 /// or a link.
 pub(super) struct Offer<'a> {
-    pub text: &'a str,
-    pub body: Span,
-    pub renderer: Option<&'a Renderer>,
+    pub(crate) text: &'a str,
+    pub(crate) body: Span,
+    pub(crate) renderer: Option<&'a Renderer>,
     /// The page being written, where the site as last read holds it.
-    pub page: Option<PageId>,
+    pub(crate) page: Option<PageId>,
     /// The folder under `content/` the page's file is in, ending with
     /// `/`, or empty at the top.
-    pub folder: &'a str,
+    pub(crate) folder: &'a str,
     /// Whether the editor fills in places in what it writes, moving
     /// between them as the author types.
-    pub snippets: bool,
+    pub(crate) snippets: bool,
 }
 
 impl Offer<'_> {

@@ -14,12 +14,12 @@ use crate::source::{Place, Sources, Span};
 
 /// Where a file stopped being TOML that reads.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Stopped {
-    pub line: usize,
+pub(crate) struct Stopped {
+    pub(crate) line: usize,
 }
 
 /// The fields `text` holds, each top-level one with its line.
-pub fn read(text: &str) -> Result<Vec<Field>, Stopped> {
+pub(crate) fn read(text: &str) -> Result<Vec<Field>, Stopped> {
     let table = DeTable::parse(text).map_err(|error| Stopped {
         line: line_of(text, error.span().map_or(0, |span| span.start)),
     })?;
@@ -37,7 +37,7 @@ pub fn read(text: &str) -> Result<Vec<Field>, Stopped> {
 
 /// Why the settings file at `path`, holding `text`, can't be read, placed
 /// at the line where it stopped.
-pub fn failed(path: &Path, text: String, stopped: &Stopped) -> Box<Failed> {
+pub(crate) fn failed(path: &Path, text: String, stopped: &Stopped) -> Box<Failed> {
     let start = text
         .split_inclusive('\n')
         .take(stopped.line - 1)

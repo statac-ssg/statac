@@ -16,9 +16,9 @@ use crate::wording;
 /// `place`.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Fix {
-    pub title: String,
-    pub place: Place,
-    pub text: String,
+    pub(crate) title: String,
+    pub(crate) place: Place,
+    pub(crate) text: String,
 }
 
 /// The fixes for `problem`, read against the files in `sources`, in a

@@ -44,13 +44,13 @@ id!(
 
 /// Field and setting names, interned so a read can be recorded as two numbers.
 #[derive(Default)]
-pub struct Names {
+pub(crate) struct Names {
     names: Vec<Box<str>>,
     ids: std::collections::HashMap<Box<str>, NameId>,
 }
 
 impl Names {
-    pub fn intern(&mut self, name: &str) -> NameId {
+    pub(crate) fn intern(&mut self, name: &str) -> NameId {
         if let Some(&id) = self.ids.get(name) {
             return id;
         }
@@ -60,20 +60,16 @@ impl Names {
         id
     }
 
-    pub fn get(&self, name: &str) -> Option<NameId> {
+    pub(crate) fn get(&self, name: &str) -> Option<NameId> {
         self.ids.get(name).copied()
     }
 
-    pub fn name(&self, id: NameId) -> &str {
+    pub(crate) fn name(&self, id: NameId) -> &str {
         &self.names[id.index()]
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.names.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.names.is_empty()
     }
 }
 
@@ -92,17 +88,17 @@ impl<I: Id, T> Default for Arena<I, T> {
 }
 
 impl<I: Id, T> Arena<I, T> {
-    pub fn push(&mut self, item: T) -> I {
+    pub(crate) fn push(&mut self, item: T) -> I {
         let id = I::from_index(self.items.len());
         self.items.push(item);
         id
     }
 
-    pub fn get(&self, id: I) -> &T {
+    pub(crate) fn get(&self, id: I) -> &T {
         &self.items[id.index()]
     }
 
-    pub fn get_mut(&mut self, id: I) -> &mut T {
+    pub(crate) fn get_mut(&mut self, id: I) -> &mut T {
         &mut self.items[id.index()]
     }
 

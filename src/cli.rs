@@ -27,7 +27,7 @@ use crate::wording;
 
 /// What the command line asks for.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Request {
+pub(crate) enum Request {
     Build {
         options: Options,
         /// Whether where the build spent its time is shown after it.
@@ -661,7 +661,8 @@ fn say(stream: &mut dyn Write, text: &str) {
 }
 
 /// Reads the command line, or gives every mistake in it, in order.
-pub fn parse(args: &[String]) -> Result<Request, Vec<Problem>> {
+#[cfg(test)]
+pub(crate) fn parse(args: &[String]) -> Result<Request, Vec<Problem>> {
     parse_with(args, &[])
 }
 
@@ -679,8 +680,9 @@ fn unusable_name(written: &str, unreadable: bool) -> Option<Kind> {
     }
 }
 
-/// [`parse`], given for each of `args` whether the system's own reading
-/// of it held bytes that aren't UTF-8, which `args` then has replaced.
+/// Reads the command line, or gives every mistake in it, in order, given
+/// for each of `args` whether the system's own reading of it held bytes
+/// that aren't UTF-8, which `args` then has replaced.
 fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Problem>> {
     let unreadable = |at: usize| unreadable.get(at).copied().unwrap_or(false);
     if args.is_empty() {

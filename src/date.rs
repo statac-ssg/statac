@@ -8,19 +8,19 @@ use std::fmt;
 /// offset if they wrote them. Nothing is converted to another zone here.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Date {
-    pub year: i32,
-    pub month: u8,
-    pub day: u8,
-    pub time: Option<Time>,
+    pub(crate) year: i32,
+    pub(crate) month: u8,
+    pub(crate) day: u8,
+    pub(crate) time: Option<Time>,
     /// Minutes east of UTC.
-    pub offset: Option<i16>,
+    pub(crate) offset: Option<i16>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Time {
-    pub hour: u8,
-    pub minute: u8,
-    pub second: Option<u8>,
+pub(crate) struct Time {
+    pub(crate) hour: u8,
+    pub(crate) minute: u8,
+    pub(crate) second: Option<u8>,
 }
 
 /// As much of a date as the author knows.
@@ -65,11 +65,11 @@ impl Date {
     }
 
     /// The day alone, as `2026-10-04`.
-    pub fn iso_day(&self) -> String {
+    pub(crate) fn iso_day(&self) -> String {
         format!("{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
 
-    pub fn same_day(&self, other: &Date) -> bool {
+    pub(crate) fn same_day(&self, other: &Date) -> bool {
         (self.year, self.month, self.day) == (other.year, other.month, other.day)
     }
 }
@@ -165,7 +165,7 @@ pub fn read(text: &str) -> Result<Date, Fault> {
 /// Reads a date whose day is written in English words, `4 October 2026` or
 /// `Oct 4, 2026`, then optionally a time and an offset as [`read`] takes
 /// them. Nothing with two readings is read.
-pub fn read_words(text: &str) -> Option<Date> {
+pub(crate) fn read_words(text: &str) -> Option<Date> {
     let text = text.trim();
     let mut words = 0;
     let mut within = false;
@@ -190,7 +190,7 @@ pub fn read_words(text: &str) -> Option<Date> {
 }
 
 /// Reads a year, a year and month, or a whole date.
-pub fn read_when(text: &str) -> Result<When, Fault> {
+pub(crate) fn read_when(text: &str) -> Result<When, Fault> {
     let text = text.trim();
     let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
     if text.len() == 4 && digits(text) {
@@ -226,7 +226,7 @@ fn iso_day(text: &str) -> Option<(i32, u8, u8, &str)> {
 
 /// A date at the start of a file name, `2026-10-04-post-1`, and the name
 /// after it and its hyphen. Only a real day counts.
-pub fn in_name(name: &str) -> Option<(Date, &str)> {
+pub(crate) fn in_name(name: &str) -> Option<(Date, &str)> {
     let (year, month, day, rest) = iso_day(name)?;
     let rest = match rest {
         "" => "",

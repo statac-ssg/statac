@@ -33,14 +33,14 @@ pub(super) const SETS: [char; 4] = ['\'', '"', '-', '.'];
 pub struct Typography<'a> {
     /// None where the language gives no marks: quotes then stay as typed,
     /// though an apostrophe, a dash and an ellipsis are still set.
-    pub quotes: Option<Quotes>,
+    pub(crate) quotes: Option<Quotes>,
     /// The space written just inside each pair of outer quotes typography
     /// sets.
-    pub inside_quotes: Option<char>,
+    pub(crate) inside_quotes: Option<char>,
     /// Marks a typed space before them is kept with.
-    pub no_break_before: &'a [char],
+    pub(crate) no_break_before: &'a [char],
     /// Marks a typed space after them is kept with.
-    pub no_break_after: &'a [char],
+    pub(crate) no_break_after: &'a [char],
 }
 
 impl<'a> Typography<'a> {
@@ -157,17 +157,17 @@ fn run(nodes: &mut [Node], source: &str, typography: &Typography<'_>) {
 /// emphasis, links and pictures.
 pub(super) struct Bare {
     /// The node it starts in, and the character it starts at there.
-    pub from: (usize, usize),
+    pub(crate) from: (usize, usize),
     /// The node it ends in, and the character just past its end there.
-    pub to: (usize, usize),
+    pub(crate) to: (usize, usize),
     /// Where a link to it points.
-    pub destination: String,
+    pub(crate) destination: String,
     /// Whether it is all writing, rather than inside a link, a picture's
     /// description or an `<a>`, or in part typed as an escape or an entity,
     /// or shown as typed in raw HTML.
-    pub linkable: bool,
+    pub(crate) linkable: bool,
     /// Whether it is a mail address.
-    pub mail: bool,
+    pub(crate) mail: bool,
 }
 
 /// Every address written bare among a block's words, found as typography

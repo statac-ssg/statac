@@ -19,36 +19,36 @@ use crate::yaml::{Node, Value as Yaml};
 pub(crate) const FOLDER: &str = "data";
 
 /// One data file read.
-pub struct DataFile {
+pub(crate) struct DataFile {
     /// Its path in the site, such as `data/people.yaml`.
-    pub path: String,
-    pub source: SourceId,
+    pub(crate) path: String,
+    pub(crate) source: SourceId,
     /// None where it couldn't be read, which a problem has said.
-    pub node: Option<Node>,
+    pub(crate) node: Option<Node>,
 }
 
 /// A folder under `data/`, or `data/` itself.
 #[derive(Default)]
-pub struct Folder {
+pub(crate) struct Folder {
     /// Its path in the site, ending with `/`: `data/people/`.
-    pub path: String,
-    pub entries: BTreeMap<String, Entry>,
+    pub(crate) path: String,
+    pub(crate) entries: BTreeMap<String, Entry>,
 }
 
-pub enum Entry {
+pub(crate) enum Entry {
     File(DataId),
     Folder(Folder),
 }
 
 /// Everything under `data/`.
 #[derive(Default)]
-pub struct Data {
-    pub files: Arena<DataId, DataFile>,
-    pub top: Folder,
+pub(crate) struct Data {
+    pub(crate) files: Arena<DataId, DataFile>,
+    pub(crate) top: Folder,
 }
 
 /// What a name under `data/` leads to.
-pub enum Reached<'a> {
+pub(crate) enum Reached<'a> {
     Folder(&'a Folder),
     /// A value in a file, the whole file where the names stop at it.
     Value {
@@ -56,24 +56,24 @@ pub enum Reached<'a> {
         node: &'a Node,
     },
     /// A file that couldn't be read.
-    Unread(DataId),
+    Unread,
 }
 
 impl Data {
-    pub fn file(&self, id: DataId) -> &DataFile {
+    pub(crate) fn file(&self, id: DataId) -> &DataFile {
         self.files.get(id)
     }
 
     /// What `names` lead to from the top of `data/`: folders, then a file,
     /// then keys inside it.
-    pub fn reach(&self, names: &[&str]) -> Option<Reached<'_>> {
+    pub(crate) fn reach(&self, names: &[&str]) -> Option<Reached<'_>> {
         let mut folder = &self.top;
         for (at, name) in names.iter().enumerate() {
             match folder.entries.get(*name)? {
                 Entry::Folder(inner) => folder = inner,
                 Entry::File(id) => {
                     let Some(mut node) = self.file(*id).node.as_ref() else {
-                        return Some(Reached::Unread(*id));
+                        return Some(Reached::Unread);
                     };
                     for key in &names[at + 1..] {
                         node = node.get(key)?;
@@ -87,7 +87,7 @@ impl Data {
 
     /// Every name a template or `each:` can reach from the top, as
     /// `a.b.c`, for offering the nearest to one that reaches nothing.
-    pub fn names(&self) -> Vec<String> {
+    pub(crate) fn names(&self) -> Vec<String> {
         fn walk(data: &Data, prefix: &str, folder: &Folder, names: &mut Vec<String>) {
             for (name, entry) in &folder.entries {
                 let path = match prefix.is_empty() {

@@ -33,7 +33,7 @@ pub(crate) const LONGEST_WORDS: usize = 2_000;
 
 /// What another site's page did with one of the site's pages.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub enum Said {
+pub(crate) enum Said {
     Replied,
     Liked,
     Reposted,
@@ -42,7 +42,7 @@ pub enum Said {
 }
 
 impl Said {
-    pub const ALL: [Said; 5] = [
+    pub(crate) const ALL: [Said; 5] = [
         Said::Replied,
         Said::Liked,
         Said::Reposted,
@@ -51,7 +51,7 @@ impl Said {
     ];
 
     /// The word a mention's file and a template give it.
-    pub fn word(self) -> &'static str {
+    pub(crate) fn word(self) -> &'static str {
         match self {
             Said::Replied => "replied",
             Said::Liked => "liked",
@@ -62,7 +62,7 @@ impl Said {
     }
 
     /// The kind a relay's `wm-property` names.
-    pub fn of_property(property: &str) -> Option<Said> {
+    pub(crate) fn of_property(property: &str) -> Option<Said> {
         Some(match property {
             "in-reply-to" => Said::Replied,
             "like-of" => Said::Liked,
@@ -74,29 +74,29 @@ impl Said {
     }
 
     /// Whether a page shows it as a face alone, with no words.
-    pub fn is_a_face(self) -> bool {
+    pub(crate) fn is_a_face(self) -> bool {
         matches!(self, Said::Liked | Said::Reposted)
     }
 }
 
 /// One mention, as its file holds it.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Mention {
+pub(crate) struct Mention {
     /// The relay's id, from the file's name; none for a file named
     /// otherwise.
-    pub id: Option<u64>,
-    pub kind: Said,
-    pub author: Option<String>,
-    pub author_url: Option<String>,
+    pub(crate) id: Option<u64>,
+    pub(crate) kind: Said,
+    pub(crate) author: Option<String>,
+    pub(crate) author_url: Option<String>,
     /// The sender's face, by its name in `fetched/faces/`.
-    pub face: Option<String>,
+    pub(crate) face: Option<String>,
     /// The sender's page.
-    pub url: String,
+    pub(crate) url: String,
     /// The address on the site it mentions.
-    pub target: String,
-    pub published: Option<Date>,
-    pub fetched: Date,
-    pub words: Option<String>,
+    pub(crate) target: String,
+    pub(crate) published: Option<Date>,
+    pub(crate) fetched: Date,
+    pub(crate) words: Option<String>,
 }
 
 const FIELDS: &[&str] = &[
@@ -113,7 +113,7 @@ const FIELDS: &[&str] = &[
 
 impl Mention {
     /// The file Statac writes for it.
-    pub fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         let fields = [
             ("kind", Some(self.kind.word().to_owned())),
             ("author", self.author.clone()),
@@ -243,18 +243,18 @@ fn spelt(address: &Address) -> String {
 /// shows them: by the day each was published, then by id, the undated
 /// last.
 #[derive(Default, Debug)]
-pub struct Mentions {
+pub(crate) struct Mentions {
     by_page: HashMap<PageId, Vec<Mention>>,
     /// The mentions `refuse_webmentions_from` leaves out, by path under
     /// `fetched/`, in order of id.
-    pub refused: Vec<(String, Mention)>,
+    pub(crate) refused: Vec<(String, Mention)>,
     /// The faces the mentions not refused name, by path under `fetched/`.
-    pub faces_named: BTreeSet<String>,
+    pub(crate) faces_named: BTreeSet<String>,
 }
 
 impl Mentions {
     /// The mentions of `page`.
-    pub fn of(&self, page: PageId) -> &[Mention] {
+    pub(crate) fn of(&self, page: PageId) -> &[Mention] {
         self.by_page.get(&page).map_or(&[], Vec::as_slice)
     }
 }

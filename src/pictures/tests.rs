@@ -656,11 +656,13 @@ fn a_photograph_converts_only_from_a_profile_that_is_not_srgb() {
         60_000
     )));
     assert!(!converts(b"no picture at all"));
+    let plain = opened_rgb(&open(&jpeg).unwrap()).clone();
     for bytes in [
         with_profile(&jpeg, &p3, 60_000),
         with_profile(&jpeg, &srgb, 60_000),
     ] {
-        assert_eq!(open(&bytes).unwrap().converted, converts(&bytes));
+        let changed = *opened_rgb(&open(&bytes).unwrap()) != plain;
+        assert_eq!(changed, converts(&bytes));
     }
 }
 
@@ -1115,9 +1117,8 @@ fn display_p3_is_converted_to_srgb() {
     let flat = RgbaImage::from_pixel(32, 16, Rgba([128, 0, 199, 255]));
     let p3 = profile_named(ColorProfile::new_display_p3(), "Display P3");
     let webp = extended(&flat, false, 0x20, &[(b"ICCP", &p3)]);
+    assert_eq!(photograph(&webp).profile, Some(Some("Display P3".into())));
     let opened = open(&webp).unwrap();
-    assert!(opened.converted);
-    assert_eq!(opened.profile, Some(Some("Display P3".into())));
     for pixel in opened_rgb(&opened).pixels() {
         let close = pixel
             .0
@@ -1134,8 +1135,10 @@ fn a_profile_that_is_srgb_under_another_name_is_not_converted() {
     let srgb = profile_named(ColorProfile::new_srgb(), "Camera standard");
     let webp = extended(&flat, false, 0x20, &[(b"ICCP", &srgb)]);
     let opened = open(&webp).unwrap();
-    assert!(!opened.converted);
-    assert_eq!(opened.profile, Some(Some("Camera standard".into())));
+    assert_eq!(
+        photograph(&webp).profile,
+        Some(Some("Camera standard".into()))
+    );
     assert!(opened_rgb(&opened).pixels().all(|p| p.0 == [128, 0, 199]));
 }
 
@@ -1145,8 +1148,7 @@ fn an_unreadable_profile_leaves_the_pixels_alone() {
     let v2 = profile_v2("Broken");
     let webp = extended(&flat, false, 0x20, &[(b"ICCP", &v2)]);
     let opened = open(&webp).unwrap();
-    assert!(!opened.converted);
-    assert_eq!(opened.profile, Some(Some("Broken".into())));
+    assert_eq!(photograph(&webp).profile, Some(Some("Broken".into())));
     assert!(opened_rgb(&opened).pixels().all(|p| p.0 == [128, 0, 199]));
 }
 
@@ -1156,7 +1158,6 @@ fn a_jpeg_with_a_display_p3_profile_is_converted() {
     let p3 = profile_named(ColorProfile::new_display_p3(), "Display P3");
     let jpeg = with_profile(&encode_jpeg(&flat), &p3, 60_000);
     let opened = open(&jpeg).unwrap();
-    assert!(opened.converted);
     let pixel = opened_rgb(&opened).get_pixel(16, 16);
     assert!(
         pixel
@@ -1521,8 +1522,7 @@ fn a_png_with_a_profile_is_converted() {
     assert_eq!(photograph(&png).profile, Some(Some("Display P3".into())));
     assert!(converts(&png));
     let opened = open(&png).unwrap();
-    assert!(opened.converted);
-    assert_eq!(opened.profile, Some(Some("Display P3".into())));
+    assert_eq!(photograph(&png).profile, Some(Some("Display P3".into())));
     for pixel in opened_rgb(&opened).pixels() {
         let close = pixel
             .0
@@ -1537,7 +1537,6 @@ fn a_png_with_a_profile_is_converted() {
     assert_eq!(photograph(&png).profile, Some(Some("Another name".into())));
     assert!(!converts(&png));
     let opened = open(&png).unwrap();
-    assert!(!opened.converted);
     assert!(opened_rgb(&opened).pixels().all(|p| p.0 == [128, 0, 199]));
 }
 
@@ -1838,8 +1837,7 @@ fn a_png_profile_that_inflates_past_the_ceiling_is_not_read() {
     assert_eq!(photograph(&huge).profile, None);
     assert!(!converts(&huge));
     let opened = open(&huge).unwrap();
-    assert!(!opened.converted);
-    assert_eq!(opened.profile, None);
+    assert_eq!(photograph(&huge).profile, None);
     assert!(opened_rgb(&opened).pixels().all(|p| p.0 == [128, 0, 199]));
     assert!(decode_still(&huge).is_ok());
 

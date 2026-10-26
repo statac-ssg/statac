@@ -30,50 +30,50 @@ pub(super) enum Engine {
 
 /// What the writing is converted with.
 pub(super) struct Context<'a> {
-    pub engine: Engine,
+    pub(crate) engine: Engine,
     /// Whether the page is Markdown, rather than HTML.
-    pub markdown: bool,
-    pub separator: Option<&'a str>,
+    pub(crate) markdown: bool,
+    pub(crate) separator: Option<&'a str>,
     /// The tags of the site's own that some call anywhere wraps writing
     /// with.
-    pub wrapping: &'a HashSet<String>,
-    pub breaks: bool,
-    pub attributes: bool,
-    pub linkify: bool,
+    pub(crate) wrapping: &'a HashSet<String>,
+    pub(crate) breaks: bool,
+    pub(crate) attributes: bool,
+    pub(crate) linkify: bool,
     /// Whether the old site's Markdown showed HTML as text.
-    pub html_off: bool,
+    pub(crate) html_off: bool,
     /// The path the old site was published under, as `/blog`, or empty.
-    pub base: &'a str,
+    pub(crate) base: &'a str,
 }
 
 /// A snippet call put in place of an include or a tag of the site's own.
 #[derive(Clone, Debug)]
 pub(super) struct Call {
-    pub snippet: String,
+    pub(crate) snippet: String,
     /// What it stands for, as the snippet's comment says it: ``include
     /// `note.html` `` or ``tag `image` ``.
-    pub what: String,
-    pub include: bool,
+    pub(crate) what: String,
+    pub(crate) include: bool,
     /// The names it hands, in order.
-    pub names: Vec<String>,
+    pub(crate) names: Vec<String>,
     /// Whether it hands values without names.
-    pub positional: bool,
-    pub wraps: bool,
-    pub spot: Spot,
+    pub(crate) positional: bool,
+    pub(crate) wraps: bool,
+    pub(crate) spot: Spot,
 }
 
 /// The writing converted, with what didn't convert.
 pub(super) struct Converted {
-    pub writing: String,
-    pub findings: Vec<Finding>,
-    pub calls: Vec<Call>,
-    pub fences: Vec<usize>,
-    pub called: Vec<usize>,
+    pub(crate) writing: String,
+    pub(crate) findings: Vec<Finding>,
+    pub(crate) calls: Vec<Call>,
+    pub(crate) fences: Vec<usize>,
+    pub(crate) called: Vec<usize>,
     /// How many line ends were made line breaks.
-    pub breaks: usize,
+    pub(crate) breaks: usize,
     /// How many places hold the separator alone on a line, made
     /// `<!--more-->`.
-    pub separators: usize,
+    pub(crate) separators: usize,
 }
 
 /// The tags Liquid and Nunjucks know themselves, and those of Eleventy's

@@ -16,14 +16,14 @@ use crate::templates::Renderer;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Heading {
     /// Its words, as plain text.
-    pub words: String,
-    pub level: u8,
+    pub(crate) words: String,
+    pub(crate) level: u8,
     /// The heading itself, as offsets in the page's text.
-    pub at: Range<usize>,
+    pub(crate) at: Range<usize>,
     /// The heading and the writing under it, up to the next heading at
     /// its level or above.
-    pub section: Range<usize>,
-    pub within: Vec<Heading>,
+    pub(crate) section: Range<usize>,
+    pub(crate) within: Vec<Heading>,
 }
 
 /// The headings of `text`, the text of `file` in the site at `site`, each
@@ -115,10 +115,10 @@ impl Sort {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Found {
     /// A page's title, or a snippet's or template's name.
-    pub name: String,
-    pub sort: Sort,
+    pub(crate) name: String,
+    pub(crate) sort: Sort,
     /// The path of its file in the site.
-    pub path: String,
+    pub(crate) path: String,
 }
 
 /// Every page of the site that has a file of its own, by its title, and

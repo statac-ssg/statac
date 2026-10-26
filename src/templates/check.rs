@@ -153,9 +153,9 @@ const FORMER_HANDED: &[(&str, &str)] = &[
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Field {
-    pub ty: Ty,
+    pub(crate) ty: Ty,
     /// Whether every value of the record has it.
-    pub always: bool,
+    pub(crate) always: bool,
 }
 
 impl Field {
@@ -167,8 +167,8 @@ impl Field {
 /// Every name a template may read, and what each holds.
 #[derive(Debug, Default)]
 pub(super) struct Schema {
-    pub page: BTreeMap<String, Field>,
-    pub site: BTreeMap<String, Field>,
+    pub(crate) page: BTreeMap<String, Field>,
+    pub(crate) site: BTreeMap<String, Field>,
     list: BTreeMap<String, Field>,
     date: BTreeMap<String, Field>,
     when: BTreeMap<String, Field>,
@@ -176,7 +176,7 @@ pub(super) struct Schema {
     mention: BTreeMap<String, Field>,
     video: BTreeMap<String, Field>,
     /// Statac's own, and those the files describing the site's images add.
-    pub image: BTreeMap<String, Field>,
+    pub(crate) image: BTreeMap<String, Field>,
     file: BTreeMap<String, Field>,
     media: BTreeMap<String, Field>,
     card: BTreeMap<String, Field>,
@@ -186,12 +186,12 @@ pub(super) struct Schema {
     search_field: BTreeMap<String, Field>,
     looping: BTreeMap<String, Field>,
     /// Each snippet by its name.
-    pub snippets: BTreeMap<String, Snippet>,
+    pub(crate) snippets: BTreeMap<String, Snippet>,
     /// The templates, by the names `extends` and `layout:` use.
-    pub templates: BTreeSet<String>,
+    pub(crate) templates: BTreeSet<String>,
     /// The templates the site's feeds are built with, by name. One named
     /// `feed.` is checked as a feed's whether or not one is.
-    pub feeds: BTreeSet<String>,
+    pub(crate) feeds: BTreeSet<String>,
 }
 
 impl Schema {
@@ -362,11 +362,11 @@ pub(crate) const TYPED: &str = "statac_typed_";
 /// A name a template may read, with what it holds.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct ReadableName {
-    pub name: String,
-    pub ty: Ty,
+    pub(crate) name: String,
+    pub(crate) ty: Ty,
     /// Whether Statac hands it to the template, rather than the template
     /// setting it, a call handing it to a snippet, or it being a snippet.
-    pub statacs: bool,
+    pub(crate) statacs: bool,
 }
 
 /// What a template may read where [`TYPED`] is written.
@@ -382,9 +382,9 @@ pub(super) enum Answer {
 
 /// One file to check.
 pub(super) struct Checked<'a> {
-    pub name: &'a str,
-    pub source: SourceId,
-    pub role: &'a Role,
+    pub(crate) name: &'a str,
+    pub(crate) source: SourceId,
+    pub(crate) role: &'a Role,
 }
 
 /// Checks every template and snippet of a site, and gives the problems

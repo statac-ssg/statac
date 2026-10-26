@@ -21,11 +21,11 @@ use crate::templates::Renderer;
 /// One kind of JavaScript the built pages carry, and on how many pages.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Javascript {
-    pub carried: Carried,
+    pub(crate) carried: Carried,
     /// Whether a browser runs it; where not, it is somewhere a browser may
     /// or may not run it, such as a comment, and counted all the same.
-    pub sure: bool,
-    pub pages: usize,
+    pub(crate) sure: bool,
+    pub(crate) pages: usize,
 }
 
 /// How much of a file is looked at to tell text from binary.

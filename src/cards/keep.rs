@@ -20,16 +20,16 @@ use crate::publish::Staging;
 const CARDS: &str = "cards";
 
 /// A card some built page asked for.
-pub struct Wanted<'a> {
-    pub kit: &'a Kit,
-    pub texts: Vec<Text<'a>>,
-    pub key: Key,
+pub(crate) struct Wanted<'a> {
+    pub(crate) kit: &'a Kit,
+    pub(crate) texts: Vec<Text<'a>>,
+    pub(crate) key: Key,
     /// Its texts as placed, where no card kept showed it can be drawn.
-    pub plan: Option<&'a Plan>,
+    pub(crate) plan: Option<&'a Plan>,
     /// Where it is published, as a file from the top of the built site.
-    pub file: String,
+    pub(crate) file: String,
     /// The description it is drawn from, by its path in the site.
-    pub from: &'a str,
+    pub(crate) from: &'a str,
 }
 
 impl Wanted<'_> {
@@ -39,37 +39,42 @@ impl Wanted<'_> {
 }
 
 /// The name a card is kept under.
-pub fn kept_as(key: &Key, format: Format) -> String {
+pub(crate) fn kept_as(key: &Key, format: Format) -> String {
     format!("{}.{}", &key.hex()[..32], format.extension())
 }
 
 /// The cards a site keeps, for asking which are there.
-pub struct Store(Kept);
+pub(crate) struct Store(Kept);
 
 impl Store {
-    pub fn open(site: &Path) -> Store {
+    pub(crate) fn open(site: &Path) -> Store {
         Store(Kept::new(site, CARDS))
     }
 
     /// Whether the card of `key` is kept, drawn by an earlier build.
-    pub fn has(&self, key: &Key, format: Format) -> bool {
+    pub(crate) fn has(&self, key: &Key, format: Format) -> bool {
         self.0.has(&kept_as(key, format))
     }
 }
 
 /// What drawing and publishing the cards came to.
 #[derive(Default, Debug)]
-pub struct Drew {
+pub(crate) struct Drew {
     /// The cards drawn, the rest being kept from an earlier build.
-    pub drawn: usize,
+    pub(crate) drawn: usize,
     /// The cards written into the built site.
-    pub published: usize,
-    pub problems: Vec<Problem>,
+    pub(crate) published: usize,
+    pub(crate) problems: Vec<Problem>,
 }
 
 /// Draws each of `wanted` that no earlier build kept, and publishes them
 /// all, each beside its page.
-pub fn publish(site: &Path, wanted: &[Wanted], staging: &Staging, progress: Progress) -> Drew {
+pub(crate) fn publish(
+    site: &Path,
+    wanted: &[Wanted],
+    staging: &Staging,
+    progress: Progress,
+) -> Drew {
     let kept = Kept::new(site, CARDS);
     // Two pages in one folder sharing a card share its file.
     let mut files = HashSet::new();
@@ -142,6 +147,6 @@ pub fn publish(site: &Path, wanted: &[Wanted], staging: &Staging, progress: Prog
 
 /// Removes every card kept that is none of `asked`, each by the name it is
 /// kept under, and says how many.
-pub fn sweep(site: &Path, asked: &HashSet<String>) -> usize {
+pub(crate) fn sweep(site: &Path, asked: &HashSet<String>) -> usize {
     Kept::new(site, CARDS).sweep(asked, &["png", "jpg"])
 }

@@ -38,7 +38,7 @@ const VERSION: u32 = 4;
 
 /// What the panel shows after one round.
 #[derive(Default)]
-pub struct Panel {
+pub(crate) struct Panel {
     /// The errors of a round that stopped.
     stopped: Option<Stopped>,
     /// The site as the last round to build it left it.
@@ -58,15 +58,15 @@ pub struct Panel {
 }
 
 /// What serve knows of a round besides the round itself.
-pub struct Besides<'a> {
-    pub took: Took,
+pub(crate) struct Besides<'a> {
+    pub(crate) took: Took,
     /// The files it was for, as they are shown; none for the first.
-    pub changed: &'a [String],
+    pub(crate) changed: &'a [String],
     /// What the terminal said of how it ended.
-    pub said: &'a str,
-    pub gone: Option<&'a str>,
+    pub(crate) said: &'a str,
+    pub(crate) gone: Option<&'a str>,
     /// Whether serve shows drafts and posts waiting for their day.
-    pub drafts: bool,
+    pub(crate) drafts: bool,
 }
 
 struct Stopped {
@@ -101,15 +101,15 @@ struct Built {
 
 /// A page the last round to build the site built, as `serve` lists it at
 /// the top of a site with no home page.
-pub struct Listed {
+pub(crate) struct Listed {
     /// Its URL, with the path the site is published under.
-    pub address: String,
-    pub title: Option<String>,
+    pub(crate) address: String,
+    pub(crate) title: Option<String>,
     /// Which of its list's pages it is, counted from 1.
-    pub number: usize,
-    pub draft: bool,
+    pub(crate) number: usize,
+    pub(crate) draft: bool,
     /// The day it waits for, where that is after today.
-    pub waiting: Option<String>,
+    pub(crate) waiting: Option<String>,
 }
 
 struct Page {
@@ -143,7 +143,7 @@ impl Panel {
     /// The panel after `round` of the site at `site`, published under
     /// `base`. `before` is the panel of the round before, whose pages are
     /// still the ones answered where this round stopped.
-    pub fn after(
+    pub(crate) fn after(
         mut round: Round,
         site: &Path,
         base: &str,
@@ -251,7 +251,7 @@ impl Panel {
 
     /// Every HTML page the last round to build the site built, by URL;
     /// none before any round has built.
-    pub fn pages(&self) -> Option<Vec<Listed>> {
+    pub(crate) fn pages(&self) -> Option<Vec<Listed>> {
         let built = &self.built;
         let read = built.read.as_ref()?;
         let site = read.renderer.site();
@@ -280,7 +280,7 @@ impl Panel {
     /// The last round to build the site's problems, of the kind named
     /// `kind` or of every kind, quietened ones among them, in their parts,
     /// as JSON.
-    pub fn problems(&self, kind: Option<&str>) -> String {
+    pub(crate) fn problems(&self, kind: Option<&str>) -> String {
         let built = &self.built;
         let Some(read) = &built.read else {
             return format!("{{\"v\":{VERSION},\"problems\":[],\"more\":0,\"explanations\":{{}}}}");
@@ -301,7 +301,7 @@ impl Panel {
 
     /// The panel for the page published as `file`, or for an address with
     /// no page at it, as JSON.
-    pub fn to_json(&self, file: Option<&str>) -> String {
+    pub(crate) fn to_json(&self, file: Option<&str>) -> String {
         let built = &self.built;
         let page = file.and_then(|file| built.pages.get(file));
         let explained = built.read.as_ref().and_then(|read| {
@@ -333,7 +333,7 @@ impl Panel {
     /// What a reader would find for `words`, its last word being typed
     /// where `typing`, in the site as the last round to build it read it,
     /// the language of the page published as `file` first, as JSON.
-    pub fn search(&self, words: &str, typing: bool, file: Option<&str>) -> String {
+    pub(crate) fn search(&self, words: &str, typing: bool, file: Option<&str>) -> String {
         search::found(&self.built, self.drafts, words, typing, file)
     }
 
@@ -481,7 +481,7 @@ fn pieced(sentence: &str) -> String {
 /// Every word the panel puts together for itself, as a JSON object of
 /// each by its name: a sentence's pieces, or for a count, the pieces said
 /// of one and of any other number.
-pub fn words() -> &'static str {
+pub(crate) fn words() -> &'static str {
     static WORDS: OnceLock<String> = OnceLock::new();
     WORDS.get_or_init(|| {
         let words: Vec<String> = (wording::panel_words().into_iter())
@@ -502,7 +502,7 @@ pub fn words() -> &'static str {
 /// Every way the panel offers to write a name, as a JSON object of each
 /// kind of thing a name holds, by the kind's name, and that kind's ways:
 /// each the template and the name of the word for what it is for.
-pub fn ways() -> &'static str {
+pub(crate) fn ways() -> &'static str {
     static WAYS: OnceLock<String> = OnceLock::new();
     WAYS.get_or_init(|| {
         let kinds: Vec<String> = (Holds::ALL.into_iter())

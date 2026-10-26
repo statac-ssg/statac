@@ -29,10 +29,10 @@ const NAMED: &[(&str, &[&str])] = &[
 /// Where in which template the engine stopped: its name, its text, the
 /// engine's range in it and that range widened to the whole expression.
 pub(in crate::templates) struct Site<'a> {
-    pub name: &'a str,
-    pub text: &'a str,
-    pub range: Range<usize>,
-    pub at: Range<usize>,
+    pub(crate) name: &'a str,
+    pub(crate) text: &'a str,
+    pub(crate) range: Range<usize>,
+    pub(crate) at: Range<usize>,
 }
 
 /// The side of an arithmetic operator a missing value was handed to,

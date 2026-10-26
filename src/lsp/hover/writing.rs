@@ -104,14 +104,14 @@ pub(super) fn snippet_said(snippet: &Snippet, path: &str, wraps: bool) -> Said {
 
 /// What the page's writing is read against.
 pub(super) struct Reading<'a> {
-    pub renderer: &'a Renderer,
+    pub(crate) renderer: &'a Renderer,
     /// The page being written, where the site as last read holds it.
-    pub page: Option<PageId>,
+    pub(crate) page: Option<PageId>,
     /// The folder under `content/` the page's file is in, ending with
     /// `/`, or empty at the top.
-    pub folder: &'a str,
+    pub(crate) folder: &'a str,
     /// The path the site is published under.
-    pub base: &'a str,
+    pub(crate) base: &'a str,
 }
 
 impl Reading<'_> {

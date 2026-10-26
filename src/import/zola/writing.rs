@@ -42,46 +42,46 @@ pub(super) enum Reading {
 
 /// What the writing is converted with.
 pub(super) struct Context<'a> {
-    pub reading: Reading,
+    pub(crate) reading: Reading,
     /// The page's language, and the site's main one.
-    pub language: &'a str,
-    pub main_language: &'a str,
+    pub(crate) language: &'a str,
+    pub(crate) main_language: &'a str,
     /// The names the settings give the feeds.
-    pub feeds: &'a [String],
+    pub(crate) feeds: &'a [String],
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
-    pub base: &'a str,
+    pub(crate) base: &'a str,
     /// The address, from the top of the site, of the page an `@/` link
     /// names by its path in `content/`, where there is one.
-    pub refs: &'a dyn Fn(&str) -> Option<String>,
+    pub(crate) refs: &'a dyn Fn(&str) -> Option<String>,
     /// Where an `@/` link names a file beside a page that came across: the
     /// page, as an `@/` link names it, and the file's path from the page's
     /// folder.
-    pub beside: &'a dyn Fn(&str) -> Option<(String, String)>,
+    pub(crate) beside: &'a dyn Fn(&str) -> Option<(String, String)>,
     /// The tags some call anywhere in the site wraps writing with.
-    pub wrapping: &'a HashSet<String>,
+    pub(crate) wrapping: &'a HashSet<String>,
 }
 
 /// A snippet call put in place of a tag.
 #[derive(Clone, Debug)]
 pub(super) struct Call {
-    pub snippet: String,
+    pub(crate) snippet: String,
     /// The tag's name, as written.
-    pub tag: String,
+    pub(crate) tag: String,
     /// The names it hands, in order.
-    pub names: Vec<String>,
-    pub wraps: bool,
-    pub spot: Spot,
+    pub(crate) names: Vec<String>,
+    pub(crate) wraps: bool,
+    pub(crate) spot: Spot,
 }
 
 /// The writing converted, with what didn't convert.
 pub(super) struct Converted {
-    pub writing: String,
-    pub findings: Vec<Finding>,
-    pub calls: Vec<Call>,
+    pub(crate) writing: String,
+    pub(crate) findings: Vec<Finding>,
+    pub(crate) calls: Vec<Call>,
     /// Where each snippet call written here starts, and each `@end`, in
     /// order.
-    pub called: Vec<usize>,
+    pub(crate) called: Vec<usize>,
 }
 
 /// A value handed to a tag.
@@ -414,15 +414,15 @@ const FUNCTIONS: [&str; 17] = [
 #[derive(Clone, Copy, Default, Debug)]
 pub(super) struct Signs {
     /// A component call, which only 0.23 and later read.
-    pub component: bool,
+    pub(crate) component: bool,
     /// A call to one of Zola 0.23's functions, of a name the site has no
     /// shortcode by, which would have stopped an earlier version.
-    pub function: bool,
+    pub(crate) function: bool,
     /// `raw`, which only 0.23 and later take out.
-    pub raw: bool,
+    pub(crate) raw: bool,
     /// A tag shown as text, `{{/* name() */}}`, which only versions before
     /// 0.23 read.
-    pub shown: bool,
+    pub(crate) shown: bool,
 }
 
 /// The [`Signs`] in `body`, on a site whose own tags are `own`.

@@ -92,12 +92,12 @@ pub(super) fn glob_matches(glob: &str, text: &str) -> bool {
 /// A file read for its front matter: each field with its line, and the
 /// writing after it with the line it starts on.
 pub(super) struct Front {
-    pub fields: Vec<Field>,
-    pub body: String,
-    pub body_line: usize,
+    pub(crate) fields: Vec<Field>,
+    pub(crate) body: String,
+    pub(crate) body_line: usize,
     /// The front matter, where it is YAML Statac's reader stopped at: the
     /// page is then read as if it had none.
-    pub unread: Option<Unread>,
+    pub(crate) unread: Option<Unread>,
 }
 
 /// Reads `text`'s front matter, written in YAML between `---`, TOML

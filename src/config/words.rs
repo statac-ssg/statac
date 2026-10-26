@@ -12,7 +12,7 @@ use crate::yaml::{Node, Resolved, Value as Yaml, key_name};
 
 /// Statac's own words on a page.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub enum PageWord {
+pub(crate) enum PageWord {
     Title,
     Date,
     Updated,
@@ -138,7 +138,7 @@ const WORDS: &[Spec] = &[
 
 /// The names Statac fills on every page itself, so a page writing one is
 /// read by nothing.
-pub const STATAC_FILLS: &[&str] = &[
+pub(crate) const STATAC_FILLS: &[&str] = &[
     "slug",
     "url",
     "key",
@@ -168,7 +168,7 @@ pub const STATAC_FILLS: &[&str] = &[
 ];
 
 /// Other tools' words for Statac's own, and Statac's.
-pub const OTHER_SPELLINGS: &[(&str, &str)] = &[
+pub(crate) const OTHER_SPELLINGS: &[(&str, &str)] = &[
     ("template", "layout"),
     ("aliases", "redirect_from"),
     ("categories", "tags"),
@@ -202,27 +202,27 @@ impl PageWord {
             .expect("every word has a row")
     }
 
-    pub fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         self.spec().name
     }
 
-    pub fn named(name: &str) -> Option<PageWord> {
+    pub(crate) fn named(name: &str) -> Option<PageWord> {
         WORDS
             .iter()
             .find(|spec| spec.name == name)
             .map(|spec| spec.word)
     }
 
-    pub fn handed_down(self) -> bool {
+    pub(crate) fn handed_down(self) -> bool {
         self.spec().handed
     }
 
-    pub fn all() -> impl Iterator<Item = PageWord> {
+    pub(crate) fn all() -> impl Iterator<Item = PageWord> {
         WORDS.iter().map(|spec| spec.word)
     }
 
     /// The values it takes where they are a few words to choose from.
-    pub fn choices(self) -> Vec<&'static str> {
+    pub(crate) fn choices(self) -> Vec<&'static str> {
         match self.spec().shape {
             Shape::Truth | Shape::Feed => vec!["true", "false"],
             Shape::OneOf(words) => words.to_vec(),
@@ -234,54 +234,54 @@ impl PageWord {
 }
 
 /// Whether `name` is a word Statac gives a meaning to on a page.
-pub fn is_statacs(name: &str) -> bool {
+pub(crate) fn is_statacs(name: &str) -> bool {
     PageWord::named(name).is_some() || STATAC_FILLS.contains(&name)
 }
 
 /// One of the author's own fields.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Field {
-    pub name: String,
+pub(crate) struct Field {
+    pub(crate) name: String,
     /// Where its name is written.
-    pub key: Place,
-    pub value: Node,
-    pub origin: Origin,
+    pub(crate) key: Place,
+    pub(crate) value: Node,
+    pub(crate) origin: Origin,
 }
 
 /// The values on a page, or the values a folder hands down.
 #[derive(Clone, Default, PartialEq, Debug)]
-pub struct Words {
-    pub words: Vec<(PageWord, Sourced<Value>)>,
-    pub fields: Vec<Field>,
+pub(crate) struct Words {
+    pub(crate) words: Vec<(PageWord, Sourced<Value>)>,
+    pub(crate) fields: Vec<Field>,
 }
 
 impl Words {
-    pub fn get(&self, word: PageWord) -> Option<&Sourced<Value>> {
+    pub(crate) fn get(&self, word: PageWord) -> Option<&Sourced<Value>> {
         self.words.iter().find(|(w, _)| *w == word).map(|(_, v)| v)
     }
 
-    pub fn text(&self, word: PageWord) -> Option<Sourced<&str>> {
+    pub(crate) fn text(&self, word: PageWord) -> Option<Sourced<&str>> {
         let value = self.get(word)?;
         Some(Sourced::new(value.value.as_text()?, value.origin.clone()))
     }
 
-    pub fn truth(&self, word: PageWord) -> Option<bool> {
+    pub(crate) fn truth(&self, word: PageWord) -> Option<bool> {
         self.get(word)?.value.as_bool()
     }
 
-    pub fn field(&self, name: &str) -> Option<&Field> {
+    pub(crate) fn field(&self, name: &str) -> Option<&Field> {
         self.fields.iter().find(|field| field.name == name)
     }
 
     /// Whether the field at `path` is written: under that name, or nested,
     /// as `book:` with `author:` beneath it is `book.author`.
-    pub fn has(&self, path: &str) -> bool {
+    pub(crate) fn has(&self, path: &str) -> bool {
         self.at(path).is_some()
     }
 
     /// The value of the field at `path`, written under that name or
     /// nested, as [`Words::has`] finds it.
-    pub fn at(&self, path: &str) -> Option<&Node> {
+    pub(crate) fn at(&self, path: &str) -> Option<&Node> {
         if let Some(field) = self.field(path) {
             return Some(&field.value);
         }
@@ -298,7 +298,7 @@ impl Words {
     }
 
     /// Takes from `layer` whatever isn't set here, as handed down.
-    pub fn hand_down_from(&mut self, layer: &Words) {
+    pub(crate) fn hand_down_from(&mut self, layer: &Words) {
         for (word, value) in &layer.words {
             if self.get(*word).is_none() {
                 let origin = value.origin.handed_down();
@@ -319,7 +319,7 @@ impl Words {
 
 /// What holds the words being read.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Holder {
+pub(crate) enum Holder {
     Page,
     /// A folder's own page, which may hand words down to the pages inside.
     FolderPage {
@@ -329,16 +329,16 @@ pub enum Holder {
 
 /// One file's front matter read.
 #[derive(Default, Debug)]
-pub struct Read {
-    pub own: Words,
+pub(crate) struct Read {
+    pub(crate) own: Words,
     /// What a folder's own page hands down.
-    pub layer: Words,
-    pub problems: Vec<Problem>,
+    pub(crate) layer: Words,
+    pub(crate) problems: Vec<Problem>,
 }
 
 /// Reads front matter: Statac's words typed, the author's fields kept and
 /// checked against their declarations, `pages.` lines into the layer.
-pub fn read_front_matter(
+pub(crate) fn read_front_matter(
     sources: &Sources,
     node: Option<&Node>,
     holder: Holder,
@@ -461,7 +461,7 @@ pub fn read_front_matter(
 /// Reads `pages.<rest>: value`, a word handed down to the pages inside,
 /// checked against the site's declarations, on a site in several
 /// languages or not.
-pub fn read_handed(
+pub(crate) fn read_handed(
     sources: &Sources,
     key: &Node,
     rest: &str,
@@ -545,7 +545,7 @@ fn slip(
 /// A warning where nothing at all is written after the colon of `name`,
 /// one of Statac's words or settings or a declared field. `~` and `null`
 /// are written, and meant.
-pub fn empty(name: &str, word: Word, key: &Node, value: &Node) -> Option<Problem> {
+pub(crate) fn empty(name: &str, word: Word, key: &Node, value: &Node) -> Option<Problem> {
     let nothing = value.tag.is_none()
         && value.style == crate::origin::Style::Plain
         && matches!(&value.value, Yaml::Scalar(text) if text.is_empty());
@@ -595,7 +595,7 @@ fn one_tag(sources: &Sources, word: PageWord, key: &Node, value: &Node) -> Optio
 /// A warning for each `type` one slip from a type the site declares,
 /// where it names no declared type and no template in `templates`. A
 /// value handed down is told once, where it is written.
-pub fn type_slips<'a>(
+pub(crate) fn type_slips<'a>(
     all: impl Iterator<Item = &'a Words>,
     declarations: &Declarations,
     templates: &std::path::Path,
@@ -688,7 +688,7 @@ fn set_aside(field: &str, key: &Node) -> Problem {
 /// Each setting nested under `under`, refused with its flat line offered.
 /// A declaration is a line of its own however deep it is nested, so each
 /// is offered whole: `fields.book.author: text`.
-pub fn nested(sources: &Sources, under: &str, value: &Node) -> Vec<Problem> {
+pub(crate) fn nested(sources: &Sources, under: &str, value: &Node) -> Vec<Problem> {
     let mut problems = Vec::new();
     let Yaml::Mapping(entries) = &value.value else {
         return problems;
@@ -844,7 +844,7 @@ fn well_formed_id(id: &str) -> bool {
 /// The author's own fields at every depth, for finding one written flat on
 /// one page and nested on another: each flat name holding a dot, and each
 /// nested path, with the place of its last key.
-pub fn shapes(
+pub(crate) fn shapes(
     fields: &[Field],
     flat: &mut Vec<(String, Place)>,
     nested: &mut Vec<(String, Place)>,
@@ -868,7 +868,7 @@ pub fn shapes(
 }
 
 /// A warning for each flat name that is also written nested.
-pub fn written_two_ways(
+pub(crate) fn written_two_ways(
     on: Root,
     flat: &[(String, Place)],
     nested: &[(String, Place)],
@@ -896,7 +896,7 @@ pub fn written_two_ways(
 }
 
 /// The first line of a source, where a problem about a whole page is shown.
-pub fn head(sources: &Sources, source: crate::source::SourceId) -> Place {
+pub(crate) fn head(sources: &Sources, source: crate::source::SourceId) -> Place {
     let text = sources.text(source);
     let start = if text.starts_with('\u{feff}') { 3 } else { 0 };
     let end = text[start..]

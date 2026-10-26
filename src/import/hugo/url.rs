@@ -67,15 +67,15 @@ pub(super) fn finished(path: &str, ugly: bool) -> String {
 
 /// What a page gives a `[permalinks]` pattern.
 pub(super) struct Pieces<'a> {
-    pub date: Option<&'a Date>,
-    pub title: &'a str,
-    pub slug: Option<&'a str>,
+    pub(crate) date: Option<&'a Date>,
+    pub(crate) title: &'a str,
+    pub(crate) slug: Option<&'a str>,
     /// The file's name, without its ending or language, or the folder's
     /// for a page kept as a folder.
-    pub file_name: &'a str,
+    pub(crate) file_name: &'a str,
     /// The folders the page is in that are lists, outermost first, each as
     /// [`read`] gives it.
-    pub sections: &'a [String],
+    pub(crate) sections: &'a [String],
 }
 
 const MONTHS: [&str; 12] = [

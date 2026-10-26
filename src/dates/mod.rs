@@ -5,7 +5,7 @@
 //! was written for. A date written without one is read in the site's
 //! `timezone`, so the moment it names is the one the author's clock showed.
 
-pub mod format;
+pub(crate) mod format;
 #[cfg(test)]
 mod tests;
 
@@ -25,7 +25,7 @@ use crate::problem::{FormatFault, Kind, Look, Problem, Word, WordsFrom};
 use crate::source::{Place, Sources, Span};
 use crate::value::place_within;
 
-pub use format::{DateWords, Format, Reading, Refusal};
+pub(crate) use format::{DateWords, Format, Reading, Refusal};
 
 /// What templates ask of a site's dates.
 pub trait ShowDates {
@@ -330,13 +330,13 @@ impl Dates {
     }
 
     /// The same dates with `site.today` fixed, so a build can be repeated.
-    pub fn with_today(self, today: Date) -> Dates {
+    pub(crate) fn with_today(self, today: Date) -> Dates {
         Dates { today, ..self }
     }
 
     /// Whether the moment `date` names falls after the build's day ends on
     /// the site's clock.
-    pub fn after_today(&self, date: &Date) -> bool {
+    pub(crate) fn after_today(&self, date: &Date) -> bool {
         let today = &self.today;
         let Ok(tomorrow) = jiff::civil::Date::new(
             i16::try_from(today.year).unwrap_or(i16::MAX),
@@ -356,7 +356,7 @@ impl Dates {
 
     /// The present minute on the site's clock, as a date written with no
     /// offset names it there.
-    pub fn now(&self) -> Date {
+    pub(crate) fn now(&self) -> Date {
         let zone = self.zone.clone().unwrap_or_else(TimeZone::system);
         let now = jiff::Timestamp::now().to_zoned(zone);
         minute_of(&now, self.zone.is_some())
@@ -368,13 +368,8 @@ impl Dates {
     }
 
     /// The site's languages, main first, in the order of their ids.
-    pub fn languages(&self) -> impl Iterator<Item = &Language> {
+    pub(crate) fn languages(&self) -> impl Iterator<Item = &Language> {
         self.languages.iter().map(|language| &language.language)
-    }
-
-    /// The site's own format in `language`.
-    pub fn site_format(&self, language: LanguageId) -> &Format {
-        &self.languages[language.index()].format
     }
 
     /// What the site's zone makes of `date`: the moment it names, with the
@@ -403,7 +398,7 @@ impl Dates {
     }
 
     /// Seconds from the start of 1970 to the moment `date` names.
-    pub fn instant(&self, date: &Date) -> i64 {
+    pub(crate) fn instant(&self, date: &Date) -> i64 {
         let at = self.settle(date);
         days_from_civil(at.year, at.month, at.day) * 86_400
             + i64::from(at.hour) * 3_600
@@ -456,7 +451,11 @@ impl Dates {
 
     /// The other language whose words `language` reads the site's format,
     /// or a template's `example`, in, where its own words can't.
-    pub fn read_in(&self, language: LanguageId, example: Option<&str>) -> Option<LanguageId> {
+    pub(crate) fn read_in(
+        &self,
+        language: LanguageId,
+        example: Option<&str>,
+    ) -> Option<LanguageId> {
         match example {
             None => self.languages[language.index()].format_read_in,
             Some(example) => self.example(language, example).read_in,
@@ -546,7 +545,7 @@ impl ShowDates for Dates {
 
 /// The warning for a site naming no `timezone` where a date it uses has no
 /// written offset, which is then read as UTC: said once, of the site.
-pub fn unzoned<'a>(
+pub(crate) fn unzoned<'a>(
     settings: &Settings,
     mut dates: impl Iterator<Item = &'a Date>,
 ) -> Option<Problem> {

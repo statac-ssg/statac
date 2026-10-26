@@ -23,7 +23,7 @@ const FORMAT: u32 = 1;
 impl Report<'_> {
     /// Every problem, quietened or not, as JSON, in the order `check`
     /// draws them.
-    pub fn check_json(&self, problems: &[Problem], quiet: &Quiet) -> String {
+    pub(crate) fn check_json(&self, problems: &[Problem], quiet: &Quiet) -> String {
         let site = std::path::absolute(self.root).ok();
         let site = site.map(|site| json::string(&site.display().to_string()));
         let problems: Vec<String> = (self.ordered(problems).into_iter())

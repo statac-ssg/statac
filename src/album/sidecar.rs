@@ -11,17 +11,17 @@ use crate::yaml::{self, Resolved, Value as Yaml};
 
 /// What a picture's own file says of it.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Sidecar {
-    pub source: SourceId,
+pub(crate) struct Sidecar {
+    pub(crate) source: SourceId,
     /// The picture's description, for readers who can't see it.
-    pub alt: Option<Sourced<String>>,
-    pub caption: Option<Sourced<String>>,
+    pub(crate) alt: Option<Sourced<String>>,
+    pub(crate) caption: Option<Sourced<String>>,
     /// False leaves a photograph as it is, with no copies made.
-    pub optimise: Option<Sourced<bool>>,
+    pub(crate) optimise: Option<Sourced<bool>>,
     /// Whether the picture is decoration, wanting no description.
-    pub decorative: Option<Sourced<bool>>,
+    pub(crate) decorative: Option<Sourced<bool>>,
     /// Every other key, the author's own.
-    pub own: Vec<Field>,
+    pub(crate) own: Vec<Field>,
 }
 
 /// Reads the file at `source`. None where it can't be read as fields,

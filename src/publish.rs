@@ -137,13 +137,13 @@ impl Drop for Saving<'_> {
 /// What a build that finished left in the folder it wrote, for a later
 /// one that writes into the same folder to start from.
 #[derive(Clone, Default, Debug)]
-pub struct Left {
+pub(crate) struct Left {
     /// Every file the folder holds, each a path from its top.
-    pub files: Vec<String>,
+    pub(crate) files: Vec<String>,
     /// The files made or made anew.
-    pub written: Vec<String>,
+    pub(crate) written: Vec<String>,
     /// The files the folder held before that it holds no more.
-    pub removed: Vec<String>,
+    pub(crate) removed: Vec<String>,
     /// Each file copied from one of the site's as it is, with what it
     /// was copied from, where a later change to that file would change
     /// its stamp.
@@ -520,7 +520,7 @@ fn tidy(
 pub struct Hold {
     _locked: Option<fs::File>,
     /// How long it took to have, waiting for another build included.
-    pub waited: Duration,
+    pub(crate) waited: Duration,
 }
 
 /// Takes the hold on the site at `site` for a build, calling `waiting`
@@ -564,7 +564,7 @@ fn locked(site: &Path, waiting: impl FnOnce()) -> io::Result<fs::File> {
 /// no other holds. It is held by a lock on a file beside it, let go of as
 /// a [`Hold`] is. Where no file can be locked it is `name`, unheld, and
 /// the hold each build takes says why.
-pub fn claim(site: &Path, name: &str) -> (String, Option<fs::File>) {
+pub(crate) fn claim(site: &Path, name: &str) -> (String, Option<fs::File>) {
     for n in 1.. {
         let folder = match n {
             1 => name.to_owned(),
@@ -694,7 +694,7 @@ pub fn begin(site: &Path, out: &Path) -> Result<Staging, Problem> {
 /// where that file has the stamp it had when the build that `left` it
 /// copied it. A build dropped unfinished leaves the folder as far as it
 /// got.
-pub fn resume(
+pub(crate) fn resume(
     site: &Path,
     folder: &Path,
     files: impl IntoIterator<Item = String>,
@@ -786,18 +786,18 @@ fn same_bytes(a: &mut fs::File, mut b: fs::File) -> io::Result<bool> {
 
 impl Staging {
     /// The folder the build writes into.
-    pub fn root(&self) -> &Path {
+    pub(crate) fn root(&self) -> &Path {
         &self.fresh
     }
 
     /// Why no spare is kept for the next build, where one can't be.
-    pub fn unkept(&self) -> Option<Problem> {
+    pub(crate) fn unkept(&self) -> Option<Problem> {
         self.unkept.clone()
     }
 
     /// The same build of the site at `site`, leaving in `into` once it has
     /// finished what the output holds, for a build that [`resume`]s there.
-    pub fn leaving(mut self, site: &Path, into: Arc<Mutex<Option<Left>>>) -> Staging {
+    pub(crate) fn leaving(mut self, site: &Path, into: Arc<Mutex<Option<Left>>>) -> Staging {
         self.notes = Some(Notes {
             before: HashMap::new(),
             written: Mutex::default(),
@@ -895,13 +895,13 @@ impl Staging {
 
     /// The time spent so far writing and copying files into the folder,
     /// on every thread together.
-    pub fn saving(&self) -> Duration {
+    pub(crate) fn saving(&self) -> Duration {
         Duration::from_nanos(self.saving.load(Ordering::Relaxed))
     }
 
     /// Writes `bytes` at `rel`, a path with forward slashes, making the
     /// folders above it.
-    pub fn write(&self, rel: &str, bytes: &[u8]) -> Result<(), Problem> {
+    pub(crate) fn write(&self, rel: &str, bytes: &[u8]) -> Result<(), Problem> {
         let _saving = Saving::of(self);
         let held = self.claimed(rel, false)?;
         if self.in_place {
@@ -983,7 +983,7 @@ impl Staging {
     /// [`Staging::write`] does. One the build before left at `rel` in the
     /// folder, written where it stands, holds them already: nothing of it
     /// is read, written or removed.
-    pub fn write_named(&self, rel: &str, bytes: &[u8]) -> Result<(), Problem> {
+    pub(crate) fn write_named(&self, rel: &str, bytes: &[u8]) -> Result<(), Problem> {
         if !self.stands_named(rel) {
             self.write(rel, bytes)?;
         }
@@ -1010,7 +1010,7 @@ impl Staging {
 
     /// Copies `source`, the file `shown` names as opened to read, to
     /// `rel`. Where it couldn't be opened, the problem says why.
-    pub fn copy(
+    pub(crate) fn copy(
         &self,
         source: io::Result<fs::File>,
         shown: &str,
@@ -1064,7 +1064,7 @@ impl Staging {
     /// The copy is given the time `source` was last changed, and one the
     /// spare holds is left as it is where it is a file itself with that
     /// time and the length of `source`, without its bytes being read.
-    pub fn copy_whole(
+    pub(crate) fn copy_whole(
         &self,
         source: io::Result<fs::File>,
         shown: &str,
@@ -1212,7 +1212,7 @@ impl Staging {
     /// nothing else, once the build has written every file. What is
     /// written there afterwards without this build's hand is published
     /// with the rest.
-    pub fn settle(&mut self) -> Result<(), Problem> {
+    pub(crate) fn settle(&mut self) -> Result<(), Problem> {
         // What the build itself asked for is told only while the spare
         // still says so.
         if self.settled.is_none() {
@@ -1228,7 +1228,7 @@ impl Staging {
 
     /// Every file the folder written into holds now, each by its path
     /// with forward slashes, with its stamp where the system gives one.
-    pub fn files(&self) -> Result<Inventory, Problem> {
+    pub(crate) fn files(&self) -> Result<Inventory, Problem> {
         let found = |path: &Path| fs::symlink_metadata(path);
         Ok(Inventory::of(&self.fresh, self.held()?, found))
     }
@@ -1236,7 +1236,7 @@ impl Staging {
     /// Every file the folder written into holds now, as [`Staging::files`]
     /// gives them, known well enough for a later look to tell one written
     /// again at its length and time, as [`Inventory::to_compare`] has it.
-    pub fn files_to_compare(&self) -> Result<Inventory, Problem> {
+    pub(crate) fn files_to_compare(&self) -> Result<Inventory, Problem> {
         let clock = self.disk_clock();
         let found = |path: &Path| fs::symlink_metadata(path);
         Ok(Inventory::to_compare(

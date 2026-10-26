@@ -26,10 +26,10 @@ pub(crate) enum Found {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Finding {
-    pub found: Found,
+    pub(crate) found: Found,
     /// Whether a browser reading the page as HTML runs it; where not, it
     /// was found only by the wider reading.
-    pub sure: bool,
+    pub(crate) sure: bool,
 }
 
 /// Everything in `html` that runs JavaScript or may, the sure first.
@@ -63,10 +63,10 @@ pub(super) type Print = [u8; 16];
 /// A piece of JavaScript a text writes in.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Piece {
-    pub print: Print,
+    pub(crate) print: Print,
     /// Whether a template fills some of it in as a page is built, so that
     /// what a page holds is not what the file holds.
-    pub filled: bool,
+    pub(crate) filled: bool,
 }
 
 /// Every piece of JavaScript `html` writes in where a browser runs it: one

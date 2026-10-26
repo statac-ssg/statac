@@ -18,16 +18,16 @@ use cosmic_text::{Attrs, AttrsList, CacheKeyFlags, Family};
 /// One face of a font file, as the text engine knows it.
 #[derive(Clone)]
 pub(super) struct Face {
-    pub id: fontdb::ID,
-    pub name: String,
-    pub weight: fontdb::Weight,
-    pub style: fontdb::Style,
-    pub stretch: fontdb::Stretch,
+    pub(crate) id: fontdb::ID,
+    pub(crate) name: String,
+    pub(crate) weight: fontdb::Weight,
+    pub(crate) style: fontdb::Style,
+    pub(crate) stretch: fontdb::Stretch,
     /// The font file it is in, by its index among those the kit is given.
-    pub file: usize,
+    pub(crate) file: usize,
     /// Whether its digits, `#` and `*` are there only as the bases of
     /// keycaps.
-    pub keycaps_only: bool,
+    pub(crate) keycaps_only: bool,
     data: Arc<Vec<u8>>,
     index: u32,
 }
@@ -212,14 +212,14 @@ fn keycaps_only(font: &FontRef) -> bool {
 /// A list's faces in order, with what is known of which characters
 /// each draws.
 pub(super) struct Faces {
-    pub faces: Vec<Face>,
+    pub(crate) faces: Vec<Face>,
     known: HashMap<(usize, char), bool>,
 }
 
 /// A run of text drawn in one face, by its index.
 pub(super) struct Run {
-    pub range: Range<usize>,
-    pub face: usize,
+    pub(crate) range: Range<usize>,
+    pub(crate) face: usize,
 }
 
 impl Faces {

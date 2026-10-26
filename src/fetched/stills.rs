@@ -8,7 +8,7 @@ use crate::problem::Host;
 pub(crate) const FOLDER: &str = "stills";
 
 impl Host {
-    pub fn site(self) -> &'static str {
+    pub(crate) fn site(self) -> &'static str {
         match self {
             Host::YouTube => "YouTube",
             Host::Vimeo => "Vimeo",
@@ -16,7 +16,7 @@ impl Host {
     }
 
     /// The name a still of the video `id` is kept under.
-    pub fn still(self, id: &str) -> String {
+    pub(crate) fn still(self, id: &str) -> String {
         match self {
             Host::YouTube => format!("youtube-{id}.jpg"),
             Host::Vimeo => format!("vimeo-{id}.jpg"),
@@ -25,7 +25,7 @@ impl Host {
 
     /// Whether `id` is one video, which has a still: a YouTube playlist
     /// shown in one player stands as `videoseries`.
-    pub fn is_one_video(self, id: &str) -> bool {
+    pub(crate) fn is_one_video(self, id: &str) -> bool {
         !(self == Host::YouTube && id == "videoseries")
     }
 }

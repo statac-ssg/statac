@@ -5,7 +5,7 @@ use crate::source::Place;
 
 /// How a value reached the thing it applies to.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Arrival {
+pub(crate) enum Arrival {
     /// Written on the thing itself.
     Written,
     /// Written further up and handed down, nearest first; `place` on the
@@ -22,7 +22,7 @@ pub enum Arrival {
 /// How a scalar was written. YAML reads the same characters differently by
 /// style, and some problems turn on it (`3.10` against `"3.10"`).
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Style {
+pub(crate) enum Style {
     Plain,
     SingleQuoted,
     DoubleQuoted,
@@ -33,15 +33,15 @@ pub enum Style {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Origin {
+pub(crate) struct Origin {
     /// None only for a default, or a value given on the command line.
-    pub place: Option<Place>,
-    pub style: Style,
-    pub arrival: Arrival,
+    pub(crate) place: Option<Place>,
+    pub(crate) style: Style,
+    pub(crate) arrival: Arrival,
 }
 
 impl Origin {
-    pub fn written(place: Place, style: Style) -> Self {
+    pub(crate) fn written(place: Place, style: Style) -> Self {
         Origin {
             place: Some(place),
             style,
@@ -49,7 +49,7 @@ impl Origin {
         }
     }
 
-    pub fn defaulted() -> Self {
+    pub(crate) fn defaulted() -> Self {
         Origin {
             place: None,
             style: Style::None,
@@ -57,7 +57,7 @@ impl Origin {
         }
     }
 
-    pub fn command_line() -> Self {
+    pub(crate) fn command_line() -> Self {
         Origin {
             place: None,
             style: Style::None,
@@ -66,7 +66,7 @@ impl Origin {
     }
 
     /// The same written value, as it reaches something further down.
-    pub fn handed_down(&self) -> Self {
+    pub(crate) fn handed_down(&self) -> Self {
         Origin {
             arrival: match self.arrival {
                 Arrival::Defaulted => Arrival::Defaulted,
@@ -79,27 +79,20 @@ impl Origin {
 
 /// A value and where it came from.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Sourced<T> {
-    pub value: T,
-    pub origin: Origin,
+pub(crate) struct Sourced<T> {
+    pub(crate) value: T,
+    pub(crate) origin: Origin,
 }
 
 impl<T> Sourced<T> {
-    pub fn new(value: T, origin: Origin) -> Self {
+    pub(crate) fn new(value: T, origin: Origin) -> Self {
         Sourced { value, origin }
     }
 
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Sourced<U> {
+    pub(crate) fn map<U>(self, f: impl FnOnce(T) -> U) -> Sourced<U> {
         Sourced {
             value: f(self.value),
             origin: self.origin,
-        }
-    }
-
-    pub fn as_ref(&self) -> Sourced<&T> {
-        Sourced {
-            value: &self.value,
-            origin: self.origin.clone(),
         }
     }
 }

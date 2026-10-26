@@ -4,16 +4,16 @@
 /// An engine a form can send a search of the site to, and how the form
 /// is written for it.
 #[derive(Debug)]
-pub struct Engine {
+pub(crate) struct Engine {
     /// The word `search_without_javascript` names it by.
-    pub setting: &'static str,
-    pub name: &'static str,
+    pub(crate) setting: &'static str,
+    pub(crate) name: &'static str,
     /// Where the form sends the words.
-    pub action: &'static str,
+    pub(crate) action: &'static str,
     /// The name the reader's words are sent under.
-    pub words: &'static str,
+    pub(crate) words: &'static str,
     /// The name the site's host is sent under.
-    pub site: &'static str,
+    pub(crate) site: &'static str,
 }
 
 const ENGINES: [Engine; 1] = [
@@ -30,7 +30,7 @@ const ENGINES: [Engine; 1] = [
 ];
 
 /// Every word `search_without_javascript` takes.
-pub const SETTING: &[&str] = &{
+pub(crate) const SETTING: &[&str] = &{
     let mut names = [""; ENGINES.len()];
     let mut at = 0;
     while at < names.len() {
@@ -41,7 +41,7 @@ pub const SETTING: &[&str] = &{
 };
 
 /// The engine `setting`, a word `search_without_javascript` takes, names.
-pub fn engine(setting: &str) -> Option<&'static Engine> {
+pub(crate) fn engine(setting: &str) -> Option<&'static Engine> {
     ENGINES.iter().find(|engine| engine.setting == setting)
 }
 
@@ -50,6 +50,6 @@ pub fn engine(setting: &str) -> Option<&'static Engine> {
 /// Its path is left out: an engine that ignores a path in `site:` may
 /// find nothing at all, where one kept to the host finds the site's pages
 /// among its neighbours'.
-pub fn site(url: &str) -> Option<String> {
+pub(crate) fn site(url: &str) -> Option<String> {
     url::Url::parse(url).ok()?.host_str().map(str::to_owned)
 }

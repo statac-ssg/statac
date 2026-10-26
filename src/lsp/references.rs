@@ -30,13 +30,13 @@ pub(super) enum Written {
 
 /// A link to what is sought, as it is written.
 pub(super) struct Link {
-    pub place: Place,
+    pub(crate) place: Place,
     /// The page it is written in; none in a template.
-    pub from: Option<PageId>,
+    pub(crate) from: Option<PageId>,
     /// Whether it is handed an address from the top of the site, without
     /// the path the site is published under, as `@url(...)` and `url(...)`
     /// are.
-    pub helper: bool,
+    pub(crate) helper: bool,
 }
 
 /// Every link in the site's writing and templates that leads to one of

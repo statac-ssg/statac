@@ -29,15 +29,15 @@ use crate::wording::{self, Described};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Hover {
     /// What it is said of, as offsets in the file's text.
-    pub range: Range<usize>,
+    pub(crate) range: Range<usize>,
     /// What it is, in a line.
-    pub head: String,
+    pub(crate) head: String,
     /// What more is said, a paragraph each.
-    pub body: Vec<String>,
+    pub(crate) body: Vec<String>,
     /// Where the docs say more.
-    pub more: Option<String>,
+    pub(crate) more: Option<String>,
     /// Where what it names is written.
-    pub to: Option<Goes>,
+    pub(crate) to: Option<Goes>,
 }
 
 /// Where a file of the site holds what the pointer is over.

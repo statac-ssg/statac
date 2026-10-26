@@ -160,22 +160,22 @@ pub(super) enum Callee {
 /// comes back from the engine, to point at the value in the template.
 #[derive(Debug, Clone)]
 pub(super) struct Refusal {
-    pub callee: String,
-    pub kind: Callee,
-    pub role: Role,
-    pub path: Vec<Step>,
+    pub(crate) callee: String,
+    pub(crate) kind: Callee,
+    pub(crate) role: Role,
+    pub(crate) path: Vec<Step>,
     /// Whether the value is there and empty, rather than missing.
-    pub empty: bool,
+    pub(crate) empty: bool,
     /// For a filter that groups or tells items apart by a field: the field
     /// an item lacks, and the item.
-    pub by_field: Option<(String, Value)>,
+    pub(crate) by_field: Option<(String, Value)>,
 }
 
 /// What a missing value was found as.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Found {
-    pub path: Vec<Step>,
-    pub empty: bool,
+    pub(crate) path: Vec<Step>,
+    pub(crate) empty: bool,
 }
 
 /// The first missing value inside `value`, an empty path for `value`
@@ -246,8 +246,8 @@ pub(super) fn refuse(callee: &str, kind: Callee, role: Role, found: Found) -> Er
 /// what it was handed, the input first.
 #[derive(Debug, Clone)]
 pub(super) struct Failed {
-    pub callee: &'static str,
-    pub args: Vec<Value>,
+    pub(crate) callee: &'static str,
+    pub(crate) args: Vec<Value>,
 }
 
 /// Notes what `callee` was handed where it stopped, unless a callable it

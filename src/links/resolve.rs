@@ -58,18 +58,18 @@ pub(super) enum Leads {
 pub(super) struct Arrival {
     /// From the top of the site, without the site's own path, its `%XX`
     /// read as the characters they stand for.
-    pub path: String,
+    pub(crate) path: String,
     /// What follows the `#`, as written, where anything does.
-    pub fragment: Option<String>,
+    pub(crate) fragment: Option<String>,
     /// The scheme and host the link named the site by, where it named one.
-    pub origin: Option<String>,
+    pub(crate) origin: Option<String>,
     /// Whether the path is on the site's host but outside the site's own
     /// path, where the site publishes nothing: `path` is then from the top
     /// of the host.
-    pub outside: bool,
+    pub(crate) outside: bool,
     /// Whether the link named the site by the address it is at beyond
     /// this run, and `path` is from the top of the site there.
-    pub home: bool,
+    pub(crate) home: bool,
 }
 
 impl Site {

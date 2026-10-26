@@ -33,7 +33,7 @@ const ABOUT: &str = "\
 
 /// The addresses the file holds, each with where its line is.
 #[derive(Clone, Default, Debug)]
-pub struct Record {
+pub(crate) struct Record {
     /// Whether the site has the file.
     held: bool,
     addresses: Vec<(Address, Place)>,
@@ -253,23 +253,23 @@ fn folders(address: &str) -> impl Iterator<Item = &str> {
 
 /// What a build added to the file.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub struct Kept {
+pub(crate) struct Kept {
     /// How many addresses.
-    pub added: usize,
+    pub(crate) added: usize,
     /// Whether the build made the file.
-    pub started: bool,
+    pub(crate) started: bool,
 }
 
 /// What writing the file came to.
 #[derive(Clone, Default, Debug)]
 pub(crate) struct Written {
-    pub kept: Kept,
+    pub(crate) kept: Kept,
     /// The addresses a serve session took out, as the file writes them.
-    pub dropped: Vec<String>,
+    pub(crate) dropped: Vec<String>,
     /// The hash of what was written, where the file was written.
-    pub hash: Option<blake3::Hash>,
+    pub(crate) hash: Option<blake3::Hash>,
     /// The line each address is on in what was written, counted from 1.
-    pub lines: std::collections::HashMap<String, usize>,
+    pub(crate) lines: std::collections::HashMap<String, usize>,
 }
 
 impl Written {

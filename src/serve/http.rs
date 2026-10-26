@@ -22,7 +22,7 @@ use crate::{platform, wording};
 
 /// Where the server's own answers are, which no built file can be: Statac
 /// keeps every name opening `.statac` at the top of a built site.
-pub const LIVE: &str = "/.statac-live/";
+pub(crate) const LIVE: &str = "/.statac-live/";
 
 const CLIENT: &str = include_str!("client.js");
 
@@ -45,10 +45,10 @@ fn client() -> &'static str {
 const LONGEST_WAIT: Duration = Duration::from_secs(25);
 
 /// How many ports after the one asked for are tried where it is taken.
-pub const NEXT_PORTS: u16 = 10;
+pub(crate) const NEXT_PORTS: u16 = 10;
 
 /// What the server answers from.
-pub struct Site {
+pub(crate) struct Site {
     folder: PathBuf,
     hub: Arc<Hub>,
     /// The path the site is published under, as `/blog`, or empty.
@@ -58,7 +58,7 @@ pub struct Site {
 }
 
 impl Site {
-    pub fn new(folder: PathBuf, hub: Arc<Hub>, base: String) -> Site {
+    pub(crate) fn new(folder: PathBuf, hub: Arc<Hub>, base: String) -> Site {
         Site {
             folder,
             hub,
@@ -67,14 +67,14 @@ impl Site {
         }
     }
 
-    pub fn base(&self) -> String {
+    pub(crate) fn base(&self) -> String {
         self.base
             .read()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
     }
 
-    pub fn set_base(&self, base: String) {
+    pub(crate) fn set_base(&self, base: String) {
         *self.base.write().unwrap_or_else(PoisonError::into_inner) = base;
     }
 }
@@ -83,7 +83,7 @@ impl Site {
 /// program has it, the first free port of the next few. Port 0 asks for
 /// any free port. Gives the port taken. `unanswered` is handed what kept
 /// the browser from being answered, once for each run of such faults.
-pub fn listen(
+pub(crate) fn listen(
     site: &Arc<Site>,
     port: u16,
     unanswered: impl Fn(&io::Error) + Send + Sync + 'static,

@@ -16,17 +16,17 @@ use crate::problem::Told;
 
 /// How the site stands after a round, for the page to show.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
-pub struct Status {
+pub(crate) struct Status {
     /// Whether the last round stopped, leaving the pages of an earlier one.
-    pub stopped: bool,
+    pub(crate) stopped: bool,
     /// One line for the reader.
-    pub line: String,
+    pub(crate) line: String,
     /// Every problem of the last round, drawn as `check` draws them.
-    pub problems: String,
+    pub(crate) problems: String,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Kind {
+pub(crate) enum Kind {
     /// Nothing has happened since the page's generation.
     None,
     /// Rounds have run, and the page as loaded is still right.
@@ -36,14 +36,14 @@ pub enum Kind {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Reply {
-    pub generation: u64,
-    pub kind: Kind,
+pub(crate) struct Reply {
+    pub(crate) generation: u64,
+    pub(crate) kind: Kind,
     /// The site's files that changed since the asker's generation.
-    pub changed: Vec<String>,
+    pub(crate) changed: Vec<String>,
     /// Whether a round is building now.
-    pub building: bool,
-    pub status: Status,
+    pub(crate) building: bool,
+    pub(crate) status: Status,
 }
 
 /// How many rounds are remembered. A page further behind reloads.
@@ -72,7 +72,7 @@ impl Default for Hub {
 }
 
 impl Hub {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         // Generations start from the clock, so a page left open from an
         // earlier run of the server is always behind, and reloads.
         let start = SystemTime::now()
@@ -108,23 +108,23 @@ impl Hub {
     }
 
     /// How the site stands before any round has been told.
-    pub fn set_status(&self, status: Status) {
+    pub(crate) fn set_status(&self, status: Status) {
         self.state().status = status;
     }
 
     /// What the panel on a page shows from now on. Set before the round
     /// it is of is published, so a page told of the round finds it.
-    pub fn set_panel(&self, panel: Panel) {
+    pub(crate) fn set_panel(&self, panel: Panel) {
         self.state().panel = Arc::new(panel);
     }
 
-    pub fn panel(&self) -> Arc<Panel> {
+    pub(crate) fn panel(&self) -> Arc<Panel> {
         Arc::clone(&self.state().panel)
     }
 
     /// Whether a round is building, which answers every held request
     /// that asked to be told.
-    pub fn set_building(&self, building: bool) {
+    pub(crate) fn set_building(&self, building: bool) {
         let mut state = self.state();
         if state.building != building {
             state.building = building;
@@ -134,7 +134,7 @@ impl Hub {
 
     /// Records a round, answers every held request, and gives the round's
     /// generation.
-    pub fn publish(&self, told: Told, changed: Vec<String>, status: Status) -> u64 {
+    pub(crate) fn publish(&self, told: Told, changed: Vec<String>, status: Status) -> u64 {
         let mut state = self.state();
         state.generation += 1;
         let generation = state.generation;
@@ -153,7 +153,7 @@ impl Hub {
     /// Answers at once when a round has run since `since`, and otherwise
     /// holds until one does or `longest` passes. Given whether the asker
     /// knows a round to be building, it answers too once that isn't so.
-    pub fn wait(&self, since: u64, building: Option<bool>, longest: Duration) -> Reply {
+    pub(crate) fn wait(&self, since: u64, building: Option<bool>, longest: Duration) -> Reply {
         let deadline = Instant::now() + longest;
         let mut state = self.state();
         state.waiting += 1;
@@ -221,7 +221,7 @@ fn reply(state: &State, since: u64) -> Reply {
 }
 
 impl Reply {
-    pub fn to_json(&self) -> String {
+    pub(crate) fn to_json(&self) -> String {
         let (kind, styles) = match &self.kind {
             Kind::None => ("none", &[][..]),
             Kind::Said => ("said", &[][..]),

@@ -77,16 +77,16 @@ impl Site {
 
 /// One built page, as the check reads it.
 pub(crate) struct Page<'a> {
-    pub id: PageId,
+    pub(crate) id: PageId,
     /// Which of its list's pages it is, counted from 1.
-    pub number: usize,
-    pub address: &'a Address,
-    pub reads: &'a Reads,
+    pub(crate) number: usize,
+    pub(crate) address: &'a Address,
+    pub(crate) reads: &'a Reads,
     /// The files its own sharing cards are published as, from the top of
     /// the built site, which the site holds once the page is built.
-    pub cards: Vec<String>,
+    pub(crate) cards: Vec<String>,
     /// Where each part of its HTML was written.
-    pub own: &'a Own,
+    pub(crate) own: &'a Own,
 }
 
 /// What a built page's links came to, found as it was built.

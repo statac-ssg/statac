@@ -35,15 +35,19 @@ mod typing;
 mod typography;
 mod unmatched;
 
-pub use call::{Argument, Call, IN_SITE, Value, Within, from_the_top};
+pub(crate) use call::{Call, IN_SITE, Value, Within, from_the_top};
 pub(crate) use html::escape_href;
-pub use html::{Copies, Options, Picture, Placement, Snippets, to_html, write};
-pub use ids::give_heading_ids;
+pub(crate) use html::{Copies, Options, Picture, Placement, Snippets, to_html, write};
+pub(crate) use ids::give_heading_ids;
 pub use node::{Alignment, CalloutKind, Kind, Node};
-pub use opening::{Called, Written, as_written, closed_up, lines_of, references_read, words_of};
-pub use pieces::{Piece, PieceValue, language_word};
-pub use questions::{Heading, Link, has_callout, headings, links, plain_text, uses_maths};
-pub use typing::{in_a_definition, reads_a_call, reads_a_link};
+pub(crate) use opening::{
+    Called, Written, as_written, closed_up, lines_of, references_read, words_of,
+};
+pub(crate) use pieces::{Piece, PieceValue, language_word};
+pub(crate) use questions::{has_callout, headings, uses_maths};
+#[cfg(test)]
+pub(crate) use questions::{links, plain_text};
+pub(crate) use typing::{in_a_definition, reads_a_call, reads_a_link};
 pub use typography::{Typography, set_typography, set_words};
 
 use crate::problem::CallFault;
@@ -54,7 +58,7 @@ use crate::source::{Place, SourceId, Sources, Span};
 /// for one that wraps it up to an `@end`, `Some(false)` for one that
 /// doesn't, and none for a name the site has no snippet for, or one whose
 /// snippet can't be read.
-pub type Wraps<'a> = &'a dyn Fn(&str) -> Option<bool>;
+pub(crate) type Wraps<'a> = &'a dyn Fn(&str) -> Option<bool>;
 
 pub struct Document {
     /// A `Kind::Document` holding the writing in the order written, without
@@ -63,25 +67,25 @@ pub struct Document {
     /// The footnotes the writing points at, in the order of their numbers.
     pub notes: Vec<Node>,
     /// Every line defining a link reference, `[label]: /address`.
-    pub definitions: Vec<Definition>,
+    pub(crate) definitions: Vec<Definition>,
     /// Every `@url(...)` read as the address it stands for, in the order
     /// written.
-    pub in_site: Vec<InSite>,
-    pub problems: Vec<Problem>,
+    pub(crate) in_site: Vec<InSite>,
+    pub(crate) problems: Vec<Problem>,
     /// What raw HTML leaves open inside a paragraph at the top of the
     /// writing, which the paragraph's end closes: told of a value shown as
     /// that paragraph's words alone, without its `<p>`.
-    pub held_in_paragraph: Vec<Problem>,
+    pub(crate) held_in_paragraph: Vec<Problem>,
     /// Each piece of raw HTML opening with a comment inside an element the
     /// raw HTML opened before it and left open: where the piece starts,
     /// and the innermost such element's name as written.
-    pub held_open: Vec<(u32, String)>,
+    pub(crate) held_open: Vec<(u32, String)>,
 }
 
 impl Document {
     /// Where the `@url(...)` standing for `address` is written within
     /// `place`: the last there, as a link's address follows its words.
-    pub fn in_site_at(&self, address: &str, place: Place) -> Option<Place> {
+    pub(crate) fn in_site_at(&self, address: &str, place: Place) -> Option<Place> {
         let within = |stands: &&InSite| {
             let at = stands.place.span;
             place.span.start <= at.start && at.end <= place.span.end
@@ -96,21 +100,21 @@ impl Document {
 /// An `@url(...)` in the writing: an address inside the site, wherever the
 /// site is published.
 #[derive(Clone, PartialEq, Debug)]
-pub struct InSite {
+pub(crate) struct InSite {
     /// The address it stands for, the site's own path included.
-    pub address: String,
+    pub(crate) address: String,
     /// The call as written.
-    pub place: Place,
+    pub(crate) place: Place,
 }
 
 /// A line defining a link reference, which every link naming its label
 /// follows.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Definition {
-    pub label: String,
-    pub destination: String,
+pub(crate) struct Definition {
+    pub(crate) label: String,
+    pub(crate) destination: String,
     /// The whole line.
-    pub place: Place,
+    pub(crate) place: Place,
 }
 
 /// What reading writing tells that is told of a value a template reads
@@ -130,7 +134,7 @@ const TOLD_OF_A_VALUE: &[crate::problem::Code] = &[
 /// Whether a problem met reading writing is told of a value a template
 /// reads as Markdown too. An `@url(...)` is read in one, so one handed
 /// the wrong thing is told.
-pub fn told_of_a_value(kind: &ProblemKind) -> bool {
+pub(crate) fn told_of_a_value(kind: &ProblemKind) -> bool {
     let not_one_address = ProblemKind::MalformedCall {
         found: CallFault::NotOneAddress,
     };

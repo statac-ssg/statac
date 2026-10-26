@@ -23,44 +23,44 @@ use crate::import::{Finding, Spot};
 pub(super) struct Context<'a> {
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
-    pub base: &'a str,
+    pub(crate) base: &'a str,
     /// The site's address without its path.
-    pub host: Option<&'a str>,
+    pub(crate) host: Option<&'a str>,
     /// Each post's address by the name `post_url` gives it.
-    pub posts: &'a HashMap<String, String>,
+    pub(crate) posts: &'a HashMap<String, String>,
     /// Each page's, post's or file's address by its path in the old site.
-    pub links: &'a HashMap<String, String>,
+    pub(crate) links: &'a HashMap<String, String>,
     /// The site's or the page's `excerpt_separator`, where it is one.
-    pub separator: Option<&'a str>,
+    pub(crate) separator: Option<&'a str>,
     /// The fields of the page's own front matter that hold plain text or
     /// a number, as Jekyll showed each.
-    pub page: &'a [(String, String)],
+    pub(crate) page: &'a [(String, String)],
 }
 
 /// A snippet call put in place of an include.
 #[derive(Clone, Debug)]
 pub(super) struct Call {
-    pub snippet: String,
+    pub(crate) snippet: String,
     /// The include's file, as the tag names it.
-    pub include: String,
+    pub(crate) include: String,
     /// The names it hands, in order.
-    pub names: Vec<String>,
-    pub spot: Spot,
+    pub(crate) names: Vec<String>,
+    pub(crate) spot: Spot,
 }
 
 /// The writing converted, with what didn't convert.
 pub(super) struct Converted {
-    pub writing: String,
-    pub findings: Vec<Finding>,
-    pub calls: Vec<Call>,
+    pub(crate) writing: String,
+    pub(crate) findings: Vec<Finding>,
+    pub(crate) calls: Vec<Call>,
     /// Where each code fence written here starts in the writing, in
     /// order.
-    pub fences: Vec<usize>,
+    pub(crate) fences: Vec<usize>,
     /// Where each snippet call written here starts, in order.
-    pub called: Vec<usize>,
+    pub(crate) called: Vec<usize>,
     /// How many footnotes were given a blank line between them and the
     /// link definition after.
-    pub set_apart: usize,
+    pub(crate) set_apart: usize,
 }
 
 /// Converts the writing of `file`, whose first line is line `first_line`

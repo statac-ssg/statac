@@ -18,9 +18,9 @@ use crate::yaml::{Node, Resolved, Tag, Value as Yaml};
 /// `data/`, or a folder inside it.
 #[derive(Debug)]
 pub(super) struct FolderValue {
-    pub shared: Arc<Shared>,
+    pub(crate) shared: Arc<Shared>,
     /// The folder's names from the top of `data/`.
-    pub names: Vec<String>,
+    pub(crate) names: Vec<String>,
 }
 
 impl FolderValue {
@@ -183,8 +183,8 @@ fn value(node: &Node, file: DataId, origins: &mut frame::Origins) -> Value {
 /// because a key before it has the same name.
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct Holds {
-    pub empty: bool,
-    pub bytes: bool,
+    pub(crate) empty: bool,
+    pub(crate) bytes: bool,
 }
 
 impl Holds {

@@ -22,10 +22,10 @@ pub const ALIAS_TEXT_LIMIT: usize = 1_000_000;
 #[derive(Clone, PartialEq, Debug)]
 pub struct Node {
     /// For an alias, the place of the anchor it repeats.
-    pub place: Place,
+    pub(crate) place: Place,
     /// `Style::None` for a list or a mapping.
-    pub style: Style,
-    pub tag: Option<Tag>,
+    pub(crate) style: Style,
+    pub(crate) tag: Option<Tag>,
     pub value: Value,
 }
 
@@ -40,7 +40,7 @@ pub enum Value {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Entry {
-    pub key: Node,
+    pub(crate) key: Node,
     pub value: Node,
 }
 
@@ -63,7 +63,7 @@ pub enum Tag {
 }
 
 impl Node {
-    pub fn origin(&self) -> Origin {
+    pub(crate) fn origin(&self) -> Origin {
         Origin::written(self.place, self.style)
     }
 
@@ -134,10 +134,10 @@ pub struct Partial {
     /// open is closed after what it holds, and each other stretch the
     /// reader stopped at is left out, with the lines after it deeper than
     /// its own.
-    pub node: Node,
+    pub(crate) node: Node,
     /// The problem at each quote or bracket closed and each stretch left
     /// out, in the order the reader met them.
-    pub problems: Vec<Problem>,
+    pub(crate) problems: Vec<Problem>,
 }
 
 pub(super) fn build_partial(sources: &Sources, at: Place) -> Partial {

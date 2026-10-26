@@ -36,7 +36,7 @@ const HASHED: usize = 16;
 
 /// What the record says a file is.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Held {
+pub(crate) enum Held {
     /// The opening of the hash of the bytes fetched.
     Hash(String),
     /// The other site answered that it has no such thing.
@@ -45,15 +45,15 @@ pub enum Held {
 
 /// One file's line.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Line {
-    pub held: Held,
+pub(crate) struct Line {
+    pub(crate) held: Held,
     /// The day it was fetched, or found absent.
-    pub day: Date,
+    pub(crate) day: Date,
 }
 
 /// The record, each file's line by its path under `fetched/`.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
-pub struct Record {
+pub(crate) struct Record {
     lines: BTreeMap<String, Line>,
 }
 
@@ -74,7 +74,7 @@ pub(crate) fn key(path: &str) -> u64 {
 impl Record {
     /// Reads the record held in `source`, with a problem at each line that
     /// doesn't read; such a line is left out.
-    pub fn read(sources: &Sources, source: SourceId) -> (Record, Vec<Problem>) {
+    pub(crate) fn read(sources: &Sources, source: SourceId) -> (Record, Vec<Problem>) {
         let text = sources.text(source);
         let mut record = Record::default();
         let mut problems = Vec::new();
@@ -148,26 +148,27 @@ impl Record {
     }
 
     /// The line of the file at `path` under `fetched/`.
-    pub fn get(&self, path: &str) -> Option<&Line> {
+    pub(crate) fn get(&self, path: &str) -> Option<&Line> {
         self.lines.get(path)
     }
 
-    pub fn set(&mut self, path: &str, line: Line) {
+    pub(crate) fn set(&mut self, path: &str, line: Line) {
         self.lines.insert(path.to_owned(), line);
     }
 
     /// Every line, by path, in order.
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &Line)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, &Line)> {
         self.lines.iter().map(|(path, line)| (path.as_str(), line))
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }
 
     /// The record as written, but for the lines of files `standing` says
     /// are gone: a line saying `absent` stands for no file, and stays.
-    pub fn text(&self, standing: impl Fn(&str) -> bool) -> String {
+    pub(crate) fn text(&self, standing: impl Fn(&str) -> bool) -> String {
         let mut text = format!("{OPENING}\n");
         for (path, line) in &self.lines {
             let held = match &line.held {
@@ -183,37 +184,37 @@ impl Record {
 
 /// What the site's `fetched/` holds.
 #[derive(Default, Debug)]
-pub struct Fetched {
-    pub record: Record,
+pub(crate) struct Fetched {
+    pub(crate) record: Record,
     /// Every file in the folder but the record and the retired list of
     /// refused webmentions, by its path under it with forward slashes,
     /// with where it really is: its path past every link under `real`.
-    pub files: Vec<(String, String)>,
+    pub(crate) files: Vec<(String, String)>,
     /// The site's real path.
-    pub real: PathBuf,
+    pub(crate) real: PathBuf,
 }
 
 /// How old the stills in `fetched/stills/` and the mentions in
 /// `fetched/mentions/` are, as `build` says.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub struct Ages {
-    pub stills: usize,
+pub(crate) struct Ages {
+    pub(crate) stills: usize,
     /// How many days before `today` the oldest still the record dates
     /// was fetched.
-    pub oldest: Option<i64>,
+    pub(crate) oldest: Option<i64>,
     /// The stills the record doesn't date.
-    pub undated: usize,
-    pub mentions: usize,
+    pub(crate) undated: usize,
+    pub(crate) mentions: usize,
     /// How many days before `today` the newest mention the record dates
     /// was fetched.
-    pub newest: Option<i64>,
+    pub(crate) newest: Option<i64>,
 }
 
 impl Ages {
     /// The ages of the stills among `pictures`, the paths under
     /// `fetched/` of the pictures the site shows from there, and of the
     /// mentions `fetched` holds, on the day `today`.
-    pub fn of<'a>(
+    pub(crate) fn of<'a>(
         fetched: &Fetched,
         pictures: impl Iterator<Item = &'a str>,
         today: &Date,

@@ -47,7 +47,7 @@ impl Direction {
     /// Which way the language `tag` names is written: by its script
     /// where it names one (`pa-Arab`), by its region where the language's
     /// script differs there (`pa-PK`), and by its language otherwise.
-    pub fn of(tag: &str) -> Direction {
+    pub(crate) fn of(tag: &str) -> Direction {
         let mut parts = tag.split('-');
         let language = parts.next().unwrap_or_default();
         let (mut script, mut region) = (None, None);

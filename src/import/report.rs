@@ -8,9 +8,9 @@ use crate::config;
 
 /// The names the report gives the tool and the two folders.
 pub(super) struct Shown<'a> {
-    pub tool: &'a str,
-    pub old: &'a str,
-    pub new: &'a str,
+    pub(crate) tool: &'a str,
+    pub(crate) old: &'a str,
+    pub(crate) new: &'a str,
 }
 
 /// `text` as Markdown code, fenced so no backtick inside ends it, on one

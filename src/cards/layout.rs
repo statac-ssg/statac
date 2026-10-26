@@ -17,47 +17,47 @@
 use super::{Align, HEIGHT, Placement, Row, Size, WIDTH};
 
 /// The smallest size the middle row's search tries.
-pub const FLOOR: u32 = 45;
+pub(crate) const FLOOR: u32 = 45;
 
 /// Measures text set in the card's fonts.
-pub trait Measure {
+pub(crate) trait Measure {
     /// The lines `text` breaks into, set in the list of fonts `fonts` at
     /// `size`, wrapped within `width` pixels, and the width of the widest.
     fn measure(&self, text: &str, fonts: usize, size: u32, width: f32) -> Measured;
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Measured {
-    pub lines: Vec<String>,
-    pub width: f32,
+pub(crate) struct Measured {
+    pub(crate) lines: Vec<String>,
+    pub(crate) width: f32,
 }
 
 /// A text to place: where and how large, its text once built, and the
 /// list of fonts it is set in, by an index [`Measure`] knows.
 #[derive(Copy, Clone, Debug)]
-pub struct Text<'a> {
-    pub placement: Placement,
-    pub size: Size,
-    pub built: &'a str,
-    pub fonts: usize,
+pub(crate) struct Text<'a> {
+    pub(crate) placement: Placement,
+    pub(crate) size: Size,
+    pub(crate) built: &'a str,
+    pub(crate) fonts: usize,
 }
 
 /// A text placed, by its index among those given.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Placed {
-    pub text: usize,
-    pub size: u32,
-    pub lines: Vec<Line>,
+pub(crate) struct Placed {
+    pub(crate) text: usize,
+    pub(crate) size: u32,
+    pub(crate) lines: Vec<Line>,
 }
 
 /// A line's box on the card, in pixels from its top left corner.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Line {
-    pub text: String,
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
+pub(crate) struct Line {
+    pub(crate) text: String,
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) width: f32,
+    pub(crate) height: f32,
 }
 
 /// Why the texts can't be placed. Heights are in pixels.
@@ -137,7 +137,7 @@ fn row_height(sized: &[Sized], texts: &[Text], row: Row) -> u64 {
 }
 
 /// Places every text with a built text on a card with `padding`.
-pub fn lay_out(
+pub(crate) fn lay_out(
     padding: u32,
     texts: &[Text],
     measure: &impl Measure,

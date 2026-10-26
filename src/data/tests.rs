@@ -14,7 +14,7 @@ fn written(sources: &Sources, data: &Data, names: &str) -> Option<String> {
     match data.reach(&names)? {
         Reached::Value { node, .. } => Some(sources.spelling(node.place).to_owned()),
         Reached::Folder(folder) => Some(folder.path.clone()),
-        Reached::Unread(id) => Some(format!("unread {}", data.file(id).path)),
+        Reached::Unread => Some("unread".into()),
     }
 }
 
@@ -185,7 +185,7 @@ fn a_file_that_cant_be_read_keeps_its_name() {
     assert_eq!(problems[0].kind.name(), "malformed-yaml");
     assert!(matches!(
         data.reach(&["people", "a"]),
-        Some(Reached::Unread(_))
+        Some(Reached::Unread)
     ));
 }
 

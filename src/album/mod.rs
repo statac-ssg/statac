@@ -29,12 +29,12 @@ use crate::pictures::{self, Header, Kind, Photograph, Rendition, Size, Unreadabl
 use crate::problem::{Kind as Told, Named, PictureFault, Problem};
 use crate::source::{SourceId, Sources};
 
-pub use develop::{Developed, Shown, develop, sweep};
 pub(crate) use develop::{Kept, fault};
+pub(crate) use develop::{Shown, develop, sweep};
 pub(crate) use index::{escaped, unescaped};
 pub use progress::Progress;
 pub(crate) use progress::{Counted, Making};
-pub use sidecar::Sidecar;
+pub(crate) use sidecar::Sidecar;
 
 /// The folder in the site at `site` where copies and the index are kept,
 /// whether or not it is there yet. Refused where `.statac` or the folder
@@ -46,7 +46,7 @@ fn kept_folder(site: &Path) -> std::io::Result<PathBuf> {
 
 /// The folder a picture file is under.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub enum Root {
+pub(crate) enum Root {
     Content,
     Static,
     /// What Statac fetched, published only as copies, and never named
@@ -55,7 +55,7 @@ pub enum Root {
 }
 
 impl Root {
-    pub fn folder(self) -> &'static str {
+    pub(crate) fn folder(self) -> &'static str {
         match self {
             Root::Content => "content",
             Root::Static => crate::assets::STATIC,
@@ -85,29 +85,29 @@ pub enum Seen {
 }
 
 pub struct Picture {
-    pub root: Root,
+    pub(crate) root: Root,
     /// Its path under its root, names parted by `/`.
-    pub path: String,
+    pub(crate) path: String,
     /// Where it really is: its path past every link under the site's real
     /// path.
     at: String,
     /// Where it is published, from the top of the site; none for a file
     /// beside a page left out of the build.
-    pub address: Option<String>,
+    pub(crate) address: Option<String>,
     pub seen: Seen,
     /// The BLAKE3 of its bytes.
-    pub hash: blake3::Hash,
+    pub(crate) hash: blake3::Hash,
     /// Whether a file under `content/` holds where it was taken.
-    pub located: bool,
-    pub sidecar: Option<Sidecar>,
+    pub(crate) located: bool,
+    pub(crate) sidecar: Option<Sidecar>,
     /// A photograph's copies; none for any other picture, and none for a
     /// photograph left alone by `optimise: false`.
     pub copies: Vec<Rendition>,
     /// The copy at the photograph's own width, made only where a template
     /// asks for it; none where the widest of `copies` is that wide.
-    pub full: Option<Rendition>,
+    pub(crate) full: Option<Rendition>,
     /// Which of the files beside the writing it is, where it is one.
-    pub travelling: Option<usize>,
+    pub(crate) travelling: Option<usize>,
 }
 
 impl Picture {
@@ -133,12 +133,12 @@ impl Picture {
 
     /// Whether the file is published only where a built page links it: a
     /// photograph beside the writing that has copies to show in its place.
-    pub fn held(&self) -> bool {
+    pub(crate) fn held(&self) -> bool {
         self.root == Root::Content && !self.copies.is_empty()
     }
 
     /// Whether the file describing it leaves a photograph as it is.
-    pub fn left_alone(&self) -> bool {
+    pub(crate) fn left_alone(&self) -> bool {
         self.sidecar
             .as_ref()
             .and_then(|sidecar| sidecar.optimise.as_ref())
@@ -146,7 +146,7 @@ impl Picture {
     }
 
     /// Whether the file describing it marks it as decoration.
-    pub fn decorative(&self) -> bool {
+    pub(crate) fn decorative(&self) -> bool {
         self.sidecar
             .as_ref()
             .and_then(|sidecar| sidecar.decorative.as_ref())
@@ -155,7 +155,7 @@ impl Picture {
 
     /// The copies published for it: its ladder, and with `full` the copy
     /// at its own width.
-    pub fn wanted(&self, full: bool) -> impl Iterator<Item = &Rendition> {
+    pub(crate) fn wanted(&self, full: bool) -> impl Iterator<Item = &Rendition> {
         self.copies
             .iter()
             .chain(self.full.as_ref().filter(|_| full))
@@ -186,27 +186,27 @@ pub struct Pictures {
 
 /// A picture the writing names, and the address that reaches it.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Found {
-    pub id: PictureId,
+pub(crate) struct Found {
+    pub(crate) id: PictureId,
     /// As written where that reaches the file from the page, else the
     /// file's own address, the site's path included.
-    pub address: String,
+    pub(crate) address: String,
 }
 
 /// Where a picture is named from.
 #[derive(Copy, Clone, Debug)]
-pub struct From<'a> {
+pub(crate) struct From<'a> {
     /// The folder under `content/` of the file the name is written in,
     /// ending with `/`, or empty at the top; none where no file holds it.
-    pub folder: Option<&'a str>,
+    pub(crate) folder: Option<&'a str>,
     /// Where the page is published, the site's path included.
-    pub page: &'a str,
+    pub(crate) page: &'a str,
     /// The path the site is published under, or empty.
-    pub base: &'a str,
+    pub(crate) base: &'a str,
 }
 
 impl Pictures {
-    pub fn get(&self, id: PictureId) -> &Picture {
+    pub(crate) fn get(&self, id: PictureId) -> &Picture {
         self.all.get(id)
     }
 
@@ -219,7 +219,7 @@ impl Pictures {
     }
 
     /// The picture at `path` under `fetched/`.
-    pub fn fetched(&self, path: &str) -> Option<PictureId> {
+    pub(crate) fn fetched(&self, path: &str) -> Option<PictureId> {
         self.by_source
             .get(&(Root::Fetched, path.to_owned()))
             .copied()
@@ -234,7 +234,7 @@ impl Pictures {
     /// `content/` and then in `static/`, and either as a browser reads it
     /// from the page. None for an address elsewhere, or one that reaches
     /// no picture.
-    pub fn find(&self, written: &str, from: &From<'_>) -> Option<Found> {
+    pub(crate) fn find(&self, written: &str, from: &From<'_>) -> Option<Found> {
         if written.is_empty() || crate::address::is_full(written) || written.starts_with('#') {
             return None;
         }
@@ -289,7 +289,7 @@ impl Pictures {
 
     /// The pictures whose file names `text` holds, as writing naming them
     /// would: what a page left out of the build may show.
-    pub fn named_in(&self, text: &str) -> Vec<PictureId> {
+    pub(crate) fn named_in(&self, text: &str) -> Vec<PictureId> {
         let mut found = Vec::new();
         for word in text.split(|c: char| c.is_whitespace() || "()[]<>\"'=,".contains(c)) {
             if !is_picture(word) {
@@ -306,7 +306,7 @@ impl Pictures {
 
     /// Every copy the site may publish: its file from the top of the built
     /// site, and the photograph it is made from.
-    pub fn claims(&self) -> Vec<(String, Named)> {
+    pub(crate) fn claims(&self) -> Vec<(String, Named)> {
         let mut claims = Vec::new();
         for (_, picture) in self.iter() {
             for copy in picture.wanted(true) {
@@ -320,7 +320,7 @@ impl Pictures {
 
     /// The files beside the writing published only where a built page
     /// links them, each by its place among those files.
-    pub fn held(&self) -> impl Iterator<Item = (PictureId, usize)> + '_ {
+    pub(crate) fn held(&self) -> impl Iterator<Item = (PictureId, usize)> + '_ {
         self.iter()
             .filter(|(_, picture)| picture.held())
             .filter_map(|(id, picture)| Some((id, picture.travelling?)))
@@ -328,7 +328,7 @@ impl Pictures {
 
     /// Keeps what the headers said for the next build. Nothing is written
     /// where nothing changed.
-    pub fn keep_index(&self, site: &Path) -> std::io::Result<()> {
+    pub(crate) fn keep_index(&self, site: &Path) -> std::io::Result<()> {
         self.index.save(site)
     }
 }
@@ -358,7 +358,7 @@ const ENDINGS: [&str; 9] = [
 ];
 
 /// Whether a file's name says it may be a picture.
-pub fn is_picture(name: &str) -> bool {
+pub(crate) fn is_picture(name: &str) -> bool {
     name.rsplit_once('.').is_some_and(|(_, ending)| {
         ENDINGS
             .iter()
@@ -368,25 +368,25 @@ pub fn is_picture(name: &str) -> bool {
 
 /// Whether a file under `content/` describes the picture it is named
 /// after: `photo-1.jpg.yaml` beside `photo-1.jpg`.
-pub fn is_sidecar(name: &str) -> bool {
+pub(crate) fn is_sidecar(name: &str) -> bool {
     name.strip_suffix(".yaml").is_some_and(is_picture)
 }
 
 /// A picture file to read.
-pub struct Wanted<'a> {
-    pub root: Root,
-    pub path: String,
+pub(crate) struct Wanted<'a> {
+    pub(crate) root: Root,
+    pub(crate) path: String,
     /// Where it really is, as [`Picture`] has it.
-    pub at: &'a str,
-    pub address: Option<String>,
-    pub travelling: Option<usize>,
+    pub(crate) at: &'a str,
+    pub(crate) address: Option<String>,
+    pub(crate) travelling: Option<usize>,
 }
 
 /// Reads `wanted`, the pictures of the site at `root`, whose real path is
 /// `real`, with `sidecars`, the files describing them, each by its path
 /// under `content/` and where `sources` holds it, and says what is wrong
 /// with those.
-pub fn read(
+pub(crate) fn read(
     root: &Path,
     real: &Path,
     wanted: Vec<Wanted<'_>>,

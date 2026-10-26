@@ -36,7 +36,7 @@ use crate::yaml::{Node, Value as Yaml};
 
 /// One reading of a site, and what each of its ids names.
 pub(crate) struct Reading {
-    pub renderer: Renderer,
+    pub(crate) renderer: Renderer,
     pages: Vec<String>,
     lists: Vec<String>,
     templates: Vec<String>,
@@ -405,9 +405,9 @@ impl Prints {
 /// One reading of the site at `at`, and the fingerprints taken of it.
 #[derive(Copy, Clone)]
 pub(super) struct Taken<'a> {
-    pub reading: &'a Reading,
-    pub at: &'a Path,
-    pub prints: &'a Prints,
+    pub(crate) reading: &'a Reading,
+    pub(crate) at: &'a Path,
+    pub(crate) prints: &'a Prints,
 }
 
 impl Taken<'_> {

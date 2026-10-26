@@ -45,7 +45,7 @@ pub fn colour_for(stream: &impl IsTerminal) -> bool {
 /// What opens a run on a terminal that takes colour: Statac's name as a
 /// badge, and the command. Nothing anywhere else, since it says nothing
 /// the command line didn't.
-pub fn badge(colour: bool, command: &str) -> String {
+pub(crate) fn badge(colour: bool, command: &str) -> String {
     let paint = Paint::new(colour);
     match colour {
         true => format!(
@@ -58,18 +58,18 @@ pub fn badge(colour: bool, command: &str) -> String {
 }
 
 /// A question `statac new` asks, in bold.
-pub fn question(colour: bool, text: &str) -> String {
+pub(crate) fn question(colour: bool, text: &str) -> String {
     format!("{}\n", Paint::new(colour).paint(BOLD, text))
 }
 
 /// A hint or choice under a question, indented and dim.
-pub fn hint(colour: bool, text: &str) -> String {
+pub(crate) fn hint(colour: bool, text: &str) -> String {
     format!("  {}\n", Paint::new(colour).paint(DIM, text))
 }
 
 /// The line an answer is typed on: the default dim, where there is one,
 /// then the mark in Statac's orange and a space.
-pub fn answer_line(colour: bool, default: Option<&str>) -> String {
+pub(crate) fn answer_line(colour: bool, default: Option<&str>) -> String {
     let paint = Paint::new(colour);
     let default = default.map_or_else(String::new, |shown| format!("{} ", paint.paint(DIM, shown)));
     format!(
@@ -100,19 +100,19 @@ impl<'a> Report<'a> {
 
     /// A sentence of Statac's own as a terminal that takes colour shows
     /// it, each name in backticks picked out.
-    pub fn said(&self, sentence: &str) -> String {
+    pub(crate) fn said(&self, sentence: &str) -> String {
         self.paint.inline("", sentence)
     }
 
     /// A sentence saying that errors stopped a build, as `build`'s last
     /// line is coloured where it wrote nothing.
-    pub fn stopped(&self, sentence: &str) -> String {
+    pub(crate) fn stopped(&self, sentence: &str) -> String {
         self.paint.paint(RED, sentence)
     }
 
     /// What `build` says: errors in full, and with them what `check`
     /// couldn't show, then the other warnings and notes counted.
-    pub fn build(&self, problems: &[Problem], quiet: &Quiet) -> String {
+    pub(crate) fn build(&self, problems: &[Problem], quiet: &Quiet) -> String {
         let (full, counted): (Vec<&Problem>, Vec<&Problem>) = problems.iter().partition(|p| {
             p.kind.severity() == Severity::Error
                 || (p.kind.code().found_by_build_alone() && !quiet.quietens(&p.kind))
@@ -142,7 +142,7 @@ impl<'a> Report<'a> {
     /// Of several: that for each language that found any, under its code,
     /// or where none did, the words the first language offering some may
     /// have meant.
-    pub fn found(&self, words: &str, found: &[(String, crate::search::Results)]) -> String {
+    pub(crate) fn found(&self, words: &str, found: &[(String, crate::search::Results)]) -> String {
         if let [(_, results)] = found {
             return self.results(words, results);
         }
@@ -203,7 +203,7 @@ impl<'a> Report<'a> {
 
     /// What `--drafts` brought into the run, ahead of the rest; nothing
     /// where it brought nothing.
-    pub fn included(&self, included: Included) -> String {
+    pub(crate) fn included(&self, included: Included) -> String {
         match included.drafts + included.waiting {
             0 => String::new(),
             _ => format!(
@@ -234,7 +234,7 @@ impl<'a> Report<'a> {
 
     /// What `build` did with the copies of photographs: those it made, and
     /// those it removed; nothing where it did neither.
-    pub fn copies(&self, copies: Copies) -> String {
+    pub(crate) fn copies(&self, copies: Copies) -> String {
         let mut out = String::new();
         if copies.made > 0 {
             out.push_str(&wording::made_copies(copies.made, copies.from));
@@ -249,7 +249,7 @@ impl<'a> Report<'a> {
 
     /// What `build` added to `published.txt`; nothing where it added
     /// nothing.
-    pub fn kept(&self, kept: crate::published::Kept) -> String {
+    pub(crate) fn kept(&self, kept: crate::published::Kept) -> String {
         match kept.added > 0 || kept.started {
             true => format!(
                 "{}\n",
@@ -261,7 +261,7 @@ impl<'a> Report<'a> {
 
     /// What `build` did with the sharing cards: those it drew, and those
     /// it removed; nothing where it did neither.
-    pub fn cards(&self, cards: Cards) -> String {
+    pub(crate) fn cards(&self, cards: Cards) -> String {
         let mut out = String::new();
         if cards.drawn > 0 {
             out.push_str(&wording::drew_cards(cards.drawn));
@@ -276,7 +276,7 @@ impl<'a> Report<'a> {
 
     /// What became of the site's own commands in a build: each it ran,
     /// and a `before_build` it didn't; nothing where the site sets none.
-    pub fn hooks(&self, ran: Ran) -> String {
+    pub(crate) fn hooks(&self, ran: Ran) -> String {
         let mut out = String::new();
         match ran.before {
             Before::Unset => {}
@@ -302,7 +302,7 @@ impl<'a> Report<'a> {
 
     /// How old what the site fetched is; nothing where it holds nothing
     /// fetched.
-    pub fn fetched(&self, ages: Ages) -> String {
+    pub(crate) fn fetched(&self, ages: Ages) -> String {
         let mut parts = Vec::new();
         if ages.stills > 0 {
             parts.push(wording::stills_age(ages.stills, ages.oldest, ages.undated));
@@ -318,7 +318,7 @@ impl<'a> Report<'a> {
 
     /// What `build` says of a build into `out` that took `took`: its errors
     /// in full, the rest counted, and what it wrote.
-    pub fn of_build(&self, outcome: &Outcome, out: &Path, took: Duration) -> String {
+    pub(crate) fn of_build(&self, outcome: &Outcome, out: &Path, took: Duration) -> String {
         let problems = &outcome.problems;
         let mut said = self.build(problems, &outcome.quiet);
         let wrote = self.wrote(problems, outcome.published, out, took);
@@ -339,7 +339,7 @@ impl<'a> Report<'a> {
 
     /// `build`'s last line: what it wrote and where, and how long it took,
     /// or that errors stopped it.
-    pub fn wrote(
+    pub(crate) fn wrote(
         &self,
         problems: &[Problem],
         published: Option<Published>,
@@ -368,7 +368,7 @@ impl<'a> Report<'a> {
     /// date written, and that none was while the settings have an error.
     /// The names of files and fields are the site's, so they are shown
     /// as any text Statac didn't write is.
-    pub fn stamps(&self, pass: &Pass) -> String {
+    pub(crate) fn stamps(&self, pass: &Pass) -> String {
         let mut out = String::new();
         for stamped in &pass.stamped {
             let line = wording::stamped(&stamped.file, &stamped.field, &stamped.written);
@@ -390,7 +390,7 @@ impl<'a> Report<'a> {
 
     /// The same, with the JavaScript the site carries between the problems
     /// and the count.
-    pub fn check_with(
+    pub(crate) fn check_with(
         &self,
         problems: &[Problem],
         quiet: &Quiet,
@@ -443,7 +443,10 @@ impl<'a> Report<'a> {
     }
 
     /// Problems in the order they are drawn in.
-    pub fn ordered<'p>(&self, problems: impl IntoIterator<Item = &'p Problem>) -> Vec<&'p Problem> {
+    pub(crate) fn ordered<'p>(
+        &self,
+        problems: impl IntoIterator<Item = &'p Problem>,
+    ) -> Vec<&'p Problem> {
         let mut keyed: Vec<_> = problems
             .into_iter()
             .map(|p| {
@@ -458,7 +461,7 @@ impl<'a> Report<'a> {
     }
 
     /// A file of the site, as a problem names it.
-    pub fn file(&self, source: SourceId) -> String {
+    pub(crate) fn file(&self, source: SourceId) -> String {
         self.path(source)
     }
 
@@ -740,19 +743,19 @@ impl<'a> Report<'a> {
 /// Where a place is, and its line, as [`Report::excerpt`] gives them.
 pub(crate) struct Excerpt {
     /// The lines the place starts and ends on.
-    pub first: usize,
-    pub last: usize,
+    pub(crate) first: usize,
+    pub(crate) last: usize,
     /// Where on its first line the place starts, in characters from 1.
-    pub column: usize,
-    pub lines: Vec<Shown>,
+    pub(crate) column: usize,
+    pub(crate) lines: Vec<Shown>,
 }
 
 /// One line of an excerpt. A line beside the place's own is all `before`.
 pub(crate) struct Shown {
-    pub number: usize,
-    pub before: String,
-    pub marked: Option<String>,
-    pub after: String,
+    pub(crate) number: usize,
+    pub(crate) before: String,
+    pub(crate) marked: Option<String>,
+    pub(crate) after: String,
 }
 
 /// Problems counted by kind, a line for each of `severities` that has any,
@@ -952,7 +955,7 @@ impl Cut {
 
 /// A piece of a sentence of Statac's own.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Piece<'a> {
+pub(crate) enum Piece<'a> {
     /// A name, written between backticks.
     Name(&'a str),
     Words(&'a str),
@@ -960,7 +963,7 @@ pub enum Piece<'a> {
 
 /// The sentence's names and the words between them, in order. A backtick
 /// with none to close it is a character like any other.
-pub fn pieces(sentence: &str) -> Vec<Piece<'_>> {
+pub(crate) fn pieces(sentence: &str) -> Vec<Piece<'_>> {
     let mut pieces = Vec::new();
     let mut rest = sentence;
     while let Some(open) = rest.find('`') {

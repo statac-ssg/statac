@@ -40,13 +40,13 @@ impl Stamp {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Entry {
-    pub stamp: Stamp,
-    pub hash: blake3::Hash,
+    pub(crate) stamp: Stamp,
+    pub(crate) hash: blake3::Hash,
     /// Whether it holds where it was taken, asked only of a file under
     /// `content/`.
-    pub located: bool,
+    pub(crate) located: bool,
     /// None for a file that begins as no kind of picture known.
-    pub seen: Option<Seen>,
+    pub(crate) seen: Option<Seen>,
 }
 
 impl Entry {
@@ -64,7 +64,7 @@ impl Entry {
 pub(super) struct Index {
     entries: HashMap<(Root, String), Entry>,
     /// Whether it differs from the file it was read from.
-    pub changed: bool,
+    pub(crate) changed: bool,
 }
 
 impl Index {

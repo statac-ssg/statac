@@ -86,16 +86,16 @@ pub(super) fn fields_of(folder: &Path, rel: &str) -> Result<Vec<Field>, Box<Fail
 /// written at.
 #[derive(Clone, Debug)]
 pub(super) struct Entry {
-    pub field: Field,
-    pub file: String,
+    pub(crate) field: Field,
+    pub(crate) file: String,
 }
 
 /// Every setting of the site, the main file's first, and the files and
 /// folders of settings Hugo doesn't read for the site as built.
 pub(super) struct Found {
-    pub entries: Vec<Entry>,
-    pub file: String,
-    pub left: Vec<Left>,
+    pub(crate) entries: Vec<Entry>,
+    pub(crate) file: String,
+    pub(crate) left: Vec<Left>,
 }
 
 /// Reads every settings file Hugo reads in `folder`.
@@ -277,9 +277,9 @@ pub(super) fn get<'a>(fields: &'a [(String, Value)], name: &str) -> Option<&'a V
 pub(super) struct Permalinks {
     /// Written straight under `[permalinks]`, for a folder's pages or a
     /// list of terms.
-    pub any: Vec<(String, String)>,
-    pub page: Vec<(String, String)>,
-    pub term: Vec<(String, String)>,
+    pub(crate) any: Vec<(String, String)>,
+    pub(crate) page: Vec<(String, String)>,
+    pub(crate) term: Vec<(String, String)>,
 }
 
 impl Permalinks {
@@ -305,19 +305,19 @@ fn find<'a>(patterns: &'a [(String, String)], name: &str) -> Option<&'a str> {
 #[derive(Clone, Debug)]
 pub(super) struct Language {
     /// Its name among the settings, which its folder and addresses use.
-    pub key: String,
-    pub title: Option<String>,
-    pub content_dir: Option<String>,
-    pub weight: i64,
-    pub locale: Option<String>,
-    pub language_code: Option<String>,
+    pub(crate) key: String,
+    pub(crate) title: Option<String>,
+    pub(crate) content_dir: Option<String>,
+    pub(crate) weight: i64,
+    pub(crate) locale: Option<String>,
+    pub(crate) language_code: Option<String>,
 }
 
 /// Which pages Hugo published as their own file rather than a folder.
 #[derive(Default, Debug)]
 pub(super) struct Ugly {
-    pub all: bool,
-    pub folders: Vec<(String, bool)>,
+    pub(crate) all: bool,
+    pub(crate) folders: Vec<(String, bool)>,
 }
 
 impl Ugly {
@@ -332,48 +332,48 @@ impl Ugly {
 /// What the settings say.
 #[derive(Debug)]
 pub(super) struct Settings {
-    pub base_url: Option<String>,
-    pub title: Option<String>,
-    pub language_code: Option<String>,
-    pub locale: Option<String>,
-    pub default_language: Option<String>,
-    pub default_in_subdir: bool,
-    pub timezone: Option<String>,
-    pub permalinks: Permalinks,
+    pub(crate) base_url: Option<String>,
+    pub(crate) title: Option<String>,
+    pub(crate) language_code: Option<String>,
+    pub(crate) locale: Option<String>,
+    pub(crate) default_language: Option<String>,
+    pub(crate) default_in_subdir: bool,
+    pub(crate) timezone: Option<String>,
+    pub(crate) permalinks: Permalinks,
     /// Each list of terms, by its name in one and in many.
-    pub taxonomies: Vec<(String, String)>,
-    pub pager_size: Option<u64>,
-    pub pager_path: Option<String>,
-    pub ugly: Ugly,
+    pub(crate) taxonomies: Vec<(String, String)>,
+    pub(crate) pager_size: Option<u64>,
+    pub(crate) pager_path: Option<String>,
+    pub(crate) ugly: Ugly,
     /// How Hugo put the name of a term in capitals for its title.
-    pub titles: Style,
-    pub languages: Vec<Language>,
-    pub params: Vec<Field>,
-    pub params_file: String,
-    pub content_dir: String,
-    pub static_dirs: Vec<String>,
-    pub data_dir: String,
-    pub publish_dir: String,
-    pub themes_dir: String,
-    pub summary_length: usize,
-    pub emoji: bool,
-    pub unsafe_html: bool,
+    pub(crate) titles: Style,
+    pub(crate) languages: Vec<Language>,
+    pub(crate) params: Vec<Field>,
+    pub(crate) params_file: String,
+    pub(crate) content_dir: String,
+    pub(crate) static_dirs: Vec<String>,
+    pub(crate) data_dir: String,
+    pub(crate) publish_dir: String,
+    pub(crate) themes_dir: String,
+    pub(crate) summary_length: usize,
+    pub(crate) emoji: bool,
+    pub(crate) unsafe_html: bool,
     /// Whether the settings' `passthrough` hands maths between `$` and
     /// `$`, and between `$$` and `$$`, through to the page to be set.
-    pub maths: (bool, bool),
-    pub block_attributes: bool,
-    pub feeds: bool,
+    pub(crate) maths: (bool, bool),
+    pub(crate) block_attributes: bool,
+    pub(crate) feeds: bool,
     /// Whether `outputs` gives a feed to the home page, to each list, and
     /// to each tag.
-    pub feeds_for: (bool, bool, bool),
+    pub(crate) feeds_for: (bool, bool, bool),
     /// The name of a feed's file, which `outputFormats` can change.
-    pub feed_name: String,
-    pub terms: bool,
+    pub(crate) feed_name: String,
+    pub(crate) terms: bool,
     /// Settings Statac has no equal for, each with its file, line and text.
-    pub left: Vec<(String, Option<usize>, String)>,
+    pub(crate) left: Vec<(String, Option<usize>, String)>,
     /// Settings naming a folder outside the old site or through a link,
     /// each with its file, line and text.
-    pub unread: Vec<(String, Option<usize>, String)>,
+    pub(crate) unread: Vec<(String, Option<usize>, String)>,
 }
 
 /// Hugo's lists of which fields each date is read from, unless its

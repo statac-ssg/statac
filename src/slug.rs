@@ -12,7 +12,7 @@ use unicode_normalization::char::{compose, is_combining_mark};
 /// and tatweel are dropped as a Latin accent is: a writer may leave the
 /// vowels out, and the tatweel only stretches the line. Empty where the name
 /// holds no letter or figure.
-pub fn slugify(text: &str) -> String {
+pub(crate) fn slugify(text: &str) -> String {
     let mut slug = String::with_capacity(text.len());
     let mut hyphen = true;
     let mut kept = false;
@@ -38,7 +38,7 @@ pub fn slugify(text: &str) -> String {
 /// hyphens stay as typed, so a link written from the heading's words lands;
 /// and another script's marks stay in the order they were typed, as the
 /// link spells them. Empty where the words hold no letter or figure.
-pub fn anchor(text: &str) -> String {
+pub(crate) fn anchor(text: &str) -> String {
     let mut anchor = String::with_capacity(text.len());
     let mut kept = false;
     for c in folded(text.trim()).to_lowercase().chars() {
@@ -58,7 +58,7 @@ pub fn anchor(text: &str) -> String {
 
 /// A folder's path under `content/` as its address spells it, each name
 /// made a slug. A name with no letter or figure keeps its own spelling.
-pub fn tidied_path(path: &str) -> String {
+pub(crate) fn tidied_path(path: &str) -> String {
     let mut tidied = String::with_capacity(path.len());
     for name in path.split('/').filter(|name| !name.is_empty()) {
         let slug = slugify(name);
@@ -70,7 +70,7 @@ pub fn tidied_path(path: &str) -> String {
 
 /// A slug made from something with no letter or figure in it: eight hex
 /// digits of a hash of `path`, the same on every machine.
-pub fn made_slug(path: &str) -> String {
+pub(crate) fn made_slug(path: &str) -> String {
     // FNV-1a: stable across builds and platforms, unlike the standard hasher.
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in path.bytes() {
@@ -83,7 +83,7 @@ pub fn made_slug(path: &str) -> String {
 /// The text with its characters composed the one way, Unicode's NFC. A
 /// disk may hand back `é` as `e` and a separate accent; both must reach one
 /// address.
-pub fn nfc(text: &str) -> String {
+pub(crate) fn nfc(text: &str) -> String {
     text.nfc().collect()
 }
 

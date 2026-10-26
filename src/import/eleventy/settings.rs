@@ -196,8 +196,8 @@ fn pieces(text: &str) -> Vec<Piece> {
 /// A value the settings give, with the line it is on.
 #[derive(Clone, PartialEq, Debug)]
 pub(super) struct Given<T> {
-    pub value: T,
-    pub line: usize,
+    pub(crate) value: T,
+    pub(crate) line: usize,
 }
 
 /// One of `dir`'s folders.
@@ -213,11 +213,11 @@ pub(super) enum Folder {
 /// built site where the settings say.
 #[derive(Clone, PartialEq, Debug)]
 pub(super) struct Copy {
-    pub from: String,
-    pub to: Option<String>,
-    pub line: usize,
+    pub(crate) from: String,
+    pub(crate) to: Option<String>,
+    pub(crate) line: usize,
     /// The call as written, for a finding.
-    pub written: String,
+    pub(crate) written: String,
 }
 
 /// A feed the RSS plugin's template makes, as an
@@ -226,62 +226,62 @@ pub(super) struct Copy {
 pub(super) struct PluginFeed {
     /// `outputPath`, `/feed.xml` where the call gives none; none where it
     /// gives one some other way than text in quotes.
-    pub path: Option<String>,
+    pub(crate) path: Option<String>,
     /// `type`, `atom` where the call gives none; none where it gives one
     /// some other way than text in quotes.
-    pub kind: Option<String>,
+    pub(crate) kind: Option<String>,
     /// `metadata.base`, the URL each post's URL is written from, where the
     /// call gives it as text in quotes.
-    pub base: Option<String>,
+    pub(crate) base: Option<String>,
     /// `metadata.title` and `metadata.language`, the feed's own, each where
     /// the call gives it as text in quotes.
-    pub title: Option<String>,
-    pub language: Option<String>,
-    pub line: usize,
+    pub(crate) title: Option<String>,
+    pub(crate) language: Option<String>,
+    pub(crate) line: usize,
     /// The call as the settings Statac didn't read show it.
-    pub written: String,
+    pub(crate) written: String,
 }
 
 /// What the settings' text shows.
 #[derive(Default, Debug)]
 pub(super) struct Settings {
     /// The settings file read, where there is one.
-    pub file: Option<String>,
+    pub(crate) file: Option<String>,
     /// Whether a `dir` was found at all.
-    pub dir: bool,
-    pub input: Option<Folder>,
-    pub output: Option<Folder>,
-    pub includes: Option<Folder>,
-    pub data: Option<Folder>,
-    pub layouts: Option<Folder>,
-    pub copies: Vec<Copy>,
-    pub breaks: Option<Given<bool>>,
-    pub linkify: Option<Given<bool>>,
-    pub html: Option<Given<bool>>,
+    pub(crate) dir: bool,
+    pub(crate) input: Option<Folder>,
+    pub(crate) output: Option<Folder>,
+    pub(crate) includes: Option<Folder>,
+    pub(crate) data: Option<Folder>,
+    pub(crate) layouts: Option<Folder>,
+    pub(crate) copies: Vec<Copy>,
+    pub(crate) breaks: Option<Given<bool>>,
+    pub(crate) linkify: Option<Given<bool>>,
+    pub(crate) html: Option<Given<bool>>,
     /// Where the settings give Markdown a library of their own, whose
     /// `html` is off unless they say.
-    pub library: Option<usize>,
+    pub(crate) library: Option<usize>,
     /// The plugin for attributes in braces, by the name it is fetched by.
-    pub attributes: Option<Given<String>>,
-    pub separator: Option<Given<String>>,
+    pub(crate) attributes: Option<Given<String>>,
+    pub(crate) separator: Option<Given<String>>,
     /// Where `excerpt: true` is, which with no separator ends an excerpt at
     /// the first `---` line.
-    pub excerpt: Option<usize>,
+    pub(crate) excerpt: Option<usize>,
     /// `markdownTemplateEngine`: a language's name, or `false` as `None`.
-    pub engine: Option<Given<Option<String>>>,
-    pub html_engine: Option<Given<Option<String>>>,
+    pub(crate) engine: Option<Given<Option<String>>>,
+    pub(crate) html_engine: Option<Given<Option<String>>>,
     /// Where `setUseGitIgnore(false)` is.
-    pub no_gitignore: Option<usize>,
+    pub(crate) no_gitignore: Option<usize>,
     /// `pathPrefix`, as written.
-    pub path_prefix: Option<Given<String>>,
+    pub(crate) path_prefix: Option<Given<String>>,
     /// The feeds `feedPlugin` makes, in order.
-    pub feeds: Vec<PluginFeed>,
+    pub(crate) feeds: Vec<PluginFeed>,
     /// What the settings do that Statac didn't read, by the names it
     /// shows, each with its line.
-    pub unread: Vec<(usize, String)>,
+    pub(crate) unread: Vec<(usize, String)>,
     /// The files the settings fetch that Markdown's options were read
     /// in, where the settings file itself held none.
-    pub markdown_in: Vec<String>,
+    pub(crate) markdown_in: Vec<String>,
 }
 
 impl Settings {

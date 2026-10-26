@@ -33,8 +33,8 @@ const CLOSE: char = '\u{E001}';
 const DIGIT: u32 = 0xE010;
 
 pub(super) struct Token {
-    pub kind: TokenKind,
-    pub span: Span,
+    pub(crate) kind: TokenKind,
+    pub(crate) span: Span,
 }
 
 pub(super) enum TokenKind {
@@ -60,29 +60,29 @@ pub(super) enum TokenKind {
 /// read once every definition on the page is known, so a link or footnote
 /// marker inside finds one written outside, and the other way about.
 pub(super) struct Wrapping {
-    pub wrapped: block::Wrapped,
-    pub masked: Masked,
+    pub(crate) wrapped: block::Wrapped,
+    pub(crate) masked: Masked,
 }
 
 /// One line's share of a token.
 #[derive(Copy, Clone)]
 pub(super) struct Piece {
-    pub token: usize,
-    pub span: Span,
-    pub first: bool,
-    pub last: bool,
+    pub(crate) token: usize,
+    pub(crate) span: Span,
+    pub(crate) first: bool,
+    pub(crate) last: bool,
 }
 
 pub(super) struct Masked {
     /// The body, with placeholders.
-    pub text: String,
-    pub tokens: Vec<Token>,
-    pub pieces: Vec<Piece>,
-    pub map: OffsetMap,
+    pub(crate) text: String,
+    pub(crate) tokens: Vec<Token>,
+    pub(crate) pieces: Vec<Piece>,
+    pub(crate) map: OffsetMap,
     /// Calls that couldn't be read, said only where they aren't in code.
-    pub unread: Vec<Fault>,
+    pub(crate) unread: Vec<Fault>,
     /// Each control character, left out of the text and of every token.
-    pub left_out: Vec<(Span, char)>,
+    pub(crate) left_out: Vec<(Span, char)>,
 }
 
 impl Masked {

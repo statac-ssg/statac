@@ -272,7 +272,7 @@ struct Answer {
 
 /// A page's card as an output asked for it.
 #[derive(Clone)]
-pub struct Asked {
+pub(crate) struct Asked {
     page: PageId,
     answer: Arc<Answer>,
 }
@@ -285,13 +285,13 @@ impl std::fmt::Debug for Asked {
 
 impl Asked {
     /// The page whose card it is.
-    pub fn page(&self) -> PageId {
+    pub(crate) fn page(&self) -> PageId {
         self.page
     }
 
     /// The file the card is published as, from the top of the built site,
     /// where one is drawn.
-    pub fn file(&self) -> Option<&str> {
+    pub(crate) fn file(&self) -> Option<&str> {
         match &self.answer.outcome {
             Outcome::Drawn(shown, _) => Some(&shown.file),
             _ => None,
@@ -311,12 +311,12 @@ pub(super) fn asked(shared: &Arc<Shared>, page: PageId) -> Asked {
 
 /// What the outputs built asked of the site's cards: each page's card
 /// once, in the order of the pages.
-pub struct Gathered {
+pub(crate) struct Gathered {
     answers: BTreeMap<PageId, Arc<Answer>>,
 }
 
 impl Gathered {
-    pub fn of<'a>(asked: impl IntoIterator<Item = &'a Asked>) -> Gathered {
+    pub(crate) fn of<'a>(asked: impl IntoIterator<Item = &'a Asked>) -> Gathered {
         let asked = asked.into_iter();
         Gathered {
             answers: asked
@@ -327,7 +327,7 @@ impl Gathered {
 
     /// The files the cards drawn are published as, from the top of the
     /// built site.
-    pub fn files(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn files(&self) -> impl Iterator<Item = &str> {
         self.answers
             .values()
             .filter_map(|answer| match &answer.outcome {

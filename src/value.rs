@@ -14,7 +14,7 @@ use crate::yaml::{Node, Resolved, Value as Yaml, keeps_characters};
 
 /// A value of one of Statac's own words or settings.
 #[derive(Clone, PartialEq, Debug)]
-pub enum Value {
+pub(crate) enum Value {
     Text(String),
     Bool(bool),
     Whole(u64),
@@ -28,35 +28,35 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn as_text(&self) -> Option<&str> {
+    pub(crate) fn as_text(&self) -> Option<&str> {
         match self {
             Value::Text(text) => Some(text),
             _ => None,
         }
     }
 
-    pub fn as_bool(&self) -> Option<bool> {
+    pub(crate) fn as_bool(&self) -> Option<bool> {
         match self {
             Value::Bool(b) => Some(*b),
             _ => None,
         }
     }
 
-    pub fn as_whole(&self) -> Option<u64> {
+    pub(crate) fn as_whole(&self) -> Option<u64> {
         match self {
             Value::Whole(n) => Some(*n),
             _ => None,
         }
     }
 
-    pub fn as_texts(&self) -> Option<&[Sourced<String>]> {
+    pub(crate) fn as_texts(&self) -> Option<&[Sourced<String>]> {
         match self {
             Value::Texts(texts) => Some(texts),
             _ => None,
         }
     }
 
-    pub fn as_date(&self) -> Option<&Date> {
+    pub(crate) fn as_date(&self) -> Option<&Date> {
         match self {
             Value::Date(date) => Some(date),
             _ => None,
@@ -66,10 +66,10 @@ impl Value {
 
 /// Reads values for the field or setting named `field`.
 pub(crate) struct Reader<'a> {
-    pub sources: &'a Sources,
-    pub field: &'a str,
+    pub(crate) sources: &'a Sources,
+    pub(crate) field: &'a str,
     /// Whether the value is a secret, never to be quoted back.
-    pub secret: bool,
+    pub(crate) secret: bool,
 }
 
 type Read<T> = Result<Option<Sourced<T>>, Problem>;

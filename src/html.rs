@@ -9,21 +9,21 @@ use std::ops::Range;
 /// A start or end tag as the tokenizer reads it.
 pub(crate) struct Tag {
     /// In small letters.
-    pub name: String,
-    pub attributes: Vec<Attribute>,
+    pub(crate) name: String,
+    pub(crate) attributes: Vec<Attribute>,
     /// Where the tag ends, past its `>`.
-    pub end: usize,
+    pub(crate) end: usize,
     /// Whether the tag ran past the longest it was read to before it ended.
-    pub cut: bool,
+    pub(crate) cut: bool,
 }
 
 pub(crate) struct Attribute {
     /// In small letters.
-    pub name: String,
+    pub(crate) name: String,
     /// As written, its character references undecoded.
-    pub value: String,
+    pub(crate) value: String,
     /// Where the value is written, inside any quotes.
-    pub at: Range<usize>,
+    pub(crate) at: Range<usize>,
 }
 
 impl Tag {

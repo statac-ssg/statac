@@ -27,11 +27,11 @@ use crate::wording::{self, Described};
 #[derive(Debug)]
 pub(super) struct Completion {
     /// What is typed so far, as offsets in the file's text.
-    pub typed: Range<usize>,
-    pub items: Vec<Item>,
+    pub(crate) typed: Range<usize>,
+    pub(crate) items: Vec<Item>,
     /// Whether the items are a part of what may be written there, so the
     /// editor asks again as more is typed.
-    pub incomplete: bool,
+    pub(crate) incomplete: bool,
 }
 
 impl Completion {
@@ -46,23 +46,23 @@ impl Completion {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Item {
-    pub label: String,
+    pub(crate) label: String,
     /// What the item is, said beside it.
-    pub detail: Option<String>,
-    pub kind: ItemKind,
+    pub(crate) detail: Option<String>,
+    pub(crate) kind: ItemKind,
     /// What is written in place of what is typed.
-    pub insert: String,
+    pub(crate) insert: String,
     /// Where it is listed among the others, the lowest first: Statac's own
     /// before the site's.
-    pub group: u8,
+    pub(crate) group: u8,
     /// Whether it is text of the site's, written to read back as that text,
     /// rather than one of Statac's own words, written as it is.
-    pub text: bool,
+    pub(crate) text: bool,
     /// What the editor matches what is typed against, where it isn't the
     /// label.
-    pub filter: Option<String>,
+    pub(crate) filter: Option<String>,
     /// What it is, where it is one of Statac's own names.
-    pub about: Option<&'static Described>,
+    pub(crate) about: Option<&'static Described>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -251,14 +251,14 @@ fn value_written(value: &str, text: bool, flow: bool, quote: Option<char>, space
 
 /// What the site holds, as completion offers it.
 pub(super) struct Known<'a> {
-    pub renderer: Option<&'a Renderer>,
+    pub(crate) renderer: Option<&'a Renderer>,
     /// The page being written, where the site as last read holds it.
-    pub page: Option<PageId>,
+    pub(crate) page: Option<PageId>,
     /// The language of the page being written, where the site as last
     /// read tells it.
-    pub language: Option<LanguageId>,
+    pub(crate) language: Option<LanguageId>,
     /// What holds the front matter being written.
-    pub holder: Holder,
+    pub(crate) holder: Holder,
 }
 
 impl<'a> Known<'a> {

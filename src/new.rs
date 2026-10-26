@@ -57,14 +57,14 @@ pub struct Input<'a> {
 /// The machine's locale, as its environment gives it.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Locale {
-    pub lc_all: Option<String>,
-    pub lc_messages: Option<String>,
-    pub lang: Option<String>,
+    pub(crate) lc_all: Option<String>,
+    pub(crate) lc_messages: Option<String>,
+    pub(crate) lang: Option<String>,
 }
 
 impl Locale {
     /// This machine's, from its environment.
-    pub fn of_this_machine() -> Locale {
+    pub(crate) fn of_this_machine() -> Locale {
         let read = |name| std::env::var(name).ok();
         Locale {
             lc_all: read("LC_ALL"),
@@ -90,13 +90,13 @@ impl Locale {
 }
 
 /// This machine's time zone, by its name, where it has one.
-pub fn zone_of_this_machine() -> Option<String> {
+pub(crate) fn zone_of_this_machine() -> Option<String> {
     let zone = jiff::tz::TimeZone::try_system().ok()?;
     zone.iana_name().map(str::to_owned)
 }
 
 /// Today on this machine's clock, in its zone.
-pub fn today_on_this_machine() -> Date {
+pub(crate) fn today_on_this_machine() -> Date {
     let now = jiff::Zoned::now();
     Date::day_only(
         i32::from(now.year()),
@@ -107,30 +107,30 @@ pub fn today_on_this_machine() -> Date {
 
 /// The answers a site's settings are made from.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Answers {
-    pub title: String,
+pub(crate) struct Answers {
+    pub(crate) title: String,
     /// Whose site it is, where that is given.
-    pub author: Option<String>,
+    pub(crate) author: Option<String>,
     /// The site's address, `http` or `https` with a host, and no slash at
     /// its end.
-    pub address: Option<String>,
+    pub(crate) address: Option<String>,
     /// Codes `statac.yaml` takes, the main language first, each once.
-    pub languages: Vec<String>,
+    pub(crate) languages: Vec<String>,
     /// The zone the site's times are in, by its name in the time zone
     /// database.
-    pub timezone: Option<String>,
+    pub(crate) timezone: Option<String>,
     /// Whether feeds came across with an imported site, whose ids are made
     /// from the key it is then given.
-    pub feeds: bool,
+    pub(crate) feeds: bool,
 }
 
 /// What [`make`] wrote.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Made {
+pub(crate) struct Made {
     /// How many files.
-    pub files: usize,
+    pub(crate) files: usize,
     /// `statac.yaml` as written.
-    pub settings: String,
+    pub(crate) settings: String,
 }
 
 /// Asks for a new site and makes it, saying what it did on `out`. Gives
@@ -285,10 +285,10 @@ pub(crate) fn as_words(name: &str) -> String {
 /// is asked again after an answer that can't be used, or answered by the
 /// lines read with nothing shown.
 pub(crate) struct Asking<'a> {
-    pub reader: &'a mut dyn BufRead,
-    pub say: &'a mut dyn FnMut(&str),
-    pub colour: bool,
-    pub terminal: bool,
+    pub(crate) reader: &'a mut dyn BufRead,
+    pub(crate) say: &'a mut dyn FnMut(&str),
+    pub(crate) colour: bool,
+    pub(crate) terminal: bool,
 }
 
 impl Asking<'_> {

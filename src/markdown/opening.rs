@@ -12,48 +12,48 @@ use crate::source::{Place, Span};
 
 /// The writing as HTML, with what is shown of it elsewhere.
 #[derive(Clone, PartialEq, Debug, Default)]
-pub struct Written {
-    pub html: String,
+pub(crate) struct Written {
+    pub(crate) html: String,
     /// The writing before the more marker, or else its opening paragraph,
     /// as HTML, without the footnotes' markers; none where that is empty.
-    pub excerpt: Option<String>,
+    pub(crate) excerpt: Option<String>,
     /// Each piece of the excerpt copied from `html`: where it is in the
     /// excerpt, and where it starts in `html`.
-    pub excerpt_from: Vec<(Range<usize>, usize)>,
+    pub(crate) excerpt_from: Vec<(Range<usize>, usize)>,
     /// Where the writing the excerpt shows is written in the page's file;
     /// none for a page written in HTML.
-    pub excerpt_span: Option<Span>,
+    pub(crate) excerpt_span: Option<Span>,
     /// Whether the writing has a more marker, so the excerpt ends where the
     /// author said.
-    pub excerpt_marked: bool,
+    pub(crate) excerpt_marked: bool,
     /// The opening paragraph's words as plain text, each run of space
     /// closed up to one.
-    pub opening: Option<String>,
+    pub(crate) opening: Option<String>,
     /// How many words a reader reads: code blocks, the footnotes' markers
     /// and their ways back left out.
-    pub words: usize,
+    pub(crate) words: usize,
     /// Whether the writing holds any maths.
-    pub maths: bool,
+    pub(crate) maths: bool,
     /// Where each heading with an id starts in `html`, with its id, in
     /// order: where the part of the writing it heads begins. Footnotes
     /// written at the end fall in the last part.
-    pub headings: Vec<(usize, String)>,
+    pub(crate) headings: Vec<(usize, String)>,
     /// Where in `html` each part of the writing is written, with where it
     /// is written in the page's file: nested, a part inside the part
     /// holding it.
-    pub traced: Vec<(Range<usize>, Place)>,
+    pub(crate) traced: Vec<(Range<usize>, Place)>,
     /// Where in `html` each line a snippet call wrote is written.
-    pub called: Vec<Called>,
+    pub(crate) called: Vec<Called>,
 }
 
 /// A line, or the whole, of what a snippet call wrote, as the writing's
 /// HTML holds it: where it is in that HTML, where it starts in what the
 /// call wrote, and the call's place as the snippets were handed it.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Called {
-    pub at: Range<usize>,
-    pub within: usize,
-    pub place: Place,
+pub(crate) struct Called {
+    pub(crate) at: Range<usize>,
+    pub(crate) within: usize,
+    pub(crate) place: Place,
 }
 
 /// Which of the writing's blocks holds the more marker that ends the
@@ -276,7 +276,7 @@ impl Markers<'_> {
 
 /// A page written in HTML, read as it is published: its excerpt ends at a
 /// more marker on a line of its own, and its opening is its first `<p>`.
-pub fn as_written(html: &str) -> Written {
+pub(crate) fn as_written(html: &str) -> Written {
     let mut at = 0;
     let mut more_at = None;
     for line in html.split_inclusive('\n') {
@@ -360,7 +360,7 @@ pub(super) fn first_html_paragraph(html: &str) -> Option<Range<usize>> {
 }
 
 /// Words with every run of space closed up to one, none at either end.
-pub fn closed_up(text: &str) -> String {
+pub(crate) fn closed_up(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
@@ -388,13 +388,13 @@ pub(super) fn count_words(html: &str) -> usize {
 /// The words of a piece of HTML, its tags taken off and its character
 /// references read. A line break or a block's edge parts the words either
 /// side, though no space stands between them.
-pub fn words_of(html: &str) -> String {
+pub(crate) fn words_of(html: &str) -> String {
     read_words(html, false, false)
 }
 
 /// [`words_of`] with a line break wherever a line break or a block's edge
 /// parts the words, and every other run of white space one space.
-pub fn lines_of(html: &str) -> String {
+pub(crate) fn lines_of(html: &str) -> String {
     let marked = read_words(html, false, true);
     let mut out = String::with_capacity(marked.len());
     let mut gap: Option<char> = None;
@@ -479,7 +479,7 @@ fn text_words(out: &mut String, text: &str, parted: &mut bool, edges: bool) {
 
 /// `text` with its character references read as the characters they
 /// stand for.
-pub fn references_read(text: &str) -> String {
+pub(crate) fn references_read(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     references_read_into(&mut out, text);
     out

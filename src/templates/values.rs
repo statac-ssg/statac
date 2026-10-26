@@ -139,17 +139,17 @@ pub(crate) fn of_the_front(key: &str) -> bool {
 /// `page`, by `where` or by a sort. Always the words and fields the page
 /// writes under the name; for some names more.
 pub(crate) struct Answering<'a> {
-    pub name: &'a str,
+    pub(crate) name: &'a str,
     /// The word of Statac's the name is, where it is one.
-    pub word: Option<PageWord>,
+    pub(crate) word: Option<PageWord>,
     /// Whether the page's title answers it, which may be taken from
     /// elsewhere than the page's own front matter.
-    pub titled: bool,
+    pub(crate) titled: bool,
     /// Whether the page's date answers it: the date itself, or a part of
     /// it that `where` answers for by name.
-    pub dated: bool,
+    pub(crate) dated: bool,
     /// Whether it chooses the page's template.
-    pub choosing: bool,
+    pub(crate) choosing: bool,
 }
 
 impl Answering<'_> {
@@ -206,12 +206,12 @@ const FIRST_PAGES_OWN: &[PageWord] = &[
 /// The page the template is about.
 #[derive(Debug)]
 pub(super) struct PageValue {
-    pub shared: Arc<Shared>,
-    pub id: PageId,
+    pub(crate) shared: Arc<Shared>,
+    pub(crate) id: PageId,
     /// Which of its list's pages it is, counted from 1. A list's later
     /// pages are its page continued, carrying what that page says of itself
     /// but none of its writing.
-    pub number: usize,
+    pub(crate) number: usize,
 }
 
 impl PageValue {
@@ -680,8 +680,8 @@ pub(super) fn setting_in<'a>(
 /// answers in the language of the page being built.
 #[derive(Debug)]
 pub(super) struct SiteValue {
-    pub shared: Arc<Shared>,
-    pub language: LanguageId,
+    pub(crate) shared: Arc<Shared>,
+    pub(crate) language: LanguageId,
 }
 
 impl SiteValue {
@@ -894,8 +894,8 @@ pub(super) fn read_whole(list: ListId) {
 /// many there are.
 #[derive(Debug)]
 pub(super) struct Pages {
-    pub shared: Arc<Shared>,
-    pub which: Which,
+    pub(crate) shared: Arc<Shared>,
+    pub(crate) which: Which,
 }
 
 /// Which pages a list of them holds.
@@ -1230,10 +1230,10 @@ pub(super) fn list_name(shared: &Shared, id: ListId) -> String {
 #[derive(Debug)]
 pub(crate) struct ListKnown<'a> {
     /// The page that speaks for it, and whether that is published.
-    pub page: Option<(PageId, bool)>,
+    pub(crate) page: Option<(PageId, bool)>,
     /// Where its feeds are published, in the order its `feed:` names them.
-    pub feeds: Vec<&'a crate::address::Address>,
-    pub order: Option<Order>,
+    pub(crate) feeds: Vec<&'a crate::address::Address>,
+    pub(crate) order: Option<Order>,
 }
 
 pub(super) fn list_known(shared: &Shared, id: ListId) -> ListKnown<'_> {
@@ -1250,8 +1250,8 @@ pub(super) fn list_known(shared: &Shared, id: ListId) -> ListKnown<'_> {
 /// answering the same names.
 #[derive(Debug)]
 pub(super) struct ListValue {
-    pub shared: Arc<Shared>,
-    pub id: ListId,
+    pub(crate) shared: Arc<Shared>,
+    pub(crate) id: ListId,
 }
 
 impl ListValue {
@@ -1364,7 +1364,7 @@ impl Object for ListValue {
 /// asked by tag for the page at that language's top, written or made.
 #[derive(Debug)]
 pub(super) struct Languages {
-    pub shared: Arc<Shared>,
+    pub(crate) shared: Arc<Shared>,
 }
 
 impl Object for Languages {
@@ -1408,8 +1408,8 @@ impl Object for Languages {
 /// tag however its capitals are written.
 #[derive(Debug)]
 pub(super) struct Lists {
-    pub shared: Arc<Shared>,
-    pub lists: Vec<ListId>,
+    pub(crate) shared: Arc<Shared>,
+    pub(crate) lists: Vec<ListId>,
 }
 
 impl Lists {
@@ -1476,12 +1476,12 @@ impl Object for Lists {
 /// A date, printed in the site's own way.
 #[derive(Debug)]
 pub(super) struct DateValue {
-    pub shared: Arc<Shared>,
+    pub(crate) shared: Arc<Shared>,
     /// The date, or the first day of the year or month written.
-    pub date: Date,
+    pub(crate) date: Date,
     /// A year, or a year and month, where that is all that was written,
     /// with the language it is printed in.
-    pub part: Option<(When, LanguageId)>,
+    pub(crate) part: Option<(When, LanguageId)>,
 }
 
 impl DateValue {
@@ -1693,7 +1693,7 @@ pub(super) fn node_value(shared: &Arc<Shared>, node: &Node, path: Option<&str>) 
 
 /// A map that keeps the order it was written in.
 #[derive(Debug)]
-pub(super) struct Ordered(pub Vec<(String, Value)>);
+pub(super) struct Ordered(pub(crate) Vec<(String, Value)>);
 
 impl Object for Ordered {
     fn repr(self: &Arc<Self>) -> ObjectRepr {

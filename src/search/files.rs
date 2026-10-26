@@ -50,11 +50,11 @@ const MARK: usize = 16;
 
 /// One file, by its path from the top of the built site.
 #[derive(Clone, Debug, PartialEq)]
-pub struct File {
-    pub path: String,
-    pub bytes: Vec<u8>,
+pub(crate) struct File {
+    pub(crate) path: String,
+    pub(crate) bytes: Vec<u8>,
     /// Whether its name says what it holds.
-    pub named: bool,
+    pub(crate) named: bool,
 }
 
 /// Every file of `index`, the site `renderer` read, in `folder`, the
@@ -165,7 +165,7 @@ pub(super) fn files(renderer: &Renderer, folder: &str, index: &Index, kept: &Kep
 }
 
 /// What each file claims of the site's addresses.
-pub fn claims(files: &[File]) -> Vec<(String, Named)> {
+pub(crate) fn claims(files: &[File]) -> Vec<(String, Named)> {
     (files.iter())
         .map(|file| (file.path.clone(), Named::Search))
         .collect()

@@ -24,10 +24,10 @@ pub(crate) enum Readable {
 /// A name or field, with what it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Name {
-    pub name: String,
-    pub holds: Holds,
+    pub(crate) name: String,
+    pub(crate) holds: Holds,
     /// What it is, where it is one of Statac's.
-    pub about: Option<&'static Described>,
+    pub(crate) about: Option<&'static Described>,
 }
 
 impl Renderer {

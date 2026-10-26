@@ -93,23 +93,23 @@ pub enum Key {
 /// recorded is carried over by what each id named there; none where the
 /// later reading has nothing of that name, or holds it changed.
 #[derive(Default)]
-pub struct Translation {
+pub(crate) struct Translation {
     /// A file read is the same file only where its text is the same, so a
     /// place in it is the same place.
-    pub sources: Vec<Option<SourceId>>,
-    pub pages: Vec<Option<PageId>>,
-    pub lists: Vec<Option<ListId>>,
-    pub names: Vec<NameId>,
-    pub templates: Vec<Option<TemplateId>>,
-    pub data: Vec<Option<DataId>>,
-    pub assets: Vec<Option<AssetId>>,
-    pub pictures: Vec<Option<PictureId>>,
-    pub beside: Vec<Option<u32>>,
-    pub statics: Vec<Option<u32>>,
+    pub(crate) sources: Vec<Option<SourceId>>,
+    pub(crate) pages: Vec<Option<PageId>>,
+    pub(crate) lists: Vec<Option<ListId>>,
+    pub(crate) names: Vec<NameId>,
+    pub(crate) templates: Vec<Option<TemplateId>>,
+    pub(crate) data: Vec<Option<DataId>>,
+    pub(crate) assets: Vec<Option<AssetId>>,
+    pub(crate) pictures: Vec<Option<PictureId>>,
+    pub(crate) beside: Vec<Option<u32>>,
+    pub(crate) statics: Vec<Option<u32>>,
     /// The old addresses that send readers on, and the feeds, each by its
     /// place among them.
-    pub redirects: Vec<Option<usize>>,
-    pub feeds: Vec<Option<usize>>,
+    pub(crate) redirects: Vec<Option<usize>>,
+    pub(crate) feeds: Vec<Option<usize>>,
 }
 
 fn carried<I: crate::ids::Id>(over: &[Option<I>], id: I) -> Option<I> {
@@ -117,23 +117,23 @@ fn carried<I: crate::ids::Id>(over: &[Option<I>], id: I) -> Option<I> {
 }
 
 impl Translation {
-    pub fn page(&self, id: PageId) -> Option<PageId> {
+    pub(crate) fn page(&self, id: PageId) -> Option<PageId> {
         carried(&self.pages, id)
     }
 
-    pub fn list(&self, id: ListId) -> Option<ListId> {
+    pub(crate) fn list(&self, id: ListId) -> Option<ListId> {
         carried(&self.lists, id)
     }
 
-    pub fn template(&self, id: TemplateId) -> Option<TemplateId> {
+    pub(crate) fn template(&self, id: TemplateId) -> Option<TemplateId> {
         carried(&self.templates, id)
     }
 
-    pub fn picture(&self, id: PictureId) -> Option<PictureId> {
+    pub(crate) fn picture(&self, id: PictureId) -> Option<PictureId> {
         carried(&self.pictures, id)
     }
 
-    pub fn place(&self, place: Place) -> Option<Place> {
+    pub(crate) fn place(&self, place: Place) -> Option<Place> {
         let source = self.sources.get(place.source.index() as usize)?;
         Some(Place {
             source: (*source)?,
@@ -142,7 +142,7 @@ impl Translation {
     }
 
     /// `key` as the later reading names it.
-    pub fn key(&self, key: Key) -> Option<Key> {
+    pub(crate) fn key(&self, key: Key) -> Option<Key> {
         use crate::ids::Id;
         let at = |over: &[Option<u32>], at: u32| over.get(at as usize).copied().flatten();
         Some(match key {
@@ -201,11 +201,11 @@ pub struct Reads {
 }
 
 /// How many reads of a page's field an output holds one by one.
-pub const MANY: usize = 1024;
+pub(crate) const MANY: usize = 1024;
 
 impl Reads {
     /// The reads `keys`, in that order.
-    pub fn of(keys: Vec<Key>) -> Reads {
+    pub(crate) fn of(keys: Vec<Key>) -> Reads {
         let mut reads = Reads::default();
         for key in keys {
             reads.read(key);
@@ -214,7 +214,7 @@ impl Reads {
     }
 
     #[inline]
-    pub fn read(&mut self, key: Key) {
+    pub(crate) fn read(&mut self, key: Key) {
         // The read before it over again, as a loop asking each page the
         // same thing of the site makes.
         if self.keys.last() == Some(&key) {
@@ -244,7 +244,7 @@ impl Reads {
     }
 
     /// The cards this output announced.
-    pub fn cards(&self) -> impl Iterator<Item = PageId> + '_ {
+    pub(crate) fn cards(&self) -> impl Iterator<Item = PageId> + '_ {
         self.keys.iter().filter_map(|key| match key {
             Key::Card(page) => Some(*page),
             _ => None,
@@ -257,39 +257,39 @@ impl Reads {
 /// once, in order. Unlike its reads, this decides nothing of a build; it
 /// says which names a page's templates use.
 #[derive(Default, Clone, PartialEq, Eq, Debug)]
-pub struct Asked {
+pub(crate) struct Asked {
     page: Vec<NameId>,
     site: Vec<NameId>,
     data: Vec<DataId>,
 }
 
 impl Asked {
-    pub fn ask_page(&mut self, name: NameId) {
+    pub(crate) fn ask_page(&mut self, name: NameId) {
         hold(&mut self.page, name);
     }
 
-    pub fn ask_site(&mut self, name: NameId) {
+    pub(crate) fn ask_site(&mut self, name: NameId) {
         hold(&mut self.site, name);
     }
 
-    pub fn reach(&mut self, file: DataId) {
+    pub(crate) fn reach(&mut self, file: DataId) {
         hold(&mut self.data, file);
     }
 
-    pub fn asked_page(&self, name: NameId) -> bool {
+    pub(crate) fn asked_page(&self, name: NameId) -> bool {
         self.page.binary_search(&name).is_ok()
     }
 
-    pub fn asked_site(&self, name: NameId) -> bool {
+    pub(crate) fn asked_site(&self, name: NameId) -> bool {
         self.site.binary_search(&name).is_ok()
     }
 
-    pub fn reached(&self, file: DataId) -> bool {
+    pub(crate) fn reached(&self, file: DataId) -> bool {
         self.data.binary_search(&file).is_ok()
     }
 
     /// Holds what `other` asked too.
-    pub fn extend(&mut self, other: &Asked) {
+    pub(crate) fn extend(&mut self, other: &Asked) {
         other.page.iter().for_each(|&name| self.ask_page(name));
         other.site.iter().for_each(|&name| self.ask_site(name));
         other.data.iter().for_each(|&file| self.reach(file));
@@ -297,7 +297,7 @@ impl Asked {
 
     /// The same as the later reading `to` names it; none where it has
     /// nothing of a name or file asked.
-    pub fn carried(&self, to: &Translation) -> Option<Asked> {
+    pub(crate) fn carried(&self, to: &Translation) -> Option<Asked> {
         use crate::ids::Id;
         let name = |name: &NameId| to.names.get(name.index()).copied();
         let mut asked = Asked::default();
@@ -324,14 +324,14 @@ fn hold<T: Ord>(held: &mut Vec<T>, it: T) {
 
 /// Every output's reads, and the reverse: who read a key.
 #[derive(Default)]
-pub struct Record {
+pub(crate) struct Record {
     reads: HashMap<OutputId, Reads>,
     readers: HashMap<Key, Vec<OutputId>>,
 }
 
 impl Record {
     /// Replaces what `output` read last time.
-    pub fn set(&mut self, output: OutputId, reads: Reads) {
+    pub(crate) fn set(&mut self, output: OutputId, reads: Reads) {
         self.forget(output);
         let mut keys = reads.keys.clone();
         keys.sort_unstable();
@@ -342,7 +342,7 @@ impl Record {
         self.reads.insert(output, reads);
     }
 
-    pub fn forget(&mut self, output: OutputId) {
+    pub(crate) fn forget(&mut self, output: OutputId) {
         let Some(old) = self.reads.remove(&output) else {
             return;
         };
@@ -356,17 +356,14 @@ impl Record {
         }
     }
 
-    pub fn reads(&self, output: OutputId) -> Option<&Reads> {
-        self.reads.get(&output)
-    }
-
     /// Every key some output read, each once.
-    pub fn keys(&self) -> impl Iterator<Item = Key> + '_ {
+    pub(crate) fn keys(&self) -> impl Iterator<Item = Key> + '_ {
         self.readers.keys().copied()
     }
 
     /// The outputs that read any of `changed`, each once, in id order.
-    pub fn affected(&self, changed: &[Key]) -> Vec<OutputId> {
+    #[cfg(test)]
+    pub(crate) fn affected(&self, changed: &[Key]) -> Vec<OutputId> {
         let mut outputs: Vec<OutputId> = changed
             .iter()
             .filter_map(|key| self.readers.get(key))

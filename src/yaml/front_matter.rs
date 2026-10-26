@@ -7,7 +7,7 @@ use crate::source::Span;
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Split {
     /// The YAML between the `---` lines, without them.
-    pub front_matter: Option<Span>,
+    pub(crate) front_matter: Option<Span>,
     /// Everything after the closing `---` line, or after any byte-order
     /// mark where there is no front matter.
     pub body: Span,
@@ -17,9 +17,9 @@ pub struct Split {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Unclosed {
     /// The opening `---`.
-    pub opening: Span,
+    pub(crate) opening: Span,
     /// The lines after the opening one, to the end of the file.
-    pub rest: Span,
+    pub(crate) rest: Span,
 }
 
 pub fn split(text: &str) -> Result<Split, Unclosed> {

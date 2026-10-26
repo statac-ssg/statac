@@ -29,13 +29,13 @@ use crate::templates::{self, Renderer};
 use crate::unnamed;
 use scripts::{Finding, Found};
 
-pub use javascript::Javascript;
+pub(crate) use javascript::Javascript;
 pub(crate) use javascript::Remembered;
 pub(crate) use timings::Clock;
-pub use timings::{Stage, Timings, Work};
+pub(crate) use timings::{Stage, Timings};
 
 /// Where the built site goes in the site's folder, unless the author says.
-pub const OUT: &str = "_site";
+pub(crate) const OUT: &str = "_site";
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Mode {
@@ -76,12 +76,12 @@ impl Options {
 
     /// Where the built site goes, as the author asked: as written, or
     /// `_site`.
-    pub fn out_as_asked(&self) -> &Path {
+    pub(crate) fn out_as_asked(&self) -> &Path {
         self.out.as_deref().unwrap_or(Path::new(OUT))
     }
 
     /// What reading the site is asked to do.
-    pub fn run(&self) -> content::Run {
+    pub(crate) fn run(&self) -> content::Run {
         content::Run {
             today: self.today,
             drafts: self.drafts,
@@ -102,52 +102,52 @@ pub struct Outcome {
     /// The JavaScript the built pages carry, and where each came from.
     pub javascript: Vec<Javascript>,
     /// What each page read while it was built, by its output.
-    pub record: Record,
+    pub(crate) record: Record,
     /// The drafts and posts waiting for their day built as if published.
     pub included: content::Included,
     /// The files of the pages left out as drafts and until their day:
     /// each page's own, or the data file a page was made from.
-    pub pages_left_out: Vec<SourceId>,
+    pub(crate) pages_left_out: Vec<SourceId>,
     /// What became of the copies of photographs, where the site was written.
-    pub copies: Copies,
+    pub(crate) copies: Copies,
     /// What became of the sharing cards, where the site was written.
-    pub cards: Cards,
+    pub(crate) cards: Cards,
     /// What became of the site's own commands.
     pub hooks: crate::hooks::Ran,
     /// How old what was fetched is, where the site was written.
-    pub fetched: crate::fetched::Ages,
+    pub(crate) fetched: crate::fetched::Ages,
     /// The photographs beside the writing that a page shows and none
     /// links, so only their copies are published and not the files
     /// themselves: each by where its own file would be published.
-    pub held_back: Vec<String>,
+    pub(crate) held_back: Vec<String>,
     /// What the build added to `published.txt`.
-    pub kept: crate::published::Kept,
+    pub(crate) kept: crate::published::Kept,
     /// How long the build waited for another build of the site to end.
-    pub waited: Duration,
+    pub(crate) waited: Duration,
     /// Where the build spent its time.
-    pub timings: Timings,
+    pub(crate) timings: Timings,
 }
 
 /// What a build did with the sharing cards.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub struct Cards {
+pub(crate) struct Cards {
     /// The cards drawn, the rest being kept from an earlier build.
-    pub drawn: usize,
+    pub(crate) drawn: usize,
     /// The cards kept from earlier builds and removed, no page being
     /// shared with them any more.
-    pub removed: usize,
+    pub(crate) removed: usize,
 }
 
 /// What a build did with the copies of photographs.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub struct Copies {
+pub(crate) struct Copies {
     /// The copies made, the rest being kept from an earlier build.
-    pub made: usize,
+    pub(crate) made: usize,
     /// The photographs those were made from.
-    pub from: usize,
+    pub(crate) from: usize,
     /// The copies kept from earlier builds and removed, no page showing
     /// them any more.
-    pub removed: usize,
+    pub(crate) removed: usize,
 }
 
 /// What holds the files read, so any problem can be shown where it was
@@ -171,7 +171,7 @@ impl Outcome {
     }
 
     /// The site as it was read, where it was.
-    pub fn site(&self) -> Option<&crate::site::Site> {
+    pub(crate) fn site(&self) -> Option<&crate::site::Site> {
         match &self.held {
             Held::Sources(_) => None,
             Held::Renderer(renderer) => Some(renderer.site()),
@@ -179,7 +179,7 @@ impl Outcome {
     }
 
     /// The site's settings, where the site was read.
-    pub fn settings(&self) -> Option<&crate::config::Settings> {
+    pub(crate) fn settings(&self) -> Option<&crate::config::Settings> {
         match &self.held {
             Held::Sources(_) => None,
             Held::Renderer(renderer) => Some(renderer.settings()),
@@ -187,7 +187,7 @@ impl Outcome {
     }
 
     /// The build's date, `site.today`, where the site was read.
-    pub fn today(&self) -> Option<Date> {
+    pub(crate) fn today(&self) -> Option<Date> {
         match &self.held {
             Held::Sources(_) => None,
             Held::Renderer(renderer) => Some(renderer.today()),
@@ -325,21 +325,21 @@ pub fn renderer(site: &Path, today: Option<Date>) -> (Renderer, Vec<Problem>) {
 
 /// A site read and ready to build.
 pub(crate) struct Prepared {
-    pub renderer: Renderer,
+    pub(crate) renderer: Renderer,
     /// Every problem reading it.
-    pub problems: Vec<Problem>,
+    pub(crate) problems: Vec<Problem>,
     /// The kinds its `quiet:` setting quietens.
-    pub quiet: Quiet,
+    pub(crate) quiet: Quiet,
     /// What `--drafts` brought in.
-    pub included: content::Included,
+    pub(crate) included: content::Included,
     /// The files of the pages left out of the build, as
     /// [`Outcome::pages_left_out`] has them.
-    pub pages_left_out: Vec<SourceId>,
+    pub(crate) pages_left_out: Vec<SourceId>,
     /// The pictures that pages left out of the build name.
-    pub left_out: Vec<PictureId>,
+    pub(crate) left_out: Vec<PictureId>,
     /// The posts feed readers know, as the last build to publish kept
     /// them.
-    pub known: feeds::Known,
+    pub(crate) known: feeds::Known,
 }
 
 pub(crate) fn prepared(site: &Path, run: &content::Run) -> Prepared {
@@ -436,37 +436,37 @@ pub(crate) enum Output {
 
 /// One output built, and everything building it adds to the build.
 pub(crate) struct Built {
-    pub output: Output,
+    pub(crate) output: Output,
     /// How long building it took, and what in.
-    pub timed: timings::Output,
+    pub(crate) timed: timings::Output,
     /// The file it is published as, from the top of the built site.
-    pub file: String,
+    pub(crate) file: String,
     /// Its text, where it was built whole and is held to be written later.
-    pub html: Option<String>,
-    pub reads: Reads,
+    pub(crate) html: Option<String>,
+    pub(crate) reads: Reads,
     /// What it asked of its own page and of the site, by name.
-    pub asked: Asked,
-    pub problems: Vec<Problem>,
-    pub scripts: Vec<Finding>,
+    pub(crate) asked: Asked,
+    pub(crate) problems: Vec<Problem>,
+    pub(crate) scripts: Vec<Finding>,
     /// Each piece of JavaScript written into it where a browser runs it.
-    pub pieces: Vec<scripts::Print>,
+    pub(crate) pieces: Vec<scripts::Print>,
     /// What its links came to, for a page written as HTML.
-    pub links: Option<links::Checked>,
+    pub(crate) links: Option<links::Checked>,
     /// The photographs whose copies it names, as each was named.
-    pub developed: Vec<crate::album::Shown>,
+    pub(crate) developed: Vec<crate::album::Shown>,
     /// The sharing cards it asked for.
-    pub cards: Vec<templates::Asked>,
+    pub(crate) cards: Vec<templates::Asked>,
     /// Whether it is a page showing a picture with its width and height.
-    pub sized: bool,
+    pub(crate) sized: bool,
     /// How many pages of lists of the whole site it reached.
-    pub walked: u64,
+    pub(crate) walked: u64,
     /// Whether the built site holds it.
-    pub written: bool,
+    pub(crate) written: bool,
     /// The languages whose search index it names.
-    pub indexed: Vec<crate::ids::LanguageId>,
+    pub(crate) indexed: Vec<crate::ids::LanguageId>,
     /// Where each link or button it shows was written that is all an image
     /// told as missing alt text, which no page tells as missing words.
-    pub folded: Vec<Option<Place>>,
+    pub(crate) folded: Vec<Option<Place>>,
 }
 
 /// Where an output goes once it is built.
@@ -481,11 +481,11 @@ pub(crate) enum Writes<'a> {
 
 /// What a site read is about to build, and what its links are held to.
 pub(crate) struct Plan {
-    pub outputs: Vec<Output>,
-    pub linked: links::Site,
+    pub(crate) outputs: Vec<Output>,
+    pub(crate) linked: links::Site,
     /// The pictures beside the writing published only where a built page
     /// links them, each by its place among the files beside the writing.
-    pub held: HashMap<usize, PictureId>,
+    pub(crate) held: HashMap<usize, PictureId>,
 }
 
 impl Output {
@@ -574,7 +574,7 @@ pub fn run(options: &Options) -> Outcome {
 /// [`run`], saying as `progress` has it how far a long build has got.
 /// A build runs the site's own commands around it, and `check` says once
 /// that it runs neither.
-pub fn run_saying(options: &Options, progress: Progress) -> Outcome {
+pub(crate) fn run_saying(options: &Options, progress: Progress) -> Outcome {
     if let Err(problem) = a_folder(&options.site) {
         return Outcome::unread(problem);
     }
@@ -753,7 +753,7 @@ fn built(
 /// written.
 pub(crate) struct Concluded {
     /// Every problem, reading the site and building it.
-    pub problems: Vec<Problem>,
+    pub(crate) problems: Vec<Problem>,
     javascript: Vec<Javascript>,
     /// The photographs whose copies some output names.
     developed: Vec<crate::album::Shown>,
@@ -1126,26 +1126,26 @@ fn no_language(renderer: &Renderer, built: &[Built]) -> Option<Problem> {
 pub(crate) struct Publishing {
     /// The folder written into, holding every output already; none for a
     /// build that writes nothing.
-    pub staging: Option<Staging>,
+    pub(crate) staging: Option<Staging>,
     /// How many files published as they are the folder holds, the held
     /// pictures counted.
-    pub files: usize,
-    pub progress: Progress,
+    pub(crate) files: usize,
+    pub(crate) progress: Progress,
     /// Whether what earlier builds kept and no page asks for any more is
     /// removed.
-    pub tidies: bool,
+    pub(crate) tidies: bool,
     /// Whether the command the site runs on a built site is run.
-    pub after: bool,
+    pub(crate) after: bool,
     /// Whether the site is built to be previewed, which a command it runs
     /// is told.
-    pub serving: bool,
+    pub(crate) serving: bool,
     /// Whether the posts published are kept as what feed readers now
     /// know, and the addresses published added to `published.txt`.
-    pub remembers: bool,
+    pub(crate) remembers: bool,
     /// Why the build doesn't hold the site, where it doesn't.
-    pub unheld: Option<Problem>,
+    pub(crate) unheld: Option<Problem>,
     /// The build's stages timed so far.
-    pub clock: Clock,
+    pub(crate) clock: Clock,
 }
 
 /// Writes what the outputs `built` asked for beside them, the pictures a

@@ -2,9 +2,9 @@
 //! on every save, and the browser told. After the first round with no
 //! error, what `refresh` fetches is fetched once, beside the rounds.
 
-pub mod http;
+pub(crate) mod http;
 pub mod live;
-pub mod panel;
+pub(crate) mod panel;
 mod server;
 pub mod session;
 pub mod watch;
@@ -31,7 +31,7 @@ use session::{Round, Session};
 use watch::{Batch, How, Settle, Watching};
 
 /// The port `serve` answers on unless asked for another.
-pub const PORT: u16 = 3000;
+pub(crate) const PORT: u16 = 3000;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Options {
@@ -299,7 +299,7 @@ impl Serving {
     }
 
     /// The site's first page, as a browser on this machine asks for it.
-    pub fn address(&self) -> String {
+    pub(crate) fn address(&self) -> String {
         format!(
             "http://localhost:{}{}",
             self.port,
@@ -743,12 +743,9 @@ mod tests {
         /// What serve says of a round for a batch the system's reports were
         /// lost from, naming `changed`.
         fn rescan(&mut self, changed: &[&str]) -> String {
-            let now = Instant::now();
             let batch = Batch {
                 changed: paths(changed),
                 rescan: true,
-                first_event: now,
-                settled: now,
             };
             self.serving.tell.send(Heard::Saves(batch)).unwrap();
             let mut said = Vec::new();

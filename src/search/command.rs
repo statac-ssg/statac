@@ -21,14 +21,14 @@ const AFTER: usize = 140;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Options {
-    pub site: PathBuf,
-    pub words: String,
-    pub today: Option<Date>,
+    pub(crate) site: PathBuf,
+    pub(crate) words: String,
+    pub(crate) today: Option<Date>,
     /// Whether drafts and posts waiting for their day are searched too.
-    pub drafts: bool,
+    pub(crate) drafts: bool,
     /// The code of the one language whose pages are searched; none for
     /// every language's.
-    pub language: Option<String>,
+    pub(crate) language: Option<String>,
 }
 
 /// One page found, at the part of it that matched best.
@@ -47,7 +47,7 @@ pub struct Shown {
     pub excerpt: Vec<(String, bool)>,
     /// The part, by its place among the index's records, and how well it
     /// matched.
-    pub found: super::Found,
+    pub(crate) found: super::Found,
 }
 
 /// Where `options` name no folder and the words are a site's folder, as

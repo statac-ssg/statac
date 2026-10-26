@@ -13,8 +13,8 @@ use super::{Header, Kind, NoSize, Photograph, Plain, Size, Unreadable};
 /// What reading a header finds, with the photograph's colour profile kept
 /// for opening it.
 pub(super) struct Parsed {
-    pub header: Header,
-    pub profile: Option<Vec<u8>>,
+    pub(crate) header: Header,
+    pub(crate) profile: Option<Vec<u8>>,
 }
 
 pub(super) fn parse(bytes: &[u8]) -> Result<Parsed, Unreadable> {

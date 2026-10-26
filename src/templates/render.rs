@@ -32,15 +32,15 @@ use crate::source::{Place, SourceId, Sources, Span};
 
 /// Everything a page is built from, shared by every page built.
 pub(super) struct Shared {
-    pub sources: Sources,
-    pub settings: Settings,
-    pub site: Site,
-    pub assets: Assets,
-    pub templates: Templates,
-    pub dates: Dates,
+    pub(crate) sources: Sources,
+    pub(crate) settings: Settings,
+    pub(crate) site: Site,
+    pub(crate) assets: Assets,
+    pub(crate) templates: Templates,
+    pub(crate) dates: Dates,
     /// The path the site is published under, such as `/blog`; empty at the
     /// top of its domain.
-    pub base: String,
+    pub(crate) base: String,
     outlines: Mutex<HashMap<PageId, Arc<Vec<Section>>>>,
     /// The names known before any page is built, read by every thread
     /// without waiting on another.
@@ -48,10 +48,10 @@ pub(super) struct Shared {
     /// Names first met while building, numbered on from `known`.
     later: RwLock<Names>,
     /// Each page's writing once built, by page.
-    pub bodies: Vec<OnceLock<Arc<Body>>>,
+    pub(crate) bodies: Vec<OnceLock<Arc<Body>>>,
     /// Each data file's value once a template has reached it, by file,
     /// with where each text in it is written, by the text's address.
-    pub data_values: Vec<OnceLock<(Value, frame::Origins)>>,
+    pub(crate) data_values: Vec<OnceLock<(Value, frame::Origins)>>,
     /// Every feed the site publishes.
     feeds: Vec<crate::feeds::Feed>,
     /// Each list's feeds among `feeds`, in the order its `feed:` names
@@ -71,15 +71,15 @@ pub(super) struct Shared {
     /// The pages chosen from every page by what each writes under one
     /// name, each choice worked out once: by the filter, the name and the
     /// test, and the values the test was handed.
-    pub chosen: Mutex<HashMap<(String, Vec<Value>), Known>>,
+    pub(crate) chosen: Mutex<HashMap<(String, Vec<Value>), Known>>,
     /// What there is to tell of the pages a sort worked out once put
     /// last, by what the sort is known by.
-    pub put_last: Mutex<HashMap<(String, Vec<Value>), PutLast>>,
+    pub(crate) put_last: Mutex<HashMap<(String, Vec<Value>), PutLast>>,
     /// What colours the code in the writing, where `code_colours: true`
     /// asks.
-    pub highlighter: Option<Highlighter>,
+    pub(crate) highlighter: Option<Highlighter>,
     /// What the site's cards come to, each worked out once.
-    pub cards: super::card::Room,
+    pub(crate) cards: super::card::Room,
 }
 
 impl std::fmt::Debug for Shared {
@@ -96,11 +96,11 @@ pub(super) type Known = Arc<Mutex<Option<SomePages>>>;
 #[derive(Clone, Debug)]
 pub(super) struct PutLast {
     /// The field they lack, or every field sorted by where they differ.
-    pub field: String,
-    pub count: usize,
+    pub(crate) field: String,
+    pub(crate) count: usize,
     /// The first of them, and where it stood before the sort.
-    pub first: (PageId, usize),
-    pub index: usize,
+    pub(crate) first: (PageId, usize),
+    pub(crate) index: usize,
 }
 
 /// Some of the site's pages, each with which of its list's pages it is.
@@ -301,9 +301,9 @@ struct Elsewhere {
 /// its id and its words, none for the part before the first heading; and
 /// its HTML, the heading's own included.
 #[derive(Debug)]
-pub struct Cut {
-    pub heading: Option<(String, String)>,
-    pub html: String,
+pub(crate) struct Cut {
+    pub(crate) heading: Option<(String, String)>,
+    pub(crate) html: String,
 }
 
 /// The words of the heading `html` starts with.
@@ -326,20 +326,20 @@ fn heading_words(html: &str) -> String {
 pub struct Rendered {
     pub html: Option<String>,
     pub reads: Reads,
-    pub asked: Asked,
+    pub(crate) asked: Asked,
     pub problems: Vec<Problem>,
     /// The photographs whose copies it names, as each was named.
-    pub developed: Vec<crate::album::Shown>,
+    pub(crate) developed: Vec<crate::album::Shown>,
     /// The sharing cards it asked for, each page's once.
-    pub cards: Vec<super::card::Asked>,
+    pub(crate) cards: Vec<super::card::Asked>,
     /// How many pages of lists of the whole site it reached.
-    pub walked: u64,
+    pub(crate) walked: u64,
     /// Where its HTML is the own text of the templates it is built with.
-    pub own: Own,
+    pub(crate) own: Own,
     /// The languages whose search index it names.
-    pub indexed: Vec<LanguageId>,
+    pub(crate) indexed: Vec<LanguageId>,
     /// The template it is built with, by its index among the files.
-    pub layout: Option<usize>,
+    pub(crate) layout: Option<usize>,
 }
 
 impl Rendered {
@@ -413,7 +413,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(
+    pub(crate) fn new(
         sources: Sources,
         settings: Settings,
         site: Site,
@@ -473,11 +473,11 @@ impl Renderer {
         &self.shared.site
     }
 
-    pub fn settings(&self) -> &Settings {
+    pub(crate) fn settings(&self) -> &Settings {
         &self.shared.settings
     }
 
-    pub fn assets(&self) -> &Assets {
+    pub(crate) fn assets(&self) -> &Assets {
         &self.shared.assets
     }
 
@@ -495,17 +495,20 @@ impl Renderer {
     /// Everything to say of the site's cards, once its outputs are built
     /// and have `asked` what they did of them: what stopped one, the pages
     /// left without, and what no page uses.
-    pub fn cards_told(&self, asked: &Gathered) -> Vec<Problem> {
+    pub(crate) fn cards_told(&self, asked: &Gathered) -> Vec<Problem> {
         super::card::told(&self.shared, asked)
     }
 
     /// The cards the outputs built `asked` for, to draw.
-    pub fn cards_wanted<'a>(&'a self, asked: &'a Gathered) -> Vec<crate::cards::keep::Wanted<'a>> {
+    pub(crate) fn cards_wanted<'a>(
+        &'a self,
+        asked: &'a Gathered,
+    ) -> Vec<crate::cards::keep::Wanted<'a>> {
         super::card::wanted(&self.shared, asked)
     }
 
     /// The names those cards are kept under between builds.
-    pub fn cards_kept(&self, asked: &Gathered) -> std::collections::HashSet<String> {
+    pub(crate) fn cards_kept(&self, asked: &Gathered) -> std::collections::HashSet<String> {
         super::card::kept(&self.shared, asked)
     }
 
@@ -516,7 +519,7 @@ impl Renderer {
 
     /// The pictures that pages are shared with as `og_image` names them,
     /// each with how many pages asked for it.
-    pub fn own_cards(&self, asked: &Gathered) -> BTreeMap<PictureId, usize> {
+    pub(crate) fn own_cards(&self, asked: &Gathered) -> BTreeMap<PictureId, usize> {
         super::card::own(asked)
     }
 
@@ -663,7 +666,7 @@ impl Renderer {
     /// The template whose own text the byte at `at` of an output is, and
     /// where in that template it is written; none for a byte of a value's,
     /// or of a snippet's.
-    pub fn written_at(&self, own: &Own, at: usize) -> Option<(TemplateId, usize)> {
+    pub(crate) fn written_at(&self, own: &Own, at: usize) -> Option<(TemplateId, usize)> {
         let Origin::Own(from) = own.origin(at)? else {
             return None;
         };
@@ -677,7 +680,7 @@ impl Renderer {
     /// place in the text or the only place they are, else the whole text;
     /// for what a template made, the `{{ ... }}` printing it. None for the
     /// template's own text, or a value printed nowhere known.
-    pub fn printed_at(&self, own: &Own, html: &str, at: usize, len: usize) -> Option<Place> {
+    pub(crate) fn printed_at(&self, own: &Own, html: &str, at: usize, len: usize) -> Option<Place> {
         let sources = &self.shared.sources;
         match own.origin(at)? {
             Origin::Own(_) => None,
@@ -717,25 +720,25 @@ impl Renderer {
     /// The outermost markup of a file's that the byte at `at` of an output
     /// is in: for a byte a snippet called in a page's writing wrote, the
     /// call.
-    pub fn in_text(&self, own: &Own, at: usize) -> Option<Place> {
+    pub(crate) fn in_text(&self, own: &Own, at: usize) -> Option<Place> {
         own.in_text(at)
     }
 
     /// The template or snippet read from `source`, where it is one.
-    pub fn template_of(&self, source: SourceId) -> Option<TemplateId> {
+    pub(crate) fn template_of(&self, source: SourceId) -> Option<TemplateId> {
         let files = &self.shared.templates.files;
         let at = files.iter().position(|file| file.source == source)?;
         Some(Templates::id(at))
     }
 
     /// The file a template or snippet is read from.
-    pub fn template_source(&self, id: TemplateId) -> SourceId {
+    pub(crate) fn template_source(&self, id: TemplateId) -> SourceId {
         self.shared.templates.files[id.index()].source
     }
 
     /// Whether the file is a snippet, built only where the writing or a
     /// template calls it by its name.
-    pub fn called_by_name(&self, id: TemplateId) -> bool {
+    pub(crate) fn called_by_name(&self, id: TemplateId) -> bool {
         matches!(
             self.shared.templates.files[id.index()].role,
             super::files::Role::Snippet(_)
@@ -743,19 +746,19 @@ impl Renderer {
     }
 
     /// The id a field or setting's reads are recorded by.
-    pub fn name_id(&self, name: &str) -> NameId {
+    pub(crate) fn name_id(&self, name: &str) -> NameId {
         self.shared.name_id(name)
     }
 
     /// Everything `page`'s writing read, once it has been built.
-    pub fn writing_read(&self, page: PageId) -> Option<&[Key]> {
+    pub(crate) fn writing_read(&self, page: PageId) -> Option<&[Key]> {
         let body = self.shared.bodies[page.index()].get()?;
         Some(body.reads.keys())
     }
 
     /// What `page`'s writing links to and hands its snippet calls, once
     /// its writing has been built.
-    pub fn writing(&self, page: PageId) -> Option<&crate::linked::Writing> {
+    pub(crate) fn writing(&self, page: PageId) -> Option<&crate::linked::Writing> {
         let body = self.shared.bodies[page.index()].get()?;
         Some(&body.writing)
     }
@@ -763,7 +766,7 @@ impl Renderer {
     /// What `page`'s writing links to and hands its snippet calls, its
     /// writing built now where no output has built it, as where a round
     /// kept the page's output from the round before.
-    pub fn writing_built(&self, page: PageId) -> &crate::linked::Writing {
+    pub(crate) fn writing_built(&self, page: PageId) -> &crate::linked::Writing {
         kept_body(&self.shared, page);
         &(self.shared.bodies[page.index()].get())
             .expect("kept just now")
@@ -773,7 +776,7 @@ impl Renderer {
     /// `page`'s writing as built, cut where each heading with an id
     /// starts: the part before the first heading, then each heading's
     /// part. Built now where no output has built it.
-    pub fn cut_at_headings(&self, page: PageId) -> Vec<Cut> {
+    pub(crate) fn cut_at_headings(&self, page: PageId) -> Vec<Cut> {
         let shared = &self.shared;
         let body = kept_body(shared, page);
         let written = &body.written;
@@ -815,7 +818,11 @@ impl Renderer {
 
     /// How a problem met building `page`, or its list's page `number`
     /// counted from 1, names the page, and where.
-    pub fn building(&self, page: PageId, number: usize) -> Option<(Relation, Option<Place>)> {
+    pub(crate) fn building(
+        &self,
+        page: PageId,
+        number: usize,
+    ) -> Option<(Relation, Option<Place>)> {
         let frame = Frame {
             number,
             ..Frame::new(Arc::clone(&self.shared), Some(page))
@@ -825,7 +832,7 @@ impl Renderer {
 
     /// The template `page` is built with: none for a page built as its
     /// content alone.
-    pub fn layout_of(&self, page: PageId) -> Result<Option<Chosen>, Problem> {
+    pub(crate) fn layout_of(&self, page: PageId) -> Result<Option<Chosen>, Problem> {
         let shared = &self.shared;
         layout::choose(
             &shared.templates,
@@ -843,7 +850,7 @@ impl Renderer {
     /// Builds the page `number`, counted from 2, of the list `page` speaks
     /// for: `page`'s layout, handed the page as it stands there, which
     /// carries none of its writing.
-    pub fn render_later(&self, page: PageId, number: usize) -> Rendered {
+    pub(crate) fn render_later(&self, page: PageId, number: usize) -> Rendered {
         self.render_numbered(page, number)
     }
 
@@ -934,7 +941,7 @@ impl Renderer {
     /// to, where one on the site is, or else `to`; and the page writing
     /// the redirect as `page`. A site with no such template has a refresh
     /// to `to` and a link to it written, and nothing else.
-    pub fn render_redirect(&self, redirect: &Redirect) -> Rendered {
+    pub(crate) fn render_redirect(&self, redirect: &Redirect) -> Rendered {
         let shared = &self.shared;
         let page = redirect.page;
         frame::push(Frame {
@@ -983,7 +990,7 @@ impl Renderer {
     /// What a list calls the page `id`, as `headline` does, and its date as
     /// the site writes dates, where it has one it isn't already called by.
     /// What finding the name tells of the page is left to its own build.
-    pub fn named(&self, id: PageId) -> (String, Option<String>) {
+    pub(crate) fn named(&self, id: PageId) -> (String, Option<String>) {
         let shared = &self.shared;
         frame::push(Frame::new(Arc::clone(shared), Some(id)));
         let called = super::own::called(shared, id);
@@ -1000,19 +1007,19 @@ impl Renderer {
 
     /// Every page the site publishes, a list's later pages among them
     /// with their numbers, in the order of their addresses.
-    pub fn every_page(&self) -> &[(PageId, usize)] {
+    pub(crate) fn every_page(&self) -> &[(PageId, usize)] {
         self.shared.every_page()
     }
 
     /// Every feed the site publishes.
-    pub fn feeds(&self) -> &[crate::feeds::Feed] {
+    pub(crate) fn feeds(&self) -> &[crate::feeds::Feed] {
         &self.shared.feeds
     }
 
     /// Builds a list's feed with its template, handed `feed`, where it is
     /// published, `list`, its dated `posts` newest first, and `page`, the
     /// page speaking for the list, where one does.
-    pub fn render_feed(&self, feed: &crate::feeds::Feed) -> Rendered {
+    pub(crate) fn render_feed(&self, feed: &crate::feeds::Feed) -> Rendered {
         let shared = &self.shared;
         let page = shared.site.lists.get(feed.list).page;
         frame::push(Frame {
@@ -1274,21 +1281,21 @@ pub(super) fn words_of(shared: &Shared, language: LanguageId) -> &crate::languag
 /// The headings of a page's writing, as its table of contents lists them.
 #[derive(Debug)]
 pub(super) struct Section {
-    pub level: u8,
-    pub id: String,
-    pub text: String,
-    pub place: Place,
+    pub(crate) level: u8,
+    pub(crate) id: String,
+    pub(crate) text: String,
+    pub(crate) place: Place,
 }
 
 /// A heading of a page's writing.
 #[derive(Debug)]
 pub(crate) struct Headed {
     /// What an address names it by after `#`.
-    pub id: String,
+    pub(crate) id: String,
     /// Its words, as plain text.
-    pub words: String,
+    pub(crate) words: String,
     /// Where it is written.
-    pub place: Place,
+    pub(crate) place: Place,
 }
 
 fn sections(document: &markdown::Document) -> Vec<Section> {

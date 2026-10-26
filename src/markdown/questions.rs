@@ -10,7 +10,7 @@ use crate::source::Place;
 /// writing, code and maths as written, each block on a line of its own.
 /// Raw HTML, calls, footnote markers and pictures' descriptions are no
 /// part of it, nor is the text of the elements a browser doesn't show.
-pub fn plain_text(node: &Node) -> String {
+pub(crate) fn plain_text(node: &Node) -> String {
     let mut out = String::new();
     text_of(node, &mut out);
     let kept = out.trim_end().len();
@@ -67,7 +67,7 @@ fn text_of(node: &Node, out: &mut String) {
 
 /// Whether the writing holds any maths, its footnotes and the writing its
 /// calls wrap included.
-pub fn uses_maths(document: &Document) -> bool {
+pub(crate) fn uses_maths(document: &Document) -> bool {
     let mut found = false;
     for top in std::iter::once(&document.root).chain(&document.notes) {
         top.walk(&mut |node| found |= matches!(node.kind, Kind::Maths { .. }));
@@ -77,15 +77,17 @@ pub fn uses_maths(document: &Document) -> bool {
 
 /// A link or a picture in the writing.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Link<'a> {
-    pub destination: &'a str,
+#[cfg(test)]
+pub(crate) struct Link<'a> {
+    pub(crate) destination: &'a str,
     /// The whole link or picture as written.
-    pub place: Place,
-    pub picture: bool,
+    pub(crate) place: Place,
+    pub(crate) picture: bool,
 }
 
 /// Every link and picture, in the order written, the footnotes' last.
-pub fn links(document: &Document) -> Vec<Link<'_>> {
+#[cfg(test)]
+pub(crate) fn links(document: &Document) -> Vec<Link<'_>> {
     let mut out = Vec::new();
     for top in std::iter::once(&document.root).chain(&document.notes) {
         top.walk(&mut |node| {
@@ -102,7 +104,7 @@ pub fn links(document: &Document) -> Vec<Link<'_>> {
 }
 
 /// Whether the writing holds a callout, its footnotes included.
-pub fn has_callout(document: &Document) -> bool {
+pub(crate) fn has_callout(document: &Document) -> bool {
     let mut found = false;
     for top in std::iter::once(&document.root).chain(&document.notes) {
         top.walk(&mut |node| found |= matches!(node.kind, Kind::Callout(_)));
@@ -111,17 +113,17 @@ pub fn has_callout(document: &Document) -> bool {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Heading<'a> {
-    pub level: u8,
+pub(crate) struct Heading<'a> {
+    pub(crate) level: u8,
     /// None until heading ids are given.
-    pub id: Option<&'a str>,
+    pub(crate) id: Option<&'a str>,
     /// Its words, as plain text.
-    pub text: String,
-    pub place: Place,
+    pub(crate) text: String,
+    pub(crate) place: Place,
 }
 
 /// Every heading in the writing, in the order written.
-pub fn headings(document: &Document) -> Vec<Heading<'_>> {
+pub(crate) fn headings(document: &Document) -> Vec<Heading<'_>> {
     let mut out = Vec::new();
     document.root.walk(&mut |node| {
         if let Kind::Heading { level, id, .. } = &node.kind {

@@ -57,28 +57,29 @@ fn first_day(year: i32, month: u8) -> Reading {
 /// A date as a format writes it: the calendar day, the weekday it falls
 /// on, and the time of day where the date has one.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Reading {
-    pub year: i32,
-    pub month: u8,
-    pub day: u8,
+pub(crate) struct Reading {
+    pub(crate) year: i32,
+    pub(crate) month: u8,
+    pub(crate) day: u8,
     /// Monday first.
-    pub weekday: usize,
-    pub time: Option<(u8, u8)>,
+    pub(crate) weekday: usize,
+    pub(crate) time: Option<(u8, u8)>,
 }
 
 /// The words a site's dates are written in, and how a format refers to
 /// them.
 #[derive(Clone, Debug)]
-pub struct DateWords {
-    pub words: Arc<Words>,
+pub(crate) struct DateWords {
+    pub(crate) words: Arc<Words>,
     /// Where the words come from, for saying which has none.
-    pub from: WordsFrom,
+    pub(crate) from: WordsFrom,
     /// Whether a day or a month in figures keeps its leading zero.
-    pub zeros: bool,
+    pub(crate) zeros: bool,
 }
 
 impl DateWords {
-    pub fn english() -> DateWords {
+    #[cfg(test)]
+    pub(crate) fn english() -> DateWords {
         DateWords {
             words: crate::language::english(),
             from: WordsFrom::Statac("en".into()),
@@ -95,7 +96,7 @@ impl DateWords {
     /// The reference moment as these words write it, for saying what an
     /// example is read against. Other languages have it in figures, year
     /// first.
-    pub fn moment(&self) -> String {
+    pub(crate) fn moment(&self) -> String {
         let months = match &self.words.months {
             Some(months) if self.english_like() => months,
             _ => return format!("{YEAR_FIRST} 15:04"),
@@ -192,9 +193,9 @@ impl DateWords {
 /// Why an example can't be read, and the stretch of it to point at.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Refusal {
-    pub fault: FormatFault,
+    pub(crate) fault: FormatFault,
     /// Bytes of the example, as written.
-    pub at: Range<usize>,
+    pub(crate) at: Range<usize>,
 }
 
 impl Refusal {
@@ -210,7 +211,7 @@ impl Refusal {
 
     /// The problem to tell, placed by whoever knows where the example is
     /// written.
-    pub fn into_kind(self) -> Kind {
+    pub(crate) fn into_kind(self) -> Kind {
         Kind::UnusableDateFormat {
             fault: Box::new(self.fault),
         }
@@ -366,7 +367,7 @@ enum Part {
 
 /// A date format read from an example, or from a look's pattern.
 #[derive(Clone, Debug)]
-pub struct Format {
+pub(crate) struct Format {
     parts: Vec<Part>,
     words: DateWords,
     /// Whether it is one of the language's looks.
@@ -377,7 +378,7 @@ impl Format {
     /// Reads an example a template hands the `date` filter. It may ask for
     /// any piece alone, but a day and a year with no month between them is
     /// an example whose month is in words the site hasn't got.
-    pub fn for_a_template(example: &str, words: &DateWords) -> Result<Format, Refusal> {
+    pub(crate) fn for_a_template(example: &str, words: &DateWords) -> Result<Format, Refusal> {
         let format = Format::read(example, words).map_err(Refusal::offering_looks)?;
         if format.writes(Piece::Day) && format.writes(Piece::Year) && !format.writes(Piece::Month) {
             return Err(whole(
@@ -395,7 +396,7 @@ impl Format {
     /// Reads a site's `date_format`, the spelling of every date on the
     /// site, so it must write the day, the month and the year, and the
     /// year in full.
-    pub fn for_the_site(example: &str, words: &DateWords) -> Result<Format, Refusal> {
+    pub(crate) fn for_the_site(example: &str, words: &DateWords) -> Result<Format, Refusal> {
         let format = Format::read(example, words)?;
         if !format.parts_of(Component::is_date) {
             let fault = match format.parts_of(Component::is_time) {
@@ -435,7 +436,7 @@ impl Format {
 
     /// The format a site naming no `date_format` writes its dates in: the
     /// long look.
-    pub fn house(words: &DateWords) -> Format {
+    pub(crate) fn house(words: &DateWords) -> Format {
         Format::look(Look::Long, words).unwrap_or_else(|_| Format::unpatterned(Look::Long, words))
     }
 
@@ -443,7 +444,7 @@ impl Format {
     /// [`Format::unpatterned`] does where Statac has no patterns for the
     /// language. A pattern wanting words the language hasn't got is
     /// refused.
-    pub fn look(look: Look, words: &DateWords) -> Result<Format, Refusal> {
+    pub(crate) fn look(look: Look, words: &DateWords) -> Result<Format, Refusal> {
         let Some(patterns) = &words.words.dates else {
             return Ok(Format::unpatterned(look, words));
         };
@@ -508,7 +509,7 @@ impl Format {
     /// The same pieces written in another language's `words`, the text
     /// between them as written in `example`. A piece written in words that
     /// language hasn't got is refused.
-    pub fn in_words(&self, words: &DateWords, example: &str) -> Result<Format, Refusal> {
+    pub(crate) fn in_words(&self, words: &DateWords, example: &str) -> Result<Format, Refusal> {
         let mut format = Format {
             parts: self.parts.clone(),
             words: words.clone(),
@@ -522,7 +523,7 @@ impl Format {
     /// Reads an example in the site's words. Where the site writes its own
     /// digits, an example holding them is read as in 0 to 9, and any
     /// refusal told as written.
-    pub fn read(example: &str, words: &DateWords) -> Result<Format, Refusal> {
+    pub(crate) fn read(example: &str, words: &DateWords) -> Result<Format, Refusal> {
         let digits = words.words.digits.as_ref();
         let Some(plain) = digits.and_then(|digits| Plain::of(example, digits)) else {
             let format = Format::read_as_written(example, words)?;
@@ -864,15 +865,10 @@ impl Format {
             .any(|part| matches!(part, Part::Component(c) if wanted(*c)))
     }
 
-    /// Whether this format writes any part of the time of day.
-    pub fn wants_time(&self) -> bool {
-        self.parts_of(Component::is_time)
-    }
-
     /// `reading` written in this format, its numbers in the site's digits.
     /// A date with no time of day never has one invented: the time's
     /// pieces go, with the text beside them.
-    pub fn write(&self, reading: &Reading) -> String {
+    pub(crate) fn write(&self, reading: &Reading) -> String {
         self.written(reading, true)
     }
 
@@ -909,7 +905,8 @@ impl Format {
     }
 
     /// The reference day as this format writes it.
-    pub fn shown(&self) -> String {
+    #[cfg(test)]
+    pub(crate) fn shown(&self) -> String {
         self.write(&REFERENCE_DAY)
     }
 
@@ -962,7 +959,7 @@ impl Format {
     /// Statac has one, else the month standing alone before the year. A
     /// format writing its month in figures by example gets the one
     /// spelling of a month and a year read only one way.
-    pub fn month_and_year(&self, year: i32, month: u8) -> String {
+    pub(crate) fn month_and_year(&self, year: i32, month: u8) -> String {
         let form = self.parts.iter().find_map(|part| match part {
             Part::Component(Component::Month { form, case, .. }) => Some((*form, *case)),
             _ => None,
@@ -1013,7 +1010,7 @@ impl Format {
 
     /// A year alone, as the language's Unicode CLDR pattern writes it
     /// where Statac has one and this format isn't a machine's.
-    pub fn year_alone(&self, year: i32) -> String {
+    pub(crate) fn year_alone(&self, year: i32) -> String {
         let patterned = match self.for_a_machine() {
             true => None,
             false => (self.words.words.dates.as_ref()).and_then(|p| pattern(&p.year)),

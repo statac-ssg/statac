@@ -9,7 +9,7 @@ use crate::templates::timed::Tally;
 
 /// A part of a build, in the order a build goes through them.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Stage {
+pub(crate) enum Stage {
     /// Running the site's `before_build`.
     Before,
     Reading,
@@ -40,47 +40,47 @@ const STAGES: [Stage; 8] = [
 
 /// Where a build spent its time.
 #[derive(Clone, Default, Debug)]
-pub struct Timings {
+pub(crate) struct Timings {
     /// How long each stage the build went through took, in the order a
     /// build goes through them.
-    pub stages: Vec<(Stage, Duration)>,
+    pub(crate) stages: Vec<(Stage, Duration)>,
     /// What building the outputs and copying the files came to, on every
     /// thread together.
-    pub work: Work,
+    pub(crate) work: Work,
     /// How many threads that work was shared among.
-    pub threads: usize,
+    pub(crate) threads: usize,
     /// Each template that ran, by its path in the site: its time, leaving
     /// out the templates and writing built inside it, and how many times it
     /// ran. The slowest first.
-    pub templates: Vec<(String, Duration, u32)>,
+    pub(crate) templates: Vec<(String, Duration, u32)>,
     /// Each page's writing built, by its file's path in the site. The
     /// slowest first.
-    pub writing: Vec<(String, Duration)>,
+    pub(crate) writing: Vec<(String, Duration)>,
     /// Each output built, by its address: its time, leaving out the writing
     /// built for it, and the template it is built with. The slowest first.
-    pub pages: Vec<(String, Duration, Option<String>)>,
+    pub(crate) pages: Vec<(String, Duration, Option<String>)>,
     /// Each photograph whose copies were made, by its path in the site:
     /// how long making them took, and how many were made. The slowest
     /// first.
-    pub photographs: Vec<(String, Duration, usize)>,
+    pub(crate) photographs: Vec<(String, Duration, usize)>,
 }
 
 /// What building the outputs and copying the files came to, on every
 /// thread together.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub struct Work {
-    pub whole: Duration,
+pub(crate) struct Work {
+    pub(crate) whole: Duration,
     /// Writing files into the built site and copying files there.
-    pub saving: Duration,
+    pub(crate) saving: Duration,
     /// Building the writing of pages.
-    pub writing: Duration,
-    pub templates: Duration,
-    pub links: Duration,
+    pub(crate) writing: Duration,
+    pub(crate) templates: Duration,
+    pub(crate) links: Duration,
 }
 
 impl Work {
     /// What the parts named leave of the whole.
-    pub fn rest(&self) -> Duration {
+    pub(crate) fn rest(&self) -> Duration {
         let named = self.saving + self.writing + self.templates + self.links;
         self.whole.saturating_sub(named)
     }
@@ -90,13 +90,13 @@ impl Work {
 #[derive(Clone, Default, Debug)]
 pub(crate) struct Output {
     /// Its address.
-    pub address: String,
-    pub whole: Duration,
-    pub links: Duration,
-    pub saving: Duration,
-    pub tally: Tally,
+    pub(crate) address: String,
+    pub(crate) whole: Duration,
+    pub(crate) links: Duration,
+    pub(crate) saving: Duration,
+    pub(crate) tally: Tally,
     /// The template it is built with, by its index among the files.
-    pub layout: Option<usize>,
+    pub(crate) layout: Option<usize>,
 }
 
 /// Times each stage of a build as it ends.

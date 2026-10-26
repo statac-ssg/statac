@@ -31,7 +31,7 @@ pub enum Unwritable {
 /// Why a file or folder is refused here rather than by the system. It
 /// travels inside an `io::Error` and is worded as a `problem::Reason`.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Refused {
+pub(crate) enum Refused {
     /// It is a link, never followed.
     Link,
     /// It is a folder or something else, not a file.
@@ -44,7 +44,7 @@ pub enum Refused {
 
 impl Refused {
     /// The refusal `error` carries, where it is one.
-    pub fn of(error: &io::Error) -> Option<Refused> {
+    pub(crate) fn of(error: &io::Error) -> Option<Refused> {
         error.get_ref()?.downcast_ref().copied()
     }
 }
@@ -99,7 +99,7 @@ const REFUSED: [char; 8] = ['<', '>', ':', '"', '|', '?', '*', '\\'];
 
 /// Why `path`, a relative path written with forward slashes, can't be
 /// written on some common disk, if it can't.
-pub fn unwritable(path: &str) -> Option<Unwritable> {
+pub(crate) fn unwritable(path: &str) -> Option<Unwritable> {
     path.split('/').find_map(unwritable_piece)
 }
 
@@ -134,7 +134,7 @@ pub enum Alike {
 /// `path` as common disks compare names: macOS and Windows disks ignore
 /// capitals, and macOS disks ignore how an accented letter is stored. Two
 /// paths with the same key are one file there.
-pub fn folded(path: &str) -> String {
+pub(crate) fn folded(path: &str) -> String {
     // ASCII is its own decomposition, and most paths are nothing else.
     if path.is_ascii() {
         return path.to_ascii_lowercase();
@@ -147,7 +147,7 @@ pub fn folded(path: &str) -> String {
 }
 
 /// How `a` and `b` differ, given that they fold alike.
-pub fn alike(a: &str, b: &str) -> Alike {
+pub(crate) fn alike(a: &str, b: &str) -> Alike {
     if a == b {
         Alike::Exactly
     } else if decomposed(a) == decomposed(b) {
@@ -161,7 +161,7 @@ pub fn alike(a: &str, b: &str) -> Alike {
 /// names differing only in capitals as one: asked of the nearest folder
 /// whose name has a letter, by that name in other capitals, which such a
 /// disk finds without listing both.
-pub fn ignores_capitals(folder: &Path) -> bool {
+pub(crate) fn ignores_capitals(folder: &Path) -> bool {
     for at in folder.ancestors() {
         let (Some(above), Some(name)) = (at.parent(), at.file_name().and_then(|n| n.to_str()))
         else {
@@ -189,19 +189,19 @@ pub fn ignores_capitals(folder: &Path) -> bool {
 }
 
 /// Canonical decomposition, Unicode's NFD.
-pub fn decomposed(text: &str) -> String {
+pub(crate) fn decomposed(text: &str) -> String {
     text.nfd().collect()
 }
 
 /// `rel`, written with forward slashes, as a path under `root`.
-pub fn join(root: &Path, rel: &str) -> PathBuf {
+pub(crate) fn join(root: &Path, rel: &str) -> PathBuf {
     let mut path = root.to_path_buf();
     path.extend(rel.split('/').filter(|piece| !piece.is_empty()));
     path
 }
 
 /// `path` made whole, as far as it is there, with the rest as written.
-pub fn whole_to_be(path: &Path) -> PathBuf {
+pub(crate) fn whole_to_be(path: &Path) -> PathBuf {
     let mut missing = Vec::new();
     let mut at = path.to_path_buf();
     loop {
@@ -226,7 +226,7 @@ pub fn whole_to_be(path: &Path) -> PathBuf {
 
 /// A relative path written with forward slashes whatever the system, or
 /// `Err` with a lossy spelling where a piece isn't text.
-pub fn slashed(rel: &Path) -> Result<String, String> {
+pub(crate) fn slashed(rel: &Path) -> Result<String, String> {
     let mut out = String::new();
     let mut text = true;
     for component in rel.components() {
@@ -261,13 +261,13 @@ const PAUSES: [Duration; 6] = [
 /// Moves `from` to `to`, which must not exist: Windows refuses to move a
 /// folder over anything, and other systems would move one over an empty
 /// folder, so the two only agree when nothing is there.
-pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
+pub(crate) fn rename(from: &Path, to: &Path) -> io::Result<()> {
     retrying(|| std::fs::rename(from, to), transient, &PAUSES)
 }
 
 /// Why a file wasn't written over.
 #[derive(Debug)]
-pub enum Unwritten {
+pub(crate) enum Unwritten {
     /// It no longer holds what was read.
     Changed,
     /// It has a second name somewhere, which writing it would part it from.
@@ -296,7 +296,7 @@ pub fn beside(name: &str) -> String {
 /// no link is followed even where one is put in place while this runs;
 /// elsewhere each path is asked what it is before it is used, and the
 /// file is asked and read through one handle.
-pub fn rewrite(root: &Path, rel: &str, read: &[u8], text: &[u8]) -> Result<(), Unwritten> {
+pub(crate) fn rewrite(root: &Path, rel: &str, read: &[u8], text: &[u8]) -> Result<(), Unwritten> {
     #[cfg(unix)]
     {
         unix::rewrite(root, rel, read, text)
@@ -339,7 +339,7 @@ pub fn rewrite(root: &Path, rel: &str, read: &[u8], text: &[u8]) -> Result<(), U
 
 /// What became of a file asked to hold other bytes where it stands.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Over {
+pub(crate) enum Over {
     /// It held them already, and is untouched.
     Same,
     Written,
@@ -356,7 +356,7 @@ pub enum Over {
 /// where the folder is found to be a folder and no link; the folders
 /// above `folder` are the caller's to be sure of. A failure part of the
 /// way through leaves the file holding anything.
-pub fn write_over(folder: &Path, name: &str, bytes: &[u8]) -> io::Result<Over> {
+pub(crate) fn write_over(folder: &Path, name: &str, bytes: &[u8]) -> io::Result<Over> {
     #[cfg(unix)]
     {
         unix::write_over(folder, name, bytes)
@@ -372,7 +372,7 @@ pub fn write_over(folder: &Path, name: &str, bytes: &[u8]) -> io::Result<Over> {
 /// step, so neither name is ever without its folder. `Ok(false)` where the
 /// system or the disk has no such step, and nothing has moved: macOS and
 /// Linux have one on most disks, Windows has none.
-pub fn exchange(a: &Path, b: &Path) -> io::Result<bool> {
+pub(crate) fn exchange(a: &Path, b: &Path) -> io::Result<bool> {
     #[cfg(any(target_vendor = "apple", target_os = "linux", target_os = "android"))]
     {
         unix::exchange(a, b)
@@ -391,7 +391,7 @@ pub fn exchange(a: &Path, b: &Path) -> io::Result<bool> {
 /// there yet is no link. On Unix each folder is opened by its name in the
 /// folder above it, already open, so none is looked up twice; elsewhere
 /// each is asked what it is by its path.
-pub fn no_link_to(root: &Path, rel: &str) -> io::Result<()> {
+pub(crate) fn no_link_to(root: &Path, rel: &str) -> io::Result<()> {
     #[cfg(unix)]
     {
         unix::no_link_to(root, rel)
@@ -436,7 +436,7 @@ pub fn no_link_to(root: &Path, rel: &str) -> io::Result<()> {
 /// file. Nothing there is no error. On Unix the name is removed from its
 /// folder, already open, so a folder on the way swapped for a link while
 /// this runs can't send the removal anywhere else.
-pub fn remove_file(root: &Path, rel: &str) -> io::Result<()> {
+pub(crate) fn remove_file(root: &Path, rel: &str) -> io::Result<()> {
     #[cfg(unix)]
     {
         unix::remove_file(root, rel)
@@ -455,7 +455,7 @@ pub fn remove_file(root: &Path, rel: &str) -> io::Result<()> {
 /// `root`, where nothing has its name yet. The folders on the way must be
 /// there already, and neither they nor `root` may be a link. On Unix the
 /// folder is made by name in the folder above it, already open.
-pub fn make_folder(root: &Path, rel: &str) -> io::Result<()> {
+pub(crate) fn make_folder(root: &Path, rel: &str) -> io::Result<()> {
     #[cfg(unix)]
     {
         unix::make_folder(root, rel)
@@ -472,7 +472,7 @@ pub fn make_folder(root: &Path, rel: &str) -> io::Result<()> {
 /// included. The folders on the way must be there already, and neither
 /// they nor `root` may be a link. On Unix the file is made by name in the
 /// folder above it, already open.
-pub fn make_file(root: &Path, rel: &str, bytes: &[u8]) -> io::Result<()> {
+pub(crate) fn make_file(root: &Path, rel: &str, bytes: &[u8]) -> io::Result<()> {
     #[cfg(unix)]
     {
         unix::make_file(root, rel, bytes)
@@ -495,7 +495,7 @@ pub fn make_file(root: &Path, rel: &str, bytes: &[u8]) -> io::Result<()> {
 /// stands at `rel` is a link, or where that is no file. On Unix the file
 /// is opened by name in the folder above it, already open, and never
 /// through a link.
-pub fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
+pub(crate) fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
     #[cfg(unix)]
     {
         unix::read_file(root, rel)
@@ -515,7 +515,7 @@ pub fn read_file(root: &Path, rel: &str) -> io::Result<Option<Vec<u8>>> {
 /// error. On Unix the file is opened by name in the folder above it,
 /// already open, and never through a link, so a link put in place of the
 /// file or a folder on the way after either was looked at is refused.
-pub fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
+pub(crate) fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
     #[cfg(unix)]
     {
         unix::open_file(root, rel)
@@ -535,7 +535,7 @@ pub fn open_file(root: &Path, rel: &str) -> io::Result<std::fs::File> {
 /// stands at `rel`; the file under `fresh` is removed where it fails. On
 /// Unix each is done by name in the folder above, already open, and never
 /// through a link.
-pub fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Result<()> {
+pub(crate) fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Result<()> {
     #[cfg(unix)]
     {
         unix::keep_file(root, rel, fresh, bytes)
@@ -572,7 +572,7 @@ pub fn keep_file(root: &Path, rel: &str, fresh: &str, bytes: &[u8]) -> io::Resul
 /// the folder it was, wherever it is moved. Elsewhere each is reached by
 /// its path.
 #[derive(Debug)]
-pub struct Folders {
+pub(crate) struct Folders {
     #[cfg(unix)]
     open: unix::Folders,
     #[cfg(not(unix))]
@@ -581,7 +581,7 @@ pub struct Folders {
 
 impl Folders {
     /// The folder at `root`, nothing in it open yet.
-    pub fn new(root: &Path) -> Folders {
+    pub(crate) fn new(root: &Path) -> Folders {
         Folders {
             #[cfg(unix)]
             open: unix::Folders::new(root),
@@ -592,7 +592,7 @@ impl Folders {
 
     /// Makes the folder `rel`, and each folder on the way to it, where
     /// they aren't there.
-    pub fn make_folders(&self, rel: &str) -> io::Result<()> {
+    pub(crate) fn make_folders(&self, rel: &str) -> io::Result<()> {
         #[cfg(unix)]
         {
             self.open.make_folders(rel)
@@ -607,7 +607,7 @@ impl Folders {
     /// `replacing`, what stands at `rel` is removed first, a link as a
     /// link; nothing else already there is ever written through. The
     /// folders on the way must be there already.
-    pub fn make_new_file(&self, rel: &str, replacing: bool) -> io::Result<std::fs::File> {
+    pub(crate) fn make_new_file(&self, rel: &str, replacing: bool) -> io::Result<std::fs::File> {
         #[cfg(unix)]
         {
             self.open.make_new_file(rel, replacing)
@@ -635,7 +635,7 @@ impl Folders {
     /// bytes where the disk can, as a copy made by the system's own
     /// copying does. Gives the copy open to write where it can be opened
     /// so, for its time to be set.
-    pub fn copy_file(
+    pub(crate) fn copy_file(
         &self,
         source: &std::fs::File,
         rel: &str,
@@ -655,7 +655,7 @@ impl Folders {
     }
 
     /// The file `rel` opened to read, as [`open_file`] opens it.
-    pub fn open_file(&self, rel: &str) -> io::Result<std::fs::File> {
+    pub(crate) fn open_file(&self, rel: &str) -> io::Result<std::fs::File> {
         #[cfg(unix)]
         {
             self.open.open_file(rel)
@@ -668,7 +668,11 @@ impl Folders {
 
     /// Gives the file `rel` `modified` as the time its bytes last changed,
     /// refused as [`open_file`] refuses.
-    pub fn set_modified(&self, rel: &str, modified: std::time::SystemTime) -> io::Result<()> {
+    pub(crate) fn set_modified(
+        &self,
+        rel: &str,
+        modified: std::time::SystemTime,
+    ) -> io::Result<()> {
         #[cfg(unix)]
         {
             // The owner may set a file's times through any handle on it.
@@ -685,7 +689,7 @@ impl Folders {
     }
 
     /// What the file `rel` is found to be, as [`measure`] finds it.
-    pub fn measure(&self, rel: &str) -> io::Result<Measure> {
+    pub(crate) fn measure(&self, rel: &str) -> io::Result<Measure> {
         #[cfg(unix)]
         {
             self.open.measure(rel)
@@ -701,7 +705,7 @@ impl Folders {
     /// error. `alone` keeps the work on the calling thread: one waiting on
     /// others takes up other work meanwhile, which may ask for a lock it
     /// holds.
-    pub fn remove(&self, rel: &str, alone: bool) -> io::Result<()> {
+    pub(crate) fn remove(&self, rel: &str, alone: bool) -> io::Result<()> {
         #[cfg(unix)]
         {
             self.open.remove(rel, alone)
@@ -723,7 +727,7 @@ impl Folders {
     }
 
     /// Removes the file `rel` as [`remove_file`] does.
-    pub fn remove_file(&self, rel: &str) -> io::Result<()> {
+    pub(crate) fn remove_file(&self, rel: &str) -> io::Result<()> {
         #[cfg(unix)]
         {
             self.open.remove_file(rel)
@@ -736,7 +740,7 @@ impl Folders {
 
     /// Removes the folder `rel` where it is empty, and fails where it
     /// isn't.
-    pub fn remove_empty_folder(&self, rel: &str) -> io::Result<()> {
+    pub(crate) fn remove_empty_folder(&self, rel: &str) -> io::Result<()> {
         #[cfg(unix)]
         {
             self.open.remove_empty_folder(rel)
@@ -748,7 +752,7 @@ impl Folders {
     }
 
     /// Gives the entry `from` in the folder `folder` the name `to` there.
-    pub fn rename_in(&self, folder: &str, from: &str, to: &str) -> io::Result<()> {
+    pub(crate) fn rename_in(&self, folder: &str, from: &str, to: &str) -> io::Result<()> {
         #[cfg(unix)]
         {
             self.open.rename_in(folder, from, to)
@@ -763,12 +767,12 @@ impl Folders {
 
 /// What [`measure`] finds of a file.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Measure {
-    pub length: u64,
+pub(crate) struct Measure {
+    pub(crate) length: u64,
     /// When its bytes last changed.
-    pub modified: std::time::SystemTime,
+    pub(crate) modified: std::time::SystemTime,
     /// Whether it has one name only, as [`named_once`] says.
-    pub named_once: bool,
+    pub(crate) named_once: bool,
 }
 
 /// What the file `rel`, a path with forward slashes under the folder
@@ -777,7 +781,7 @@ pub struct Measure {
 /// too. On Unix it is asked by name in the folder above it, already open,
 /// and never through a link; elsewhere through one handle, opened as
 /// itself.
-pub fn measure(root: &Path, rel: &str) -> io::Result<Measure> {
+pub(crate) fn measure(root: &Path, rel: &str) -> io::Result<Measure> {
     #[cfg(unix)]
     {
         unix::measure(root, rel)
@@ -801,7 +805,7 @@ pub fn measure(root: &Path, rel: &str) -> io::Result<Measure> {
 /// the file is opened by name in the folder, already open; elsewhere each
 /// is asked what it is first, and a file Windows refuses for a moment
 /// while another program has it open is asked for again.
-pub fn lock_file(folder: &Path, name: &str) -> io::Result<std::fs::File> {
+pub(crate) fn lock_file(folder: &Path, name: &str) -> io::Result<std::fs::File> {
     #[cfg(unix)]
     {
         unix::lock_file(folder, name)
@@ -874,7 +878,7 @@ fn itself(file: &std::fs::File) -> io::Result<std::fs::Metadata> {
 /// second name somewhere may be a file outside the site. The count is
 /// asked of the open file, so it is of the file read through `file`, and
 /// where it can't be asked the file doesn't pass.
-pub fn named_once(file: &std::fs::File) -> bool {
+pub(crate) fn named_once(file: &std::fs::File) -> bool {
     #[cfg(unix)]
     {
         file.metadata()
@@ -889,7 +893,7 @@ pub fn named_once(file: &std::fs::File) -> bool {
 /// Whether a file itself stands at `path`: not a link to one, nor a
 /// folder, nor a file with another name somewhere, which may be a file
 /// outside the site.
-pub fn is_file_itself(path: &Path) -> bool {
+pub(crate) fn is_file_itself(path: &Path) -> bool {
     #[cfg(unix)]
     {
         std::fs::symlink_metadata(path).is_ok_and(|found| {
@@ -906,7 +910,7 @@ pub fn is_file_itself(path: &Path) -> bool {
 /// and nanoseconds, which no program sets back as it can the time of its
 /// bytes, and which disk and which file on it it is. Stable Rust reads
 /// none of them on Windows.
-pub fn changed_and_placed(found: &std::fs::Metadata) -> Option<((i64, i64), u64, u64)> {
+pub(crate) fn changed_and_placed(found: &std::fs::Metadata) -> Option<((i64, i64), u64, u64)> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
@@ -927,7 +931,7 @@ pub fn changed_and_placed(found: &std::fs::Metadata) -> Option<((i64, i64), u64,
 /// which only two folders on one disk allow. Told by moving an empty
 /// folder called `probe` from one to `landing` in the other, neither of
 /// which may exist, and removing it.
-pub fn moves_between(from: &Path, probe: &str, landing: &Path) -> io::Result<bool> {
+pub(crate) fn moves_between(from: &Path, probe: &str, landing: &Path) -> io::Result<bool> {
     let probe = from.join(probe);
     // One left by a build stopped half way.
     let _ = std::fs::remove_dir(&probe);
@@ -946,7 +950,7 @@ pub fn moves_between(from: &Path, probe: &str, landing: &Path) -> io::Result<boo
 
 /// Whether `rel`, a path with forward slashes, stays inside the folder it
 /// is joined to: no piece climbs out or names a drive or a root.
-pub fn stays_inside(rel: &str) -> bool {
+pub(crate) fn stays_inside(rel: &str) -> bool {
     !rel.starts_with('/')
         && rel
             .split('/')
@@ -956,7 +960,7 @@ pub fn stays_inside(rel: &str) -> bool {
 /// Removes a folder and everything in it. A link, whether `path` itself
 /// or anywhere inside, is never followed: `path` being one is refused, and
 /// a link inside is removed as a link, even one put there while it runs.
-pub fn remove_folder(path: &Path) -> io::Result<()> {
+pub(crate) fn remove_folder(path: &Path) -> io::Result<()> {
     if std::fs::symlink_metadata(path)?.is_symlink() {
         return Err(io::Error::from(Refused::Link));
     }
@@ -975,7 +979,7 @@ pub fn remove_folder(path: &Path) -> io::Result<()> {
 /// virtual machine or a container. Nothing where the disk is the
 /// machine's own, or where the system can't be asked: Windows can't be
 /// from stable Rust without a call Statac doesn't make.
-pub fn remote_disk(path: &Path) -> Option<String> {
+pub(crate) fn remote_disk(path: &Path) -> Option<String> {
     #[cfg(any(target_vendor = "apple", target_os = "linux", target_os = "android"))]
     {
         unix::remote_disk(path)
@@ -991,14 +995,15 @@ pub fn remote_disk(path: &Path) -> Option<String> {
 /// on it to stay prompt. macOS's come up to a second and a half late
 /// after fifteen seconds or more with nothing written. Nothing where they
 /// come as promptly whatever the quiet.
-pub const KEEPS_REPORTS_PROMPT: Option<Duration> = match cfg!(target_os = "macos") {
+pub(crate) const KEEPS_REPORTS_PROMPT: Option<Duration> = match cfg!(target_os = "macos") {
     true => Some(Duration::from_secs(10)),
     false => None,
 };
 
 /// Whether a disk macOS calls `kind` is remote, `local` being whether the
 /// system counts it as one of the machine's own.
-pub fn remote_by_name(kind: &str, local: bool) -> bool {
+#[cfg(any(target_vendor = "apple", test))]
+pub(crate) fn remote_by_name(kind: &str, local: bool) -> bool {
     const REMOTE: [&str; 8] = [
         "nfs", "smbfs", "afpfs", "webdav", "cifs", "macfuse", "osxfuse", "fuse",
     ];
@@ -1006,7 +1011,8 @@ pub fn remote_by_name(kind: &str, local: bool) -> bool {
 }
 
 /// The name of the kind of disk Linux numbers `magic`, where it is remote.
-pub fn remote_by_number(magic: u32) -> Option<&'static str> {
+#[cfg(any(target_os = "linux", target_os = "android", test))]
+pub(crate) fn remote_by_number(magic: u32) -> Option<&'static str> {
     Some(match magic {
         0x6969 => "NFS",
         0x517B => "SMB",
@@ -1051,7 +1057,7 @@ fn retrying<T>(
 
 /// The system's shell, ready to run `line` as it reads a line typed at
 /// it: `sh -c` on Unix, `cmd /C` on Windows.
-pub fn shell(line: &str) -> std::process::Command {
+pub(crate) fn shell(line: &str) -> std::process::Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -1070,7 +1076,7 @@ pub fn shell(line: &str) -> std::process::Command {
 }
 
 /// How the system's shell spells the folder a command is to act on.
-pub const SHELL_OUT: &str = match cfg!(windows) {
+pub(crate) const SHELL_OUT: &str = match cfg!(windows) {
     true => "%STATAC_OUT%",
     false => "$STATAC_OUT",
 };
@@ -1078,14 +1084,14 @@ pub const SHELL_OUT: &str = match cfg!(windows) {
 /// Whether the console Statac writes to shows escape codes as colour.
 /// Older Windows consoles print them as text unless a program asks them
 /// not to, which takes a system call Statac doesn't make.
-pub fn console_reads_escapes() -> bool {
+pub(crate) fn console_reads_escapes() -> bool {
     let set = |name| std::env::var_os(name).is_some_and(|value| !value.is_empty());
     !cfg!(windows) || set("WT_SESSION") || set("TERM")
 }
 
 /// Whether `code` is the exit code the system's shell gives for a command
 /// it couldn't find.
-pub fn command_not_found(code: i32) -> bool {
+pub(crate) fn command_not_found(code: i32) -> bool {
     code == if cfg!(windows) { 9009 } else { 127 }
 }
 

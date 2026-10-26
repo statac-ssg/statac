@@ -24,25 +24,25 @@ use crate::import::{Finding, Spot};
 pub(super) struct Context<'a> {
     /// The path the site is under, as `/blog`; empty at the top of its
     /// host.
-    pub base: &'a str,
+    pub(crate) base: &'a str,
     /// The site's whole address, with its path, where it is known.
-    pub whole: Option<&'a str>,
+    pub(crate) whole: Option<&'a str>,
     /// The address, from the top of the site, of the page a `ref` names,
     /// in the language named, where there is one.
-    pub refs: &'a dyn Fn(&str, Option<&str>) -> Option<String>,
+    pub(crate) refs: &'a dyn Fn(&str, Option<&str>) -> Option<String>,
     /// A value of the page's own, or else the site's, by its name.
-    pub param: &'a dyn Fn(&str) -> Option<String>,
+    pub(crate) param: &'a dyn Fn(&str) -> Option<String>,
     /// The names of the site's own tags, from its layouts.
-    pub own: &'a [String],
+    pub(crate) own: &'a [String],
     /// The tags some call anywhere in the site wraps writing with.
-    pub wrapping: &'a HashSet<String>,
-    pub html: bool,
-    pub unsafe_html: bool,
-    pub emoji: bool,
-    pub block_attributes: bool,
+    pub(crate) wrapping: &'a HashSet<String>,
+    pub(crate) html: bool,
+    pub(crate) unsafe_html: bool,
+    pub(crate) emoji: bool,
+    pub(crate) block_attributes: bool,
     /// The words Hugo cut a summary at, where the page's summary is one
     /// Hugo cut.
-    pub summary_length: Option<usize>,
+    pub(crate) summary_length: Option<usize>,
 }
 
 /// The address a `ref` or `relref` tag is written as: from the top of the
@@ -98,26 +98,26 @@ fn in_address(body: &str, at: usize) -> bool {
 /// A snippet call put in place of a tag.
 #[derive(Clone, Debug)]
 pub(super) struct Call {
-    pub snippet: String,
+    pub(crate) snippet: String,
     /// The tag's name, as written.
-    pub tag: String,
+    pub(crate) tag: String,
     /// The names it hands, in order.
-    pub names: Vec<String>,
-    pub wraps: bool,
-    pub spot: Spot,
+    pub(crate) names: Vec<String>,
+    pub(crate) wraps: bool,
+    pub(crate) spot: Spot,
 }
 
 /// The writing converted, with what didn't convert.
 pub(super) struct Converted {
-    pub writing: String,
-    pub findings: Vec<Finding>,
-    pub calls: Vec<Call>,
+    pub(crate) writing: String,
+    pub(crate) findings: Vec<Finding>,
+    pub(crate) calls: Vec<Call>,
     /// Where each code fence written here starts in the writing, in
     /// order.
-    pub fences: Vec<usize>,
+    pub(crate) fences: Vec<usize>,
     /// Where each snippet call written here starts, and each `@end`, in
     /// order.
-    pub called: Vec<usize>,
+    pub(crate) called: Vec<usize>,
 }
 
 /// The names Hugo's own tags give the values they take without one.

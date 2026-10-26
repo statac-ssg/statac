@@ -34,11 +34,11 @@ use crate::reads::{Key, Reads};
 use crate::source::{Place, Sources, Span};
 use crate::suggest;
 
-pub const ASSETS: &str = "assets";
-pub const STATIC: &str = "static";
+pub(crate) const ASSETS: &str = "assets";
+pub(crate) const STATIC: &str = "static";
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum AssetKind {
+pub(crate) enum AssetKind {
     Stylesheet,
     Script {
         module: bool,
@@ -52,26 +52,26 @@ pub enum AssetKind {
 pub struct Asset {
     /// The name a template asks for it by: its path under `assets/`, a Sass
     /// file named as the stylesheet it becomes.
-    pub name: String,
+    pub(crate) name: String,
     /// Its path in the published site, fingerprint and all.
     pub published: String,
     /// The file it was made from, under the site's folder.
-    pub source: String,
-    pub kind: AssetKind,
+    pub(crate) source: String,
+    pub(crate) kind: AssetKind,
     bytes: Vec<u8>,
 }
 
 impl Asset {
     /// The bytes as published.
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 }
 
 #[derive(Debug)]
-pub struct StaticFile {
+pub(crate) struct StaticFile {
     /// Its path under `static/`, which is its path in the published site.
-    pub name: String,
+    pub(crate) name: String,
     at: String,
 }
 
@@ -79,7 +79,7 @@ impl StaticFile {
     /// Where it really is: its path past every link under
     /// [`Assets::real`], to be read by [`platform::open_file`], which
     /// follows no link.
-    pub fn at(&self) -> &str {
+    pub(crate) fn at(&self) -> &str {
         &self.at
     }
 }
@@ -464,7 +464,7 @@ impl Assets {
 
     /// Every path this publishes in the site, with the file it comes
     /// from, for checking against what else the build publishes.
-    pub fn claims(&self) -> Vec<(String, Named)> {
+    pub(crate) fn claims(&self) -> Vec<(String, Named)> {
         claims(&self.assets, &self.statics)
             .into_iter()
             .map(|(rel, source)| (rel, Named::File(source)))
@@ -473,7 +473,7 @@ impl Assets {
 
     /// The stylesheets Sass stopped on, each by the path it would have
     /// been published at, which a page may still link.
-    pub fn unwritten(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn unwritten(&self) -> impl Iterator<Item = &str> {
         self.unwritten.iter().map(String::as_str)
     }
 
@@ -481,33 +481,28 @@ impl Assets {
         self.names.get(name).map(|&id| self.assets.get(id))
     }
 
-    /// The asset a template asks for as `name`, as a read of it is recorded.
-    pub fn id(&self, name: &str) -> Option<AssetId> {
-        self.names.get(name).copied()
-    }
-
     /// The name of every asset, as a template asks for it.
-    pub fn names(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
         self.names.keys().map(String::as_str)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (AssetId, &Asset)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (AssetId, &Asset)> {
         self.assets.iter()
     }
 
-    pub fn statics(&self) -> &[StaticFile] {
+    pub(crate) fn statics(&self) -> &[StaticFile] {
         &self.statics
     }
 
     /// The site's real path, which each file in `static/` really is under.
-    pub fn real(&self) -> &Path {
+    pub(crate) fn real(&self) -> &Path {
         &self.real
     }
 
     /// The warning for a stylesheet rule that narrows pictures and keeps
     /// their height, to be told where a built page shows a picture given
     /// its width and height.
-    pub fn narrowed(&self) -> Option<&Problem> {
+    pub(crate) fn narrowed(&self) -> Option<&Problem> {
         self.narrowed.as_ref()
     }
 
@@ -748,7 +743,7 @@ fn claims(assets: &Arena<AssetId, Asset>, statics: &[StaticFile]) -> Vec<(String
 /// path in the published site with the file it comes from, so pages can
 /// be checked against assets and static files by adding them to
 /// [`Assets::claims`].
-pub fn same_address(outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
+pub(crate) fn same_address(outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
     let mut problems = Vec::new();
     let mut told = HashSet::new();
     let mut tell = |first: &Named, second: &Named, alike: Alike, rel: &str| {
@@ -972,7 +967,7 @@ fn split_extension(name: &str) -> (&str, &str) {
     }
 }
 
-pub fn is_script(name: &str) -> bool {
+pub(crate) fn is_script(name: &str) -> bool {
     matches!(
         split_extension(name).1.to_ascii_lowercase().as_str(),
         "js" | "mjs" | "cjs"

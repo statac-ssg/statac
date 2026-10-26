@@ -42,7 +42,7 @@ pub(crate) const FOLDER: &str = "languages";
 
 /// Which way a language's lines run.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
-pub enum Direction {
+pub(crate) enum Direction {
     #[default]
     LeftToRight,
     RightToLeft,
@@ -50,7 +50,7 @@ pub enum Direction {
 
 impl Direction {
     /// As a language file writes it, and as HTML's `dir` reads it.
-    pub fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Direction::LeftToRight => "ltr",
             Direction::RightToLeft => "rtl",
@@ -60,11 +60,11 @@ impl Direction {
 
 /// The marks straight quotes are set as: the outer pair, then the inner.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Quotes {
-    pub open: char,
-    pub close: char,
-    pub inner_open: char,
-    pub inner_close: char,
+pub(crate) struct Quotes {
+    pub(crate) open: char,
+    pub(crate) close: char,
+    pub(crate) inner_open: char,
+    pub(crate) inner_close: char,
 }
 
 /// The words and marks of one language, each `None` or empty where the
@@ -72,62 +72,62 @@ pub struct Quotes {
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Words {
     /// As a month is written inside a date, January first.
-    pub months: Option<[String; 12]>,
+    pub(crate) months: Option<[String; 12]>,
     /// As a month is written with no day beside it, where that differs.
-    pub months_alone: Option<[String; 12]>,
-    pub months_short: Option<[String; 12]>,
-    pub months_short_alone: Option<[String; 12]>,
+    pub(crate) months_alone: Option<[String; 12]>,
+    pub(crate) months_short: Option<[String; 12]>,
+    pub(crate) months_short_alone: Option<[String; 12]>,
     /// Monday first.
-    pub weekdays: Option<[String; 7]>,
-    pub weekdays_short: Option<[String; 7]>,
+    pub(crate) weekdays: Option<[String; 7]>,
+    pub(crate) weekdays_short: Option<[String; 7]>,
     /// A day of the month as a date writes it, the first first.
-    pub days: Option<[String; 31]>,
+    pub(crate) days: Option<[String; 31]>,
     /// The morning's word, then the afternoon's.
-    pub am_pm: Option<[String; 2]>,
+    pub(crate) am_pm: Option<[String; 2]>,
     /// The ten digits numbers are written in, zero first.
-    pub digits: Option<[char; 10]>,
-    pub quotes: Option<Quotes>,
+    pub(crate) digits: Option<[char; 10]>,
+    pub(crate) quotes: Option<Quotes>,
     /// Marks a typed space before them can't break at.
-    pub no_break_before: Vec<char>,
+    pub(crate) no_break_before: Vec<char>,
     /// Marks a typed space after them can't break at.
-    pub no_break_after: Vec<char>,
+    pub(crate) no_break_after: Vec<char>,
     /// The space written just inside the outer quotes.
-    pub inside_quotes: Option<char>,
-    pub direction: Direction,
+    pub(crate) inside_quotes: Option<char>,
+    pub(crate) direction: Direction,
     /// What a screen reader says for a note's way back to the text.
-    pub back_to_the_text: Option<String>,
+    pub(crate) back_to_the_text: Option<String>,
     /// The words for each kind of callout, in the order of `CALLOUTS`.
-    pub callouts: Option<[String; 5]>,
+    pub(crate) callouts: Option<[String; 5]>,
     /// How the Unicode CLDR writes a date in the language, where Statac
     /// has the language's own.
-    pub dates: Option<Patterns>,
+    pub(crate) dates: Option<Patterns>,
 }
 
 /// The Unicode CLDR's patterns for a language's dates, in its letters:
 /// `d MMMM y`.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
-pub struct Patterns {
+pub(crate) struct Patterns {
     /// The CLDR's full date, with its weekday.
-    pub full: String,
+    pub(crate) full: String,
     /// The CLDR's long date.
-    pub long: String,
+    pub(crate) long: String,
     /// The CLDR's medium date.
-    pub short: String,
+    pub(crate) short: String,
     /// The CLDR's short date, in figures.
-    pub figures: String,
+    pub(crate) figures: String,
     /// The day and the month, `MMMd`.
-    pub day: String,
+    pub(crate) day: String,
     /// The CLDR's short time.
-    pub time: String,
+    pub(crate) time: String,
     /// How a date and a time are put together, `{1}` the date and `{0}`
     /// the time: the CLDR's medium.
-    pub date_and_time: String,
+    pub(crate) date_and_time: String,
     /// `yMMMM`.
-    pub month_and_year: String,
+    pub(crate) month_and_year: String,
     /// `yMMM`.
-    pub month_short_and_year: String,
+    pub(crate) month_short_and_year: String,
     /// `y`.
-    pub year: String,
+    pub(crate) year: String,
 }
 
 /// The kinds of callout, in the order a language file gives their words.
@@ -135,7 +135,7 @@ pub(crate) const CALLOUTS: [&str; 5] = ["note", "tip", "important", "warning", "
 
 impl Words {
     /// No words, on lines running the way the language `tag` is written.
-    pub fn wordless(tag: &str) -> Words {
+    pub(crate) fn wordless(tag: &str) -> Words {
         Words {
             direction: Direction::of(tag),
             ..Words::default()
@@ -144,18 +144,18 @@ impl Words {
 
     /// Months with no day beside them: `months_alone`, or `months` where
     /// the language writes the two alike.
-    pub fn months_with_no_day(&self) -> Option<&[String; 12]> {
+    pub(crate) fn months_with_no_day(&self) -> Option<&[String; 12]> {
         self.months_alone.as_ref().or(self.months.as_ref())
     }
 
     /// The words for the callout of the kind `kind`, where the language
     /// has them.
-    pub fn callout(&self, kind: &str) -> Option<&str> {
+    pub(crate) fn callout(&self, kind: &str) -> Option<&str> {
         let at = CALLOUTS.iter().position(|known| *known == kind)?;
         self.callouts.as_ref().map(|words| words[at].as_str())
     }
 
-    pub fn months_short_with_no_day(&self) -> Option<&[String; 12]> {
+    pub(crate) fn months_short_with_no_day(&self) -> Option<&[String; 12]> {
         self.months_short_alone
             .as_ref()
             .or(self.months_short.as_ref())
@@ -367,7 +367,7 @@ pub(crate) fn english() -> Arc<Words> {
 
 /// Where a language's words came from.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Whence {
+pub(crate) enum Whence {
     /// The site's own file, by its path in the site.
     Site(String),
     /// Statac's own words for the tag.
@@ -379,14 +379,14 @@ pub enum Whence {
 #[derive(Clone, Debug)]
 pub struct Language {
     /// The tag as the site names it; none where it names no language.
-    pub tag: Option<String>,
+    pub(crate) tag: Option<String>,
     pub words: Arc<Words>,
-    pub whence: Whence,
+    pub(crate) whence: Whence,
 }
 
 impl Language {
     /// A site that names no language is written in English.
-    pub fn unnamed() -> Language {
+    pub(crate) fn unnamed() -> Language {
         Language {
             tag: None,
             words: english(),

@@ -26,14 +26,14 @@ use crate::source::Sources;
 
 /// The template a page is built with, and where the choice came from.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Chosen {
+pub(crate) struct Chosen {
     /// The template's name, as `extends` and `layout:` write it.
-    pub name: String,
+    pub(crate) name: String,
     /// Where the name is written; a default where nothing named it.
-    pub origin: Origin,
+    pub(crate) origin: Origin,
     /// The template a default choice would have been, `home` or
     /// `folder`, where the site lacks it and `page` builds in its place.
-    pub instead_of: Option<&'static str>,
+    pub(crate) instead_of: Option<&'static str>,
 }
 
 /// The names a page's template is chosen by. What it chooses turns on more

@@ -154,12 +154,12 @@ impl Stamp {
 
 /// What a disk gives a file written now.
 #[derive(Copy, Clone, Debug)]
-pub struct Clock(Stamp);
+pub(crate) struct Clock(Stamp);
 
 impl Clock {
     /// Read from a file written at `at` and removed. None where the disk
     /// keeps no such time.
-    pub fn at(at: &Path) -> io::Result<Option<Clock>> {
+    pub(crate) fn at(at: &Path) -> io::Result<Option<Clock>> {
         // Made anew, so that it takes the time whatever was there before.
         if fs::symlink_metadata(at).is_ok() {
             fs::remove_file(at)?;
@@ -175,7 +175,7 @@ impl Clock {
     /// The clock of the disk the site at `site` is on, read in its
     /// `.statac`, which is made where it isn't there. None where it can't
     /// be read.
-    pub fn of_site(site: &Path) -> Option<Clock> {
+    pub(crate) fn of_site(site: &Path) -> Option<Clock> {
         kept(site).ok()?;
         match fs::create_dir(site.join(KEPT)) {
             Err(error) if error.kind() != io::ErrorKind::AlreadyExists => return None,
@@ -214,7 +214,7 @@ pub(crate) fn wait_until_settled(site: &Path, path: &Path) {
 
 /// The files a folder held at one moment, for a later look at it to say
 /// which were added, changed or removed.
-pub struct Inventory {
+pub(crate) struct Inventory {
     root: PathBuf,
     /// Each file by its path from the top, with its stamp where the
     /// system gives one.
@@ -227,7 +227,7 @@ pub struct Inventory {
 impl Inventory {
     /// Each of `files`, by its path from `root` with forward slashes, with
     /// its stamp as `found` reads it.
-    pub fn of(
+    pub(crate) fn of(
         root: &Path,
         files: Vec<String>,
         found: impl Fn(&Path) -> io::Result<fs::Metadata> + Sync,
@@ -247,7 +247,7 @@ impl Inventory {
     /// file written again at its length and time: each whose stamp
     /// `clock`, read before any of them was looked at, doesn't settle is
     /// known by its bytes as well.
-    pub fn to_compare(
+    pub(crate) fn to_compare(
         root: &Path,
         files: Vec<String>,
         found: impl Fn(&Path) -> io::Result<fs::Metadata> + Sync,
@@ -264,16 +264,16 @@ impl Inventory {
         inventory
     }
 
-    pub fn holds(&self, rel: &str) -> bool {
+    pub(crate) fn holds(&self, rel: &str) -> bool {
         self.stamps.contains_key(rel)
     }
 
-    pub fn names(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
         self.stamps.keys().map(String::as_str)
     }
 
     /// The files `before` held, and this holds, that have changed.
-    pub fn changed_since<'a>(&'a self, before: &Inventory) -> Vec<&'a str> {
+    pub(crate) fn changed_since<'a>(&'a self, before: &Inventory) -> Vec<&'a str> {
         (self.stamps.par_iter())
             .filter(|(rel, stamp)| {
                 let Some(was) = before.stamps.get(*rel) else {

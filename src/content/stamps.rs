@@ -44,7 +44,7 @@ const SHORTEST: usize = 3;
 const SHORTEST_SLIP: usize = 5;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Day {
+pub(crate) enum Day {
     Today,
     /// The present date and time.
     Now,
@@ -55,15 +55,15 @@ pub enum Day {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Stamp {
-    pub day: Day,
+pub(crate) struct Stamp {
+    pub(crate) day: Day,
     /// The hour and minute written after the day.
-    pub time: Option<(u8, u8)>,
+    pub(crate) time: Option<(u8, u8)>,
 }
 
 /// Why a value meant as a stamp isn't one.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Refused {
+pub(crate) enum Refused {
     /// Another spelling of the stamp given.
     Respelt(String),
     /// A slip in a word, with the stamp it is nearest.
@@ -83,7 +83,7 @@ enum Clock {
 
 impl Stamp {
     /// The one way the stamp is written.
-    pub fn spelling(&self) -> String {
+    pub(crate) fn spelling(&self) -> String {
         let day = match self.day {
             Day::Today => "today",
             Day::Now => "now",
@@ -100,7 +100,7 @@ impl Stamp {
     /// The date written in the stamp's place at `moment`, as the site's
     /// date reader takes it. None where the day falls outside the years
     /// a date can be written in.
-    pub fn written(&self, moment: &Moment) -> Option<String> {
+    pub(crate) fn written(&self, moment: &Moment) -> Option<String> {
         let days = match self.day {
             Day::Now => return Some(spelt(&moment.now)),
             Day::Today => 0,
@@ -161,15 +161,15 @@ fn spelt(date: &Date) -> String {
 
 /// When stamps are written: the site's day, and the present minute.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Moment {
-    pub today: Date,
-    pub now: Date,
+pub(crate) struct Moment {
+    pub(crate) today: Date,
+    pub(crate) now: Date,
 }
 
 impl Moment {
     /// The moment on the site's clock. Where the day is `fixed`, so that
     /// a run can be repeated, the present minute is its midnight.
-    pub fn of(dates: &Dates, fixed: bool) -> Moment {
+    pub(crate) fn of(dates: &Dates, fixed: bool) -> Moment {
         let today = dates.today();
         let midnight = Time {
             hour: 0,
@@ -192,7 +192,7 @@ impl Moment {
 /// words for a day, or near one, with nothing after it but a time. So
 /// `=IF(A1)`, `=TODAY()` and `=today's news` are text, and `=Today`,
 /// `=mon`, `=next monday`, `=tomorow` and `=today 9am` are refused.
-pub fn read(text: &str) -> Option<Result<Stamp, Refused>> {
+pub(crate) fn read(text: &str) -> Option<Result<Stamp, Refused>> {
     let written = text.strip_prefix('=')?.trim();
     // Statac's words are ASCII, and lowering only ASCII keeps every
     // letter where it was.
@@ -323,7 +323,7 @@ fn clock(written: &str) -> Option<Clock> {
 /// or was meant as one, placed at the value. A value repeated by an alias
 /// is told once, where it is written. A value written as a block is the
 /// author's text whatever it says.
-pub fn problems(front: &Node) -> Vec<Problem> {
+pub(crate) fn problems(front: &Node) -> Vec<Problem> {
     let mut found = Vec::new();
     walk(front, "", &mut found);
     let mut placed = HashSet::new();

@@ -14,15 +14,15 @@ use crate::source::{Place, SourceId, Span};
 const SEARCH_FOLDER: &str = "search";
 
 /// The script reading a search index, by its path in the folder.
-pub const SEARCH_ENTRY: &str = "index.js";
+pub(crate) const SEARCH_ENTRY: &str = "index.js";
 
 pub struct Language {
     /// A BCP 47 tag as the author wrote it, such as `en-GB`; none where the
     /// site doesn't say.
-    pub tag: Option<String>,
+    pub(crate) tag: Option<String>,
     /// Its folder at the top of `content/`, by its path there, on a site in
     /// several languages: `en`.
-    pub folder: Option<String>,
+    pub(crate) folder: Option<String>,
 }
 
 pub struct Page {
@@ -30,44 +30,44 @@ pub struct Page {
     /// file or the page that made it; none for a list's page Statac made,
     /// which no file holds.
     pub source: Option<SourceId>,
-    pub language: LanguageId,
+    pub(crate) language: LanguageId,
     /// Its path under `content/`, names parted by `/`.
     pub path: String,
-    pub place: PagePlace,
+    pub(crate) place: PagePlace,
     /// The folder it is listed in.
-    pub folder: ListId,
+    pub(crate) folder: ListId,
     /// Its own words, and those handed down to it.
-    pub words: Words,
-    pub title: Option<Sourced<String>>,
-    pub date: Option<Sourced<Date>>,
+    pub(crate) words: Words,
+    pub(crate) title: Option<Sourced<String>>,
+    pub(crate) date: Option<Sourced<Date>>,
     pub address: Address,
     /// The writing after any front matter.
     pub body: Span,
     /// The list the page speaks for: it is the list's page, its writing the
     /// list's introduction.
-    pub speaks_for: Option<ListId>,
+    pub(crate) speaks_for: Option<ListId>,
     /// Where the page was made by a page's `each:` rather than written: its
     /// `source` is then the data file, or for a post the page that made it.
-    pub made: Option<Made>,
+    pub(crate) made: Option<Made>,
 }
 
 /// How a page was made by a page's `each:`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Made {
+pub(crate) struct Made {
     /// The page whose `each:` made it.
-    pub by: PageId,
-    pub item: Item,
+    pub(crate) by: PageId,
+    pub(crate) item: Item,
     /// Where the item is written: its name, or its first line; for a post,
     /// the `each:` line.
-    pub head: Place,
+    pub(crate) head: Place,
     /// Where an item's fields are written; none for a post.
-    pub fields: Option<Place>,
+    pub(crate) fields: Option<Place>,
 }
 
 /// What a page was made for: an item of a table, by its name or by its
 /// place in a list from 1, or a post.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Item {
+pub(crate) enum Item {
     Key(String),
     At(usize),
     Post {
@@ -81,7 +81,7 @@ impl Item {
     /// How a problem names what was made from the file at `path`:
     /// `data/people.yaml: ada`, `data/people.yaml: item 3`, or
     /// `content/cards.md: content/post-1.md`.
-    pub fn named(&self, path: &str) -> String {
+    pub(crate) fn named(&self, path: &str) -> String {
         match self {
             Item::Key(key) => format!("{path}: {key}"),
             Item::At(at) => format!("{path}: item {at}"),
@@ -94,7 +94,7 @@ impl Page {
     /// How a problem names a page read from a file: by its file, or by the
     /// item it was made from. None for a list's page Statac made, which
     /// [`Site::named`] names by its list.
-    pub fn file_named(&self, sources: &crate::source::Sources) -> Option<String> {
+    pub(crate) fn file_named(&self, sources: &crate::source::Sources) -> Option<String> {
         let path = sources.path(self.source?).to_string_lossy();
         Some(match &self.made {
             Some(made) => made.item.named(&path),
@@ -105,7 +105,7 @@ impl Page {
     /// Where a problem with the whole page is shown: the first line of its
     /// file, or the item it was made from. None for a list's page Statac
     /// made, which [`Site::head`] places.
-    pub fn head(&self, sources: &crate::source::Sources) -> Option<Place> {
+    pub(crate) fn head(&self, sources: &crate::source::Sources) -> Option<Place> {
         match &self.made {
             Some(made) => Some(made.head),
             None => Some(crate::config::words::head(sources, self.source?)),
@@ -113,7 +113,7 @@ impl Page {
     }
 
     /// Whether the page makes a page per item of a table, by its own `each:`.
-    pub fn makes_pages(&self) -> bool {
+    pub(crate) fn makes_pages(&self) -> bool {
         !self.sends_on()
             && self
                 .words
@@ -124,7 +124,7 @@ impl Page {
     /// Whether the page speaks for a list: a folder's own page, a page
     /// standing at a list's address, or one naming the posts it lists or
     /// making a page per item.
-    pub fn speaks_for_a_list(&self) -> bool {
+    pub(crate) fn speaks_for_a_list(&self) -> bool {
         use crate::config::words::PageWord;
         self.speaks_for.is_some()
             || matches!(self.place, PagePlace::Folder | PagePlace::Made)
@@ -138,7 +138,7 @@ impl Page {
     /// Whether the page is published at its address: a page speaking for a
     /// list with `index_page: false` is published nowhere, and a page
     /// sending readers on leaves a redirect there instead.
-    pub fn lands(&self) -> bool {
+    pub(crate) fn lands(&self) -> bool {
         !self.sends_on()
             && !(self.speaks_for_a_list()
                 && self.words.truth(crate::config::words::PageWord::IndexPage) == Some(false))
@@ -146,7 +146,7 @@ impl Page {
 
     /// Whether the page sends readers on with `redirect_to`, publishing
     /// a redirect at its address and nothing else.
-    pub fn sends_on(&self) -> bool {
+    pub(crate) fn sends_on(&self) -> bool {
         self.words
             .text(crate::config::words::PageWord::RedirectTo)
             .is_some()
@@ -154,7 +154,7 @@ impl Page {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum PagePlace {
+pub(crate) enum PagePlace {
     /// A page in a folder of pages.
     Ordinary,
     /// A folder's own page, its `index.md`.
@@ -170,38 +170,38 @@ pub enum PagePlace {
 /// A file under `content/` that is no page, published beside the writing.
 pub struct Travelling {
     /// Its path under `content/`.
-    pub path: String,
-    pub address: Address,
+    pub(crate) path: String,
+    pub(crate) address: Address,
     /// The page it travels with, where its folder is one page.
-    pub page: Option<PageId>,
+    pub(crate) page: Option<PageId>,
 }
 
 /// A page left out as a draft or until its day: its address, the old
 /// addresses its `redirect_from` names, why it is left out, and where what
 /// leaves it out is written.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct HeldBack {
-    pub address: Address,
-    pub redirect_from: Vec<Address>,
-    pub held: Held,
-    pub place: Place,
+pub(crate) struct HeldBack {
+    pub(crate) address: Address,
+    pub(crate) redirect_from: Vec<Address>,
+    pub(crate) held: Held,
+    pub(crate) place: Place,
 }
 
 /// An address that sends readers on: an old address of a page's, or the
 /// address of a page with `redirect_to`.
 pub struct Redirect {
-    pub from: Address,
+    pub(crate) from: Address,
     /// The page that writes it: the page readers are sent to from its old
     /// address, or the page sending them on.
-    pub page: PageId,
-    pub to: SentTo,
+    pub(crate) page: PageId,
+    pub(crate) to: SentTo,
     /// Where the old address, or the address sent to, is written.
-    pub place: Place,
+    pub(crate) place: Place,
 }
 
 /// Where a redirect sends readers.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum SentTo {
+pub(crate) enum SentTo {
     /// The page itself, from one of its old addresses.
     Page,
     /// An address on the site, from its top, as written and as read, with
@@ -218,7 +218,7 @@ pub enum SentTo {
 /// Folders, tags and series are all lists; paging, feeds and neighbours are
 /// answered once, for lists.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum ListKey {
+pub(crate) enum ListKey {
     /// A folder, by its path under `content/`; the site's own list is the
     /// folder at the top.
     Folder(String),
@@ -232,7 +232,7 @@ pub enum ListKey {
 
 impl ListKey {
     /// The word an author uses for the list, as `list.word` answers it.
-    pub fn word(&self) -> &'static str {
+    pub(crate) fn word(&self) -> &'static str {
         match self {
             ListKey::Folder(path) if path.is_empty() => "site",
             ListKey::Folder(_) => "folder",
@@ -245,14 +245,14 @@ impl ListKey {
 
 /// Which way a list's posts run.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Order {
+pub(crate) enum Order {
     NewestFirst,
     OldestFirst,
 }
 
 impl Order {
     /// The order as `order:` writes it.
-    pub fn word(self) -> &'static str {
+    pub(crate) fn word(self) -> &'static str {
         match self {
             Order::NewestFirst => "newest first",
             Order::OldestFirst => "oldest first",
@@ -260,35 +260,35 @@ impl Order {
     }
 }
 
-pub struct List {
-    pub key: ListKey,
-    pub language: LanguageId,
+pub(crate) struct List {
+    pub(crate) key: ListKey,
+    pub(crate) language: LanguageId,
     /// Its posts, in its order. A folder ordered by hand holds every page
     /// in it, dated or not.
-    pub members: Vec<PageId>,
+    pub(crate) members: Vec<PageId>,
     /// The pages it would hold were they dated, A to Z by file name; the
     /// pages made for posts in their posts' order.
-    pub undated: Vec<PageId>,
+    pub(crate) undated: Vec<PageId>,
     /// The page that speaks for the list, such as a folder's `index.md`.
-    pub page: Option<PageId>,
+    pub(crate) page: Option<PageId>,
     /// Where a tag's or a series' page stands, from `tags.permalink` or
     /// `series.permalink`, whether or not a page is made there.
-    pub address: Option<Sourced<Address>>,
+    pub(crate) address: Option<Sourced<Address>>,
     /// Whether a folder's pages are ordered by the numbers their names
     /// open with.
-    pub numbered: bool,
+    pub(crate) numbered: bool,
     /// Which way its posts run by their dates; none where the numbers or
     /// an `order:` list place them.
-    pub order: Option<crate::site::Order>,
+    pub(crate) order: Option<crate::site::Order>,
     /// How many posts each of its pages shows; 0 shows them all on one.
-    pub per_page: usize,
+    pub(crate) per_page: usize,
     /// Where its pages after the first stand, page 2 first: none where
     /// nothing is published at its address or its posts fit on one page.
-    pub later: Vec<Address>,
+    pub(crate) later: Vec<Address>,
 }
 
 impl List {
-    pub fn new(key: ListKey, language: LanguageId) -> List {
+    pub(crate) fn new(key: ListKey, language: LanguageId) -> List {
         List {
             key,
             language,
@@ -305,7 +305,7 @@ impl List {
 
     /// How many stretches its posts are shown in, `per_page` at a time,
     /// one at least: where its page is published, one on each of its pages.
-    pub fn stretches(&self) -> usize {
+    pub(crate) fn stretches(&self) -> usize {
         match self.per_page {
             0 => 1,
             per => self.members.len().div_ceil(per).max(1),
@@ -313,7 +313,7 @@ impl List {
     }
 
     /// The posts shown on its page `number`, counted from 1.
-    pub fn stretch(&self, number: usize) -> &[PageId] {
+    pub(crate) fn stretch(&self, number: usize) -> &[PageId] {
         match self.per_page {
             0 if number == 1 => &self.members,
             0 => &[],
@@ -326,7 +326,7 @@ impl List {
     }
 
     /// Where its page `number` stands, counted from 2.
-    pub fn later_address(&self, number: usize) -> Option<&Address> {
+    pub(crate) fn later_address(&self, number: usize) -> Option<&Address> {
         self.later.get(number.checked_sub(2)?)
     }
 }
@@ -334,48 +334,48 @@ impl List {
 #[derive(Default)]
 pub struct Site {
     /// Its folder on disk, past every link.
-    pub real: std::path::PathBuf,
+    pub(crate) real: std::path::PathBuf,
     /// Where each file under `content/` really is, by its path there: its
     /// path past every link under `real`.
-    pub found: std::collections::HashMap<String, String>,
-    pub languages: Arena<LanguageId, Language>,
+    pub(crate) found: std::collections::HashMap<String, String>,
+    pub(crate) languages: Arena<LanguageId, Language>,
     pub pages: Arena<PageId, Page>,
-    pub lists: Arena<ListId, List>,
+    pub(crate) lists: Arena<ListId, List>,
     pub files: Vec<Travelling>,
     pub redirects: Vec<Redirect>,
     /// Each spelling of a tag or a series a page writes, by language, and
     /// the list it belongs to: spellings whose address parts come out alike
     /// are one list.
-    pub spellings: std::collections::HashMap<(LanguageId, ListKey), ListId>,
-    pub data: crate::data::Data,
+    pub(crate) spellings: std::collections::HashMap<(LanguageId, ListKey), ListId>,
+    pub(crate) data: crate::data::Data,
     pub pictures: crate::album::Pictures,
     /// What Statac fetched into the site's `fetched/`.
-    pub fetched: crate::fetched::Fetched,
+    pub(crate) fetched: crate::fetched::Fetched,
     /// The mentions of each page kept in `fetched/mentions/`.
-    pub mentions: crate::fetched::mentions::Mentions,
+    pub(crate) mentions: crate::fetched::mentions::Mentions,
     /// The addresses the site published before, kept in `published.txt`.
-    pub published: crate::published::Record,
+    pub(crate) published: crate::published::Record,
     /// Where each page left out as a draft or until its day would stand.
-    pub held_back: Vec<HeldBack>,
+    pub(crate) held_back: Vec<HeldBack>,
     /// The `layout:` of each page left out until the site has an address.
-    pub layouts_needing_url: Vec<String>,
+    pub(crate) layouts_needing_url: Vec<String>,
     /// The names of the pages in each folder, by its path under `content/`
     /// with its closing slash, kept where a field is declared one of a
     /// folder's pages.
-    pub page_names: std::collections::HashMap<String, Vec<String>>,
+    pub(crate) page_names: std::collections::HashMap<String, Vec<String>>,
     /// Each page's previous and next page, by page, in the run it walks.
-    pub neighbours: Vec<[Option<PageId>; 2]>,
+    pub(crate) neighbours: Vec<[Option<PageId>; 2]>,
     /// Each post's place in its language's own list, by page.
-    pub places: Vec<Option<usize>>,
+    pub(crate) places: Vec<Option<usize>>,
     /// Each page's translations, by page, in the order the languages are
     /// declared; empty where no page has one.
-    pub translations: Vec<Vec<PageId>>,
+    pub(crate) translations: Vec<Vec<PageId>>,
 }
 
 impl Site {
     /// The file at `rel` under `content/`, opened where it really is and
     /// reached through no link, as [`crate::platform::open_file`] opens it.
-    pub fn open_content(&self, rel: &str) -> std::io::Result<std::fs::File> {
+    pub(crate) fn open_content(&self, rel: &str) -> std::io::Result<std::fs::File> {
         let at = (self.found.get(rel)).ok_or(std::io::ErrorKind::NotFound)?;
         crate::platform::open_file(&self.real, at)
     }
@@ -395,7 +395,7 @@ impl Site {
     /// The folder at the top of `language`'s pages, by its path under
     /// `content/`: its own folder, or for the main language with none,
     /// `content/` itself, the empty path.
-    pub fn top(&self, language: LanguageId) -> &str {
+    pub(crate) fn top(&self, language: LanguageId) -> &str {
         self.languages
             .get(language)
             .folder
@@ -406,7 +406,7 @@ impl Site {
     /// The top that the folder at `path` under `content/` stands beneath:
     /// the language folder it is in, or else `content/` itself. Folder
     /// lists, and the addresses pages write, stop there.
-    pub fn top_above(&self, path: &str) -> &str {
+    pub(crate) fn top_above(&self, path: &str) -> &str {
         self.languages
             .iter()
             .filter_map(|(_, language)| language.folder.as_deref())
@@ -418,7 +418,7 @@ impl Site {
     }
 
     /// A language's own list: the folder list at its top.
-    pub fn own_list(&self, language: LanguageId) -> Option<ListId> {
+    pub(crate) fn own_list(&self, language: LanguageId) -> Option<ListId> {
         let top = self.top(language);
         self.lists
             .iter()
@@ -430,14 +430,14 @@ impl Site {
     }
 
     /// The page at the top of a language's pages, where it lands.
-    pub fn home(&self, language: LanguageId) -> Option<PageId> {
+    pub(crate) fn home(&self, language: LanguageId) -> Option<PageId> {
         let page = self.lists.get(self.own_list(language)?).page?;
         self.pages.get(page).lands().then_some(page)
     }
 
     /// A language's folders whose pages land, in the order of their
     /// addresses, its home's left out.
-    pub fn folders(&self, language: LanguageId) -> Vec<ListId> {
+    pub(crate) fn folders(&self, language: LanguageId) -> Vec<ListId> {
         let address = |id: ListId| {
             let page = self.pages.get(self.lists.get(id).page?);
             page.lands().then(|| page.address.as_str())
@@ -457,7 +457,7 @@ impl Site {
 
     /// Whether `list` is a home's: a language's own list, or the folder at
     /// the top of `content/`.
-    pub fn is_home(&self, list: ListId) -> bool {
+    pub(crate) fn is_home(&self, list: ListId) -> bool {
         let list = self.lists.get(list);
         match &list.key {
             ListKey::Folder(path) => path.is_empty() || path == self.top(list.language),
@@ -469,7 +469,7 @@ impl Site {
     /// directly inside it: one of the lists with a feed where the author
     /// writes none. The folder at the top of `content/` is one only where
     /// it is a language's top.
-    pub fn outermost(&self, list: ListId) -> bool {
+    pub(crate) fn outermost(&self, list: ListId) -> bool {
         let list = self.lists.get(list);
         let ListKey::Folder(path) = &list.key else {
             return false;
@@ -482,12 +482,16 @@ impl Site {
     }
 
     /// The lists of one kind, one per language.
-    pub fn lists_for<'a>(&'a self, key: &'a ListKey) -> impl Iterator<Item = (ListId, &'a List)> {
+    #[cfg(test)]
+    pub(crate) fn lists_for<'a>(
+        &'a self,
+        key: &'a ListKey,
+    ) -> impl Iterator<Item = (ListId, &'a List)> {
         self.lists.iter().filter(move |(_, list)| &list.key == key)
     }
 
     /// The list a tag or a series spelt as `key` belongs to in `language`.
-    pub fn spelt(&self, language: LanguageId, key: &ListKey) -> Option<ListId> {
+    pub(crate) fn spelt(&self, language: LanguageId, key: &ListKey) -> Option<ListId> {
         self.spellings.get(&(language, key.clone())).copied()
     }
 
@@ -495,7 +499,7 @@ impl Site {
     /// it sends readers on from. A page left out of the build stands at
     /// its addresses as none. A later address that is also an earlier one
     /// is the one that holds.
-    pub fn addresses(&self) -> impl Iterator<Item = (&Address, Option<PageId>)> {
+    pub(crate) fn addresses(&self) -> impl Iterator<Item = (&Address, Option<PageId>)> {
         let held = (self.held_back.iter())
             .flat_map(|held| std::iter::once(&held.address).chain(&held.redirect_from))
             .map(|address| (address, None));
@@ -508,20 +512,20 @@ impl Site {
     /// The folder `language`'s search files are published in, by its path
     /// from the top of the built site: `search`, or `fr/search` beneath a
     /// language's folder.
-    pub fn search_folder(&self, language: LanguageId) -> String {
+    pub(crate) fn search_folder(&self, language: LanguageId) -> String {
         let top = Top::new(self.top(language)).address("/");
         format!("{}{SEARCH_FOLDER}", top.trim_start_matches('/'))
     }
 
     /// The script reading `language`'s search index, by its path from the
     /// top of the built site.
-    pub fn search_entry(&self, language: LanguageId) -> String {
+    pub(crate) fn search_entry(&self, language: LanguageId) -> String {
         format!("{}/{SEARCH_ENTRY}", self.search_folder(language))
     }
 
     /// How a problem names `page`: by its file or the item it was made
     /// from, or a list's page Statac made by its list.
-    pub fn named(&self, page: PageId, sources: &crate::source::Sources) -> Named {
+    pub(crate) fn named(&self, page: PageId, sources: &crate::source::Sources) -> Named {
         let p = self.pages.get(page);
         if let Some(named) = p.file_named(sources) {
             return Named::File(named);
@@ -539,7 +543,7 @@ impl Site {
     /// Where a problem with the whole of `page` is shown: the first line
     /// of its file or the item it was made from, or for a list's page
     /// Statac made, the setting placing it where the site writes one.
-    pub fn head(&self, page: PageId, sources: &crate::source::Sources) -> Option<Place> {
+    pub(crate) fn head(&self, page: PageId, sources: &crate::source::Sources) -> Option<Place> {
         let p = self.pages.get(page);
         match p.source {
             Some(_) => p.head(sources),

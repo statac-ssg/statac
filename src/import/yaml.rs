@@ -3,13 +3,12 @@
 //! text, and in double quotes where it wouldn't.
 
 use crate::origin::Style;
-use crate::source::Sources;
 use crate::yaml::write::key;
 use crate::yaml::{self, Node, Resolved, Value as Yaml};
 
 /// A value in front matter or settings, as a reader found it.
 #[derive(Clone, PartialEq, Debug)]
-pub enum Value {
+pub(crate) enum Value {
     Text(String),
     /// A number, as written: digits, a sign, a point, an exponent.
     Number(String),
@@ -21,7 +20,7 @@ pub enum Value {
 }
 
 /// `fields` as lines of a YAML mapping, each line ending with a line break.
-pub fn fields<'a>(fields: impl IntoIterator<Item = (&'a str, &'a Value)>) -> String {
+pub(crate) fn fields<'a>(fields: impl IntoIterator<Item = (&'a str, &'a Value)>) -> String {
     let mut out = String::new();
     for (name, value) in fields {
         out.push_str(&key(name));
@@ -96,7 +95,7 @@ fn scalar_text(value: &Value) -> String {
 
 /// What `node` holds, each plain scalar read by `plain` and every other
 /// scalar as text.
-pub fn value_of(node: &Node, plain: &dyn Fn(&str) -> Value) -> Value {
+pub(crate) fn value_of(node: &Node, plain: &dyn Fn(&str) -> Value) -> Value {
     match &node.value {
         Yaml::Scalar(text) => match (node.style, node.tag) {
             (Style::Plain, None) => plain(text),
@@ -119,7 +118,7 @@ pub fn value_of(node: &Node, plain: &dyn Fn(&str) -> Value) -> Value {
 }
 
 /// A mapping key as text, whatever it holds.
-pub fn key_text(key: &Node) -> String {
+pub(crate) fn key_text(key: &Node) -> String {
     match &key.value {
         Yaml::Scalar(text) => text.clone(),
         _ => String::new(),
@@ -127,7 +126,7 @@ pub fn key_text(key: &Node) -> String {
 }
 
 /// A plain scalar as Statac reads it, by YAML's core schema.
-pub fn core(text: &str) -> Value {
+pub(crate) fn core(text: &str) -> Value {
     match yaml::resolve(text) {
         Resolved::Null => Value::Nothing,
         Resolved::Bool(truth) => Value::Truth(truth),
@@ -138,8 +137,9 @@ pub fn core(text: &str) -> Value {
 
 /// The fields `text` holds, read as Statac reads front matter; none where
 /// it isn't a mapping that reads.
-pub fn read_back(text: &str) -> Option<Vec<(String, Value)>> {
-    let mut sources = Sources::default();
+#[cfg(test)]
+pub(crate) fn read_back(text: &str) -> Option<Vec<(String, Value)>> {
+    let mut sources = crate::source::Sources::default();
     let source = sources.add("value.yaml", text.to_owned());
     let node = yaml::read(&sources, source).ok()?;
     match value_of(&node, &core) {

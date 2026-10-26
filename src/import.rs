@@ -77,10 +77,10 @@ mod liquid;
 mod report;
 #[cfg(test)]
 mod tests;
-pub mod toml;
+pub(crate) mod toml;
 mod write;
 mod writing;
-pub mod yaml;
+pub(crate) mod yaml;
 mod zola;
 
 use std::io::Write;
@@ -92,8 +92,8 @@ use crate::problem::{Kind, Maker, Problem, Reason};
 use crate::report::Report;
 use crate::source::Sources;
 use crate::wording;
-pub use writing::Maths;
-pub use yaml::Value;
+pub(crate) use writing::Maths;
+pub(crate) use yaml::Value;
 
 /// What `statac import` is asked.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -120,10 +120,10 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: &[Tool] = &[Tool::Jekyll, Tool::Hugo, Tool::Zola, Tool::Eleventy];
+    pub(crate) const ALL: &[Tool] = &[Tool::Jekyll, Tool::Hugo, Tool::Zola, Tool::Eleventy];
 
     /// The tool's name in `--from`.
-    pub fn word(self) -> &'static str {
+    pub(crate) fn word(self) -> &'static str {
         match self {
             Tool::Jekyll => "jekyll",
             Tool::Hugo => "hugo",
@@ -133,7 +133,7 @@ impl Tool {
     }
 
     /// The tool's name in a sentence.
-    pub fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Tool::Jekyll => "Jekyll",
             Tool::Hugo => "Hugo",
@@ -142,7 +142,7 @@ impl Tool {
         }
     }
 
-    pub fn from_word(word: &str) -> Option<Tool> {
+    pub(crate) fn from_word(word: &str) -> Option<Tool> {
         Tool::ALL.iter().copied().find(|tool| tool.word() == word)
     }
 
@@ -171,104 +171,104 @@ impl Tool {
 /// What a reader makes of an old site: everything the new site should
 /// hold, and everything that didn't come across.
 #[derive(Clone, Default, Debug)]
-pub struct Import {
+pub(crate) struct Import {
     /// The tool's settings file, by its path in the old site.
-    pub settings_file: String,
-    pub title: Option<String>,
+    pub(crate) settings_file: String,
+    pub(crate) title: Option<String>,
     /// Where the site is published, whole, with any path it is under, and
     /// no `/` at its end.
-    pub address: Option<String>,
+    pub(crate) address: Option<String>,
     /// The site's languages, the main one first; `en` where none is given.
-    pub languages: Vec<String>,
+    pub(crate) languages: Vec<String>,
     /// A name from the time zone database.
-    pub timezone: Option<String>,
+    pub(crate) timezone: Option<String>,
     /// Whether the tool set maths written between dollar signs: where it
     /// didn't, the shared part escapes each dollar sign Statac would read
     /// as opening maths.
-    pub maths: Maths,
+    pub(crate) maths: Maths,
     /// Lines for `statac.yaml` besides the title, address, languages and
     /// time zone, in order: Statac's own settings.
-    pub settings: Vec<(String, Value)>,
+    pub(crate) settings: Vec<(String, Value)>,
     /// The author's own values in the settings, for `statac.yaml` as
     /// values of the author's own, in order.
-    pub values: Vec<Field>,
-    pub pages: Vec<Page>,
-    pub files: Vec<File>,
+    pub(crate) values: Vec<Field>,
+    pub(crate) pages: Vec<Page>,
+    pub(crate) files: Vec<File>,
     /// Files the reader writes whole, by their paths in the new site,
     /// such as a snippet standing for something that didn't convert.
-    pub written: Vec<(String, String)>,
+    pub(crate) written: Vec<(String, String)>,
     /// Old addresses that belong to no one page, such as a list's later
     /// pages, from the top of the site.
-    pub addresses: Vec<String>,
+    pub(crate) addresses: Vec<String>,
     /// The later pages of the old home page, where it showed the posts
     /// now in `content/posts/` a few at a time.
-    pub home_pages: Option<HomePages>,
+    pub(crate) home_pages: Option<HomePages>,
     /// The addresses of the pages left behind as the work of the old
     /// site's templates, each with the old file it was made from.
-    pub templated: Vec<(String, String)>,
+    pub(crate) templated: Vec<(String, String)>,
     /// The address of the page the old site made for each name in a list
     /// of terms, with the list's name and the name: `categories`, `linux`
     /// and `/categories/linux/`; and for a tag, as `tags`, where it isn't
     /// where Statac's would be.
-    pub term_pages: Vec<(String, String, String)>,
+    pub(crate) term_pages: Vec<(String, String, String)>,
     /// The address of each page the old site made to list every tag, or
     /// every name of another list of that kind, with the list's name:
     /// `/tags/` and `tags`.
-    pub term_lists: Vec<(String, String)>,
+    pub(crate) term_lists: Vec<(String, String)>,
     /// Addresses the old site published a feed at that its templates
     /// made, each with the old file it was made from.
-    pub feeds: Vec<(String, String)>,
+    pub(crate) feeds: Vec<(String, String)>,
     /// The template the report names for each feed asked for whose format
     /// the reader knows, by its path, as `templates/index.xml` for an RSS
     /// feed at `index.xml`.
-    pub feed_templates: Vec<String>,
+    pub(crate) feed_templates: Vec<String>,
     /// The tool's own built output, by its path in the old site, where
     /// it is there.
-    pub built: Option<String>,
+    pub(crate) built: Option<String>,
     /// The folder the tool builds the site into, by its path in the old
     /// site, whether it is there or not.
-    pub output: String,
-    pub findings: Vec<Finding>,
-    pub left: Vec<Left>,
+    pub(crate) output: String,
+    pub(crate) findings: Vec<Finding>,
+    pub(crate) left: Vec<Left>,
     /// The pages whose front matter Statac's YAML reader stopped at, each
     /// read as if it had none.
-    pub unread: Vec<Unread>,
+    pub(crate) unread: Vec<Unread>,
     /// Sentences for the report on what the reader did with the settings
     /// and the front matter, in Markdown.
-    pub notes: Vec<String>,
+    pub(crate) notes: Vec<String>,
     /// Lines of front matter in Statac's own words, meant as Statac means
     /// them, such as a list's `feed` or `order`, by the path under
     /// `content/` of the page they go on: one that came across, or else one
     /// written to hold them. They are written as they are, after the
     /// page's own.
-    pub words: Vec<(String, Field)>,
+    pub(crate) words: Vec<(String, Field)>,
 }
 
 /// The later pages of an old home page that showed the site's posts a
 /// few at a time, the newest first.
 #[derive(Clone, Debug)]
-pub struct HomePages {
+pub(crate) struct HomePages {
     /// How many posts each page showed.
-    pub per_page: usize,
+    pub(crate) per_page: usize,
     /// The address of each page after the first, page 2 first.
-    pub addresses: Vec<String>,
+    pub(crate) addresses: Vec<String>,
 }
 
 /// A page's front matter that Statac's YAML reader stopped at.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Unread {
+pub(crate) struct Unread {
     /// The page's path in the old site.
-    pub from: String,
+    pub(crate) from: String,
     /// The line the reader stopped at, and its text.
-    pub line: usize,
-    pub text: String,
+    pub(crate) line: usize,
+    pub(crate) text: String,
     /// The front matter as written, between its `---` lines.
-    pub front: String,
+    pub(crate) front: String,
 }
 
 /// What a page is, for the counts.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum PageKind {
+pub(crate) enum PageKind {
     Post,
     Draft,
     Page,
@@ -276,52 +276,52 @@ pub enum PageKind {
 
 /// A page of the old site, as it goes into the new.
 #[derive(Clone, Debug)]
-pub struct Page {
+pub(crate) struct Page {
     /// Its path in the old site.
-    pub from: String,
+    pub(crate) from: String,
     /// Its path under `content/`.
-    pub to: String,
-    pub kind: PageKind,
+    pub(crate) to: String,
+    pub(crate) kind: PageKind,
     /// Its front matter, in the author's order.
-    pub front: Vec<Field>,
-    pub writing: String,
+    pub(crate) front: Vec<Field>,
+    pub(crate) writing: String,
     /// The page's names in each list of terms the tool kept that Statac has
     /// no equal for, such as `categories`, by the list's name as the site
     /// wrote it; and in `series`, where the page names more than one. The
     /// shared part makes each a tag.
-    pub terms: Vec<(String, Vec<String>)>,
+    pub(crate) terms: Vec<(String, Vec<String>)>,
     /// Where the reader wrote a fenced code block into the writing, by the
     /// offset each fence starts at, in order.
-    pub fences: Vec<usize>,
+    pub(crate) fences: Vec<usize>,
     /// Where the reader wrote a snippet call into the writing, and the
     /// `@end` of one that wraps writing, by the offset of each one's `@`,
     /// in order.
-    pub calls: Vec<usize>,
+    pub(crate) calls: Vec<usize>,
     /// Where the old tool published it, from the top of the site; none
     /// where it wasn't published.
-    pub address: Option<String>,
+    pub(crate) address: Option<String>,
     /// Whether that address is the page's own choice, as a permalink in
     /// its front matter is, rather than its folder's rule.
-    pub own_address: bool,
+    pub(crate) own_address: bool,
     /// Other addresses that led to it.
-    pub other_addresses: Vec<String>,
+    pub(crate) other_addresses: Vec<String>,
     /// Its front matter as written, where Statac's YAML reader stopped
     /// at it: the shared part writes it in place of `front`. A reader
     /// leaves this empty and says so in [`Import::unread`].
-    pub unread: Option<String>,
+    pub(crate) unread: Option<String>,
 }
 
 /// A field of front matter.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Field {
-    pub name: String,
-    pub value: Value,
+pub(crate) struct Field {
+    pub(crate) name: String,
+    pub(crate) value: Value,
     /// Its line in the old file, where it was written there.
-    pub line: Option<usize>,
+    pub(crate) line: Option<usize>,
 }
 
 impl Field {
-    pub fn new(name: &str, value: Value, line: Option<usize>) -> Field {
+    pub(crate) fn new(name: &str, value: Value, line: Option<usize>) -> Field {
         Field {
             name: name.to_owned(),
             value,
@@ -332,45 +332,50 @@ impl Field {
 
 /// A file copied as it is.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct File {
+pub(crate) struct File {
     /// Its path in the old site.
-    pub from: String,
+    pub(crate) from: String,
     /// Its path in the new site, such as `static/photo-1.jpg`.
-    pub to: String,
+    pub(crate) to: String,
 }
 
 /// A kind of thing that didn't convert: its heading in the report, and
 /// one sentence on what it means and what to do.
 #[derive(Debug, PartialEq, Eq)]
-pub struct FindingKind {
-    pub heading: &'static str,
-    pub sentence: &'static str,
+pub(crate) struct FindingKind {
+    pub(crate) heading: &'static str,
+    pub(crate) sentence: &'static str,
 }
 
 /// Something that didn't convert, at the places it is.
 #[derive(Clone, Debug)]
-pub struct Finding {
-    pub kind: &'static FindingKind,
+pub(crate) struct Finding {
+    pub(crate) kind: &'static FindingKind,
     /// What the places share, such as the snippet every call names.
-    pub about: Option<String>,
-    pub spots: Vec<Spot>,
+    pub(crate) about: Option<String>,
+    pub(crate) spots: Vec<Spot>,
 }
 
 /// A place in the old site.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Spot {
-    pub file: String,
-    pub line: Option<usize>,
+pub(crate) struct Spot {
+    pub(crate) file: String,
+    pub(crate) line: Option<usize>,
     /// The text there, exactly; or, where the spot names no file and
     /// counts no places, a line of the report as it stands.
-    pub text: String,
+    pub(crate) text: String,
     /// How many places hold the text, where the spot stands for all of
     /// them and names no file.
-    pub times: Option<usize>,
+    pub(crate) times: Option<usize>,
 }
 
 impl Finding {
-    pub fn at(kind: &'static FindingKind, file: &str, line: Option<usize>, text: &str) -> Finding {
+    pub(crate) fn at(
+        kind: &'static FindingKind,
+        file: &str,
+        line: Option<usize>,
+        text: &str,
+    ) -> Finding {
         Finding {
             kind,
             about: None,
@@ -386,9 +391,9 @@ impl Finding {
 
 /// Why a reader couldn't read the old site, with the files the problem
 /// is placed in.
-pub struct Failed {
-    pub sources: Sources,
-    pub problem: Problem,
+pub(crate) struct Failed {
+    pub(crate) sources: Sources,
+    pub(crate) problem: Problem,
 }
 
 impl From<Problem> for Box<Failed> {
@@ -402,11 +407,11 @@ impl From<Problem> for Box<Failed> {
 
 /// A file or folder of the old site that wasn't converted at all.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Left {
+pub(crate) struct Left {
     /// Its path in the old site, a folder's ending with `/`.
-    pub path: String,
+    pub(crate) path: String,
     /// What it is, as a sentence's end: `the old site's templates`.
-    pub what: String,
+    pub(crate) what: String,
 }
 
 /// What a reader says of the new home page's own list, kept to one page.

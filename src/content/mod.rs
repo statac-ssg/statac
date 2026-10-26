@@ -7,7 +7,7 @@
 //! are published beside the writing.
 
 mod made;
-pub mod stamps;
+pub(crate) mod stamps;
 #[cfg(test)]
 mod tests;
 mod texts;
@@ -40,16 +40,16 @@ pub(crate) use texts::Texts;
 pub struct Run {
     /// The build's day, `site.today`; today in the site's zone where none
     /// is given.
-    pub today: Option<Date>,
+    pub(crate) today: Option<Date>,
     /// Whether drafts and posts waiting for their day are built as if
     /// published.
-    pub drafts: bool,
+    pub(crate) drafts: bool,
     /// The site's address for this run, in place of `url`, where one was
     /// given.
-    pub url: Option<String>,
+    pub(crate) url: Option<String>,
     /// Files and folders under `content/` read as if renamed, each from its
     /// path there to the path it is read at.
-    pub renamed: Vec<(String, String)>,
+    pub(crate) renamed: Vec<(String, String)>,
 }
 
 /// What reading a site found.
@@ -61,21 +61,21 @@ pub struct Read {
     /// Pages left out of the build as drafts.
     pub drafts: Vec<SourceId>,
     /// Posts left out of the build until their day.
-    pub waiting: Vec<SourceId>,
+    pub(crate) waiting: Vec<SourceId>,
     /// The drafts and posts waiting for their day built as if published.
-    pub included: Included,
+    pub(crate) included: Included,
     /// How the site shows its dates.
-    pub dates: Dates,
+    pub(crate) dates: Dates,
     /// The files describing pictures, by their paths under `content/`,
     /// which are never published.
-    pub sidecars: Vec<String>,
+    pub(crate) sidecars: Vec<String>,
     /// The files beside pages left out of the build, by their paths under
     /// `content/`, left out with them.
-    pub left_out: Vec<String>,
+    pub(crate) left_out: Vec<String>,
     /// The names of the templates at the top of the site's `templates/`,
     /// as the template reader names them: `feed.xml`, and `home` for
     /// `home.html`. Which pages the site has turns on them.
-    pub templates: HashSet<String>,
+    pub(crate) templates: HashSet<String>,
 }
 
 /// How many drafts and posts waiting for their day `--drafts` built.
@@ -96,7 +96,7 @@ impl Read {
 
 /// What `site` publishes from `content/`: each file's path in the
 /// published site, and what it comes from.
-pub fn claims(site: &Site, sources: &Sources, settings: &Settings) -> Vec<(String, Named)> {
+pub(crate) fn claims(site: &Site, sources: &Sources, settings: &Settings) -> Vec<(String, Named)> {
     let files = site.files.iter().map(|file| {
         let path = format!("content/{}", file.path);
         (file.address.file(), Named::File(path))
@@ -161,7 +161,7 @@ pub fn claims(site: &Site, sources: &Sources, settings: &Settings) -> Vec<(Strin
 }
 
 /// Reads the settings and content of the site at `root`, and its lists.
-pub fn read(root: &Path, run: &Run) -> Read {
+pub(crate) fn read(root: &Path, run: &Run) -> Read {
     read_with(root, run, &mut Texts::default())
 }
 
@@ -1584,7 +1584,7 @@ fn sent_to(written: &str) -> Result<SentTo, address::Fault> {
 /// A warning for each redirect sending readers to an address on the site
 /// that nothing in `outputs`, each published file's path from the top of
 /// the built site, stands at, offering the nearest that something does.
-pub fn sent_nowhere(site: &Site, outputs: &[(String, Named)]) -> Vec<Problem> {
+pub(crate) fn sent_nowhere(site: &Site, outputs: &[(String, Named)]) -> Vec<Problem> {
     let published: HashSet<&str> = outputs.iter().map(|(file, _)| file.as_str()).collect();
     let mut addresses: Option<Vec<String>> = None;
     let mut problems = Vec::new();
@@ -1632,7 +1632,7 @@ pub fn sent_nowhere(site: &Site, outputs: &[(String, Named)]) -> Vec<Problem> {
 /// A warning for each page left out of the build whose address something
 /// in `outputs`, each published file's path from the top of the built
 /// site, already stands at, compared as two published files are.
-pub fn taken(site: &Site, outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
+pub(crate) fn taken(site: &Site, outputs: &[(String, Named)], base: &str) -> Vec<Problem> {
     // Reversed, so the first to claim a file is the one named.
     let published: HashMap<String, &Named> = (outputs.iter().rev())
         .map(|(file, named)| (crate::platform::folded(file), named))
@@ -1824,7 +1824,7 @@ fn names_held<'a>(
                         (folder.path.clone(), names)
                     }
                     // Told already, where the file was read.
-                    Some(Reached::Unread(_)) => continue,
+                    Some(Reached::Unread) => continue,
                     None => {
                         let known = site.data.names();
                         let nearest =

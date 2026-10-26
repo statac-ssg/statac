@@ -153,7 +153,7 @@ pub(super) fn line_start(b: &[u8], at: usize) -> usize {
 /// The writing a call wraps, with the margin of the call's own line taken
 /// off each of its lines, and where each line's writing is in the file.
 pub(super) struct Wrapped {
-    pub text: String,
+    pub(crate) text: String,
     /// Each line's start in `text`, and where that is in the file.
     lines: Vec<(usize, usize)>,
 }

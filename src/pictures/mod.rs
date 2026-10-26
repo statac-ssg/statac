@@ -42,7 +42,7 @@ pub enum Kind {
 
 impl Kind {
     /// Whether pictures of this kind are published as resized copies.
-    pub fn is_photograph(self) -> bool {
+    pub(crate) fn is_photograph(self) -> bool {
         matches!(self, Kind::Jpeg | Kind::WebP | Kind::Png)
     }
 }
@@ -74,25 +74,25 @@ pub enum Header {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Photograph {
     /// [`Kind::Jpeg`], [`Kind::WebP`] or [`Kind::Png`].
-    pub kind: Kind,
+    pub(crate) kind: Kind,
     /// The size as the pixels are stored.
-    pub stored: Size,
+    pub(crate) stored: Size,
     /// The EXIF orientation, 1 to 8, or 1 where there is none. A PNG's is
     /// not read, and it is never turned.
-    pub orientation: u8,
+    pub(crate) orientation: u8,
     /// The size once turned by its orientation.
     pub shown: Size,
     /// Whether the container says the pixels carry alpha. Most that say so
     /// are opaque throughout; [`transparent`] tells.
-    pub alpha: bool,
+    pub(crate) alpha: bool,
     /// Present where a colour profile is embedded, holding its description
     /// where it has one.
-    pub profile: Option<Option<String>>,
+    pub(crate) profile: Option<Option<String>>,
 }
 
 /// The formats of a photograph's copies: AVIF, then PNG where it is
 /// [`transparent`] and JPEG where it is not, whatever kind of file it is.
-pub fn formats(transparent: bool) -> [Format; 2] {
+pub(crate) fn formats(transparent: bool) -> [Format; 2] {
     [
         Format::Avif,
         match transparent {
@@ -105,13 +105,13 @@ pub fn formats(transparent: bool) -> [Format; 2] {
 /// A picture published as it is.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Plain {
-    pub kind: Kind,
-    pub size: Result<Size, NoSize>,
+    pub(crate) kind: Kind,
+    pub(crate) size: Result<Size, NoSize>,
 }
 
 /// Why a plain picture's size is not given.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum NoSize {
+pub(crate) enum NoSize {
     /// Its kind is not one whose size is read.
     NotRead,
     /// An SVG whose root element does not give both its width and height in
@@ -133,14 +133,14 @@ pub fn read_header(bytes: &[u8]) -> Result<Header, Unreadable> {
 /// The kind of picture `bytes` begin as, told from their first few alone;
 /// none where they begin as no picture, or as too little of one to tell.
 /// A WebP or a PNG that moves is told as one that doesn't.
-pub fn begins_as(bytes: &[u8]) -> Option<Kind> {
+pub(crate) fn begins_as(bytes: &[u8]) -> Option<Kind> {
     header::sniff(bytes).ok()
 }
 
 /// Whether `bytes` are a JPEG, PNG or WebP whose EXIF holds where it was
 /// taken, a latitude and a longitude. Nothing else it holds is read for
 /// one, and a file that does not read holds none.
-pub fn holds_location(bytes: &[u8]) -> bool {
+pub(crate) fn holds_location(bytes: &[u8]) -> bool {
     header::located(bytes)
 }
 
@@ -170,29 +170,29 @@ pub enum Error {
 /// The most memory a photograph's pixels may take, both as its decoder
 /// gives them, which for a PNG of 16 bits a sample is twice what is kept,
 /// and as they are kept, 8-bit RGB or RGBA.
-pub const MAX_DECODED_BYTES: u64 = 1 << 30;
+pub(crate) const MAX_DECODED_BYTES: u64 = 1 << 30;
 
 /// How large a picture may be for its pixels to be decoded at all.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Bounds {
     /// The most pixels either side may hold.
-    pub side: u32,
+    pub(crate) side: u32,
     /// The most memory its pixels may take, as [`MAX_DECODED_BYTES`] is.
-    pub bytes: u64,
+    pub(crate) bytes: u64,
 }
 
 /// The bounds of a photograph of the site's own.
-pub const PHOTOGRAPH: Bounds = Bounds {
+pub(crate) const PHOTOGRAPH: Bounds = Bounds {
     side: u32::MAX,
     bytes: MAX_DECODED_BYTES,
 };
 
 /// The widths copies are made at, where a photograph is wide enough.
-pub const RUNGS: [u32; 5] = [400, 800, 1200, 1600, 2400];
+pub(crate) const RUNGS: [u32; 5] = [400, 800, 1200, 1600, 2400];
 
 /// The widths of the copies of a photograph `natural` pixels wide as shown,
 /// none wider than `max_width` nor than the photograph, narrowest first.
-pub fn widths(natural: u32, max_width: u32) -> Vec<u32> {
+pub(crate) fn widths(natural: u32, max_width: u32) -> Vec<u32> {
     let max_width = max_width.max(1);
     let mut widths: Vec<u32> = RUNGS
         .into_iter()
@@ -211,14 +211,14 @@ pub fn widths(natural: u32, max_width: u32) -> Vec<u32> {
 
 /// The width a tag's `src` names among `widths`: the widest at or below
 /// 1200, or else the widest.
-pub fn src_width(widths: &[u32]) -> Option<u32> {
+pub(crate) fn src_width(widths: &[u32]) -> Option<u32> {
     let below = widths.iter().copied().filter(|&w| w <= 1200).max();
     below.or_else(|| widths.iter().copied().max())
 }
 
 /// The height of a copy `width` wide of a photograph `shown`, rounded and
 /// at least 1.
-pub fn copy_height(shown: Size, width: u32) -> u32 {
+pub(crate) fn copy_height(shown: Size, width: u32) -> u32 {
     let numerator = 2 * u64::from(shown.height) * u64::from(width);
     let denominator = 2 * u64::from(shown.width.max(1));
     let height = (numerator + denominator / 2) / denominator;
@@ -245,31 +245,31 @@ impl Format {
 
 /// Raised by hand whenever a change here makes copies differ for the same
 /// photograph and [`Settings`], so their keys change with them.
-pub const PIPELINE: u32 = 1;
+pub(crate) const PIPELINE: u32 = 1;
 
 /// Every choice that decides a copy's bytes. Each goes into the copy's
 /// [`Key`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
-    pub pipeline: u32,
+    pub(crate) pipeline: u32,
     /// The AVIF encoder's [`avif_aom_sys::version`].
-    pub avif_encoder: String,
-    pub avif_speed: u8,
-    pub avif_quality: u8,
-    pub avif_alpha_quality: u8,
+    pub(crate) avif_encoder: String,
+    pub(crate) avif_speed: u8,
+    pub(crate) avif_quality: u8,
+    pub(crate) avif_alpha_quality: u8,
     /// Copies are the same from run to run only with 1.
-    pub avif_threads: u32,
-    pub resize: FilterType,
+    pub(crate) avif_threads: u32,
+    pub(crate) resize: FilterType,
     /// On `jpeg-encoder`'s scale, 1 to 100.
-    pub jpeg_quality: u8,
-    pub jpeg_subsampling: SamplingFactor,
-    pub jpeg_chroma_method: ChromaSubsamplingMethod,
-    pub jpeg_progressive: bool,
-    pub jpeg_optimised_huffman: bool,
+    pub(crate) jpeg_quality: u8,
+    pub(crate) jpeg_subsampling: SamplingFactor,
+    pub(crate) jpeg_chroma_method: ChromaSubsamplingMethod,
+    pub(crate) jpeg_progressive: bool,
+    pub(crate) jpeg_optimised_huffman: bool,
     /// The slowest setting takes near three times as long for files a
     /// hundredth smaller.
-    pub png_compression: CompressionType,
-    pub png_filter: PngFilter,
+    pub(crate) png_compression: CompressionType,
+    pub(crate) png_filter: PngFilter,
 }
 
 impl Default for Settings {
@@ -337,12 +337,17 @@ impl Settings {
 
 /// What a copy's bytes are decided by, hashed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Key(blake3::Hash);
+pub(crate) struct Key(blake3::Hash);
 
 impl Key {
     /// The key of the copy `width` wide in `format` of the file whose bytes
     /// hash to `source`.
-    pub fn new(source: &blake3::Hash, width: u32, format: Format, settings: &Settings) -> Key {
+    pub(crate) fn new(
+        source: &blake3::Hash,
+        width: u32,
+        format: Format,
+        settings: &Settings,
+    ) -> Key {
         let mut hasher = blake3::Hasher::new();
         hasher.update(source.as_bytes());
         hasher.update(&width.to_le_bytes());
@@ -353,12 +358,12 @@ impl Key {
     }
 
     /// The whole key, as 64 hex digits.
-    pub fn hex(&self) -> String {
+    pub(crate) fn hex(&self) -> String {
         self.0.to_hex().to_string()
     }
 
     /// The first eight hex digits, which name the copy.
-    pub fn hash8(&self) -> String {
+    pub(crate) fn hash8(&self) -> String {
         self.0.to_hex()[..8].to_owned()
     }
 }
@@ -369,7 +374,7 @@ pub struct Rendition {
     pub width: u32,
     pub height: u32,
     pub format: Format,
-    pub key: Key,
+    pub(crate) key: Key,
     /// `{stem}-{width}.{hash8}.{extension}`.
     pub name: String,
 }

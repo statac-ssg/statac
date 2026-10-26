@@ -107,7 +107,6 @@ fn value(handed: PieceValue) -> Value {
     match handed {
         PieceValue::Text(text) => Value::from(text),
         PieceValue::Number(n) => Value::from(n),
-        PieceValue::Truth(truth) => Value::from(truth),
         PieceValue::Html(html) => Value::from_safe_string(html),
         PieceValue::List(items) => Value::from(items.into_iter().map(value).collect::<Vec<_>>()),
         PieceValue::Record(fields) => Value::from(

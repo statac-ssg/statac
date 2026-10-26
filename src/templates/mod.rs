@@ -61,7 +61,7 @@ pub(crate) use typing::{Name, Readable, TYPED, filter_names, test_names};
 
 /// The site's templates and snippets, read and checked, ready to build
 /// pages with.
-pub struct Templates {
+pub(crate) struct Templates {
     env: Environment<'static>,
     files: Vec<File>,
     by_name: HashMap<String, usize>,

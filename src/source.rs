@@ -22,11 +22,11 @@ impl SourceId {
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Span {
     pub start: u32,
-    pub end: u32,
+    pub(crate) end: u32,
 }
 
 impl Span {
-    pub fn new(start: usize, end: usize) -> Self {
+    pub(crate) fn new(start: usize, end: usize) -> Self {
         assert!(start <= end, "span runs backwards: {start}..{end}");
         Span {
             start: u32::try_from(start).expect("source over 4 GiB"),
@@ -34,7 +34,7 @@ impl Span {
         }
     }
 
-    pub fn range(self) -> std::ops::Range<usize> {
+    pub(crate) fn range(self) -> std::ops::Range<usize> {
         self.start as usize..self.end as usize
     }
 }
@@ -50,7 +50,7 @@ pub struct Place {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct LineColumn {
     pub line: usize,
-    pub column: usize,
+    pub(crate) column: usize,
 }
 
 struct Source {
@@ -62,7 +62,7 @@ struct Source {
 }
 
 /// Where each line of `text` starts.
-pub fn line_starts(text: &str) -> Vec<usize> {
+pub(crate) fn line_starts(text: &str) -> Vec<usize> {
     std::iter::once(0)
         .chain(text.match_indices('\n').map(|(i, _)| i + 1))
         .collect()
@@ -98,7 +98,7 @@ impl Sources {
 
     /// [`Sources::add`], for a text whose [`line_starts`] are found
     /// already, as many files read at once find them.
-    pub fn add_with_lines(
+    pub(crate) fn add_with_lines(
         &mut self,
         path: impl Into<PathBuf>,
         text: String,
@@ -117,7 +117,7 @@ impl Sources {
     /// Marks `place` as holding a secret, such as a token, so that no line
     /// drawn from its source shows it.
     /// Overlapping spans are merged, so a secret is masked once.
-    pub fn hide(&mut self, place: Place) {
+    pub(crate) fn hide(&mut self, place: Place) {
         let hidden = &mut self.sources[place.source.0 as usize].hidden;
         let mut span = place.span;
         hidden.retain(|other| {
@@ -133,12 +133,12 @@ impl Sources {
     }
 
     /// The spans of a source that hold secrets.
-    pub fn hidden(&self, id: SourceId) -> &[Span] {
+    pub(crate) fn hidden(&self, id: SourceId) -> &[Span] {
         &self.get(id).hidden
     }
 
     /// Every source, in the order read.
-    pub fn ids(&self) -> impl Iterator<Item = SourceId> {
+    pub(crate) fn ids(&self) -> impl Iterator<Item = SourceId> {
         (0..self.sources.len() as u32).map(SourceId)
     }
 
@@ -146,7 +146,7 @@ impl Sources {
         &self.get(id).path
     }
 
-    pub fn text(&self, id: SourceId) -> &str {
+    pub(crate) fn text(&self, id: SourceId) -> &str {
         &self.get(id).text
     }
 
@@ -177,12 +177,12 @@ impl Sources {
     }
 
     /// Where line `line` (counted from 1) starts.
-    pub fn line_start(&self, id: SourceId, line: usize) -> usize {
+    pub(crate) fn line_start(&self, id: SourceId, line: usize) -> usize {
         self.get(id).line_starts[line - 1]
     }
 
     /// The whole of line `line` (counted from 1), without its line ending.
-    pub fn line(&self, id: SourceId, line: usize) -> &str {
+    pub(crate) fn line(&self, id: SourceId, line: usize) -> &str {
         let source = self.get(id);
         let start = source.line_starts[line - 1];
         let end = source

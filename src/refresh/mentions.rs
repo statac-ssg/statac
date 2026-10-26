@@ -47,26 +47,26 @@ const FACE_BOUNDS: Bounds = Bounds {
 /// What came of asking.
 #[derive(Default)]
 pub(super) struct Asked {
-    pub fetched: usize,
-    pub faces: usize,
-    pub not_kept: usize,
+    pub(crate) fetched: usize,
+    pub(crate) faces: usize,
+    pub(crate) not_kept: usize,
     /// Whether the relay answered at least once.
-    pub answered: bool,
+    pub(crate) answered: bool,
     /// Whether the relay couldn't be asked, or what it sent couldn't be
     /// kept.
-    pub failed: bool,
+    pub(crate) failed: bool,
 }
 
 /// Where what is asked for is kept, and what is known of it.
 pub(super) struct Keeping<'a> {
-    pub folder: &'a Path,
-    pub record: &'a mut Record,
-    pub standing: &'a mut HashSet<String>,
-    pub today: Date,
+    pub(crate) folder: &'a Path,
+    pub(crate) record: &'a mut Record,
+    pub(crate) standing: &'a mut HashSet<String>,
+    pub(crate) today: Date,
     /// The site's `url`.
-    pub url: &'a str,
-    pub refused: &'a Refused,
-    pub report: &'a Report<'a>,
+    pub(crate) url: &'a str,
+    pub(crate) refused: &'a Refused,
+    pub(crate) report: &'a Report<'a>,
 }
 
 /// The relay's address for the mentions after `since`, with `token`.

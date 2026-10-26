@@ -21,13 +21,13 @@ use std::ops::Range;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct Address {
     /// Where it is written, within the words searched.
-    pub at: Range<usize>,
+    pub(crate) at: Range<usize>,
     /// What a link to it writes before it: `http://` for a `www.` address,
     /// `mailto:` for a mail address written without a scheme.
-    pub scheme: &'static str,
+    pub(crate) scheme: &'static str,
     /// Whether it is a mail address, which an open `[` doesn't stop being
     /// linked.
-    pub mail: bool,
+    pub(crate) mail: bool,
 }
 
 /// Each address written bare in `words`, in the order written. `before`

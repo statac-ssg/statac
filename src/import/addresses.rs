@@ -23,37 +23,37 @@ use crate::site::{ListKey, PagePlace};
 pub(super) struct Kept {
     /// Each folder given a pattern, by its path under `content/`, the
     /// pattern, and how many pages land at their old address by it.
-    pub patterns: Vec<(String, String, usize)>,
+    pub(crate) patterns: Vec<(String, String, usize)>,
     /// How many pages carry a `permalink` of their own.
-    pub own: usize,
+    pub(crate) own: usize,
     /// How many pages carry `redirect_from`.
-    pub redirected: usize,
+    pub(crate) redirected: usize,
     /// How many old addresses the new site answers.
-    pub answered: usize,
+    pub(crate) answered: usize,
     /// The old addresses it doesn't, each with the old file it was for.
-    pub unanswered: Vec<(String, String)>,
+    pub(crate) unanswered: Vec<(String, String)>,
     /// The addresses of the pages in the old built output that Statac
     /// didn't work out and the new site doesn't answer, in order.
-    pub unworked: Vec<String>,
+    pub(crate) unworked: Vec<String>,
     /// The old addresses of the files given another name, each with the
     /// old file.
-    pub files: Vec<(String, String)>,
+    pub(crate) files: Vec<(String, String)>,
     /// The old pages of tags that a page of their own now sends readers
     /// on from: each one's address, and the file written for it.
-    pub sent_on: Vec<(String, String)>,
+    pub(crate) sent_on: Vec<(String, String)>,
     /// The old home page's later pages that a page of their own now sends
     /// readers on from, and how many no page could.
-    pub later: LaterPages,
+    pub(crate) later: LaterPages,
     /// The old addresses of the photographs beside pages that the new
     /// site publishes only as copies.
-    pub pictures: Vec<String>,
+    pub(crate) pictures: Vec<String>,
     /// The pages the old site made to list every tag, or every name of
     /// another list of that kind, that nothing answers: each one's
     /// address and its list's name.
-    pub lists: Vec<(String, String)>,
+    pub(crate) lists: Vec<(String, String)>,
     /// The old addresses the new site can't publish a redirect at, each
     /// with the old file of its page, where it has one, and why.
-    pub unkept: Vec<(String, String, String)>,
+    pub(crate) unkept: Vec<(String, String, String)>,
 }
 
 impl Kept {
@@ -454,10 +454,10 @@ pub(super) fn send_on_to_later_pages(
 pub(super) struct LaterPages {
     /// Each old address now answered by the page of the same number, with
     /// the file written for it.
-    pub pages: Vec<(String, String)>,
+    pub(crate) pages: Vec<(String, String)>,
     /// How many old pages had a number past the last page of the posts'
     /// list.
-    pub left: usize,
+    pub(crate) left: usize,
 }
 
 /// `address`, an address or a pattern from the top of the site, as a
@@ -754,36 +754,36 @@ fn pages_in(folder: &Path) -> Vec<String> {
 
 /// What reading the new site as a build does found.
 pub(super) struct Checked {
-    pub answered: usize,
-    pub unanswered: Vec<(String, String)>,
+    pub(crate) answered: usize,
+    pub(crate) unanswered: Vec<(String, String)>,
     /// Those of `old` the new site can't publish a redirect at, each with
     /// the old file it was for and why.
-    pub unkept: Vec<(String, String, String)>,
+    pub(crate) unkept: Vec<(String, String, String)>,
     /// The old feeds' addresses the new site publishes nothing at, each
     /// with the old file it was made from.
-    pub feeds: Vec<(String, String)>,
+    pub(crate) feeds: Vec<(String, String)>,
     /// Those of `lists` the new site publishes nothing at.
-    pub lists: Vec<(String, String)>,
+    pub(crate) lists: Vec<(String, String)>,
     /// The address of each photograph beside a page that the new site
     /// publishes only as copies, in order.
-    pub pictures: Vec<String>,
+    pub(crate) pictures: Vec<String>,
     /// The addresses of the pages in the old built output that are none
     /// of `old` and that the new site doesn't answer, in order.
-    pub unworked: Vec<String>,
+    pub(crate) unworked: Vec<String>,
     /// Each error `statac check` finds, by its file, its line and its
     /// headline.
-    pub errors: Vec<(String, Option<usize>, String)>,
+    pub(crate) errors: Vec<(String, Option<usize>, String)>,
     /// Each template the site's pages and feeds are built with that it
     /// doesn't have, by its path, in order.
-    pub templates: Vec<String>,
+    pub(crate) templates: Vec<String>,
     /// Whether any of `templates` is one a feed is built with.
-    pub for_feeds: bool,
+    pub(crate) for_feeds: bool,
     /// Those of `templates` the site doesn't build without, as a page it
     /// makes for a tag needs `templates/folder.html`, in order.
-    pub stopping: Vec<String>,
+    pub(crate) stopping: Vec<String>,
     /// Whether the site asks for a feed and has no `url`, which every feed
     /// needs.
-    pub feeds_need_url: bool,
+    pub(crate) feeds_need_url: bool,
 }
 
 /// Reads the site in `folder` as a build of `today` does, looks for each

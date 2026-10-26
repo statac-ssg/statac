@@ -115,8 +115,8 @@ pub(crate) fn told(
 /// What [`told`] found on a page: its problems, and where each link or
 /// button was written that is all an image told as missing alt text.
 pub(crate) struct Told {
-    pub problems: Vec<Problem>,
-    pub folded: Vec<Option<Place>>,
+    pub(crate) problems: Vec<Problem>,
+    pub(crate) folded: Vec<Option<Place>>,
 }
 
 /// Whether `problem` is a link or a button with no words that is all an
@@ -191,9 +191,9 @@ struct Open {
 /// `<` and its name, and for a link or a button, the whole tag of the
 /// first image with no alt text it holds.
 pub(crate) struct Unnamed {
-    pub kind: Kind,
-    pub at: Option<Range<usize>>,
-    pub image: Option<Range<usize>>,
+    pub(crate) kind: Kind,
+    pub(crate) at: Option<Range<usize>>,
+    pub(crate) image: Option<Range<usize>>,
 }
 
 /// A form control with no label but perhaps a `<label for>` further on.

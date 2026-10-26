@@ -21,22 +21,22 @@ use crate::source::Sources;
 /// One of the site's commands, and what it is handed.
 pub(crate) struct Hook<'a> {
     /// The setting it is written in.
-    pub setting: &'static str,
-    pub line: &'a str,
+    pub(crate) setting: &'static str,
+    pub(crate) line: &'a str,
     /// The site's folder, which the command runs in.
-    pub site: &'a Path,
+    pub(crate) site: &'a Path,
     /// The folder the command is to act on.
-    pub out: &'a Path,
-    pub drafts: bool,
+    pub(crate) out: &'a Path,
+    pub(crate) drafts: bool,
     /// Whether `statac serve` runs it, on a site being previewed.
-    pub serve: bool,
+    pub(crate) serve: bool,
 }
 
 /// A command that didn't end well: how it ended, and what it printed.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Stopped {
-    pub ended: Ended,
-    pub said: String,
+    pub(crate) ended: Ended,
+    pub(crate) said: String,
 }
 
 impl Hook<'_> {
@@ -105,7 +105,7 @@ fn absolute(path: &Path) -> PathBuf {
 
 /// What became of a site's `before_build`.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub enum Before {
+pub(crate) enum Before {
     /// The site sets none, or the run is one that runs none.
     #[default]
     Unset,
@@ -120,14 +120,14 @@ pub struct Changed {
     /// The files it added, those it wrote over, by their length or when
     /// they were last changed, and those it removed.
     pub added: usize,
-    pub changed: usize,
+    pub(crate) changed: usize,
     pub removed: usize,
 }
 
 /// What became of a site's own commands in one build.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 pub struct Ran {
-    pub before: Before,
+    pub(crate) before: Before,
     /// What `after_build` did, where it ran.
     pub after: Option<Changed>,
 }

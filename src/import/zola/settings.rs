@@ -51,55 +51,55 @@ pub(super) fn found(folder: &Path) -> Result<(String, Vec<Field>), Box<Failed>> 
 /// A list of terms the settings declare.
 #[derive(Clone, Debug)]
 pub(super) struct Taxonomy {
-    pub name: String,
-    pub paginate_by: Option<u64>,
-    pub feed: bool,
-    pub render: bool,
+    pub(crate) name: String,
+    pub(crate) paginate_by: Option<u64>,
+    pub(crate) feed: bool,
+    pub(crate) render: bool,
 }
 
 /// A language the settings declare besides the main one.
 #[derive(Clone, Debug)]
 pub(super) struct Language {
-    pub code: String,
-    pub title: Option<String>,
-    pub feeds: Option<bool>,
-    pub feed_filenames: Option<Vec<String>>,
-    pub taxonomies: Option<Vec<Taxonomy>>,
+    pub(crate) code: String,
+    pub(crate) title: Option<String>,
+    pub(crate) feeds: Option<bool>,
+    pub(crate) feed_filenames: Option<Vec<String>>,
+    pub(crate) taxonomies: Option<Vec<Taxonomy>>,
 }
 
 /// What the settings say.
 #[derive(Debug)]
 pub(super) struct Settings {
-    pub base_url: Option<String>,
-    pub title: Option<String>,
-    pub default_language: String,
-    pub languages: Vec<Language>,
-    pub taxonomies: Vec<Taxonomy>,
-    pub paths: Strategy,
-    pub terms: Strategy,
-    pub anchors: Strategy,
-    pub keep_dates: bool,
-    pub feeds: bool,
-    pub feed_filenames: Vec<String>,
-    pub output_dir: String,
-    pub ignored_content: Vec<String>,
-    pub ignored_static: Vec<String>,
+    pub(crate) base_url: Option<String>,
+    pub(crate) title: Option<String>,
+    pub(crate) default_language: String,
+    pub(crate) languages: Vec<Language>,
+    pub(crate) taxonomies: Vec<Taxonomy>,
+    pub(crate) paths: Strategy,
+    pub(crate) terms: Strategy,
+    pub(crate) anchors: Strategy,
+    pub(crate) keep_dates: bool,
+    pub(crate) feeds: bool,
+    pub(crate) feed_filenames: Vec<String>,
+    pub(crate) output_dir: String,
+    pub(crate) ignored_content: Vec<String>,
+    pub(crate) ignored_static: Vec<String>,
     /// The files whose writing Zola 0.23 and later don't run as a
     /// template, where the setting is there at all.
-    pub skip_content_templating: Option<Vec<String>>,
-    pub smart_punctuation: bool,
-    pub target_blank: bool,
-    pub no_follow: bool,
-    pub no_referrer: bool,
-    pub theme: Option<String>,
+    pub(crate) skip_content_templating: Option<Vec<String>>,
+    pub(crate) smart_punctuation: bool,
+    pub(crate) target_blank: bool,
+    pub(crate) no_follow: bool,
+    pub(crate) no_referrer: bool,
+    pub(crate) theme: Option<String>,
     /// The lines `output_dir` and `theme` are written on.
-    pub output_line: Option<usize>,
-    pub theme_line: Option<usize>,
+    pub(crate) output_line: Option<usize>,
+    pub(crate) theme_line: Option<usize>,
     /// The author's own values, and the site's own words that are values
     /// in Statac, such as `description`.
-    pub values: Vec<Field>,
+    pub(crate) values: Vec<Field>,
     /// Settings Statac has no equal for, each with its line and text.
-    pub left: Vec<(Option<usize>, String)>,
+    pub(crate) left: Vec<(Option<usize>, String)>,
 }
 
 /// The field `name` of a table.
