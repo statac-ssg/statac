@@ -666,6 +666,24 @@ impl Folders {
         }
     }
 
+    /// Gives the file `rel` `modified` as the time its bytes last changed,
+    /// refused as [`open_file`] refuses.
+    pub fn set_modified(&self, rel: &str, modified: std::time::SystemTime) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            // The owner may set a file's times through any handle on it.
+            self.open.open_file(rel)?.set_modified(modified)
+        }
+        #[cfg(not(unix))]
+        {
+            no_link_to(&self.root, rel)?;
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .open(join(&self.root, rel))?;
+            file.set_modified(modified)
+        }
+    }
+
     /// What the file `rel` is found to be, as [`measure`] finds it.
     pub fn measure(&self, rel: &str) -> io::Result<Measure> {
         #[cfg(unix)]

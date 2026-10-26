@@ -11,6 +11,11 @@
 //! byte for byte. Where no spare can be kept, each build writes a fresh
 //! folder beside the output and removes the old one.
 //!
+//! A file the same as the output's keeps the output's time, so a file no
+//! build changes keeps its time though the spare and the output change
+//! places; any other has the time it was put in place, so a tool that
+//! uploads what is newer sends what changed.
+//!
 //! An output folder is replaced only when it is empty or carries the marker
 //! Statac leaves in every folder it builds, so a mistyped output folder can
 //! never cost anyone their files.
@@ -929,12 +934,49 @@ impl Staging {
                 Ok(same && file.read_to_end(&mut there)? == bytes.len() && there == bytes)
             });
             if same.unwrap_or(false) {
+                self.settle_time(rel, true);
                 return Ok(());
             }
         }
         let _turn = self.makers.take();
         let mut file = self.create(rel, held)?;
-        io::Write::write_all(&mut file, bytes).map_err(|error| self.cant_write(rel, &error))
+        io::Write::write_all(&mut file, bytes).map_err(|error| self.cant_write(rel, &error))?;
+        drop(file);
+        self.settle_time(rel, false);
+        Ok(())
+    }
+
+    /// Gives the file just put at `rel` the time the output's file there
+    /// has where the two hold the same bytes, so a file no build changes
+    /// keeps its time though the spare and the output change places each
+    /// build; and where they differ, the time now, to one `kept` as the
+    /// spare held it, which may be older than the output's.
+    fn settle_time(&self, rel: &str, kept: bool) {
+        if self.in_place {
+            return;
+        }
+        let Ok(here) = self.folders.measure(rel) else {
+            return;
+        };
+        let same_bytes_as = |out: &platform::Measure| {
+            out.modified == here.modified
+                || platform::open_file(&self.out, rel)
+                    .and_then(|out| {
+                        let mut here = self.folders.open_file(rel)?;
+                        same_bytes(&mut here, out)
+                    })
+                    .unwrap_or(false)
+        };
+        let published = platform::measure(&self.out, rel)
+            .ok()
+            .filter(|out| out.length == here.length && same_bytes_as(out));
+        let to = match (published, kept) {
+            (Some(out), _) if out.modified != here.modified => out.modified,
+            (None, true) => std::time::SystemTime::now(),
+            _ => return,
+        };
+        // A disk that can't be given the time leaves the file as it is.
+        let _ = self.folders.set_modified(rel, to);
     }
 
     /// Writes `bytes` at `rel`, a name that says what they are, as
@@ -1000,6 +1042,7 @@ impl Staging {
                     .unwrap_or(false)
             {
                 self.copied(rel, found);
+                self.settle_time(rel, true);
                 return Ok(());
             }
             source.rewind().map_err(|error| cant_read(&error))?;
@@ -1007,7 +1050,9 @@ impl Staging {
         let _turn = self.makers.take();
         let mut file = self.create(rel, held)?;
         io::copy(&mut source, &mut file).map_err(|error| self.cant_write(rel, &error))?;
+        drop(file);
         self.copied(rel, found);
+        self.settle_time(rel, false);
         Ok(())
     }
 
@@ -1883,6 +1928,32 @@ mod tests {
         assert_eq!(changed(&out.join("a.html")), long_ago());
         assert_ne!(changed(&out.join("b/c.html")), long_ago());
         assert_eq!(tree(&scratch.spare()).len(), first.len() + 2);
+    }
+
+    /// A file no build changes keeps its time, though the spare and the
+    /// output change places each build, and one changed and changed back
+    /// is newer than the change, though the spare held it as it was.
+    #[test]
+    fn a_file_no_build_changes_keeps_its_time_and_one_changed_back_is_newer() {
+        let scratch = scratch_with_site("times");
+        let out = scratch.out();
+        let files = [("a.html", "a"), ("b.html", "b")];
+        scratch.build(&files);
+        for file in ["a.html", "b.html"] {
+            change(&out.join(file), long_ago());
+        }
+        for _ in 0..3 {
+            scratch.build(&files);
+            assert_eq!(changed(&out.join("a.html")), long_ago());
+            assert_eq!(changed(&out.join("b.html")), long_ago());
+        }
+        scratch.build(&[("a.html", "a"), ("b.html", "B")]);
+        let change_made = long_ago() + Duration::from_secs(3600);
+        change(&out.join("b.html"), change_made);
+        scratch.build(&files);
+        assert_eq!(tree(&out), ["a.html=a", "b.html=b"]);
+        assert!(changed(&out.join("b.html")) > change_made);
+        assert_eq!(changed(&out.join("a.html")), long_ago());
     }
 
     #[test]
