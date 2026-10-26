@@ -1281,6 +1281,31 @@ fn a_date_with_no_time_never_has_one_invented() {
     );
 }
 
+/// A month's or weekday's name in English, in a language that writes them
+/// otherwise, is refused as English with the language's word offered,
+/// rather than copied onto every date as text.
+#[test]
+fn an_english_month_or_weekday_in_another_language_is_refused() {
+    let spanish = words(bundled("es"));
+    for (example, written, corrected) in [
+        ("December 2025", "December", "diciembre 2025"),
+        ("31 Dec 2025", "Dec", "31 dic 2025"),
+        (
+            "Wednesday 31 diciembre 2025",
+            "Wednesday",
+            "miércoles 31 diciembre 2025",
+        ),
+    ] {
+        let refused = Format::read(example, &spanish).unwrap_err();
+        let fault = FormatFault::English {
+            written: written.into(),
+            corrected: Some(corrected.into()),
+        };
+        assert_eq!(refused.fault, fault, "{example}");
+    }
+    assert!(Format::read("December 2025", &english()).is_ok());
+}
+
 #[test]
 fn a_languages_words_are_written_in_the_case_the_example_writes() {
     let days: Vec<String> = (1..=31).map(|day| day.to_string()).collect();
@@ -2235,11 +2260,11 @@ fn a_template_may_ask_for_any_piece_but_a_day_and_year_want_a_month() {
         );
     }
     let french = words(bundled("fr"));
-    let refusal = Format::for_a_template("Wed, 31 Dec 2025", &french).unwrap_err();
+    let refusal = Format::for_a_template("mercredi 31, 2025", &french).unwrap_err();
     assert_eq!(
         refusal.fault,
         FormatFault::Missing {
-            example: "Wed, 31 Dec 2025".into(),
+            example: "mercredi 31, 2025".into(),
             pieces: vec![Piece::Month],
             months: vec!["décembre".into(), "déc.".into(), "12".into()],
         }

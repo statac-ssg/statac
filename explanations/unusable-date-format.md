@@ -38,6 +38,12 @@ Write the moment Statac expects: 31 December 2025, with 15:04 or 3.04pm
 if you want the time. Write the month in the site's language, or as a
 number. In a template, you can name a look instead.
 
+Statac refuses a month or weekday written in English, such as `December`
+on a site in Spanish, because it would otherwise copy the English word
+onto every date. The message offers the language's own word. On a site
+in several languages, one of them English, you can write the example in
+any of them.
+
 ## Example
 
 In `statac.yaml`:

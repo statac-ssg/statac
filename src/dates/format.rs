@@ -679,6 +679,29 @@ impl Format {
             }
         }
 
+        // A month or weekday in English, where the language has its own.
+        for (token, resolution) in tokens.iter().zip(&resolved) {
+            let Resolution::English { month, short } = *resolution else {
+                continue;
+            };
+            let w = &words.words;
+            let theirs = match (month, short) {
+                (true, true) => w
+                    .months_short_with_no_day()
+                    .map(|names| &names[MONTH_LISTED]),
+                (true, false) => w.months_with_no_day().map(|names| &names[MONTH_LISTED]),
+                (false, true) => w.weekdays_short.as_ref().map(|names| &names[WEEKDAY]),
+                (false, false) => w.weekdays.as_ref().map(|names| &names[WEEKDAY]),
+            };
+            return refuse(
+                FormatFault::English {
+                    written: example[token.span.clone()].to_owned(),
+                    corrected: theirs.map(|theirs| spliced(&token.span, theirs)),
+                },
+                token.span.clone(),
+            );
+        }
+
         // A piece written twice, told at the second.
         let mut seen: HashMap<Piece, Range<usize>> = HashMap::new();
         for (token, resolution) in tokens.iter().zip(&resolved) {
@@ -1339,6 +1362,10 @@ impl<'a> Plain<'a> {
                 am,
                 pm,
             },
+            FormatFault::English { written, corrected } => FormatFault::English {
+                written,
+                corrected: corrected.map(|c| self.figures(&c)),
+            },
             FormatFault::MinuteWithoutHour { written, examples } => {
                 FormatFault::MinuteWithoutHour {
                     written: self.figures(&written),
@@ -1991,6 +2018,52 @@ enum Resolution {
     OtherMonth {
         list: MonthList,
     },
+    /// A month's or weekday's name in English, short where `short`, in a
+    /// language whose words aren't English's.
+    English {
+        month: bool,
+        short: bool,
+    },
+}
+
+/// Whether `text` is a month's or weekday's name in English, as Statac
+/// writes them, and which, in a language that writes them otherwise.
+fn english(text: &str, words: &Words) -> Option<Resolution> {
+    let english = crate::language::english();
+    let lists = [
+        (
+            true,
+            false,
+            english.months.as_ref().map(|names| names.as_slice()),
+        ),
+        (
+            true,
+            true,
+            english.months_short.as_ref().map(|names| names.as_slice()),
+        ),
+        (
+            false,
+            false,
+            english.weekdays.as_ref().map(|names| names.as_slice()),
+        ),
+        (
+            false,
+            true,
+            english
+                .weekdays_short
+                .as_ref()
+                .map(|names| names.as_slice()),
+        ),
+    ];
+    if words.months.is_none() || words.months == english.months {
+        return None;
+    }
+    lists.into_iter().find_map(|(month, short, names)| {
+        names?
+            .iter()
+            .any(|name| name == text)
+            .then_some(Resolution::English { month, short })
+    })
 }
 
 fn resolve(token: &Token, words: &Words) -> Resolution {
@@ -2029,6 +2102,10 @@ fn resolve(token: &Token, words: &Words) -> Resolution {
             }
             if let Some(component) = begun(text, words) {
                 return Resolution::Component(component);
+            }
+            // Written as text, it would be English on every date.
+            if let Some(english) = english(text, words) {
+                return english;
             }
             // A slip in another weekday's or month's word is refused as
             // the word itself is, the reference moment's winning a tie.

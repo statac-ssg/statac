@@ -1397,6 +1397,7 @@ fn format_fault(fault: &FormatFault) -> String {
         FormatFault::LoneHour { written, am, pm } => {
             format!("`{written}` is an hour with no {am} or {pm}")
         }
+        FormatFault::English { written, .. } => format!("`{written}` is in English"),
         FormatFault::MinuteWithoutHour { written, .. } => {
             format!("`{written}` is a minute with no hour")
         }
@@ -1525,7 +1526,7 @@ fn format_suggestion(fault: &FormatFault) -> Option<String> {
             "`{first}` is already the {}, so keep one of them.",
             piece_name(*piece)
         )),
-        FormatFault::NotInReference { corrected, .. } => {
+        FormatFault::NotInReference { corrected, .. } | FormatFault::English { corrected, .. } => {
             corrected.as_ref().map(|c| format!("Did you mean `{c}`?"))
         }
         FormatFault::LoneHour { pm, .. } => Some(format!(
@@ -9110,6 +9111,14 @@ mod tests {
                 }),
                 "Unusable date format: `3` is an hour with no am or pm",
                 Some("Write the time as `15:04`, or add `pm`, such as `3.04pm`."),
+            ),
+            (
+                unusable(FormatFault::English {
+                    written: "December".into(),
+                    corrected: Some("diciembre 2025".into()),
+                }),
+                "Unusable date format: `December` is in English",
+                Some("Did you mean `diciembre 2025`?"),
             ),
             (
                 unusable(FormatFault::MinuteWithoutHour {

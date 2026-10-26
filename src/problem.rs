@@ -2767,6 +2767,13 @@ pub enum FormatFault {
         list: WordsWanted,
         from: WordsFrom,
     },
+    /// A month's or weekday's name in English, where the language the date
+    /// is written in has words of its own: the example with that
+    /// language's word in its place, where it has one.
+    English {
+        written: String,
+        corrected: Option<String>,
+    },
 }
 
 /// A piece of a date as a format writes it.
