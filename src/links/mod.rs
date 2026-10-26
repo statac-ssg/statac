@@ -26,7 +26,6 @@
 //! that the site would publish under its own path is offered as one.
 
 mod resolve;
-mod scan;
 mod template;
 #[cfg(test)]
 mod tests;
@@ -34,24 +33,16 @@ mod tests;
 use std::collections::{HashMap, HashSet};
 
 pub(crate) use resolve::Site;
-pub(crate) use scan::{Attribute, Linked, handed, written, written_in_html};
 
 use crate::address::{self, Address};
 use crate::ids::{PageId, TemplateId};
+use crate::linked::{Linked, Writing, scan};
 use crate::problem::{Kind, Problem};
 use crate::reads::{Key, Reads, Translation};
 use crate::slug;
 use crate::source::Place;
 use crate::templates::{Own, Renderer};
 use resolve::{Arrival, Leads};
-use scan::scan;
-
-/// What a page's writing links to, and what it hands its snippet calls.
-#[derive(Default, Debug)]
-pub struct Writing {
-    pub written: Vec<Linked>,
-    pub handed: Vec<Linked>,
-}
 
 /// Each link in `text`, a template's own text, whose address the template
 /// writes whole, from the top of the host or with its host, so that it

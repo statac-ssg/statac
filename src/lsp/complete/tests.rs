@@ -183,7 +183,7 @@ fn settings_offer_statacs_names_and_what_each_takes() {
     let words = offered(&site, "statac.yaml", "search_without_javascript: |\n").unwrap();
     assert_eq!(
         labels(&words),
-        crate::search::elsewhere::SETTING.to_vec(),
+        crate::engines::SETTING.to_vec(),
         "every word, in order"
     );
     let truth = offered(&site, "statac.yaml", "typography:|\n").unwrap();

@@ -20,7 +20,7 @@ use crate::dates::ShowDates;
 use crate::highlight::{self, Language};
 use crate::html::escaped;
 use crate::ids::{Id, ListId, PageId};
-use crate::links::Attribute;
+use crate::linked::Attribute;
 use crate::lists::Filter;
 use crate::markdown::{Piece, PieceValue, closed_up, words_of};
 use crate::problem::{Called, Kind, Problem, Relation, Stopped, Word};

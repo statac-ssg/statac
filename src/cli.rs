@@ -2,6 +2,8 @@
 //!
 //! Options are written `--name=value`, and may come before or after the command.
 
+pub(crate) mod search;
+
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -15,7 +17,6 @@ use crate::new;
 use crate::problem::{Code, CommandHint, Expected, Found, Kind, Missing, OptionHint, Problem};
 use crate::refresh;
 use crate::report::{Quiet, Report};
-use crate::search;
 use crate::serve;
 use crate::serve::watch::{self, How};
 use crate::source::Sources;
@@ -45,7 +46,7 @@ pub enum Request {
     Refresh(refresh::Options),
     New(new::Options),
     Import(import::Options),
-    Search(search::Options),
+    Search(crate::search::Options),
     Explain(Code),
     /// A language server for an editor, on standard input and output.
     Lsp,
@@ -405,7 +406,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
         say(terminal.out, &badge);
     }
     let given_alone = match &request {
-        Request::Search(options) => search::folder_for_words(options),
+        Request::Search(options) => crate::search::folder_for_words(options),
         _ => None,
     };
     if let Some(problem) = given_alone {
@@ -540,7 +541,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
                 );
                 return 2;
             }
-            say(terminal.out, &report.found(&options.words, &outcome));
+            say(terminal.out, &report.found(&options.words, &outcome.found));
         }
         Request::Import(options) => {
             let stdin = std::io::stdin();
@@ -1049,7 +1050,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             from,
             today,
         }),
-        Some("search") => Request::Search(search::Options {
+        Some("search") => Request::Search(crate::search::Options {
             site: site.unwrap_or_default(),
             words: words.expect("checked above").to_owned(),
             today,

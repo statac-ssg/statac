@@ -268,7 +268,7 @@ pub(super) struct Body {
     /// page's.
     colours: bool,
     /// What the writing links to, for checking once the site is built.
-    writing: crate::links::Writing,
+    writing: crate::linked::Writing,
     /// The steps the engine took building it, and whether they ran out.
     steps: u64,
     spent: bool,
@@ -755,7 +755,7 @@ impl Renderer {
 
     /// What `page`'s writing links to and hands its snippet calls, once
     /// its writing has been built.
-    pub fn writing(&self, page: PageId) -> Option<&crate::links::Writing> {
+    pub fn writing(&self, page: PageId) -> Option<&crate::linked::Writing> {
         let body = self.shared.bodies[page.index()].get()?;
         Some(&body.writing)
     }
@@ -763,7 +763,7 @@ impl Renderer {
     /// What `page`'s writing links to and hands its snippet calls, its
     /// writing built now where no output has built it, as where a round
     /// kept the page's output from the round before.
-    pub fn writing_built(&self, page: PageId) -> &crate::links::Writing {
+    pub fn writing_built(&self, page: PageId) -> &crate::linked::Writing {
         kept_body(&self.shared, page);
         &(self.shared.bodies[page.index()].get())
             .expect("kept just now")
@@ -1361,7 +1361,7 @@ fn build_body_untimed(
     });
     let mut problems = Vec::new();
     let mut wordless = Vec::new();
-    let mut links = crate::links::Writing::default();
+    let mut links = crate::linked::Writing::default();
     let document = writing(shared, page);
     // The frame is new, so what it has read the reading read.
     let reading = frame::with(|frame| frame.reads.keys().to_vec()).unwrap_or_default();
@@ -1370,7 +1370,7 @@ fn build_body_untimed(
         None => match p.source {
             Some(source) => {
                 undescribed_in_html(shared, page, source, p.body);
-                links.written = crate::links::written_in_html(&shared.sources, source, p.body);
+                links.written = crate::linked::written_in_html(&shared.sources, source, p.body);
                 let mut written =
                     markdown::as_written(&shared.sources.text(source)[p.body.range()]);
                 written.traced = vec![(
@@ -1385,8 +1385,8 @@ fn build_body_untimed(
             None => markdown::Written::default(),
         },
         Some(document) => {
-            links.written = crate::links::written(&document, &shared.sources);
-            links.handed = crate::links::handed(&document);
+            links.written = crate::linked::written(&document, &shared.sources);
+            links.handed = crate::linked::handed(&document);
             problems.extend(document.problems.iter().cloned());
             if code_languages(shared, &document, &mut problems) {
                 frame::with(|frame| frame.colours = true);

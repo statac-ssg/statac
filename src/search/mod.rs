@@ -9,7 +9,6 @@
 //! text's against a word there.
 
 mod command;
-pub mod elsewhere;
 mod files;
 mod kept;
 mod meant;
@@ -32,10 +31,8 @@ use crate::ids::{LanguageId, PageId};
 use crate::site::{ListKey, Page, Site};
 use crate::templates::Renderer;
 
-pub use command::{
-    Options, Outcome, Results, SHOWN, Shown, code, excerpt, folder_for_words, results, run,
-};
-pub use files::{File, claims, entry, folder};
+pub use command::{Options, Results, SHOWN, Shown, code, excerpt, folder_for_words, results};
+pub use files::{File, claims};
 pub use kept::Kept;
 pub use why::{Counted, Stands, Why};
 pub use words::{Stemmer, fold, spans};
@@ -197,7 +194,7 @@ fn language_files(
         .iter_mut()
         .flat_map(|page| std::mem::take(&mut page.records));
     let index = assembled.with(records.collect());
-    let files = files::files(renderer, &folder(site, language), &index, kept);
+    let files = files::files(renderer, &site.search_folder(language), &index, kept);
     (files, pages)
 }
 

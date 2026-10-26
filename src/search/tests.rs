@@ -545,12 +545,12 @@ fn said(root: &std::path::Path, words: &str, language: Option<&str>) -> Result<S
         drafts: false,
         language: language.map(str::to_owned),
     };
-    let outcome = run(&options);
+    let outcome = crate::cli::search::run(&options);
     let report = crate::report::Report::new(outcome.sources().unwrap(), root, false);
     assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
     match &outcome.mistake {
         Some(mistake) => Err(report.problems(std::slice::from_ref(mistake))),
-        None => Ok(report.found(words, &outcome)),
+        None => Ok(report.found(words, &outcome.found)),
     }
 }
 

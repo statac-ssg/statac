@@ -4,14 +4,11 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::path::PathBuf;
 
-use rayon::prelude::*;
-
-use super::{Asked, Index, Record, fold, records, runs, spans, unspaced};
+use super::{Asked, Index, Record, fold, runs, spans, unspaced};
 use crate::date::Date;
-use crate::ids::{LanguageId, PageId};
-use crate::problem::{Expected, Found, Kind, Problem, Severity};
+use crate::ids::PageId;
+use crate::problem::{Kind, Problem};
 use crate::site::Language;
-use crate::source::Sources;
 use crate::templates::Renderer;
 
 /// How many pages are shown, best first.
@@ -53,23 +50,6 @@ pub struct Shown {
     pub found: super::Found,
 }
 
-pub struct Outcome {
-    renderer: Option<Renderer>,
-    /// The errors that stopped the site being read.
-    pub errors: Vec<Problem>,
-    /// The language asked for, where the site declares none of its code.
-    pub mistake: Option<Problem>,
-    /// What each language searched found, by its code, in the site's
-    /// order of languages, at most [`SHOWN`] pages shown of each.
-    pub found: Vec<(String, Results)>,
-}
-
-impl Outcome {
-    pub fn sources(&self) -> Option<&Sources> {
-        self.renderer.as_ref().map(Renderer::sources)
-    }
-}
-
 /// Where `options` name no folder and the words are a site's folder, as
 /// every other command takes it, what says the words go first.
 pub fn folder_for_words(options: &Options) -> Option<Problem> {
@@ -80,68 +60,6 @@ pub fn folder_for_words(options: &Options) -> Option<Problem> {
             site: Some(words.to_owned()),
         })
     })
-}
-
-pub fn run(options: &Options) -> Outcome {
-    if let Err(problem) = crate::build::a_folder(&options.site) {
-        return Outcome {
-            renderer: None,
-            errors: vec![problem],
-            mistake: None,
-            found: Vec::new(),
-        };
-    }
-    let run = crate::content::Run {
-        today: options.today,
-        drafts: options.drafts,
-        url: None,
-        renamed: Vec::new(),
-    };
-    let prepared = crate::build::prepared(&options.site, &run);
-    let errors: Vec<Problem> = (prepared.problems.into_iter())
-        .filter(|problem| problem.kind.severity() == Severity::Error)
-        .collect();
-    let renderer = prepared.renderer;
-    let site = renderer.site();
-    let mut languages: Vec<(String, LanguageId)> = (site.languages.iter())
-        .map(|(id, language)| (code(language).to_owned(), id))
-        .collect();
-    let mut mistake = None;
-    if let Some(asked) = &options.language {
-        match languages.iter().position(|(code, _)| code == asked) {
-            Some(at) => languages = vec![languages.swap_remove(at)],
-            None => {
-                let codes = languages.iter().map(|(code, _)| code.clone()).collect();
-                mistake = Some(Problem::nowhere(Kind::WrongKind {
-                    field: "--language".into(),
-                    expected: Expected::OneOf(codes),
-                    found: Found::Written(asked.clone()),
-                    respelt: None,
-                }));
-            }
-        }
-    }
-    if !errors.is_empty() || mistake.is_some() {
-        return Outcome {
-            renderer: Some(renderer),
-            errors,
-            mistake,
-            found: Vec::new(),
-        };
-    }
-    let found = (languages.into_par_iter())
-        .map(|(code, language)| {
-            let index = Index::of(site, language, records(&renderer, language));
-            let results = results(&renderer, &index, &options.words, false, SHOWN);
-            (code, results)
-        })
-        .collect();
-    Outcome {
-        renderer: Some(renderer),
-        errors,
-        mistake,
-        found,
-    }
 }
 
 /// A language's code, as the site declares it.

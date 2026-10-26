@@ -2,8 +2,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::Helper;
 use super::resolve::{Arrival, Leads, Site};
-use super::scan::{Attribute, scan};
 use crate::config::Settings;
+use crate::linked::{Attribute, scan};
 use crate::source::Sources;
 
 fn settings(yaml: &str) -> Settings {

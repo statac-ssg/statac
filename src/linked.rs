@@ -5,6 +5,13 @@ use crate::html::{Tag, addresses, decoded, start_tags};
 use crate::markdown::{self, Document, InSite, Kind, Node};
 use crate::source::{Place, SourceId, Sources, Span};
 
+/// What a page's writing links to, and what it hands its snippet calls.
+#[derive(Default, Debug)]
+pub struct Writing {
+    pub written: Vec<Linked>,
+    pub handed: Vec<Linked>,
+}
+
 /// The attribute a link is written in.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Attribute {
@@ -24,7 +31,7 @@ impl Attribute {
         ("poster", Attribute::Poster),
     ];
 
-    pub(super) fn of(name: &str) -> Option<Attribute> {
+    pub(crate) fn of(name: &str) -> Option<Attribute> {
         let (_, attribute) = Attribute::NAMED.iter().find(|(named, _)| *named == name)?;
         Some(*attribute)
     }
@@ -32,7 +39,7 @@ impl Attribute {
 
 /// An address a built page links to.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(super) struct Found {
+pub(crate) struct Found {
     pub attribute: Attribute,
     /// As written in the HTML, its character references undecoded.
     pub raw: String,
@@ -44,14 +51,14 @@ pub(super) struct Found {
 
 impl Found {
     /// The address a browser follows: its character references decoded.
-    pub(super) fn address(&self) -> String {
+    pub(crate) fn address(&self) -> String {
         decoded(&self.raw, false)
     }
 }
 
 /// What a built page links to, and the ids a link can land on in it.
 #[derive(Default, Debug)]
-pub(super) struct Scanned {
+pub(crate) struct Scanned {
     pub links: Vec<Found>,
     /// Sorted, each once.
     pub ids: Vec<String>,
@@ -60,7 +67,7 @@ pub(super) struct Scanned {
 }
 
 /// Every link on a built page and every id on it.
-pub(super) fn scan(html: &str) -> Scanned {
+pub(crate) fn scan(html: &str) -> Scanned {
     let mut scanned = Scanned::default();
     start_tags(html, |tag| {
         for attribute in &tag.attributes {

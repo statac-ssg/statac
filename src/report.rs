@@ -185,11 +185,11 @@ impl<'a> Report<'a> {
     /// Of several: that for each language that found any, under its code,
     /// or where none did, the words the first language offering some may
     /// have meant.
-    pub fn found(&self, words: &str, found: &crate::search::Outcome) -> String {
-        if let [(_, results)] = found.found.as_slice() {
+    pub fn found(&self, words: &str, found: &[(String, crate::search::Results)]) -> String {
+        if let [(_, results)] = found {
             return self.results(words, results);
         }
-        let blocks: Vec<String> = (found.found.iter())
+        let blocks: Vec<String> = (found.iter())
             .filter(|(_, results)| results.pages > 0)
             .map(|(code, results)| {
                 let heading = self.paint.paint(BOLD, code);
@@ -200,7 +200,7 @@ impl<'a> Report<'a> {
             return blocks.join("\n");
         }
         let mut out = format!("{}\n", self.said(&wording::found(words, 0, false)));
-        let meant = (found.found.iter()).find_map(|(_, results)| results.suggestion.as_deref());
+        let meant = (found.iter()).find_map(|(_, results)| results.suggestion.as_deref());
         if let Some(meant) = meant {
             out.push_str(&format!("{}\n", self.said(&wording::meant(meant))));
         }

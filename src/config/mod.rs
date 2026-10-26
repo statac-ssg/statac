@@ -150,7 +150,7 @@ const SETTINGS: &[Setting] = &[
     ),
     setting(
         "search_without_javascript",
-        Shape::OneOf(crate::search::elsewhere::SETTING),
+        Shape::OneOf(crate::engines::SETTING),
         None,
     ),
     setting("webmentions", Shape::Truth, Some(Preset::Truth(false))),

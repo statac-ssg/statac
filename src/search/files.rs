@@ -33,31 +33,8 @@ use std::fmt::Write as _;
 use rayon::prelude::*;
 
 use super::{Index, Kept, Place, Times};
-use crate::address::Top;
-use crate::ids::LanguageId;
 use crate::problem::Named;
-use crate::site::Site;
 use crate::templates::Renderer;
-
-/// The folder each language's files are published in, at its top.
-const FOLDER: &str = "search";
-
-/// The script reading the index, by its path in the folder.
-const ENTRY: &str = "index.js";
-
-/// The folder `language`'s files are published in, by its path from the
-/// top of the built site: `search`, or `fr/search` beneath a language's
-/// folder.
-pub fn folder(site: &Site, language: LanguageId) -> String {
-    let top = Top::new(site.top(language)).address("/");
-    format!("{}{FOLDER}", top.trim_start_matches('/'))
-}
-
-/// The script reading `language`'s index, by its path from the top of the
-/// built site.
-pub fn entry(site: &Site, language: LanguageId) -> String {
-    format!("{}/{ENTRY}", folder(site, language))
-}
 
 /// The script, which the names of the index's files are written before.
 const READER: &str = include_str!("reader.js");
@@ -174,7 +151,7 @@ pub(super) fn files(renderer: &Renderer, folder: &str, index: &Index, kept: &Kep
     entry.push_str(READER);
 
     let mut files = vec![File {
-        path: ENTRY.to_owned(),
+        path: crate::site::SEARCH_ENTRY.to_owned(),
         bytes: entry.into_bytes(),
         named: false,
     }];

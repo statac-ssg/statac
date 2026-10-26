@@ -818,7 +818,7 @@ pub(crate) fn conclude(
     indexed.sort_unstable();
     indexed.dedup();
     let entries: Vec<String> = (indexed.iter())
-        .map(|&language| crate::search::entry(site, language))
+        .map(|&language| site.search_entry(language))
         .collect();
     let made: HashSet<&str> = cards
         .files()

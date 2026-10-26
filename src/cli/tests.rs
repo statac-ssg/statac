@@ -1469,7 +1469,7 @@ fn a_fault_of_statacs_own_is_told_after_rusts_report() {
 #[test]
 fn search_is_read_with_its_words_and_options() {
     let searching = |words: &str, site: &str, drafts: bool, today: Option<&str>| {
-        Ok(Request::Search(search::Options {
+        Ok(Request::Search(crate::search::Options {
             site: site.into(),
             words: words.into(),
             today: today.map(|day| date::read(day).unwrap()),
@@ -1478,7 +1478,7 @@ fn search_is_read_with_its_words_and_options() {
         }))
     };
     let in_language = |language: &str| {
-        Ok(Request::Search(search::Options {
+        Ok(Request::Search(crate::search::Options {
             site: UNNAMED.into(),
             words: "zfs".into(),
             today: None,

@@ -2,13 +2,19 @@
 //! the start, so a one-language site is the case of one language, not a
 //! special path.
 
-use crate::address::Address;
+use crate::address::{Address, Top};
 use crate::config::words::Words;
 use crate::date::Date;
 use crate::ids::{Arena, LanguageId, ListId, PageId};
 use crate::origin::Sourced;
 use crate::problem::{Held, Named, Word};
 use crate::source::{Place, SourceId, Span};
+
+/// The folder each language's search files are published in, at its top.
+const SEARCH_FOLDER: &str = "search";
+
+/// The script reading a search index, by its path in the folder.
+pub const SEARCH_ENTRY: &str = "index.js";
 
 pub struct Language {
     /// A BCP 47 tag as the author wrote it, such as `en-GB`; none where the
@@ -497,6 +503,20 @@ impl Site {
             (self.redirects.iter()).map(|redirect| (&redirect.from, Some(redirect.page)));
         let pages = (self.pages.iter()).map(|(id, page)| (&page.address, Some(id)));
         held.chain(redirects).chain(pages)
+    }
+
+    /// The folder `language`'s search files are published in, by its path
+    /// from the top of the built site: `search`, or `fr/search` beneath a
+    /// language's folder.
+    pub fn search_folder(&self, language: LanguageId) -> String {
+        let top = Top::new(self.top(language)).address("/");
+        format!("{}{SEARCH_FOLDER}", top.trim_start_matches('/'))
+    }
+
+    /// The script reading `language`'s search index, by its path from the
+    /// top of the built site.
+    pub fn search_entry(&self, language: LanguageId) -> String {
+        format!("{}/{SEARCH_ENTRY}", self.search_folder(language))
     }
 
     /// How a problem names `page`: by its file or the item it was made

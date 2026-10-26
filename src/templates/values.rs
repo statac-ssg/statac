@@ -607,7 +607,7 @@ impl Object for SearchBox {
                 frame::read(Key::Setting(self.shared.name_id("url")));
                 let language = frame::language();
                 frame::with(|frame| frame.names_index(language));
-                let entry = crate::search::entry(&self.shared.site, language);
+                let entry = self.shared.site.search_entry(language);
                 Some(Value::from(format!("{}/{entry}", self.shared.base)))
             }
             other => {
@@ -854,11 +854,10 @@ impl Object for SiteValue {
 /// a search of the site is written: none where the setting is unset or
 /// the site has no address.
 fn search_elsewhere(settings: &crate::config::Settings) -> Option<Value> {
-    let engine =
-        crate::search::elsewhere::engine(settings.text("search_without_javascript")?.value)?;
+    let engine = crate::engines::engine(settings.text("search_without_javascript")?.value)?;
     // The engine knows the site by its own address, whatever address the
     // run was given.
-    let site = crate::search::elsewhere::site(settings.home()?)?;
+    let site = crate::engines::site(settings.home()?)?;
     let field = Ordered(vec![
         ("name".into(), Value::from(engine.site)),
         ("value".into(), Value::from(site)),
