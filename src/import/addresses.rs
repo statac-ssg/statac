@@ -778,6 +778,9 @@ pub(super) struct Checked {
     pub templates: Vec<String>,
     /// Whether any of `templates` is one a feed is built with.
     pub for_feeds: bool,
+    /// Those of `templates` the site doesn't build without, as a page it
+    /// makes for a tag needs `templates/folder.html`, in order.
+    pub stopping: Vec<String>,
     /// Whether the site asks for a feed and has no `url`, which every feed
     /// needs.
     pub feeds_need_url: bool,
@@ -830,6 +833,7 @@ pub(super) fn check(
         errors: Vec::new(),
         templates: Vec::new(),
         for_feeds: false,
+        stopping: Vec::new(),
         feeds_need_url: !written.is_empty() && read.settings.text("url").is_none(),
     };
     let answered = |address: &str| {
@@ -893,7 +897,12 @@ pub(super) fn check(
     let sources = outcome.sources();
     for problem in &outcome.problems {
         let template = match &problem.kind {
-            Kind::MissingTemplate { path, .. } => path,
+            Kind::MissingTemplate { path, .. } => {
+                if problem.kind.severity() == Severity::Error && !checked.stopping.contains(path) {
+                    checked.stopping.push(path.clone());
+                }
+                path
+            }
             // A feed is built with the template the reader named for its
             // format, a JSON feed otherwise with `templates/feed.json`, and
             // any other with the last looked for, `templates/feed.xml`.
@@ -918,6 +927,7 @@ pub(super) fn check(
         }
     }
     checked.templates.sort();
+    checked.stopping.sort();
     for problem in outcome
         .problems
         .iter()

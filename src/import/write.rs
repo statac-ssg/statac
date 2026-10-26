@@ -267,6 +267,8 @@ pub(super) struct Summary {
     pub templates: Vec<String>,
     /// Whether any of `templates` is one a feed is built with.
     pub for_feeds: bool,
+    /// Those of `templates` the new site doesn't build without.
+    pub stopping: Vec<String>,
     /// Whether the new site asks for a feed and has no `url`, which every
     /// feed needs.
     pub feeds_need_url: bool,
@@ -741,6 +743,7 @@ pub(super) fn write<'a>(
     summary.errors = checked.errors.len();
     summary.templates = checked.templates;
     summary.for_feeds = checked.for_feeds;
+    summary.stopping = checked.stopping;
     summary.feeds_need_url = checked.feeds_need_url;
     findings.extend(
         checked

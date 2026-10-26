@@ -1,6 +1,6 @@
 This site was imported from a Hugo site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/hugo-tags/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/. Its pages and feeds need `templates/folder.html` and `templates/index.xml`.
+It was made from `tests/import/hugo-tags/old` by `statac import`, which changed nothing there. It has no templates, and doesn't build until you add `templates/folder.html`: see https://statac.dev/templates/. Its pages and feeds need `templates/folder.html` and `templates/index.xml`.
 
 ## What came across
 

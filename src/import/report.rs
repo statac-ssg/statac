@@ -77,6 +77,13 @@ fn no_built_output(summary: &Summary) -> String {
     }
 }
 
+/// The templates the new site doesn't build without, as a sentence lists
+/// them.
+fn stopping(summary: &Summary) -> String {
+    let templates: Vec<String> = summary.stopping.iter().map(|t| code(t)).collect();
+    crate::wording::listed(&templates)
+}
+
 /// What is printed once the site is made.
 pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
     let mut text = format!(
@@ -115,10 +122,16 @@ pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
             counted(kinds, "kind", "kinds")
         ));
     }
-    text.push_str(
-        "The new site has no templates, so each page is published as its content alone until \
-         you add your own: see https://statac.dev/templates/.\n",
-    );
+    text.push_str(&match summary.stopping.is_empty() {
+        true => "The new site has no templates, so each page is published as its content alone \
+                 until you add your own: see https://statac.dev/templates/.\n"
+            .to_owned(),
+        false => format!(
+            "The new site has no templates, and doesn't build until you add {}: see \
+             https://statac.dev/templates/.\n",
+            stopping(summary)
+        ),
+    });
     if summary.errors > 0 {
         let errors = counted(summary.errors, "error", "errors");
         text.push_str(&format!(
@@ -146,11 +159,19 @@ pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
         tool = shown.tool
     );
     text.push_str(&format!(
-        "It was made from `{}` by `statac import`, which changed nothing there. It has no \
-         templates, so each page is published as its content alone until you add templates of \
-         your own: see https://statac.dev/templates/.",
+        "It was made from `{}` by `statac import`, which changed nothing there. ",
         shown.old
     ));
+    text.push_str(&match summary.stopping.is_empty() {
+        true => "It has no templates, so each page is published as its content alone until you \
+                 add templates of your own: see https://statac.dev/templates/."
+            .to_owned(),
+        false => format!(
+            "It has no templates, and doesn't build until you add {}: see \
+             https://statac.dev/templates/.",
+            stopping(summary)
+        ),
+    });
     if !summary.templates.is_empty() {
         let templates: Vec<String> = summary.templates.iter().map(|t| code(t)).collect();
         text.push_str(&format!(
