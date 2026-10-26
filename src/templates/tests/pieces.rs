@@ -144,7 +144,7 @@ fn a_value_read_as_markdown_is_written_through_the_pieces_that_need_no_page() {
          <callout kind=tip title=Tip body=<p>Words.</p>>\n\
          <table head=[a ] rows=[[1 ]] id= classes=>\n\
          <section class=\"footnotes\">\n  <ol>\n    <li id=\"note-1\">\n      \
-         <p>A note. <a href=\"#back-1\" class=\"back\">\u{21a9}</a></p>\n    </li>\n  </ol>\n\
+         <p>A note. <a href=\"#back-1\" class=\"back\" aria-label=\"back to the text\">\u{21a9}</a></p>\n    </li>\n  </ol>\n\
          </section>"
     );
 }

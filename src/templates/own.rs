@@ -940,7 +940,7 @@ fn markdown(state: &State, value: &Value) -> Value {
         &document,
         &crate::markdown::Options {
             snippets: &of_value,
-            back_to_the_text: None,
+            back_to_the_text: words.and_then(|words| words.back_to_the_text.as_deref()),
             digits: words.and_then(|words| words.digits.as_ref()),
             right_to_left: words
                 .is_some_and(|words| words.direction == crate::language::Direction::RightToLeft),

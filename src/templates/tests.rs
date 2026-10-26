@@ -4837,6 +4837,28 @@ fn related_gives_the_posts_sharing_most_tags_first() {
     );
 }
 
+/// A note in a value built through `markdown` says where its way back
+/// goes, as a note in the page's content does.
+#[test]
+fn a_notes_way_back_in_a_value_built_as_markdown_says_where_it_goes() {
+    let built = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\npages.feed: false\n",
+        ),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\nsummary: \"Words.[^1]\\n\\n[^1]: A note.\"\n---\n",
+        ),
+        ("templates/page.html", "{{ page.summary | markdown }}"),
+    ]);
+    let html = built.html("post-1.md");
+    assert!(
+        html.contains("<a href=\"#back-1\" class=\"back\" aria-label=\"back to the text\">"),
+        "{html}"
+    );
+}
+
 #[test]
 fn a_notes_way_back_says_where_it_goes_in_the_sites_language() {
     let built = site(&[
