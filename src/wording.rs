@@ -2075,7 +2075,9 @@ fn expected_words(expected: &Expected) -> String {
         Expected::LaterAddress => {
             "a URL starting with `{list}` and holding `{n}`, such as `{list}page/{n}/`".into()
         }
-        Expected::Id => "six letters and digits, such as `k3m9x2`".into(),
+        Expected::Id => {
+            "six letters and digits, such as `k3m9x2`, or a UUID in small letters".into()
+        }
         Expected::FieldKind => "a kind, such as `text` or `one of a, b`".into(),
         Expected::Words(list) => match list {
             WordList::Months => "12 months, January first".into(),
@@ -8711,6 +8713,12 @@ mod tests {
                 ),
                 "Wrong kind of value: `date` is a date, not `13/04/2026`",
                 Some("Write it as `2026-04-13`."),
+            ),
+            (
+                wrong("id", Expected::Id, Found::Written("nope".into()), None),
+                "Wrong kind of value: `id` is six letters and digits, such as `k3m9x2`, or a \
+                 UUID in small letters, not `nope`",
+                None,
             ),
             (
                 wrong(
