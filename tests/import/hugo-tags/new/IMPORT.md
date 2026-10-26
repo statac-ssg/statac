@@ -67,6 +67,11 @@ Statac worked these URLs out by the old tool's rules, but the old site's built o
 - `content/posts/post-1.md`: `/posts/post-1/`
 - `content/posts/post-2.md`: `/posts/post-2/`
 - `content/posts/post-3.md`: `/posts/post-3/`
+
+### Lists' and feeds' URLs the old built site doesn't have
+
+Statac worked these URLs out by the old tool's rules, but the old site's built output has nothing there, so the rule was wrong for the site or the output is older than the content. Each is a list's or a feed's, not one page's, so there is no `redirect_from` to add: where the old site published the list at another URL, that URL is among the pages listed at URLs Statac didn't work out.
+
 - `/posts/index.xml`
 - `/index.xml`
 - `/topics/c++/`

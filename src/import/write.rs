@@ -100,6 +100,15 @@ pub(super) static NOT_IN_BUILT: FindingKind = FindingKind {
                URL to the page's `redirect_from`.",
 };
 
+pub(super) static LIST_NOT_IN_BUILT: FindingKind = FindingKind {
+    heading: "Lists' and feeds' URLs the old built site doesn't have",
+    sentence: "Statac worked these URLs out by the old tool's rules, but the old site's built \
+               output has nothing there, so the rule was wrong for the site or the output is \
+               older than the content. Each is a list's or a feed's, not one page's, so there \
+               is no `redirect_from` to add: where the old site published the list at another \
+               URL, that URL is among the pages listed at URLs Statac didn't work out.",
+};
+
 pub(super) static FEED_LEFT: FindingKind = FindingKind {
     heading: "Feeds made by templates",
     sentence: "Readers subscribed to the old site's feed at each of these URLs, and the \
@@ -708,6 +717,7 @@ pub(super) fn write<'a>(
         })
         .collect();
     if let Some(built) = &built {
+        let mut lists = Vec::new();
         for (address, from) in &worked_out {
             let file = built_file(address);
             if !platform::stays_inside(&file)
@@ -715,13 +725,18 @@ pub(super) fn write<'a>(
             {
                 // An address of no one page names no file, so its spot is
                 // the report's line itself.
-                let text = match from.is_empty() {
-                    true => report::code(address),
-                    false => address.clone(),
-                };
-                findings.push(Finding::at(&NOT_IN_BUILT, from, None, &text));
+                match from.is_empty() {
+                    true => lists.push(Finding::at(
+                        &LIST_NOT_IN_BUILT,
+                        from,
+                        None,
+                        &report::code(address),
+                    )),
+                    false => findings.push(Finding::at(&NOT_IN_BUILT, from, None, address)),
+                }
             }
         }
+        findings.extend(lists);
     }
     summary.errors = checked.errors.len();
     summary.templates = checked.templates;
