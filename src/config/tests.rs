@@ -946,6 +946,21 @@ fn a_setting_for_a_language_not_declared_or_that_no_language_has_is_unknown() {
     let (_, settings, problems) = read_settings("language: [ar, en]\nog.title: Site 1\n");
     assert_eq!(problems, []);
     assert!(settings.own("og.title").is_some());
+    // A site in one language writes the setting itself.
+    for settings in ["language: en\n", "language: [en]\n", ""] {
+        for line in ["en.title: Site 1", "fr.title: Site 1"] {
+            let at = line.split(':').next().unwrap().to_owned();
+            let kind = unknown(&at, Some("title"));
+            assert_eq!(
+                found(&format!("{settings}{line}\n")),
+                [(kind, at)],
+                "{line}"
+            );
+        }
+    }
+    let (_, settings, problems) = read_settings("language: en\nog.title: Site 1\n");
+    assert_eq!(problems, []);
+    assert!(settings.own("og.title").is_some());
 }
 
 /// A setting for a tag the site doesn't declare is told as meant for a
@@ -976,13 +991,16 @@ fn a_tag_names_a_language_as_statac_finds_its_words() {
     }
 }
 
+/// A site in one language has no settings for one: `en.title` is told,
+/// and `en:` with lines beneath it is the author's own.
 #[test]
 fn a_site_in_one_language_writes_no_setting_for_one() {
-    let (_, settings, problems) =
-        read_settings("language: en\nen.title: Site 1\nen:\n  date_format: soon\n");
+    let (_, settings, problems) = read_settings("language: en\nen:\n  date_format: soon\n");
     assert_eq!(problems, []);
-    assert!(settings.own("en.title").is_some());
     assert!(settings.own("en").is_some());
+    let (_, settings, problems) = read_settings("language: en\nen.title: Site 1\n");
+    assert_eq!(problems.len(), 1);
+    assert!(settings.own("en.title").is_none());
     assert!(settings.for_language("en", "title").is_none());
 }
 

@@ -556,7 +556,6 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
         } else if declared.contains(&name) && matches!(value.value, Yaml::Mapping(_)) {
             problems.extend(words::nested(sources, &name, value));
         } else if let Some((tag, rest)) = name.split_once('.')
-            && !declared.is_empty()
             && PER_LANGUAGE.contains(&rest)
             && names_a_language(tag, &declared)
         {
@@ -748,10 +747,12 @@ fn names_a_language(tag: &str, declared: &[String]) -> bool {
 
 /// A setting written for a language the site doesn't declare, or one that
 /// can't be written for a language. Another language is never offered for
-/// the one written, which may be meant: only its capitals as declared.
+/// the one written, which may be meant: only its capitals as declared, and
+/// on a site in one language, the setting itself.
 fn unknown_for_a_language(name: &str, key: &Node, declared: &[String]) -> Problem {
     let (tag, rest) = name.split_once('.').unwrap_or((name, ""));
     let nearest = match declared.iter().find(|d| d.eq_ignore_ascii_case(tag)) {
+        _ if declared.is_empty() && PER_LANGUAGE.contains(&rest) => Some(rest.to_owned()),
         Some(declared) if declared == tag => {
             crate::suggest::nearest(rest, PER_LANGUAGE.iter().copied())
                 .map(|setting| format!("{tag}.{setting}"))
