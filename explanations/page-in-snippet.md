@@ -21,8 +21,8 @@ builds the page as written and warns you.
 
 ## How to fix it
 
-Read the field from the name the page is handed under, as Statac
-suggests.
+Read the field through the name the call hands the post under, such as
+`post.title`, as Statac suggests.
 If the page being built is what you meant, quieten this warning with
 `quiet: [page-in-snippet]` in `statac.yaml`.
 

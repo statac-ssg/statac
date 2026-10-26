@@ -24,15 +24,16 @@ part of the whole page, not on its own, so a tag that doesn't match
 reaches past your content. An element left open takes in what the layout
 puts after the content: on a list of posts, the posts after this one, the
 links to more pages and the footer. A comment left open hides all of it.
-A closing tag with nothing to close is ignored where the layout has
-nothing of that name open round the content, and closes part of the
-layout where it has, so what follows falls out of place. Which it does
-turns on the layout, which can change, so every one is warned of.
+If the layout has nothing of that name open round the content, a browser
+ignores a closing tag with nothing to close. If the layout has, the tag
+closes part of the layout, and what follows falls out of place. Which of
+these happens depends on the layout, which can change, so Statac warns of
+every one.
 
 Statac doesn't add or remove a tag for you, because it can't know where
 you meant the element to end.
 
-HTML that browsers close without harm isn't warned about:
+Statac doesn't warn about HTML that browsers close without harm:
 
 - Elements whose closing tag may be left out, such as `<p>`, `<li>`,
   `<tr>` and `<td>`, and elements that hold nothing, such as `<br>` and
@@ -45,9 +46,10 @@ HTML that browsers close without harm isn't warned about:
   again round what follows, until their own closing tag.
 - HTML in a code span or a code block, which is shown as text.
 
-Each piece of Markdown is matched on its own: a page's content, each
-footnote definition, the content each snippet call wraps, and each value
-shown through `markdown`. HTML that a snippet writes isn't counted.
+Statac matches the tags in each piece of Markdown on its own: a page's
+content, each footnote definition, the content each snippet call wraps,
+and each value shown through `markdown`. It doesn't count HTML that a
+snippet writes.
 
 ## How to fix it
 

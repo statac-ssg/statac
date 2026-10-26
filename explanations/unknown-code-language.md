@@ -1,8 +1,8 @@
 # Unknown code language
 
 A code block gives its language as the first word after the opening
-fence, and Statac has no colours for that word. The block is published as
-it is, without colour, and its `<code>` element keeps the word in its
+fence, and Statac has no colours for that word. Statac publishes the
+block without colour, and its `<code>` element keeps the word in its
 class, such as `language-qbasic`. Statac tells of this only on a site
 with `code_colours: true`, where it colours code.
 
@@ -27,8 +27,8 @@ If the word is a typo, write the language's name as Statac knows it.
 The writing page lists the names of the common languages.
 
 If the code is in a language Statac doesn't colour, or isn't code at all,
-replace the word with `text`. The block is then shown as it is, without
-this warning. If the word is there on purpose, so that your own
+replace the word with `text`. Statac then shows the block without
+colour, and without this warning. If the word is there on purpose, so that your own
 stylesheet or script can find it in the class, quieten this warning with
 `quiet: [unknown-code-language]` in `statac.yaml`.
 

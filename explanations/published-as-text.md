@@ -21,9 +21,9 @@ written. It is one of these:
 {:toc}
 ```
 
-Markdown is never read as a template, so Statac treats none of these
-calls and marks as anything but text. Front matter is read only between two
-`---` lines at the very top of the file.
+Statac never reads Markdown as a template, so it treats these calls and
+marks as text. It reads front matter only between two `---` lines at the
+very top of the file.
 
 ## What you'll see {#what-youll-see}
 
@@ -37,8 +37,8 @@ warning  Published as text: `{{< figure src="photo-1.jpg" >}}` is another tool's
 
 Statac publishes the page with what you wrote unchanged, as it does with
 any text, and warns you, because a reader would see it where you meant
-something else to appear. Text kept as code (in a code span, a code
-block, or HTML's own `<pre>` or comment) is left alone, and so is a brace
+something else to appear. Statac leaves alone text kept as code (in a
+code span, a code block, or HTML's own `<pre>` or comment), and a brace
 written after a backslash.
 
 ## How to fix it
@@ -70,7 +70,8 @@ as HTML:
 <div class="box">A note in a box.</div>
 ```
 
-In `content/post-2.md`, the fields are published as the first paragraph:
+In `content/post-2.md`, Statac publishes the fields as the first
+paragraph:
 
 ```markdown
 title: Post 2

@@ -1,8 +1,8 @@
 # Definition written twice
 
 A page has two footnote definitions with the same label, such as two
-lines that start with `[^1]:`. Labels match whatever their case, so
-`[^note]:` and `[^Note]:` also count as the same label. Every footnote
+lines that start with `[^1]:`. Statac matches labels whatever their case,
+so `[^note]:` and `[^Note]:` also count as the same label. Every footnote
 reference with that label points to the later definition, so the first
 definition is never shown.
 

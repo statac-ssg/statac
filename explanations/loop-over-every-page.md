@@ -36,9 +36,9 @@ over the pages it shows:
 {% for entry in site.pages | selectattr("menu") %}
 ```
 
-`selectattr`, `rejectattr`, `tagged`, `in`, `where`, `sort` and
-`newest_first` are each worked out once for the site, and so is one after
-another. To show a few pages, take them from the list, as
+Statac works out each of `selectattr`, `rejectattr`, `tagged`, `in`,
+`where`, `sort` and `newest_first` once for the site, and the same goes
+for several of them written one after another. To show a few pages, take them from the list, as
 `site.posts[:5]` does; Statac then reads only those.
 
 Some loops have to look at every page, such as one that finds a page's
@@ -61,8 +61,8 @@ In `templates/base.html`, a menu of the pages that ask to be in it:
 ```
 
 Every page of the site is built with this layout, and each one looks at
-every page to find the few for the menu. Written with a filter, the pages
-are chosen once:
+every page to find the few for the menu. With a filter, Statac chooses
+the pages once:
 
 ```html
 {% for entry in site.pages | selectattr("menu") %}

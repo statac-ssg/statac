@@ -25,7 +25,8 @@ aren't a reference, such as `[draft]` on its own or `x[i][j]`.
 
 Add the line the reference needs, or change the label to one the page
 defines. If a defined label is close to the one you wrote, Statac suggests
-it. Labels match regardless of case. To show the brackets as text, put a
+it. Statac matches labels whatever their case. To show the brackets as
+text, put a
 backslash before the first one: `\[^label]`.
 
 ## Example

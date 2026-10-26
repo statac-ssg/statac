@@ -38,8 +38,8 @@ names. If some pages don't have it, say what they show instead:
 
 A filter that groups or collects pages by a field, such as
 `groupby("rank")`, `unique(attribute="rank")` or `map(attribute="rank")`,
-needs that field on every page it is given, because where to put a page
-without it would be a guess. The message names the page that doesn't have
+needs that field on every page it is given, because Statac would have to
+guess where to put a page without it. The message names the page that doesn't have
 the field. Leave out the pages without it first, as in
 `site.pages | selectattr("rank", "defined") | groupby("rank")`, or give
 `map` a `default=`. A filter that only tests a field, such as

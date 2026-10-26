@@ -22,13 +22,14 @@ A page that names no template with `layout:` is built with
 its own falls back to `templates/page.html`. If the site has no
 `templates/page.html`, nothing is left to build the page with.
 
-Statac doesn't make up a template in its place. The page is published as
+Statac doesn't make up a template in its place. It publishes the page as
 the HTML its content becomes, and nothing else: no doctype, no `<head>`,
 no title and no stylesheet. That isn't a whole HTML document, but browsers
-show it. The links in it are checked as on any other page.
+show it. Statac checks the links in it as it does on any other page.
 
-A redirect with no `templates/redirect.html` is published as a refresh to
-the URL it sends readers to and a link to it, and nothing else:
+If there is no `templates/redirect.html`, Statac publishes a redirect as a
+refresh to the URL it redirects to and a link to that URL, and nothing
+else:
 
 ```html
 <meta http-equiv="refresh" content="0; url=/post-1/">
@@ -50,12 +51,12 @@ Quieten the note with `quiet: [built-without-template]` in `statac.yaml`.
 
 To build them with a template, add `templates/page.html`. It builds every
 page that names no other template, from then on. For the redirects, add
-`templates/redirect.html`. It is handed `to`, the URL readers are sent to,
-and `title`, what the browser's tab shows meanwhile.
+`templates/redirect.html`. Statac hands it `to`, the URL the page
+redirects to, and `title`, what the browser's tab shows meanwhile.
 
 ## Example
 
-A site holds `content/index.md` and `content/hello.md`, and no templates.
+A site has `content/index.md` and `content/hello.md`, and no templates.
 `content/hello.md` is:
 
 ```markdown
@@ -64,7 +65,7 @@ A site holds `content/index.md` and `content/hello.md`, and no templates.
 The first page.
 ```
 
-It is published as `hello/index.html`, which holds:
+Statac publishes it as `hello/index.html`, which contains:
 
 ```html
 <h1 id="hello">Hello</h1>

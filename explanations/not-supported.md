@@ -10,9 +10,9 @@ in `snippets/`. A template places a snippet by calling it by its file name:
 For `import` and `from`, it suggests the call to write in place of each
 later use of what the line brought in.
 
-Some of Statac's own names, such as the one for the images beside a
-page, aren't available in this version yet. The message says which one
-you used.
+Some of Statac's own names, such as `lines` in a snippet called from the
+content, aren't available in this version yet. The message says which
+one you used.
 
 ## What you'll see {#what-youll-see}
 

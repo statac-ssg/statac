@@ -3,8 +3,8 @@
 A template that extends another template fills a block that the other
 one doesn't have, so the block's contents don't appear on any page.
 
-A template that starts `{% extends "base" %}` is built as `base`, with each
-of its blocks replacing the block of the same name in `base`. If neither
+Statac builds a template that starts `{% extends "base" %}` from `base`,
+with each of its blocks replacing the block of the same name in `base`. If neither
 `base` nor any template `base` extends has a block of that name, the block
 has nowhere to go.
 

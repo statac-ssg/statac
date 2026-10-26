@@ -19,11 +19,11 @@ A page that names no template with `layout:` is built with
 `templates/home.html` if it is the site's home page, with
 `templates/folder.html` if it is any other list page, such as a folder's
 `index.md`, and with `templates/page.html` otherwise. A small site often
-needs only `templates/page.html`, so a home page or list page with
-content of its own is built with it where the site lacks the template for
-its kind. If the site has no `templates/page.html` either, the page is
-published as its content alone, and the `built-without-template` note
-says so.
+needs only `templates/page.html`, so Statac builds a home page or list
+page with content of its own with it if the site lacks the template for
+its kind. If the site has no `templates/page.html` either, Statac
+publishes the page as its content alone, and the `built-without-template`
+note says so.
 
 A list page Statac makes itself, such as a tag's page or the home page of
 a site with no `content/index.md`, has no content of its own, so it still
