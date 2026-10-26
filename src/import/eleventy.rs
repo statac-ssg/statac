@@ -17,8 +17,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::common::{
-    FeedKind, counted, feeds_built_alike, glob_matches, joined, last, listed, mapping, names_in,
-    parent, text_of,
+    counted, feeds_built_alike, glob_matches, joined, last, listed, mapping, names_in, parent,
+    text_of,
 };
 use super::inside;
 use super::report::code;
@@ -28,7 +28,7 @@ use super::{
 use crate::content::address::Address;
 use crate::date::{self, Date};
 use crate::platform;
-use crate::problem::{Kind, Problem, Reason};
+use crate::problem::{FeedFormat, Kind, Problem, Reason};
 use crate::source::{Place, Sources};
 use settings::{Folder, Settings};
 use writing::Engine;
@@ -387,7 +387,7 @@ struct Reader<'a> {
     controls: (usize, usize),
     /// The address of each feed the settings show the RSS plugin made,
     /// with what it was written as, where the settings say.
-    plugin_feeds: Vec<(String, Option<FeedKind>)>,
+    plugin_feeds: Vec<(String, Option<FeedFormat>)>,
     /// What the report says of the first `feedPlugin` call whose feed's
     /// URL Statac didn't take.
     unread_feed: Option<String>,
@@ -585,26 +585,19 @@ fn names_file(writing: &str, name: &str) -> bool {
     })
 }
 
-impl FeedKind {
-    /// The kind the RSS plugin's `type` names.
-    fn named(name: &str) -> Option<FeedKind> {
-        match name {
-            "atom" => Some(FeedKind::Atom),
-            "rss" => Some(FeedKind::Rss),
-            "json" => Some(FeedKind::Json),
-            _ => None,
-        }
+/// The format the RSS plugin's `type` names.
+fn plugin_format(name: &str) -> Option<FeedFormat> {
+    match name {
+        "atom" => Some(FeedFormat::Atom),
+        "rss" => Some(FeedFormat::Rss),
+        "json" => Some(FeedFormat::Json),
+        _ => None,
     }
+}
 
-    /// A feed of this kind, in words.
-    fn a(kind: Option<FeedKind>) -> &'static str {
-        match kind {
-            Some(FeedKind::Atom) => "an Atom feed",
-            Some(FeedKind::Rss) => "an RSS feed",
-            Some(FeedKind::Json) => "a JSON feed",
-            None => "a feed",
-        }
-    }
+/// A feed of `format`, in words.
+fn a_feed(format: Option<FeedFormat>) -> &'static str {
+    format.map_or("a feed", crate::wording::a_feed)
 }
 
 /// One sentence naming `posts`, the old URLs of the posts whose ids the
@@ -623,50 +616,6 @@ fn escaped_twice(posts: &[String]) -> String {
          with a `'` or `&` in an Atom or JSON feed, so feed readers may show {each} once as new \
          after the move."
     )
-}
-
-/// What `text` is written as where it is a feed: XML whose root is RSS's or
-/// Atom's, or a JSON Feed.
-fn feed_kind(text: &str) -> Option<FeedKind> {
-    let mut rest = text.trim_start_matches('\u{feff}').trim_start();
-    if rest.starts_with('{') {
-        if !rest.contains("jsonfeed.org/version/") {
-            return None;
-        }
-        let mut sources = Sources::default();
-        let source = sources.add("feed.json", rest.to_owned());
-        let node = crate::yaml::read_json(&sources, source).ok()?;
-        let crate::yaml::Value::Mapping(entries) = &node.value else {
-            return None;
-        };
-        return entries
-            .iter()
-            .any(|entry| {
-                matches!(&entry.key.value, crate::yaml::Value::Scalar(key) if key == "version")
-                    && matches!(&entry.value.value, crate::yaml::Value::Scalar(version)
-                        if version.starts_with("https://jsonfeed.org/version/"))
-            })
-            .then_some(FeedKind::Json);
-    }
-    // The XML declaration and any comment come before the root.
-    while let Some(close) = ["<?", "<!--"]
-        .iter()
-        .zip(["?>", "-->"])
-        .find_map(|(open, close)| rest.starts_with(open).then_some(close))
-    {
-        rest = rest[rest.find(close)? + close.len()..].trim_start();
-    }
-    [
-        ("<rss", FeedKind::Rss),
-        ("<feed", FeedKind::Atom),
-        ("<rdf:RDF", FeedKind::Rss),
-    ]
-    .into_iter()
-    .find(|(root, _)| {
-        rest.strip_prefix(root)
-            .is_some_and(|after| after.starts_with([' ', '\t', '\r', '\n', '>']))
-    })
-    .map(|(_, kind)| kind)
 }
 
 impl Reader<'_> {
@@ -1339,7 +1288,7 @@ impl Reader<'_> {
         let Ok(bytes) = std::fs::read(self.path(&path)) else {
             return false;
         };
-        feed_kind(&String::from_utf8_lossy(&bytes)).is_some()
+        crate::feeds::format::of(&String::from_utf8_lossy(&bytes)).is_some()
     }
 
     /// The feeds the settings show the RSS plugin made, and the feeds in
@@ -1370,7 +1319,7 @@ impl Reader<'_> {
                 continue;
             };
             if self.plugin_feeds.iter().all(|(had, _)| *had != address) {
-                let kind = feed.kind.as_deref().and_then(FeedKind::named);
+                let kind = feed.kind.as_deref().and_then(plugin_format);
                 self.plugin_feeds.push((address, kind));
             }
         }
@@ -1397,7 +1346,7 @@ impl Reader<'_> {
             let Ok(bytes) = std::fs::read(self.path(&path)) else {
                 continue;
             };
-            if feed_kind(&String::from_utf8_lossy(&bytes)).is_some() {
+            if crate::feeds::format::of(&String::from_utf8_lossy(&bytes)).is_some() {
                 self.import.feeds.push((address, path));
             }
         }
@@ -2767,7 +2716,7 @@ impl Reader<'_> {
             return;
         }
         let made: Vec<String> = (self.plugin_feeds.iter())
-            .map(|(address, kind)| format!("{} at {}", FeedKind::a(*kind), code(address)))
+            .map(|(address, kind)| format!("{} at {}", a_feed(*kind), code(address)))
             .collect();
         let lead = format!(
             "The settings' `feedPlugin`, from Eleventy's RSS plugin, made {}.",
@@ -2792,7 +2741,7 @@ impl Reader<'_> {
                 _ => "them",
             }
         );
-        let feeds: Vec<(String, Option<FeedKind>)> = (self.plugin_feeds.iter())
+        let feeds: Vec<(String, Option<FeedFormat>)> = (self.plugin_feeds.iter())
             .map(|(address, kind)| (last(address).to_owned(), *kind))
             .collect();
         if let Some(alike) = feeds_built_alike(&[feeds]) {

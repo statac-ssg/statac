@@ -17,6 +17,7 @@
 //! else `templates/feed.xml`. A page of the author's standing at a feed's
 //! address is published in its place.
 
+pub(crate) mod format;
 mod ids;
 pub(crate) mod known;
 #[cfg(test)]
@@ -489,6 +490,30 @@ pub(crate) fn plan(
         });
     }
     (feeds, problems)
+}
+
+/// The warning for `feed`, built as `text`, where its file name says one
+/// format and it is written as another; none where they agree, or where
+/// either says none.
+pub(crate) fn mismatch(feed: &Feed, text: &str) -> Option<Problem> {
+    let file = feed.address.as_str().rsplit('/').next().unwrap_or_default();
+    let named = format::named(file)?;
+    let built = format::of(text)?;
+    if named == built {
+        return None;
+    }
+    let own = looked_for(&feed.address).swap_remove(0);
+    let kind = Kind::FeedFormatMismatch {
+        file: file.to_owned(),
+        template: format!("templates/{}", feed.template),
+        own: format!("templates/{own}"),
+        named,
+        built,
+    };
+    Some(match feed.placed {
+        Some(place) => Problem::at(kind, place),
+        None => Problem::nowhere(kind),
+    })
 }
 
 /// The lists of `fed`, each once, in order; a list's feeds are side by

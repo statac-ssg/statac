@@ -43,8 +43,12 @@ page).
 
 A list can have several feeds, such as an Atom feed and an RSS feed:
 `feed: [feed.xml, rss.xml]` builds `feed.xml` with `templates/feed.xml`
-and `rss.xml` with `templates/rss.xml`. Statac warns once for each
-template that is missing, naming the first list that needs it.
+and `rss.xml` with `templates/rss.xml`. Without `templates/rss.xml`,
+`rss.xml` is built with `templates/feed.xml`, and Statac warns with
+[feed format mismatch](https://statac.dev/e/feed-format-mismatch/)
+where that builds it as another format than its name says. A feed is
+left out only where none of its templates exists, and Statac warns once
+for each such set of templates, naming the first list that needs it.
 
 If you don't want the feed, take out the `feed:` line that asks for
 it.

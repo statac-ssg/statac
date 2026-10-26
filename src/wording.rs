@@ -10,6 +10,7 @@
 
 use crate::fetch::Refusal;
 use crate::platform::{Alike, Unwritable};
+use crate::problem::FeedFormat;
 use crate::problem::{
     AddressFault, AllOf, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
     Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found, Held, Hint, Holds,
@@ -802,6 +803,12 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 "Feed written twice: `{first_written}` and `{written}` are both at `{address}`"
             ),
         },
+        Kind::FeedFormatMismatch { file, built, .. } => {
+            format!(
+                "Feed format mismatch: `{file}` is built as {}",
+                a_feed(*built)
+            )
+        }
         Kind::NoFeedKey { .. } => "No feed key: `statac.yaml` has no `feed_key`".into(),
         Kind::UnusedFeedTemplate { .. } => "Unused feed template: no list asks for a feed".into(),
         Kind::NoSiteUrl { waiting } => {
@@ -1238,6 +1245,15 @@ fn found_words(found: &Found) -> String {
         Found::Items(n) => n.to_string(),
         Found::Twice(word) => format!("`{word}` twice"),
         Found::Nothing => "nothing".into(),
+    }
+}
+
+/// A feed in `format`, in words: `an RSS feed`.
+pub(crate) fn a_feed(format: FeedFormat) -> &'static str {
+    match format {
+        FeedFormat::Atom => "an Atom feed",
+        FeedFormat::Rss => "an RSS feed",
+        FeedFormat::Json => "a JSON feed",
     }
 }
 
@@ -3137,6 +3153,21 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::FeedWrittenTwice { .. } => {
             Some("The feed is published once; take one of them out of the `feed:` line.".into())
         }
+        Kind::FeedFormatMismatch {
+            template,
+            own,
+            named,
+            ..
+        } => Some(match template == own {
+            true => format!(
+                "Write `{own}` as {}, or give the feed a name that doesn't say it is one.",
+                a_feed(*named)
+            ),
+            false => format!(
+                "It is built with `{template}`; add `{own}` to build it as {}.",
+                a_feed(*named)
+            ),
+        }),
         Kind::NoFeedKey { key } => Some(feed_key_line(key)),
         Kind::UnusedFeedTemplate { template, line } => Some(format!(
             "Write `{line}` in `statac.yaml` for the site's feed, built with `{template}`."
@@ -6129,6 +6160,34 @@ mod tests {
                 },
                 "Feed written twice: `rss.xml`",
                 Some("The feed is published once; take one of them out of the `feed:` line."),
+            ),
+            (
+                Kind::FeedFormatMismatch {
+                    file: "rss.xml".into(),
+                    template: "templates/feed.xml".into(),
+                    own: "templates/rss.xml".into(),
+                    named: FeedFormat::Rss,
+                    built: FeedFormat::Atom,
+                },
+                "Feed format mismatch: `rss.xml` is built as an Atom feed",
+                Some(
+                    "It is built with `templates/feed.xml`; add `templates/rss.xml` to build it \
+                     as an RSS feed.",
+                ),
+            ),
+            (
+                Kind::FeedFormatMismatch {
+                    file: "atom.xml".into(),
+                    template: "templates/atom.xml".into(),
+                    own: "templates/atom.xml".into(),
+                    named: FeedFormat::Atom,
+                    built: FeedFormat::Rss,
+                },
+                "Feed format mismatch: `atom.xml` is built as an RSS feed",
+                Some(
+                    "Write `templates/atom.xml` as an Atom feed, or give the feed a name that \
+                     doesn't say it is one.",
+                ),
             ),
             (
                 Kind::UnusedFeedTemplate {

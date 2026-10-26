@@ -15,8 +15,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::common::{
-    FeedKind, counted, feeds_built_alike, fields, front, glob_matches, joined, last, listed,
-    names_in, parent, text_of, texts_of,
+    counted, feeds_built_alike, fields, front, glob_matches, joined, last, listed, names_in,
+    parent, text_of, texts_of,
 };
 use super::inside;
 use super::report::code;
@@ -26,7 +26,7 @@ use super::{
 use crate::content::address::{Address, name_fault};
 use crate::content::slug as statac_slug;
 use crate::date::{self, Date};
-use crate::problem::{Kind, Problem, Reason};
+use crate::problem::{FeedFormat, Kind, Problem, Reason};
 use settings::{Settings, Taxonomy};
 use slug::Strategy;
 use writing::Reading;
@@ -1215,11 +1215,11 @@ impl Reader<'_> {
         };
         // Zola builds `atom.xml` and `rss.xml` with templates of its own,
         // and any other name with the site's.
-        let kinds = |names: &[String]| -> Vec<(String, Option<FeedKind>)> {
+        let kinds = |names: &[String]| -> Vec<(String, Option<FeedFormat>)> {
             (names.iter())
                 .map(|name| match name.as_str() {
-                    "atom.xml" => (name.clone(), Some(FeedKind::Atom)),
-                    "rss.xml" => (name.clone(), Some(FeedKind::Rss)),
+                    "atom.xml" => (name.clone(), Some(FeedFormat::Atom)),
+                    "rss.xml" => (name.clone(), Some(FeedFormat::Rss)),
                     _ => (name.clone(), None),
                 })
                 .collect()

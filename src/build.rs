@@ -900,7 +900,10 @@ pub(crate) fn conclude(
                     // Told at the template, alike for every page built
                     // through it handed the same items, or told of a page
                     // every output naming it names: told once.
-                    let once = matches!(problem.kind.code(), Code::SortedLast | Code::UntitledPage);
+                    let once = matches!(
+                        problem.kind.code(),
+                        Code::SortedLast | Code::UntitledPage | Code::FeedFormatMismatch
+                    );
                     if once && problems.contains(problem) {
                         continue;
                     }
@@ -1480,6 +1483,9 @@ pub(crate) fn build_output(
     };
     let file = address.file();
     let mut problems = rendered.problems;
+    if let (Output::Feed(at), Some(text)) = (output, &rendered.html) {
+        problems.extend(feeds::mismatch(&feeds[at], text));
+    }
     let mut scripts = Vec::new();
     let mut pieces = Vec::new();
     let mut checked = None;

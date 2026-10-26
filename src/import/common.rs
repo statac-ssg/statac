@@ -8,7 +8,7 @@ use super::report::code;
 use super::{Failed, Field, Unread, Value};
 use crate::content::address::Address;
 use crate::date::{self, Date};
-use crate::problem::{Kind, Problem, Reason};
+use crate::problem::{FeedFormat, Kind, Problem, Reason};
 use crate::source::{Place, Sources};
 use crate::yaml::Value as Yaml;
 
@@ -327,14 +327,6 @@ pub(super) fn listed(items: &[String]) -> String {
     }
 }
 
-/// What a feed is written as.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub(super) enum FeedKind {
-    Atom,
-    Rss,
-    Json,
-}
-
 /// What is said of each feed of a list in `lists`, each feed by its file
 /// name and its kind where known, that is built with the template another
 /// of the list's feeds is, of another kind or of a kind not known, until
@@ -342,7 +334,7 @@ pub(super) enum FeedKind {
 /// so shared is taken to be for the feed named as it, or else the first
 /// of the kind the docs' template of that name is, Atom for `feed.xml` and
 /// JSON for `feed.json`, or else the first.
-pub(super) fn feeds_built_alike(lists: &[Vec<(String, Option<FeedKind>)>]) -> Option<String> {
+pub(super) fn feeds_built_alike(lists: &[Vec<(String, Option<FeedFormat>)>]) -> Option<String> {
     // The template a feed is built with where the site has only
     // `templates/feed.xml` and `templates/feed.json`.
     let general = |name: &str| {
@@ -351,14 +343,14 @@ pub(super) fn feeds_built_alike(lists: &[Vec<(String, Option<FeedKind>)>]) -> Op
     };
     let mut sentences: Vec<String> = Vec::new();
     for feeds in lists {
-        let built: Vec<(&str, Option<FeedKind>, String)> = (feeds.iter())
+        let built: Vec<(&str, Option<FeedFormat>, String)> = (feeds.iter())
             .filter_map(|(name, kind)| Some((name.as_str(), *kind, general(name)?)))
             .collect();
         for (name, kind, template) in &built {
             let alike: Vec<_> = built.iter().filter(|(.., t)| t == template).collect();
             let docs = match template.as_str() {
-                "feed.json" => FeedKind::Json,
-                _ => FeedKind::Atom,
+                "feed.json" => FeedFormat::Json,
+                _ => FeedFormat::Atom,
             };
             let Some(&&(kept, kept_kind, _)) = (alike.iter().find(|(n, ..)| n == template))
                 .or_else(|| alike.iter().find(|(_, k, _)| *k == Some(docs)))

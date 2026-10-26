@@ -153,6 +153,7 @@ codes! {
     TwoLists "two-lists",
     FeedNotWritten "feed-not-written",
     FeedWrittenTwice "feed-written-twice",
+    FeedFormatMismatch "feed-format-mismatch",
     NoFeedKey "no-feed-key",
     FeedIdChanged "feed-id-changed",
     NoSiteUrl "no-site-url",
@@ -343,6 +344,7 @@ impl Code {
             | Code::NotData
             | Code::FeedNotWritten
             | Code::FeedWrittenTwice
+            | Code::FeedFormatMismatch
             | Code::FeedIdChanged
             | Code::MoreWrittenTwice
             | Code::MissingDefinition
@@ -513,6 +515,7 @@ impl Code {
             | Code::NotData
             | Code::FeedNotWritten
             | Code::FeedWrittenTwice
+            | Code::FeedFormatMismatch
             | Code::FeedIdChanged
             | Code::RobotsBeneathPath
             | Code::UnusedFeedTemplate
@@ -1264,6 +1267,16 @@ pub enum Kind {
         first: Place,
         address: String,
     },
+    /// A feed whose file name says one format, built as another: its file
+    /// name, the template it was built with, the template named as its
+    /// file, the format its name says and the one it was built as.
+    FeedFormatMismatch {
+        file: String,
+        template: String,
+        own: String,
+        named: FeedFormat,
+        built: FeedFormat,
+    },
     /// Lists that have feeds on a site with no `feed_key`, told with a key
     /// freshly made for it.
     NoFeedKey {
@@ -1773,6 +1786,14 @@ pub enum Waiting {
     Cards,
     /// The mentions in `fetched/mentions/`, and the relay's address.
     Webmentions,
+}
+
+/// What a feed is written as.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FeedFormat {
+    Atom,
+    Rss,
+    Json,
 }
 
 /// Why a list's feed isn't published.
@@ -3029,6 +3050,7 @@ impl Kind {
             Kind::NotAPost { .. } => Code::NotAPost,
             Kind::FeedNotWritten { .. } => Code::FeedNotWritten,
             Kind::FeedWrittenTwice { .. } => Code::FeedWrittenTwice,
+            Kind::FeedFormatMismatch { .. } => Code::FeedFormatMismatch,
             Kind::NoFeedKey { .. } => Code::NoFeedKey,
             Kind::FeedIdChanged { .. } => Code::FeedIdChanged,
             Kind::NoSiteUrl { .. } => Code::NoSiteUrl,

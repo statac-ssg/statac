@@ -448,6 +448,144 @@ fn a_list_naming_several_feeds_is_told_of_once_for_what_every_feed_lacks() {
     );
 }
 
+/// An Atom feed's template.
+const ATOM: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\
+                    <feed xmlns=\"http://www.w3.org/2005/Atom\"><id>{{ feed }}</id></feed>\n";
+/// An RSS feed's template.
+const RSS: &str = "<?xml version=\"1.0\"?>\n<rss version=\"2.0\"><channel>\
+                   <link>{{ feed }}</link></channel></rss>\n";
+
+/// A case of feeds and their templates: what it is, the page asking for
+/// them, the templates, and what is said of them, with the text each is
+/// placed at.
+type Mismatched<'a> = (
+    &'a str,
+    (&'a str, String),
+    Files<'a>,
+    Vec<(Kind, Option<&'a str>)>,
+);
+
+/// A feed whose name says a format, built as another, is warned of at the
+/// line naming it, with the template to add, or the one to write again
+/// where it was built with its own; a feed whose name says none, or the
+/// format it is built as, is not.
+#[test]
+fn a_feed_built_in_another_format_than_its_name_says_is_warned_of() {
+    let quiet = (
+        "statac.yaml",
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n",
+    );
+    let posts = |feed: &str| {
+        let text = format!("---\ntitle: Posts\nfeed: {feed}\n---\n");
+        ("content/posts/index.md", text)
+    };
+    let mismatch = |file: &str, template: &str, own: &str, named, built| Kind::FeedFormatMismatch {
+        file: file.into(),
+        template: format!("templates/{template}"),
+        own: format!("templates/{own}"),
+        named,
+        built,
+    };
+    use crate::problem::FeedFormat::{Atom, Json, Rss};
+    let cases: Vec<Mismatched> = vec![
+        (
+            "an RSS name built with the Atom template",
+            posts("[atom.xml, rss.xml]"),
+            vec![("templates/feed.xml", ATOM)],
+            vec![(
+                mismatch("rss.xml", "feed.xml", "rss.xml", Rss, Atom),
+                Some("rss.xml"),
+            )],
+        ),
+        (
+            "each built with a template in its format",
+            posts("[atom.xml, rss.xml]"),
+            vec![("templates/feed.xml", ATOM), ("templates/rss.xml", RSS)],
+            vec![],
+        ),
+        (
+            "an Atom name built with its own template, written as RSS",
+            posts("atom.xml"),
+            vec![("templates/atom.xml", RSS)],
+            vec![(
+                mismatch("atom.xml", "atom.xml", "atom.xml", Atom, Rss),
+                Some("atom.xml"),
+            )],
+        ),
+        (
+            "a JSON name built with the Atom template",
+            posts("feed.json"),
+            vec![("templates/feed.xml", ATOM)],
+            vec![(
+                mismatch("feed.json", "feed.xml", "feed.json", Json, Atom),
+                Some("feed.json"),
+            )],
+        ),
+        (
+            "names that say no format",
+            posts("[feed.xml, index.xml]"),
+            vec![("templates/feed.xml", RSS)],
+            vec![],
+        ),
+    ];
+    for (case, page, templates, wanted) in cases {
+        let mut files = vec![quiet, HOME, PAGE, HOME_TEMPLATE, FOLDER];
+        files.push((page.0, page.1.as_str()));
+        files.extend(templates);
+        let built = with_posts(&files);
+        let sources = built.outcome.sources();
+        let told: Vec<(Kind, Option<&str>)> = (built.outcome.problems.iter())
+            .map(|problem| {
+                let at = problem.place.map(|place| sources.spelling(place));
+                (problem.kind.clone(), at)
+            })
+            .collect();
+        assert_eq!(told, wanted, "{case}");
+    }
+}
+
+/// A `feed:` line cascaded to several lists is warned of once where a
+/// feed it names is built in another format.
+#[test]
+fn a_cascaded_feed_in_another_format_is_warned_of_once() {
+    let settings = (
+        "statac.yaml",
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n\
+         pages.feed: [atom.xml, rss.xml]\n",
+    );
+    let posts: Vec<(String, String)> = (1..=2)
+        .flat_map(|n| {
+            [
+                post(n, ""),
+                (
+                    format!("content/notes/note-{n}.md"),
+                    format!("---\ntitle: Note {n}\ndate: 2026-01-0{n}\n---\nText.\n"),
+                ),
+            ]
+        })
+        .collect();
+    let mut files: Files = (posts.iter())
+        .map(|(path, text)| (path.as_str(), text.as_str()))
+        .collect();
+    files.extend([
+        settings,
+        HOME,
+        POSTS_PAGE,
+        ("content/notes/index.md", "---\ntitle: Notes\n---\n"),
+        PAGE,
+        HOME_TEMPLATE,
+        FOLDER,
+        ("templates/feed.xml", ATOM),
+    ]);
+    let built = Built::new(&files);
+    assert!(built.file("posts/rss.xml").is_some());
+    assert!(built.file("notes/rss.xml").is_some());
+    assert_eq!(
+        built.told(),
+        [("feed-format-mismatch", Some("rss.xml".into()))]
+    );
+}
+
 #[test]
 fn what_a_feed_lacks_is_said_once_for_the_site() {
     let site = (Word::Folder, String::new());
