@@ -14,7 +14,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::language::{Patterns, Words};
-use crate::problem::{FormatFault, Kind, Piece, WordsFrom, WordsWanted};
+use crate::problem::{FormatFault, Kind, Look, Piece, WordsFrom, WordsWanted};
 
 const DAY: u32 = 31;
 const MONTH: u32 = 12;
@@ -32,38 +32,6 @@ const YEAR_FIRST: &str = "2025-12-31";
 /// The reference day in figures, for a site with words for months but no
 /// patterns.
 const IN_FIGURES: &str = "31/12/2025";
-
-/// A look a template names a date by, each written as the language's
-/// Unicode CLDR data has it.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Look {
-    /// The CLDR's long date: `31 December 2025`.
-    Long,
-    /// Its medium date: `31 Dec 2025`.
-    Short,
-    /// The day and the month: `31 Dec`.
-    Day,
-    /// The medium date and the short time: `31 Dec 2025, 15:04`.
-    Stamp,
-}
-
-impl Look {
-    pub const ALL: [Look; 4] = [Look::Long, Look::Short, Look::Day, Look::Stamp];
-
-    /// As a template names it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Look::Long => "long",
-            Look::Short => "short",
-            Look::Day => "day",
-            Look::Stamp => "stamp",
-        }
-    }
-
-    pub fn named(name: &str) -> Option<Look> {
-        Look::ALL.into_iter().find(|look| look.name() == name)
-    }
-}
 
 /// The reference day, with no time.
 const REFERENCE_DAY: Reading = Reading {

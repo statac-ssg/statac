@@ -2780,6 +2780,38 @@ pub enum FormatFault {
     },
 }
 
+/// A look a template names a date by, each written as the language's
+/// Unicode CLDR data has it.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Look {
+    /// The CLDR's long date: `31 December 2025`.
+    Long,
+    /// Its medium date: `31 Dec 2025`.
+    Short,
+    /// The day and the month: `31 Dec`.
+    Day,
+    /// The medium date and the short time: `31 Dec 2025, 15:04`.
+    Stamp,
+}
+
+impl Look {
+    pub const ALL: [Look; 4] = [Look::Long, Look::Short, Look::Day, Look::Stamp];
+
+    /// As a template names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Look::Long => "long",
+            Look::Short => "short",
+            Look::Day => "day",
+            Look::Stamp => "stamp",
+        }
+    }
+
+    pub fn named(name: &str) -> Option<Look> {
+        Look::ALL.into_iter().find(|look| look.name() == name)
+    }
+}
+
 /// A piece of a date as a format writes it.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Piece {

@@ -20,12 +20,12 @@ use crate::config::Settings;
 use crate::date::{Date, Time, When};
 use crate::language::{Language, Languages, Whence};
 use crate::origin::Sourced;
-use crate::problem::{FormatFault, Kind, Problem, Word, WordsFrom};
+use crate::problem::{FormatFault, Kind, Look, Problem, Word, WordsFrom};
 use crate::site::{Id, LanguageId};
 use crate::source::{Place, Sources, Span};
 use crate::value::place_within;
 
-pub use format::{DateWords, Format, Look, Reading, Refusal};
+pub use format::{DateWords, Format, Reading, Refusal};
 
 /// What templates ask of a site's dates.
 pub trait ShowDates {

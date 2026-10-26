@@ -294,7 +294,10 @@ impl<'a> Report<'a> {
     /// nothing.
     pub fn kept(&self, kept: crate::published::Kept) -> String {
         match kept.added > 0 || kept.started {
-            true => format!("{}\n", shown(&wording::kept_published(kept))),
+            true => format!(
+                "{}\n",
+                shown(&wording::kept_published(kept.added, kept.started))
+            ),
             false => String::new(),
         }
     }

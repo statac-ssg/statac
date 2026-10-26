@@ -14,13 +14,13 @@ use crate::problem::FeedFormat;
 use crate::problem::{
     AddressFault, AllOf, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
     Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found, Held, Hint, Holds,
-    InPlace, Instead, JsonFault, Kind, LabelledBy, Lack, ListFault, Maker, Malformed, MathsFault,
-    Missing, MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint, Own,
-    PictureFault, Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault, Related,
-    Relation, Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity, Shape,
-    ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault, TemplateFault,
-    Told, Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported, Unwritten, Waiting,
-    Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
+    InPlace, Instead, JsonFault, Kind, LabelledBy, Lack, ListFault, Look, Maker, Malformed,
+    MathsFault, Missing, MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint,
+    Own, PictureFault, Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault,
+    Related, Relation, Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity,
+    Shape, ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault,
+    TemplateFault, Told, Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported,
+    Unwritten, Waiting, Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 
 pub(crate) use crate::described::{
@@ -1501,7 +1501,7 @@ fn format_suggestion(fault: &FormatFault) -> Option<String> {
     let write = |reference: &str, examples: &[String], looks: bool| {
         let looks = match looks {
             true => {
-                let names: Vec<String> = (crate::dates::Look::ALL.iter())
+                let names: Vec<String> = (Look::ALL.iter())
                     .map(|look| look.name().to_owned())
                     .collect();
                 format!(", or name a look: {}", quoted_either(&names))
@@ -3696,20 +3696,15 @@ pub(crate) fn wrote(published: &Published, out: &str, seconds: f64) -> String {
 /// What `build --timings` heads the stages of a build with.
 pub(crate) const TIMINGS_STAGES: &str = "Where the time went:";
 
-/// A stage of a build, as `build --timings` names it.
-pub(crate) fn stage(stage: crate::build::Stage) -> &'static str {
-    use crate::build::Stage;
-    match stage {
-        Stage::Before => "Running before_build",
-        Stage::Reading => "Reading the site",
-        Stage::Building => "Building the pages",
-        Stage::Concluding => "Concluding",
-        Stage::Copies => "Resizing images",
-        Stage::Cards => "Drawing social cards",
-        Stage::After => "Running after_build",
-        Stage::Writing => "Writing the rest",
-    }
-}
+/// The stages of a build, as `build --timings` names them.
+pub(crate) const STAGE_BEFORE: &str = "Running before_build";
+pub(crate) const STAGE_READING: &str = "Reading the site";
+pub(crate) const STAGE_BUILDING: &str = "Building the pages";
+pub(crate) const STAGE_CONCLUDING: &str = "Concluding";
+pub(crate) const STAGE_COPIES: &str = "Resizing images";
+pub(crate) const STAGE_CARDS: &str = "Drawing social cards";
+pub(crate) const STAGE_AFTER: &str = "Running after_build";
+pub(crate) const STAGE_WRITING: &str = "Writing the rest";
 
 /// What `build --timings` heads the work of building the pages with.
 pub(crate) fn timings_work(took: &str, threads: usize) -> String {
@@ -3748,9 +3743,9 @@ pub(crate) fn copies_made(n: usize) -> String {
 
 /// What `build` says of the URLs it added to `published.txt`, or of
 /// starting the file.
-pub(crate) fn kept_published(kept: crate::published::Kept) -> String {
-    let addresses = how_many(kept.added, "URL", "URLs");
-    match kept.started {
+pub(crate) fn kept_published(added: usize, started: bool) -> String {
+    let addresses = how_many(added, "URL", "URLs");
+    match started {
         true => format!(
             "Started `published.txt` with the {addresses} this site publishes, so a later \
              build can say when one is no longer published. Commit it with the site."

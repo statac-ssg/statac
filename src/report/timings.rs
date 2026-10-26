@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use super::{Report, shown};
-use crate::build::Timings;
+use crate::build::{Stage, Timings};
 use crate::wording;
 
 /// How many of each kind are named.
@@ -13,6 +13,19 @@ const SLOWEST: usize = 5;
 
 /// A section's times are in seconds where its longest is at least this.
 const IN_SECONDS: Duration = Duration::from_millis(100);
+
+fn stage_name(stage: Stage) -> &'static str {
+    match stage {
+        Stage::Before => wording::STAGE_BEFORE,
+        Stage::Reading => wording::STAGE_READING,
+        Stage::Building => wording::STAGE_BUILDING,
+        Stage::Concluding => wording::STAGE_CONCLUDING,
+        Stage::Copies => wording::STAGE_COPIES,
+        Stage::Cards => wording::STAGE_CARDS,
+        Stage::After => wording::STAGE_AFTER,
+        Stage::Writing => wording::STAGE_WRITING,
+    }
+}
 
 #[derive(Copy, Clone)]
 enum Align {
@@ -28,7 +41,7 @@ impl Report<'_> {
         let whole: Duration = timings.stages.iter().map(|(_, took)| *took).sum();
         let seconds = in_seconds(timings.stages.iter().map(|(_, took)| *took));
         let stages = timings.stages.iter().map(|&(stage, took)| {
-            let name = wording::stage(stage).to_owned();
+            let name = stage_name(stage).to_owned();
             vec![name, time(took, seconds), share(took, whole)]
         });
         sections.push(table(wording::TIMINGS_STAGES, stages.collect(), &NAMED));
