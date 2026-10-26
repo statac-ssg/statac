@@ -396,6 +396,7 @@ pub(super) struct Checked<'a> {
 pub(super) fn check_site(
     schema: &Schema,
     with_url: Option<(&Schema, &BTreeSet<String>)>,
+    for_feeds: Option<&Schema>,
     files: &[Checked],
     sources: &Sources,
 ) -> (Vec<(usize, Problem)>, Taken) {
@@ -406,8 +407,9 @@ pub(super) fn check_site(
         if matches!(file.role, Role::Snippet(_)) {
             continue;
         }
-        let schema = match with_url {
-            Some((with_url, names)) if names.contains(file.name) => with_url,
+        let schema = match (with_url, for_feeds) {
+            (_, Some(for_feeds)) if is_feeds(schema, file.name, file.role) => for_feeds,
+            (Some((with_url, names)), _) if names.contains(file.name) => with_url,
             _ => schema,
         };
         let mut checker = Checker::new(schema, file, sources, None);
@@ -555,6 +557,12 @@ const ENGINE_NAMES: &[&str] = &["self", "super", "caller", "varargs", "kwargs"];
 /// What `redirect.html` is handed besides `page` and `site`.
 fn handed_to_redirect() -> Vec<(&'static str, Ty)> {
     vec![("to", Ty::Text), ("title", Ty::Text)]
+}
+
+/// Whether `file` is checked as a feed's template: one named `feed.`,
+/// whether or not a feed is built with it, or one a feed is.
+pub(super) fn is_feeds(schema: &Schema, name: &str, role: &Role) -> bool {
+    *role == Role::Template && (name.starts_with("feed.") || schema.feeds.contains(name))
 }
 
 /// What a feed's template is handed besides `page` and `site`.
@@ -707,11 +715,7 @@ impl<'a> Checker<'a> {
     ) -> Checker<'a> {
         let extra = match file.role {
             Role::Template if file.name == super::render::REDIRECT => handed_to_redirect(),
-            Role::Template
-                if file.name.starts_with("feed.") || schema.feeds.contains(file.name) =>
-            {
-                handed_to_feed()
-            }
+            Role::Template if is_feeds(schema, file.name, file.role) => handed_to_feed(),
             Role::Piece(piece) => handed_to(*piece),
             _ => Vec::new(),
         };

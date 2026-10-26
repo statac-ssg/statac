@@ -100,6 +100,12 @@ const PAGE: (&str, &str) = (
 const HOME_TEMPLATE: (&str, &str) = ("templates/home.html", "{{ page.title }}");
 const FOLDER: (&str, &str) = ("templates/folder.html", "{{ headline(page) }}");
 /// A feed template printing what it is handed.
+/// A feed's template reading what every feed needs of the site.
+const READS_SETTINGS: (&str, &str) = (
+    "templates/feed.xml",
+    "{{ site.title }}|{{ site.url }}|{{ site.host }}|{{ list.word }}",
+);
+
 const FEED: (&str, &str) = (
     "templates/feed.xml",
     "{{ list.word }}|{% for post in posts %}{{ post.title }};{% endfor %}|{{ page.url }}|\
@@ -611,6 +617,29 @@ fn what_a_feed_lacks_is_said_once_for_the_site() {
                 list: site.clone(),
                 more: 1,
                 why: Unwritten::NoTitle,
+            }],
+        ),
+        // A feed is built only with them, so its template reads them as set.
+        (
+            "no title, read by the template",
+            "language: en\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
+            vec![READS_SETTINGS, POSTS],
+            vec![Kind::FeedNotWritten {
+                list: site.clone(),
+                more: 1,
+                why: Unwritten::NoTitle,
+            }],
+        ),
+        (
+            "no address, read by the template",
+            "language: en\ntitle: Site\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
+            vec![READS_SETTINGS, POSTS],
+            vec![Kind::NoSiteUrl {
+                waiting: Waiting::Feeds {
+                    list: site.clone(),
+                    more: 1,
+                    feeds: 2,
+                },
             }],
         ),
         (

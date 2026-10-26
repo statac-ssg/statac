@@ -286,25 +286,35 @@ pub(crate) fn read(
             role: &f.role,
         })
         .collect();
-    // A template only pages left out until the site has an address are
-    // built with is never built without one, and is checked as with one.
-    let waiting = layouts_only_needing_url(site);
-    let with_url = (!waiting.is_empty()).then(|| {
-        let mut with_url = self::schema(site, settings);
-        with_url.snippets = snippets.clone();
-        with_url.templates.clone_from(&schema.templates);
-        with_url.feeds.clone_from(&schema.feeds);
-        for name in ["url", "host"] {
+    // The schema for a template only ever built where the site has each of
+    // the settings `always`, which it is checked as having.
+    let having = |always: &[&str]| {
+        let mut having = self::schema(site, settings);
+        having.snippets = snippets.clone();
+        having.templates.clone_from(&schema.templates);
+        having.feeds.clone_from(&schema.feeds);
+        for &name in always {
             let always = Field {
                 ty: Ty::Text,
                 always: true,
             };
-            with_url.site.insert(name.to_owned(), always);
+            having.site.insert(name.to_owned(), always);
         }
-        (with_url, waiting)
-    });
+        having
+    };
+    // A template only pages left out until the site has an address are
+    // built with is never built without one, and is checked as with one.
+    let waiting = layouts_only_needing_url(site);
+    let with_url = (!waiting.is_empty()).then(|| (having(&["url", "host"]), waiting));
     let with_url = with_url.as_ref().map(|(schema, waiting)| (schema, waiting));
-    let (checked, taken) = check::check_site(&schema, with_url, &checked, sources);
+    // A feed is built only for a site with a `url` and, in the feed's
+    // language, a `title`.
+    let fed = files
+        .iter()
+        .any(|f| check::is_feeds(&schema, &f.name, &f.role));
+    let for_feeds = fed.then(|| having(&["url", "host", "title"]));
+    let (checked, taken) =
+        check::check_site(&schema, with_url, for_feeds.as_ref(), &checked, sources);
     told.extend(checked);
 
     let mut unusable = BTreeSet::new();
