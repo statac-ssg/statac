@@ -113,6 +113,7 @@ pub(super) fn choose(
         Kind::MissingTemplate {
             path: template_path(&chosen.name),
             chosen: match chosen.origin.arrival {
+                Arrival::Defaulted if page.source.is_none() => Chooser::Made,
                 Arrival::Defaulted => Chooser::Default,
                 _ => Chooser::Written,
             },

@@ -351,7 +351,7 @@ fn a_default_template_the_site_lacks_gives_way_to_page_then_to_the_content_alone
             };
             let made = |template: &str, has: bool| match has {
                 true => template.to_owned(),
-                false => format!("missing templates/{template}.html, Default"),
+                false => format!("missing templates/{template}.html, Made"),
             };
             let home_page = match (index, home) {
                 (true, _) => own("home", home),

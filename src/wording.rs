@@ -2929,6 +2929,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             (None, Chooser::Default) => {
                 Some("Add the template, or choose another with `layout:`.".into())
             }
+            (None, Chooser::Made) => {
+                Some("Add the template, or a page of your own at the same URL.".into())
+            }
             (None, Chooser::Written) => None,
         },
         Kind::BuiltWithPageTemplate { path, pages } => Some(format!(
@@ -9589,10 +9592,19 @@ mod tests {
             (
                 Kind::MissingTemplate {
                     path: "templates/folder.html".into(),
-                    chosen: Chooser::Default,
+                    chosen: Chooser::Made,
                     nearest: None,
                 },
                 "Missing template: there is no `templates/folder.html`",
+                Some("Add the template, or a page of your own at the same URL."),
+            ),
+            (
+                Kind::MissingTemplate {
+                    path: "templates/page.html".into(),
+                    chosen: Chooser::Default,
+                    nearest: None,
+                },
+                "Missing template: there is no `templates/page.html`",
                 Some("Add the template, or choose another with `layout:`."),
             ),
             (

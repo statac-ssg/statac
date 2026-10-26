@@ -174,7 +174,7 @@ fn a_page_statac_makes_with_no_template_is_named_as_it_is() {
         built.drawn("/tags/rust/", 1),
         "error  Missing template: there is no `templates/folder.html`\n  \
          While building the page for the tag `Rust`\n  \
-         Add the template, or choose another with `layout:`.\n  \
+         Add the template, or a page of your own at the same URL.\n  \
          More: https://statac.dev/e/missing-template/\n"
     );
 }

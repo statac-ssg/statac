@@ -28,7 +28,7 @@ way. Each name is the file's name in `templates/`, with or without
 
 ```text
 error  Missing template: there is no `templates/folder.html`
-  Add the template, or choose another with `layout:`.
+  Add the template, or a page of your own at the same URL.
   More: https://statac.dev/e/missing-template/
 ```
 
@@ -44,6 +44,13 @@ Add the template to `templates/`, or correct the name. If there is a
 template with a similar name, Statac suggests it. To build a page with a
 different template, set `layout:` on the page, or `pages.layout:` in its
 folder's `index.md`.
+
+A list page Statac makes itself, such as a tag's page, has no front
+matter where you could write `layout:`, and a cascaded `layout:` doesn't
+reach a list page. Add `templates/folder.html` to build these pages, or
+`templates/home.html` for the home page. To build one page your own way,
+write a page of your own at its URL, such as `content/tags/rust.md` for
+the tag `rust`, and Statac builds that page in its place.
 
 ## Example
 

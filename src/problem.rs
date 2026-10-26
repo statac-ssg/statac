@@ -1976,6 +1976,9 @@ pub enum Chooser {
     Written,
     /// Statac's own choice for a page that names none.
     Default,
+    /// Statac's own choice for a list's page it made, which no file holds
+    /// for a `layout:` to be written in.
+    Made,
 }
 
 /// Why a value has none.
