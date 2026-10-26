@@ -9,7 +9,7 @@
 # commit the tag v<version> names on main, and never replaces a version
 # already published. The version's files go to v<version>/, then
 # latest/SHA256SUMS names it as the newest release, and the install script
-# as tagged goes to the top.
+# as tagged goes to the top, as index.html.
 set -eu
 
 zone=statac-get
@@ -68,12 +68,23 @@ bunny storage files upload SHA256SUMS -z "$zone" --to "latest/" --checksum >/dev
     stop "Couldn't update latest/SHA256SUMS." "v$version/ is published, but latest/ still names the release before."
 echo "latest/ names $version"
 
-# The script that installs it, which get.statac.dev serves at its top.
+# The script that installs it, which get.statac.dev serves at its top:
+# a request for / is answered from index.html, as text so a browser
+# shows it.
 git -C "$root" show "v$version:tools/install.sh" >"$folder/install.sh"
-bunny storage files upload "$folder/install.sh" -z "$zone" --to "/" --checksum >/dev/null ||
+bunny storage files upload "$folder/install.sh" -z "$zone" --to index.html \
+    --content-type 'text/plain; charset=utf-8' --checksum >/dev/null ||
     stop "Couldn't upload install.sh." "v$version/ is published and latest/ names it."
 echo "published install.sh"
 
 curl -fsS "$served/v$version/SHA256SUMS" | cmp -s - SHA256SUMS ||
     stop "What $served serves for v$version/SHA256SUMS isn't what was published."
+# The edge keeps / for 60 seconds.
+tries=0
+until curl -fsS "$served/" | cmp -s - "$folder/install.sh"; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 15 ] ||
+        stop "What $served serves at / isn't the install script as tagged."
+    sleep 5
+done
 echo "Published $version, built from $commit."
