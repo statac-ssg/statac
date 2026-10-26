@@ -6,6 +6,7 @@ use std::ops::Range;
 use super::Document;
 use super::node::{Kind, Node};
 use crate::html::{Markup, markup};
+use crate::language::runs_without_spaces;
 use crate::problem::{Kind as ProblemKind, MoreAt, Problem, Word, WrongPlace};
 use crate::source::{Place, Span};
 
@@ -382,25 +383,6 @@ pub(super) fn count_words(html: &str) -> usize {
         }
     }
     words
-}
-
-/// Whether `c` is written in Han, hiragana or katakana.
-pub(crate) fn runs_without_spaces(c: char) -> bool {
-    matches!(
-        c,
-        '\u{2e80}'..='\u{2fdf}'
-            | '\u{3005}'..='\u{3007}'
-            | '\u{3021}'..='\u{3029}'
-            | '\u{3038}'..='\u{303b}'
-            | '\u{3041}'..='\u{309f}'
-            | '\u{30a1}'..='\u{30ff}'
-            | '\u{31f0}'..='\u{31ff}'
-            | '\u{3400}'..='\u{4dbf}'
-            | '\u{4e00}'..='\u{9fff}'
-            | '\u{f900}'..='\u{faff}'
-            | '\u{ff66}'..='\u{ff9f}'
-            | '\u{20000}'..='\u{323af}'
-    )
 }
 
 /// The words of a piece of HTML, its tags taken off and its character

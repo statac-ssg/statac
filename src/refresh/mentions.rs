@@ -9,10 +9,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::{Fetch, Token, keep, unwritten};
+use crate::config::refused::Refused;
 use crate::date::Date;
 use crate::fetch::Refusal;
 use crate::fetched::mentions::{self, Mention, Said};
-use crate::fetched::refused::Refused;
 use crate::fetched::{Held, Line, Record};
 use crate::pictures::Bounds;
 use crate::report::{Report, shown};

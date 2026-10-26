@@ -1,4 +1,5 @@
 use super::*;
+use crate::disk::KEPT;
 
 fn plain(root: Root, path: &str, address: Option<&str>) -> Picture {
     Picture {

@@ -20,13 +20,14 @@ pub mod layout;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::config::words::{self, key_name};
+use crate::config::words;
 use crate::origin::{Origin, Sourced};
 use crate::problem::{
     Expected, Found, Hint, Kind, Problem, Reach, Requirer, SetAside, Severity, Word,
 };
 use crate::source::{Place, SourceId, Sources, Span};
 use crate::value::Reader;
+use crate::yaml::key_name;
 use crate::yaml::{Node, Resolved, Value as Yaml};
 
 /// The folder in `templates/` a description's files are named in.

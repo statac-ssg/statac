@@ -15,7 +15,8 @@ use std::time::{Duration, Instant};
 use rayon::prelude::*;
 
 use super::progress::{Counted, Making};
-use super::{KEPT, Picture, Pictures, Progress, kept_in, make_kept_in, quietly};
+use super::{Picture, Pictures, Progress, quietly};
+use crate::disk::{KEPT, kept_in, make_kept_in};
 use crate::ids::PictureId;
 use crate::pictures::{self, Error, Rendition, Unreadable};
 use crate::platform;

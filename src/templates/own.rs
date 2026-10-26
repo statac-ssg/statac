@@ -138,7 +138,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
         checked("digits", std::slice::from_ref(&value))?;
         let shared = shared()?;
         let words = super::render::words_of(&shared, frame::language());
-        Ok::<_, Error>(Value::from(crate::dates::format::in_digits(
+        Ok::<_, Error>(Value::from(crate::language::in_digits(
             &plain(&value),
             words.digits.as_ref(),
         )))

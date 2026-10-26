@@ -40,6 +40,14 @@ pub(crate) fn reads_as_text(line: &str, spaces: usize) -> bool {
     name.is_empty() || (name.contains(' ') && !name.starts_with(['"', '\'']))
 }
 
+/// The name of a mapping's key as written.
+pub fn key_name(key: &Node) -> String {
+    match &key.value {
+        Value::Scalar(text) => text.clone(),
+        _ => String::new(),
+    }
+}
+
 /// Reads the whole of a source as one YAML document.
 pub fn read(sources: &Sources, source: SourceId) -> Result<Node, Problem> {
     let span = Span::new(0, sources.text(source).len());

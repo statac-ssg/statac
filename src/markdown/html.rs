@@ -664,7 +664,7 @@ impl<'a> Writer<'a> {
 
     /// A footnote's number as a reader sees it, in the language's digits.
     fn shown(&self, number: u32) -> String {
-        crate::dates::format::in_digits(&number.to_string(), self.options.digits)
+        crate::language::in_digits(&number.to_string(), self.options.digits)
     }
 
     /// The footnotes, at the foot of the page, each with its way back.

@@ -1,11 +1,12 @@
 //! The file describing a picture, beside it under `content/` and named
 //! after it: `photo-1.jpg.yaml` for `photo-1.jpg`.
 
-use crate::config::words::{Field, key_name};
+use crate::config::words::Field;
 use crate::origin::Sourced;
 use crate::problem::{Expected, Problem};
 use crate::source::{SourceId, Sources};
 use crate::value::Reader;
+use crate::yaml::key_name;
 use crate::yaml::{self, Resolved, Value as Yaml};
 
 /// What a picture's own file says of it.

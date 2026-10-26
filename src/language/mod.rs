@@ -319,6 +319,39 @@ pub(crate) fn bundled(tag: &str) -> Option<(&'static str, Arc<Words>)> {
         .map(|at| (BUNDLED[at].0, Arc::clone(&read[at])))
 }
 
+/// `written` with 0 to 9 in `digits`, zero first, and all else as it is.
+pub(crate) fn in_digits(written: &str, digits: Option<&[char; 10]>) -> String {
+    let Some(digits) = digits else {
+        return written.to_owned();
+    };
+    written
+        .chars()
+        .map(|c| match c.to_digit(10) {
+            Some(figure) => digits[figure as usize],
+            None => c,
+        })
+        .collect()
+}
+
+/// Whether `c` is written in Han, hiragana or katakana.
+pub(crate) fn runs_without_spaces(c: char) -> bool {
+    matches!(
+        c,
+        '\u{2e80}'..='\u{2fdf}'
+            | '\u{3005}'..='\u{3007}'
+            | '\u{3021}'..='\u{3029}'
+            | '\u{3038}'..='\u{303b}'
+            | '\u{3041}'..='\u{309f}'
+            | '\u{30a1}'..='\u{30ff}'
+            | '\u{31f0}'..='\u{31ff}'
+            | '\u{3400}'..='\u{4dbf}'
+            | '\u{4e00}'..='\u{9fff}'
+            | '\u{f900}'..='\u{faff}'
+            | '\u{ff66}'..='\u{ff9f}'
+            | '\u{20000}'..='\u{323af}'
+    )
+}
+
 /// Statac's own words for `tag`, or for the nearest tag it inherits from.
 pub(crate) fn statacs(tag: &str) -> Option<(&'static str, Arc<Words>)> {
     parents::inherited(tag).find_map(|tag| bundled(&tag))

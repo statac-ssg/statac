@@ -12,8 +12,7 @@ use crate::build::{Cards, Copies, Javascript, Outcome};
 use crate::content::Included;
 use crate::fetched::Ages;
 use crate::hooks::{Before, Ran};
-use crate::origin::Sourced;
-use crate::problem::{Code, Kind, Problem, Published, Severity, Unquietenable};
+use crate::problem::{Problem, Published, Quiet, Severity};
 use crate::source::{Place, SourceId, Sources};
 use crate::stamp::Pass;
 use crate::wording;
@@ -77,48 +76,6 @@ pub fn answer_line(colour: bool, default: Option<&str>) -> String {
         "  {default}{} ",
         paint.paint(&paint.brand_ink(), wording::ASK_MARK)
     )
-}
-
-/// The kinds the author has quietened, by name.
-#[derive(Default, Debug)]
-pub struct Quiet {
-    codes: Vec<Code>,
-}
-
-impl Quiet {
-    /// Takes the names as written, and gives a problem for each that names
-    /// no kind or a kind that can't be quietened.
-    pub fn new(names: &[Sourced<String>]) -> (Quiet, Vec<Problem>) {
-        let mut quiet = Quiet::default();
-        let mut problems = Vec::new();
-        for name in names {
-            let written = &name.value;
-            let kind = match Code::from_name(written) {
-                Some(code) if code.quietenable() => {
-                    quiet.codes.push(code);
-                    continue;
-                }
-                Some(code) => Kind::CantQuieten {
-                    name: written.clone(),
-                    because: match code.severity() {
-                        Severity::Error => Unquietenable::Error,
-                        _ => Unquietenable::LeavesAPageOut,
-                    },
-                },
-                None => Code::unknown(written),
-            };
-            problems.push(Problem {
-                kind,
-                place: name.origin.place,
-                context: Default::default(),
-            });
-        }
-        (quiet, problems)
-    }
-
-    pub fn quietens(&self, kind: &Kind) -> bool {
-        self.codes.contains(&kind.code())
-    }
 }
 
 /// How many of the other pages whose builds met a problem are named
@@ -324,7 +281,7 @@ impl<'a> Report<'a> {
         match ran.before {
             Before::Unset => {}
             Before::Ran => {
-                out.push_str(&wording::ran_hook(crate::hooks::BEFORE));
+                out.push_str(&wording::ran_hook(crate::config::hooks::BEFORE));
                 out.push('\n');
             }
             Before::PassedOver => {

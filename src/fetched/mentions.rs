@@ -11,15 +11,15 @@
 use std::collections::{BTreeSet, HashMap};
 
 use super::Fetched;
-use super::refused::{Refused, SETTING};
 use crate::address::{Address, decoded};
 use crate::config::Settings;
-use crate::config::words::key_name;
+use crate::config::refused::{Refused, SETTING};
 use crate::date::Date;
 use crate::ids::PageId;
 use crate::problem::{Expected, Kind, Problem, Requirer, Waiting, Word};
 use crate::source::{Place, SourceId, Sources};
 use crate::value::Reader;
+use crate::yaml::key_name;
 use crate::yaml::{self, Value as Yaml};
 
 /// The folder under `fetched/` mentions are kept in.

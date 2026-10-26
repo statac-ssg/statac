@@ -7,6 +7,7 @@
 use std::io;
 use std::path::PathBuf;
 
+use crate::origin::Sourced;
 use crate::platform::{Alike, Refused, Unwritable};
 use crate::source::Place;
 
@@ -1799,6 +1800,48 @@ pub enum Waiting {
     Cards,
     /// The mentions in `fetched/mentions/`, and the relay's address.
     Webmentions,
+}
+
+/// The kinds the author has quietened, by name.
+#[derive(Default, Debug)]
+pub struct Quiet {
+    codes: Vec<Code>,
+}
+
+impl Quiet {
+    /// Takes the names as written, and gives a problem for each that names
+    /// no kind or a kind that can't be quietened.
+    pub fn new(names: &[Sourced<String>]) -> (Quiet, Vec<Problem>) {
+        let mut quiet = Quiet::default();
+        let mut problems = Vec::new();
+        for name in names {
+            let written = &name.value;
+            let kind = match Code::from_name(written) {
+                Some(code) if code.quietenable() => {
+                    quiet.codes.push(code);
+                    continue;
+                }
+                Some(code) => Kind::CantQuieten {
+                    name: written.clone(),
+                    because: match code.severity() {
+                        Severity::Error => Unquietenable::Error,
+                        _ => Unquietenable::LeavesAPageOut,
+                    },
+                },
+                None => Code::unknown(written),
+            };
+            problems.push(Problem {
+                kind,
+                place: name.origin.place,
+                context: Default::default(),
+            });
+        }
+        (quiet, problems)
+    }
+
+    pub fn quietens(&self, kind: &Kind) -> bool {
+        self.codes.contains(&kind.code())
+    }
 }
 
 /// What a feed is written as.

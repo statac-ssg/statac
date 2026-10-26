@@ -14,9 +14,10 @@ use crate::build::{self, Mode, Options, Outcome};
 use crate::date::{self, Date, Fault};
 use crate::import;
 use crate::new;
+use crate::problem::Quiet;
 use crate::problem::{Code, CommandHint, Expected, Found, Kind, Missing, OptionHint, Problem};
 use crate::refresh;
-use crate::report::{Quiet, Report};
+use crate::report::Report;
 use crate::serve;
 use crate::serve::watch::{self, How};
 use crate::source::Sources;
@@ -60,7 +61,7 @@ const COMMANDS: [&str; 10] = [
 ];
 
 /// Commands Statac once had, each with the setting that does its work now.
-const FORMER_COMMANDS: [(&str, &str); 1] = [("refuse", crate::fetched::refused::SETTING)];
+const FORMER_COMMANDS: [(&str, &str); 1] = [("refuse", crate::config::refused::SETTING)];
 
 /// The commands that work on a site, named by the folder after the command.
 const SITE_COMMANDS: [&str; 6] = ["build", "check", "serve", "stamp", "refresh", "search"];

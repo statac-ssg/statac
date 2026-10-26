@@ -4,8 +4,8 @@
 
 use std::ops::Range;
 
-use crate::config::words::key_name;
 use crate::source::{Place, Sources};
+use crate::yaml::key_name;
 use crate::yaml::{Node, Value};
 
 /// Where the cursor stands.

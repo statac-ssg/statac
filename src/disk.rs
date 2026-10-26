@@ -7,6 +7,10 @@
 //! times. So a stamp is trusted only where the disk's clock, read before
 //! the file was, settles it; a file whose stamp isn't settled is known by
 //! its bytes, or not at all.
+//!
+//! It also finds `.statac`, where Statac keeps what it makes between
+//! builds in the site's folder, and the folders in it, never through a
+//! link.
 
 use std::collections::HashMap;
 use std::fs;
@@ -16,8 +20,69 @@ use std::time::SystemTime;
 
 use rayon::prelude::*;
 
-use crate::album::{KEPT, kept};
 use crate::platform;
+
+/// Where Statac keeps what it makes between builds, in the site's folder.
+pub(crate) const KEPT: &str = ".statac";
+
+/// The folder `name` of what Statac keeps in the site at `site`, whether
+/// or not it is there yet. Refused where `.statac` or the folder in it
+/// is a link or anything else than a folder: nothing is ever read,
+/// written or removed through a link, which may lead out of the site.
+pub(crate) fn kept_in(site: &Path, name: &str) -> std::io::Result<PathBuf> {
+    kept_at(site, &[KEPT, name])
+}
+
+/// [`kept_in`], for the folder everything Statac keeps is in.
+pub(crate) fn kept(site: &Path) -> std::io::Result<PathBuf> {
+    kept_at(site, &[KEPT])
+}
+
+fn kept_at(site: &Path, names: &[&str]) -> std::io::Result<PathBuf> {
+    let mut folder = site.to_path_buf();
+    for name in names {
+        folder.push(name);
+        match std::fs::symlink_metadata(&folder) {
+            Ok(found) if found.file_type().is_symlink() => {
+                return Err(std::io::Error::from(crate::problem::Reason::Link));
+            }
+            Ok(found) if !found.is_dir() => {
+                return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(folder)
+}
+
+/// Makes the site's `.statac` where it isn't there, and gives its path.
+/// Refused where it is a link or anything else than a folder.
+pub(crate) fn make_kept(site: &Path) -> std::io::Result<PathBuf> {
+    let kept = site.join(KEPT);
+    there_already(std::fs::create_dir(&kept))?;
+    // Asked again once made: it may have been put there as a link.
+    self::kept(site)?;
+    Ok(kept)
+}
+
+/// [`make_kept`], and the folder `name` in it, made by name in `.statac`
+/// opened and never through a link.
+pub(crate) fn make_kept_in(site: &Path, name: &str) -> std::io::Result<PathBuf> {
+    let kept = make_kept(site)?;
+    there_already(crate::platform::make_folder(&kept, name))?;
+    kept_in(site, name)?;
+    Ok(kept)
+}
+
+/// `made`, where it failed only for something having the name already.
+fn there_already(made: std::io::Result<()>) -> std::io::Result<()> {
+    match made {
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        made => made,
+    }
+}
 
 /// The file written and removed in the site's `.statac`, and the end of
 /// the name of one written and removed beside the output, to read the time

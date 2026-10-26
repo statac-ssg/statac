@@ -12,7 +12,7 @@ use std::path::Path;
 use super::{Report, shown};
 use crate::json;
 use crate::problem::Problem;
-use crate::report::Quiet;
+use crate::problem::Quiet;
 use crate::source::Place;
 use crate::wording;
 

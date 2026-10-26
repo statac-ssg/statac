@@ -12,10 +12,11 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 
-use crate::album::{KEPT, Progress};
+use crate::album::Progress;
 use crate::build::incremental::{self, Kept, Reading, Rebuilding, Rebuilt};
 use crate::build::{self, Built, Mode, Options, Output, Plan, Publishing, Remembered, Writes};
 use crate::config::words::PageWord;
+use crate::disk::KEPT;
 use crate::disk::{Clock, Inventory};
 use crate::hooks::Before;
 use crate::problem::Occupant;
@@ -279,7 +280,7 @@ impl Session {
     fn held(&mut self, changed: Option<&[String]>, at: &Path, unheld: Option<Problem>) -> Round {
         let began = Instant::now();
         let (settings, _) = crate::config::read(at, &mut crate::source::Sources::default());
-        let sets = settings.text(crate::hooks::BEFORE).is_some();
+        let sets = settings.text(crate::config::hooks::BEFORE).is_some();
         let runs = match changed {
             Some(changed) => sets && crate::hooks::watched(&settings, changed),
             None => true,
@@ -294,7 +295,13 @@ impl Session {
             let files = own_files(at);
             Inventory::to_compare(at, files, |path| std::fs::metadata(path), clock.as_ref())
         });
-        let ran = crate::hooks::before(&self.options, Progress::Silent, true);
+        let ran = crate::hooks::before(
+            &self.options.site,
+            &self.options.out(),
+            self.options.drafts,
+            Progress::Silent,
+            true,
+        );
         let hooked = match was {
             Some(was) => {
                 let now = Inventory::of(at, own_files(at), |path| std::fs::metadata(path));
@@ -345,10 +352,10 @@ impl Session {
         took.reading = began.elapsed();
 
         let settings = prepared.renderer.settings();
-        let after = settings.text(crate::hooks::AFTER);
+        let after = settings.text(crate::config::hooks::AFTER);
         let after = after.map(|line| line.value.to_owned());
         self.sets_after = after.is_some();
-        self.watches = !settings.texts(crate::hooks::WATCHES).is_empty();
+        self.watches = !settings.texts(crate::config::hooks::WATCHES).is_empty();
         // The command ran on the folder as an earlier round built it whole,
         // and what it left there stays. Another command, or none, is for a
         // folder built whole again, once the settings read without error.
@@ -475,7 +482,11 @@ impl Session {
             clock: build::Clock::start(),
         };
         let mut outcome = build::publish(options, prepared, &plan, &built, concluded, publishing);
-        let named = crate::hooks::names_output(renderer.settings(), renderer.sources(), options);
+        let named = crate::hooks::names_output(
+            renderer.settings(),
+            renderer.sources(),
+            options.out_as_asked(),
+        );
         outcome.problems.extend(named);
         if !whole_site && after.is_some() && !outcome.stopped() {
             let unmade = crate::hooks::still_unmade(renderer.settings(), &self.folder);

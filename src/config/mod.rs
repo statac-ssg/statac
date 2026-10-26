@@ -8,6 +8,8 @@
 //! templates as `site.<name>`, and may nest.
 
 pub mod declarations;
+pub(crate) mod hooks;
+pub(crate) mod refused;
 pub mod words;
 
 use std::path::Path;
@@ -140,12 +142,12 @@ const SETTINGS: &[Setting] = &[
     setting("after_build", Shape::Text, None),
     setting(
         "after_build_outputs",
-        Shape::Places(crate::hooks::a_built_place, PlaceIn::BuiltSite),
+        Shape::Places(hooks::a_built_place, PlaceIn::BuiltSite),
         None,
     ),
     setting(
         "before_build_watches",
-        Shape::Places(crate::hooks::a_place, PlaceIn::Site),
+        Shape::Places(hooks::a_place, PlaceIn::Site),
         None,
     ),
     setting(
@@ -402,7 +404,7 @@ pub fn read(root: &Path, sources: &mut Sources) -> (Settings, Vec<Problem>) {
     };
     let source = sources.add(FILE_NAME, text);
     let (settings, mut found) = read_source(sources, source);
-    found.extend(crate::hooks::check(root, &settings));
+    found.extend(hooks::check(root, &settings));
     for &secret in &settings.secrets {
         sources.hide(secret);
     }
@@ -471,7 +473,7 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
     let declared = declared(sources, entries);
     // Declarations first, so values handed down can be checked against them.
     for entry in entries {
-        let name = words::key_name(&entry.key);
+        let name = crate::yaml::key_name(&entry.key);
         let declares = name.starts_with("fields.") || name.starts_with("types.");
         if declares && matches!(entry.value.value, Yaml::Mapping(_)) {
             problems.extend(words::nested(sources, &name, &entry.value));
@@ -501,7 +503,7 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
         }
     }
     for entry in entries {
-        let name = words::key_name(&entry.key);
+        let name = crate::yaml::key_name(&entry.key);
         let (key, value) = (&entry.key, &entry.value);
         let bare = ["pages.", "default."]
             .iter()
@@ -647,7 +649,7 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
 fn declared(sources: &Sources, entries: &[crate::yaml::Entry]) -> Vec<String> {
     let Some(entry) = entries
         .iter()
-        .find(|entry| words::key_name(&entry.key) == "language")
+        .find(|entry| crate::yaml::key_name(&entry.key) == "language")
     else {
         return Vec::new();
     };
@@ -718,7 +720,7 @@ fn read_web_addresses(
         Yaml::Scalar(_) if node.resolved() == Some(crate::yaml::Resolved::Null) => return Ok(None),
         Yaml::Scalar(_) => vec![node],
     };
-    let a_url = |text: &str| crate::fetched::refused::Spot::of(text).is_some();
+    let a_url = |text: &str| refused::Spot::of(text).is_some();
     let mut urls = Vec::with_capacity(items.len());
     for item in items {
         match reader.text(item) {

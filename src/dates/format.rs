@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use crate::language::{Patterns, Words};
+use crate::language::{Patterns, Words, in_digits, runs_without_spaces};
 use crate::problem::{FormatFault, Kind, Look, Piece, WordsFrom, WordsWanted};
 
 const DAY: u32 = 31;
@@ -1234,20 +1234,6 @@ fn from<const N: usize>(list: Option<&[String; N]>, at: usize) -> &str {
         .map_or("", String::as_str)
 }
 
-/// `written` with 0 to 9 in `digits`, zero first, and all else as it is.
-pub fn in_digits(written: &str, digits: Option<&[char; 10]>) -> String {
-    let Some(digits) = digits else {
-        return written.to_owned();
-    };
-    written
-        .chars()
-        .map(|c| match c.to_digit(10) {
-            Some(figure) => digits[figure as usize],
-            None => c,
-        })
-        .collect()
-}
-
 /// An example respelt with the site's own digits as 0 to 9, and the way
 /// back to where each byte stood as written.
 struct Plain<'a> {
@@ -1733,7 +1719,7 @@ fn marks(words: &Words) -> Vec<String> {
 /// or more.
 fn syllabic(word: &str) -> bool {
     word.chars()
-        .all(|c| crate::markdown::runs_without_spaces(c) || matches!(c, '\u{ac00}'..='\u{d7af}'))
+        .all(|c| runs_without_spaces(c) || matches!(c, '\u{ac00}'..='\u{d7af}'))
 }
 
 /// Every word an example may name, with its list: the language's own,

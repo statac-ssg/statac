@@ -8,7 +8,7 @@ use crate::origin::{Origin, Sourced};
 use crate::problem::{Expected, Kind, Own, Problem, Root, SetAside, Word, WrongPlace};
 use crate::source::{Place, Sources, Span};
 use crate::value::{Reader, Value, place_within};
-use crate::yaml::{Node, Resolved, Value as Yaml};
+use crate::yaml::{Node, Resolved, Value as Yaml, key_name};
 
 /// Statac's own words on a page.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -334,14 +334,6 @@ pub struct Read {
     /// What a folder's own page hands down.
     pub layer: Words,
     pub problems: Vec<Problem>,
-}
-
-/// The name of a mapping's key as written.
-pub fn key_name(key: &Node) -> String {
-    match &key.value {
-        Yaml::Scalar(text) => text.clone(),
-        _ => String::new(),
-    }
 }
 
 /// Reads front matter: Statac's words typed, the author's fields kept and

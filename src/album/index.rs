@@ -73,7 +73,8 @@ impl Index {
         let mut index = Index::default();
         // Asked what it is through the handle it is read by, so no link
         // put in its place, or in place of a folder on the way, is read.
-        let Ok(file) = crate::platform::open_file(&site.join(super::KEPT), "pictures/index") else {
+        let Ok(file) = crate::platform::open_file(&site.join(crate::disk::KEPT), "pictures/index")
+        else {
             return index;
         };
         if !crate::platform::named_once(&file) {
@@ -128,7 +129,7 @@ impl Index {
             text.push_str(&line);
             text.push('\n');
         }
-        let kept = super::make_kept_in(site, "pictures")?;
+        let kept = crate::disk::make_kept_in(site, "pictures")?;
         let fresh = format!("index.{}", std::process::id());
         crate::platform::keep_file(&kept, "pictures/index", &fresh, text.as_bytes())
     }
@@ -413,7 +414,7 @@ mod tests {
         index.changed = true;
         index.save(&site).unwrap();
         assert_eq!(Index::load(&site).len(), 1);
-        let kept = site.join(super::super::KEPT).join("pictures");
+        let kept = site.join(crate::disk::KEPT).join("pictures");
         fs::hard_link(kept.join("index"), site.join("index")).unwrap();
         assert_eq!(Index::load(&site).len(), 0);
         fs::remove_file(site.join("index")).unwrap();

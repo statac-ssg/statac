@@ -14,7 +14,6 @@
 //! next time the record is written.
 
 pub(crate) mod mentions;
-pub(crate) mod refused;
 pub(crate) mod stills;
 
 use std::collections::BTreeMap;
@@ -274,7 +273,7 @@ pub(crate) fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>
     for (path, at) in crate::assets::walk(site, &real, FOLDER, false, &mut problems) {
         match path.as_str() {
             RECORD => {}
-            refused::NAME => {
+            crate::config::refused::NAME => {
                 problems.push(retired(sources, &real, &at));
                 continue;
             }
@@ -306,7 +305,7 @@ pub(crate) fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>
 /// carrying the URLs it holds.
 fn retired(sources: &Sources, real: &Path, at: &str) -> Problem {
     let (urls, unread) = match sources.unsaved().read(real, at) {
-        Ok(text) => match refused::carried(&text) {
+        Ok(text) => match crate::config::refused::carried(&text) {
             (urls, 0) => (urls, Unread::Nothing),
             (urls, lines) => (urls, Unread::Lines(lines)),
         },

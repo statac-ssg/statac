@@ -20,10 +20,10 @@ use crate::date::Date;
 use crate::feeds;
 use crate::ids::{Id, ListId, OutputId, PageId, PictureId};
 use crate::links;
+use crate::problem::Quiet;
 use crate::problem::{Code, Kind, Named, Problem, Published, Reason, Severity};
 use crate::publish::{self, Staging};
 use crate::reads::{Asked, Key, Reads, Record};
-use crate::report::Quiet;
 use crate::source::{Place, SourceId, Sources};
 use crate::templates::{self, Renderer};
 use crate::unnamed;
@@ -72,6 +72,12 @@ impl Options {
             None if self.site == Path::new(".") => PathBuf::from(OUT),
             None => self.site.join(OUT),
         }
+    }
+
+    /// Where the built site goes, as the author asked: as written, or
+    /// `_site`.
+    pub fn out_as_asked(&self) -> &Path {
+        self.out.as_deref().unwrap_or(Path::new(OUT))
     }
 
     /// What reading the site is asked to do.
@@ -247,7 +253,7 @@ pub(crate) fn read_with(
     let (fetched, found) = crate::fetched::read(site, &mut read.sources);
     read.site.fetched = fetched;
     read.problems.extend(found);
-    let found = crate::album::read(site, &mut read, assets.statics());
+    let found = content::pictures(site, &mut read, assets.statics());
     read.problems.extend(found);
     let (mentions, found) = crate::fetched::mentions::read(
         &read.site.fetched,
@@ -590,7 +596,13 @@ pub fn run_saying(options: &Options, progress: Progress) -> Outcome {
     let waited = hold.as_ref().map_or(Duration::ZERO, |hold| hold.waited);
     let mut clock = Clock::start();
     let before = match options.mode {
-        Mode::Build => match crate::hooks::before(options, progress, false) {
+        Mode::Build => match crate::hooks::before(
+            &options.site,
+            &options.out(),
+            options.drafts,
+            progress,
+            false,
+        ) {
             Ok(before) => before,
             Err(stopped) => {
                 clock.lap(Stage::Before);
@@ -622,7 +634,11 @@ pub(crate) fn told_once_built(outcome: &mut Outcome, options: &Options) {
     let Held::Renderer(renderer) = &outcome.held else {
         return;
     };
-    let named = crate::hooks::names_output(renderer.settings(), renderer.sources(), options);
+    let named = crate::hooks::names_output(
+        renderer.settings(),
+        renderer.sources(),
+        options.out_as_asked(),
+    );
     outcome.problems.extend(named);
     if options.mode == Mode::Check {
         let unrun = crate::hooks::unrun_by_check(renderer.settings());
@@ -1259,9 +1275,15 @@ pub(crate) fn publish(
             let ran = match after {
                 true => {
                     let settings = renderer.settings();
-                    let ran =
-                        crate::hooks::after(settings, options, &mut staging, progress, serving);
-                    if settings.text(crate::hooks::AFTER).is_some() {
+                    let ran = crate::hooks::after(
+                        settings,
+                        &options.site,
+                        options.drafts,
+                        &mut staging,
+                        progress,
+                        serving,
+                    );
+                    if settings.text(crate::config::hooks::AFTER).is_some() {
                         clock.lap(Stage::After);
                     }
                     ran
@@ -1304,7 +1326,7 @@ pub(crate) fn publish(
                 .any(|problem| problem.kind.code() == Code::CacheNotWritten)
         {
             problems.push(Problem::nowhere(Kind::CacheNotWritten {
-                path: Path::new(crate::album::KEPT).join("pictures"),
+                path: Path::new(crate::disk::KEPT).join("pictures"),
                 reason: Reason::of(&error),
             }));
         }

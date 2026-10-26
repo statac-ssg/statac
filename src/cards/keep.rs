@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use rayon::prelude::*;
 
 use super::draw::{Failure, Format, Key, Kit, Plan, Text};
-use crate::album::{Counted, KEPT, Kept, Making, Progress};
+use crate::album::{Counted, Kept, Making, Progress};
+use crate::disk::KEPT;
 use crate::problem::{Kind, Problem, Reason};
 use crate::publish::Staging;
 

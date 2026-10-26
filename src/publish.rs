@@ -35,8 +35,8 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 
-use crate::album::{KEPT, kept, kept_in};
 use crate::disk::{CLOCK, Clock, Inventory, Stamp};
+use crate::disk::{KEPT, kept, kept_in};
 use crate::platform::{self, Over};
 use crate::problem::Occupant;
 use crate::problem::{Kind, Problem, Reason};

@@ -12,17 +12,11 @@ use std::process::Stdio;
 
 use crate::album::Progress;
 use crate::config::Settings;
+use crate::config::hooks::{AFTER, BEFORE, MAKES, WATCHES};
 use crate::platform::{self, SHELL_OUT};
-use crate::problem::{Ended, Hint, Kind, Named, Problem, Severity, WrongPlace};
+use crate::problem::{Ended, Kind, Named, Problem, Severity};
 use crate::publish::Staging;
 use crate::source::Sources;
-
-pub(crate) const BEFORE: &str = "before_build";
-pub(crate) const AFTER: &str = "after_build";
-/// The setting naming what `after_build` makes in the built site.
-pub(crate) const MAKES: &str = "after_build_outputs";
-/// The setting naming what `before_build` is run again for.
-pub(crate) const WATCHES: &str = "before_build_watches";
 
 /// One of the site's commands, and what it is handed.
 pub(crate) struct Hook<'a> {
@@ -138,17 +132,19 @@ pub struct Ran {
     pub after: Option<Changed>,
 }
 
-/// Runs the `before_build` of the site at `site`, read from its settings
+/// Runs the `before_build` of the site at `site`, built into `out` and
+/// with its drafts where `drafts`, read from its settings
 /// alone since the command may write what the site is read from. The
 /// command isn't run where the settings have an error, which the build
 /// goes on to tell. `Err` holds a command that didn't end well, and the
 /// settings it is placed in.
 pub(crate) fn before(
-    options: &crate::build::Options,
+    site: &Path,
+    out: &Path,
+    drafts: bool,
     progress: Progress,
     serve: bool,
 ) -> Result<Before, Box<(Sources, Problem)>> {
-    let (site, out) = (options.site.as_path(), options.out());
     let mut sources = Sources::default();
     let (settings, problems) = crate::config::read(site, &mut sources);
     let stopped = problems
@@ -172,8 +168,8 @@ pub(crate) fn before(
         setting: BEFORE,
         line: line.value,
         site,
-        out: &out,
-        drafts: options.drafts,
+        out,
+        drafts,
         serve,
     };
     match hook.run_saying(progress) {
@@ -199,7 +195,8 @@ fn told(setting: &str, stopped: Stopped) -> Kind {
 /// nothing at.
 pub(crate) fn after(
     settings: &Settings,
-    options: &crate::build::Options,
+    site: &Path,
+    drafts: bool,
     staging: &mut Staging,
     progress: Progress,
     serve: bool,
@@ -213,9 +210,9 @@ pub(crate) fn after(
     let hook = Hook {
         setting: AFTER,
         line: line.value,
-        site: &options.site,
+        site,
         out: staging.root(),
-        drafts: options.drafts,
+        drafts,
         serve,
     };
     hook.run_saying(progress)
@@ -301,54 +298,6 @@ fn made(written: &str) -> (&str, bool) {
 fn within(file: &str, folder: &str) -> bool {
     file.strip_prefix(folder)
         .is_some_and(|rest| rest.starts_with('/'))
-}
-
-/// Whether `written` reads as a file or a folder below some folder: no
-/// piece of it empty, climbing out, or naming a drive or a root.
-pub(crate) fn a_place(written: &str) -> bool {
-    let rel = written.strip_suffix('/').unwrap_or(written);
-    !rel.is_empty() && platform::stays_inside(rel) && !rel.split('/').any(str::is_empty)
-}
-
-/// Whether `written` names a file or a folder in the built site, as an
-/// entry of `after_build_outputs` does: from its top, with or without the
-/// `/` an address opens with.
-pub(crate) fn a_built_place(written: &str) -> bool {
-    a_place(written.strip_prefix('/').unwrap_or(written))
-}
-
-/// What is wrong with how the settings about the site's commands stand
-/// together, for the site at `site`: one describing a command the site
-/// doesn't set, and something `before_build_watches` names that the site
-/// doesn't have.
-pub(crate) fn check(site: &Path, settings: &Settings) -> Vec<Problem> {
-    let mut problems = Vec::new();
-    for (about, command) in [(MAKES, AFTER), (WATCHES, BEFORE)] {
-        if settings.text(command).is_none()
-            && let Some(written) = settings.get(about)
-        {
-            let kind = Kind::WrongPlace {
-                key: about.to_owned(),
-                why: WrongPlace::NoCommand(command),
-            };
-            problems.push(Problem::placed(kind, written.origin.place));
-        }
-    }
-    for watched in settings.texts(WATCHES) {
-        let path = platform::join(site, &watched.value);
-        let found = match watched.value.ends_with('/') {
-            true => path.is_dir(),
-            false => path.exists(),
-        };
-        if !found {
-            let kind = Kind::MissingFile {
-                path: watched.value.clone(),
-                hint: None::<Hint>,
-            };
-            problems.push(Problem::placed(kind, watched.origin.place));
-        }
-    }
-    problems
 }
 
 /// Each of `outputs`, a path in the built site and what is published
@@ -437,19 +386,12 @@ fn rewritten(line: &str, named: &[(usize, usize, usize)]) -> String {
     out
 }
 
-/// The warning for an `after_build` that names the folder the site is
-/// published in, as the build was asked for it: the command runs before
+/// The warning for an `after_build` that names `out`, the folder the site
+/// is published in as the build was asked for it: the command runs before
 /// the built site is put there. Placed at the folder's name.
-pub(crate) fn names_output(
-    settings: &Settings,
-    sources: &Sources,
-    options: &crate::build::Options,
-) -> Option<Problem> {
+pub(crate) fn names_output(settings: &Settings, sources: &Sources, out: &Path) -> Option<Problem> {
     let line = settings.text(AFTER)?;
-    let folder = match &options.out {
-        Some(out) => out.to_string_lossy().into_owned(),
-        None => crate::build::OUT.to_owned(),
-    };
+    let folder = out.to_string_lossy();
     let folder = folder.strip_prefix("./").unwrap_or(&folder);
     let folder = folder.trim_end_matches(['/', '\\']);
     if folder.is_empty() {
@@ -572,20 +514,6 @@ mod tests {
             false => "read answer; test -z \"$answer\"",
         };
         assert_eq!(run(line), Ok(()));
-    }
-
-    #[test]
-    fn a_place_stays_below_its_folder() {
-        for written in ["search/", "feed.json", "a/b/", "a/b.txt"] {
-            assert!(a_place(written), "{written}");
-            assert!(a_built_place(&format!("/{written}")), "{written}");
-        }
-        for written in [
-            "", "/", "../a", "a/../b", "a//b", "/a", "C:/a", "a\\b", "./a",
-        ] {
-            assert!(!a_place(written), "{written}");
-        }
-        assert!(!a_built_place("//a"));
     }
 
     #[test]

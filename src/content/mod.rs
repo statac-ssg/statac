@@ -7,6 +7,7 @@
 //! are published beside the writing.
 
 mod made;
+pub mod stamps;
 #[cfg(test)]
 mod tests;
 mod texts;
@@ -31,7 +32,7 @@ use crate::site::{Language, List, ListKey, Page, PagePlace, Redirect, SentTo, Si
 use crate::source::{Place, SourceId, Sources, Span};
 use crate::value::Value;
 use crate::yaml::Node;
-use crate::{address, slug};
+use crate::{address, album, slug};
 pub(crate) use texts::Texts;
 
 /// What a run asks of reading the site.
@@ -300,6 +301,83 @@ pub(crate) fn read_with(root: &Path, run: &Run, texts: &mut Texts) -> Read {
         left_out,
         templates,
     }
+}
+
+/// Reads every picture under `content/`, `static/` and `fetched/` of the
+/// site at `root` into `read`, with the files describing them, and says
+/// what is wrong with those.
+pub(crate) fn pictures(
+    root: &Path,
+    read: &mut Read,
+    statics: &[crate::assets::StaticFile],
+) -> Vec<Problem> {
+    let site = &read.site;
+    let mut wanted = Vec::new();
+    for (at, file) in site.files.iter().enumerate() {
+        if album::is_picture(&file.path)
+            && let Some(found) = site.found.get(&file.path)
+        {
+            wanted.push(album::Wanted {
+                root: album::Root::Content,
+                path: file.path.clone(),
+                at: found,
+                address: Some(file.address.as_str().to_owned()),
+                travelling: Some(at),
+            });
+        }
+    }
+    for path in read.left_out.iter().filter(|path| album::is_picture(path)) {
+        let Some(found) = site.found.get(path) else {
+            continue;
+        };
+        wanted.push(album::Wanted {
+            root: album::Root::Content,
+            path: path.clone(),
+            at: found,
+            address: None,
+            travelling: None,
+        });
+    }
+    for file in statics.iter().filter(|file| album::is_picture(&file.name)) {
+        wanted.push(album::Wanted {
+            root: album::Root::Static,
+            path: file.name.clone(),
+            at: file.at(),
+            address: Some(format!("/{}", file.name)),
+            travelling: None,
+        });
+    }
+    // Its copies are published from the top of the built site as the file
+    // stands under `fetched/`.
+    for (path, at) in site.fetched.files.iter() {
+        if album::is_picture(path) {
+            wanted.push(album::Wanted {
+                root: album::Root::Fetched,
+                path: path.clone(),
+                at,
+                address: Some(format!("/{path}")),
+                travelling: None,
+            });
+        }
+    }
+    let mut sidecars = Vec::new();
+    for path in std::mem::take(&mut read.sidecars) {
+        let Ok(text) = site.read_content(&path, read.sources.unsaved()) else {
+            continue;
+        };
+        let source = read.sources.add(format!("content/{path}"), text);
+        sidecars.push((path, source));
+    }
+    let (pictures, problems) = album::read(
+        root,
+        &site.real,
+        wanted,
+        sidecars,
+        &read.sources,
+        &read.settings,
+    );
+    read.site.pictures = pictures;
+    problems
 }
 
 /// The names of the templates at the top of the site's `templates/`, as
@@ -734,7 +812,7 @@ impl Reader<'_> {
     /// Tells of each stamp in a file's front matter, and gives whether
     /// there is one.
     fn stamps(&mut self, front: &Node) -> bool {
-        let found = crate::stamp::problems(front);
+        let found = stamps::problems(front);
         let any = !found.is_empty();
         self.problems.extend(found);
         any
@@ -758,7 +836,7 @@ impl Reader<'_> {
             let speaks = folder.index.is_some_and(|index| {
                 let front = self.docs[index].front.as_ref();
                 matches!(front.map(|n| &n.value), Some(crate::yaml::Value::Mapping(entries))
-                    if entries.iter().any(|e| words::key_name(&e.key).starts_with("pages.")))
+                    if entries.iter().any(|e| crate::yaml::key_name(&e.key).starts_with("pages.")))
             });
             // A language's folder holds its pages as the top of `content/`
             // holds the main language's.
@@ -803,7 +881,7 @@ impl Reader<'_> {
         match self.docs[doc].front.as_ref().map(|node| &node.value) {
             Some(crate::yaml::Value::Mapping(entries)) => entries
                 .iter()
-                .any(|entry| words::key_name(&entry.key) == PageWord::Each.name()),
+                .any(|entry| crate::yaml::key_name(&entry.key) == PageWord::Each.name()),
             _ => false,
         }
     }

@@ -1680,7 +1680,7 @@ pub(super) fn node_value(shared: &Arc<Shared>, node: &Node, path: Option<&str>) 
                 entries
                     .iter()
                     .map(|entry| {
-                        let key = crate::config::words::key_name(&entry.key);
+                        let key = crate::yaml::key_name(&entry.key);
                         let inner = nests.map(|path| format!("{path}.{key}"));
                         let value = node_value(shared, &entry.value, inner.as_deref());
                         (key, value)

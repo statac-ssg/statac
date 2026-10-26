@@ -23,10 +23,11 @@ use std::sync::Once;
 
 use rayon::prelude::*;
 
-use crate::content;
+use crate::config::Settings;
 use crate::ids::{Arena, Id, PictureId};
 use crate::pictures::{self, Header, Kind, Photograph, Rendition, Size, Unreadable};
 use crate::problem::{Kind as Told, Named, PictureFault, Problem};
+use crate::source::{SourceId, Sources};
 
 pub use develop::{Developed, Shown, develop, sweep};
 pub(crate) use develop::{Kept, fault};
@@ -35,71 +36,12 @@ pub use progress::Progress;
 pub(crate) use progress::{Counted, Making};
 pub use sidecar::Sidecar;
 
-/// Where Statac keeps what it makes between builds, in the site's folder.
-pub const KEPT: &str = ".statac";
-
 /// The folder in the site at `site` where copies and the index are kept,
 /// whether or not it is there yet. Refused where `.statac` or the folder
 /// in it is a link or anything else than a folder: nothing is ever read,
 /// written or removed through a link, which may lead out of the site.
 fn kept_folder(site: &Path) -> std::io::Result<PathBuf> {
-    kept_in(site, "pictures")
-}
-
-/// [`kept_folder`], for the folder `name` of what Statac keeps.
-pub(crate) fn kept_in(site: &Path, name: &str) -> std::io::Result<PathBuf> {
-    kept_at(site, &[KEPT, name])
-}
-
-/// [`kept_folder`], for the folder everything Statac keeps is in.
-pub(crate) fn kept(site: &Path) -> std::io::Result<PathBuf> {
-    kept_at(site, &[KEPT])
-}
-
-fn kept_at(site: &Path, names: &[&str]) -> std::io::Result<PathBuf> {
-    let mut folder = site.to_path_buf();
-    for name in names {
-        folder.push(name);
-        match std::fs::symlink_metadata(&folder) {
-            Ok(found) if found.file_type().is_symlink() => {
-                return Err(std::io::Error::from(crate::problem::Reason::Link));
-            }
-            Ok(found) if !found.is_dir() => {
-                return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory));
-            }
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
-        }
-    }
-    Ok(folder)
-}
-
-/// Makes the site's `.statac` where it isn't there, and gives its path.
-/// Refused where it is a link or anything else than a folder.
-pub(crate) fn make_kept(site: &Path) -> std::io::Result<PathBuf> {
-    let kept = site.join(KEPT);
-    there_already(std::fs::create_dir(&kept))?;
-    // Asked again once made: it may have been put there as a link.
-    self::kept(site)?;
-    Ok(kept)
-}
-
-/// [`make_kept`], and the folder `name` in it, made by name in `.statac`
-/// opened and never through a link.
-pub(crate) fn make_kept_in(site: &Path, name: &str) -> std::io::Result<PathBuf> {
-    let kept = make_kept(site)?;
-    there_already(crate::platform::make_folder(&kept, name))?;
-    kept_in(site, name)?;
-    Ok(kept)
-}
-
-/// `made`, where it failed only for something having the name already.
-fn there_already(made: std::io::Result<()>) -> std::io::Result<()> {
-    match made {
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-        made => made,
-    }
+    crate::disk::kept_in(site, "pictures")
 }
 
 /// The folder a picture file is under.
@@ -431,96 +373,48 @@ pub fn is_sidecar(name: &str) -> bool {
 }
 
 /// A picture file to read.
-struct Wanted<'a> {
-    root: Root,
-    path: String,
+pub struct Wanted<'a> {
+    pub root: Root,
+    pub path: String,
     /// Where it really is, as [`Picture`] has it.
-    at: &'a str,
-    address: Option<String>,
-    travelling: Option<usize>,
+    pub at: &'a str,
+    pub address: Option<String>,
+    pub travelling: Option<usize>,
 }
 
-/// Reads every picture under `content/`, `static/` and `fetched/` of the
-/// site at `root` into `read`, with the files describing them, and says
-/// what is wrong with those.
+/// Reads `wanted`, the pictures of the site at `root`, whose real path is
+/// `real`, with `sidecars`, the files describing them, each by its path
+/// under `content/` and where `sources` holds it, and says what is wrong
+/// with those.
 pub fn read(
     root: &Path,
-    read: &mut content::Read,
-    statics: &[crate::assets::StaticFile],
-) -> Vec<Problem> {
-    let site = &read.site;
-    let mut wanted = Vec::new();
-    for (at, file) in site.files.iter().enumerate() {
-        if is_picture(&file.path)
-            && let Some(found) = site.found.get(&file.path)
-        {
-            wanted.push(Wanted {
-                root: Root::Content,
-                path: file.path.clone(),
-                at: found,
-                address: Some(file.address.as_str().to_owned()),
-                travelling: Some(at),
-            });
-        }
-    }
-    for path in read.left_out.iter().filter(|path| is_picture(path)) {
-        let Some(found) = site.found.get(path) else {
-            continue;
-        };
-        wanted.push(Wanted {
-            root: Root::Content,
-            path: path.clone(),
-            at: found,
-            address: None,
-            travelling: None,
-        });
-    }
-    for file in statics.iter().filter(|file| is_picture(&file.name)) {
-        wanted.push(Wanted {
-            root: Root::Static,
-            path: file.name.clone(),
-            at: file.at(),
-            address: Some(format!("/{}", file.name)),
-            travelling: None,
-        });
-    }
-    // Its copies are published from the top of the built site as the file
-    // stands under `fetched/`.
-    for (path, at) in site.fetched.files.iter() {
-        if is_picture(path) {
-            wanted.push(Wanted {
-                root: Root::Fetched,
-                path: path.clone(),
-                at,
-                address: Some(format!("/{path}")),
-                travelling: None,
-            });
-        }
-    }
-
+    real: &Path,
+    wanted: Vec<Wanted<'_>>,
+    sidecars: Vec<(String, SourceId)>,
+    sources: &Sources,
+    settings: &Settings,
+) -> (Pictures, Vec<Problem>) {
     let known = index::Index::load(root);
     let entries: Vec<Option<(index::Entry, bool)>> = wanted
         .par_iter()
         .map(|wanted| {
-            let measure = crate::platform::measure(&site.real, wanted.at).ok()?;
+            let measure = crate::platform::measure(real, wanted.at).ok()?;
             let stamp = index::Stamp::new(measure.length, measure.modified);
             if let Some(entry) = known.get(wanted.root, &wanted.path)
                 && stamp.is_some_and(|stamp| stamp == entry.stamp)
             {
                 return Some((entry.clone(), false));
             }
-            let bytes = crate::assets::read_walked(&site.real, wanted.at).ok()?;
+            let bytes = crate::assets::read_walked(real, wanted.at).ok()?;
             let stamp = stamp.unwrap_or_default();
             Some((index::Entry::read(stamp, wanted.root, &bytes), true))
         })
         .collect();
 
-    let settings = pictures::Settings::default();
-    let max_width = read
-        .settings
-        .whole("max_width")
+    let max_width = (settings.whole("max_width"))
         .map_or(1600, |width| u32::try_from(width).unwrap_or(u32::MAX));
-    let optimise = read.settings.truth("optimise_images") != Some(false);
+    let optimise = settings.truth("optimise_images") != Some(false);
+    let settings = pictures::Settings::default();
     let mut gathered = Pictures::default();
     let mut index = index::Index::default();
     let mut changed = known.len() != entries.iter().flatten().count();
@@ -568,16 +462,11 @@ pub fn read(
     }
     index.changed = changed;
     gathered.index = index;
-    gathered.real.clone_from(&site.real);
+    gathered.real = real.to_path_buf();
 
     let mut problems = Vec::new();
-    for path in std::mem::take(&mut read.sidecars) {
-        let text = read.site.read_content(&path, read.sources.unsaved());
-        let Ok(text) = text else {
-            continue;
-        };
-        let source = read.sources.add(format!("content/{path}"), text);
-        let (sidecar, found) = sidecar::read(&read.sources, source);
+    for (path, source) in sidecars {
+        let (sidecar, found) = sidecar::read(sources, source);
         problems.extend(found);
         let picture = path.strip_suffix(".yaml").unwrap_or(&path);
         match gathered.by_source.get(&(Root::Content, picture.to_owned())) {
@@ -600,7 +489,7 @@ pub fn read(
                         picture: format!("content/{picture}"),
                         nearest,
                     },
-                    crate::config::words::head(&read.sources, source),
+                    crate::config::words::head(sources, source),
                 ));
             }
         }
@@ -634,8 +523,7 @@ pub fn read(
                 pictures::ladder(photograph, transparent, stem, source, own, &settings).pop();
         }
     }
-    read.site.pictures = gathered;
-    problems
+    (gathered, problems)
 }
 
 /// What a picture file's bytes say of it; none where they begin as no

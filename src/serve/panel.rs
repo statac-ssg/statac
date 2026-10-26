@@ -21,8 +21,9 @@ use crate::address::on_the_wire;
 use crate::build::Outcome;
 use crate::json;
 use crate::problem::Holds;
+use crate::problem::Quiet;
 use crate::problem::{Code, Kind, Problem, Severity};
-use crate::report::{Piece, Quiet, Report, pieces, shown};
+use crate::report::{Piece, Report, pieces, shown};
 use crate::wording::{self, PanelWord};
 use problems::{Addresses, Parts};
 

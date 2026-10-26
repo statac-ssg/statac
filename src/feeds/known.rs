@@ -28,10 +28,11 @@ use rayon::prelude::*;
 
 use super::Feed;
 use super::ids::{entry_id, is_a_feed_id, kept_id};
-use crate::album::{KEPT, escaped, make_kept, unescaped};
+use crate::album::{escaped, unescaped};
 use crate::config::Settings;
 use crate::config::words::PageWord;
 use crate::dates::Dates;
+use crate::disk::{KEPT, make_kept};
 use crate::ids::PageId;
 use crate::problem::{Kind, Problem};
 use crate::site::{Item, Made, Page, SentTo, Site};

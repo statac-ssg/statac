@@ -148,7 +148,7 @@ mod tests {
     /// A scratch folder holding the folder texts are kept in.
     fn scratch_with_kept(name: &str) -> Scratch {
         let scratch = Scratch::new(name);
-        fs::create_dir_all(scratch.0.join(crate::album::KEPT)).unwrap();
+        fs::create_dir_all(scratch.0.join(crate::disk::KEPT)).unwrap();
         scratch
     }
 

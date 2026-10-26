@@ -111,7 +111,7 @@ impl Declarations {
             && self.nests(name)
         {
             for entry in entries {
-                let path = format!("{name}.{}", crate::config::words::key_name(&entry.key));
+                let path = format!("{name}.{}", crate::yaml::key_name(&entry.key));
                 found.extend(self.naming_in(&path, &entry.value));
             }
         }
@@ -221,7 +221,7 @@ impl Declarations {
             && self.nests(name)
         {
             for entry in entries {
-                let path = format!("{name}.{}", crate::config::words::key_name(&entry.key));
+                let path = format!("{name}.{}", crate::yaml::key_name(&entry.key));
                 problems.extend(self.check_all(sources, &path, &entry.value));
             }
         }

@@ -26,9 +26,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::build::{self, Mode};
+use crate::config::refused::Refused;
 use crate::date::Date;
 use crate::fetch::{Fetched, Refusal};
-use crate::fetched::refused::Refused;
 use crate::fetched::stills;
 use crate::fetched::{self as kept, Held, Line, Record};
 use crate::problem::Host;

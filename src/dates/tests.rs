@@ -1512,7 +1512,7 @@ fn in_the_cldrs_pattern(
             true => format!("{number:02}"),
             false => number.to_string(),
         };
-        format::in_digits(&written, digits)
+        crate::language::in_digits(&written, digits)
     };
     let month = |context: &str, width: &str| {
         let month = at.month.to_string();
@@ -2201,7 +2201,7 @@ fn every_languages_own_dates_read_back() {
         };
         let (_, full) = offered(&words);
         let offered = examples.into_iter().chain(full).map(|example| {
-            let written = format::in_digits(&example, digits);
+            let written = crate::language::in_digits(&example, digits);
             ("offered", example, written, true)
         });
         let looks = Look::ALL.into_iter().map(|look| {
@@ -2719,7 +2719,7 @@ fn the_present_minute_carries_its_offset_only_where_the_clocks_show_it_twice() {
 
 #[test]
 fn a_stamp_written_as_the_clocks_change_names_the_day_and_time_asked_for() {
-    use crate::stamp::{Moment, read};
+    use crate::content::stamps::{Moment, read};
     let (dates, _, _) = site("timezone: Europe/London\n");
     let on = |today: &str| Moment {
         today: date(today),

@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use super::*;
-use crate::origin::{Origin, Style};
+use crate::origin::{Origin, Sourced, Style};
 use crate::problem::Malformed;
-use crate::problem::{Former, OptionHint, Reason};
+use crate::problem::{Former, Kind, OptionHint, Reason, Unquietenable};
 use crate::source::Span;
 
 const SITE: &str = "site";
