@@ -1047,6 +1047,24 @@ error  No value: nothing is set for `page.{host}.start`
     }
 }
 
+/// A video shown whole is its id, and handed whole to a snippet, it is
+/// read only for what the snippet reads: neither asks for its `start`.
+#[test]
+fn a_video_shown_or_handed_whole_needs_no_start() {
+    let site = Site::new(
+        "video-whole",
+        "{{ page.vimeo('123456789') }}|{{ page.youtube('abcdefghijk') }}|\
+         {{ player(page.youtube('abcdefghijk')) }}",
+    );
+    site.write("snippets/player.html", "{# takes video #}{{ video.id }}");
+    site.write("content/post-1.md", "---\ntitle: Post 1\n---\n");
+    site.build();
+    assert_eq!(
+        site.page("post-1/index.html"),
+        "123456789|abcdefghijk|abcdefghijk"
+    );
+}
+
 #[test]
 fn a_still_is_read_by_its_bytes_and_shown_as_copies_whatever_the_settings() {
     let site = Site::new(

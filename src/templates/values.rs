@@ -166,10 +166,12 @@ impl Answering<'_> {
     }
 }
 
-/// Whether `value` is one of Statac's own objects, which never hold a
-/// missing value and are too large to search.
+/// Whether `value` is one of Statac's own objects, which are too large to
+/// search, or tell a value they lack only where it is read, as a video
+/// with no `start` does.
 pub(super) fn opaque(value: &Value) -> bool {
-    value.downcast_object_ref::<PageValue>().is_some()
+    super::media::is_video(value)
+        || value.downcast_object_ref::<PageValue>().is_some()
         || value.downcast_object_ref::<SiteValue>().is_some()
         || value.downcast_object_ref::<Pages>().is_some()
         || value.downcast_object_ref::<ListValue>().is_some()

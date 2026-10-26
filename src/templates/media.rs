@@ -731,6 +731,10 @@ struct PhotoValue {
 /// What the file describing a picture says beyond Statac's own names, where
 /// `value` is a picture. Statac's own are never missing, and looking through
 /// them would read the description as a template showing it does.
+pub(super) fn is_video(value: &Value) -> bool {
+    value.downcast_object_ref::<VideoValue>().is_some()
+}
+
 pub(super) fn own_fields(value: &Value) -> Option<&[(String, Value)]> {
     let photo = value.downcast_object_ref::<PhotoValue>()?;
     Some(&photo.own)
