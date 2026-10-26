@@ -69,9 +69,9 @@ fn a_setting_says_what_it_does() {
         lines,
         [
             "`code_colours`, a setting",
-            "`true` marks each piece of code in the content with a class for its kind, such \
-             as `hl-keyword`, for the site's own stylesheet to colour. Unset, it is `false`, \
-             and code is written as it is.",
+            "`true` marks each piece of code in the content with a class for what kind of \
+             piece it is, such as `hl-keyword`, for the site's own stylesheet to colour. The \
+             default is `false`, and Statac writes code exactly as typed.",
         ]
     );
     assert_eq!(
@@ -80,7 +80,7 @@ fn a_setting_says_what_it_does() {
     );
     let (lines, more, _) = settings(&site, "fields.book.au|thor: text\n").unwrap();
     assert_eq!(lines[0], "`fields.book.author`, a setting");
-    assert!(lines[1].starts_with("The kind of value a custom field holds"));
+    assert!(lines[1].starts_with("The kind of value a custom field takes"));
     assert_eq!(more.unwrap(), "https://statac.dev/settings/#fields");
     let (lines, more, _) = settings(&site, "pages.lay|out: post\n").unwrap();
     assert_eq!(

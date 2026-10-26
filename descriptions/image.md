@@ -1,21 +1,21 @@
 # An image in a template
 
-What a template reads on an image `page.image` gives, and on each image
-`page.images` gives, a video's `thumbnail`, a mention's `avatar` and
-`image` in `image.html`. Shown as it is, an image is its `src`. A custom
-field in the image's `.yaml` file is read the same way, as
-`image.credit`.
+What a template reads on the image that `page.image` returns, and on
+each image from `page.images`, a video's `thumbnail`, a mention's
+`avatar`, and `image` in `image.html`. `{{ image }}` on its own writes
+the image's `src`. A template reads a custom field in the image's
+`.yaml` file the same way, such as `image.credit`.
 
 ## `src`
 
 The image's URL, for the `src` of an `<img>`: its widest resized copy no
-more than 1200 pixels wide, or the image itself where it has no copies.
+more than 1200 pixels wide, or the image itself if it has no copies.
 
 More: https://statac.dev/templates/#files
 
 ## `avif`
 
-The image's AVIF copies, written as a `srcset`. Empty where it has no
+The image's AVIF copies, written as a `srcset`. Empty if it has no
 copies.
 
 More: https://statac.dev/templates/#files
@@ -23,54 +23,57 @@ More: https://statac.dev/templates/#files
 ## `fallback`
 
 The image's JPEG or PNG copies, written as a `srcset`, for a browser
-without AVIF. Empty where it has no copies.
+without AVIF. Empty if it has no copies.
 
 More: https://statac.dev/templates/#files
 
 ## `sizes`
 
-How wide the image is shown, written as the `sizes` of an `<img>`: the
-call's `sizes`, or else the site's `image_sizes`.
+How wide the browser shows the image, written as the `sizes` of an
+`<img>`. It is the `sizes` the call gives, or if the call gives none,
+the site's `image_sizes`.
 
 More: https://statac.dev/templates/#files
 
 ## `full`
 
-The URL of the image's widest copy, to link to, or with `full=true` of a
-copy at the image's own width. The image itself where it has no copies.
+The URL of the image's widest copy, to link to. With `full=true`, it is
+the URL of a copy at the image's own width. If the image has no copies,
+it is the URL of the image itself.
 
 More: https://statac.dev/templates/#files
 
 ## `width`
 
-The image's width in pixels, once turned upright. Empty where its size
-isn't known.
+The image's width in pixels, after Statac turns it the right way up.
+Empty if Statac doesn't know its size.
 
 More: https://statac.dev/templates/#files
 
 ## `height`
 
-The image's height in pixels, once turned upright. Empty where its size
-isn't known.
+The image's height in pixels, after Statac turns it the right way up.
+Empty if Statac doesn't know its size.
 
 More: https://statac.dev/templates/#files
 
 ## `alt`
 
-The image's alt text, from its `.yaml` file. Empty where it has none,
-and reading it then warns of the missing alt text, unless the image is
-decorative.
+The image's alt text, from its `.yaml` file. If the image has none,
+`alt` is empty, and Statac warns that the alt text is missing when a
+template reads it, unless the image is decorative.
 
 More: https://statac.dev/templates/#files
 
 ## `caption`
 
-The image's caption, from its `.yaml` file. Empty where it has none.
+The image's caption, from its `.yaml` file. Empty if it has none.
 
 More: https://statac.dev/templates/#files
 
 ## `name`
 
-The image's file name read as words: `photo-1.jpg` is `Photo 1`.
+The image's file name turned into words: `photo-1.jpg` becomes
+`Photo 1`.
 
 More: https://statac.dev/templates/#files

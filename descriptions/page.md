@@ -1,21 +1,22 @@
 # A page in a template
 
-What a template reads on a page: after `page.`, or after any other page
-it holds, as `post.title` or `page.next.url`. A custom field is read the
-same way, as `page.isbn`.
+What a template reads on a page: after `page.`, or after any other name
+that stands for a page, such as `post.title` or `page.next.url`. A
+template reads a custom field the same way, such as `page.isbn`.
 
 ## `title`
 
-The page's title: its `title`, or else the `# heading` its content opens
-with. A page with neither has none, so to show the names of pages write
-`headline(page)`.
+The page's title: its `title`, or if it has none, the `# heading` its
+content opens with. If the page has neither, `title` has no value, so to
+show the name of any page, write `headline(page)`.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `url`
 
-Where the page is published, from the top of the host and with the
-site's path: `/posts/post-1/`.
+The URL the page is published at, starting with `/`, such as
+`/posts/post-1/`. If the site's `url` has a path, such as
+`https://example.org/blog/`, the URL starts with that path, `/blog/`.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
@@ -27,75 +28,77 @@ More: https://statac.dev/templates/#what-a-template-sees
 
 ## `date`
 
-The page's `date`, shown as the site writes dates, with its `year`,
-`month`, `day` and `weekday`. A page without one has none, and nor does
-a list's paginated page.
+The page's `date`, with its `year`, `month`, `day` and `weekday`. On its
+own, it shows in the site's date format. If the page has no `date`, it
+has no value, and neither does a list's paginated page.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `updated`
 
-The page's `updated` date, shown as the site writes dates. A page
-without one has none, and nor does a list's paginated page.
+The page's `updated` date. On its own, it shows in the site's date
+format. If the page has no `updated`, it has no value, and neither does
+a list's paginated page.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `summary`
 
-The page's `summary`, as written. A page without one has none, and
-`page.opening` holds the words of its first paragraph instead.
+The page's `summary`, as written. If the page has none, `summary` has no
+value, and `page.opening` has the words of its first paragraph
+instead.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `content`
 
-The page's content, built into HTML, and empty on a list's paginated
-page. Shown on another page, as in a list or a feed, its relative URLs
-are written in full.
+The page's content, built into HTML. It is empty on a list's paginated
+page. When another page shows it, such as a list or a feed, Statac
+writes its relative URLs in full.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `excerpt`
 
 The start of the page's content, built into HTML: everything before its
-`<!--more-->` line, or else its first paragraph. A page with neither has
-none.
+`<!--more-->` line, or if it has none, its first paragraph. If the page
+has neither, `excerpt` has no value.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `excerpt_marked`
 
-`true` where the page's excerpt ends at a `<!--more-->` line, and
-`false` where it is the first paragraph.
+`true` if the page's excerpt ends at a `<!--more-->` line, and `false`
+if it is the first paragraph.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `opening`
 
-The words of the page's first paragraph, as text with no markup. A page
-with no paragraph has none.
+The words of the page's first paragraph, as text with no markup. If the
+page has no paragraph, `opening` has no value.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `word_count`
 
-How many words a reader reads in the page's content, not counting code
-blocks and footnote markers. In Chinese and Japanese, each character
+The number of words in the page's content, not counting code blocks and
+footnote markers. In Chinese and Japanese, each character
 counts as a word.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `maths`
 
-`true` where the page's content holds maths, so a layout can add the
-maths stylesheet where it is needed.
+`true` if the page's content has maths in it, so a layout can add the
+maths stylesheet only where it is needed.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `toc`
 
 The page's headings, each with its `title`, `id`, `url`, `level` and the
-headings beneath it as `headings`. Empty where it has none.
+headings under it as `headings`. Empty if the page has no headings.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
@@ -115,64 +118,65 @@ More: https://statac.dev/dates-and-languages/#each-language-in-templates
 ## `translations`
 
 The same page in the site's other languages, the main language first.
-Empty where there are none.
+Empty if there are none.
 
 More: https://statac.dev/dates-and-languages/#translations
 
 ## `tags`
 
-The page's tags, each a list with its `name`, `url` and `posts`. `"Rust"
-in page.tags` asks whether the page has a tag, however its capitals are
-written.
+The page's tags, each a list with its `name`, `url` and `posts`.
+`"Rust" in page.tags` is `true` if the page has that tag, whatever
+capitals it is written with.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `series`
 
 The series the page is in, as a list with its `name`, `url` and `posts`.
-A page in no series has none.
+If the page isn't in a series, `series` has no value.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `folder`
 
-The folder the page is filed in, as a list with its `name`, `url` and
+The folder the page is in, as a list with its `name`, `url` and
 `posts`.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `list`
 
-On a list page, and on each of its paginated pages, the list it is the
-page of. Other pages have none.
+On a list page and each of its paginated pages, the list the page is
+for. On other pages, it has no value.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `posts`
 
 On a list page, the posts this page of the list shows, in the list's
-order. Other pages have none.
+order. On other pages, it has no value.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `number`
 
-On a list page, which page of the list this is, counting from 1. Other
-pages have none.
+On a list page, which page of the list this is, counting from 1. On
+other pages, it has no value.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `previous`
 
-The page before this one in its list, as `neighbours` chooses, or on a
-list page, the list's page before this one. The first has none.
+The page before this one in the list `neighbours` chooses. On a list
+page, it is the list's page before this one. On the first page, it has
+no value.
 
 More: https://statac.dev/lists/#previous-and-next
 
 ## `next`
 
-The page after this one in its list, as `neighbours` chooses, or on a
-list page, the list's next page. The last has none.
+The page after this one in the list `neighbours` chooses. On a list
+page, it is the list's next page. On the last page, it has no value.
 
 More: https://statac.dev/lists/#previous-and-next
 
@@ -191,23 +195,23 @@ More: https://statac.dev/data/#pages-made-from-data
 
 ## `source`
 
-The file the page was read from, from the top of the site:
-`content/posts/post-1.md`. A page Statac makes, such as a tag's, has
-none.
+The file Statac read the page from, starting from the site's folder:
+`content/posts/post-1.md`. A page Statac makes, such as a tag's page,
+has no `source`.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
 ## `og_title`
 
-What the page is called where it is shared: its `og_title`, or else what
-`headline(page)` gives.
+The page's name where it is shared: its `og_title`, or if it has none,
+`headline(page)`.
 
 More: https://statac.dev/sharing-cards/#in-a-layout
 
 ## `card`
 
-The social card drawn for the page, with its `url`, `width`, `height`
-and `alt`. A page with no card has none.
+The social card Statac draws for the page, with its `url`, `width`,
+`height` and `alt`. If the page has no card, `card` has no value.
 
 More: https://statac.dev/sharing-cards/#in-a-layout
 
@@ -215,7 +219,7 @@ More: https://statac.dev/sharing-cards/#in-a-layout
 
 What other sites have said about the page: `comments`, the replies,
 mentions and bookmarks, and `reactions`, the likes and reposts. Both are
-empty where nothing has been said.
+empty if no one has said anything.
 
 More: https://statac.dev/webmentions/#webmentions-in-a-layout
 
@@ -223,24 +227,25 @@ More: https://statac.dev/webmentions/#webmentions-in-a-layout
 
 Called as `page.search_box()`, what a search box needs: `id`, the id for
 its element, `first`, whether it is the page's first, and `index`, the
-URL of the search index for the page's language. Reading `index` has the
-build publish the index.
+URL of the search index for the page's language. If a template reads
+`index`, the build publishes the index.
 
 More: https://statac.dev/search/#placing-the-box
 
 ## `image`
 
 Called as `page.image("photo-1.jpg")`, an image beside the page, with
-`src`, `width`, `height`, `alt` and the rest a tag showing it needs. It
-also takes `sizes`, `full=true` and `decorative=true`.
+`src`, `width`, `height`, `alt` and everything else an `<img>` for it
+needs. The call also takes `sizes`, `full=true` and
+`decorative=true`.
 
 More: https://statac.dev/templates/#files
 
 ## `images`
 
 Called as `page.images(["photo-1.jpg", "photo-2.jpg"])`, the images
-named, in that order, each as `page.image` gives it. Called as
-`page.images()`, every JPEG, PNG and WebP beside a page that has a
+named, in that order, each with the same values as `page.image`. Called
+as `page.images()`, every JPEG, PNG and WebP beside a page that has a
 folder of its own, in file name order. Animated images and other kinds,
 such as GIFs and SVGs, are left out.
 
@@ -269,40 +274,43 @@ More: https://statac.dev/templates/#files
 
 ## `youtube`
 
-Called as `page.youtube(url)` with a YouTube video's URL or its id
-alone, the video, with `id`, `start`, `embed` and `thumbnail`.
+Called as `page.youtube(url)`, where `url` is a YouTube video's URL or
+its id on its own: the video, with `id`, `start`, `embed` and
+`thumbnail`.
 
 More: https://statac.dev/templates/#files
 
 ## `vimeo`
 
-Called as `page.vimeo(url)` with a Vimeo video's URL or its id alone,
-the video, with `id`, `start`, `embed` and `thumbnail`.
+Called as `page.vimeo(url)`, where `url` is a Vimeo video's URL or its
+id on its own: the video, with `id`, `start`, `embed` and
+`thumbnail`.
 
 More: https://statac.dev/templates/#files
 
 ## `untitled`
 
-`true` where the page's `untitled` says it is meant to have no title.
+`true` if the page's `untitled` says it is meant to have no title.
 
 More: https://statac.dev/front-matter/#page-fields
 
 ## `draft`
 
-`true` where the page is a draft. Only `statac serve` builds drafts.
+`true` if the page is a draft. Only `statac serve` builds drafts.
 
 More: https://statac.dev/front-matter/#page-fields
 
 ## `layout`
 
-The `layout` the page names, or is cascaded, as written. A page that
-names none has none.
+The `layout` the page names, or the one cascaded to it, as written. If
+neither names one, `layout` has no value.
 
 More: https://statac.dev/front-matter/#page-fields
 
 ## `type`
 
-The page's `type`, as written. A page without one has none.
+The page's `type`, as written. If the page has no `type`, it has no
+value.
 
 More: https://statac.dev/front-matter/#page-fields
 
@@ -327,7 +335,7 @@ More: https://statac.dev/front-matter/#address-fields
 
 ## `needs`
 
-`url` where the page's front matter has `needs: url`.
+`url` if the page's front matter has `needs: url`.
 
 More: https://statac.dev/front-matter/#address-fields
 
@@ -340,7 +348,7 @@ More: https://statac.dev/front-matter/#address-fields
 ## `neighbours`
 
 The page's `neighbours`, as written: `site`, `folder`, `series` or
-`false`. A page without one has none.
+`false`. If the page has none, it has no value.
 
 More: https://statac.dev/front-matter/#list-fields
 
@@ -366,8 +374,8 @@ More: https://statac.dev/front-matter/#list-page-fields
 
 ## `posts_per_page`
 
-On a list page, its `posts_per_page`, as written. Where the page doesn't
-write one, it has none.
+On a list page, its `posts_per_page`, as written. If the page doesn't
+write one, it has no value.
 
 More: https://statac.dev/front-matter/#list-page-fields
 
@@ -386,14 +394,14 @@ More: https://statac.dev/front-matter/#list-page-fields
 
 ## `id`
 
-The post's `id` in a feed, as written. `feed_id(page)` gives the id
-every post has.
+The post's `id` in a feed, as written. `feed_id(page)` returns the id
+every post has, whether or not it writes one.
 
 More: https://statac.dev/front-matter/#sharing-fields
 
 ## `search`
 
-`false` where the page's `search` leaves it out of the site's search.
+`false` if the page's `search` leaves it out of the site's search.
 
 More: https://statac.dev/front-matter/#sharing-fields
 
@@ -406,6 +414,6 @@ More: https://statac.dev/front-matter/#sharing-fields
 
 ## `mentions`
 
-`true` where the page's `mentions` asks for its webmentions to be shown.
+`true` if the page's `mentions` asks for its webmentions to be shown.
 
 More: https://statac.dev/front-matter/#sharing-fields

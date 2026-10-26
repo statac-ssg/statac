@@ -5,14 +5,14 @@ Every value is plain text, never HTML.
 
 ## `comments`
 
-The page's replies, mentions and bookmarks, oldest first. Empty where
-there are none.
+The page's replies, mentions and bookmarks, oldest first. Empty if there
+are none.
 
 More: https://statac.dev/templates/#mention
 
 ## `reactions`
 
-The page's likes and reposts, oldest first. Empty where there are none.
+The page's likes and reposts, oldest first. Empty if there are none.
 
 More: https://statac.dev/templates/#mention
 
@@ -31,34 +31,37 @@ More: https://statac.dev/templates/#mention
 
 ## `author`
 
-Who sent the mention. A mention that doesn't say has none.
+Who sent the mention. If the mention doesn't say, `author` has no
+value.
 
 More: https://statac.dev/templates/#mention
 
 ## `author_url`
 
-The URL of the sender's own page. A mention that doesn't say has none.
+The URL of the sender's own page. If the mention doesn't say,
+`author_url` has no value.
 
 More: https://statac.dev/templates/#mention
 
 ## `published`
 
-When the mention was published, as a date. A mention that doesn't say
-has none.
+When the mention was published, as a date. If the mention doesn't say,
+`published` has no value.
 
 More: https://statac.dev/templates/#mention
 
 ## `content`
 
-What the sender wrote, as plain text. Show it as it is: `markdown` or
-`safe` would put another site's HTML into the page. A mention that says
-nothing has none.
+What the sender wrote, as plain text. Show it without `markdown` or
+`safe`, which would put another site's HTML into the page. If the
+mention has no text, `content` has no value.
 
 More: https://statac.dev/templates/#mention
 
 ## `avatar`
 
-The sender's image, as `page.image` gives one, once `statac refresh` has
-fetched it. A mention without one has none.
+The sender's image, with the same values as an image from `page.image`.
+It has no value until `statac refresh` fetches it, or if the mention has
+no image.
 
 More: https://statac.dev/templates/#mention

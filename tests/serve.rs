@@ -1083,9 +1083,10 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
         \"empty\":false,\"has\":[],\"from\":{\"file\":\"content/posts/post-3.md\",\"line\":2,\
         \"excerpt\":[{\"line\":2,\"text\":[{\"text\":\"title: \"},{\"mark\":\"Post 3\"}]}]},\
         \"used\":true,\"about\":[{\"text\":\"The page\\u0027s title: its \"},\
-        {\"code\":\"title\"},{\"text\":\", or else the \"},{\"code\":\"# heading\"},\
-        {\"text\":\" its content opens with. A page with neither has none, so to show the \
-        names of pages write \"},{\"code\":\"headline(page)\"},{\"text\":\".\"}],\
+        {\"code\":\"title\"},{\"text\":\", or if it has none, the \"},{\"code\":\"# heading\"},\
+        {\"text\":\" its content opens with. If the page has neither, \"},{\"code\":\"title\"},\
+        {\"text\":\" has no value, so to show the name of any page, write \"},\
+        {\"code\":\"headline(page)\"},{\"text\":\".\"}],\
         \"more\":\"https://statac.dev/templates/#what-a-template-sees\"}";
     assert!(
         post.contains(title)

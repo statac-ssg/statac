@@ -1,33 +1,35 @@
 # A list in a template
 
 What a template reads on a list: a folder, a tag, a series, or a list a
-page makes with `posts:` or `each:`. Lists are reached as `page.list`,
-`page.folder`, `page.tags`, `site.tags` and the like, and as `list` in a
-feed's template.
+page makes with `posts:` or `each:`. A template reaches lists through
+`page.list`, `page.folder`, `page.tags`, `site.tags` and the like, and
+through `list` in a feed's template.
 
 ## `name`
 
-The list's name: a folder's own name, a tag or a series as it is spelt,
-or for a list a page makes, that page's title.
+The list's name: a folder's own name, a tag's or a series' name as the
+pages spell it, or, for a list a page makes, that page's title.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `title`
 
-The title of the list's page, or for the site's own list the site's
-title, or else the list's name.
+The title of the list's page. If the list has no page, or its page has
+no title, it is the site's title for the site's own list, and the list's
+name for any other.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `url`
 
-The URL of the list's page. A list with no page has none.
+The URL of the list's page. If the list has no page, `url` has no
+value.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `page`
 
-The list's page. A list with no page has none.
+The list's page. If the list has no page, `page` has no value.
 
 More: https://statac.dev/lists/#lists-in-templates
 
@@ -39,29 +41,28 @@ More: https://statac.dev/lists/#lists-in-templates
 
 ## `pages`
 
-The list's posts, then the pages it holds that have no date.
+The list's posts, then its pages that have no date.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `pager`
 
 The list's page and each of its paginated pages, first to last, each
-with its `number` and `url`. Empty where the list's page isn't
-published.
+with its `number` and `url`. Empty if the list's page isn't published.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `feed`
 
-The URL of the list's feed, or of the first where it has several. Empty
-where it has none.
+The URL of the list's feed, or of its first feed if it has several.
+Empty if it has none.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `feeds`
 
 The URL of each of the list's feeds, in the order `feed:` names them.
-Empty where it has none.
+Empty if it has none.
 
 More: https://statac.dev/lists/#lists-in-templates
 
@@ -74,7 +75,7 @@ More: https://statac.dev/lists/#lists-in-templates
 
 ## `order`
 
-`newest first` or `oldest first`. Empty where numbers or an `order:`
-list of names put its posts in order.
+`newest first` or `oldest first`. Empty if the numbers its file names
+start with, or an `order:` list of names, put its posts in order.
 
 More: https://statac.dev/lists/#lists-in-templates

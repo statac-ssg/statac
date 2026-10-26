@@ -1,78 +1,81 @@
 # Filters
 
-Each filter a template can write after `|`, as `{{ page.date | moment
-}}`: Statac's own, and those of the template engine.
+Each filter a template can write after `|`, such as
+`{{ page.date | moment }}`: Statac's own, and the template engine's.
 
 ## `absolute`
 
-A URL starting with `/` made into a full URL, with the start of the
-site's `url` put in front. Given HTML, it does this to each URL in an
-`href`, `src`, `srcset` or `poster`. It needs the site's `url`.
+Turns a URL starting with `/` into a full URL, by putting the start of
+the site's `url` in front of it. If it is given HTML, it does this to
+each URL in an `href`, `src`, `srcset` or `poster`. It needs the site's
+`url`.
 
 More: https://statac.dev/templates/#filters
 
 ## `date`
 
-A date written as an example date, as `date_format` is, or in one of the
-language's looks: `long`, `short`, `day` or `stamp`. Given nothing, the
-date as the site writes dates.
+Writes a date the way an example date shows, as `date_format` does, such
+as `date("31 December 2025")`, or in one of the language's looks:
+`long`, `short`, `day` or `stamp`. With nothing in the brackets, it
+writes the date in the site's date format.
 
 More: https://statac.dev/dates-and-languages/#how-dates-look
 
 ## `moment`
 
-A date in the form machines read, `2026-10-04T15:04:00+01:00`, for
-`<time datetime>`. `moment("rss")` gives the form RSS uses.
+Writes a date in the form machines read, such as
+`2026-10-04T15:04:00+01:00`, for `<time datetime>`. `moment("rss")`
+writes it in the form RSS uses.
 
 More: https://statac.dev/templates/#filters
 
 ## `markdown`
 
-Text built as Markdown into HTML, such as a `summary` with emphasis in
+Builds text into HTML as Markdown, such as a `summary` with emphasis in
 it.
 
 More: https://statac.dev/templates/#markdown
 
 ## `highlight`
 
-Text as code to go inside a `<code>` element, each piece marked with a
-class for its kind, given the language as a code block names it:
-`highlight("rust")`. Where `code_colours` isn't `true`, and in a feed,
-the text as written.
+Marks text as code, ready to go inside a `<code>` element, with a class
+on each piece for what kind of piece it is. It takes the language the
+way a code block names it: `highlight("rust")`. If `code_colours` isn't
+`true`, and in a feed, it leaves the text as written.
 
 More: https://statac.dev/templates/#filters
 
 ## `plain`
 
-The words of some HTML on one line, with the markup taken out.
+Takes the markup out of some HTML, leaving its words on one line.
 
 More: https://statac.dev/templates/#filters
 
 ## `truncate`
 
-Text, or the words of some HTML, cut at a word to fit the number of
-characters given, with the ending given where it is cut: `truncate(160,
-"…")`.
+Cuts text, or the words of some HTML, at a word so that it fits in the
+number of characters given, and adds the ending given if it cuts
+anything: `truncate(160, "…")`.
 
 More: https://statac.dev/templates/#filters
 
 ## `digits`
 
-A number, or text holding numbers, written in the digits of the page's
+Writes a number, or the numbers in a text, in the digits of the page's
 language: `۱۲` for 12 on a Persian page. Only `0` to `9` change.
 
 More: https://statac.dev/templates/#filters
 
 ## `json`
 
-A value written as JSON. It is safe inside a `<script>`, and inside an
+Writes a value as JSON. It is safe inside a `<script>`, and inside an
 attribute in single quotes.
 
 More: https://statac.dev/templates/#filters
 
 ## `urlencode`
 
-Text made safe to use as part of a URL.
+Makes text safe to use as part of a URL.
 
 More: https://statac.dev/templates/#filters
 
@@ -85,7 +88,7 @@ More: https://statac.dev/lists/#lists-of-your-own
 
 ## `in`
 
-The pages of a list filed in the folder given: `site.posts |
+The pages of a list that are in the folder given: `site.posts |
 in("blog")`.
 
 More: https://statac.dev/lists/#lists-of-your-own
@@ -105,36 +108,36 @@ More: https://statac.dev/templates/#filters
 
 ## `newest_date`
 
-The newest date among a list of pages. A list with no dated page gives
-none.
+The newest date among a list of pages. If no page in the list has a
+date, it has no value.
 
 More: https://statac.dev/templates/#filters
 
 ## `sort`
 
-A list in order, smallest first, or by a field:
-`sort(attribute="title")`, with `reverse=true` for the other way. A page
-that lacks the field goes after the rest.
+Sorts a list, smallest first, or by a field: `sort(attribute="title")`.
+`reverse=true` sorts it the other way. A page that doesn't have the
+field goes after the rest.
 
 More: https://statac.dev/templates/#no-value
 
 ## `abs`
 
-A number without its sign: `-3` gives `3`.
+A number without its sign: `-3` becomes `3`.
 
 ## `attr`
 
-The field of a value named by the text given: `post | attr("title")` is
-`post.title`.
+The field of a value that the text given names: `post | attr("title")`
+is `post.title`.
 
 ## `batch`
 
-A list in lists of the number given, the last one shorter, or filled up
-with the second value given.
+Splits a list into lists of the number given. The last one is shorter,
+unless a second value is given to fill it up.
 
 ## `bool`
 
-A value as `true` or `false`, as an `{% if %}` would take it.
+A value as `true` or `false`, the way an `{% if %}` would treat it.
 
 ## `capitalize`
 
@@ -147,8 +150,8 @@ chain(other)`.
 
 ## `count`
 
-How many items a list holds, or how many characters a text holds. The
-same as `length`.
+How many items a list has, or how many characters a text has. The same
+as `length`.
 
 ## `d`
 
@@ -156,15 +159,15 @@ A shorter name for `default`.
 
 ## `default`
 
-The value, or where it has no value, the one given: `page.summary |
-default("")`. With `true` after it, an empty value is replaced too.
+The value, or if it has no value, the one given: `page.summary |
+default("")`. With `true` after it, it also replaces an empty value.
 
 More: https://statac.dev/templates/#no-value
 
 ## `dictsort`
 
-The names and values of a table, as pairs in order of their names, or
-with `by="value"`, of their values.
+The names and values of a table, as pairs sorted by name, or with
+`by="value"`, by value.
 
 ## `e`
 
@@ -172,13 +175,13 @@ A shorter name for `escape`.
 
 ## `escape`
 
-Text with `<`, `>`, `&` and quotes written so a browser shows them
-rather than reads them as HTML.
+Escapes `<`, `>`, `&` and quotes in text, so a browser shows them
+instead of reading them as HTML.
 
 ## `first`
 
-The first item of a list, or the first character of a text. An empty
-list gives none.
+The first item of a list, or the first character of a text. If the list
+is empty, it has no value.
 
 ## `float`
 
@@ -186,21 +189,21 @@ A value as a number that may have a fraction.
 
 ## `format`
 
-Text with values put into it where it has `%s`: `"%s of %s" | format(1,
+Puts values into text in place of each `%s`: `"%s of %s" | format(1,
 3)`.
 
 ## `groupby`
 
-A list in groups, by the field named: each group has `grouper`, the
-field's value, and `list`, the items with it. A page that lacks the
-field stops the build.
+Groups a list by the field named. Each group has `grouper`, the field's
+value, and `list`, the items with that value. A page that doesn't have
+the field stops the build.
 
 More: https://statac.dev/templates/#no-value
 
 ## `indent`
 
-Text with every line but the first indented by the number of spaces
-given. `first=true` indents the first too.
+Indents every line of text but the first by the number of spaces given.
+`first=true` indents the first too.
 
 ## `int`
 
@@ -217,12 +220,12 @@ The items of a list as one text, with the text given between each:
 
 ## `last`
 
-The last item of a list, or the last character of a text. An empty list
-gives none.
+The last item of a list, or the last character of a text. If the list
+is empty, it has no value.
 
 ## `length`
 
-How many items a list holds, or how many characters a text holds.
+How many items a list has, or how many characters a text has.
 
 ## `lines`
 
@@ -230,7 +233,8 @@ Text as a list of its lines.
 
 ## `list`
 
-A value as a list: a text gives its characters, and a table its names.
+A value as a list: a text becomes a list of its characters, and a table
+a list of its names.
 
 ## `lower`
 
@@ -238,9 +242,9 @@ Text in small letters.
 
 ## `map`
 
-Each item's field, as `map(attribute="title")`, or each item through the
-filter named, as `map("upper")`. A page that lacks the field stops the
-build.
+The field of each item, such as `map(attribute="title")`, or each item
+passed through the filter named, such as `map("upper")`. A page that
+doesn't have the field stops the build.
 
 More: https://statac.dev/templates/#no-value
 
@@ -256,7 +260,7 @@ field is smallest.
 
 ## `pprint`
 
-A value written out to show what it holds, for finding a fault in a
+Writes out a value and everything in it, to help find a fault in a
 template.
 
 ## `reject`
@@ -265,14 +269,14 @@ The items of a list that don't pass the test named: `reject("none")`.
 
 ## `rejectattr`
 
-The items of a list whose field doesn't pass the test named, as
-`rejectattr("draft")`. A page that lacks the field is kept.
+The items of a list whose field doesn't pass the test named, such as
+`rejectattr("draft")`. A page that doesn't have the field is kept.
 
 More: https://statac.dev/templates/#no-value
 
 ## `replace`
 
-Text with each of the first text given replaced by the second.
+Replaces each occurrence of the first text given with the second.
 
 ## `reverse`
 
@@ -284,7 +288,8 @@ A number rounded to the number of places given, or to a whole number.
 
 ## `safe`
 
-Text marked as HTML to write as it is, without escaping it.
+Marks text as HTML, so that the template writes it into the page without
+escaping it.
 
 ## `select`
 
@@ -293,21 +298,21 @@ test, those that are true.
 
 ## `selectattr`
 
-The items of a list whose field passes the test named, as
-`selectattr("group", "eq", "a")`. A page that lacks the field is left
-out.
+The items of a list whose field passes the test named, such as
+`selectattr("group", "eq", "a")`. A page that doesn't have the field is
+left out.
 
 More: https://statac.dev/templates/#no-value
 
 ## `slice`
 
-A list in the number of lists given, as columns, the last shorter, or
-filled up with the second value given.
+Splits a list into the number of lists given, such as for columns. The
+last one is shorter, unless a second value is given to fill it up.
 
 ## `split`
 
-Text as a list of the pieces between each of the text given, or between
-spaces.
+Splits text into a list at each occurrence of the text given, or at
+spaces if none is given.
 
 ## `string`
 
@@ -328,9 +333,9 @@ given.
 
 ## `unique`
 
-A list with each item once, in the order they first come, or with
-`attribute="rank"`, one for each value of the field. A page that lacks
-the field stops the build.
+A list with each item only once, in the order the items first appear.
+With `attribute="rank"`, it keeps one item for each value of the field.
+A page that doesn't have the field stops the build.
 
 More: https://statac.dev/templates/#no-value
 
@@ -340,5 +345,5 @@ Text in capitals.
 
 ## `zip`
 
-Two or more lists taken together, item by item, as a list of pairs, as
-long as the shortest.
+Takes two or more lists item by item, and makes a list of the items that
+stand at the same place in each. It is as long as the shortest list.

@@ -4,11 +4,11 @@ What a template reads on `loop` inside a `for` loop.
 
 ## `index`
 
-How far the loop has got, counting from 1.
+The number of the current item, counting from 1.
 
 ## `index0`
 
-How far the loop has got, counting from 0.
+The number of the current item, counting from 0.
 
 ## `revindex`
 
@@ -42,19 +42,20 @@ from 0.
 
 ## `previtem`
 
-The item before this one. The first item has none.
+The item before this one. On the first item, it has no value.
 
 ## `nextitem`
 
-The item after this one. The last item has none.
+The item after this one. On the last item, it has no value.
 
 ## `changed`
 
-Called as `loop.changed(post.date.year)`, `true` where what it is given
-differs from what it was given on the item before, and on the first
-item.
+Called as `loop.changed(post.date.year)`, `true` if the value it is
+given differs from the one it was given on the item before. It is always
+`true` on the first item.
 
 ## `cycle`
 
-Called as `loop.cycle("odd", "even")`, each of what it is given in turn,
-one for each item.
+Called as `loop.cycle("odd", "even")`, the values it is given, taking
+the next one on each item: `odd` on the first item, `even` on the
+second, and `odd` again on the third.

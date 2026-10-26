@@ -17,7 +17,7 @@ More: https://statac.dev/templates/#what-a-template-sees
 
 ## `url`
 
-A link to the heading on its page: `#` and its id.
+A link to the heading on its page: `#` followed by its id.
 
 More: https://statac.dev/templates/#what-a-template-sees
 
@@ -29,7 +29,7 @@ More: https://statac.dev/templates/#what-a-template-sees
 
 ## `headings`
 
-The headings beneath it, each as `page.toc` gives one. Empty where there
-are none.
+The headings under this one, each with the same values as a heading in
+`page.toc`. Empty if there are none.
 
 More: https://statac.dev/templates/#what-a-template-sees

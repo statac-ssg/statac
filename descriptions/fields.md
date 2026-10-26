@@ -12,8 +12,8 @@ More: https://statac.dev/front-matter/#page-fields
 
 ## `untitled`
 
-`true` where the page is meant to have no title, such as a short note.
-Statac refers to it by its date instead.
+`true` if the page is meant to have no title, such as a short note.
+Statac then names it by its date.
 
 More: https://statac.dev/front-matter/#page-fields
 
@@ -26,13 +26,14 @@ More: https://statac.dev/front-matter/#page-fields
 ## `date`
 
 The page's date, year first: `2026-10-04`, or `2026-10-04 09:30` with a
-time. `=today` has `statac serve` or `statac stamp` write the day in.
+time. If you write `=today`, `statac serve` or `statac stamp` replaces
+it with the day's date.
 
 More: https://statac.dev/front-matter/#page-fields
 
 ## `updated`
 
-When the page last changed, written as a `date` is.
+When the page last changed, written the same way as `date`.
 
 More: https://statac.dev/front-matter/#page-fields
 
@@ -52,9 +53,9 @@ More: https://statac.dev/front-matter/#page-fields
 
 ## `type`
 
-What kind of page this is, in a word of your own. Where `templates/` has
-a template of that name and the page sets no `layout`, it is built with
-that template.
+What kind of page this is, in a word of your own. If `templates/` has a
+template of that name and the page sets no `layout`, Statac builds the
+page with that template.
 
 More: https://statac.dev/front-matter/#page-fields
 
@@ -72,7 +73,8 @@ More: https://statac.dev/front-matter/#address-fields
 
 ## `redirect_to`
 
-The URL the page redirects to. The page publishes nothing else.
+The URL the page redirects to. Statac publishes nothing else for the
+page.
 
 More: https://statac.dev/front-matter/#address-fields
 
@@ -84,8 +86,8 @@ More: https://statac.dev/front-matter/#address-fields
 
 ## `translation_key`
 
-Links the page to its translations where their names differ. Pages with
-the same key are translations of each other.
+Links the page to its translations if their names differ. Pages with the
+same key are translations of each other.
 
 More: https://statac.dev/front-matter/#address-fields
 
@@ -110,8 +112,8 @@ More: https://statac.dev/front-matter/#list-fields
 
 ## `posts`
 
-A list of the page's own, chosen from all the posts: `site.posts |
-tagged("Rust")`.
+A list the page makes of its own, chosen from all the posts, such as
+`site.posts | tagged("Rust")`.
 
 More: https://statac.dev/front-matter/#list-page-fields
 
@@ -131,8 +133,8 @@ More: https://statac.dev/front-matter/#list-page-fields
 
 ## `numbered`
 
-In a folder's `index.md`, `false` where the numbers at the start of its
-pages' names are part of the names.
+In a folder's `index.md`, `false` says that the numbers at the start of
+its pages' names are part of the names.
 
 More: https://statac.dev/front-matter/#list-page-fields
 
@@ -145,16 +147,17 @@ More: https://statac.dev/front-matter/#list-page-fields
 
 ## `index_page`
 
-`false` publishes nothing at the list's URL, and none of its paginated
-pages. The list still works in templates.
+`false` stops Statac publishing the list's page and its paginated pages.
+Templates can still use the list.
 
 More: https://statac.dev/front-matter/#list-page-fields
 
 ## `feed`
 
-`true` gives the list a feed, beside its page as `feed.xml`, and a name
-or a URL puts it there. A list of them gives it a feed at each,
-templates linking the first. A list has no feed unless it asks for one.
+`true` gives the list a feed, published beside the list's page as
+`feed.xml`. A file name or a URL publishes the feed there instead. A
+list of them gives the list a feed at each, and templates link to the
+first. A list has no feed unless a `feed:` line asks for one.
 
 More: https://statac.dev/front-matter/#list-page-fields
 
@@ -172,8 +175,8 @@ More: https://statac.dev/front-matter/#sharing-fields
 
 ## `card`
 
-Which of the site's social cards is drawn for the page, once cards are
-turned on.
+Which of the site's social cards Statac draws for the page, if the site
+has cards turned on.
 
 More: https://statac.dev/front-matter/#sharing-fields
 
@@ -191,7 +194,7 @@ More: https://statac.dev/front-matter/#sharing-fields
 
 ## `mentions`
 
-`true` where the page shows its webmentions. A template reads it as
+`true` if the page shows its webmentions. A template reads it as
 `page.mentions`.
 
 More: https://statac.dev/front-matter/#sharing-fields

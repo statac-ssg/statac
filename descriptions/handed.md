@@ -1,8 +1,8 @@
 # Names a template is handed
 
 The names a template, a snippet or a file in `snippets/markdown/` reads
-at its top, before any dot. Each template is handed `page` and `site`;
-the rest are handed only where each says.
+on their own, before any dot. Statac hands every template `page` and
+`site`, and each of the others only where its entry says.
 
 ## `page`
 
@@ -13,14 +13,14 @@ More: https://statac.dev/templates/#handed
 
 ## `site`
 
-The site, the same on every page. On a site in several languages, as the
-page's language has it.
+The site, the same on every page. On a site in several languages, its
+values are the ones for the page's language.
 
 More: https://statac.dev/templates/#handed
 
 ## `loop`
 
-Inside a `for` loop, where the loop has got to: `loop.index`,
+Inside a `for` loop, how far the loop has got: `loop.index`,
 `loop.first`, `loop.last` and the rest. In a loop written with
 `recursive`, `loop(...)` goes a level deeper.
 
@@ -34,19 +34,19 @@ More: https://statac.dev/templates/#extends
 ## `super`
 
 Inside a block of a template that `extends` another, `super()` writes
-the block as the template it extends has it.
+the block from the template this one extends.
 
 More: https://statac.dev/templates/#extends
 
 ## `caller`
 
-Inside a `macro` called with a `call` block, `caller()` writes what the
-`call` block holds.
+Inside a `macro` called with a `call` block, `caller()` writes the
+contents of the `call` block.
 
 ## `varargs`
 
-Inside a `macro`, the values a call hands it past those the macro names,
-as a list.
+Inside a `macro`, the values a call hands it beyond those the macro
+names, as a list.
 
 ## `kwargs`
 
@@ -74,39 +74,40 @@ More: https://statac.dev/feeds/#the-template
 
 ## `to`
 
-In `redirect.html`, the URL the page redirects to, in full where the
-site has a `url`.
+In `redirect.html`, the URL the page redirects to, written in full if
+the site has a `url`.
 
 More: https://statac.dev/addresses/#redirect-page
 
 ## `title`
 
-In `redirect.html`, the redirecting page's `title`, or else the name of
-the page it redirects to. In `link.html` and `image.html`, the title
-written after the URL, and in `callout.html`, the callout's title: empty
-where none is written.
+In `redirect.html`, the redirecting page's `title`, or if it has none,
+the name of the page it redirects to. In `link.html` and `image.html`,
+the title written after the URL. In `callout.html`, the callout's title.
+In these three, it is empty if no title is written.
 
 More: https://statac.dev/addresses/#redirect-page
 
 ## `standalone`
 
-In a snippet called from the content, `true` where the call is on a line
-of its own, and `false` where it is inside a sentence.
+In a snippet called from the content, `true` if the call is on a line of
+its own, and `false` if it is inside a sentence.
 
 More: https://statac.dev/snippets/#handed
 
 ## `body`
 
 In a snippet, the content a call wraps, built into HTML. In a file in
-`snippets/markdown/`, what the piece holds, built into HTML: a heading's
-or a link's words, a code block's code, or a callout's content.
+`snippets/markdown/`, what is inside the piece, built into HTML: a
+heading's or a link's words, a code block's code, or a callout's
+content.
 
 More: https://statac.dev/snippets/#handed
 
 ## `lines`
 
-In a snippet, the lines of the content a call wraps. Only a call in a
-template can hand it yet.
+In a snippet, the lines of the content a call wraps. For now, only a
+call in a template can hand a snippet `lines`.
 
 More: https://statac.dev/snippets/#handed
 
@@ -127,8 +128,8 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 ## `classes`
 
 In `heading.html` and `table.html`, the classes written in braces at the
-end of the heading or the table, separated by spaces. Empty where none
-are written.
+end of the heading or the table, separated by spaces. Empty if none are
+written.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
@@ -140,8 +141,8 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `external`
 
-In `link.html`, `true` where the link leads to another site: its host is
-neither the one in the site's `url` nor one in `other_hosts`.
+In `link.html`, `true` if the link leads to another site, which means its
+host is neither the one in the site's `url` nor one in `other_hosts`.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
@@ -154,22 +155,22 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `width`
 
-In `image.html`, the image's width in pixels, where its size is known.
-Empty where it isn't.
+In `image.html`, the image's width in pixels. Empty if Statac doesn't
+know the image's size.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `height`
 
-In `image.html`, the image's height in pixels, where its size is known.
-Empty where it isn't.
+In `image.html`, the image's height in pixels. Empty if Statac doesn't
+know the image's size.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `image`
 
-In `image.html`, the image as `page.image` gives it, where the URL names
-a file in the site. Empty where it doesn't.
+In `image.html`, if the URL names a file in the site, that image, with
+the same values as an image from `page.image`. Empty if it doesn't.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
@@ -181,16 +182,17 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `language`
 
-In `code.html`, the first word after the opening fence, or the language
-a file's name there stands for. Empty where the fence names none.
+In `code.html`, the first word after the opening fence, or if a file's
+name is there, the language its name stands for. Empty if the fence
+names neither.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `caption`
 
 In `code.html`, the rest of the opening fence's line after the language,
-or the whole line where it opens with a file's name. Empty where there
-is nothing more.
+or the whole line if it starts with a file's name. Empty if there is
+nothing more.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 
@@ -244,7 +246,7 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 ## `rows`
 
-In `table.html`, every other row, each a list of cells with their `body`
-and their column's `align`.
+In `table.html`, every row after the heading row, each a list of cells
+with their `body` and their column's `align`.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing

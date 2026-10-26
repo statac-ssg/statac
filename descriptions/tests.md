@@ -1,19 +1,19 @@
 # Tests
 
-Each test a template can write after `is`, as `{% if page.title is
-defined %}`, or hand `select` and `reject` by name: those of the template
-engine. `is not` turns a test round.
+Each test a template can write after `is`, such as
+`{% if page.title is defined %}`, or name in `select` and `reject`. They
+are the template engine's. `is not` reverses a test.
 
 ## `defined`
 
-Whether the value is set, such as a field some pages lack. Asking never
-stops the build, where reading a value that isn't set does.
+Whether the value is set, such as a field some pages don't have. Testing
+it never stops the build, but reading a value that isn't set does.
 
 More: https://statac.dev/templates/#no-value
 
 ## `undefined`
 
-Whether the value isn't set: `defined` turned round.
+Whether the value isn't set: the opposite of `defined`.
 
 More: https://statac.dev/templates/#no-value
 
@@ -23,12 +23,12 @@ Whether the value is `none`.
 
 ## `true`
 
-Whether the value is `true` itself, not merely a value an `if` takes as
+Whether the value is `true` itself, not only a value an `if` treats as
 true, such as text with something in it.
 
 ## `false`
 
-Whether the value is `false` itself, not merely a value an `if` takes as
+Whether the value is `false` itself, not only a value an `if` treats as
 false, such as empty text or `0`.
 
 ## `boolean`
@@ -62,7 +62,8 @@ Whether the value is a list.
 
 ## `mapping`
 
-Whether the value is a table of names and values, as `{"name": "value"}`.
+Whether the value is a table of names and values, such as
+`{"name": "value"}`.
 
 ## `iterable`
 
@@ -143,8 +144,8 @@ Whether the text has letters only in upper case.
 
 ## `safe`
 
-Whether the text is marked as HTML to write as it is, as `safe` and
-`markdown` mark it.
+Whether the text is marked as HTML to write into the page unchanged.
+`safe` and `markdown` mark text this way.
 
 ## `escaped`
 
@@ -157,9 +158,8 @@ equal to it: two lists written alike are equal but not the same.
 
 ## `filter`
 
-Whether a filter of the name given is there to use: `"markdown" is
-filter`.
+Whether there is a filter with the name given: `"markdown" is filter`.
 
 ## `test`
 
-Whether a test of the name given is there to use.
+Whether there is a test with the name given.
