@@ -1,5 +1,5 @@
 use super::*;
-use crate::problem::{Expected, Found, Word, WordList};
+use crate::problem::{Expected, Found, Word, WordList, WrongPlace};
 use crate::testing::TempSite;
 use crate::yaml::{Node, Value as Yaml};
 
@@ -728,7 +728,7 @@ fn a_value_that_cant_be_read_is_refused_at_its_text() {
         (
             "monts: [a]\n",
             Kind::UnknownWord {
-                word: Word::Setting,
+                word: Word::Line,
                 written: "monts".into(),
                 nearest: Some("months".into()),
             },
@@ -742,10 +742,9 @@ fn a_value_that_cant_be_read_is_refused_at_its_text() {
         // How dates are written is Statac's own, which no site's file writes.
         (
             "dates:\n  long: d MMMM y\n",
-            Kind::UnknownWord {
-                word: Word::Setting,
-                written: "dates".into(),
-                nearest: None,
+            Kind::WrongPlace {
+                key: "dates".into(),
+                why: WrongPlace::LanguageFile,
             },
             "dates",
         ),

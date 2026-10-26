@@ -22,6 +22,11 @@ set. `after_build_outputs` says what `after_build` makes, and
 On a site that doesn't set the hook, either setting on its own has
 nothing to describe.
 
+A file in `languages/` can't have a `dates:` line. Statac takes how each
+language writes its dates from the Unicode CLDR, and a site's file can't
+change that. To choose how dates look on the site, write `date_format` in
+`statac.yaml`.
+
 ## What you'll see {#what-youll-see}
 
 ```text

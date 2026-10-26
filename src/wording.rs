@@ -391,6 +391,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 format!("Wrong place: `{key}` belongs in a folder's `index.md`")
             }
             WrongPlace::Item => format!("Wrong place: an item can't set `{key}`"),
+            WrongPlace::LanguageFile => format!("Wrong place: a language file can't set `{key}`"),
             WrongPlace::NoCommand(command) => {
                 format!("Wrong place: `{key}` is for a site that sets `{command}`")
             }
@@ -2022,6 +2023,7 @@ fn word_name(word: Word) -> &'static str {
         Word::Place => "place",
         Word::Card => "card",
         Word::Stamp => "stamp",
+        Word::Line => "line",
     }
 }
 
@@ -2805,6 +2807,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 Some(format!("Write `{bare}:` in `statac.yaml` instead."))
             }
             WrongPlace::Item => Some("Write it on a page in `content/` instead.".into()),
+            WrongPlace::LanguageFile => {
+                Some("Set how dates look with `date_format:` in `statac.yaml` instead.".into())
+            }
             WrongPlace::NoCommand(command) => Some(format!(
                 "Add the `{command}:` line it describes, or take it out."
             )),
@@ -8856,6 +8861,23 @@ mod tests {
                 },
                 "Wrong place: a page can't set `site.author`",
                 Some("Write `author:` in `statac.yaml` instead."),
+            ),
+            (
+                Kind::WrongPlace {
+                    key: "dates".into(),
+                    why: WrongPlace::LanguageFile,
+                },
+                "Wrong place: a language file can't set `dates`",
+                Some("Set how dates look with `date_format:` in `statac.yaml` instead."),
+            ),
+            (
+                Kind::UnknownWord {
+                    word: Word::Line,
+                    written: "monts".into(),
+                    nearest: Some("months".into()),
+                },
+                "Unknown line: `monts`",
+                Some("Did you mean `months`?"),
             ),
             (
                 unusable(AddressFault::UnknownPiece {

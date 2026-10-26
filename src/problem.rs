@@ -2345,6 +2345,8 @@ pub enum Word {
     Card,
     /// A word standing for a date in front matter, such as `=today`.
     Stamp,
+    /// A key of a language file, such as `months`.
+    Line,
 }
 
 /// What a name kept as the author's own is read as.
@@ -2437,6 +2439,8 @@ pub enum WrongPlace {
     /// A setting about one of the site's own commands, on a site that
     /// doesn't set the command, named by its setting.
     NoCommand(&'static str),
+    /// A key only Statac's own language files write, in a site's.
+    LanguageFile,
 }
 
 /// Words a language file gives that a page's writing is shown with.

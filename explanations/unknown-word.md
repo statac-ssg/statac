@@ -2,7 +2,7 @@
 
 Statac found a word it doesn't know in a place where it knows every word
 that can be written. That place is one of these: a setting under `tags.`
-or `series.`, a kind in a field declaration, a setting in a language file,
+or `series.`, a kind in a field declaration, a line in a language file,
 a time zone, a table in `data/` that `each:` refers to, a place on a card,
 a stamp in front matter such as `=tomorrow`, or a name in a template.
 

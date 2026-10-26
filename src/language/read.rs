@@ -2,7 +2,7 @@
 //! written.
 
 use crate::origin::Sourced;
-use crate::problem::{Expected, Found, Kind, Problem, Word, WordList};
+use crate::problem::{Expected, Found, Kind, Problem, Word, WordList, WrongPlace};
 use crate::source::{Place, SourceId, Sources, Span};
 use crate::value::{Reader, place_within};
 use crate::yaml::{Node, Resolved, Value as Yaml};
@@ -127,9 +127,16 @@ fn read_file(
             "dates" if statacs => file
                 .patterns(words.dates.take().unwrap_or_default())
                 .map(|p| words.dates = Some(p)),
+            "dates" => Err(vec![Problem::at(
+                Kind::WrongPlace {
+                    key: key.clone(),
+                    why: WrongPlace::LanguageFile,
+                },
+                entry.key.place,
+            )]),
             _ => Err(vec![Problem::at(
                 Kind::UnknownWord {
-                    word: Word::Setting,
+                    word: Word::Line,
                     written: key.clone(),
                     nearest: crate::suggest::nearest(&key, KEYS.iter().copied()).map(str::to_owned),
                 },
@@ -367,7 +374,7 @@ impl File<'_> {
                 _ => {
                     problems.push(Problem::at(
                         Kind::UnknownWord {
-                            word: Word::Setting,
+                            word: Word::Line,
                             written: key.clone(),
                             nearest: crate::suggest::nearest(&key, PATTERNS.iter().copied())
                                 .map(str::to_owned),
