@@ -2,7 +2,10 @@
 //! elsewhere, which `build` never fetches. The site is built in memory,
 //! drafts and posts waiting for their day with it, to learn what it asks
 //! for and lacks: the still of each video a page reads one for. Where the
-//! site stops only with them, it is built as `build` publishes it.
+//! site stops only with them, it is built as `build` publishes it. Where
+//! it stops only on values it has none of, as a layout reading a missing
+//! still unguarded does, the stills are fetched first and the site read
+//! again.
 //!
 //! Each file is written as it arrives, and the record once every fetch is
 //! done, whatever became of each. A fetch the other site answered it has
@@ -194,18 +197,50 @@ fn refresh(
             url: None,
         })
     };
-    let mut outcome = read(true);
     // Where only what isn't published yet stops the site, what is
     // published still gets its stills.
-    let mut left_out = 0;
-    if outcome.stopped() {
-        let published = read(false);
-        if !published.stopped() {
-            left_out = (outcome.problems.iter())
-                .filter(|problem| problem.kind.severity() == Severity::Error)
-                .count();
-            outcome = published;
+    let settle = || {
+        let outcome = read(true);
+        if outcome.stopped() {
+            let published = read(false);
+            if !published.stopped() {
+                let left_out = (outcome.problems.iter())
+                    .filter(|problem| problem.kind.severity() == Severity::Error)
+                    .count();
+                return (published, left_out);
+            }
         }
+        (outcome, 0)
+    };
+    let (mut outcome, mut left_out) = settle();
+    // A template reading a still the site lacks stops it on the value it
+    // has none of, so where only such values stop the site, the stills it
+    // asks for are fetched first and the site read again.
+    let mut tried: Vec<String> = Vec::new();
+    let mut code = 0;
+    let errors =
+        || (outcome.problems.iter()).filter(|problem| problem.kind.severity() == Severity::Error);
+    if outcome.stopped()
+        && errors().all(|problem| problem.kind.code() == crate::problem::Code::NoValue)
+        && let (Some(site), Some(today)) = (outcome.site(), outcome.today())
+        && let missing = missing_stills(&outcome.problems)
+        && !missing.is_empty()
+    {
+        let report = Report::new(outcome.sources(), &options.site, colour);
+        let folder = options.site.join(kept::FOLDER);
+        let mut record = site.fetched.record.clone();
+        let mut standing = standing_of(site);
+        let here = stills_here(&outcome, site);
+        let keeping = (folder.as_path(), &mut record, &mut standing, today);
+        let (fetched, failed) = fetch_stills(&missing, fetcher, keeping, &report, say);
+        if let Err(error) = keep_record(&folder, &site.fetched.record, &record, &standing) {
+            say(&unwritten(&report, &kept::record_shown(), &error));
+            return 1;
+        }
+        say(&format!("{}\n", wording::refreshed(fetched, here, failed)));
+        code = u8::from(failed > 0);
+        tried = missing.into_iter().map(|(path, ..)| path).collect();
+        (outcome, left_out) = settle();
     }
     let report = Report::new(outcome.sources(), &options.site, colour);
     let (Some(site), Some(today), false) = (outcome.site(), outcome.today(), outcome.stopped())
@@ -213,16 +248,9 @@ fn refresh(
         say(&report.check(&outcome.problems, &outcome.quiet));
         return 1;
     };
-    let mut missing: Vec<(String, Host, &str)> = (outcome.problems.iter())
-        .filter_map(|problem| match &problem.kind {
-            Kind::NoThumbnail {
-                host,
-                id,
-                absent: false,
-            } => Some((host.still(id), *host, id.as_str())),
-            _ => None,
-        })
-        .collect();
+    let mut missing = missing_stills(&outcome.problems);
+    missing.retain(|(path, ..)| !tried.contains(path));
+    let nothing_said = nothing_said && tried.is_empty();
     let drafts_left_out = |say: &mut dyn FnMut(&str)| {
         if left_out > 0 {
             say(&format!(
@@ -246,10 +274,8 @@ fn refresh(
     let url = url.filter(|_| webmentions);
     let folder = options.site.join(kept::FOLDER);
     let mut record = site.fetched.record.clone();
-    let mut standing: HashSet<String> = (site.fetched.files.iter())
-        .map(|(path, _)| path.clone())
-        .collect();
-    let mut code = remove_refused(
+    let mut standing = standing_of(site);
+    code |= remove_refused(
         &folder,
         &site.mentions,
         (&mut record, &mut standing, today),
@@ -267,52 +293,10 @@ fn refresh(
         }
         return code;
     }
-    missing.sort_unstable();
-    missing.dedup();
     let stills_missing = !missing.is_empty();
-    let here = outcome
-        .record
-        .keys()
-        .filter(|key| match key {
-            Key::Picture(id) => {
-                let picture = site.pictures.get(*id);
-                picture.root == crate::album::Root::Fetched
-                    && picture.path.starts_with(&format!("{}/", stills::FOLDER))
-            }
-            _ => false,
-        })
-        .count();
-
-    let (mut fetched, mut failed) = (0, 0);
-    for (_, host, id) in missing {
-        let path = stills::path(host, id);
-        let file = format!("{}/{path}", kept::FOLDER);
-        match still(fetcher, host, id) {
-            Ok(bytes) => match keep(&folder, &path, &bytes) {
-                Ok(()) => {
-                    let held = Held::Hash(kept::hash_of(&bytes));
-                    record.set(&path, Line { held, day: today });
-                    standing.insert(path);
-                    fetched += 1;
-                    say(&format!("{}\n", shown(&wording::fetched_file(&file))));
-                }
-                Err(error) => {
-                    failed += 1;
-                    say(&unwritten(&report, &file, &error));
-                }
-            },
-            Err(Unfetched::Absent) => {
-                let held = Held::Absent;
-                record.set(&path, Line { held, day: today });
-                say(&format!("{}\n", wording::no_still_there(host.site(), id)));
-            }
-            Err(Unfetched::Failed(reason)) => {
-                failed += 1;
-                let line = wording::cant_fetch_still(id, &reason);
-                say(&format!("{}\n", shown(&line)));
-            }
-        }
-    }
+    let here = stills_here(&outcome, site);
+    let keeping = (folder.as_path(), &mut record, &mut standing, today);
+    let (fetched, failed) = fetch_stills(&missing, fetcher, keeping, &report, say);
     code |= u8::from(failed > 0);
     if stills_missing {
         say(&format!("{}\n", wording::refreshed(fetched, here, failed)));
@@ -349,6 +333,90 @@ fn refresh(
     }
     drafts_left_out(say);
     code
+}
+
+/// The stills the site's pages read and the site lacks, each by its path
+/// in `fetched/`, and not yet answered as absent.
+fn missing_stills(problems: &[Problem]) -> Vec<(String, Host, String)> {
+    let mut missing: Vec<(String, Host, String)> = (problems.iter())
+        .filter_map(|problem| match &problem.kind {
+            Kind::NoThumbnail {
+                host,
+                id,
+                absent: false,
+            } => Some((host.still(id), *host, id.clone())),
+            _ => None,
+        })
+        .collect();
+    missing.sort_unstable();
+    missing.dedup();
+    missing
+}
+
+/// The paths of the files in `fetched/` that are there.
+fn standing_of(site: &crate::site::Site) -> HashSet<String> {
+    (site.fetched.files.iter())
+        .map(|(path, _)| path.clone())
+        .collect()
+}
+
+/// How many stills the site built as `outcome` read that it already has.
+fn stills_here(outcome: &build::Outcome, site: &crate::site::Site) -> usize {
+    outcome
+        .record
+        .keys()
+        .filter(|key| match key {
+            Key::Picture(id) => {
+                let picture = site.pictures.get(*id);
+                picture.root == crate::album::Root::Fetched
+                    && picture.path.starts_with(&format!("{}/", stills::FOLDER))
+            }
+            _ => false,
+        })
+        .count()
+}
+
+/// Fetches each of `missing` into `folder`, recording what became of it,
+/// and says each: how many were fetched, and how many couldn't be.
+fn fetch_stills(
+    missing: &[(String, Host, String)],
+    fetcher: &dyn Fetch,
+    (folder, record, standing, today): (&Path, &mut Record, &mut HashSet<String>, Date),
+    report: &Report,
+    say: &mut dyn FnMut(&str),
+) -> (usize, usize) {
+    let (mut fetched, mut failed) = (0, 0);
+    for (_, host, id) in missing {
+        let (host, id) = (*host, id.as_str());
+        let path = stills::path(host, id);
+        let file = format!("{}/{path}", kept::FOLDER);
+        match still(fetcher, host, id) {
+            Ok(bytes) => match keep(folder, &path, &bytes) {
+                Ok(()) => {
+                    let held = Held::Hash(kept::hash_of(&bytes));
+                    record.set(&path, Line { held, day: today });
+                    standing.insert(path);
+                    fetched += 1;
+                    say(&format!("{}\n", shown(&wording::fetched_file(&file))));
+                }
+                Err(error) => {
+                    failed += 1;
+                    say(&unwritten(report, &file, &error));
+                }
+            },
+            Err(Unfetched::Absent) => {
+                let held = Held::Absent;
+                record.set(&path, Line { held, day: today });
+                say(&format!("{}\n", wording::no_still_there(host.site(), id)));
+            }
+            Err(Unfetched::Failed(reason)) => {
+                failed += 1;
+                let line = wording::cant_fetch_still(id, &reason);
+                say(&format!("{}\n", shown(&line)));
+            }
+        }
+    }
+    (fetched, failed)
 }
 
 /// Removes the file of each mention `refuse_webmentions_from` refuses,

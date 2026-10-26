@@ -543,6 +543,58 @@ fn a_site_with_an_error_is_told_as_check_tells_it_and_nothing_is_fetched() {
     );
 }
 
+/// A layout reading a still the site lacks, unguarded, stops the site on
+/// it, so refresh fetches the still before it reads the site again.
+#[test]
+fn a_site_stopped_only_by_a_still_it_lacks_gets_the_still() {
+    let site = Site::new("stopped-by-still");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\nlayout: video\n---\n",
+    );
+    site.write(
+        "templates/video.html",
+        "{% set v = page.youtube(\"abcdefghijk\") %}<img src=\"{{ v.thumbnail.src }}\" alt=\"\">",
+    );
+    let (said, code) = site.run("build", "2026-10-06");
+    assert_eq!(code, Some(1), "{said}");
+    let still = jpeg(64, 36);
+    let (said, code, asked) = site.refresh(&|address| answer(address, &still));
+    assert_eq!(
+        said,
+        "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n"
+    );
+    assert_eq!(code, 0);
+    assert_eq!(asked, [MAXRES]);
+    let (said, code) = site.run("build", "2026-10-06");
+    assert_eq!(code, Some(0), "{said}");
+
+    // A video with no still stays without one, and what stops the site is
+    // told as check tells it.
+    let site = Site::new("stopped-by-absent-still");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\nlayout: video\n---\n",
+    );
+    site.write(
+        "templates/video.html",
+        "{% set v = page.youtube(\"abcdefghijk\") %}<img src=\"{{ v.thumbnail.src }}\" alt=\"\">",
+    );
+    let (said, code, asked) = site.refresh(&|_| missing());
+    assert_eq!(code, 1);
+    assert_eq!(asked.len(), 2, "{asked:?}");
+    assert!(
+        said.contains("error  No value: nothing is set for `v.thumbnail`"),
+        "{said}"
+    );
+    let (again, _, asked) = site.refresh(&|_| panic!("nothing is asked for"));
+    assert!(asked.is_empty());
+    assert!(
+        again.contains("error  No value: nothing is set for `v.thumbnail`"),
+        "{again}"
+    );
+}
+
 #[test]
 fn a_site_only_a_draft_stops_gets_the_stills_of_what_it_publishes() {
     let site = Site::with_a_video("draft-error");
