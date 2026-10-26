@@ -18,13 +18,13 @@ The URL the page is published at, starting with `/`, such as
 `/posts/post-1/`. If the site's `url` has a path, such as
 `https://example.org/blog/`, the URL starts with that path, `/blog/`.
 
-More: https://statac.dev/addresses/#made
+More: https://statac.dev/urls/#made
 
 ## `slug`
 
 The last part of the page's URL: `post-1` for `/posts/post-1/`.
 
-More: https://statac.dev/addresses/#name
+More: https://statac.dev/urls/#name
 
 ## `date`
 
@@ -197,14 +197,14 @@ has no `source`.
 The page's name where it is shared: its `og_title`, or if it has none,
 `headline(page)`.
 
-More: https://statac.dev/sharing-cards/#in-a-layout
+More: https://statac.dev/social-cards/#in-a-layout
 
 ## `card`
 
 The social card Statac draws for the page, with its `url`, `width`,
 `height` and `alt`. If the page has no card, `card` has no value.
 
-More: https://statac.dev/sharing-cards/#in-a-layout
+More: https://statac.dev/social-cards/#in-a-layout
 
 ## `webmentions`
 
@@ -230,7 +230,7 @@ Called as `page.image("photo-1.jpg")`, an image beside the page, with
 needs. The call also takes `sizes`, `full=true` and
 `decorative=true`.
 
-More: https://statac.dev/pictures/#pictures-in-templates-and-snippets
+More: https://statac.dev/images/#pictures-in-templates-and-snippets
 
 ## `images`
 
@@ -240,7 +240,7 @@ as `page.images()`, every JPEG, PNG and WebP beside a page that has a
 folder of its own, in file name order. Animated images and other kinds,
 such as GIFs and SVGs, are left out.
 
-More: https://statac.dev/pictures/#pictures-in-templates-and-snippets
+More: https://statac.dev/images/#pictures-in-templates-and-snippets
 
 ## `file`
 
@@ -310,19 +310,19 @@ More: https://statac.dev/templates/#which
 The page's `permalink`, as written: a URL or a pattern. `page.url` is
 where the page is published.
 
-More: https://statac.dev/addresses/#permalink
+More: https://statac.dev/urls/#permalink
 
 ## `redirect_from`
 
 The old URLs the page's `redirect_from` lists, as written.
 
-More: https://statac.dev/addresses/#redirect-from
+More: https://statac.dev/urls/#redirect-from
 
 ## `redirect_to`
 
 The URL the page's `redirect_to` names, as written.
 
-More: https://statac.dev/addresses/#sending-readers-on
+More: https://statac.dev/urls/#sending-readers-on
 
 ## `needs`
 
@@ -401,7 +401,7 @@ More: https://statac.dev/search/#leave-out
 The page's `og_image`, as written: the social image used in place of a
 card.
 
-More: https://statac.dev/sharing-cards/#a-picture-of-your-own
+More: https://statac.dev/social-cards/#a-picture-of-your-own
 
 ## `mentions`
 

@@ -79,7 +79,7 @@ More: https://statac.dev/feeds/#the-template
 In `redirect.html`, the URL the page redirects to, written in full if
 the site has a `url`.
 
-More: https://statac.dev/addresses/#redirect-page
+More: https://statac.dev/urls/#redirect-page
 
 ## `title`
 
@@ -88,7 +88,7 @@ the name of the page it redirects to. In `link.html` and `image.html`,
 the title written after the URL. In `callout.html`, the callout's title.
 In these three, it is empty if no title is written.
 
-More: https://statac.dev/addresses/#redirect-page
+More: https://statac.dev/urls/#redirect-page
 
 ## `standalone`
 

@@ -132,21 +132,21 @@ More: https://statac.dev/lists/#tags
 The widest resized copy Statac makes of an image, in pixels: a whole
 number, 1 or more. The default is `1600`.
 
-More: https://statac.dev/pictures/#a-photographs-copies
+More: https://statac.dev/images/#a-photographs-copies
 
 ## `image_sizes`
 
 How wide the browser shows images on the page, written as the `sizes` of
 an `<img>`. The default is `(max-width: 46rem) 100vw, 46rem`.
 
-More: https://statac.dev/pictures/#what-is-written-for-a-picture
+More: https://statac.dev/images/#what-is-written-for-a-picture
 
 ## `optimise_images`
 
 `false` stops Statac making resized copies of images, so it publishes
 each image unchanged. The default is `true`.
 
-More: https://statac.dev/pictures/#settings
+More: https://statac.dev/images/#settings
 
 ## `feed`
 
@@ -278,7 +278,7 @@ as `drafts`, wherever it is, or a path from `content/`, such as
 `blog/one.md`. Setting it replaces the whole default list, which is
 `.DS_Store`, `Thumbs.db` and `desktop.ini`.
 
-More: https://statac.dev/addresses/#files
+More: https://statac.dev/urls/#files
 
 ## `pages.<field>`
 

@@ -34,7 +34,7 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old URLs there: 6 are published or redirected.
 
-- The site is under a path, `/blog`, as its `url` says, so every URL starts with it, and links in the content were written with it: see https://statac.dev/addresses/.
+- The site is under a path, `/blog`, as its `url` says, so every URL starts with it, and links in the content were written with it: see https://statac.dev/urls/.
 
 Each URL was also looked for in the old site's own built output, `public/`.
 

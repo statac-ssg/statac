@@ -34,7 +34,7 @@ anything after `?` or `#`. On a site at `https://example.org/blog/`,
 domain, `/about/`. A link written without it is left as written. In the
 content, `@url(/about/)` does the same.
 
-More: https://statac.dev/addresses/#a-site-in-a-folder-of-its-domain
+More: https://statac.dev/urls/#a-site-in-a-folder-of-its-domain
 
 ## `headline`
 

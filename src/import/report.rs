@@ -513,7 +513,7 @@ fn addresses(text: &mut String, summary: &Summary) {
     if !summary.base.is_empty() {
         ways.push(format!(
             "The site is under a path, {}, as its `url` says, so every URL starts with it, and \
-             links in the content were written with it: see https://statac.dev/addresses/.",
+             links in the content were written with it: see https://statac.dev/urls/.",
             code(&summary.base)
         ));
     }
@@ -602,7 +602,7 @@ fn unanswered(text: &mut String, summary: &Summary) {
         text.push_str(
             " An image's own file is published where a page links to it, or where its sidecar \
              file, such as `photo-1.jpg.yaml`, holds `optimise: false`; `optimise_images: false` \
-             in `statac.yaml` leaves every image as it is: see https://statac.dev/pictures/.\n\n",
+             in `statac.yaml` leaves every image as it is: see https://statac.dev/images/.\n\n",
         );
     }
     if !kept.files.is_empty() {

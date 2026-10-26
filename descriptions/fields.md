@@ -70,20 +70,20 @@ More: https://statac.dev/templates/#which
 
 The page's URL, or a pattern such as `/{year}/{slug}/`.
 
-More: https://statac.dev/addresses/#permalink
+More: https://statac.dev/urls/#permalink
 
 ## `redirect_from`
 
 Old URLs of the page. Each one redirects to it.
 
-More: https://statac.dev/addresses/#redirect-from
+More: https://statac.dev/urls/#redirect-from
 
 ## `redirect_to`
 
 The URL the page redirects to. Statac publishes nothing else for the
 page.
 
-More: https://statac.dev/addresses/#sending-readers-on
+More: https://statac.dev/urls/#sending-readers-on
 
 ## `needs`
 
@@ -198,19 +198,19 @@ More: https://statac.dev/search/#leave-out
 Which of the site's social cards Statac draws for the page, if the site
 has cards turned on.
 
-More: https://statac.dev/sharing-cards/#other-cards
+More: https://statac.dev/social-cards/#other-cards
 
 ## `og_image`
 
 The page's social image, in place of a card.
 
-More: https://statac.dev/sharing-cards/#a-picture-of-your-own
+More: https://statac.dev/social-cards/#a-picture-of-your-own
 
 ## `og_title`
 
 The page's title on a card and in a link preview.
 
-More: https://statac.dev/sharing-cards/#what-a-preview-says
+More: https://statac.dev/social-cards/#what-a-preview-says
 
 ## `mentions`
 
