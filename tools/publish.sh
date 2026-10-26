@@ -8,7 +8,8 @@
 # the release workflow never has. It publishes only packages built from the
 # commit the tag v<version> names on main, and never replaces a version
 # already published. The version's files go to v<version>/, then
-# latest/SHA256SUMS names it as the newest release.
+# latest/SHA256SUMS names it as the newest release, and the install script
+# as tagged goes to the top.
 set -eu
 
 zone=statac-get
@@ -66,6 +67,12 @@ done
 bunny storage files upload SHA256SUMS -z "$zone" --to "latest/" --checksum >/dev/null ||
     stop "Couldn't update latest/SHA256SUMS." "v$version/ is published, but latest/ still names the release before."
 echo "latest/ names $version"
+
+# The script that installs it, which get.statac.dev serves at its top.
+git -C "$root" show "v$version:tools/install.sh" >"$folder/install.sh"
+bunny storage files upload "$folder/install.sh" -z "$zone" --to "/" --checksum >/dev/null ||
+    stop "Couldn't upload install.sh." "v$version/ is published and latest/ names it."
+echo "published install.sh"
 
 curl -fsS "$served/v$version/SHA256SUMS" | cmp -s - SHA256SUMS ||
     stop "What $served serves for v$version/SHA256SUMS isn't what was published."

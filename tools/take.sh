@@ -69,10 +69,11 @@ echo "$commit" >COMMIT
 # The install script, given these packages laid out as a release's.
 tried=$(mktemp -d)
 trap 'rm -rf "$tried"' EXIT
-mkdir -p "$tried/releases/latest/download" "$tried/releases/download/v$version"
-cp SHA256SUMS "$tried/releases/latest/download/"
-cp SHA256SUMS statac-* "$tried/releases/download/v$version/"
-STATAC_RELEASES="file://$tried/releases" sh "$root/tools/install.sh" --to "$tried/installed" >/dev/null
+mkdir -p "$tried/releases/latest" "$tried/releases/v$version"
+cp SHA256SUMS "$tried/releases/latest/"
+cp SHA256SUMS statac-* "$tried/releases/v$version/"
+STATAC_RELEASES="file://$tried/releases" XDG_DATA_HOME="$tried/share" \
+    sh "$root/tools/install.sh" --to "$tried/installed" >/dev/null
 said=$("$tried/installed/statac" --version)
 [ "$said" = "Statac $version" ] ||
     stop "The installed package says \`$said\`, not \`Statac $version\`."

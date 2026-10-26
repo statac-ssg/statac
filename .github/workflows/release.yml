@@ -196,9 +196,9 @@ jobs:
       - env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          mkdir -p releases/latest/download "releases/download/v$VERSION"
-          cp packages/SHA256SUMS releases/latest/download/
-          cp packages/* "releases/download/v$VERSION/"
+          mkdir -p releases/latest "releases/v$VERSION"
+          cp packages/SHA256SUMS releases/latest/
+          cp packages/* "releases/v$VERSION/"
           STATAC_RELEASES="file://$PWD/releases" sh tools/install.sh --to "$PWD/installed"
           test "$(installed/statac --version)" = "Statac $VERSION"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

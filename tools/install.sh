@@ -10,7 +10,8 @@
 # It asks for no password and changes no file of the shell's.
 set -eu
 
-releases=${STATAC_RELEASES:-https://github.com/statac-ssg/statac/releases}
+# Each release is in v<version>/ there, and latest/ names the newest.
+releases=${STATAC_RELEASES:-https://get.statac.dev}
 
 stop() {
     echo "$1" >&2
@@ -90,12 +91,12 @@ main() {
     trap 'rm -rf "$work"' EXIT
 
     if [ -n "$version" ]; then
-        sums=$releases/download/v$version/SHA256SUMS
+        sums=$releases/v$version/SHA256SUMS
         fetch "$sums" "$work/SHA256SUMS" ||
             stop "Can't download $sums" \
-                "Is $version a release? They are listed at $releases"
+                "Is $version a release? They are listed in https://github.com/statac-ssg/statac/blob/main/CHANGELOG.md"
     else
-        sums=$releases/latest/download/SHA256SUMS
+        sums=$releases/latest/SHA256SUMS
         fetch "$sums" "$work/SHA256SUMS" || stop "Can't download $sums"
     fi
 
@@ -111,7 +112,7 @@ main() {
     version=${version%-"$target"}
 
     echo "Downloading Statac $version ($target)"
-    address=$releases/download/v$version/$package
+    address=$releases/v$version/$package
     fetch "$address" "$work/$package" || stop "Can't download $address"
 
     found=$(sha256 "$work/$package")
