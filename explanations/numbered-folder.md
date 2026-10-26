@@ -16,10 +16,10 @@ note  Numbered folder: `content/days/` is ordered by the number each name opens 
 
 In a numbered folder, the numbers set the order. The folder's list
 includes every page in it, dated or not, in order of their numbers. The
-numbers are left out of the URLs, so `03-day-three.md` is published at
-`/day-three/`, and renumbering a page never changes its URL. Only
-the first number sets the order, so `07-50-notes.md` is published at
-`/50-notes/`.
+numbers are left out of the URLs, so `content/days/03-day-three.md` is
+published at `/days/day-three/`, and renumbering a page never changes its
+URL. Only the first number sets the order, so `content/days/07-50-notes.md`
+is published at `/days/50-notes/`.
 
 A page in the folder that has a date is still a post everywhere else.
 The site's list, its tags and its series still sort it by date.

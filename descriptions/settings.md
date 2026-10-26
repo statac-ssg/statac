@@ -155,8 +155,10 @@ More: https://statac.dev/settings/#feeds
 
 ## `feed_key`
 
-What each post's id in a feed is made from. `statac new` writes a new
-one. Once a feed is published, never change it.
+What each post's id in a feed is made from. If a list asks for a feed
+and there is no key, the build stops and offers a newly made one.
+`statac import` writes one for a site whose feeds come across with it.
+Once a feed is published, never change it.
 
 More: https://statac.dev/settings/#feeds
 

@@ -240,8 +240,9 @@ More: https://statac.dev/templates/#files
 
 Called as `page.images(["photo-1.jpg", "photo-2.jpg"])`, the images
 named, in that order, each as `page.image` gives it. Called as
-`page.images()`, every image beside a page that has a folder of its own,
-in file name order.
+`page.images()`, every JPEG, PNG and WebP beside a page that has a
+folder of its own, in file name order. Animated images and other kinds,
+such as GIFs and SVGs, are left out.
 
 More: https://statac.dev/templates/#files
 
