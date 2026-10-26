@@ -2828,6 +2828,41 @@ fn hugos_page_listing_a_list_of_terms_no_page_uses_is_told_as_a_list() {
     assert!(!report.contains("/categories/"), "{report}");
 }
 
+/// A Hugo site in several languages whose settings title only each
+/// language is titled by its main language's, as Hugo titles it, and each
+/// other language keeps its own; nothing is said of a missing title.
+#[test]
+fn a_hugo_site_titled_only_by_its_languages_takes_the_main_ones_title() {
+    let top = scratch("hugo-language-titles");
+    let old = top.join("old");
+    let post = "---\ntitle: Post 1\ndate: 2026-01-01\n---\nText.\n";
+    let files = [
+        (
+            "hugo.toml",
+            "baseURL = \"https://example.org/\"\ndefaultContentLanguage = \"en\"\n\
+             [languages.en]\ntitle = \"Site\"\nweight = 1\n\
+             [languages.fr]\ntitle = \"Le site\"\nweight = 2\n",
+        ),
+        ("content/posts/post-1.md", post),
+        ("content/posts/post-1.fr.md", post),
+    ];
+    for (path, text) in files {
+        let path = old.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    let new = top.join("new");
+    let (code, told) = import(&old, &new, None);
+    assert_eq!(code, 0, "{told}");
+    let written = fs::read_to_string(new.join("statac.yaml")).unwrap();
+    assert!(written.starts_with("title: Site\n"), "{written}");
+    assert!(written.contains("\nfr.title: Le site\n"), "{written}");
+    assert!(!written.contains("en.title"), "{written}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(!report.contains("The settings give no `title`"), "{report}");
+    checked(&new);
+}
+
 /// An empty `title` in the old settings is no title, in each tool's
 /// settings: the new site's is made from the old folder's name, and the
 /// report says so.

@@ -366,13 +366,27 @@ impl Reader<'_> {
     /// and zone, the author's own values, and what is said of each.
     fn settled(&mut self) {
         let s = &self.s;
-        self.import.title = s.title.clone();
+        let mut declared = s.languages.clone();
+        declared.sort_by(|a, b| a.weight.cmp(&b.weight).then_with(|| a.key.cmp(&b.key)));
+        let default = s
+            .default_language
+            .clone()
+            .or_else(|| declared.first().map(|l| l.key.clone()))
+            .unwrap_or_else(|| "en".to_owned());
+        // Hugo titles the site by its main language's title where the
+        // settings give none of their own.
+        let title = s.title.clone().or_else(|| {
+            (declared.iter())
+                .find(|language| language.key == default)
+                .and_then(|language| language.title.clone())
+        });
+        self.import.title = title.clone();
         self.import.maths = super::Maths {
             inline: s.maths.0,
             display: s.maths.1,
         };
         let mut notes = Vec::new();
-        if s.title.is_none() {
+        if title.is_none() {
             notes.push(super::report::NO_TITLE.to_owned());
         }
         match (&s.base_url, self.given) {
@@ -385,13 +399,6 @@ impl Reader<'_> {
                 url.as_deref().filter(|url| !url.trim().is_empty()),
             )),
         }
-        let mut declared = s.languages.clone();
-        declared.sort_by(|a, b| a.weight.cmp(&b.weight).then_with(|| a.key.cmp(&b.key)));
-        let default = s
-            .default_language
-            .clone()
-            .or_else(|| declared.first().map(|l| l.key.clone()))
-            .unwrap_or_else(|| "en".to_owned());
         if declared.len() > 1 {
             self.main = default.clone();
             self.languages = std::iter::once(default.clone())
@@ -418,13 +425,12 @@ impl Reader<'_> {
             }
             self.import.languages = self.languages.clone();
             for language in &declared {
-                if let Some(title) = &language.title
-                    && Some(title) != s.title.as_ref()
+                if let Some(own) = &language.title
+                    && Some(own) != title.as_ref()
                 {
-                    self.import.settings.push((
-                        format!("{}.title", language.key),
-                        Value::Text(title.clone()),
-                    ));
+                    self.import
+                        .settings
+                        .push((format!("{}.title", language.key), Value::Text(own.clone())));
                 }
             }
             notes.push(format!(
