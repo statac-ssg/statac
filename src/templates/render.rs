@@ -21,14 +21,13 @@ use crate::config::Settings;
 use crate::config::words::PageWord;
 use crate::dates::Dates;
 use crate::highlight::{self, Highlighter, Language};
+use crate::ids::{Id, LanguageId, ListId, NameId, Names, PageId, PictureId, TemplateId};
 use crate::markdown::{self, Piece, PieceValue, Placement, Within};
 use crate::problem::{
     ArgumentFault, Kind, Named, NamedFeed, Problem, Relation, ShownBy, ShownWords, Stopped, Word,
 };
 use crate::reads::{Asked, Key, Reads};
-use crate::site::{
-    Id, LanguageId, ListId, NameId, Names, PageId, PictureId, Redirect, SentTo, Site, TemplateId,
-};
+use crate::site::{Redirect, SentTo, Site};
 use crate::source::{Place, SourceId, Sources, Span};
 
 /// Everything a page is built from, shared by every page built.

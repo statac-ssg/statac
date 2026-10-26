@@ -14,8 +14,9 @@ use rayon::prelude::*;
 use super::complete::template::{Pointed, pointed};
 use super::hover::Goes;
 use crate::address;
+use crate::ids::PageId;
 use crate::links;
-use crate::site::{PageId, SentTo};
+use crate::site::SentTo;
 use crate::source::{Place, Span};
 use crate::templates::Renderer;
 

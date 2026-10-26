@@ -17,10 +17,11 @@ use super::Templates;
 use super::files::{Role, template_path};
 use super::render::Shared;
 use crate::config::words::PageWord;
+use crate::ids::PageId;
 use crate::origin::{Arrival, Origin};
 use crate::problem::{Chooser, Kind, Problem};
 use crate::reads::Key;
-use crate::site::{Page, PageId, Site};
+use crate::site::{Page, Site};
 use crate::source::Sources;
 
 /// The template a page is built with, and where the choice came from.

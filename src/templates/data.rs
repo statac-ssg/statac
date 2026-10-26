@@ -11,8 +11,8 @@ use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
 use super::frame::{self, InData};
 use super::render::Shared;
 use crate::data::{Entry, Folder};
+use crate::ids::{DataId, Id};
 use crate::reads::Key;
-use crate::site::{DataId, Id};
 use crate::yaml::{Node, Resolved, Tag, Value as Yaml};
 
 /// `data/`, or a folder inside it.

@@ -22,14 +22,12 @@ use crate::config::words::{self, Holder, PageWord, Words};
 use crate::config::{self, Settings};
 use crate::date::{self, Date};
 use crate::dates::Dates;
+use crate::ids::{Id, LanguageId, ListId, PageId};
 use crate::origin::{Arrival, Origin, Sourced, Style};
 use crate::problem::{
     AddressFault, Held, Kind, Named, Problem, PublishedAsText, Requirer, Root, SetAside,
 };
-use crate::site::{
-    Id, Language, LanguageId, List, ListId, ListKey, Page, PageId, PagePlace, Redirect, SentTo,
-    Site, Travelling,
-};
+use crate::site::{Language, List, ListKey, Page, PagePlace, Redirect, SentTo, Site, Travelling};
 use crate::source::{Place, SourceId, Sources, Span};
 use crate::value::Value;
 use crate::yaml::Node;

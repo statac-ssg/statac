@@ -16,11 +16,11 @@ use rayon::prelude::*;
 
 use super::progress::{Counted, Making};
 use super::{KEPT, Picture, Pictures, Progress, kept_in, make_kept_in, quietly};
+use crate::ids::PictureId;
 use crate::pictures::{self, Error, Rendition, Unreadable};
 use crate::platform;
 use crate::problem::{Kind, PictureFault, Problem, Reason};
 use crate::publish::Staging;
-use crate::site::PictureId;
 use crate::source::Place;
 
 /// What making and publishing the copies came to.

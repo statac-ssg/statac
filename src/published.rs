@@ -22,8 +22,9 @@ use crate::config::Settings;
 use crate::config::words::PageWord;
 use crate::dates::Dates;
 use crate::feeds::Feed;
+use crate::ids::PageId;
 use crate::problem::{Kind, Named, Problem, Reason, RecordFault};
-use crate::site::{ListKey, Page, PageId, Site};
+use crate::site::{ListKey, Page, Site};
 use crate::source::{Place, Sources, Span};
 
 /// The file's name at the top of the site.

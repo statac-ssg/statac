@@ -1,6 +1,6 @@
 use super::super::{Read, Run, read};
+use crate::ids::{Id, PageId};
 use crate::problem::{Kind, Relation, Translated};
-use crate::site::{Id, PageId};
 use crate::testing::TempSite;
 
 fn site(files: &[(&str, &str)]) -> Read {

@@ -37,29 +37,13 @@ use crate::address::{Address, Top};
 use crate::config::Settings;
 use crate::config::words::{PageWord, Words};
 use crate::dates::Dates;
+use crate::ids::{Id, ListId, PageId};
 use crate::origin::{Arrival, Sourced};
 use crate::problem::{Kind, Problem, Word};
-use crate::site::{Id, List, ListId, ListKey, Page, PageId, PagePlace, Site};
+use crate::site::{List, ListKey, Order, Page, PagePlace, Site};
 use crate::slug;
 use crate::source::{Place, Sources, Span};
 use crate::value::Value;
-
-/// Which way a list's posts run.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Order {
-    NewestFirst,
-    OldestFirst,
-}
-
-impl Order {
-    /// The order as `order:` writes it.
-    pub fn word(self) -> &'static str {
-        match self {
-            Order::NewestFirst => "newest first",
-            Order::OldestFirst => "oldest first",
-        }
-    }
-}
 
 /// The two kinds of list a page names by writing them: tags and series.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]

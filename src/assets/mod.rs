@@ -26,11 +26,11 @@ use std::path::{Path, PathBuf};
 use rayon::prelude::*;
 
 use crate::html::escaped;
+use crate::ids::{Arena, AssetId};
 use crate::platform::{self, Alike, Unwritable};
 use crate::problem::{Hint, Kind, Named, Problem, Reach, Reason};
 use crate::publish::Staging;
 use crate::reads::{Key, Reads};
-use crate::site::{Arena, AssetId};
 use crate::source::{Place, Sources, Span};
 use crate::suggest;
 

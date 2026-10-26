@@ -5,8 +5,8 @@
 
 use std::path::PathBuf;
 
+use statac::ids::{Id, LanguageId};
 use statac::problem::Severity;
-use statac::site::{Id, LanguageId};
 
 #[test]
 #[ignore = "reads sites outside the repository, named by STATAC_SITES"]

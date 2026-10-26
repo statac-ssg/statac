@@ -37,9 +37,9 @@ pub(crate) use resolve::Site;
 pub(crate) use scan::{Attribute, Linked, handed, written, written_in_html};
 
 use crate::address::{self, Address};
+use crate::ids::{PageId, TemplateId};
 use crate::problem::{Kind, Problem};
 use crate::reads::{Key, Reads, Translation};
-use crate::site::{PageId, TemplateId};
 use crate::slug;
 use crate::source::Place;
 use crate::templates::{Own, Renderer};

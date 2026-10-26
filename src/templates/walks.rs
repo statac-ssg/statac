@@ -12,9 +12,9 @@ use minijinja::machinery::ast::{Expr, ForLoop, Stmt};
 
 use super::check::{full_span, parse_template};
 use super::render::Renderer;
+use crate::ids::{Id, TemplateId};
 use crate::problem::{Kind, Problem};
 use crate::reads::{Key, Reads};
-use crate::site::{Id, TemplateId};
 use crate::source::{Place, Span};
 
 /// How many pages of lists of the whole site the outputs running one loop

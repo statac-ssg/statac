@@ -21,8 +21,9 @@ mod tests;
 use std::collections::{HashMap, HashSet};
 
 use crate::config::words::PageWord;
+use crate::ids::{Id, LanguageId, PageId};
 use crate::problem::{Kind, Problem, Translated};
-use crate::site::{Id, Item, LanguageId, ListKey, PageId, PagePlace, Site};
+use crate::site::{Item, ListKey, PagePlace, Site};
 use crate::source::{Place, Sources};
 
 /// What a page is matched by in every language.

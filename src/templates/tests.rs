@@ -6,13 +6,13 @@ use std::sync::Mutex;
 
 use super::render::Rendered;
 use super::*;
+use crate::ids::{Id, LanguageId, PageId};
 use crate::origin::Arrival;
 use crate::problem::{
     ArgumentFault, Called, Chooser, Instead, Kind, Lack, Named, Needed, Relation, Stopped,
     TemplateFault, Unsupported, Word,
 };
 use crate::reads::Key;
-use crate::site::{Id, LanguageId, PageId};
 use crate::testing::TempSite;
 
 /// A site read and ready to build, with the problems reading it found.
@@ -197,7 +197,7 @@ fn a_page_is_built_through_its_layout_and_the_template_it_extends() {
     let site_list = built
         .renderer
         .site()
-        .own_list(crate::site::LanguageId::from_index(0))
+        .own_list(crate::ids::LanguageId::from_index(0))
         .unwrap();
     assert!(
         built
@@ -4907,7 +4907,7 @@ fn a_notes_way_back_says_where_it_goes_in_the_sites_language() {
         ),
         "{html}"
     );
-    let language = crate::site::LanguageId::from_index(0);
+    let language = crate::ids::LanguageId::from_index(0);
     assert!(
         built
             .render("post-1.md")

@@ -28,6 +28,7 @@ use crate::cards::keep::{Store, Wanted, kept_as};
 use crate::cards::layout::{self, FLOOR};
 use crate::cards::{self, Colour, HEIGHT, Placement, Size, WIDTH};
 use crate::config::words::{self, PageWord};
+use crate::ids::{Id, PageId, PictureId};
 use crate::origin::{Arrival, Sourced};
 use crate::pictures::{self, Kind as PictureKind};
 use crate::problem::{
@@ -35,7 +36,7 @@ use crate::problem::{
     Word,
 };
 use crate::reads::{Key, Reads};
-use crate::site::{Id, PageId, PictureId, Site};
+use crate::site::Site;
 use crate::source::{Place, SourceId, Sources, Span};
 
 /// What the engine's name for a card's text opens with, which no file's

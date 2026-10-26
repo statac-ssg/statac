@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use crate::site::{
+use crate::ids::{
     AssetId, DataId, LanguageId, ListId, NameId, OutputId, PageId, PictureId, TemplateId,
 };
 use crate::source::{Place, SourceId};
@@ -112,7 +112,7 @@ pub struct Translation {
     pub feeds: Vec<Option<usize>>,
 }
 
-fn carried<I: crate::site::Id>(over: &[Option<I>], id: I) -> Option<I> {
+fn carried<I: crate::ids::Id>(over: &[Option<I>], id: I) -> Option<I> {
     over.get(id.index()).copied().flatten()
 }
 
@@ -143,7 +143,7 @@ impl Translation {
 
     /// `key` as the later reading names it.
     pub fn key(&self, key: Key) -> Option<Key> {
-        use crate::site::Id;
+        use crate::ids::Id;
         let at = |over: &[Option<u32>], at: u32| over.get(at as usize).copied().flatten();
         Some(match key {
             Key::Field(page, name) => Key::Field(self.page(page)?, *self.names.get(name.index())?),
@@ -298,7 +298,7 @@ impl Asked {
     /// The same as the later reading `to` names it; none where it has
     /// nothing of a name or file asked.
     pub fn carried(&self, to: &Translation) -> Option<Asked> {
-        use crate::site::Id;
+        use crate::ids::Id;
         let name = |name: &NameId| to.names.get(name.index()).copied();
         let mut asked = Asked::default();
         for name in self.page.iter().map(name) {
@@ -382,7 +382,7 @@ impl Record {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::site::{Id, Names};
+    use crate::ids::{Id, Names};
 
     fn output(i: usize) -> OutputId {
         OutputId::from_index(i)

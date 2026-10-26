@@ -16,8 +16,9 @@ use spot::Spot;
 
 use crate::config::declarations::{Declarations, FieldKind, KIND_WORDS, Names};
 use crate::config::words::{Holder, PageWord};
+use crate::ids::{LanguageId, PageId};
 use crate::problem::Code;
-use crate::site::{LanguageId, ListKey, PageId, PagePlace};
+use crate::site::{ListKey, PagePlace};
 use crate::source::{Place, Sources, Span};
 use crate::templates::{Renderer, SNIPPETS, TEMPLATES};
 use crate::wording::{self, Described};

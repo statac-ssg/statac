@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use super::{File, Record, Weighed};
-use crate::site::PageId;
+use crate::ids::PageId;
 
 /// What search made in one build of a site, kept for the next, each by
 /// everything it is made from. The default keeps nothing, and everything

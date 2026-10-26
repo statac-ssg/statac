@@ -8,8 +8,9 @@ use rayon::prelude::*;
 
 use super::{Asked, Index, Record, fold, records, runs, spans, unspaced};
 use crate::date::Date;
+use crate::ids::{LanguageId, PageId};
 use crate::problem::{Expected, Found, Kind, Problem, Severity};
-use crate::site::{Language, LanguageId, PageId};
+use crate::site::Language;
 use crate::source::Sources;
 use crate::templates::Renderer;
 

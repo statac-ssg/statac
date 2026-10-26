@@ -6,8 +6,9 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeSet, HashSet};
 
 use crate::config::words::PageWord;
+use crate::ids::{Id, LanguageId, ListId, PageId};
 use crate::problem::{Kind, Word};
-use crate::site::{Id, LanguageId, ListId, ListKey, Page, PageId, Site};
+use crate::site::{ListKey, Page, Site};
 use crate::value::Value;
 use crate::yaml::{Node, Value as Yaml};
 

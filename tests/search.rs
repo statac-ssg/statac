@@ -751,10 +751,10 @@ fn a_browser_holding_the_script_from_an_earlier_build_reads_the_later_one() {
 /// `language` in its order for each of `asked`, written as the browser's
 /// script is by `search_reader.mjs`.
 fn statac_finds(site: &Site, language: usize, asked: &[(&str, bool)]) -> String {
-    use statac::site::Id;
+    use statac::ids::Id;
     let today = statac::date::read("2026-10-04").ok();
     let (renderer, _) = statac::build::renderer(&site.root, today);
-    let language = statac::site::LanguageId::from_index(language);
+    let language = statac::ids::LanguageId::from_index(language);
     let records = statac::search::records(&renderer, language);
     let index = statac::search::Index::of(renderer.site(), language, records);
     let found: Vec<String> = asked

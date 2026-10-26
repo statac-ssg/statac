@@ -5,11 +5,11 @@ use rayon::prelude::*;
 
 use super::{Built, VERSION};
 use crate::address::on_the_wire;
+use crate::ids::{Id, LanguageId};
 use crate::json;
 use crate::report::{Report, shown};
 use crate::search::{self, Asked, Index, Shown};
 use crate::serve::session::{Read, held_back};
-use crate::site::{Id, LanguageId};
 
 /// The most pages the panel is handed of each language's search.
 const MOST: usize = 100;

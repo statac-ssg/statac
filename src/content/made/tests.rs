@@ -113,7 +113,7 @@ fn a_page_is_made_for_each_item_by_name() {
     let run = read.site.pages.get(by).speaks_for.unwrap();
     let run = read.site.lists.get(run);
     assert_eq!(run.key, ListKey::Declared(by));
-    let path = |id: &crate::site::PageId| read.site.pages.get(*id).path.as_str();
+    let path = |id: &crate::ids::PageId| read.site.pages.get(*id).path.as_str();
     assert_eq!(
         run.members.iter().map(path).collect::<Vec<_>>(),
         ["people.md/Person 2"]
@@ -525,7 +525,7 @@ fn a_page_is_made_for_each_post_the_line_chooses() {
 
     // Listed by the page that made them, in their posts' order, and by no
     // other list.
-    let path = |id: &crate::site::PageId| read.site.pages.get(*id).path.as_str();
+    let path = |id: &crate::ids::PageId| read.site.pages.get(*id).path.as_str();
     let (by, _) = read
         .site
         .pages

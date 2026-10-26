@@ -2,7 +2,7 @@
 //! language of the page being built, and each page recording only them.
 
 use super::*;
-use crate::site::LanguageId;
+use crate::ids::LanguageId;
 
 const SETTINGS: (&str, &str) = (
     "statac.yaml",

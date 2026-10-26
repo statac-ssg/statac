@@ -28,7 +28,8 @@ use rayon::prelude::*;
 
 use crate::config::words::PageWord;
 use crate::html::{Markup, markup};
-use crate::site::{LanguageId, ListKey, Page, PageId, Site};
+use crate::ids::{LanguageId, PageId};
+use crate::site::{ListKey, Page, Site};
 use crate::templates::Renderer;
 
 pub use command::{

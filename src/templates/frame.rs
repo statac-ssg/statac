@@ -14,9 +14,9 @@ use super::guard::{Failed, Refusal};
 use super::indent::Own;
 use super::render::Shared;
 use crate::assets::PageScripts;
+use crate::ids::{DataId, Id, LanguageId, PageId};
 use crate::problem::{Kind, Problem, Stopped};
 use crate::reads::{Asked, Key, Reads};
-use crate::site::{DataId, Id, LanguageId, PageId};
 use crate::source::Place;
 
 pub(super) struct Frame {
@@ -288,7 +288,7 @@ pub(super) fn walked() {
 /// Notes that the output being built names the copies of the photograph
 /// `id`, at `place` where the writing does, with `full` its copy at its
 /// own width, so they are made.
-pub(super) fn develops(id: crate::site::PictureId, place: Option<Place>, full: bool) {
+pub(super) fn develops(id: crate::ids::PictureId, place: Option<Place>, full: bool) {
     with(|frame| {
         frame
             .developed

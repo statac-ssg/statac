@@ -1,5 +1,5 @@
 use super::*;
-use crate::site::Id;
+use crate::ids::Id;
 
 /// The site's language at `at` in its order, the main one first.
 fn language(at: usize) -> LanguageId {

@@ -19,12 +19,12 @@ use crate::date::Date;
 use crate::dates::ShowDates;
 use crate::highlight::{self, Language};
 use crate::html::escaped;
+use crate::ids::{Id, ListId, PageId};
 use crate::links::Attribute;
 use crate::lists::Filter;
 use crate::markdown::{Piece, PieceValue, closed_up, words_of};
 use crate::problem::{Called, Kind, Problem, Relation, Stopped, Word};
 use crate::reads::Key;
-use crate::site::{Id, ListId, PageId};
 use crate::source::{Place, Span};
 
 /// Statac's own filters, by the names templates use. `sort` is the
@@ -175,7 +175,7 @@ pub(super) fn install(env: &mut Environment<'_>) {
                 })
                 .collect();
             dated.sort_by(|a, b| {
-                crate::lists::by_moment(crate::lists::Order::NewestFirst, (a.1, a.2), (b.1, b.2))
+                crate::lists::by_moment(crate::site::Order::NewestFirst, (a.1, a.2), (b.1, b.2))
             });
             dated.into_iter().map(|(page, _, _)| page).collect()
         };

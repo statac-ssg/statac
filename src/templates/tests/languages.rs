@@ -2,8 +2,8 @@
 //! words and settings, and `site` answering in it.
 
 use super::*;
+use crate::ids::LanguageId;
 use crate::problem::ShownWords;
-use crate::site::LanguageId;
 
 /// What a page says of its language, its site and its date.
 const SAYS: (&str, &str) = (

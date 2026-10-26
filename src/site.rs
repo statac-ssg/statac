@@ -2,133 +2,13 @@
 //! the start, so a one-language site is the case of one language, not a
 //! special path.
 
-use std::marker::PhantomData;
-
 use crate::address::Address;
 use crate::config::words::Words;
 use crate::date::Date;
+use crate::ids::{Arena, LanguageId, ListId, PageId};
 use crate::origin::Sourced;
 use crate::problem::{Held, Named, Word};
 use crate::source::{Place, SourceId, Span};
-
-pub trait Id: Copy {
-    fn from_index(index: usize) -> Self;
-    fn index(self) -> usize;
-}
-
-macro_rules! id {
-    ($(#[$meta:meta])* $name:ident) => {
-        $(#[$meta])*
-        #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-        pub struct $name(u32);
-
-        impl Id for $name {
-            fn from_index(index: usize) -> Self {
-                $name(u32::try_from(index).expect(concat!("too many ", stringify!($name))))
-            }
-
-            fn index(self) -> usize {
-                self.0 as usize
-            }
-        }
-    };
-}
-
-id!(LanguageId);
-id!(PageId);
-id!(ListId);
-id!(TemplateId);
-id!(DataId);
-id!(AssetId);
-id!(NameId);
-id!(
-    /// A picture file under `content/` or `static/`.
-    PictureId
-);
-id!(
-    /// Something the build writes: a page, one page of a list, a feed, a card.
-    OutputId
-);
-
-/// Field and setting names, interned so a read can be recorded as two numbers.
-#[derive(Default)]
-pub struct Names {
-    names: Vec<Box<str>>,
-    ids: std::collections::HashMap<Box<str>, NameId>,
-}
-
-impl Names {
-    pub fn intern(&mut self, name: &str) -> NameId {
-        if let Some(&id) = self.ids.get(name) {
-            return id;
-        }
-        let id = NameId::from_index(self.names.len());
-        self.names.push(name.into());
-        self.ids.insert(name.into(), id);
-        id
-    }
-
-    pub fn get(&self, name: &str) -> Option<NameId> {
-        self.ids.get(name).copied()
-    }
-
-    pub fn name(&self, id: NameId) -> &str {
-        &self.names[id.index()]
-    }
-
-    pub fn len(&self) -> usize {
-        self.names.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.names.is_empty()
-    }
-}
-
-pub struct Arena<I, T> {
-    items: Vec<T>,
-    id: PhantomData<I>,
-}
-
-impl<I: Id, T> Default for Arena<I, T> {
-    fn default() -> Self {
-        Arena {
-            items: Vec::new(),
-            id: PhantomData,
-        }
-    }
-}
-
-impl<I: Id, T> Arena<I, T> {
-    pub fn push(&mut self, item: T) -> I {
-        let id = I::from_index(self.items.len());
-        self.items.push(item);
-        id
-    }
-
-    pub fn get(&self, id: I) -> &T {
-        &self.items[id.index()]
-    }
-
-    pub fn get_mut(&mut self, id: I) -> &mut T {
-        &mut self.items[id.index()]
-    }
-
-    pub fn len(&self) -> usize {
-        self.items.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (I, &T)> {
-        self.items
-            .iter()
-            .enumerate()
-            .map(|(i, item)| (I::from_index(i), item))
-    }
-}
 
 pub struct Language {
     /// A BCP 47 tag as the author wrote it, such as `en-GB`; none where the
@@ -357,6 +237,23 @@ impl ListKey {
     }
 }
 
+/// Which way a list's posts run.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Order {
+    NewestFirst,
+    OldestFirst,
+}
+
+impl Order {
+    /// The order as `order:` writes it.
+    pub fn word(self) -> &'static str {
+        match self {
+            Order::NewestFirst => "newest first",
+            Order::OldestFirst => "oldest first",
+        }
+    }
+}
+
 pub struct List {
     pub key: ListKey,
     pub language: LanguageId,
@@ -376,7 +273,7 @@ pub struct List {
     pub numbered: bool,
     /// Which way its posts run by their dates; none where the numbers or
     /// an `order:` list place them.
-    pub order: Option<crate::lists::Order>,
+    pub order: Option<crate::site::Order>,
     /// How many posts each of its pages shows; 0 shows them all on one.
     pub per_page: usize,
     /// Where its pages after the first stand, page 2 first: none where
@@ -623,6 +520,7 @@ impl Site {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ids::Id;
     use crate::source::Sources;
 
     fn page(source: SourceId, language: LanguageId, path: &str) -> Page {

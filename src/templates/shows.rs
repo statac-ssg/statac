@@ -18,9 +18,9 @@ use super::values::{self, Lists, PageValue, SiteValue};
 use super::{Chosen, Renderer};
 use crate::config::words::PageWord;
 use crate::described::Described;
+use crate::ids::{DataId, NameId, PageId};
 use crate::language::Direction;
 use crate::problem::Holds;
-use crate::site::{DataId, NameId, PageId};
 use crate::source::{Place, SourceId};
 
 /// How deep the author's own nested fields are followed.

@@ -12,9 +12,9 @@ use rayon::prelude::*;
 use super::scripts::{self, Finding, Found};
 use super::{Built, Output, site_origin};
 use crate::assets;
+use crate::ids::PageId;
 use crate::problem::Carried;
 use crate::reads::Key;
-use crate::site::PageId;
 use crate::source::SourceId;
 use crate::templates::Renderer;
 

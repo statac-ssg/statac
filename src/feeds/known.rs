@@ -32,8 +32,9 @@ use crate::album::{KEPT, escaped, make_kept, unescaped};
 use crate::config::Settings;
 use crate::config::words::PageWord;
 use crate::dates::Dates;
+use crate::ids::PageId;
 use crate::problem::{Kind, Problem};
-use crate::site::{Item, Made, Page, PageId, SentTo, Site};
+use crate::site::{Item, Made, Page, SentTo, Site};
 use crate::source::Sources;
 
 /// The file's name in what Statac keeps.

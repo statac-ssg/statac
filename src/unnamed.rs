@@ -17,8 +17,8 @@
 use std::ops::Range;
 
 use crate::html::{self, Markup, Tag};
+use crate::ids::{Id, PageId, TemplateId};
 use crate::problem::{AllOf, Code, Kind, LabelledBy, Problem};
-use crate::site::{Id, PageId, TemplateId};
 use crate::source::{Place, Span};
 use crate::templates::{Own, Renderer};
 

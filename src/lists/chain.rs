@@ -3,8 +3,9 @@
 //! templates use.
 
 use super::filter::{CHAINABLE, Filter};
+use crate::ids::{LanguageId, PageId};
 use crate::problem::{Kind, ListFault, Word};
-use crate::site::{LanguageId, PageId, Site};
+use crate::site::Site;
 use crate::source::Span;
 
 /// Where every line starts.

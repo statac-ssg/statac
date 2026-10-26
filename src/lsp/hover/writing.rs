@@ -7,11 +7,12 @@ use std::ops::Range;
 
 use super::{Goes, Said};
 use crate::address::Address;
+use crate::ids::PageId;
 use crate::lsp::complete::Known;
 use crate::lsp::complete::writing::{takes_written, unnamed};
 use crate::markdown::{self, Call, Document, Kind, Node};
 use crate::problem::Sort;
-use crate::site::{PageId, SentTo};
+use crate::site::SentTo;
 use crate::source::{Sources, Span};
 use crate::templates::{Renderer, Snippet};
 use crate::wording;

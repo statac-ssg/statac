@@ -18,7 +18,8 @@ use crate::address::{on_the_wire, whole};
 use crate::config::Settings;
 use crate::config::words::PageWord;
 use crate::dates::Dates;
-use crate::site::{Page, PageId, PagePlace, Site};
+use crate::ids::PageId;
+use crate::site::{Page, PagePlace, Site};
 
 /// The id of `page` in a feed, or of the feed a list's page speaks for.
 /// None where the site has no `feed_key`.

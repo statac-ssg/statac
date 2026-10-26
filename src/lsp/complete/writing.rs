@@ -13,9 +13,9 @@ mod tests;
 use std::ops::Range;
 
 use super::{Completion, Item, ItemKind};
+use crate::ids::PageId;
 use crate::markdown::{self, IN_SITE};
 use crate::problem::Sort;
-use crate::site::PageId;
 use crate::source::Span;
 use crate::templates::{Renderer, Snippet, Takes};
 use crate::wording;

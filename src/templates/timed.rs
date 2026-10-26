@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
-use crate::site::PageId;
+use crate::ids::PageId;
 
 /// What was timed while one output was built.
 #[derive(Clone, Default, Debug)]
@@ -93,7 +93,7 @@ fn ended(add: impl FnOnce(&mut Tally, Duration)) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::site::Id;
+    use crate::ids::Id;
 
     fn wait() {
         let began = Instant::now();

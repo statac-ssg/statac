@@ -20,12 +20,12 @@ use crate::address::{is_full, on_the_wire};
 use crate::album::{Picture, Root, Seen};
 use crate::fetched::stills;
 use crate::highlight::{self, Language};
+use crate::ids::{PageId, PictureId};
 use crate::origin::Sourced;
 use crate::pictures::{Format, Kind as PictureKind};
 use crate::problem::Host;
 use crate::problem::{ArgumentFault, Hint, Kind, Needed, Problem, Reason, ShownBy, Sort};
 use crate::reads::Key;
-use crate::site::{PageId, PictureId};
 use crate::source::Place;
 
 /// The names a page answers only when called.

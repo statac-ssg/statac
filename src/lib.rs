@@ -20,6 +20,7 @@ mod fetched;
 pub mod highlight;
 mod hooks;
 mod html;
+pub mod ids;
 pub mod import;
 mod json;
 mod language;

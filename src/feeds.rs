@@ -28,9 +28,10 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use crate::address::Address;
 use crate::config::Settings;
 use crate::config::words::PageWord;
+use crate::ids::{ListId, PageId};
 use crate::origin::{Arrival, Origin, Sourced};
 use crate::problem::{AddressFault, Kind, Named, Problem, Unwritten, Waiting, Word};
-use crate::site::{ListId, ListKey, Page, PageId, Site};
+use crate::site::{ListKey, Page, Site};
 use crate::source::{Place, Sources, Span};
 use crate::value::Value;
 
@@ -654,7 +655,7 @@ pub(crate) fn entries(site: &Site, dates: &crate::dates::Dates, list: ListId) ->
         .collect();
     posts.sort_by(|a, b| {
         crate::lists::by_moment(
-            crate::lists::Order::NewestFirst,
+            crate::site::Order::NewestFirst,
             (site.pages.get(a.0), a.1),
             (site.pages.get(b.0), b.1),
         )

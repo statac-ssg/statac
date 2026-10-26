@@ -17,12 +17,12 @@ use crate::assets::{self, Assets};
 use crate::content;
 use crate::date::Date;
 use crate::feeds;
+use crate::ids::{Id, ListId, OutputId, PageId, PictureId};
 use crate::links;
 use crate::problem::{Code, Kind, Named, Problem, Published, Reason, Severity};
 use crate::publish::{self, Staging};
 use crate::reads::{Asked, Key, Reads, Record};
 use crate::report::Quiet;
-use crate::site::{Id, ListId, OutputId, PageId, PictureId};
 use crate::source::{Place, SourceId, Sources};
 use crate::templates::{self, Renderer};
 use crate::unnamed;
@@ -452,7 +452,7 @@ pub(crate) struct Built {
     /// Whether the built site holds it.
     pub written: bool,
     /// The languages whose search index it names.
-    pub indexed: Vec<crate::site::LanguageId>,
+    pub indexed: Vec<crate::ids::LanguageId>,
     /// Where each link or button it shows was written that is all an image
     /// told as missing alt text, which no page tells as missing words.
     pub folded: Vec<Option<Place>>,
@@ -809,7 +809,7 @@ pub(crate) fn conclude(
         .collect();
     // The languages some page names the search index of.
     let indexed = built.iter().flat_map(|built| &built.indexed);
-    let mut indexed: Vec<crate::site::LanguageId> = indexed.copied().collect();
+    let mut indexed: Vec<crate::ids::LanguageId> = indexed.copied().collect();
     indexed.sort_unstable();
     indexed.dedup();
     let entries: Vec<String> = (indexed.iter())

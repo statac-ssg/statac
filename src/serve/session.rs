@@ -99,7 +99,7 @@ pub struct Read {
     pub renderer: crate::templates::Renderer,
     /// The page each built file is, and which of its list's pages, counted
     /// from 1.
-    pub pages: HashMap<String, (crate::site::PageId, usize)>,
+    pub pages: HashMap<String, (crate::ids::PageId, usize)>,
     /// Every output of the round, with what each read.
     pub(crate) built: Arc<Vec<Built>>,
 }
@@ -697,7 +697,7 @@ fn noted(
 /// is after today: what `statac build` leaves out.
 pub(super) fn held_back(
     renderer: &crate::templates::Renderer,
-    id: crate::site::PageId,
+    id: crate::ids::PageId,
 ) -> (bool, Option<String>) {
     let page = renderer.site().pages.get(id);
     let draft = page.words.truth(PageWord::Draft) == Some(true);

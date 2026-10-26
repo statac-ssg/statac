@@ -58,7 +58,7 @@ fn feed_at(read: &crate::content::Read, list: ListId) -> Option<String> {
 
 /// Where the own list of the language at `index` has its feed.
 fn own_feed(read: &crate::content::Read, index: usize) -> Option<String> {
-    let language = crate::site::Id::from_index(index);
+    let language = crate::ids::Id::from_index(index);
     read.site
         .own_list(language)
         .and_then(|list| feed_at(read, list))
@@ -493,7 +493,7 @@ fn a_list_naming_several_feeds_has_one_at_each() {
 fn the_setting_naming_several_feeds_gives_the_sites_own_list_each() {
     let settings = format!("{UNFED}feed: [atom.xml, /rss.xml]\n");
     let read = read(&settings, &[POST]);
-    let list = read.site.own_list(crate::site::Id::from_index(0)).unwrap();
+    let list = read.site.own_list(crate::ids::Id::from_index(0)).unwrap();
     let feeds = wanted(&read.site, &read.settings, list);
     let feeds: Vec<&str> = feeds.iter().map(Address::as_str).collect();
     assert_eq!(feeds, ["/atom.xml", "/rss.xml"]);

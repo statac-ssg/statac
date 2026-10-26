@@ -24,9 +24,9 @@ use std::sync::Once;
 use rayon::prelude::*;
 
 use crate::content;
+use crate::ids::{Arena, Id, PictureId};
 use crate::pictures::{self, Header, Kind, Photograph, Rendition, Size, Unreadable};
 use crate::problem::{Kind as Told, Named, PictureFault, Problem};
-use crate::site::{Arena, Id, PictureId};
 
 pub use develop::{Developed, Shown, develop, sweep};
 pub(crate) use develop::{Kept, fault};

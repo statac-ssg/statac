@@ -40,8 +40,9 @@ use std::sync::Arc;
 use minijinja::{AutoEscape, Environment};
 
 use crate::config::Settings;
+use crate::ids::TemplateId;
 use crate::problem::{Problem, Severity};
-use crate::site::{Site, TemplateId};
+use crate::site::Site;
 use crate::source::Sources;
 use check::{Checked, Field, Rec, Schema, Ty};
 use files::{File, Role};
@@ -142,7 +143,7 @@ impl Templates {
     }
 
     fn id(at: usize) -> TemplateId {
-        use crate::site::Id;
+        use crate::ids::Id;
         TemplateId::from_index(at)
     }
 

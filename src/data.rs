@@ -10,8 +10,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use crate::ids::{Arena, DataId};
 use crate::problem::{Kind, Problem};
-use crate::site::{Arena, DataId};
 use crate::source::{SourceId, Sources};
 use crate::yaml::{Node, Value as Yaml};
 

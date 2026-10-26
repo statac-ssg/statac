@@ -11,8 +11,9 @@ use std::collections::HashMap;
 use crate::address::Address;
 use crate::config::Settings;
 use crate::config::words::PageWord;
+use crate::ids::{Id, ListId, PageId};
 use crate::problem::{Kind, Problem};
-use crate::site::{Id, ListId, ListKey, Page, PageId, Site};
+use crate::site::{ListKey, Page, Site};
 use crate::source::Sources;
 
 /// Where a list's later pages stand where the site doesn't say.

@@ -34,8 +34,9 @@ use rayon::prelude::*;
 
 use super::{Index, Kept, Place, Times};
 use crate::address::Top;
+use crate::ids::LanguageId;
 use crate::problem::Named;
-use crate::site::{LanguageId, Site};
+use crate::site::Site;
 use crate::templates::Renderer;
 
 /// The folder each language's files are published in, at its top.

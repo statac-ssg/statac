@@ -11,9 +11,9 @@ use super::Templates;
 use super::frame;
 use super::render::Shared;
 use super::values::{PageValue, SiteValue};
+use crate::ids::PageId;
 use crate::markdown::{Piece, PieceValue};
 use crate::reads::Key;
-use crate::site::PageId;
 
 /// Builds `piece` for the page `page` with the site's file for it, handed
 /// `values` and what the site says of them: whether a link leaves the
