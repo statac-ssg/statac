@@ -57,6 +57,17 @@ pub fn pages() -> Vec<(String, String)> {
     pages
 }
 
+/// What the line naming the source of every page this writes ends with,
+/// by which a page it wrote is told from one written by hand.
+const WRITTEN_BY: &str = "by `cargo run --example reference_pages`.";
+
+/// Whether `text` is a page this wrote.
+fn written_here(text: &str) -> bool {
+    text.strip_prefix("---\n# Written from ")
+        .and_then(|rest| rest.lines().next())
+        .is_some_and(|line| line.ends_with(WRITTEN_BY))
+}
+
 fn front_matter(title: &str, summary: Option<&str>, layout: Option<&str>, from: &str) -> String {
     for text in [Some(title), summary].into_iter().flatten() {
         assert!(
@@ -66,10 +77,7 @@ fn front_matter(title: &str, summary: Option<&str>, layout: Option<&str>, from: 
     }
     let summary = summary.map_or_else(String::new, |summary| format!("summary: {summary}\n"));
     let layout = layout.map_or_else(String::new, |layout| format!("layout: {layout}\n"));
-    format!(
-        "---\n# Written from {from} by `cargo run --example reference_pages`.\n\
-         title: {title}\n{summary}{layout}---\n"
-    )
+    format!("---\n# Written from {from} {WRITTEN_BY}\ntitle: {title}\n{summary}{layout}---\n")
 }
 
 /// The id of the heading for the name `name`: its letters, figures and
@@ -151,7 +159,8 @@ fn index() -> String {
 }
 
 /// Writes every reference page into the docs site `site`, and removes a
-/// page there whose group is gone.
+/// page there it wrote whose group is gone. A page written by hand beside
+/// them is left alone.
 pub fn write(site: &Path) {
     let folder = folder(site);
     std::fs::create_dir_all(&folder).expect("the folder can be made");
@@ -159,7 +168,8 @@ pub fn write(site: &Path) {
     for entry in std::fs::read_dir(&folder).expect("the folder can be read") {
         let path = entry.expect("the folder can be read").path();
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        if !wanted.iter().any(|(wanted, _)| *wanted == name) {
+        let ours = std::fs::read_to_string(&path).is_ok_and(|text| written_here(&text));
+        if ours && !wanted.iter().any(|(wanted, _)| *wanted == name) {
             std::fs::remove_file(&path).expect("an old page can be removed");
         }
     }

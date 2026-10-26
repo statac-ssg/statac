@@ -25,8 +25,21 @@ fn the_pages_are_written_into_the_folder_given_and_one_of_no_group_is_removed() 
     let site = folder("written");
     let pages = reference_pages::folder(&site);
     std::fs::create_dir_all(&pages).unwrap();
-    std::fs::write(pages.join("no-such-group.md"), "---\ntitle: Gone\n---\n").unwrap();
+    std::fs::write(
+        pages.join("no-such-group.md"),
+        "---\n# Written from descriptions/no-such-group.md by `cargo run --example \
+         reference_pages`.\ntitle: Gone\n---\n",
+    )
+    .unwrap();
+    // A page written by hand beside them stays.
+    let by_hand = "---\ntitle: Templates\n---\nWhich template builds a page.\n";
+    std::fs::write(pages.join("templates.md"), by_hand).unwrap();
     reference_pages::write(&site);
+    assert_eq!(
+        std::fs::read_to_string(pages.join("templates.md")).unwrap(),
+        by_hand
+    );
+    std::fs::remove_file(pages.join("templates.md")).unwrap();
 
     let wanted = reference_pages::pages();
     assert_eq!(wanted.len(), Group::ALL.len() + 1);
