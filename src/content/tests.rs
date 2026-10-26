@@ -292,6 +292,12 @@ fn front_matter_refusals_are_placed_at_what_was_written() {
         ("source: a.txt", "set-aside", "source"),
         ("slug: post", "set-aside", "slug"),
         ("pages:\n  layout: post", "nested-setting", "layout"),
+        (
+            "pagination:\n  permalink: /x/{n}/",
+            "wrong-place",
+            "permalink",
+        ),
+        ("tags:\n  pages: true", "wrong-place", "pages"),
         ("draft: yes", "wrong-kind-of-value", "yes"),
         ("draft: perhaps", "wrong-kind-of-value", "perhaps"),
         ("untitled: yes", "wrong-kind-of-value", "yes"),

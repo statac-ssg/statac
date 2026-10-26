@@ -381,6 +381,12 @@ pub fn read_front_matter(
                 .push(other_spelling(&name, &format!("pages.{rest}"), key));
         } else if name == "pages" && matches!(value.value, Yaml::Mapping(_)) {
             read.problems.extend(nested(sources, "pages", value));
+        } else if let Some(settings) = nested_site_settings(&name, value) {
+            // Nested, a site setting is as out of place as written whole.
+            for (flat, key) in settings {
+                read.problems
+                    .push(wrong_place(&flat, WrongPlace::SiteSetting, key));
+            }
         } else if name == "pages.later" {
             read.problems.push(Problem::at(
                 Kind::OtherSpelling {
@@ -635,6 +641,21 @@ pub fn type_slips<'a>(
 
 /// Whether `name` is one of the settings under `tags.`, `series.` and
 /// `pagination.`, which only the site sets.
+/// The site settings `value` holds where `name` is what they start with,
+/// as `pagination:` with `permalink:` beneath it, each written whole and
+/// by its key; none where it holds none.
+fn nested_site_settings<'a>(name: &str, value: &'a Node) -> Option<Vec<(String, &'a Node)>> {
+    let Yaml::Mapping(entries) = &value.value else {
+        return None;
+    };
+    let settings: Vec<(String, &Node)> = entries
+        .iter()
+        .map(|entry| (format!("{name}.{}", key_name(&entry.key)), &entry.key))
+        .filter(|(flat, _)| is_list_setting(flat))
+        .collect();
+    (!settings.is_empty()).then_some(settings)
+}
+
 fn is_list_setting(name: &str) -> bool {
     name.split_once('.')
         .is_some_and(|(list, _)| matches!(list, "tags" | "series" | "pagination"))
