@@ -26,8 +26,8 @@ they switch language, and a guess would send them to the wrong page.
 If both have the same key, give each page its own key, or move the one in
 the wrong language to its own language's folder. If both are in the same
 place, rename one of them, or give the one that isn't the translation a
-`translation_key` of its own. It is then linked to other pages by its key
-only.
+`translation_key` of its own. Statac then links it to other pages by its
+key only.
 
 ## Example
 

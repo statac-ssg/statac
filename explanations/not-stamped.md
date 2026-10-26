@@ -14,10 +14,10 @@ error  Not stamped: `date` is still `=monday 09:00`
 
 ## Why Statac stops
 
-A stamp means a different day depending on when it is read, but a build
-of the same files is always the same. So `statac build` and
-`statac check` never choose the date. A page can't be published with the
-date `=monday` either. Instead, `statac stamp` or `statac serve` writes
+A stamp means a different day depending on when Statac reads it, but a
+build of the same files is always the same. So `statac build` and
+`statac check` never choose the date. Statac can't publish a page with
+the date `=monday` either. Instead, `statac stamp` or `statac serve` writes
 the date into the file once, and from then on the file itself says which
 day it is.
 
@@ -28,8 +28,8 @@ stamp in the site with its date, and tells you what it wrote.
 `statac serve` does the same when it starts and on every save, so a stamp
 never stays in a site being served for long.
 
-To publish a stamp's word itself, write the value as a block. A block is
-always read as text:
+To publish a stamp's word itself, write the value as a block. Statac
+always reads a block as text:
 
 ```yaml
 title: |-

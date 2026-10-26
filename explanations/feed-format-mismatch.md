@@ -1,7 +1,7 @@
 # Feed format mismatch
 
 A feed's file name says one format, but the feed is built as another,
-such as `rss.xml` built as an Atom feed. A name says a format where it
+such as `rss.xml` built as an Atom feed. A file name says a format if it
 is `rss.xml` or `atom.xml`, or ends in `.rss`, `.atom` or `.json`.
 
 ## What you'll see {#what-youll-see}
@@ -20,12 +20,12 @@ isn't one, Statac uses the template named `feed` with the feed's
 extension, such as `templates/feed.json` for `feed.json`, and otherwise
 `templates/feed.xml`. A list with `feed: [atom.xml, rss.xml]` and only
 `templates/feed.xml` therefore publishes the same Atom feed twice, once
-under the RSS feed's name, and nothing else would show it.
+under the RSS feed's name, and nothing else would tell you.
 
 Statac tells the format from the feed it built: an `<rss>` root is RSS,
 a `<feed>` root is Atom, and a JSON Feed names its version. A name such
-as `feed.xml` or `index.xml` says no format, so a feed with that name is
-never warned of.
+as `feed.xml` or `index.xml` says no format, so Statac never warns about
+a feed with that name.
 
 ## How to fix it
 

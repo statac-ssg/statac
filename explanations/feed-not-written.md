@@ -19,20 +19,20 @@ warning  Feed not written: the site's own list needs `templates/feed.xml`
 
 ## Why Statac warns
 
-A list has a feed only where a `feed:` line asks for one: on its list
-page, cascaded to that page, or for the site's own list, `feed:` in
+A list has a feed only if a `feed:` line asks for one: on its list
+page, cascaded to that page, or, for the site's own list, in
 `statac.yaml`. Statac has no built-in feed. The file a feed reader reads
-is built from your template, so you decide what it says. If something a feed needs is missing, Statac publishes the rest of
-the site without the feed, and warns once. If one of your pages is at the
-feed's URL, the page is published as you wrote it, and the feed is left
-out.
+is built from your template, so you decide what it says. If something a
+feed needs is missing, Statac publishes the rest of the site without the
+feed, and warns once. If one of your pages is at the feed's URL, Statac
+publishes the page as you wrote it, and leaves the feed out.
 
 ## How to fix it
 
 Add what is missing: a `title:` line in `statac.yaml`, or the template.
 
-A feed is built with the template named as the feed's file, if you have
-one, such as `templates/rss.xml` for `rss.xml`. Otherwise, if the feed's
+Statac builds a feed with the template that has the feed's file name, if
+you have one, such as `templates/rss.xml` for `rss.xml`. Otherwise, if the feed's
 URL ends in an extension other than `.xml`, Statac uses the template
 named `feed` with that extension, such as `templates/feed.json` for
 `/feed.json`, and otherwise `templates/feed.xml`. The message names the
@@ -44,11 +44,11 @@ page).
 A list can have several feeds, such as an Atom feed and an RSS feed:
 `feed: [feed.xml, rss.xml]` builds `feed.xml` with `templates/feed.xml`
 and `rss.xml` with `templates/rss.xml`. Without `templates/rss.xml`,
-`rss.xml` is built with `templates/feed.xml`, and Statac warns with
+Statac builds `rss.xml` with `templates/feed.xml`, and warns with
 [feed format mismatch](https://statac.dev/e/feed-format-mismatch/)
-where that builds it as another format than its name says. A feed is
-left out only where none of its templates exists, and Statac warns once
-for each such set of templates, naming the first list that needs it.
+if that builds it in another format than its name says. Statac leaves a
+feed out only if none of its templates exists, and warns once for each
+such set of templates, naming the first list that needs it.
 
 If you don't want the feed, take out the `feed:` line that asks for
 it.

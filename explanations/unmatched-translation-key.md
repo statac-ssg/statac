@@ -16,9 +16,9 @@ warning  Unmatched translation key: no page in another language has `abuot`
 Statac builds the page as written. A key is there to link a page to its
 translations, so a key that links nothing usually means one of two
 things. Either it is spelled differently on the page and on its
-translation, or the translation hasn't been written yet. A draft, or a
-scheduled post, still counts as having its key. The page is
-linked to it once it is published.
+translation, or the translation hasn't been written yet. Statac counts a
+draft or a scheduled post as having its key, and links the page to it
+once it is published.
 
 On a site in only one language there is no other language, so no key
 links anything.
@@ -44,7 +44,7 @@ and its English translation, `content/en/about-us.md`, has:
 translation_key: abuot
 ```
 
-Once the key is spelled the same on both, the two pages are linked:
+Once the key is spelled the same on both, Statac links the two pages:
 
 ```yaml
 translation_key: about

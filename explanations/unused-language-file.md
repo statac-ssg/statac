@@ -13,9 +13,9 @@ note  Unused language file: no language of the site reads `languages/en-US.yaml`
 
 ## Why Statac says so
 
-Each of the site's languages, as `language:` in `statac.yaml` names
-them, reads one file in `languages/`: the one named for it, or else one
-named for a language it comes from, as `languages/en.yaml` for `en-GB`.
+Each language that `language:` in `statac.yaml` names reads one file in
+`languages/`: the file named for it, or if there is none, the file named
+for a language it comes from, such as `languages/en.yaml` for `en-GB`.
 A file no language reads, such as `en-US.yaml` on a site in `en-GB`,
 changes nothing, and nothing else would show it, so Statac tells you.
 
@@ -35,5 +35,5 @@ A site in British English:
 language: en-GB
 ```
 
-with its words in `languages/en-US.yaml`. Renamed
-`languages/en-GB.yaml`, the file is read.
+with its words in `languages/en-US.yaml`. Rename the file
+`languages/en-GB.yaml`, and Statac reads it.

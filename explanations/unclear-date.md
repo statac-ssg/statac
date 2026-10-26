@@ -18,7 +18,7 @@ the wrong day.
 
 ## How to fix it
 
-Write the date year first, as `2026-04-03`. The message gives both
+Write the date year first, such as `2026-04-03`. The message gives both
 readings in that form, so you can choose one.
 
 ## Example

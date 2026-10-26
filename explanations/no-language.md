@@ -24,11 +24,12 @@ The language also decides the words Statac writes: the names of months
 and weekdays in dates, the quotation marks, and words such as `back to the
 text` beside a footnote. With no `language`, these are in English too.
 
-Statac shows this note once for the whole site, and only where a template
-reads the language, as `page.language`, `site.language` and
-`site.languages` do. Where no template writes it, no page says what
-language it is in, and there is nothing to tell. A site in English looks
-correct either way, so nothing else would show that the line is missing.
+Statac shows this note once for the whole site, and only if a template
+reads the language, through `page.language`, `site.language` or
+`site.languages`. If no template writes it, no page says what language
+it is in, and there is nothing to tell. A site in English shows
+correctly either way, so nothing else would show that the line is
+missing.
 
 ## How to fix it
 

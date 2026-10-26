@@ -27,11 +27,11 @@ old URL in its `redirect_from:`. If a post is moved and edited at the
 same time, with no `redirect_from:`, Statac can't tell it from a new
 post, and says nothing about it.
 
-A post made from a data file, by a page with `each:`, Statac knows by
-that page and its item: an item with a name by its name, and an item in
-a list by its fields being written exactly as before, or by the old
-URL in its `redirect_from:`. Two items in a list written alike are
-both taken as new.
+Statac recognises a post made from a data file, by a page with `each:`,
+by that page and its item. It recognises an item with a name by its
+name, and an item in a list by its fields, if they are written exactly
+as before, or by the old URL in its `redirect_from:`. If two items in a
+list are written alike, Statac takes both as new.
 
 ## How to fix it
 
@@ -49,8 +49,8 @@ next build.
 Statac never writes the line itself unless you ask it to, with
 `write_feed_ids: true` in `statac.yaml`. With that set, `statac serve`
 and `statac stamp` write it for you, and the warning goes away. They
-never write into a data file, so a post made from one always takes the
-line by hand.
+never write into a data file, so for a post made from one, you always
+write the line by hand.
 
 ## Example
 

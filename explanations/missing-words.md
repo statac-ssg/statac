@@ -5,9 +5,9 @@ reader reads out for a footnote's back link, and the name of each kind of
 callout, such as "Note" or "Warning". These words come from the page's
 language, and this language has no translation for them. Statac has these
 words in English only. For any other language, their translations come
-from the site's own file in `languages/`. So you see this note for a
+from the site's own file in `languages/`. So Statac gives this note for a
 language with no such file, for a file without the line, or for a file
-where the line is empty.
+whose line is empty.
 
 For a site in one of the other languages Statac has translations for,
 `statac new` writes this file, with these words in English for you to
@@ -27,16 +27,16 @@ note  Missing words: the footnotes of 1 page in `fr` have no translation for the
 
 ## Why Statac says so
 
-The pages are still built, with nothing left out. A footnote's back link
-is written without a label, so a screen reader can only read out its
-arrow. A callout's `title` is passed to `snippets/markdown/callout.html`
-empty.
+Statac still builds the pages, and leaves nothing out. It writes a
+footnote's back link without a label, so a screen reader can only read
+out its arrow. It passes a callout's `title` to
+`snippets/markdown/callout.html` empty.
 
-Statac gives no note if the translations wouldn't be shown anyway. The
-note on footnotes is given unless the site's own
-`snippets/markdown/footnotes.html` never reads `label`. The note on
-callouts is given only if the site has a `snippets/markdown/callout.html`
-that reads `title`. Without that file, Statac writes a callout with no
+Statac gives no note if the translations wouldn't be shown anyway. It
+gives the note on footnotes unless the site's own
+`snippets/markdown/footnotes.html` never reads `label`. It gives the note
+on callouts only if the site has a `snippets/markdown/callout.html` that
+reads `title`. Without that file, Statac writes a callout with no
 name. A file that never reads `title` has names of its own, for example
 when a site keeps them with its other translations in `data/`.
 

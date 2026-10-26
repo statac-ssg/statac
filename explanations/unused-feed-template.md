@@ -13,10 +13,10 @@ note  Unused feed template: no list asks for a feed
 
 ## Why Statac says so
 
-No list has a feed unless a `feed:` line asks for one. A feed template
-on a site where nothing asks is likely a line you meant to write, and
-nothing else would show that the site publishes no feed, so Statac
-tells you once.
+No list has a feed unless a `feed:` line asks for one. If a site has a
+feed template but nothing asks for a feed, you probably meant to write a
+`feed:` line, and nothing else would show that the site publishes no
+feed, so Statac tells you once.
 
 ## How to fix it
 
@@ -29,9 +29,10 @@ For a folder's feed, write `feed: true` in the front matter of its list
 page, the `index.md` in the folder. To give every list page a feed,
 cascade the line from `statac.yaml` with `pages.feed: true`.
 
-The message names `templates/feed.xml` where the site has it. A site
-with only another feed template, such as `templates/feed.json`, is
-offered a line naming a feed it builds, such as `feed: feed.json`.
+The message names `templates/feed.xml` if the site has it. If the site
+has only another feed template, such as `templates/feed.json`, the
+message offers a line naming a feed that template builds, such as
+`feed: feed.json`.
 
 If you don't want any feeds, remove the template, or quieten the note
 with `quiet: [unused-feed-template]` in `statac.yaml`.

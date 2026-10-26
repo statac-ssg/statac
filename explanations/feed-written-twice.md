@@ -1,7 +1,7 @@
 # Feed written twice
 
 A list's `feed:` line names the same feed twice. Either the same name is
-in the list twice, or two names give the same URL, such as `feed.xml` and
+in the list twice, or two names lead to the same URL, such as `feed.xml` and
 `/posts/feed.xml` on the list page of `content/posts/`. The message points
 at the second one, and shows where the first is written.
 
