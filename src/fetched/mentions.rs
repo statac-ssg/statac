@@ -10,6 +10,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use super::Fetched;
 use super::refused::{Refused, SETTING};
 use crate::address::{Address, decoded};
 use crate::config::Settings;
@@ -17,7 +18,6 @@ use crate::config::words::key_name;
 use crate::date::Date;
 use crate::ids::PageId;
 use crate::problem::{Expected, Kind, Problem, Requirer, Waiting, Word};
-use crate::site::Site;
 use crate::source::{Place, SourceId, Sources};
 use crate::value::Reader;
 use crate::yaml::{self, Value as Yaml};
@@ -261,9 +261,9 @@ impl Mentions {
 
 /// Whether the site reads mentions at all: it says it uses them, or it
 /// holds some.
-fn read_at_all(site: &Site, settings: &Settings) -> bool {
+fn read_at_all(fetched: &Fetched, settings: &Settings) -> bool {
     settings.truth("webmentions") == Some(true)
-        || (site.fetched.files.iter()).any(|(path, _)| mention_file(path))
+        || (fetched.files.iter()).any(|(path, _)| mention_file(path))
 }
 
 /// Whether `path` under `fetched/` is a file in `fetched/mentions/` that
@@ -278,14 +278,15 @@ pub(crate) fn mention_file(path: &str) -> bool {
 /// value that doesn't read as Statac writes it, and each mention of an
 /// address no page stands at. What `refuse_webmentions_from` refuses is
 /// left out, and counted once. A site without a `url` reads none.
-pub(crate) fn read(
-    site: &Site,
+pub(crate) fn read<'a>(
+    fetched: &Fetched,
+    addresses: impl Iterator<Item = (&'a Address, Option<PageId>)>,
     settings: &Settings,
     sources: &mut Sources,
 ) -> (Mentions, Vec<Problem>) {
     let mut problems = Vec::new();
     let mut mentions = Mentions::default();
-    if !read_at_all(site, settings) {
+    if !read_at_all(fetched, settings) {
         return (mentions, problems);
     }
     // A mention names the page where its sender found it, whatever
@@ -298,9 +299,9 @@ pub(crate) fn read(
         problems.push(Problem::placed(kind, at));
         return (mentions, problems);
     };
-    let pages = pages_by_address(site);
+    let pages = pages_by_address(addresses);
     let refused = Refused::of(settings);
-    for (path, mention, target_at) in kept(&site.fetched, sources, &mut problems) {
+    for (path, mention, target_at) in kept(fetched, sources, &mut problems) {
         if refused
             .refusing(&mention.url, mention.author_url.as_deref())
             .is_some()
@@ -379,23 +380,14 @@ pub(crate) fn kept(
     kept
 }
 
-/// Each address a mention may name a page by, to the page there: its own,
-/// and each in its `redirect_from`. A page left out of the build stands at
-/// its addresses as none.
-fn pages_by_address(site: &Site) -> HashMap<String, Option<PageId>> {
-    let mut pages = HashMap::new();
-    for held in &site.held_back {
-        for address in std::iter::once(&held.address).chain(&held.redirect_from) {
-            pages.insert(spelt(address), None);
-        }
-    }
-    for redirect in &site.redirects {
-        pages.insert(spelt(&redirect.from), Some(redirect.page));
-    }
-    for (id, page) in site.pages.iter() {
-        pages.insert(spelt(&page.address), Some(id));
-    }
-    pages
+/// Each address a mention may name a page by, as a mention spells it,
+/// to the page there.
+fn pages_by_address<'a>(
+    addresses: impl Iterator<Item = (&'a Address, Option<PageId>)>,
+) -> HashMap<String, Option<PageId>> {
+    addresses
+        .map(|(address, page)| (spelt(address), page))
+        .collect()
 }
 
 /// The mention in `source`, and where its `target` is written; none where

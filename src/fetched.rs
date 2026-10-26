@@ -211,17 +211,19 @@ pub struct Ages {
 }
 
 impl Ages {
-    /// The ages of the stills `site` holds, on the day `today`.
-    pub fn of(site: &crate::site::Site, today: &Date) -> Ages {
+    /// The ages of the stills among `pictures`, the paths under
+    /// `fetched/` of the pictures the site shows from there, and of the
+    /// mentions `fetched` holds, on the day `today`.
+    pub fn of<'a>(
+        fetched: &Fetched,
+        pictures: impl Iterator<Item = &'a str>,
+        today: &Date,
+    ) -> Ages {
         let mut ages = Ages::default();
-        let pictures = site.pictures.iter().map(|(_, picture)| picture);
-        let stills = pictures.filter(|picture| {
-            picture.root == crate::album::Root::Fetched
-                && picture.path.starts_with(&format!("{}/", stills::FOLDER))
-        });
-        for still in stills {
+        let folder = format!("{}/", stills::FOLDER);
+        for still in pictures.filter(|path| path.starts_with(&folder)) {
             ages.stills += 1;
-            let line = site.fetched.record.get(&still.path);
+            let line = fetched.record.get(still);
             let fetched = line.filter(|line| matches!(line.held, Held::Hash(_)));
             match fetched.and_then(|line| days_between(&line.day, today)) {
                 Some(days) => {
@@ -230,10 +232,10 @@ impl Ages {
                 None => ages.undated += 1,
             }
         }
-        let files = site.fetched.files.iter();
+        let files = fetched.files.iter();
         for (path, _) in files.filter(|(path, _)| mentions::mention_file(path)) {
             ages.mentions += 1;
-            let line = site.fetched.record.get(path);
+            let line = fetched.record.get(path);
             let fetched = line.filter(|line| matches!(line.held, Held::Hash(_)));
             if let Some(days) = fetched.and_then(|line| days_between(&line.day, today)) {
                 ages.newest = Some(ages.newest.map_or(days, |newest| newest.min(days)));

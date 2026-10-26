@@ -485,6 +485,20 @@ impl Site {
         self.spellings.get(&(language, key.clone())).copied()
     }
 
+    /// Each address a page stands at, with the page: its own, and each
+    /// it sends readers on from. A page left out of the build stands at
+    /// its addresses as none. A later address that is also an earlier one
+    /// is the one that holds.
+    pub fn addresses(&self) -> impl Iterator<Item = (&Address, Option<PageId>)> {
+        let held = (self.held_back.iter())
+            .flat_map(|held| std::iter::once(&held.address).chain(&held.redirect_from))
+            .map(|address| (address, None));
+        let redirects =
+            (self.redirects.iter()).map(|redirect| (&redirect.from, Some(redirect.page)));
+        let pages = (self.pages.iter()).map(|(id, page)| (&page.address, Some(id)));
+        held.chain(redirects).chain(pages)
+    }
+
     /// How a problem names `page`: by its file or the item it was made
     /// from, or a list's page Statac made by its list.
     pub fn named(&self, page: PageId, sources: &crate::source::Sources) -> Named {

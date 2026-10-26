@@ -2,6 +2,7 @@
 
 pub mod incremental;
 mod javascript;
+pub(crate) mod published;
 mod scripts;
 mod timings;
 
@@ -248,8 +249,12 @@ pub(crate) fn read_with(
     read.problems.extend(found);
     let found = crate::album::read(site, &mut read, assets.statics());
     read.problems.extend(found);
-    let (mentions, found) =
-        crate::fetched::mentions::read(&read.site, &read.settings, &mut read.sources);
+    let (mentions, found) = crate::fetched::mentions::read(
+        &read.site.fetched,
+        read.site.addresses(),
+        &read.settings,
+        &mut read.sources,
+    );
     read.site.mentions = mentions;
     read.problems.extend(found);
     let outputs = claims(&read, &assets, &feeds);
@@ -1326,7 +1331,7 @@ pub(crate) fn publish(
         }
         // A run with the drafts in publishes them only to be looked at.
         if remembers && !options.drafts {
-            let now = crate::published::now(
+            let now = published::now(
                 site,
                 renderer.dates(),
                 renderer.assets(),
@@ -1347,7 +1352,12 @@ pub(crate) fn publish(
     }
     drop(asked);
     let fetched = match published {
-        Some(_) => crate::fetched::Ages::of(site, &renderer.today()),
+        Some(_) => {
+            let pictures = (site.pictures.iter())
+                .filter(|(_, picture)| picture.root == crate::album::Root::Fetched)
+                .map(|(_, picture)| picture.path.as_str());
+            crate::fetched::Ages::of(&site.fetched, pictures, &renderer.today())
+        }
         None => crate::fetched::Ages::default(),
     };
     clock.lap(Stage::Writing);

@@ -585,7 +585,7 @@ impl Session {
         let at = self.options.site.as_path();
         let renderer = &read.renderer;
         let site = renderer.site();
-        let now = crate::published::now(
+        let now = crate::build::published::now(
             site,
             renderer.dates(),
             renderer.assets(),
