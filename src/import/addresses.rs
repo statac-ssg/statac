@@ -16,7 +16,7 @@ use crate::content::{self, Run};
 use crate::date::Date;
 use crate::feeds::Feed;
 use crate::problem::{Kind, Named, Problem, Severity, Unwritten, Word};
-use crate::site::{ListKey, PageId, PagePlace};
+use crate::site::{ListKey, PagePlace};
 
 /// How the old addresses were kept.
 #[derive(Default, Debug)]
@@ -44,10 +44,6 @@ pub(super) struct Kept {
     /// The old home page's later pages that a page of their own now sends
     /// readers on from, and how many no page could.
     pub later: LaterPages,
-    /// The old pages of other lists, past the first, found in the old
-    /// built output, that a page of their own now sends readers on from:
-    /// each one's address, and the file written for it.
-    pub list_pages: Vec<(String, String)>,
     /// The old addresses of the photographs beside pages that the new
     /// site publishes only as copies.
     pub pictures: Vec<String>,
@@ -273,13 +269,8 @@ fn published(folder: &Path, today: Date) -> HashMap<String, String> {
 
 /// Sends readers on from the old page of each tag and each series to the
 /// page Statac makes for it, and gives each old address so answered with
-/// the file written for it, and each page of `built` that listed a whole
-/// list. `known` is each tag or series with an old address a reader
-/// worked out. `names` is every tag with the name it had in the old site
-/// and the folders a tool may have kept its page in, by which a page of
-/// `built`, the old built output, is taken for a tag's:
-/// `/categories/linux/` or `/category/linux.html` for `linux` of
-/// `categories`.
+/// the file written for it. `known` is each tag or series with an old
+/// address a reader worked out.
 ///
 /// The page Statac makes for a tag or a series is no file, so it can
 /// carry no `redirect_from`. A page of the author's standing at the tag's address
@@ -291,12 +282,10 @@ pub(super) fn send_on_to_tags_and_series(
     out: &mut Out,
     today: Date,
     known: &[(Word, String, String)],
-    names: &[(String, String, String, Vec<String>)],
-    built: Option<&Path>,
     others: &[String],
-) -> Result<SentOn, Problem> {
-    let mut sent_on = SentOn::default();
-    if known.is_empty() && (built.is_none() || names.is_empty()) {
+) -> Result<Vec<(String, String)>, Problem> {
+    let mut sent_on = Vec::new();
+    if known.is_empty() {
         return Ok(sent_on);
     }
     let (read, assets, feeds) = read_site(
@@ -326,52 +315,7 @@ pub(super) fn send_on_to_tags_and_series(
         }
         taken.insert(crate::platform::folded(&file));
     }
-    let mut wanted: Vec<(Word, String, String)> = known.to_vec();
-    for page in built.map(pages_in).unwrap_or_default() {
-        if taken.contains(&crate::platform::folded(&page)) {
-            continue;
-        }
-        let path = page.strip_suffix("/index.html").unwrap_or(&page);
-        let Some((folder, last)) = path.split_once('/') else {
-            // The page that listed every name of a list.
-            let folder = path.strip_suffix(".html").unwrap_or(path).to_lowercase();
-            let list = names
-                .iter()
-                .find(|(_, _, _, folders)| folders.contains(&folder));
-            if let Some((_, _, list, _)) = list.filter(|_| path != "index.html") {
-                let address = match page.strip_suffix("index.html") {
-                    Some(above) => format!("/{above}"),
-                    None => format!("/{page}"),
-                };
-                sent_on.lists.push((address, list.clone()));
-            }
-            continue;
-        };
-        let last = last.strip_suffix(".html").unwrap_or(last).to_lowercase();
-        if last.contains('/') {
-            continue;
-        }
-        let folder = folder.to_lowercase();
-        let same = |name: &str| {
-            let lower = name.to_lowercase();
-            lower == last
-                || lower.replace(' ', "-") == last
-                || crate::content::slug::slugify(name) == last
-        };
-        let tag = names
-            .iter()
-            .find(|(_, name, _, folders)| folders.contains(&folder) && same(name));
-        if let Some((tag, _, _, _)) = tag {
-            let address = match page.strip_suffix("index.html") {
-                Some(above) => format!("/{above}"),
-                None => format!("/{page}"),
-            };
-            if !wanted.iter().any(|(_, _, known)| *known == address) {
-                wanted.push((Word::Tag, tag.clone(), address));
-            }
-        }
-    }
-    for (word, name, old) in wanted {
+    for (word, name, old) in known {
         let language = others
             .iter()
             .find(|language| old.starts_with(&format!("/{language}/")));
@@ -383,21 +327,20 @@ pub(super) fn send_on_to_tags_and_series(
         };
         let Some((_, _, to)) = list_pages
             .iter()
-            .filter(|(w, n, _)| *w == word && *n == name)
+            .filter(|(w, n, _)| w == word && n == name)
             .find(in_language)
         else {
             continue;
         };
-        let Ok(address) = Address::read(&old) else {
+        let Ok(address) = Address::read(old) else {
             continue;
         };
         let file = crate::platform::folded(&address.file());
-        if settled(&old) == settled(to) || !taken.insert(file) {
+        if settled(old) == settled(to) || !taken.insert(file) {
             continue;
         }
-        if let Some(written) = send_on(out, &old, to, language.map(String::as_str))? {
-            sent_on.moved.push((old.clone(), to.clone()));
-            sent_on.pages.push((old, written));
+        if let Some(written) = send_on(out, old, to, language.map(String::as_str))? {
+            sent_on.push((old.clone(), written));
         }
     }
     Ok(sent_on)
@@ -442,17 +385,15 @@ fn send_on(
 }
 
 /// Sends readers on from each later page of the old home page to the page
-/// of the posts' list that holds the same posts, and gives each old
-/// address so answered with the file written for it. An old page whose
-/// posts no one page of the list holds is sent on to the list's page of
-/// the same number, or left unanswered and counted where it has none.
+/// of the posts' list with the same number, and gives each old address so
+/// answered with the file written for it. An old page past the list's
+/// last is left unanswered and counted.
 ///
 /// A list's later pages are no files, so none can carry `redirect_from`;
 /// each old address gets a page of its own, as [`send_on_to_tags_and_series`] writes.
 pub(super) fn send_on_to_later_pages(
     out: &mut Out,
     today: Date,
-    pages: &[Page],
     home: &HomePages,
 ) -> Result<LaterPages, Problem> {
     let mut sent_on = LaterPages::default();
@@ -473,10 +414,7 @@ pub(super) fn send_on_to_later_pages(
     let Some((_, list)) = site.lists.iter().find(|(_, list)| list.key == posts) else {
         return Ok(sent_on);
     };
-    let Some(first) = list.page.map(|page| site.pages.get(page)) else {
-        return Ok(sent_on);
-    };
-    if !first.lands() {
+    if !list.page.is_some_and(|page| site.pages.get(page).lands()) {
         return Ok(sent_on);
     }
     let mut taken: HashSet<String> = assets
@@ -487,33 +425,9 @@ pub(super) fn send_on_to_later_pages(
         .chain(site.pictures.claims())
         .map(|(file, _)| crate::platform::folded(&file))
         .collect();
-    // The old home page's order: the newest first, and posts of one
-    // moment as the old tool put them.
-    let from = |id: &PageId| {
-        let path = &site.pages.get(*id).path;
-        pages.iter().find(|page| page.to == *path).map(|p| &p.from)
-    };
-    let moment = |id: &PageId| crate::lists::moment(&read.dates, site.pages.get(*id));
-    let mut old_order = list.members.clone();
-    old_order.sort_by(|a, b| {
-        moment(b)
-            .cmp(&moment(a))
-            .then_with(|| match home.ties_reversed {
-                true => from(b).cmp(&from(a)),
-                false => from(a).cmp(&from(b)),
-            })
-    });
-    let chunks = old_order.chunks(home.per_page).enumerate().skip(1);
-    for (old, (index, held)) in home.addresses.iter().zip(chunks) {
-        let held: HashSet<&PageId> = held.iter().collect();
-        let same = (1..=list.stretches())
-            .find(|number| list.stretch(*number).iter().collect::<HashSet<_>>() == held);
-        let to = match same {
-            Some(1) => Some(first.address.as_str()),
-            Some(number) => list.later_address(number).map(Address::as_str),
-            None => list.later_address(index + 1).map(Address::as_str),
-        };
-        let Some(to) = to else {
+    // The first of `addresses` is the old home page's second page.
+    for (old, number) in home.addresses.iter().zip(2..) {
+        let Some(to) = list.later_address(number).map(Address::as_str) else {
             sent_on.left += 1;
             continue;
         };
@@ -524,10 +438,7 @@ pub(super) fn send_on_to_later_pages(
             continue;
         }
         if let Some(written) = send_on(out, old, to, None)? {
-            match same {
-                Some(_) => sent_on.pages.push((old.clone(), written)),
-                None => sent_on.unlike.push((old.clone(), written)),
-            }
+            sent_on.pages.push((old.clone(), written));
         }
     }
     Ok(sent_on)
@@ -536,143 +447,12 @@ pub(super) fn send_on_to_later_pages(
 /// What [`send_on_to_later_pages`] did.
 #[derive(Default, Debug)]
 pub(super) struct LaterPages {
-    /// Each old address now answered by the page holding the same posts,
-    /// with the file written for it.
+    /// Each old address now answered by the page of the same number, with
+    /// the file written for it.
     pub pages: Vec<(String, String)>,
-    /// Each old address whose posts no one page of the posts' list holds,
-    /// sent on to the page of its number, with the file written for it.
-    pub unlike: Vec<(String, String)>,
-    /// How many old pages held posts no one page of the posts' list
-    /// holds, where the list has no page of their number either.
+    /// How many old pages had a number past the last page of the posts'
+    /// list.
     pub left: usize,
-}
-
-/// Sends readers on from each page of a list in `built`, the old built
-/// output, that the new site doesn't publish, to the new list's page of
-/// the same number, and gives each old address so answered with the file
-/// written for it. Such a page stands where the new list's page of its
-/// number does, or its first would, by the new site's `pagination.permalink`, or
-/// there as a file: `/posts/page/2.html` for `/posts/page/2/`, and
-/// `/tags/rust/page/1/` beside `/tags/rust/page/2/`; or beneath an old
-/// address in `moved` that now sends readers on to the list, each with the
-/// list's address: `/tags/rust/posts/page/2/` beneath
-/// `/tags/rust/posts/`, sent on to `/tags/rust/`. The home page's are
-/// [`send_on_to_later_pages`]'s.
-///
-/// A list's later pages are no files, nor is a tag's page, so each old
-/// address gets a page of its own, as [`send_on_to_tags_and_series`] writes.
-pub(super) fn send_on_to_list_pages(
-    out: &mut Out,
-    today: Date,
-    built: &Path,
-    others: &[String],
-    moved: &[(String, String)],
-) -> Result<Vec<(String, String)>, Problem> {
-    let mut sent_on = Vec::new();
-    let (read, assets, feeds) = read_site(
-        out.folder,
-        &Run {
-            today: Some(today),
-            drafts: false,
-            url: None,
-            renamed: Vec::new(),
-        },
-    );
-    let site = &read.site;
-    let mut taken: HashSet<String> = assets
-        .claims()
-        .into_iter()
-        .chain(read.claims())
-        .chain(crate::feeds::claims(&feeds))
-        .chain(site.pictures.claims())
-        .map(|(file, _)| crate::platform::folded(&file))
-        .collect();
-    // Where each list's pages stand, and the address each sends readers
-    // on to, by where the list's first would stand.
-    let mut pages: HashMap<String, Address> = HashMap::new();
-    for (_, list) in site.lists.iter() {
-        let first = match list.page.map(|page| site.pages.get(page)) {
-            Some(page) if page.lands() => page.address.clone(),
-            Some(_) => continue,
-            None => match &list.address {
-                Some(address) => address.value.clone(),
-                None => continue,
-            },
-        };
-        if list.key == ListKey::Folder(String::new()) {
-            continue;
-        }
-        let Some(second) = list.later_address(2) else {
-            continue;
-        };
-        // The folders the list's pages stood beneath: its own, and each
-        // old one sent on to it, as a folder.
-        let mut folders = vec![first.as_str().to_owned()];
-        for (old, _) in moved.iter().filter(|(_, to)| settled(to) == first.as_str()) {
-            let old = old.strip_suffix(".html").unwrap_or(old);
-            folders.push(format!("{}/", old.trim_end_matches('/')));
-        }
-        for folder in &folders {
-            let beneath = |later: &Address| match *folder == first.as_str() {
-                true => Some(crate::platform::folded(later.as_str())),
-                false => (later.as_str().strip_prefix(first.as_str()))
-                    .map(|rest| crate::platform::folded(&format!("{folder}{rest}"))),
-            };
-            if let Some(above) = beneath(second)
-                .as_deref()
-                .and_then(|a| a.strip_suffix("/2/"))
-            {
-                pages.insert(format!("{above}/1/"), first.clone());
-            }
-            for number in 2..=list.stretches() {
-                if let Some(later) = list.later_address(number)
-                    && let Some(at) = beneath(later)
-                {
-                    pages.insert(at, later.clone());
-                }
-            }
-        }
-    }
-    for page in pages_in(built) {
-        let file = crate::platform::folded(&page);
-        if taken.contains(&file) {
-            continue;
-        }
-        let folder = (page.strip_suffix("index.html"))
-            .or_else(|| page.strip_suffix(".html"))
-            .unwrap_or(&page);
-        let folder = format!("/{}/", folder.trim_end_matches('/'));
-        let Some(to) = pages.get(&crate::platform::folded(&folder)) else {
-            continue;
-        };
-        let old = match page.strip_suffix("index.html") {
-            Some(folder) => format!("/{folder}"),
-            None => format!("/{page}"),
-        };
-        let language = others
-            .iter()
-            .find(|language| old.starts_with(&format!("/{language}/")));
-        if !taken.insert(file) {
-            continue;
-        }
-        if let Some(written) = send_on(out, &old, to.as_str(), language.map(String::as_str))? {
-            sent_on.push((old, written));
-        }
-    }
-    Ok(sent_on)
-}
-
-/// What [`send_on_to_tags_and_series`] did and found.
-#[derive(Default)]
-pub(super) struct SentOn {
-    /// Each old address now answered, with the file written for it.
-    pub pages: Vec<(String, String)>,
-    /// Each old address now answered, with the tag's page it sends
-    /// readers on to.
-    pub moved: Vec<(String, String)>,
-    /// Each page of the old built output that listed every name of a
-    /// list, by its address, with the list's name.
-    pub lists: Vec<(String, String)>,
 }
 
 /// `address`, an address or a pattern from the top of the site, as a

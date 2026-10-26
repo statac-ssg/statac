@@ -29,8 +29,7 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 Statac worked out where the old site published each page, read the new site, and looked for each of the 8 old URLs there: 8 are published or redirected.
 
 - `content/posts/index.md` cascades `pages.permalink: /{year}/{month}/{day}/{slug}.html` to every page in `content/posts/`, which puts 5 of them at their old URLs.
-- 1 page at the top of `content/`, `content/page3.md`, redirects from an old paginated page of the home page to the page of `content/posts/` that holds the same posts, with `permalink` and `redirect_to`.
-- 1 page at the top of `content/`, `content/page2.md`, redirects from `/page2/`, an old paginated page of the home page, to the page of `content/posts/` with the same number, which doesn't hold exactly the same posts, as happens where posts share a date.
+- 2 pages at the top of `content/`, such as `content/page2.md`, redirect from the old paginated pages of the home page, each to the page of `content/posts/` with the same number, with `permalink` and `redirect_to`.
 
 The old site's built output isn't in `_site/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
 

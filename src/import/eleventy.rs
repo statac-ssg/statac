@@ -22,7 +22,9 @@ use super::common::{
 };
 use super::inside;
 use super::report::code;
-use super::{Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Value};
+use super::{
+    Failed, Field, File, Finding, FindingKind, Import, Left, Page, PageKind, Spot, Unread, Value,
+};
 use crate::content::address::Address;
 use crate::date::{self, Date};
 use crate::platform;
@@ -187,9 +189,9 @@ pub(super) static REDIRECT_LEFT: FindingKind = FindingKind {
 pub(super) static COPY_UNREAD: FindingKind = FindingKind {
     heading: "Copies Statac doesn't make",
     sentence: "Each of these names a file or folder outside the old site's own folder, one \
-               reached through a link that leads outside it, or one that isn't there, or a \
-               place outside the new site to copy it to. Statac reads nothing outside the old \
-               site, so it copied nothing for it: bring across by hand what it named, if it is \
+               reached through a link, or one that isn't there, or a place outside the new site \
+               to copy it to. Statac reads nothing outside the old site and follows no link in \
+               it, so it copied nothing for it: bring across by hand what it named, if it is \
                wanted.",
 };
 
@@ -250,7 +252,7 @@ const DATES_FROM_FILE: &[&str] = &[
 pub(super) fn read(folder: &Path, today: Date, given: Option<&str>) -> Result<Import, Box<Failed>> {
     let found = settings::FILES
         .iter()
-        .find(|name| inside::a_settings_file(folder, name));
+        .find(|name| inside::a_file(folder, name));
     let s = match found {
         Some(name) => settings::read(folder, name).map_err(|error| {
             Box::<Failed>::from(Problem::nowhere(Kind::CantRead {
@@ -430,20 +432,16 @@ struct Front {
     program: bool,
     /// How many control characters were taken out of it.
     controls: usize,
+    /// The front matter, where Statac's YAML reader stopped at it: the
+    /// page is then read as if it had none.
+    unread: Option<Unread>,
 }
 
 /// Reads `text`'s front matter, written in YAML after `---` or `---yaml`,
 /// up to a line of `---`; or gives the line it stopped at and that line's
-/// text.
+/// text, where it isn't YAML.
 fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    // Eleventy publishes a control character in front matter as nothing,
-    // so it is taken out here; the other readers leave one for Statac's
-    // reader to refuse.
-    let mended = super::mend::mended(text, true);
-    let (text, controls) = (mended.text.as_str(), mended.controls);
-    let line_text = |line: usize| text.lines().nth(line - 1).unwrap_or_default().to_owned();
-    let line_of = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
     let first = text.lines().next().unwrap_or_default().trim_end();
     let Some(language) = first.strip_prefix("---") else {
         return Ok(Front {
@@ -451,7 +449,8 @@ fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
             body: text.to_owned(),
             body_line: 1,
             program: false,
-            controls,
+            controls: 0,
+            unread: None,
         });
     };
     let start = text.find('\n').map_or(text.len(), |n| n + 1);
@@ -465,19 +464,31 @@ fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
         at += line.len();
     }
     let (end, body) = end.ok_or_else(|| (1, first.to_owned()))?;
+    // Eleventy publishes a control character in front matter as nothing,
+    // so it is taken out here; the other readers leave one for Statac's
+    // reader to refuse.
+    let kept: String = (text[start..end].chars())
+        .filter(|c| !c.is_control() || matches!(c, '\t' | '\n' | '\r'))
+        .collect();
+    let controls = text[start..end].chars().count() - kept.chars().count();
+    let taken = end - start - kept.len();
+    let text = format!("{}{kept}{}", &text[..start], &text[end..]);
+    let (end, body) = (end - taken, body - taken);
+    let line_of = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
     let mut sources = Sources::default();
+    let mut unread = None;
     let fields = match language.trim() {
         "" | "yaml" | "yml" => {
-            let source = sources.add(path, text.to_owned());
+            let source = sources.add(path, text.clone());
             let span = crate::source::Span::new(start, end);
-            let node =
-                crate::yaml::read_at(&sources, Place { source, span }).map_err(|problem| {
-                    let line = problem.place.map_or(1, |place| {
-                        sources.line_number(place.source, place.span.start as usize)
-                    });
-                    (line, line_text(line))
-                })?;
-            mapping(&sources, &node)
+            match crate::yaml::read_at(&sources, Place { source, span }) {
+                Ok(node) => mapping(&sources, &node),
+                Err(problem) => {
+                    let front = &text[start..end];
+                    unread = Some(super::common::unread_at(&sources, &problem, path, front));
+                    Vec::new()
+                }
+            }
         }
         "js" | "javascript" => {
             return Ok(Front {
@@ -486,6 +497,7 @@ fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
                 body_line: line_of(body),
                 program: true,
                 controls,
+                unread: None,
             });
         }
         _ => return Err((1, first.to_owned())),
@@ -496,6 +508,7 @@ fn front(text: &str, path: &str) -> Result<Front, (usize, String)> {
         body_line: line_of(body),
         program: false,
         controls,
+        unread,
     })
 }
 
@@ -680,7 +693,7 @@ impl Reader<'_> {
 
     /// The path in the old folder of `written`, a folder the settings name
     /// from `base`, where it may be followed: inside the old folder as
-    /// written, and reached through no link that leads outside it.
+    /// written, and reached through no link.
     fn follow(&self, base: &str, written: &str) -> Option<String> {
         let written = written.strip_prefix("./").unwrap_or(written);
         let written = match written.trim_end_matches('/') {
@@ -1042,9 +1055,6 @@ impl Reader<'_> {
                  there"
                     .to_owned()
             } else {
-                if self.ignored(&inner).is_none() {
-                    inside::beyond(self.folder, &inner);
-                }
                 format!(
                     "a {} outside the input folder, {}, which Eleventy doesn't publish",
                     if dir { "folder" } else { "file" },
@@ -1105,15 +1115,7 @@ impl Reader<'_> {
                 self.left(&shown, what);
                 continue;
             }
-            // What a link led to is left out where an ignore file names
-            // the place it really stands, as where it names the link.
-            let stands = inside::stands_at(self.folder, &inner);
-            let ignored = self.ignored(&inner).or_else(|| {
-                (stands.as_deref())
-                    .filter(|stands| *stands != inner)
-                    .and_then(|stands| self.ignored(stands))
-            });
-            if let Some(file) = ignored {
+            if let Some(file) = self.ignored(&inner) {
                 let what = format!(
                     "a {} {} leaves out, which Eleventy doesn't read",
                     if dir { "folder" } else { "file" },
@@ -1429,13 +1431,16 @@ impl Reader<'_> {
             self.left(path, "a file that isn't UTF-8 text");
             return Ok(());
         };
-        let front = match front(&text, path) {
+        let mut front = match front(&text, path) {
             Ok(front) => front,
             Err((line, text)) => {
                 self.find(&FRONT_MATTER_UNREAD, path, Some(line), &text);
                 return Ok(());
             }
         };
+        let unread = front.unread.take();
+        let as_written = unread.is_some();
+        self.import.unread.extend(unread);
         if front.controls > 0 {
             self.controls.0 += front.controls;
             self.controls.1 += 1;
@@ -1451,7 +1456,7 @@ impl Reader<'_> {
         }
         let rel = self.rel(path);
         let paged = front.fields.iter().find(|f| f.name == "pagination");
-        let listed = listing(&front.body);
+        let listed = listing(&front.body).filter(|_| !as_written);
         if paged.is_some() || listed.is_some() {
             let (line, shown) = match (paged, listed) {
                 (Some(field), _) => (field.line, "pagination".to_owned()),
@@ -1989,6 +1994,7 @@ impl Reader<'_> {
                 address: made.address,
                 own_address: made.own_address,
                 other_addresses: Vec::new(),
+                unread: None,
             });
         }
         self.beside(&pages);

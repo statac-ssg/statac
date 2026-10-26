@@ -16,8 +16,8 @@ pub(super) const FILES: &[&str] = &["zola.toml", "config.toml"];
 /// Whether `folder` holds a Zola site, by its settings: a `zola.toml`, or
 /// a `config.toml` that sets `base_url`, which Zola can't do without.
 pub(super) fn owns(folder: &Path) -> bool {
-    inside::a_settings_file(folder, "zola.toml")
-        || inside::a_settings_file(folder, "config.toml")
+    inside::a_file(folder, "zola.toml")
+        || inside::a_file(folder, "config.toml")
             .then(|| std::fs::read_to_string(inside::path(folder, "config.toml")).ok())
             .flatten()
             .and_then(|text| toml::read(&text).ok())
@@ -28,7 +28,7 @@ pub(super) fn owns(folder: &Path) -> bool {
 pub(super) fn found(folder: &Path) -> Result<(String, Vec<Field>), Box<Failed>> {
     let name = FILES
         .iter()
-        .find(|name| inside::a_settings_file(folder, name))
+        .find(|name| inside::a_file(folder, name))
         .copied()
         .unwrap_or(FILES[1]);
     let path = folder.join(name);

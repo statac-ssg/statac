@@ -78,10 +78,18 @@ pub(super) static MORE_OUT: FindingKind = FindingKind {
 
 pub(super) static LINKS: FindingKind = FindingKind {
     heading: "Links Statac didn't follow",
-    sentence: "Statac follows a link in the old site only to something inside it that the old \
-               site published. Each of these it didn't follow, for the reason beside it, so \
-               what the old site read through it didn't come across: put the folder or file \
-               itself where the link is, in a copy of the old site, and import again.",
+    sentence: "Statac follows no link in the old site, so what the old site read through each \
+               of these didn't come across: put the folder or file itself where the link is, in \
+               a copy of the old site, and import again.",
+};
+
+pub(super) static FRONT_MATTER_AS_WRITTEN: FindingKind = FindingKind {
+    heading: "Front matter left as written",
+    sentence: "Statac's YAML reader stopped at this line in the front matter of each of these, \
+               so the page came across with its front matter as written, and the site won't \
+               build until that is put right. Its old URL wasn't worked out either: put the \
+               front matter right in the old site and import again, or put it right in the new \
+               one and give the page a `permalink`.",
 };
 
 pub(super) static NOT_IN_BUILT: FindingKind = FindingKind {
@@ -217,29 +225,6 @@ impl Terms {
             }
         }
         old
-    }
-
-    /// Every tag a page has, with the name it had, its list, and the
-    /// folders a tool may have published its old page in, for finding one in the old built output: a list's
-    /// own name, and the name without its `s` or with `y` for `ies`.
-    fn names(&self) -> Vec<(String, String, String, Vec<String>)> {
-        let folders = |list: &str| {
-            let lower = list.to_lowercase();
-            let mut folders = vec![lower.clone()];
-            if let Some(stem) = lower.strip_suffix("ies") {
-                folders.push(format!("{stem}y"));
-            } else if let Some(stem) = lower.strip_suffix('s') {
-                folders.push(stem.to_owned());
-            }
-            folders
-        };
-        let lists = self.lists.iter().flat_map(|(list, names)| {
-            (names.iter())
-                .map(move |(name, tag)| (tag.clone(), name.clone(), list.clone(), folders(list)))
-        });
-        let tags = (self.tags.iter())
-            .map(|tag| (tag.clone(), tag.clone(), "tags".to_owned(), folders("tags")));
-        lists.chain(tags).collect()
     }
 }
 
@@ -453,6 +438,7 @@ pub(super) fn write<'a>(
         output,
         mut findings,
         left,
+        unread,
         notes,
         mut words,
     } = import;
@@ -501,27 +487,6 @@ pub(super) fn write<'a>(
         base: address.as_deref().map(base_of).unwrap_or_default(),
         ..Summary::default()
     };
-    let followed = super::inside::followed();
-    if let Some(first) = followed.first() {
-        summary.notes.push(format!(
-            "Statac followed {}, {}, which {} to somewhere inside the old site, and read what {} \
-             to as standing where the link is.",
-            match followed.len() {
-                1 => "1 link".to_owned(),
-                n => format!("{n} links"),
-            },
-            match followed.len() {
-                1 => super::report::code(first),
-                _ => format!("such as {}", super::report::code(first)),
-            },
-            if followed.len() == 1 { "leads" } else { "lead" },
-            if followed.len() == 1 {
-                "it leads"
-            } else {
-                "each leads"
-            },
-        ));
-    }
     summary.home = pages.iter().any(|page| page.to == "index.md");
     let mut text = made.settings.clone();
     text.push_str(&yaml::fields(
@@ -585,6 +550,24 @@ pub(super) fn write<'a>(
                 &format!("content/{to}"),
             ));
             page.to = to;
+        }
+        if let Some(unread) = unread.iter().find(|unread| unread.from == page.from) {
+            findings.push(Finding::at(
+                &FRONT_MATTER_AS_WRITTEN,
+                &page.from,
+                Some(unread.line),
+                &unread.text,
+            ));
+            let mut front = unread.front.clone();
+            if !front.ends_with('\n') {
+                front.push('\n');
+            }
+            page.unread = Some(front);
+            page.front.clear();
+            page.terms.clear();
+            page.address = None;
+            page.own_address = false;
+            page.other_addresses.clear();
         }
         terms.tag(&mut page);
         page.front = shared_front(&page, &mut findings);
@@ -682,73 +665,18 @@ pub(super) fn write<'a>(
         &mut out,
         today,
         &terms.old_pages(&term_pages),
-        &terms.names(),
-        built_at.as_deref(),
         &other_languages,
     )?;
-    for (address, _) in &sent_on.pages {
+    for (address, _) in &sent_on {
         if !worked_out.iter().any(|(known, _)| known == address) {
             worked_out.push((address.clone(), String::new()));
         }
     }
-    let mut term_lists = term_lists;
-    for list in sent_on.lists {
-        if !term_lists.iter().any(|(known, _)| *known == list.0) {
-            term_lists.push(list);
-        }
-    }
-    summary.kept.sent_on = sent_on.pages;
+    summary.kept.sent_on = sent_on;
     if let Some(home) = &home_pages {
-        summary.kept.later = addresses::send_on_to_later_pages(&mut out, today, &placed, home)?;
-    }
-    if let Some(built) = &built_at {
-        let pages = addresses::send_on_to_list_pages(
-            &mut out,
-            today,
-            built,
-            &other_languages,
-            &sent_on.moved,
-        )?;
-        for (address, _) in &pages {
-            if !worked_out.iter().any(|(known, _)| known == address) {
-                worked_out.push((address.clone(), String::new()));
-            }
-        }
-        summary.kept.list_pages = pages;
+        summary.kept.later = addresses::send_on_to_later_pages(&mut out, today, home)?;
     }
     summary.terms = terms;
-    // A page listing every tag, where one came across, stands where the
-    // old site's did.
-    for (address, name) in &term_lists {
-        if !name.eq_ignore_ascii_case("tags") {
-            continue;
-        }
-        let language =
-            (other_languages.iter()).find(|language| address.starts_with(&format!("/{language}/")));
-        let (path, at, rest) = match language {
-            Some(language) => (
-                format!("content/{language}/tags.md"),
-                format!("/{language}/tags/"),
-                &address[language.len() + 1..],
-            ),
-            None => (
-                "content/tags.md".to_owned(),
-                "/tags/".to_owned(),
-                address.as_str(),
-            ),
-        };
-        if *address == at {
-            continue;
-        }
-        if let Some((front, _)) = out
-            .text(&path)
-            .as_deref()
-            .and_then(|t| t.rsplit_once("---\n"))
-        {
-            let line = yaml::fields([("permalink", &Value::Text(rest.to_owned()))]);
-            out.put(&path, format!("{front}{line}---\n").as_bytes())?;
-        }
-    }
     let checked = addresses::check(
         folder,
         today,
@@ -1087,6 +1015,9 @@ fn with_word(text: &str, field: &Field) -> String {
 
 /// A page's file: its front matter, where it has any, then its writing.
 pub(super) fn page_text(page: &Page) -> String {
+    if let Some(front) = &page.unread {
+        return format!("---\n{front}---\n{}", page.writing);
+    }
     if page.front.is_empty() {
         return page.writing.clone();
     }

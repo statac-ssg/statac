@@ -889,13 +889,14 @@ impl Reader<'_> {
             .or(root_language.map(str::to_owned))
             .unwrap_or_else(|| self.main.clone());
         let html = HTML.contains(&ending.as_str());
-        let front = match front(&text, &from, true) {
+        let mut front = match front(&text, &from, true) {
             Ok(front) => front,
             Err((line, text)) => {
                 self.find(&FRONT_MATTER_UNREAD, &from, Some(line), &text);
                 return Ok(());
             }
         };
+        self.import.unread.extend(front.unread.take());
         let (dir, name) = match shape {
             Shape::Single => (parent(within).to_owned(), stem.to_owned()),
             Shape::Bundle => {
@@ -1493,6 +1494,7 @@ impl Reader<'_> {
                 address: doc.address,
                 own_address: doc.own_address,
                 other_addresses: doc.others,
+                unread: None,
                 fences,
                 calls: called,
             });

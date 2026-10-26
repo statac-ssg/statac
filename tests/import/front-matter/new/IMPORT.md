@@ -4,7 +4,7 @@ It was made from `tests/import/front-matter/old` by `statac import`, which chang
 
 ## What came across
 
-- 2 posts, into `content/posts/`.
+- 1 post, into `content/posts/`.
 - 1 draft, with `draft: true`, so it isn't published by accident.
 - 2 pages, into `content/` where they stood in the old site.
 
@@ -18,7 +18,7 @@ The settings name no time zone, so none is written, and Statac reads a date writ
 
 The settings' `defaults` were written into each page they reached, as fields of its own.
 
-`layout` was taken off 3 pages: each is built with the template for its kind, as https://statac.dev/templates/ describes.
+`layout` was taken off 2 pages: each is built with the template for its kind, as https://statac.dev/templates/ describes.
 
 2 names in the old site's `categories` are now tags, each with `category_` before it, as `category_category-1`, so they can still be told from the site's own tags. To rename one across the site, change it on each page that has it.
 
@@ -36,9 +36,9 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 6 old URLs there: 6 are published or redirected.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 5 old URLs there: 5 are published or redirected.
 
-- 4 pages carry a `permalink` of their own, where no pattern fits.
+- 3 pages carry a `permalink` of their own, where no pattern fits.
 - 2 pages carry `redirect_from`, for the other URLs that led to them.
 
 The old site's built output isn't in `_site/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.

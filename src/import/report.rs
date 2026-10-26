@@ -464,52 +464,14 @@ fn addresses(text: &mut String, summary: &Summary) {
         ways.push(match kept.later.pages.len() {
             1 => format!(
                 "1 page at the top of `content/`, {}, redirects from an old paginated page of the \
-                 home page to the page of `content/posts/` that holds the same posts, with \
+                 home page to the page of `content/posts/` with the same number, with \
                  `permalink` and `redirect_to`.",
                 code(example)
             ),
             n => format!(
                 "{n} pages at the top of `content/`, such as {}, redirect from the old paginated \
-                 pages of the home page, each to the page of `content/posts/` that holds the \
-                 same posts, with `permalink` and `redirect_to`.",
-                code(example)
-            ),
-        });
-    }
-    if let Some((old, example)) = kept.later.unlike.first() {
-        ways.push(match kept.later.unlike.len() {
-            1 => format!(
-                "1 page at the top of `content/`, {}, redirects from {}, an old paginated page \
-                 of the home page, to the page of `content/posts/` with the same number, \
-                 which doesn't hold exactly the same posts, as happens where posts share a date.",
-                code(example),
-                code(old)
-            ),
-            n => format!(
-                "{n} pages at the top of `content/`, such as {}, redirect from old paginated \
                  pages of the home page, each to the page of `content/posts/` with the same \
-                 number, which doesn't hold exactly the same posts, as happens where posts \
-                 share a date: {}.",
-                code(example),
-                (kept.later.unlike.iter())
-                    .map(|(old, _)| code(old))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-        });
-    }
-    if let Some((_, example)) = kept.list_pages.first() {
-        ways.push(match kept.list_pages.len() {
-            1 => format!(
-                "1 page at the top of `content/`, {}, redirects from an old paginated page of a \
-                 list, found in the old site's built output, to the list's paginated page with \
-                 the same number, with `permalink` and `redirect_to`.",
-                code(example)
-            ),
-            n => format!(
-                "{n} pages at the top of `content/`, such as {}, redirect from old paginated \
-                 pages of lists, found in the old site's built output, each to the list's \
-                 paginated page with the same number, with `permalink` and `redirect_to`.",
+                 number, with `permalink` and `redirect_to`.",
                 code(example)
             ),
         });
@@ -517,15 +479,13 @@ fn addresses(text: &mut String, summary: &Summary) {
     match kept.later.left {
         0 => {}
         1 => ways.push(
-            "1 old paginated page of the home page held posts that no one page of \
-             `content/posts/` holds, and `content/posts/` has no page with the same number, so \
-             nothing is published at its URL: it is listed below."
+            "1 old paginated page of the home page has a number past the last page of \
+             `content/posts/`, so nothing is published at its URL: it is listed below."
                 .to_owned(),
         ),
         n => ways.push(format!(
-            "{n} old paginated pages of the home page held posts that no one page of \
-             `content/posts/` holds, and `content/posts/` has no page with the same number, so \
-             nothing is published at their URLs: they are listed below."
+            "{n} old paginated pages of the home page have numbers past the last page of \
+             `content/posts/`, so nothing is published at their URLs: they are listed below."
         )),
     }
     if !summary.base.is_empty() {

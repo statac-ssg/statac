@@ -36,11 +36,9 @@ Nothing in the new site is published at these old URLs. Give the page each shoul
 
 - `/archive.html`, for `archive.html`
 
-The old site published a page listing every one of its `categories` at `/categories/`, and the new site has none.
+The old site's built output also holds 10 pages at URLs Statac didn't work out, and nothing in the new site is published there. Give the page each should lead to a `redirect_from` naming it. By folder:
 
-The old site's built output also holds 9 pages at URLs Statac didn't work out, and nothing in the new site is published there. Give the page each should lead to a `redirect_from` naming it. By folder:
-
-- `/categories/`: 1 page, `/categories/linux/`
+- `/categories/`: 2 pages, `/categories/` and `/categories/linux/`
 - `/category/`: 1 page, `/category/home-lab.html`
 - `/`: 1 page, `/page-9.html`
 - `/tag/`: 4 pages, such as `/tag/a.html`, `/tag/b.html` and `/tag/c.html`

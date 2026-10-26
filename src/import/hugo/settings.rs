@@ -31,13 +31,11 @@ pub(super) const DEFAULT_FOLDER: &str = "config/_default";
 
 /// Whether `folder` holds a Hugo site, by its settings.
 pub(super) fn owns(folder: &Path) -> bool {
-    HUGOS_OWN_FILES
-        .iter()
-        .any(|n| inside::a_settings_file(folder, n))
-        || inside::a_settings_folder(folder, DEFAULT_FOLDER)
+    HUGOS_OWN_FILES.iter().any(|n| inside::a_file(folder, n))
+        || inside::a_folder(folder, DEFAULT_FOLDER)
         || FILES
             .iter()
-            .filter(|n| !HUGOS_OWN_FILES.contains(n) && inside::a_settings_file(folder, n))
+            .filter(|n| !HUGOS_OWN_FILES.contains(n) && inside::a_file(folder, n))
             .any(|n| {
                 fields_of(folder, n).is_ok_and(|fields| {
                     fields
@@ -106,7 +104,7 @@ pub(super) fn found(folder: &Path) -> Result<Found, Box<Failed>> {
     let mut left = Vec::new();
     let mut main = None;
     for name in FILES {
-        if !inside::a_settings_file(folder, name) {
+        if !inside::a_file(folder, name) {
             continue;
         }
         if main.is_some() {
@@ -124,7 +122,7 @@ pub(super) fn found(folder: &Path) -> Result<Found, Box<Failed>> {
         }
     }
     let split = inside::path(folder, DEFAULT_FOLDER);
-    if inside::a_settings_folder(folder, DEFAULT_FOLDER) {
+    if inside::a_folder(folder, DEFAULT_FOLDER) {
         let mut names = names_in(&split);
         // The main file first, so a file for one setting adds to it.
         names.sort_by_key(|name| !matches!(stem(name).as_str(), "hugo" | "config"));
@@ -180,7 +178,7 @@ pub(super) fn found(folder: &Path) -> Result<Found, Box<Failed>> {
         }
     }
     let config = inside::path(folder, "config");
-    if inside::a_settings_folder(folder, "config") {
+    if inside::a_folder(folder, "config") {
         for name in names_in(&config) {
             if name == "_default" {
                 continue;

@@ -1,6 +1,5 @@
 ---
-title: "Post
-2"
+title: Post 2
 description: ""
 date: 2026-01-02
 updated: ""

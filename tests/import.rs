@@ -265,19 +265,53 @@ fn each_later_page_of_the_old_home_page_sends_readers_on_to_a_page_of_the_posts(
     let stopped = |problem: &&statac::problem::Problem| problem.kind.severity() == Severity::Error;
     assert_eq!(outcome.problems.iter().filter(stopped).count(), 0);
     let read = |path: &str| fs::read_to_string(out.join(path)).unwrap();
-    // The old third page held the oldest post, as the list's third does.
-    assert!(read("page3/index.html").contains("url=https://example.org/posts/page/3/"));
-    assert!(read("posts/page/3/index.html").contains("Post 1"));
-    // The old second page held the later post of one day and the list's
-    // second holds the earlier, so it is sent on to the page of its number.
     assert!(read("page2/index.html").contains("url=https://example.org/posts/page/2/"));
+    assert!(read("page3/index.html").contains("url=https://example.org/posts/page/3/"));
     assert!(!out.join("page").exists());
     let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
     assert!(report.contains(
-        "redirects from `/page2/`, an old paginated page of the home page, to the page of \
-         `content/posts/` with the same number, which doesn't hold exactly the same posts"
+        "2 pages at the top of `content/`, such as `content/page2.md`, redirect from the old \
+         paginated pages of the home page, each to the page of `content/posts/` with the same \
+         number, with `permalink` and `redirect_to`."
     ));
     assert!(!report.contains("Nothing in the new site is published at these old URLs"));
+}
+
+/// An old later page of the home page past the last of the posts' list
+/// is answered by nothing, and listed.
+#[test]
+fn a_later_page_of_the_old_home_page_past_the_posts_last_is_listed() {
+    let old = scratch("home-pages-past-old");
+    let new = scratch("home-pages-past-new");
+    fs::create_dir_all(old.join("_posts")).unwrap();
+    let settings = "title: Site 1\nurl: https://example.org\nplugins: [jekyll-paginate]\n\
+                    paginate: 1\n";
+    fs::write(old.join("_config.yml"), settings).unwrap();
+    fs::write(old.join("index.html"), "---\n---\n{{ paginator.posts }}\n").unwrap();
+    fs::write(
+        old.join("_posts/2026-01-01-post-1.md"),
+        "---\ntitle: Post 1\n---\nA post.\n",
+    )
+    .unwrap();
+    // Published once the import's day has come, and so not by the new
+    // site on that day.
+    fs::write(
+        old.join("_posts/2027-01-01-post-2.md"),
+        "---\ntitle: Post 2\n---\nA post.\n",
+    )
+    .unwrap();
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    assert!(
+        report.contains(
+            "- 1 old paginated page of the home page has a number past the last page of \
+             `content/posts/`, so nothing is published at its URL: it is listed below.\n"
+        ),
+        "{report}"
+    );
+    assert!(report.contains("\n- `/page2/`\n"), "{report}");
+    assert!(!new.join("content/page2.md").exists());
 }
 
 #[test]
@@ -457,8 +491,8 @@ fn what_is_said_counts_what_came_across() {
             "Imported the Jekyll site `tests/import/front-matter/old` into `{shown}`. This is a \
              best effort: read `{shown}/IMPORT.md` before you publish.\n\
              \n\
-             Converted: 2 posts, 1 draft, 2 pages.\n\
-             URLs: 6 kept.\n\
+             Converted: 1 post, 1 draft, 2 pages.\n\
+             URLs: 5 kept.\n\
              The old site's built output isn't in `_site/`, so no URL was checked against it: \
              see `{shown}/IMPORT.md`.\n\
              Left for you: 7 things of 3 kinds.\n\
@@ -1717,10 +1751,10 @@ fn a_hugo_list_stays_at_the_address_hugo_gave_it() {
 }
 
 /// Each later page of a list or a tag in the old built output, which
-/// Hugo before 0.148 published under `uglyURLs` as files, sends readers on
-/// to the new list's page of the same number.
+/// Hugo before 0.148 published under `uglyURLs` as files, and which the
+/// new site doesn't publish, is listed.
 #[test]
-fn later_pages_in_the_old_built_output_send_readers_on() {
+fn later_pages_in_the_old_built_output_are_listed() {
     let old = scratch("hugo-built-later-old");
     let new = scratch("hugo-built-later-new");
     let out = scratch("hugo-built-later-out");
@@ -1753,43 +1787,25 @@ fn later_pages_in_the_old_built_output_send_readers_on() {
     }
     let (code, told) = import(&old, &new, None);
     assert_eq!(code, 0, "{told}");
-    // Each old page, the page written for it, and where it sends readers.
-    for (from, page, to) in [
-        ("/posts/page/1.html", "posts-page-1.md", "/posts/"),
-        ("/posts/page/2.html", "posts-page-2.md", "/posts/page/2/"),
-        ("/tags/a/page/1.html", "tags-a-page-1.md", "/tags/a/"),
-        ("/tags/a/page/2.html", "tags-a-page-2.md", "/tags/a/page/2/"),
-    ] {
-        let written = fs::read_to_string(new.join("content").join(page)).unwrap();
-        assert_eq!(
-            written,
-            format!("---\npermalink: {from}\nredirect_to: {to}\n---\n")
-        );
-    }
-    let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+    let made = files(&new);
+    let sent: Vec<&String> = (made.keys())
+        .filter(|path| path.contains("-page-") || path.contains("chapter"))
+        .collect();
+    assert_eq!(sent, Vec::<&String>::new());
+    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
     assert!(
         report.contains(
-            "4 pages at the top of `content/`, such as `content/posts-page-1.md`, redirect from \
-             old paginated pages of lists, found in the old site's built output, each to the \
-             list's paginated page with the same number"
+            "- `/posts/`: 3 pages, `/posts/chapter/2.html`, `/posts/page/1.html` and \
+             `/posts/page/2.html`\n"
         ),
         "{report}"
     );
-    assert!(!report.contains("/page/2.html`"), "{report}");
-    assert!(report.contains("`/posts/chapter/2.html`"), "{report}");
-    assert!(!new.join("content/posts-chapter-2.md").exists());
     assert!(
-        !report.contains("With the old site's built output"),
+        report.contains("- `/tags/`: 1 page, `/tags/a/page/1.html`\n"),
         "{report}"
     );
+    assert!(report.contains("\n- `/tags/a/page/2.html`\n"), "{report}");
     build_into(&new, &out);
-    for file in [
-        "posts/page/2.html",
-        "tags/a/page/2.html",
-        "tags/a/page/2/index.html",
-    ] {
-        assert!(out.join(file).is_file(), "nothing at {file}");
-    }
 }
 
 /// Without the old built output, a tag's page Hugo published under
@@ -2330,8 +2346,8 @@ fn nothing_from_outside_of(old: &Path, named: &str, settings: &str) -> String {
 #[cfg(unix)]
 const LEADS_OUTSIDE: &str = "a link that leads outside the old site, which Statac doesn't follow";
 #[cfg(unix)]
-const LEADS_BACK: &str =
-    "a link that leads back to a folder it is inside, which Statac doesn't follow";
+const LEADS_INSIDE: &str =
+    "a link that leads somewhere inside the old site, which Statac doesn't follow";
 
 /// A page of the old site's own at `path`.
 #[cfg(unix)]
@@ -2343,41 +2359,9 @@ fn page_at(old: &Path, path: &str, title: &str) {
 
 #[cfg(unix)]
 #[test]
-fn a_link_that_leads_inside_the_old_site_is_followed_where_it_stands() {
+fn a_link_in_the_old_site_is_listed_by_where_it_leads_and_never_followed() {
     use std::os::unix::fs::symlink;
-    let (_folder, old, _) = beside_files_of_others("links-inside");
-    page_at(&old, "store/page-2.md", "Page 2");
-    symlink("store", old.join("linked")).unwrap();
-    symlink("store/page-2.md", old.join("page-3.md")).unwrap();
-    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
-    let new = old.parent().unwrap().parent().unwrap().join("new");
-    let (code, said) = import(&old, &new, None);
-    assert_eq!(code, 0, "{said}");
-    let made = files(&new);
-    for path in [
-        "content/store/page-2.md",
-        "content/linked/page-2.md",
-        "content/page-3.md",
-    ] {
-        let text = String::from_utf8_lossy(&made[path]);
-        assert!(text.contains("title: Page 2"), "{path}: {text}");
-    }
-    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
-    assert!(
-        report.contains(
-            "Statac followed 2 links, such as `linked`, which lead to somewhere inside the old \
-             site, and read what each leads to as standing where the link is.\n"
-        ),
-        "{report}"
-    );
-    assert!(!report.contains("Links Statac didn't follow"), "{report}");
-}
-
-#[cfg(unix)]
-#[test]
-fn a_link_that_leads_outside_back_or_nowhere_is_never_followed() {
-    use std::os::unix::fs::symlink;
-    let (_folder, old, outside) = beside_files_of_others("links-refused");
+    let (_folder, old, outside) = beside_files_of_others("links");
     // A folder beside the old one whose name begins with its name.
     let beside = outside.join("old-2");
     fs::create_dir_all(&beside).unwrap();
@@ -2387,279 +2371,70 @@ fn a_link_that_leads_outside_back_or_nowhere_is_never_followed() {
     )
     .unwrap();
     page_at(&old, "store/page-2.md", "Page 2");
-    page_at(&old, "a/page-4.md", "Page 4");
-    page_at(&old, "b/page-5.md", "Page 5");
     symlink("store", old.join("linked")).unwrap();
-    // Inside a folder a link leads to, one that leads outside.
+    symlink("store/page-2.md", old.join("page-3.md")).unwrap();
     symlink(&outside, old.join("store/out")).unwrap();
     symlink("../old-2", old.join("beside")).unwrap();
     symlink("..", old.join("store/up")).unwrap();
-    symlink("../b", old.join("a/x")).unwrap();
-    symlink("../a", old.join("b/y")).unwrap();
     symlink("nowhere", old.join("gone")).unwrap();
-    let report = nothing_from_outside(&old, "title: Site 1\n");
-    assert!(!report.contains("Page 8"), "{report}");
+    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
+    let new = old.parent().unwrap().parent().unwrap().join("new");
+    let (code, said) = import(&old, &new, None);
+    assert_eq!(code, 0, "{said}");
+    let made = files(&new);
+    for (path, bytes) in &made {
+        let text = String::from_utf8_lossy(bytes);
+        assert!(!text.contains(OUTSIDE), "`{path}`:\n{text}");
+    }
+    assert!(made.contains_key("content/store/page-2.md"));
+    let through = (made.keys()).filter(|path| path.contains("linked") || path.contains("page-3"));
+    assert_eq!(through.count(), 0, "{:?}", made.keys());
+    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
+    let (_, listed) = report
+        .split_once(
+            "### Links Statac didn't follow\n\
+             \n\
+             Statac follows no link in the old site, so what the old site read through each of \
+             these didn't come across: put the folder or file itself where the link is, in a copy \
+             of the old site, and import again.\n\
+             \n",
+        )
+        .unwrap_or_else(|| panic!("{report}"));
     for (link, why) in [
-        ("store/out", LEADS_OUTSIDE),
-        ("linked/out", LEADS_OUTSIDE),
         ("beside", LEADS_OUTSIDE),
-        ("store/up", LEADS_BACK),
-        ("linked/up", LEADS_BACK),
-        ("a/x/y", LEADS_BACK),
-        ("b/y/x", LEADS_BACK),
         ("gone", "a link to something that isn't there"),
+        ("linked", LEADS_INSIDE),
+        ("page-3.md", LEADS_INSIDE),
+        ("store/out", LEADS_OUTSIDE),
+        ("store/up", LEADS_INSIDE),
     ] {
         let line = format!("- `{link}`: {why}\n");
-        let listed = report.split("### Links Statac didn't follow").nth(1);
-        assert!(
-            listed.is_some_and(|listed| listed.contains(&line)),
-            "{line}{report}"
-        );
+        assert!(listed.contains(&line), "{line}{report}");
     }
-    assert!(
-        report.contains("Statac followed 3 links, such as `a/x`,"),
-        "{report}"
-    );
 }
 
 #[cfg(unix)]
 #[test]
-fn a_folder_the_settings_name_is_read_through_a_link_that_leads_inside() {
+fn a_folder_the_settings_name_through_a_link_inside_the_old_site_is_never_read() {
     use std::os::unix::fs::symlink;
     let (_folder, old, _) = beside_files_of_others("links-setting");
-    fs::create_dir_all(old.join("kept")).unwrap();
-    fs::rename(old.join("_posts"), old.join("kept/_posts")).unwrap();
+    page_at(&old, "kept/page-2.md", "Page 2");
     symlink("kept", old.join("linked")).unwrap();
     let report = nothing_from_outside(&old, "title: Site 1\nsource: linked\n");
-    assert!(!report.contains("Settings naming a folder"), "{report}");
+    let listed = format!("{FOLDER_UNREAD}- `_config.yml`, line 2: `source: linked`\n");
+    assert!(report.contains(&listed), "{report}");
     assert!(
-        report.contains("Statac followed 1 link, `linked`, which leads"),
+        report.contains(&format!("- `linked`: {LEADS_INSIDE}\n")),
         "{report}"
     );
 }
 
-#[cfg(unix)]
-const UNPUBLISHED: &str =
-    "a link that leads to a place the old site didn't publish, which Statac doesn't follow";
-
-/// Makes an old site of `files`, with a file and a page holding the
-/// marker in each of `kept_back`, places the tool reads without
-/// publishing or doesn't read, and imports it. Then puts a link to each,
-/// and to a hidden file, in the folder `links_in`, where the tool
-/// publishes what it finds, imports it again, and sees that the links
-/// brought nothing into the new site, and that each is listed as leading
-/// to what wasn't published. One more link, there both times, leads to
-/// `published`, a folder the tool does publish, which holds a hidden
-/// file with the marker: the folder comes across at the link, as
-/// `comes_across` in the new site, and the hidden file doesn't.
-#[cfg(unix)]
-fn nothing_kept_back_is_published_through_a_link(
-    label: &str,
-    files: &[(&str, &str)],
-    kept_back: &[&str],
-    links_in: &str,
-    published: &str,
-    comes_across: &str,
-) {
-    use std::os::unix::fs::symlink;
-    let top = scratch(label);
-    let old = top.join("old");
-    let write = |path: &str, text: &str| {
-        fs::create_dir_all(old.join(path).parent().unwrap()).unwrap();
-        fs::write(old.join(path), text).unwrap();
-    };
-    for (path, text) in files {
-        write(path, text);
-    }
-    let page = format!("---\ntitle: Page 7\ndate: 2026-03-03\n---\n{OUTSIDE}\n");
-    write(".env", OUTSIDE);
-    write(&format!("{published}/.hidden-7.txt"), OUTSIDE);
-    for place in kept_back {
-        write(&format!("{place}/file-7.txt"), OUTSIDE);
-        write(&format!("{place}/page-7.md"), &page);
-        write(&format!("{place}/inner/page-7.html"), &page);
-    }
-    fs::create_dir_all(old.join(links_in)).unwrap();
-    let up = "../".repeat(links_in.split('/').count());
-    let link = |to: &str, name: &str| {
-        symlink(format!("{up}{to}"), old.join(links_in).join(name)).unwrap();
-    };
-    link(published, "linked");
-    let (code, said) = import(&old, &top.join("new-1"), None);
-    assert_eq!(code, 0, "{said}");
-    let without = files_of(&top.join("new-1"));
-    link(".env", "env.txt");
-    for (n, place) in kept_back.iter().enumerate() {
-        link(place, &format!("link-{n}"));
-    }
-    let (code, said) = import(&old, &top.join("new-2"), None);
-    assert_eq!(code, 0, "{said}");
-    let made = files_of(&top.join("new-2"));
-    // The report differs, and the key made fresh for the feed's ids.
-    let but_those = |made: &BTreeMap<String, Vec<u8>>| -> Vec<(String, usize)> {
-        (made.iter())
-            .filter(|(path, _)| !matches!(path.as_str(), "IMPORT.md" | "statac.yaml"))
-            .map(|(path, bytes)| (path.clone(), bytes.len()))
-            .collect()
-    };
-    assert_eq!(but_those(&made), but_those(&without), "{label}");
-    for (path, bytes) in &made {
-        let through =
-            path.contains("link-") || path.contains("env.txt") || path.contains("/linked/.");
-        assert!(!through, "{label}: `{path}` was written");
-        let text = String::from_utf8_lossy(bytes);
-        let own = path != "IMPORT.md" && without.get(path) == Some(bytes);
-        assert!(own || !text.contains(OUTSIDE), "{label}: `{path}`:\n{text}");
-    }
-    assert!(
-        made.contains_key(comes_across),
-        "{label}: {:?}",
-        made.keys()
-    );
-    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
-    let listed = report.split("### Links Statac didn't follow").nth(1);
-    for name in (0..kept_back.len())
-        .map(|n| format!("link-{n}"))
-        .chain(["env.txt".to_owned()])
-    {
-        let line = format!("- `{links_in}/{name}`: {UNPUBLISHED}\n");
-        assert!(
-            listed.is_some_and(|listed| listed.contains(&line)),
-            "{label}: {line}{report}"
-        );
-    }
-}
-
-#[cfg(unix)]
-fn files_of(folder: &Path) -> BTreeMap<String, Vec<u8>> {
-    files(folder)
-}
-
+/// Eleventy reads a folder outside its input folder where a link inside
+/// it leads there; Statac follows no link, so the folder is left behind
+/// and the link listed.
 #[cfg(unix)]
 #[test]
-fn a_link_never_publishes_what_jekyll_kept_back() {
-    nothing_kept_back_is_published_through_a_link(
-        "kept-back-jekyll",
-        &[
-            ("_config.yml", "title: Site 1\nexclude: [private]\n"),
-            (
-                "_posts/2026-01-01-post-1.md",
-                "---\ntitle: Post 1\n---\nA post.\n",
-            ),
-            ("kept/page-2.md", "---\ntitle: Page 2\n---\nA page.\n"),
-        ],
-        &[
-            ".git",
-            "node_modules/package-1",
-            "_drafts",
-            "_data",
-            "_includes",
-            "_layouts",
-            "private",
-            "_site",
-        ],
-        "assets",
-        "kept",
-        "content/assets/linked/page-2.md",
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn a_link_never_publishes_what_hugo_kept_back() {
-    nothing_kept_back_is_published_through_a_link(
-        "kept-back-hugo",
-        &[
-            (
-                "hugo.toml",
-                "baseURL = \"https://example.org/\"\ntitle = \"Site 1\"\n",
-            ),
-            (
-                "content/posts/post-1.md",
-                "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n",
-            ),
-            ("static/kept/file-2.txt", "A file.\n"),
-        ],
-        &[
-            ".git",
-            "node_modules/package-1",
-            "data",
-            "layouts",
-            "archetypes",
-            "themes/theme-1",
-            "public",
-        ],
-        "static/files",
-        "static/kept",
-        "static/files/linked/file-2.txt",
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn a_link_never_publishes_what_zola_kept_back() {
-    nothing_kept_back_is_published_through_a_link(
-        "kept-back-zola",
-        &[
-            (
-                "config.toml",
-                "base_url = \"https://example.org\"\ntitle = \"Site 1\"\nignored_content = [\"private/*\"]\n",
-            ),
-            (
-                "content/post-1.md",
-                "+++\ntitle = \"Post 1\"\ndate = 2026-01-01\n+++\nA post.\n",
-            ),
-            ("static/kept/file-2.txt", "A file.\n"),
-        ],
-        &[
-            ".git",
-            "node_modules/package-1",
-            "templates",
-            "sass",
-            "themes/theme-1",
-            "content/private",
-            "public",
-        ],
-        "static/files",
-        "static/kept",
-        "static/files/linked/file-2.txt",
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn a_link_never_publishes_what_eleventy_kept_back() {
-    nothing_kept_back_is_published_through_a_link(
-        "kept-back-eleventy",
-        &[
-            (
-                ".eleventy.js",
-                "module.exports = function (eleventyConfig) {\n  eleventyConfig.addPassthroughCopy(\"files\");\n};\n",
-            ),
-            (".eleventyignore", "private/\n"),
-            (
-                "posts/post-1.md",
-                "---\ntitle: Post 1\ndate: 2026-01-01\n---\nA post.\n",
-            ),
-            ("kept/page-2.md", "---\ntitle: Page 2\n---\nA page.\n"),
-        ],
-        &[
-            ".git",
-            "node_modules/package-1",
-            "_data",
-            "_includes",
-            "private",
-            "_site",
-        ],
-        "files",
-        "kept",
-        "static/files/linked/page-2.md",
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn an_eleventy_folder_outside_the_input_folder_is_read_through_a_link_into_it() {
+fn an_eleventy_link_into_the_input_folder_is_listed_and_not_followed() {
     use std::os::unix::fs::symlink;
     let top = scratch("links-beyond");
     let old = top.join("old");
@@ -2669,60 +2444,29 @@ fn an_eleventy_folder_outside_the_input_folder_is_read_through_a_link_into_it() 
     };
     let settings = "module.exports = function () {\n  return { dir: { input: \"src\" } };\n};\n";
     write(".eleventy.js", settings);
-    write(".eleventyignore", "notes/private/\n");
     write("src/index.md", "---\ntitle: Home\n---\nThe home page.\n");
     write(
         "notes/note-1.md",
         "---\ntitle: Note 1\n---\nA note kept beside the input folder.\n",
     );
-    let kept_back = format!("---\ntitle: Page 7\n---\n{OUTSIDE}\n");
-    write("notes/private/page-7.md", &kept_back);
-    write("notes/.hidden/page-7.md", &kept_back);
-    write("notes/node_modules/package-1/page-7.md", &kept_back);
     symlink("../notes", old.join("src/notes")).unwrap();
     let new = top.join("new");
     let (code, said) = import(&old, &new, None);
     assert_eq!(code, 0, "{said}");
     let made = files(&new);
     assert!(
-        made.contains_key("content/notes/note-1.md"),
+        !made.keys().any(|path| path.contains("note-1")),
         "{:?}",
         made.keys()
     );
-    for (path, bytes) in &made {
-        let text = String::from_utf8_lossy(bytes);
-        assert!(
-            !text.contains(OUTSIDE) && !text.contains("Page 7"),
-            "`{path}`:\n{text}"
-        );
-    }
     let report = String::from_utf8_lossy(&made["IMPORT.md"]);
+    let (_, listed) = report
+        .split_once("### Links Statac didn't follow")
+        .unwrap_or_else(|| panic!("{report}"));
     assert!(
-        report.contains("Statac followed 1 link, `src/notes`,"),
+        listed.contains(&format!("- `src/notes`: {LEADS_INSIDE}\n")),
         "{report}"
     );
-}
-
-#[cfg(unix)]
-#[test]
-fn only_so_many_links_are_followed_in_one_import() {
-    use std::os::unix::fs::symlink;
-    let (_folder, old, _) = beside_files_of_others("links-many");
-    page_at(&old, "store/page-2.md", "Page 2");
-    for n in 0..70 {
-        symlink("store", old.join(format!("linked-{n:02}"))).unwrap();
-    }
-    fs::write(old.join("_config.yml"), "title: Site 1\n").unwrap();
-    let new = old.parent().unwrap().parent().unwrap().join("new");
-    let (code, said) = import(&old, &new, None);
-    assert_eq!(code, 0, "{said}");
-    let made = files(&new);
-    let report = String::from_utf8_lossy(&made["IMPORT.md"]);
-    assert!(report.contains("Statac followed 64 links,"), "{report}");
-    let past = ": a link past the number Statac follows in one site\n";
-    assert_eq!(report.matches(past).count(), 6, "{report}");
-    assert!(made.contains_key("content/linked-63/page-2.md"));
-    assert!(!made.contains_key("content/linked-64/page-2.md"));
 }
 
 #[cfg(unix)]
@@ -2739,14 +2483,14 @@ fn an_old_site_given_as_a_link_is_read() {
     let made = files(&new);
     assert!(made.contains_key("content/posts/post-1.md"), "{said}");
     let report = String::from_utf8_lossy(&made["IMPORT.md"]);
-    assert!(!report.contains("Statac followed"), "{report}");
+    assert!(!report.contains("Links Statac didn't follow"), "{report}");
 }
 
 const FOLDER_UNREAD: &str = "### Settings naming a folder Statac doesn't read\n\
      \n\
      Each of these settings names a folder outside the old site's own folder, or one reached \
-     through a link that leads outside it. Statac reads nothing outside the old site, so each was \
-     read as if it weren't set: bring across by hand what the folder holds, if it is wanted.\n\
+     through a link. Statac reads nothing outside the old site and follows no link in it, so each \
+     was read as if it weren't set: bring across by hand what the folder holds, if it is wanted.\n\
      \n";
 
 const FOLDER_SETTINGS: [&str; 3] = ["source", "destination", "collections_dir"];
@@ -2794,10 +2538,9 @@ fn a_folder_the_settings_name_through_a_link_is_never_read() {
         report.contains(
             "### Links Statac didn't follow\n\
              \n\
-             Statac follows a link in the old site only to something inside it that the old \
-             site published. Each of these it didn't follow, for the reason beside it, so what \
-             the old site read through it didn't come across: put the folder or file itself \
-             where the link is, in a copy of the old site, and import again.\n\
+             Statac follows no link in the old site, so what the old site read through each of \
+             these didn't come across: put the folder or file itself where the link is, in a \
+             copy of the old site, and import again.\n\
              \n\
              - `_site`: a link that leads outside the old site, which Statac doesn't follow\n"
         ),
@@ -4454,9 +4197,12 @@ fn eleventy_reads_gitignore_unless_the_settings_turn_it_off() {
     }
 }
 
+/// A page whose front matter Statac's YAML reader stops at comes across
+/// with it as written, which `statac check` shows at its line, and is
+/// listed.
 #[test]
-fn front_matter_holding_a_private_use_character_is_mended_as_any_other() {
-    let post = "---\ntitle: Post 1\nicon: \u{E000}\nsummary: 'One\ntwo'\n---\nWords.\n";
+fn front_matter_statacs_reader_stops_at_comes_across_as_written() {
+    let post = "---\ntitle: Post 1\nsummary: 'One\ntwo'\n---\nWords.\n";
     // The tool, and the files of a site with one post.
     let tools = [
         (
@@ -4489,15 +4235,54 @@ fn front_matter_holding_a_private_use_character_is_mended_as_any_other() {
         ),
     ];
     for (tool, name, settings, set, path) in tools {
-        let old = scratch(&format!("{name}-mend-private-use-old"));
+        let old = scratch(&format!("{name}-as-written-old"));
         fs::create_dir_all(old.join(path).parent().unwrap()).unwrap();
         fs::write(old.join(settings), set).unwrap();
         fs::write(old.join(path), post).unwrap();
-        let new = scratch(&format!("{name}-mend-private-use"));
+        let new = scratch(&format!("{name}-as-written"));
         let (code, said) = import(&old, &new, Some(tool));
         assert_eq!(code, 0, "{name}: {said}");
         let made = fs::read_to_string(new.join("content/posts/post-1.md")).unwrap();
-        assert!(made.contains("summary: One two\n"), "{name}: {made}");
-        assert!(made.contains("icon: \u{E000}\n"), "{name}: {made}");
+        assert_eq!(made, post, "{name}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(
+            report.contains(&format!(
+                "### Front matter left as written\n\
+                 \n\
+                 Statac's YAML reader stopped at this line in the front matter of each of these, \
+                 so the page came across with its front matter as written, and the site won't \
+                 build until that is put right. Its old URL wasn't worked out either: put the \
+                 front matter right in the old site and import again, or put it right in the new \
+                 one and give the page a `permalink`.\n\
+                 \n\
+                 - `{path}`, line 4: `two'`\n"
+            )),
+            "{name}: {report}"
+        );
+        let outcome = build::run(&Options {
+            mode: Mode::Check,
+            site: new.to_path_buf(),
+            out: None,
+            today: Some(today()),
+            drafts: false,
+            url: None,
+        });
+        let sources = outcome.sources();
+        let placed: Vec<(String, usize)> = (outcome.problems.iter())
+            .filter(|problem| matches!(problem.kind, Kind::MalformedYaml { .. }))
+            .filter_map(|problem| problem.place)
+            .map(|place| {
+                let file = sources.path(place.source).to_string_lossy().into_owned();
+                (
+                    file,
+                    sources.line_number(place.source, place.span.start as usize),
+                )
+            })
+            .collect();
+        assert_eq!(
+            placed,
+            [("content/posts/post-1.md".to_owned(), 4)],
+            "{name}"
+        );
     }
 }

@@ -20,10 +20,7 @@ pub(super) const FILES: [&str; 4] = [
 /// Whether `folder` holds an Eleventy site: a settings file, or a
 /// `package.json` that names Eleventy among what it needs.
 pub(super) fn owns(folder: &Path) -> bool {
-    FILES
-        .iter()
-        .any(|name| inside::a_settings_file(folder, name))
-        || needs_eleventy(folder)
+    FILES.iter().any(|name| inside::a_file(folder, name)) || needs_eleventy(folder)
 }
 
 /// Whether the folder's `package.json` names `@11ty/eleventy` among its
@@ -54,7 +51,7 @@ pub(super) fn makes_feeds(folder: &Path) -> bool {
 /// Whether the folder's `package.json` names among its dependencies a
 /// package `wanted` picks out.
 fn needs(folder: &Path, wanted: &dyn Fn(&str) -> bool) -> bool {
-    if !inside::a_settings_file(folder, "package.json") {
+    if !inside::a_file(folder, "package.json") {
         return false;
     }
     let Ok(text) = std::fs::read_to_string(inside::path(folder, "package.json")) else {
@@ -320,7 +317,7 @@ const OTHER_SETTINGS: &[&str] = &[
 ];
 
 /// Reads the settings file `name` of `folder`, already found to be a file
-/// reached through no link that leads outside the old site.
+/// reached through no link.
 pub(super) fn read(folder: &Path, name: &str) -> std::io::Result<Settings> {
     let text = std::fs::read_to_string(inside::path(folder, name))?;
     let mut settings = scan(&text);
@@ -334,7 +331,7 @@ pub(super) fn read(folder: &Path, name: &str) -> std::io::Result<Settings> {
         if seen.len() > FETCHED {
             break;
         }
-        if seen.contains(&path) || !inside::a_settings_file(folder, &path) {
+        if seen.contains(&path) || !inside::a_file(folder, &path) {
             continue;
         }
         seen.push(path.clone());

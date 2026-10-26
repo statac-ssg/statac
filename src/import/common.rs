@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use super::report::code;
-use super::{Failed, Field, Value};
+use super::{Failed, Field, Unread, Value};
 use crate::content::address::Address;
 use crate::date::{self, Date};
 use crate::problem::{Kind, Problem, Reason};
@@ -95,11 +95,14 @@ pub(super) struct Front {
     pub fields: Vec<Field>,
     pub body: String,
     pub body_line: usize,
+    /// The front matter, where it is YAML Statac's reader stopped at: the
+    /// page is then read as if it had none.
+    pub unread: Option<Unread>,
 }
 
 /// Reads `text`'s front matter, written in YAML between `---`, TOML
 /// between `+++`, or where `json` says as a JSON object; or gives the
-/// line it stopped at and that line's text.
+/// line it stopped at and that line's text, where it isn't YAML.
 pub(super) fn front(text: &str, path: &str, json: bool) -> Result<Front, (usize, String)> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let line_text = |line: usize| text.lines().nth(line - 1).unwrap_or_default().to_owned();
@@ -132,6 +135,7 @@ pub(super) fn front(text: &str, path: &str, json: bool) -> Result<Front, (usize,
             fields,
             body: text[body..].to_owned(),
             body_line: line_of(body),
+            unread: None,
         });
     }
     let mut sources = Sources::default();
@@ -153,6 +157,7 @@ pub(super) fn front(text: &str, path: &str, json: bool) -> Result<Front, (usize,
             fields: mapping(&sources, &node),
             body: body.to_owned(),
             body_line: line_of(body_start),
+            unread: None,
         });
     }
     if first != "---" {
@@ -160,27 +165,40 @@ pub(super) fn front(text: &str, path: &str, json: bool) -> Result<Front, (usize,
             fields: Vec::new(),
             body: text.to_owned(),
             body_line: 1,
+            unread: None,
         });
     }
-    let mended = super::mend::mended(text, false).text;
-    let text = mended.as_str();
     let source = sources.add(path, text.to_owned());
     let split = crate::yaml::split(text).map_err(|_| (1, first.to_owned()))?;
     let mut fields = Vec::new();
+    let mut unread = None;
     if let Some(span) = split.front_matter {
-        let node = crate::yaml::read_at(&sources, Place { source, span }).map_err(|problem| {
-            let line = problem.place.map_or(1, |place| {
-                sources.line_number(place.source, place.span.start as usize)
-            });
-            (line, line_text(line))
-        })?;
-        fields = mapping(&sources, &node);
+        match crate::yaml::read_at(&sources, Place { source, span }) {
+            Ok(node) => fields = mapping(&sources, &node),
+            Err(problem) => unread = Some(unread_at(&sources, &problem, path, &text[span.range()])),
+        }
     }
     Ok(Front {
         fields,
         body: text[split.body.range()].to_owned(),
         body_line: line_of(split.body.start as usize),
+        unread,
     })
+}
+
+/// What is said of `front`, the front matter of the old file `path`, as
+/// written, where Statac's YAML reader stopped at `problem` in it.
+pub(super) fn unread_at(sources: &Sources, problem: &Problem, path: &str, front: &str) -> Unread {
+    let line = problem.place.map_or(1, |place| {
+        sources.line_number(place.source, place.span.start as usize)
+    });
+    let text = problem.place.map_or("", |place| sources.text(place.source));
+    Unread {
+        from: path.to_owned(),
+        line,
+        text: text.lines().nth(line - 1).unwrap_or_default().to_owned(),
+        front: front.to_owned(),
+    }
 }
 
 /// Where the JSON object `text` opens with ends, just past its `}`.

@@ -252,8 +252,7 @@ impl Reader<'_> {
 
     /// Whether the folder `rel`, which the setting `setting` names as
     /// `written`, may be read: it is inside the old site and reached
-    /// through no link that leads outside it. Where it may not, a finding
-    /// says so.
+    /// through no link. Where it may not, a finding says so.
     fn followed(&mut self, rel: &str, setting: &str, written: &str, line: Option<usize>) -> bool {
         if crate::platform::stays_inside(written)
             && inside::named_folder(self.folder, rel).is_some()
@@ -706,13 +705,16 @@ impl Reader<'_> {
             self.left(&from, "a file that isn't UTF-8 text");
             return Ok(());
         };
-        let front = match front(&text, &from, false) {
+        let mut front = match front(&text, &from, false) {
             Ok(front) => front,
             Err((line, text)) => {
                 self.find(&FRONT_MATTER_UNREAD, &from, Some(line), &text);
                 return Ok(());
             }
         };
+        let unread = front.unread.take();
+        let as_written = unread.is_some();
+        self.import.unread.extend(unread);
         let (dir, written_name) = match shape {
             Shape::Single => {
                 let stem = self.page_name(last(within)).map_or("", |(stem, _)| stem);
@@ -917,7 +919,8 @@ impl Reader<'_> {
             && dir.is_empty()
             && front.body.trim().is_empty()
             && fields.is_empty()
-            && others.is_empty();
+            && others.is_empty()
+            && !as_written;
         others.splice(0..0, unusable);
         self.docs.push(Doc {
             from,
@@ -1610,6 +1613,7 @@ impl Reader<'_> {
                 address: doc.address,
                 own_address: doc.own_address,
                 other_addresses: doc.others,
+                unread: None,
                 fences: Vec::new(),
                 calls: called,
             });

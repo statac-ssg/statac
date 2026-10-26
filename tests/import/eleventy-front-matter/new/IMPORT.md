@@ -69,7 +69,7 @@ Eleventy ran the front matter of each of these as JavaScript, and Statac runs no
 
 Eleventy dated each of these pages by its file, as the words say, and Statac can't know that day, so `date` was taken off and the page is dated by its name or not at all: write the day it was published, as `2026-10-04`.
 
-- `posts/post-4.md`, line 4: `date: Last Modified`
+- `posts/post-4.md`, line 3: `date: Last Modified`
 
 ### Eleventy's fields kept as custom fields
 

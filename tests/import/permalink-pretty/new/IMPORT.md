@@ -33,7 +33,7 @@ Statac worked out where the old site published each page, read the new site, and
 
 - `content/posts/index.md` cascades `pages.permalink: /{year}/{month}/{day}/{slug}/` to every page in `content/posts/`, which puts 3 of them at their old URLs.
 - 1 page carries a `permalink` of its own, where no pattern fits.
-- 2 pages at the top of `content/`, such as `content/page2.md`, redirect from the old paginated pages of the home page, each to the page of `content/posts/` that holds the same posts, with `permalink` and `redirect_to`.
+- 2 pages at the top of `content/`, such as `content/page2.md`, redirect from the old paginated pages of the home page, each to the page of `content/posts/` with the same number, with `permalink` and `redirect_to`.
 
 Each URL was also looked for in the old site's own built output, `_site/`.
 

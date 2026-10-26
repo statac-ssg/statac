@@ -16,7 +16,7 @@ use super::common::{dated_name, text_of};
 use super::inside;
 use super::report::code;
 use super::{
-    Failed, Field, Finding, FindingKind, HomePages, Import, Left, Page, PageKind, Value,
+    Failed, Field, Finding, FindingKind, HomePages, Import, Left, Page, PageKind, Unread, Value,
     one_home_page, yaml,
 };
 use crate::date::{self, Date};
@@ -251,7 +251,7 @@ pub(super) static ADDRESS_UNKNOWN: FindingKind = FindingKind {
 pub(super) fn owns(folder: &Path) -> bool {
     SETTINGS_FILES
         .iter()
-        .any(|name| inside::a_settings_file(folder, name))
+        .any(|name| inside::a_file(folder, name))
 }
 
 /// A folder of pages Jekyll's settings name.
@@ -441,30 +441,39 @@ struct Front {
     fields: Vec<(String, Value, usize, Node)>,
     body: String,
     body_line: usize,
+    /// The front matter, where Statac's YAML reader stopped at it: the
+    /// page is then read as if it had none.
+    unread: Option<Unread>,
 }
 
 /// Reads `text`'s front matter, or tells why it can't be.
 fn front(text: &str, path: &str) -> Result<Front, String> {
     let mut sources = Sources::default();
-    let mended = super::mend::mended(text, false).text;
-    let text = mended.as_str();
     let source = sources.add(path, text.to_owned());
     let split = crate::yaml::split(text)
         .map_err(|_| "Unclosed front matter: no `---` line ends it".to_owned())?;
     let mut fields = Vec::new();
+    let mut unread = None;
     if let Some(span) = split.front_matter {
-        let node = crate::yaml::read_at(&sources, Place { source, span })
-            .map_err(|problem| problem.headline())?;
-        match &node.value {
-            Yaml::Mapping(entries) => {
+        let node = match crate::yaml::read_at(&sources, Place { source, span }) {
+            Ok(node) => Some(node),
+            Err(problem) => {
+                let front = &text[span.range()];
+                unread = Some(super::common::unread_at(&sources, &problem, path, front));
+                None
+            }
+        };
+        match node.as_ref().map(|node| &node.value) {
+            Some(Yaml::Mapping(entries)) => {
                 for entry in entries {
                     let line = sources.line_number(source, entry.key.place.span.start as usize);
                     let value = yaml::value_of(&entry.value, &plain);
                     fields.push((yaml::key_text(&entry.key), value, line, entry.value.clone()));
                 }
             }
-            Yaml::Scalar(text) if text.trim().is_empty() => {}
-            _ => return Err("Front matter: it holds no fields".to_owned()),
+            Some(Yaml::Scalar(text)) if text.trim().is_empty() => {}
+            None => {}
+            Some(_) => return Err("Front matter: it holds no fields".to_owned()),
         }
     }
     let body_line = sources.line_number(source, (split.body.start as usize).min(text.len()));
@@ -472,6 +481,7 @@ fn front(text: &str, path: &str) -> Result<Front, String> {
         fields,
         body: text[split.body.range()].to_owned(),
         body_line,
+        unread,
     })
 }
 
@@ -604,7 +614,7 @@ impl Reader<'_> {
         s.destination = "_site".into();
         let found = SETTINGS_FILES
             .iter()
-            .find(|name| inside::a_settings_file(self.folder, name));
+            .find(|name| inside::a_file(self.folder, name));
         if let Some(name) = found {
             self.settings_file(name)?;
         }
@@ -1207,6 +1217,12 @@ impl Reader<'_> {
                 return Ok(());
             }
         };
+        if let Some(unread) = &front.unread {
+            self.import.unread.push(Unread {
+                from: self.from(rel),
+                ..unread.clone()
+            });
+        }
         for (name, _, line, node) in &front.fields {
             if holds_older_number(node) {
                 let shown = crate::import::write::shown_value(&yaml::value_of(node, &yaml::core));
@@ -1463,7 +1479,10 @@ impl Reader<'_> {
                 )
             }
         };
-        if found == Found::Page && is_template(&front.body, &fields, &self.settings.gatherings) {
+        if found == Found::Page
+            && front.unread.is_none()
+            && is_template(&front.body, &fields, &self.settings.gatherings)
+        {
             let at = template_mark(&front.body);
             let (line, text) = match at {
                 Some((offset, text)) => (
@@ -1637,6 +1656,7 @@ impl Reader<'_> {
                 address: doc.address,
                 own_address: doc.own_address,
                 other_addresses: doc.others,
+                unread: None,
             });
         }
         let mut snippets: Vec<String> = Vec::new();
@@ -1778,7 +1798,6 @@ impl Reader<'_> {
         self.import.home_pages = Some(HomePages {
             per_page,
             addresses,
-            ties_reversed: true,
         });
     }
 }

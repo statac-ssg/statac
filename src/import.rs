@@ -74,7 +74,6 @@ mod hugo;
 mod inside;
 mod jekyll;
 mod liquid;
-mod mend;
 mod report;
 #[cfg(test)]
 mod tests;
@@ -227,6 +226,9 @@ pub struct Import {
     pub output: String,
     pub findings: Vec<Finding>,
     pub left: Vec<Left>,
+    /// The pages whose front matter Statac's YAML reader stopped at, each
+    /// read as if it had none.
+    pub unread: Vec<Unread>,
     /// Sentences for the report on what the reader did with the settings
     /// and the front matter, in Markdown.
     pub notes: Vec<String>,
@@ -246,9 +248,18 @@ pub struct HomePages {
     pub per_page: usize,
     /// The address of each page after the first, page 2 first.
     pub addresses: Vec<String>,
-    /// Whether posts of one moment stood in the order of their old files'
-    /// paths turned round, as Jekyll puts them.
-    pub ties_reversed: bool,
+}
+
+/// A page's front matter that Statac's YAML reader stopped at.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Unread {
+    /// The page's path in the old site.
+    pub from: String,
+    /// The line the reader stopped at, and its text.
+    pub line: usize,
+    pub text: String,
+    /// The front matter as written, between its `---` lines.
+    pub front: String,
 }
 
 /// What a page is, for the counts.
@@ -290,6 +301,10 @@ pub struct Page {
     pub own_address: bool,
     /// Other addresses that led to it.
     pub other_addresses: Vec<String>,
+    /// Its front matter as written, where Statac's YAML reader stopped
+    /// at it: the shared part writes it in place of `front`. A reader
+    /// leaves this empty and says so in [`Import::unread`].
+    pub unread: Option<String>,
 }
 
 /// A field of front matter.
@@ -416,7 +431,6 @@ pub fn run(options: &Options, input: Option<Input>, out: &mut dyn Write, colour:
     let today = options
         .today
         .unwrap_or_else(crate::new::today_on_this_machine);
-    inside::begin(&new);
     let tool = match refusal(&options.old, &new, &new_shown).and_then(|()| tool(options)) {
         Ok(tool) => tool,
         Err(problem) => {
@@ -424,22 +438,7 @@ pub fn run(options: &Options, input: Option<Input>, out: &mut dyn Write, colour:
             return 1;
         }
     };
-    // The old site is read once with no link followed, which says what
-    // it published; where a link waits on that, it is read again.
     let mut read = tool.read(&options.old, today, None);
-    if let Ok(first) = &read
-        && inside::waiting()
-    {
-        let pages = (first.pages.iter())
-            .filter(|page| page.kind != PageKind::Draft)
-            .map(|page| page.from.as_str());
-        let files = (first.files.iter())
-            .filter(|file| file.to.starts_with("content/") || file.to.starts_with("static/"))
-            .map(|file| file.from.as_str());
-        let published: Vec<&str> = pages.chain(files).collect();
-        inside::read_once(&options.old, &published);
-        read = tool.read(&options.old, today, None);
-    }
     if let (Ok(import), Some(input)) = (&read, input)
         && import.address.is_none()
     {

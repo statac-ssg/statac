@@ -139,6 +139,7 @@ fn a_site() -> Import {
         address: Some(format!("/post-{n}/")),
         own_address: false,
         other_addresses: Vec::new(),
+        unread: None,
     };
     Import {
         pages: vec![page(1), page(2)],
