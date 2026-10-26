@@ -24,7 +24,7 @@ nothing to describe.
 
 A file in `languages/` can't have a `dates:` line. Statac takes how each
 language writes its dates from the Unicode CLDR, and a site's file can't
-change that. To choose how dates look on the site, write `date_format` in
+change that. To choose how the site writes dates, write `date_format` in
 `statac.yaml`.
 
 ## What you'll see {#what-youll-see}
