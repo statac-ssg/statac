@@ -85,7 +85,8 @@ counts as a word.
 ## `maths`
 
 `true` if the page's content has maths in it, so a layout can add the
-maths stylesheet only where it is needed.
+maths stylesheet only where it is needed. It says nothing of the posts a
+page lists, so a list showing excerpts checks each post's `post.maths`.
 
 More: https://statac.dev/writing/#maths
 

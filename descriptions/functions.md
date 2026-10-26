@@ -27,17 +27,24 @@ More: https://statac.dev/assets/
 
 ## `url`
 
-Turns a URL written from the top of the site into one that works
-wherever the site is published. On a site at
-`https://example.org/blog/`, `url("/about/")` returns `/blog/about/`.
+Turns a URL written from the top of the site, starting with a single
+`/`, into one that works wherever the site is published, keeping
+anything after `?` or `#`. On a site at `https://example.org/blog/`,
+`url("/about/")` returns `/blog/about/`, and on a site at the top of its
+domain, `/about/`. A link written without it is left as written. In the
+content, `@url(/about/)` does the same.
 
 More: https://statac.dev/addresses/#a-site-in-a-folder-of-its-domain
 
 ## `headline`
 
-A page's name, as text with no markup. It is the page's title if it has
-one. Otherwise, Statac uses the best name it can find, down to the
-page's URL, so every page has a headline.
+A page's name, as text with no markup, so every page has one. It is the
+first there is of: the page's `title`; for the home page, the site's
+`title`; the `# heading` its content opens with, without its Markdown;
+a list page's list name; its `summary` or first paragraph, cut at a
+word to 70 characters with `…`; its date; its URL. A list's paginated
+pages share its first page's name, and on an `untitled` page the date
+comes before the summary.
 
 ## `related`
 
@@ -48,9 +55,12 @@ More: https://statac.dev/lists/#related-posts
 
 ## `feed_id`
 
-A page's id in a feed: its own `id` if it has one, or else an id Statac
-makes from the site's `feed_key` and the page's URL. For a list page, it
-is the id of the list's feed. It needs the site's `feed_key`.
+A page's id in a feed, written as `urn:uuid:` and a UUID: the page's
+own `id` where that is a UUID, or else one Statac makes from the site's
+`feed_key` and the page's `id` or URL. For a list page, it is the id of
+the list's feed. It needs the site's `feed_key`. On a site with
+`feed_ids_before`, a list page and each post dated before it keep the
+ids the old tool gave them instead.
 
 More: https://statac.dev/feeds/#entry-ids
 

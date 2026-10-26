@@ -13,7 +13,8 @@ More: https://statac.dev/writing/#page
 ## `untitled`
 
 `true` if the page is meant to have no title, such as a short note.
-Statac then names it by its date.
+Statac then names it by its date. A folder of such pages usually
+cascades it with `pages.untitled: true`.
 
 More: https://statac.dev/lists/#pages-without-titles
 
@@ -26,8 +27,14 @@ More: https://statac.dev/writing/#page
 ## `date`
 
 The page's date, year first: `2026-10-04`, or `2026-10-04 09:30` with a
-time. If you write `=today`, `statac serve` or `statac stamp` replaces
-it with the day's date.
+time. The time can have seconds and a `T` in place of the space, and an
+offset such as `Z`, `+01:00`, `+0100` or `+01`, with or without a space
+before it. A file named `2026-10-04-post-1.md` takes its date from its
+name. If you write a stamp, `statac serve` or `statac stamp` replaces it
+with the date: `=today`, `=now`, `=tomorrow`, `=yesterday`, or `=monday`
+to `=sunday`, the next such day, so on a Monday `=monday` is a week away.
+A time can follow, as in `=monday 09:00`. A stamp is a stamp only as the
+whole of a front matter value, and plain text anywhere else.
 
 More: https://statac.dev/dates-and-languages/#writing-a-date
 
@@ -80,7 +87,8 @@ More: https://statac.dev/addresses/#sending-readers-on
 
 ## `needs`
 
-`needs: url` leaves the page out until the site has a `url`.
+`needs: url` leaves the page out until the site has a `url`. A
+`sitemap.xml` needs it, since its URLs must be full.
 
 More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
 
@@ -105,29 +113,37 @@ More: https://statac.dev/lists/#series
 
 ## `neighbours`
 
-Which list `page.previous` and `page.next` move through: `site`,
-`folder`, `series`, or `false` for none.
+Which list `page.previous` and `page.next` move through: `site`, the
+site's own list; `series`, the page's series; `folder`, the outermost
+folder holding the page below the top of `content/`; or `false` for
+none. Without it, a page moves through its series, or else that folder.
+It acts only on pages that aren't list pages: a list page's
+`page.previous` and `page.next` are always its list's own pages.
 
 More: https://statac.dev/lists/#previous-and-next
 
 ## `posts`
 
-A list the page makes of its own, chosen from all the posts, such as
-`site.posts | tagged("Rust")`.
+A list the page makes of its own, chosen from all the posts with
+`tagged`, `in` or `where`, such as `site.posts | tagged("Rust")` or
+`site.posts | in("blog")`.
 
 More: https://statac.dev/lists/#lists-of-your-own
 
 ## `each`
 
-Makes a page for each item of a table in `data/`, as in `each:
-data.people`, or for each post, as in `each: site.posts`.
+Makes a page for each item of a table in `data/`, such as
+`each: data.people`, or for each post, such as `each: site.posts`. Posts
+can be chosen with `tagged`, `in` and `where`, as for `posts:`.
 
 More: https://statac.dev/data/#pages-made-from-data
 
 ## `order`
 
 The list's order: `newest first`, `oldest first`, or the names of its
-pages in the order you want.
+pages in the order you want. Cascaded with `pages.order`, it reaches the
+lists of the folders inside, but not the folder's own list, and a list
+of names works only on the list's own page.
 
 More: https://statac.dev/lists/#order
 
@@ -148,7 +164,9 @@ More: https://statac.dev/lists/#pages-of-a-list
 ## `index_page`
 
 `false` stops Statac publishing the list's page and its paginated pages.
-Templates can still use the list.
+Templates can still use the list. Cascaded with `pages.index_page`, it
+reaches the list pages of the folders inside, but not the folder's
+own.
 
 More: https://statac.dev/lists/#a-lists-page
 
@@ -157,7 +175,9 @@ More: https://statac.dev/lists/#a-lists-page
 `true` gives the list a feed, published beside the list's page as
 `feed.xml`. A file name or a URL publishes the feed there instead. A
 list of them gives the list a feed at each, and templates link to the
-first. A list has no feed unless a `feed:` line asks for one.
+first. A list has no feed unless a `feed:` line asks for one. Cascaded
+with `pages.feed`, it reaches the lists of the folders inside, but not
+the folder's own list.
 
 More: https://statac.dev/feeds/#which-lists-have-a-feed
 

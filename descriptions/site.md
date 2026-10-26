@@ -29,8 +29,9 @@ More: https://statac.dev/dates-and-languages/#each-language-in-templates
 
 ## `languages`
 
-Each of the site's languages as a code, the main one first. Followed by
-a code, as in `site.languages.en`, it is that language's home page.
+Each of the site's languages as a code, the main one first. A site that
+sets no `language` has only `en`. Followed by a code, as in
+`site.languages.en`, it is that language's home page.
 
 More: https://statac.dev/dates-and-languages/#each-language-in-templates
 
@@ -50,8 +51,9 @@ More: https://statac.dev/lists/#lists-in-templates
 ## `pages`
 
 Every page the site publishes, in URL order. It includes a list's
-paginated pages and pages that aren't HTML, such as the site's own
-`sitemap.xml`, but not redirects.
+paginated pages, the 404 page, and pages of the site's own that aren't
+HTML, such as a `sitemap.xml` or a `robots.txt`, but not redirects or
+feeds.
 
 More: https://statac.dev/feeds/#sitemap
 

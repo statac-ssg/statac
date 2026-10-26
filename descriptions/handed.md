@@ -7,7 +7,9 @@ on their own, before any dot. Statac hands every template `page` and
 ## `page`
 
 The page being built. In a snippet too, it is the page being built, not
-a page the call hands the snippet.
+a page the call hands the snippet. In a feed's template, it is the
+list's page, and in `redirect.html`, the page whose `redirect_to` or
+`redirect_from` makes the redirect.
 
 More: https://statac.dev/templates/#handed
 
@@ -100,7 +102,7 @@ More: https://statac.dev/snippets/#handed
 In a snippet, the content a call wraps, built into HTML. In a file in
 `snippets/markdown/`, what is inside the piece, built into HTML: a
 heading's or a link's words, a code block's code, or a callout's
-content.
+content. It is HTML, so the template writes it into the page unescaped.
 
 More: https://statac.dev/snippets/#handed
 

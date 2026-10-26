@@ -11,9 +11,11 @@ More: https://statac.dev/settings/
 
 ## `url`
 
-The site's full URL, starting with `https://` or `http://`. Until it is
-set, Statac leaves out feeds, social cards, webmentions and pages with
-`needs: url`.
+The site's full URL, starting with `https://` or `http://`. A URL with
+a path, such as `https://example.org/blog/`, makes a site in a folder of
+its domain. Until it is set, Statac leaves out feeds, social cards,
+webmentions and pages with `needs: url`. `--url` replaces it for one run
+of `statac build` or `statac check`.
 
 More: https://statac.dev/settings/
 
@@ -189,7 +191,9 @@ More: https://statac.dev/feeds/#entry-ids
 
 `true` makes `statac serve` and `statac stamp` write an `id:` line into
 each post of a feed that `statac build` hasn't yet published from this
-computer. The default is `false`.
+computer, with the id it has now, and into a post published before at
+another URL, with the id it had there. `statac build` never writes one.
+The default is `false`.
 
 More: https://statac.dev/feeds/#write-feed-ids
 
@@ -219,8 +223,8 @@ More: https://statac.dev/search/#without-javascript
 ## `quiet`
 
 The kinds of warning and note that `statac check` no longer shows, such
-as `[broken-link]`. `build` and `check` still count them. Errors can't
-be quietened.
+as `[broken-link]`. A kind's name is the last part of its `More:` link.
+`build` and `check` still count them. Errors can't be quietened.
 
 More: https://statac.dev/problems/#quiet
 
@@ -275,6 +279,15 @@ as `drafts`, wherever it is, or a path from `content/`, such as
 `.DS_Store`, `Thumbs.db` and `desktop.ini`.
 
 More: https://statac.dev/addresses/#files
+
+## `pages.<field>`
+
+A front matter field cascaded to every page that doesn't set it itself,
+such as `pages.layout: post`. In `statac.yaml` it reaches every page; in
+a folder's `index.md`, the pages in that folder and the folders inside
+it.
+
+More: https://statac.dev/front-matter/#handing-down
 
 ## `fields.<name>`
 

@@ -7,7 +7,8 @@ Each filter a template can write after `|`, such as
 
 Turns a URL starting with `/` into a full URL, by putting the start of
 the site's `url` in front of it. If it is given HTML, it does this to
-each URL in an `href`, `src`, `srcset` or `poster`. It needs the site's
+each URL in an `href`, `src`, `srcset` or `poster`. Text joined to HTML
+with `~` is text, so it changes no URL in it. It needs the site's
 `url`.
 
 More: https://statac.dev/feeds/#the-template
@@ -58,14 +59,16 @@ anything: `truncate(160, "…")`.
 ## `digits`
 
 Writes a number, or the numbers in a text, in the digits of the page's
-language: `۱۲` for 12 on a Persian page. Only `0` to `9` change.
+language: `۱۲` for 12 on a Persian page. Only `0` to `9` change. If it
+is given HTML, it returns only the words, as `plain` does.
 
 More: https://statac.dev/dates-and-languages/#language-files
 
 ## `json`
 
 Writes a value as JSON. It is safe inside a `<script>`, and inside an
-attribute in single quotes.
+attribute in single quotes, but not in double quotes, since JSON writes
+text between double quotes.
 
 ## `urlencode`
 
