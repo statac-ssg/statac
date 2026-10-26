@@ -2143,6 +2143,7 @@ fn a_stylesheet_and_the_feeds_are_named_by_their_addresses() {
             "language: en\ntitle: Site\nurl: https://example.org/blog/\nfeed_key: key\ntimezone: UTC\nfeed: true\n",
         ),
         ("assets/site.css", "body { margin: 0; }\n"),
+        ("content/index.md", "---\ntitle: Home\n---\n"),
         ("content/posts/post-1.md", "---\ndate: 2026-10-04\n---\n"),
         ("content/posts/index.md", "---\nfeed: atom.xml\n---\n"),
         (

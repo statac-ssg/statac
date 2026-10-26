@@ -8,6 +8,10 @@ list and gives the reason, which is one of these:
 - One of your pages is published at the feed's URL.
 - A `feed:` line asks for a feed of a list where nothing is dated, so the
   feed would have nothing in it.
+- The list has no list page, such as a folder with no `index.md`, or its
+  list page has `index_page: false`. A feed links to its list's page and
+  takes its id from it, so Statac doesn't write a feed with no page to
+  link to.
 
 ## What you'll see {#what-youll-see}
 
@@ -61,6 +65,12 @@ If nothing in the list is dated, give one of its pages a `date:`, or
 remove the `feed:` line. If the line cascades to several such
 lists, such as `pages.feed: true`, Statac warns once, at that line, and
 names the first of the lists.
+
+If the list has no list page, add an `index.md` to its folder, or for
+the site's own list, `content/index.md` or `templates/home.html`. If its
+list page has `index_page: false`, take that line out to publish the
+page. Or remove the `feed:` line. Statac warns once for all the lists
+without a page, naming the first.
 
 ## Example
 

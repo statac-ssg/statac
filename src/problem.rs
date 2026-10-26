@@ -1819,6 +1819,11 @@ pub enum Unwritten {
     },
     /// The list has no dated page, so a feed would carry nothing.
     Undated,
+    /// The list has no page for the feed to link to and be known by.
+    NoPage,
+    /// The list's page has `index_page: false`, so it isn't published for
+    /// the feed to link to.
+    PageUnpublished,
 }
 
 /// What is wrong with a `posts:` line.

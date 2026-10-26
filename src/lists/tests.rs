@@ -1564,6 +1564,11 @@ fn a_folder_list_holds_only_its_own_languages_pages() {
         ("content/blog/post-2.md", &post("2026-01-02")),
         ("content/en/post-1.md", &post("2026-01-03")),
         ("content/en/blog/post-2.md", &post("2026-01-04")),
+        // A list has a feed only with a page.
+        ("content/index.md", "# Home\n"),
+        ("content/blog/index.md", "# Blog\n"),
+        ("content/en/index.md", "# Home\n"),
+        ("content/en/blog/index.md", "# Blog\n"),
     ]);
     assert_eq!(problems(&read), []);
     assert_eq!(members(&read, &folder("")), ["blog/post-2.md", "post-1.md"]);
@@ -1604,6 +1609,7 @@ fn where_the_main_language_has_a_folder_the_top_holds_only_what_is_outside() {
         ("content/index.md", "# Home\n"),
         ("content/about.md", &post("2026-01-01")),
         ("content/ar/post-1.md", &post("2026-01-02")),
+        ("content/ar/index.md", "# Home\n"),
         ("content/en/index.md", "# Home\n"),
     ]);
     assert_eq!(problems(&read), []);

@@ -65,7 +65,8 @@ fn own_feed(read: &crate::content::Read, index: usize) -> Option<String> {
 }
 
 /// The site of `files` under `content/` beside a `statac.yaml` holding
-/// `settings`, read, with no errors.
+/// `settings`, read, with no errors. Each folder `files` reaches has an
+/// `index.md` where they write none, as a list has a feed only with a page.
 fn read(settings: &str, files: &[(&str, &str)]) -> crate::content::Read {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let root: PathBuf = std::env::temp_dir().join(format!(
@@ -80,6 +81,19 @@ fn read(settings: &str, files: &[(&str, &str)]) -> crate::content::Read {
         let path = root.join("content").join(path);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
+    }
+    let mut folders = vec![root.join("content")];
+    for (path, _) in files {
+        let mut at = root.join("content").join(path);
+        while at.pop() && at.starts_with(root.join("content")) {
+            folders.push(at.clone());
+        }
+    }
+    for folder in folders {
+        let index = folder.join("index.md");
+        if !index.exists() {
+            std::fs::write(index, "---\n---\n").unwrap();
+        }
     }
     let run = crate::content::Run {
         today: Some(crate::date::Date::day_only(2026, 10, 4)),
@@ -306,11 +320,13 @@ fn a_list_with_posts_has_its_feed_beside_its_page() {
             some("/index.rss"),
             some("/posts/feed.xml"),
         ),
+        // A feed links to its list's page, so a list whose page isn't
+        // published has none.
         (
             "a page published nowhere",
             vec![posts_index("index_page: false")],
             some("/feed.xml"),
-            some("/posts/feed.xml"),
+            None,
         ),
         (
             "a name that is a folder",

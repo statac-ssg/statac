@@ -785,11 +785,16 @@ pub(crate) fn headline(kind: &Kind) -> String {
                     )
                 }
                 Unwritten::Undated => {
-                    let has = match more {
-                        0 => "has",
-                        _ => "have",
-                    };
-                    format!("Feed not written: {lists} {has} nothing dated")
+                    format!("Feed not written: {lists} {} nothing dated", has(*more))
+                }
+                Unwritten::NoPage => {
+                    format!("Feed not written: {lists} {} no list page", has(*more))
+                }
+                Unwritten::PageUnpublished => {
+                    format!(
+                        "Feed not written: {lists} {} `index_page: false`",
+                        has(*more)
+                    )
                 }
             }
         }
@@ -1271,6 +1276,14 @@ fn lists(first: &(Word, String), more: usize) -> String {
             the_list(first.0, &first.1),
             how_many(n, "other list", "other lists")
         ),
+    }
+}
+
+/// The verb for lists named by the first and counting `more`.
+fn has(more: usize) -> &'static str {
+    match more {
+        0 => "has",
+        _ => "have",
     }
 }
 
@@ -3160,6 +3173,16 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Unwritten::Undated => {
                 "Give a page in it a `date:`, or take the `feed:` line out.".into()
             }
+            Unwritten::NoPage => format!(
+                "A feed links to its list's page; add an `index.md` to give {} one, or take the \
+                 `feed:` line out.",
+                if *more == 0 { "the list" } else { "each list" }
+            ),
+            Unwritten::PageUnpublished => format!(
+                "A feed links to its list's page; take out `index_page: false` to publish {}, or \
+                 take the `feed:` line out.",
+                if *more == 0 { "it" } else { "them" }
+            ),
         }),
         Kind::FeedWrittenTwice { .. } => {
             Some("The feed is published once; take one of them out of the `feed:` line.".into())
@@ -6162,6 +6185,35 @@ mod tests {
                 not_written((Word::Folder, "notes".into()), 0, Unwritten::Undated),
                 "Feed not written: the folder `content/notes/` has nothing dated",
                 Some("Give a page in it a `date:`, or take the `feed:` line out."),
+            ),
+            (
+                not_written((Word::Folder, "posts".into()), 0, Unwritten::NoPage),
+                "Feed not written: the folder `content/posts/` has no list page",
+                Some(
+                    "A feed links to its list's page; add an `index.md` to give the list one, \
+                     or take the `feed:` line out.",
+                ),
+            ),
+            (
+                not_written((Word::Folder, "posts".into()), 2, Unwritten::NoPage),
+                "Feed not written: the folder `content/posts/` and 2 other lists have no list \
+                 page",
+                Some(
+                    "A feed links to its list's page; add an `index.md` to give each list one, \
+                     or take the `feed:` line out.",
+                ),
+            ),
+            (
+                not_written(
+                    (Word::Folder, "notes".into()),
+                    0,
+                    Unwritten::PageUnpublished,
+                ),
+                "Feed not written: the folder `content/notes/` has `index_page: false`",
+                Some(
+                    "A feed links to its list's page; take out `index_page: false` to publish \
+                     it, or take the `feed:` line out.",
+                ),
             ),
             (
                 Kind::FeedWrittenTwice {

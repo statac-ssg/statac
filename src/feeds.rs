@@ -125,6 +125,25 @@ fn standing(site: &Site, list: ListId, page: Option<&Page>) -> Option<Address> {
 /// written, where one is. None for a name that gives no address, or one
 /// given by a name before it.
 fn wanting(site: &Site, settings: &Settings, list: ListId) -> Vec<(Address, Option<Place>)> {
+    match pageless(site, list) {
+        Some(_) => Vec::new(),
+        None => asking(site, settings, list),
+    }
+}
+
+/// Why `list` has no feed for want of a page: it has none, or its page
+/// isn't published. A feed links to the list's page, and is known by it.
+fn pageless(site: &Site, list: ListId) -> Option<Unwritten> {
+    match site.lists.get(list).page.map(|page| site.pages.get(page)) {
+        None => Some(Unwritten::NoPage),
+        Some(page) if !page.lands() => Some(Unwritten::PageUnpublished),
+        Some(_) => None,
+    }
+}
+
+/// Each feed `list` asks for, as [`wanting`] gives them, whether or not
+/// the list has a page published.
+fn asking(site: &Site, settings: &Settings, list: ListId) -> Vec<(Address, Option<Place>)> {
     let Some(asked) = asked(site, settings, list) else {
         return Vec::new();
     };
@@ -418,8 +437,19 @@ pub(crate) fn plan(
     let mut problems = Vec::new();
     // The templates looked for, and the lists whose feeds look for them.
     let mut untemplated: Vec<(Vec<String>, Vec<ListId>)> = Vec::new();
+    // The lists asking for a feed with no page published, by why.
+    let mut pageless_lists: Vec<(Unwritten, Vec<ListId>)> = Vec::new();
     let mut fed: Vec<(ListId, Address, String, Option<Place>)> = Vec::new();
     for (list, _) in site.lists.iter() {
+        if let Some(why) = pageless(site, list)
+            && !asking(site, settings, list).is_empty()
+        {
+            match pageless_lists.iter_mut().find(|(was, _)| *was == why) {
+                Some((_, lists)) => lists.push(list),
+                None => pageless_lists.push((why, vec![list])),
+            }
+            continue;
+        }
         for (address, placed) in wanting(site, settings, list) {
             if let Some(template) = template(&address, has) {
                 fed.push((list, address, template, placed));
@@ -436,6 +466,9 @@ pub(crate) fn plan(
     for (looked, lists) in untemplated {
         let looked = looked.iter().map(|name| format!("templates/{name}"));
         let why = Unwritten::NoTemplate(looked.collect());
+        problems.push(not_written(site, sources, &lists, why));
+    }
+    for (why, lists) in pageless_lists {
         problems.push(not_written(site, sources, &lists, why));
     }
     let Some((first, ..)) = fed.first() else {

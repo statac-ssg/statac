@@ -1028,6 +1028,61 @@ fn a_feed_template_no_list_asks_for_is_noted_once() {
     assert_eq!(built.file("feed.json").as_deref(), Some("{}"));
 }
 
+/// A feed links to its list's page and is known by it, so a list with no
+/// page published has none, told once for each reason with the lists
+/// counted.
+#[test]
+fn a_list_with_no_page_published_has_no_feed() {
+    let settings = (
+        "statac.yaml",
+        "language: en\ntitle: Site\nurl: https://example.org\nfeed_key: key\ntimezone: UTC\n\
+         pages.feed: true\n",
+    );
+    let post = |folder: &str| {
+        (
+            format!("content/{folder}/post-1.md"),
+            "---\ntitle: Post 1\ndate: 2026-01-01\n---\n".to_owned(),
+        )
+    };
+    let (posts, notes, links) = (post("posts"), post("notes"), post("links"));
+    let unpublished = (
+        "content/links/index.md",
+        "---\ntitle: Links\nindex_page: false\n---\n",
+    );
+    let built = Built::new(&[
+        settings,
+        HOME,
+        HOME_TEMPLATE,
+        PAGE,
+        FOLDER,
+        FEED,
+        (posts.0.as_str(), posts.1.as_str()),
+        (notes.0.as_str(), notes.1.as_str()),
+        (links.0.as_str(), links.1.as_str()),
+        unpublished,
+    ]);
+    let folder = |name: &str| (Word::Folder, name.to_owned());
+    assert_eq!(
+        built.kinds(),
+        [
+            Kind::FeedNotWritten {
+                list: folder("links"),
+                more: 0,
+                why: Unwritten::PageUnpublished,
+            },
+            Kind::FeedNotWritten {
+                list: folder("notes"),
+                more: 1,
+                why: Unwritten::NoPage,
+            },
+        ]
+    );
+    assert!(built.file("feed.xml").is_some());
+    for folder in ["posts", "notes", "links"] {
+        assert_eq!(built.file(&format!("{folder}/feed.xml")), None, "{folder}");
+    }
+}
+
 /// A site whose only feed asked for is of a list with nothing dated asks
 /// for no `url` or `feed_key`.
 #[test]
