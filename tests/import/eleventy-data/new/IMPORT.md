@@ -4,7 +4,7 @@ It was made from `tests/import/eleventy-data/old` by `statac import`, which chan
 
 ## What came across
 
-- 4 posts, into `content/notes/` and `content/posts/2026/` and `content/posts/`.
+- 5 posts, into `content/links/` and `content/notes/` and `content/posts/2026/` and `content/posts/`.
 - 2 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
 The old site's home page had no content of its own, so `content/index.md` has none: write the home page there.
@@ -33,7 +33,7 @@ The settings name no `excerpt_separator`, so Statac changed no excerpt marker.
 
 `layout` was taken off 4 pages and folders: each is built with the template for its kind, as https://statac.dev/templates/ describes.
 
-The data each folder's own file cascaded to the pages beneath it is in `pages.` lines of `content/posts/index.md`, as https://statac.dev/front-matter/#handing-down describes; what can't cascade that way, as a `title` or a field inside a folder with no page of its own, is in each page's own front matter.
+The data each folder's own file cascaded to the pages beneath it is in `pages.` lines of `content/links/index.md` and `content/posts/index.md`, as https://statac.dev/front-matter/#handing-down describes; what can't cascade that way, as a `title` or a field inside a folder with no page of its own, is in each page's own front matter.
 
 The settings written in `statac.yaml`:
 
@@ -47,7 +47,7 @@ and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-id
 
 ## URLs
 
-Statac worked out where the old site published each page, read the new site, and looked for each of the 4 old URLs there: 4 are published or redirected.
+Statac worked out where the old site published each page, read the new site, and looked for each of the 5 old URLs there: 5 are published or redirected.
 
 - `content/posts/index.md` cascades `pages.permalink: /blog/{slug}/` to every page in `content/posts/`, which puts 3 of them at their old URLs.
 

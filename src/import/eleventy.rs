@@ -2091,7 +2091,10 @@ impl Reader<'_> {
                 new_pages.push((path.clone(), lines));
             }
         }
-        for (path, lines) in new_pages {
+        // A page written only to hold the lines publishes nothing, as the
+        // old site had no page there.
+        for (path, mut lines) in new_pages {
+            lines.push(Field::new("index_page", Value::Truth(false), None));
             let front = super::yaml::fields(lines.iter().map(|f| (f.name.as_str(), &f.value)));
             self.import
                 .written
