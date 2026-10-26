@@ -25,7 +25,7 @@ you wrote. Statac adds a number to its own id instead: a footnote's is
 ## How to fix it
 
 Give the heading or table its own id, or remove the braces: Statac then
-makes a heading an id from its words, and leaves a table without one.
+makes a heading's id from its words, and leaves a table without one.
 
 ## Example
 

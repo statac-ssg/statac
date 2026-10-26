@@ -18,8 +18,8 @@ A page left out of the build isn't published, so for now it doesn't
 clash with anything. On the day it is published, two things would be
 published at the same URL, and the build would stop. Statac warns
 you now, while there is still time to choose, and builds the site as
-usual. With `--drafts`, and in `statac serve`, the page is built, so the
-clash is reported as `same-url` instead.
+usual. With `--drafts`, and in `statac serve`, Statac builds the page,
+so it reports the clash as `same-url` instead.
 
 ## How to fix it
 
@@ -27,8 +27,8 @@ Give one of the two a different URL with `permalink`, or move or
 rename its file. If the page that is left out is meant to replace the
 other, remove the other on the day it is published.
 
-Where the URL is taken by a redirect, an old URL listed in another
-page's `redirect_from`, the message says so and names that page. Often
+If a redirect has taken the URL, because another page lists it in its
+`redirect_from`, the message says so and names that page. Often
 the page was renamed and the old URL kept as a redirect, and the draft
 now wants it back. Take the URL out of that `redirect_from` if the draft
 is to be published there, or give the draft a `permalink` of its own if

@@ -15,10 +15,11 @@ warning  Mention of no page: nothing is published at `https://example.org/post-1
 ## Why Statac warns
 
 A webmention is a message from another site saying that it linked to one
-of your pages. It gives the page by its URL. `statac refresh` keeps every
+of your pages. It names the page by its URL. `statac refresh` keeps every
 webmention of a URL on the site, whatever is at that URL on the day,
 because a draft or a scheduled post may be published there later. When
-the site is built, each webmention belongs to the page at its URL. If
+Statac builds the site, it attaches each webmention to the page at its
+URL. If
 there is no page there, usually because a page has moved or been removed,
 Statac warns and leaves the webmention where it is. It doesn't remove it.
 

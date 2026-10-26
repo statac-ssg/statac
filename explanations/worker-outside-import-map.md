@@ -25,8 +25,9 @@ because the worker won't start.
 
 ## How to fix it
 
-Move the worker, and every file it imports, to `static/`. Files there are
-published under their own names, so the names in the scripts lead to them.
+Move the worker, and every file it imports, to `static/`. Statac
+publishes the files there under their own names, so the names in the
+scripts lead to them.
 
 ## Example
 

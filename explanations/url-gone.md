@@ -17,34 +17,35 @@ warning  URL gone: `/about/` was published before, and nothing is there now
 Each time it builds the site, and as `statac serve` runs, Statac adds
 every URL it published to `published.txt` at the top of the site's
 folder: each page from a file, each old URL in a `redirect_from`, each
-feed, and each file published as it is. Drafts and scheduled posts aren't
+feed, and each file published unchanged. Drafts and scheduled posts aren't
 added until they are published. Commit the file with the site, so a
 build on any machine knows the same URLs.
 
-A URL that first appears while `statac serve` runs, and goes again
-before it stops, such as a page renamed while you were still writing
-it, is taken out of the file with nothing said.
+If a URL first appears while `statac serve` runs and goes again before
+it stops, such as a page renamed while you were still writing it,
+Statac takes it out of the file and says nothing.
 
 When a page is renamed, moved, or given another `permalink`, its old
 URL is no longer published, and nothing else would tell you. Statac
 builds the site as usual, and warns at the URL's line in `published.txt`.
 
-List pages that Statac makes, such as a tag's, and paginated pages
-aren't kept, since they come and go with what is listed. Nor are the
-files in `assets/`, whose URLs change with what they hold.
+Statac doesn't keep the list pages it makes, such as a tag's, or
+paginated pages, since they come and go with what is listed. Nor does it
+keep the files in `assets/`, whose URLs change when their contents
+do.
 
 ## How to fix it
 
-If the page moved, add its old URL to the `redirect_from` of the page
-as it is now, and the old URL redirects to it.
+If the page moved, add its old URL to the page's `redirect_from` in its
+new place, and the old URL then redirects to it.
 
 If it is gone for good, take its line out of `published.txt`, and
 Statac stops warning about it. In an editor with Statac's extension,
 the warning offers to do that for you.
 
-Where every URL Statac kept under a folder is gone, as when a whole
-part of the site is taken away, they are one warning, under the
-outermost folder they share, and the editor offers to take all their
+If every URL Statac kept under a folder is gone, such as when you take
+away a whole part of the site, Statac gives one warning for them all, at
+the outermost folder they share, and the editor offers to take all their
 lines out at once.
 
 Once you have understood the warning, you can quieten it by name.

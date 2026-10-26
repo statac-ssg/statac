@@ -16,13 +16,13 @@ note  No home page: nothing is published at `/`
 
 Statac publishes only the pages you ask for. The home page is
 `content/index.md`, or on a site in several languages, the `index.md` at
-the top of each language's folder. Where there is none, Statac builds a
+the top of each language's folder. If there is none, Statac builds a
 page listing the site's posts there only if the site has
 `templates/home.html`. Without either, a reader who visits the site's
 address finds nothing, and nothing else would tell you.
 
-`statac check` says so once, naming every language's top with nothing
-published. `statac build` and `statac serve` don't show this note or
+`statac check` says so once, naming the top of every language that has
+nothing published there. `statac build` and `statac serve` don't show this note or
 count it.
 
 ## How to fix it

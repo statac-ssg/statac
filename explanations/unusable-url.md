@@ -11,7 +11,7 @@ A pattern can use the placeholders `{year}`, `{month}`, `{day}`,
 `{folder}` and `{name}`, and `{slug}`, the page's slug. It can also use a
 field declared in `statac.yaml`, such as `{isbn}` for
 `fields.isbn: text` or `{book.author}` for `fields.book.author: text`,
-and each page it gives a URL must have that field. The date placeholders
+and each page the pattern makes a URL for must have that field. The date placeholders
 need a page that has a date. The pattern of a page with `each:` can also
 use any field of the items or posts it makes pages for, such as `{key}`
 or `{isbn}`, and each item or post must have the fields the pattern

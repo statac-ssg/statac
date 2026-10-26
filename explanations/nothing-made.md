@@ -21,7 +21,7 @@ site, and nothing else would tell you.
 ## How to fix it
 
 Check where the command writes. It must write into the folder Statac
-passes to it as `STATAC_OUT`, and `after_build_outputs` gives each path from
+passes to it as `STATAC_OUT`, and `after_build_outputs` names each path from
 the top of that folder: `search/` for a folder, `feed.json` for a file.
 
 If the command no longer makes it, remove the name from

@@ -18,7 +18,7 @@ Statac knows every URL it publishes. Once the site is built, it follows
 every link on every page that points to this site, as a browser would, and
 tells you if a link leads to a URL with nothing published at it. If you
 wrote the link's URL, in your content, a field or a data file, the warning
-shows that line, even where a template or snippet prints it. If a template
+shows that line, even if a template or snippet prints it. If a template
 or snippet wrote the URL itself, the warning shows the line that wrote it,
 and the page the link is on. Statac still publishes the page, with the
 link as you wrote it, because the link may point at something you are

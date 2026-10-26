@@ -15,18 +15,18 @@ note  No list page: `content/notes/` has no `index.md`
 ## Why Statac says so
 
 Statac publishes only the pages you ask for. A folder's list page is its
-`index.md`. A tag or a series has a list page where `statac.yaml` says
-`tags.pages: true` or `series.pages: true`, or where one of your pages
-is published at its URL. Without one of these, the list still works in
+`index.md`. A tag or a series has a list page if `statac.yaml` says
+`tags.pages: true` or `series.pages: true`, or if one of your pages is
+published at its URL. Without one of these, the list still works in
 templates, through `site.folders`, `site.tags` and `page.tags`, but
 nothing is published at its URL and `url` has no value on it.
 
 Statac before 0.7.0 made these pages without being asked, so a site
 made with it may link to pages that are no longer there. `statac check`
 says so once for the folders and once each for the tags and the series,
-and only where the site has `templates/folder.html`, the template that
-built them. It says nothing of a list where you chose no page, with
-`tags.pages: false` or `series.pages: false`.
+and only if the site has `templates/folder.html`, the template that
+built them. It says nothing about a list for which you chose no page,
+with `tags.pages: false` or `series.pages: false`.
 
 `statac build` and `statac serve` don't show this note or count it.
 

@@ -18,7 +18,7 @@ warning  Not linked by place: `content/about.md` has `translation_key: about`
 Pages in different languages at the same path under their languages'
 folders are translations of each other. But a page with a
 `translation_key` is linked by its key alone, so the page in the same
-place is left out. Statac builds both pages as they are. It warns you
+place is left out. Statac still builds both pages. It warns you
 because two pages in the same place are usually meant to be translations
 of one page.
 
