@@ -36,7 +36,7 @@ footer.size: up to 36
 footer.colour: "#B9A88F"
 ```
 
-The text is drawn at 36 either way, so write the size as it is drawn:
+The text is drawn at 36 either way, so write the size it is drawn at:
 
 ```yaml
 footer.size: 36

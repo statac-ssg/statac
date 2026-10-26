@@ -16,8 +16,8 @@ warning  Unused card: no layout reads `page.card`
 ## Why Statac warns
 
 Statac draws a card only for a page whose layout reads `page.card`,
-because that is where the card's URL is written for link previews to
-find. If nothing reads the card's settings, they do nothing. The
+because that is where the layout writes the card's URL for link
+previews to find. If nothing reads the card's settings, they do nothing. The
 likeliest reason is a step you haven't taken yet, so Statac tells you.
 
 ## How to fix it

@@ -18,11 +18,11 @@ error  Unusable card file: `templates/og/background.png` is 1,600 by 900 pixels,
 
 ## Why Statac stops
 
-Every card those settings describe is drawn over that background, in
-those fonts. Statac never stretches or crops a background to fit, because
+Statac draws every card those settings describe over that background, in
+those fonts. It never stretches or crops a background to fit, because
 you decide where the text sits on it. It also never draws in a font you
-didn't name. If no card can be drawn, every page that reads `page.card`
-would be shared with no image, so the build stops.
+didn't name. Without the cards, every page that reads `page.card` would
+be shared with no image, so the build stops instead.
 
 ## How to fix it
 

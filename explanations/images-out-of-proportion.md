@@ -60,7 +60,7 @@ img {
 }
 ```
 
-In `statac.yaml`, to stop it being shown:
+To stop Statac showing the warning, add this to `statac.yaml`:
 
 ```yaml
 quiet: [images-out-of-proportion]

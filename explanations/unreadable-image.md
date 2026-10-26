@@ -30,8 +30,8 @@ opens the image to make the resized copies.
 Copy the file again from where it came from, or export it again from the
 program that made it.
 
-If the file is as you intend and browsers can show it, you can publish it
-unchanged. Put `optimise: false` in its sidecar file, `photo-1.jpg.yaml` for
+If the file is the way you want it and browsers can show it, you can
+publish it unchanged. Put `optimise: false` in its sidecar file, `photo-1.jpg.yaml` for
 `photo-1.jpg`. Statac then publishes the original file and makes no
 resized copies of it.
 

@@ -1,8 +1,8 @@
 # Refused webmentions
 
-Some webmentions in `fetched/mentions/` are refused by
-`refuse_webmentions_from` in `statac.yaml`, so no page shows them. Their
-files stay in `fetched/mentions/` until `statac refresh` deletes them.
+`refuse_webmentions_from` in `statac.yaml` refuses some of the
+webmentions in `fetched/mentions/`, so no page shows them. Their files
+stay in `fetched/mentions/` until `statac refresh` deletes them.
 
 ## What you'll see {#what-youll-see}
 
@@ -14,9 +14,9 @@ note  Refused webmentions: 2 in `fetched/mentions/` are left out
 
 ## Why Statac says so
 
-`refuse_webmentions_from` lists URLs, one a line. A webmention is refused
+`refuse_webmentions_from` lists URLs, one a line. It refuses a webmention
 when the page that sent it is at or under one of them, or when its
-sender's own URL is. A build leaves a refused webmention out as soon as
+sender's own URL is one of them. A build leaves a refused webmention out as soon as
 its URL is listed, whether or not its file is still there. Statac counts
 the ones whose files are still there, which are still in the site's
 history and in the folder you publish from.
@@ -53,7 +53,7 @@ The first line refuses the webmention sent from that page, and any sent
 from a page under it. The second refuses everything sent from
 `b.example`, and everything from a sender whose own URL is there.
 
-To stop the note being shown:
+To stop Statac showing the note, add this to `statac.yaml`:
 
 ```yaml
 quiet: [refused-webmentions]

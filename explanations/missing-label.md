@@ -21,24 +21,25 @@ typing, and not every screen reader reads it. That is part of the page
 Statac built, so Statac tells you. It is a note, and nothing is left out
 of the site.
 
-Statac reads each page as it is published. A control written in a
-template or snippet is told once, at its line, with the pages it is on.
-One written in the content is told in the content.
+Statac reads each page once it is built. It reports a control written in
+a template or snippet once, at its line, with the pages it is on, and
+one written in the content at its place in the content.
 
 Some controls need no `<label>`. An `<input type="hidden">` is never
 shown, and a browser labels `<input type="submit">` and
 `<input type="reset">` itself. An `<input type="button">` is labelled by
 its `value`, and an `<input type="image">` by its `alt`. A control marked
-`disabled` takes nothing in, as the box beside an item of a task list
-doesn't. A control marked `aria-hidden="true"`, or inside an element that
-is, is never read out, so it is never told. Nor is one inside a
-`<template>`, which is on no page until a script puts it there.
+`disabled`, such as the box beside an item of a task list, takes nothing
+in. A screen reader never reads out a control marked `aria-hidden="true"`,
+or one inside an element marked so, and Statac never reports it. Nor
+does it report one inside a `<template>`, which is on no page until a
+script puts it there.
 
 ## How to fix it
 
 Put the control inside a `<label>` with words saying what it is for, or
-give the control an `id` and write a `<label for>` naming it. Where the
-words would show twice, as beside a search box with a button saying
+give the control an `id` and write a `<label for>` naming it. If the
+words would show twice, such as beside a search box with a button saying
 "Search", give the control an `aria-label` instead.
 
 Once you have understood the note, you can quieten it by name.
@@ -57,7 +58,7 @@ Put it inside a `<label>`, and the note goes away:
 <label>Search <input type="search" name="q"></label>
 ```
 
-In `statac.yaml`, to stop it being shown:
+To stop Statac showing the note, add this to `statac.yaml`:
 
 ```yaml
 quiet: [missing-label]

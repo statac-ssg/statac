@@ -1,8 +1,8 @@
 # HEIC image
 
 A page shows an image saved as HEIC or HEIF, the format many phones save
-photos in. Statac published the file as it is and made no resized copies
-of it.
+photos in. Statac published the file unchanged and made no resized
+copies of it.
 
 ## What you'll see {#what-youll-see}
 
@@ -24,8 +24,8 @@ the file anyway, because the page asks for it, and warns you.
 
 Export the image as a JPEG from the program you keep it in. Put the
 JPEG beside the page's file in place of the HEIC file, and use the JPEG's
-name where the image is shown. Statac then publishes it as it does any
-other image.
+name where the image is shown. Statac then publishes it the same way as
+any other image.
 
 ## Example
 

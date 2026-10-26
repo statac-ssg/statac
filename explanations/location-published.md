@@ -2,8 +2,8 @@
 
 A JPEG, PNG or WebP image in `content/` records where it was taken. A
 phone or a camera with GPS writes this into its photos.
-Statac publishes the file exactly as it is, so the location is published
-with it.
+Statac publishes the file unchanged, so the location is published with
+it.
 
 ## What you'll see {#what-youll-see}
 
@@ -25,13 +25,13 @@ Only the file itself contains the location. The resized copies Statac
 makes of an image that a page shows contain the image and nothing else.
 An image that a page shows but nothing links to is published only as its
 resized copies, and no note is shown for it. An image that a page links
-to, one that no page shows, and one that `optimise: false` leaves
-as it is are all published as the original files.
+to, one that no page shows, and one marked `optimise: false` are all
+published as the original files.
 
 Statac looks for the location a camera writes, a latitude and a
 longitude, in JPEG, PNG and WebP files. It doesn't look in any other kind
 of file, or for any other information a file may hold about a place. A
-file in `static/` is never checked, and no note is shown for it.
+Statac never checks a file in `static/`, and shows no note for it.
 
 `statac build` and `statac serve` don't show this note or count it.
 
@@ -51,7 +51,7 @@ make the copy yourself, because Statac publishes the file you give it.
 location. `statac check` shows the note. Once you replace the file with a
 copy exported without the location, the note is no longer shown.
 
-To stop the note being shown, add this to `statac.yaml`:
+To stop Statac showing the note, add this to `statac.yaml`:
 
 ```yaml
 quiet: [location-published]

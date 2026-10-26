@@ -48,7 +48,7 @@ url: https://example.org/
 webmentions: true
 ```
 
-In `statac.yaml`, to stop the warning being shown:
+To stop Statac showing the warning, add this to `statac.yaml`:
 
 ```yaml
 quiet: [webmentions-off]

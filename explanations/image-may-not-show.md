@@ -37,7 +37,7 @@ place.
 To have the image shown in more previews, save it as a PNG and set
 `og_image` to that file.
 
-If the previews that matter to you show the image as it is, nothing
+If the previews that matter to you already show the image, nothing
 needs changing. Once you have understood the warning, quieten it by name.
 
 ## Example
@@ -51,7 +51,7 @@ og_image: cover.webp
 With `cover.png` beside the post and `og_image: cover.png` in the post,
 the warning goes away.
 
-In `statac.yaml`, to stop it being shown:
+To stop Statac showing the warning, add this to `statac.yaml`:
 
 ```yaml
 quiet: [image-may-not-show]

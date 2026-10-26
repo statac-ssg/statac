@@ -15,7 +15,8 @@ warning  Describes no image: there is no `content/photo-1.jpg`
 
 A sidecar file, named after an image with `.yaml` added after the
 image's full name, tells Statac about that image: its alt text, its
-caption, and whether to leave it as it is. The file is never published.
+caption, and whether to publish it unchanged. Statac never publishes
+the sidecar file.
 If there is no image beside it, there is nothing for it to describe.
 Statac carries on without the file and warns you, in case the image was
 renamed or moved and its sidecar file left behind.

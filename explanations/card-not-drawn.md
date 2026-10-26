@@ -10,12 +10,12 @@ these reasons:
 - the texts at the top and the bottom leave no space between them;
 - a text contains a character that none of its fonts has.
 
-Pages left without a card for the same reason are reported together,
-with the number of pages and the first of them. Pages that need some of
-the same characters are reported together too, and the characters the
-most pages need are listed first. Pages whose missing
-characters have nothing in common, such as one that needs an arrow and
-one that needs letters from another script, are reported separately.
+Statac reports pages left without a card for the same reason together,
+with the number of pages and the first of them. It also reports pages
+that need some of the same characters together, and lists first the
+characters the most pages need. It reports pages whose missing
+characters have nothing in common separately, such as one that needs an
+arrow and one that needs letters from another script.
 
 ## What you'll see {#what-youll-see}
 
@@ -42,12 +42,12 @@ at the top and bottom.
 
 If no font has a character, add a font that has it to the fonts the
 message names: the card's `font`, or a text's own, such as `title.font`.
-Fonts are tried in the order they are written. If a font in
+Statac tries the fonts in the order they are written. If a font in
 `templates/og/` that the list doesn't name has every character missing,
 the message names it. Otherwise, put the file of a font that has them in
 `templates/og/`, such as an emoji font for emoji, and add it to the list.
 
-To share a page with an image of your own instead, give that image in
+To share a page with an image of your own instead, name that image in
 the page's `og_image`.
 
 ## Example

@@ -20,15 +20,16 @@ learns about every reader who visits, whether or not they watch. If the
 page shows a thumbnail instead, and loads the player only when the
 reader presses play, the video site learns about no one until then.
 `statac refresh` fetches the thumbnail from the video site once, and the
-thumbnail is kept in the site, because `statac build` never uses the network.
+site keeps it, because `statac build` never uses the network.
 That way, building the same files gives the same result every time, and
 works with no connection at all.
 
 Statac warns once for each video, however many pages show it. If a
 page's content shows the video, the warning points at the call in the
 Markdown. Otherwise it points at the template. If the video site replied
-that it has no image for the video, `fetched/record` marks the video `absent`.
-`statac refresh` then doesn't ask again, and the warning says so.
+that it has no image for the video, `statac refresh` marks the video
+`absent` in `fetched/record`. It then doesn't ask again, and the warning
+says so.
 
 ## How to fix it
 
@@ -57,7 +58,7 @@ Fetched `fetched/stills/youtube-abcdefghijk.jpg`.
 Fetched 1 thumbnail.
 ```
 
-In `statac.yaml`, to stop it being shown:
+To stop Statac showing the warning, add this to `statac.yaml`:
 
 ```yaml
 quiet: [no-thumbnail]

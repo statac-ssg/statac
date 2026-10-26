@@ -23,8 +23,8 @@ Some colours in the wider colour space don't exist in sRGB, so Statac
 replaces each of them with the nearest sRGB colour. On most images you
 can't see the difference, but on one with very strong colours you sometimes
 can. Statac shows this note once for each such image that a page
-shows, so the change never comes as a surprise. Your own file is never
-changed.
+shows, so the change never comes as a surprise. Statac never changes
+your own file.
 
 ## How to fix it
 
