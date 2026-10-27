@@ -13,10 +13,6 @@
 
 <p align="center"><b><a href="https://statac.dev/getting-started/">Get started</a> · <a href="https://statac.dev/install/">Install</a> · <a href="https://statac.dev">Documentation</a> · <a href="https://statac.dev/e/">Problems explained</a> · <a href="CHANGELOG.md">Changes</a></b></p>
 
-> [!IMPORTANT]
-> Statac 0.7.0 is coming, with breaking changes: settings are renamed and
-> new sites start plainer. [What's changing](https://statac.dev/whats-changing/)
-
 Statac makes a website from a folder of Markdown. You write pages in
 Markdown, choose how they look with templates, and run `statac build`. It
 writes a site of plain files, ready to put on any web host. Statac adds
