@@ -401,7 +401,7 @@ fn a_language_with_no_words_says_where_its_words_go() {
             "  [en] > \n\
              Statac has no translations for `sw`: write its months and days in \
              `languages/sw.yaml`.\n\
-             More: https://statac.dev/languages/#languages\n\
+             More: https://statac.dev/languages/#language-files\n\
              \n\
              What is the site time zone?\n"
         ),
@@ -422,7 +422,7 @@ fn a_language_with_no_words_says_where_its_words_go() {
         said.starts_with(
             "Statac has no translations for `sw-KE`: write its months and days in \
              `languages/sw-KE.yaml`.\n\
-             More: https://statac.dev/languages/#languages\n\
+             More: https://statac.dev/languages/#language-files\n\
              \n\
              Made a new site in `"
         ),

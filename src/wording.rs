@@ -5130,7 +5130,7 @@ pub(crate) fn no_words_for(tag: &str) -> String {
 pub(crate) const CODE_COLOURS: &str = "https://statac.dev/code-colours/";
 
 /// Where the docs describe a language's translations.
-pub(crate) const LANGUAGE_FILES: &str = "https://statac.dev/languages/#languages";
+pub(crate) const LANGUAGE_FILES: &str = "https://statac.dev/languages/#language-files";
 
 pub(crate) fn made_site(folder: &str, files: usize) -> String {
     format!(
