@@ -558,7 +558,7 @@ pub(super) fn carried(
                 Found::Written => may_run = true,
                 Found::Embedded(address) => {
                     if !chosen(&finding.found) {
-                        carried.push((Carried::Embedded(address.clone()), sure))
+                        carried.push((embedded(address), sure))
                     }
                 }
                 Found::Loaded(src) => {
@@ -608,6 +608,24 @@ pub(super) fn carried(
             pages,
         })
         .collect()
+}
+
+/// What an embed from `address` counts as: the host it comes from, so a
+/// site's many videos are one line, or the address itself where it has no
+/// host.
+fn embedded(address: &str) -> Carried {
+    let parsed = match address.starts_with("//") {
+        true => url::Url::parse(&format!("https:{address}")),
+        false => url::Url::parse(address),
+    };
+    let from = parsed
+        .ok()
+        .and_then(|url| Some((url.host_str()?.to_owned(), url.port())));
+    match from {
+        Some((host, Some(port))) => Carried::EmbeddedFrom(format!("{host}:{port}")),
+        Some((host, None)) => Carried::EmbeddedFrom(host),
+        None => Carried::Embedded(address.to_owned()),
+    }
 }
 
 fn slashed(path: &Path) -> String {

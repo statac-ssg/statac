@@ -3802,9 +3802,11 @@ pub(crate) enum Carried {
     Loaded(String),
     /// JavaScript written into pages by this file.
     Written(String),
-    /// Something embedded from this address, empty where it has none,
-    /// which may run scripts of its own.
+    /// Something embedded from this address, which has no host, or is
+    /// empty where there is none, and may run scripts of its own.
     Embedded(String),
+    /// Things embedded from this host, which may run scripts of their own.
+    EmbeddedFrom(String),
 }
 
 /// What one round asks of the pages already open.

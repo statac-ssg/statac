@@ -3716,6 +3716,9 @@ pub(crate) fn javascript(carried: &Carried, sure: bool, pages: usize) -> String 
             format!("An embed with no URL, which may run its own, {on}")
         }
         Carried::Embedded(address) => format!("`{address}` embedded, which may run its own, {on}"),
+        Carried::EmbeddedFrom(host) => {
+            format!("Embedded from `{host}`, which may run its own, {on}")
+        }
     }
 }
 

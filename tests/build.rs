@@ -1969,6 +1969,43 @@ fn javascript_is_found_in_every_file_published_whatever_its_folder() {
     }
 }
 
+/// An embed is counted by the site it comes from, once a page however many
+/// it embeds from there; one with no host is counted by its address.
+#[test]
+fn an_embed_is_counted_by_the_site_it_comes_from() {
+    let site = Site::new("embeds");
+    let frame = |src: &str| format!("<iframe src=\"{src}\" title=\"Video\"></iframe>\n\n");
+    let titled = |n: u8, body: String| format!("---\ntitle: Post {n}\n---\n{body}");
+    site.write(
+        "content/post-1.md",
+        &titled(
+            1,
+            frame("https://www.youtube.com/embed/a") + &frame("//WWW.YouTube.com/embed/b"),
+        ),
+    );
+    site.write(
+        "content/post-2.md",
+        &titled(
+            2,
+            frame("https://www.youtube.com/embed/c") + "<object data=\"/f.svg\"></object>\n",
+        ),
+    );
+    site.write(
+        "content/post-3.md",
+        &titled(3, frame("https://player.vimeo.com/video/1")),
+    );
+    let (said, code) = site.run(&["check", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(
+        said.contains(
+            "  `/f.svg` embedded, which may run its own, on 1 page\n  \
+             Embedded from `player.vimeo.com`, which may run its own, on 1 page\n  \
+             Embedded from `www.youtube.com`, which may run its own, on 2 pages\n"
+        ),
+        "{said}"
+    );
+}
+
 /// A file a host sends as a picture, a recording, a font or a PDF is never
 /// read as a document, so what it holds is never taken for script.
 #[test]
@@ -2099,7 +2136,7 @@ fn javascript_a_snippet_called_by_name_writes_is_not_listed_and_the_rest_is() {
             ],
             &[
                 "`https://example.org/play.js`, on 1 page",
-                "`https://example.org/player` embedded, which may run its own, on 1 page",
+                "Embedded from `example.org`, which may run its own, on 1 page",
             ],
         ),
         (
@@ -2114,7 +2151,7 @@ fn javascript_a_snippet_called_by_name_writes_is_not_listed_and_the_rest_is() {
                     "@play(\"https://example.org/player\")\n",
                 ),
             ],
-            &["`https://example.org/player` embedded, which may run its own, on 1 page"],
+            &["Embedded from `example.org`, which may run its own, on 1 page"],
         ),
         (
             "a called snippet on two pages and their layout",
