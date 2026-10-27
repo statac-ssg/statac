@@ -2,6 +2,366 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.7.0 - 2026-10-27
+
+A breaking release. Statac writes no templates into a site, makes only
+the pages and feeds a site asks for, and takes the words people search
+for. Before upgrading a site made with 0.6, read
+https://statac.dev/upgrading/, which says what to change and what
+changes without a word.
+
+### Breaking
+
+- Statac writes no templates into a site. `statac new` writes
+  `statac.yaml` and an empty `content/`, and `statac import` brings
+  across the content and settings alone. Statac refuses `statac new`'s
+  `--update`, `--missing`, `--cards` and `--no-starter`. The docs'
+  tutorial has templates to copy for the parts a site may want.
+- Statac makes a list page only where the site asks for one: the home
+  page needs `content/index.md` or `templates/home.html`, a folder's
+  page its `index.md`, tag and series pages `tags.pages: true` or
+  `series.pages: true`, and later pages `posts_per_page`. `statac check`
+  says once what an existing site no longer gets, and the line to add.
+- A list has a feed only where a `feed:` line asks for one: `feed: true`
+  in `statac.yaml` for the site's feed, and in a folder's `index.md`
+  for the folder's. Both had one by default. Statac warns of a list that
+  asks for a feed and has nothing dated, notes a feed template no list
+  asks for, and publishes no feed for a list whose page isn't published,
+  since a feed links to its list's page; `feed-not-written` says so.
+- Settings, template names and problem names take the words people
+  search for. Renamed settings: `later_pages` is
+  `pagination.permalink`, `left_behind` is `exclude`, `also_at` is
+  `other_hosts`, `not_ours` is `served_elsewhere`, and
+  `after_build_makes` is `after_build_outputs`. Renamed in templates:
+  `page.photo()` and `page.photos()` are `page.image()` and
+  `page.images()`, `page.words` is `page.word_count`, a video's `still`
+  is `thumbnail`, `page.webmentions.said` and `.faces` are `.comments`
+  and `.reactions`, and a webmention's `face` and `words` are `avatar`
+  and `content`. Statac hands Markdown snippets `url`, `external` and
+  `image`. Problem names change too, such as `undescribed-picture` to
+  `missing-alt-text`, `waiting-for-its-day` to `scheduled-post` and
+  `missing-words` to `missing-translation`. An old name stops the
+  build, and Statac offers the new one.
+- Statac fills `image:` and `images:` on every page, so it sets aside a
+  page's own field of either name: rename the field.
+- Messages, explanations, descriptions and `statac --help` say URL,
+  slug, pagination, scheduled post, image, content, translation and
+  social card.
+- Statac colours code only where `code_colours: true` asks, and writes
+  no `code.css`. It refuses `code_style`; the docs give each theme's
+  rules to copy into a stylesheet of the site's own.
+- Statac writes dates as each language writes them in the Unicode
+  CLDR. English follows its region: `en` and `en-US` write "December
+  31, 2025", and `en-GB`, `en-AU` and the other regions "31 December
+  2025". A site with `language: en` keeps day-first dates with
+  `date_format: 31 December 2025`. A region of any language Statac
+  carries, such as `es-MX`, `fr-CA` or `de-AT`, writes its dates as the
+  CLDR writes that region, and a month and year, or a year alone, comes
+  in the language's own order.
+- `statac refuse` is gone. A site lists the webmentions it refuses in
+  `statac.yaml` as `refuse_webmentions_from:`, one full URL a line; each
+  refuses every mention sent from a page at or under it, or by a sender
+  whose URL is. A build leaves them out at once, and `statac refresh`
+  deletes their files for good. A site with `fetched/refused` stops,
+  and Statac tells it the lines to add.
+- `--site=` is gone: name the site's folder after the command, as
+  `statac build docs`. Statac refuses `--site=` with that suggestion.
+- `statac new` asks for the site's title, the author's name, the site's
+  URL, its language and its time zone, and writes only what you answer.
+  It writes no date format and no `feed_key`; `statac check` asks for a
+  feed key once the site has a feed.
+- `pages.order` with a list of names stops the build with
+  `wrong-place`. Handed down, a list of names did nothing, and nothing
+  said so; write it as `order:` in the `index.md` of the folder it
+  orders.
+
+### New
+
+- `statac lsp`, a language server, gives an editor what `statac check`
+  knows, as you type. https://statac.dev/editors/ says how to start it
+  in Sublime Text, VS Code, Zed and other editors.
+  - It shows every problem where it is written, with its suggestion and
+    a link to its explanation. A third of a second after you stop
+    typing, it checks the unsaved text, building again only what the
+    change touched, and it checks again when a file of the site
+    changes outside the editor.
+  - It completes `statac.yaml` and front matter: settings, fields, the
+    fields a site declares, and their values, among them the site's
+    tags with how many pages carry each, its templates and its series.
+    In content it completes snippet calls with what each takes, the
+    files beside the page, the site's URLs in links and `@url(...)`,
+    and a page's headings after `#`. In templates and snippets it
+    completes the names and fields readable where the cursor is,
+    filters, tests, statements, the blocks of the template extended,
+    and the templates, URLs and files a template names.
+  - Hover says what each setting, front matter field, template name,
+    filter and function does, with a link to the docs; what a link
+    leads to; what a snippet call names; which file beside the page a
+    value names; and how many pages carry a tag or series.
+  - Go to definition goes from a link or `@url(...)` to the page or
+    heading, from a snippet call to the snippet, from `layout:` or
+    `extends` to the template, from an image or file a page names to
+    that file, and from a custom field to its declaration in
+    `statac.yaml`. Find references lists every link to a page or a
+    heading on it, from content and templates, counting links to its
+    old URLs. The outline lists a page's headings, and the editor's
+    symbol search finds pages by title and snippets and templates by
+    name.
+  - It offers a fix where a problem's suggestion names one exact
+    answer: a misspelt word, name, label, block, argument or file,
+    another tool's spelling, a URL or anchor, a template, a value
+    needing quotes or brackets, or either reading of an unclear date.
+  - When you rename a page's file or folder in the editor, it rewrites
+    every link to the page in the form it was written in, and adds the
+    old URL to the page's `redirect_from:`.
+  - It works on drafts and scheduled posts too: an open one is checked
+    as if published, and find references and rename count the links
+    drafts write.
+- `published.txt` keeps every URL the site publishes. Each build and
+  `statac serve` add to it, and `statac check` warns when a URL stops
+  answering, with the `redirect_from` line that sends readers on; a
+  folder gone whole is one warning. Commit it with the site, and take
+  out the line of a page that's gone for good, which the editor offers
+  to do. The first build that publishes a page starts it.
+- `statac check --json` prints every problem as one JSON document, for
+  an editor, a CI job or another program to read: each problem's
+  severity, name, message, suggestion and explanation, with its file
+  and where in it the problem starts and ends, as a line and column
+  and as a byte offset. Quietened problems are there too, marked.
+- `statac build --timings` shows where a build spent its time: each
+  stage, the work of building the pages across threads, and the five
+  slowest templates, pieces of content, pages and images.
+- With no home page, `statac serve` answers the top of the site with a
+  page listing every page the build made, each linked, with drafts and
+  scheduled posts marked. `statac build` doesn't publish it.
+- Every setting, front matter field, template name, filter, function
+  and test has a description, which the editor shows on hover and in
+  completion, the debug panel shows in its Names tab, and the docs'
+  Reference pages give. Each links to the docs section that teaches
+  the name.
+- Statac checks the fields a template reads on an image, a file, a
+  video or recording, a social card, a heading in `page.toc` and a
+  search box when it reads the template, and offers the nearest field
+  for a misspelt one.
+- `statac check` notes a link or a button with nothing a screen reader
+  can read out, an `<iframe>` with no `title`, a form field with no
+  label, and a page with no `<title>`, each at the line that wrote it.
+  A link or a button in content that shows only an image with no alt
+  text is told once, as the image's missing alt text, which should
+  then say where the link leads or what the button does.
+- A task list's checkbox is labelled with its item's words, so a
+  screen reader names it.
+- `feed:` takes a list of names, each feed built from the template
+  named for its file or by its extension, the first one advertised:
+  `feed: [feed.xml, rss.xml]` publishes Atom and RSS side by side. Feed
+  templates are handed `feed`, their own URL. Statac warns of a feed
+  whose name says one format, such as `rss.xml`, when the build makes
+  another (`feed-format-mismatch`).
+- A template names a date's look: `date("long")`, `date("short")`,
+  `date("day")`, `date("stamp")`.
+- `statac check` notes a file in `languages/` that no language of the
+  site reads, such as `languages/en-US.yaml` on a site in `en-GB`
+  (`unused-language-file`), and offers the site's languages.
+- The install script, `curl -fsSL https://get.statac.dev | sh`,
+  downloads each release from get.statac.dev. Statac's code, issues,
+  Homebrew tap and Scoop bucket are at git.statac.dev. Report a
+  security problem to security@statac.dev.
+
+### Changed
+
+- Every message, explanation and description says who does what:
+  "Statac reads dates without an offset as UTC" where it said "dates
+  without an offset are read as UTC", and "Told the browser to reload."
+  where it said "Browser told to reload.". The explanations and
+  descriptions say what several names do that they left out, and
+  several that misdescribed tag pages, missing translations, social
+  cards and check-only notes are corrected.
+- Search ranks a part first by where a word stands, then by how often:
+  a word in a page's title or a part's heading counts for more than the
+  same word written several times in a short part, and a page whose
+  title is only the word comes before one whose longer title holds it.
+  Serve's Search tab shows what each place adds to a result's score.
+- `exclude` takes a path from `content/`, such as `blog/one.md`, as
+  well as a name.
+- Two files published at one URL are told at the `redirect_from` or
+  `permalink` that puts one there, with advice to change it, not to
+  rename a file. A page whose `redirect_from` names its own URL is told
+  at that line. A draft whose URL another page's `redirect_from` takes
+  is told to take it out of `redirect_from` there, or to give the draft
+  a `permalink`.
+- A broken link is told where its URL was written: in a front matter
+  field or data file a template prints, in a value shown through
+  `markdown` or `safe`, inside a macro or a snippet the content calls,
+  and at each URL a `srcset` lists. A link written in content and
+  again in a template is told once at each place, not a third time at
+  `{{ page.content }}`.
+- `statac check`'s list of JavaScript the site carries counts an embed
+  by the site it comes from, so a site's videos from one site make one
+  line, not one line each.
+- When a build stops, `statac serve` says it keeps serving the
+  previous build, and the debug panel's error card says when the page
+  it shows was built.
+- An unknown command is told alone, without an error for each argument
+  after it, and `statac <unknown> --help` stops with the unknown
+  command, as the command alone does.
+- The language file `statac new` writes for a language with no
+  translations opens with a full link to its docs.
+- A region takes the Unicode CLDR's quotation marks where they differ
+  from its language's: Spanish in the United States and French in
+  Canada and Switzerland.
+- A language code naming its language's usual script, such as
+  `en-Latn-GB`, takes the translations, dates and language file of the
+  code without it, `en-GB`; a region takes the site's file for the
+  broader form of its language, `en-GB` taking `languages/en-001.yaml`
+  before `languages/en.yaml`. A language written in another script,
+  such as `en-Shaw` or `ja-Latn`, takes none of the language's
+  translations or files, and is `unknown-language` until the site has
+  a file for it.
+- On Windows, Statac passes over a kept copy of an image or a social
+  card, the images' index and the feeds' record of posts if the file
+  has a second name somewhere, as it does on macOS and Linux, and
+  works out what it held again. A kept copy given a second name while
+  a build runs is never copied into the built site.
+
+### Fixed
+
+- A line in a site's language file that the file can't set, such as
+  `dates`, is told as in the wrong place, and any other line the file
+  doesn't know as an unknown line. Both were told as unknown settings.
+- A setting written for one language, such as `fr.title`, on a site in
+  one language is told, with the setting itself offered.
+- A site setting written nested in a page's front matter is told as in
+  the wrong place, named whole.
+- For a list page Statac makes, such as a tag's page, a missing
+  template's suggestion offers a page of your own at its URL. It
+  offered `layout:`, which can't be written there.
+- A video shown whole, or handed whole to a snippet, gives its id and
+  needs no `start`. Statac asked for one.
+- `statac refresh` fetches the thumbnails a site lacks when the only
+  problems stopping the build are values those thumbnails give, then
+  reads the site again. It stopped without fetching them.
+- Statac checks a feed's template as reading a site with a `url` and a
+  `title`, since it builds a feed only for such a site. It told the
+  site it lacked them.
+- A build keeps the time of each file it doesn't change, and gives a
+  file changed back to what it was a newer time.
+- `statac serve` builds again only the pages an edit reaches after a
+  social card's background or font, or a file a page shows, was saved
+  just before a build. Where the disk's file times move in steps, or
+  the file was dated in the future, the next build made every page
+  again, whatever the edit.
+- Statac refuses an English month or weekday in another language's
+  example date, and offers the language's own word.
+- A `date_format` message offers examples as the site's language
+  writes them: `12/31/2025` and `Wednesday, December 31, 2025` for a
+  site in `en-US`.
+- In a `date_format` or a template's example date, a slip in a
+  weekday's or month's name stops as the name written correctly does,
+  and Statac offers the reference date's: `Tusday 31 December 2025`
+  offers `Wednesday 31 December 2025`. In Chinese, Japanese and Korean
+  a slip in a short word, as `水曜目` for `水曜日`, is refused with the
+  word offered, and two words run together, as `水曜日午後3:04`, are
+  refused with the format written apart offered. Statac copied each
+  into every date as text.
+- Statac reads a `date_format` written as Japanese writes its full
+  date, `2025年12月31日水曜日`, and a weekday written straight after the
+  day's mark with a site's own Chinese translations.
+- A heading or table whose id you write in braces as a footnote's,
+  such as `## Sources {#note-1}`, keeps it, and the footnote takes
+  `note-1-1`, so both links land. The footnote's marker linked to the
+  heading.
+- A footnote in a value shown through `markdown` has its way back
+  labelled, as a page's own footnotes do.
+- A call naming a snippet with a hyphen, which no call can name, is
+  told. Statac published it as text with nothing said.
+- An `id` that is neither six letters and digits nor a UUID is told,
+  with both forms named.
+- `statac search` given a site's folder alone, which it reads as the
+  words to look for, says so, and its usage shows the words first.
+- `page.key` on a page made from no item is told as a value the page
+  hasn't got. It was told as a name not available yet.
+- `numbered: true` in a folder's `index.md` says its numbering is
+  meant, and Statac no longer notes the folder.
+- An image a template shows with no alt text is told once at the place
+  it is shown, naming every page, however each page links it. It was
+  told once for each way a page linked it.
+- A blank line inside a block of a template indented with tabs, before
+  a block inside it, no longer publishes a stray `>` on a line of its
+  own.
+
+### Fixed in `statac import`
+
+- It asks for each feed the old site made, at its old URL: every feed
+  in a Zola site's `feed_filenames`, in Zola's order; the feed
+  Eleventy's RSS plugin made, and one made with `getFeedTemplate` and
+  `addTemplate`; and it counts each as kept. It writes no
+  `feed: false` for a list Hugo made no feed for, and writes a
+  `feed_key` only for a site whose feeds come across.
+- It names the template each feed needs by the feed's own file, such
+  as `templates/index.xml` for Hugo's RSS feeds, and says which of the
+  docs' Atom and RSS templates to copy as which. It named
+  `templates/feed.xml`, the docs' Atom template, for every feed.
+- Posts keep their feed ids: it writes `feed_ids_from` with the old
+  tool's name, so a post whose URL holds a space, an accented letter or
+  a bracket keeps the id the old feed gave it; it writes
+  `feed_ids_before` for an Eleventy site that used the RSS plugin; and
+  it names each post whose id Eleventy's RSS plugin escaped twice in
+  an Atom or JSON feed, which feed readers show once as new. A site
+  with no RSS plugin is told that its posts' feed ids change. Under
+  `feed_ids_from: jekyll`, a post with `%` in its file name now keeps
+  the id Jekyll gave it, which changes its id on a site that moved
+  before.
+- It takes an Eleventy site's `url`, `title` and `language` from the
+  `metadata` its RSS plugin was given, a Hugo site's language from
+  `locale`, which took over from `languageCode` in Hugo 0.158, and a
+  Hugo site in several languages' title from its main language. It
+  says when a site's settings give no `url` or `title`, or an empty
+  `title`, and the new site's title is made from the old folder's
+  name.
+- It looks for each Hugo page and tag at the URL Hugo published it at:
+  runs of spaces, a space beside a hyphen, punctuation between spaces,
+  a slash in a title, symbols such as `½`, marks that take space of
+  their own under `removePathAccents`, a tag under a `[permalinks]`
+  pattern, a tag's title in capitals under `:slug` and `:title`, and a
+  tag whose name starts with a space. It brings across only the page
+  Hugo published where Hugo read two names as one, and makes one tag
+  of names Hugo made one tag of. It names each Hugo tag's feed beside
+  the tag's page wherever a pattern put it.
+- It keeps the URL Zola gave a page or tag whose name it spelled in
+  ASCII under `[slugify]`, so `日本.md` stays at `/ri-ben/`; keeps a
+  `#` under `paths = "safe"`, as Zola does; keeps the id Zola gave each
+  heading, writing it after the heading in braces where Statac's own
+  would differ; and says that Zola's footnote ids aren't kept.
+- It takes only the folders above a Jekyll site's `_posts` as a post's
+  categories. A post in `_posts/2019/` was given the category `2019`
+  and a second `2019` in its URL.
+- It leaves the `tags` in an Eleventy folder's data file out of its
+  pages' tags, since Eleventy reads them as collections, and publishes
+  no page at a folder whose `index.md` it writes only to hand down the
+  folder's data.
+- It gives a page no `permalink` at an old URL the new site can't
+  publish at, such as `/posts/p#q/`, so the new site builds, and lists
+  each such URL once, among those that can't be kept, with why. It
+  lists a list's or a feed's URL that the old built site doesn't have
+  under a heading of its own, with no `redirect_from` to add, where it
+  advised one.
+- It says when the old site's built output isn't there to check the
+  old URLs against, naming the folder the old tool builds into. It
+  said every page landed where the old site published it.
+- It follows no symbolic link in the old site, and lists each. A page
+  whose front matter Statac's YAML reader stops at comes across as
+  written, listed in `IMPORT.md`, and `statac check` shows the error.
+  It sends an old paginated page of the home page to the page of
+  `content/posts/` with the same number.
+- It lists, rather than reproduces, what Statac has no equal for: Zola's
+  other `sort_by` orders, `paginate_reversed` and `render_emoji`; a
+  Jekyll site's `_config.toml`, which it no longer reads, and its moved
+  folders; Hugo's `uglyURLs` lists, moved tags, `cascade`,
+  `[frontmatter]`, `enableGitInfo` and folder settings; and the rarer
+  ways an Eleventy site makes its feeds and pages. `IMPORT.md` says
+  what the new site needs before it builds, and calls another tool's
+  shortcodes shortcodes.
+
 ## 0.6.2 - 2026-10-21
 
 ### New
