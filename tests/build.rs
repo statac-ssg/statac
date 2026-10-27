@@ -1633,7 +1633,7 @@ warning  Content never shown: 3 pages built by `templates/hollow.html` have cont
 
 #[test]
 fn words_a_language_lacks_are_noted_once_for_the_language_counting_its_pages() {
-    let site = Site::new("missing-words");
+    let site = Site::new("missing-translation");
     let settings = "title: Site\nlanguage: fr\ntimezone: UTC\npages.feed: false\n";
     site.write("statac.yaml", settings);
     site.write("templates/page.html", "{{ page.content }}\n");
@@ -1656,27 +1656,27 @@ fn words_a_language_lacks_are_noted_once_for_the_language_counting_its_pages() {
     assert_eq!(
         said,
         "\
-note  Missing words: the footnotes of 3 pages in `fr` have no translation for the back link
+note  Missing translation: the footnotes' back link, on 3 pages in `fr`
   While building: content/post-1.md
   And while building 2 more:
     content/post-2.md
     content/post-3.md
   Add the line `back_to_the_text: back to the text` to `languages/fr.yaml`, translated.
-  More: https://statac.dev/e/missing-words/
+  More: https://statac.dev/e/missing-translation/
 
-note  Missing words: the callouts of 1 page in `fr` have no names
+note  Missing translation: the callouts' names, on 1 page in `fr`
   While building: content/post-4.md
   Add the line `callouts: [Note, Tip, Important, Warning, Caution]` \
 to `languages/fr.yaml`, translated.
-  More: https://statac.dev/e/missing-words/
+  More: https://statac.dev/e/missing-translation/
 
-2 notes: 2 missing-words.
+2 notes: 2 missing-translation.
 "
     );
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
     assert!(
-        said.starts_with("2 notes: 2 missing-words. Run `statac check` to see them.\n"),
+        said.starts_with("2 notes: 2 missing-translation. Run `statac check` to see them.\n"),
         "{said}"
     );
 
@@ -1696,7 +1696,7 @@ to `languages/fr.yaml`, translated.
     fs::remove_file(site.root.join("languages/fr.yaml")).unwrap();
     site.write(
         "statac.yaml",
-        &format!("{settings}quiet: [missing-words]\n"),
+        &format!("{settings}quiet: [missing-translation]\n"),
     );
     let (said, code) = site.check_without_javascript(&[]);
     assert_eq!(code, 0, "{said}");

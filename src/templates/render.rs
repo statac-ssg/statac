@@ -1430,7 +1430,7 @@ fn build_body_untimed(
                     highlighter: shared.highlighter.as_ref().filter(|_| !colourless),
                 },
             );
-            wordless = missing_words(shared, p.language, &document);
+            wordless = missing_translations(shared, p.language, &document);
             // A picture's tag leads where it was written to, not where
             // the writing spells it.
             for (place, address) in prose.moved.into_inner() {
@@ -1528,7 +1528,7 @@ fn among_the_pages_boxes(shared: &Arc<Shared>, page: PageId, body: &Body) -> Val
 /// is told of the language, or where nothing shows the words: the site's
 /// own file for the footnotes or a callout never reads them, or the site
 /// has no file for a callout.
-fn missing_words(
+fn missing_translations(
     shared: &Shared,
     language: LanguageId,
     document: &markdown::Document,
@@ -1556,7 +1556,7 @@ fn missing_words(
     ]
     .into_iter()
     .filter(|(missing, _)| *missing)
-    .map(|(_, words)| Kind::MissingWords {
+    .map(|(_, words)| Kind::MissingTranslation {
         tag: tag.clone(),
         file: file.clone(),
         words,

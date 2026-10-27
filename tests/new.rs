@@ -165,13 +165,11 @@ fn a_site_in_a_language_lacking_the_words_statac_shows_is_given_them_in_english(
             "{tag}: {page}"
         );
 
-        // Without the file, the footnote has no words.
+        // Without the file, the footnote has no translation.
         fs::remove_file(&file).unwrap();
-        let line = format!(
-            "note  Missing words: the footnotes of 1 page in `{tag}` have no translation for \
-             the back link"
-        );
-        let wanted = [("missing-words".to_owned(), line)];
+        let line =
+            format!("note  Missing translation: the footnotes' back link, on 1 page in `{tag}`");
+        let wanted = [("missing-translation".to_owned(), line)];
         assert_eq!(built(&folder, Mode::Check).0, wanted, "{tag}");
     }
 }

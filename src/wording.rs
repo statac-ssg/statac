@@ -455,17 +455,16 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 "Language written twice: `{first_written}` and `{written}` are one language"
             ),
         },
-        Kind::MissingWords {
+        Kind::MissingTranslation {
             tag, words, pages, ..
         } => {
             let pages = how_many(*pages, "page", "pages");
             match words {
-                ShownWords::BackToTheText => format!(
-                    "Missing words: the footnotes of {pages} in `{tag}` have no translation for \
-                     the back link"
-                ),
+                ShownWords::BackToTheText => {
+                    format!("Missing translation: the footnotes' back link, on {pages} in `{tag}`")
+                }
                 ShownWords::Callouts => {
-                    format!("Missing words: the callouts of {pages} in `{tag}` have no names")
+                    format!("Missing translation: the callouts' names, on {pages} in `{tag}`")
                 }
             }
         }
@@ -2929,7 +2928,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             "Write its months, weekdays and quotation marks in `languages/{tag}.yaml`."
         )),
         Kind::LanguageWrittenTwice { .. } => None,
-        Kind::MissingWords { file, words, .. } => Some(format!(
+        Kind::MissingTranslation { file, words, .. } => Some(format!(
             "Add the line `{}` to `{file}`, translated.",
             match words {
                 ShownWords::BackToTheText => "back_to_the_text: back to the text",
@@ -9460,27 +9459,26 @@ mod tests {
                 None,
             ),
             (
-                Kind::MissingWords {
+                Kind::MissingTranslation {
                     tag: "fr".into(),
                     file: "languages/fr.yaml".into(),
                     words: ShownWords::BackToTheText,
                     pages: 1,
                 },
-                "Missing words: the footnotes of 1 page in `fr` have no translation for the back \
-                 link",
+                "Missing translation: the footnotes' back link, on 1 page in `fr`",
                 Some(
                     "Add the line `back_to_the_text: back to the text` to `languages/fr.yaml`, \
                      translated.",
                 ),
             ),
             (
-                Kind::MissingWords {
+                Kind::MissingTranslation {
                     tag: "fr-CA".into(),
                     file: "languages/fr-CA.yaml".into(),
                     words: ShownWords::Callouts,
                     pages: 1200,
                 },
-                "Missing words: the callouts of 1,200 pages in `fr-CA` have no names",
+                "Missing translation: the callouts' names, on 1,200 pages in `fr-CA`",
                 Some(
                     "Add the line `callouts: [Note, Tip, Important, Warning, Caution]` to \
                      `languages/fr-CA.yaml`, translated.",

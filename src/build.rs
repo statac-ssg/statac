@@ -976,11 +976,13 @@ pub(crate) fn conclude(
                     }
                     // Each page says its language lacks the words it is
                     // shown with; they are told once, counting the pages.
-                    if let Kind::MissingWords { tag, words, .. } = &problem.kind {
+                    if let Kind::MissingTranslation { tag, words, .. } = &problem.kind {
                         match wordless.get(&(tag.clone(), *words)) {
                             Some(&at) => {
                                 problems[at].met_building_too(problem);
-                                if let Kind::MissingWords { pages, .. } = &mut problems[at].kind {
+                                if let Kind::MissingTranslation { pages, .. } =
+                                    &mut problems[at].kind
+                                {
                                     *pages += 1;
                                 }
                             }

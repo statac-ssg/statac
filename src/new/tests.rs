@@ -748,8 +748,8 @@ fn nothing_is_coloured_where_colour_is_off() {
 /// The explanation of words a language lacks shows the lines a new site's
 /// file for a language holds, as they are written there.
 #[test]
-fn the_example_of_missing_words_is_a_new_sites_language_file() {
-    let shown = crate::language::tests::example(crate::problem::Code::MissingWords);
+fn the_example_of_missing_translation_is_a_new_sites_language_file() {
+    let shown = crate::language::tests::example(crate::problem::Code::MissingTranslation);
     let written = language_file();
     let (comment, lines) = written.split_once('\n').unwrap();
     assert!(comment.starts_with("# "), "{comment}");

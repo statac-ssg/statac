@@ -126,7 +126,7 @@ codes! {
     UnknownLanguage "unknown-language",
     LanguageWrittenTwice "language-written-twice",
     NoPagesInLanguage "no-pages-in-language",
-    MissingWords "missing-words",
+    MissingTranslation "missing-translation",
     LanguageFolderInPattern "language-folder-in-pattern",
     SameTranslation "same-translation",
     UnmatchedTranslationKey "unmatched-translation-key",
@@ -227,6 +227,7 @@ const FORMER_NAMES: &[(&str, Code)] = &[
     ("writing-not-published", Code::ContentNotPublished),
     ("read-as-your-own", Code::ReadAsCustom),
     ("no-still", Code::NoThumbnail),
+    ("missing-words", Code::MissingTranslation),
 ];
 
 /// Names of kinds of problem Statac no longer has, each with the kind
@@ -384,7 +385,7 @@ impl Code {
             | Code::NoLanguage
             | Code::NoListPage
             | Code::NoHomePage
-            | Code::MissingWords
+            | Code::MissingTranslation
             | Code::BuiltWithPageTemplate
             | Code::BuiltWithoutTemplate
             | Code::LocationPublished
@@ -495,7 +496,7 @@ impl Code {
             | Code::OutputFolderNamed
             | Code::UnknownLanguage
             | Code::NoPagesInLanguage
-            | Code::MissingWords
+            | Code::MissingTranslation
             | Code::BuiltWithPageTemplate
             | Code::BuiltWithoutTemplate
             | Code::LanguageFolderInPattern
@@ -1102,7 +1103,7 @@ pub enum Kind {
     /// language whose words have none for it: the language as the site
     /// names it, the file its words go in, which words, and how many
     /// pages.
-    MissingWords {
+    MissingTranslation {
         tag: String,
         file: String,
         words: ShownWords,
@@ -3133,7 +3134,7 @@ impl Kind {
             Kind::UnknownLanguage { .. } => Code::UnknownLanguage,
             Kind::LanguageWrittenTwice { .. } => Code::LanguageWrittenTwice,
             Kind::NoPagesInLanguage { .. } => Code::NoPagesInLanguage,
-            Kind::MissingWords { .. } => Code::MissingWords,
+            Kind::MissingTranslation { .. } => Code::MissingTranslation,
             Kind::LanguageFolderInPattern { .. } => Code::LanguageFolderInPattern,
             Kind::SameTranslation { .. } => Code::SameTranslation,
             Kind::UnmatchedTranslationKey { .. } => Code::UnmatchedTranslationKey,

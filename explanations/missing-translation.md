@@ -1,16 +1,16 @@
-# Missing words
+# Missing translation
 
-Statac adds a few words of its own to a page's content: what a screen
+Statac adds a little text of its own to a page's content: what a screen
 reader reads out for a footnote's back link, and the name of each kind of
-callout, such as "Note" or "Warning". These words come from the page's
-language, and this language has no translation for them. Statac has these
-words in English only. For any other language, their translations come
+callout, such as "Note" or "Warning". This text comes from the page's
+language, and this language has no translation for it. Statac has these
+lines in English only. For any other language, their translations come
 from the site's own file in `languages/`. So Statac gives this note for a
 language with no such file, for a file without the line, or for a file
 whose line is empty.
 
 For a site made in another language Statac knows the dates and
-quotation marks of, `statac new` writes this file, with these words in
+quotation marks of, `statac new` writes this file, with these lines in
 English for you to translate.
 
 The message shows the language and the number of pages. It appears once
@@ -20,9 +20,9 @@ pages there are.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Missing words: the footnotes of 1 page in `fr` have no translation for the back link
+note  Missing translation: the footnotes' back link, on 1 page in `fr`
   Add the line `back_to_the_text: back to the text` to `languages/fr.yaml`, translated.
-  More: https://statac.dev/e/missing-words/
+  More: https://statac.dev/e/missing-translation/
 ```
 
 ## Why Statac says so

@@ -1,7 +1,7 @@
 # Unused language file
 
 The site has a file in `languages/`, such as `languages/en-US.yaml`, but
-no language of the site reads it, so its words are used nowhere.
+no language of the site reads it, so nothing in it is used.
 
 ## What you'll see {#what-youll-see}
 
@@ -35,5 +35,5 @@ A site in British English:
 language: en-GB
 ```
 
-with its words in `languages/en-US.yaml`. Rename the file
+with its translations in `languages/en-US.yaml`. Rename the file
 `languages/en-GB.yaml`, and Statac reads it.

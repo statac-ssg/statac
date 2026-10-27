@@ -25,7 +25,7 @@ fn wordless(built: &Built, page: &str) -> (Vec<(String, ShownWords)>, String) {
         .problems
         .iter()
         .map(|problem| match &problem.kind {
-            Kind::MissingWords {
+            Kind::MissingTranslation {
                 file,
                 words,
                 pages: 1,
