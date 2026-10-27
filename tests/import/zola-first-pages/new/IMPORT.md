@@ -27,8 +27,6 @@ timezone: UTC
 typography: false
 ```
 
-and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
-
 ## URLs
 
 Statac worked out where the old site published each page, read the new site, and looked for each of the 7 old URLs there: 7 are published or redirected.

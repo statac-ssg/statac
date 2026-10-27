@@ -273,17 +273,22 @@ fn came_across(text: &mut String, summary: &Summary) {
         "The settings written in `{}`:\n\n```yaml\n",
         config::FILE_NAME
     ));
+    let mut keyed = false;
     for line in summary.settings.lines() {
+        keyed |= line.starts_with("feed_key:");
         if line.starts_with('#') || line.starts_with("feed_key:") {
             continue;
         }
         text.push_str(line);
         text.push('\n');
     }
-    text.push_str(
-        "```\n\nand a `feed_key` made fresh for the site: see \
-         https://statac.dev/feeds/#entry-ids.\n\n",
-    );
+    text.push_str("```\n\n");
+    if keyed {
+        text.push_str(
+            "and a `feed_key` made fresh for the site: see \
+             https://statac.dev/feeds/#entry-ids.\n\n",
+        );
+    }
 }
 
 /// What became of the old site's lists of terms that Statac has no equal

@@ -25,8 +25,6 @@ title: Markers and dollars
 language: en
 ```
 
-and a `feed_key` made fresh for the site: see https://statac.dev/feeds/#entry-ids.
-
 ## URLs
 
 Statac worked out where the old site published each page, read the new site, and looked for each of the 4 old URLs there: 4 are published or redirected.
