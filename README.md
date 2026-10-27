@@ -10,7 +10,6 @@
 
 <p align="center">
   <a href="https://github.com/statac-ssg/statac/releases/latest"><img alt="The latest release" src="https://img.shields.io/github/v/release/statac-ssg/statac?label=release&color=CC4E00"></a>
-  <a href="https://github.com/statac-ssg/statac/actions/workflows/release.yml"><img alt="The build of the latest release's packages" src="https://img.shields.io/github/actions/workflow/status/statac-ssg/statac/release.yml?label=release%20packages"></a>
   <a href="https://statac.dev/install/"><img alt="Runs on macOS, Linux and Windows" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-191919"></a>
   <a href="#licence"><img alt="Licence: MIT or Apache-2.0" src="https://img.shields.io/badge/licence-MIT%20or%20Apache--2.0-191919"></a>
 </p>
