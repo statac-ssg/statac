@@ -2,7 +2,7 @@
 # Publishes a release's packages, taken and checked by tools/take.sh, to
 # get.statac.dev:
 #
-#     tools/publish.sh <folder>
+#     tools/publish.sh [--dry-run] <folder>
 #
 # A person's step, run with the Bunny login of the person releasing, which
 # the release workflow never has. It publishes only packages built from the
@@ -10,6 +10,10 @@
 # already published. The version's files go to v<version>/, then
 # latest/SHA256SUMS names it as the newest release, and the install script
 # as tagged goes to the top, as index.html.
+#
+# --dry-run makes every check and says each upload it would make, uploading
+# nothing, so a practice release can reach this step. It accepts a version
+# with no tag, the packages' commit still having to be on main.
 set -eu
 
 zone=statac-get
@@ -21,8 +25,13 @@ stop() {
     exit 1
 }
 
+dry=false
+if [ $# -eq 2 ] && [ "$1" = --dry-run ]; then
+    dry=true
+    shift
+fi
 if [ $# -ne 1 ]; then
-    echo "usage: tools/publish.sh <folder>" >&2
+    echo "usage: tools/publish.sh [--dry-run] <folder>" >&2
     exit 2
 fi
 folder=$(cd "$1" && pwd)
@@ -42,13 +51,23 @@ commit=$(cat COMMIT)
 version=$(sed -n '1s/.*statac-\([0-9][^-]*\)-.*/\1/p' SHA256SUMS)
 [ -n "$version" ] || stop "Can't read the version from $folder/SHA256SUMS."
 
-# The tag, on main, at the commit the packages were built from.
-git -C "$root" fetch --quiet origin main "+refs/tags/v$version:refs/tags/v$version" ||
+# The tag, on main, at the commit the packages were built from. A dry run
+# without one reads the install script from the commit instead.
+source=v$version
+if git -C "$root" fetch --quiet origin main "+refs/tags/v$version:refs/tags/v$version" 2>/dev/null; then
+    tagged=$(git -C "$root" rev-parse "v$version^{commit}")
+    [ "$tagged" = "$commit" ] ||
+        stop "v$version names $tagged, but the packages were built from $commit."
+elif $dry; then
+    git -C "$root" fetch --quiet origin main || stop "Can't fetch main from origin."
+    git -C "$root" cat-file -e "$commit^{commit}" 2>/dev/null ||
+        stop "The packages' commit, $commit, isn't in this checkout."
+    echo "no tag v$version: a real run stops here until $commit is tagged"
+    source=$commit
+else
     stop "There's no tag v$version on origin." \
         "Tag the commit the release was built from first: git tag v$version $commit && git push origin v$version"
-tagged=$(git -C "$root" rev-parse "v$version^{commit}")
-[ "$tagged" = "$commit" ] ||
-    stop "v$version names $tagged, but the packages were built from $commit."
+fi
 git -C "$root" merge-base --is-ancestor "$commit" origin/main ||
     stop "v$version's commit, $commit, isn't on main."
 
@@ -58,6 +77,17 @@ present=$(bunny storage files list "v$version" -z "$zone" -o json) ||
 case $present in
     *objectName*) stop "$version is published already." "A published version is never replaced: release a new one." ;;
 esac
+
+if $dry; then
+    for file in statac-* SHA256SUMS; do
+        echo "would publish v$version/$file"
+    done
+    echo "would make latest/ name $version"
+    git -C "$root" show "$source:tools/install.sh" >"$folder/install.sh"
+    echo "would publish install.sh from $source at the top"
+    echo "Checked $version, built from $commit: nothing was uploaded."
+    exit 0
+fi
 
 for file in statac-* SHA256SUMS; do
     bunny storage files upload "$file" -z "$zone" --to "v$version/" --checksum >/dev/null ||
