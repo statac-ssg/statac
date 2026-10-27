@@ -144,7 +144,8 @@ jobs:
             exit 1
           }
           rust=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)
-          git archive --format=tar HEAD > ../source.tar
+          # A zip, whose names git marks as UTF-8.
+          git archive --format=zip HEAD > ../source.zip
           cat > ../tests.ps1 <<'SCRIPT'
           param([string]$rust)
           $env:Path = "$env:USERPROFILE\.cargo\bin;C:\Program Files\Git\cmd;C:\Program Files\Git\usr\bin;C:\Program Files\CMake\bin;C:\Program Files\NASM;" + $env:Path
@@ -154,15 +155,17 @@ jobs:
           $source = "$env:USERPROFILE\build\source"
           if (Test-Path $source) { Remove-Item -Recurse -Force $source }
           New-Item -ItemType Directory -Force $source | Out-Null
-          # Windows' own tar: Git's, first on the path, reads C: as a host.
-          & "$env:SystemRoot\System32\tar.exe" -xf "$env:USERPROFILE\source.tar" -C $source
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Remove-Item "$env:USERPROFILE\source.tar"
+          # Windows' own tar writes a name only where the machine's code page
+          # holds it, which a Japanese one isn't.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          try { [IO.Compression.ZipFile]::ExtractToDirectory("$env:USERPROFILE\source.zip", $source) }
+          catch { $_; exit 1 }
+          Remove-Item "$env:USERPROFILE\source.zip"
           Set-Location $source
           cmd /c "rustup toolchain install $rust --profile minimal 2>&1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmd /c "cargo +$rust test --release --locked --no-fail-fast --target x86_64-pc-windows-msvc 2>&1"
           exit $LASTEXITCODE
           SCRIPT
-          scp -q ../source.tar ../tests.ps1 statac-windows:
+          scp -q ../source.zip ../tests.ps1 statac-windows:
           ssh statac-windows powershell -NoProfile -ExecutionPolicy Bypass -File tests.ps1 "$rust"
