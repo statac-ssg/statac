@@ -111,6 +111,10 @@ on every save.
 
 Everything else is at [statac.dev](https://statac.dev).
 
+Report a problem in [Statac's issues](https://git.statac.dev/statac/statac/issues)
+on git.statac.dev, Statac's home. The copy on GitHub is
+read-only, with its issues turned off.
+
 ## Licence
 
 Statac is offered under the MIT licence or the Apache License 2.0, at your
