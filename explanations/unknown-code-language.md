@@ -24,7 +24,8 @@ nothing would tell you.
 ## How to fix it
 
 If the word is a typo, write the language's name as Statac knows it.
-The writing page lists the names of the common languages.
+https://statac.dev/writing/#languages lists the names of the common
+languages.
 
 If the code is in a language Statac doesn't colour, or isn't code at all,
 replace the word with `text`. Statac then shows the block without

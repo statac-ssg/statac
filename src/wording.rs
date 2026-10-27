@@ -2958,7 +2958,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             TemplateFault::Syntax(fault) => syntax_suggestion(fault),
             TemplateFault::Takes(fault) => Some(match fault {
                 TakesFault::Unclosed | TakesFault::Missing | TakesFault::NamesNothing => {
-                    "Write it on one line, such as `{# takes photo, alt #}`.".into()
+                    "Write it on one line, such as `{# takes image, alt #}`.".into()
                 }
                 TakesFault::NotAlone(name) => {
                     format!("Write `{{# takes {name} #}}`, and have calls name anything else.")
@@ -4920,7 +4920,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
             ),
         ),
         // Settings.
-        ("settingsLabel", said("Panel settings")),
+        ("settingsLabel", said("Debug panel settings")),
         ("sits", said("Where the debug panel sits")),
         ("corner", said("Corner")),
         ("bar", said("Bar")),

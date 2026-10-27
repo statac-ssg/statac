@@ -100,9 +100,9 @@ More: https://statac.dev/snippets/#handed
 ## `body`
 
 In a snippet, the content a call wraps, built into HTML. In a file in
-`snippets/markdown/`, what is inside the piece, built into HTML: a
-heading's or a link's words, a code block's code, or a callout's
-content. It is HTML, so the template writes it into the page unescaped.
+`snippets/markdown/`, what is inside the heading, link, code block or
+callout, built into HTML: a heading's or a link's text, a code block's
+code, or a callout's content. It is HTML, so the template writes it into the page unescaped.
 
 More: https://statac.dev/snippets/#handed
 
@@ -229,7 +229,7 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 In `footnotes.html`, what a screen reader says for the link back to the
 text: `back to the text` in English, or else the language's
-`back_to_the_text` line. Empty in another language whose file has no
+`back_to_the_text` translation. Empty in another language whose file has no
 such line.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing

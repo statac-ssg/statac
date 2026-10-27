@@ -23,7 +23,7 @@ Statac publishes what you wrote as written. A browser reads your HTML as
 part of the whole page, not on its own, so a tag that doesn't match
 reaches past your content. An element left open takes in what the layout
 puts after the content: on a list of posts, the posts after this one, the
-links to more pages and the footer. A comment left open hides all of it.
+pagination links and the footer. A comment left open hides all of it.
 If the layout has nothing of that name open round the content, a browser
 ignores a closing tag with nothing to close. If the layout has, the tag
 closes part of the layout, and what follows falls out of place. Which of

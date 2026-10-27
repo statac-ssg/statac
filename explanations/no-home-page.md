@@ -1,8 +1,8 @@
 # No home page
 
-The site has pages, but nothing is published at its top, the URL a
-reader reaches by its address alone. There is no `content/index.md`, and
-no `templates/home.html` to build a page listing the posts.
+The site has pages, but nothing is published at its top, `/`, where a
+reader arrives from the site's URL alone. There is no `content/index.md`,
+and no `templates/home.html` to build a page listing the posts.
 
 ## What you'll see {#what-youll-see}
 
@@ -19,7 +19,7 @@ Statac publishes only the pages you ask for. The home page is
 the top of each language's folder. If there is none, Statac builds a
 page listing the site's posts there only if the site has
 `templates/home.html`. Without either, a reader who visits the site's
-address finds nothing, and nothing else would tell you.
+URL finds nothing, and nothing else would tell you.
 
 `statac check` says so once, naming the top of every language that has
 nothing published there. `statac build` and `statac serve` don't show this note or

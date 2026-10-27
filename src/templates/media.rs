@@ -39,7 +39,7 @@ const PHOTO_OPTIONS: &[&str] = &["sizes", "full", "decorative"];
 /// Who is asking, for a problem to be told where it was asked.
 #[derive(Clone, Debug)]
 pub(super) struct Asking {
-    /// The call as a problem names it: `page.photo`.
+    /// The call as a problem names it: `page.image`.
     call: String,
     method: String,
     /// The call in the writing whose snippet or piece is asking, where one

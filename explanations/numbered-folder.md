@@ -53,7 +53,7 @@ numbered.
 `/days/day-two/` and `/days/day-three/`.
 
 To order a folder without renaming its files, write the order in its
-`index.md` instead, naming each page by the last part of its URL:
+`index.md` instead, naming each page by its slug:
 
 ```yaml
 order: [day-one, day-two, day-three]

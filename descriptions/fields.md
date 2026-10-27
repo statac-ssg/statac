@@ -60,7 +60,7 @@ More: https://statac.dev/templates/#which
 
 ## `type`
 
-What kind of page this is, in a word of your own. If `templates/` has a
+What kind of page this is, in a word you choose. If `templates/` has a
 template of that name and the page sets no `layout`, Statac builds the
 page with that template.
 

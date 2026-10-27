@@ -20,9 +20,10 @@ another language is read aloud in an English voice. A browser also uses
 the same value to decide whether to offer a translation, and how to break
 words at the ends of lines.
 
-The language also decides the words Statac writes: the names of months
-and weekdays in dates, the quotation marks, and words such as `back to the
-text` beside a footnote. With no `language`, these are in English too.
+The language also decides the translations Statac writes: the names of
+months and weekdays in dates, the quotation marks, and text such as `back
+to the text` beside a footnote. With no `language`, these are in English
+too.
 
 Statac shows this note once for the whole site, and only if a template
 reads the language, through `page.language`, `site.language` or
