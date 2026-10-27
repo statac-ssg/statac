@@ -3706,7 +3706,7 @@ pub(crate) fn javascript(carried: &Carried, sure: bool, pages: usize) -> String 
         n => format!("on {}", how_many(n, "page", "pages")),
     };
     if !sure {
-        on.push_str(", where a browser may not run it");
+        on.push_str(", though a browser may not run it");
     }
     match carried {
         Carried::Published { address, from } => format!("`{address}` from `{from}`, {on}"),
@@ -3939,7 +3939,7 @@ pub(crate) const HOOK_RUNS_AGAIN: &str =
 
 /// What `serve` says as it opens of an `after_build` it ran.
 pub(crate) const AFTER_RAN_ONCE: &str =
-    "`after_build` ran once: what it made stays as it is until serve is started again.";
+    "`after_build` ran once: what it made stays unchanged until you start serve again.";
 
 /// What `serve` says as it opens of an `after_build` it hasn't run, the
 /// first build having stopped.
@@ -3952,7 +3952,7 @@ pub(crate) const FETCHING: &str =
 
 /// What `serve` says as it opens where the site has something to fetch
 /// and it was asked for `--offline`.
-pub(crate) const OFFLINE: &str = "Offline: nothing is fetched from other sites.";
+pub(crate) const OFFLINE: &str = "Offline: Statac fetches nothing from other sites.";
 
 /// What `serve` says where fetching ended in a fault of Statac's own.
 pub(crate) const FETCHING_STOPPED: &str = "Fetching stopped: Statac met a fault of its own.";
@@ -4045,12 +4045,12 @@ pub(crate) fn hover_own_field(name: &str) -> String {
 
 /// How an editor's hover says a template reaches a value, as `site.author`.
 pub(crate) fn shown_as(reached: &str) -> String {
-    format!("Templates show it as `{reached}`.")
+    format!("Templates read it as `{reached}`.")
 }
 
 /// How an editor's hover says a custom field is declared.
 pub(crate) fn declared_as(kind: &str) -> String {
-    format!("Declared in `statac.yaml` as `{kind}`.")
+    format!("`statac.yaml` declares it as `{kind}`.")
 }
 
 /// What an editor's hover says a kind of problem is.
@@ -4222,7 +4222,7 @@ pub(crate) fn refusal(address: &str, refusal: &Refusal) -> String {
         }
         // As long as a fetch is given, which `fetch` keeps to itself.
         Refusal::TimedOut => "no answer came within 30 seconds".into(),
-        Refusal::Tls { host } => format!("a secure connection to `{host}` couldn't be made"),
+        Refusal::Tls { host } => format!("Statac couldn't make a secure connection to `{host}`"),
         Refusal::Failed { reason } => crate::problem::system_words(reason),
     }
 }
@@ -4264,7 +4264,7 @@ pub(crate) fn refreshed(fetched: usize, here: usize, failed: usize) -> String {
         parts.push(format!("{} already here.", grouped(here)));
     }
     if failed > 0 {
-        parts.push(format!("{} couldn't be fetched.", grouped(failed)));
+        parts.push(format!("Couldn't fetch {}.", grouped(failed)));
     }
     match parts.is_empty() {
         true => "Fetched no thumbnails.".into(),
@@ -4278,7 +4278,7 @@ pub(crate) fn drafts_not_refreshed(errors: usize) -> String {
     let them = if errors == 1 { "it" } else { "them" };
     let errors = how_many(errors, "error", "errors");
     format!(
-        "Drafts weren't looked at: the site has {errors} with {them}. Run `statac check --drafts` \
+        "Left the drafts out: the site has {errors} with {them}. Run `statac check --drafts` \
          to see {them}."
     )
 }
@@ -4289,12 +4289,12 @@ pub(crate) const NOTHING_TO_FETCH: &str = "Nothing to fetch.";
 /// What `refresh` says where the site uses webmentions and the webmention
 /// service's token wasn't given.
 pub(crate) const NO_TOKEN: &str =
-    "Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.";
+    "Didn't ask for webmentions: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.";
 
 /// What is said of a `.statac/token` that is there and isn't used, and
 /// why.
 pub(crate) fn token_unused(reason: &str) -> String {
-    format!("`.statac/token` wasn't used: {reason}.")
+    format!("Didn't use `.statac/token`: {reason}.")
 }
 
 pub(crate) const TOKEN_FILE_EMPTY: &str = "it is empty";
@@ -4320,7 +4320,7 @@ pub(crate) const TOKEN_REFUSED: &str = "the webmention service didn't accept the
 
 /// Why the webmention service couldn't be asked, where its answer isn't
 /// the feed it sends.
-pub(crate) const UNREADABLE_ANSWER: &str = "the webmention service's answer couldn't be read";
+pub(crate) const UNREADABLE_ANSWER: &str = "Statac couldn't read the webmention service's answer";
 
 /// What `refresh` says where it stopped asking the webmention service with
 /// more to come.
@@ -4378,14 +4378,14 @@ pub(crate) fn removed_refused(mentions: usize, faces: usize) -> String {
 /// What `refresh` says of a new mention a line of
 /// `refuse_webmentions_from` refuses, by the line as written.
 pub(crate) fn refused_here(id: u64, address: &str) -> String {
-    format!("Webmention `{id}` not kept: `{address}` is refused.")
+    format!("Webmention `{id}` not kept: `refuse_webmentions_from` refuses `{address}`.")
 }
 
 /// What `refresh` says of a mention kept without its sender's URL.
 pub(crate) fn sender_not_kept(id: u64, address: &str) -> String {
     format!(
-        "Webmention `{id}`: `{address}` isn't an `https://` or `http://` URL, so the sender's \
-         own URL isn't kept."
+        "Webmention `{id}`: `{address}` isn't an `https://` or `http://` URL, so Statac doesn't \
+         keep the sender's URL."
     )
 }
 
@@ -4405,7 +4405,7 @@ pub(crate) fn too_large_to_open(width: u32, height: u32) -> String {
 }
 
 /// Why an avatar fetched wasn't kept: no copy of it could be made.
-pub(crate) const NOT_MADE_AGAIN: &str = "the image couldn't be made again";
+pub(crate) const NOT_MADE_AGAIN: &str = "Statac couldn't make a copy of the image";
 
 /// `refresh`'s line for webmentions, where the webmention service
 /// answered: what it kept, the avatars it fetched, and what it didn't keep,
@@ -4425,7 +4425,7 @@ pub(crate) fn mentions_refreshed(fetched: usize, faces: usize, not_kept: usize) 
         )),
     }
     if not_kept > 0 {
-        parts.push(format!("{} not kept.", grouped(not_kept)));
+        parts.push(format!("Didn't keep {}.", grouped(not_kept)));
     }
     match parts.is_empty() {
         true => "No new webmentions.".into(),
@@ -4520,7 +4520,7 @@ pub(crate) const STOP_SERVING: &str = "Press Ctrl+C to stop.";
 
 /// What `serve` says as it ends because it can no longer tell when a file
 /// changes.
-pub(crate) const WATCHING_ENDED: &str = "Stopped: the site's folder is no longer being watched.";
+pub(crate) const WATCHING_ENDED: &str = "Stopped: Statac can no longer watch the site's folder.";
 
 /// The files of the site a rebuild of `serve` answers to, as its line
 /// opens. With none named, the system lost count of them.
@@ -4551,9 +4551,9 @@ pub(crate) fn stopped_round(errors: usize) -> String {
 pub(crate) fn told(told: &Told) -> String {
     match told {
         Told::Nothing => "No built file changed.".into(),
-        Told::Reload => "Browser told to reload.".into(),
+        Told::Reload => "Told the browser to reload.".into(),
         Told::Styles(styles) => format!(
-            "Browser told to swap {}.",
+            "Told the browser to swap {}.",
             how_many(styles.len(), "stylesheet", "stylesheets")
         ),
     }
@@ -4756,7 +4756,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("parts", said("What the debug panel shows")),
         (
             "statusStopped",
-            said("Stopped at {time}; the page is as built at {built}"),
+            said("Stopped at {time}; the page is from the build at {built}"),
         ),
         ("statusStoppedFirst", said("Stopped at {time}")),
         ("find", said("Find a name")),
@@ -4802,8 +4802,8 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         (
             "noMatch",
             said(
-                "No name here matches \u{201c}{query}\u{201d}. Names are written as a \
-                 template writes them, like `page.title`.",
+                "No name here matches \u{201c}{query}\u{201d}. Write a name the way a \
+                 template does, such as `page.title`.",
             ),
         ),
         ("noneLeft", said("The filters leave no name here.")),
@@ -4814,25 +4814,25 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("here", said("Here")),
         (
             "uses",
-            said("Uses it: the page read it while it was built."),
+            said("Uses it: Statac read it while building the page."),
         ),
         ("usesNot", said("Doesn't use it.")),
         ("answers", said("It answers these in turn")),
         ("ways", said("Ways to write it")),
-        ("wayAsWritten", said("As the site writes dates")),
+        ("wayAsWritten", said("In the site's date format")),
         ("wayYear", said("Only the year, written by example")),
         ("wayTime", said("In a time element, for machines to read")),
         ("wayEachPost", said("Each post in it")),
         ("wayLink", said("A link to it")),
         ("wayEachList", said("A link to each")),
         ("wayEachPage", said("Each page")),
-        ("wayLinkIf", said("A link to it, where there is one")),
-        ("wayTrue", said("Only where it is true")),
-        ("wayHtml", said("As it is, as HTML")),
+        ("wayLinkIf", said("A link to it, if there is one")),
+        ("wayTrue", said("Only if it is true")),
+        ("wayHtml", said("On its own, as HTML")),
         ("wayReactions", said("Each like, repost or bookmark")),
         ("wayEachItem", said("Each item in it")),
         ("wayHasOne", said("Only on the pages that have one")),
-        ("wayAsIs", said("As it is")),
+        ("wayAsIs", said("On its own")),
         // This page.
         ("published", said("Published by `statac build`")),
         ("isDraft", said(PANEL_IS_DRAFT)),
@@ -4853,7 +4853,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ),
         (
             "layoutUnnamed",
-            said("Nothing names one, so it is `{name}`."),
+            said("Nothing names one, so Statac uses `{name}`."),
         ),
         ("leftToRight", said("{tag}, left to right")),
         ("rightToLeft", said("{tag}, right to left")),
@@ -4900,19 +4900,19 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         (
             "leftOutNone",
             said(
-                "No drafts and no scheduled posts. A page with `draft: true`, or a date after \
-                 today, is listed here with a link to it.",
+                "No drafts and no scheduled posts. This lists each page with `draft: true` or a \
+                 date after today, with a link to it.",
             ),
         ),
         (
             "leftOutUnbuilt",
-            said("Serve was started with `--no-drafts`, so these have no page to open."),
+            said("Serve is running with `--no-drafts`, so these have no page to open."),
         ),
         ("written", said(PANEL_WRITTEN)),
         (
             "writtenNone",
             said(
-                "Nothing in the last rebuild. When a stamp such as `=today` is turned into a \
+                "Nothing in the last rebuild. When serve turns a stamp such as `=today` into a \
                  date, the file and line show here.",
             ),
         ),
@@ -4969,7 +4969,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ),
         (
             "searchDrafts",
-            said("Drafts and scheduled posts are searched too, as serve shows them."),
+            said("Search covers drafts and scheduled posts too, because serve shows them."),
         ),
         ("pagesFound", Counted("{n} page found.", "{n} pages found.")),
         ("foundSome", said("No page holds every word.")),
@@ -5065,7 +5065,7 @@ pub(crate) fn answers_only_at(address: &str) -> String {
 }
 
 /// `serve`'s answer to a request that isn't for reading.
-pub(crate) const READING_ONLY: &str = "Only GET and HEAD are answered.";
+pub(crate) const READING_ONLY: &str = "Serve answers only GET and HEAD.";
 
 /// What `statac new` says before its questions.
 pub(crate) fn new_site_in(folder: &str) -> String {
@@ -5084,11 +5084,12 @@ pub(crate) const ASK_ADDRESS_HINT: &str = "Enter for none yet.";
 pub(crate) const ASK_OLD_ADDRESS: &str = "What is the site's URL?";
 pub(crate) const ASK_OLD_ADDRESS_HINT: &str = "The old site's settings don't say.";
 pub(crate) const ASK_LANGUAGE: &str = "What is the site language?";
-pub(crate) const ASK_LANGUAGE_HINT: &str = "For more than one, the main one first, as `en, fr`.";
+pub(crate) const ASK_LANGUAGE_HINT: &str =
+    "For more than one, the main one first, such as `en, fr`.";
 pub(crate) const ASK_ZONE: &str = "What is the site time zone?";
-pub(crate) const ASK_ZONE_HINT: &str = "As `Europe/London`. Enter for none.";
+pub(crate) const ASK_ZONE_HINT: &str = "Such as `Europe/London`. Enter for none.";
 /// Said under a question whose answer in brackets is how this machine is set.
-pub(crate) const ASK_MACHINES: &str = "In brackets, as this machine is set.";
+pub(crate) const ASK_MACHINES: &str = "In brackets: how this machine is set.";
 
 /// The answer Enter gives, as the line the answer is typed on shows it.
 pub(crate) fn ask_default(default: &str) -> String {
@@ -5386,16 +5387,16 @@ mod tests {
     fn what_refresh_says_of_webmentions_reads_as_written() {
         assert_eq!(
             NO_TOKEN,
-            "Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or \
+            "Didn't ask for webmentions: no token is in `STATAC_WEBMENTION_TOKEN` or \
              `.statac/token`."
         );
         assert_eq!(
             token_unused(TOKEN_FILE_LINES),
-            "`.statac/token` wasn't used: it holds more than one line."
+            "Didn't use `.statac/token`: it holds more than one line."
         );
         assert_eq!(
             token_unused(&token_file_linked(".statac")),
-            "`.statac/token` wasn't used: `.statac` is a link."
+            "Didn't use `.statac/token`: `.statac` is a link."
         );
         assert_eq!(
             cant_ask(TOKEN_REFUSED),
@@ -5403,7 +5404,7 @@ mod tests {
         );
         assert_eq!(
             cant_ask(UNREADABLE_ANSWER),
-            "Can't ask for webmentions: the webmention service's answer couldn't be read."
+            "Can't ask for webmentions: Statac couldn't read the webmention service's answer."
         );
         assert_eq!(
             not_read(1, "follow-of"),
@@ -5419,8 +5420,8 @@ mod tests {
         );
         assert_eq!(
             sender_not_kept(1, "ftp://a.example/"),
-            "Webmention `1`: `ftp://a.example/` isn't an `https://` or `http://` URL, so the \
-             sender's own URL isn't kept."
+            "Webmention `1`: `ftp://a.example/` isn't an `https://` or `http://` URL, so Statac \
+             doesn't keep the sender's URL."
         );
         assert_eq!(
             cant_fetch_face(1, NOT_A_PICTURE),
@@ -5428,14 +5429,14 @@ mod tests {
         );
         assert_eq!(
             mentions_refreshed(3, 2, 1),
-            "Fetched 3 webmentions and 2 avatars. 1 not kept."
+            "Fetched 3 webmentions and 2 avatars. Didn't keep 1."
         );
         assert_eq!(mentions_refreshed(1, 0, 0), "Fetched 1 webmention.");
         assert_eq!(
             mentions_refreshed(1, 1, 0),
             "Fetched 1 webmention and 1 avatar."
         );
-        assert_eq!(mentions_refreshed(0, 0, 2), "2 not kept.");
+        assert_eq!(mentions_refreshed(0, 0, 2), "Didn't keep 2.");
         assert_eq!(mentions_refreshed(0, 0, 0), "No new webmentions.");
     }
 
@@ -5531,7 +5532,7 @@ mod tests {
             (Refusal::TimedOut, "no answer came within 30 seconds".into()),
             (
                 Refusal::Tls { host: host() },
-                "a secure connection to `i.ytimg.com` couldn't be made".into(),
+                "Statac couldn't make a secure connection to `i.ytimg.com`".into(),
             ),
             (
                 Refusal::Failed {
@@ -5615,19 +5616,19 @@ mod tests {
     fn what_refresh_fetched_is_counted_rightly() {
         assert_eq!(
             refreshed(2, 85, 1),
-            "Fetched 2 thumbnails. 85 already here. 1 couldn't be fetched."
+            "Fetched 2 thumbnails. 85 already here. Couldn't fetch 1."
         );
         assert_eq!(refreshed(1, 0, 0), "Fetched 1 thumbnail.");
         assert_eq!(refreshed(0, 1, 0), "1 already here.");
         assert_eq!(refreshed(0, 0, 0), "Fetched no thumbnails.");
         assert_eq!(
             drafts_not_refreshed(1),
-            "Drafts weren't looked at: the site has 1 error with it. Run `statac check --drafts` \
+            "Left the drafts out: the site has 1 error with it. Run `statac check --drafts` \
              to see it."
         );
         assert_eq!(
             drafts_not_refreshed(2),
-            "Drafts weren't looked at: the site has 2 errors with them. Run `statac check \
+            "Left the drafts out: the site has 2 errors with them. Run `statac check \
              --drafts` to see them."
         );
         assert_eq!(and_more(1), "and 1 more. Run `statac check` to see it.");

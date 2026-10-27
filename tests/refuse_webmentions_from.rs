@@ -20,7 +20,7 @@ const SETTINGS: &str = "title: Site\nlanguage: en\ntimezone: Europe/London\npage
 
 /// What `refresh` says where it asks the webmention service nothing.
 const NO_TOKEN: &str =
-    "Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n";
+    "Didn't ask for webmentions: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n";
 
 /// One mention of `post-1`, as its file holds it: its id, the page that
 /// sent it, the sender's own URL, and the name of its face.

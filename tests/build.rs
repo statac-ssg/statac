@@ -2080,7 +2080,7 @@ fn javascript_a_snippet_called_by_name_writes_is_not_listed_and_the_rest_is() {
                     "{{ page.content }}<!-- <script>run()</script> -->\n",
                 ),
             ],
-            &["Written in `templates/page.html`, on 1 page, where a browser may not run it"],
+            &["Written in `templates/page.html`, on 1 page, though a browser may not run it"],
         ),
         (
             "a called snippet loading and embedding from another site",

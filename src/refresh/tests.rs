@@ -69,15 +69,15 @@ fn the_token_is_the_variables_where_it_is_set_and_else_the_files_one_line() {
 #[test]
 fn a_token_file_empty_or_of_more_than_one_line_is_said_and_not_used() {
     let cases = [
-        (&b""[..], "`.statac/token` wasn't used: it is empty."),
-        (b" \n\n", "`.statac/token` wasn't used: it is empty."),
+        (&b""[..], "Didn't use `.statac/token`: it is empty."),
+        (b" \n\n", "Didn't use `.statac/token`: it is empty."),
         (
             b"secret-1\nsecret-2\n",
-            "`.statac/token` wasn't used: it holds more than one line.",
+            "Didn't use `.statac/token`: it holds more than one line.",
         ),
         (
             b"\xffsecret-1",
-            "`.statac/token` wasn't used: it isn't UTF-8 text.",
+            "Didn't use `.statac/token`: it isn't UTF-8 text.",
         ),
     ];
     for (written, line) in cases {
@@ -100,7 +100,7 @@ fn a_token_file_that_is_a_link_or_behind_one_is_said_and_not_used() {
     assert_eq!(text_of(given), None);
     assert_eq!(
         said.as_deref(),
-        Some("`.statac/token` wasn't used: it is a link.")
+        Some("Didn't use `.statac/token`: it is a link.")
     );
 
     let folder = site_with_token("linked-folder", None);
@@ -110,6 +110,6 @@ fn a_token_file_that_is_a_link_or_behind_one_is_said_and_not_used() {
     assert_eq!(text_of(given), None);
     assert_eq!(
         said.as_deref(),
-        Some("`.statac/token` wasn't used: `.statac` is a link.")
+        Some("Didn't use `.statac/token`: `.statac` is a link.")
     );
 }

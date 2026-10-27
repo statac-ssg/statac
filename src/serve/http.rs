@@ -1219,7 +1219,7 @@ mod tests {
         let post = asked(&site, Method::POST, "/", None);
         assert_eq!(
             (post.status, post.body.as_str()),
-            (405, "Only GET and HEAD are answered.")
+            (405, "Serve answers only GET and HEAD.")
         );
         let head = asked(&site, Method::HEAD, "/notes.txt", None);
         assert_eq!(

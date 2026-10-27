@@ -102,8 +102,8 @@ fn a_setting_says_what_it_does() {
         [
             "`pages.isbn`, a cascade",
             "Cascades `isbn` to every page.",
-            "Templates show it as `page.isbn`.",
-            "Declared in `statac.yaml` as `required text`.",
+            "Templates read it as `page.isbn`.",
+            "`statac.yaml` declares it as `required text`.",
         ]
     );
 }
@@ -117,14 +117,14 @@ fn a_value_of_the_sites_own_says_how_templates_show_it() {
         lines,
         [
             "`tagline`, a custom setting",
-            "Templates show it as `site.tagline`."
+            "Templates read it as `site.tagline`."
         ]
     );
     assert_eq!(more.unwrap(), "https://statac.dev/settings/");
     let nested = "tagline: Notes\nbook:\n  auth|or: Author 1\n";
     let (lines, ..) = settings(&site, nested).unwrap();
     assert_eq!(lines[0], "`book.author`, a custom setting");
-    assert_eq!(lines[1], "Templates show it as `site.book.author`.");
+    assert_eq!(lines[1], "Templates read it as `site.book.author`.");
 }
 
 #[test]
@@ -159,8 +159,8 @@ fn a_field_says_what_it_does() {
         lines,
         [
             "`isbn`, a custom field",
-            "Templates show it as `page.isbn`.",
-            "Declared in `statac.yaml` as `required text`.",
+            "Templates read it as `page.isbn`.",
+            "`statac.yaml` declares it as `required text`.",
         ]
     );
     assert_eq!(more.unwrap(), "https://statac.dev/front-matter/#your-own");
@@ -169,7 +169,7 @@ fn a_field_says_what_it_does() {
         lines,
         [
             "`greeting`, a custom field",
-            "Templates show it as `page.greeting`."
+            "Templates read it as `page.greeting`."
         ]
     );
     let index = "---\ntitle: Posts\npages.lay|out: post\n---\n";

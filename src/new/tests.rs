@@ -120,10 +120,10 @@ fn every_default_is_taken_by_enter() {
              \x20 Enter for none yet.\n\
              \x20 > \n\
              What is the site language?\n\
-             \x20 For more than one, the main one first, as `en, fr`.\n\
+             \x20 For more than one, the main one first, such as `en, fr`.\n\
              \x20 [en] > \n\
              What is the site time zone?\n\
-             \x20 In brackets, as this machine is set.\n\
+             \x20 In brackets: how this machine is set.\n\
              \x20 [Europe/London] > \n\
              Made a new site in `{shown}`: 2 files.\n\
              \n\
@@ -182,8 +182,8 @@ fn each_unusable_answer_is_told_and_asked_again() {
     assert_eq!(code, 0, "{said}");
     let address = "What is the site URL?\n\x20 Enter for none yet.\n";
     let language = "What is the site language?\n\
-                    \x20 For more than one, the main one first, as `en, fr`.\n";
-    let zone = "What is the site time zone?\n\x20 In brackets, as this machine is set.\n";
+                    \x20 For more than one, the main one first, such as `en, fr`.\n";
+    let zone = "What is the site time zone?\n\x20 In brackets: how this machine is set.\n";
     let told = [
         format!(
             "{address}\x20 > \x20 `example` isn't a full URL. Write it as \
@@ -378,7 +378,7 @@ fn a_machine_with_no_time_zone_offers_none_and_none_is_written_unless_typed() {
     assert!(
         said.contains(
             "What is the site time zone?\n\
-             \x20 As `Europe/London`. Enter for none.\n\
+             \x20 Such as `Europe/London`. Enter for none.\n\
              \x20 > \nMade a new site"
         ),
         "{said}"
@@ -729,7 +729,7 @@ fn colour_picks_out_the_question_the_hints_the_default_and_the_mark() {
         "{said:?}"
     );
     assert!(
-        said.contains("\n  \x1b[2mIn brackets, as this machine is set.\x1b[0m\n"),
+        said.contains("\n  \x1b[2mIn brackets: how this machine is set.\x1b[0m\n"),
         "{said:?}"
     );
     assert!(said.contains("  \x1b[2m[en]\x1b[0m \x1b[38;"), "{said:?}");

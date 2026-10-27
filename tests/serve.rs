@@ -343,7 +343,7 @@ fn a_saved_stylesheet_is_swapped_in_not_reloaded() {
         let said = served.said.after(mark, "\n");
         assert!(
             said.starts_with("`assets/site.css` changed. Built ")
-                && said.ends_with(" seconds. Browser told to swap 1 stylesheet.\n"),
+                && said.ends_with(" seconds. Told the browser to swap 1 stylesheet.\n"),
             "{way}: {said}"
         );
     });
@@ -368,7 +368,7 @@ fn a_saved_page_reloads() {
         let said = served.said.after(mark, "\n");
         assert!(
             said.starts_with("`content/post-1.md` changed. Built ")
-                && said.ends_with(" seconds. Browser told to reload.\n"),
+                && said.ends_with(" seconds. Told the browser to reload.\n"),
             "{way}: {said}"
         );
     });
@@ -479,7 +479,7 @@ error  Unclear date: `4/10/2026` could be 4 October or 10 April
         assert!(
             said.starts_with("`content/post-1.md` changed. Built ")
                 && said.ends_with(
-                    " seconds. Browser told to reload.\n\
+                    " seconds. Told the browser to reload.\n\
                      Gone since the last build: 1 unclear-date.\n"
                 ),
             "{way}: {said}"
@@ -496,7 +496,7 @@ fn a_page_answered_after_a_round_is_not_told_of_it() {
         "content/index.md",
         "---\nlayout: page\n---\n# Home\n\nChanged.\n",
     );
-    served.said.after(mark, "Browser told to reload.\n");
+    served.said.after(mark, "Told the browser to reload.\n");
     let since = served.page_generation();
     assert_eq!(since, before + 1);
     let (_, body) = get(
@@ -644,7 +644,7 @@ fn a_stamp_saved_is_written_and_built_in_one_round() {
         let said = served.said.text()[mark..].to_owned();
         assert!(
             said.starts_with("`content/post-2.md` changed. Built ")
-                && said.contains(" seconds. Browser told to reload.\nStamped `"),
+                && said.contains(" seconds. Told the browser to reload.\nStamped `"),
             "{way}: {said}"
         );
         assert_eq!(said.matches(" changed. ").count(), 1, "{way}: {said}");
@@ -1124,7 +1124,7 @@ fn the_panel_is_handed_the_pages_facts_and_what_its_build_read_of_each_name() {
         "content/posts/post-4.md",
         "---\ntitle: Post 4\ndate: 2026-10-04\n---\nPost 4, again.\n",
     );
-    let said = served.said.after(mark, "Browser told to reload.\n");
+    let said = served.said.after(mark, "Told the browser to reload.\n");
     assert!(said.contains(" changed. Built 1 of "), "{said}");
     let kept = panel(&served, "/posts/post-3/");
     assert!(
@@ -1424,7 +1424,7 @@ fn the_command_after_a_build_runs_once_and_serve_says_so() {
     assert!(
         said.contains("Ran `after_build`, which added 1 file.\n")
             && said.contains(
-                "`after_build` ran once: what it made stays as it is until serve is started \
+                "`after_build` ran once: what it made stays unchanged until you start serve \
                  again.\n"
             ),
         "{said}"
@@ -1433,7 +1433,7 @@ fn the_command_after_a_build_runs_once_and_serve_says_so() {
     served
         .site
         .write("content/post-1.md", "# Post 1\n\nEdited.\n");
-    let said = served.said.after(mark, "Browser told to reload.\n");
+    let said = served.said.after(mark, "Told the browser to reload.\n");
     assert!(!said.contains("after_build"), "{said}");
     assert_eq!(served.page("/made.txt"), "made\n");
 }
@@ -1727,13 +1727,15 @@ Fetching what's new from other sites. `--offline` turns this off.
 Press Ctrl+C to stop.
 "
     );
-    let said = served.said.after(opened.len(), "Browser told to reload.\n");
+    let said = served
+        .said
+        .after(opened.len(), "Told the browser to reload.\n");
     assert_eq!(
         steady_from_the_start(&served, &said),
         "\
 Fetched `fetched/stills/youtube-abcdefghijk.jpg`.
 Fetched 1 thumbnail.
-FILES changed. Built 1 of 3 files in TIME seconds. Browser told to reload.
+FILES changed. Built 1 of 3 files in TIME seconds. Told the browser to reload.
 Gone since the last build: 1 no-thumbnail.
 "
     );
@@ -1747,7 +1749,7 @@ Gone since the last build: 1 no-thumbnail.
         "content/post-3.md",
         "# Post 3\n\n@youtube(\"https://youtu.be/bcdefghijkl\")\n",
     );
-    let said = served.said.after(mark, "Browser told to reload.\n");
+    let said = served.said.after(mark, "Told the browser to reload.\n");
     assert!(
         said.contains("No thumbnail: `statac refresh` hasn't fetched an image"),
         "{said}"
@@ -1784,14 +1786,16 @@ Fetching what's new from other sites. `--offline` turns this off.
 Press Ctrl+C to stop.
 "
     );
-    let said = served.said.after(opened.len(), "Browser told to reload.\n");
+    let said = served
+        .said
+        .after(opened.len(), "Told the browser to reload.\n");
     assert_eq!(
         steady_from_the_start(&served, &said),
         "\
 Fetched `fetched/faces/0a523cc7bab84b06.jpg`.
 Fetched `fetched/mentions/1.yaml`.
 Fetched 1 webmention and 1 avatar.
-FILES changed. Built 1 of 2 files in TIME seconds. Browser told to reload.
+FILES changed. Built 1 of 2 files in TIME seconds. Told the browser to reload.
 "
     );
     // The three files are one round, and neither what fetching wrote nor
@@ -1819,17 +1823,17 @@ fn a_fetch_that_fails_is_said_and_serving_goes_on() {
         None,
         with_a_video,
     );
-    let said = served.said.after(opened.len(), "couldn't be fetched.\n");
+    let said = served.said.after(opened.len(), "Couldn't fetch 1.\n");
     assert_eq!(
         steady_from_the_start(&served, &said),
         "Can't fetch the thumbnail for `abcdefghijk`: the server answered 503.\n\
-         1 couldn't be fetched.\n"
+         Couldn't fetch 1.\n"
     );
     let mark = served.said.text().len();
     served
         .site
         .write("content/post-1.md", "# Post 1\n\nEdited.\n");
-    served.said.after(mark, "Browser told to reload.\n");
+    served.said.after(mark, "Told the browser to reload.\n");
 }
 
 #[test]
@@ -1852,7 +1856,7 @@ fn a_fault_while_fetching_is_said_in_a_line_and_serving_goes_on() {
     served
         .site
         .write("content/post-1.md", "# Post 1\n\nEdited.\n");
-    served.said.after(mark, "Browser told to reload.\n");
+    served.said.after(mark, "Told the browser to reload.\n");
 }
 
 #[test]
@@ -1897,7 +1901,7 @@ fn offline_nothing_is_fetched_and_serve_says_so() {
 Started `published.txt` with the 3 URLs this site publishes, so a later build can say when one is no longer published. Commit it with the site.
 Wrote 3 pages and 1 other file to `SITE/.statac/serve` in TIME seconds.
 Serving `SITE/.statac/serve` at http://localhost:PORT/
-Offline: nothing is fetched from other sites.
+Offline: Statac fetches nothing from other sites.
 Press Ctrl+C to stop.
 "
     );
@@ -1953,7 +1957,7 @@ fn webmentions_without_the_token_are_said_not_to_be_asked_for() {
     let said = served.said.after(opened.len(), "`.statac/token`.\n");
     assert_eq!(
         steady_from_the_start(&served, &said),
-        "Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n"
+        "Didn't ask for webmentions: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n"
     );
     assert!(asked.lock().unwrap().is_empty());
 }

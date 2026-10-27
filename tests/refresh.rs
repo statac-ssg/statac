@@ -338,7 +338,7 @@ fn each_reason_a_still_couldnt_be_fetched_is_said_and_nothing_is_kept() {
         (Refusal::TimedOut, "no answer came within 30 seconds".into()),
         (
             Refusal::Tls { host: host() },
-            "a secure connection to `i.ytimg.com` couldn't be made".into(),
+            "Statac couldn't make a secure connection to `i.ytimg.com`".into(),
         ),
         (
             Refusal::Failed {
@@ -351,9 +351,7 @@ fn each_reason_a_still_couldnt_be_fetched_is_said_and_nothing_is_kept() {
         let (said, code, asked) = site.refresh(&|_| Err(refusal.clone()));
         assert_eq!(
             said,
-            format!(
-                "Can't fetch the thumbnail for `abcdefghijk`: {reason}.\n1 couldn't be fetched.\n"
-            ),
+            format!("Can't fetch the thumbnail for `abcdefghijk`: {reason}.\nCouldn't fetch 1.\n"),
             "{refusal:?}"
         );
         assert_eq!(code, 1, "{refusal:?}");
@@ -371,7 +369,7 @@ fn an_answer_that_isnt_a_picture_is_not_kept() {
         assert_eq!(
             said,
             "Can't fetch the thumbnail for `abcdefghijk`: the answer isn't an image.\n\
-             1 couldn't be fetched.\n"
+             Couldn't fetch 1.\n"
         );
         assert_eq!(code, 1);
         assert!(!site.holds("fetched"));
@@ -412,7 +410,7 @@ fn a_vimeo_still_is_fetched_from_where_vimeo_says_it_is() {
         (said.as_str(), code),
         (
             "Can't fetch the thumbnail for `123456789`: the video site named no image.\n\
-             1 couldn't be fetched.\n",
+             Couldn't fetch 1.\n",
             1
         )
     );
@@ -465,7 +463,7 @@ fn only_the_stills_missing_are_asked_for_in_order_of_name() {
          Fetched `fetched/stills/youtube-bcdefghijkl.jpg`.\n\
          Fetched `fetched/stills/youtube-defghijklmn.jpg`.\n\
          Fetched `fetched/stills/youtube-efghijklmno.jpg`.\n\
-         Fetched 3 thumbnails. 1 already here. 1 couldn't be fetched.\n"
+         Fetched 3 thumbnails. 1 already here. Couldn't fetch 1.\n"
     );
     assert_eq!(code, 1);
     assert_eq!(
@@ -607,7 +605,7 @@ fn a_site_only_a_draft_stops_gets_the_stills_of_what_it_publishes() {
     assert_eq!(
         said,
         "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n\
-         Drafts weren't looked at: the site has 1 error with it. \
+         Left the drafts out: the site has 1 error with it. \
          Run `statac check --drafts` to see it.\n"
     );
     assert_eq!(code, 0);
@@ -617,7 +615,7 @@ fn a_site_only_a_draft_stops_gets_the_stills_of_what_it_publishes() {
     assert_eq!(
         said,
         "Nothing to fetch.\n\
-         Drafts weren't looked at: the site has 1 error with it. \
+         Left the drafts out: the site has 1 error with it. \
          Run `statac check --drafts` to see it.\n"
     );
     assert_eq!(code, 0);
@@ -937,7 +935,7 @@ fn the_relay_is_asked_fifty_times_at_most() {
     assert!(
         said.ends_with(
             "Stopped asking for webmentions after 50 asks: run `statac refresh` again for \
-             the rest.\n5,000 not kept.\n"
+             the rest.\nDidn't keep 5,000.\n"
         ),
         "{}",
         &said[said.len() - 200..]
@@ -980,7 +978,7 @@ fn each_mention_not_kept_is_said_recorded_and_never_asked_for_again() {
          Fetched `fetched/mentions/13.yaml`.\n\
          Webmention `14` not kept: `https://example.com/post-1/` isn't on this site.\n\
          Webmention `15` not kept: it doesn't say what kind it is.\n\
-         Fetched 1 webmention. 12 not kept.\n"
+         Fetched 1 webmention. Didn't keep 12.\n"
     );
     assert_eq!(code, 0);
     assert_eq!(asked, [relay(0)]);
@@ -1015,7 +1013,7 @@ fn without_the_token_the_relay_isnt_asked_and_the_stills_are_fetched() {
     assert_eq!(
         (said.as_str(), code),
         (
-            "Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n",
+            "Didn't ask for webmentions: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n",
             0
         )
     );
@@ -1030,7 +1028,7 @@ fn without_the_token_the_relay_isnt_asked_and_the_stills_are_fetched() {
     assert_eq!(
         said,
         "Fetched `fetched/stills/youtube-abcdefghijk.jpg`.\nFetched 1 thumbnail.\n\
-         Webmentions weren't asked for: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n"
+         Didn't ask for webmentions: no token is in `STATAC_WEBMENTION_TOKEN` or `.statac/token`.\n"
     );
     assert_eq!(code, 0);
     assert_eq!(asked, [MAXRES]);
@@ -1073,7 +1071,7 @@ fn an_answer_that_isnt_the_relays_feed_is_said_and_nothing_is_kept() {
         assert_eq!(
             (said.as_str(), code),
             (
-                "Can't ask for webmentions: the webmention service's answer couldn't be read.\n",
+                "Can't ask for webmentions: Statac couldn't read the webmention service's answer.\n",
                 1
             ),
             "{body}"
@@ -1113,7 +1111,7 @@ fn a_relay_that_cant_be_asked_is_said_without_its_address() {
         ),
         (
             Refusal::Tls { host: host() },
-            "a secure connection to `webmention.io` couldn't be made".into(),
+            "Statac couldn't make a secure connection to `webmention.io`".into(),
         ),
         (
             Refusal::Failed {
@@ -1273,8 +1271,8 @@ fn a_strangers_addresses_are_kept_only_on_the_web() {
     let (said, code, asked) = site.ask(&|address| answer(address, &feed(&children)));
     assert_eq!(
         said,
-        "Webmention `1`: `javascript:alert(1)` isn't an `https://` or `http://` URL, so the \
-         sender's own URL isn't kept.\n\
+        "Webmention `1`: `javascript:alert(1)` isn't an `https://` or `http://` URL, so Statac \
+         doesn't keep the sender's URL.\n\
          Can't fetch the avatar for `1`: `javascript:alert(1)` isn't an `https://` or `http://` URL.\n\
          Fetched `fetched/mentions/1.yaml`.\nFetched 1 webmention.\n"
     );
@@ -1410,12 +1408,12 @@ fn a_refused_mention_and_anything_from_a_refused_sender_is_not_kept() {
     assert_eq!(
         said,
         format!(
-            "Webmention `12` not kept: `https://b.example/post-12/` is refused.\n\
-             Webmention `13` not kept: `https://a.example/` is refused.\n\
-             Webmention `14` not kept: `https://a.example/` is refused.\n\
+            "Webmention `12` not kept: `refuse_webmentions_from` refuses `https://b.example/post-12/`.\n\
+             Webmention `13` not kept: `refuse_webmentions_from` refuses `https://a.example/`.\n\
+             Webmention `14` not kept: `refuse_webmentions_from` refuses `https://a.example/`.\n\
              Fetched `fetched/faces/{}`.\n\
              Fetched `fetched/mentions/15.yaml`.\n\
-             Fetched 1 webmention and 1 avatar. 3 not kept.\n",
+             Fetched 1 webmention and 1 avatar. Didn't keep 3.\n",
             face_name(FACE)
         )
     );

@@ -136,7 +136,7 @@ fn refresh_says_why_a_token_file_isnt_used() {
         .unwrap();
     let said = String::from_utf8(output.stdout).unwrap();
     assert!(
-        said.starts_with("`.statac/token` wasn't used: it holds more than one line.\n"),
+        said.starts_with("Didn't use `.statac/token`: it holds more than one line.\n"),
         "{said}"
     );
     assert!(!said.contains("secret"), "{said}");
