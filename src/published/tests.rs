@@ -100,19 +100,13 @@ fn a_build_adds_only_the_addresses_the_file_lacks_sorted_and_writes_nothing_wher
         record.keep(scratch, &addresses(now), None).unwrap().kept
     };
     let text = |scratch: &Scratch| std::fs::read_to_string(scratch.join(FILE)).unwrap();
-    assert_eq!(
-        kept(&scratch, &[]),
-        Kept {
-            added: 0,
-            started: true
-        }
-    );
-    assert_eq!(text(&scratch), ABOUT);
+    assert_eq!(kept(&scratch, &[]), Kept::default());
+    assert!(!scratch.join(FILE).exists());
     assert_eq!(
         kept(&scratch, &["/notes/", "/about/", "/about/"]),
         Kept {
             added: 2,
-            started: false
+            started: true
         }
     );
     assert_eq!(text(&scratch), format!("{ABOUT}/about/\n/notes/\n"));

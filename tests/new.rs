@@ -118,6 +118,8 @@ fn every_combination_is_written_checks_and_builds() {
             let (found, published) = built(&folder, Mode::Build);
             assert_eq!(found, wanted, "build: {combination}");
             assert!(published, "{combination}");
+            // A build that publishes no page has no URL to keep.
+            assert!(!folder.join("published.txt").exists(), "{combination}");
         }
     }
 }

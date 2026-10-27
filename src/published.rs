@@ -182,8 +182,9 @@ impl Record {
     }
 
     /// Writes the file under the site at `site` with every address it
-    /// holds and each of `now` it lacks, where it lacks any or the site
-    /// has no file yet, and says what it added. Where `ours` holds the
+    /// holds and each of `now` it lacks, where it lacks any, and says what
+    /// it added. A site with no file yet gets one only once `now` holds
+    /// an address. Where `ours` holds the
     /// addresses a serve added since its first round, one of those no
     /// longer in `now` was never published beyond it, and is taken out.
     pub(crate) fn keep(
@@ -215,6 +216,9 @@ impl Record {
         }
         let before = all.len();
         all.extend(now);
+        if !self.held && all.is_empty() {
+            return Ok(written);
+        }
         written.kept = Kept {
             added: all.len() - before,
             started: !self.held,
