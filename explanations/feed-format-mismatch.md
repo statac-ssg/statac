@@ -14,13 +14,13 @@ warning  Feed format mismatch: `templates/feed.xml` makes `rss.xml` an Atom feed
 
 ## Why Statac warns
 
-Statac has no feed of its own. Each feed is built with the template
-named as its file, such as `templates/rss.xml` for `rss.xml`. If there
-isn't one, Statac uses the template named `feed` with the feed's
-extension, such as `templates/feed.json` for `feed.json`, and otherwise
-`templates/feed.xml`. A list with `feed: [atom.xml, rss.xml]` and only
-`templates/feed.xml` therefore publishes the same Atom feed twice, once
-under the RSS feed's name, and nothing else would tell you.
+Statac has no feed template of its own. Each feed is built with the
+template named as its file, such as `templates/rss.xml` for `rss.xml`.
+If there isn't one, Statac uses the template named `feed` with the
+feed's extension, such as `templates/feed.json` for `feed.json`, and
+otherwise `templates/feed.xml`. A list with `feed: [atom.xml, rss.xml]`
+and only `templates/feed.xml` therefore publishes the same Atom feed
+twice, once under the RSS feed's name, and nothing else would tell you.
 
 Statac tells the format from the feed it built: an `<rss>` root is RSS,
 a `<feed>` root is Atom, and a JSON Feed names its version. A name such

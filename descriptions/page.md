@@ -44,9 +44,9 @@ More: https://statac.dev/dates-and-languages/#how-dates-look
 
 ## `summary`
 
-The page's `summary`, as written. If the page has none, `summary` has no
-value, and `page.opening` has the words of its first paragraph
-instead.
+The page's `summary`, as the page writes it. If the page has none,
+`summary` has no value, and `page.opening` has the words of its first
+paragraph instead.
 
 ## `content`
 
@@ -86,7 +86,8 @@ counts as a word.
 
 `true` if the page's content has maths in it, so a layout can add the
 maths stylesheet only where it is needed. It says nothing of the posts a
-page lists, so a list showing excerpts checks each post's `post.maths`.
+page lists, so a template listing excerpts reads each post's
+`post.maths`.
 
 More: https://statac.dev/writing/#maths
 
@@ -216,7 +217,7 @@ More: https://statac.dev/webmentions/#webmentions-in-a-layout
 
 ## `search_box`
 
-Called as `page.search_box()`, what a search box needs: `id`, the id for
+`page.search_box()` gives what a search box needs: `id`, the id for
 its element, `first`, whether it is the page's first, and `index`, the
 URL of the search index for the page's language. If a template reads
 `index`, the build publishes the index.
@@ -225,7 +226,7 @@ More: https://statac.dev/search/#placing-the-box
 
 ## `image`
 
-Called as `page.image("photo-1.jpg")`, an image beside the page, with
+`page.image("photo-1.jpg")` gives an image beside the page, with
 `src`, `width`, `height`, `alt` and everything else an `<img>` for it
 needs. The call also takes `sizes`, `full=true` and
 `decorative=true`.
@@ -234,47 +235,47 @@ More: https://statac.dev/images/#pictures-in-templates-and-snippets
 
 ## `images`
 
-Called as `page.images(["photo-1.jpg", "photo-2.jpg"])`, the images
-named, in that order, each with the same values as `page.image`. Called
-as `page.images()`, every JPEG, PNG and WebP beside a page that has a
-folder of its own, in file name order. Animated images and other kinds,
-such as GIFs and SVGs, are left out.
+`page.images(["photo-1.jpg", "photo-2.jpg"])` gives the images named,
+in that order, each with the same values as `page.image`.
+`page.images()` gives every JPEG, PNG and WebP beside a page that has a
+folder of its own, in file name order. It leaves out animated images and
+other kinds, such as GIFs and SVGs.
 
 More: https://statac.dev/images/#pictures-in-templates-and-snippets
 
 ## `file`
 
-Called as `page.file("notes-1.pdf")`, any file beside the page, with
+`page.file("notes-1.pdf")` gives any file beside the page, with
 `url`, `name`, `size` in bytes, `text`, `code` and `language`.
 
 More: https://statac.dev/videos/#files-videos-and-recordings
 
 ## `video`
 
-Called as `page.video("video-1.mp4")`, a video beside the page, with
+`page.video("video-1.mp4")` gives a video beside the page, with
 `src` and `type`.
 
 More: https://statac.dev/videos/#video
 
 ## `audio`
 
-Called as `page.audio("recording-1.m4a")`, a recording beside the page,
+`page.audio("recording-1.m4a")` gives a recording beside the page,
 with `src` and `type`.
 
 More: https://statac.dev/videos/#video
 
 ## `youtube`
 
-Called as `page.youtube(url)`, where `url` is a YouTube video's URL or
-its id on its own: the video, with `id`, `start`, `embed` and
+`page.youtube(url)`, where `url` is a YouTube video's URL or its id on
+its own, gives the video, with `id`, `start`, `embed` and
 `thumbnail`.
 
 More: https://statac.dev/videos/#youtube
 
 ## `vimeo`
 
-Called as `page.vimeo(url)`, where `url` is a Vimeo video's URL or its
-id on its own: the video, with `id`, `start`, `embed` and
+`page.vimeo(url)`, where `url` is a Vimeo video's URL or its id on its
+own, gives the video, with `id`, `start`, `embed` and
 `thumbnail`.
 
 More: https://statac.dev/videos/#youtube
@@ -293,34 +294,35 @@ More: https://statac.dev/lists/#drafts-and-posts-waiting-for-their-day
 
 ## `layout`
 
-The `layout` the page names, or the one cascaded to it, as written. If
+The `layout` the page names, or the one cascaded to it, as its front
+matter writes it. If
 neither names one, `layout` has no value.
 
 More: https://statac.dev/templates/#which
 
 ## `type`
 
-The page's `type`, as written. If the page has no `type`, it has no
-value.
+The page's `type`, as the page writes it. If the page has no `type`, it
+has no value.
 
 More: https://statac.dev/templates/#which
 
 ## `permalink`
 
-The page's `permalink`, as written: a URL or a pattern. `page.url` is
-where the page is published.
+The page's `permalink`, as the page writes it: a URL or a pattern.
+`page.url` is where the page is published.
 
 More: https://statac.dev/urls/#permalink
 
 ## `redirect_from`
 
-The old URLs the page's `redirect_from` lists, as written.
+The old URLs the page's `redirect_from` lists, as the page writes them.
 
 More: https://statac.dev/urls/#redirect-from
 
 ## `redirect_to`
 
-The URL the page's `redirect_to` names, as written.
+The URL the page's `redirect_to` names, as the page writes it.
 
 More: https://statac.dev/urls/#sending-readers-on
 
@@ -332,61 +334,62 @@ More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
 
 ## `translation_key`
 
-The page's `translation_key`, as written.
+The page's `translation_key`, as the page writes it.
 
 More: https://statac.dev/dates-and-languages/#translations
 
 ## `neighbours`
 
-The page's `neighbours`, as written: `site`, `folder`, `series` or
-`false`. If the page has none, it has no value.
+The page's `neighbours`, as the page writes it: `site`, `folder`,
+`series` or `false`. If the page has none, it has no value.
 
 More: https://statac.dev/lists/#previous-and-next
 
 ## `each`
 
-On a page that makes pages, its `each`, as written: `data.people` or
-`site.posts`.
+On a page that makes pages, its `each`, as the page writes it:
+`data.people` or `site.posts`.
 
 More: https://statac.dev/data/#pages-made-from-data
 
 ## `order`
 
-On a list page, its `order`, as written. `page.list.order` is the order
-the list runs in.
+On a list page, its `order`, as the page writes it. `page.list.order` is
+the order the list runs in.
 
 More: https://statac.dev/lists/#order
 
 ## `numbered`
 
-On a folder's page, its `numbered`, as written.
+On a folder's page, its `numbered`, as the page writes it.
 
 More: https://statac.dev/lists/#numbered-folders
 
 ## `posts_per_page`
 
-On a list page, its `posts_per_page`, as written. If the page doesn't
-write one, it has no value.
+On a list page, its `posts_per_page`, as the page writes it. If the page
+doesn't write one, it has no value.
 
 More: https://statac.dev/lists/#pages-of-a-list
 
 ## `index_page`
 
-On a list page, its `index_page`, as written.
+On a list page, its `index_page`, as the page writes it.
 
 More: https://statac.dev/lists/#a-lists-page
 
 ## `feed`
 
-On a list page, its `feed`, as written: `true`, `false`, or the name or
-URL of a feed. `page.list.feed` is the URL of the list's feed.
+On a list page, its `feed`, as the page writes it: `true`, `false`, or
+the name or URL of a feed. `page.list.feed` is the URL of the list's
+feed.
 
 More: https://statac.dev/feeds/#which-lists-have-a-feed
 
 ## `id`
 
-The post's `id` in a feed, as written. `feed_id(page)` returns the id
-every post has, whether or not it writes one.
+The post's `id` in a feed, as the page writes it. `feed_id(page)`
+returns the id every post has, whether or not it writes one.
 
 More: https://statac.dev/feeds/#entry-ids
 
@@ -398,8 +401,8 @@ More: https://statac.dev/search/#leave-out
 
 ## `og_image`
 
-The page's `og_image`, as written: the social image used in place of a
-card.
+The page's `og_image`, as the page writes it: the social image used in
+place of a card.
 
 More: https://statac.dev/social-cards/#a-picture-of-your-own
 

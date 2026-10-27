@@ -584,7 +584,7 @@ Options:
   --out=<folder>         Where statac build writes the built site. Without
                          it, _site in the site's folder.
   --url=<url>            The site's full URL for this run, in place of url
-                         in statac.yaml, as a preview of the site needs.
+                         in statac.yaml, for example to build a preview.
   --today=<date>         The day the site is built on, as 2026-10-04, for
                          site.today, the day stamps are counted from, and
                          the day statac refresh records. Without it, today
@@ -603,8 +603,8 @@ Options:
                          errors.
   --yes                  Take every answer statac new offers without asking.
   --from=<tool>          The tool that made the site statac import reads:
-                         jekyll, hugo, zola or eleventy. Without it, told
-                         from the site's files.
+                         jekyll, hugo, zola or eleventy. Without it,
+                         Statac tells from the site's files.
   --port=<number>        The port statac serve answers on. Without it,
                          3000, or the next port that is free.
   --watch=<way>          How statac serve learns of a save: native, by
@@ -651,7 +651,7 @@ Options:
   --out=<folder>         Where statac build writes the built site. Without
                          it, _site in the site's folder.
   --url=<url>            The site's full URL for this run, in place of url
-                         in statac.yaml, as a preview of the site needs.
+                         in statac.yaml, for example to build a preview.
   --today=<date>         The day the site is built on, as 2026-10-04, for
                          site.today, the day stamps are counted from, and
                          the day statac refresh records. Without it, today

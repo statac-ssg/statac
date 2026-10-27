@@ -5,7 +5,7 @@ setting, which templates read as `site.<name>`.
 
 ## `title`
 
-The site's name, which templates show as `site.title`. Feeds need it.
+The site's name. Templates read it as `site.title`. Feeds need it.
 
 More: https://statac.dev/settings/
 

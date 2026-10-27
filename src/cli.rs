@@ -207,7 +207,7 @@ const OPTION_LINES: [(&str, &str); 15] = [
     (
         "--url",
         "  --url=<url>            The site's full URL for this run, in place of url
-                         in statac.yaml, as a preview of the site needs.
+                         in statac.yaml, for example to build a preview.
 ",
     ),
     (
@@ -257,8 +257,8 @@ const OPTION_LINES: [(&str, &str); 15] = [
     (
         "--from",
         "  --from=<tool>          The tool that made the site statac import reads:
-                         jekyll, hugo, zola or eleventy. Without it, told
-                         from the site's files.
+                         jekyll, hugo, zola or eleventy. Without it,
+                         Statac tells from the site's files.
 ",
     ),
     (

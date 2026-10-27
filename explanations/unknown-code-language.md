@@ -3,7 +3,7 @@
 A code block gives its language as the first word after the opening
 fence, and Statac has no colours for that word. Statac publishes the
 block without colour, and its `<code>` element keeps the word in its
-class, such as `language-qbasic`. Statac tells of this only on a site
+class, such as `language-qbasic`. Statac says so only on a site
 with `code_colours: true`, where it colours code.
 
 ## What you'll see {#what-youll-see}

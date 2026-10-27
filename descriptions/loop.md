@@ -50,12 +50,12 @@ The item after this one. On the last item, it has no value.
 
 ## `changed`
 
-Called as `loop.changed(post.date.year)`, `true` if the value it is
-given differs from the one it was given on the item before. It is always
+`loop.changed(post.date.year)` gives `true` if the value it is given
+differs from the one it was given on the item before. It is always
 `true` on the first item.
 
 ## `cycle`
 
-Called as `loop.cycle("odd", "even")`, the values it is given, taking
-the next one on each item: `odd` on the first item, `even` on the
+`loop.cycle("odd", "even")` gives the values it is given in turn, the
+next one on each item: `odd` on the first item, `even` on the
 second, and `odd` again on the third.

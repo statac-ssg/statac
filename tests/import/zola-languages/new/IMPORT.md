@@ -6,7 +6,7 @@ It was made from `tests/import/zola-languages/old` by `statac import`, which cha
 
 - 4 posts, into `content/fr/posts/` and `content/posts/`.
 - 4 pages, into `content/` where they stood in the old site.
-- 2 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
+- 2 other files, copied unchanged: the files to publish into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
 The old site's home page is `content/index.md`.
 

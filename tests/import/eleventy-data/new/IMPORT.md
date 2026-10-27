@@ -1,11 +1,11 @@
 This site was imported from an Eleventy site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/eleventy-data/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/.
+It was made from `tests/import/eleventy-data/old` by `statac import`, which changed nothing there. It has no templates, so Statac publishes each page as its content alone until you add templates of your own: see https://statac.dev/templates/.
 
 ## What came across
 
 - 5 posts, into `content/links/` and `content/notes/` and `content/posts/2026/` and `content/posts/`.
-- 2 other files, copied as they were: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
+- 2 other files, copied unchanged: the files to publish into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
 No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 

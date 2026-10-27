@@ -19,16 +19,16 @@ warning  Unmatched tag: `<div>` is never closed
 
 ## Why Statac warns
 
-Statac publishes what you wrote as written. A browser reads your HTML as
-part of the whole page, not on its own, so a tag that doesn't match
+Statac publishes the HTML you wrote unchanged. A browser reads your HTML
+as part of the whole page, not on its own, so a tag that doesn't match
 reaches past your content. An element left open takes in what the layout
-puts after the content: on a list of posts, the posts after this one, the
-pagination links and the footer. A comment left open hides all of it.
-If the layout has nothing of that name open round the content, a browser
-ignores a closing tag with nothing to close. If the layout has, the tag
-closes part of the layout, and what follows falls out of place. Which of
-these happens depends on the layout, which can change, so Statac warns of
-every one.
+puts after the content: on a list of posts, the posts after this one,
+the pagination links and the footer. A comment left open hides all of
+it. If the layout has nothing of that name open round the content, a
+browser ignores a closing tag with nothing to close. If the layout has,
+the tag closes part of the layout, and what follows falls out of place.
+Which of these happens depends on the layout, which can change, so
+Statac warns of every one.
 
 Statac doesn't add or remove a tag for you, because it can't know where
 you meant the element to end.
@@ -44,7 +44,7 @@ Statac doesn't warn about HTML that browsers close without harm:
   Markdown ends it. A browser closes both. The exceptions are `<a>`, `<b>`,
   `<i>`, `<em>`, `<strong>`, `<code>` and the like, which a browser opens
   again round what follows, until their own closing tag.
-- HTML in a code span or a code block, which is shown as text.
+- HTML in a code span or a code block, which Statac shows as text.
 
 Statac matches the tags in each piece of Markdown on its own: a page's
 content, each footnote definition, the content each snippet call wraps,

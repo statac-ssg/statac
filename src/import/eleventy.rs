@@ -2359,8 +2359,8 @@ impl Reader<'_> {
                  through the `url` filter is written with {path} in front, as Eleventy wrote it. \
                  Statac puts a site under a path only by its `url`, and the new site has none \
                  yet. Add the full URL as `url` in `statac.yaml`, such as {example}. Until then, \
-                 `statac check` says nothing is published at those links: leave them as they \
-                 are, even where it offers another URL.",
+                 `statac check` says nothing is published at those links: leave them unchanged, \
+                 even where it offers another URL.",
                 path = code(&base),
                 example = code(&format!("url: https://example.org{base}"))
             ));

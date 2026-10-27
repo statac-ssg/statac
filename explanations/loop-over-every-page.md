@@ -1,9 +1,9 @@
 # Loop over every page
 
 A template loops over a list of the whole site's pages, such as
-`site.pages` or `site.posts`, and so many pages are built with it that
-the build went through pages by the million. The message says which list,
-and how many pages ran the loop.
+`site.pages` or `site.posts`, and Statac builds so many pages with it
+that, between them, the loops go through millions of pages. The message
+says which list, and how many pages ran the loop.
 
 ## What you'll see {#what-youll-see}
 
@@ -15,13 +15,13 @@ note  Loop over every page: 11,243 pages each go through `site.pages`
 
 ## Why Statac says so
 
-Nothing is built wrongly. A loop over every page, run on every page, does
-work that grows with the square of the site: twice the pages take four
-times as long. On a small site that is too little to notice, and Statac
-says nothing. It says so once the pages running one loop go through five
-million pages between them in one build, which a site of about 2,000
-pages reaches, because from there the loop is most of the time a build
-takes.
+Statac builds nothing wrongly. A loop over every page, run on every
+page, does work that grows with the square of the site: twice the pages
+take four times as long. On a small site that is too little to notice,
+and Statac says nothing. It says so once the pages running one loop go
+through five million pages between them in one build, which a site of
+about 2,000 pages reaches, because from there the loop is most of the
+time a build takes.
 
 A filter is different. Statac works out `site.pages | selectattr("menu")`
 once for the whole site and gives every page the answer, however many

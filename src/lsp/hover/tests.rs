@@ -250,7 +250,7 @@ fn a_setting_for_one_language_says_what_it_is() {
         [
             "`fr.title`, a setting for one language",
             "`title` for the pages in `fr`.",
-            "The site's name, which templates show as `site.title`. Feeds need it.",
+            "The site's name. Templates read it as `site.title`. Feeds need it.",
         ]
     );
     assert_eq!(

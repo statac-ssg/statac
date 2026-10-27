@@ -174,7 +174,7 @@ fn a_pattern_opening_with_its_languages_folder_is_read_once_and_warned_of() {
     );
     assert!(
         said.contains(
-            "warning  Language folder in pattern: Statac reads `/en/{slug}/` from `/en/` already\n  \
+            "warning  Language folder in pattern: `/en/{slug}/` starts with `/en/`, which Statac puts in front already\n  \
              content/en/index.md, line 2\n"
         ),
         "{said}"

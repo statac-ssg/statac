@@ -186,7 +186,7 @@ More: https://statac.dev/snippets/#pieces-of-the-writing
 
 In `code.html`, the first word after the opening fence, or if a file's
 name is there, the language its name stands for. Empty if the fence
-names neither, and if the line after the fence starts with a quote.
+names neither, or if the line after the fence starts with a quote.
 
 More: https://statac.dev/snippets/#pieces-of-the-writing
 

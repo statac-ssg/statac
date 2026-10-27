@@ -496,7 +496,7 @@ fn what_is_said_counts_what_came_across() {
              The old site's built output isn't in `_site/`, so no URL was checked against it: \
              see `{shown}/IMPORT.md`.\n\
              Left for you: 7 things of 3 kinds.\n\
-             The new site has no templates, so each page is published as its content alone \
+             The new site has no templates, so Statac publishes each page as its content alone \
              until you add your own: see https://statac.dev/templates/.\n\
              \n\
              Next: `cd {shown}`, add your own templates to `templates/`, then `statac check`.\n"
@@ -1334,7 +1334,7 @@ fn every_error_check_finds_in_the_new_site_is_listed_and_said() {
     assert!(
         said.ends_with(&format!(
             "Left for you: 4 things of 3 kinds.\n\
-             The new site has no templates, so each page is published as its content alone \
+             The new site has no templates, so Statac publishes each page as its content alone \
              until you add your own: see https://statac.dev/templates/.\n\
              The new site also has 2 errors, listed in `{shown}/IMPORT.md`.\n\
              \n\
@@ -1417,13 +1417,13 @@ fn a_site_imported_has_its_settings_and_what_came_across_alone() {
         let settings = text("statac.yaml");
         assert!(settings.starts_with(settings_start), "{name}: {settings}");
         let report = text("IMPORT.md");
-        let templates = "It has no templates, so each page is published as its content alone \
+        let templates = "It has no templates, so Statac publishes each page as its content alone \
                          until you add templates of your own: see https://statac.dev/templates/.";
         assert_eq!(report.matches(templates).count(), 1, "{name}: {report}");
         assert!(!report.contains("Missing template"), "{name}: {report}");
         assert!(
             said.contains(
-                "The new site has no templates, so each page is published as its content alone \
+                "The new site has no templates, so Statac publishes each page as its content alone \
                  until you add your own: see https://statac.dev/templates/.\n"
             ),
             "{name}: {said}"

@@ -74,7 +74,7 @@ without a page, naming the first.
 
 ## Example
 
-A site with posts whose `statac.yaml` says `feed: true`, but with no
+Here a site with posts has `feed: true` in `statac.yaml`, but no
 `templates/feed.xml`. The site's own list asks for a feed, but there is
 no template to build it with:
 
@@ -93,7 +93,8 @@ templates/
   page.html
 ```
 
-A folder of notes with no dates, whose list page asks for a feed. In
+Here a folder of notes has no dates, and its list page asks for a feed.
+In
 `content/notes/index.md`:
 
 ```yaml

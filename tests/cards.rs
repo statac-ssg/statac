@@ -343,7 +343,7 @@ fn a_page_picks_another_card_and_a_folder_hands_one_down() {
     let said = site.build();
     assert!(said.contains("Drew 1 card."), "{said}");
     assert!(
-        said.contains("Removed 1 card no page is shared with any more from `.statac`."),
+        said.contains("Removed 1 card from `.statac` that no page uses any more."),
         "{said}"
     );
     assert_ne!(site.cards(), before);
@@ -1257,9 +1257,7 @@ fn a_second_build_draws_nothing_and_publishes_the_same_bytes() {
     site.write("content/post-1.md", "---\ntitle: Post one\n---\nA post.\n");
     let said = site.build();
     assert!(
-        said.contains(
-            "Drew 1 card.\nRemoved 1 card no page is shared with any more from `.statac`."
-        ),
+        said.contains("Drew 1 card.\nRemoved 1 card from `.statac` that no page uses any more."),
         "{said}"
     );
     assert_eq!(site.kept().len(), 2);
@@ -1421,7 +1419,7 @@ fn a_link_standing_for_a_card_kept_is_neither_published_nor_removed() {
     assert_eq!(fs::read(outside.join("private.png")).unwrap(), b"private");
     // Only the file that is itself a stale card went.
     assert!(
-        said.contains("Removed 1 card no page is shared with any more"),
+        said.contains("Removed 1 card from `.statac` that no page uses any more"),
         "{said}"
     );
     let left = names(&kept);

@@ -152,7 +152,7 @@ More: https://statac.dev/lists/#order
 
 In a folder's `index.md`, `false` says that the numbers at the start of
 its pages' names are part of the names, and `true` that they order the
-folder, as meant, so Statac doesn't note it.
+folder on purpose, so Statac gives no note about it.
 
 More: https://statac.dev/lists/#numbered-folders
 

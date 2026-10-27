@@ -474,7 +474,10 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::LanguageFolderInPattern {
             pattern, folder, ..
         } => {
-            format!("Language folder in pattern: Statac reads `{pattern}` from `{folder}` already")
+            format!(
+                "Language folder in pattern: `{pattern}` starts with `{folder}`, which Statac puts \
+                 in front already"
+            )
         }
         Kind::SameTranslation { tag, by, .. } => match by {
             Translated::Key(key) => {
@@ -837,7 +840,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::NoFeedKey { .. } => "No feed key: `statac.yaml` has no `feed_key`".into(),
         Kind::UnusedFeedTemplate { .. } => "Unused feed template: no list asks for a feed".into(),
         Kind::UnusedLanguageFile { path, .. } => {
-            format!("Unused language file: no language of the site reads `{path}`")
+            format!("Unused language file: Statac reads `{path}` for none of the site's languages")
         }
         Kind::NoSiteUrl { waiting } => {
             let what = match waiting {
@@ -2577,8 +2580,8 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             ),
         }),
         Kind::WorkerOutsideImportMap { .. } => Some(
-            "Keep the worker and the files it imports in `static/`, which publishes them under \
-             their own names."
+            "Keep the worker and the files it imports in `static/`: Statac publishes those \
+             under their own names."
                 .into(),
         ),
         Kind::SameUrl {
@@ -3834,7 +3837,7 @@ pub(crate) fn drew_cards(cards: usize) -> String {
 /// more.
 pub(crate) fn removed_cards(cards: usize) -> String {
     let cards = how_many(cards, "card", "cards");
-    format!("Removed {cards} no page is shared with any more from `.statac`.")
+    format!("Removed {cards} from `.statac` that no page uses any more.")
 }
 
 /// How far a build has got with the cards it is drawing.
@@ -6339,7 +6342,7 @@ mod tests {
                     path: "languages/en-US.yaml".into(),
                     languages: vec!["en-GB".into()],
                 },
-                "Unused language file: no language of the site reads `languages/en-US.yaml`",
+                "Unused language file: Statac reads `languages/en-US.yaml` for none of the site's languages",
                 Some("Name it for the site's language, `languages/en-GB.yaml`, or take it out."),
             ),
             (
@@ -6347,7 +6350,7 @@ mod tests {
                     path: "languages/de.yaml".into(),
                     languages: vec!["en".into(), "fr".into()],
                 },
-                "Unused language file: no language of the site reads `languages/de.yaml`",
+                "Unused language file: Statac reads `languages/de.yaml` for none of the site's languages",
                 Some("Name it for one of the site's languages, `en` or `fr`, or take it out."),
             ),
             (
@@ -6355,7 +6358,7 @@ mod tests {
                     path: "languages/en.yaml".into(),
                     languages: Vec::new(),
                 },
-                "Unused language file: no language of the site reads `languages/en.yaml`",
+                "Unused language file: Statac reads `languages/en.yaml` for none of the site's languages",
                 Some(
                     "The site names no `language`; write one in `statac.yaml` for Statac to \
                      read the file.",
@@ -7271,8 +7274,8 @@ mod tests {
                 },
                 "Worker outside the import map: `./worker.js` isn't published under that name",
                 Some(
-                    "Keep the worker and the files it imports in `static/`, which publishes \
-                     them under their own names.",
+                    "Keep the worker and the files it imports in `static/`: Statac publishes those \
+                     under their own names.",
                 ),
             ),
             (
@@ -9496,7 +9499,7 @@ mod tests {
                     folder: "/en/".into(),
                     without: "/{year}/{slug}/".into(),
                 },
-                "Language folder in pattern: Statac reads `/en/{year}/{slug}/` from `/en/` already",
+                "Language folder in pattern: `/en/{year}/{slug}/` starts with `/en/`, which Statac puts in front already",
                 Some("Write it as `/{year}/{slug}/`."),
             ),
             (

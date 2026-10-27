@@ -1,6 +1,6 @@
 This site was imported from an Eleventy site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/eleventy-under-path/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/.
+It was made from `tests/import/eleventy-under-path/old` by `statac import`, which changed nothing there. It has no templates, so Statac publishes each page as its content alone until you add templates of your own: see https://statac.dev/templates/.
 
 ## What came across
 
@@ -13,7 +13,7 @@ Eleventy's settings are a program, and Statac runs none of it: it read `.elevent
 
 Eleventy's settings hold no title, URL or language for the site, so the new site's `title` is made from the old folder's name, it has no `url` yet, and it is in English, `en`: put each right in `statac.yaml`.
 
-The settings' `pathPrefix` puts the old site under `/blog`, and each URL through the `url` filter is written with `/blog` in front, as Eleventy wrote it. Statac puts a site under a path only by its `url`, and the new site has none yet. Add the full URL as `url` in `statac.yaml`, such as `url: https://example.org/blog`. Until then, `statac check` says nothing is published at those links: leave them as they are, even where it offers another URL.
+The settings' `pathPrefix` puts the old site under `/blog`, and each URL through the `url` filter is written with `/blog` in front, as Eleventy wrote it. Statac puts a site under a path only by its `url`, and the new site has none yet. Add the full URL as `url` in `statac.yaml`, such as `url: https://example.org/blog`. Until then, `statac check` says nothing is published at those links: leave them unchanged, even where it offers another URL.
 
 Eleventy reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 

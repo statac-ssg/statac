@@ -16,9 +16,9 @@ warning  Not linked by place: `content/about.md` has `translation_key: about`
 ## Why Statac warns
 
 Pages in different languages at the same path under their languages'
-folders are translations of each other. But a page with a
-`translation_key` is linked by its key alone, so the page in the same
-place is left out. Statac still builds both pages. It warns you
+folders are translations of each other. But Statac links a page with a
+`translation_key` by its key alone, so it leaves out the page in the
+same place. Statac still builds both pages. It warns you
 because two pages in the same place are usually meant to be translations
 of one page.
 

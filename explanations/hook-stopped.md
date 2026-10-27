@@ -1,8 +1,9 @@
 # Hook stopped
 
-A hook, `before_build` or `after_build` in `statac.yaml`, failed. The
-message says which hook it was and how its command ended. It also shows
-what the command printed (the last 40 lines, if it printed more).
+The command a hook runs, `before_build` or `after_build` in
+`statac.yaml`, didn't succeed. The message says which hook it was and
+how its command ended. It also shows what the command printed (the last
+40 lines, if it printed more).
 
 A command succeeds if it ends with exit code 0. The build stops if the
 command ends with any other code, if something else ends the command

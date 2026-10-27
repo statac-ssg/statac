@@ -123,8 +123,8 @@ pub(super) fn said(shown: &Shown, summary: &Summary) -> String {
         ));
     }
     text.push_str(&match summary.stopping.is_empty() {
-        true => "The new site has no templates, so each page is published as its content alone \
-                 until you add your own: see https://statac.dev/templates/.\n"
+        true => "The new site has no templates, so Statac publishes each page as its content \
+                 alone until you add your own: see https://statac.dev/templates/.\n"
             .to_owned(),
         false => format!(
             "The new site has no templates, and doesn't build until you add {}: see \
@@ -163,8 +163,8 @@ pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
         shown.old
     ));
     text.push_str(&match summary.stopping.is_empty() {
-        true => "It has no templates, so each page is published as its content alone until you \
-                 add templates of your own: see https://statac.dev/templates/."
+        true => "It has no templates, so Statac publishes each page as its content alone until \
+                 you add templates of your own: see https://statac.dev/templates/."
             .to_owned(),
         false => format!(
             "It has no templates, and doesn't build until you add {}: see \
@@ -242,10 +242,9 @@ fn came_across(text: &mut String, summary: &Summary) {
     }
     if summary.files > 0 {
         lines.push(format!(
-            "{}, copied as {}: files published as they are into `static/` at the same path, \
-             so their URLs stay, and data files into `data/`.",
+            "{}, copied unchanged: the files to publish into `static/` at the same path, so \
+             their URLs stay, and data files into `data/`.",
             counted(summary.files, "other file", "other files"),
-            one(summary.files, "it was", "they were")
         ));
     }
     if lines.is_empty() {
@@ -593,21 +592,22 @@ fn unanswered(text: &mut String, summary: &Summary) {
     if let Some(example) = kept.pictures.first() {
         text.push_str(&match kept.pictures.len() {
             1 => format!(
-                "1 image beside a page is shown as resized copies Statac makes, and the file \
-                 itself isn't published, so its old URL, {}, is no longer published.",
+                "Statac shows 1 image beside a page through resized copies it makes, and doesn't \
+                 publish the image's own file, so nothing answers at its old URL, {}.",
                 code(example)
             ),
             n => format!(
-                "{n} images beside pages are shown as resized copies Statac makes, and the files \
-                 themselves aren't published, so the old URL of each, such as {}, is no longer \
-                 published.",
+                "Statac shows {n} images beside pages through resized copies it makes, and \
+                 doesn't publish the images' own files, so nothing answers at the old URL of \
+                 each, such as {}.",
                 code(example)
             ),
         });
         text.push_str(
-            " An image's own file is published where a page links to it, or where its sidecar \
-             file, such as `photo-1.jpg.yaml`, holds `optimise: false`; `optimise_images: false` \
-             in `statac.yaml` leaves every image as it is: see https://statac.dev/images/.\n\n",
+            " Statac publishes an image's own file where a page links to it, or where its \
+             sidecar file, such as `photo-1.jpg.yaml`, holds `optimise: false`. With \
+             `optimise_images: false` in `statac.yaml`, Statac makes no resized copies and \
+             publishes each image unchanged: see https://statac.dev/images/.\n\n",
         );
     }
     if !kept.files.is_empty() {

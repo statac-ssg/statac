@@ -1,12 +1,12 @@
 This site was imported from a Zola site, as well as Statac can. It is a best effort: the content, its settings and its URLs came across, the old site's templates and theme did not, and what is listed below needs your eye before you publish.
 
-It was made from `tests/import/zola-pages/old` by `statac import`, which changed nothing there. It has no templates, so each page is published as its content alone until you add templates of your own: see https://statac.dev/templates/.
+It was made from `tests/import/zola-pages/old` by `statac import`, which changed nothing there. It has no templates, so Statac publishes each page as its content alone until you add templates of your own: see https://statac.dev/templates/.
 
 ## What came across
 
 - 7 posts, into `content/posts/`.
 - 2 pages, into `content/` where they stood in the old site.
-- 1 other file, copied as it was: files published as they are into `static/` at the same path, so their URLs stay, and data files into `data/`.
+- 1 other file, copied unchanged: the files to publish into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
 No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
@@ -32,7 +32,7 @@ Statac worked out where the old site published each page, read the new site, and
 
 The old site's built output isn't in `public/`, so no old URL was checked against the pages the old site built: build the old site and import again to check each one.
 
-1 image beside a page is shown as resized copies Statac makes, and the file itself isn't published, so its old URL, `/posts/post-1/photo-1.jpg`, is no longer published. An image's own file is published where a page links to it, or where its sidecar file, such as `photo-1.jpg.yaml`, holds `optimise: false`; `optimise_images: false` in `statac.yaml` leaves every image as it is: see https://statac.dev/images/.
+Statac shows 1 image beside a page through resized copies it makes, and doesn't publish the image's own file, so nothing answers at its old URL, `/posts/post-1/photo-1.jpg`. Statac publishes an image's own file where a page links to it, or where its sidecar file, such as `photo-1.jpg.yaml`, holds `optimise: false`. With `optimise_images: false` in `statac.yaml`, Statac makes no resized copies and publishes each image unchanged: see https://statac.dev/images/.
 
 ## Left for you
 

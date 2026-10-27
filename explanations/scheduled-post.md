@@ -1,7 +1,7 @@
 # Scheduled post
 
-A post is dated after the day of the build, so it isn't built yet: it is
-a scheduled post.
+A post is dated after the day of the build, so Statac doesn't publish it
+yet: it is a scheduled post.
 
 ## What you'll see {#what-youll-see}
 

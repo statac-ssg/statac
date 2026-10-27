@@ -15,10 +15,10 @@ warning  No pages in `en`: there is no `content/en/` folder
 
 ## Why Statac warns
 
-Statac knows what to build: every page outside the language folders is in
-the main language, which is the first in the list. But the language you
-declared publishes nothing. Statac warns you in case its pages are in a
-folder with a different name.
+Statac knows what to build: every page outside the language folders is
+in the main language, which is the first in the list. But Statac
+publishes no page in the language you declared. Statac warns you in case
+its pages are in a folder with a different name.
 
 ## How to fix it
 
@@ -34,7 +34,7 @@ In `statac.yaml`:
 language: [ar, en]
 ```
 
-with the English pages in `content/english/`. To match the language as
+with the English pages in `content/english/`. To match the language you
 declared, the folder must be `content/en/`:
 
 ```text

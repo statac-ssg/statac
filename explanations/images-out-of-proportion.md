@@ -20,10 +20,10 @@ warning  Images out of proportion: `img` has a `max-width` and no `height`
 
 Statac writes each image's `width` and `height` into the page, so the
 page keeps a space of the right size for the image and doesn't jump as
-images load. A browser treats those two numbers as the image's size.
-A rule that changes only the width leaves the height as the page wrote
-it. For example, an image 1600 wide and 1067 tall, shown in a column
-400 wide, is drawn 400 wide but still 1067 tall.
+images load. A browser treats those two numbers as the image's size. A
+rule that changes only the width keeps the height the page wrote. For
+example, an image 1600 wide and 1067 tall, shown in a column 400 wide,
+is drawn 400 wide but still 1067 tall.
 
 Adding `height: auto` to the rule leaves the height to the browser, which
 works it out from the width. The space kept for the image is then still

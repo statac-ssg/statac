@@ -19,8 +19,8 @@ you can place a snippet inside a `<div>` or a `<figure>` of your own. In
 HTML, only the names of the site's snippets count as calls. Inside
 `<style>`, `<script>`, `<pre>`, `<code>` and comments, nothing does.
 
-Text in HTML is usually meant to appear as written, so an email address or a
-handle that happens to match a snippet's name would otherwise be
+You usually mean text in HTML to appear unchanged, so an email address
+or a handle that happens to match a snippet's name would otherwise be
 replaced without any warning. Statac tells you once for the whole site,
 at the first call it builds inside HTML. Once you have understood it,
 you can quieten it.
@@ -29,8 +29,8 @@ you can quieten it.
 
 If you meant the call, nothing is wrong.
 
-If you want the text shown as written, put a backslash before the `@`.
-Statac then shows the call as text, without the backslash.
+If you want the text to appear unchanged, put a backslash before the
+`@`. Statac then shows the call as text, without the backslash.
 
 ## Example
 

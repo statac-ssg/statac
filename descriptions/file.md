@@ -33,9 +33,9 @@ More: https://statac.dev/videos/#files-videos-and-recordings
 
 The file's contents, ready to go inside a `<code>` element. Statac marks
 each piece of the code with a class for what kind of piece it is, in the
-file's language, which Statac works out from the file's name. If `code_colours` isn't `true`, it is
-the text as written. Empty for a file over 200,000 bytes or one that
-isn't UTF-8 text.
+file's language, which Statac works out from the file's name. If
+`code_colours` isn't `true`, it is the file's text with no classes.
+Empty for a file over 200,000 bytes or one that isn't UTF-8 text.
 
 More: https://statac.dev/videos/#a-file-shown-as-code
 

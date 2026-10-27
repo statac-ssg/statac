@@ -31,8 +31,8 @@ Turns a URL written from the top of the site, starting with a single
 `/`, into one that works wherever the site is published, keeping
 anything after `?` or `#`. On a site at `https://example.org/blog/`,
 `url("/about/")` returns `/blog/about/`, and on a site at the top of its
-domain, `/about/`. A link written without it is left as written. In the
-content, `@url(/about/)` does the same.
+domain, `/about/`. Statac leaves a link written without it unchanged. In
+the content, `@url(/about/)` does the same.
 
 More: https://statac.dev/urls/#a-site-in-a-folder-of-its-domain
 
@@ -48,7 +48,7 @@ comes before the summary.
 
 ## `related`
 
-Called as `related(page)`, the posts that share a tag with the page,
+`related(page)` gives the posts that share a tag with the page,
 those sharing the most tags first.
 
 More: https://statac.dev/lists/#related-posts

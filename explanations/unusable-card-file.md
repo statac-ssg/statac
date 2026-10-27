@@ -6,7 +6,7 @@ with it:
 
 - a background that isn't 1,200 pixels wide and 630 tall;
 - a background that isn't a JPEG, a PNG or a still WebP;
-- a font file that doesn't read as a font.
+- a font file that Statac can't read as a font.
 
 ## What you'll see {#what-youll-see}
 

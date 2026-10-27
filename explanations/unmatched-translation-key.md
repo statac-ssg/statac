@@ -13,9 +13,9 @@ warning  Unmatched translation key: no page in another language has `abuot`
 
 ## Why Statac warns
 
-Statac builds the page as written. A key is there to link a page to its
-translations, so a key that links nothing usually means one of two
-things. Either it is spelled differently on the page and on its
+Statac builds the page with the key you wrote. A key is there to link a
+page to its translations, so a key that links nothing usually means one
+of two things. Either it is spelled differently on the page and on its
 translation, or the translation hasn't been written yet. Statac counts a
 draft or a scheduled post as having its key, and links the page to it
 once it is published.

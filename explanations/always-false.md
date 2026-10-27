@@ -18,9 +18,10 @@ warning  Always false: no page has `subtitel`
 ## Why Statac warns
 
 A field that no page has yet is often one that pages written later will
-have, so Statac builds the page as written. But if the name is one slip
-away from a field that pages do have, the test is more likely a mistake
-than a plan, and nothing on the built page would show the mistake.
+have, so Statac builds the page with the test you wrote. But if the name
+is one slip away from a field that pages do have, the test is more
+likely a mistake than a plan, and nothing on the built page would show
+the mistake.
 
 ## How to fix it
 
