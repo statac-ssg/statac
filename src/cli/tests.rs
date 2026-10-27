@@ -625,8 +625,6 @@ fn help_alone_or_before_a_command_shows_the_whole_screen() {
         &["--help"],
         &["--help", "build"],
         &["--out=public", "--help", "check"],
-        &["biuld", "--help"],
-        &["post-1.md", "--help"],
     ] {
         let (out, err, code) = ran(args);
         assert_eq!(out, WHOLE_SCREEN, "{args:?}");
@@ -716,6 +714,25 @@ fn help_after_a_command_answers_before_any_other_mistake() {
         let (out, err, code) = ran(args);
         assert_eq!(out, screen, "{args:?}");
         assert_eq!((err.as_str(), code), ("", 0), "{args:?}");
+    }
+}
+
+#[test]
+fn help_after_an_unknown_command_refuses_the_command_as_it_would_alone() {
+    for args in [
+        &["fetch", "--help"][..],
+        &["biuld", "--help"],
+        &["biuld", "site", "--help"],
+        &["post-1.md", "--help"],
+    ] {
+        let (_, alone, code_alone) = ran(&args[..args.len() - 1]);
+        let (out, err, code) = ran(args);
+        assert_eq!(
+            (out.as_str(), err.as_str(), code),
+            ("", alone.as_str(), code_alone),
+            "{args:?}"
+        );
+        assert_eq!(code, 2, "{args:?}");
     }
 }
 

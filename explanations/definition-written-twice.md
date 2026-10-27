@@ -10,7 +10,7 @@ definition is never shown.
 
 ```text
 warning  Definition written twice: Statac doesn't show the first `[^n]:` line
-  Give one of them another name, or take one out.
+  Give one of them another label, or take one out.
   More: https://statac.dev/e/definition-written-twice/
 ```
 

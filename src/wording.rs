@@ -374,7 +374,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         } => format!("Missing data: there is no `{table}` for `{declared}` to name"),
         Kind::MissingContentFolder {
             folder, declared, ..
-        } => format!("Missing folder: there is no `{folder}` for `{declared}` to name"),
+        } => format!("Missing content folder: there is no `{folder}` for `{declared}` to name"),
         Kind::NoNamesToCheck { path, declared } => format!(
             "No names to check: `{path}` is a list, so `{declared}` can't name one of its items"
         ),
@@ -3345,7 +3345,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             .as_ref()
             .map(|marker| format!("Is it the definition for `[^{marker}]`?")),
         Kind::DefinitionWrittenTwice { .. } => {
-            Some("Give one of them another name, or take one out.".into())
+            Some("Give one of them another label, or take one out.".into())
         }
         Kind::CellNeverShown { cells, .. } => Some(
             match cells.len() {
@@ -3751,7 +3751,7 @@ pub(crate) const STAGE_READING: &str = "Reading the site";
 pub(crate) const STAGE_BUILDING: &str = "Building the pages";
 pub(crate) const STAGE_CONCLUDING: &str = "Concluding";
 pub(crate) const STAGE_COPIES: &str = "Resizing images";
-pub(crate) const STAGE_CARDS: &str = "Drawing social cards";
+pub(crate) const STAGE_CARDS: &str = "Drawing cards";
 pub(crate) const STAGE_AFTER: &str = "Running after_build";
 pub(crate) const STAGE_WRITING: &str = "Writing the rest";
 
@@ -5087,7 +5087,7 @@ pub(crate) const ASK_AUTHOR: &str = "What is the author's name?";
 pub(crate) const ASK_NONE_HINT: &str = "Enter for none.";
 pub(crate) const ASK_ADDRESS: &str = "What is the site URL?";
 pub(crate) const ASK_ADDRESS_HINT: &str = "Enter for none yet.";
-pub(crate) const ASK_OLD_ADDRESS: &str = "What is the site's URL?";
+pub(crate) const ASK_OLD_ADDRESS: &str = "What is the site URL?";
 pub(crate) const ASK_OLD_ADDRESS_HINT: &str = "The old site's settings don't say.";
 pub(crate) const ASK_LANGUAGE: &str = "What is the site language?";
 pub(crate) const ASK_LANGUAGE_HINT: &str =
@@ -5105,8 +5105,11 @@ pub(crate) fn ask_default(default: &str) -> String {
 /// Marks where the answer is typed.
 pub(crate) const ASK_MARK: &str = ">";
 
-pub(crate) fn not_a_site_address(written: &str) -> String {
-    format!("`{written}` isn't a full URL. Write it as `https://example.org`.")
+/// The answer to the URL question that isn't a full URL, with the full URL
+/// it could be, where there is one.
+pub(crate) fn not_a_site_address(written: &str, offered: Option<&str>) -> String {
+    let offered = offered.unwrap_or("https://example.org");
+    format!("`{written}` isn't a full URL. Write it as `{offered}`.")
 }
 
 pub(crate) fn not_a_language_code(written: &str) -> String {
@@ -5962,7 +5965,7 @@ mod tests {
                     shown: None,
                 },
                 "Definition written twice: Statac doesn't show the first `[^n]:` line",
-                Some("Give one of them another name, or take one out."),
+                Some("Give one of them another label, or take one out."),
             ),
             (
                 Kind::CellNeverShown {
@@ -7075,7 +7078,7 @@ mod tests {
                     declared: "types.review.book".into(),
                     nearest: Some("folder.books".into()),
                 },
-                "Missing folder: there is no `content/boks/` for `types.review.book` to name",
+                "Missing content folder: there is no `content/boks/` for `types.review.book` to name",
                 Some("Did you mean `folder.books`?"),
             ),
             (

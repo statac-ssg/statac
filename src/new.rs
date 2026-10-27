@@ -341,7 +341,12 @@ impl Asking<'_> {
             }
             match site_address(&typed) {
                 Some(address) => break Some(address),
-                None => self.refused(wording::not_a_site_address(&typed))?,
+                None => {
+                    let offered = (!typed.contains("://") && typed.contains('.'))
+                        .then(|| site_address(&format!("https://{typed}")))
+                        .flatten();
+                    self.refused(wording::not_a_site_address(&typed, offered.as_deref()))?
+                }
             }
         };
         self.show("\n");

@@ -4052,7 +4052,7 @@ fn a_site_whose_settings_give_no_title_is_said_to_have_one_from_the_folder() {
 #[test]
 fn the_sites_address_is_asked_for_at_a_terminal_until_it_is_one_or_enter() {
     let old = Path::new("tests/import/eleventy-under-path/old");
-    let question = "What is the site's URL?\n\x20 The old site's settings don't say.\n\
+    let question = "What is the site URL?\n\x20 The old site's settings don't say.\n\
                     \x20 Enter for none yet.\n";
     let new = scratch("address-asked");
     let typed = "example\nhttps://example.org/blog\n";
@@ -4117,7 +4117,7 @@ fn the_sites_address_is_asked_for_of_any_tool_and_only_where_the_settings_give_n
         let new = scratch(&format!("address-{label}"));
         let (code, said) = import_answering(old, &new, "https://example.org/\n", true);
         assert_eq!(code, 0, "{said}");
-        assert!(said.starts_with("What is the site's URL?\n"), "{said}");
+        assert!(said.starts_with("What is the site URL?\n"), "{said}");
         let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
         assert!(settings.contains("\nurl: https://example.org\n"), "{label}");
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();

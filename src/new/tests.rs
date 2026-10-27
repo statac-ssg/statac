@@ -288,6 +288,11 @@ fn with_no_terminal_an_unusable_answer_stops_with_what_a_person_is_told() {
             "`example` isn't a full URL. Write it as `https://example.org`.\n",
         ),
         (
+            "piped-host",
+            "Site 1\n\nexample.com\nhttps://example.com\n",
+            "`example.com` isn't a full URL. Write it as `https://example.com`.\n",
+        ),
+        (
             "piped-language",
             "Site 1\n\n\nenglish\nen\n",
             "`english` isn't a language's code. Write it as `en`, or `en-GB`.\n",

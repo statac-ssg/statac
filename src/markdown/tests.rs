@@ -2190,7 +2190,7 @@ fn a_footnote_nothing_points_at_is_told() {
             line(
                 "Definition written twice: Statac doesn't show the first `[^twice]:` line",
                 "[^twice]",
-                Some("Give one of them another name, or take one out.")
+                Some("Give one of them another label, or take one out.")
             ),
         ]
     );

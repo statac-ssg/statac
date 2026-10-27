@@ -195,15 +195,16 @@ has no `source`.
 
 ## `og_title`
 
-The page's name where it is shared: its `og_title`, or if it has none,
-`headline(page)`.
+The page's title where it is shared, on a card and in a link preview:
+its `og_title`, or if it has none, `headline(page)`.
 
 More: https://statac.dev/social-cards/#in-a-layout
 
 ## `card`
 
-The social card Statac draws for the page, with its `url`, `width`,
-`height` and `alt`. If the page has no card, `card` has no value.
+The social card Statac draws for the page, or the social image its
+`og_image` names, with its `url`, `width`, `height` and `alt`. If the
+page has neither, `card` has no value.
 
 More: https://statac.dev/social-cards/#in-a-layout
 

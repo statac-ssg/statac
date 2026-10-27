@@ -15,7 +15,7 @@ error  Malformed maths: Statac doesn't know `\fracc`
 ## Why Statac stops
 
 If Statac can't read some maths, it can't tell what the maths was meant
-to say. A command may be spelt wrong, a brace may be missing, or the
+to say. A command may be spelled wrong, a brace may be missing, or the
 dollar signs may never have been maths at all. Publishing what you typed
 would show readers the maths' source instead, so Statac stops rather
 than guess.
@@ -24,7 +24,7 @@ than guess.
 
 Look at the place the caret points to. Common causes:
 
-- A command Statac doesn't know, often a misspelt one: `\fracc` for
+- A command Statac doesn't know, often a misspelled one: `\fracc` for
   `\frac`. [Writing](/writing/#maths) lists the maths Statac supports.
 - A `{` with no `}` to close it, or a `\begin{cases}` with no
   `\end{cases}`.

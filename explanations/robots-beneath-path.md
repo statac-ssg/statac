@@ -12,7 +12,7 @@ note  Robots beneath a path: crawlers read only `https://example.org/robots.txt`
   More: https://statac.dev/e/robots-beneath-path/
 ```
 
-## Why Statac notes it
+## Why Statac says so
 
 Crawlers read `robots.txt` only at the root of a host, so they never read
 this one. Statac publishes it anyway, since it is your file, and tells

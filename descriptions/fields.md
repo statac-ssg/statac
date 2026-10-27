@@ -197,8 +197,8 @@ More: https://statac.dev/search/#leave-out
 
 ## `card`
 
-Which of the site's social cards Statac draws for the page, if the site
-has cards turned on.
+Which of the cards in `templates/og.yaml` Statac draws for the page, if
+the site has that file.
 
 More: https://statac.dev/social-cards/#other-cards
 
@@ -210,7 +210,8 @@ More: https://statac.dev/social-cards/#a-picture-of-your-own
 
 ## `og_title`
 
-The page's title on a card and in a link preview.
+The page's title where it is shared, on a card and in a link preview, in
+place of its `title`.
 
 More: https://statac.dev/social-cards/#what-a-preview-says
 

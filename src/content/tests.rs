@@ -1563,17 +1563,17 @@ fn a_declaration_naming_no_table_or_folder_is_told_where_it_is_written() {
         ),
         (
             "folder.boks",
-            "Missing folder: there is no `content/boks/` for `{}` to name",
+            "Missing content folder: there is no `content/boks/` for `{}` to name",
             Some("Did you mean `folder.books`?"),
         ),
         (
             "folder.books/shelf-2",
-            "Missing folder: there is no `content/books/shelf-2/` for `{}` to name",
+            "Missing content folder: there is no `content/books/shelf-2/` for `{}` to name",
             Some("Did you mean `folder.books/shelf-1`?"),
         ),
         (
             "folder.nothing-like-it",
-            "Missing folder: there is no `content/nothing-like-it/` for `{}` to name",
+            "Missing content folder: there is no `content/nothing-like-it/` for `{}` to name",
             None,
         ),
     ];

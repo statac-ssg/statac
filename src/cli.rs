@@ -689,10 +689,16 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
         return Ok(Request::Help(None));
     }
     if let Some(asked) = args.iter().position(|arg| arg == "--help") {
-        let command = command_at(args)
-            .filter(|&at| at < asked)
-            .and_then(|at| COMMANDS.into_iter().find(|&command| command == args[at]));
-        return Ok(Request::Help(command));
+        let Some(at) = command_at(args).filter(|&at| at < asked) else {
+            return Ok(Request::Help(None));
+        };
+        return match COMMANDS.into_iter().find(|&command| command == args[at]) {
+            Some(command) => Ok(Request::Help(Some(command))),
+            None => Err(vec![Problem::nowhere(Kind::UnknownCommand {
+                written: args[at].clone(),
+                hint: command_hint(&args[at]),
+            })]),
+        };
     }
     if args.iter().any(|arg| arg == "--version") {
         return Ok(Request::Version);

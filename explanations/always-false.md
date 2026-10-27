@@ -3,7 +3,7 @@
 A template uses `is defined` or `is not defined` to test whether a page
 has a field, but no page has a field with that name. A page can have a
 field whose name is one slip away (a character added, left out or changed,
-or two neighbours swapped), so the name is probably misspelt. The test
+or two neighbours swapped), so the name is probably misspelled. The test
 then has the same result on every page, so whatever it wraps is either
 never shown or always shown.
 
