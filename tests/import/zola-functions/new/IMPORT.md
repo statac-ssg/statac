@@ -36,7 +36,7 @@ The old site's built output isn't in `public/`, so no old URL was checked agains
 
 ## Left for you
 
-### Shortcodes left as written
+### Shortcodes the import left unchanged
 
 Statac's Markdown runs none of Zola's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
@@ -44,7 +44,7 @@ Statac's Markdown runs none of Zola's shortcodes, and these have no equal in it,
 
 ### Links to pages that didn't come across
 
-Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so it is left as written: link to the page's URL instead.
+Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so the import left it unchanged: link to the page's URL instead.
 
 - `content/posts/post-1.md`, line 9: `{{ get_url(path="@/posts/post-3.md") }}`
 

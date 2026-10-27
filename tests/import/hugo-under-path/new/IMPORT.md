@@ -42,7 +42,7 @@ Each URL was also looked for in the old site's own built output, `public/`.
 
 ### Links to pages that didn't come across
 
-Each of these names a page Statac couldn't find in the old site, so it is left as written: link to the page's URL instead.
+Each of these names a page Statac couldn't find in the old site, so the import left it unchanged: link to the page's URL instead.
 
 - `content/posts/post-1.md`, line 11: `{{< ref "post-9.md" >}}`
 

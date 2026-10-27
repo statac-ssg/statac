@@ -92,7 +92,7 @@ const DATE_NAMES: &[&str] = &[
 ];
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
-    heading: "Shortcodes left as written",
+    heading: "Shortcodes the import left unchanged",
     sentence: "Statac's Markdown runs none of Hugo's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
@@ -105,15 +105,15 @@ pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
 
 pub(super) static TAG_IN_ADDRESS: FindingKind = FindingKind {
     heading: "Shortcodes inside a URL",
-    sentence: "Each of these shortcodes stands inside a link's URL, where Statac runs no snippet, so it \
-               is left as written and the link leads nowhere: write the URL the shortcode made in its \
-               place.",
+    sentence: "Each of these shortcodes stands inside a link's URL, where Statac runs no snippet, so \
+               the import left it unchanged, and the link leads nowhere: write the URL the \
+               shortcode made in its place.",
 };
 
 pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
-    sentence: "Each of these names a page Statac couldn't find in the old site, so it is left as \
-               written: link to the page's URL instead.",
+    sentence: "Each of these names a page Statac couldn't find in the old site, so the import left \
+               it unchanged: link to the page's URL instead.",
 };
 
 pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {

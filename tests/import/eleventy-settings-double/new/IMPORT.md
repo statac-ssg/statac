@@ -61,7 +61,7 @@ The old site's Markdown read each of these as attributes of what stands before i
 
 - `src/posts/post-1.md`, line 12: `{.wide}`
 
-### Template tags left as written
+### Template tags the import left unchanged
 
 Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 

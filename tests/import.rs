@@ -4510,10 +4510,10 @@ fn front_matter_statacs_reader_stops_at_comes_across_as_written() {
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         assert!(
             report.contains(&format!(
-                "### Front matter left as written\n\
+                "### Front matter the import left unchanged\n\
                  \n\
                  Statac's YAML reader stopped at this line in the front matter of each of these, \
-                 so the page came across with its front matter as written, and the site won't \
+                 so the import copied the page with its front matter unchanged, and the site won't \
                  build until that is put right. Its old URL wasn't worked out either: put the \
                  front matter right in the old site and import again, or put it right in the new \
                  one and give the page a `permalink`.\n\

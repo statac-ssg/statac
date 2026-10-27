@@ -45,9 +45,9 @@ pub(super) static FIELD_RENAMED: FindingKind = FindingKind {
 };
 
 pub(super) static DATE_LEFT: FindingKind = FindingKind {
-    heading: "Dates left as written",
-    sentence: "Statac couldn't be sure which moment each of these dates means, so it left it as \
-               written, and the page won't build until it is written year first, as \
+    heading: "Dates the import left unchanged",
+    sentence: "Statac couldn't be sure which moment each of these dates means, so it left each \
+               unchanged, and the page won't build until it is written year first, as \
                `2026-10-04` or `2026-10-04T09:30+01:00`.",
 };
 
@@ -84,9 +84,9 @@ pub(super) static LINKS: FindingKind = FindingKind {
 };
 
 pub(super) static FRONT_MATTER_AS_WRITTEN: FindingKind = FindingKind {
-    heading: "Front matter left as written",
+    heading: "Front matter the import left unchanged",
     sentence: "Statac's YAML reader stopped at this line in the front matter of each of these, \
-               so the page came across with its front matter as written, and the site won't \
+               so the import copied the page with its front matter unchanged, and the site won't \
                build until that is put right. Its old URL wasn't worked out either: put the \
                front matter right in the old site and import again, or put it right in the new \
                one and give the page a `permalink`.",

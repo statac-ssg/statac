@@ -32,7 +32,7 @@ use slug::Strategy;
 use writing::Reading;
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
-    heading: "Shortcodes left as written",
+    heading: "Shortcodes the import left unchanged",
     sentence: "Statac's Markdown runs none of Zola's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it \
                made, or call a snippet, as https://statac.dev/snippets/ describes.",
 };
@@ -53,7 +53,7 @@ pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
 pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page by its file, and Statac couldn't find that file in the \
-               old site, or Zola didn't publish it, so it is left as written: link to the page's \
+               old site, or Zola didn't publish it, so the import left it unchanged: link to the page's \
                URL instead.",
 };
 

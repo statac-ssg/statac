@@ -46,7 +46,7 @@ Nothing is published at the old URL of the file given another name, and a file c
 
 ### Links to pages that didn't come across
 
-Each of these names a page Statac couldn't find in the old site, so it is left as written: link to the page's URL instead.
+Each of these names a page Statac couldn't find in the old site, so the import left it unchanged: link to the page's URL instead.
 
 - `content/posts/post-1/index.md`, line 24: `{{< relref "post-9" >}}`
 
@@ -57,7 +57,7 @@ Statac reads the rest of a code block's first line as its caption, so options su
 - `content/posts/post-1/index.md`, line 26: `{{< highlight go "linenos=table,hl_lines=1" >}}`
 - `content/posts/post-1/index.md`, line 64: ```` ```go {linenos=true} ````
 
-### Shortcodes left as written
+### Shortcodes the import left unchanged
 
 Statac's Markdown runs none of Hugo's shortcodes, and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
@@ -72,7 +72,7 @@ Hugo ran these even inside code, and Statac shows code exactly as written, so ea
 
 ### Shortcodes inside a URL
 
-Each of these shortcodes stands inside a link's URL, where Statac runs no snippet, so it is left as written and the link leads nowhere: write the URL the shortcode made in its place.
+Each of these shortcodes stands inside a link's URL, where Statac runs no snippet, so the import left it unchanged, and the link leads nowhere: write the URL the shortcode made in its place.
 
 - `content/posts/post-1/index.md`, line 71: `{{< top >}}`
 - `content/posts/post-1/index.md`, line 71: `{{< top >}}`

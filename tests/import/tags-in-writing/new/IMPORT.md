@@ -34,11 +34,11 @@ The old site's built output isn't in `_site/`, so no old URL was checked against
 
 ### Links to pages that didn't come across
 
-Each of these names a page Statac couldn't find in the old site, or one Jekyll didn't publish, so it is left as written: link to the page's URL instead.
+Each of these names a page Statac couldn't find in the old site, or one Jekyll didn't publish, so the import left it unchanged: link to the page's URL instead.
 
 - `_posts/2026-01-01-post-1.md`, line 18: `{% post_url 2026-01-09-post-9 %}`
 
-### Template tags left as written
+### Template tags the import left unchanged
 
 Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 

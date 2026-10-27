@@ -41,7 +41,7 @@ The old site's built output isn't in `public/`, so no old URL was checked agains
 
 ### Links to pages that didn't come across
 
-Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so it is left as written: link to the page's URL instead.
+Each of these names a page by its file, and Statac couldn't find that file in the old site, or Zola didn't publish it, so the import left it unchanged: link to the page's URL instead.
 
 - `content/posts/post-3.fr.md`, line 5: `{{ get_url(path="@/posts/post-2/file-4.txt") }}`
 

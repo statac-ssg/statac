@@ -53,7 +53,7 @@ The old site's built output isn't in `_site/`, so no old URL was checked against
 
 ## Left for you
 
-### Template tags left as written
+### Template tags the import left unchanged
 
 Statac's Markdown runs no template tags and these have no equal in it, so each appears on the page as written: write by hand what it made, or call a snippet, as https://statac.dev/snippets/ describes.
 
