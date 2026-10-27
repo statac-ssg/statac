@@ -4175,7 +4175,7 @@ pub(crate) const WROTE_NOTHING: &str = "Wrote nothing.";
 
 /// What any command says last after a fault of Statac's own.
 pub(crate) const REPORT_FAULT: &str =
-    "Report it at https://github.com/statac-ssg/statac/issues, with the lines above.";
+    "Report it at https://git.statac.dev/statac/statac/issues, with the lines above.";
 
 /// What `build` says of a `before_build` it didn't run.
 pub(crate) const HOOK_PASSED_OVER: &str = "Didn't run `before_build`: `statac.yaml` has an error.";

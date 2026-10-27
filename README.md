@@ -9,7 +9,7 @@
 <p align="center">The friendly static site generator.</p>
 
 <p align="center">
-  <a href="https://github.com/statac-ssg/statac/releases/latest"><img alt="The latest release" src="https://img.shields.io/github/v/release/statac-ssg/statac?label=release&color=CC4E00"></a>
+  <a href="https://git.statac.dev/statac/statac/releases/latest"><img alt="The latest release" src="https://img.shields.io/gitea/v/release/statac/statac?gitea_url=https%3A%2F%2Fgit.statac.dev&label=release&color=CC4E00"></a>
   <a href="https://statac.dev/install/"><img alt="Runs on macOS, Linux and Windows" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-191919"></a>
   <a href="#licence"><img alt="Licence: MIT or Apache-2.0" src="https://img.shields.io/badge/licence-MIT%20or%20Apache--2.0-191919"></a>
 </p>
@@ -70,7 +70,8 @@ succeeds.
 On a Mac, with [Homebrew](https://brew.sh):
 
 ```sh
-brew install statac-ssg/statac/statac
+brew tap statac/statac https://git.statac.dev/statac/homebrew-statac
+brew install statac
 ```
 
 On Linux:
@@ -82,14 +83,13 @@ curl -fsSL https://get.statac.dev | sh
 On Windows, with [Scoop](https://scoop.sh):
 
 ```powershell
-scoop bucket add statac https://github.com/statac-ssg/scoop-statac
+scoop bucket add statac https://git.statac.dev/statac/scoop-statac
 scoop install statac
 ```
 
-For another way to install, each
-[release](https://github.com/statac-ssg/statac/releases) has a package
-for each kind of machine. [Installing](https://statac.dev/install/)
-says which to take and how to check it.
+For another way to install, each release has a package for each kind
+of machine. [Installing](https://statac.dev/install/) says which to
+take and how to check it.
 
 ## A first site
 

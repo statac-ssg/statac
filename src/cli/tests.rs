@@ -1427,7 +1427,7 @@ fn a_fault_of_statacs_own_is_told_after_rusts_report() {
     };
     let fault = |_: &mut Terminal| -> u8 { panic!("a fault") };
     let report =
-        "Report it at https://github.com/statac-ssg/statac/issues, with the lines above.\n";
+        "Report it at https://git.statac.dev/statac/statac/issues, with the lines above.\n";
     assert_eq!(
         ran(Some("build"), fault),
         (

@@ -94,7 +94,7 @@ main() {
         sums=$releases/v$version/SHA256SUMS
         fetch "$sums" "$work/SHA256SUMS" ||
             stop "Can't download $sums" \
-                "Is $version a release? They are listed in https://github.com/statac-ssg/statac/blob/main/CHANGELOG.md"
+                "Is $version a release? They are listed in https://git.statac.dev/statac/statac/src/branch/main/CHANGELOG.md"
     else
         sums=$releases/latest/SHA256SUMS
         fetch "$sums" "$work/SHA256SUMS" || stop "Can't download $sums"

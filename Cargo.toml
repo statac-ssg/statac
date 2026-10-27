@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.99"
 description = "The friendly static site generator."
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/statac-ssg/statac"
+repository = "https://git.statac.dev/statac/statac"
 homepage = "https://statac.dev"
 publish = false
 

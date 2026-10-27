@@ -7,7 +7,7 @@ rust-version = "1.70"
 publish = false
 description = "MiniJinja 3.0.1, the template engine, kept with Statac"
 license = "Apache-2.0"
-repository = "https://github.com/statac-ssg/statac"
+repository = "https://git.statac.dev/statac/statac"
 
 [features]
 adjacent_loop_items = []

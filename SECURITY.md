@@ -2,9 +2,9 @@
 
 ## Reporting a problem
 
-Don't open an issue for a security problem. Report it privately with
-[Report a vulnerability](https://github.com/statac-ssg/statac/security/advisories/new).
-Only the people who look after Statac see the report.
+Don't open an issue for a security problem. Report it privately by
+email to [security@statac.dev](mailto:security@statac.dev). Only the
+people who look after Statac see the report.
 
 Say what you ran, what Statac did and what you expected, with the version
 `statac --version` gives. The smallest site that shows the problem helps

@@ -6,7 +6,7 @@ publish = false
 links = "avif"
 description = "libavif 1.4.2 with libaom 3.15.1, built from vendored source, encode only"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/statac-ssg/statac"
+repository = "https://git.statac.dev/statac/statac"
 
 [build-dependencies]
 cc = "1.6.0"

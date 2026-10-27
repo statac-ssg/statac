@@ -2,7 +2,7 @@
 
 ## Reporting a problem
 
-Open an [issue](https://github.com/statac-ssg/statac/issues). Say what
+Open an [issue](https://git.statac.dev/statac/statac/issues). Say what
 you ran, what Statac printed and what you expected, with the version
 `statac --version` gives. The smallest site that shows the problem helps
 most: often one page and one template.
