@@ -1,9 +1,6 @@
 <h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/readme/statac-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset=".github/readme/statac-light.svg">
-    <img src=".github/readme/statac.svg" alt="Statac" width="300">
-  </picture>
+  <img src=".github/readme/statac-light.svg#gh-light-mode-only" alt="Statac" width="300">
+  <img src=".github/readme/statac-dark.svg#gh-dark-mode-only" alt="Statac" width="300">
 </h1>
 
 <p align="center">A friendlier static site generator for personal websites.</p>
@@ -31,10 +28,8 @@ install beside it.
 ## It explains itself
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/readme/debug-panel-dark.png">
-    <img src=".github/readme/debug-panel-light.png" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
-  </picture>
+  <img src=".github/readme/debug-panel-light.png#gh-light-mode-only" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
+  <img src=".github/readme/debug-panel-dark.png#gh-dark-mode-only" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
 </p>
 
 When something in the site is wrong, Statac shows you the file, the line
