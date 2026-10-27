@@ -392,7 +392,7 @@ impl Serving {
         );
         said.push(' ');
         said.push_str(&match stopped {
-            true => wording::BROWSER_KEEPS.to_owned(),
+            true => wording::PREVIOUS_SERVED.to_owned(),
             false => wording::told(&told),
         });
         said.push('\n');
@@ -524,7 +524,7 @@ impl Serving {
         let mut line = self.result(round, took);
         if stopped {
             line.push(' ');
-            line.push_str(wording::PAGE_KEPT);
+            line.push_str(wording::PREVIOUS_SERVED);
         }
         let report = Report::new(round.outcome.sources(), &self.options.site, false);
         Status {

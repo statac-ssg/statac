@@ -4561,11 +4561,12 @@ pub(crate) fn told(told: &Told) -> String {
     }
 }
 
-/// After a rebuild of `serve` that stopped, in the terminal.
-pub(crate) const BROWSER_KEEPS: &str = "The browser keeps the pages as last built.";
+/// After a rebuild of `serve` that stopped.
+pub(crate) const PREVIOUS_SERVED: &str = "Serve keeps serving the previous build.";
 
-/// After a rebuild of `serve` that stopped, on the page.
-pub(crate) const PAGE_KEPT: &str = "This page is as last built.";
+/// After a rebuild of `serve` that stopped, on the page, with the time of
+/// the build the page is from.
+pub(crate) const PAGE_KEPT: &str = "This page is from the build at {built}.";
 
 /// What the debug panel on a served page calls the page it is on and the
 /// site.

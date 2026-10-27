@@ -1420,7 +1420,7 @@
         { class: "said" },
         shape("error"),
         make("strong", {}, told("stoppedAt", { time: halted.at })),
-        panel.round.builtAt ? make("span", { class: "kept" }, told("pageKept")) : null,
+        panel.round.builtAt ? make("span", { class: "kept" }, told("pageKept", { built: panel.round.builtAt })) : null,
       ),
       make(
         "div",

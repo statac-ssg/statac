@@ -439,7 +439,7 @@ fn a_build_that_stops_keeps_the_last_pages_and_says_why() {
         assert!(
             body.contains(
                 "\"status\":{\"stopped\":true,\
-                 \"line\":\"1 error stopped the build. This page is as last built.\",\
+                 \"line\":\"1 error stopped the build. Serve keeps serving the previous build.\",\
                  \"problems\":\"error  Unclear date: `4/10/2026` could be 4 October or 10 April"
             ),
             "{way}: {body}"
@@ -453,7 +453,7 @@ fn a_build_that_stops_keeps_the_last_pages_and_says_why() {
         assert_eq!(
             said,
             "\
-`content/post-1.md` changed. 1 error stopped the build. The browser keeps the pages as last built.
+`content/post-1.md` changed. 1 error stopped the build. Serve keeps serving the previous build.
 
 error  Unclear date: `4/10/2026` could be 4 October or 10 April
   content/post-1.md, line 2
