@@ -16,7 +16,8 @@ warning  One tag, not two: `tags: hills, water` makes a single tag called `hills
 ## Why Statac warns
 
 Statac reads the line the same way YAML does, and makes the single tag,
-with its own page and its own place in the list of tags. That is rarely
+with its own place in the list of tags, and its own page where the site
+has tag pages. That is rarely
 what was meant, and nothing on the page shows the mistake until someone
 looks for the tag. Text in quotes, such as `tags: "hills, water"`, is
 clearly meant as one tag, so Statac never warns about it.

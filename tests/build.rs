@@ -1661,14 +1661,13 @@ note  Missing words: the footnotes of 3 pages in `fr` have no translation for th
   And while building 2 more:
     content/post-2.md
     content/post-3.md
-  Add them to `languages/fr.yaml`, \
-translating the English line `back_to_the_text: back to the text`.
+  Add the line `back_to_the_text: back to the text` to `languages/fr.yaml`, translated.
   More: https://statac.dev/e/missing-words/
 
 note  Missing words: the callouts of 1 page in `fr` have no names
   While building: content/post-4.md
-  Add them to `languages/fr.yaml`, \
-translating the English line `callouts: [Note, Tip, Important, Warning, Caution]`.
+  Add the line `callouts: [Note, Tip, Important, Warning, Caution]` \
+to `languages/fr.yaml`, translated.
   More: https://statac.dev/e/missing-words/
 
 2 notes: 2 missing-words.

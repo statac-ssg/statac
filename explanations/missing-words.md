@@ -9,9 +9,9 @@ from the site's own file in `languages/`. So Statac gives this note for a
 language with no such file, for a file without the line, or for a file
 whose line is empty.
 
-For a site in one of the other languages Statac has translations for,
-`statac new` writes this file, with these words in English for you to
-translate.
+For a site made in another language Statac knows the dates and
+quotation marks of, `statac new` writes this file, with these words in
+English for you to translate.
 
 The message shows the language and the number of pages. It appears once
 for each language's footnotes and once for its callouts, however many
@@ -21,7 +21,7 @@ pages there are.
 
 ```text
 note  Missing words: the footnotes of 1 page in `fr` have no translation for the back link
-  Add them to `languages/fr.yaml`, translating the English line `back_to_the_text: back to the text`.
+  Add the line `back_to_the_text: back to the text` to `languages/fr.yaml`, translated.
   More: https://statac.dev/e/missing-words/
 ```
 

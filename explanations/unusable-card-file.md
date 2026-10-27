@@ -26,11 +26,12 @@ be shared with no image, so the build stops instead.
 
 ## How to fix it
 
-Save the background at 1200 by 630 pixels, as a PNG or a JPEG. Name
-TrueType or OpenType font files, ending `.ttf`, `.otf` or `.ttc`. A web
-font ending `.woff2` is a different format, even if you rename it.
+Save the background at 1,200 by 630 pixels, as a JPEG, a PNG or a still
+WebP. Name TrueType or OpenType font files, ending `.ttf`, `.otf` or
+`.ttc`. A web font ending `.woff2` is a different format, even if you
+rename it.
 
 ## Example
 
-Once `templates/og/background.png` is saved again at 1200 by 630, the
+Once `templates/og/background.png` is saved again at 1,200 by 630, the
 cards are drawn.

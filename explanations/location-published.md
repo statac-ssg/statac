@@ -30,7 +30,7 @@ published as the original files.
 
 Statac looks for the location a camera writes, a latitude and a
 longitude, in JPEG, PNG and WebP files. It doesn't look in any other kind
-of file, or for any other information a file may hold about a place. A
+of file, or for any other information a file may hold about a place.
 Statac never checks a file in `static/`, and shows no note for it.
 
 `statac build` and `statac serve` don't show this note or count it.

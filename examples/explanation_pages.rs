@@ -82,9 +82,11 @@ fn page(code: Code) -> String {
         &body[..after],
         &body[after..]
     );
-    // Only `statac check` reports these two, so only it counts them.
+    // Only `statac check` reports these, so only it counts them.
     let counts = match code {
-        Code::HookNotRun | Code::LocationPublished => "<code>statac check</code>",
+        Code::HookNotRun | Code::LocationPublished | Code::NoHomePage | Code::NoListPage => {
+            "<code>statac check</code>"
+        }
         _ => "Statac",
     };
     let quieten = match code.quietenable() {

@@ -2930,7 +2930,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         )),
         Kind::LanguageWrittenTwice { .. } => None,
         Kind::MissingWords { file, words, .. } => Some(format!(
-            "Add them to `{file}`, translating the English line `{}`.",
+            "Add the line `{}` to `{file}`, translated.",
             match words {
                 ShownWords::BackToTheText => "back_to_the_text: back to the text",
                 ShownWords::Callouts => "callouts: [Note, Tip, Important, Warning, Caution]",
@@ -9469,8 +9469,8 @@ mod tests {
                 "Missing words: the footnotes of 1 page in `fr` have no translation for the back \
                  link",
                 Some(
-                    "Add them to `languages/fr.yaml`, translating the English line \
-                     `back_to_the_text: back to the text`.",
+                    "Add the line `back_to_the_text: back to the text` to `languages/fr.yaml`, \
+                     translated.",
                 ),
             ),
             (
@@ -9482,8 +9482,8 @@ mod tests {
                 },
                 "Missing words: the callouts of 1,200 pages in `fr-CA` have no names",
                 Some(
-                    "Add them to `languages/fr-CA.yaml`, translating the English line `callouts: \
-                     [Note, Tip, Important, Warning, Caution]`.",
+                    "Add the line `callouts: [Note, Tip, Important, Warning, Caution]` to \
+                     `languages/fr-CA.yaml`, translated.",
                 ),
             ),
             (
