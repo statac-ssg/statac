@@ -3,7 +3,7 @@
   <img src=".github/readme/statac-dark.svg#gh-dark-mode-only" alt="Statac" width="300">
 </h1>
 
-<p align="center">A friendlier static site generator for personal websites.</p>
+<p align="center">A friendlier static site generator.</p>
 
 <p align="center">
   <a href="https://git.statac.dev/statac/statac/releases/latest"><img alt="The latest release" src="https://img.shields.io/gitea/v/release/statac/statac?gitea_url=https%3A%2F%2Fgit.statac.dev&label=release&color=CC4E00"></a>
