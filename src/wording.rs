@@ -31,8 +31,7 @@ pub(crate) use crate::described::{
 pub(crate) const HANDING_DOWN: &str = "https://statac.dev/front-matter/#handing-down";
 
 /// Where the docs say more of a setting for one language.
-pub(crate) const FOR_ONE_LANGUAGE: &str =
-    "https://statac.dev/dates-and-languages/#settings-for-one-language";
+pub(crate) const FOR_ONE_LANGUAGE: &str = "https://statac.dev/languages/#settings-for-one-language";
 
 /// Where the docs say more of a custom setting.
 pub(crate) const OWN_VALUE: &str = "https://statac.dev/settings/";
@@ -5131,7 +5130,7 @@ pub(crate) fn no_words_for(tag: &str) -> String {
 pub(crate) const CODE_COLOURS: &str = "https://statac.dev/code-colours/";
 
 /// Where the docs describe a language's translations.
-pub(crate) const LANGUAGE_FILES: &str = "https://statac.dev/dates-and-languages/#languages";
+pub(crate) const LANGUAGE_FILES: &str = "https://statac.dev/languages/#languages";
 
 pub(crate) fn made_site(folder: &str, files: usize) -> String {
     format!(

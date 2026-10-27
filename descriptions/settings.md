@@ -25,7 +25,7 @@ The site's language as a code, such as `en`, `en-GB` or `fr`. A site in
 several languages lists them all, the main one first: `[ar, en]`. The
 default is `en`.
 
-More: https://statac.dev/dates-and-languages/#languages
+More: https://statac.dev/languages/#languages
 
 ## `timezone`
 
@@ -33,7 +33,7 @@ The time zone your clock is in, such as `Europe/London`. Statac reads a
 date with no offset in this time zone, and uses it to decide which day
 is today. The default is UTC.
 
-More: https://statac.dev/dates-and-languages/#time-zones
+More: https://statac.dev/dates/#time-zones
 
 ## `date_format`
 
@@ -41,7 +41,7 @@ How the site writes dates, given as an example date:
 `31 December 2025`. Without it, the site writes dates the way its
 language usually does.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `date_zeros`
 
@@ -49,7 +49,7 @@ When a date's month is written in figures, `false` drops the leading
 zero from the day and the month: `4/3/2026`, not `04/03/2026`. The
 default is `true`.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `typography`
 
@@ -296,7 +296,7 @@ alone: the language's code as `language` lists it, a dot, then the
 setting, such as `en.title: Notes` or `en-NZ.date_format: 31 Dec 2025`.
 The setting without a language holds for the others.
 
-More: https://statac.dev/dates-and-languages/#settings-for-one-language
+More: https://statac.dev/languages/#settings-for-one-language
 
 ## `fields.<name>`
 

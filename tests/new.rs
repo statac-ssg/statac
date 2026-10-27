@@ -136,7 +136,7 @@ fn a_site_in_a_language_lacking_the_words_statac_shows_is_given_them_in_english(
         assert_eq!(
             fs::read_to_string(&file).unwrap(),
             "# The text Statac adds to your content, in English for you to translate: \
-             see https://statac.dev/dates-and-languages/#language-files\n\
+             see https://statac.dev/languages/#language-files\n\
              back_to_the_text: back to the text\n\
              callouts: [Note, Tip, Important, Warning, Caution]\n",
             "{tag}"

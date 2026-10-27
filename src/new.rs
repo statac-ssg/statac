@@ -795,7 +795,7 @@ fn language_file() -> String {
     let english = crate::language::english();
     let mut text = String::from(
         "# The text Statac adds to your content, in English for you to translate: \
-         see https://statac.dev/dates-and-languages/#language-files\n",
+         see https://statac.dev/languages/#language-files\n",
     );
     if let Some(label) = &english.back_to_the_text {
         text.push_str(&format!("back_to_the_text: {}\n", yaml::write::text(label)));

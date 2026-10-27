@@ -9,25 +9,25 @@ or a whole date.
 
 The date's year, as a number.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `month`
 
 The date's month, as a number from 1 to 12. A date written as a year
 alone has no month.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `day`
 
 The date's day of the month, as a number. A date written without a day
 has no day.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `weekday`
 
 The name of the date's day of the week, in the page's language. A date
 written without a day has no weekday.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look

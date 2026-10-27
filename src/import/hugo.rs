@@ -444,7 +444,7 @@ impl Reader<'_> {
                 "The settings declare {} languages, so the new site is in each, the main one, \
                  {}, first: each other language's pages are in its own folder in `content/`, \
                  where they stand at the same place as the page they translate, as \
-                 https://statac.dev/dates-and-languages/#a-site-in-several-languages \
+                 https://statac.dev/languages/#a-site-in-several-languages \
                  describes.",
                 self.languages.len(),
                 code(&self.main)

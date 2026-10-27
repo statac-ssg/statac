@@ -36,13 +36,13 @@ to `=sunday`, the next such day, so on a Monday `=monday` is a week away.
 A time can follow, as in `=monday 09:00`. A stamp is a stamp only as the
 whole of a front matter value, and plain text anywhere else.
 
-More: https://statac.dev/dates-and-languages/#writing-a-date
+More: https://statac.dev/dates/#writing-a-date
 
 ## `updated`
 
 When the page last changed, written the same way as `date`.
 
-More: https://statac.dev/dates-and-languages/#writing-a-date
+More: https://statac.dev/dates/#writing-a-date
 
 ## `draft`
 
@@ -97,7 +97,7 @@ More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
 Links the page to its translations if their names differ. Pages with the
 same key are translations of each other.
 
-More: https://statac.dev/dates-and-languages/#translations
+More: https://statac.dev/languages/#translations
 
 ## `tags`
 

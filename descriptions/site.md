@@ -25,7 +25,7 @@ value.
 The page's language as a code, such as `en`. If the site sets no
 `language`, it is `en`.
 
-More: https://statac.dev/dates-and-languages/#each-language-in-templates
+More: https://statac.dev/languages/#each-language-in-templates
 
 ## `languages`
 
@@ -33,7 +33,7 @@ Each of the site's languages as a code, the main one first. A site that
 sets no `language` has only `en`. Followed by a code, as in
 `site.languages.en`, it is that language's home page.
 
-More: https://statac.dev/dates-and-languages/#each-language-in-templates
+More: https://statac.dev/languages/#each-language-in-templates
 
 ## `today`
 

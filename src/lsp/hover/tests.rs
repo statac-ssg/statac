@@ -255,7 +255,7 @@ fn a_setting_for_one_language_says_what_it_is() {
     );
     assert_eq!(
         more.unwrap(),
-        "https://statac.dev/dates-and-languages/#settings-for-one-language"
+        "https://statac.dev/languages/#settings-for-one-language"
     );
 }
 

@@ -20,7 +20,7 @@ Writes a date the way an example date shows it, the same way
 language's looks: `long`, `short`, `day` or `stamp`. With nothing in the
 brackets, it writes the date in the site's date format.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `moment`
 
@@ -62,7 +62,7 @@ Writes a number, or the numbers in a text, in the digits of the page's
 language: `۱۲` for 12 on a Persian page. Only `0` to `9` change. If it
 is given HTML, it returns only the words, as `plain` does.
 
-More: https://statac.dev/dates-and-languages/#language-files
+More: https://statac.dev/languages/#language-files
 
 ## `json`
 

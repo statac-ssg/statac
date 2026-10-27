@@ -10,7 +10,7 @@ It was made from `tests/import/zola-beside/old` by `statac import`, which change
 
 No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
 
-The settings declare 2 languages, so the new site is in each, the main one, `en`, first: each other language's pages are in its own folder in `content/`, where they stand at the same place as the page they translate, as https://statac.dev/dates-and-languages/#a-site-in-several-languages describes.
+The settings declare 2 languages, so the new site is in each, the main one, `en`, first: each other language's pages are in its own folder in `content/`, where they stand at the same place as the page they translate, as https://statac.dev/languages/#a-site-in-several-languages describes.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 

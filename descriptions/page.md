@@ -32,7 +32,7 @@ The page's `date`, with its `year`, `month`, `day` and `weekday`. On its
 own, it shows in the site's date format. If the page has no `date`, it
 has no value, and neither does a list's paginated page.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `updated`
 
@@ -40,7 +40,7 @@ The page's `updated` date. On its own, it shows in the site's date
 format. If the page has no `updated`, it has no value, and neither does
 a list's paginated page.
 
-More: https://statac.dev/dates-and-languages/#how-dates-look
+More: https://statac.dev/dates/#how-dates-look
 
 ## `summary`
 
@@ -100,21 +100,21 @@ headings under it as `headings`. Empty if the page has no headings.
 
 The page's language as a code, such as `en` or `fr`, for `<html lang>`.
 
-More: https://statac.dev/dates-and-languages/#each-language-in-templates
+More: https://statac.dev/languages/#each-language-in-templates
 
 ## `direction`
 
 Which way the page's language runs: `ltr`, left to right, or `rtl`,
 right to left. For `<html dir>`.
 
-More: https://statac.dev/dates-and-languages/#each-language-in-templates
+More: https://statac.dev/languages/#each-language-in-templates
 
 ## `translations`
 
 The same page in the site's other languages, the main language first.
 Empty if there are none.
 
-More: https://statac.dev/dates-and-languages/#translations
+More: https://statac.dev/languages/#translations
 
 ## `tags`
 
@@ -337,7 +337,7 @@ More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
 
 The page's `translation_key`, as the page writes it.
 
-More: https://statac.dev/dates-and-languages/#translations
+More: https://statac.dev/languages/#translations
 
 ## `neighbours`
 
