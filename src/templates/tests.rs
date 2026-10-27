@@ -1364,7 +1364,7 @@ fn a_name_nothing_has_is_told_when_the_template_is_read() {
 #[test]
 fn loop_in_a_fors_own_if_is_told_when_the_template_is_read() {
     let name = "Unknown name: `loop`";
-    let in_if = Some("`loop` is set only inside the loop: test it with an `{% if %}` there.");
+    let in_if = Some("`loop` has a value only inside the loop: test it with an `{% if %}` there.");
     for (template, told) in [
         (
             "{% for x in [1, 2] if loop.index0 == 1 %}{{ x }}{% endfor %}",

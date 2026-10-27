@@ -9,7 +9,7 @@ at the second one, and shows where the first is written.
 
 ```text
 warning  Feed written twice: `feed.xml` and `/posts/feed.xml` are both at `/posts/feed.xml`
-  The feed is published once; take one of them out of the `feed:` line.
+  Statac publishes the feed once; take one of them out of the `feed:` line.
   More: https://statac.dev/e/feed-written-twice/
 ```
 

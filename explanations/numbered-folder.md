@@ -7,7 +7,7 @@ so Statac treats the folder as numbered.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Numbered folder: `content/days/` is ordered by the number each name opens with
+note  Numbered folder: Statac orders `content/days/` by the number each name opens with
   If the numbers are part of the names, write `numbered: false` in `content/days/index.md`.
   More: https://statac.dev/e/numbered-folder/
 ```

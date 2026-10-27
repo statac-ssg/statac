@@ -8,7 +8,7 @@ converted their colours to sRGB.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Colour converted: the resized copies of `content/photo-1.jpg` are in sRGB, converted from `Display P3`
+note  Colour converted: Statac converted the resized copies of `content/photo-1.jpg` to sRGB from `Display P3`
   More: https://statac.dev/e/colour-converted/
 ```
 

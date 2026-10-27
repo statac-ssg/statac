@@ -261,7 +261,7 @@ fn a_before_build_the_shell_cant_find_stops_the_build_unread() {
         assert!(
             said.contains(
                 "  The shell ends with 127 when it can't find a command. Is the command \
-                 installed, and on the path Statac was run with?\n"
+                 installed, and on the path you ran Statac with?\n"
             ),
             "{said}"
         );

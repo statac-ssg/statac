@@ -8,8 +8,8 @@ site's webmentions.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  No site URL: social cards are left out until the site has a `url`
-  Add the site's full URL to `statac.yaml`, as `url: https://example.org/`.
+note  No site URL: Statac leaves out social cards until the site has a `url`
+  Add the site's full URL to `statac.yaml`, such as `url: https://example.org/`.
   More: https://statac.dev/e/no-site-url/
 ```
 
@@ -18,7 +18,7 @@ note  No site URL: social cards are left out until the site has a `url`
 Some files are useless without the site's full URL. A feed reader
 follows each post's link from the feed file, away from the site, and a
 sitemap lists every page by its full URL. Rather than publish these
-files with URLs that lead nowhere, Statac leaves them out until
+files with URLs that lead nowhere, Statac leaves out them until
 `statac.yaml` says where the site lives. It reports each one it leaves
 out, since nothing else would tell you it is missing.
 

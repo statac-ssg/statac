@@ -883,7 +883,7 @@ fn a_sites_folder_given_alone_is_told_to_come_after_the_words() {
         said,
         format!(
             "error  Nothing to search for: `{folder}` is a site's folder, not words\n  \
-             Give the words first, then the folder, as `statac search \"raspberry pi\" \
+             Give the words first, then the folder, such as `statac search \"raspberry pi\" \
              {folder}`.\n  More: https://statac.dev/e/nothing-to-search/\n"
         )
     );

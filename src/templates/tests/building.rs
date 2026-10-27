@@ -68,7 +68,7 @@ fn no_summary(template: &str, page: &str, building: &[&str]) -> String {
         "     │    ^^^^^^^^^^^^".to_owned(),
     ];
     lines.extend(building.iter().map(|line| format!("  {line}")));
-    lines.push("  Write `page.summary | default(\"\")` to show nothing where it isn't set.".into());
+    lines.push("  Write `page.summary | default(\"\")` to show nothing if it isn't set.".into());
     lines.push("  More: https://statac.dev/e/no-value/".into());
     lines.join("\n") + "\n"
 }
@@ -245,9 +245,8 @@ fn a_problem_met_building_a_feed_names_the_feed() {
             format!("  {building}"),
         ];
         lines.extend(at.iter().map(|line| format!("  {line}")));
-        lines.push(
-            "  Write `post.summary | default(\"\")` to show nothing where it isn't set.".into(),
-        );
+        lines
+            .push("  Write `post.summary | default(\"\")` to show nothing if it isn't set.".into());
         lines.push("  More: https://statac.dev/e/no-value/".into());
         assert_eq!(drawn, lines.join("\n") + "\n", "{address}");
     }

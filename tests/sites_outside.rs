@@ -59,7 +59,7 @@ fn sites_outside_read_with_no_errors() {
 /// `STATAC_DATES` names a folder holding a file per site, named as the
 /// site's folder above `site/` is, each line a date as written, what was
 /// asked of it (`date`, `moment`, `rss` or `example:` and a template's
-/// example), and what another build wrote, parted by tabs.
+/// example), and what another build wrote, separated by tabs.
 #[test]
 #[ignore = "reads sites outside the repository, named by STATAC_SITES and STATAC_DATES"]
 fn sites_outside_write_dates_as_expected() {

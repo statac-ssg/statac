@@ -400,7 +400,7 @@ note  Missing alt text: `photo-3.jpg`
   content/post-1/index.md, line 8
    8 │ <img src=\"photo-3.jpg\">
      │           ^^^^^^^^^^^
-  Give the `<img>` an `alt`, or `alt=\"\"` where it is decorative.
+  Give the `<img>` an `alt`, or `alt=\"\"` if it is decorative.
   More: https://statac.dev/e/missing-alt-text/
 
 note  Missing alt text: `content/post-1/photo-4.jpg`
@@ -739,7 +739,7 @@ fn a_heic_picture_a_template_shows_is_told_at_the_call_that_asks_for_it() {
     site.put("static/img/photo-2.heic", HEIC);
     let said = site.check();
     let expected = "\
-warning  HEIC image: `static/img/photo-2.heic` is published as it is, with no resized copies made
+warning  HEIC image: Statac publishes `static/img/photo-2.heic` unchanged, with no resized copies
   templates/page.html, line 4
    4 │ {{ page.image('/img/photo-2.heic').src }}
      │    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -766,14 +766,14 @@ fn a_heic_picture_is_published_as_it_is_and_told_where_it_is_shown() {
     site.put("content/post-1/photo-2.heic", HEIC);
     let said = site.check();
     let expected = "\
-warning  HEIC image: `content/post-1/photo-1.heic` is published as it is, with no resized copies made
+warning  HEIC image: Statac publishes `content/post-1/photo-1.heic` unchanged, with no resized copies
   content/post-1/index.md, line 4
    4 │ ![A photograph](photo-1.heic)
      │                 ^^^^^^^^^^^^
   Export it as a JPEG: most browsers can't show a HEIC image.
   More: https://statac.dev/e/heic-image/
 
-warning  HEIC image: `content/post-1/photo-2.heic` is published as it is, with no resized copies made
+warning  HEIC image: Statac publishes `content/post-1/photo-2.heic` unchanged, with no resized copies
   content/post-1/index.md, line 6
    6 │ @image(\"photo-2.heic\", alt=\"Another\")
      │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1032,7 +1032,7 @@ error  No value: nothing is set for `page.{host}.start`
    3 │ {line}
      │ {under}
   While building: content/post-1.md
-  Write `page.{host}.start | default(\"\")` to show nothing where it isn't set.
+  Write `page.{host}.start | default(\"\")` to show nothing if it isn't set.
   More: https://statac.dev/e/no-value/
 "
             )),
@@ -1128,14 +1128,14 @@ fn a_video_with_no_still_is_told_once_at_the_first_call_in_the_writing() {
     assert_eq!(
         said,
         "\
-warning  No thumbnail: no image has been fetched for this video yet
+warning  No thumbnail: `statac refresh` hasn't fetched an image for this video yet
   content/post-1.md, line 6
    6 │ @youtube(\"https://youtu.be/abcdefghijk\")
      │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Run `statac refresh` to fetch one.
   More: https://statac.dev/e/no-thumbnail/
 
-warning  No thumbnail: no image has been fetched for this video yet
+warning  No thumbnail: `statac refresh` hasn't fetched an image for this video yet
   content/post-1.md, line 8
    8 │ @youtube(\"https://youtu.be/bcdefghijkl\")
      │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1393,7 +1393,9 @@ fn each_mistake_asking_for_a_picture_or_a_file_is_told_at_the_call() {
         (
             "page.image('photo-1.jpg', sizes=10)",
             "Wrong argument: `page.image` needs `sizes` as text",
-            Some("Write it as a browser reads it: `sizes=\"(max-width: 40rem) 100vw, 40rem\"`."),
+            Some(
+                "Write it the way a browser reads it: `sizes=\"(max-width: 40rem) 100vw, 40rem\"`.",
+            ),
         ),
         (
             "page.image('photo-1.jpg', full='yes')",
@@ -2111,7 +2113,7 @@ warning  Webmentions off: `webmention()` writes nothing here
     let said = site.check();
     assert!(
         said.starts_with(
-            "note  No site URL: webmentions are left out until the site has a `url`\n  \
+            "note  No site URL: Statac leaves out webmentions until the site has a `url`\n  \
              statac.yaml, line 5\n"
         ),
         "{said}"

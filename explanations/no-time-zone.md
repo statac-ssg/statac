@@ -8,7 +8,7 @@ no zone set, it reads it as UTC.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  No time zone: dates without an offset are read as UTC
+warning  No time zone: Statac reads dates without an offset as UTC
   Add a line such as `timezone: Europe/London` to `statac.yaml`, naming the zone your dates are written in.
   More: https://statac.dev/e/no-time-zone/
 ```

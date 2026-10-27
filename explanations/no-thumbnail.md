@@ -8,7 +8,7 @@ so `thumbnail` is empty.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  No thumbnail: no image has been fetched for this video yet
+warning  No thumbnail: `statac refresh` hasn't fetched an image for this video yet
   Run `statac refresh` to fetch one.
   More: https://statac.dev/e/no-thumbnail/
 ```

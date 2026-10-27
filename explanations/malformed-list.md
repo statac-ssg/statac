@@ -7,7 +7,7 @@ page lists.
 
 ```text
 error  Malformed list: a list starts from `site.posts`, not `site.pages`
-  Start it with `site.posts`, as `site.posts | tagged("Rust")`.
+  Start it with `site.posts`, such as `site.posts | tagged("Rust")`.
   More: https://statac.dev/e/malformed-list/
 ```
 

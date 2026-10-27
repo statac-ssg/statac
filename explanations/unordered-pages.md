@@ -7,7 +7,7 @@ day-two]`, but the list has pages that aren't named there.
 
 ```text
 warning  Unordered pages: `order` leaves out `day-four` and `day-five`
-  They follow in their usual order; name them in `order` to place them.
+  Statac puts them after the named pages, in their usual order; name them in `order` to place them.
   More: https://statac.dev/e/unordered-pages/
 ```
 

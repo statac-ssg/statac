@@ -8,8 +8,8 @@ text at the top or the bottom is drawn at the size written.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Size kept: at `bottom`, `up to 36` is drawn at 36
-  Write `footer.size: 36`; only a text at `left`, `centre` or `right` is fitted.
+warning  Size kept: at `bottom`, Statac draws `up to 36` at 36
+  Write `footer.size: 36`; Statac fits only a text at `left`, `centre` or `right`.
   More: https://statac.dev/e/size-kept/
 ```
 

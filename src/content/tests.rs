@@ -2588,42 +2588,50 @@ fn a_page_left_out_at_an_address_already_taken_is_warned_of() {
         (
             "draft: true\npermalink: /post-1/",
             "true",
-            Some(format!("{DRAFT} `/post-1/`, as `content/post-1.md` is")),
+            Some(format!(
+                "{DRAFT} `/post-1/`, where `content/post-1.md` is already"
+            )),
         ),
         (
             "draft: true\npermalink: /Post-1/",
             "true",
-            Some(format!("{DRAFT} `/Post-1/`, as `content/post-1.md` is")),
+            Some(format!(
+                "{DRAFT} `/Post-1/`, where `content/post-1.md` is already"
+            )),
         ),
         (
             "date: 2027-01-01\npermalink: /post-1/",
             "2027-01-01",
-            Some(format!("{WAITING} `/post-1/`, as `content/post-1.md` is")),
+            Some(format!(
+                "{WAITING} `/post-1/`, where `content/post-1.md` is already"
+            )),
         ),
         (
             "draft: true\npermalink: /file-1.txt",
             "true",
-            Some(format!("{DRAFT} `/file-1.txt`, as `static/file-1.txt` is")),
+            Some(format!(
+                "{DRAFT} `/file-1.txt`, where `static/file-1.txt` is already"
+            )),
         ),
         (
             "date: 2027-01-01\npermalink: /file-1.txt",
             "2027-01-01",
             Some(format!(
-                "{WAITING} `/file-1.txt`, as `static/file-1.txt` is"
+                "{WAITING} `/file-1.txt`, where `static/file-1.txt` is already"
             )),
         ),
         (
             "draft: true\npermalink: /tags/tag-1/",
             "true",
             Some(format!(
-                "{DRAFT} `/tags/tag-1/`, as the page for the tag `Tag 1` is"
+                "{DRAFT} `/tags/tag-1/`, where the page for the tag `Tag 1` is already"
             )),
         ),
         (
             "date: 2027-01-01\npermalink: /tags/tag-1/",
             "2027-01-01",
             Some(format!(
-                "{WAITING} `/tags/tag-1/`, as the page for the tag `Tag 1` is"
+                "{WAITING} `/tags/tag-1/`, where the page for the tag `Tag 1` is already"
             )),
         ),
     ];

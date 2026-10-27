@@ -216,7 +216,7 @@ fn a_site_naming_no_language_is_in_english() {
     fs::write(folder.join("content/index.md"), "---\ntitle: Home\n---\n").unwrap();
     let note = [(
         "no-language".to_owned(),
-        "note  No language set: the site is read as English".to_owned(),
+        "note  No language set: Statac reads the site as English".to_owned(),
     )];
     assert_eq!(built(&folder, Mode::Check).0, note);
     let (found, published) = built(&folder, Mode::Build);

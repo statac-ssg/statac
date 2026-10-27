@@ -7,7 +7,7 @@ site would find for some words, so it needs the words.
 
 ```text
 error  Nothing to search for: `statac search` needs the words to look for
-  Give them after the command, as `statac search "raspberry pi"`.
+  Give them after the command, such as `statac search "raspberry pi"`.
   More: https://statac.dev/e/nothing-to-search/
 ```
 

@@ -7,7 +7,7 @@ An argument in a snippet call was named with a colon, as in
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Colon in call: `caption:` was read as `caption=`
+warning  Colon in call: Statac read `caption:` as `caption=`
   Write `caption=` instead.
   More: https://statac.dev/e/colon-in-call/
 ```

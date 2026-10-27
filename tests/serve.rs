@@ -739,7 +739,7 @@ fn the_panel_is_handed_what_there_is_to_say_of_a_page_and_the_site() {
                  {\"kind\":\"no-site-url\",\"severity\":\"note\",\"title\":\"No site URL\",\
                  \"count\":1,\"quietened\":0,\
                  \"suggestion\":[{\"text\":\"Add the site\\u0027s full URL \
-                 to \"},{\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
+                 to \"},{\"code\":\"statac.yaml\"},{\"text\":\", such as \"},\
                  {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}],\"gone\":null,\
                  \"drafts\":[{\"text\":\"Post \\u003c2\\u003e\",\"href\":\"/post-2/\"}],\
                  \"waiting\":[{\"text\":\"Post 3\",\"href\":\"/post-3/\",\"day\":\"2999-01-01\"}],\
@@ -1006,7 +1006,7 @@ fn the_panel_is_handed_a_kinds_suggestion_where_each_of_its_problems_has_it() {
             "{\"kind\":\"no-site-url\",\"severity\":\"note\",\"title\":\"No site URL\",\
              \"count\":2,\"quietened\":0,\
              \"suggestion\":[{\"text\":\"Add the site\\u0027s full URL to \"},\
-             {\"code\":\"statac.yaml\"},{\"text\":\", as \"},\
+             {\"code\":\"statac.yaml\"},{\"text\":\", such as \"},\
              {\"code\":\"url: https://example.org/\"},{\"text\":\".\"}]}"
         ),
         "{site}"
@@ -1749,7 +1749,7 @@ Gone since the last build: 1 no-thumbnail.
     );
     let said = served.said.after(mark, "Browser told to reload.\n");
     assert!(
-        said.contains("No thumbnail: no image has been fetched"),
+        said.contains("No thumbnail: `statac refresh` hasn't fetched an image"),
         "{said}"
     );
     let generation = served.hub.generation();

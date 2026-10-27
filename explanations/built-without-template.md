@@ -8,7 +8,7 @@ published this way, and lists them. Redirects published without
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Built without template: 2 pages are published as their content alone
+note  Built without template: Statac publishes 2 pages as their content alone
   Add `templates/page.html` to build them with a template.
   More: https://statac.dev/e/built-without-template/
 ```

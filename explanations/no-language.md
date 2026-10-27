@@ -6,8 +6,8 @@ written in English.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  No language set: the site is read as English
-  Add the site's language to `statac.yaml`, as `language: en`.
+note  No language set: Statac reads the site as English
+  Add the site's language to `statac.yaml`, such as `language: en`.
   More: https://statac.dev/e/no-language/
 ```
 

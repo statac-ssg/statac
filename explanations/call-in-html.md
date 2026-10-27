@@ -7,7 +7,7 @@ bracket, such as `@book(`. Statac built it as a call to that snippet.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Call in HTML: `@book` is built as a snippet
+note  Call in HTML: Statac builds `@book` as a snippet
   To show it as text, write `\@book`.
   More: https://statac.dev/e/call-in-html/
 ```

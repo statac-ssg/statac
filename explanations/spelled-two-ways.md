@@ -6,7 +6,7 @@ URL, such as `Rust` on some pages and `rust` on others.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Tag spelled two ways: `Rust` (12 pages) and `rust` (2 pages) are one tag, shown as `Rust`
+warning  Tag spelled two ways: `Rust` (12 pages) and `rust` (2 pages) are one tag, which Statac shows as `Rust`, the commonest
   Use one spelling on every page to choose how it's shown.
   More: https://statac.dev/e/spelled-two-ways/
 ```
@@ -47,9 +47,9 @@ and `content/post-3.md` contains:
 tags: [rust]
 ```
 
-`Rust` (2 pages) and `rust` (1 page) are one tag, shown as `Rust`. To
-show it as `rust` instead, write it that way in `content/post-1.md` and
-`content/post-2.md`:
+`Rust` (2 pages) and `rust` (1 page) are one tag, which Statac shows as
+`Rust`, the commonest. To show it as `rust` instead, write it that way in
+`content/post-1.md` and `content/post-2.md`:
 
 ```yaml
 tags: [rust]

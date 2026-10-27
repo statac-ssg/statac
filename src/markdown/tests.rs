@@ -1222,11 +1222,11 @@ fn a_colon_names_an_argument_with_a_warning() {
         problems,
         [
             (
-                "Colon in call: `caption:` was read as `caption=`".to_owned(),
+                "Colon in call: Statac read `caption:` as `caption=`".to_owned(),
                 "caption:".to_owned()
             ),
             (
-                "Colon in call: `alt:` was read as `alt=`".to_owned(),
+                "Colon in call: Statac read `alt:` as `alt=`".to_owned(),
                 "alt:".to_owned()
             ),
         ]
@@ -2188,7 +2188,7 @@ fn a_footnote_nothing_points_at_is_told() {
                 Some("Is it the definition for `[^source]`?")
             ),
             line(
-                "Definition written twice: the first `[^twice]:` line isn't shown",
+                "Definition written twice: Statac doesn't show the first `[^twice]:` line",
                 "[^twice]",
                 Some("Give one of them another name, or take one out.")
             ),
@@ -2221,7 +2221,7 @@ fn a_footnote_written_twice_is_told_at_the_one_not_shown() {
     };
     let twice = |label: &str, at: &str, shown: &str| {
         (
-            format!("Definition written twice: the first `[^{label}]:` line isn't shown"),
+            format!("Definition written twice: Statac doesn't show the first `[^{label}]:` line"),
             at.to_owned(),
             Some(shown.to_owned()),
         )

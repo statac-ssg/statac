@@ -1063,7 +1063,7 @@ fn the_site_named_with_an_option_is_refused_with_the_folder_after_the_command() 
         refused(&["build", "--site=docs"]),
         "\
 error  Unknown option: `--site=docs`
-  Name the folder after the command, as `statac build docs`.
+  Name the folder after the command: `statac build docs`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1071,7 +1071,7 @@ error  Unknown option: `--site=docs`
         refused(&["search", "zfs", "--site", "docs"]),
         "\
 error  Unknown option: `--site`
-  Name the folder after the words, as `statac search <words> docs`.
+  Name the folder after the words: `statac search <words> docs`.
   More: https://statac.dev/e/unknown-option/
 "
     );
@@ -1527,7 +1527,7 @@ error  Unknown option: `statac build` has no `--language`
             refused(words),
             "\
 error  Nothing to search for: `statac search` needs the words to look for
-  Give them after the command, as `statac search \"raspberry pi\"`.
+  Give them after the command, such as `statac search \"raspberry pi\"`.
   More: https://statac.dev/e/nothing-to-search/
 "
         );

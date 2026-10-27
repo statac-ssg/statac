@@ -601,14 +601,14 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
         case(
             "{{ page.summary + \"a\" }}",
             "No value: `page.summary` isn't set on `content/post-1.md`",
-            Some("Write `page.summary | default(\"\")` to show nothing where it isn't set."),
+            Some("Write `page.summary | default(\"\")` to show nothing if it isn't set."),
             1,
             "page.summary",
         ),
         case(
             "{{ 2 - page.summary }}",
             "No value: `page.summary` isn't set on `content/post-1.md`",
-            Some("Write `page.summary | default(\"\")` to show nothing where it isn't set."),
+            Some("Write `page.summary | default(\"\")` to show nothing if it isn't set."),
             1,
             "page.summary",
         ),
@@ -1279,7 +1279,7 @@ fn what_stops_the_engine_is_told_in_statacs_words() {
         ),
         case(
             "{% extends \"ring\" %}",
-            "Template stopped: `templates/ring.html` is reached again through `extends`",
+            "Template stopped: `extends` leads back to `templates/ring.html`",
             None,
             1,
             "extends \"ring\"",

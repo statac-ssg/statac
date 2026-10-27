@@ -8,7 +8,7 @@ and how many pages ran the loop.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Loop over every page: `site.pages` is gone through on 11,243 pages
+note  Loop over every page: 11,243 pages each go through `site.pages`
   Write `site.pages | selectattr("menu")` to choose the pages once for the site.
   More: https://statac.dev/e/loop-over-every-page/
 ```

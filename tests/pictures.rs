@@ -840,13 +840,13 @@ fn an_image_that_is_all_a_link_shows_is_told_once_as_its_alt_text() {
         told,
         [
             "note  Missing alt text: `photo-1.jpg`",
-            "  Say in the brackets where the link to `/post-2/` leads, as the image is all the \
+            "  Say in the brackets where the link to `/post-2/` leads, because the image is all the \
              link shows.",
             "note  Missing alt text: `photo-2.jpg`",
-            "  Give the `<img>` an `alt` saying where the link to `/post-2/` leads, as the image \
-             is all the link shows.",
+            "  Give the `<img>` an `alt` saying where the link to `/post-2/` leads, because the \
+             image is all the link shows.",
             "note  Missing alt text: `photo-3.jpg`",
-            "  Give the `<img>` an `alt` saying what the button does, as the image is all the \
+            "  Give the `<img>` an `alt` saying what the button does, because the image is all the \
              button shows.",
             "note  Missing link text: the link to `/post-2/` has nothing a screen reader can read \
              out",
@@ -1147,8 +1147,8 @@ fn a_photograph_in_another_colour_space_is_converted_and_said() {
     assert_eq!(code, 0, "{said}");
     assert!(
         said.starts_with(
-            "note  Colour converted: the resized copies of `content/post-1/photo-1.jpg` are in \
-             sRGB, converted from `"
+            "note  Colour converted: Statac converted the resized copies of \
+             `content/post-1/photo-1.jpg` to sRGB from `"
         ),
         "{said}"
     );

@@ -14,7 +14,7 @@ and its code, such as `<U+0092>`, for one between U+0080 and U+009F.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Control character: U+000B is left out of the page
+warning  Control character: Statac leaves U+000B out of the page
   Delete it, or type the character you meant.
   More: https://statac.dev/e/control-character/
 ```

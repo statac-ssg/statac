@@ -7,7 +7,7 @@ no language of the site reads it, so its words are used nowhere.
 
 ```text
 note  Unused language file: no language of the site reads `languages/en-US.yaml`
-  Name it for the site's language, as `languages/en-GB.yaml`, or take it out.
+  Name it for the site's language, `languages/en-GB.yaml`, or take it out.
   More: https://statac.dev/e/unused-language-file/
 ```
 

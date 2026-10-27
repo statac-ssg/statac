@@ -23,7 +23,7 @@ the year in full, because every date on the site is written with it.
 
 ```text
 error  Unusable date format: `31 December` has no year
-  Add the year, which every date on the site is written with.
+  Add the year: the site writes every date in this format.
   More: https://statac.dev/e/unusable-date-format/
 ```
 

@@ -340,7 +340,7 @@ fn a_control_character_is_drawn_where_it_can_be_seen() {
         drawn(&sources, &problem),
         lines(
             "
-            |warning  Control character: U+0092 is left out of the page
+            |warning  Control character: Statac leaves U+0092 out of the page
             |  content/post-1.md, line 1
             |   1 │ a\u{240b}b<U+0092>c\u{2421}d
             |     │    ^^^^^^^^

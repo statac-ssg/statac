@@ -398,7 +398,7 @@ fn check_notes_once_how_many_the_list_leaves_out() {
     let (said, code) = site.run(&["check"]);
     assert_eq!(
         said,
-        "note  Refused webmentions: 2 in `fetched/mentions/` are left out\n  \
+        "note  Refused webmentions: `refuse_webmentions_from` refuses 2 in `fetched/mentions/`\n  \
          statac.yaml, line 8\n   \
          8 │   - https://a.example/\n     \
          │   ^^^^^^^^^^^^^^^^^^^^ runs to line 9\n  \
@@ -436,7 +436,7 @@ fn a_line_that_isnt_a_full_url_is_told_where_it_is() {
     // The line that is a URL refuses what it refuses.
     assert_eq!(
         said,
-        "note  Refused webmentions: 1 in `fetched/mentions/` is left out\n  \
+        "note  Refused webmentions: `refuse_webmentions_from` refuses 1 in `fetched/mentions/`\n  \
          statac.yaml, line 8\n   \
          8 │   - a.example\n     \
          │   ^^^^^^^^^^^ runs to line 10\n  \
@@ -520,7 +520,7 @@ fn an_old_list_of_refused_is_told_with_the_lines_that_carry_it_over() {
     assert!(
         said.contains(
             "  Delete `fetched/refused` after adding them, and the URL on the line that \
-             couldn't be read.\n"
+             Statac couldn't read.\n"
         ),
         "{said}"
     );

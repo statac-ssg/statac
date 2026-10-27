@@ -9,7 +9,7 @@ definition is never shown.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Definition written twice: the first `[^n]:` line isn't shown
+warning  Definition written twice: Statac doesn't show the first `[^n]:` line
   Give one of them another name, or take one out.
   More: https://statac.dev/e/definition-written-twice/
 ```

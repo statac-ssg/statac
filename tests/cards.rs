@@ -284,7 +284,7 @@ fn a_site_with_no_address_draws_nothing_and_says_so() {
     assert_eq!(meta(&site.html("post-1/index.html"), "og:image"), None);
     assert_eq!(
         told(&site.check()),
-        ["note  No site URL: social cards are left out until the site has a `url`"]
+        ["note  No site URL: Statac leaves out social cards until the site has a `url`"]
     );
 }
 
@@ -748,7 +748,7 @@ fn files_no_card_can_be_drawn_with_stop_the_build_once() {
     });
     assert_eq!(
         told(&said),
-        ["error  Unusable card file: `templates/og/more.ttf` doesn't read as a font"]
+        ["error  Unusable card file: Statac can't read `templates/og/more.ttf` as a font"]
     );
     assert!(
         said.contains("   2 │ font: [text.ttf, more.ttf]\n     │                  ^^^^^^^^\n"),
@@ -763,7 +763,7 @@ fn files_no_card_can_be_drawn_with_stop_the_build_once() {
     });
     assert_eq!(
         told(&said),
-        ["error  Unusable card file: `templates/og/more.ttf` doesn't read as a font"]
+        ["error  Unusable card file: Statac can't read `templates/og/more.ttf` as a font"]
     );
     assert!(
         said.contains("  13 │ title.font: [more.ttf, text.ttf]\n     │              ^^^^^^^^\n"),
@@ -1138,7 +1138,7 @@ fn a_card_is_answered_in_a_layout_and_nowhere_else() {
     assert_eq!(code, 1, "{said}");
     assert_eq!(
         told(&said),
-        ["error  Template stopped: `page.card` isn't answered in a page's content"]
+        ["error  Template stopped: a page's content can't read `page.card`"]
     );
     assert!(
         said.contains("  snippets/shared.html, line 1\n   1 │ {{ page.card.url }}\n"),
@@ -1168,7 +1168,7 @@ fn a_card_is_answered_in_a_layout_and_nowhere_else() {
     assert_eq!(code, 1, "{said}");
     assert_eq!(
         told(&said),
-        ["error  Template stopped: `page.card` isn't answered in a card's own text"]
+        ["error  Template stopped: a card's own text can't read `page.card`"]
     );
     assert!(
         said.contains("   4 │ title.text: \"{{ page.card.alt }}\"\n"),
@@ -1192,7 +1192,7 @@ fn a_problem_raised_in_a_text_or_a_snippet_it_calls_is_told_where_raised() {
         told(&said),
         [
             "error  Template stopped: `url` needs a URL starting with `/`",
-            "error  Template stopped: `page.card` isn't answered in a card's own text",
+            "error  Template stopped: a card's own text can't read `page.card`",
         ]
     );
     assert!(

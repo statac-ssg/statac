@@ -9,7 +9,7 @@ message says which, and names the page or file.
 
 ```text
 error  No value: `page.summary` isn't set on `content/post-1.md`
-  Write `page.summary | default("")` to show nothing where it isn't set.
+  Write `page.summary | default("")` to show nothing if it isn't set.
   More: https://statac.dev/e/no-value/
 ```
 

@@ -344,7 +344,7 @@ fn a_control_character_in_the_writing_is_left_out_and_said_where_it_was() {
     assert_eq!(
         said,
         "\
-warning  Control character: U+000B is left out of the page
+warning  Control character: Statac leaves U+000B out of the page
   content/post-1.md, line 5
    5 │ The first\u{240b}post.
      │          ^
@@ -935,7 +935,10 @@ fn a_template_only_a_page_needing_the_address_uses_is_checked_as_with_one() {
     site.write("templates/robots.txt", robots);
     let (said, code) = site.run(&["check"]);
     assert_eq!(code, 0, "{said}");
-    assert!(said.contains("`content/robots.md` is left out"), "{said}");
+    assert!(
+        said.contains("Statac leaves out `content/robots.md`"),
+        "{said}"
+    );
     assert!(!said.contains("site.url"), "{said}");
 
     let (said, code) = site.run(&["build", "--url=https://example.org"]);
@@ -1024,11 +1027,12 @@ fn every_whole_address_follows_the_address_given_for_the_run() {
     // The site with no address is one only for the run that gives it.
     let (said, _) = site.check_without_javascript(&[]);
     for waiting in [
-        "the feed of the site's own list is",
-        "`content/robots.md` is",
-        "`content/sitemap.md` is",
+        "the feed of the site's own list",
+        "`content/robots.md`",
+        "`content/sitemap.md`",
     ] {
-        let note = format!("note  No site URL: {waiting} left out until the site has a `url`\n");
+        let note =
+            format!("note  No site URL: Statac leaves out {waiting} until the site has a `url`\n");
         assert!(said.contains(&note), "{said}");
     }
     let (said, code) = site.check_without_javascript(&["--url=https://preview.example.org"]);
@@ -1047,7 +1051,7 @@ fn an_old_address_sends_readers_on() {
     assert_eq!(
         said,
         "\
-note  Built without template: 1 redirect is published as a refresh and a link
+note  Built without template: Statac publishes 1 redirect as a refresh and a link
   While building: content/post-1.md, line 3
    3 │ redirect_from: [/old/post-1/]
      │                 ^^^^^^^^^^^^
@@ -1123,7 +1127,7 @@ fn a_site_of_two_pages_and_no_templates_publishes_their_content_alone() {
     assert_eq!(
         said,
         "\
-note  Built without template: 2 pages are published as their content alone
+note  Built without template: Statac publishes 2 pages as their content alone
   While building: content/hello.md
   And while building 1 more:
     content/index.md
@@ -1179,7 +1183,7 @@ fn pages_built_without_their_own_template_are_told_once_counting_them() {
     assert_eq!(
         said,
         "\
-note  Built without template: 4 pages are published as their content alone
+note  Built without template: Statac publishes 4 pages as their content alone
   While building: content/index.md
   And while building 3 more:
     content/post-1.md
@@ -1188,7 +1192,7 @@ note  Built without template: 4 pages are published as their content alone
   Add `templates/page.html` to build them with a template.
   More: https://statac.dev/e/built-without-template/
 
-note  Built without template: 3 redirects are published as a refresh and a link
+note  Built without template: Statac publishes 3 redirects as a refresh and a link
   While building: content/diary/index.md, line 3
    3 │ redirect_from: [/old-diary/]
      │                 ^^^^^^^^^^^
@@ -1725,12 +1729,12 @@ fn a_page_called_by_what_the_author_never_wrote_as_a_name_is_noted_once() {
     assert_eq!(
         said,
         "\
-note  Untitled page: `content/post-2.md` is called by its opening words, `Post 2 opens here.`
+note  Untitled page: Statac names `content/post-2.md` by its opening words, `Post 2 opens here.`
   content/post-2.md, line 1
    1 │ ---
      │ ^^^
   Give it a `title`, or open its content with a `# heading`. \
-A folder whose pages go without titles says `pages.untitled: true`.
+If a folder's pages need no titles, write `pages.untitled: true` in its `index.md`.
   More: https://statac.dev/e/untitled-page/
 
 1 note: 1 untitled-page.
@@ -1794,12 +1798,12 @@ fn a_folder_whose_pages_go_untitled_is_called_by_its_dates_and_never_noted() {
     assert_eq!(
         said,
         "\
-note  Untitled page: `content/notes-1/note-1.md` is called by its opening words, `Note 1 opens here.`
+note  Untitled page: Statac names `content/notes-1/note-1.md` by its opening words, `Note 1 opens here.`
   content/notes-1/note-1.md, line 1
    1 │ ---
      │ ^^^
   Give it a `title`, or open its content with a `# heading`. \
-A folder whose pages go without titles says `pages.untitled: true`.
+If a folder's pages need no titles, write `pages.untitled: true` in its `index.md`.
   More: https://statac.dev/e/untitled-page/
 
 1 note: 1 untitled-page.
@@ -2503,7 +2507,7 @@ fn the_first_call_built_inside_html_is_said_once_for_the_site() {
     assert_eq!(
         said,
         "\
-note  Call in HTML: `@book` is built as a snippet
+note  Call in HTML: Statac builds `@book` as a snippet
   content/index.md, line 4
    4 │ <p>@book('Post 1')</p>
      │    ^^^^^^^^^^^^^^^

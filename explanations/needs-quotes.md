@@ -9,7 +9,7 @@ without quotes is a comment to YAML, so the field has no value.
 
 ```text
 error  Needs quotes: YAML reads `3.10` as 3.1
-  Write it as `"3.10"` to keep it as written.
+  Write it as `"3.10"` so YAML keeps it unchanged.
   More: https://statac.dev/e/needs-quotes/
 ```
 

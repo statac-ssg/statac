@@ -6,7 +6,7 @@ Lists on the site ask for feeds, and `statac.yaml` has no `feed_key`.
 
 ```text
 error  No feed key: `statac.yaml` has no `feed_key`
-  Add `feed_key: key` to `statac.yaml` and never change it: feed readers know each post by an id made from it.
+  Add `feed_key: key` to `statac.yaml` and never change it: feed readers know each post by an id Statac makes from it.
   More: https://statac.dev/e/no-feed-key/
 ```
 

@@ -1365,9 +1365,9 @@ fn webmentions_on_a_site_without_url_are_not_asked_for() {
     let (said, code, asked) = site.ask(&|_| panic!("nothing is asked for"));
     assert_eq!(
         said,
-        "note  No site URL: webmentions are left out until the site has a `url`\n  \
+        "note  No site URL: Statac leaves out webmentions until the site has a `url`\n  \
          statac.yaml, line 5\n   5 │ webmentions: true\n     │              ^^^^\n  \
-         Add the site's full URL to `statac.yaml`, as `url: https://example.org/`.\n  \
+         Add the site's full URL to `statac.yaml`, such as `url: https://example.org/`.\n  \
          More: https://statac.dev/e/no-site-url/\nNothing to fetch.\n"
     );
     assert_eq!(code, 0);

@@ -7,8 +7,8 @@ is `rss.xml` or `atom.xml`, or ends in `.rss`, `.atom` or `.json`.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Feed format mismatch: `rss.xml` is built as an Atom feed
-  It is built with `templates/feed.xml`; add `templates/rss.xml` to build it as an RSS feed.
+warning  Feed format mismatch: `templates/feed.xml` makes `rss.xml` an Atom feed
+  Add `templates/rss.xml` to build it as an RSS feed.
   More: https://statac.dev/e/feed-format-mismatch/
 ```
 

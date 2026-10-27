@@ -12,7 +12,7 @@ URL twice.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Language folder in pattern: `/en/{year}/{slug}/` is read from `/en/` already
+warning  Language folder in pattern: Statac reads `/en/{year}/{slug}/` from `/en/` already
   Write it as `/{year}/{slug}/`.
   More: https://statac.dev/e/language-folder-in-pattern/
 ```

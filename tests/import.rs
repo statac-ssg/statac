@@ -2277,7 +2277,7 @@ fn a_hugo_site_is_told_by_its_settings() {
     assert_eq!(
         refused(&broken, &top.join("new-4"), None),
         format!(
-            "error  Can't read `{}`: this line doesn't read as TOML",
+            "error  Can't read `{}`: Statac can't read this line as TOML",
             broken.join("hugo.toml").display()
         )
     );

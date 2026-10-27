@@ -9,7 +9,7 @@ such as `templates/rss.xml` opening with `<rss`.
 
 ```text
 note  Unused feed template: no list asks for a feed
-  Write `feed: true` in `statac.yaml` for the site's feed, built with `templates/feed.xml`.
+  Write `feed: true` in `statac.yaml` for `templates/feed.xml` to build the site's feed.
   More: https://statac.dev/e/unused-feed-template/
 ```
 
