@@ -784,13 +784,13 @@ fn language_path(tag: &str) -> String {
     format!("{}/{tag}.yaml", crate::language::FOLDER)
 }
 
-/// A language's file in a new site: the words Statac writes beside a
-/// page's writing, in English.
+/// A language's file in a new site: the text Statac adds to a page's
+/// content, in English.
 fn language_file() -> String {
     let english = crate::language::english();
     let mut text = String::from(
-        "# The words Statac itself shows alongside your writing, in English for you to translate: \
-         see /dates-and-languages/\n",
+        "# The text Statac adds to your content, in English for you to translate: \
+         see https://statac.dev/dates-and-languages/#language-files\n",
     );
     if let Some(label) = &english.back_to_the_text {
         text.push_str(&format!("back_to_the_text: {}\n", yaml::write::text(label)));
