@@ -6,7 +6,7 @@
   </picture>
 </h1>
 
-<p align="center">The friendly static site generator.</p>
+<p align="center">A friendlier static site generator for personal websites.</p>
 
 <p align="center">
   <a href="https://git.statac.dev/statac/statac/releases/latest"><img alt="The latest release" src="https://img.shields.io/gitea/v/release/statac/statac?gitea_url=https%3A%2F%2Fgit.statac.dev&label=release&color=CC4E00"></a>
@@ -20,7 +20,7 @@
 > Statac 0.7.0 is coming, with breaking changes: settings are renamed and
 > new sites start plainer. [What's changing](https://statac.dev/whats-changing/)
 
-Statac makes a website from a folder of writing. You write pages in
+Statac makes a website from a folder of Markdown. You write pages in
 Markdown, choose how they look with templates, and run `statac build`. It
 writes a site of plain files, ready to put on any web host. Statac adds
 no JavaScript to a page unless you ask it to.
@@ -28,33 +28,40 @@ no JavaScript to a page unless you ask it to.
 It is one program in one file, with no plugins and nothing else to
 install beside it.
 
-## When something is wrong, it says where
+## It explains itself
 
 <p align="center">
-  <img src=".github/readme/check.svg" alt="A terminal after statac check. A warning reads: Broken link: nothing is published at /about-us/. It names content/posts/post-1.md, line 5, shows the line with carets under the address, asks: Did you mean /about/? and ends with the link https://statac.dev/e/broken-link/" width="860">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/readme/debug-panel-dark.png">
+    <img src=".github/readme/debug-panel-light.png" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
+  </picture>
 </p>
 
-Statac explains itself. When something in the site is wrong, it shows you
-the file, the line and the exact text, says what it did or why it
-stopped, and links to a page about that kind of problem.
-`statac explain broken-link` shows the same explanation in the terminal.
+When something in the site is wrong, Statac shows you the file, the line
+and the exact text, says what it did or why it stopped, and links to a
+page about that kind of problem. `statac explain broken-link` shows the
+same explanation in the terminal.
+
+While `statac serve` runs, the
+[debug panel](https://statac.dev/debug-panel/) on every page shows the
+problems, each name a template can write, what it holds on that page and
+where its value came from.
 
 ## What you get
 
 - **Broken links caught.** Statac checks every
   [link within your site](https://statac.dev/problems/#links) before
   anything is published, including the heading it points to.
-- **Photographs handled.** Write an ordinary Markdown
-  [picture](https://statac.dev/pictures/). Readers get it in several
-  sizes, as AVIF with a JPEG fallback.
-- **Search built in.** A
-  [search page](https://statac.dev/search/) finds pages as the reader
-  types, from an index Statac writes at each build, with nothing outside
-  your site needed. `statac search` gives the same results in
-  the terminal.
-- **Sharing cards.** Statac draws a
-  [link preview](https://statac.dev/sharing-cards/) for every page, from
-  a layout you set, in fonts and over a background of your own.
+- **Images handled.** Write an ordinary Markdown
+  [image](https://statac.dev/images/). Readers get it in several sizes,
+  as AVIF with a JPEG fallback.
+- **Search built in.** Statac writes a search index at each build, and
+  a [search box](https://statac.dev/search/) you add to your site finds
+  pages as the reader types, with nothing outside your site needed.
+  `statac search` gives the same results in the terminal.
+- **Social cards.** Statac draws a
+  [social card](https://statac.dev/social-cards/) for each page, from a
+  layout you set, in fonts and over a background of your own.
 - **Bring your site with you.** `statac import` brings a Hugo, Jekyll,
   Zola or Eleventy site across, and lists anything it couldn't bring.
   See [Arriving from another tool](https://statac.dev/import/).

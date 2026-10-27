@@ -13,7 +13,7 @@ most.
 ## What is a security problem
 
 Statac reads files its user may not have written: a site being imported,
-a picture, a template, what it fetches from another site. It is a
+an image, a template, what it fetches from another site. It is a
 security problem where such a file makes Statac read or write outside
 the folders it was given, run a command the site's settings don't name,
 or send anything anywhere the site didn't ask for.
