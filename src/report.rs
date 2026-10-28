@@ -1180,6 +1180,9 @@ const BLUE: &str = "34";
 /// where it doesn't.
 const BRAND: (&str, &str) = ("2;247;108;20", "5;208");
 const IN_BACKTICKS: (&str, &str) = ("2;215;95;0", "5;166");
+/// Black for a badge's text, fixed rather than the palette's `30`, which a
+/// terminal that brightens bold text shows as grey.
+const BLACK: (&str, &str) = ("2;0;0;0", "5;16");
 
 /// Colour is decoration: with it off, the text alone is written.
 #[derive(Copy, Clone)]
@@ -1215,7 +1218,7 @@ impl Paint {
 
     /// Black on Statac's orange, for its name.
     fn brand_chip(self) -> String {
-        format!("1;30;48;{}", self.pick(BRAND))
+        format!("1;38;{};48;{}", self.pick(BLACK), self.pick(BRAND))
     }
 
     /// Statac's orange as a foreground colour.
@@ -1229,12 +1232,13 @@ impl Paint {
         if !self.on {
             return word.to_owned();
         }
+        let black = self.pick(BLACK);
         let style = match severity {
-            Severity::Error => "1;97;41",
-            Severity::Warning => "1;30;43",
-            Severity::Note => "1;30;46",
+            Severity::Error => "1;97;41".to_owned(),
+            Severity::Warning => format!("1;38;{black};43"),
+            Severity::Note => format!("1;38;{black};46"),
         };
-        self.paint(style, &format!(" {word} "))
+        self.paint(&style, &format!(" {word} "))
     }
 
     /// A sentence in `style`, each name in backticks picked out in the

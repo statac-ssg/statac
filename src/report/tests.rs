@@ -443,7 +443,34 @@ fn a_run_opens_with_statacs_name_only_where_there_is_colour() {
     assert_eq!(badge(false, "build"), "");
     let opened = badge(true, "build");
     assert!(opened.contains(" Statac \x1b[0m \x1b[1mbuild\x1b[0m\n\n"));
-    assert!(opened.starts_with("\x1b[1;30;48;"), "{opened:?}");
+    assert!(
+        opened.starts_with("\x1b[1;38;2;0;0;0;48;2;247;108;20m")
+            || opened.starts_with("\x1b[1;38;5;16;48;5;208m"),
+        "{opened:?}"
+    );
+}
+
+#[test]
+fn a_badge_is_written_in_fixed_black_where_its_text_is_black() {
+    for (every, black, brand) in [(true, "2;0;0;0", "2;247;108;20"), (false, "5;16", "5;208")] {
+        let paint = Paint { on: true, every };
+        assert_eq!(paint.brand_chip(), format!("1;38;{black};48;{brand}"));
+        assert_eq!(
+            paint.chip(Severity::Warning, "warning"),
+            format!("\x1b[1;38;{black};43m warning \x1b[0m")
+        );
+        assert_eq!(
+            paint.chip(Severity::Note, "note"),
+            format!("\x1b[1;38;{black};46m note \x1b[0m")
+        );
+        assert_eq!(
+            paint.chip(Severity::Error, "error"),
+            "\x1b[1;97;41m error \x1b[0m"
+        );
+        let plain = Paint { on: false, every };
+        assert_eq!(plain.chip(Severity::Warning, "warning"), "warning");
+        assert_eq!(plain.chip(Severity::Note, "note"), "note");
+    }
 }
 
 #[test]
