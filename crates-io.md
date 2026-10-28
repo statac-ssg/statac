@@ -34,8 +34,8 @@ cargo install --locked statac
 ```
 
 Cargo builds Statac from its source, which needs Rust 1.99 or later, a
-C compiler, CMake and Perl, and NASM on a machine with an Intel or AMD
-processor.
+C and C++ compiler, CMake and Perl, and NASM on a machine with an Intel
+or AMD processor.
 
 [Installing](https://statac.dev/install/) has the other ways: Homebrew on
 a Mac, a script on Linux, Scoop on Windows, and a package for each kind

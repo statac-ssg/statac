@@ -115,6 +115,19 @@ fn missing_tool() -> Option<String> {
             install("CMake", "https://cmake.org/download/")
         ));
     }
+    if let Some(compiler) = missing_cxx() {
+        let place = if compiler.components().count() > 1 {
+            ""
+        } else {
+            " on PATH"
+        };
+        return Some(format!(
+            "C++ compiler not found: building libaom needs one, and there is no {}{place}. \
+             Install one, such as g++, with the system's package manager, or set CXX to the \
+             compiler to use.",
+            compiler.display()
+        ));
+    }
     // CMake's FindPerl also looks in these on Windows.
     let perl_folders: &[PathBuf] = if cfg!(windows) {
         &[
@@ -149,23 +162,12 @@ fn missing_tool() -> Option<String> {
 }
 
 fn cmake_found() -> bool {
-    // Where one of these is set, the cmake crate runs the program it names.
-    let target = env::var("TARGET").unwrap();
-    let kind = if env::var("HOST").unwrap() == target {
-        "HOST"
-    } else {
-        "TARGET"
-    };
-    let named = [
-        format!("CMAKE_{target}"),
-        format!("CMAKE_{}", target.replace('-', "_")),
-        format!("{kind}_CMAKE"),
-        "CMAKE".to_string(),
-    ];
-    if named.iter().any(|name| env::var_os(name).is_some()) {
+    // Where this is set, the cmake crate runs the program it names.
+    if cmake_crate_reads("CMAKE") {
         return true;
     }
     // Without one on PATH, it runs the copy Visual Studio carries.
+    let target = env::var("TARGET").unwrap();
     found("cmake", &[])
         || cfg!(windows)
             && cc::windows_registry::find_tool(&target, "devenv").is_some_and(|devenv| {
@@ -175,6 +177,79 @@ fn cmake_found() -> bool {
                     .canonicalize()
                     .is_ok()
             })
+}
+
+/// The C++ compiler CMake would be given and can't find. libaom's project
+/// declares C++ as well as C, and CMake stops without both.
+fn missing_cxx() -> Option<PathBuf> {
+    // A toolchain file names the compilers itself.
+    if cmake_crate_reads("CMAKE_TOOLCHAIN_FILE") {
+        return None;
+    }
+    // Outside Windows the cmake crate hands CMake the compiler cc finds, CXX
+    // where that is set. Where cc finds none, the cmake crate stops with cc's
+    // own message.
+    let compiler = cc::Build::new()
+        .cpp(true)
+        .cargo_metadata(false)
+        .cargo_warnings(false)
+        .try_get_compiler()
+        .ok()?;
+    let path = compiler.path();
+    if compiler_found(path) {
+        return None;
+    }
+    // On Windows the cmake crate hands CMake a compiler only for MSVC with
+    // Ninja, and otherwise CMake looks in Visual Studio or on PATH itself.
+    if cfg!(windows) {
+        let target = env::var("TARGET").unwrap();
+        if cc::windows_registry::find_tool(&target, "cl.exe").is_some()
+            || ["c++", "g++", "clang++", "cl"]
+                .into_iter()
+                .any(|name| found(name, &[]))
+        {
+            return None;
+        }
+    }
+    Some(path.to_path_buf())
+}
+
+/// Whether a variable the cmake crate reads is set under any of its names.
+fn cmake_crate_reads(name: &str) -> bool {
+    let target = env::var("TARGET").unwrap();
+    let kind = if env::var("HOST").unwrap() == target {
+        "HOST"
+    } else {
+        "TARGET"
+    };
+    [
+        format!("{name}_{target}"),
+        format!("{name}_{}", target.replace('-', "_")),
+        format!("{kind}_{name}"),
+        name.to_string(),
+    ]
+    .iter()
+    .any(|var| env::var_os(var).is_some())
+}
+
+fn compiler_found(path: &Path) -> bool {
+    if path.components().count() > 1 {
+        return path.is_file();
+    }
+    let mut file = path.as_os_str().to_owned();
+    file.push(env::consts::EXE_SUFFIX);
+    // CMake looks for a bare name in its usual prefixes too, past PATH.
+    let prefixes: &[&str] = if cfg!(unix) {
+        &["/usr/local", "/usr", "/", "/usr/X11R6", "/usr/pkg", "/opt"]
+    } else {
+        &[]
+    };
+    let folders = prefixes
+        .iter()
+        .flat_map(|prefix| ["bin", "sbin"].map(|folder| Path::new(prefix).join(folder)));
+    env::split_paths(&env::var_os("PATH").unwrap_or_default())
+        .chain(folders)
+        .any(|folder| folder.join(path).is_file() || folder.join(&file).is_file())
 }
 
 fn found(program: &str, folders: &[PathBuf]) -> bool {
