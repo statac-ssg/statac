@@ -442,23 +442,23 @@ impl Resized<'_> {
         let encode_error = |message: String| Error::Encode { format, message };
         match format {
             Format::Avif => {
-                let image = avif_aom_sys::Image {
+                let image = statac_avif_sys::Image {
                     pixels,
                     width,
                     height,
                     layout: if self.alpha {
-                        avif_aom_sys::Layout::Rgba
+                        statac_avif_sys::Layout::Rgba
                     } else {
-                        avif_aom_sys::Layout::Rgb
+                        statac_avif_sys::Layout::Rgb
                     },
                 };
-                let avif = avif_aom_sys::Settings {
+                let avif = statac_avif_sys::Settings {
                     speed: settings.avif_speed,
                     quality: settings.avif_quality,
                     alpha_quality: settings.avif_alpha_quality,
                     threads: settings.avif_threads,
                 };
-                avif_aom_sys::encode(&image, &avif).map_err(|e| encode_error(e.to_string()))
+                statac_avif_sys::encode(&image, &avif).map_err(|e| encode_error(e.to_string()))
             }
             Format::Jpeg => {
                 let too_large = || encode_error("too large for JPEG".into());

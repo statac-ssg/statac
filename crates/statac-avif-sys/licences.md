@@ -1,4 +1,4 @@
-# Code avif-aom-sys carries
+# Code statac-avif-sys carries
 
 `vendor/avif` is libavif and `vendor/avif/ext/aom` is libaom, each from
 its release tarball less the folders an encode-only build does not need.

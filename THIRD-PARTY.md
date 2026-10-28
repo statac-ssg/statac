@@ -24,7 +24,7 @@ Statac's own code is offered under MIT or Apache-2.0, at your choice. A built `s
 
 ### C libraries built from source kept here
 
-The paths are in `crates/avif-aom-sys/`.
+The paths are in `crates/statac-avif-sys/`.
 
 - libavif 1.4.2: BSD-2-Clause. https://github.com/AOMediaCodec/libavif/archive/refs/tags/v1.4.2.tar.gz. Licence: `vendor/avif/LICENSE`, which also gives the licences of the files below. [3]
 - `vendor/avif/src/obu.c`, from dav1d: BSD-2-Clause. `vendor/avif/LICENSE` [3]
@@ -594,7 +594,7 @@ SPDX-License-Identifier: Unicode-3.0
 
 ### [3]
 
-`crates/avif-aom-sys/vendor/avif/LICENSE`.
+`crates/statac-avif-sys/vendor/avif/LICENSE`.
 
 ````text
 Copyright 2019 Joe Drago. All rights reserved.
@@ -988,7 +988,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### [4]
 
-`crates/avif-aom-sys/vendor/avif/ext/aom/LICENSE`.
+`crates/statac-avif-sys/vendor/avif/ext/aom/LICENSE`.
 
 ````text
 Copyright (c) 2016, Alliance for Open Media. All rights reserved.
@@ -1021,7 +1021,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ### [5]
 
-`crates/avif-aom-sys/vendor/avif/ext/aom/PATENTS`.
+`crates/statac-avif-sys/vendor/avif/ext/aom/PATENTS`.
 
 ````text
 Alliance for Open Media Patent License 1.0
@@ -1135,7 +1135,7 @@ Alliance for Open Media Patent License 1.0
 
 ### [6]
 
-`crates/avif-aom-sys/vendor/avif/ext/aom/third_party/fastfeat/LICENSE`.
+`crates/statac-avif-sys/vendor/avif/ext/aom/third_party/fastfeat/LICENSE`.
 
 ````text
 Copyright (c) 2006, 2008 Edward Rosten
@@ -1172,7 +1172,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### [7]
 
-`crates/avif-aom-sys/vendor/avif/ext/aom/third_party/libyuv/LICENSE`.
+`crates/statac-avif-sys/vendor/avif/ext/aom/third_party/libyuv/LICENSE`.
 
 ````text
 Copyright 2011 The LibYuv Project Authors. All rights reserved.
@@ -1208,7 +1208,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### [8]
 
-`crates/avif-aom-sys/vendor/avif/ext/aom/third_party/vector/LICENSE`.
+`crates/statac-avif-sys/vendor/avif/ext/aom/third_party/vector/LICENSE`.
 
 ````text
 The MIT License (MIT)
@@ -1234,7 +1234,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### [9]
 
-`crates/avif-aom-sys/vendor/avif/ext/aom/third_party/x86inc/LICENSE`.
+`crates/statac-avif-sys/vendor/avif/ext/aom/third_party/x86inc/LICENSE`.
 
 ````text
 Copyright (C) 2005-2012 x264 project

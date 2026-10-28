@@ -1,10 +1,10 @@
 //! Times encoding a 1200 by 800 picture drawn in code, as RGB at speed 8,
 //! quality 67, on one thread:
-//! `cargo run --release -p avif-aom-sys --example encode_timing`.
+//! `cargo run --release -p statac-avif-sys --example encode_timing`.
 
 use std::time::Instant;
 
-use avif_aom_sys::{Image, Layout, Settings, build_facts, encode, version};
+use statac_avif_sys::{Image, Layout, Settings, build_facts, encode, version};
 
 const WIDTH: u32 = 1200;
 const HEIGHT: u32 = 800;

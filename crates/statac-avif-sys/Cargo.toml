@@ -1,11 +1,11 @@
 [package]
-name = "avif-aom-sys"
+name = "statac-avif-sys"
 version = "0.1.0"
 edition = "2024"
 publish = false
 links = "avif"
 description = "libavif 1.4.2 with libaom 3.15.1, built from vendored source, encode only"
-license = "MIT OR Apache-2.0"
+license = "(MIT OR Apache-2.0) AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MIT"
 repository = "https://git.statac.dev/statac/statac"
 
 [build-dependencies]

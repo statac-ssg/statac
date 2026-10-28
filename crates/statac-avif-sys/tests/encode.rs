@@ -1,6 +1,6 @@
 //! Encodes pictures drawn in code and reads the boxes of the files written.
 
-use avif_aom_sys::{Error, Image, Layout, Settings, build_facts, encode, version};
+use statac_avif_sys::{Error, Image, Layout, Settings, build_facts, encode, version};
 
 const SETTINGS: Settings = Settings {
     speed: 10,

@@ -445,9 +445,9 @@ fn list() -> String {
 
     out.push_str(
         "\n### C libraries built from source kept here\n\n\
-         The paths are in `crates/avif-aom-sys/`.\n\n",
+         The paths are in `crates/statac-avif-sys/`.\n\n",
     );
-    recorded(&mut out, &mut texts, "crates/avif-aom-sys", apache);
+    recorded(&mut out, &mut texts, "crates/statac-avif-sys", apache);
 
     out.push_str(
         "\n### C libraries a crate carries\n\n\

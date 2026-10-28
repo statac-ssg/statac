@@ -929,7 +929,7 @@ fn a_key_changes_with_the_source_the_width_and_the_format() {
 fn the_settings_are_as_documented() {
     let settings = Settings::default();
     assert_eq!(settings.pipeline, PIPELINE);
-    assert_eq!(settings.avif_encoder, avif_aom_sys::version());
+    assert_eq!(settings.avif_encoder, statac_avif_sys::version());
     let avif = (
         settings.avif_speed,
         settings.avif_quality,

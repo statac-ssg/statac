@@ -252,7 +252,7 @@ pub(crate) const PIPELINE: u32 = 1;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub(crate) pipeline: u32,
-    /// The AVIF encoder's [`avif_aom_sys::version`].
+    /// The AVIF encoder's [`statac_avif_sys::version`].
     pub(crate) avif_encoder: String,
     pub(crate) avif_speed: u8,
     pub(crate) avif_quality: u8,
@@ -276,7 +276,7 @@ impl Default for Settings {
     fn default() -> Settings {
         Settings {
             pipeline: PIPELINE,
-            avif_encoder: avif_aom_sys::version(),
+            avif_encoder: statac_avif_sys::version(),
             avif_speed: 8,
             avif_quality: 67,
             avif_alpha_quality: 90,

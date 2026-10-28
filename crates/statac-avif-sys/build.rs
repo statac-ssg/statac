@@ -7,6 +7,13 @@ fn main() {
     println!("cargo:rerun-if-changed=shim/shim.c");
     println!("cargo:rerun-if-changed=vendor");
 
+    // docs.rs has no CMake, and documenting the bindings needs nothing built.
+    if env::var_os("DOCS_RS").is_some() {
+        println!("cargo:rustc-env=AVIF_AOM_BUILD_TYPE=");
+        println!("cargo:rustc-env=AVIF_AOM_C_FLAGS=");
+        return;
+    }
+
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let aom_source = manifest.join("vendor/avif/ext/aom");
     let aom_lists = aom_source.join("CMakeLists.txt");
@@ -15,6 +22,13 @@ fn main() {
             "cargo::error=the libaom source is missing from the crate: {} not found",
             aom_lists.display()
         );
+        return;
+    }
+
+    // Otherwise a missing CMake shows as a command that failed to start, and a
+    // missing Perl or NASM far into CMake's output.
+    if let Some(missing) = missing_tool() {
+        println!("cargo::error={missing}");
         return;
     }
 
@@ -87,6 +101,87 @@ fn main() {
     if target_os == "linux" {
         println!("cargo:rustc-link-lib=m");
     }
+}
+
+/// The first tool the build needs and can't find, looking where the cmake
+/// crate and libaom's CMake files look.
+fn missing_tool() -> Option<String> {
+    let install = |tool: &str, page: &str| {
+        format!("Install {tool} from {page} or with the system's package manager.")
+    };
+    if !cmake_found() {
+        return Some(format!(
+            "CMake not found on PATH: building libavif and libaom needs it. {}",
+            install("CMake", "https://cmake.org/download/")
+        ));
+    }
+    // CMake's FindPerl also looks in these on Windows.
+    let perl_folders: &[PathBuf] = if cfg!(windows) {
+        &[
+            PathBuf::from(r"C:\Perl\bin"),
+            PathBuf::from(r"C:\Strawberry\perl\bin"),
+        ]
+    } else {
+        &[]
+    };
+    if !found("perl", perl_folders) {
+        return Some(format!(
+            "Perl not found on PATH: building libaom needs it. {}",
+            install("Perl", "https://www.perl.org/get.html")
+        ));
+    }
+    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    if arch == "x86" || arch == "x86_64" {
+        // libaom takes yasm in place of NASM, and looks in these folders too.
+        let hints: Vec<PathBuf> = ["NASM_PATH", "YASM_PATH"]
+            .into_iter()
+            .filter_map(env::var_os)
+            .map(PathBuf::from)
+            .collect();
+        if !found("nasm", &hints) && !found("yasm", &hints) {
+            return Some(format!(
+                "NASM not found on PATH: building libaom for {arch} needs it. {}",
+                install("NASM", "https://www.nasm.us/")
+            ));
+        }
+    }
+    None
+}
+
+fn cmake_found() -> bool {
+    // Where one of these is set, the cmake crate runs the program it names.
+    let target = env::var("TARGET").unwrap();
+    let kind = if env::var("HOST").unwrap() == target {
+        "HOST"
+    } else {
+        "TARGET"
+    };
+    let named = [
+        format!("CMAKE_{target}"),
+        format!("CMAKE_{}", target.replace('-', "_")),
+        format!("{kind}_CMAKE"),
+        "CMAKE".to_string(),
+    ];
+    if named.iter().any(|name| env::var_os(name).is_some()) {
+        return true;
+    }
+    // Without one on PATH, it runs the copy Visual Studio carries.
+    found("cmake", &[])
+        || cfg!(windows)
+            && cc::windows_registry::find_tool(&target, "devenv").is_some_and(|devenv| {
+                devenv
+                    .path()
+                    .join(r"..\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe")
+                    .canonicalize()
+                    .is_ok()
+            })
+}
+
+fn found(program: &str, folders: &[PathBuf]) -> bool {
+    let file = format!("{program}{}", env::consts::EXE_SUFFIX);
+    env::split_paths(&env::var_os("PATH").unwrap_or_default())
+        .chain(folders.iter().cloned())
+        .any(|folder| folder.join(&file).is_file())
 }
 
 fn record_build_facts(cache: &Path) {
