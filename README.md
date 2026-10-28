@@ -73,7 +73,7 @@ On a Mac, with [Homebrew](https://brew.sh):
 
 ```sh
 brew tap statac/statac https://git.statac.dev/statac/homebrew-statac
-brew install statac
+brew install statac/statac/statac
 ```
 
 On Linux:
