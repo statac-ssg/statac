@@ -9,7 +9,7 @@ list and gives the reason, which is one of these:
 - A `feed:` line asks for a feed of a list where nothing is dated, so the
   feed would have nothing in it.
 - The list has no list page, such as a folder with no `index.md`, or its
-  list page has `index_page: false`. A feed links to its list's page and
+  list page has `index_page: false`. A feed links to its list page and
   takes its id from it, so Statac doesn't write a feed with no page to
   link to.
 

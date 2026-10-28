@@ -1,5 +1,7 @@
 # The site in a template
 
+Summary: Every value a template can read on the site, such as its title, posts, tags and data.
+
 What a template reads on the site, after `site.`. A template reads a
 custom setting the same way, such as `site.tagline`. On a site in
 several languages, each value is the one for the page's language.

@@ -65,6 +65,8 @@ fn each_name_has_a_heading_of_its_own_and_each_group_is_listed() {
     let index = text("index.md");
     for &group in Group::ALL {
         let page = text(&format!("{}.md", group.name()));
+        let summary = format!("\nsummary: {}\n", group.summary());
+        assert!(page.contains(&summary), "{group:?}");
         assert!(page.contains(group.about()), "{group:?}");
         for described in group.described() {
             let id = reference_pages::id(&described.name);

@@ -1,5 +1,7 @@
 # A list in a template
 
+Summary: Every value a template can read on a folder, a tag, a series or another list, such as its posts and feed.
+
 What a template reads on a list: a folder, a tag, a series, or a list a
 page makes with `posts:` or `each:`. A template reaches lists through
 `page.list`, `page.folder`, `page.tags`, `site.tags` and the like, and
@@ -14,22 +16,22 @@ More: https://statac.dev/lists/#lists-in-templates
 
 ## `title`
 
-The title of the list's page. If the list has no page, or its page has
-no title, it is the site's title for the site's own list, and the list's
+The title of the list page. If there is no list page, or it has no
+title, it is the site's title for the site's own list, and the list's
 name for any other.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `url`
 
-The URL of the list's page. If the list has no page, `url` has no
+The URL of the list page. If the list has no list page, `url` has no
 value.
 
 More: https://statac.dev/lists/#lists-in-templates
 
 ## `page`
 
-The list's page. If the list has no page, `page` has no value.
+The list page. If the list has no list page, `page` has no value.
 
 More: https://statac.dev/lists/#lists-in-templates
 
@@ -47,8 +49,8 @@ More: https://statac.dev/lists/#lists-in-templates
 
 ## `pager`
 
-The list's page and each of its paginated pages, first to last, each
-with its `number` and `url`. Empty if the list's page isn't published.
+The list page and each of its paginated pages, first to last, each
+with its `number` and `url`. Empty if the list page isn't published.
 
 More: https://statac.dev/lists/#lists-in-templates
 

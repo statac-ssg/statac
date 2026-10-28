@@ -1,5 +1,7 @@
 # Front matter fields
 
+Summary: Every front matter field Statac reads, and what each one does.
+
 Each field of a page's front matter that Statac reads. Any other field
 is a custom field, which templates read as `page.<name>`.
 
@@ -117,8 +119,9 @@ Which list `page.previous` and `page.next` move through: `site`, the
 site's own list; `series`, the page's series; `folder`, the outermost
 folder holding the page below the top of `content/`; or `false` for
 none. Without it, a page moves through its series, or else that folder.
-It acts only on pages that aren't list pages: a list page's
-`page.previous` and `page.next` are always its list's own pages.
+It acts only on pages that aren't list pages: on a list page and its
+paginated pages, `page.previous` and `page.next` are the previous and
+next page of the list.
 
 More: https://statac.dev/lists/#previous-and-next
 
@@ -143,7 +146,7 @@ More: https://statac.dev/data/#pages-made-from-data
 The list's order: `newest first`, `oldest first`, or the names of its
 pages in the order you want. Cascaded with `pages.order`, `newest first`
 or `oldest first` reaches the lists of the folders inside, but not the
-folder's own list. A list of names works only on the list's own page, and
+folder's own list. A list of names works only on the list page, and
 `pages.order` can't cascade one.
 
 More: https://statac.dev/lists/#order
@@ -165,7 +168,7 @@ More: https://statac.dev/lists/#pages-of-a-list
 
 ## `index_page`
 
-`false` stops Statac publishing the list's page and its paginated pages.
+`false` stops Statac publishing the list page and its paginated pages.
 Templates can still use the list. Cascaded with `pages.index_page`, it
 reaches the list pages of the folders inside, but not the folder's
 own.
@@ -174,7 +177,7 @@ More: https://statac.dev/lists/#a-lists-page
 
 ## `feed`
 
-`true` gives the list a feed, published beside the list's page as
+`true` gives the list a feed, published beside the list page as
 `feed.xml`. A file name or a URL publishes the feed there instead. A
 list of them gives the list a feed at each, and templates link to the
 first. A list has no feed unless a `feed:` line asks for one. Cascaded

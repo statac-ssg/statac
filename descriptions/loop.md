@@ -1,5 +1,7 @@
 # A loop in a template
 
+Summary: Every value a template can read inside a for loop, such as the item's number and whether it is the last.
+
 What a template reads on `loop` inside a `for` loop.
 
 ## `index`

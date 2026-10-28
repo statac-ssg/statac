@@ -3,8 +3,9 @@
 //! `descriptions/`: an editor's hover and completion say it, the debug
 //! panel shows it beside each name, and the docs list it.
 //!
-//! Each file names its group in a `#` heading and says what the group is
-//! in the paragraph after it. Each name follows as a `##` heading holding
+//! Each file names its group in a `#` heading, gives it a `Summary:` line
+//! in plain text for the docs to show under the heading, and says what the
+//! group is in the paragraph after it. Each name follows as a `##` heading holding
 //! it in backticks, its description, and a `More:` line with the docs'
 //! URL where the docs say more.
 
@@ -72,6 +73,7 @@ pub struct Described {
 /// One file, read.
 struct Read {
     title: String,
+    summary: String,
     about: String,
     described: Vec<Described>,
 }
@@ -87,6 +89,11 @@ impl Group {
     /// What the group is called, as its file's heading has it.
     pub fn title(self) -> &'static str {
         &self.read().title
+    }
+
+    /// The group in a line of plain text, from its file's `Summary:` line.
+    pub fn summary(self) -> &'static str {
+        &self.read().summary
     }
 
     /// What the group's file says of it before the first name.
@@ -114,6 +121,7 @@ fn read(group: Group) -> Read {
     let title = (lines.next())
         .and_then(|line| line.strip_prefix("# "))
         .unwrap_or_else(|| panic!("descriptions/{file}.md opens with no heading"));
+    let mut summary: Option<&str> = None;
     let mut about: Vec<&str> = Vec::new();
     let mut described: Vec<Described> = Vec::new();
     let mut text: Vec<&str> = Vec::new();
@@ -133,6 +141,11 @@ fn read(group: Group) -> Read {
             let last =
                 last.unwrap_or_else(|| panic!("descriptions/{file}.md: More: before a name"));
             last.more = Some(more.trim().to_owned());
+        } else if let Some(line) = line.strip_prefix("Summary: ") {
+            match described.is_empty() && summary.is_none() {
+                true => summary = Some(line.trim()),
+                false => panic!("descriptions/{file}.md: Summary: after a name, or twice"),
+            }
         } else if !line.trim().is_empty() {
             match described.is_empty() {
                 true => about.push(line.trim()),
@@ -143,6 +156,9 @@ fn read(group: Group) -> Read {
     close(&mut described, &mut text);
     Read {
         title: title.to_owned(),
+        summary: summary
+            .unwrap_or_else(|| panic!("descriptions/{file}.md has no Summary: line"))
+            .to_owned(),
         about: about.join(" "),
         described,
     }
@@ -233,10 +249,15 @@ mod tests {
     #[test]
     fn descriptions_follow_the_wording_guide() {
         for &group in Group::ALL {
-            let about = std::iter::once((group.title(), group.about(), None));
+            // The docs show the summary as plain text, where backticks would show.
+            assert!(!group.summary().contains('`'), "{}", group.name());
+            let about = [
+                ("summary", group.summary(), None),
+                (group.title(), group.about(), None),
+            ];
             let all = (group.described().iter())
                 .map(|d| (d.name.as_str(), d.text.as_str(), d.more.as_deref()));
-            for (name, text, more) in about.chain(all) {
+            for (name, text, more) in about.into_iter().chain(all) {
                 let name = format!("{}: {name}", group.name());
                 assert!(text.ends_with('.'), "{name}");
                 assert!(

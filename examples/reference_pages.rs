@@ -114,7 +114,7 @@ fn entry(described: &Described) -> String {
 fn page(group: Group) -> String {
     let mut out = front_matter(
         group.title(),
-        None,
+        Some(group.summary()),
         None,
         &format!("descriptions/{}.md", group.name()),
     );

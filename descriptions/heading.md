@@ -1,5 +1,7 @@
 # A heading in a template
 
+Summary: Every value a template can read on a heading in a page's table of contents.
+
 What a template reads on each heading in `page.toc`, and in each
 heading's `headings`.
 

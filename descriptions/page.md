@@ -1,5 +1,7 @@
 # A page in a template
 
+Summary: Every value a template can read on a page, from its title and URL to its images and webmentions.
+
 What a template reads on a page: after `page.`, or after any other name
 that stands for a page, such as `post.title` or `page.next.url`. A
 template reads a custom field the same way, such as `page.isbn`.
@@ -162,15 +164,16 @@ More: https://statac.dev/lists/#lists-in-templates
 ## `previous`
 
 The page before this one in the list `neighbours` chooses. On a list
-page, it is the list's page before this one. On the first page, it has
-no value.
+page, it is the previous page of the list. On the first page, it has no
+value.
 
 More: https://statac.dev/lists/#previous-and-next
 
 ## `next`
 
 The page after this one in the list `neighbours` chooses. On a list
-page, it is the list's next page. On the last page, it has no value.
+page, it is the next page of the list. On the last page, it has no
+value.
 
 More: https://statac.dev/lists/#previous-and-next
 
@@ -190,8 +193,8 @@ More: https://statac.dev/data/#pages-made-from-data
 ## `source`
 
 The file Statac read the page from, starting from the site's folder:
-`content/posts/post-1.md`. A page Statac makes, such as a tag's page,
-has no `source`.
+`content/posts/post-1.md`. A page Statac makes, such as a tag's list
+page, has no `source`.
 
 ## `og_title`
 
@@ -362,7 +365,7 @@ More: https://statac.dev/lists/#order
 
 ## `numbered`
 
-On a folder's page, its `numbered`, as the page writes it.
+On a folder's list page, its `numbered`, as the page writes it.
 
 More: https://statac.dev/lists/#numbered-folders
 

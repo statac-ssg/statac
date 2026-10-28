@@ -1,5 +1,7 @@
 # Filters
 
+Summary: Every filter a template can use, and what each one does.
+
 Each filter a template can write after `|`, such as
 `{{ page.date | moment }}`: Statac's own, and the template engine's.
 

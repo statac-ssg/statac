@@ -1,5 +1,7 @@
 # Functions
 
+Summary: Every function a template can call, and what each one does.
+
 Each function a template can call by its name, such as
 `{{ css("site.css") }}`: Statac's own, and the template engine's. A
 template calls a snippet the same way, by its file's name.

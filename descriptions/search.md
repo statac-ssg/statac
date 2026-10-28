@@ -1,5 +1,7 @@
 # Search in a template
 
+Summary: Every value a template can read on the search box, and on the search form that works without JavaScript.
+
 What a template reads on the search box that `page.search_box()`
 returns, and on the search form `site.search_without_javascript`
 describes.

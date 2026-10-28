@@ -1,5 +1,7 @@
 # Webmentions in a template
 
+Summary: Every value a template can read on a page's webmentions, and on each comment or reaction.
+
 What a template reads on `page.webmentions`, and on each mention in it.
 Every value is plain text, never HTML.
 

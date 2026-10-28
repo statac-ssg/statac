@@ -3232,12 +3232,12 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Give a page in it a `date:`, or take the `feed:` line out.".into()
             }
             Unwritten::NoPage => format!(
-                "A feed links to its list's page; add an `index.md` to give {} one, or take the \
+                "A feed links to its list page; add an `index.md` to give {} one, or take the \
                  `feed:` line out.",
                 if *more == 0 { "the list" } else { "each list" }
             ),
             Unwritten::PageUnpublished => format!(
-                "A feed links to its list's page; take out `index_page: false` to publish {}, or \
+                "A feed links to its list page; take out `index_page: false` to publish {}, or \
                  take the `feed:` line out.",
                 if *more == 0 { "it" } else { "them" }
             ),
@@ -6280,7 +6280,7 @@ mod tests {
                 not_written((Word::Folder, "posts".into()), 0, Unwritten::NoPage),
                 "Feed not written: the folder `content/posts/` has no list page",
                 Some(
-                    "A feed links to its list's page; add an `index.md` to give the list one, \
+                    "A feed links to its list page; add an `index.md` to give the list one, \
                      or take the `feed:` line out.",
                 ),
             ),
@@ -6289,7 +6289,7 @@ mod tests {
                 "Feed not written: the folder `content/posts/` and 2 other lists have no list \
                  page",
                 Some(
-                    "A feed links to its list's page; add an `index.md` to give each list one, \
+                    "A feed links to its list page; add an `index.md` to give each list one, \
                      or take the `feed:` line out.",
                 ),
             ),
@@ -6301,7 +6301,7 @@ mod tests {
                 ),
                 "Feed not written: the folder `content/notes/` has `index_page: false`",
                 Some(
-                    "A feed links to its list's page; take out `index_page: false` to publish \
+                    "A feed links to its list page; take out `index_page: false` to publish \
                      it, or take the `feed:` line out.",
                 ),
             ),

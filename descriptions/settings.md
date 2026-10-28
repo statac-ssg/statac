@@ -1,5 +1,7 @@
 # Settings
 
+Summary: Every setting Statac reads in statac.yaml, and what each one does.
+
 Each line of `statac.yaml` that Statac reads. Any other line is a custom
 setting, which templates read as `site.<name>`.
 

@@ -1,5 +1,7 @@
 # Tests
 
+Summary: Every test a template can use, and what each one checks.
+
 Each test a template can write after `is`, such as
 `{% if page.title is defined %}`, or name in `select` and `reject`. They
 are the template engine's. `is not` reverses a test.

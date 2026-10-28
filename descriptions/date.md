@@ -1,5 +1,7 @@
 # A date in a template
 
+Summary: The year, month, day and weekday a template can read on a date.
+
 What a template reads on a date, such as `page.date.year`.
 `{{ page.date }}` on its own shows the date in the site's date format.
 A custom field declared `when` can be a year alone, a year and a month,

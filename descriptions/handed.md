@@ -1,5 +1,7 @@
 # Names a template is handed
 
+Summary: The names a template or snippet can use on their own, and which templates are handed each one.
+
 The names a template, a snippet or a file in `snippets/markdown/` reads
 on their own, before any dot. Statac hands every template `page` and
 `site`, and each of the others only where its entry says.
@@ -7,8 +9,9 @@ on their own, before any dot. Statac hands every template `page` and
 ## `page`
 
 The page being built. In a snippet too, it is the page being built, not
-a page the call hands the snippet. In a feed's template, it is the
-list's page, and in `redirect.html`, the page whose `redirect_to` or
+a page the call hands the snippet. In a feed's template, it is the list
+page the feed links to, and in `redirect.html`, the page whose
+`redirect_to` or
 `redirect_from` makes the redirect.
 
 More: https://statac.dev/templates/#handed

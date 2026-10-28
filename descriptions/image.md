@@ -1,5 +1,7 @@
 # An image in a template
 
+Summary: Every value a template can read on an image, such as its resized copies, size and alt text.
+
 What a template reads on the image that `page.image` returns, and on
 each image from `page.images`, a video's `thumbnail`, a mention's
 `avatar`, and `image` in `image.html`. `{{ image }}` on its own writes
