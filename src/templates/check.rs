@@ -144,6 +144,13 @@ const FORMER_NAMES: &[(Rec, &str, &str)] = &[
     (Rec::Video, "still", "thumbnail"),
 ];
 
+/// The name now of a name a template once read on `rec`.
+fn former_name(rec: Rec, name: &str) -> Option<&'static str> {
+    (FORMER_NAMES.iter())
+        .find(|&&(on, former, _)| on == rec && former == name)
+        .map(|&(_, _, ours)| ours)
+}
+
 /// Names a Markdown snippet was once handed, with each one's name now.
 const FORMER_HANDED: &[(&str, &str)] = &[
     ("address", "url"),
@@ -1400,10 +1407,21 @@ impl<'a> Checker<'a> {
         match &base.ty {
             Ty::Record(rec) => match self.schema.record(*rec).get(name) {
                 Some(field) => Info::maybe(field.ty.clone(), !field.always && !present),
-                None if self.probing || present => Info::unknown(),
+                // A former name nothing of the site's sets is told in a test
+                // too, where it would quietly be false.
+                None if (self.probing || present) && former_name(*rec, name).is_none() => {
+                    Info::unknown()
+                }
                 None => {
                     self.unknown_field(*rec, base_expr, name, span);
-                    Info::told()
+                    // Read on as the name it has now, so a former name read
+                    // from it, as `mention.face` in a loop over
+                    // `mentions.faces`, is told in the same check.
+                    let now = former_name(*rec, name).and_then(|ours| {
+                        let fields = self.schema.record(*rec);
+                        fields.get(ours).map(|field| field.ty.clone())
+                    });
+                    now.map_or_else(Info::told, Info::of)
                 }
             },
             Ty::List(of) if name.parse::<usize>().is_ok() => Info::maybe((**of).clone(), true),
@@ -1441,6 +1459,7 @@ impl<'a> Checker<'a> {
         let fields = self.schema.record(Rec::Page);
         if !on_a_page
             || fields.contains_key(attr.name)
+            || former_name(Rec::Page, attr.name).is_some()
             || attr.name.chars().count() < 4
             || self.is_present(&path)
         {
@@ -1462,9 +1481,7 @@ impl<'a> Checker<'a> {
     fn unknown_field(&mut self, rec: Rec, base_expr: &Expr<'_>, name: &str, span: Span) {
         let base_text = self.spelling(full_span(base_expr, self.text)).to_owned();
         let written = format!("{base_text}.{name}");
-        if let Some(&(_, _, ours)) =
-            (FORMER_NAMES.iter()).find(|&&(on, former, _)| on == rec && former == name)
-        {
+        if let Some(ours) = former_name(rec, name) {
             let kind = Kind::OtherSpelling {
                 word: Word::Field,
                 written,
@@ -1550,8 +1567,7 @@ impl<'a> Checker<'a> {
                 let on = self.expr(receiver, Seen::Unseen);
                 self.args(&call.args, Seen::Unseen);
                 if let Ty::Record(rec) = on.ty
-                    && let Some(&(_, _, ours)) = (FORMER_NAMES.iter())
-                        .find(|&&(of, former, _)| of == rec && former == method)
+                    && let Some(ours) = former_name(rec, method)
                 {
                     let base = self.spelling(full_span(receiver, self.text)).to_owned();
                     let kind = Kind::OtherSpelling {
@@ -1776,10 +1792,19 @@ impl<'a> Checker<'a> {
                         Some(field) => {
                             ty = field.ty.clone();
                         }
-                        None if probing => return None,
+                        None if probing && former_name(*rec, piece).is_none() => return None,
                         None => {
-                            let near = nearest(piece, fields.keys().map(String::as_str));
                             let written = self.spelling(span).to_owned();
+                            if let Some(ours) = former_name(*rec, piece) {
+                                let kind = Kind::OtherSpelling {
+                                    word: Word::Field,
+                                    ours: written.replacen(piece, ours, 1),
+                                    written,
+                                };
+                                self.tell(kind, span);
+                                return None;
+                            }
+                            let near = nearest(piece, fields.keys().map(String::as_str));
                             let kind = match near {
                                 Some(near) => Kind::UnknownWord {
                                     word: Word::Field,

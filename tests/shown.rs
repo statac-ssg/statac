@@ -1192,7 +1192,7 @@ fn a_video_whose_still_is_never_read_or_has_none_is_never_told() {
     let site = Site::new(
         "no-still-unread",
         "{{ page.youtube('abcdefghijk').embed }} \
-         {% if page.youtube('https://www.youtube.com/embed/videoseries?list=PL0123').still %}\
+         {% if page.youtube('https://www.youtube.com/embed/videoseries?list=PL0123').thumbnail %}\
          still{% else %}none{% endif %}",
     );
     site.write("content/post-1.md", "---\ntitle: Post 1\n---\n");

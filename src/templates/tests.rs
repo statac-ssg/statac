@@ -1512,6 +1512,126 @@ fn a_declared_field_is_one_a_page_can_have() {
 }
 
 #[test]
+fn a_former_name_is_told_in_a_test_and_where_its_test_proved_it_there() {
+    // (the template, the former names told in it)
+    let cases: [(&str, &[&str]); 9] = [
+        ("{% if page.photo %}x{% endif %}", &["page.photo"]),
+        (
+            "{% if page.photos is defined %}x{% endif %}",
+            &["page.photos"],
+        ),
+        ("{{ 'x' if page.words else 'y' }}", &["page.words"]),
+        (
+            "{% set mentions = page.webmentions %}\
+             {% if mentions.said or mentions.faces %}x{% endif %}",
+            &["mentions.said", "mentions.faces"],
+        ),
+        (
+            "{% if page.webmentions.faces %}\
+             {% for m in page.webmentions.faces %}{{ m.url }}{% endfor %}{% endif %}",
+            &["page.webmentions.faces", "page.webmentions.faces"],
+        ),
+        (
+            "{% for m in page.webmentions.comments %}\
+             {% if m.face %}{{ m.face.src }}{% endif %}\
+             {% if m.words %}{{ m.words }}{% endif %}{% endfor %}",
+            &["m.face", "m.face", "m.words", "m.words"],
+        ),
+        (
+            "{% for m in page.webmentions.reactions if m.face %}{{ m.url }}{% endfor %}",
+            &["m.face"],
+        ),
+        (
+            "{{ page.webmentions.reactions | selectattr('face') | list | length }}",
+            &["'face'"],
+        ),
+        (
+            "{% if page.youtube('abcdefghijk').still %}x{% endif %}",
+            &["page.youtube('abcdefghijk').still"],
+        ),
+    ];
+    for (template, told) in cases {
+        let built = site(&[
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("templates/page.html", template),
+        ]);
+        let expected: Vec<_> = (told.iter())
+            .map(|&written| {
+                (
+                    "other-spelling",
+                    "templates/page.html".into(),
+                    written.into(),
+                )
+            })
+            .collect();
+        assert_eq!(built.template_problems(), expected, "{template}");
+    }
+    let built = site(&[
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        (
+            "templates/page.html",
+            "{% for m in page.webmentions.reactions %}{% if m.face %}x{% endif %}{% endfor %}\
+             {{ page.webmentions.comments | selectattr('words') | list | length }}",
+        ),
+    ]);
+    let offered: Vec<_> = (built.problems.iter())
+        .map(|problem| match &problem.kind {
+            Kind::OtherSpelling { written, ours, .. } => (written.as_str(), ours.as_str()),
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(offered, [("m.face", "m.avatar"), ("'words'", "'content'")]);
+}
+
+#[test]
+fn a_former_name_a_page_sets_itself_is_that_pages_own_field() {
+    for template in [
+        "{% if page.photo %}{{ page.photo }}{% endif %}",
+        "{% if page.words is defined %}{{ page.words }}{% endif %}",
+        "{{ page.photo | default('') }}{{ page.words | default('') }}",
+    ] {
+        let built = site(&[
+            (
+                "content/post-1.md",
+                "---\ntitle: Post 1\nphoto: one.jpg\nwords: 300\n---\n",
+            ),
+            ("content/post-2.md", "---\ntitle: Post 2\n---\n"),
+            ("templates/page.html", template),
+        ]);
+        assert_eq!(built.template_problems(), [], "{template}");
+    }
+    // A former name one slip from it is still told as the former name.
+    let built = site(&[
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\nphoto: one.jpg\n---\n",
+        ),
+        (
+            "templates/page.html",
+            "{% if page.photos is defined %}x{% endif %}",
+        ),
+    ]);
+    assert_eq!(
+        built.template_problems(),
+        [(
+            "other-spelling",
+            "templates/page.html".into(),
+            "page.photos".into()
+        )]
+    );
+    // Declared, it needs no page to set it.
+    let built = site(&[
+        ("statac.yaml", "language: en\nfields.photo: text\n"),
+        ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+        (
+            "templates/page.html",
+            "{% if page.photo %}{{ page.photo }}{% endif %}",
+        ),
+    ]);
+    assert_eq!(built.template_problems(), []);
+}
+
+#[test]
 fn a_dates_weekday_is_a_field_the_check_accepts_and_its_value_the_days_name() {
     let built = site(&[
         (
