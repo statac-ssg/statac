@@ -8,6 +8,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://git.statac.dev/statac/statac"
 homepage = "https://statac.dev"
 documentation = "https://statac.dev"
+# crates.io shows both of README.md's light and dark images, so it has a README of its own.
+readme = "crates-io.md"
 keywords = ["static-site", "ssg", "markdown", "website", "blog"]
 categories = ["command-line-utilities", "web-programming"]
 include = [
@@ -16,6 +18,7 @@ include = [
     "/explanations/",
     "/licences/",
     "/CHANGELOG.md",
+    "/crates-io.md",
     "/LICENSE-APACHE",
     "/LICENSE-MIT",
     "/README.md",
