@@ -1379,6 +1379,16 @@ fn the_list(word: Word, name: &str) -> String {
     }
 }
 
+/// The setting that publishes a page for each tag, or for each series.
+fn list_pages(word: Word) -> String {
+    match word {
+        Word::Series => {
+            "Add `series.pages: true` to `statac.yaml` to publish a page for each series.".into()
+        }
+        _ => "Add `tags.pages: true` to `statac.yaml` to publish a page for each tag.".into(),
+    }
+}
+
 /// What `--drafts` brought into the run: drafts and scheduled posts, built
 /// as if published.
 pub(crate) fn included(drafts: usize, waiting: usize) -> String {
@@ -3008,6 +3018,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             Instead::Headline(written) => Some(format!(
                 "A page Statac makes has no title: write `{written}` to name it."
             )),
+            Instead::ListPages(word) => Some(list_pages(*word)),
             Instead::Nothing => None,
         },
         Kind::NotSupported { what } => match what {
@@ -3290,11 +3301,7 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         } => Some(match (word, more) {
             (Word::Folder, 0) => format!("Add `content/{name}/index.md` to publish one."),
             (Word::Folder, _) => "Add an `index.md` to a folder to publish its list page.".into(),
-            (Word::Series, _) => {
-                "Add `series.pages: true` to `statac.yaml` to publish a page for each series."
-                    .into()
-            }
-            _ => "Add `tags.pages: true` to `statac.yaml` to publish a page for each tag.".into(),
+            (word, _) => list_pages(*word),
         }),
         Kind::NoHomePage { addresses, index } => Some(match addresses.len() {
             1 => format!("Add `{index}`, or `templates/home.html` to list the posts there."),
@@ -9866,6 +9873,26 @@ mod tests {
                 },
                 "No value: `page.title` isn't set on the page for the tag `Rust`",
                 Some("A page Statac makes has no title: write `headline(page)` to name it."),
+            ),
+            (
+                Kind::NoValue {
+                    written: "tag.url".into(),
+                    lack: Lack::Unset,
+                    instead: Instead::ListPages(Word::Tag),
+                },
+                "No value: nothing is set for `tag.url`",
+                Some("Add `tags.pages: true` to `statac.yaml` to publish a page for each tag."),
+            ),
+            (
+                Kind::NoValue {
+                    written: "page.series.url".into(),
+                    lack: Lack::Unset,
+                    instead: Instead::ListPages(Word::Series),
+                },
+                "No value: nothing is set for `page.series.url`",
+                Some(
+                    "Add `series.pages: true` to `statac.yaml` to publish a page for each series.",
+                ),
             ),
             (
                 no_value(Lack::Unset, Instead::Handed("post.summary".into())),

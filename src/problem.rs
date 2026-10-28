@@ -2074,6 +2074,10 @@ pub enum Instead {
     /// `headline` of a page Statac made, which has no title, where its
     /// `title` is missing.
     Headline(String),
+    /// `tags.pages: true` or `series.pages: true`, where the `url` or
+    /// `page` of a tag or series is missing because the setting is
+    /// unwritten.
+    ListPages(Word),
     Nothing,
 }
 

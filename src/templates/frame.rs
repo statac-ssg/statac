@@ -14,7 +14,7 @@ use super::guard::{Failed, Refusal};
 use super::indent::Own;
 use super::render::Shared;
 use crate::assets::PageScripts;
-use crate::ids::{DataId, Id, LanguageId, PageId};
+use crate::ids::{DataId, Id, LanguageId, ListId, PageId};
 use crate::problem::{Kind, Problem, Stopped};
 use crate::reads::{Asked, Key, Reads};
 use crate::source::Place;
@@ -120,11 +120,12 @@ pub(super) struct Handed {
     pub(crate) values: Vec<(String, Value)>,
 }
 
-/// A lookup that found nothing: the name, and the page or the part of
-/// `data/` it was asked of where it was asked of one.
+/// A lookup that found nothing: the name, and the page, the list or the
+/// part of `data/` it was asked of where it was asked of one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Miss {
     pub(crate) page: Option<PageId>,
+    pub(crate) list: Option<ListId>,
     pub(crate) data: Option<InData>,
     pub(crate) name: String,
 }
@@ -303,6 +304,21 @@ pub(super) fn missed(page: Option<PageId>, name: &str) {
     with(|frame| {
         frame.misses.push(Miss {
             page,
+            list: None,
+            data: None,
+            name: name.to_owned(),
+        })
+    });
+}
+
+pub(super) fn missed_on_list(list: ListId, name: &str) {
+    if UNRECORDED.get() {
+        return;
+    }
+    with(|frame| {
+        frame.misses.push(Miss {
+            page: None,
+            list: Some(list),
             data: None,
             name: name.to_owned(),
         })
@@ -313,6 +329,7 @@ pub(super) fn missed_in_data(data: InData, name: &str) {
     with(|frame| {
         frame.misses.push(Miss {
             page: None,
+            list: None,
             data: Some(data),
             name: name.to_owned(),
         })

@@ -1336,7 +1336,7 @@ impl Object for ListValue {
         let key = key.as_str()?;
         let answer = self.answer(key);
         if answer.is_none() {
-            frame::missed(None, key);
+            frame::missed_on_list(self.id, key);
         }
         answer
     }

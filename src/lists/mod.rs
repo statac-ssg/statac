@@ -443,8 +443,7 @@ pub(crate) fn unasked(
         folders.sort_unstable();
         tell(Word::Folder, folders.into_iter().cloned().collect());
         for (named, names) in [Named::Tag, Named::Series].into_iter().zip(named) {
-            let setting = settings.get(&named.setting("pages"));
-            if setting.is_none_or(|setting| setting.origin.arrival == Arrival::Defaulted) {
+            if pages_unwritten(settings, named) {
                 tell(named.word(), names);
             }
         }
@@ -462,6 +461,26 @@ pub(crate) fn unasked(
         problems.push(Problem::nowhere(Kind::NoHomePage { addresses, index }));
     }
     problems
+}
+
+/// Whether the site leaves `tags.pages` or `series.pages` unwritten.
+fn pages_unwritten(settings: &Settings, named: Named) -> bool {
+    let setting = settings.get(&named.setting("pages"));
+    setting.is_none_or(|setting| setting.origin.arrival == Arrival::Defaulted)
+}
+
+/// The kind of `list` where it is a tag or a series with no list page
+/// only because `tags.pages` or `series.pages` is unwritten, as
+/// [`unasked`] tells of.
+pub(crate) fn unasked_page(site: &Site, settings: &Settings, list: ListId) -> Option<Word> {
+    let list = site.lists.get(list);
+    let named = match list.key {
+        ListKey::Tag(_) => Named::Tag,
+        ListKey::Series(_) => Named::Series,
+        _ => return None,
+    };
+    let unasked = list.page.is_none() && list.address.is_some() && pages_unwritten(settings, named);
+    unasked.then(|| named.word())
 }
 
 /// Makes the page that speaks for `list`, filed in `folder`, with no

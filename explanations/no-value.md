@@ -46,6 +46,13 @@ the field. Leave out the pages without it first, as in
 `selectattr("rank", "eq", 1)`, skips a page without it, as `if` does.
 `sort(attribute="rank")` puts pages without the field last, and warns.
 
+A tag or a series has a `url` and a `page` only if it has a list page.
+If `tag.url` has no value because `statac.yaml` doesn't ask for tag
+pages, add `tags.pages: true` to publish a page for each tag, or
+`series.pages: true` for each series. Statac before 0.7.0 published these
+pages without being asked, so a site made with it needs the setting for
+its tag links to work.
+
 A list page that Statac makes itself, such as a tag's, has no `title`.
 For such a page, `{{ headline(page) }}` shows the list's name.
 For any other page, it shows the page's `title` if it has one.

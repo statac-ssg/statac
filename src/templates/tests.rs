@@ -4024,6 +4024,46 @@ fn a_missing_title_is_offered_the_headline_only_on_a_page_statac_made() {
 }
 
 #[test]
+fn a_tags_or_series_missing_url_is_offered_the_setting_that_publishes_its_page() {
+    let tag = Instead::ListPages(Word::Tag);
+    let series = Instead::ListPages(Word::Series);
+    let default = |written: &str| Instead::Default(format!("{written} | default(\"\")"));
+    let tags = "{% for tag in page.tags %}{{ tag.url }}{% endfor %}";
+    let cases = [
+        ("", tags, tag.clone()),
+        (
+            "",
+            "{% for tag in page.tags %}{{ tag.page.title }}{% endfor %}",
+            tag.clone(),
+        ),
+        ("", "{{ page.series.url }}", series.clone()),
+        ("tags.pages: false\n", tags, default("tag.url")),
+        ("series.pages: true\n", tags, tag),
+        ("tags.pages: true\n", "{{ page.series.url }}", series),
+        ("", "{{ page.summary }}", default("page.summary")),
+    ];
+    for (setting, template, instead) in cases {
+        let built = site(&[
+            (
+                "statac.yaml",
+                &format!("language: en\ntimezone: UTC\npages.feed: false\n{setting}"),
+            ),
+            (
+                "content/notes/post-1.md",
+                "---\ndate: 2026-01-01\ntags: [Rust]\nseries: Series 1\n---\nPost 1 opens here.\n",
+            ),
+            ("templates/page.html", template),
+        ]);
+        let rendered = built.render("notes/post-1.md");
+        let Some(Kind::NoValue { instead: found, .. }) = rendered.problems.first().map(|p| &p.kind)
+        else {
+            panic!("{setting}{template}: {:?}", rendered.problems);
+        };
+        assert_eq!(found, &instead, "{setting}{template}");
+    }
+}
+
+#[test]
 fn a_site_with_no_index_has_its_home_page_built_with_the_home_template() {
     let built = site(&[
         (

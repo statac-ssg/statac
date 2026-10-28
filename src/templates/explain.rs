@@ -412,9 +412,22 @@ fn lack_of(shared: &Shared, miss: Option<&Miss>, empty: bool) -> Lack {
 
 /// What a missing value's suggestion offers: in a snippet handed a page,
 /// that page's own field where `page`'s is missing; for the `title` of a
-/// page Statac made, which never has one, its headline. `handed` is what
-/// the snippet missing it was handed.
+/// page Statac made, which never has one, its headline; for the `url` or
+/// `page` of a tag or series with no page only because the site doesn't
+/// ask for one, the setting that does. `handed` is what the snippet
+/// missing it was handed.
 fn instead(written: &str, frame: &Frame, handed: Option<&Handed>, miss: Option<&Miss>) -> Instead {
+    if let Some(Miss {
+        list: Some(list),
+        name,
+        ..
+    }) = miss
+        && matches!(name.as_str(), "url" | "page")
+        && let shared = &frame.shared
+        && let Some(word) = crate::lists::unasked_page(&shared.site, &shared.settings, *list)
+    {
+        return Instead::ListPages(word);
+    }
     if let Some(field) = written.strip_prefix("page.")
         && let Some(handed) = handed
     {
