@@ -46,18 +46,22 @@ where its value came from.
 - **Images handled.** Write an ordinary Markdown
   [image](https://statac.dev/images/). Readers get it in several sizes,
   as AVIF with a JPEG fallback.
-- **Search built in.** Statac writes a search index at each build, and
-  a [search box](https://statac.dev/search/) you add to your site finds
-  pages as the reader types, with nothing outside your site needed.
-  `statac search` gives the same results in the terminal.
+- **Search built in.** Once you add a
+  [search box](https://statac.dev/search/) to your site, Statac writes a
+  search index at each build, and the box finds pages as the reader
+  types, with nothing outside your site needed. `statac search` gives
+  the same results in the terminal.
 - **Social cards.** Statac draws a
   [social card](https://statac.dev/social-cards/) for each page, from a
   layout you set, in fonts and over a background of your own.
 - **Bring your site with you.** `statac import` brings a Hugo, Jekyll,
   Zola or Eleventy site across, and lists anything it couldn't bring.
   See [Arriving from another tool](https://statac.dev/import/).
-- **One program.** Sass, coloured code, feeds and a sitemap are built
-  in. There are no plugins to hunt down.
+- **One program.** Sass, code colours, feeds and a sitemap need no
+  plugin: Statac does each once you ask. The stylesheet that
+  [colours code](https://statac.dev/code-colours/) and the templates for
+  [feeds and a sitemap](https://statac.dev/feeds/) are your own, and the
+  docs have them ready to copy.
 
 And the rest: tags and series, several languages, webmentions, a preview
 that reloads as you save, and nothing published unless the whole build
