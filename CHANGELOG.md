@@ -2,6 +2,57 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.7.1 - 2026-10-28
+
+### Fixed
+
+- Statac stops the build at a template name that 0.7.0 renamed, such
+  as `page.photo`, `mentions.faces` or `mention.face`, wherever a
+  template reads it, and offers the new name: inside `{% if %}`, in a
+  loop's `if`, in `selectattr` and `rejectattr`, and inside a branch
+  whose test read it. Statac 0.7.0 told it only outside a test, so a
+  template that tested an old name showed nothing there, and nothing
+  said so. This means a template that 0.7.0 built without a word can
+  now stop the build, with `other-spelling` naming the new name to
+  write. Statac still reads `photo`, `photos` or `words` from a page
+  that sets it, or where `statac.yaml` declares it, since the field is
+  then the page's own.
+- Where a site has no `published.txt` and its `_site` holds an earlier
+  Statac build, Statac reads the URLs in `_site` in the file's place,
+  so `statac check` and the first build warn of each page and feed the
+  site no longer publishes (`url-gone`), such as a folder's feed or a
+  paginated page, which 0.7.0 makes only where the site asks. Until the
+  first build writes the file, each warning says where its URL came
+  from: "Published by an earlier build, in `_site`". The build starts
+  `published.txt` with those URLs and says so. A build with `--drafts`
+  or `--url` that replaces `_site` starts the file with them too, so
+  they aren't lost with the folder. Statac 0.7.0 started the file
+  afresh, so a site upgraded from 0.6 was told nothing of what it no
+  longer published.
+- Where a template reads a tag's or a series' `url` and the site
+  doesn't publish tag or series pages, `no-value` offers the setting
+  to add, `tags.pages: true` or `series.pages: true`, as `statac
+  check`'s "No list page" note does. It offered a `default` filter,
+  which would hide the links.
+- Statac's messages, the descriptions an editor shows on hover, the
+  comment at the top of the language file `statac new` writes, and
+  `statac import`'s notes on a site in several languages link to
+  https://statac.dev/dates/ and https://statac.dev/languages/, where
+  the docs moved the sections of /dates-and-languages/. The old links
+  still lead to the right section, so a language file written before
+  needs no change.
+- When you give `statac new` a language Statac has no translations
+  for, its note links the section on writing that language's file,
+  https://statac.dev/languages/#language-files, in place of the section
+  on languages as a whole.
+- The descriptions an editor shows on hover and the debug panel shows
+  in its Names tab say "list page" where they said "the list's page"
+  or "the list's own page", and `page.previous` and `page.next` on a
+  list page say "the previous page of the list" and "the next page of
+  the list". `feed-not-written`'s explanation and suggestion say "list
+  page" too: "A feed links to its list page; add an `index.md` to give
+  the list one, or take the `feed:` line out."
+
 ## 0.7.0 - 2026-10-27
 
 A breaking release. Statac writes no templates into a site, makes only
