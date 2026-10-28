@@ -64,7 +64,7 @@ pagefind_stem = { version = "1.0.0", features = ["arabic", "armenian", "basque",
 pulldown-cmark = { version = "=0.13.4", default-features = false }
 rayon = "1.12.0"
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std"] }
-statac-avif-sys = { path = "crates/statac-avif-sys", version = "=0.1.0" }
+statac-avif-sys = { path = "crates/statac-avif-sys", version = "=0.1.1" }
 unicode-normalization = "0.1.25"
 # src/fetch.rs uses its unversioned modules, which follow no semver promise.
 ureq = { version = "=3.4.2", default-features = false, features = ["rustls-no-provider", "rustls-webpki-roots"] }
