@@ -1,10 +1,9 @@
-# Changed from MiniJinja 3.0.1 for Statac: the registry metadata (authors, keywords, docs.rs settings, dev-dependencies but similar-asserts) is dropped, the package is renamed statac-minijinja, marked unpublished and described as changed for Statac, and the repository is Statac's.
+# Changed from MiniJinja 3.0.1 for Statac: the registry metadata (authors, keywords, docs.rs settings, dev-dependencies but similar-asserts) is dropped, the package is renamed statac-minijinja and described as changed for Statac, and the repository is Statac's.
 [package]
 name = "statac-minijinja"
 version = "3.0.1"
 edition = "2021"
 rust-version = "1.70"
-publish = false
 description = "MiniJinja 3.0.1, by Armin Ronacher, changed for Statac"
 license = "Apache-2.0"
 repository = "https://git.statac.dev/statac/statac"

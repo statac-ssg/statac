@@ -1,6 +1,6 @@
 // Changed from oxhttp 0.3.3 for Statac: the client, TLS, content decoding and request-body reading are removed; an `on_fault` hook hands connection faults to the owner, and requests sent together on one connection are each answered.
 //! An HTTP/1.1 server on plain threads: the server of oxhttp 0.3.3,
-//! https://github.com/oxigraph/oxhttp, which is offered under MIT or
+//! <https://github.com/oxigraph/oxhttp>, which is offered under MIT or
 //! Apache-2.0, less its client, its TLS, its content decoding and the
 //! reading of a request's body. It says nothing of its own: a connection
 //! it can't take or answer is handed to its owner to tell.

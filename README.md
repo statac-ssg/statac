@@ -1,6 +1,6 @@
 <h1 align="center">
-  <img src=".github/readme/statac-light.svg#gh-light-mode-only" alt="Statac" width="300">
-  <img src=".github/readme/statac-dark.svg#gh-dark-mode-only" alt="Statac" width="300">
+  <img src="https://git.statac.dev/statac/statac/raw/branch/main/.github/readme/statac-light.svg#gh-light-mode-only" alt="Statac" width="300">
+  <img src="https://git.statac.dev/statac/statac/raw/branch/main/.github/readme/statac-dark.svg#gh-dark-mode-only" alt="Statac" width="300">
 </h1>
 
 <p align="center">A friendlier static site generator.</p>
@@ -11,7 +11,7 @@
   <a href="#licence"><img alt="Licence: MIT or Apache-2.0" src="https://img.shields.io/badge/licence-MIT%20or%20Apache--2.0-191919"></a>
 </p>
 
-<p align="center"><b><a href="https://statac.dev/getting-started/">Get started</a> · <a href="https://statac.dev/install/">Install</a> · <a href="https://statac.dev">Documentation</a> · <a href="https://statac.dev/e/">Problems explained</a> · <a href="CHANGELOG.md">Changes</a></b></p>
+<p align="center"><b><a href="https://statac.dev/getting-started/">Get started</a> · <a href="https://statac.dev/install/">Install</a> · <a href="https://statac.dev">Documentation</a> · <a href="https://statac.dev/e/">Problems explained</a> · <a href="https://git.statac.dev/statac/statac/src/branch/main/CHANGELOG.md">Changes</a></b></p>
 
 Statac makes a website from a folder of Markdown. You write pages in
 Markdown, choose how they look with templates, and run `statac build`. It
@@ -24,8 +24,8 @@ install beside it.
 ## It explains itself
 
 <p align="center">
-  <img src=".github/readme/debug-panel-light.png#gh-light-mode-only" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
-  <img src=".github/readme/debug-panel-dark.png#gh-dark-mode-only" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
+  <img src="https://git.statac.dev/statac/statac/raw/branch/main/.github/readme/debug-panel-light.png#gh-light-mode-only" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
+  <img src="https://git.statac.dev/statac/statac/raw/branch/main/.github/readme/debug-panel-dark.png#gh-dark-mode-only" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
 </p>
 
 When something in the site is wrong, Statac shows you the file, the line
@@ -92,6 +92,16 @@ scoop install statac
 For another way to install, each release has a package for each kind
 of machine. [Installing](https://statac.dev/install/) says which to
 take and how to check it.
+
+With [Cargo](https://doc.rust-lang.org/cargo/), from crates.io:
+
+```sh
+cargo install --locked statac
+```
+
+Cargo builds Statac from its source, which needs Rust 1.99 or later, a
+C compiler, CMake and Perl, and NASM on a machine with an Intel or AMD
+processor.
 
 ## A first site
 
