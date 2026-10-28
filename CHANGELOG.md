@@ -2,6 +2,24 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.7.2 - 2026-10-28
+
+### New
+
+- You can install Statac from crates.io with `cargo install --locked
+  statac`. Cargo builds Statac from its source, so this needs Rust 1.99
+  or later, a C compiler, CMake and Perl, and NASM on a machine with an
+  Intel or AMD processor. If CMake, Perl or NASM is missing, the build
+  stops with a message that names it and says where to get it.
+
+### Fixed
+
+- Statac writes the text of its name badge, and of the `warning` and
+  `note` badges, in a fixed black, so the text stays black in a
+  terminal that brightens bold text, as iTerm2 does by default. Statac
+  0.7.1 used the terminal's own black, which such a terminal turns
+  grey.
+
 ## 0.7.1 - 2026-10-28
 
 ### Fixed
