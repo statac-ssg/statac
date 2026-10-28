@@ -3615,6 +3615,9 @@ pub(crate) fn relation(relation: &Relation) -> String {
         Relation::CalledFrom => "Called here".into(),
         Relation::ReadAsMarkdown => "Read as Markdown here".into(),
         Relation::AlsoPublished => "Also published there".into(),
+        Relation::FoundBuilt => {
+            format!("Published by an earlier build, in `{}`", crate::build::OUT)
+        }
     }
 }
 
@@ -3797,15 +3800,28 @@ pub(crate) fn copies_made(n: usize) -> String {
 }
 
 /// What `build` says of the URLs it added to `published.txt`, or of
-/// starting the file.
-pub(crate) fn kept_published(added: usize, started: bool) -> String {
+/// starting the file, with the `found` URLs the site's earlier build
+/// published where it started the file with them.
+pub(crate) fn kept_published(added: usize, started: bool, found: usize) -> String {
     let addresses = how_many(added, "URL", "URLs");
-    match started {
-        true => format!(
+    match (started, found) {
+        (true, 0) => format!(
             "Started `published.txt` with the {addresses} this site publishes, so a later \
              build can say when one is no longer published. Commit it with the site."
         ),
-        false => format!("Added {addresses} to `published.txt`."),
+        (true, _) => {
+            let more = match added {
+                0 => String::new(),
+                _ => format!(", and {added} more this site publishes"),
+            };
+            format!(
+                "Started `published.txt` with the {} an earlier build published in `{}`{more}, \
+                 so Statac can say when one is no longer published. Commit it with the site.",
+                how_many(found, "URL", "URLs"),
+                crate::build::OUT,
+            )
+        }
+        (false, _) => format!("Added {addresses} to `published.txt`."),
     }
 }
 

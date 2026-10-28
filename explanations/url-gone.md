@@ -34,6 +34,15 @@ paginated pages, since they come and go with what is listed. Nor does it
 keep the files in `assets/`, whose URLs change when their contents
 do.
 
+If the site has no `published.txt` yet, but `_site` still holds a site
+Statac built, Statac reads the URLs in `_site` in its place. That is how
+a site built by a Statac that kept no `published.txt` learns what an
+upgrade no longer publishes. Each URL gone is told with "Published by an
+earlier build, in `_site`", and the first build writes every URL from
+`_site` into `published.txt`, paginated pages and tag pages among them,
+so later warnings are at their lines. Statac leaves out the files it
+names by their contents, and the script that reads a search index.
+
 ## How to fix it
 
 If the page moved, add its old URL to the page's `redirect_from` in its

@@ -381,7 +381,8 @@ pub(crate) fn prepared_with(
     ));
     // Read last, so whether the site has the file moves no other file's
     // place among those read.
-    let (published, unread) = crate::published::Record::read(site, &mut read.sources);
+    let (published, unread) =
+        crate::published::Record::read(site, &mut read.sources, &read.settings);
     read.problems.extend(unread);
     let outputs = claims(&read, &assets, &feeds);
     read.problems
@@ -1354,14 +1355,28 @@ pub(crate) fn publish(
             }));
         }
         // A run with the drafts in publishes them only to be looked at.
-        if remembers && !options.drafts {
-            let now = published::now(
+        let now = match remembers && !options.drafts {
+            true => Some(published::now(
                 site,
                 renderer.dates(),
                 renderer.assets(),
                 renderer.feeds(),
                 &held_back,
-            );
+            )),
+            false => None,
+        };
+        // An earlier build's addresses, standing in for the file, would be
+        // lost with the folder this run has just put its own in place of.
+        let replaced_found = || {
+            let (out, found) = (options.out(), options.site.join(OUT));
+            site.published.found()
+                && matches!(
+                    (fs::canonicalize(out), fs::canonicalize(found)),
+                    (Ok(out), Ok(found)) if out == found
+                )
+        };
+        if now.is_some() || replaced_found() {
+            let now = now.unwrap_or_default();
             match site.published.keep(&options.site, &now, None) {
                 Ok(written) => {
                     written.re_place(&mut problems, renderer.sources());

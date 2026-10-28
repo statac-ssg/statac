@@ -253,7 +253,11 @@ impl<'a> Report<'a> {
         match kept.added > 0 || kept.started {
             true => format!(
                 "{}\n",
-                shown(&wording::kept_published(kept.added, kept.started))
+                shown(&wording::kept_published(
+                    kept.added,
+                    kept.started,
+                    kept.found
+                ))
             ),
             false => String::new(),
         }

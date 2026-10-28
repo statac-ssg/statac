@@ -18,7 +18,7 @@ fn read(text: &str) -> (Vec<String>, Vec<(Code, String)>) {
     let scratch = Scratch::new("published");
     scratch.write(FILE, text);
     let mut sources = Sources::default();
-    let (record, problems) = Record::read(&scratch, &mut sources);
+    let (record, problems) = Record::read(&scratch, &mut sources, &Settings::default());
     let addresses = (record.addresses.iter())
         .map(|(address, _)| address.as_str().to_owned())
         .collect();
@@ -46,7 +46,7 @@ fn each_line_is_an_address_from_the_top_of_the_site_but_what_says_what_the_file_
         ]
     );
     let scratch = Scratch::new("published-none");
-    let (record, problems) = Record::read(&scratch, &mut Sources::default());
+    let (record, problems) = Record::read(&scratch, &mut Sources::default(), &Settings::default());
     assert!(!record.held && record.addresses.is_empty() && problems.is_empty());
 }
 
@@ -96,7 +96,7 @@ fn a_build_adds_only_the_addresses_the_file_lacks_sorted_and_writes_nothing_wher
             .collect()
     };
     let kept = |scratch: &Scratch, now: &[&str]| {
-        let (record, _) = Record::read(scratch, &mut Sources::default());
+        let (record, _) = Record::read(scratch, &mut Sources::default(), &Settings::default());
         record.keep(scratch, &addresses(now), None).unwrap().kept
     };
     let text = |scratch: &Scratch| std::fs::read_to_string(scratch.join(FILE)).unwrap();
@@ -106,7 +106,8 @@ fn a_build_adds_only_the_addresses_the_file_lacks_sorted_and_writes_nothing_wher
         kept(&scratch, &["/notes/", "/about/", "/about/"]),
         Kept {
             added: 2,
-            started: true
+            started: true,
+            found: 0
         }
     );
     assert_eq!(text(&scratch), format!("{ABOUT}/about/\n/notes/\n"));
@@ -247,4 +248,82 @@ fn every_address_under_a_folder_gone_is_one_warning_under_the_outermost_such_fol
             ),
         ]
     );
+}
+
+#[test]
+fn a_site_with_no_file_has_published_what_its_earlier_build_holds_that_a_reader_can_find() {
+    let built = [
+        "_site/.statac-built",
+        "_site/index.html",
+        "_site/404.html",
+        "_site/CNAME",
+        "_site/.well-known/security.txt",
+        "_site/.DS_Store",
+        "_site/site.1a2b3c4d.css",
+        "_site/notes/index.html",
+        "_site/notes/feed.xml",
+        "_site/notes/page/2/index.html",
+        "_site/notes/note-1/index.html",
+        "_site/notes/note-1/image-400.1a2b3c4d.jpg",
+        "_site/notes/note-1/notes.pdf",
+        "_site/search/index.html",
+        "_site/search/index.js",
+        "_site/search/records.0123456789abcdef.bin",
+        "_site/search/pages/0123456789abcdef.bin",
+        "_site/scripts/index.js",
+    ];
+    let files: Vec<(&str, &str)> = built.iter().map(|path| (*path, "")).collect();
+    let site = TempSite::site(&files);
+    let found = |site: &TempSite| {
+        let mut sources = Sources::default();
+        let settings = crate::config::read(&site.root, &mut sources).0;
+        let (record, problems) = Record::read(&site.root, &mut sources, &settings);
+        assert!(problems.is_empty(), "{problems:?}");
+        assert!(!record.held);
+        let addresses: Vec<String> = (record.addresses.iter())
+            .map(|(address, place)| {
+                assert!(place.is_none());
+                address.as_str().to_owned()
+            })
+            .collect();
+        (record.found, addresses)
+    };
+    assert_eq!(
+        found(&site),
+        (
+            true,
+            [
+                "/",
+                "/.well-known/security.txt",
+                "/404.html",
+                "/CNAME",
+                "/notes/",
+                "/notes/feed.xml",
+                "/notes/note-1/",
+                "/notes/note-1/notes.pdf",
+                "/notes/page/2/",
+                "/scripts/index.js",
+                "/search/",
+            ]
+            .map(String::from)
+            .to_vec()
+        )
+    );
+    // A folder Statac didn't build is nobody's record.
+    std::fs::remove_file(site.root.join("_site/.statac-built")).unwrap();
+    assert_eq!(found(&site), (false, Vec::new()));
+    #[cfg(unix)]
+    {
+        let elsewhere = TempSite::site(&files);
+        std::fs::remove_dir_all(site.root.join("_site")).unwrap();
+        std::os::unix::fs::symlink(elsewhere.root.join("_site"), site.root.join("_site")).unwrap();
+        assert_eq!(found(&site), (false, Vec::new()));
+    }
+    // The file, where there is one, is the record alone.
+    let mut files = files;
+    files.push((FILE, "/notes/\n"));
+    let site = TempSite::site(&files);
+    let mut sources = Sources::default();
+    let (record, _) = Record::read(&site.root, &mut sources, &Settings::default());
+    assert!(record.held && !record.found && record.addresses.len() == 1);
 }

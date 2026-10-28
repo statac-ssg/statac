@@ -3055,6 +3055,8 @@ pub(crate) enum Relation {
     ReadAsMarkdown,
     /// Another thing published at the problem's address.
     AlsoPublished,
+    /// The site's earlier build, where an address told of was found.
+    FoundBuilt,
 }
 
 impl Kind {

@@ -2702,6 +2702,134 @@ fn an_address_published_before_that_stops_answering_is_told() {
     assert!(said.contains("Added 1 URL to `published.txt`.\n"), "{said}");
 }
 
+/// A site with a folder of notes, upgraded from a Statac that kept no
+/// `published.txt`, with what its build there left in `_site`: a feed for
+/// the site and for the folder, and the notes over two pages.
+fn upgraded(name: &str) -> Site {
+    let site = Site::new(name);
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\nurl: https://example.org/\n\
+         feed_key: 0b6d0c4e-2f7a-4d51-9a8e-3c1f5e7a9b20\nfeed: true\n",
+    );
+    site.write(
+        "templates/feed.xml",
+        "{% for post in posts %}<title>{{ post.title }}</title>{% endfor %}\n",
+    );
+    site.write("templates/folder.html", "{{ page.title }}\n");
+    site.write("content/notes/index.md", "---\ntitle: Notes\n---\n");
+    let mut earlier = vec![
+        ".statac-built".to_owned(),
+        "index.html".into(),
+        "feed.xml".into(),
+        "post-1/index.html".into(),
+        "site.1a2b3c4d.css".into(),
+        "notes/index.html".into(),
+        "notes/feed.xml".into(),
+        "notes/page/2/index.html".into(),
+    ];
+    for n in 1..=11 {
+        site.write(
+            &format!("content/notes/note-{n}.md"),
+            &format!("---\ntitle: Note {n}\ndate: 2026-01-{n:02}\n---\n"),
+        );
+        earlier.push(format!("notes/note-{n}/index.html"));
+    }
+    for path in earlier {
+        site.write(&format!("_site/{path}"), "");
+    }
+    site
+}
+
+/// An upgraded site with no `published.txt` takes what its earlier build
+/// in `_site` published in the file's place, so the first check and build
+/// tell each feed and paginated page it no longer publishes, and the build
+/// starts the file with them, saying so.
+#[test]
+fn an_upgraded_site_is_told_each_url_its_earlier_build_published_that_this_one_does_not() {
+    let site = upgraded("upgraded");
+    let told = |url: &str, place: &str| {
+        format!(
+            "warning  URL gone: `{url}` was published before, and nothing is there now\n\
+             {place}  Redirect it with `redirect_from: [{url}]` in the page that took its \
+             place, or take it out of `published.txt` if it is gone for good.\n  \
+             More: https://statac.dev/e/url-gone/\n"
+        )
+    };
+    let found = "  Published by an earlier build, in `_site`\n";
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said,
+        format!(
+            "{}\n{}\n2 warnings: 2 url-gone.\n",
+            told("/notes/feed.xml", found),
+            told("/notes/page/2/", found)
+        )
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(
+        said.starts_with(
+            "2 warnings: 2 url-gone. Run `statac check` to see them.\n\n\
+             Started `published.txt` with the 17 URLs an earlier build published in \
+             `_site`, so Statac can say when one is no longer published. Commit it with \
+             the site.\n"
+        ),
+        "{said}"
+    );
+    let kept = fs::read_to_string(site.root.join("published.txt")).unwrap();
+    assert!(
+        kept.contains("\n/notes/feed.xml\n") && kept.contains("\n/notes/page/2/\n"),
+        "{kept}"
+    );
+    assert!(
+        !kept.contains(".css") && !kept.contains("index.html"),
+        "{kept}"
+    );
+    let (said, _) = site.check_without_javascript(&[]);
+    assert_eq!(
+        said,
+        format!(
+            "{}\n{}\n2 warnings: 2 url-gone.\n",
+            told(
+                "/notes/feed.xml",
+                "  published.txt, line 7\n   7 │ /notes/feed.xml\n     │ ^^^^^^^^^^^^^^^\n"
+            ),
+            told(
+                "/notes/page/2/",
+                "  published.txt, line 19\n  19 │ /notes/page/2/\n     │ ^^^^^^^^^^^^^^\n"
+            )
+        )
+    );
+}
+
+/// A run that keeps nothing of what it publishes, but puts its site in
+/// place of the earlier build's, keeps what that build published.
+#[test]
+fn a_run_that_replaces_an_earlier_build_keeps_what_it_published() {
+    for (name, args) in [
+        ("upgraded-drafts", &["build", "--drafts"][..]),
+        (
+            "upgraded-url",
+            &["build", "--url=https://preview.example.org/"],
+        ),
+    ] {
+        let site = upgraded(name);
+        let (said, code) = site.run(args);
+        assert_eq!(code, 0, "{said}");
+        assert!(
+            said.contains("Started `published.txt` with the 17 URLs"),
+            "{said}"
+        );
+        let (said, _) = site.check_without_javascript(&[]);
+        assert!(
+            said.ends_with("\n2 warnings: 2 url-gone.\n"),
+            "{args:?}: {said}"
+        );
+    }
+}
+
 /// A template's link is offered the nearest address the site publishes,
 /// even where that is the page being built when it is first met.
 #[test]
@@ -4110,6 +4238,7 @@ note  No list page: the tag `Go` and 1 other tag have none
 
     // Nothing is published at the top of a site that never published it.
     fs::remove_file(site.root.join("published.txt")).unwrap();
+    fs::remove_dir_all(site.out()).unwrap();
     fs::remove_file(site.root.join("content/index.md")).unwrap();
     fs::remove_file(site.root.join("templates/home.html")).unwrap();
     site.write("content/notes-1/index.md", "---\ntitle: Notes\n---\n");
