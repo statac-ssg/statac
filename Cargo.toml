@@ -10,8 +10,9 @@ homepage = "https://statac.dev"
 publish = false
 
 [workspace]
-members = ["crates/avif-aom-sys"]
-exclude = ["crates/minijinja"]
+members = ["crates/avif-aom-sys", "crates/minijinja"]
+# Not 3, which prefers dependencies for the oldest Rust any member asks for, the engine's copy's 1.70.
+resolver = "2"
 default-members = [".", "crates/avif-aom-sys"]
 
 [dependencies]
@@ -37,7 +38,8 @@ jpeg-encoder = "0.7.1"
 # Its error labels and messages are matched as written, in src/markdown/maths.rs.
 math-core = "=0.8.2"
 miniz_oxide = "0.9.1"
-minijinja = { path = "crates/minijinja", default-features = false, features = ["builtins", "debug", "macros", "multi_template", "adjacent_loop_items", "std_collections", "loop_controls", "unstable_machinery", "fuel"] }
+# Statac's changed copy of the template engine, whose changes follow no semver promise.
+minijinja = { package = "statac-minijinja", path = "crates/minijinja", version = "=3.0.1", default-features = false, features = ["builtins", "debug", "macros", "multi_template", "adjacent_loop_items", "std_collections", "loop_controls", "unstable_machinery", "fuel"] }
 moxcms = "0.8"
 # A release candidate: without `=`, Cargo would take a later candidate, which may break.
 notify = { version = "=9.0.0-rc.5", default-features = false, features = ["macos_fsevent"] }

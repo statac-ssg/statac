@@ -247,21 +247,25 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 
 ## Crates in no binary
 
-`Cargo.lock` names 71 more crates. They build or test Statac, or another crate names them for a system or a feature Statac does not use, and no binary links them.
+`Cargo.lock` names 82 more crates. They build or test Statac, or another crate names them for a system or a feature Statac does not use, and no binary links them.
 
 | Crate | Version |
 | --- | --- |
+| `ar_archive_writer` | 0.5.3 |
 | `autocfg` | 1.5.1 |
 | `bitflags` | 1.3.2 |
+| `bstr` | 1.13.1 |
 | `bumpalo` | 3.20.3 |
 | `bytemuck_derive` | 1.12.1 |
 | `cc` | 1.6.0 |
 | `cmake` | 0.1.58 |
+| `console` | 0.15.11 |
 | `defmt` | 1.1.1 |
 | `defmt-macros` | 1.1.1 |
 | `defmt-parser` | 1.0.0 |
 | `displaydoc` | 0.2.7 |
 | `dunce` | 1.0.5 |
+| `encode_unicode` | 1.0.0 |
 | `fastrand` | 2.5.0 |
 | `find-msvc-tools` | 0.1.14 |
 | `fs_extra` | 1.3.0 |
@@ -275,6 +279,7 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 | `js-sys` | 0.3.106 |
 | `kqueue` | 1.2.1 |
 | `kqueue-sys` | 1.1.2 |
+| `object` | 0.39.1 |
 | `phf_generator` | 0.11.3 |
 | `phf_generator` | 0.14.0 |
 | `phf_macros` | 0.11.3 |
@@ -284,6 +289,7 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 | `portable-atomic` | 1.15.0 |
 | `portable-atomic-util` | 0.2.8 |
 | `proc-macro2` | 1.0.107 |
+| `psm` | 0.1.32 |
 | `quote` | 1.0.47 |
 | `r-efi` | 6.0.0 |
 | `rand` | 0.8.8 |
@@ -293,7 +299,10 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 | `serde-tuple-vec-map` | 1.0.1 |
 | `serde_derive` | 1.0.229 |
 | `shlex` | 2.0.1 |
+| `similar` | 2.7.0 |
+| `similar-asserts` | 1.7.0 |
 | `slab` | 0.4.12 |
+| `stacker` | 0.1.25 |
 | `strum_macros` | 0.28.0 |
 | `syn` | 2.0.119 |
 | `syn` | 3.0.6 |
@@ -301,6 +310,7 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 | `thiserror` | 2.0.21 |
 | `thiserror-impl` | 2.0.21 |
 | `unicode-ident` | 1.0.26 |
+| `v_htmlescape` | 0.15.8 |
 | `version_check` | 0.9.5 |
 | `wasi` | 0.11.1+wasi-snapshot-preview1 |
 | `wasm-bindgen` | 0.2.129 |
@@ -308,6 +318,7 @@ These crates hold no licence file, so there is no copyright line of theirs to gi
 | `wasm-bindgen-macro-support` | 0.2.129 |
 | `wasm-bindgen-shared` | 0.2.129 |
 | `windows-sys` | 0.52.0 |
+| `windows-sys` | 0.59.0 |
 | `windows-targets` | 0.52.6 |
 | `windows_aarch64_gnullvm` | 0.52.6 |
 | `windows_aarch64_msvc` | 0.52.6 |

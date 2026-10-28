@@ -238,6 +238,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::Held;
+    use crate::value::Value;
     use crate::Environment;
 
     /// Notes each body it is written and gives it back in capitals.
@@ -254,9 +255,14 @@ mod tests {
     }
 
     impl Held for Shouting {
-        fn finish(self: Box<Self>) -> String {
+        fn finish(self: Box<Self>, safe: bool) -> Value {
             self.seen.lock().unwrap().push(self.text.clone());
-            self.text.to_uppercase()
+            let text = self.text.to_uppercase();
+            if safe {
+                Value::from_safe_string(text)
+            } else {
+                Value::from(text)
+            }
         }
     }
 

@@ -1,11 +1,11 @@
-# Changed from MiniJinja 3.0.1 for Statac: the registry metadata (authors, keywords, docs.rs settings, dev-dependencies) is dropped, the package is marked unpublished and described as kept with Statac, and the repository is Statac's.
+# Changed from MiniJinja 3.0.1 for Statac: the registry metadata (authors, keywords, docs.rs settings, dev-dependencies but similar-asserts) is dropped, the package is renamed statac-minijinja, marked unpublished and described as changed for Statac, and the repository is Statac's.
 [package]
-name = "minijinja"
+name = "statac-minijinja"
 version = "3.0.1"
 edition = "2021"
 rust-version = "1.70"
 publish = false
-description = "MiniJinja 3.0.1, the template engine, kept with Statac"
+description = "MiniJinja 3.0.1, by Armin Ronacher, changed for Statac"
 license = "Apache-2.0"
 repository = "https://git.statac.dev/statac/statac"
 
@@ -49,6 +49,9 @@ unstable_machinery_serde = [
 ]
 urlencode = ["percent-encoding"]
 
+[lib]
+name = "minijinja"
+
 [dependencies.indexmap]
 version = "2.2.0"
 optional = true
@@ -84,3 +87,6 @@ optional = true
 [dependencies.zmij]
 version = "1.0.17"
 optional = true
+
+[dev-dependencies.similar-asserts]
+version = "1.4.2"
