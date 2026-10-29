@@ -1,10 +1,11 @@
-# Names a template is handed
+# Names a template is handed (variables)
 
 Summary: The names a template or snippet can use on their own, and which templates are handed each one.
 
-The names a template, a snippet or a file in `snippets/markdown/` reads
-on their own, before any dot. Statac hands every template `page` and
-`site`, and each of the others only where its entry says.
+The names (the variables a template can use) that a template, a snippet
+or a file in `snippets/markdown/` reads on their own, before any dot.
+Statac hands every template `page` and `site`, and each of the others
+only where its entry says.
 
 ## `page`
 

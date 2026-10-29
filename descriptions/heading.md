@@ -2,8 +2,8 @@
 
 Summary: Every value a template can read on a heading in a page's table of contents.
 
-What a template reads on each heading in `page.toc`, and in each
-heading's `headings`.
+The names (the variables a template can use) that a template reads on
+each heading in `page.toc`, and in each heading's `headings`.
 
 ## `title`
 

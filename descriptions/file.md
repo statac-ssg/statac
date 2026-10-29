@@ -2,9 +2,10 @@
 
 Summary: Every value a template can read on a file, a video or a recording kept beside a page.
 
-What a template reads on the file that `page.file` returns, and on the
-video or recording that `page.video` or `page.audio` returns.
-`{{ page.file("notes-1.pdf") }}` on its own writes the file's `url`.
+The names (the variables a template can use) that a template reads on
+the file that `page.file` returns, and on the video or recording that
+`page.video` or `page.audio` returns. `{{ page.file("notes-1.pdf") }}`
+on its own writes the file's `url`.
 
 ## `url`
 

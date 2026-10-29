@@ -125,6 +125,9 @@ fn page(group: Group) -> String {
     out
 }
 
+/// What the docs say after "names" where a page first uses the word.
+pub const GLOSS: &str = " (the variables a template can use)";
+
 /// The first sentence of `text`.
 fn opening(text: &str) -> &str {
     text.find(". ").map_or(text, |at| &text[..=at])
@@ -144,14 +147,21 @@ fn index() -> String {
         "\nEach of Statac's names has a line or two here. An editor shows the same \
          words when you point at the name, and the debug panel shows them beside it.\n",
     );
+    // Most groups' openings gloss "names": the list keeps the first gloss only.
+    let mut glossed = false;
     for (heading, groups) in SECTIONS {
         out.push_str(&format!("\n## {heading}\n\n"));
         for group in *groups {
+            let mut opening = opening(group.about()).to_owned();
+            if glossed {
+                opening = opening.replacen(GLOSS, "", 1);
+            }
+            glossed |= opening.contains(GLOSS);
             out.push_str(&format!(
                 "- [{}](/reference/{}/): {}\n",
                 group.title(),
                 group.name(),
-                opening(group.about())
+                opening
             ));
         }
     }

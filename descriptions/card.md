@@ -2,8 +2,9 @@
 
 Summary: Every value a template can read on a page's social card or social image.
 
-What a layout reads on `page.card`: the card Statac draws for the page,
-or the social image its `og_image` names.
+The names (the variables a template can use) that a layout reads on
+`page.card`: the card Statac draws for the page, or the social image its
+`og_image` names.
 
 ## `url`
 

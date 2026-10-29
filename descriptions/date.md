@@ -2,10 +2,10 @@
 
 Summary: The year, month, day and weekday a template can read on a date.
 
-What a template reads on a date, such as `page.date.year`.
-`{{ page.date }}` on its own shows the date in the site's date format.
-A custom field declared `when` can be a year alone, a year and a month,
-or a whole date.
+The names (the variables a template can use) that a template reads on a
+date, such as `page.date.year`. `{{ page.date }}` on its own shows the
+date in the site's date format. A custom field declared `when` can be a
+year alone, a year and a month, or a whole date.
 
 ## `year`
 

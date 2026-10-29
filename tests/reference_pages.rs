@@ -89,3 +89,21 @@ fn each_name_has_a_heading_of_its_own_and_each_group_is_listed() {
     );
     assert_eq!(reference_pages::id("og_title"), "og_title");
 }
+
+#[test]
+fn names_are_glossed_once_a_page_where_first_used() {
+    for (name, text) in reference_pages::pages() {
+        let glosses = text.matches(reference_pages::GLOSS).count();
+        assert!(glosses <= 1, "{name} glosses names {glosses} times");
+    }
+    for &group in Group::ALL {
+        if let Some(at) = group.about().find("names") {
+            let after = &group.about()[at + "names".len()..];
+            assert!(after.starts_with(reference_pages::GLOSS), "{group:?}");
+        }
+    }
+    let index = reference_pages::pages()
+        .into_iter()
+        .find(|(name, _)| name == "index.md");
+    assert!(index.unwrap().1.contains(reference_pages::GLOSS));
+}
