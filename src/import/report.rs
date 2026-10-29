@@ -203,6 +203,43 @@ pub(super) fn document(shown: &Shown, summary: &Summary) -> String {
     text
 }
 
+/// Which home pages came across from the old site, and which have no
+/// content for the author to write.
+fn home_pages(summary: &Summary) -> String {
+    let empty: Vec<String> = (summary.homes.iter())
+        .filter(|(_, came)| !came)
+        .map(|(path, _)| code(&format!("content/{path}")))
+        .collect();
+    // Opens a sentence where it isn't empty.
+    let main = match summary.homes.first() {
+        Some((_, true)) => "The old site's home page is `content/index.md`. ",
+        _ => "",
+    };
+    let none = empty.len() == summary.homes.len();
+    match &empty[..] {
+        [] => main.trim_end().to_owned(),
+        [one] if main.is_empty() => format!(
+            "No page of the old site's came across as its home page, so {one} has no content: \
+             write the home page there."
+        ),
+        _ if none => format!(
+            "No page of the old site's came across as its home pages, so {} have no content: \
+             write the home pages there.",
+            crate::wording::listed(&empty)
+        ),
+        // Some languages' home pages came across, and some didn't.
+        [one] => format!(
+            "{main}No page of the old site's came across to {one}, so it has no content: write the \
+             home page there."
+        ),
+        [rest @ .., last] => format!(
+            "{main}No page of the old site's came across to {} or {last}, so they have no \
+             content: write the home pages there.",
+            rest.join(", ")
+        ),
+    }
+}
+
 fn came_across(text: &mut String, summary: &Summary) {
     text.push_str("## What came across\n\n");
     let folders: Vec<String> = summary
@@ -254,13 +291,8 @@ fn came_across(text: &mut String, summary: &Summary) {
         text.push_str(&format!("- {line}\n"));
     }
     text.push('\n');
-    text.push_str(match summary.home {
-        false => {
-            "No page of the old site's came across as its home page, so `content/index.md` \
-             has no content: write the home page there.\n\n"
-        }
-        true => "The old site's home page is `content/index.md`.\n\n",
-    });
+    text.push_str(&home_pages(summary));
+    text.push_str("\n\n");
     for note in (summary.notes.iter())
         .chain(&terms(summary))
         .chain(&settled(summary))

@@ -314,8 +314,46 @@ fn a_later_page_of_the_old_home_page_past_the_posts_last_is_listed() {
     assert!(!new.join("content/page2.md").exists());
 }
 
+/// Each home page of the new site in `new` that has no content, front
+/// matter aside, as the report names it: `content/index.md` for the main
+/// language and `content/<language>/index.md` for each other.
+fn homes_with_no_content(new: &Path) -> Vec<String> {
+    let settings = fs::read_to_string(new.join("statac.yaml")).unwrap();
+    let languages = (settings.lines())
+        .find_map(|line| line.strip_prefix("language: "))
+        .unwrap();
+    let languages = languages.trim_start_matches('[').trim_end_matches(']');
+    let mut found = Vec::new();
+    for (n, language) in languages.split(", ").enumerate() {
+        let path = match n {
+            0 => "content/index.md".to_owned(),
+            _ => format!("content/{language}/index.md"),
+        };
+        let home = fs::read_to_string(new.join(&path)).unwrap();
+        let mut lines = home.lines().peekable();
+        if lines.next_if_eq(&"---").is_some() {
+            lines.by_ref().find(|line| *line == "---");
+        }
+        if lines.all(|line| line.trim().is_empty()) {
+            found.push(format!("`{path}`"));
+        }
+    }
+    found
+}
+
+/// The home pages `report` says have no content.
+fn home_pages_named(report: &str) -> Vec<String> {
+    let said = "No page of the old site's came across";
+    let Some(line) = report.lines().find_map(|line| line.split_once(said)) else {
+        return Vec::new();
+    };
+    (line.1.split('`').skip(1).step_by(2))
+        .map(|path| format!("`{path}`"))
+        .collect()
+}
+
 #[test]
-fn the_report_says_the_home_page_has_no_content_whether_or_not_it_holds_front_matter() {
+fn the_report_names_each_home_page_with_no_content_whether_or_not_it_holds_front_matter() {
     let line = "No page of the old site's came across as its home page, so `content/index.md` \
                 has no content: write the home page there.\n";
     // A paginated home page leaves `content/index.md` with front matter.
@@ -338,22 +376,86 @@ fn the_report_says_the_home_page_has_no_content_whether_or_not_it_holds_front_ma
         let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
         assert!(report.contains(line), "{report}");
     }
-    // The same holds for every kept site, from each tool.
+    // A site in several languages, each with a feed, leaves each home
+    // page no page came across to with `feed:` and no content.
+    let came = "The old site's home page is `content/index.md`. ";
+    for (languages, home, said) in [
+        (
+            &["fr"][..],
+            None,
+            "No page of the old site's came across as its home pages, so `content/index.md` and \
+             `content/fr/index.md` have no content: write the home pages there.",
+        ),
+        (
+            &["fr"],
+            Some("_index.fr.md"),
+            "No page of the old site's came across as its home page, so `content/index.md` has \
+             no content: write the home page there.",
+        ),
+        (
+            &["fr"],
+            Some("_index.md"),
+            &format!(
+                "{came}No page of the old site's came across to `content/fr/index.md`, so it has \
+                 no content: write the home page there."
+            ),
+        ),
+        (
+            &["fr", "de"],
+            Some("_index.md"),
+            &format!(
+                "{came}No page of the old site's came across to `content/fr/index.md` or \
+                 `content/de/index.md`, so they have no content: write the home pages there."
+            ),
+        ),
+    ] {
+        let label = format!("{}-{}", languages.join("-"), home.unwrap_or("none"));
+        let old = scratch(&format!("homes-no-content-old-{label}"));
+        let new = scratch(&format!("homes-no-content-new-{label}"));
+        fs::create_dir_all(old.join("content")).unwrap();
+        let mut settings = "base_url = \"https://example.org\"\ntitle = \"Site 1\"\n\
+                            generate_feeds = true\n"
+            .to_owned();
+        for language in languages {
+            settings.push_str(&format!(
+                "\n[languages.{language}]\ngenerate_feeds = true\n"
+            ));
+        }
+        fs::write(old.join("config.toml"), settings).unwrap();
+        if let Some(home) = home {
+            let text = "+++\ntitle = \"Home\"\n+++\nThe home page.\n";
+            fs::write(old.join("content").join(home), text).unwrap();
+        }
+        let (code, out) = import(&old, &new, None);
+        assert_eq!(code, 0, "{out}");
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(report.contains(&format!("\n{said}\n")), "{label}: {report}");
+        assert_eq!(
+            home_pages_named(&report),
+            homes_with_no_content(&new),
+            "{label}"
+        );
+        for path in home_pages_named(&report) {
+            let path = new.join(path.trim_matches('`'));
+            assert_eq!(
+                fs::read_to_string(path).unwrap(),
+                "---\nfeed: atom.xml\n---\n"
+            );
+        }
+    }
+    // Every kept site, from each tool, names exactly the home pages it
+    // wrote with no content.
     for entry in fs::read_dir("tests/import").unwrap() {
         let new = entry.unwrap().path().join("new");
         let Ok(report) = fs::read_to_string(new.join("IMPORT.md")) else {
             continue;
         };
-        if !report.contains(line) {
-            continue;
-        }
-        let home = fs::read_to_string(new.join("content/index.md")).unwrap();
-        let mut lines = home.lines().peekable();
-        if lines.next_if_eq(&"---").is_some() {
-            lines.by_ref().find(|line| *line == "---");
-        }
-        let content: Vec<&str> = lines.filter(|line| !line.trim().is_empty()).collect();
-        assert!(content.is_empty(), "{}: {home}", new.display());
+        assert_eq!(
+            home_pages_named(&report),
+            homes_with_no_content(&new),
+            "{}",
+            new.display()
+        );
     }
 }
 

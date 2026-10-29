@@ -252,8 +252,10 @@ pub(super) struct Summary {
     pub(crate) notes: Vec<String>,
     /// `statac.yaml` as written.
     pub(crate) settings: String,
-    /// Whether the old site's home page came across.
-    pub(crate) home: bool,
+    /// Each language's home page, the main language's first, by its path
+    /// under `content/`, with whether a page of the old site's came across
+    /// to it. One that none came across to has no content.
+    pub(crate) homes: Vec<(String, bool)>,
     /// The path the site is under, where it is under one.
     pub(crate) base: String,
     pub(crate) built: Option<String>,
@@ -502,7 +504,6 @@ pub(super) fn write<'a>(
         base: address.as_deref().map(base_of).unwrap_or_default(),
         ..Summary::default()
     };
-    summary.home = pages.iter().any(|page| page.to == "index.md");
     let mut text = made.settings.clone();
     text.push_str(&yaml::fields(
         settings.iter().map(|(name, value)| (name.as_str(), value)),
@@ -630,9 +631,11 @@ pub(super) fn write<'a>(
             true => "index.md".to_owned(),
             false => format!("{language}/index.md"),
         };
-        if !came.contains(&path) && out.text(&format!("content/{path}")).is_none() {
+        let home_came = came.contains(&path);
+        if !home_came && out.text(&format!("content/{path}")).is_none() {
             out.put(&format!("content/{path}"), b"")?;
         }
+        summary.homes.push((path, home_came));
     }
     // A page the words are for that isn't there is written to hold them.
     for (path, field) in &words {
