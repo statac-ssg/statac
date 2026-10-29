@@ -98,8 +98,8 @@ fn names_are_glossed_once_a_page_where_first_used() {
     }
     for &group in Group::ALL {
         if let Some(at) = group.about().find("names") {
-            let after = &group.about()[at + "names".len()..];
-            assert!(after.starts_with(reference_pages::GLOSS), "{group:?}");
+            let first = &group.about()[at..];
+            assert!(first.starts_with(reference_pages::GLOSS), "{group:?}");
         }
     }
     let index = reference_pages::pages()

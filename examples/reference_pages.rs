@@ -125,8 +125,8 @@ fn page(group: Group) -> String {
     out
 }
 
-/// What the docs say after "names" where a page first uses the word.
-pub const GLOSS: &str = " (the variables a template can use)";
+/// "names" as the docs write it where a page first uses the word.
+pub const GLOSS: &str = "names (variables)";
 
 /// The first sentence of `text`.
 fn opening(text: &str) -> &str {
@@ -154,7 +154,7 @@ fn index() -> String {
         for group in *groups {
             let mut opening = opening(group.about()).to_owned();
             if glossed {
-                opening = opening.replacen(GLOSS, "", 1);
+                opening = opening.replacen(GLOSS, "names", 1);
             }
             glossed |= opening.contains(GLOSS);
             out.push_str(&format!(

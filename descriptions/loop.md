@@ -2,8 +2,7 @@
 
 Summary: Every value a template can read inside a for loop, such as the item's number and whether it is the last.
 
-The names (the variables a template can use) that a template reads on
-`loop` inside a `for` loop.
+The names (variables) a template reads on `loop` inside a `for` loop.
 
 ## `index`
 

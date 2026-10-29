@@ -2,12 +2,11 @@
 
 Summary: Every value a template can read on an image, such as its resized copies, size and alt text.
 
-The names (the variables a template can use) that a template reads on
-the image that `page.image` returns, and on each image from
-`page.images`, a video's `thumbnail`, a mention's `avatar`, and `image`
-in `image.html`. `{{ image }}` on its own writes the image's `src`. A
-template reads a custom field in the image's `.yaml` file the same way,
-such as `image.credit`.
+The names (variables) a template reads on the image that `page.image`
+returns, and on each image from `page.images`, a video's `thumbnail`, a
+mention's `avatar`, and `image` in `image.html`. `{{ image }}` on its
+own writes the image's `src`. A template reads a custom field in the
+image's `.yaml` file the same way, such as `image.credit`.
 
 ## `src`
 
