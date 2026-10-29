@@ -9,6 +9,9 @@ name, but nothing in `data/` has that name. `data.people` means
 
 ```text
 error  Missing data: there is no `data.poeple` for `fields.author` to name
+  statac.yaml, line 1
+   1 │ fields.author: one of data.poeple
+     │                ^^^^^^^^^^^^^^^^^^
   Did you mean `data.people`?
   More: https://statac.dev/e/missing-data/
 ```

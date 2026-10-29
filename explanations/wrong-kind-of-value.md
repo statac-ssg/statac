@@ -19,7 +19,11 @@ The message says what kind of value is expected.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Wrong kind of value: `draft` is `true` or `false`, not `perhaps`
+error  Wrong kind of value: `draft` is `true` or `false`, not `yes`
+  content/post-1.md, line 3
+   3 │ draft: yes
+     │        ^^^
+  Write it as `true`.
   More: https://statac.dev/e/wrong-kind-of-value/
 ```
 

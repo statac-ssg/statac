@@ -6,8 +6,11 @@ page lists.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Malformed list: a list starts from `site.posts`, not `site.pages`
-  Start it with `site.posts`, such as `site.posts | tagged("Rust")`.
+error  Malformed list: `(` is never closed
+  content/rust.md, line 3
+   3 │ posts: site.posts | tagged(Rust
+     │                           ^
+  Close it with `)`.
   More: https://statac.dev/e/malformed-list/
 ```
 

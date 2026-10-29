@@ -9,6 +9,7 @@ says how many pages were built this way, and lists them.
 
 ```text
 note  Built with page template: `templates/page.html` builds 1 page in place of `templates/home.html`
+  While building: content/index.md
   Add `templates/home.html` to give it a template of its own.
   More: https://statac.dev/e/built-with-page-template/
 ```

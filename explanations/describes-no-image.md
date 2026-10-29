@@ -7,6 +7,9 @@ A file under `content/` is named like an image's sidecar file, such as
 
 ```text
 warning  Describes no image: there is no `content/photo-1.jpg`
+  content/photo-1.jpg.yaml, line 1
+   1 │ alt: A gradient from blue to orange
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Did you mean `photo-1.jpeg`?
   More: https://statac.dev/e/describes-no-image/
 ```

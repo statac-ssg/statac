@@ -7,6 +7,9 @@ An `<iframe>` on a built page has no `title`, and no `aria-label` or
 
 ```text
 note  Missing iframe title: the `<iframe>` showing `https://example.org/video/1` has no `title`
+  content/post-1.md, line 1
+   1 │ <iframe src="https://example.org/video/1"></iframe>
+     │ ^^^^^^^
   Give it a `title` saying what it shows.
   More: https://statac.dev/e/missing-iframe-title/
 ```

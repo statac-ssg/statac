@@ -7,7 +7,7 @@ can listen on each port.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Can't listen on port 3000: another program is using it
+error  Can't listen on port 80: permission denied
   Choose another port with `--port=<number>`.
   More: https://statac.dev/e/cant-listen/
 ```

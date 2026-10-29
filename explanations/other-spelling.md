@@ -17,6 +17,9 @@ Statac refuses an old name the same way, and offers the new one:
 
 ```text
 error  Unknown field: `template`
+  content/post-1.md, line 3
+   3 │ template: post
+     │ ^^^^^^^^
   Statac calls this `layout`.
   More: https://statac.dev/e/other-spelling/
 ```

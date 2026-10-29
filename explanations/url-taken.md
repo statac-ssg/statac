@@ -7,7 +7,10 @@ published there now.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  URL taken: this draft would be published at `/post-1/`, where `content/post-2.md` is already
+warning  URL taken: this draft would be published at `/post-1/`, where `content/post-1.md` is already
+  content/post-2.md, line 3
+   3 │ draft: true
+     │        ^^^^
   Give one of them another `permalink` before it is published.
   More: https://statac.dev/e/url-taken/
 ```

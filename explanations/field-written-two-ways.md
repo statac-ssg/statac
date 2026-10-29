@@ -8,6 +8,12 @@ under it. YAML reads these as two different fields.
 
 ```text
 warning  Field written two ways: `book.author` is also nested under `book`
+  content/post-1.md, line 3
+   3 │ book.author: Author 1
+     │ ^^^^^^^^^^^
+  Nested here: content/post-2.md, line 4
+   4 │   author: Author 2
+     │   ^^^^^^
   Nest it under `book`, so templates read it as `page.book.author`.
   More: https://statac.dev/e/field-written-two-ways/
 ```

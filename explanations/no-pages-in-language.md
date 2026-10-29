@@ -9,6 +9,9 @@ the site is in this language.
 
 ```text
 warning  No pages in `en`: there is no `content/en/` folder
+  statac.yaml, line 1
+   1 │ language: [ar, en]
+     │                ^^
   Put the pages written in `en` in `content/en/`.
   More: https://statac.dev/e/no-pages-in-language/
 ```

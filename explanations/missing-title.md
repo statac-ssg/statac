@@ -6,6 +6,10 @@ A page built with a template has no `<title>`, or its `<title>` is empty.
 
 ```text
 note  Missing title: the page has no `<title>`
+  templates/page.html, line 3
+   3 │ <head>
+     │ ^^^^^
+  While building: content/index.md
   Add a `<title>` naming the page, such as `<title>{{ page.title }}</title>`.
   More: https://statac.dev/e/missing-title/
 ```

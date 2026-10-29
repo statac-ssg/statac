@@ -9,6 +9,9 @@ so `thumbnail` is empty.
 
 ```text
 warning  No thumbnail: `statac refresh` hasn't fetched an image for this video yet
+  content/post-1.md, line 1
+   1 │ @youtube("https://youtu.be/abcdefghijk")
+     │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Run `statac refresh` to fetch one.
   More: https://statac.dev/e/no-thumbnail/
 ```

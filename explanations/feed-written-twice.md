@@ -8,7 +8,13 @@ at the second one, and shows where the first is written.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Feed written twice: `feed.xml` and `/posts/feed.xml` are both at `/posts/feed.xml`
+warning  Feed written twice: `feed.xml`
+  content/posts/index.md, line 3
+   3 │ feed: [feed.xml, rss.xml, feed.xml]
+     │                           ^^^^^^^^
+  First written: content/posts/index.md, line 3
+   3 │ feed: [feed.xml, rss.xml, feed.xml]
+     │        ^^^^^^^^
   Statac publishes the feed once; take one of them out of the `feed:` line.
   More: https://statac.dev/e/feed-written-twice/
 ```

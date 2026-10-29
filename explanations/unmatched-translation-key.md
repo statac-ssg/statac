@@ -7,6 +7,9 @@ language has, so it isn't linked to any translation.
 
 ```text
 warning  Unmatched translation key: no page in another language has `abuot`
+  content/en/about-us.md, line 2
+   2 │ translation_key: abuot
+     │                  ^^^^^
   Did you mean `about`?
   More: https://statac.dev/e/unmatched-translation-key/
 ```

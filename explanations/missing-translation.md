@@ -21,6 +21,7 @@ pages there are.
 
 ```text
 note  Missing translation: the footnotes' back link, on 1 page in `fr`
+  While building: content/post-1.md
   Add the line `back_to_the_text: back to the text` to `languages/fr.yaml`, translated.
   More: https://statac.dev/e/missing-translation/
 ```

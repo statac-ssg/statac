@@ -9,6 +9,9 @@ provides its own.
 
 ```text
 warning  Unknown language: Statac has no translations for `sw`
+  statac.yaml, line 1
+   1 │ language: sw
+     │           ^^
   Write its months, weekdays and quotation marks in `languages/sw.yaml`.
   More: https://statac.dev/e/unknown-language/
 ```

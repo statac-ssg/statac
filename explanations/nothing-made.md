@@ -8,6 +8,9 @@ there.
 
 ```text
 warning  Nothing made: `after_build` left nothing at `search/`
+  statac.yaml, line 2
+   2 │ after_build_outputs: [search/]
+     │                       ^^^^^^^
   More: https://statac.dev/e/nothing-made/
 ```
 

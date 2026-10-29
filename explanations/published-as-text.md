@@ -29,6 +29,9 @@ very top of the file.
 
 ```text
 warning  Published as text: `{{< figure src="photo-1.jpg" >}}` is another tool's call
+  content/post-1.md, line 1
+   1 │ {{< figure src="photo-1.jpg" >}}
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Call a snippet in its place, written `@name(...)`, or take it out.
   More: https://statac.dev/e/published-as-text/
 ```

@@ -9,6 +9,9 @@ doesn't appear anywhere.
 
 ```text
 warning  Footnote never shown: nothing points at `[^sources]`
+  content/post-1.md, line 3
+   3 │ [^sources]: The yearly report.
+     │ ^^^^^^^^^^
   Is it the definition for `[^source]`?
   More: https://statac.dev/e/footnote-never-shown/
 ```

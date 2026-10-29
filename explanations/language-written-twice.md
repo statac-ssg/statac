@@ -7,7 +7,13 @@ message points at the second one, and shows where the first is written.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Language written twice: `en`
+error  Language written twice: `en` and `EN` are one language
+  statac.yaml, line 1
+   1 │ language: [en, ar, EN]
+     │                    ^^
+  First written: statac.yaml, line 1
+   1 │ language: [en, ar, EN]
+     │            ^^
   More: https://statac.dev/e/language-written-twice/
 ```
 

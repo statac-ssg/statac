@@ -8,6 +8,9 @@ An argument in a snippet call was named with a colon, as in
 
 ```text
 warning  Colon in call: Statac read `caption:` as `caption=`
+  content/post-1.md, line 1
+   1 │ @image('photo-1.jpg', caption: 'Post 1')
+     │                       ^^^^^^^^
   Write `caption=` instead.
   More: https://statac.dev/e/colon-in-call/
 ```

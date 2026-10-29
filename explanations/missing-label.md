@@ -8,6 +8,10 @@ and it has no `aria-label`, `aria-labelledby` or `title`.
 
 ```text
 note  Missing label: the `<input>` named `q` has no label
+  templates/search.html, line 1
+   1 │ <input type="search" name="q">
+     │ ^^^^^^
+  While building: content/search.md
   Put it inside a `<label>` saying what it is for, or give it an `aria-label`.
   More: https://statac.dev/e/missing-label/
 ```

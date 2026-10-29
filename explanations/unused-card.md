@@ -8,8 +8,9 @@ card, or the card is one of several, with its settings in
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Unused card: no layout reads `page.card`
-  Write the card's `<meta>` lines in a layout, or remove the card's settings and `templates/og/`.
+warning  Unused card: no page picks `wide`
+  templates/og.wide.yaml
+  Write `card: wide` on the pages it is for, or remove the card's settings.
   More: https://statac.dev/e/unused-card/
 ```
 

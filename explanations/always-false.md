@@ -11,6 +11,9 @@ never shown or always shown.
 
 ```text
 warning  Always false: no page has `subtitel`
+  templates/post.html, line 1
+   1 │ {% if page.subtitel is defined %}
+     │       ^^^^^^^^^^^^^
   Did you mean `page.subtitle`?
   More: https://statac.dev/e/always-false/
 ```

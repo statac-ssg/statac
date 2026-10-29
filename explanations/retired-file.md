@@ -9,7 +9,8 @@ under `refuse_webmentions_from`.
 
 ```text
 error  Retired file: Statac no longer reads `fetched/refused`
-  Delete `fetched/refused` after adding them.
+  Statac can't read its 2 lines.
+  Copy its URLs to `refuse_webmentions_from:` in `statac.yaml`, then delete it.
   More: https://statac.dev/e/retired-file/
 ```
 

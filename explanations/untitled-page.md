@@ -9,7 +9,10 @@ its URL.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Untitled page: Statac names `content/post-1.md` by its opening words, `Post 1 opens…`
+note  Untitled page: Statac names `content/post-1.md` by its opening words, `Post 1 opens with this paragraph.`
+  content/post-1.md, line 1
+   1 │ ---
+     │ ^^^
   Give it a `title`, or open its content with a `# heading`. If a folder's pages need no titles, write `pages.untitled: true` in its `index.md`.
   More: https://statac.dev/e/untitled-page/
 ```

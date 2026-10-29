@@ -8,7 +8,10 @@ site's webmentions.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  No site URL: Statac leaves out social cards until the site has a `url`
+note  No site URL: Statac leaves out `content/sitemap.md` until the site has a `url`
+  content/sitemap.md, line 4
+   4 │ needs: url
+     │        ^^^
   Add the site's full URL to `statac.yaml`, such as `url: https://example.org/`.
   More: https://statac.dev/e/no-site-url/
 ```

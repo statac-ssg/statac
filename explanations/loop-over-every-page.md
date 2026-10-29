@@ -8,7 +8,10 @@ says which list, and how many pages ran the loop.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Loop over every page: 11,243 pages each go through `site.pages`
+note  Loop over every page: 2,301 pages each go through `site.pages`
+  templates/base.html, line 1
+   1 │ {% for entry in site.pages if entry.menu %}
+     │                 ^^^^^^^^^^
   Write `site.pages | selectattr("menu")` to choose the pages once for the site.
   More: https://statac.dev/e/loop-over-every-page/
 ```

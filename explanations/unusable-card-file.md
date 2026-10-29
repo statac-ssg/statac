@@ -12,6 +12,9 @@ with it:
 
 ```text
 error  Unusable card file: `templates/og/background.png` is 1,600 by 900 pixels, not 1,200 by 630
+  templates/og.yaml, line 1
+   1 │ background: background.png
+     │             ^^^^^^^^^^^^^^
   Save the background 1,200 pixels wide and 630 tall.
   More: https://statac.dev/e/unusable-card-file/
 ```

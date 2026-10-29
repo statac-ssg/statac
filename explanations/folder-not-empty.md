@@ -8,7 +8,7 @@ many more there are.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Folder not empty: `site-1` holds `a.txt`
+error  Folder not empty: `notes` holds `a.txt`
   Give `statac new` an empty folder, or the name of a new one.
   More: https://statac.dev/e/folder-not-empty/
 ```

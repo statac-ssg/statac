@@ -7,6 +7,9 @@ the `alt` of its tag is empty or missing.
 
 ```text
 note  Missing alt text: `photo-1.jpg`
+  content/post-1.md, line 1
+   1 │ ![](photo-1.jpg)
+     │     ^^^^^^^^^^^
   Describe it in the brackets, or mark it decorative.
   More: https://statac.dev/e/missing-alt-text/
 ```

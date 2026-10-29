@@ -10,6 +10,9 @@ with `code_colours: true`, where it colours code.
 
 ```text
 warning  Unknown code language: Statac has no colours for `cosole`
+  content/post-1.md, line 1
+   1 │ ```cosole
+     │    ^^^^^^
   Did you mean `console`?
   More: https://statac.dev/e/unknown-code-language/
 ```

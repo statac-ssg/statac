@@ -7,6 +7,9 @@ yet: it is a scheduled post.
 
 ```text
 note  Scheduled post: `content/post-2.md` is dated `2026-10-05`
+  content/post-2.md, line 3
+   3 │ date: 2026-10-05
+     │       ^^^^^^^^^^
   Run with `--drafts` to build it as if published.
   More: https://statac.dev/e/scheduled-post/
 ```

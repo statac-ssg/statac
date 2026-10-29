@@ -8,6 +8,9 @@ on the page itself, or cascaded from its folder's `index.md` with
 
 ```text
 note  Draft left out: `content/post-1.md`
+  content/post-1.md, line 3
+   3 │ draft: true
+     │        ^^^^
   Run with `--drafts` to build it as if published.
   More: https://statac.dev/e/draft-left-out/
 ```

@@ -8,6 +8,10 @@ name: no words inside it, no image inside it with alt text, and no
 
 ```text
 note  Missing link text: the link to `https://example.org/` has nothing a screen reader can read out
+  templates/page.html, line 1
+   1 │ <a href="https://example.org/"><img src="/icon.svg" alt=""></a>
+     │ ^^
+  While building: content/index.md
   Give the `<img>` inside it an `alt` saying where the link leads.
   More: https://statac.dev/e/missing-link-text/
 ```

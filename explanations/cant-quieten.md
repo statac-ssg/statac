@@ -9,6 +9,9 @@ site.
 
 ```text
 error  Can't quieten: `duplicate-key` stops the build
+  statac.yaml, line 1
+   1 │ quiet: [broken-link, duplicate-key]
+     │                      ^^^^^^^^^^^^^
   Take it out of `quiet:`.
   More: https://statac.dev/e/cant-quieten/
 ```

@@ -9,6 +9,9 @@ post that the call handed to the snippet.
 
 ```text
 warning  Page in snippet: `card` shows `page.title`, the page being built
+  snippets/card.html, line 1
+   1 │ <h2>{{ page.title }}</h2>
+     │        ^^^^^^^^^^
   Did you mean `post.title`?
   More: https://statac.dev/e/page-in-snippet/
 ```

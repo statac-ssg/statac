@@ -10,6 +10,9 @@ file and says which of these it is.
 
 ```text
 error  Unreadable image: `content/photo-1.jpg` is cut short or damaged
+  content/post-1.md, line 1
+   1 │ ![A gradient from blue to orange](photo-1.jpg)
+     │                                   ^^^^^^^^^^^
   Copy or export the file again.
   More: https://statac.dev/e/unreadable-image/
 ```

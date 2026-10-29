@@ -10,6 +10,9 @@ if the bytes are text.
 
 ```text
 error  Unknown YAML tag: `!local`
+  content/post-1.md, line 3
+   3 │ version: !local 3.10
+     │          ^^^^^^
   More: https://statac.dev/e/unknown-yaml-tag/
 ```
 

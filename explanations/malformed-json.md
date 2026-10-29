@@ -8,6 +8,9 @@ comma with nothing after it.
 
 ```text
 error  Malformed JSON: a comma with nothing after it
+  data/people.json, line 3
+   3 │   {"name": "Person 2"},
+     │                       ^
   Take the comma out.
   More: https://statac.dev/e/malformed-json/
 ```

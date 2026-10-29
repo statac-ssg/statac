@@ -9,6 +9,9 @@ unless `code_colours: true` asks.
 
 ```text
 error  Retired setting: Statac no longer reads `code_style`
+  statac.yaml, line 2
+   2 │ code_style: ocean
+     │ ^^^^^^^^^^
   Write `code_colours: true` in its place, and copy the `ocean` theme's rules from https://statac.dev/code-colours/ into a stylesheet of the site's own.
   More: https://statac.dev/e/retired-setting/
 ```

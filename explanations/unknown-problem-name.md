@@ -8,6 +8,9 @@ its `More:` link.
 
 ```text
 error  Unknown problem name: `brokn-link`
+  statac.yaml, line 1
+   1 │ quiet: [brokn-link]
+     │         ^^^^^^^^^^
   Did you mean `broken-link`?
   More: https://statac.dev/e/unknown-problem-name/
 ```

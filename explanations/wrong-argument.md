@@ -14,6 +14,9 @@ names, in that order, and anything else by name.
 
 ```text
 error  Wrong argument: `card` takes no `pots`
+  templates/folder.html, line 2
+   2 │ {{ card(pots=post) }}
+     │              ^^^^
   Did you mean `post`?
   More: https://statac.dev/e/wrong-argument/
 ```

@@ -9,6 +9,9 @@ text at the top or the bottom is drawn at the size written.
 
 ```text
 warning  Size kept: at `bottom`, Statac draws `up to 36` at 36
+  templates/og.yaml, line 6
+   6 │ footer.size: up to 36
+     │              ^^^^^^^^
   Write `footer.size: 36`; Statac fits only a text at `left`, `centre` or `right`.
   More: https://statac.dev/e/size-kept/
 ```

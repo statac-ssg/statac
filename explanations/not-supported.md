@@ -18,7 +18,10 @@ one you used.
 
 ```text
 error  Not supported: `include`
-  Call the snippet instead: `{{ card(post) }}`.
+  templates/folder.html, line 2
+   2 │ {% include "card.html" %}
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^
+  Call the snippet instead: `{{ card() }}`.
   More: https://statac.dev/e/not-supported/
 ```
 

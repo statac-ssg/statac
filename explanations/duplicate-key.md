@@ -9,6 +9,12 @@ one, and shows where the first was written.
 
 ```text
 error  Duplicate key: `title`
+  content/post-1.md, line 4
+   4 │ title: Post 2
+     │ ^^^^^
+  First written: content/post-1.md, line 2
+   2 │ title: Post 1
+     │ ^^^^^
   More: https://statac.dev/e/duplicate-key/
 ```
 

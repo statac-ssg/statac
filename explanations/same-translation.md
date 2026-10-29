@@ -11,6 +11,12 @@ the second page, and shows the first.
 
 ```text
 error  Same translation: two pages in `en` have `translation_key: about`
+  content/en/about.md, line 2
+   2 │ translation_key: about
+     │                  ^^^^^
+  First written: content/en/about-us.md, line 2
+   2 │ translation_key: about
+     │                  ^^^^^
   Give each page in `en` its own key.
   More: https://statac.dev/e/same-translation/
 ```

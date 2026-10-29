@@ -7,7 +7,10 @@ values, or more than 1 MB of text.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Alias limit: by `*book`, aliases have repeated more than 10,000 values
+error  Alias limit: by `*c`, aliases have repeated more than 10,000 values
+  data/values.yaml, line 4
+   4 │ d: [*c, *c, *c, *c, *c, *c, *c, *c, *c, *c]
+     │                                 ^^
   More: https://statac.dev/e/alias-limit/
 ```
 

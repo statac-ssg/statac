@@ -12,7 +12,12 @@ before it finishes, or if the system's shell doesn't start at all.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Hook stopped: `after_build` ended with exit code 3
+error  Hook stopped: `after_build` ended with exit code 1
+  statac.yaml, line 1
+   1 │ after_build: gzip -k "$STATAC_OUT/missing.html"
+     │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  What it printed:
+    gzip: can't stat: missing.html: No such file or directory
   More: https://statac.dev/e/hook-stopped/
 ```
 

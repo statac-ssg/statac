@@ -9,6 +9,9 @@ points at the line that produced it.
 
 ```text
 warning  Sass warning: `$columns is deprecated`
+  assets/_grid.scss, line 1
+   1 │ @warn "$columns is deprecated";
+     │       ^^^^^^^^^^^^^^^^^^^^^^^^
   More: https://statac.dev/e/sass-warning/
 ```
 

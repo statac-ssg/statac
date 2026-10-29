@@ -9,7 +9,13 @@ definition is never shown.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Definition written twice: Statac doesn't show the first `[^n]:` line
+warning  Definition written twice: Statac doesn't show the first `[^1]:` line
+  content/post-1.md, line 3
+   3 │ [^1]: The yearly report.
+     │ ^^^^
+  Shown instead: content/post-1.md, line 5
+   5 │ [^1]: Photograph by the author.
+     │ ^^^^
   Give one of them another label, or take one out.
   More: https://statac.dev/e/definition-written-twice/
 ```

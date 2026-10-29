@@ -9,6 +9,9 @@ published this way, and lists them. Redirects published without
 
 ```text
 note  Built without template: Statac publishes 2 pages as their content alone
+  While building: content/hello.md
+  And while building 1 more:
+    content/index.md
   Add `templates/page.html` to build them with a template.
   More: https://statac.dev/e/built-without-template/
 ```

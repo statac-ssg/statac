@@ -22,8 +22,11 @@ the year in full, because every date on the site is written with it.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Unusable date format: `31 December` has no year
-  Add the year: the site writes every date in this format.
+error  Unusable date format: December 31, 2025 is in December, not `January`
+  statac.yaml, line 1
+   1 │ date_format: 1 January 2020
+     │                ^^^^^^^
+  Did you mean `1 December 2020`?
   More: https://statac.dev/e/unusable-date-format/
 ```
 

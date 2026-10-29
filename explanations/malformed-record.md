@@ -6,8 +6,11 @@ lists what `statac refresh` fetched into `fetched/`, and when.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Malformed record: the first line isn't `statac fetched 1`
-  Write `statac fetched 1` as its first line.
+error  Malformed record: `6 October` isn't a day
+  fetched/record, line 2
+   2 │ stills/youtube-abcdefghijk.jpg  0f3a9c1e5b7d2468    6 October
+     │                                                     ^^^^^^^^^
+  Write the day as `2026-10-06`.
   More: https://statac.dev/e/malformed-record/
 ```
 

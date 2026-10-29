@@ -9,6 +9,12 @@ line, and shows where the first one is.
 
 ```text
 error  Two lists: this page has both `posts:` and `each:`
+  content/rust.md, line 4
+   4 │ each: site.posts | tagged("Rust")
+     │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  First written: content/rust.md, line 3
+   3 │ posts: site.posts | tagged("Rust")
+     │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Move one of them to a page of its own.
   More: https://statac.dev/e/two-lists/
 ```

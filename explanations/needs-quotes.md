@@ -9,6 +9,9 @@ without quotes is a comment to YAML, so the field has no value.
 
 ```text
 error  Needs quotes: YAML reads `3.10` as 3.1
+  content/post-1.md, line 3
+   3 │ version: 3.10
+     │          ^^^^
   Write it as `"3.10"` so YAML keeps it unchanged.
   More: https://statac.dev/e/needs-quotes/
 ```

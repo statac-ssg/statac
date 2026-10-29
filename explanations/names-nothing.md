@@ -10,6 +10,9 @@ for `book-1.md`, and `day-one` for `03-day-one.md` in a numbered folder.
 
 ```text
 error  Names nothing: `data/people.yaml` has no `persn-1`
+  content/post-1.md, line 3
+   3 │ author: persn-1
+     │         ^^^^^^^
   Did you mean `person-1`?
   More: https://statac.dev/e/names-nothing/
 ```

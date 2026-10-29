@@ -29,6 +29,9 @@ it.
 
 ```text
 warning  Field set aside: Statac fills `page.source` itself
+  content/post-1.md, line 3
+   3 │ source: notes/post-1.txt
+     │ ^^^^^^
   Give it a name of your own, such as `my_source`.
   More: https://statac.dev/e/set-aside/
 ```

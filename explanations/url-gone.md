@@ -8,6 +8,9 @@ there.
 
 ```text
 warning  URL gone: `/about/` was published before, and nothing is there now
+  published.txt, line 1
+   1 │ /about/
+     │ ^^^^^^^
   Redirect it with `redirect_from: [/about/]` in the page that took its place, or take it out of `published.txt` if it is gone for good.
   More: https://statac.dev/e/url-gone/
 ```

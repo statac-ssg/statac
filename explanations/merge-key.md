@@ -7,6 +7,9 @@ elsewhere in the file.
 
 ```text
 error  Merge key: Statac doesn't copy fields in with `<<`
+  data/people.yaml, line 4
+   4 │ - <<: *first
+     │   ^^
   Write the fields out in full.
   More: https://statac.dev/e/merge-key/
 ```

@@ -6,7 +6,10 @@ URL, such as `Rust` on some pages and `rust` on others.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Tag spelled two ways: `Rust` (12 pages) and `rust` (2 pages) are one tag, which Statac shows as `Rust`, the commonest
+warning  Tag spelled two ways: `Rust` (2 pages) and `rust` (1 page) are one tag, which Statac shows as `Rust`, the commonest
+  content/post-3.md, line 2
+   2 │ tags: [rust]
+     │        ^^^^
   Use one spelling on every page to choose how it's shown.
   More: https://statac.dev/e/spelled-two-ways/
 ```

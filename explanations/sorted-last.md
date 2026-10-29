@@ -9,6 +9,9 @@ names the first.
 
 ```text
 warning  Sorted last: `content/post-2.md` has no `rank`
+  templates/page.html, line 1
+   1 │ {% for post in site.pages | sort(attribute="rank") %}
+     │                                            ^^^^^^
   Write `site.pages | selectattr("rank", "defined") | sort(attribute="rank")` to leave out the items without it.
   More: https://statac.dev/e/sorted-last/
 ```

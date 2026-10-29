@@ -21,6 +21,9 @@ arrow and one that needs letters from another script.
 
 ```text
 warning  Card not drawn: the `title` of `content/post-1.md` doesn't fit, even at 45 pixels
+  templates/og.yaml, line 6
+   6 │ title.size: up to 75
+     │             ^^^^^^^^
   Give the page fewer words there, or the middle of the card more room.
   More: https://statac.dev/e/card-not-drawn/
 ```

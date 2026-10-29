@@ -528,8 +528,11 @@ fn explain_prints_the_explanation() {
     assert_eq!(out, Code::BrokenLink.explained());
     assert!(out.contains(
         "\n## What you'll see\n\n```text\n\
-         warning  Broken link: nothing is published at `/about-us/`\n  \
-         Did you mean `/about/`?\n  \
+         warning  Broken link: nothing is published at `/post-2/`\n  \
+         content/post-1.md, line 1\n   \
+         1 │ Read [Post 2](/post-2/) next.\n     \
+         │               ^^^^^^^^\n  \
+         Did you mean `/posts/post-2/`?\n  \
          More: https://statac.dev/e/broken-link/\n```\n"
     ));
     assert_eq!((err.as_str(), code), ("", 0));

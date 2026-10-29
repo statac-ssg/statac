@@ -11,6 +11,9 @@ with `code_colours: true`, where it colours code.
 
 ```text
 warning  Code not coloured: a line in this block is 52,310 characters long
+  content/post-1.md, line 1
+   1 │ ```js
+     │    ^^
   Break the line up, or take the language off the block's first line.
   More: https://statac.dev/e/code-not-coloured/
 ```

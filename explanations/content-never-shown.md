@@ -10,7 +10,11 @@ the page with `{{ page.content }}`.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Content never shown: 3 pages built by `templates/hollow.html` have content it never shows
+warning  Content never shown: 1 page built by `templates/hollow.html` has content it never shows
+  templates/hollow.html, line 1
+   1 │ <h1>{{ page.title }}</h1>
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
   Add `{{ page.content }}` where the content belongs.
   More: https://statac.dev/e/content-never-shown/
 ```

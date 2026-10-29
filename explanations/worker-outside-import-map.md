@@ -8,6 +8,9 @@ using the name of another file in `assets/`. It does this with
 
 ```text
 warning  Worker outside the import map: `./worker.js` isn't published under that name
+  assets/app.js, line 1
+   1 │ const worker = new Worker("./worker.js", { type: "module" });
+     │                            ^^^^^^^^^^^
   Keep the worker and the files it imports in `static/`: Statac publishes those under their own names.
   More: https://statac.dev/e/worker-outside-import-map/
 ```

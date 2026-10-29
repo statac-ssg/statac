@@ -7,6 +7,9 @@ its `date:` line has a different day.
 
 ```text
 warning  Dates disagree: `date` is `2026-10-05`, the file name `2026-10-04`
+  content/2026-10-04-post-1.md, line 3
+   3 │ date: 2026-10-05
+     │       ^^^^^^^^^^
   Change one so they match; Statac uses the `date` line.
   More: https://statac.dev/e/dates-disagree/
 ```

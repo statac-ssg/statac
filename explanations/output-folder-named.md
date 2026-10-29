@@ -9,6 +9,9 @@ last time in it.
 
 ```text
 warning  Output folder named: `_site` holds the site built last time while `after_build` runs
+  statac.yaml, line 1
+   1 │ after_build: ./index.sh _site
+     │                         ^^^^^
   Write it as `./index.sh "$STATAC_OUT"`.
   More: https://statac.dev/e/output-folder-named/
 ```

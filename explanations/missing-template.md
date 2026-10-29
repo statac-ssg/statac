@@ -28,8 +28,11 @@ way. Each name is the file's name in `templates/`, with or without
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Missing template: there is no `templates/folder.html`
-  Add the template, or a page of your own at the same URL.
+error  Missing template: there is no `templates/psot.html`
+  content/posts/index.md, line 2
+   2 │ pages.layout: psot
+     │               ^^^^
+  Did you mean `post`?
   More: https://statac.dev/e/missing-template/
 ```
 

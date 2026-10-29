@@ -8,6 +8,12 @@ points at the second page, and shows where the first was written.
 
 ```text
 error  Same id: two pages have the id `k3m9x2`
+  content/post-2.md, line 3
+   3 │ id: k3m9x2
+     │     ^^^^^^
+  First written: content/post-1.md, line 3
+   3 │ id: k3m9x2
+     │     ^^^^^^
   Give each page its own id.
   More: https://statac.dev/e/same-id/
 ```

@@ -6,8 +6,8 @@ has no option by that name, or it belongs to another command.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Unknown option: `--otu=public`
-  Did you mean `--out=public`?
+error  Unknown option: `statac check` has no `--out`
+  `--out` is for `statac build`.
   More: https://statac.dev/e/unknown-option/
 ```
 

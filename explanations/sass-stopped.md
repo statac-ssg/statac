@@ -11,6 +11,9 @@ what the `@error` says.
 
 ```text
 error  Sass stopped: no variable called `$link`
+  assets/_parts.scss, line 2
+   2 │   color: $link;
+     │          ^^^^^
   More: https://statac.dev/e/sass-stopped/
 ```
 

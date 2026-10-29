@@ -8,6 +8,9 @@ belong in a file that is kept with the site.
 
 ```text
 error  Token in settings: `webmention_token` doesn't belong in a file kept with the site
+  statac.yaml, line 2
+   2 │ webmention_token: •••
+     │ ^^^^^^^^^^^^^^^^
   Remove the line, add `webmentions: true`, and put the token in `STATAC_WEBMENTION_TOKEN` or in the site's `.statac/token`.
   More: https://statac.dev/e/token-in-settings/
 ```

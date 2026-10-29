@@ -11,7 +11,7 @@ folder and each folder above it, and none of them has either.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  No site here: `.` has no `content/` folder and no `statac.yaml`
+error  No site here: `notes` has no `content/` folder and no `statac.yaml`
   Run it in a site's folder, or make one with `statac new`.
   More: https://statac.dev/e/no-site-here/
 ```

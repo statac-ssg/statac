@@ -8,7 +8,13 @@ message points at the second use of the id, and also shows the first.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Id used twice: a heading above has the id `rust`
+warning  Id used twice: a heading above has the id `route`
+  content/post-1.md, line 3
+   3 │ ## Coming back {#route}
+     │                 ^^^^^^
+  First written: content/post-1.md, line 1
+   1 │ ## Getting there {#route}
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^
   Give this heading an id of its own.
   More: https://statac.dev/e/id-used-twice/
 ```

@@ -8,6 +8,9 @@ place to fix, such as a bracket that is never closed.
 
 ```text
 error  Malformed call: `@image(` is never closed
+  content/post-1.md, line 1
+   1 │ A photograph: @image('photo-1.jpg'
+     │               ^^^^^^^
   Close it with `)`.
   More: https://statac.dev/e/malformed-call/
 ```

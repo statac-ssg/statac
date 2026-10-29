@@ -12,6 +12,9 @@ because Statac uses them on `site`. In a field declaration, names such as
 
 ```text
 error  Reserved name: `site.posts` is Statac's own
+  statac.yaml, line 2
+   2 │ posts: 12
+     │ ^^^^^
   Give it a name of your own, such as `my_posts`.
   More: https://statac.dev/e/reserved-name/
 ```

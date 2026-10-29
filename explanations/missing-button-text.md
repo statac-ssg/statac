@@ -8,6 +8,10 @@ its name: no words inside it, no image inside it with alt text, and no
 
 ```text
 note  Missing button text: a `<button>` has nothing a screen reader can read out
+  templates/page.html, line 1
+   1 │ <button class="menu"><img src="/menu.svg" alt=""></button>
+     │ ^^^^^^^
+  While building: content/index.md
   Give the `<img>` inside it an `alt` saying what the button does.
   More: https://statac.dev/e/missing-button-text/
 ```

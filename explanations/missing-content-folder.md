@@ -8,7 +8,10 @@ means the folder at that path inside each language's own folder.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Missing content folder: there is no `content/boks/` for `types.review.book` to name
+error  Missing content folder: there is no `content/boks/` for `fields.review_of` to name
+  statac.yaml, line 1
+   1 │ fields.review_of: one of folder.boks
+     │                   ^^^^^^^^^^^^^^^^^^
   Did you mean `folder.books`?
   More: https://statac.dev/e/missing-content-folder/
 ```

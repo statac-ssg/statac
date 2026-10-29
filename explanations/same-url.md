@@ -11,8 +11,11 @@ at that URL in `redirect_from`.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Same URL: `assets/site.css` and `assets/site.scss` are both published at `/site.css`
-  Rename one of them.
+error  Same URL: `content/about.md` and a redirect in `content/about-us.md` are both published at `/about/index.html`
+  content/about-us.md, line 2
+   2 │ redirect_from: [/about/]
+     │                 ^^^^^^^
+  Take it out of `redirect_from` in `content/about-us.md`.
   More: https://statac.dev/e/same-url/
 ```
 

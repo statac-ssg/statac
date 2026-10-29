@@ -8,6 +8,9 @@ page that introduces the list and holds its settings.
 
 ```text
 warning  Not a post: `content/tags/rust.md` is the list page for the tag `Rust`
+  content/tags/rust.md, line 3
+   3 │ date: 2026-10-04
+     │       ^^^^^^^^^^
   A list page is in no list; give it a `permalink` of its own to list it as a post.
   More: https://statac.dev/e/not-a-post/
 ```

@@ -9,7 +9,10 @@ and whenever a file listed in `before_build_watches` changes, and
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Hook not run: `check` doesn't run `before_build` or `after_build`
+note  Hook not run: `check` doesn't run `after_build`
+  statac.yaml, line 1
+   1 │ after_build: gzip -k -r "$STATAC_OUT"
+     │              ^^^^^^^^^^^^^^^^^^^^^^^^
   More: https://statac.dev/e/hook-not-run/
 ```
 

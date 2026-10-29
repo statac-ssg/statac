@@ -13,6 +13,9 @@ URL twice.
 
 ```text
 warning  Language folder in pattern: `/en/{year}/{slug}/` starts with `/en/`, which Statac puts in front already
+  content/en/index.md, line 3
+   3 │ pages.permalink: /en/{year}/{slug}/
+     │                  ^^^^^^^^^^^^^^^^^^
   Write it as `/{year}/{slug}/`.
   More: https://statac.dev/e/language-folder-in-pattern/
 ```

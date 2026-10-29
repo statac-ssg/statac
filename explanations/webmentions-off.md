@@ -8,6 +8,9 @@ webmentions of your pages, but `statac.yaml` doesn't have
 
 ```text
 warning  Webmentions off: `webmention()` writes nothing here
+  templates/page.html, line 3
+   3 │   {{ webmention() }}
+     │      ^^^^^^^^^^^^
   Add `webmentions: true` to `statac.yaml`, or remove the call.
   More: https://statac.dev/e/webmentions-off/
 ```

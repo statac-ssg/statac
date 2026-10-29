@@ -9,6 +9,10 @@ file Statac looked for.
 
 ```text
 error  Missing file: there is no `assets/sit.css`
+  templates/base.html, line 1
+   1 │ {{ css("sit.css") }}
+     │    ^^^^^^^^^^^^^^
+  While building: content/post-1.md
   Did you mean `site.css`?
   More: https://statac.dev/e/missing-file/
 ```

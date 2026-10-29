@@ -9,8 +9,11 @@ something it can't work on, a snippet that calls itself, and showing a
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Template stopped: `absolute` needs the site's `url`
-  Add `url:` to `statac.yaml`.
+error  Template stopped: `date` needs a date
+  templates/post.html, line 1
+   1 │ <p>{{ page.title | date }}</p>
+     │       ^^^^^^^^^^^^^^^^^
+  While building: content/post-1.md
   More: https://statac.dev/e/template-stopped/
 ```
 

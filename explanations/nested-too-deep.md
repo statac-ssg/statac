@@ -11,6 +11,9 @@ first level past 200, which is the most Statac reads.
 
 ```text
 error  Nested too deep: the Markdown here is nested more than 200 deep
+  content/post-1.md, line 1
+   1 │ …>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> The words.
+     │                                                                      ^
   More: https://statac.dev/e/nested-too-deep/
 ```
 

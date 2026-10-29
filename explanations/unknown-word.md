@@ -15,6 +15,9 @@ tags and folders.
 
 ```text
 error  Unknown setting: `tags.permalnk`
+  statac.yaml, line 1
+   1 │ tags.permalnk: /topics/{slug}/
+     │ ^^^^^^^^^^^^^
   Did you mean `tags.permalink`?
   More: https://statac.dev/e/unknown-word/
 ```

@@ -12,6 +12,9 @@ Statac warns once for the whole site, at the first rule like this.
 
 ```text
 warning  Images out of proportion: `img` has a `max-width` and no `height`
+  assets/site.css, line 2
+   2 │   max-width: 100%;
+     │   ^^^^^^^^^
   Add `height: auto` to the rule.
   More: https://statac.dev/e/images-out-of-proportion/
 ```

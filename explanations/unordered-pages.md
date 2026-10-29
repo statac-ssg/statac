@@ -6,7 +6,10 @@ day-two]`, but the list has pages that aren't named there.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Unordered pages: `order` leaves out `day-four` and `day-five`
+warning  Unordered pages: `order` leaves out `day-three`
+  content/days/index.md, line 3
+   3 │ order: [day-one, day-two]
+     │        ^^^^^^^^^^^^^^^^^^
   Statac puts them after the named pages, in their usual order; name them in `order` to place them.
   More: https://statac.dev/e/unordered-pages/
 ```

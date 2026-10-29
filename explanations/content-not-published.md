@@ -8,6 +8,9 @@ anywhere.
 
 ```text
 warning  Content not published: `content/post-1.md` redirects
+  content/post-1.md, line 4
+   4 │ The first post.
+     │ ^^^^^^^^^^^^^^^
   Move it to the page it redirects to, or take out `redirect_to` to publish it.
   More: https://statac.dev/e/content-not-published/
 ```

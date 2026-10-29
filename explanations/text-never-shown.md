@@ -12,7 +12,9 @@ has nowhere to go.
 
 ```text
 error  Text never shown: `templates/base.html` has no block called `content`
-  Did you mean `main`?
+  templates/post.html, line 2
+   2 │ {% block content %}{{ page.content }}{% endblock %}
+     │          ^^^^^^^
   More: https://statac.dev/e/text-never-shown/
 ```
 

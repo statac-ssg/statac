@@ -19,6 +19,9 @@ Statac reports the error on every page in the loop, each at its own
 
 ```text
 error  Redirect to itself: `/post-1/` is this page's own URL
+  content/post-1.md, line 2
+   2 │ redirect_to: /post-1/
+     │              ^^^^^^^^
   Point `redirect_to` at the URL readers should reach.
   More: https://statac.dev/e/redirect-to-itself/
 ```

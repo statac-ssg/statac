@@ -7,6 +7,9 @@ later `---` line closes it.
 
 ```text
 error  Unclosed front matter: no `---` line ends it
+  content/post-1.md, line 1
+   1 │ ---
+     │ ^^^
   Add a `---` line after the last field.
   More: https://statac.dev/e/unclosed-front-matter/
 ```

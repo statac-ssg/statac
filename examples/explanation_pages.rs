@@ -72,16 +72,6 @@ fn page(code: Code) -> String {
         .split_once('\n')
         .map_or("", |(_, rest)| rest)
         .trim_start_matches('\n');
-    // The page alone says what the terminal adds to the message it shows.
-    let seen = "\n## What you'll see {#what-youll-see}\n\n```text\n";
-    let shown = body.find(seen).expect("each explanation shows its message") + seen.len();
-    let after = shown + body[shown..].find("```\n").expect("the message closes") + 4;
-    let body = format!(
-        "{}\nIn the terminal, the message also shows the file and line, if there is one, \
-         and marks the exact text.\n{}",
-        &body[..after],
-        &body[after..]
-    );
     // Only `statac check` reports these, so only it counts them.
     let counts = match code {
         Code::HookNotRun | Code::LocationPublished | Code::NoHomePage | Code::NoListPage => {

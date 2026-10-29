@@ -9,6 +9,9 @@ Statac can't follow.
 
 ```text
 error  Malformed template: `{% if %}` is never closed
+  templates/post.html, line 1
+   1 │ {% if page.date %}
+     │ ^^^^^^^^^^^^^^^^^^
   Close it with `{% endif %}`.
   More: https://statac.dev/e/malformed-template/
 ```

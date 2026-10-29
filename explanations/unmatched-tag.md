@@ -13,6 +13,9 @@ these:
 
 ```text
 warning  Unmatched tag: `<div>` is never closed
+  content/post-1.md, line 1
+   1 │ <div class="box">
+     │ ^^^^^^^^^^^^^^^^^
   Close it with `</div>` where it should end.
   More: https://statac.dev/e/unmatched-tag/
 ```

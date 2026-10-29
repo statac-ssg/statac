@@ -7,8 +7,11 @@ label. Statac publishes what you wrote as plain text, brackets and all.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Missing definition: there is no `[^2]:` line
-  Did you mean `[^1]`?
+warning  Missing definition: there is no `[^source]:` line
+  content/post-1.md, line 1
+   1 │ The figures are from 2026.[^source]
+     │                           ^^^^^^^^^
+  Did you mean `[^sources]`?
   More: https://statac.dev/e/missing-definition/
 ```
 

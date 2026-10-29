@@ -8,6 +8,9 @@ so there are no names for the field's values to be one of.
 
 ```text
 error  No names to check: `data/people.yaml` is a list, so `fields.author` can't name one of its items
+  statac.yaml, line 1
+   1 │ fields.author: one of data.people
+     │                ^^^^^^^^^^^^^^^^^^
   Give each item a name with its fields beneath, or declare the field as `text`.
   More: https://statac.dev/e/no-names-to-check/
 ```

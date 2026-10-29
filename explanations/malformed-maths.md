@@ -8,7 +8,11 @@ Statac doesn't know.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Malformed maths: Statac doesn't know `\fracc`
+error  Malformed maths: `{` is never closed
+  content/post-1.md, line 1
+   1 │ The area is $\frac{1}{2 b h$.
+     │                      ^
+  Close it with `}`.
   More: https://statac.dev/e/malformed-maths/
 ```
 

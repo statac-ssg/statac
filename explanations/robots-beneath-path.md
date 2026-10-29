@@ -8,6 +8,9 @@ ends up beneath the same path, at `https://example.org/blog/robots.txt`.
 
 ```text
 note  Robots beneath a path: crawlers read only `https://example.org/robots.txt`
+  content/robots.md, line 2
+   2 │ permalink: /robots.txt
+     │            ^^^^^^^^^^^
   Copy its lines into the `robots.txt` at the root of the host for crawlers to read them.
   More: https://statac.dev/e/robots-beneath-path/
 ```

@@ -9,6 +9,9 @@ linked as translations.
 
 ```text
 warning  Not linked by place: `content/about.md` has `translation_key: about`
+  content/en/about.md, line 1
+   1 │ ---
+     │ ^^^
   To link the two, give this page `translation_key: about` too.
   More: https://statac.dev/e/not-linked-by-place/
 ```

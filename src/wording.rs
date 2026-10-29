@@ -5193,11 +5193,14 @@ fn option_name(written: &str) -> &str {
 }
 
 #[cfg(test)]
+mod samples;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::problem::Host;
 
-    fn kinds() -> Vec<Kind> {
+    pub(super) fn kinds() -> Vec<Kind> {
         vec![
             Kind::BrokenLink {
                 target: "/about-us/".into(),
@@ -10635,46 +10638,6 @@ mod tests {
             if let Some(s) = suggestion(&kind) {
                 assert!(s.ends_with(['.', '?']), "{s}");
             }
-        }
-    }
-
-    /// A kind's short form: what the terminal prints of it without
-    /// colour, less its place.
-    fn short_form(kind: &Kind) -> String {
-        let mut out = format!(
-            "{}  {}\n",
-            severity(kind.severity()),
-            crate::report::shown(&headline(kind))
-        );
-        if let Some(suggestion) = suggestion(kind) {
-            out.push_str(&format!("  {}\n", crate::report::shown(&suggestion)));
-        }
-        out.push_str(&format!("  {}\n", more(&explanation_link(kind.name()))));
-        out
-    }
-
-    /// Each explanation shows its kind's first fixture in short form,
-    /// straight after its opening.
-    #[test]
-    fn every_explanation_shows_its_first_fixture() {
-        let mut seen = Vec::new();
-        for kind in kinds() {
-            let code = kind.code();
-            if seen.contains(&code) {
-                continue;
-            }
-            seen.push(code);
-            let section = format!(
-                "\n## What you'll see {{#what-youll-see}}\n\n```text\n{}```\n\n## ",
-                short_form(&kind)
-            );
-            let text = code.explanation().replace("\r\n", "\n");
-            let sections = text.find("\n## ").map_or("", |at| &text[at..]);
-            assert!(
-                sections.starts_with(&section),
-                "explanations/{}.md should open its sections with{section}",
-                code.name()
-            );
         }
     }
 

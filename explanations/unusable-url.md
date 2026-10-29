@@ -21,6 +21,9 @@ uses.
 
 ```text
 error  Unusable URL: there is no placeholder `{yaer}`
+  content/notes/index.md, line 2
+   2 │ pages.permalink: /notes/{yaer}/{name}/
+     │                         ^^^^^^
   Did you mean `{year}`?
   More: https://statac.dev/e/unusable-url/
 ```

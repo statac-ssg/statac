@@ -14,8 +14,11 @@ and its code, such as `<U+0092>`, for one between U+0080 and U+009F.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Control character: Statac leaves U+000B out of the page
-  Delete it, or type the character you meant.
+warning  Control character: Statac leaves U+0092 out of the page
+  content/post-1.md, line 1
+   1 │ Qu<U+0092>un
+     │   ^^^^^^^^
+  This is usually a character such as ’ saved in an old encoding: type it again.
   More: https://statac.dev/e/control-character/
 ```
 

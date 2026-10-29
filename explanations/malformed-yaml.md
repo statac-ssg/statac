@@ -8,6 +8,9 @@ fixing, such as a quote that is never closed or a line indented too far.
 
 ```text
 error  Malformed YAML: `"` is never closed
+  content/post-1.md, line 2
+   2 │ title: "Post 1
+     │        ^
   End the value with another `"`.
   More: https://statac.dev/e/malformed-yaml/
 ```

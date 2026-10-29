@@ -15,6 +15,9 @@ text on the card needs all four of its fields, `text`, `place`, `size` and
 
 ```text
 error  Missing field: `isbn`
+  content/books/book-1.md, line 1
+   1 │ ---
+     │ ^^^
   Add `isbn:`, which `statac.yaml` requires on pages of type `book`.
   More: https://statac.dev/e/missing-field/
 ```

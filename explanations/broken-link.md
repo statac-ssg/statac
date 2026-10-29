@@ -7,8 +7,11 @@ missing page.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Broken link: nothing is published at `/about-us/`
-  Did you mean `/about/`?
+warning  Broken link: nothing is published at `/post-2/`
+  content/post-1.md, line 1
+   1 │ Read [Post 2](/post-2/) next.
+     │               ^^^^^^^^
+  Did you mean `/posts/post-2/`?
   More: https://statac.dev/e/broken-link/
 ```
 

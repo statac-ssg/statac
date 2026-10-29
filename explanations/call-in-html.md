@@ -8,6 +8,9 @@ bracket, such as `@book(`. Statac built it as a call to that snippet.
 
 ```text
 note  Call in HTML: Statac builds `@book` as a snippet
+  content/post-1.md, line 1
+   1 │ <div class="aside">@book('Post 1')</div>
+     │                    ^^^^^^^^^^^^^^^
   To show it as text, write `\@book`.
   More: https://statac.dev/e/call-in-html/
 ```

@@ -7,8 +7,11 @@ stay in `fetched/mentions/` until `statac refresh` deletes them.
 ## What you'll see {#what-youll-see}
 
 ```text
-note  Refused webmentions: `refuse_webmentions_from` refuses 2 in `fetched/mentions/`
-  Run `statac refresh` to delete their files.
+note  Refused webmentions: `refuse_webmentions_from` refuses 1 in `fetched/mentions/`
+  statac.yaml, line 4
+   4 │   - https://a.example/post-1/
+     │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ runs to line 5
+  Run `statac refresh` to delete its file.
   More: https://statac.dev/e/refused-webmentions/
 ```
 

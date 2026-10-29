@@ -20,6 +20,9 @@ a field that `statac.yaml` declares.
 
 ```text
 warning  Read as a custom field: `titel`
+  content/post-1.md, line 2
+   2 │ titel: Post 1
+     │ ^^^^^
   Did you mean `title`? To keep `titel`, declare it in `statac.yaml` as `fields.titel: text`.
   More: https://statac.dev/e/read-as-custom/
 ```

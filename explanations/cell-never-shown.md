@@ -9,6 +9,9 @@ shows the row without it.
 
 ```text
 warning  Cell never shown: `Extra` is past the table's 2 columns
+  content/post-1.md, line 3
+   3 │ | Post 1 | 1     | Extra |
+     │                    ^^^^^
   Add a column to the table's first two lines, or take the cell out.
   More: https://statac.dev/e/cell-never-shown/
 ```

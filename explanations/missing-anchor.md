@@ -7,8 +7,11 @@ at the top of the page instead of the part you meant.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Missing anchor: nothing on `/posts/post-1/` has the id `rust`
-  Did you mean `#rust-1`?
+warning  Missing anchor: nothing on `/about/` has the id `getting-here`
+  content/post-1.md, line 1
+   1 │ See [how to get there](/about/#getting-here).
+     │                        ^^^^^^^^^^^^^^^^^^^^
+  Did you mean `#getting-there`?
   More: https://statac.dev/e/missing-anchor/
 ```
 

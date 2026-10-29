@@ -8,6 +8,9 @@ copies of it.
 
 ```text
 warning  HEIC image: Statac publishes `content/photo-1.heic` unchanged, with no resized copies
+  content/post-1.md, line 1
+   1 │ ![A gradient from blue to orange](photo-1.heic)
+     │                                   ^^^^^^^^^^^^
   Export it as a JPEG: most browsers can't show a HEIC image.
   More: https://statac.dev/e/heic-image/
 ```

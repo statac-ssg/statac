@@ -33,6 +33,9 @@ change that. To choose how the site writes dates, write `date_format` in
 
 ```text
 error  Wrong place: `pages.title` can't cascade
+  content/notes/index.md, line 3
+   3 │ pages.title: Note
+     │ ^^^^^^^^^^^
   Write `title:` on each page instead.
   More: https://statac.dev/e/wrong-place/
 ```

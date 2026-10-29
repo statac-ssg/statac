@@ -11,7 +11,10 @@ first page that uses it, and says how many pages there are.
 ## What you'll see {#what-youll-see}
 
 ```text
-warning  Social image may not show: `content/cover.webp` is a WebP
+warning  Social image may not show: `content/post-1/cover.webp` is a WebP
+  content/post-1/index.md, line 2
+   2 │ og_image: cover.webp
+     │           ^^^^^^^^^^
   For an image more link previews show, save it as a PNG.
   More: https://statac.dev/e/image-may-not-show/
 ```

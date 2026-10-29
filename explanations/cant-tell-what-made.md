@@ -20,7 +20,7 @@ or has files from more than one.
 
 ```text
 error  Can't tell what made the site: `old` has no settings file Statac knows
-  Say what made it with `--from=jekyll`.
+  Say what made it with `--from=jekyll`, `--from=hugo`, `--from=zola` or `--from=eleventy`.
   More: https://statac.dev/e/cant-tell-what-made/
 ```
 

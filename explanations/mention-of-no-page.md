@@ -8,6 +8,9 @@ nothing is published. No page is at that URL, and no page lists it in its
 
 ```text
 warning  Mention of no page: nothing is published at `https://example.org/post-1/`
+  fetched/mentions/2028899.yaml, line 5
+   5 │ target: "https://example.org/post-1/"
+     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   If the page moved, add the old URL to its `redirect_from`.
   More: https://statac.dev/e/mention-of-no-page/
 ```

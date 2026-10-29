@@ -9,6 +9,9 @@ applies to `pages.tags` in a cascade, and to `tags` on an item in a table.
 
 ```text
 warning  One tag, not two: `tags: hills, water` makes a single tag called `hills, water`
+  content/post-1.md, line 3
+   3 │ tags: hills, water
+     │       ^^^^^^^^^^^^
   For two tags, write `tags: [hills, water]`.
   More: https://statac.dev/e/one-tag-not-two/
 ```

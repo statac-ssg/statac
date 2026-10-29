@@ -7,6 +7,9 @@ A date is written with slashes or dots, so it could be read two ways:
 
 ```text
 error  Unclear date: `3/4/2026` could be 3 April or 4 March
+  content/post-1.md, line 3
+   3 │ date: 3/4/2026
+     │       ^^^^^^^^
   Write it as `2026-04-03` or `2026-03-04`.
   More: https://statac.dev/e/unclear-date/
 ```

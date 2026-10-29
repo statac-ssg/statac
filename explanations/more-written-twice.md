@@ -8,6 +8,12 @@ ones have no effect.
 
 ```text
 warning  More written twice: the excerpt ends at the first `<!--more-->`
+  content/post-1.md, line 7
+   7 │ <!--more-->
+     │ ^^^^^^^^^^^
+  First written: content/post-1.md, line 3
+   3 │ <!--more-->
+     │ ^^^^^^^^^^^
   Delete the later one.
   More: https://statac.dev/e/more-written-twice/
 ```

@@ -9,7 +9,10 @@ that folder. Statac doesn't read the file.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Outside the site: `../../outside` isn't in `assets/`
+error  Outside the site: `../../shared/colours` isn't in `assets/`
+  assets/site.scss, line 1
+   1 │ @use "../../shared/colours";
+     │       ^^^^^^^^^^^^^^^^^^^^
   Copy the file into `assets/` and load it from there.
   More: https://statac.dev/e/outside-site/
 ```

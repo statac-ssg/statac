@@ -9,7 +9,10 @@ spelling, written flat on one line: `pages.layout: post`, `title.text:`.
 
 ```text
 error  Nested setting: `layout` under `pages`
-  Write it flat: `pages.layout: post`.
+  content/notes/index.md, line 4
+   4 │   layout: note
+     │   ^^^^^^
+  Write it flat: `pages.layout: note`.
   More: https://statac.dev/e/nested-setting/
 ```
 

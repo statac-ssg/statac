@@ -8,6 +8,9 @@ from UTC.
 
 ```text
 error  No such date: there is no 30 February in 2026
+  content/post-1.md, line 3
+   3 │ date: 2026-02-30
+     │       ^^^^^^^^^^
   More: https://statac.dev/e/no-such-date/
 ```
 

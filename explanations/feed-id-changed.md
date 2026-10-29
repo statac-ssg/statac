@@ -8,7 +8,10 @@ old URL.
 
 ```text
 warning  Feed id changed: this post was published at `/posts/post-1/`
-  Add `id: fc370633-88f0-8092-9f96-7749dbfff0eb` to its front matter to keep it the same post in feed readers.
+  content/posts/post-1.md, line 1
+   1 │ ---
+     │ ^^^
+  Add `id: f4104519-15e1-8778-9ea7-8a325999dcaf` to its front matter to keep it the same post in feed readers.
   More: https://statac.dev/e/feed-id-changed/
 ```
 
