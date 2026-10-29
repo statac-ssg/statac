@@ -8,7 +8,7 @@ It was made from `tests/import/source-folder/old` by `statac import`, which chan
 - 2 pages, into `content/` where they stood in the old site.
 - 1 other file, copied unchanged: the files to publish into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
 

@@ -315,6 +315,49 @@ fn a_later_page_of_the_old_home_page_past_the_posts_last_is_listed() {
 }
 
 #[test]
+fn the_report_says_the_home_page_has_no_content_whether_or_not_it_holds_front_matter() {
+    let line = "No page of the old site's came across as its home page, so `content/index.md` \
+                has no content: write the home page there.\n";
+    // A paginated home page leaves `content/index.md` with front matter.
+    for (paginate, home) in [("", ""), ("paginate: 2\n", "---\nposts_per_page: 0\n---\n")] {
+        let old = scratch(&format!("home-no-content-old-{}", paginate.len()));
+        let new = scratch(&format!("home-no-content-new-{}", paginate.len()));
+        fs::create_dir_all(old.join("_posts")).unwrap();
+        let settings = format!("title: Site 1\nurl: https://example.org\n{paginate}");
+        fs::write(old.join("_config.yml"), settings).unwrap();
+        fs::write(old.join("index.html"), "---\n---\n{{ paginator.posts }}\n").unwrap();
+        fs::write(
+            old.join("_posts/2026-01-01-post-1.md"),
+            "---\ntitle: Post 1\n---\nA post.\n",
+        )
+        .unwrap();
+        let (code, said) = import(&old, &new, None);
+        assert_eq!(code, 0, "{said}");
+        let written = fs::read_to_string(new.join("content/index.md")).unwrap();
+        assert_eq!(written, home);
+        let report = fs::read_to_string(new.join("IMPORT.md")).unwrap();
+        assert!(report.contains(line), "{report}");
+    }
+    // The same holds for every kept site, from each tool.
+    for entry in fs::read_dir("tests/import").unwrap() {
+        let new = entry.unwrap().path().join("new");
+        let Ok(report) = fs::read_to_string(new.join("IMPORT.md")) else {
+            continue;
+        };
+        if !report.contains(line) {
+            continue;
+        }
+        let home = fs::read_to_string(new.join("content/index.md")).unwrap();
+        let mut lines = home.lines().peekable();
+        if lines.next_if_eq(&"---").is_some() {
+            lines.by_ref().find(|line| *line == "---");
+        }
+        let content: Vec<&str> = lines.filter(|line| !line.trim().is_empty()).collect();
+        assert!(content.is_empty(), "{}: {home}", new.display());
+    }
+}
+
+#[test]
 fn the_home_page_of_a_site_imported_from_any_tool_has_no_later_pages() {
     // Only Hugo paginated every list, so only its site asks for
     // pagination, and its home page says `0`.

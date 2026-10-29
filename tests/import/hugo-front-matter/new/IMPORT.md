@@ -8,7 +8,7 @@ It was made from `tests/import/hugo-front-matter/old` by `statac import`, which 
 - 2 drafts, each with `draft: true`, so none is published by accident.
 - 2 pages, into `content/` where they stood in the old site.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 Hugo ordered the pages of `content/posts/` by their `weight`, so `content/posts/index.md` lists them in that order with `order:`, and `weight` was taken off them.
 

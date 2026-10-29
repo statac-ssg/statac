@@ -7,7 +7,7 @@ It was made from `tests/import/permalink-pretty/old` by `statac import`, which c
 - 3 posts, into `content/posts/`.
 - 2 pages, into `content/` where they stood in the old site.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
 

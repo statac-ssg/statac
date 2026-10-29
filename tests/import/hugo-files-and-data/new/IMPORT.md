@@ -7,7 +7,7 @@ It was made from `tests/import/hugo-files-and-data/old` by `statac import`, whic
 - 1 post, into `content/posts/`.
 - 5 other files, copied unchanged: the files to publish into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 `data/links.toml` was written in TOML, which Statac doesn't read in `data/`, so it is written as YAML, holding the same values, in `data/links.yaml`.
 

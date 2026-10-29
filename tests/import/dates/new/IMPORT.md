@@ -7,7 +7,7 @@ It was made from `tests/import/dates/old` by `statac import`, which changed noth
 - 7 posts, into `content/posts/`.
 - 2 drafts, each with `draft: true`, so none is published by accident.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 The settings give no `url`, so the new site has no `url` yet: add it to `statac.yaml` once it is known.
 

@@ -7,7 +7,7 @@ It was made from `tests/import/zola-front-matter/old` by `statac import`, which 
 - 2 posts, into `content/posts/`.
 - 1 draft, with `draft: true`, so it isn't published by accident.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 Zola has no setting for a time zone, and reads a date written without an offset as UTC, so `timezone` is `UTC`: write the site's own, as `Europe/London`, where its dates were meant there.
 

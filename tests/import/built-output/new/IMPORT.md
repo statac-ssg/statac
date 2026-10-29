@@ -6,7 +6,7 @@ It was made from `tests/import/built-output/old` by `statac import`, which chang
 
 - 1 post, into `content/posts/`.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 The settings name no language, so the site is in English, `en`: change `language` in `statac.yaml` if it isn't.
 

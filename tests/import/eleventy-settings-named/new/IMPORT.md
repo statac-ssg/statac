@@ -6,7 +6,7 @@ It was made from `tests/import/eleventy-settings-named/old` by `statac import`, 
 
 - 1 post, into `content/posts/`.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `eleventy.config.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 

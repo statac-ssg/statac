@@ -6,7 +6,7 @@ It was made from `tests/import/eleventy-pattern/old` by `statac import`, which c
 
 - 4 posts, into `content/posts/2026/01/01/` and `content/posts/2026/01/02/` and `content/posts/2026/01/03/` and `content/posts/2026/01/04/`.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 Eleventy's settings are a program, and Statac runs none of it: it read `.eleventy.js` as text, for the plain forms it knows, and says here what it took and what it assumed where it found none.
 

@@ -257,7 +257,7 @@ fn came_across(text: &mut String, summary: &Summary) {
     text.push_str(match summary.home {
         false => {
             "No page of the old site's came across as its home page, so `content/index.md` \
-             is empty: write the home page there.\n\n"
+             has no content: write the home page there.\n\n"
         }
         true => "The old site's home page is `content/index.md`.\n\n",
     });

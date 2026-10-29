@@ -7,7 +7,7 @@ It was made from `tests/import/hugo-languages-folders/old` by `statac import`, w
 - 2 posts, into `content/posts/` and `content/fr/posts/`.
 - 2 pages, into `content/` where they stood in the old site.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 The settings declare 2 languages, so the new site is in each, the main one, `en`, first: each other language's pages are in its own folder in `content/`, where they stand at the same place as the page they translate, as https://statac.dev/languages/#a-site-in-several-languages describes.
 

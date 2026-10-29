@@ -8,7 +8,7 @@ It was made from `tests/import/hugo-file-names/old` by `statac import`, which ch
 - 1 page, into `content/` where it stood in the old site.
 - 4 other files, copied unchanged: the files to publish into `static/` at the same path, so their URLs stay, and data files into `data/`.
 
-No page of the old site's came across as its home page, so `content/index.md` is empty: write the home page there.
+No page of the old site's came across as its home page, so `content/index.md` has no content: write the home page there.
 
 Hugo's feeds were RSS, at `index.xml` beside the home page and each list page. Each stays at the same URL, as `feed: index.xml` on each list page says, built with `templates/index.xml` once you add it, and `feed_ids_before` and `feed_ids_from: hugo` keep each post's id the URL Hugo gave it, so feed readers see nothing new: see https://statac.dev/feeds/#entry-ids. Copy the docs' RSS template as `templates/index.xml`: see https://statac.dev/feeds/#the-template.
 
