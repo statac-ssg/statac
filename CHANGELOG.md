@@ -2,6 +2,108 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.7.3 - 2026-10-30
+
+### Fixed
+
+- `cargo install --locked statac`, like any build of Statac from its
+  source, needs a C++ compiler as well as a C compiler. If the C++
+  compiler is missing, the build now stops before CMake runs, with a
+  message that names the compiler it looked for and says to install
+  one, such as `g++`, or to set `CXX` to the compiler to use. With
+  Statac 0.7.2, the build stopped deep in CMake's output on a machine
+  without one, such as Debian, Ubuntu or Fedora with only the `gcc`
+  package.
+- `IMPORT.md` names every home page the import wrote with no content,
+  such as `content/index.md` and, on a site in several languages,
+  `content/fr/index.md`, and says it has no content. Statac 0.7.2 named
+  only `content/index.md`, so the report didn't tell you that each
+  other language's home page needed writing too. It also said the file
+  was empty, but where the import writes front matter there, such as
+  `posts_per_page: 0` for a paginated home page or `feed:` for the home
+  page's feed, it isn't.
+- When a page's `og_image` names an image that Statac can't read
+  because of the form it is saved in, Statac suggests exporting the
+  image again as an ordinary JPEG, PNG or WebP. Statac 0.7.2 suggested
+  `optimise: false` in the image's sidecar file, which doesn't help
+  there: Statac needs the image's size for the social card. Where the
+  content shows the same image, the suggestion is still `optimise:
+  false`, which works there.
+- The debug panel shows a problem's explanation with its links as
+  links, opening statac.dev in a new tab, its bold text as bold, and
+  its lists as lists. Statac 0.7.2 showed the Markdown as written, so
+  a link read as `[text](url)` and a bold lead-in as `**text**`.
+- The Examples of five explanations now give the problem they explain,
+  so a site that follows one meets the message under "What you'll
+  see": `same-id` shows two posts with the same `id:`,
+  `page-in-snippet` a snippet that also reads the post it is handed,
+  `unused-card` a whole card file in a site whose layout reads
+  `page.card`, `hook-stopped` a `before_build` hook naming a file that
+  isn't there, and `cant-write` a read-only `_site`. Before,
+  `page-in-snippet`'s and `unused-card`'s Examples stopped with another
+  error, `same-id`'s and `cant-write`'s gave no problem, and
+  `hook-stopped`'s showed a message that wasn't what Statac prints.
+  `cant-write`'s explanation also says that Statac reports it for a
+  file in `content/` whose name can't be part of a URL, such as one
+  with `#` or `%` in it, and no longer suggests moving a folder that is
+  in the way, which a build replaces.
+- The explanation of `unreadable-image` gives each of the five reasons
+  the message can give, with a fix for each: a file cut short or
+  damaged, one saved in a form Statac doesn't read, an image too large
+  to open, a resized copy Statac can't make, and a file in `fetched/`
+  that isn't a JPEG, a PNG or a still WebP. It also says that only
+  `build` finds an image too large to open or a copy it can't make, and
+  how to publish an image in `static/` unchanged. Statac 0.7.2's
+  explanation described only the first two reasons.
+
+### Changed
+
+- Each explanation, on its page at `https://statac.dev/e/<name>/` and
+  in `statac explain <name>`, shows the message under "What you'll
+  see" whole, in the form Statac prints it: the headline, then the file
+  and line, the line itself with carets under the text, the suggestion
+  and the `More:` line. A message about a page's file follows the
+  page's own Example. A message in no file, such as a full disk or a
+  mistake on the command line, has no location lines, as in the
+  terminal. The pages no longer say that the terminal adds the file
+  and line.
+- The list of problems at https://statac.dev/e/ follows each kind's
+  name with the first sentence of its explanation, so you can find a
+  kind by what happened, not only by its name. Eleven explanations
+  open with a new first sentence for it, which `statac explain`, the
+  debug panel and an editor's hover show too: `alias-limit`,
+  `cant-tell-what-made`, `field-written-two-ways`,
+  `footnote-never-shown`, `loop-over-every-page`, `missing-anchor`,
+  `missing-translation`, `no-thumbnail`, `not-stamped`,
+  `other-spelling` and `unusable-date-format`.
+- Where a kind of problem has several causes, its explanation, on
+  statac.dev and in `statac explain`, starts the fix for each cause
+  with that cause in bold, so you can find the fix for yours without
+  reading the others: `card-not-drawn`, `feed-not-written`,
+  `missing-template`, `no-value`, `redirect-to-itself`, `same-url`,
+  `unknown-word`, `unmatched-tag` and `unused-card`.
+  `feed-not-written` links to https://statac.dev/feeds/#the-template
+  for the order in which Statac looks for a feed's template and the
+  names the template is handed, in place of setting them out, and
+  `no-value` links to https://statac.dev/templates/#no-value for what
+  each filter does with a page that lacks a field, and to
+  https://statac.dev/upgrading/#other-stops for tag pages on a site
+  made before 0.7.0.
+- The explanation of `colour-converted` gives as its Example the
+  sidecar file `content/photo-1.jpg.yaml` with `optimise: false`, with
+  which Statac publishes the image's own file, with its Display P3
+  profile, in place of resized copies, and shows no note. The Example
+  used to repeat the `quiet:` line. The explanation of `url-gone` says
+  why `published.txt` exists: if a URL in it stops being published,
+  Statac tells you, so links other people have to your site don't
+  quietly break.
+- Each of the docs' Reference pages that describes the names a
+  template can read writes "names (variables)" where it first uses the
+  word, so the pages use the same term as the docs' guides. The page of
+  names a template is handed is titled "Names a template is handed
+  (variables)", so a search for variables finds it. The editor's hover
+  is unchanged.
+
 ## 0.7.2 - 2026-10-28
 
 ### New
