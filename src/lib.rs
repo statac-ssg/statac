@@ -90,6 +90,7 @@ mod templates;
 mod testing;
 mod unnamed;
 mod unsaved;
+mod upgrade;
 mod value;
 mod wording;
 #[doc(hidden)]

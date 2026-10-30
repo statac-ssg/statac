@@ -15,7 +15,7 @@ use statac::fetch::{Fetched, Refusal};
 use statac::refresh::Token;
 use statac::serve::live::Hub;
 use statac::serve::watch::{How, Settle};
-use statac::serve::{self, Fetcher, Options};
+use statac::serve::{self, Fetcher, Options, Upgrader};
 
 /// Generous, for a machine busy with other tests.
 const BOUND: Duration = Duration::from_secs(10);
@@ -144,6 +144,19 @@ fn served_fetching(
     token: Option<Token>,
     ready: impl FnOnce(&Site),
 ) -> (Served, String) {
+    served_with(label, how, drafts, fetcher, token, None, ready)
+}
+
+/// [`served_fetching`], looking for a newer Statac with `upgrade`.
+fn served_with(
+    label: &str,
+    how: How,
+    drafts: bool,
+    fetcher: Option<Fetcher>,
+    token: Option<Token>,
+    upgrade: Option<Upgrader>,
+    ready: impl FnOnce(&Site),
+) -> (Served, String) {
     let site = Site::new(label);
     ready(&site);
     let options = Options {
@@ -159,6 +172,7 @@ fn served_fetching(
         drafts,
         fetcher,
         token,
+        upgrade,
     };
     let mut said = Said::default();
     let mut serving = serve::start(&options, &mut said, false)
@@ -1851,6 +1865,60 @@ fn a_fault_while_fetching_is_said_in_a_line_and_serving_goes_on() {
     assert_eq!(
         steady_from_the_start(&served, &said),
         "Fetching stopped: Statac met a fault of its own.\n"
+    );
+    let mark = served.said.text().len();
+    served
+        .site
+        .write("content/post-1.md", "# Post 1\n\nEdited.\n");
+    served.said.after(mark, "Told the browser to reload.\n");
+}
+
+#[test]
+fn the_first_build_doesnt_wait_for_a_newer_statac_to_be_looked_for() {
+    let (release, released) = mpsc::channel::<()>();
+    let released = Mutex::new(released);
+    let upgrade = Upgrader::new(move |say| {
+        let _ = released.lock().unwrap().recv();
+        say("The upgrade's line.\n");
+    });
+    let (served, opened) = served_with(
+        "upgrade",
+        How::Native,
+        true,
+        None,
+        None,
+        Some(upgrade),
+        |_| {},
+    );
+    // Serving began, its first build done, while the look still waits.
+    assert!(opened.contains("Serving `"), "{opened}");
+    assert!(!opened.contains("The upgrade's line."), "{opened}");
+    let mark = served.said.text().len();
+    release.send(()).unwrap();
+    assert_eq!(served.said.after(mark, "\n"), "The upgrade's line.\n");
+    let mark = served.said.text().len();
+    served
+        .site
+        .write("content/post-1.md", "# Post 1\n\nEdited.\n");
+    served.said.after(mark, "Told the browser to reload.\n");
+}
+
+#[test]
+fn a_fault_while_looking_for_a_newer_statac_is_said_in_a_line_and_serving_goes_on() {
+    let upgrade = Upgrader::new(|_| panic!("a fault"));
+    let (served, _) = served_with(
+        "upgrade-fault",
+        How::Native,
+        true,
+        None,
+        None,
+        Some(upgrade),
+        |_| {},
+    );
+    let said = served.said.after(0, "Checking for a newer Statac stopped");
+    assert!(
+        said.contains("\nChecking for a newer Statac stopped: Statac met a fault of its own.\n"),
+        "{said}"
     );
     let mark = served.said.text().len();
     served

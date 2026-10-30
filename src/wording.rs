@@ -4035,6 +4035,178 @@ pub(crate) const OFFLINE: &str = "Offline: Statac fetches nothing from other sit
 /// What `serve` says where fetching ended in a fault of Statac's own.
 pub(crate) const FETCHING_STOPPED: &str = "Fetching stopped: Statac met a fault of its own.";
 
+/// What `serve` says where checking for a newer Statac ended in a fault
+/// of Statac's own.
+pub(crate) const UPGRADE_STOPPED: &str =
+    "Checking for a newer Statac stopped: Statac met a fault of its own.";
+
+/// What `serve` says as it opens where Statac keeps itself up to date and
+/// it was asked for `--offline`.
+pub(crate) const UPGRADE_OFFLINE: &str =
+    "Offline: Statac doesn't check for a newer release of itself.";
+
+/// What `serve` says of a fix to Statac it installed as it opened.
+pub(crate) fn upgraded_while_serving(from: &str, to: &str) -> String {
+    format!(
+        "Upgraded Statac from {from} to {to}. This serve carries on with {from} until you start it again."
+    )
+}
+
+/// What `serve` says as it opens of a release in a later series, which it
+/// doesn't install by itself.
+pub(crate) fn later_release(version: &str) -> String {
+    format!("Statac {version} is released. Run `statac upgrade` to install it.")
+}
+
+/// What `serve` says where `updates` in the install script's marker at
+/// `path` is `written`, neither `on` nor `off`.
+pub(crate) fn unclear_updates(path: &str, written: &str) -> String {
+    format!(
+        "Didn't check for a newer Statac: `updates` in `{path}` is `{written}`, not `on` or `off`."
+    )
+}
+
+/// What `upgrade` says of the release it upgraded to.
+pub(crate) fn upgraded(from: &str, to: &str) -> String {
+    format!("Upgraded Statac from {from} to {to}.")
+}
+
+/// What `upgrade` says where the latest release is no newer than the one
+/// running.
+pub(crate) fn nothing_to_upgrade(running: &str, latest: &str) -> String {
+    match running == latest {
+        true => format!("Nothing to upgrade: Statac {running} is the latest release."),
+        false => format!(
+            "Nothing to upgrade: this is Statac {running}, newer than the latest release, {latest}."
+        ),
+    }
+}
+
+/// What `upgrade` says as it downloads a release's package.
+pub(crate) fn downloading(version: &str, target: &str) -> String {
+    format!("Downloading Statac {version} ({target}).")
+}
+
+/// What `upgrade` and `serve` say where a newer release couldn't be
+/// installed, and the program is as it was.
+pub(crate) fn not_upgraded(version: &str, reason: &str) -> String {
+    format!("Didn't upgrade Statac to {version}: {reason}.")
+}
+
+/// What `upgrade` and `serve` say where no release could be read.
+pub(crate) fn cant_check(reason: &str) -> String {
+    format!("Can't check for a newer Statac: {reason}.")
+}
+
+/// Why no release could be read, to follow a colon: the `SHA256SUMS` at
+/// `address` doesn't read as one.
+pub(crate) fn unreadable_sums(address: &str) -> String {
+    format!("`{address}` isn't a list of hashes and package names")
+}
+
+/// Why a newer release wasn't installed, to follow a colon: it has no
+/// package for this machine, `target`.
+pub(crate) fn no_package(target: &str) -> String {
+    format!("the release has no package for this machine, `{target}`")
+}
+
+/// Why a newer release wasn't installed, to follow a colon.
+pub(crate) const UNSIGNED: &str = "its SHA256SUMS has no signature";
+
+/// Why a newer release wasn't installed, to follow a colon.
+pub(crate) const SIGNED_OTHERWISE: &str = "its SHA256SUMS isn't signed with Statac's key";
+
+/// Why a newer release wasn't installed, to follow a colon.
+pub(crate) const PACKAGE_DIFFERS: &str = "the download doesn't match the release's SHA256SUMS";
+
+/// Why a newer release wasn't installed, to follow a colon.
+pub(crate) const UNREADABLE_PACKAGE: &str = "Statac can't unpack the package";
+
+/// Why a newer release wasn't installed, to follow a colon: its package
+/// holds no program at `path`.
+pub(crate) fn no_program(path: &str) -> String {
+    format!("the package holds no `{path}`")
+}
+
+/// Why a newer release wasn't installed, to follow a colon: the download
+/// ran out of `time`.
+pub(crate) fn download_took(time: std::time::Duration) -> String {
+    format!(
+        "the download took longer than {} minutes",
+        time.as_secs() / 60
+    )
+}
+
+/// Why a newer release wasn't installed, to follow a colon: Statac
+/// couldn't write the file at `path`, for `reason`.
+pub(crate) fn cant_write_program(path: &str, reason: &Reason) -> String {
+    format!("Statac can't write `{path}` ({reason})")
+}
+
+/// What `upgrade` and `serve` say where the licences couldn't be written
+/// into their folder, `folder`, after the program was upgraded.
+pub(crate) fn licences_unwritten(folder: &str, reason: &Reason) -> String {
+    format!("Can't write the licences to `{folder}`: {reason}.")
+}
+
+/// What `upgrade` says where a file it reads or writes, at `path`, can't
+/// be read or written.
+pub(crate) fn cant_read_file(path: &str, reason: &Reason) -> String {
+    format!("Can't read `{path}`: {reason}.")
+}
+
+/// What `upgrade` says where a file it rewrites, at `path`, can't be
+/// written.
+pub(crate) fn cant_write_file(path: &str, reason: &Reason) -> String {
+    format!("Can't write `{path}`: {reason}.")
+}
+
+/// What `upgrade` says where the system can't say where the program is.
+pub(crate) fn cant_find_program(reason: &Reason) -> String {
+    format!("Can't upgrade: Statac can't tell where it is installed ({reason}).")
+}
+
+/// What `upgrade` says, asked to upgrade, where Statac's install script
+/// didn't install it.
+pub(crate) const UPGRADE_NOT_SCRIPTED: &str =
+    "Statac can't upgrade itself here: its install script didn't install it.";
+
+/// What `upgrade --updates` says where Statac's install script didn't
+/// install it.
+pub(crate) const UPDATES_NOT_SCRIPTED: &str =
+    "Statac doesn't keep itself up to date here: its install script didn't install it.";
+
+/// What `upgrade` says after either line above, given the tool whose
+/// folder the program is in and its command; with none, `commands`,
+/// each tool's that could have installed it.
+pub(crate) fn upgrade_with(tool: Option<(&str, &str)>, commands: &[&str]) -> String {
+    match tool {
+        Some((tool, command)) => format!("{tool} installed it, so upgrade it with `{command}`."),
+        None => {
+            let commands: Vec<String> = (commands.iter())
+                .map(|command| format!("`{command}`"))
+                .collect();
+            let listed = match commands.as_slice() {
+                [rest @ .., last] if !rest.is_empty() => format!("{} or {last}", rest.join(", ")),
+                _ => commands.concat(),
+            };
+            format!("Upgrade it the way it was installed: {listed}.")
+        }
+    }
+}
+
+/// What `upgrade --updates` says once it has turned updates `on` or off.
+pub(crate) fn updates(on: bool) -> String {
+    match on {
+        true => "Statac keeps itself up to date: `statac serve` installs each fix as it starts.\n\
+                 Turn this off with `statac upgrade --updates=off`."
+            .into(),
+        false => "Statac doesn't keep itself up to date.\n\
+                  Turn this on with `statac upgrade --updates=on`."
+            .into(),
+    }
+}
+
 /// What `build` says, after Rust's report of a panic, of a fault of
 /// Statac's own.
 pub(crate) const BUILD_STOPPED: &str = "Build stopped: Statac met a fault of its own.";

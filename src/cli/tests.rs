@@ -579,6 +579,8 @@ Usage:
                          of the problem's More: link.
   statac lsp             Tell an editor the site's problems as you type. The
                          editor starts it.
+  statac upgrade         Install the latest release of Statac in place of
+                         this one, where Statac's install script put it.
 
 Without a folder, statac build, check, serve, stamp, refresh and search
 work on the site the current folder is in.
@@ -603,7 +605,8 @@ Options:
   --offline              Fetch nothing as statac serve starts. Without it,
                          statac serve fetches what is new once, as statac
                          refresh does, after the first build with no
-                         errors.
+                         errors, and installs any fix to Statac where
+                         Statac keeps itself up to date.
   --yes                  Take every answer statac new offers without asking.
   --from=<tool>          The tool that made the site statac import reads:
                          jekyll, hugo, zola or eleventy. Without it,
@@ -617,6 +620,9 @@ Options:
                          Without it, auto.
   --language=<code>      Search only the pages in this language, named
                          by its code in statac.yaml.
+  --updates=<on|off>     Whether statac serve installs each fix to Statac
+                         as it starts. Given this, statac upgrade turns
+                         that on or off, and installs nothing.
   --help                 Show this.
   --version              Show which version of Statac this is.
 ";
@@ -784,6 +790,7 @@ fn serving(site: &str) -> serve::Options {
         drafts: true,
         fetcher: None,
         token: None,
+        upgrade: None,
     }
 }
 
@@ -792,6 +799,56 @@ fn online(options: serve::Options) -> Request {
         options,
         offline: false,
     }
+}
+
+#[test]
+fn upgrade_is_read_with_its_option() {
+    assert_eq!(parsed(&["upgrade"]), Ok(Request::Upgrade { updates: None }));
+    assert_eq!(
+        parsed(&["upgrade", "--updates=on"]),
+        Ok(Request::Upgrade {
+            updates: Some(true)
+        })
+    );
+    assert_eq!(
+        parsed(&["--updates=off", "upgrade"]),
+        Ok(Request::Upgrade {
+            updates: Some(false)
+        })
+    );
+    let wrong = |written: &str| {
+        Err(vec![Kind::WrongKind {
+            field: "--updates".into(),
+            expected: Expected::OneOf(vec!["on".into(), "off".into()]),
+            found: Found::Written(written.into()),
+            respelt: None,
+        }])
+    };
+    assert_eq!(parsed(&["upgrade", "--updates=yes"]), wrong("yes"));
+    assert_eq!(parsed(&["upgrade", "--updates=On"]), wrong("On"));
+    assert_eq!(
+        parsed(&["upgrade", "--updates=on", "--updates=off"]),
+        Err(vec![Kind::OptionGivenTwice {
+            option: "--updates".into()
+        }])
+    );
+    assert_eq!(
+        parsed(&["upgrade", "docs"]),
+        Err(vec![Kind::UnexpectedArgument {
+            written: "docs".into()
+        }])
+    );
+    assert_eq!(
+        parsed(&["serve", "--updates=on"]),
+        Err(vec![Kind::UnknownOption {
+            written: "--updates=on".into(),
+            hint: OptionHint::ForOther {
+                command: "serve".into(),
+                option: "--updates".into(),
+                takers: vec!["upgrade"].into(),
+            },
+        }])
+    );
 }
 
 #[test]

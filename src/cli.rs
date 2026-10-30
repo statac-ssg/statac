@@ -51,13 +51,19 @@ pub(crate) enum Request {
     Explain(Code),
     /// A language server for an editor, on standard input and output.
     Lsp,
+    /// The latest release installed in place of this one, or with a
+    /// value, updates turned on or off.
+    Upgrade {
+        updates: Option<bool>,
+    },
     /// The usage screen, for the command named before `--help`, or whole.
     Help(Option<&'static str>),
     Version,
 }
 
-const COMMANDS: [&str; 10] = [
+const COMMANDS: [&str; 11] = [
     "build", "check", "serve", "stamp", "refresh", "new", "import", "search", "explain", "lsp",
+    "upgrade",
 ];
 
 /// Commands Statac once had, each with the setting that does its work now.
@@ -67,7 +73,7 @@ const FORMER_COMMANDS: [(&str, &str); 1] = [("refuse", crate::config::refused::S
 const SITE_COMMANDS: [&str; 6] = ["build", "check", "serve", "stamp", "refresh", "search"];
 
 /// The options that take a value, and the commands that take each.
-const OPTIONS: [(&str, &[&str]); 7] = [
+const OPTIONS: [(&str, &[&str]); 8] = [
     ("--out", &["build"]),
     ("--url", &["build", "check"]),
     (
@@ -80,6 +86,7 @@ const OPTIONS: [(&str, &[&str]); 7] = [
     ("--watch", &["serve"]),
     ("--from", &["import"]),
     ("--language", &["search"]),
+    ("--updates", &["upgrade"]),
 ];
 
 /// The ways `--watch` names of watching the site's folder.
@@ -120,7 +127,7 @@ const OTHER_SPELLINGS: [(&str, &str); 7] = [
 const INTRO: &str = "Statac builds a website from a folder of Markdown.\n";
 
 /// Each command's entry on the usage screen, as the screen sets it.
-const USAGE: [(&str, &str); 10] = [
+const USAGE: [(&str, &str); 11] = [
     (
         "build",
         "  statac build [folder]  Read the site and write it out, ready to publish.\n",
@@ -187,6 +194,12 @@ const USAGE: [(&str, &str); 10] = [
                          editor starts it.
 ",
     ),
+    (
+        "upgrade",
+        "  statac upgrade         Install the latest release of Statac in place of
+                         this one, where Statac's install script put it.
+",
+    ),
 ];
 
 /// What the usage screen says, after the entries of the commands that work
@@ -197,7 +210,7 @@ work on the site the current folder is in.
 ";
 
 /// Each option's entry on the usage screen, as the screen sets it.
-const OPTION_LINES: [(&str, &str); 15] = [
+const OPTION_LINES: [(&str, &str); 16] = [
     (
         "--out",
         "  --out=<folder>         Where statac build writes the built site. Without
@@ -247,7 +260,8 @@ const OPTION_LINES: [(&str, &str); 15] = [
         "  --offline              Fetch nothing as statac serve starts. Without it,
                          statac serve fetches what is new once, as statac
                          refresh does, after the first build with no
-                         errors.
+                         errors, and installs any fix to Statac where
+                         Statac keeps itself up to date.
 ",
     ),
     (
@@ -280,6 +294,13 @@ const OPTION_LINES: [(&str, &str); 15] = [
         "--language",
         "  --language=<code>      Search only the pages in this language, named
                          by its code in statac.yaml.
+",
+    ),
+    (
+        "--updates",
+        "  --updates=<on|off>     Whether statac serve installs each fix to Statac
+                         as it starts. Given this, statac upgrade turns
+                         that on or off, and installs nothing.
 ",
     ),
     ("--help", "  --help                 Show this.\n"),
@@ -366,6 +387,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>, terminal: &mut Terminal) ->
         Request::New(_) => Some("new"),
         Request::Serve { .. } => Some("serve"),
         Request::Search(_) => Some("search"),
+        Request::Upgrade { .. } => Some("upgrade"),
     };
     guarded(command, terminal, |terminal| {
         act(request, command, terminal)
@@ -445,6 +467,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             let input = std::io::BufReader::new(std::io::stdin());
             return crate::lsp::run(input, terminal.out);
         }
+        Request::Upgrade { updates } => return crate::upgrade::run(updates, terminal.out),
         Request::Build { options, .. } | Request::Check { options, .. } => {
             let started = Instant::now();
             let outcome = build::run_saying(&options, terminal.progress);
@@ -573,6 +596,9 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             let options = serve::Options {
                 fetcher: (!offline).then(|| serve::Fetcher::new(crate::fetch::fetch)),
                 token,
+                upgrade: Some(serve::Upgrader::new(move |say| {
+                    crate::upgrade::as_serve_starts(offline, say)
+                })),
                 ..options
             };
             let Some(mut serving) = serve::start(&options, terminal.out, terminal.colour_out)
@@ -599,6 +625,7 @@ fn site_of(request: &mut Request) -> Option<&mut PathBuf> {
         | Request::Import(_)
         | Request::Explain(_)
         | Request::Lsp
+        | Request::Upgrade { .. }
         | Request::Help(_)
         | Request::Version => None,
     }
@@ -723,6 +750,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
     let mut port = None;
     let mut watch = None;
     let mut language = None;
+    let mut updates = None;
     let wrong = |option: &str, expected, written: &str| Kind::WrongKind {
         field: option.into(),
         expected,
@@ -970,6 +998,24 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             }
             continue;
         }
+        if option == "--updates" {
+            let on = match value {
+                "on" => Some(true),
+                "off" => Some(false),
+                _ => None,
+            };
+            match (updates, on) {
+                (Some(_), _) => mistake(Kind::OptionGivenTwice {
+                    option: option.into(),
+                }),
+                (None, Some(on)) => updates = Some(on),
+                (None, None) => {
+                    let values = ["on", "off"].map(str::to_owned).into();
+                    mistake(wrong(option, Expected::OneOf(values), value));
+                }
+            }
+            continue;
+        }
         if option == "--watch" {
             let how = match value {
                 "auto" => Some(How::Auto),
@@ -1040,6 +1086,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
                 drafts: !no_drafts,
                 fetcher: None,
                 token: None,
+                upgrade: None,
             },
             offline,
         },
@@ -1067,6 +1114,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
             language,
         }),
         Some("lsp") => Request::Lsp,
+        Some("upgrade") => Request::Upgrade { updates },
         _ => Request::Explain(name.and_then(Code::from_name).expect("checked above")),
     })
 }

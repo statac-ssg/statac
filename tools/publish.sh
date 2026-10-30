@@ -7,9 +7,14 @@
 # A person's step, run with the Bunny login of the person releasing, which
 # the release workflow never has. It publishes only packages built from the
 # commit the tag v<version> names on main, and never replaces a version
-# already published. The version's files go to v<version>/, then
-# latest/SHA256SUMS names it as the newest release, and the install script
-# as tagged goes to the top, as index.html.
+# already published. It signs SHA256SUMS with the release key, whose public
+# half the tagged Statac carries in src/upgrade.rs, and which it reads from
+# ~/.config/statac-release/signing-key.pem or the file STATAC_SIGNING_KEY
+# names. The version's files go to v<version>/, the signature beside
+# SHA256SUMS as SHA256SUMS.sig, then latest-<major>.<minor>/SHA256SUMS names
+# it as the newest of its series and, unless a later release is out,
+# latest/SHA256SUMS as the newest of all, and the install script as tagged
+# goes to the top, as index.html.
 #
 # --dry-run makes every check and says each upload it would make, uploading
 # nothing, so a practice release can reach this step. It accepts a version
@@ -18,6 +23,7 @@ set -eu
 
 zone=statac-get
 served=https://statac-get.b-cdn.net
+key=${STATAC_SIGNING_KEY:-$HOME/.config/statac-release/signing-key.pem}
 
 stop() {
     echo "$1" >&2
@@ -38,6 +44,8 @@ folder=$(cd "$1" && pwd)
 root=$(cd "$(dirname "$0")/.." && pwd)
 
 command -v bunny >/dev/null 2>&1 || stop "Can't publish: \`bunny\` isn't installed."
+[ -f "$key" ] || stop "Can't sign the release: there's no key at $key." \
+    "Set STATAC_SIGNING_KEY to the release key's file."
 [ -f "$folder/SHA256SUMS" ] && [ -f "$folder/COMMIT" ] ||
     stop "$folder holds no taken release." "Take one first with tools/take.sh."
 
@@ -50,6 +58,7 @@ fi || stop "A package in $folder no longer matches SHA256SUMS."
 commit=$(cat COMMIT)
 version=$(sed -n '1s/.*statac-\([0-9][^-]*\)-.*/\1/p' SHA256SUMS)
 [ -n "$version" ] || stop "Can't read the version from $folder/SHA256SUMS."
+series=${version%.*}
 
 # The tag, on main, at the commit the packages were built from. A dry run
 # without one reads the install script from the commit instead.
@@ -71,6 +80,42 @@ fi
 git -C "$root" merge-base --is-ancestor "$commit" origin/main ||
     stop "v$version's commit, $commit, isn't on main."
 
+# Signed with the key whose public half this release carries, and checked,
+# so no release goes out that its own upgrade would refuse. The signature
+# is Ed25519's 64 bytes as they are, which needs OpenSSL 3, not LibreSSL.
+public=$(mktemp)
+trap 'rm -f "$public"' EXIT
+openssl pkey -in "$key" -pubout -out "$public" 2>/dev/null ||
+    stop "Can't read the key at $key." "It needs OpenSSL 3: \`openssl version\` says $(openssl version)."
+carried=$(openssl pkey -pubin -in "$public" -outform DER | tail -c 32 | od -An -tx1 | tr -d ' \n')
+git -C "$root" show "$source:src/upgrade.rs" | grep -qF "hex(\"$carried\")" ||
+    stop "The key at $key isn't the one $version carries in src/upgrade.rs."
+openssl pkeyutl -sign -rawin -inkey "$key" -in SHA256SUMS -out SHA256SUMS.sig ||
+    stop "Can't sign $folder/SHA256SUMS."
+openssl pkeyutl -verify -rawin -pubin -inkey "$public" -in SHA256SUMS -sigfile SHA256SUMS.sig >/dev/null ||
+    stop "The signature on $folder/SHA256SUMS doesn't check."
+
+# latest/ moves only to a newer release, so a fix to an older series names
+# only its own series.
+newer() {
+    old=$1
+    new=$2
+    while [ -n "$old$new" ]; do
+        a=${old%%.*}
+        b=${new%%.*}
+        [ "${a:-0}" -eq "${b:-0}" ] || { [ "${b:-0}" -gt "${a:-0}" ]; return; }
+        case $old in *.*) old=${old#*.} ;; *) old= ;; esac
+        case $new in *.*) new=${new#*.} ;; *) new= ;; esac
+    done
+    return 1
+}
+latest=$(curl -fsS "$served/latest/SHA256SUMS" 2>/dev/null | sed -n '1s/.*statac-\([0-9][^-]*\)-.*/\1/p') ||
+    latest=
+moves=true
+if [ -n "$latest" ] && ! newer "$latest" "$version"; then
+    moves=false
+fi
+
 # Asked of the zone, not the CDN, which might keep its answer.
 present=$(bunny storage files list "v$version" -z "$zone" -o json) ||
     stop "Can't ask $zone what it holds."
@@ -79,24 +124,38 @@ case $present in
 esac
 
 if $dry; then
-    for file in statac-* SHA256SUMS; do
+    for file in statac-* SHA256SUMS.sig SHA256SUMS; do
         echo "would publish v$version/$file"
     done
-    echo "would make latest/ name $version"
+    echo "would make latest-$series/ name $version"
+    if $moves; then
+        echo "would make latest/ name $version"
+    else
+        echo "would leave latest/ naming $latest"
+    fi
     git -C "$root" show "$source:tools/install.sh" >"$folder/install.sh"
     echo "would publish install.sh from $source at the top"
     echo "Checked $version, built from $commit: nothing was uploaded."
     exit 0
 fi
 
-for file in statac-* SHA256SUMS; do
+# The signature before SHA256SUMS, so a release whose SHA256SUMS can be
+# fetched always has its signature.
+for file in statac-* SHA256SUMS.sig SHA256SUMS; do
     bunny storage files upload "$file" -z "$zone" --to "v$version/" --checksum >/dev/null ||
         stop "Couldn't upload $file." "v$version/ may be part-published: finish it by hand before latest/ names it."
     echo "published v$version/$file"
 done
-bunny storage files upload SHA256SUMS -z "$zone" --to "latest/" --checksum >/dev/null ||
-    stop "Couldn't update latest/SHA256SUMS." "v$version/ is published, but latest/ still names the release before."
-echo "latest/ names $version"
+bunny storage files upload SHA256SUMS -z "$zone" --to "latest-$series/" --checksum >/dev/null ||
+    stop "Couldn't update latest-$series/SHA256SUMS." "v$version/ is published, but latest-$series/ still names the release before."
+echo "latest-$series/ names $version"
+if $moves; then
+    bunny storage files upload SHA256SUMS -z "$zone" --to "latest/" --checksum >/dev/null ||
+        stop "Couldn't update latest/SHA256SUMS." "v$version/ is published, but latest/ still names the release before."
+    echo "latest/ names $version"
+else
+    echo "latest/ still names $latest, which is newer"
+fi
 
 # The script that installs it, which get.statac.dev serves at its top:
 # a request for / is answered from index.html, as text so a browser

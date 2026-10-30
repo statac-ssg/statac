@@ -265,6 +265,57 @@ pub(crate) fn rename(from: &Path, to: &Path) -> io::Result<()> {
     retrying(|| std::fs::rename(from, to), transient, &PAUSES)
 }
 
+/// Puts `bytes` in place of the program at `path`, which may be running,
+/// with the program's permissions: written whole at `new`, beside it,
+/// which nothing may have yet, and moved to the program's name in one
+/// step, so the program there is always whole and one running from it
+/// carries on. Windows refuses to replace a program that is running but
+/// lets it be renamed, so there the program is first moved to `aside`,
+/// which can be removed once nothing runs it. Where any step fails, the
+/// program is left as it was and `new` is removed.
+pub(crate) fn replace_program(
+    path: &Path,
+    bytes: &[u8],
+    new: &Path,
+    aside: &Path,
+) -> io::Result<()> {
+    use std::io::Write;
+    let found = std::fs::metadata(path)?;
+    let written = (|| -> io::Result<()> {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(new)?;
+        file.write_all(bytes)?;
+        file.set_permissions(found.permissions())?;
+        file.sync_all()?;
+        drop(file);
+        #[cfg(unix)]
+        {
+            let _ = aside;
+            std::fs::rename(new, path)
+        }
+        #[cfg(not(unix))]
+        {
+            moved_aside_and_placed(new, path, aside)
+        }
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(new);
+    }
+    written
+}
+
+/// Moves the program at `path` to `aside`, then `new` to `path`, moving
+/// the program back where the second move fails.
+#[cfg(any(not(unix), test))]
+fn moved_aside_and_placed(new: &Path, path: &Path, aside: &Path) -> io::Result<()> {
+    retrying(|| std::fs::rename(path, aside), transient, &PAUSES)?;
+    retrying(|| std::fs::rename(new, path), transient, &PAUSES).inspect_err(|_| {
+        let _ = retrying(|| std::fs::rename(aside, path), transient, &PAUSES);
+    })
+}
+
 /// Why a file wasn't written over.
 #[derive(Debug)]
 pub(crate) enum Unwritten {
@@ -1107,6 +1158,11 @@ fn copy_whole(source: &std::fs::File, to: &mut std::fs::File) -> io::Result<u64>
 mod tests {
     use super::*;
 
+    /// Held by a test starting a program and by one locking a file: a
+    /// program being started holds a copy of every open file until it
+    /// runs, which keeps a lock held after its file is closed.
+    static STARTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn a_disk_is_asked_about_capitals_by_a_folder_with_a_letter_in_its_name() {
         let top = std::env::temp_dir().join(format!("statac-capitals-{}", std::process::id()));
@@ -1450,6 +1506,9 @@ mod tests {
 
     #[test]
     fn a_lock_file_is_made_once_and_locked_by_one_handle_at_a_time() {
+        let _starting = STARTING
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let root =
             std::env::temp_dir().join(format!("statac-platform-lock-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -1490,6 +1549,84 @@ mod tests {
                 }
             });
         }
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_running_program_is_replaced_and_runs_on() {
+        // The test runs a copy of itself as the program, which says it is
+        // running and waits until its input closes.
+        if std::env::var_os("STATAC_RUNNING_PROGRAM_TEST").is_some() {
+            let mut out = std::io::stdout();
+            std::io::Write::write_all(&mut out, b"running\n").unwrap();
+            std::io::Write::flush(&mut out).unwrap();
+            let _ = std::io::Read::read_to_end(&mut std::io::stdin(), &mut Vec::new());
+            return;
+        }
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-program-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let program = root.join(format!("statac{}", std::env::consts::EXE_SUFFIX));
+        std::fs::copy(std::env::current_exe().unwrap(), &program).unwrap();
+        let starting = STARTING
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut running = std::process::Command::new(&program)
+            .arg("platform::tests::a_running_program_is_replaced_and_runs_on")
+            .args(["--exact", "--nocapture", "--test-threads=1"])
+            .env("STATAC_RUNNING_PROGRAM_TEST", "1")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        drop(starting);
+        // Replaced once it runs, as a serve is: macOS can stall a program
+        // replaced while it is still being started.
+        let mut said = std::io::BufReader::new(running.stdout.take().unwrap());
+        let mut line = String::new();
+        while !line.contains("running") {
+            line.clear();
+            let read = std::io::BufRead::read_line(&mut said, &mut line).unwrap();
+            assert!(read > 0, "the program ended before it said it was running");
+        }
+        let (new, aside) = (root.join(".statac-new-1"), root.join(".statac-old-1"));
+        replace_program(&program, b"the program after", &new, &aside).unwrap();
+        assert_eq!(std::fs::read(&program).unwrap(), b"the program after");
+        assert!(!new.exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&program).unwrap().permissions().mode();
+            assert_eq!(mode & 0o111, 0o111, "{mode:o}");
+        }
+        assert!(running.try_wait().unwrap().is_none(), "the program stopped");
+        drop(running.stdin.take());
+        assert!(running.wait().unwrap().success());
+        // Windows won't replace a running program, so it was moved aside.
+        assert_eq!(aside.exists(), cfg!(windows));
+        remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_program_moved_aside_comes_back_where_its_replacement_cant_take_its_place() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-aside-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let (program, new, aside) = (root.join("statac"), root.join("new"), root.join("aside"));
+        std::fs::write(&program, "before").unwrap();
+        std::fs::write(&new, "after").unwrap();
+        moved_aside_and_placed(&new, &program, &aside).unwrap();
+        assert_eq!(std::fs::read(&program).unwrap(), b"after");
+        assert_eq!(std::fs::read(&aside).unwrap(), b"before");
+        assert!(!new.exists());
+
+        std::fs::remove_file(&aside).unwrap();
+        assert!(moved_aside_and_placed(&new, &program, &aside).is_err());
+        assert_eq!(std::fs::read(&program).unwrap(), b"after");
+        assert!(!aside.exists());
         remove_folder(&root).unwrap();
     }
 

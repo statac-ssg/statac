@@ -104,6 +104,32 @@ pub(crate) fn fetch(address: &str, limit: u64) -> Result<Fetched, Refusal> {
     run(&Plan::for_a_fetch(), address, limit)
 }
 
+/// Fetches as [`fetch`] does, given `total` for the whole of it in place
+/// of thirty seconds, for a download larger than a page.
+pub(crate) fn fetch_within(address: &str, limit: u64, total: Duration) -> Result<Fetched, Refusal> {
+    let plan = Plan {
+        total,
+        ..Plan::for_a_fetch()
+    };
+    run(&plan, address, limit)
+}
+
+/// Fetches as [`fetch_within`] does, where the addresses of servers a test
+/// started on this machine are allowed.
+#[cfg(test)]
+pub(crate) fn fetch_allowing(
+    allowed: &[SocketAddr],
+    address: &str,
+    limit: u64,
+    total: Duration,
+) -> Result<Fetched, Refusal> {
+    run(
+        &Plan::for_a_test(Lookup::System, allowed.to_vec(), total),
+        address,
+        limit,
+    )
+}
+
 /// What a fetch is given beyond the caller's address and limit: the whole
 /// time it may take, how a name is looked up, and the addresses it may
 /// reach however they judge. A fetch looks names up with the system,

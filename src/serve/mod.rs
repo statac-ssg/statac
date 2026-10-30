@@ -1,6 +1,8 @@
 //! `statac serve`: the site built, answered on this machine, built again
 //! on every save, and the browser told. After the first round with no
-//! error, what `refresh` fetches is fetched once, beside the rounds.
+//! error, what `refresh` fetches is fetched once, beside the rounds. As it
+//! starts, a newer Statac is looked for on a thread of its own, so the
+//! first build doesn't wait for it.
 
 pub(crate) mod http;
 pub mod live;
@@ -50,6 +52,37 @@ pub struct Options {
     pub fetcher: Option<Fetcher>,
     /// The webmention relay's token, as `refresh` takes it.
     pub token: Option<Token>,
+    /// What looks for a newer Statac as the session starts; with none,
+    /// nothing does.
+    pub upgrade: Option<Upgrader>,
+}
+
+/// What looks for a newer Statac, on a thread of its own, saying each
+/// line it has to say on what it is handed.
+#[derive(Clone)]
+pub struct Upgrader(Arc<Upgrade>);
+
+/// Looks for a newer Statac, saying each line on what it is handed.
+type Upgrade = dyn Fn(&mut dyn FnMut(&str)) + Send + Sync;
+
+impl Upgrader {
+    pub fn new(upgrade: impl Fn(&mut dyn FnMut(&str)) + Send + Sync + 'static) -> Upgrader {
+        Upgrader(Arc::new(upgrade))
+    }
+}
+
+impl PartialEq for Upgrader {
+    fn eq(&self, other: &Upgrader) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for Upgrader {}
+
+impl std::fmt::Debug for Upgrader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Upgrader")
+    }
 }
 
 /// A fetcher handed to the thread that fetches.
@@ -144,6 +177,24 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
         drafts: options.drafts,
         url: None,
     };
+    // One receiver holds the saves and what the fetching, the upgrade and
+    // the server say, so only the thread running rounds writes, and no
+    // line is torn.
+    let (tell, heard) = mpsc::channel();
+    if let Some(Upgrader(upgrade)) = options.upgrade.clone() {
+        let tell = tell.clone();
+        std::thread::spawn(move || {
+            let mut say = |line: &str| {
+                let _ = tell.send(Heard::Said(line.to_owned()));
+            };
+            let upgraded = crate::album::quietly(|| {
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| upgrade(&mut say)))
+            });
+            if upgraded.is_err() {
+                say(&format!("{}\n", wording::UPGRADE_STOPPED));
+            }
+        });
+    }
     // Watching starts before the first build, so a save made while it runs
     // is built after it.
     let (sender, batches) = mpsc::channel();
@@ -193,9 +244,6 @@ pub fn start(options: &Options, out: &mut dyn Write, colour: bool) -> Option<Ser
         hub.clone(),
         base(&options.site).unwrap_or_default(),
     ));
-    // One receiver holds the saves and what the fetching and the server
-    // say, so only the thread running rounds writes, and no line is torn.
-    let (tell, heard) = mpsc::channel();
     let unanswered = {
         let tell = tell.clone();
         move |error: &std::io::Error| {
@@ -732,6 +780,7 @@ mod tests {
                 drafts: true,
                 fetcher: None,
                 token: None,
+                upgrade: None,
             };
             let mut opened = Vec::new();
             let serving = start(&options, &mut opened, false).unwrap_or_else(|| {
