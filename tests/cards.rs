@@ -486,6 +486,45 @@ fn a_picture_a_page_cannot_be_shared_with_stops_the_build() {
     );
 }
 
+#[test]
+fn a_picture_a_page_cannot_be_shared_with_is_exported_again_not_left_alone() {
+    let site = Site::new("own-unsupported");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\nog_image: photo-1.jpg\n---\n![A photograph](photo-1.jpg)\n",
+    );
+    // A JPEG with no frame, so no size.
+    site.put("content/photo-1.jpg", b"\xff\xd8\xff\xd9");
+    let unchanged = "  To publish the file unchanged, write `optimise: false` in \
+                     `content/photo-1.jpg.yaml`.\n";
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(code, 1, "{said}");
+    assert_eq!(said.matches("error  Unreadable image").count(), 2, "{said}");
+    assert_eq!(said.matches(unchanged).count(), 1, "{said}");
+
+    // Left alone, the writing shows it, but the card still needs its size.
+    site.write("content/photo-1.jpg.yaml", "optimise: false\n");
+    let (said, code) = site.run(&["check"]);
+    assert_eq!(code, 1, "{said}");
+    assert_eq!(
+        told(&said),
+        ["error  Unreadable image: `content/photo-1.jpg` is saved in a form Statac doesn't read"]
+    );
+    assert!(
+        said.contains("  content/post-1.md, line 3\n   3 │ og_image: photo-1.jpg\n"),
+        "{said}"
+    );
+    assert!(
+        said.contains("  Export the file again as an ordinary JPEG, PNG or WebP.\n"),
+        "{said}"
+    );
+
+    site.put("content/photo-1.jpg", &jpeg(40, 30));
+    site.build();
+    let built = site.html("post-1/index.html");
+    assert_eq!(meta(&built, "og:image:width").unwrap(), "40");
+}
+
 /// A WebP of one pixel.
 const WEBP: &[u8] = b"RIFF\x1a\x00\x00\x00WEBPVP8L\x0d\x00\x00\x00\
                       \x2f\x00\x00\x00\x10\x07\x10\x11\x11\x88\x88\xfe\x07\x00";

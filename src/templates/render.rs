@@ -1995,6 +1995,7 @@ impl markdown::Snippets for Prose<'_> {
             crate::album::Seen::Unreadable(fault) if !left_alone => Some(Kind::UnreadableImage {
                 path: picture.shown(),
                 fault: fault.clone(),
+                og_image: false,
             }),
             crate::album::Seen::Plain {
                 kind: crate::pictures::Kind::Heic | crate::pictures::Kind::Heif,

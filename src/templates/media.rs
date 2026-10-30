@@ -597,6 +597,7 @@ fn shown(
             return Err(frame::raise(Kind::UnreadableImage {
                 path: picture.shown(),
                 fault: fault.clone(),
+                og_image: false,
             }));
         }
         Seen::Plain {

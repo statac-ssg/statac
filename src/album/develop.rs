@@ -301,6 +301,7 @@ pub(crate) fn develop(
                 let kind = Kind::UnreadableImage {
                     path: picture.shown(),
                     fault,
+                    og_image: false,
                 };
                 Problem::placed(kind, shown.place)
             };

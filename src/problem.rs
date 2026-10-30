@@ -1451,10 +1451,13 @@ pub enum Kind {
         size: u32,
     },
     /// A picture the writing shows that can't be read, or a photograph
-    /// whose copies can't be made: its file, and what is wrong with it.
+    /// whose copies can't be made: its file, what is wrong with it, and
+    /// whether a page's `og_image` names it, whose card needs its size
+    /// whatever its sidecar file says.
     UnreadableImage {
         path: String,
         fault: PictureFault,
+        og_image: bool,
     },
     /// A photograph whose copies are made in sRGB from another colour
     /// space: its file, and the name its profile gives the space, where it

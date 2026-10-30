@@ -568,6 +568,7 @@ fn own_picture(shared: &Arc<Shared>, id: PageId, named: &Sourced<&str>) -> Outco
             let kind = Kind::UnreadableImage {
                 path: picture.shown(),
                 fault: fault.clone(),
+                og_image: true,
             };
             tell(kind, place);
             return Outcome::None;
@@ -678,6 +679,7 @@ fn make_kit(cards: &Cards, at: usize) -> Result<Kit, Problem> {
                 let kind = Kind::UnreadableImage {
                     path: cards::file_named(&card.background.value),
                     fault: crate::album::fault(error),
+                    og_image: false,
                 };
                 Problem::placed(kind, card.background.origin.place)
             }

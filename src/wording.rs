@@ -993,7 +993,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
         Kind::SizeKept {
             written, at, size, ..
         } => format!("Size kept: at `{at}`, Statac draws `{written}` at {size}"),
-        Kind::UnreadableImage { path, fault } => match fault {
+        Kind::UnreadableImage { path, fault, .. } => match fault {
             PictureFault::CutShort => {
                 format!("Unreadable image: `{path}` is cut short or damaged")
             }
@@ -3377,10 +3377,17 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         Kind::SizeKept { field, size, .. } => Some(format!(
             "Write `{field}: {size}`; Statac fits only a text at `left`, `centre` or `right`."
         )),
-        Kind::UnreadableImage { path, fault } => match fault {
+        Kind::UnreadableImage {
+            path,
+            fault,
+            og_image,
+        } => match fault {
             PictureFault::CutShort => Some("Copy or export the file again.".into()),
             PictureFault::NotAStill => {
                 Some("Delete it, then run `statac refresh` to fetch one.".into())
+            }
+            PictureFault::Unsupported(_) if *og_image => {
+                Some("Export the file again as an ordinary JPEG, PNG or WebP.".into())
             }
             _ if path.starts_with("content/") => Some(format!(
                 "To publish the file unchanged, write `optimise: false` in `{path}.yaml`."
@@ -5310,6 +5317,7 @@ mod tests {
                 Kind::UnreadableImage {
                     path: "fetched/stills/youtube-abcdefghijk.jpg".into(),
                     fault: PictureFault::NotAStill,
+                    og_image: false,
                 },
                 "Unreadable image: `fetched/stills/youtube-abcdefghijk.jpg` isn't a JPEG, a \
                  PNG or a still WebP",
@@ -7575,6 +7583,7 @@ mod tests {
                 Kind::UnreadableImage {
                     path: "content/photo-1.jpg".into(),
                     fault: PictureFault::CutShort,
+                    og_image: false,
                 },
                 "Unreadable image: `content/photo-1.jpg` is cut short or damaged",
                 Some("Copy or export the file again."),
@@ -7583,6 +7592,7 @@ mod tests {
                 Kind::UnreadableImage {
                     path: "content/photo-1.jpg".into(),
                     fault: PictureFault::Unsupported("JPEG without a frame header".into()),
+                    og_image: false,
                 },
                 "Unreadable image: `content/photo-1.jpg` is saved in a form Statac doesn't read",
                 Some(
@@ -7592,8 +7602,18 @@ mod tests {
             ),
             (
                 Kind::UnreadableImage {
+                    path: "content/photo-1.jpg".into(),
+                    fault: PictureFault::Unsupported("JPEG without a frame header".into()),
+                    og_image: true,
+                },
+                "Unreadable image: `content/photo-1.jpg` is saved in a form Statac doesn't read",
+                Some("Export the file again as an ordinary JPEG, PNG or WebP."),
+            ),
+            (
+                Kind::UnreadableImage {
                     path: "static/photo-1.avif".into(),
                     fault: PictureFault::Unsupported("AVIF without an image size".into()),
+                    og_image: false,
                 },
                 "Unreadable image: `static/photo-1.avif` is saved in a form Statac doesn't read",
                 None,
@@ -7605,6 +7625,7 @@ mod tests {
                         width: 40000,
                         height: 30000,
                     },
+                    og_image: false,
                 },
                 "Unreadable image: `content/photo-1.jpg` is 40,000 by 30,000 pixels, too large \
                  to open",
@@ -7617,6 +7638,7 @@ mod tests {
                 Kind::UnreadableImage {
                     path: "static/photo-1.jpg".into(),
                     fault: PictureFault::CantMake("too large for JPEG".into()),
+                    og_image: false,
                 },
                 "Unreadable image: Statac can't make a resized copy of `static/photo-1.jpg`: too \
                  large for JPEG",

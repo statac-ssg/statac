@@ -64,7 +64,10 @@ original file and makes no resized copies of it. Only an image in
 `content/` has a sidecar file. For an image in `static/`,
 `optimise_images: false` in `statac.yaml` publishes every image on the
 site unchanged. Statac never publishes a social card's background, or a
-file in `fetched/`, unchanged.
+file in `fetched/`, unchanged. Statac always publishes the image a
+page's `og_image` names unchanged, but still reads its size for the
+social card. If that image is saved in a form Statac doesn't read,
+export it again.
 
 ## Example
 
