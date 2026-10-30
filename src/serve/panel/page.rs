@@ -248,6 +248,7 @@ impl On<'_> {
             Key::Translations(_) => {
                 return Behind::Said(wording::PANEL_READ_TRANSLATIONS.to_owned());
             }
+            Key::Backlinks(_) => return Behind::Said(wording::PANEL_READ_BACKLINKS.to_owned()),
             Key::FieldOfEvery(name) | Key::FieldOfWriters(_, _, name) => {
                 let name = shown(&renderer.name_of(name));
                 return Behind::Said(wording::panel_read_field(&name));

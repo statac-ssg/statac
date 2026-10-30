@@ -427,6 +427,7 @@ kinds![
     Body,
     Neighbours,
     Translations,
+    Backlinks,
     Card,
     ListPage,
     ListHead,
@@ -538,6 +539,7 @@ const CENSUS: &[fn()] = &[
     what_a_template_shows_of_a_folder_a_feed_and_a_home_follows_them,
     pages_chosen_from_every_page_by_a_field_follow_the_field,
     posts_and_their_tags_listed,
+    backlinks_follow_links_added_removed_and_their_pages_moved,
 ];
 
 /// A kind of key no edit reaches is one a read serve misses could hide in.
@@ -629,6 +631,75 @@ fn a_body_and_a_title_reach_only_what_shows_them() {
     let outputs = built[0].1;
     assert!(built[1].0 > 0 && built[1].0 < outputs, "{built:?}");
     assert!(built[2].0 > 0 && built[2].0 < outputs, "{built:?}");
+}
+
+#[test]
+fn backlinks_follow_links_added_removed_and_their_pages_moved() {
+    let Some(_counted) = counted(backlinks_follow_links_added_removed_and_their_pages_moved) else {
+        return;
+    };
+    let site = Site::new("backlinks");
+    site.write(
+        "templates/page.html",
+        &format!(
+            "{BASE}{PAGE}<ul>{{% for other in page.backlinks %}}<li><a href=\"{{{{ other.url }}}}\">\
+             {{{{ other.title }}}}</a></li>{{% endfor %}}</ul>\n"
+        ),
+    );
+    let linking = |title: &str, text: &str| post(title, "2026-01-03", "one", text);
+    let built = through(
+        &site,
+        &[
+            ("a link added", &|site| {
+                site.write(
+                    "content/post-3.md",
+                    &linking("Post 3", "Post 3 says this.\n\nAnd [the second](/post-2/)."),
+                )
+            }),
+            ("its words changed", &|site| {
+                site.write(
+                    "content/post-3.md",
+                    &linking("Post 3", "Post 3 says this.\n\nAnd [post 2](/post-2/)."),
+                )
+            }),
+            ("the writing round it changed", &|site| {
+                site.write(
+                    "content/post-3.md",
+                    &linking("Post 3", "Post 3 says more.\n\nAnd [post 2](/post-2/)."),
+                )
+            }),
+            ("the linking page retitled", &|site| {
+                site.write(
+                    "content/post-3.md",
+                    &linking("Post three", "Post 3 says more.\n\nAnd [post 2](/post-2/)."),
+                )
+            }),
+            ("a link to an old address", &|site| {
+                site.write(
+                    "content/post-4.md",
+                    &post(
+                        "Post 4",
+                        "2026-01-04",
+                        "one",
+                        "Post 4 says this.\n\n<a href=\"/old-6/\">6</a>",
+                    ),
+                )
+            }),
+            ("the link removed", &|site| {
+                site.write(
+                    "content/post-3.md",
+                    &linking("Post three", "Post 3 says more."),
+                )
+            }),
+            ("the linked page moved", &|site| {
+                let text = site.read("content/post-2.md");
+                site.remove("content/post-2.md");
+                site.write("content/post-two.md", &text);
+            }),
+        ],
+    );
+    // A link's words and the writing round it are no page's backlinks.
+    assert_eq!((built[2].0, built[3].0), (4, 4), "{built:?}");
 }
 
 #[test]

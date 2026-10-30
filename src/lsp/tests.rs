@@ -932,6 +932,82 @@ fn finding_references_lists_every_link_to_the_page_the_cursor_is_in() {
     assert_eq!(found, format!("[{}]", wanted.join(",")));
 }
 
+#[test]
+fn the_pages_linking_to_a_page_are_listed_newest_first_with_each_link() {
+    let site = TempSite::site(&[
+        ("statac.yaml", "title: Site 1\ntimezone: UTC\n"),
+        ("templates/page.html", "{{ page.content }}\n"),
+        ("content/about.md", "---\ntitle: About\n---\nA page.\n"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-01\n---\nSee [about](/about/), \
+             [again](/about/) and ![a picture](/about/).\n",
+        ),
+        (
+            "content/post-2.md",
+            "---\ndate: 2026-01-02\nuntitled: true\n---\nA note on [about](/about/).\n",
+        ),
+    ]);
+    let about = site.root.join("content/about.md");
+    let backlinks = |id: u32, file: &Path| {
+        format!(
+            "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"statac/backlinks\",\
+             \"params\":{{\"textDocument\":{{\"uri\":{}}}}}}}",
+            json::string(&uri::of(file))
+        )
+    };
+    let elsewhere = site.root.join("templates/page.html");
+    let mut editor = Editor::start();
+    editor.send(&initialize(""));
+    let mark = editor.mark();
+    editor.send_all(&[
+        &opened(&about),
+        &backlinks(2, &about),
+        &backlinks(3, &elsewhere),
+    ]);
+    editor.until(mark, |message| message.id() == Some("3"));
+    let (sent, _) = editor.end(true);
+    let result = |id: &str| {
+        let answer = (sent.iter())
+            .find(|message| message.id() == Some(id))
+            .expect("an answer");
+        let result = answer.at(&["result"]).unwrap().place;
+        answer.sources.spelling(result).to_owned()
+    };
+    let range = |line: usize, start: usize, end: usize| {
+        format!(
+            "{{\"range\":{{\"start\":{{\"line\":{line},\"character\":{start}}},\
+             \"end\":{{\"line\":{line},\"character\":{end}}}}}}}"
+        )
+    };
+    let page = |path: &str, title: &str, url: &str, date: &str, links: &[String]| {
+        format!(
+            "{{\"uri\":{},\"title\":\"{title}\",\"url\":\"{url}\",\"date\":\"{date}\",\
+             \"links\":[{}]}}",
+            json::string(&uri::of(&site.root.join(path))),
+            links.join(",")
+        )
+    };
+    let wanted = [
+        page(
+            "content/post-2.md",
+            "January 2, 2026",
+            "/post-2/",
+            "2026-01-02",
+            &[range(4, 18, 25)],
+        ),
+        page(
+            "content/post-1.md",
+            "Post 1",
+            "/post-1/",
+            "2026-01-01",
+            &[range(4, 12, 19), range(4, 30, 37)],
+        ),
+    ];
+    assert_eq!(result("2"), format!("[{}]", wanted.join(",")));
+    assert_eq!(result("3"), "null");
+}
+
 fn actions(id: u32, file: &Path, line: usize, character: usize, only: &str) -> String {
     format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"textDocument/codeAction\",\

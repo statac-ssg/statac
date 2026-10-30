@@ -4866,6 +4866,7 @@ pub(crate) const PANEL_READ_PAGES: &str = "Which pages there are";
 pub(crate) const PANEL_READ_LISTS: &str = "Which lists there are";
 pub(crate) const PANEL_READ_ORDER: &str = "The order of the pages in their lists";
 pub(crate) const PANEL_READ_TRANSLATIONS: &str = "Which pages are translations of which";
+pub(crate) const PANEL_READ_BACKLINKS: &str = "Which pages link to which";
 pub(crate) const PANEL_READ_FILES: &str = "Which images and other files the site has";
 pub(crate) const PANEL_READ_MENTIONS: &str = "The webmentions in `fetched/mentions/`";
 pub(crate) const PANEL_READ_TODAY: &str = "Today's date";

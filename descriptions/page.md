@@ -119,6 +119,12 @@ Empty if there are none.
 
 More: https://statac.dev/languages/#translations
 
+## `backlinks`
+
+The pages whose content links to this page, the newest first, each
+once. Links a template writes, such as a menu's, don't count. Empty if
+there are none.
+
 ## `tags`
 
 The page's tags, each a list with its `name`, `url` and `posts`.

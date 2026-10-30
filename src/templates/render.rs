@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use minijinja::value::{Rest, Value, ValueOrKwargs};
 use minijinja::{Environment, Error, State};
 
+use super::backlinks::{Carried, Linking};
 use super::card::Gathered;
 use super::files::{Snippet, Unnamed, unnamed_fills};
 use super::frame::{self, Frame, Handed, Stop};
@@ -80,6 +81,12 @@ pub(super) struct Shared {
     pub(crate) highlighter: Option<Highlighter>,
     /// What the site's cards come to, each worked out once.
     pub(crate) cards: super::card::Room,
+    /// What every page's writing links to, and the pages linking to each,
+    /// worked out the first time any is asked.
+    linking: OnceLock<Linking>,
+    /// What the reading before carried of each page's links, until they
+    /// are worked out.
+    carried: Mutex<Carried>,
 }
 
 impl std::fmt::Debug for Shared {
@@ -461,6 +468,8 @@ impl Renderer {
                 put_last: Mutex::new(HashMap::new()),
                 highlighter,
                 cards,
+                linking: OnceLock::new(),
+                carried: Mutex::new(Carried::new()),
             }),
         }
     }
@@ -763,14 +772,31 @@ impl Renderer {
         Some(&body.writing)
     }
 
-    /// What `page`'s writing links to and hands its snippet calls, its
-    /// writing built now where no output has built it, as where a round
-    /// kept the page's output from the round before.
-    pub(crate) fn writing_built(&self, page: PageId) -> &crate::linked::Writing {
-        kept_body(&self.shared, page);
-        &(self.shared.bodies[page.index()].get())
-            .expect("kept just now")
-            .writing
+    /// What `page`'s writing links to and hands its snippet calls, as
+    /// Markdown reads it apart from building it; nothing for a page with
+    /// no file of its own.
+    pub(crate) fn links_of(&self, page: PageId) -> Option<&crate::linked::Writing> {
+        linking(&self.shared).writing(page)
+    }
+
+    /// The pages whose writing links to `page`, each once, newest first.
+    pub(crate) fn backlinks(&self, page: PageId) -> &[PageId] {
+        linking(&self.shared).to(page)
+    }
+
+    /// Takes from `earlier`, a reading of the same site before this one,
+    /// each page's links where it had worked them out and the page's file
+    /// is read as it was, so they are read again only where changed.
+    pub(crate) fn carry_links(&self, earlier: &Renderer) {
+        if let Some(linking) = earlier.shared.linking.get() {
+            let carried = linking.carried(&earlier.shared, &self.shared);
+            *self.shared.carried.lock().expect("never poisoned") = carried;
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn links_read(&self) -> Option<usize> {
+        self.shared.linking.get().map(Linking::fresh)
     }
 
     /// `page`'s writing as built, cut where each heading with an id
@@ -1158,6 +1184,16 @@ thread_local! {
     static WRITING: RefCell<Vec<PageId>> = const { RefCell::new(Vec::new()) };
 }
 
+/// What every page's writing links to, and the pages linking to each,
+/// worked out the first time any is asked, recording nothing: each output
+/// asking records what it reads of it.
+pub(super) fn linking(shared: &Shared) -> &Linking {
+    shared.linking.get_or_init(|| {
+        let carried = std::mem::take(&mut *shared.carried.lock().expect("never poisoned"));
+        frame::unrecorded(|| Linking::of(shared, carried))
+    })
+}
+
 /// A page's writing, built once and kept. What building it read is
 /// recorded on the output asking for it.
 fn body(shared: &Arc<Shared>, page: PageId) -> Result<Arc<Body>, Error> {
@@ -1218,14 +1254,14 @@ fn has_writing(shared: &Shared, page: PageId) -> bool {
 /// Whether the site's snippet `name` wraps the writing below a call to it,
 /// which it does where it shows the writing; none where the site has no
 /// such snippet, or its snippet can't be read.
-fn wraps(shared: &Shared, name: &str) -> Option<bool> {
+pub(super) fn wraps(shared: &Shared, name: &str) -> Option<bool> {
     let snippet = shared.templates.snippets.get(name)?;
     snippet.readable.then_some(!snippet.wrapped.is_empty())
 }
 
 /// The file a page's writing is read from as Markdown; none for a page
 /// written in HTML, or one Statac made with none.
-fn written_as_markdown(shared: &Shared, page: PageId) -> Option<SourceId> {
+pub(super) fn written_as_markdown(shared: &Shared, page: PageId) -> Option<SourceId> {
     let p = shared.site.pages.get(page);
     let source = p.source?;
     (!(p.path.ends_with(".html") || p.path.ends_with(".htm"))).then_some(source)
@@ -1377,7 +1413,7 @@ fn build_body_untimed(
         None => match p.source {
             Some(source) => {
                 undescribed_in_html(shared, page, source, p.body);
-                links.written = crate::linked::written_in_html(&shared.sources, source, p.body);
+                links = crate::linked::Writing::of_html(&shared.sources, source, p.body);
                 let mut written =
                     markdown::as_written(&shared.sources.text(source)[p.body.range()]);
                 written.traced = vec![(
@@ -1392,8 +1428,7 @@ fn build_body_untimed(
             None => markdown::Written::default(),
         },
         Some(document) => {
-            links.written = crate::linked::written(&document, &shared.sources);
-            links.handed = crate::linked::handed(&document);
+            links = crate::linked::Writing::of(&document, &shared.sources);
             problems.extend(document.problems.iter().cloned());
             if code_languages(shared, &document, &mut problems) {
                 frame::with(|frame| frame.colours = true);

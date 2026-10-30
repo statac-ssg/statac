@@ -9,8 +9,6 @@
 #[cfg(test)]
 mod tests;
 
-use rayon::prelude::*;
-
 use super::complete::template::{Pointed, pointed};
 use super::hover::Goes;
 use crate::address;
@@ -58,17 +56,10 @@ pub(super) fn links(renderer: &Renderer, files: Vec<String>, id: Option<&str>) -
     let sources = renderer.sources();
     let mut found = Vec::new();
     let base = renderer.settings().base();
-    let written: Vec<PageId> = (site.pages.iter())
-        .filter(|(_, held)| held.source.is_some())
-        .map(|(page, _)| page)
-        .collect();
-    // Built together first, as a round that kept a page's output from the
-    // round before leaves its writing unbuilt.
-    written.par_iter().for_each(|&page| {
-        renderer.writing_built(page);
-    });
-    for other in written {
-        let (writing, held) = (renderer.writing_built(other), site.pages.get(other));
+    for (other, held) in site.pages.iter() {
+        let Some(writing) = renderer.links_of(other) else {
+            continue;
+        };
         let from = format!("{base}{}", held.address.as_str());
         // Any text can be handed to a call; one that isn't written as an
         // address is taken as something else.
@@ -169,15 +160,45 @@ pub(super) fn found(
     Some(found)
 }
 
+/// A page whose writing links to the page sought, and where each of its
+/// links to it is written.
+pub(super) struct Backlink {
+    pub(crate) page: PageId,
+    pub(crate) links: Vec<Place>,
+}
+
+/// The pages whose writing links to the page the file at `rel` is, as
+/// `page.backlinks` gives them, each with where it links to the page.
+/// None where the file is no page.
+pub(super) fn backlinks(renderer: &Renderer, rel: &str) -> Option<Vec<Backlink>> {
+    let page = page_at(renderer, rel)?;
+    let site = renderer.site();
+    let follow = links::Site::new(renderer.settings(), files(renderer, page));
+    let base = renderer.settings().base();
+    let backlinks = (renderer.backlinks(page).iter()).map(|&other| {
+        let from = format!("{base}{}", site.pages.get(other).address.as_str());
+        let written = renderer.links_of(other).map_or(&[][..], |w| &w.written);
+        let links = (written.iter())
+            .filter(|linked| linked.followed && follow.lands_on(&linked.address, &from).is_some())
+            .map(|linked| linked.place)
+            .collect();
+        Backlink { page: other, links }
+    });
+    Some(backlinks.collect())
+}
+
+/// The page whose own file is at `path` in the site.
+fn page_at(renderer: &Renderer, path: &str) -> Option<PageId> {
+    (renderer.site().pages.iter())
+        .filter(|(_, page)| page.source.is_some() && page.made.is_none())
+        .find(|(id, _)| renderer.page_path(*id) == path)
+        .map(|(id, _)| id)
+}
+
 /// What the cursor names, or is in where it names nothing.
 fn sought(renderer: &Renderer, rel: &str, offset: usize, to: Option<Goes>) -> Option<Sought> {
     let site = renderer.site();
-    let page_at = |path: &str| {
-        (site.pages.iter())
-            .filter(|(_, page)| page.source.is_some() && page.made.is_none())
-            .find(|(id, _)| renderer.page_path(*id) == path)
-            .map(|(id, _)| id)
-    };
+    let page_at = |path: &str| page_at(renderer, path);
     let heading = |page: PageId, holds: &dyn Fn(Place) -> bool| {
         let heading = (renderer.headings(page).into_iter()).find(|heading| holds(heading.place))?;
         Some(Sought::Heading(page, heading.id, heading.place))
@@ -191,8 +212,8 @@ fn sought(renderer: &Renderer, rel: &str, offset: usize, to: Option<Goes>) -> Op
             let page = page_at(rel)?;
             let under = |at: Place| at.span.range().contains(&offset);
             // A link that leads nowhere known names no page.
-            let linked =
-                (renderer.writing_built(page).written.iter()).any(|linked| under(linked.place));
+            let written = renderer.links_of(page).map_or(&[][..], |w| &w.written);
+            let linked = written.iter().any(|linked| under(linked.place));
             if linked {
                 return None;
             }

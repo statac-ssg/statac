@@ -264,6 +264,9 @@ pub(crate) fn rebuild(
     };
     let reading = Reading::of(prepared.renderer.share());
     let renderer = &reading.renderer;
+    if let Some(last) = last {
+        renderer.carry_links(&last.reading.renderer);
+    }
     let prints = Prints::new(&reading, disk, last.map(|last| &last.prints));
     let taken = Taken {
         reading: &reading,

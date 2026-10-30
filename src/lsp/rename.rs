@@ -114,7 +114,9 @@ pub(super) fn renamed(
         .map(|(id, page)| (page.address.file(), id))
         .collect();
     for &page in &pages {
-        let writing = renderer.writing_built(page);
+        let Some(writing) = renderer.links_of(page) else {
+            continue;
+        };
         let was = format!("{base}{}", site.pages.get(page).address.as_str());
         let is = format!("{base}{}", address(page));
         let handed = (writing.handed.iter()).filter(|linked| linked.address.contains('/'));

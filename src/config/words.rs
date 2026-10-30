@@ -165,6 +165,7 @@ pub(crate) const STATAC_FILLS: &[&str] = &[
     "maths",
     "source",
     "translations",
+    "backlinks",
 ];
 
 /// Other tools' words for Statac's own, and Statac's.

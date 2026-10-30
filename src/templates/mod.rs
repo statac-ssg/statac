@@ -9,6 +9,7 @@
 //! finds the mistakes it can before any page is built. Nothing outside
 //! this module knows which engine is underneath.
 
+mod backlinks;
 mod card;
 mod check;
 mod data;
@@ -711,6 +712,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("next", Ty::Record(Rec::Page), false),
         ("previous", Ty::Record(Rec::Page), false),
         ("translations", pages.clone(), true),
+        ("backlinks", pages.clone(), true),
         ("og_title", Ty::Text, true),
         ("card", Ty::Record(Rec::Card), false),
         ("webmentions", Ty::Record(Rec::Webmentions), true),

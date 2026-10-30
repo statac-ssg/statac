@@ -16,6 +16,16 @@
 //! it keeps every link to the pages moved leading to them, and sends
 //! readers on from the addresses they leave.
 //!
+//! Beside the protocol's own requests it answers one of Statac's,
+//! `statac/backlinks`, for an editor's list of what links to a page.
+//! Handed a `textDocument` as `textDocument/documentSymbol` is, it
+//! answers with the pages whose writing links to the page that file is,
+//! as `page.backlinks` gives them, newest first: each an object with
+//! the page's file as `uri`, what `headline` calls it as `title`, its
+//! `url`, its `date` as written or `null`, and `links`, an object with
+//! the `range` of each of its links to the page. It answers `null` where
+//! the file is no page.
+//!
 //! Nothing but the protocol may be written to standard output, which the
 //! editor reads as messages.
 
@@ -448,6 +458,10 @@ impl Server<'_> {
                 let result = self.symbols(message)?;
                 self.respond(id.unwrap_or("null"), &result)
             }
+            "statac/backlinks" => {
+                let result = self.backlinks(message)?;
+                self.respond(id.unwrap_or("null"), &result)
+            }
             "shutdown" => {
                 self.shut_down = true;
                 self.respond(id.unwrap_or("null"), "null")
@@ -774,6 +788,50 @@ impl Server<'_> {
                 format!(
                     "{{\"uri\":{},\"range\":{range}}}",
                     json::string(&uri::of(&path))
+                )
+            })
+            .collect();
+        Ok(format!("[{}]", told.join(",")))
+    }
+
+    /// The pages whose writing links to the page the request's file is,
+    /// as `page.backlinks` gives them, or `null` where the file is no page.
+    fn backlinks(&mut self, message: &Message) -> std::io::Result<String> {
+        let Some((folder, file, _)) = self.named(message)? else {
+            return Ok("null".to_owned());
+        };
+        self.drafts_if_due(&folder)?;
+        let Some(known) = (self.sites.get(&folder)).and_then(Site::known_whole) else {
+            return Ok("null".to_owned());
+        };
+        let Some(rel) = file.strip_prefix(&folder).ok() else {
+            return Ok("null".to_owned());
+        };
+        let rel = rel.to_string_lossy().replace('\\', "/");
+        let Some(found) = references::backlinks(known, &rel) else {
+            return Ok("null".to_owned());
+        };
+        let (site, sources) = (known.site(), known.sources());
+        let base = known.settings().base();
+        let told: Vec<String> = (found.into_iter())
+            .map(|backlink| {
+                let page = site.pages.get(backlink.page);
+                let path = folder.join(known.page_path(backlink.page));
+                let date = page.date.as_ref().map(|date| date.value.to_string());
+                let links: Vec<String> = (backlink.links.iter())
+                    .map(|&place| {
+                        let range = diagnostics::range(sources, place, self.encoding);
+                        format!("{{\"range\":{range}}}")
+                    })
+                    .collect();
+                format!(
+                    "{{\"uri\":{},\"title\":{},\"url\":{},\"date\":{},\"links\":[{}]}}",
+                    json::string(&uri::of(&path)),
+                    json::string(&known.named(backlink.page).0),
+                    json::string(&format!("{base}{}", page.address.as_str())),
+                    date.as_deref()
+                        .map_or_else(|| "null".to_owned(), json::string),
+                    links.join(","),
                 )
             })
             .collect();

@@ -31,6 +31,8 @@ pub enum Key {
     Neighbours(PageId),
     /// Which pages are the page's translations.
     Translations(PageId),
+    /// Which pages link to the page from their writing, in their order.
+    Backlinks(PageId),
     /// A page's sharing card. Reading it announces the card, so it is drawn.
     Card(PageId),
     /// The members on one page of a list (counted from 1), and whether another follows.
@@ -150,6 +152,7 @@ impl Translation {
             Key::Body(page) => Key::Body(self.page(page)?),
             Key::Neighbours(page) => Key::Neighbours(self.page(page)?),
             Key::Translations(page) => Key::Translations(self.page(page)?),
+            Key::Backlinks(page) => Key::Backlinks(self.page(page)?),
             Key::Card(page) => Key::Card(self.page(page)?),
             Key::Mentions(page) => Key::Mentions(self.page(page)?),
             Key::ListPage(list, number) => Key::ListPage(self.list(list)?, number),

@@ -55,6 +55,7 @@ pub(super) const PAGE_ANSWERS: &[&str] = &[
     "next",
     "previous",
     "translations",
+    "backlinks",
     "post",
     "key",
 ];
@@ -84,6 +85,7 @@ const WORKED_OUT: &[&str] = &[
     "next",
     "previous",
     "translations",
+    "backlinks",
     "language",
     "direction",
     "tags",
@@ -378,6 +380,14 @@ impl PageValue {
                         .filter_map(|&other| self.translation(other))
                         .collect::<Vec<_>>(),
                 ))
+            }
+            // Links lead to a list's first page, not to its later pages.
+            "backlinks" if later => Some(Value::from(Vec::<Value>::new())),
+            "backlinks" => {
+                frame::read(Key::Backlinks(self.id));
+                let linking = super::render::linking(shared).to(self.id).iter();
+                let pages = linking.map(|&other| PageValue::value(shared, other));
+                Some(Value::from(pages.collect::<Vec<_>>()))
             }
             "language" => {
                 frame::read(Key::Language(page.language));

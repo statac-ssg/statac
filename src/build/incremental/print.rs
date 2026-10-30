@@ -316,6 +316,7 @@ pub(super) struct Prints {
     bodies: Slots,
     neighbours: Slots,
     translations: Slots,
+    backlinks: Slots,
     lists: Slots,
     lists_own: Slots,
     heads: Slots,
@@ -371,6 +372,7 @@ impl Prints {
             bodies: slots(pages),
             neighbours: slots(pages),
             translations: slots(pages),
+            backlinks: slots(pages),
             lists: slots(lists),
             lists_own: slots(lists),
             heads: slots(lists),
@@ -663,6 +665,11 @@ impl Taken<'_> {
                 let others = site.translations.get(page.index());
                 Print::default()
                     .with(others.map(|others| self.named(others)))
+                    .done()
+            }),
+            Key::Backlinks(page) => *prints.backlinks[page.index()].get_or_init(|| {
+                Print::default()
+                    .with(self.named(renderer.backlinks(page)))
                     .done()
             }),
             Key::ListPage(list, number) => {

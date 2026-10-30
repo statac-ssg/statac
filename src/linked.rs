@@ -6,10 +6,28 @@ use crate::markdown::{self, Document, InSite, Kind, Node};
 use crate::source::{Place, SourceId, Sources, Span};
 
 /// What a page's writing links to, and what it hands its snippet calls.
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub(crate) struct Writing {
     pub(crate) written: Vec<Linked>,
     pub(crate) handed: Vec<Linked>,
+}
+
+impl Writing {
+    /// What the writing `document` links to and hands its snippet calls.
+    pub(crate) fn of(document: &Document, sources: &Sources) -> Writing {
+        Writing {
+            written: written(document, sources),
+            handed: handed(document),
+        }
+    }
+
+    /// What writing in HTML, at `span` in `source`, links to.
+    pub(crate) fn of_html(sources: &Sources, source: SourceId, span: Span) -> Writing {
+        Writing {
+            written: written_in_html(sources, source, span),
+            handed: Vec::new(),
+        }
+    }
 }
 
 /// The attribute a link is written in.
@@ -110,6 +128,10 @@ pub(crate) struct Linked {
     /// Whether it is a value handed to a snippet call, where an
     /// `@url(...)` is not read.
     pub(crate) handed: bool,
+    /// Whether a reader follows it to where it leads: a link's address, or
+    /// `href` on `<a>` or `<area>`, and not a picture's or anything else a
+    /// page fetches.
+    pub(crate) followed: bool,
 }
 
 /// Every address the writing links to: each link's and picture's, placed
@@ -156,6 +178,7 @@ fn written_in_node(node: &Node, document: &Document, sources: &Sources, out: &mu
                 address: destination.clone(),
                 place,
                 handed: false,
+                followed: matches!(node.kind, Kind::Link { .. }),
             });
         }
         // A block of HTML is read whole, as a tag may run over its lines.
@@ -221,6 +244,7 @@ fn in_html(sources: &Sources, source: SourceId, span: Span, in_site: &[InSite]) 
                         span: Span::new(start, end),
                     },
                     handed: false,
+                    followed: kind == Attribute::Href && matches!(tag.name.as_str(), "a" | "area"),
                 });
             }
         }
@@ -245,6 +269,7 @@ pub(crate) fn handed(document: &Document) -> Vec<Linked> {
                         address: text.clone(),
                         place,
                         handed: true,
+                        followed: false,
                     });
                 }
             }
