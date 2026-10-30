@@ -106,8 +106,9 @@ pub(crate) struct Checked {
     /// The files its own sharing cards are published as.
     cards: Vec<String>,
     /// Each path on the site a link of its led to, sorted, with the file
-    /// the site held there, where the site notes what its pages ask of it.
-    asked: Vec<(String, Option<String>)>,
+    /// the site held there and whether that file was published only where
+    /// a page links it, where the site notes what its pages ask of it.
+    asked: Vec<(String, Option<String>, bool)>,
 }
 
 impl Checked {
@@ -248,11 +249,7 @@ impl Site {
         for link in &scanned.links {
             let written = link.address();
             if let Some((path, file)) = self.watched(&written, &from) {
-                if self.notes() {
-                    let own = |file: &str| checked.cards.iter().any(|card| card == file);
-                    let held = self.file_among(&path, own);
-                    checked.asked.push((path, held));
-                }
+                self.ask(&path, &mut checked);
                 checked.reached.extend(file);
             }
             let key = address::decoded(&written);
@@ -280,9 +277,9 @@ impl Site {
                 if let Some(other) = other {
                     let there = site.pages.get(other.page);
                     let at_home = format!("{}{}", self.base(), there.address.as_str());
-                    if there.lands()
-                        && self.leads(&written, &at_home) == self.leads(&written, &from)
-                    {
+                    let here = self.leads(&written, &from);
+                    if there.lands() && self.leads(&written, &at_home) == here {
+                        self.asks(&here, &mut checked);
                         continue;
                     }
                 }
@@ -364,6 +361,7 @@ impl Site {
         let there = site.pages.get(other);
         let at_home = format!("{}{}", self.base(), there.address.as_str());
         if there.lands() && self.leads(written, &at_home) == here {
+            self.asks(&here, checked);
             return;
         }
         if let Leads::Here(arrival) = here {
@@ -373,11 +371,37 @@ impl Site {
     }
 
     /// Whether the site still holds, at each path a link of the page led
-    /// to, what it held when the page was checked.
+    /// to, what it held when the page was checked, published as it was
+    /// then.
     pub(crate) fn holds_as(&self, checked: &Checked) -> bool {
         let own = |file: &str| checked.cards.iter().any(|card| card == file);
         let mut asked = checked.asked.iter();
-        asked.all(|(path, file)| self.file_among(path, own) == *file)
+        asked.all(|(path, file, waits)| {
+            let now = self.file_among(path, own);
+            now == *file && now.is_some_and(|now| self.waits(&now)) == *waits
+        })
+    }
+
+    /// [`Site::ask`] for the path `leads` arrives at, where it is on the
+    /// site.
+    fn asks(&self, leads: &Leads, checked: &mut Checked) {
+        if let Leads::Here(arrival) = leads
+            && !arrival.outside
+        {
+            self.ask(&arrival.path, checked);
+        }
+    }
+
+    /// The file the site holds at `path`, a path from the top of the site,
+    /// noted on `checked` where the site notes what its pages ask of it.
+    fn ask(&self, path: &str, checked: &mut Checked) -> Option<String> {
+        let own = |file: &str| checked.cards.iter().any(|card| card == file);
+        let file = self.file_among(path, own);
+        if self.notes() {
+            let waits = file.as_deref().is_some_and(|file| self.waits(file));
+            checked.asked.push((path.to_owned(), file.clone(), waits));
+        }
+        file
     }
 
     fn follow(&self, written: &str, from: &str, blame: Blame, checked: &mut Checked) {
@@ -388,14 +412,10 @@ impl Site {
 
     /// Holds a link arriving at `arrival` to what the site publishes there.
     fn arrive(&self, arrival: Arrival, written: &str, blame: Blame, checked: &mut Checked) {
-        let own = |file: &str| checked.cards.iter().any(|card| card == file);
         let file = match arrival.outside {
             true => None,
-            false => self.file_among(&arrival.path, own),
+            false => self.ask(&arrival.path, checked),
         };
-        if self.notes() && !arrival.outside {
-            checked.asked.push((arrival.path.clone(), file.clone()));
-        }
         let anchored = file.as_ref().is_some_and(|file| file.ends_with(".html"))
             && arrival
                 .fragment

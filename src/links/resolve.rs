@@ -172,11 +172,9 @@ impl Site {
         self.notes
     }
 
-    /// The files published only where a page links them, sorted.
-    pub(crate) fn watches(&self) -> Vec<&str> {
-        let mut watched: Vec<&str> = self.watched.iter().map(String::as_str).collect();
-        watched.sort_unstable();
-        watched
+    /// Whether `file` is published only where a page links it.
+    pub(super) fn waits(&self, file: &str) -> bool {
+        self.watched.contains(file)
     }
 
     pub(super) fn base(&self) -> &str {

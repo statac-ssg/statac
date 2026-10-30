@@ -122,6 +122,15 @@ impl Picture {
         format!("{}/{}", self.root.folder(), self.path)
     }
 
+    /// The last name in its path and in its address. A name that reaches
+    /// it in [`Pictures::find`] reaches another picture instead only where
+    /// that picture shares one of them.
+    pub(crate) fn last_names(&self) -> impl Iterator<Item = &str> {
+        let named = last_name(&self.path);
+        let address = self.address.as_deref().map(last_name);
+        std::iter::once(named).chain(address.filter(|address| *address != named))
+    }
+
     /// The size its tag gives: a photograph's once turned.
     pub fn size(&self) -> Option<Size> {
         match &self.seen {
@@ -331,6 +340,11 @@ impl Pictures {
     pub(crate) fn keep_index(&self, site: &Path) -> std::io::Result<()> {
         self.index.save(site)
     }
+}
+
+/// The last of the names in `path`, parted by `/`.
+fn last_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or_default()
 }
 
 /// `name` followed from `folder`, a path ending with `/` or empty, with its

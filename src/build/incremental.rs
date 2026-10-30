@@ -273,7 +273,7 @@ pub(crate) fn rebuild(
         at,
         prints: &prints,
     };
-    let whole = taken.whole(&plan, options, last.map(|last| &last.prints));
+    let whole = taken.whole(options, last.map(|last| &last.prints));
     let outputs = plan.outputs.par_iter();
     let own: Vec<u64> = outputs.map(|&output| taken.own(output)).collect();
     let changed = match last {

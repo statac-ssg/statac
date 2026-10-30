@@ -1152,6 +1152,97 @@ fn a_plain_file_added_beside_a_picture_builds_nothing() {
     assert_eq!((built[1].0, built[2].0), (0, 0), "{built:?}");
 }
 
+/// A post moved with its photograph builds what shows the post or links
+/// its files, not every output, though the photograph's original, which a
+/// link publishes, moves with it, and not a page showing another
+/// photograph. No page lists the tags, which every page moved changes.
+#[test]
+fn a_post_moved_with_its_photograph() {
+    let site = Site::new("moved-photograph");
+    let base = "<!doctype html>\n<title>{{ headline(page) }}</title>\n";
+    site.write("templates/home.html", &format!("{base}{HOME}"));
+    site.write("templates/folder.html", &format!("{base}{HOME}"));
+    site.write("templates/page.html", &format!("{base}{PAGE}"));
+    let text = "---\ntitle: Post 6\ndate: 2026-01-06\n---\n\
+                ![](photo-1.jpg)\n\n[The photograph](photo-1.jpg).\n";
+    site.write("content/post-6/index.md", text);
+    site.remove("content/post-3.md");
+    let text = "Post 3 says this.\n\n![](photo-3.jpg)";
+    site.write(
+        "content/post-3/index.md",
+        &post("Post 3", "2026-01-03", "one", text),
+    );
+    site.put("content/post-3/photo-3.jpg", &jpeg(32, 32));
+    let moved = |from: &'static str, to: &'static str| {
+        move |site: &Site| {
+            let content = site.root().join("content");
+            fs::rename(content.join(from), content.join(to)).unwrap();
+        }
+    };
+    let built = through(
+        &site,
+        &[
+            ("the post moved", &moved("post-6", "post-7")),
+            ("the post moved back", &moved("post-7", "post-6")),
+        ],
+    );
+    // The post, its neighbour, the home page listing it and the feed.
+    assert_eq!((built[1].0, built[2].0), (4, 4), "{built:?}");
+}
+
+/// A picture a name reaches by its address gives way to one the name
+/// reaches by its file, and a picture of another name changes nothing.
+#[test]
+fn a_picture_named_in_the_writing_follows_the_file_the_name_reaches_first() {
+    let site = Site::new("reached-first");
+    let text = "Post 2 says this.\n\n![](photo.jpg)";
+    site.write(
+        "content/notes/post-2.md",
+        &post("Post 2", "2026-01-02", "one", text),
+    );
+    site.put("content/notes/post-2/photo.jpg", &jpeg(32, 32));
+    let built = through(
+        &site,
+        &[
+            ("a picture of another name", &|site| {
+                site.put("content/notes/other.jpg", &jpeg(16, 16))
+            }),
+            ("a picture the name reaches first", &|site| {
+                site.put("content/notes/photo.jpg", &jpeg(24, 16))
+            }),
+            ("the picture the name reaches first removed", &|site| {
+                site.remove("content/notes/photo.jpg")
+            }),
+        ],
+    );
+    assert_eq!(built[1].0, 0, "{built:?}");
+}
+
+/// A page linking a photograph shown elsewhere is held to whether the
+/// photograph's original is published only where a page links it.
+#[test]
+fn a_link_to_a_photograph_follows_whether_its_original_waits_for_a_link() {
+    let site = Site::new("original-waits");
+    let text = "[The photograph](/post-6/photo-1.jpg) of post 6.";
+    site.write(
+        "content/post-2.md",
+        &post("Post 2", "2026-01-02", "one", text),
+    );
+    let alone = "optimise: false\n";
+    site.write("content/post-6/photo-1.jpg.yaml", alone);
+    through(
+        &site,
+        &[
+            ("the photograph given copies", &|site| {
+                site.remove("content/post-6/photo-1.jpg.yaml")
+            }),
+            ("the photograph left alone", &|site| {
+                site.write("content/post-6/photo-1.jpg.yaml", alone)
+            }),
+        ],
+    );
+}
+
 /// A check that stops is kept for the next, as the language server keeps
 /// it, so a name that reached no file decides what the next check builds
 /// again.
@@ -2878,8 +2969,7 @@ fn a_mention_written_changed_and_removed_rebuilds_only_the_pages_that_read_their
             ("a mention of a page that never asks", &|site| {
                 site.write("fetched/mentions/2.yaml", &mention("post-1", ""));
             }),
-            // As any picture added does, it reaches what looks for
-            // pictures by name.
+            // No page names a picture by its name until a mention gives it.
             ("a face fetched", &|site| {
                 site.put(&format!("fetched/faces/{face}"), &jpeg(48, 48));
             }),
@@ -2900,9 +2990,7 @@ fn a_mention_written_changed_and_removed_rebuilds_only_the_pages_that_read_their
             }),
         ],
     );
-    let (face, outputs) = built[3];
-    assert!(face > 0 && face < outputs, "{built:?}");
-    for (at, expected) in [(1, 1), (2, 0), (4, 1), (5, 0), (6, 1)] {
+    for (at, expected) in [(1, 1), (2, 0), (3, 0), (4, 1), (5, 0), (6, 1)] {
         assert_eq!(built[at].0, expected, "{at}: {built:?}");
     }
 }

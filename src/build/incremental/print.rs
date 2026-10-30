@@ -6,7 +6,8 @@
 //! taken from the text of the files a value is written in, which decides
 //! both. Where what an output can see through a key is wider than the key
 //! says, the fingerprint is the wider thing: a page's fields are one
-//! fingerprint, and a picture's carries which pictures the site has.
+//! fingerprint, and a picture's carries the pictures a name reaching it
+//! could reach instead.
 //!
 //! What a key covers beyond a value, such as what a page's answer to a
 //! name turns on or what a list is known by, is the build's to say, beside
@@ -22,7 +23,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use rayon::prelude::*;
 
 use crate::album::Root;
-use crate::build::{Options, Output, Plan};
+use crate::build::{Options, Output};
 use crate::config::words::PageWord;
 use crate::disk::{Clock, Stamp};
 use crate::ids::{Id, ListId, NameId, PageId};
@@ -341,6 +342,7 @@ pub(super) struct Prints {
     /// What every page writing a name answers to another, by the names.
     fields_of_writers: Keyed<(NameId, Option<NameId>, NameId)>,
     every_picture: OnceLock<u64>,
+    pictures_named: OnceLock<HashMap<String, u64>>,
     every_file: OnceLock<u64>,
     /// What the reading holds under `fetched/`, by each file's key.
     fetched: OnceLock<HashMap<u64, u64>>,
@@ -392,6 +394,7 @@ impl Prints {
             fields_of_every: Mutex::default(),
             fields_of_writers: Mutex::default(),
             every_picture: OnceLock::new(),
+            pictures_named: OnceLock::new(),
             every_file: OnceLock::new(),
             fetched: OnceLock::new(),
             mentions: slots(pages),
@@ -443,10 +446,11 @@ impl Taken<'_> {
     /// no page's, template's, data's or asset's, which holds the site's
     /// settings, its languages and its cards; which templates, data
     /// files, assets and languages the site has; what its cards are drawn
-    /// with; which files a link publishes; and how it is asked to build.
+    /// with; and how it is asked to build. Which files a link publishes is
+    /// left to each page's links, which are held to what they reached.
     /// What `last`, the reading before, found the cards drawn with is
     /// taken where a file is found as it was then.
-    pub(super) fn whole(&self, plan: &Plan, options: &Options, last: Option<&Prints>) -> u64 {
+    pub(super) fn whole(&self, options: &Options, last: Option<&Prints>) -> u64 {
         let reading = self.reading;
         let renderer = &reading.renderer;
         let sources = renderer.sources();
@@ -480,10 +484,7 @@ impl Taken<'_> {
             print = print.with((held.map(|hash| *hash.as_bytes()), file));
         }
         let _ = self.prints.drawn_with.set(drawn_with);
-        print
-            .with(plan.linked.watches())
-            .with(options.drafts)
-            .done()
+        print.with(options.drafts).done()
     }
 
     /// What the file the cards are drawn with at `path` holds, where it
@@ -740,8 +741,10 @@ impl Taken<'_> {
             }),
             Key::Picture(id) => *prints.pictures[id.index()].get_or_init(|| {
                 let picture = site.pictures.get(id);
+                let alike = picture.last_names().map(|name| self.pictures_named(name));
                 let mut print = Print::default()
-                    .with((self.every_picture(), picture.shown(), &picture.address))
+                    .with(alike.collect::<Vec<_>>())
+                    .with((picture.shown(), &picture.address))
                     .with(picture.hash.as_bytes())
                     .with(picture.travelling.map(|at| &site.files[at].path))
                     .shown(&(&picture.seen, &picture.copies, &picture.full));
@@ -790,6 +793,27 @@ impl Taken<'_> {
             }
             print.done()
         })
+    }
+
+    /// Which pictures have `name` as the last name in their path or their
+    /// address, and where each is and is published.
+    fn pictures_named(&self, name: &str) -> u64 {
+        let named = self.prints.pictures_named.get_or_init(|| {
+            let site = self.reading.renderer.site();
+            let mut named: HashMap<&str, Vec<_>> = HashMap::new();
+            for (_, picture) in site.pictures.iter() {
+                for name in picture.last_names() {
+                    let said = (picture.root, &picture.path, &picture.address);
+                    named.entry(name).or_default().push(said);
+                }
+            }
+            let named = named.into_iter().map(|(name, mut alike)| {
+                alike.sort_unstable();
+                (name.to_owned(), Print::default().with(alike).done())
+            });
+            named.collect()
+        });
+        named.get(name).copied().unwrap_or_default()
     }
 
     /// What the reading holds of the file under `fetched/` that `key`
