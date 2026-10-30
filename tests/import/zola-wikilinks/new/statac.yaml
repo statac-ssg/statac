@@ -1,0 +1,7 @@
+title: Wikilinks
+url: https://example.org
+language: [en, fr]
+timezone: UTC
+fr.title: Liens
+typography: false
+tags.pages: true

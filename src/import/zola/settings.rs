@@ -91,6 +91,8 @@ pub(super) struct Settings {
     pub(crate) target_blank: bool,
     pub(crate) no_follow: bool,
     pub(crate) no_referrer: bool,
+    /// Whether Zola read `[[name]]` as a wikilink.
+    pub(crate) wikilinks: bool,
     pub(crate) theme: Option<String>,
     /// The lines `output_dir` and `theme` are written on.
     pub(crate) output_line: Option<usize>,
@@ -173,6 +175,7 @@ pub(super) fn settle(entries: &[Field]) -> Settings {
         target_blank: false,
         no_follow: false,
         no_referrer: false,
+        wikilinks: false,
         theme: None,
         output_line: None,
         theme_line: None,
@@ -242,6 +245,7 @@ pub(super) fn settle(entries: &[Field]) -> Settings {
                         "external_links_target_blank" => s.target_blank = truth(inner),
                         "external_links_no_follow" => s.no_follow = truth(inner),
                         "external_links_no_referrer" => s.no_referrer = truth(inner),
+                        "wikilinks" => s.wikilinks = truth(inner),
                         _ => leave(format!("markdown.{name}: {}", shown_value(inner))),
                     }
                 }

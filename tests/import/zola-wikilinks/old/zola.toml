@@ -1,0 +1,9 @@
+base_url = "https://example.org"
+title = "Wikilinks"
+taxonomies = [{ name = "tags" }]
+
+[markdown]
+wikilinks = true
+
+[languages.fr]
+title = "Liens"

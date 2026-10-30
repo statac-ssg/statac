@@ -3388,6 +3388,15 @@ fn a_zola_link_to_a_file_beside_a_page_reaches_it() {
     assert_eq!(fixture("zola-beside"), [BUILT]);
 }
 
+/// Each of Zola's wikilinks becomes a link to the page or file Zola found
+/// by its path, an alias or its file's name, with any place on the page;
+/// one that names nothing Zola published, or more than one, stays as
+/// written. Every one is listed in `IMPORT.md`.
+#[test]
+fn zola_wikilinks_become_links_to_what_zola_linked() {
+    assert_eq!(fixture("zola-wikilinks"), [BUILT, DRAFT]);
+}
+
 #[test]
 fn private_use_characters_come_across_from_hugo_and_zola_as_written() {
     let words = "A \u{E000} and \u{E001}.\n\n<div title=\"\u{E001}\">\u{E000}</div>\n\n\

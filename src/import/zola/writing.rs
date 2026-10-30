@@ -2,7 +2,8 @@
 //! up to `{% end %}`, and the components that replaced them in Zola 0.23,
 //! `{{ <name a="b" /> }}` and `{% <name a="b"> %}` up to `{% </name> %}`,
 //! each made a snippet call, or left exactly as written; links to a page
-//! by its file, `@/folder/page.md`, made the page's address; and the forms
+//! by its file, `@/folder/page.md`, made the page's address; wikilinks,
+//! `[[name]]`, where Zola read them, made links to the same; and the forms
 //! of Zola's Markdown that Statac's reads differently, counted. Nothing
 //! inside a code block or a code span is converted, but `{{/* name() */}}`,
 //! Zola's way of showing a tag as text, is the tag as text wherever it
@@ -17,9 +18,12 @@
 use std::collections::HashSet;
 use std::ops::Range;
 
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, LinkType, Options, Parser, Tag};
 
-use super::{CODE_OPTIONS, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE};
+use super::wikilinks::{Target, Wikilinks};
+use super::{
+    CODE_OPTIONS, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE, WIKILINK_LEFT, WIKILINKS,
+};
 use crate::import::common::{ends_line, opens_line};
 use crate::import::liquid::{self, finding, quoted, split_word, within};
 use crate::import::writing::Marked;
@@ -60,6 +64,10 @@ pub(super) struct Context<'a> {
     pub(crate) beside: &'a dyn Fn(&str) -> Option<(String, String)>,
     /// The tags some call anywhere in the site wraps writing with.
     pub(crate) wrapping: &'a HashSet<String>,
+    /// The page's own path in `content/`, as an `@/` link names it.
+    pub(crate) page: &'a str,
+    /// What a wikilink can name, where Zola read wikilinks.
+    pub(crate) wikilinks: Option<&'a Wikilinks>,
 }
 
 /// A snippet call put in place of a tag.
@@ -776,6 +784,10 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
     let mut findings = Vec::new();
     let body = fences_bare(body, &spotter(body), &mut findings);
     let body = links_and_more(&body, cx, &spotter(&body), &mut findings);
+    let body = match cx.wikilinks {
+        Some(wikilinks) => linked(&body, wikilinks, cx, &spotter(&body), &mut findings),
+        None => body,
+    };
     let body = body.as_str();
     let spot = spotter(body);
     let code = code_ranges(body);
@@ -1063,6 +1075,116 @@ fn links_and_more(
     out
 }
 
+/// The writing with each of Zola's wikilinks outside code written as an
+/// ordinary link to the URL Zola gave what it names, each told: one that
+/// leads to no page or file that came across is left as written.
+fn linked(
+    body: &str,
+    wikilinks: &Wikilinks,
+    cx: &Context,
+    spot: &dyn Fn(usize, &str) -> Spot,
+    findings: &mut Vec<Finding>,
+) -> String {
+    let mut out = String::with_capacity(body.len());
+    let mut copied = 0;
+    let parser = Parser::new_ext(body, options() | Options::ENABLE_WIKILINKS);
+    for (event, range) in parser.into_offset_iter() {
+        let (image, name, piped) = match event {
+            Event::Start(Tag::Link {
+                link_type: LinkType::WikiLink { has_pothole },
+                dest_url,
+                ..
+            }) => (false, dest_url, has_pothole),
+            Event::Start(Tag::Image {
+                link_type: LinkType::WikiLink { has_pothole },
+                dest_url,
+                ..
+            }) => (true, dest_url, has_pothole),
+            _ => continue,
+        };
+        if range.start < copied {
+            continue;
+        }
+        let written = &body[range.clone()];
+        let Some(url) = wikilink_url(&name, wikilinks, cx) else {
+            findings.push(finding(&WIKILINK_LEFT, spot(range.start, written)));
+            continue;
+        };
+        // The text after the first `|`, as written; else the name, which
+        // Zola showed as plain text.
+        let text = match piped {
+            true => (written.strip_suffix("]]").unwrap_or(written))
+                .split_once('|')
+                .map_or(String::new(), |(_, text)| text.to_owned()),
+            false => as_text(&name),
+        };
+        findings.push(finding(&WIKILINKS, spot(range.start, written)));
+        out.push_str(&body[copied..range.start]);
+        if image {
+            out.push('!');
+        }
+        out.push_str(&format!("[{text}]({})", destination(&url)));
+        copied = range.end;
+    }
+    out.push_str(&body[copied..]);
+    out
+}
+
+/// The URL, from the top of the host, of what a wikilink's `name` leads
+/// to, where it came across, with the place on the page it names.
+fn wikilink_url(name: &str, wikilinks: &Wikilinks, cx: &Context) -> Option<String> {
+    let (name, anchor) = match name.split_once('#') {
+        Some((name, anchor)) => (name, format!("#{anchor}")),
+        None => (name, String::new()),
+    };
+    if name.is_empty() && !anchor.is_empty() {
+        return Some(match (cx.refs)(cx.page) {
+            Some(address) => format!("{}{address}{anchor}", cx.base),
+            None => anchor,
+        });
+    }
+    let address = match wikilinks.find(name)? {
+        Target::Page(path) => format!("{}{}", cx.base, (cx.refs)(path)?),
+        // In the page's own language where it has one, as Zola does.
+        Target::File(path) => beside(path, cx.language, true, cx)?.ok()?,
+    };
+    Some(format!("{address}{anchor}"))
+}
+
+/// `url` as a link's destination in Markdown: in angle brackets where it
+/// holds a space or a bracket.
+fn destination(url: &str) -> String {
+    match url.contains(|c: char| c.is_whitespace() || matches!(c, '(' | ')' | '<' | '>')) {
+        true => format!("<{}>", url.replace('<', "%3C").replace('>', "%3E")),
+        false => url.to_owned(),
+    }
+}
+
+/// `text` with a backslash before each mark Markdown would read as more
+/// than the mark itself. A `$` or `@` is left to the import's own pass.
+fn as_text(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let in_word = |at: Option<usize>| {
+        at.and_then(|at| chars.get(at))
+            .is_some_and(|c| c.is_alphanumeric())
+    };
+    let mut out = String::with_capacity(text.len());
+    for (at, c) in chars.iter().enumerate() {
+        let marked = match c {
+            '\\' | '`' | '*' | '[' | ']' | '<' | '&' | '~' => true,
+            '!' => chars.get(at + 1) == Some(&'['),
+            // Between two letters `_` emphasises nothing.
+            '_' => !(in_word(at.checked_sub(1)) && in_word(Some(at + 1))),
+            _ => false,
+        };
+        if marked {
+            out.push('\\');
+        }
+        out.push(*c);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1163,6 +1285,8 @@ mod tests {
             refs: &|_| None,
             beside: &|_| None,
             wrapping: &wrapping,
+            page: "a.md",
+            wikilinks: None,
         };
         // The writing, what it becomes, and the line from each call made.
         let cases: [(&str, &str, &[&str]); 5] = [
@@ -1213,6 +1337,8 @@ mod tests {
             refs: &|_| None,
             beside: &|_| None,
             wrapping: &wrapping,
+            page: "a.md",
+            wikilinks: None,
         };
         let converted = convert(body, 1, "a.md", &cx);
         let found = (converted.findings.into_iter())
@@ -1402,6 +1528,8 @@ mod tests {
                 refs: &refs,
                 beside: &|_| None,
                 wrapping: &wrapping,
+                page: "a.md",
+                wikilinks: None,
             };
             let body = format!("{{{{ {call} }}}}\n");
             let converted = convert(&body, 1, "a.md", &cx);
@@ -1423,6 +1551,96 @@ mod tests {
             }
             assert!(converted.calls.is_empty(), "{call}");
         }
+    }
+
+    #[test]
+    fn a_wikilink_becomes_a_link_to_what_zola_linked_it_to() {
+        let mut wikilinks = Wikilinks::default();
+        wikilinks.page("posts/post-1.md", &["/old-post-1/".to_owned()]);
+        wikilinks.page("posts/post-2/index.md", &[]);
+        wikilinks.file("posts/post-2/file 1.txt");
+        let refs = |file: &str| match file {
+            "posts/post-1.md" => Some("/posts/post-1/".to_owned()),
+            "posts/post-2/index.md" => Some("/posts/post-2/".to_owned()),
+            _ => None,
+        };
+        let beside = |path: &str| {
+            (path == "posts/post-2/file 1.txt")
+                .then(|| ("posts/post-2/index.md".to_owned(), "file 1.txt".to_owned()))
+        };
+        let wrapping = HashSet::new();
+        let cx = Context {
+            reading: Reading::Template,
+            language: "en",
+            main_language: "en",
+            feeds: &[],
+            base: "/blog",
+            refs: &refs,
+            beside: &beside,
+            wrapping: &wrapping,
+            page: "posts/post-1.md",
+            wikilinks: Some(&wikilinks),
+        };
+        let (converted, left) = (WIKILINKS.heading, WIKILINK_LEFT.heading);
+        // The writing, what it becomes, and what is told of it.
+        let cases: [(&str, &str, &[&str]); 8] = [
+            ("[[post-1]]", "[post-1](/blog/posts/post-1/)", &[converted]),
+            (
+                "See [[posts/post-1#a|Post *1*]].",
+                "See [Post *1*](/blog/posts/post-1/#a).",
+                &[converted],
+            ),
+            (
+                "[[old-post-1]] and [[#a]]",
+                "[old-post-1](/blog/posts/post-1/) and [#a](/blog/posts/post-1/#a)",
+                &[converted, converted],
+            ),
+            (
+                "![[file 1.txt|A file]]",
+                "![A file](</blog/posts/post-2/file 1.txt>)",
+                &[converted],
+            ),
+            (
+                "[[posts/post-2/index]]",
+                "[posts/post-2/index](/blog/posts/post-2/)",
+                &[converted],
+            ),
+            (
+                "[[post-3]] and [[index.md]]",
+                "[[post-3]] and [[index.md]]",
+                &[left, left],
+            ),
+            (
+                "`[[post-1]]`\n\n    [[post-1]]\n",
+                "`[[post-1]]`\n\n    [[post-1]]\n",
+                &[],
+            ),
+            ("[link](/a/) and [[]]", "[link](/a/) and [[]]", &[]),
+        ];
+        for (body, writing, told) in cases {
+            let made = convert(body, 1, "a.md", &cx);
+            assert_eq!(made.writing, writing, "{body}");
+            let found: Vec<&str> = made.findings.iter().map(|f| f.kind.heading).collect();
+            assert_eq!(found, told, "{body}");
+        }
+        // With wikilinks off, Zola showed each as written.
+        let off = Context {
+            wikilinks: None,
+            ..cx
+        };
+        let made = convert("[[post-1]]", 1, "a.md", &off);
+        assert_eq!(
+            (made.writing.as_str(), made.findings.len()),
+            ("[[post-1]]", 0)
+        );
+    }
+
+    #[test]
+    fn a_wikilinks_name_is_kept_as_plain_text() {
+        assert_eq!(
+            as_text("a_b *c* _d [e] `f` <g> &h; !i ![j] ~k~ \\l"),
+            "a_b \\*c\\* \\_d \\[e\\] \\`f\\` \\<g> \\&h; !i \\!\\[j\\] \\~k\\~ \\\\l"
+        );
     }
 
     #[test]

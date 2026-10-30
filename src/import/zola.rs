@@ -9,6 +9,7 @@
 mod ids;
 mod settings;
 mod slug;
+mod wikilinks;
 mod writing;
 
 use std::collections::HashSet;
@@ -29,6 +30,7 @@ use crate::problem::{FeedFormat, Kind, Problem, Reason};
 use crate::slug as statac_slug;
 use settings::{Settings, Taxonomy};
 use slug::Strategy;
+use wikilinks::Wikilinks;
 use writing::Reading;
 
 pub(super) static TAG_LEFT: FindingKind = FindingKind {
@@ -55,6 +57,20 @@ pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     sentence: "Each of these names a page by its file, and Statac couldn't find that file in the \
                old site, or Zola didn't publish it, so the import left it unchanged: link to the page's \
                URL instead.",
+};
+
+pub(super) static WIKILINKS: FindingKind = FindingKind {
+    heading: "Wikilinks now links",
+    sentence: "Statac's Markdown doesn't read wikilinks, so the import wrote each of these as an \
+               ordinary link to the URL of the page or file Zola linked it to.",
+};
+
+pub(super) static WIKILINK_LEFT: FindingKind = FindingKind {
+    heading: "Wikilinks the import left unchanged",
+    sentence: "Zola looks up the page or file a wikilink names by its path, an alias or its \
+               file's name. For each of these, Statac found no page or file Zola published by \
+               that name, or more than one, so the import left it unchanged and it appears on \
+               the page as written: link to the page's URL instead.",
 };
 
 pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
@@ -164,6 +180,10 @@ struct Doc {
     terms: Vec<(String, Vec<String>)>,
     address: Option<String>,
     own_address: bool,
+    /// Its `aliases`, as written.
+    aliases: Vec<String>,
+    /// Whether Zola published it, `render = false` saying not.
+    rendered: bool,
     others: Vec<String>,
     /// Whether it takes nothing but words, which a page written for them
     /// holds.
@@ -743,6 +763,7 @@ impl Reader<'_> {
         let mut words = Vec::new();
         let raw = front.fields;
         let has = |name: &str| raw.iter().any(|f| f.name == name);
+        let rendered = !(raw.iter()).any(|f| f.name == "render" && f.value == Value::Truth(false));
         let summary_given = has("summary");
         let list_field = |name: &str| shape == Shape::List && LIST_WORDS.contains(&name);
         for field in &raw {
@@ -939,6 +960,8 @@ impl Reader<'_> {
             terms,
             address,
             own_address,
+            aliases,
+            rendered,
             others,
             words_only,
         });
@@ -1548,6 +1571,21 @@ impl Reader<'_> {
             }
             None
         };
+        // As Zola reads them: every page it published, and every file
+        // beside one.
+        let wikilinks = self.s.wikilinks.then(|| {
+            let shown = |path: &str| (docs.iter()).any(|d| d.rel == path && d.rendered && !d.draft);
+            let mut wikilinks = Wikilinks::default();
+            for doc in docs.iter().filter(|d| shown(&d.rel)) {
+                wikilinks.page(&doc.rel, &doc.aliases);
+            }
+            for path in &came {
+                if beside(path).is_some_and(|(page, _)| shown(&page)) {
+                    wikilinks.file(path);
+                }
+            }
+            wikilinks
+        });
         let skip = self.s.skip_content_templating.clone().unwrap_or_default();
         let cx = writing::Context {
             reading,
@@ -1558,6 +1596,8 @@ impl Reader<'_> {
             refs: &refs,
             beside: &beside,
             wrapping: &wrapping,
+            page: "",
+            wikilinks: wikilinks.as_ref(),
         };
         let mut calls = Vec::new();
         let mut written = Vec::new();
@@ -1578,6 +1618,7 @@ impl Reader<'_> {
             let cx = writing::Context {
                 reading,
                 language: &doc.language,
+                page: &doc.rel,
                 ..cx
             };
             let mut converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);
