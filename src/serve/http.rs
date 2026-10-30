@@ -1319,13 +1319,13 @@ mod tests {
         // Nothing has been built yet for there to be anything to say.
         assert_eq!(
             answer.body,
-            "{\"v\":4,\"problems\":[],\"stopped\":null,\"explanations\":{},\"round\":null,\
+            "{\"v\":5,\"problems\":[],\"stopped\":null,\"explanations\":{},\"round\":null,\
              \"rounds\":[],\
              \"site\":{\"kinds\":[],\"gone\":null,\"drafts\":[],\"waiting\":[],\"written\":[]},\
              \"root\":null,\"page\":null,\"names\":[]}"
         );
         let answer = get(&site, "/.statac-live/search?words=post");
-        assert_eq!(answer.body, "{\"v\":4,\"drafts\":false,\"languages\":null}");
+        assert_eq!(answer.body, "{\"v\":5,\"drafts\":false,\"languages\":null}");
     }
 
     #[test]
@@ -1388,7 +1388,7 @@ mod tests {
             );
             // Nothing has been built yet for there to be any.
             assert_eq!(
-                answer.body, "{\"v\":4,\"problems\":[],\"more\":0,\"explanations\":{}}",
+                answer.body, "{\"v\":5,\"problems\":[],\"more\":0,\"explanations\":{}}",
                 "{target}"
             );
         }

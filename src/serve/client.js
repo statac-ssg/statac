@@ -12,7 +12,7 @@
   const kept = "statac-live-panel";
   // The version of serve's answers this script reads. A page loaded from
   // one Statac can be answered by another, once serve is started anew.
-  const understood = 4;
+  const understood = 5;
 
   // Every word the panel puts together itself, from serve: each the pieces
   // of a sentence, or for a count, those said of one and of many.
@@ -103,11 +103,15 @@
   };
 
   // A sentence's pieces: words, names shown as code, and in a line of a
-  // file, the place a problem is at.
+  // file, the place a problem is at. In an explanation, bold, emphasis and
+  // links too, each holding pieces of its own.
   const pieces = (sentence) =>
     (sentence || []).map((piece) => {
       if ("code" in piece) return make("code", {}, piece.code);
       if ("mark" in piece) return make("span", { class: "marked" }, piece.mark);
+      if ("strong" in piece) return make("strong", {}, pieces(piece.strong));
+      if ("em" in piece) return make("em", {}, pieces(piece.em));
+      if ("link" in piece) return link(piece.href, pieces(piece.link));
       return document.createTextNode(piece.text);
     });
   const refill = (element, ...children) =>
@@ -621,6 +625,12 @@
       background: var(--well); border: 1px solid var(--rule); border-radius: ${em(6, 13)};
       white-space: pre-wrap; overflow-wrap: anywhere;
     }
+    .explanation strong { font-weight: 650; color: var(--text-strong); }
+    .explanation ul, .explanation ol { padding-left: ${em(20)}; }
+    .explanation ul { list-style: disc; }
+    .explanation ol { list-style: decimal; }
+    .explanation li + li, .explanation li > * + * { margin-top: ${em(6)}; }
+    .explanation li::marker { color: var(--text-muted); }
     .explanation .fill { flex: 1; }
 
     /* Names. */
@@ -2054,15 +2064,21 @@
   const explanation = (problem, explanations) => {
     const said = problem && explanations[problem.kind];
     if (!said) return make("aside", { class: "side-pane explanation", hidden: true });
-    const paragraph = (part) =>
-      "code" in part ? make("pre", {}, part.code) : spoken("p", part.said);
+    const block = (part) => {
+      if ("code" in part) return make("pre", {}, part.code);
+      if ("list" in part) {
+        const items = part.list.map((item) => make("li", {}, item.map(block)));
+        return "start" in part ? make("ol", { start: part.start }, items) : make("ul", {}, items);
+      }
+      return spoken("p", part.said);
+    };
     return make(
       "aside",
       { class: "side-pane explanation", "aria-label": told("aboutKind") },
       make("p", { class: "meta" }, say("fromExplain", { kind: problem.kind })),
       make("h3", {}, said.title),
-      said.opening.map(paragraph),
-      said.fix.length ? [make("h4", {}, told("howToFix")), said.fix.map(paragraph)] : null,
+      said.opening.map(block),
+      said.fix.length ? [make("h4", {}, told("howToFix")), said.fix.map(block)] : null,
       make("span", { class: "fill" }),
       make("p", {}, link(problem.explanation, told("readOnline"))),
     );

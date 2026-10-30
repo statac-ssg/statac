@@ -9,11 +9,12 @@ use std::time::Duration;
 use super::pieced;
 use crate::address::on_the_wire;
 use crate::json;
+use crate::markdown::{self, Document, Kind, Node};
 use crate::problem::Quiet;
-use crate::problem::{Code, Kind, Named, Problem, Severity, Word, unanchored};
+use crate::problem::{Code, Kind as ProblemKind, Named, Problem, Severity, Word, unanchored};
 use crate::report::{Excerpt, NAMED, Report, shown};
 use crate::serve::session::{Read, Took};
-use crate::source::Place;
+use crate::source::{Place, Sources, Span};
 use crate::wording;
 
 /// What turns a round's problems into their parts.
@@ -162,14 +163,14 @@ pub(super) fn lines(excerpt: &Excerpt) -> String {
 /// The name a problem's suggestion offers in its place, where it is one
 /// of the page's or the site's that a template writes, which the panel
 /// lists.
-fn suggests(kind: &Kind) -> Option<&str> {
+fn suggests(kind: &ProblemKind) -> Option<&str> {
     let name = match kind {
-        Kind::UnknownWord {
+        ProblemKind::UnknownWord {
             word: Word::Field,
             nearest: Some(name),
             ..
         }
-        | Kind::AlwaysFalse { meant: name, .. } => name,
+        | ProblemKind::AlwaysFalse { meant: name, .. } => name,
         _ => return None,
     };
     (name.starts_with("page.") || name.starts_with("site.")).then_some(name.as_str())
@@ -270,74 +271,152 @@ pub(super) fn explanations(codes: impl IntoIterator<Item = Code>) -> String {
     format!("{{{}}}", said.join(","))
 }
 
-/// An explanation's heading, the paragraphs before its first section, and
-/// those of the section saying how to fix it. A paragraph is a sentence
-/// of Statac's own, its lines run together; an item of a list is one of
-/// its own; a block of code is as written. Anything else is as `statac
-/// explain` prints it.
+/// Where the docs are published. A link in an explanation to a URL
+/// starting with `/` is to a page of theirs.
+const DOCS: &str = "https://statac.dev/";
+
+/// An explanation's heading, the blocks before its first section, and
+/// those of the section saying how to fix it.
 fn explain(code: Code) -> Explained {
-    let mut lines = code.explanation().lines();
-    let title = (lines.next())
+    let written = code.explanation().replace("\r\n", "\n");
+    let title = (written.lines().next())
         .and_then(|line| line.strip_prefix("# "))
         .map(unanchored)
         .unwrap_or_default();
-    let mut parts: [Vec<String>; 2] = Default::default();
-    // The part being read, where it is one the panel shows.
-    let mut part = Some(0);
-    let mut said: Vec<&str> = Vec::new();
-    // The backticks that opened the block of code being read, and its lines.
-    let mut code: Option<(usize, Vec<&str>)> = None;
-    let flush = |said: &mut Vec<&str>, part: Option<usize>, parts: &mut [Vec<String>; 2]| {
-        if let Some(part) = part.filter(|_| !said.is_empty()) {
-            parts[part].push(format!("{{\"said\":{}}}", pieced(&said.join(" "))));
-        }
-        said.clear();
-    };
-    for line in lines {
-        let ticks = line.len() - line.trim_start_matches('`').len();
-        if let Some((fence, held)) = &mut code {
-            if ticks >= *fence && line[ticks..].trim().is_empty() {
-                if let Some(part) = part {
-                    let block = format!("{{\"code\":{}}}", json::string(&held.join("\n")));
-                    parts[part].push(block);
-                }
-                code = None;
-            } else {
-                held.push(line);
-            }
-            continue;
-        }
-        if let Some(heading) = line.strip_prefix("## ") {
-            flush(&mut said, part, &mut parts);
-            part = (unanchored(heading) == FIX).then_some(1);
-            continue;
-        }
-        if ticks >= 3 {
-            flush(&mut said, part, &mut parts);
-            code = Some((ticks, Vec::new()));
-            continue;
-        }
-        let numbered = line
-            .split_once(". ")
-            .is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
-        if line.trim().is_empty() || line.starts_with("- ") || numbered {
-            flush(&mut said, part, &mut parts);
-        }
-        if !line.trim().is_empty() {
-            said.push(line.trim());
-        }
-    }
-    flush(&mut said, part, &mut parts);
-    let [opening, fix] = parts;
+    let [opening, fix] = parts(&written);
     Explained {
         json: format!(
-            "{{\"title\":{},\"opening\":[{}],\"fix\":[{}]}}",
+            "{{\"title\":{},\"opening\":[{opening}],\"fix\":[{fix}]}}",
             json::string(title),
-            opening.join(","),
-            fix.join(",")
         ),
         title: title.to_owned(),
     }
+}
+
+/// The blocks before an explanation's first section, and those of the
+/// section saying how to fix it, each as JSON, read as the docs read
+/// them. A paragraph is its pieces: its words, and the code, bold,
+/// emphasis and links among them, a link's URL as the docs publish it. A
+/// block of code is as written, and a list is its items, each its own
+/// blocks. Anything else is as written, which no explanation needs.
+fn parts(written: &str) -> [String; 2] {
+    let document = read(written);
+    sections(&document).map(|blocks| {
+        let blocks: Vec<String> = blocks.iter().map(|node| block(node, written)).collect();
+        blocks.join(",")
+    })
+}
+
+/// An explanation read as Markdown. It calls no snippet.
+fn read(written: &str) -> Document {
+    let mut sources = Sources::default();
+    let source = sources.add("explanation.md", written.to_owned());
+    let whole = Span::new(0, written.len());
+    markdown::read(&sources, source, whole, &|_| None, "")
+}
+
+/// The blocks before an explanation's first section, and those of the
+/// section saying how to fix it.
+fn sections(document: &Document) -> [Vec<&Node>; 2] {
+    let mut parts: [Vec<&Node>; 2] = Default::default();
+    // The part being read, where it is one the panel shows.
+    let mut part = Some(0);
+    for node in &document.root.children {
+        match node.kind {
+            Kind::Heading { level: 1, .. } => {}
+            Kind::Heading { level: 2, .. } => part = (words(node) == FIX).then_some(1),
+            _ => {
+                if let Some(part) = part {
+                    parts[part].push(node);
+                }
+            }
+        }
+    }
+    parts
+}
+
+/// The words of a heading.
+fn words(node: &Node) -> String {
+    let mut words = String::new();
+    node.walk(&mut |node| {
+        if let Kind::Text(text) | Kind::Literal(text) | Kind::Code(text) = &node.kind {
+            words.push_str(text);
+        }
+    });
+    words
+}
+
+/// A block of an explanation, as JSON.
+fn block(node: &Node, written: &str) -> String {
+    match &node.kind {
+        Kind::Paragraph { .. } => format!("{{\"said\":{}}}", said(&node.children, written)),
+        Kind::CodeBlock { text, .. } => {
+            let text = text.strip_suffix('\n').unwrap_or(text);
+            format!("{{\"code\":{}}}", json::string(text))
+        }
+        Kind::List { start } => {
+            let items: Vec<String> = (node.children.iter())
+                .map(|item| {
+                    let blocks: Vec<String> = (item.children.iter())
+                        .map(|node| block(node, written))
+                        .collect();
+                    format!("[{}]", blocks.join(","))
+                })
+                .collect();
+            let start = start.map_or_else(String::new, |start| format!(",\"start\":{start}"));
+            format!("{{\"list\":[{}]{start}}}", items.join(","))
+        }
+        _ => format!(
+            "{{\"said\":[{{\"text\":{}}}]}}",
+            json::string(&written[node.place.span.range()])
+        ),
+    }
+}
+
+/// The pieces of a paragraph of an explanation, as JSON: its words, and
+/// the code, bold, emphasis and links among them.
+fn said(nodes: &[Node], written: &str) -> String {
+    let mut pieces = Vec::new();
+    let mut words = String::new();
+    for node in nodes {
+        let piece = match &node.kind {
+            Kind::Text(text) | Kind::Literal(text) => {
+                words.push_str(text);
+                continue;
+            }
+            Kind::SoftBreak => {
+                words.push(' ');
+                continue;
+            }
+            Kind::Code(code) => format!("{{\"code\":{}}}", json::string(code)),
+            Kind::Strong => format!("{{\"strong\":{}}}", said(&node.children, written)),
+            Kind::Emphasis => format!("{{\"em\":{}}}", said(&node.children, written)),
+            Kind::Link { destination, .. } => {
+                let href = match destination.strip_prefix('/') {
+                    Some(path) if !path.starts_with('/') => format!("{DOCS}{path}"),
+                    _ => destination.clone(),
+                };
+                format!(
+                    "{{\"link\":{},\"href\":{}}}",
+                    said(&node.children, written),
+                    json::string(&href)
+                )
+            }
+            _ => {
+                words.push_str(&written[node.place.span.range()]);
+                continue;
+            }
+        };
+        if !words.is_empty() {
+            pieces.push(format!("{{\"text\":{}}}", json::string(&words)));
+            words.clear();
+        }
+        pieces.push(piece);
+    }
+    if !words.is_empty() {
+        pieces.push(format!("{{\"text\":{}}}", json::string(&words)));
+    }
+    format!("[{}]", pieces.join(","))
 }
 
 /// The problems not quietened, counted by severity, as JSON.
@@ -403,4 +482,89 @@ pub(super) fn kinds(problems: &[Problem], quiet: &Quiet) -> String {
         })
         .collect();
     kinds.join(",")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Whether `block` and `said` draw a kind of node, rather than show it
+    /// as written.
+    fn drawn(kind: &Kind) -> bool {
+        matches!(
+            kind,
+            Kind::Paragraph { .. }
+                | Kind::CodeBlock { .. }
+                | Kind::List { .. }
+                | Kind::Item
+                | Kind::Text(_)
+                | Kind::Literal(_)
+                | Kind::SoftBreak
+                | Kind::Code(_)
+                | Kind::Strong
+                | Kind::Emphasis
+                | Kind::Link { .. }
+        )
+    }
+
+    #[test]
+    fn an_explanation_keeps_its_links_bold_lists_and_code() {
+        let written = "# Kind\n\
+            \n\
+            Words with `code`, **bold**, *emphasis*,\n\
+            a [page](/writing/#maths) and [another](https://statac.dev/e/broken-link/).\n\
+            \n\
+            - One item.\n\
+            - Another item,\n  \
+              over two lines.\n\
+            \n\
+            ## What you'll see {#what-youll-see}\n\
+            \n\
+            Not shown.\n\
+            \n\
+            ## How to fix it {#fix}\n\
+            \n\
+            **A cause.** What to do.\n\
+            \n\
+            3. Third.\n\
+            4. Fourth.\n\
+            \n\
+            ```yaml\n\
+            title: Site\n\
+            ```\n\
+            \n\
+            > Shown as written.\n\
+            \n\
+            ## Example\n\
+            \n\
+            Not shown either.\n";
+        let [opening, fix] = parts(written);
+        assert_eq!(
+            opening,
+            r#"{"said":[{"text":"Words with "},{"code":"code"},{"text":", "},{"strong":[{"text":"bold"}]},{"text":", "},{"em":[{"text":"emphasis"}]},{"text":", a "},{"link":[{"text":"page"}],"href":"https://statac.dev/writing/#maths"},{"text":" and "},{"link":[{"text":"another"}],"href":"https://statac.dev/e/broken-link/"},{"text":"."}]},{"list":[[{"said":[{"text":"One item."}]}],[{"said":[{"text":"Another item, over two lines."}]}]]}"#
+        );
+        assert_eq!(
+            fix,
+            r#"{"said":[{"strong":[{"text":"A cause."}]},{"text":" What to do."}]},{"list":[[{"said":[{"text":"Third."}]}],[{"said":[{"text":"Fourth."}]}]],"start":3},{"code":"title: Site"},{"said":[{"text":"\u003e Shown as written."}]}"#
+        );
+    }
+
+    #[test]
+    fn the_panel_draws_every_explanation_and_each_link_goes_to_the_docs() {
+        for &code in Code::ALL {
+            let name = code.name();
+            let written = code.explanation().replace("\r\n", "\n");
+            let document = read(&written);
+            let [opening, fix] = sections(&document);
+            assert!(!opening.is_empty() && !fix.is_empty(), "{name}");
+            for node in opening.into_iter().chain(fix) {
+                node.walk(&mut |node| assert!(drawn(&node.kind), "{name}: {:?}", node.kind));
+            }
+            let json = &explained(code).json;
+            for (at, _) in json.match_indices("\"href\":") {
+                let href = &json[at + "\"href\":".len()..];
+                assert!(href.starts_with(&format!("\"{DOCS}")), "{name}: {href}");
+            }
+        }
+    }
 }
