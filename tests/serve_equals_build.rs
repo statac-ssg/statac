@@ -516,8 +516,9 @@ fn reached_by(test: fn()) -> Reached {
 
 /// The kinds of key no edit can reach.
 const UNREACHABLE: &[&str] = &[
-    // Read only where a name reaches no file, which stops the round, so no
-    // round that read it is kept for an edit to reach.
+    // Read only where a name reaches no file, which stops the round, and a
+    // session keeps no round that stopped for an edit to reach. A check
+    // keeps one: `a_file_a_page_shows_removed_and_put_back`.
     "Files",
 ];
 
@@ -1057,6 +1058,50 @@ fn files_beside_a_page_and_in_static_added_changed_and_removed() {
                 &|site| site.write("content/note.txt", "four\n"),
             ),
             ("and removed", &|site| site.remove("content/note.txt")),
+        ],
+    );
+}
+
+/// A picture beside the writing is known by its file, not by where that
+/// file falls among the others.
+#[test]
+fn a_plain_file_added_beside_a_picture_builds_nothing() {
+    let site = Site::new("plain-beside");
+    let built = through(
+        &site,
+        &[
+            ("a plain file added", &|site| {
+                site.write("content/post-6/notes.txt", "Notes.\n")
+            }),
+            ("the plain file removed", &|site| {
+                site.remove("content/post-6/notes.txt")
+            }),
+        ],
+    );
+    assert_eq!((built[1].0, built[2].0), (0, 0), "{built:?}");
+}
+
+/// A check that stops is kept for the next, as the language server keeps
+/// it, so a name that reached no file decides what the next check builds
+/// again.
+#[test]
+fn a_file_a_page_shows_removed_and_put_back() {
+    let site = Site::new("file-put-back");
+    site.write("templates/note.html", "{{ page.file('note.txt').text }}\n");
+    site.write(
+        "content/notes/index.md",
+        "---\ntitle: Notes\ntype: note\n---\nNotes.\n",
+    );
+    site.write("content/notes/note.txt", "one\n");
+    through(
+        &site,
+        &[
+            ("the file removed", &|site| {
+                site.remove("content/notes/note.txt")
+            }),
+            ("the file put back", &|site| {
+                site.write("content/notes/note.txt", "one\n")
+            }),
         ],
     );
 }

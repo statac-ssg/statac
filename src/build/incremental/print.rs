@@ -735,7 +735,8 @@ impl Taken<'_> {
                 let picture = site.pictures.get(id);
                 let mut print = Print::default()
                     .with((self.every_picture(), picture.shown(), &picture.address))
-                    .with((picture.hash.as_bytes(), picture.travelling))
+                    .with(picture.hash.as_bytes())
+                    .with(picture.travelling.map(|at| &site.files[at].path))
                     .shown(&(&picture.seen, &picture.copies, &picture.full));
                 if let Some(said) = &picture.sidecar {
                     print = self.file(print, said.source);
