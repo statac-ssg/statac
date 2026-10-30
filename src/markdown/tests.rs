@@ -3556,3 +3556,122 @@ fn code_is_coloured_for_a_file_of_the_sites_only_where_the_file_can_read_it() {
         );
     }
 }
+
+#[test]
+fn a_block_asking_for_its_lines_is_written_a_line_at_a_time() {
+    let cases = [
+        (
+            "```rust main.rs numbered=true mark=2\na\nb\n```\n",
+            "<figure class=\"code\"><figcaption>main.rs</figcaption>\
+             <pre><code class=\"language-rust\">\
+             <span class=\"hl-line\" data-line=\"1\">a</span>\n\
+             <span class=\"hl-line hl-marked\" data-line=\"2\">b</span>\
+             </code></pre></figure>",
+        ),
+        (
+            "~~~text mark=\"1, 3\"\na <b>\nb\nc\n~~~\n",
+            "<pre class=\"code\"><code class=\"language-text\">\
+             <span class=\"hl-line hl-marked\">a &lt;b&gt;</span>\n\
+             <span class=\"hl-line\">b</span>\n\
+             <span class=\"hl-line hl-marked\">c</span></code></pre>",
+        ),
+        (
+            "```mark=1\na\n```\n",
+            "<pre class=\"code\"><code><span class=\"hl-line hl-marked\">a</span></code></pre>",
+        ),
+        (
+            "```text numbered=true\r\na\r\nb\r\n```\r\n",
+            "<pre class=\"code\"><code class=\"language-text\">\
+             <span class=\"hl-line\" data-line=\"1\">a</span>\n\
+             <span class=\"hl-line\" data-line=\"2\">b</span></code></pre>",
+        ),
+        (
+            "- An item.\n\n  ```text numbered=true\n  a\n  ```\n",
+            "<span class=\"hl-line\" data-line=\"1\">a</span>",
+        ),
+    ];
+    for (text, html) in cases {
+        assert!(
+            html_of(text).contains(html),
+            "{text:?} wrote\n{}",
+            html_of(text)
+        );
+    }
+}
+
+/// A block asking for neither, or whose words can't be read, is written
+/// as a block without the words is.
+#[test]
+fn a_block_asking_for_neither_is_written_as_one_without_the_words() {
+    for (text, without) in [
+        ("```rust numbered=false\na\n```\n", "```rust\na\n```\n"),
+        ("```rust numbered=yes mark=x\na\n```\n", "```rust\na\n```\n"),
+        (
+            "```rust main.rs numbered=false\na\n```\n",
+            "```rust main.rs\na\n```\n",
+        ),
+    ] {
+        assert_eq!(html_of(text), html_of(without), "{text:?}");
+    }
+}
+
+#[test]
+fn a_coloured_block_is_written_a_line_at_a_time_with_its_colours() {
+    let highlighter = Highlighter::default();
+    let code = "fn a() {}\n/* b\nc */";
+    let (_, document) = read_text(&format!("```rust numbered=true mark=3\n{code}\n```\n"));
+    let built = to_html(
+        &document,
+        &Options {
+            snippets: &StandIn,
+            back_to_the_text: None,
+            digits: None,
+            right_to_left: false,
+            highlighter: Some(&highlighter),
+        },
+    );
+    let lines =
+        crate::highlight::lines::wrapped(&highlighter.html("rust", code), 1, true, &[(3, 3)]);
+    assert_eq!(
+        built,
+        format!("<pre class=\"code\"><code class=\"language-rust\">{lines}</code></pre>")
+    );
+    assert!(
+        built.contains(
+            "<span class=\"hl-line hl-marked\" data-line=\"3\"><span class=\"hl-comment\">c */</span></span>"
+        ),
+        "{built}"
+    );
+}
+
+#[test]
+fn a_line_to_mark_past_the_blocks_end_and_a_word_that_cant_be_read_are_told_at_the_word() {
+    assert_eq!(
+        told_at("```rust mark=2,4-5\na\nb\nc\n```\n"),
+        [(
+            "No such line: this block has no line 4".to_owned(),
+            "mark=2,4-5".to_owned()
+        )]
+    );
+    assert_eq!(
+        told_at("> ```rust numbered=yes mark=\"2\u{2013}3\"\n> a\n> b\n> c\n> ```\n"),
+        [
+            (
+                "Wrong kind of value: `numbered` is `true` or `false`, not `yes`".to_owned(),
+                "numbered=yes".to_owned()
+            ),
+            (
+                "Wrong kind of value: `mark` is a list of lines, such as `3` or `3-5,8`, not `2\u{2013}3`"
+                    .to_owned(),
+                "mark=\"2\u{2013}3\"".to_owned()
+            ),
+        ]
+    );
+    for fine in [
+        "```rust numbered=true mark=1-3\na\nb\nc\n```\n",
+        "```rust mark=4 for the caption\na\n```\n",
+        "    mark=9\n",
+    ] {
+        assert_eq!(told_at(fine), [], "{fine:?}");
+    }
+}

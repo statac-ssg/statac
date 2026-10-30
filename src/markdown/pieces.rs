@@ -1,6 +1,7 @@
 //! The pieces of the writing a site may write itself, each through a file
 //! of its name in `snippets/markdown/`, and what each is handed.
 
+use super::code_lines::line_words;
 use crate::highlight::{self, FirstWord, Language};
 
 /// A kind of element in the writing whose HTML a site may write itself.
@@ -105,9 +106,10 @@ pub(crate) enum PieceValue {
 /// the line opening its fence: the first word is the language, unless the
 /// line opens with a quote, and the rest is the caption, without the quotes
 /// round it where it is quoted whole. A first word that is a file's name
-/// opens the caption, and the language is the one its name gives.
+/// opens the caption, and the language is the one its name gives. The
+/// words asking how its lines are shown are neither.
 pub(super) fn fence(info: &str) -> (&str, &str) {
-    let info = info.trim();
+    let info = line_words(info).0.trim();
     let language = language_word(info).unwrap_or("");
     let rest = &info[language.len()..];
     let (language, rest) = match highlight::first_word(language) {
@@ -128,9 +130,10 @@ pub(super) fn fence(info: &str) -> (&str, &str) {
 }
 
 /// The word of a fence's opening line that names its language or its
-/// file: the first, and none where the line opens with a quoted caption.
+/// file: the first, and none where the line opens with a quoted caption
+/// or holds only words asking how its lines are shown.
 pub(crate) fn language_word(info: &str) -> Option<&str> {
-    let info = info.trim_start();
+    let info = line_words(info).0.trim_start();
     match info.starts_with(['"', '\'']) {
         true => None,
         false => info.split_whitespace().next(),
@@ -172,5 +175,13 @@ mod tests {
         assert_eq!(Piece::meant_by("inlinecode"), Some(Piece::InlineCode));
         assert_eq!(Piece::meant_by("tables"), Some(Piece::Table));
         assert_eq!(Piece::meant_by("blockquote"), None);
+    }
+
+    #[test]
+    fn words_asking_how_lines_are_shown_are_no_language_or_caption() {
+        assert_eq!(fence("rust main.rs numbered=true"), ("rust", "main.rs"));
+        assert_eq!(fence("main.rs mark=2"), ("rs", "main.rs"));
+        assert_eq!(fence("\"The example\" mark=2"), ("", "The example"));
+        assert_eq!(language_word("numbered=true"), None);
     }
 }

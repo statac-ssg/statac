@@ -499,6 +499,10 @@ pub(crate) fn headline(kind: &Kind) -> String {
             "Code not coloured: a line in this block is {} characters long",
             grouped(*characters)
         ),
+        Kind::NoSuchLine { line, file, .. } => match file {
+            Some(file) => format!("No such line: `{file}` has no line {line}"),
+            None => format!("No such line: this block has no line {line}"),
+        },
         Kind::MalformedTemplate { found } => format!(
             "Malformed template: {}",
             match found {
@@ -590,6 +594,13 @@ pub(crate) fn headline(kind: &Kind) -> String {
                     Needed::Playable { sort, written } => format!(
                         "`{snippet}` needs a {} a browser plays, not `{written}`",
                         sort_name(*sort)
+                    ),
+                    Needed::Line { option, from } => {
+                        format!("`{snippet}` needs `{option}` to be a whole number from {from}")
+                    }
+                    Needed::Lines(option) => format!(
+                        "`{snippet}` needs `{option}` to be {}",
+                        expected_words(&Expected::Lines)
                     ),
                 },
             }
@@ -2137,6 +2148,7 @@ fn expected_words(expected: &Expected) -> String {
         Expected::Space => "one space, such as `\"\\u00A0\"`".into(),
         Expected::Table => "a table of items".into(),
         Expected::Between { from, to } => format!("a whole number from {from} to {to}"),
+        Expected::Lines => "a list of lines, such as `3` or `3-5,8`".into(),
         Expected::RoundedBetween { from, to } => format!("a number from {from} to {to}"),
         Expected::FontFile => "a font file ending `.ttf`, `.otf` or `.ttc`".into(),
         Expected::BuiltPlace => {
@@ -2972,6 +2984,18 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
         }
         Kind::CodeNotColoured { block, .. } => block
             .then(|| "Break the line up, or take the language off the block's first line.".into()),
+        Kind::NoSuchLine {
+            line,
+            first,
+            last,
+            file,
+        } => {
+            let whose = if file.is_some() { "file" } else { "block" };
+            Some(match line < first {
+                true => format!("The {whose}'s first line is {first}."),
+                false => format!("The {whose}'s last line is {last}."),
+            })
+        }
         Kind::MalformedTemplate { found } => match found {
             TemplateFault::Syntax(fault) => syntax_suggestion(fault),
             TemplateFault::Takes(fault) => Some(match fault {
@@ -3082,7 +3106,11 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                      `sizes=\"(max-width: 40rem) 100vw, 40rem\"`."
                         .into(),
                 ),
-                Needed::Text(_) | Needed::TrueFalse(_) | Needed::OnSite(_) => None,
+                Needed::Text(_)
+                | Needed::TrueFalse(_)
+                | Needed::OnSite(_)
+                | Needed::Line { .. }
+                | Needed::Lines(_) => None,
                 Needed::VideoOn { site, .. } => Some(format!(
                     "Write the URL {site} gives for the video, such as `{}`.",
                     match *site {
@@ -4029,6 +4057,14 @@ pub(crate) const OFFERED_TYPE: &str = "type";
 
 /// What an editor's completion says beside `@url(...)` in the content.
 pub(crate) const OFFERED_IN_SITE: &str = "URL in the site";
+
+/// What an editor's completion says beside `numbered=true` on a code
+/// block's opening line.
+pub(crate) const OFFERED_NUMBERED: &str = "line numbers";
+
+/// What an editor's completion says beside `mark=` on a code block's
+/// opening line.
+pub(crate) const OFFERED_MARK: &str = "lines to mark";
 
 /// What an editor's completion says beside a name a snippet call may
 /// give a value by.
@@ -5429,6 +5465,17 @@ mod tests {
                 "Wrong kind of value: `face` is an avatar's file name, such as \
                  `0123456789abcdef.jpg`, not `\"../record\"`",
                 None,
+            ),
+            (
+                Kind::WrongKind {
+                    field: "mark".into(),
+                    expected: Expected::Lines,
+                    found: Found::Written("2\u{2013}3".into()),
+                    respelt: Some("2-3".into()),
+                },
+                "Wrong kind of value: `mark` is a list of lines, such as `3` or `3-5,8`, \
+                 not `2\u{2013}3`",
+                Some("Write it as `2-3`."),
             ),
             (
                 Kind::MissingField {
@@ -9658,6 +9705,36 @@ mod tests {
                 None,
             ),
             (
+                Kind::NoSuchLine {
+                    line: 15,
+                    first: 1,
+                    last: 12,
+                    file: None,
+                },
+                "No such line: this block has no line 15",
+                Some("The block's last line is 12."),
+            ),
+            (
+                Kind::NoSuchLine {
+                    line: 5,
+                    first: 10,
+                    last: 20,
+                    file: None,
+                },
+                "No such line: this block has no line 5",
+                Some("The block's first line is 10."),
+            ),
+            (
+                Kind::NoSuchLine {
+                    line: 60,
+                    first: 1,
+                    last: 50,
+                    file: Some("main.rs".into()),
+                },
+                "No such line: `main.rs` has no line 60",
+                Some("The file's last line is 50."),
+            ),
+            (
                 Kind::RetiredSetting {
                     setting: "code_style".into(),
                     in_place: InPlace::CodeColours {
@@ -10130,6 +10207,23 @@ mod tests {
             (
                 asked("page.image", Needed::TrueFalse("full".into())),
                 "Wrong argument: `page.image` needs `full` to be `true` or `false`",
+                None,
+            ),
+            (
+                asked(
+                    "file.code",
+                    Needed::Line {
+                        option: "to".into(),
+                        from: 10,
+                    },
+                ),
+                "Wrong argument: `file.code` needs `to` to be a whole number from 10",
+                None,
+            ),
+            (
+                asked("file.code", Needed::Lines("mark".into())),
+                "Wrong argument: `file.code` needs `mark` to be a list of lines, \
+                 such as `3` or `3-5,8`",
                 None,
             ),
             (

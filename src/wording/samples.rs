@@ -636,6 +636,14 @@ const RUNS: &[Run] = &[
         ],
     ),
     Run::new(
+        Code::NoSuchLine,
+        CHECK,
+        &[(
+            "content/post-1.md",
+            "```rust mark=4\nfn main() {\n    println!(\"Hello\");\n}\n```\n",
+        )],
+    ),
+    Run::new(
         Code::MalformedTemplate,
         CHECK,
         &[

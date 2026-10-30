@@ -83,6 +83,23 @@ pub(crate) fn in_a_definition(text: &str, body: Span, offset: usize, wraps: Wrap
     })
 }
 
+/// Whether the line starting at `line` opens a fenced code block.
+pub(crate) fn opens_a_fence(text: &str, body: Span, line: usize, wraps: Wraps<'_>) -> bool {
+    let mut sources = Sources::default();
+    let source = sources.add("typed", text.to_owned());
+    let document = super::read(&sources, source, body, wraps, "");
+    let end = text[line..].find('\n').map_or(text.len(), |at| line + at);
+    let mut found = false;
+    for top in std::iter::once(&document.root).chain(&document.notes) {
+        top.walk(&mut |node| {
+            let start = node.place.span.start as usize;
+            let fenced = matches!(node.kind, Kind::CodeBlock { fenced: true, .. });
+            found |= fenced && (line..end).contains(&start);
+        });
+    }
+    found
+}
+
 /// The writing read with `written` in place of what lies from `at` to
 /// `end`; none where `body` doesn't reach `end`.
 fn read_with(

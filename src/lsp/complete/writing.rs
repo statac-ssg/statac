@@ -1,6 +1,7 @@
 //! Completion in a page's writing: the snippets a call may name, the
-//! values a call takes, and the addresses, headings and files a link,
-//! a picture or an `@url(...)` may lead to.
+//! values a call takes, the addresses, headings and files a link,
+//! a picture or an `@url(...)` may lead to, and the words asking how a
+//! code block's lines are shown.
 //!
 //! Where the cursor stands is found from the text before it, then asked
 //! of the writing as it reads (see `markdown::reads_a_call`), so nothing
@@ -14,7 +15,7 @@ use std::ops::Range;
 
 use super::{Completion, Item, ItemKind};
 use crate::ids::PageId;
-use crate::markdown::{self, IN_SITE};
+use crate::markdown::{self, IN_SITE, LINE_WORDS};
 use crate::problem::Sort;
 use crate::source::Span;
 use crate::templates::{Renderer, Snippet, Takes};
@@ -60,6 +61,14 @@ pub(super) enum Spot {
         typed: Range<usize>,
         definition: bool,
     },
+    /// In a word after the first on the line starting at `line`, where it
+    /// opens a fence: a word asking how the block's lines are shown.
+    Fence {
+        line: usize,
+        typed: Range<usize>,
+        /// Those words the line has already.
+        written: Vec<&'static str>,
+    },
 }
 
 /// Where `offset` stands in the writing at `body` of `text`, from the
@@ -70,9 +79,46 @@ pub(super) fn find(text: &str, body: Span, offset: usize) -> Option<Spot> {
         return None;
     }
     let line = text[..offset].rfind('\n').map_or(0, |at| at + 1).max(start);
-    in_value(text, start, offset)
+    in_fence(text, line, offset)
+        .or_else(|| in_value(text, start, offset))
         .or_else(|| in_name(text, line, offset))
         .or_else(|| in_address(text, line, offset))
+}
+
+/// The cursor in a word after the first on a line written as a fence's
+/// opening, outside a quoted caption.
+fn in_fence(text: &str, line: usize, offset: usize) -> Option<Spot> {
+    let before = &text[line..offset];
+    let opening = before.trim_start_matches([' ', '\t', '>']);
+    let marker = opening.chars().next().filter(|c| matches!(c, '`' | '~'))?;
+    let info = opening.trim_start_matches(marker);
+    if opening.len() - info.len() < 3 {
+        return None;
+    }
+    let word = info.len() - info.trim_end_matches(is_name_char).len();
+    let ahead = &info[..info.len() - word];
+    let quoted = ['"', '\'']
+        .iter()
+        .any(|q| ahead.matches(*q).count() % 2 == 1);
+    if ahead.trim().is_empty() || !ahead.ends_with(char::is_whitespace) || quoted {
+        return None;
+    }
+    let end = text[offset..]
+        .find('\n')
+        .map_or(text.len(), |at| offset + at);
+    let whole = &text[line..end];
+    let written = (LINE_WORDS.into_iter())
+        .filter(|name| {
+            whole
+                .split_whitespace()
+                .any(|w| w.starts_with(&format!("{name}=")))
+        })
+        .collect();
+    Some(Spot::Fence {
+        line,
+        typed: offset - word..offset,
+        written,
+    })
 }
 
 /// The cursor in the name of a call.
@@ -344,6 +390,51 @@ impl Offer<'_> {
                 let base = renderer.map(|r| r.settings().base()).unwrap_or_default();
                 Some(addresses(renderer, self.page, text, typed, &base, None))
             }
+            Spot::Fence {
+                line,
+                typed,
+                written,
+            } => {
+                if !markdown::opens_a_fence(text, body, line, &wraps) {
+                    return None;
+                }
+                let items = (LINE_WORDS.into_iter())
+                    .filter(|name| !written.contains(name))
+                    .map(|name| self.line_word(name))
+                    .collect();
+                Some(Completion::of(typed, items))
+            }
+        }
+    }
+
+    /// A word asking how a code block's lines are shown, written with its
+    /// value where it has one: `numbered=true`, and `mark=` with the
+    /// cursor after it.
+    fn line_word(&self, name: &'static str) -> Item {
+        let (label, insert, detail) = match name {
+            "numbered" => (
+                "numbered=true".to_owned(),
+                "numbered=true".to_owned(),
+                wording::OFFERED_NUMBERED,
+            ),
+            _ => (
+                format!("{name}="),
+                match self.snippets {
+                    true => format!("{name}=$1"),
+                    false => format!("{name}="),
+                },
+                wording::OFFERED_MARK,
+            ),
+        };
+        Item {
+            label,
+            detail: Some(detail.to_owned()),
+            kind: ItemKind::Field,
+            insert,
+            group: 0,
+            text: false,
+            filter: Some(name.to_owned()),
+            about: None,
         }
     }
 

@@ -18,6 +18,7 @@
 mod autolinks;
 mod block;
 mod call;
+mod code_lines;
 mod controls;
 mod html;
 mod ids;
@@ -36,6 +37,7 @@ mod typography;
 mod unmatched;
 
 pub(crate) use call::{Call, IN_SITE, Value, Within, from_the_top};
+pub(crate) use code_lines::LINE_WORDS;
 pub(crate) use html::escape_href;
 pub(crate) use html::{Copies, Options, Picture, Placement, Snippets, to_html, write};
 pub(crate) use ids::give_heading_ids;
@@ -47,7 +49,7 @@ pub(crate) use pieces::{Piece, PieceValue, language_word};
 pub(crate) use questions::{has_callout, headings, uses_maths};
 #[cfg(test)]
 pub(crate) use questions::{links, plain_text};
-pub(crate) use typing::{in_a_definition, reads_a_call, reads_a_link};
+pub(crate) use typing::{in_a_definition, opens_a_fence, reads_a_call, reads_a_link};
 pub use typography::{Typography, set_typography, set_words};
 
 use crate::problem::CallFault;
@@ -129,6 +131,8 @@ const TOLD_OF_A_VALUE: &[crate::problem::Code] = &[
     crate::problem::Code::FootnoteNeverShown,
     crate::problem::Code::DefinitionWrittenTwice,
     crate::problem::Code::UnmatchedTag,
+    crate::problem::Code::WrongKind,
+    crate::problem::Code::NoSuchLine,
 ];
 
 /// Whether a problem met reading writing is told of a value a template
@@ -143,7 +147,8 @@ pub(crate) fn told_of_a_value(kind: &ProblemKind) -> bool {
 
 /// Reads the Markdown at `body` in `source`, every node placed in the whole
 /// file, numbers its footnotes, makes its maths MathML and tells the more
-/// markers and maths it can't act on.
+/// markers and maths it can't act on, and the words asking how a code
+/// block's lines are shown.
 /// `wraps` says which snippets wrap the writing below a call to them, and
 /// `base` is the path the site is published under, which an `@url(...)`
 /// puts before its address.
@@ -168,6 +173,8 @@ pub fn read(
     document.problems.extend(misplaced);
     let others = another_tools(&document, text, body);
     document.problems.extend(others);
+    let lines = code_lines::problems(&document, text);
+    document.problems.extend(lines);
     if document.problems.len() > read {
         document
             .problems

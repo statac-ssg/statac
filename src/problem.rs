@@ -133,6 +133,7 @@ codes! {
     NotLinkedByPlace "not-linked-by-place",
     UnknownCodeLanguage "unknown-code-language",
     CodeNotColoured "code-not-coloured",
+    NoSuchLine "no-such-line",
     MalformedTemplate "malformed-template",
     MissingTemplate "missing-template",
     BuiltWithPageTemplate "built-with-page-template",
@@ -338,6 +339,7 @@ impl Code {
             | Code::NotLinkedByPlace
             | Code::UnknownCodeLanguage
             | Code::CodeNotColoured
+            | Code::NoSuchLine
             | Code::PageInSnippet
             | Code::AlwaysFalse
             | Code::ContentNeverShown
@@ -506,6 +508,7 @@ impl Code {
             | Code::NotLinkedByPlace
             | Code::UnknownCodeLanguage
             | Code::CodeNotColoured
+            | Code::NoSuchLine
             | Code::PageInSnippet
             | Code::AlwaysFalse
             | Code::ContentNeverShown
@@ -1155,6 +1158,16 @@ pub enum Kind {
     CodeNotColoured {
         characters: usize,
         block: bool,
+    },
+    /// A line asked for by number that isn't among the lines of code
+    /// there are: the number, and the first and last there are, of the
+    /// file named where the number asks which of its lines to show, or
+    /// else of the block shown.
+    NoSuchLine {
+        line: u64,
+        first: u64,
+        last: u64,
+        file: Option<String>,
     },
     /// A template or snippet that can't be read.
     MalformedTemplate {
@@ -2167,6 +2180,10 @@ pub enum Needed {
     },
     /// A file a browser plays, where the one named is of another kind.
     Playable { sort: Sort, written: String },
+    /// A line's number no lower than `from`, for the option named.
+    Line { option: String, from: u64 },
+    /// Lines by number, as `mark=3-5,8` writes them, for the option named.
+    Lines(String),
 }
 
 /// A sort of file a page is asked for.
@@ -2628,6 +2645,8 @@ pub enum Expected {
     OwnPicture,
     /// The name of a face in `fetched/faces/`, as a mention names it.
     FaceName,
+    /// Lines of code by number, as `mark=3-5,8` writes them.
+    Lines,
 }
 
 /// The lists and runs of marks a language file holds.
@@ -3166,6 +3185,7 @@ impl Kind {
             Kind::NotLinkedByPlace { .. } => Code::NotLinkedByPlace,
             Kind::UnknownCodeLanguage { .. } => Code::UnknownCodeLanguage,
             Kind::CodeNotColoured { .. } => Code::CodeNotColoured,
+            Kind::NoSuchLine { .. } => Code::NoSuchLine,
             Kind::MalformedTemplate { .. } => Code::MalformedTemplate,
             Kind::MissingTemplate { .. } => Code::MissingTemplate,
             Kind::BuiltWithPageTemplate { .. } => Code::BuiltWithPageTemplate,

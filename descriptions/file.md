@@ -40,6 +40,14 @@ file's language, which Statac works out from the file's name. If
 `code_colours` isn't `true`, it is the file's text with no classes.
 Empty for a file over 200,000 bytes or one that isn't UTF-8 text.
 
+Called with values, it shows some of the lines, or numbers or marks
+them: `file.code(from=10, to=20, numbered=true, mark="12-14")`. `from`
+and `to` are the first and last lines shown. `numbered=true` numbers the
+lines, starting from the first shown. `mark` lists the lines to mark, by
+the same numbers. Each line is then wrapped in `<span class="hl-line">`.
+A marked line also has the class `hl-marked`, and a numbered line has
+its number in `data-line`, for the site's stylesheet to show.
+
 More: https://statac.dev/videos/#a-file-shown-as-code
 
 ## `language`

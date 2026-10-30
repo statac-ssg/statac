@@ -861,6 +861,100 @@ fn a_file_beside_the_page_is_shown_as_code_coloured_by_its_name() {
     );
 }
 
+/// A snippet showing some of a file's lines, numbered and marked, as its
+/// call asks.
+const FILE_LINES: &str = "{# takes name #}\n\
+{% set file = page.file(name) %}\n\
+<pre class=\"code\"><code>{{ file.code(from=from | default(none), to=to | default(none), \
+numbered=numbered | default(false), mark=mark | default(none)) }}</code></pre>\n";
+
+#[test]
+fn a_file_beside_the_page_is_shown_from_a_line_to_a_line_numbered_from_the_first_and_marked() {
+    for colours in [false, true] {
+        let site = Site::new("file-lines", "{{ page.content }}");
+        site.write(
+            "statac.yaml",
+            &format!(
+                "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
+                 code_colours: {colours}\n"
+            ),
+        );
+        site.write("snippets/file.html", FILE_LINES);
+        site.write(
+            "content/post-1/index.md",
+            "---\ntitle: Post 1\n---\n\
+             @file(\"notes-1.txt\", from=2, to=3, numbered=true, mark=3)\n\n\
+             @file(\"notes-1.txt\", from=3)\n\n\
+             @file(\"notes-1.txt\")\n\n\
+             @file(\"code-1.rs\", from=2, numbered=true)\n",
+        );
+        site.write("content/post-1/notes-1.txt", "a\nb\nc\nd\n");
+        site.write("content/post-1/code-1.rs", "/* a\nb */\n");
+        assert_eq!(site.check(), "No problems.\n");
+        site.build();
+        let html = site.page("post-1/index.html");
+        let (plain, code) = html.rsplit_once('\n').unwrap();
+        assert_eq!(
+            plain,
+            "<pre class=\"code\"><code><span class=\"hl-line\" data-line=\"2\">b</span>\n\
+             <span class=\"hl-line hl-marked\" data-line=\"3\">c</span></code></pre>\n\
+             <pre class=\"code\"><code>c\nd</code></pre>\n\
+             <pre class=\"code\"><code>a\nb\nc\nd</code></pre>",
+            "colours {colours}"
+        );
+        let shown = match colours {
+            true => "<span class=\"hl-comment\">b */</span>",
+            false => "b */",
+        };
+        assert_eq!(
+            code,
+            format!(
+                "<pre class=\"code\"><code><span class=\"hl-line\" data-line=\"2\">{shown}</span>\
+                 </code></pre>"
+            ),
+            "colours {colours}"
+        );
+    }
+}
+
+#[test]
+fn a_line_a_file_or_its_lines_shown_hasnt_is_told_at_the_call_asking_for_it() {
+    let site = Site::new("file-lines-past", "{{ page.content }}");
+    site.write("snippets/file.html", FILE_LINES);
+    site.write(
+        "content/post-1/index.md",
+        "---\ntitle: Post 1\n---\n@file(\"notes-1.txt\", to=9)\n\n\
+         @file(\"notes-1.txt\", from=2, mark=\"2,1\")\n",
+    );
+    site.write("content/post-1/notes-1.txt", "a\nb\n");
+    assert_eq!(
+        site.check(),
+        "\
+warning  No such line: `notes-1.txt` has no line 9
+  content/post-1/index.md, line 4
+   4 │ @file(\"notes-1.txt\", to=9)
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  The file's last line is 2.
+  More: https://statac.dev/e/no-such-line/
+
+warning  No such line: this block has no line 1
+  content/post-1/index.md, line 6
+   6 │ @file(\"notes-1.txt\", from=2, mark=\"2,1\")
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  The block's first line is 2.
+  More: https://statac.dev/e/no-such-line/
+
+2 warnings: 2 no-such-line.
+"
+    );
+    site.build();
+    assert_eq!(
+        site.page("post-1/index.html"),
+        "<pre class=\"code\"><code>a\nb</code></pre>\n\
+         <pre class=\"code\"><code><span class=\"hl-line hl-marked\">b</span></code></pre>"
+    );
+}
+
 #[test]
 fn an_unknown_language_is_told_at_its_own_highlight_where_two_colour_worked_out_text() {
     let site = Site::new(

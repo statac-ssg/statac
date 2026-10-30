@@ -14,6 +14,9 @@ On a card, `padding` is a number from 0 to 314. A text's size is a number
 from 1 to 630, or `up to` such a number. Its colour is `#RGB`, `#RRGGBB`
 or a template. A font is a file ending in `.ttf`, `.otf` or `.ttc`.
 
+At the end of a code block's first line, `numbered` is `true` or
+`false`, and `mark` is a list of lines, such as `3` or `3-5,8`.
+
 The message says what kind of value is expected.
 
 ## What you'll see {#what-youll-see}

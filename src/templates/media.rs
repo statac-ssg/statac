@@ -9,7 +9,7 @@ use std::sync::{Arc, OnceLock};
 
 use minijinja::machinery::Span;
 use minijinja::machinery::ast::{CallType, Expr};
-use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Value, ValueKind};
 use minijinja::{Error, State};
 
 use super::check::{full_span, parse_template, place, visit_exprs};
@@ -19,7 +19,7 @@ use super::values::node_value;
 use crate::address::{is_full, on_the_wire};
 use crate::album::{Picture, Root, Seen};
 use crate::fetched::stills;
-use crate::highlight::{self, Language};
+use crate::highlight::{self, Language, lines};
 use crate::ids::{PageId, PictureId};
 use crate::origin::Sourced;
 use crate::pictures::{Format, Kind as PictureKind};
@@ -1010,9 +1010,9 @@ impl FileValue {
     }
 
     /// What the file holds as the inside of a `<code>`, coloured as its
-    /// name says. Nothing for a file too large to show or one that isn't
-    /// text.
-    fn code(&self) -> Value {
+    /// name says, its lines shown as `shown` asks. Nothing for a file too
+    /// large to show or one that isn't text.
+    fn code(&self, shown: &Shown) -> Value {
         let mut file = match self.on_disk.open() {
             Ok(file) => file,
             Err(error) => return self.cant_read(&error),
@@ -1034,11 +1034,154 @@ impl FileValue {
         let code = text.strip_suffix('\n').unwrap_or(&text);
         let code = code.strip_suffix('\r').unwrap_or(code);
         let Some(shared) = frame::shared() else {
-            return Value::from_safe_string(highlight::plain(code));
+            return Value::from_safe_string(shown.lines(&highlight::plain(code), code, || None));
         };
         let language = highlight::file_language(&self.name);
         let at = || self.asking.place_or_first(&shared);
-        Value::from_safe_string(super::render::code_html(&shared, code, language, at))
+        let html = super::render::code_html(&shared, code, language, at);
+        let total = lines::count(code);
+        if let Some(line) = [shown.from, shown.to]
+            .into_iter()
+            .flatten()
+            .find(|&n| n > total)
+        {
+            let kind = Kind::NoSuchLine {
+                line,
+                first: 1,
+                last: total,
+                file: Some(self.name.clone()),
+            };
+            told_at(at(), kind);
+        }
+        Value::from_safe_string(shown.lines(&html, code, at))
+    }
+}
+
+/// Which of a file's lines `file.code(...)` shows, from `from` to `to`, or
+/// all of them, and how: numbered from the first shown, where `numbered`,
+/// and marked where `marked` holds their numbers.
+#[derive(Default)]
+struct Shown {
+    from: Option<u64>,
+    to: Option<u64>,
+    numbered: bool,
+    marked: Vec<(u64, u64)>,
+}
+
+/// What `file.code(...)` takes by name.
+const SHOWN_OPTIONS: &[&str] = &["from", "to", "numbered", "mark"];
+
+/// The line `value` given as `option` numbers, no lower than `from`; none
+/// where it is none.
+fn line(asking: &Asking, option: &str, value: &Value, from: u64) -> Result<Option<u64>, Error> {
+    let wrong = || {
+        asking.wrong(Needed::Line {
+            option: option.to_owned(),
+            from,
+        })
+    };
+    match value.kind() {
+        ValueKind::None => Ok(None),
+        ValueKind::Number => (value.as_usize().map(|n| n as u64))
+            .filter(|&n| n >= from)
+            .map(Some)
+            .ok_or_else(wrong),
+        _ => Err(wrong()),
+    }
+}
+
+impl Shown {
+    fn read(asking: &Asking, args: &[Value]) -> Result<Shown, Error> {
+        let (unnamed, named) = parted(args)?;
+        if !unnamed.is_empty() {
+            return Err(frame::raise(Kind::WrongArgument {
+                snippet: asking.call.clone(),
+                fault: ArgumentFault::NeedsNames {
+                    wanted: SHOWN_OPTIONS
+                        .iter()
+                        .map(|name| (*name).to_owned())
+                        .collect(),
+                },
+            }));
+        }
+        let mut shown = Shown::default();
+        // `to` is held to `from` wherever each is written.
+        let mut to = None;
+        for (name, value) in &named {
+            if value.is_undefined() {
+                return Err(undefined());
+            }
+            match name.as_str() {
+                "from" => shown.from = line(asking, "from", value, 1)?,
+                "to" => to = Some(value),
+                "numbered" => {
+                    shown.numbered = match value.kind() {
+                        ValueKind::Bool => value.is_true(),
+                        ValueKind::None => false,
+                        _ => return Err(asking.wrong(Needed::TrueFalse(name.clone()))),
+                    }
+                }
+                "mark" => {
+                    let marked = match value.kind() {
+                        ValueKind::None => Some(Vec::new()),
+                        ValueKind::String if value.as_str() == Some("") => Some(Vec::new()),
+                        ValueKind::String => value.as_str().and_then(lines::read),
+                        ValueKind::Number => {
+                            value.as_usize().and_then(|n| lines::read(&n.to_string()))
+                        }
+                        _ => None,
+                    };
+                    shown.marked =
+                        marked.ok_or_else(|| asking.wrong(Needed::Lines(name.clone())))?;
+                }
+                _ => {
+                    return Err(frame::raise(Kind::WrongArgument {
+                        snippet: asking.call.clone(),
+                        fault: ArgumentFault::NoSuchName {
+                            given: name.clone(),
+                            nearest: crate::suggest::nearest(name, SHOWN_OPTIONS.iter().copied())
+                                .map(str::to_owned),
+                        },
+                    }));
+                }
+            }
+        }
+        if let Some(value) = to {
+            shown.to = line(asking, "to", value, shown.from.unwrap_or(1))?;
+        }
+        Ok(shown)
+    }
+
+    /// The lines of `html`, the HTML of `code`, that are shown, written a
+    /// line at a time where numbered or marked; none where `from` is past
+    /// the last. A line marked that isn't shown is told at `at`.
+    fn lines(&self, html: &str, code: &str, at: impl FnOnce() -> Option<Place>) -> String {
+        let total = lines::count(code);
+        let first = self.from.unwrap_or(1);
+        let last = self.to.unwrap_or(total).min(total);
+        if first > last {
+            return String::new();
+        }
+        if let Some(line) = lines::outside(&self.marked, first, last) {
+            let kind = Kind::NoSuchLine {
+                line,
+                first,
+                last,
+                file: None,
+            };
+            told_at(at(), kind);
+        }
+        let wraps = self.numbered || !self.marked.is_empty();
+        if first == 1 && last == total && !wraps {
+            return html.to_owned();
+        }
+        let mut kept: Vec<&str> = html.split('\n').collect();
+        kept.truncate(last as usize);
+        let kept = kept.split_off(first as usize - 1).join("\n");
+        match wraps {
+            true => lines::wrapped(&kept, first, self.numbered, &self.marked),
+            false => lines::without_return(&kept).into_owned(),
+        }
     }
 }
 
@@ -1065,7 +1208,7 @@ impl Object for FileValue {
                     Err(error) => self.cant_read(&error),
                 },
             ),
-            "code" => Some(self.code()),
+            "code" => Some(self.code(&Shown::default())),
             "language" => Some(Value::from(self.language())),
             other => {
                 frame::missed(None, other);
@@ -1076,6 +1219,28 @@ impl Object for FileValue {
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         Enumerator::Str(&["url", "name", "size", "text", "code", "language"])
+    }
+
+    /// `code` called, to show some of the file's lines, or to number or
+    /// mark them.
+    fn call_method(
+        self: &Arc<Self>,
+        state: &mut State<'_, '_>,
+        method: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
+        if method == "code" {
+            let asking = Asking {
+                call: "file.code".into(),
+                ..self.asking.clone()
+            };
+            let shown = Shown::read(&asking, args)?;
+            return Ok(self.code(&shown));
+        }
+        match self.get_value(&Value::from(method)) {
+            Some(value) => value.call(state, args),
+            None => Err(Error::from(minijinja::ErrorKind::UnknownMethod)),
+        }
     }
 
     /// A file printed is where it is published.

@@ -49,6 +49,34 @@ fn spot(text: &str) -> String {
             &text[typed],
             if definition { " defined" } else { "" }
         ),
+        Some(Spot::Fence { typed, written, .. }) => format!(
+            "fence word `{}`{}",
+            &text[typed],
+            if written.is_empty() {
+                String::new()
+            } else {
+                format!(" {written:?}")
+            }
+        ),
+    }
+}
+
+#[test]
+fn the_cursor_is_found_in_a_word_after_the_first_on_a_fences_line() {
+    let cases = [
+        ("```rust |", "fence word ``"),
+        ("```rust main.rs num|", "fence word `num`"),
+        ("~~~ rust ma|", "fence word `ma`"),
+        ("> ```rust |", "fence word ``"),
+        ("```rust mark=2 |", "fence word `` [\"mark\"]"),
+        ("```rust | numbered=true", "fence word `` [\"numbered\"]"),
+        ("```rust \"A |", "none"),
+        ("```|", "none"),
+        ("```ru|", "none"),
+        ("``rust |", "none"),
+    ];
+    for (text, said) in cases {
+        assert_eq!(spot(text), said, "{text:?}");
     }
 }
 
@@ -348,4 +376,48 @@ fn a_large_sites_addresses_are_offered_a_part_at_a_time() {
             .all(|label| label.starts_with("/notes/note-2"))
     );
     assert_eq!(some.items[0].detail.as_deref(), Some("Note 2"));
+}
+
+#[test]
+fn a_fences_line_offers_the_words_asking_how_its_lines_are_shown() {
+    let site = site();
+    let words = offered(
+        &site,
+        "```rust |
+a
+```
+",
+    )
+    .unwrap();
+    assert_eq!(
+        words,
+        [
+            (
+                "numbered=true".into(),
+                "line numbers".into(),
+                "numbered=true".into()
+            ),
+            ("mark=".into(), "lines to mark".into(), "mark=$1".into()),
+        ]
+    );
+    let left = offered(
+        &site,
+        "```rust numbered=true |
+a
+```
+",
+    )
+    .unwrap();
+    assert_eq!(labels(&left), ["mark="]);
+    for text in [
+        "```
+a
+```rust |
+",
+        "    ```rust |
+",
+        "`` `rust |``",
+    ] {
+        assert_eq!(offered(&site, text), None, "{text:?}");
+    }
 }

@@ -4,11 +4,14 @@
 //! it is, a comment or a keyword, by one class carrying `hl-` so a site's own
 //! stylesheet never meets one by chance; code of no kind carries none. The
 //! site's own stylesheet gives each class its colour: Statac writes none.
+//! A block that asks for its lines numbered or marked is written a line
+//! at a time (see `lines`).
 //!
 //! The grammars are written by `cargo run --example grammars`, which says
 //! where they come from.
 
 mod languages;
+pub(crate) mod lines;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -28,7 +31,7 @@ const CLASS_PREFIX: &str = "hl-";
 /// The kinds of thing code is marked as, each the name of its class after
 /// `hl-`. Sites' stylesheets, and the themes the docs give, colour the
 /// classes by name, so the list is a contract kept from one release to
-/// the next.
+/// the next, as are the classes and attribute of [`lines`].
 pub(crate) const KINDS: [&str; 19] = [
     "comment",
     "keyword",

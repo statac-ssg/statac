@@ -6,6 +6,7 @@ use std::ops::Range;
 
 use super::Document;
 use super::call::Call;
+use super::code_lines;
 use super::node::{Alignment, Kind, Node};
 use super::opening::{self, Called, Written, words_of};
 use super::pieces::{self, Piece, PieceValue};
@@ -407,16 +408,15 @@ impl<'a> Writer<'a> {
             }
             Kind::Definition => self.wrapped("<dd>", node, "</dd>"),
             Kind::CodeBlock { info, text, .. } => {
-                // The last line's ending only: a blank line before the
-                // fence is the code's.
-                let code = text.strip_suffix('\n').unwrap_or(text);
-                let code = code.strip_suffix('\r').unwrap_or(code);
+                let code = code_lines::block_code(text);
+                let (info, words) = code_lines::line_words(info);
+                let asked = code_lines::Asked::of(&words);
                 let (language, caption) = pieces::fence(info);
                 let mut body = None;
                 if self.writes(Piece::Code) {
                     // Colouring is most of the cost of a block.
                     if self.options.snippets.reads(Piece::Code, "body") {
-                        body = Some(self.code(info, code));
+                        body = Some(self.code(info, code, &asked));
                     }
                     let values = vec![
                         ("code", PieceValue::Text(code.to_owned())),
@@ -428,7 +428,7 @@ impl<'a> Writer<'a> {
                         return;
                     }
                 }
-                let body = body.unwrap_or_else(|| self.code(info, code));
+                let body = body.unwrap_or_else(|| self.code(info, code, &asked));
                 self.new_block();
                 // Words with no letter or digit caption nothing, and the
                 // line's first word is then the block's class, quoted or
@@ -972,11 +972,12 @@ impl<'a> Writer<'a> {
     }
 
     /// A block's code as HTML: coloured where its fence names a language
-    /// Statac colours and no line of it is too long, as it is otherwise.
-    fn code(&self, info: &str, code: &str) -> String {
+    /// Statac colours and no line of it is too long, as it is otherwise,
+    /// and written a line at a time where the words ending its fence ask.
+    fn code(&self, info: &str, code: &str, asked: &code_lines::Asked) -> String {
         let language =
             pieces::language_word(info).map(|word| highlight::first_word(word).language());
-        match (self.options.highlighter, language) {
+        let body = match (self.options.highlighter, language) {
             (Some(highlighter), Some(Language::Known(name)))
                 if highlight::too_long(code).is_none() =>
             {
@@ -987,6 +988,10 @@ impl<'a> Writer<'a> {
                 escape(code, &mut body);
                 body
             }
+        };
+        match asked.any() {
+            true => highlight::lines::wrapped(&body, 1, asked.numbered, &asked.marked),
+            false => body,
         }
     }
 
