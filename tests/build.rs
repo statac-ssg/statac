@@ -4384,3 +4384,89 @@ note  Missing button text: a `<button>` has nothing a screen reader can read out
     assert_eq!(code, 0, "{said}");
     assert_eq!(said, "7 notes, all quietened.\n");
 }
+
+#[test]
+fn a_page_for_each_year_lists_its_posts_and_names_the_years_beside_it() {
+    let site = Site::new("years");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\nposts_per_page: 2\n\
+         years.pages: true\n",
+    );
+    site.write(
+        "templates/folder.html",
+        "{{ page.list.word }} {{ page.list }}:\
+         {% for post in page.posts %} {{ post.title }}{% endfor %}\n\
+         {% if page.next %}more {{ page.next.url }}\n{% endif %}\
+         {% if page.list.previous %}previous {{ page.list.previous.url }}\n{% endif %}\
+         {% if page.list.next %}next {{ page.list.next.url }}\n{% endif %}\
+         years:{% for year in site.years %} {{ year.name }}{% endfor %}\n",
+    );
+    for (n, date) in [(2, "2024-05-01"), (3, "2026-02-01"), (4, "2026-03-01")] {
+        site.write(
+            &format!("content/post-{n}.md"),
+            &format!("---\ntitle: Post {n}\ndate: {date}\n---\n"),
+        );
+    }
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let read = |path: &str| fs::read_to_string(site.out().join(path)).unwrap();
+    assert_eq!(
+        read("2026/index.html"),
+        "year 2026: Post 4 Post 3\nmore /2026/page/2/\nnext /2024/\nyears: 2026 2024"
+    );
+    assert_eq!(
+        read("2026/page/2/index.html"),
+        "year 2026: Post 1\nnext /2024/\nyears: 2026 2024"
+    );
+    assert_eq!(
+        read("2024/index.html"),
+        "year 2024: Post 2\nprevious /2026/\nyears: 2026 2024"
+    );
+    assert!(!site.out().join("2025").exists());
+
+    // A page of the author's at a year's URL is published there twice.
+    site.write("content/2024.md", "---\ntitle: The year\n---\n");
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 1, "{said}");
+    assert!(
+        said.contains(
+            "error  Same URL: `content/2024.md` and the page for the year `2024` are both \
+             published at `/2024/index.html`"
+        ),
+        "{said}"
+    );
+    fs::remove_file(site.root.join("content/2024.md")).unwrap();
+
+    // Asked for with no template to build them with.
+    fs::remove_file(site.root.join("templates/folder.html")).unwrap();
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 1, "{said}");
+    assert!(
+        said.contains(
+            "error  Missing template: there is no `templates/folder.html`\n  \
+             While building the page for the year `2024`\n  \
+             And while building 1 more:\n    \
+             the page for the year `2026`\n  \
+             Add the template, or take `years.pages` out of `statac.yaml`.\n"
+        ),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_site_without_years_pages_publishes_no_year() {
+    let site = Site::new("no-years");
+    site.write("templates/folder.html", "{{ page.list }}\n");
+    site.write(
+        "templates/home.html",
+        "years:{% for year in site.years %} {{ year }}{% endfor %}\n",
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(!site.out().join("2026").exists());
+    assert_eq!(
+        fs::read_to_string(site.out().join("index.html")).unwrap(),
+        "years:"
+    );
+}

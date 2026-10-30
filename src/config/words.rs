@@ -654,7 +654,7 @@ fn nested_site_settings<'a>(name: &str, value: &'a Node) -> Option<Vec<(String, 
 
 fn is_list_setting(name: &str) -> bool {
     name.split_once('.')
-        .is_some_and(|(list, _)| matches!(list, "tags" | "series" | "pagination"))
+        .is_some_and(|(list, _)| matches!(list, "tags" | "series" | "years" | "pagination"))
         && crate::config::is_setting(name)
 }
 

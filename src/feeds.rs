@@ -613,13 +613,14 @@ fn not_written(site: &Site, sources: &Sources, lists: &[ListId], why: Unwritten)
 }
 
 /// A list as a problem names it: a folder by its path, the site's own
-/// where that is empty, a tag or a series by its name, a list a page
-/// chooses by that page's file.
+/// where that is empty, a tag or a series by its name, a year by itself,
+/// a list a page chooses by that page's file.
 pub(crate) fn described(site: &Site, sources: &Sources, list: ListId) -> (Word, String) {
     match &site.lists.get(list).key {
         ListKey::Folder(path) => (Word::Folder, path.clone()),
         ListKey::Tag(name) => (Word::Tag, name.clone()),
         ListKey::Series(name) => (Word::Series, name.clone()),
+        ListKey::Year(year) => (Word::Year, year.to_string()),
         ListKey::Declared(page) => (
             Word::Page,
             site.pages

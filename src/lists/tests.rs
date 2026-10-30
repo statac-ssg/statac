@@ -1902,3 +1902,217 @@ fn the_notes_of_list_pages_nothing_asks_for_are_quietened_by_name() {
         "{said}"
     );
 }
+
+fn year(year: i32) -> ListKey {
+    ListKey::Year(year)
+}
+
+/// Years, each with where its page stands.
+type YearPages = Vec<(i32, Option<String>)>;
+
+/// The years a site has lists for, each with where its page stands.
+fn years(read: &Read) -> YearPages {
+    let mut years: YearPages = (read.site.lists.iter())
+        .filter_map(|(_, list)| match list.key {
+            ListKey::Year(year) => Some((year, speaker(read, &list.key))),
+            _ => None,
+        })
+        .collect();
+    years.sort();
+    years
+}
+
+/// The settings for year pages, times what they make: a year only where
+/// the site asks, each holding its posts newest first, kept to a folder
+/// where `years.folder` names one.
+#[test]
+fn years_have_pages_where_the_site_says() {
+    let both = |at: &str| {
+        vec![
+            (2024, Some(format!("{at}2024/"))),
+            (2026, Some(format!("{at}2026/"))),
+        ]
+    };
+    // (settings, the years and their pages, the posts of 2026)
+    let cases: [(&str, YearPages, &[&str]); 9] = [
+        ("", vec![], &[]),
+        ("years.pages: false\n", vec![], &[]),
+        ("years.permalink: /archive/{year}/\n", vec![], &[]),
+        (
+            "years.pages: true\n",
+            both("/"),
+            &["notes/note-1.md", "blog/inner/post-3.md", "blog/post-2.md"],
+        ),
+        (
+            "years.pages: true\nyears.permalink: /archive/{year}/\n",
+            both("/archive/"),
+            &["notes/note-1.md", "blog/inner/post-3.md", "blog/post-2.md"],
+        ),
+        (
+            "years.pages: true\nyears.folder: blog\n",
+            both("/"),
+            &["blog/inner/post-3.md", "blog/post-2.md"],
+        ),
+        (
+            "years.pages: true\nyears.folder: /blog/\n",
+            both("/"),
+            &["blog/inner/post-3.md", "blog/post-2.md"],
+        ),
+        (
+            "years.pages: true\nyears.folder: inner\n",
+            vec![(2026, Some("/2026/".into()))],
+            &["blog/inner/post-3.md"],
+        ),
+        (
+            "years.pages: true\nyears.folder: notes\n",
+            vec![(2026, Some("/2026/".into()))],
+            &["notes/note-1.md"],
+        ),
+    ];
+    for (settings, wanted, posts) in cases {
+        let settings = format!("language: en\ntimezone: UTC\n{settings}");
+        let read = site(&[
+            ("statac.yaml", &settings),
+            ("content/about.md", "---\ntitle: About\n---\n"),
+            ("content/blog/post-1.md", &post("2024-06-01")),
+            ("content/blog/post-2.md", &post("2026-01-01")),
+            ("content/blog/inner/post-3.md", &post("2026-03-01")),
+            ("content/notes/note-1.md", &post("2026-05-01")),
+            (
+                "content/old.md",
+                "---\ndate: 2025-01-01\nredirect_to: /about/\n---\n",
+            ),
+        ]);
+        assert_eq!(problems(&read), [], "{settings}");
+        assert_eq!(years(&read), wanted, "{settings}");
+        if !posts.is_empty() {
+            assert_eq!(members(&read, &year(2026)), posts, "{settings}");
+            assert_eq!(undated(&read, &year(2026)), [] as [&str; 0], "{settings}");
+            assert_eq!(list(&read, &year(2026)).order, Some(Order::NewestFirst));
+        }
+    }
+}
+
+#[test]
+fn a_year_is_never_spoken_for_by_a_page_at_its_address() {
+    let read = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\nyears.pages: true\n",
+        ),
+        ("content/post-1.md", &post("2026-01-01")),
+        ("content/2026.md", "---\ntitle: The year\n---\n"),
+    ]);
+    let made = list(&read, &year(2026)).page.unwrap();
+    assert_eq!(read.site.pages.get(made).place, PagePlace::Made);
+    assert_eq!(address_of(&read, "2026.md"), "/2026/");
+    // Both are published there, which the build stops at.
+    let claims = read.claims();
+    let at = claims
+        .iter()
+        .filter(|(file, _)| file == "2026/index.html")
+        .count();
+    assert_eq!(at, 2, "{claims:?}");
+}
+
+#[test]
+fn years_with_no_post_to_hold_are_told_at_the_setting() {
+    // (settings, the problem's name and the text it is told at)
+    let cases = [
+        (
+            "years.pages: true\n",
+            "No year pages: no page has a date",
+            "true",
+        ),
+        (
+            "years.pages: true\nyears.folder: pages\n",
+            "No year pages: no page in `content/pages/` has a date",
+            "true",
+        ),
+        (
+            "years.pages: true\nyears.folder: blgo\n",
+            "Unknown folder: `blgo`",
+            "blgo",
+        ),
+    ];
+    for (settings, said, at) in cases {
+        let settings = format!("language: en\ntimezone: UTC\n{settings}");
+        let read = site(&[
+            ("statac.yaml", &settings),
+            ("content/pages/about.md", "---\ntitle: About\n---\n"),
+            ("content/blog/index.md", "---\ntitle: Blog\n---\n"),
+        ]);
+        let told = problems(&read);
+        assert_eq!(told.len(), 1, "{settings}{told:?}");
+        assert_eq!(
+            (told[0].1.as_str(), told[0].2.as_str()),
+            ("statac.yaml", at)
+        );
+        assert_eq!(read.problems[0].headline(), said, "{settings}");
+        assert_eq!(years(&read), [], "{settings}");
+    }
+    // A post anywhere is a year to show.
+    let read = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\nyears.pages: true\n",
+        ),
+        ("content/blog/post-1.md", &post("2026-01-01")),
+    ]);
+    assert_eq!(problems(&read), []);
+}
+
+#[test]
+fn a_year_pages_through_its_posts() {
+    let read = site(&[
+        (
+            "statac.yaml",
+            "language: en\ntimezone: UTC\nyears.pages: true\nposts_per_page: 2\n",
+        ),
+        ("content/post-1.md", &post("2026-01-01")),
+        ("content/post-2.md", &post("2026-02-01")),
+        ("content/post-3.md", &post("2026-03-01")),
+        ("content/post-4.md", &post("2025-03-01")),
+    ]);
+    assert_eq!(problems(&read), []);
+    assert_eq!(later(&read, &year(2026)), ["/2026/page/2/"]);
+    assert_eq!(later(&read, &year(2025)), [] as [&str; 0]);
+    let list = list(&read, &year(2026));
+    assert_eq!(
+        shown(&read, list.stretch(2)),
+        ["post-1.md"],
+        "the oldest post is on the last page"
+    );
+}
+
+#[test]
+fn each_language_has_years_of_its_own() {
+    let read = site(&[
+        (
+            "statac.yaml",
+            "language: [en, fr]\ntimezone: UTC\nyears.pages: true\n",
+        ),
+        ("content/post-1.md", &post("2026-01-01")),
+        ("content/fr/post-1.md", &post("2025-01-01")),
+    ]);
+    assert_eq!(problems(&read), []);
+    let mut found: Vec<(String, i32, Option<String>)> = (read.site.lists.iter())
+        .filter_map(|(_, list)| match list.key {
+            ListKey::Year(year) => Some((
+                read.site.languages.get(list.language).tag.clone().unwrap(),
+                year,
+                list.page
+                    .map(|page| read.site.pages.get(page).address.as_str().to_owned()),
+            )),
+            _ => None,
+        })
+        .collect();
+    found.sort();
+    assert_eq!(
+        found,
+        [
+            ("en".into(), 2026, Some("/2026/".into())),
+            ("fr".into(), 2025, Some("/fr/2025/".into())),
+        ]
+    );
+}

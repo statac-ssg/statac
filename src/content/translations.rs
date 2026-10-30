@@ -222,7 +222,9 @@ fn place_of(
         PagePlace::Made => match &site.lists.get(page.speaks_for?).key {
             ListKey::Folder(folder) if folder.is_empty() => "index".to_owned(),
             ListKey::Folder(folder) => format!("{folder}/index"),
-            ListKey::Tag(_) | ListKey::Series(_) => return listed(site, page, top),
+            ListKey::Tag(_) | ListKey::Series(_) | ListKey::Year(_) => {
+                return listed(site, page, top);
+            }
             ListKey::Declared(_) => return None,
         },
         PagePlace::Folder | PagePlace::Ordinary | PagePlace::Bundle => page.path.clone(),
@@ -253,11 +255,11 @@ fn place_of(
     Some(Match::Place(stem.to_owned()))
 }
 
-/// A tag's or a series' page, by its address from `top`. None for a page
-/// speaking for no tag or series.
+/// A tag's, a series' or a year's page, by its address from `top`. None
+/// for a page speaking for none.
 fn listed(site: &Site, page: &crate::site::Page, top: &str) -> Option<Match> {
     let key = &site.lists.get(page.speaks_for?).key;
-    if !matches!(key, ListKey::Tag(_) | ListKey::Series(_)) {
+    if !matches!(key, ListKey::Tag(_) | ListKey::Series(_) | ListKey::Year(_)) {
         return None;
     }
     let address = page.address.as_str();

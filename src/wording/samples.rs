@@ -962,6 +962,14 @@ const RUNS: &[Run] = &[
         ],
     ),
     Run::new(
+        Code::NoYearPages,
+        CHECK,
+        &[
+            ("statac.yaml", "title: Site 1\nyears.pages: true\n"),
+            ("content/about.md", "---\ntitle: About\n---\n"),
+        ],
+    ),
+    Run::new(
         Code::RobotsBeneathPath,
         CHECK,
         &[

@@ -1,16 +1,17 @@
 # A list in a template
 
-Summary: Every value a template can read on a folder, a tag, a series or another list, such as its posts and feed.
+Summary: Every value a template can read on a folder, a tag, a series, a year or another list, such as its posts and feed.
 
 The names (variables) a template reads on a list: a folder, a tag, a
-series, or a list a page makes with `posts:` or `each:`. A template
+series, a year, or a list a page makes with `posts:` or `each:`. A template
 reaches lists through `page.list`, `page.folder`, `page.tags`,
 `site.tags` and the like, and through `list` in a feed's template.
 
 ## `name`
 
 The list's name: a folder's own name, a tag's or a series' name as the
-pages spell it, or, for a list a page makes, that page's title.
+pages spell it, a year's number, such as `2026`, or, for a list a page
+makes, that page's title.
 
 More: https://statac.dev/lists/#lists-in-templates
 
@@ -70,8 +71,8 @@ More: https://statac.dev/lists/#lists-in-templates
 
 ## `word`
 
-Which kind of list it is: `site`, `folder`, `tag`, `series`, or `chosen`
-for a list a page makes with `posts:` or `each:`.
+Which kind of list it is: `site`, `folder`, `tag`, `series`, `year`, or
+`chosen` for a list a page makes with `posts:` or `each:`.
 
 More: https://statac.dev/lists/#lists-in-templates
 
@@ -81,3 +82,19 @@ More: https://statac.dev/lists/#lists-in-templates
 start with, or an `order:` list of names, put its posts in order.
 
 More: https://statac.dev/lists/#lists-in-templates
+
+## `previous`
+
+On a year, the year before it in `site.years`, which runs newest first:
+the next later year that has a list page. On the latest year, and on any
+other kind of list, it has no value.
+
+More: https://statac.dev/lists/#years
+
+## `next`
+
+On a year, the year after it in `site.years`, which runs newest first:
+the next earlier year that has a list page. On the earliest year, and on
+any other kind of list, it has no value.
+
+More: https://statac.dev/lists/#years

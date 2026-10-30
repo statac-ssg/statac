@@ -753,6 +753,10 @@ impl SiteValue {
                 frame::read(Key::Folders(self.language));
                 Some(Lists::value(shared, shared.site.folders(self.language)))
             }
+            "years" => {
+                frame::read(Key::ListsIn(self.language));
+                Some(Lists::value(shared, years(shared, self.language)))
+            }
             "webmentions" => {
                 frame::read(setting_key(shared, key));
                 Some(Value::from(shared.settings.truth(key) == Some(true)))
@@ -1210,6 +1214,7 @@ pub(super) fn list_name(shared: &Shared, id: ListId) -> String {
     match &shared.site.lists.get(id).key {
         ListKey::Folder(path) => path.rsplit('/').next().unwrap_or_default().to_owned(),
         ListKey::Tag(name) | ListKey::Series(name) => name.clone(),
+        ListKey::Year(year) => year.to_string(),
         ListKey::Declared(page) => {
             frame::read(field_key(shared, *page, "title"));
             let page = shared.site.pages.get(*page);
@@ -1222,6 +1227,19 @@ pub(super) fn list_name(shared: &Shared, id: ListId) -> String {
             }
         }
     }
+}
+
+/// The years of `language` with posts, newest first.
+fn years(shared: &Shared, language: LanguageId) -> Vec<ListId> {
+    let mut years: Vec<(i32, ListId)> = (shared.site.lists.iter())
+        .filter(|(_, list)| list.language == language)
+        .filter_map(|(id, list)| match list.key {
+            ListKey::Year(year) => Some((year, id)),
+            _ => None,
+        })
+        .collect();
+    years.sort_unstable_by(|a, b| b.cmp(a));
+    years.into_iter().map(|(_, id)| id).collect()
 }
 
 /// What a list is known by but for its members, all [`Key::List`] covers.
@@ -1318,6 +1336,21 @@ impl ListValue {
                 false => list.key.word(),
             })),
             "order" => Some(Value::from(known().order.map_or("", Order::word))),
+            // A year's neighbours are the years either side of it with
+            // posts, in its language, in the order `site.years` gives.
+            "previous" | "next" => {
+                if !matches!(list.key, ListKey::Year(_)) {
+                    return None;
+                }
+                frame::read(Key::ListsIn(list.language));
+                let years = years(shared, list.language);
+                let at = years.iter().position(|&id| id == self.id)?;
+                let beside = match key {
+                    "previous" => years.get(at.checked_sub(1)?),
+                    _ => years.get(at + 1),
+                };
+                beside.map(|&id| ListValue::value(shared, id))
+            }
             _ => None,
         }
     }
@@ -1342,10 +1375,18 @@ impl Object for ListValue {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Str(&[
+        const NAMES: &[&str] = &[
             "name", "title", "url", "page", "feed", "feeds", "posts", "pages", "pager", "word",
             "order",
-        ])
+        ];
+        const A_YEARS: &[&str] = &[
+            "name", "title", "url", "page", "feed", "feeds", "posts", "pages", "pager", "word",
+            "order", "previous", "next",
+        ];
+        match self.shared.site.lists.get(self.id).key {
+            ListKey::Year(_) => Enumerator::Str(A_YEARS),
+            _ => Enumerator::Str(NAMES),
+        }
     }
 
     fn custom_cmp(self: &Arc<Self>, other: &DynObject) -> Option<Ordering> {

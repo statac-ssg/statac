@@ -895,6 +895,10 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 either_of(&quoted)
             )
         }
+        Kind::NoYearPages { folder } => match folder {
+            Some(folder) => format!("No year pages: no page in `content/{folder}/` has a date"),
+            None => "No year pages: no page has a date".into(),
+        },
         Kind::RobotsBeneathPath { top } => {
             format!("Robots beneath a path: crawlers read only `{top}`")
         }
@@ -2070,6 +2074,7 @@ fn word_name(word: Word) -> &'static str {
         Word::Tag => "tag",
         Word::Series => "series",
         Word::Folder => "folder",
+        Word::Year => "year",
         Word::Page => "page",
         Word::Table => "table",
         Word::Marker => "marker",
@@ -2111,6 +2116,7 @@ fn expected_words(expected: &Expected) -> String {
         Expected::TrueFalseOrAddress => "`true`, `false`, a URL or a list of URLs".into(),
         Expected::Fields => "`name: value` lines".into(),
         Expected::ListAddress => "a URL ending in `{slug}/`, such as `/topics/{slug}/`".into(),
+        Expected::YearAddress => "a URL ending in `{year}/`, such as `/archive/{year}/`".into(),
         Expected::LaterAddress => {
             "a URL starting with `{list}` and holding `{n}`, such as `{list}page/{n}/`".into()
         }
@@ -2995,6 +3001,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             (None, Chooser::Made) => {
                 Some("Add the template, or a page of your own at the same URL.".into())
             }
+            (None, Chooser::Year) => {
+                Some("Add the template, or take `years.pages` out of `statac.yaml`.".into())
+            }
             (None, Chooser::Written) => None,
         },
         Kind::BuiltWithPageTemplate { path, pages } => Some(format!(
@@ -3308,6 +3317,13 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             _ => "Add an `index.md` at the top of each language, or `templates/home.html` to \
                   list the posts there."
                 .into(),
+        }),
+        Kind::NoYearPages { folder } => Some(match folder {
+            Some(folder) => format!(
+                "Give a page in `content/{folder}/` a `date`, or name another folder in \
+                 `years.folder`."
+            ),
+            None => "Give a page a `date` to publish a page for its year.".into(),
         }),
         Kind::RobotsBeneathPath { .. } => Some(
             "Copy its lines into the `robots.txt` at the root of the host for crawlers to read \
@@ -6962,6 +6978,21 @@ mod tests {
                      list the posts there.",
                 ),
             ),
+            (
+                Kind::NoYearPages { folder: None },
+                "No year pages: no page has a date",
+                Some("Give a page a `date` to publish a page for its year."),
+            ),
+            (
+                Kind::NoYearPages {
+                    folder: Some("notes".into()),
+                },
+                "No year pages: no page in `content/notes/` has a date",
+                Some(
+                    "Give a page in `content/notes/` a `date`, or name another folder in \
+                     `years.folder`.",
+                ),
+            ),
         ]
     }
 
@@ -9829,6 +9860,15 @@ mod tests {
                 },
                 "Missing template: there is no `templates/folder.html`",
                 Some("Add the template, or a page of your own at the same URL."),
+            ),
+            (
+                Kind::MissingTemplate {
+                    path: "templates/folder.html".into(),
+                    chosen: Chooser::Year,
+                    nearest: None,
+                },
+                "Missing template: there is no `templates/folder.html`",
+                Some("Add the template, or take `years.pages` out of `statac.yaml`."),
             ),
             (
                 Kind::MissingTemplate {

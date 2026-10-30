@@ -115,6 +115,28 @@ The default is `false`.
 
 More: https://statac.dev/lists/#tags
 
+## `years.pages`
+
+`true` makes a list page for each year that has posts, listing the
+posts dated in that year, newest first. The default is `false`.
+
+More: https://statac.dev/lists/#years
+
+## `years.permalink`
+
+Where Statac publishes each year's list page: a pattern ending with
+`{year}/`. The default is `/{year}/`.
+
+More: https://statac.dev/lists/#years
+
+## `years.folder`
+
+The folder whose posts the year pages list, such as `blog`. A post in a
+folder inside it counts too. If the setting is unset, the year pages
+list every post.
+
+More: https://statac.dev/lists/#years
+
 ## `tags.slugs`
 
 The slug for each tag you name, one tag per line under the setting, such

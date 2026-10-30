@@ -812,6 +812,7 @@ fn schema(site: &Site, settings: &Settings) -> Schema {
         ("posts", pages),
         ("tags", lists.clone()),
         ("folders", lists.clone()),
+        ("years", lists.clone()),
         ("series", lists),
         ("today", Ty::Record(Rec::Date)),
         ("feed", Ty::Text),

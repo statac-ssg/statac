@@ -5,9 +5,9 @@
 //! `layout:` handed down from a folder does, except to a page speaking for
 //! a list, which stays what it is. A page that names none is built with
 //! `home` where it speaks for the site's own list, `folder` where it
-//! speaks for any other list, the pages Statac makes for tags and series
-//! among them, and `page` for any other. A page making pages from a table
-//! speaks for their list: its `layout:` builds the pages it makes.
+//! speaks for any other list, the pages Statac makes for tags, series and
+//! years among them, and `page` for any other. A page making pages from a
+//! table speaks for their list: its `layout:` builds the pages it makes.
 //!
 //! Where the site lacks the template so chosen, a page with content of
 //! its own is built with `page`, and where the site lacks that too, as its
@@ -114,7 +114,13 @@ pub(super) fn choose(
         Kind::MissingTemplate {
             path: template_path(&chosen.name),
             chosen: match chosen.origin.arrival {
-                Arrival::Defaulted if page.source.is_none() => Chooser::Made,
+                Arrival::Defaulted if page.source.is_none() => {
+                    let list = page.speaks_for.map(|list| &site.lists.get(list).key);
+                    match list {
+                        Some(crate::site::ListKey::Year(_)) => Chooser::Year,
+                        _ => Chooser::Made,
+                    }
+                }
                 Arrival::Defaulted => Chooser::Default,
                 _ => Chooser::Written,
             },

@@ -649,6 +649,42 @@ fn a_tag_added_and_removed() {
 }
 
 #[test]
+fn a_posts_date_moved_into_another_year_and_back() {
+    let site = Site::new("year");
+    site.write("statac.yaml", &format!("{SETTINGS}years.pages: true\n"));
+    site.write(
+        "templates/folder.html",
+        &format!(
+            "{BASE}{HOME}{{% set year = page.list %}}\
+             {{% if year.previous %}}<a href=\"{{{{ year.previous.url }}}}\">\
+             {{{{ year.previous }}}}</a>{{% endif %}}\
+             {{% if year.next %}}<a href=\"{{{{ year.next.url }}}}\">{{{{ year.next }}}}</a>\
+             {{% endif %}}\n\
+             {{% for other in site.years %}}{{{{ other }}}} {{% endfor %}}\n"
+        ),
+    );
+    let moved = |date: &str| post("Post 3", date, "one", "Post 3 says this.");
+    through(
+        &site,
+        &[
+            ("a post moved into a year of its own", &|site| {
+                site.write("content/post-3.md", &moved("2025-06-01"))
+            }),
+            ("a post moved into another year of its own", &|site| {
+                site.write("content/post-3.md", &moved("2024-06-01"))
+            }),
+            ("a post moved back", &|site| {
+                assert!(site.top.join("fresh/2024/index.html").exists());
+                site.write("content/post-3.md", &moved("2026-01-03"))
+            }),
+        ],
+    );
+    let fresh = |path: &str| site.top.join("fresh").join(path);
+    assert!(fresh("2026/index.html").exists());
+    assert!(!fresh("2024").exists());
+}
+
+#[test]
 fn a_post_added_and_deleted() {
     let site = Site::new("post");
     // Named to be read before the posts there are, so every file read

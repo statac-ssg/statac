@@ -215,8 +215,8 @@ pub(crate) enum SentTo {
     Elsewhere(String),
 }
 
-/// Folders, tags and series are all lists; paging, feeds and neighbours are
-/// answered once, for lists.
+/// Folders, tags, series and years are all lists; paging, feeds and
+/// neighbours are answered once, for lists.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum ListKey {
     /// A folder, by its path under `content/`; the site's own list is the
@@ -226,6 +226,8 @@ pub(crate) enum ListKey {
     /// way.
     Tag(String),
     Series(String),
+    /// The posts dated in one year, where `years.pages` asks for them.
+    Year(i32),
     /// A list a page declares with `posts:`, by that page.
     Declared(PageId),
 }
@@ -238,6 +240,7 @@ impl ListKey {
             ListKey::Folder(_) => "folder",
             ListKey::Tag(_) => "tag",
             ListKey::Series(_) => "series",
+            ListKey::Year(_) => "year",
             ListKey::Declared(_) => "chosen",
         }
     }
@@ -271,8 +274,9 @@ pub(crate) struct List {
     pub(crate) undated: Vec<PageId>,
     /// The page that speaks for the list, such as a folder's `index.md`.
     pub(crate) page: Option<PageId>,
-    /// Where a tag's or a series' page stands, from `tags.permalink` or
-    /// `series.permalink`, whether or not a page is made there.
+    /// Where a tag's, a series' or a year's page stands, from
+    /// `tags.permalink`, `series.permalink` or `years.permalink`, whether
+    /// or not a page is made there.
     pub(crate) address: Option<Sourced<Address>>,
     /// Whether a folder's pages are ordered by the numbers their names
     /// open with.
@@ -535,6 +539,7 @@ impl Site {
             ListKey::Folder(path) => (Word::Folder, path.clone()),
             ListKey::Tag(name) => (Word::Tag, name.clone()),
             ListKey::Series(name) => (Word::Series, name.clone()),
+            ListKey::Year(year) => (Word::Year, year.to_string()),
             ListKey::Declared(_) => unreachable!("a page declaring a list is the author's"),
         };
         Named::ListPage(word, name)

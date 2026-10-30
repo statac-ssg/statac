@@ -72,6 +72,14 @@ Every series, A to Z, each a list with its `name`, `url` and `posts`.
 
 More: https://statac.dev/lists/#lists-in-templates
 
+## `years`
+
+Every year that has a list page, newest first, each a list with its
+`name`, `url` and `posts`. Empty unless the site has `years.pages:
+true`.
+
+More: https://statac.dev/lists/#years
+
 ## `folders`
 
 Every folder that has a page of its own, in URL order, each a list with

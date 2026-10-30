@@ -163,6 +163,7 @@ codes! {
     NoLanguage "no-language",
     NoListPage "no-list-page",
     NoHomePage "no-home-page",
+    NoYearPages "no-year-pages",
     RobotsBeneathPath "robots-beneath-path",
     RedirectToItself "redirect-to-itself",
     ContentNotPublished "content-not-published",
@@ -328,6 +329,7 @@ impl Code {
             | Code::DatesDisagree
             | Code::NoTimeZone
             | Code::NothingMade
+            | Code::NoYearPages
             | Code::OutputFolderNamed
             | Code::UnknownLanguage
             | Code::NoPagesInLanguage
@@ -512,6 +514,7 @@ impl Code {
             | Code::NoLanguage
             | Code::NoListPage
             | Code::NoHomePage
+            | Code::NoYearPages
             | Code::UnorderedPages
             | Code::NotAPost
             | Code::ContentNotPublished
@@ -1335,6 +1338,12 @@ pub enum Kind {
         addresses: Vec<String>,
         index: String,
     },
+    /// `years.pages: true` where no page has a date to list under a year,
+    /// or none in the folder `years.folder` names, by its path under
+    /// `content/`.
+    NoYearPages {
+        folder: Option<String>,
+    },
     /// A `robots.txt` published beneath the site's path, where crawlers
     /// never look; `top` is the one address they read.
     RobotsBeneathPath {
@@ -2035,6 +2044,9 @@ pub enum Chooser {
     /// Statac's own choice for a list's page it made, which no file holds
     /// for a `layout:` to be written in.
     Made,
+    /// Statac's own choice for a year's page, which no page of the
+    /// author's can stand in for.
+    Year,
 }
 
 /// Why a value has none.
@@ -2396,6 +2408,8 @@ pub enum Word {
     Tag,
     Series,
     Folder,
+    /// A year's list, by the year.
+    Year,
     /// A page, by its name as its address writes it.
     Page,
     /// A table in `data/`, by the name `each:` gives it.
@@ -2570,6 +2584,8 @@ pub enum Expected {
     Fields,
     /// An address pattern ending in `{slug}/`.
     ListAddress,
+    /// An address pattern ending in `{year}/`.
+    YearAddress,
     /// An address pattern opening with `{list}` and holding `{n}`.
     LaterAddress,
     /// A page's own id.
@@ -3179,6 +3195,7 @@ impl Kind {
             Kind::NoLanguage => Code::NoLanguage,
             Kind::NoListPage { .. } => Code::NoListPage,
             Kind::NoHomePage { .. } => Code::NoHomePage,
+            Kind::NoYearPages { .. } => Code::NoYearPages,
             Kind::RobotsBeneathPath { .. } => Code::RobotsBeneathPath,
             Kind::RedirectToItself { .. }
             | Kind::RedirectFromItself { .. }

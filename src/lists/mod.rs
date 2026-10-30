@@ -1,5 +1,5 @@
-//! Folders, tags, series, the lists pages declare and the pages made from
-//! a table, filled and put in order.
+//! Folders, tags, series, years, the lists pages declare and the pages
+//! made from a table, filled and put in order.
 //!
 //! A post is a published page with a date that speaks for no list. Each
 //! list holds its posts in its order, and apart from them the pages it
@@ -21,6 +21,12 @@
 //! where the site has `templates/home.html`. A folder has a page only
 //! where it has an `index.md`. A list whose page sets `posts_per_page`, or
 //! the site's, goes on onto pages of its own beneath it.
+//!
+//! Years are lists only where the site says `years.pages: true`: one for
+//! each year a post is dated in, or a post in the folder `years.folder`
+//! names, each with a page made for it. No page of the author's speaks
+//! for a year, so one standing at a year's address is published there
+//! twice.
 
 mod chain;
 mod filter;
@@ -29,7 +35,7 @@ mod paging;
 mod tests;
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 pub(crate) use filter::{DATE_PARTS, Filter, in_site_order, related, tags_of};
 
@@ -37,7 +43,7 @@ use crate::address::{Address, Top};
 use crate::config::Settings;
 use crate::config::words::{PageWord, Words};
 use crate::dates::Dates;
-use crate::ids::{Id, ListId, PageId};
+use crate::ids::{Id, LanguageId, ListId, PageId};
 use crate::origin::{Arrival, Sourced};
 use crate::problem::{Kind, Problem, Word};
 use crate::site::{List, ListKey, Order, Page, PagePlace, Site};
@@ -112,9 +118,14 @@ pub(crate) fn build(
     for named in [Named::Tag, Named::Series] {
         tags_and_series.extend(named_lists(site, settings, named, &mut problems));
     }
+    let years = year_lists(site, settings, &mut problems);
     speakers_at_addresses(site, sources, &mut problems);
-    made_pages(site, settings, &tags_and_series, has);
-    fill(site);
+    let named: Vec<ListId> = tags_and_series
+        .into_iter()
+        .chain(years.lists.values().copied())
+        .collect();
+    made_pages(site, settings, &named, has);
+    fill(site, &years);
     let moments: Vec<Option<i64>> = site
         .pages
         .iter()
@@ -284,6 +295,113 @@ fn address_part(name: &str, slugs: Option<&Sourced<Value>>) -> String {
     slug::slugify(name)
 }
 
+/// The year lists of a site, where `years.pages: true` asks for them.
+#[derive(Default)]
+struct Years {
+    /// Each year's list, by its language and the year.
+    lists: BTreeMap<(LanguageId, i32), ListId>,
+    /// The folder each language's years keep to, by its path under
+    /// `content/`, where `years.folder` names one.
+    within: BTreeMap<LanguageId, String>,
+}
+
+impl Years {
+    /// The year `page` is listed under, where it is a post the years
+    /// hold: one filed in the folder `years.folder` names, however deeply,
+    /// where it names one.
+    fn year(&self, site: &Site, page: &Page) -> Option<i32> {
+        let date = page.date.as_ref()?;
+        if page.speaks_for_a_list() || page.sends_on() {
+            return None;
+        }
+        if let Some(within) = self.within.get(&page.language) {
+            let ListKey::Folder(path) = &site.lists.get(page.folder).key else {
+                return None;
+            };
+            let rest = path.strip_prefix(within.as_str())?;
+            if !rest.is_empty() && !rest.starts_with('/') {
+                return None;
+            }
+        } else if !self.within.is_empty() {
+            return None;
+        }
+        Some(date.value.year)
+    }
+
+    /// The list of the year `page` is listed under.
+    fn of(&self, site: &Site, page: &Page) -> Option<ListId> {
+        let year = self.year(site, page)?;
+        self.lists.get(&(page.language, year)).copied()
+    }
+}
+
+/// A list for each year a post is dated in, in each language, where
+/// `years.pages: true` asks: each post's, or each post's in the folder
+/// `years.folder` names. Where that leaves none, says so at `years.pages`.
+fn year_lists(site: &mut Site, settings: &Settings, problems: &mut Vec<Problem>) -> Years {
+    let mut years = Years::default();
+    let Some(asked) = settings.get("years.pages") else {
+        return years;
+    };
+    if asked.value.as_bool() != Some(true) {
+        return years;
+    }
+    let folder = settings.text("years.folder");
+    if let Some(folder) = &folder {
+        let languages: Vec<LanguageId> = site.languages.iter().map(|(id, _)| id).collect();
+        let mut unknown = None;
+        for language in languages {
+            match Filter::in_folder(site, language, folder.value) {
+                Ok(Filter::In(list, _)) => {
+                    if let ListKey::Folder(path) = &site.lists.get(list).key {
+                        years.within.insert(language, path.clone());
+                    }
+                }
+                Ok(_) => {}
+                Err(kind) => {
+                    unknown.get_or_insert(kind);
+                }
+            }
+        }
+        if years.within.is_empty() {
+            if let (Some(kind), Some(place)) = (unknown, folder.origin.place) {
+                problems.push(Problem::at(kind, place));
+            }
+            return years;
+        }
+    }
+    let dated: BTreeSet<(LanguageId, i32)> = (site.pages.iter())
+        .filter_map(|(_, page)| Some((page.language, years.year(site, page)?)))
+        .collect();
+    let pattern = settings
+        .text("years.permalink")
+        .map(|pattern| pattern.map(str::to_owned));
+    for (language, year) in dated {
+        let address = pattern.as_ref().and_then(|pattern| {
+            let top = Top::new(site.top(language));
+            let written = top.pattern(&pattern.value, pattern.origin.place, problems);
+            let filled = written.replace("{year}", &year.to_string());
+            let address = Address::read(&top.address(&filled)).ok()?;
+            Some(Sourced::new(address, pattern.origin.clone()))
+        });
+        let list = site.lists.push(List {
+            address,
+            ..List::new(ListKey::Year(year), language)
+        });
+        years.lists.insert((language, year), list);
+    }
+    if years.lists.is_empty() {
+        let kind = Kind::NoYearPages {
+            folder: years.within.values().next().cloned(),
+        };
+        problems.push(match asked.origin.place {
+            Some(place) => Problem::at(kind, place),
+            None => Problem::nowhere(kind),
+        });
+    }
+    years
+}
+
 /// Where a folder's own page stands unless a `permalink` written on it
 /// moves it.
 fn folder_address(path: &str) -> Option<Address> {
@@ -311,7 +429,7 @@ fn speakers_at_addresses(site: &mut Site, sources: &Sources, problems: &mut Vec<
                 ListKey::Tag(_) | ListKey::Series(_) => {
                     list.address.as_ref().map(|address| address.value.clone())
                 }
-                ListKey::Declared(_) => None,
+                ListKey::Year(_) | ListKey::Declared(_) => None,
             }?;
             at.get(&address.key()).map(|&page| (id, page))
         })
@@ -329,7 +447,7 @@ fn speakers_at_addresses(site: &mut Site, sources: &Sources, problems: &mut Vec<
                 ListKey::Tag(name) => (Word::Tag, name.clone()),
                 ListKey::Series(name) => (Word::Series, name.clone()),
                 ListKey::Folder(path) => (Word::Folder, path.clone()),
-                ListKey::Declared(_) => continue,
+                ListKey::Year(_) | ListKey::Declared(_) => continue,
             };
             let kind = Kind::NotAPost { path, word, name };
             // A date in the file's name is written nowhere in the file.
@@ -341,8 +459,9 @@ fn speakers_at_addresses(site: &mut Site, sources: &Sources, problems: &mut Vec<
     }
 }
 
-/// A page for each tag and series no page speaks for, where `tags.pages:
-/// true` or `series.pages: true` asks, filed in its language's own list;
+/// A page for each tag, series and year no page speaks for, where
+/// `tags.pages: true`, `series.pages: true` or `years.pages: true` asks,
+/// filed in its language's own list;
 /// and for each language's own list no page speaks for, where the site has
 /// `templates/home.html`, as `has` says. It has no title, having no front
 /// matter and no writing: templates call it by its list's name. It carries
@@ -377,6 +496,7 @@ fn made_pages(site: &mut Site, settings: &Settings, named: &[ListId], has: &dyn 
         let setting = match list.key {
             ListKey::Tag(_) => "tags.pages",
             ListKey::Series(_) => "series.pages",
+            ListKey::Year(_) => "years.pages",
             _ => continue,
         };
         let (Some(address), None) = (&list.address, list.page) else {
@@ -516,9 +636,9 @@ fn order_list(site: &Site, list: &List) -> Option<Sourced<Vec<Sourced<String>>>>
     Some(Sourced::new(names.to_vec(), order.origin.clone()))
 }
 
-/// Puts each post in its folders, tags and series, and each page with no
-/// date beside them.
-fn fill(site: &mut Site) {
+/// Puts each post in its folders, tags, series and year, and each page
+/// with no date beside them.
+fn fill(site: &mut Site, years: &Years) {
     let folders: HashMap<String, ListId> = site
         .lists
         .iter()
@@ -584,6 +704,9 @@ fn fill(site: &mut Site) {
                     into.push(id);
                 }
             }
+        }
+        if let Some(list) = years.of(site, page) {
+            members[list.index()].push(id);
         }
     }
     for ((list, members), undated) in members.into_iter().enumerate().zip(undated) {

@@ -35,6 +35,7 @@ const RESERVED: &[&str] = &[
     "folders",
     "tags",
     "series",
+    "years",
     "pagination",
     "feed",
     "feeds",
@@ -87,6 +88,7 @@ enum Shape {
     /// Full URLs, each told where it isn't one.
     WebAddresses,
     ListAddress,
+    YearAddress,
     LaterAddress,
     Table,
     /// `true`, `false`, or the name or URL of a feed, as the page word
@@ -180,6 +182,13 @@ const SETTINGS: &[Setting] = &[
     ),
     setting("series.pages", Shape::Truth, Some(Preset::Truth(false))),
     setting("series.slugs", Shape::Table, None),
+    setting(
+        "years.permalink",
+        Shape::YearAddress,
+        Some(Preset::Text("/{year}/")),
+    ),
+    setting("years.pages", Shape::Truth, Some(Preset::Truth(false))),
+    setting("years.folder", Shape::Text, None),
     setting("posts_per_page", Shape::Whole(0), None),
     setting(
         "pagination.permalink",
@@ -606,7 +615,7 @@ fn read_node(sources: &Sources, node: &Node, settings: &mut Settings, problems: 
         } else if RESERVED.contains(&name.as_str()) && matches!(value.value, Yaml::Mapping(_)) {
             problems.extend(words::nested(sources, &name, value));
         } else if let Some((head, _)) = name.split_once('.')
-            && matches!(head, "tags" | "series" | "pagination")
+            && matches!(head, "tags" | "series" | "years" | "pagination")
         {
             problems.push(unknown_setting(&name, key));
         } else if RESERVED.contains(&name.split('.').next().unwrap_or(&name)) {
@@ -860,6 +869,7 @@ fn read_setting(
             }
         }
         Shape::ListAddress => text(list_address, Expected::ListAddress)?,
+        Shape::YearAddress => text(year_address, Expected::YearAddress)?,
         Shape::LaterAddress => text(later_address, Expected::LaterAddress)?,
         Shape::Table => {
             let Yaml::Mapping(entries) = &node.value else {
@@ -929,6 +939,14 @@ fn list_address(text: &str) -> bool {
         && before.ends_with('/')
         && !before.trim_matches('/').is_empty()
         && !before.contains(['{', '}'])
+}
+
+/// Folders, then `{year}` as the last piece: `/{year}/`, `/archive/{year}/`.
+fn year_address(text: &str) -> bool {
+    let Some(before) = text.trim_end_matches('/').strip_suffix("{year}") else {
+        return false;
+    };
+    text.ends_with('/') && before.starts_with('/') && !before.contains(['{', '}'])
 }
 
 /// `{list}` first, `{n}` once, and a `/` at the end, with names every disk

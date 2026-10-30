@@ -223,6 +223,8 @@ impl Schema {
                 ("feed", Ty::Text, true),
                 ("feeds", Ty::list(Ty::Text), true),
                 ("pager", pages, true),
+                ("previous", Ty::Record(Rec::List), false),
+                ("next", Ty::Record(Rec::List), false),
             ]),
             date: fields(&[
                 ("year", Ty::Number, true),
