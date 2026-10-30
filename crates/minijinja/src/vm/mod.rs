@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: a capture is begun with the environment, which may supply its writer; the state is told which instruction makes each call, and each print.
+// Changed from MiniJinja 3.0.1 for Statac: a capture is begun with the environment, which may supply its writer; the state is told which instruction makes each call, and each print; slicing a missing value is refused under `SemiStrict`, as iterating it is.
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 #[cfg(feature = "macros")]
@@ -465,6 +465,7 @@ impl<'env> Executor<'env> {
                     if a.is_undefined() && matches!(undefined_behavior, UndefinedBehavior::Strict) {
                         bail!(Error::undefined(&a));
                     }
+                    ctx_ok!(undefined_behavior.assert_iterable(&a));
                     stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
                 }
                 Instruction::LoadConst(value) => {
@@ -1359,5 +1360,26 @@ fn describe_expr_at(
             ))
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Environment, ErrorKind, UndefinedBehavior};
+
+    #[test]
+    fn test_slice_of_undefined() {
+        let render = |behavior| {
+            let mut env = Environment::new();
+            env.set_undefined_behavior(behavior);
+            env.render_str("{{ missing[1:] | length }}", ())
+        };
+        assert_eq!(render(UndefinedBehavior::Lenient).unwrap(), "0");
+        assert_eq!(render(UndefinedBehavior::Chainable).unwrap(), "0");
+        for behavior in [UndefinedBehavior::SemiStrict, UndefinedBehavior::Strict] {
+            let err = render(behavior).unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::UndefinedError);
+            assert_eq!(err.range(), Some(3..14));
+        }
     }
 }

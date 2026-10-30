@@ -1003,6 +1003,147 @@ fn what_default_gives_in_place_of_a_missing_value_is_blamed_where_it_is_used() {
     }
 }
 
+/// A slice of a value that has none is told at the value, as a loop over
+/// the value is.
+#[test]
+fn a_slice_of_no_value_is_told_at_the_value() {
+    for template in [
+        "{% for p in site.data.peple[:3] %}{{ p }}{% endfor %}",
+        "{{ site.data.peple[1:] | length }}",
+        "{% for p in site.data.peple[:3] if p.name %}{{ p }}{% endfor %}",
+        "{{ site.data.peple[::2] }}",
+    ] {
+        let built = site(&[
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("data/people.yaml", "person-1:\n  name: Person 1\n"),
+            ("templates/page.html", template),
+        ]);
+        let rendered = built.render("post-1.md");
+        assert_eq!(rendered.html, None, "{template}");
+        assert_eq!(
+            rendered
+                .problems
+                .iter()
+                .map(|p| &p.kind)
+                .collect::<Vec<_>>(),
+            [&Kind::NoValue {
+                written: "site.data.peple".into(),
+                lack: Lack::InDataFolder("data/".into()),
+                instead: Instead::Default("site.data.peple | default(\"\")".into()),
+            }],
+            "{template}"
+        );
+        assert_eq!(
+            built.told(&rendered.problems),
+            [(
+                "no-value",
+                "templates/page.html".into(),
+                "site.data.peple".into()
+            )],
+            "{template}"
+        );
+    }
+}
+
+/// A name set to a value that has none is told as that value, where it is
+/// set, however the name is used.
+#[test]
+fn a_name_set_to_no_value_is_told_as_that_value() {
+    let set = "{% set people = site.data.peple %}";
+    let cases = [
+        (format!("{set}{{% for p in people %}}{{{{ p }}}}{{% endfor %}}"), "site.data.peple"),
+        (format!("{set}{{{{ people }}}}"), "site.data.peple"),
+        (format!("{set}{{{{ people | length }}}}"), "site.data.peple"),
+        (format!("{set}{{{{ people | sort | join(\",\") }}}}"), "site.data.peple"),
+        (format!("{set}{{{{ people.person_1 }}}}"), "site.data.peple"),
+        (format!("{set}{{{{ people[:3] }}}}"), "site.data.peple"),
+        (
+            format!("{set}{{% set others = people %}}{{{{ others | length }}}}"),
+            "site.data.peple",
+        ),
+        (
+            format!("{set}{{% if people %}}{{% endif %}}{{{{ people }}}}"),
+            "site.data.peple",
+        ),
+        (
+            "{% with people = site.data.peple %}{{ people }}{% endwith %}".to_owned(),
+            "site.data.peple",
+        ),
+        (
+            "{% set people = site.data.peple | default(site.data.lists.link) %}{{ people | length }}"
+                .to_owned(),
+            "site.data.lists.link",
+        ),
+        (
+            "{% set people = site.data.peple | default(site.data.lists.link) %}{{ people }}"
+                .to_owned(),
+            "site.data.lists.link",
+        ),
+    ];
+    for (template, written) in cases {
+        let built = site(&[
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("data/people.yaml", "person-1:\n  name: Person 1\n"),
+            ("data/lists/links.yaml", "- url: /a/\n"),
+            ("templates/page.html", template.as_str()),
+        ]);
+        let rendered = built.render("post-1.md");
+        assert_eq!(rendered.html, None, "{template}");
+        let lack = match written {
+            "site.data.peple" => Lack::InDataFolder("data/".into()),
+            _ => Lack::InDataFolder("data/lists/".into()),
+        };
+        assert_eq!(
+            rendered
+                .problems
+                .iter()
+                .map(|p| &p.kind)
+                .collect::<Vec<_>>(),
+            [&Kind::NoValue {
+                written: written.into(),
+                lack,
+                instead: Instead::Default(format!("{written} | default(\"\")")),
+            }],
+            "{template}"
+        );
+        assert_eq!(
+            built.told(&rendered.problems),
+            [("no-value", "templates/page.html".into(), written.into())],
+            "{template}"
+        );
+    }
+}
+
+/// A name set only inside a loop, or given again since, is not told as
+/// the value it was set to there.
+#[test]
+fn a_name_set_out_of_reach_is_not_told_as_that_value() {
+    for (template, written) in [
+        (
+            "{% set people = site.data.peple %}{% for people in [none] %}{{ people.name }}{% endfor %}",
+            "people.name",
+        ),
+        (
+            "{% set people = site.data.peple %}{% set people = site.data.lists.link %}\
+             {% if site.data.peple %}{% endif %}{{ people }}",
+            "site.data.lists.link",
+        ),
+    ] {
+        let built = site(&[
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("data/people.yaml", "person-1:\n  name: Person 1\n"),
+            ("data/lists/links.yaml", "- url: /a/\n"),
+            ("templates/page.html", template),
+        ]);
+        let rendered = built.render("post-1.md");
+        assert_eq!(
+            built.told(&rendered.problems),
+            [("no-value", "templates/page.html".into(), written.into())],
+            "{template}"
+        );
+    }
+}
+
 #[test]
 fn a_filter_over_pages_tests_a_field_some_lack_without_stopping() {
     let pages = [

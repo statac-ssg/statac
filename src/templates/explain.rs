@@ -11,10 +11,10 @@
 use std::ops::Range;
 use std::sync::Arc;
 
-use minijinja::machinery::ast::{CallArg, CallType, Expr};
+use minijinja::machinery::ast::{CallArg, CallType, Expr, Stmt};
 use minijinja::{Error, ErrorKind};
 
-use super::check::{full_span, parse_template, visit_exprs};
+use super::check::{full_span, parse_template, stmt_span, visit_exprs};
 use super::engine::{Site, missing_operand, read_stopped};
 use super::files::Role;
 use super::frame::{Frame, Handed, InData, Miss, Stop};
@@ -677,7 +677,35 @@ fn culprit_of_refusal(
             target = Some(descend(text, hit, &refusal.path, refusal.empty));
         }
     });
-    target
+    let (span, rest) = target?;
+    if rest.is_empty()
+        && !refusal.empty
+        && let Some(value) = set_value(&ast, text, &span)
+    {
+        let value = full_span(left_missing(value, false), text);
+        return Some((value.start_offset as usize..value.end_offset as usize, rest));
+    }
+    Some((span, rest))
+}
+
+/// The value the name written at `span` was set to further up, followed
+/// through each name set to another.
+fn set_value<'e, 's>(ast: &'e Stmt<'s>, text: &str, span: &Range<usize>) -> Option<&'e Expr<'s>> {
+    let mut id = text.get(span.clone())?;
+    let mut at = span.start;
+    let mut followed = Vec::new();
+    let mut found = None;
+    while !followed.contains(&id) {
+        followed.push(id);
+        let mut value = None;
+        set_before(std::slice::from_ref(ast), id, at, &mut value);
+        let Some(value) = value else { break };
+        found = Some(value);
+        let Expr::Var(var) = value else { break };
+        id = var.id;
+        at = var.span().start_offset as usize;
+    }
+    found
 }
 
 /// What left a missing value missing: `a | default(b)` is missing only
@@ -743,8 +771,9 @@ fn kw<'e, 'a>(args: &'e [CallArg<'a>], name: &str) -> Option<&'e Expr<'a>> {
 }
 
 /// Which lookup inside the place the engine stopped found nothing: the one
-/// whose name was most recently missed; else the lookup or the name the
-/// place is, as for a value a snippet's call left out.
+/// whose name was most recently missed, a name set further up being told
+/// as the value it was set to; else the lookup or the name the place is,
+/// as for a value a snippet's call left out.
 fn culprit_of_lookup(
     name: &str,
     text: &str,
@@ -752,9 +781,44 @@ fn culprit_of_lookup(
     misses: &[Miss],
 ) -> Option<(Range<usize>, Option<Miss>)> {
     let ast = parse_template(name, text).ok()?;
-    let mut lookups: Vec<(Range<usize>, String)> = Vec::new();
-    let mut names: Vec<Range<usize>> = Vec::new();
-    visit_exprs(&ast, &mut |expr| {
+    let (lookups, names) = written_within(&ast, text, range);
+    let mut set_to = Vec::new();
+    let mut followed = Vec::new();
+    let mut pending: Vec<_> = names.iter().map(|(span, id)| (*id, span.start)).collect();
+    while let Some((id, at)) = pending.pop() {
+        if followed.contains(&id) {
+            continue;
+        }
+        followed.push(id);
+        let mut value = None;
+        set_before(std::slice::from_ref(&ast), id, at, &mut value);
+        if let Some(value) = value {
+            let span = full_span(value, text);
+            let range = span.start_offset as usize..span.end_offset as usize;
+            let (more, names) = written_within(&ast, text, &range);
+            set_to.extend(more);
+            pending.extend(names.into_iter().map(|(span, id)| (id, span.start)));
+        }
+    }
+    for miss in misses.iter().rev() {
+        if let Some((span, _)) = lookups.iter().chain(&set_to).find(|(_, n)| *n == miss.name) {
+            return Some((span.clone(), Some(miss.clone())));
+        }
+    }
+    let outermost = lookups.into_iter().map(|(span, _)| span).next();
+    outermost
+        .or_else(|| names.into_iter().next().map(|(span, _)| span))
+        .map(|span| (span, None))
+}
+
+type Written<'s> = (Vec<(Range<usize>, String)>, Vec<(Range<usize>, &'s str)>);
+
+/// The lookups by a written name, and the names, inside `range`, each
+/// outermost first.
+fn written_within<'s>(ast: &Stmt<'s>, text: &str, range: &Range<usize>) -> Written<'s> {
+    let mut lookups = Vec::new();
+    let mut names = Vec::new();
+    visit_exprs(ast, &mut |expr| {
         let span = full_span(expr, text);
         let (s, e) = (span.start_offset as usize, span.end_offset as usize);
         if s > range.end || e < range.start {
@@ -767,19 +831,89 @@ fn culprit_of_lookup(
                     lookups.push((s..e, c.value.as_str().unwrap_or_default().to_owned()));
                 }
             }
-            Expr::Var(_) => names.push(s..e),
+            Expr::Var(v) => names.push((s..e, v.id)),
             _ => {}
         }
     });
-    for miss in misses.iter().rev() {
-        if let Some((span, _)) = lookups.iter().find(|(_, n)| *n == miss.name) {
-            return Some((span.clone(), Some(miss.clone())));
+    (lookups, names)
+}
+
+/// The value the name `id` was last given before `at` by a `set` or a
+/// `with` whose scope reaches `at`, into `value`: none where something
+/// else gave it since, such as a loop.
+fn set_before<'e, 's>(
+    stmts: &'e [Stmt<'s>],
+    id: &str,
+    at: usize,
+    value: &mut Option<&'e Expr<'s>>,
+) {
+    for stmt in stmts {
+        let span = stmt_span(stmt);
+        if span.start_offset as usize >= at {
+            break;
+        }
+        let holds = at < span.end_offset as usize;
+        match stmt {
+            Stmt::Template(t) => set_before(&t.children, id, at, value),
+            Stmt::Set(s) if !holds && binds(&s.target, id) => {
+                *value = matches!(s.target, Expr::Var(_)).then_some(&s.expr);
+            }
+            Stmt::SetBlock(s) if binds(&s.target, id) => *value = None,
+            // An `if` makes no scope of its own.
+            Stmt::IfCond(i) => {
+                set_before(&i.true_body, id, at, value);
+                set_before(&i.false_body, id, at, value);
+            }
+            Stmt::AutoEscape(a) => set_before(&a.body, id, at, value),
+            Stmt::FilterBlock(f) => set_before(&f.body, id, at, value),
+            _ if !holds => {}
+            Stmt::ForLoop(f) => {
+                let in_else = f
+                    .else_body
+                    .first()
+                    .is_some_and(|s| stmt_span(s).start_offset as usize <= at);
+                if in_else {
+                    set_before(&f.else_body, id, at, value);
+                } else if at >= f.iter.span().end_offset as usize {
+                    if binds(&f.target, id) || id == "loop" {
+                        *value = None;
+                    }
+                    set_before(&f.body, id, at, value);
+                }
+            }
+            Stmt::WithBlock(w) => {
+                for (target, given) in &w.assignments {
+                    if (given.span().end_offset as usize) <= at && binds(target, id) {
+                        *value = matches!(target, Expr::Var(_)).then_some(given);
+                    }
+                }
+                set_before(&w.body, id, at, value);
+            }
+            Stmt::Block(b) => set_before(&b.body, id, at, value),
+            Stmt::Macro(m) => {
+                if m.args.iter().any(|a| binds(a, id)) {
+                    *value = None;
+                }
+                set_before(&m.body, id, at, value);
+            }
+            Stmt::CallBlock(c) => {
+                if c.macro_decl.args.iter().any(|a| binds(a, id)) {
+                    *value = None;
+                }
+                set_before(&c.macro_decl.body, id, at, value);
+            }
+            _ => {}
         }
     }
-    let outermost = lookups.into_iter().map(|(span, _)| span).next();
-    outermost
-        .or_else(|| names.into_iter().next())
-        .map(|span| (span, None))
+}
+
+/// Whether assigning to `target` gives the name `id` a value.
+fn binds(target: &Expr<'_>, id: &str) -> bool {
+    match target {
+        Expr::Var(v) => v.id == id,
+        Expr::Tuple(t) => t.items.iter().any(|item| binds(item, id)),
+        _ => false,
+    }
 }
 
 /// Where the template running now runs the filter `name` on `text`: where
