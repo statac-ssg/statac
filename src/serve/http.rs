@@ -607,6 +607,7 @@ fn content_type(path: &Path, bytes: &[u8]) -> &'static str {
         "image/webp",
         "image/avif",
         "image/gif",
+        "image/jxl",
         "application/octet-stream",
     ];
     if !pictures.contains(&named) {
@@ -636,9 +637,10 @@ fn named_type(path: &Path) -> &'static str {
         "js" | "mjs" => "text/javascript; charset=utf-8",
         "json" | "map" => "application/json",
         "webmanifest" => "application/manifest+json",
-        "xml" => "application/xml",
+        "xml" | "xsl" => "application/xml",
         "atom" => "application/atom+xml",
         "rss" => "application/rss+xml",
+        "opml" => "text/x-opml; charset=utf-8",
         "txt" | "md" => "text/plain; charset=utf-8",
         "csv" => "text/csv; charset=utf-8",
         "svg" => "image/svg+xml",
@@ -647,6 +649,7 @@ fn named_type(path: &Path) -> &'static str {
         "webp" => "image/webp",
         "avif" => "image/avif",
         "gif" => "image/gif",
+        "jxl" => "image/jxl",
         "ico" => "image/x-icon",
         "woff2" => "font/woff2",
         "woff" => "font/woff",
@@ -658,6 +661,7 @@ fn named_type(path: &Path) -> &'static str {
         "wav" => "audio/wav",
         "flac" => "audio/flac",
         "mp4" | "m4v" => "video/mp4",
+        "ogv" => "video/ogg",
         "webm" => "video/webm",
         "mov" => "video/quicktime",
         "vtt" => "text/vtt; charset=utf-8",
@@ -1402,6 +1406,10 @@ mod tests {
             ("photo-1.AVIF", "image/avif"),
             ("font-1.woff2", "font/woff2"),
             ("site.webmanifest", "application/manifest+json"),
+            ("blogroll.opml", "text/x-opml; charset=utf-8"),
+            ("feed.xsl", "application/xml"),
+            ("photo-1.jxl", "image/jxl"),
+            ("clip.ogv", "video/ogg"),
             ("LICENCE", "application/octet-stream"),
         ] {
             assert_eq!(content_type(Path::new(name), b""), kind, "{name}");
@@ -1426,6 +1434,7 @@ mod tests {
             ("notes.txt", png, "text/plain; charset=utf-8"),
             ("drawing.png", svg, "image/png"),
             ("drawing", svg, "application/octet-stream"),
+            ("photo-1.jxl", jpeg, "image/jpeg"),
         ] {
             assert_eq!(content_type(Path::new(name), bytes), kind, "{name}");
         }
