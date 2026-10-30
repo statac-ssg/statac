@@ -360,9 +360,17 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
             }
             match word {
                 "highlight" => {
-                    let language = quoted_value(words).map_or(words.to_owned(), |(l, _)| l);
-                    match highlight(body, start, end, &language) {
-                        Some((text, resume)) => {
+                    let given = quoted_value(words).map_or(words.to_owned(), |(l, _)| l);
+                    let mut given = given.split_whitespace();
+                    let language = given.next().unwrap_or_default();
+                    // The plugin reads the rest as lines to mark, counted
+                    // from 0, and reads nothing from `linenos`.
+                    let plain = given.all(|word| word == "linenos");
+                    match plain
+                        .then(|| highlight(body, start, end, language, false, &[]))
+                        .flatten()
+                    {
+                        Some((text, resume, _)) => {
                             out.push_str(&body[copied..start]);
                             fences.push(out.len());
                             out.push_str(&text);

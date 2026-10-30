@@ -23,7 +23,7 @@ A post with every tag in the writing.
 - [Post 2, relatively](/posts/post-2/)
 - [Post 9]({{< relref "post-9" >}})
 
-```go
+```go numbered=true mark=1
 fmt.Println("one")
 ```
 
@@ -64,7 +64,7 @@ A tag no one knows: @unknown_1(value_1='value').
 
 To show a tag as text: {{< figure src="photo-1.jpg" >}}.
 
-```go
+```go numbered=true
 {{< youtube w7Ft2ymGmfc >}}
 {{< vimeo 146022717 >}}
 ```
@@ -92,3 +92,32 @@ A picture that moves, and a figure inside HTML.
 <p class="centre">
 @figure(src='photo-1.jpg', alt='Photo 1')
 </p>
+
+Code whose lines are numbered or marked:
+
+```go numbered=true mark=2,4-5
+fmt.Println("one")
+fmt.Println("two")
+fmt.Println("three")
+fmt.Println("four")
+fmt.Println("five")
+```
+
+```go mark=1,3
+fmt.Println("one")
+fmt.Println("two")
+fmt.Println("three")
+```
+
+```go numbered=true
+fmt.Println("one")
+```
+
+```go numbered=true mark=2
+fmt.Println("one")
+fmt.Println("two")
+```
+
+```go
+fmt.Println("one")
+```

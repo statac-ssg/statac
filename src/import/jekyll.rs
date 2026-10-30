@@ -141,6 +141,14 @@ pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
                so each now shows as written: write by hand what it made, where that was meant.",
 };
 
+pub(super) static CODE_LINES: FindingKind = FindingKind {
+    heading: "Line numbers and marked lines in code",
+    sentence: "Jekyll numbered or marked lines of each of these code blocks, and the import wrote \
+               `numbered=true` or `mark=` at the end of its first line to do the same: Statac gives \
+               each line a class, and the numbers and marks show once the site's stylesheet styles \
+               them, as https://statac.dev/writing/#lines describes.",
+};
+
 pub(super) static LINK_NOWHERE: FindingKind = FindingKind {
     heading: "Links to pages that didn't come across",
     sentence: "Each of these names a page Statac couldn't find in the old site, or one Jekyll \

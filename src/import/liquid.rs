@@ -8,6 +8,7 @@ use std::ops::Range;
 
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
+use super::common::line_words;
 use super::{Finding, FindingKind, Spot};
 
 pub(super) fn options() -> Options {
@@ -111,19 +112,18 @@ pub(super) fn raw(
 }
 
 /// `{% highlight lang %}` to its `{% endhighlight %}` as a fenced code
-/// block, `linenos` dropped. None where it opens no line, holds another
-/// option, or is never closed.
+/// block in `language`, its lines numbered where `numbered` and those of
+/// `marked` marked: the block, where the writing resumes, and whether its
+/// first line asks for numbered or marked lines. None where it opens no
+/// line or is never closed.
 pub(super) fn highlight(
     body: &str,
     start: usize,
     end: usize,
-    rest: &str,
-) -> Option<(String, usize)> {
-    let mut words = rest.split_whitespace();
-    let language = words.next().unwrap_or_default();
-    if words.any(|word| word != "linenos") {
-        return None;
-    }
+    language: &str,
+    numbered: bool,
+    marked: &[(i64, i64)],
+) -> Option<(String, usize, bool)> {
     let opens_line = body[..start].rfind('\n').map_or(0, |i| i + 1);
     if !body[opens_line..start].trim().is_empty() {
         return None;
@@ -144,9 +144,11 @@ pub(super) fn highlight(
         longest = longest.max(run);
     }
     let fence = "`".repeat(longest.max(2) + 1);
+    let words = line_words(numbered, marked, inside);
     Some((
-        format!("{fence}{language}\n{inside}\n{fence}"),
+        format!("{fence}{language}{words}\n{inside}\n{fence}"),
         close + close_length,
+        !words.is_empty(),
     ))
 }
 

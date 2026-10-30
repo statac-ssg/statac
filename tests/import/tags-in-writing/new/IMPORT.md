@@ -32,6 +32,14 @@ The old site's built output isn't in `_site/`, so no old URL was checked against
 
 ## Left for you
 
+### Line numbers and marked lines in code
+
+Jekyll numbered or marked lines of each of these code blocks, and the import wrote `numbered=true` or `mark=` at the end of its first line to do the same: Statac gives each line a class, and the numbers and marks show once the site's stylesheet styles them, as https://statac.dev/writing/#lines describes.
+
+- `_posts/2026-01-01-post-1.md`, line 12: `{% highlight ruby linenos %}`
+- `_posts/2026-01-01-post-1.md`, line 61: `{% highlight ruby linenos=table mark_lines="1 3 7" %}`
+- `_posts/2026-01-01-post-1.md`, line 67: `{% highlight ruby mark_lines="2" %}`
+
 ### Links to pages that didn't come across
 
 Each of these names a page Statac couldn't find in the old site, or one Jekyll didn't publish, so the import left it unchanged: link to the page's URL instead.

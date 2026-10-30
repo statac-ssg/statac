@@ -12,7 +12,7 @@ A post with every tag in the writing.
 
 {{ kept as written }}
 
-```ruby
+```ruby numbered=true
 puts 1
 ```
 
@@ -54,3 +54,16 @@ Text in quotes: written as it is, {{ in braces}}, and through a filter: {{ "left
 The page's own: Post 1, 7, and what it hasn't as plain text: {{ page.authors }}, {{ page.date }}, {{ page.url }}.
 
     {{ in code}} and Post 1
+
+Code whose lines are numbered or marked:
+
+```ruby numbered=true mark=1,3
+puts 1
+puts 2
+puts 3
+```
+
+```ruby mark=2
+puts 1
+puts 2
+```

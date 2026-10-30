@@ -196,3 +196,21 @@ fn a_site_stopped_part_way_leaves_nothing() {
     assert!(stopped_after(&old, &empty, 2));
     assert_eq!(std::fs::read_dir(&empty).unwrap().count(), 0);
 }
+
+#[test]
+fn lines_asked_for_become_statacs_words_for_the_lines_a_block_holds() {
+    use super::common::line_words;
+    let code = "one\ntwo\nthree\n";
+    for (numbered, marked, words) in [
+        (false, &[][..], ""),
+        (true, &[][..], " numbered=true"),
+        (false, &[(2, 2)][..], " mark=2"),
+        (true, &[(3, 3), (1, 1)][..], " numbered=true mark=1,3"),
+        (false, &[(1, 2), (2, 3)][..], " mark=1-3"),
+        (false, &[(0, 0), (4, 9), (3, 1)][..], ""),
+        (false, &[(-5, 1), (3, 99)][..], " mark=1,3"),
+    ] {
+        assert_eq!(line_words(numbered, marked, code), words, "{marked:?}");
+    }
+    assert_eq!(line_words(false, &[(1, 2)], ""), " mark=1");
+}

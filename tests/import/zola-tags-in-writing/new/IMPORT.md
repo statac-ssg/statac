@@ -56,11 +56,14 @@ Each of these names a page by its file, and Statac couldn't find that file in th
 - `content/posts/post-1.md`, line 33: `@/posts/post-4.md`
 - `content/posts/post-1.md`, line 33: `@/posts/post-9.md`
 
-### Options on code taken off
+### Line numbers and marked lines in code
 
-Statac reads the rest of a code block's first line as its caption, so Zola's options after a comma, such as `,linenos`, were taken off each of these: the code is shown without them.
+Zola numbered or marked lines of each of these code blocks, and the import wrote `numbered=true` or `mark=` at the end of its first line to do the same: Statac gives each line a class, and the numbers and marks show once the site's stylesheet styles them, as https://statac.dev/writing/#lines describes.
 
 - `content/posts/post-1.md`, line 39: ```` ```rust,linenos,hl_lines=1 ````
+- `content/posts/post-1.md`, line 49: ```` ```rust,linenos,hl_lines=2 4-5,linenostart=1 ````
+- `content/posts/post-1.md`, line 57: ```` ```rust,hl_lines=3-1 9 ````
+- `content/posts/post-1.md`, line 63: ```` ```rust, linenos, linenostart=10, hide_lines=1, name=main.rs ````
 
 ### Shortcodes inside code
 
@@ -68,6 +71,12 @@ Zola ran these even inside code, and Statac shows code exactly as written, so ea
 
 - `content/posts/post-1.md`, line 40: `{{ youtube(id="in-code") }}`
 - `content/posts/post-1.md`, line 43: `{{ youtube(id="in-span") }}`
+
+### Options on code taken off
+
+Statac has no equal for some of Zola's options after a comma on each of these code blocks, such as `hide_lines`, a `linenostart` other than 1 or `name=`, so the import took them off: lines that `hide_lines` hid now show.
+
+- `content/posts/post-1.md`, line 63: ```` ```rust, linenos, linenostart=10, hide_lines=1, name=main.rs ````
 
 ### Shortcodes now snippet calls
 

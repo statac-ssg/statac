@@ -280,6 +280,46 @@ pub(super) fn ends_line(text: &str, at: usize) -> bool {
     text[at..end].trim().is_empty()
 }
 
+/// The words ending a fence's opening line that number a code block's
+/// lines and mark some of them, each with a space before it, as
+/// ` numbered=true mark=2,4-6`, or nothing where neither is asked.
+/// `marked` counts from the block's first line as 1, and only the lines
+/// `code` holds are marked, as the other tools mark no line a block
+/// hasn't.
+pub(super) fn line_words(numbered: bool, marked: &[(i64, i64)], code: &str) -> String {
+    let code = code.strip_suffix('\n').unwrap_or(code);
+    let code = code.strip_suffix('\r').unwrap_or(code);
+    let last = i64::try_from(crate::highlight::lines::count(code)).unwrap_or(i64::MAX);
+    let mut runs: Vec<(i64, i64)> = marked
+        .iter()
+        .map(|&(from, to)| (from.max(1), to.min(last)))
+        .filter(|(from, to)| from <= to)
+        .collect();
+    runs.sort_unstable();
+    let mut joined: Vec<(i64, i64)> = Vec::new();
+    for (from, to) in runs {
+        match joined.last_mut() {
+            Some(run) if from <= run.1 + 1 => run.1 = run.1.max(to),
+            _ => joined.push((from, to)),
+        }
+    }
+    let mut words = String::new();
+    if numbered {
+        words.push_str(" numbered=true");
+    }
+    if !joined.is_empty() {
+        let runs: Vec<String> = joined
+            .iter()
+            .map(|&(from, to)| match from == to {
+                true => from.to_string(),
+                false => format!("{from}-{to}"),
+            })
+            .collect();
+        words.push_str(&format!(" mark={}", runs.join(",")));
+    }
+    words
+}
+
 /// Each `:name:` in `line`, by its offset.
 pub(super) fn emoji_names(line: &str) -> Vec<(usize, &str)> {
     let mut names = Vec::new();

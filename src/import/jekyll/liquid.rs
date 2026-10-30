@@ -10,8 +10,8 @@ use std::ops::Range;
 use pulldown_cmark::{Event, Parser, Tag};
 
 use super::{
-    ABBREVIATIONS, ATTRIBUTE_LINES, EXCERPT_LEFT, EXTENSIONS, INLINE_MATHS, LINK_NOWHERE,
-    MARKDOWN_IN_HTML, TAG_IN_CODE, TAG_LEFT, TOC,
+    ABBREVIATIONS, ATTRIBUTE_LINES, CODE_LINES, EXCERPT_LEFT, EXTENSIONS, INLINE_MATHS,
+    LINK_NOWHERE, MARKDOWN_IN_HTML, TAG_IN_CODE, TAG_LEFT, TOC,
 };
 use crate::import::liquid::{
     code_ranges, excerpt, excerpts_inside, finding, highlight, include, options, raw, split_word,
@@ -123,7 +123,14 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
             findings.push(finding(kind, spot(start, written)));
         };
         let replaced: Option<(String, usize)> = match (statement, word) {
-            (true, "highlight") => highlight(body, start, end, rest),
+            (true, "highlight") => highlighted(rest).and_then(|tag| {
+                let (text, resume, lines) =
+                    highlight(body, start, end, tag.language, tag.numbered, &tag.marked)?;
+                if lines {
+                    findings.push(finding(&CODE_LINES, spot(start, written)));
+                }
+                Some((text, resume))
+            }),
             (true, "post_url") => {
                 let address = cx.posts.get(rest.trim_start_matches('/'));
                 match address {
@@ -402,4 +409,113 @@ fn markdown_forms(
         }
     }
     found
+}
+
+/// A `highlight` tag as Jekyll reads it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+struct Highlighted<'a> {
+    language: &'a str,
+    numbered: bool,
+    /// Counted from the block's first line as 1.
+    marked: Vec<(i64, i64)>,
+}
+
+/// What follows the name of `{% highlight ruby linenos mark_lines="3 4" %}`,
+/// as Jekyll reads it: `linenos` numbers the lines whatever value it is
+/// given. None where Jekyll stops at the tag, or it has an option other
+/// than those two.
+fn highlighted(rest: &str) -> Option<Highlighted<'_>> {
+    let space = |c: char| c.is_ascii_whitespace() || c == '\x0b';
+    let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    let rest = rest.trim_matches(|c: char| space(c) || c == '\0');
+    let end = rest
+        .find(|c: char| !(word(c) || matches!(c, '.' | '+' | '#' | '-')))
+        .unwrap_or(rest.len());
+    if end == 0 {
+        return None;
+    }
+    let (language, mut options) = rest.split_at(end);
+    let mut numbered = false;
+    let mut marked = Vec::new();
+    while !options.is_empty() {
+        let option = options.trim_start_matches(space);
+        if option.len() == options.len() {
+            return None;
+        }
+        let name_end = option.find(|c: char| !word(c)).unwrap_or(option.len());
+        let name = &option[..name_end];
+        options = &option[name_end..];
+        let mut list = None;
+        if let Some(given) = options.strip_prefix('=') {
+            if let Some(quoted) = given.strip_prefix('"') {
+                let close = quoted.find('"')?;
+                let numbers = &quoted[..close];
+                let digits_apart = numbers
+                    .split(space)
+                    .all(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+                if !digits_apart {
+                    return None;
+                }
+                list = Some(numbers);
+                options = &quoted[close + 1..];
+            } else {
+                let value_end = given.find(|c: char| !word(c)).unwrap_or(given.len());
+                if value_end == 0 {
+                    return None;
+                }
+                options = &given[value_end..];
+            }
+        }
+        match (name, list) {
+            ("", _) => return None,
+            ("linenos", _) => numbered = true,
+            ("mark_lines", Some(numbers)) => {
+                marked = numbers
+                    .split(space)
+                    .filter_map(|n| n.parse().ok())
+                    .map(|n| (n, n))
+                    .collect();
+            }
+            _ => return None,
+        }
+    }
+    Some(Highlighted {
+        language,
+        numbered,
+        marked,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_highlight_tags_options_are_read_as_jekyll_reads_them() {
+        let tag = |language, numbered, marked: &[(i64, i64)]| Highlighted {
+            language,
+            numbered,
+            marked: marked.to_vec(),
+        };
+        for (rest, expected) in [
+            ("ruby", Some(tag("ruby", false, &[]))),
+            ("ruby linenos", Some(tag("ruby", true, &[]))),
+            ("ruby linenos=table", Some(tag("ruby", true, &[]))),
+            ("ruby linenos=false", Some(tag("ruby", true, &[]))),
+            (
+                "ruby mark_lines=\"1 3\" linenos",
+                Some(tag("ruby", true, &[(1, 1), (3, 3)])),
+            ),
+            ("c++ mark_lines=\"2\"", Some(tag("c++", false, &[(2, 2)]))),
+            ("ruby mark_lines=2", None),
+            ("ruby mark_lines=\"1  3\"", None),
+            ("ruby mark_lines=\"\"", None),
+            ("ruby hl_lines=\"1\"", None),
+            ("ruby linenos=", None),
+            ("ruby,linenos", None),
+            ("", None),
+        ] {
+            assert_eq!(highlighted(rest), expected, "{rest}");
+        }
+    }
 }

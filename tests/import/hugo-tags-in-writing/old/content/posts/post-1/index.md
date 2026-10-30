@@ -89,3 +89,32 @@ A picture that moves, and a figure inside HTML.
 <p class="centre">
 {{< figure src="photo-1.jpg" alt="Photo 1" >}}
 </p>
+
+Code whose lines are numbered or marked:
+
+```go {linenos=table,hl_lines=[2,"4-5"],linenostart=1}
+fmt.Println("one")
+fmt.Println("two")
+fmt.Println("three")
+fmt.Println("four")
+fmt.Println("five")
+```
+
+```go {hl_lines="1 3-9"}
+fmt.Println("one")
+fmt.Println("two")
+fmt.Println("three")
+```
+
+```go {linenos=true,linenostart=10,.wide}
+fmt.Println("one")
+```
+
+{{< highlight go "linenos=inline,hl_lines=2" >}}
+fmt.Println("one")
+fmt.Println("two")
+{{< /highlight >}}
+
+```go {linenos=false}
+fmt.Println("one")
+```

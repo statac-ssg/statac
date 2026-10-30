@@ -10,12 +10,13 @@ use std::ops::Range;
 
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 
+use super::code;
 use super::{
-    ATTRIBUTE_LINES, CODE_OPTIONS, EMOJI, LINK_NOWHERE, RAW_HTML, SUMMARY_CUT, TAG_IN_ADDRESS,
-    TAG_IN_CODE, TAG_LEFT,
+    ATTRIBUTE_LINES, CODE_LINES, CODE_OPTIONS, EMOJI, LINK_NOWHERE, RAW_HTML, SUMMARY_CUT,
+    TAG_IN_ADDRESS, TAG_IN_CODE, TAG_LEFT,
 };
 use crate::html::escaped;
-use crate::import::common::{emoji_names, ends_line, opens_line};
+use crate::import::common::{emoji_names, ends_line, line_words, opens_line};
 use crate::import::liquid::{code_ranges, finding, options, quoted, within};
 use crate::import::writing::Marked;
 use crate::import::{Finding, Spot};
@@ -328,11 +329,11 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
     let mut findings = Vec::new();
     let body = match cx.html {
         true => body.to_owned(),
-        false => fences_bare(body, &spot, &mut findings),
+        false => fences_converted(body, &spot, &mut findings),
     };
     let body = body.as_str();
-    // Offsets from here on are into the writing with its options cut,
-    // which has the same lines.
+    // Offsets from here on are into the writing with its options
+    // converted, which has the same lines.
     let spot = |at: usize, text: &str| Spot {
         file: file.to_owned(),
         line: Some(first_line + body[..at].matches('\n').count()),
@@ -429,10 +430,16 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
                         }
                         _ => return None,
                     };
-                    if !options.trim().is_empty() {
+                    let inside = code_inside(&body[tag.end..close.start]);
+                    let asked = code::from_options(options);
+                    let words = line_words(asked.numbered, &asked.marked, inside);
+                    if !words.is_empty() {
+                        findings.push(finding(&CODE_LINES, spot(start, written)));
+                    }
+                    if asked.left {
                         findings.push(finding(&CODE_OPTIONS, spot(start, written)));
                     }
-                    Some((fenced(language, &body[tag.end..close.start]), close.end))
+                    Some((fenced(&format!("{language}{words}"), inside), close.end))
                 }),
             "details" => closing
                 .as_ref()
@@ -488,15 +495,20 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
     }
 }
 
-/// The code `highlight` wraps as a fenced code block.
-fn fenced(language: &str, inside: &str) -> Marked {
+/// The code `highlight` wraps, without the line endings round it.
+fn code_inside(inside: &str) -> &str {
     let inside = inside
         .strip_prefix("\r\n")
         .or_else(|| inside.strip_prefix('\n'))
         .unwrap_or(inside);
     let inside = inside.trim_end_matches([' ', '\t']);
     let inside = inside.strip_suffix('\n').unwrap_or(inside);
-    let inside = inside.strip_suffix('\r').unwrap_or(inside);
+    inside.strip_suffix('\r').unwrap_or(inside)
+}
+
+/// `inside`, the code `highlight` wraps, as a fenced code block whose
+/// first line reads `info` after the fence.
+fn fenced(info: &str, inside: &str) -> Marked {
     let mut longest = 0;
     let mut run = 0;
     for c in inside.chars() {
@@ -504,7 +516,7 @@ fn fenced(language: &str, inside: &str) -> Marked {
         longest = longest.max(run);
     }
     let fence = "`".repeat(longest.max(2) + 1);
-    Marked::fence(format!("{fence}{language}\n{inside}\n{fence}"))
+    Marked::fence(format!("{fence}{info}\n{inside}\n{fence}"))
 }
 
 /// The opening of a `details` element, as Hugo wrote it.
@@ -614,50 +626,85 @@ fn snippet_call(
 }
 
 /// The writing with the options on each fenced code block's first line,
-/// such as `{linenos=true}`, taken off, each told.
-fn fences_bare(
+/// such as `{linenos=true}`, written as Statac's words where it has them
+/// and otherwise taken off, each told.
+fn fences_converted(
     body: &str,
     spot: &dyn Fn(usize, &str) -> Spot,
     findings: &mut Vec<Finding>,
 ) -> String {
-    let mut cuts: Vec<Range<usize>> = Vec::new();
+    let mut changes: Vec<(Range<usize>, String)> = Vec::new();
+    let mut open: Option<(usize, String)> = None;
+    let mut code = String::new();
     for (event, range) in Parser::new_ext(body, options()).into_offset_iter() {
-        let Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) = event else {
-            continue;
-        };
-        let Some(open) = info.find('{') else { continue };
-        if !info.trim_end().ends_with('}') {
-            continue;
+        match event {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) => {
+                open = Some((range.start, info.into_string()));
+                code.clear();
+            }
+            Event::Text(text) if open.is_some() => code.push_str(&text),
+            Event::End(TagEnd::CodeBlock) => {
+                if let Some((start, info)) = open.take()
+                    && let Some(change) = fence_converted(body, start, &info, &code, spot, findings)
+                {
+                    changes.push(change);
+                }
+            }
+            _ => {}
         }
-        let line_end = body[range.start..]
-            .find('\n')
-            .map_or(body.len(), |i| range.start + i);
-        let line = &body[range.start..line_end];
-        let Some(brace) = line.find('{') else {
-            continue;
-        };
-        let cut_from = line[..brace].trim_end().len();
-        let kept = info[..open].trim_end();
-        if line[..cut_from]
-            .trim_start()
-            .trim_start_matches(['`', '~'])
-            .trim()
-            != kept
-        {
-            continue;
-        }
-        let cut_to = line.trim_end_matches('\r').len();
-        findings.push(finding(&CODE_OPTIONS, spot(range.start, line.trim())));
-        cuts.push(range.start + cut_from..range.start + cut_to);
     }
     let mut out = String::with_capacity(body.len());
     let mut copied = 0;
-    for cut in cuts {
+    for (cut, words) in changes {
         out.push_str(&body[copied..cut.start]);
+        out.push_str(&words);
         copied = cut.end;
     }
     out.push_str(&body[copied..]);
     out
+}
+
+/// The options ending the first line of the fenced code block at `start`,
+/// whose info is `info` and code `code`, and the words to write in their
+/// place, each told. None where the line ends in no braces.
+fn fence_converted(
+    body: &str,
+    start: usize,
+    info: &str,
+    code: &str,
+    spot: &dyn Fn(usize, &str) -> Spot,
+    findings: &mut Vec<Finding>,
+) -> Option<(Range<usize>, String)> {
+    let open = info.find('{')?;
+    if !info.trim_end().ends_with('}') {
+        return None;
+    }
+    let line_end = body[start..].find('\n').map_or(body.len(), |i| start + i);
+    let line = &body[start..line_end];
+    let brace = line.find('{')?;
+    let cut_from = line[..brace].trim_end().len();
+    let kept = info[..open].trim_end();
+    if line[..cut_from]
+        .trim_start()
+        .trim_start_matches(['`', '~'])
+        .trim()
+        != kept
+    {
+        return None;
+    }
+    let cut_to = line.trim_end_matches('\r').len();
+    let asked = code::from_braces(&info[open..]).unwrap_or(code::Asked {
+        left: true,
+        ..code::Asked::default()
+    });
+    let words = line_words(asked.numbered, &asked.marked, code);
+    if !words.is_empty() {
+        findings.push(finding(&CODE_LINES, spot(start, line.trim())));
+    }
+    if asked.left {
+        findings.push(finding(&CODE_OPTIONS, spot(start, line.trim())));
+    }
+    Some((start + cut_from..start + cut_to, words))
 }
 
 /// Each place the writing has a form of Hugo's Markdown that Statac's

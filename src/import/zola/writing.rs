@@ -18,13 +18,14 @@
 use std::collections::HashSet;
 use std::ops::Range;
 
-use pulldown_cmark::{CodeBlockKind, Event, LinkType, Options, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, LinkType, Options, Parser, Tag, TagEnd};
 
 use super::wikilinks::{Target, Wikilinks};
 use super::{
-    CODE_OPTIONS, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE, WIKILINK_LEFT, WIKILINKS,
+    CODE_LINES, CODE_OPTIONS, LINK_NOWHERE, TAG_IN_CODE, TAG_LEFT, TEMPLATE_CODE, WIKILINK_LEFT,
+    WIKILINKS,
 };
-use crate::import::common::{ends_line, opens_line};
+use crate::import::common::{ends_line, line_words, opens_line};
 use crate::import::liquid::{self, finding, quoted, split_word, within};
 use crate::import::writing::Marked;
 use crate::import::{Finding, Spot};
@@ -782,7 +783,7 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
         }
     };
     let mut findings = Vec::new();
-    let body = fences_bare(body, &spotter(body), &mut findings);
+    let body = fences_converted(body, &spotter(body), &mut findings);
     let body = links_and_more(&body, cx, &spotter(&body), &mut findings);
     let body = match cx.wikilinks {
         Some(wikilinks) => linked(&body, wikilinks, cx, &spotter(&body), &mut findings),
@@ -967,40 +968,106 @@ fn snippet_call(tag: &Written, cx: &Context) -> Option<(Marked, Call)> {
 }
 
 /// The writing with Zola's options after a comma on each fenced code
-/// block's first line, as in ```` ```rust,linenos ````, taken off, each
-/// told.
-fn fences_bare(
+/// block's first line, as in ```` ```rust,linenos ````, written as
+/// Statac's words where it has them and otherwise taken off, each told.
+fn fences_converted(
     body: &str,
     spot: &dyn Fn(usize, &str) -> Spot,
     findings: &mut Vec<Finding>,
 ) -> String {
-    let mut cuts: Vec<Range<usize>> = Vec::new();
+    let mut changes: Vec<(Range<usize>, String)> = Vec::new();
+    let mut open: Option<(usize, String)> = None;
+    let mut code = String::new();
     for (event, range) in Parser::new_ext(body, options()).into_offset_iter() {
-        let Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) = event else {
-            continue;
-        };
-        if !info.contains(',') {
-            continue;
+        match event {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) => {
+                open = Some((range.start, info.into_string()));
+                code.clear();
+            }
+            Event::Text(text) if open.is_some() => code.push_str(&text),
+            Event::End(TagEnd::CodeBlock) => {
+                let Some((start, info)) = open.take() else {
+                    continue;
+                };
+                let Some((_, after)) = info.split_once(',') else {
+                    continue;
+                };
+                let line_end = body[start..].find('\n').map_or(body.len(), |i| start + i);
+                let line = &body[start..line_end];
+                let Some(comma) = line.find(',') else {
+                    continue;
+                };
+                let asked = fence_options(after);
+                let words = line_words(asked.numbered, &asked.marked, &code);
+                if !words.is_empty() {
+                    findings.push(finding(&CODE_LINES, spot(start, line.trim())));
+                }
+                if asked.left {
+                    findings.push(finding(&CODE_OPTIONS, spot(start, line.trim())));
+                }
+                let cut_to = line.trim_end_matches('\r').len();
+                changes.push((start + comma..start + cut_to, words));
+            }
+            _ => {}
         }
-        let line_end = body[range.start..]
-            .find('\n')
-            .map_or(body.len(), |i| range.start + i);
-        let line = &body[range.start..line_end];
-        let Some(comma) = line.find(',') else {
-            continue;
-        };
-        findings.push(finding(&CODE_OPTIONS, spot(range.start, line.trim())));
-        let cut_to = line.trim_end_matches('\r').len();
-        cuts.push(range.start + comma..range.start + cut_to);
     }
     let mut out = String::with_capacity(body.len());
     let mut copied = 0;
-    for cut in cuts {
+    for (cut, words) in changes {
         out.push_str(&body[copied..cut.start]);
+        out.push_str(&words);
         copied = cut.end;
     }
     out.push_str(&body[copied..]);
     out
+}
+
+/// What a code block's options after the language ask of its lines, as
+/// Zola reads them: `linenos` numbers the lines, whatever value it is
+/// given, and `hl_lines=1-3 5` marks lines counted from the block's first
+/// as 1, whatever number `linenostart` shows there.
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+struct FenceOptions {
+    numbered: bool,
+    marked: Vec<(i64, i64)>,
+    /// Whether some option has no equal in Statac.
+    left: bool,
+}
+
+fn fence_options(options: &str) -> FenceOptions {
+    let mut asked = FenceOptions::default();
+    let mut start: i64 = 1;
+    for option in options.split(',').map(str::trim) {
+        let mut parts = option.split('=');
+        let name = parts.next().unwrap_or_default().trim();
+        let value = parts.next();
+        match name {
+            "" => {}
+            "linenos" => asked.numbered = true,
+            "linenostart" => {
+                if let Some(first) = value.and_then(|v| v.parse().ok()) {
+                    start = first;
+                }
+            }
+            "hl_lines" => {
+                let runs = value.unwrap_or_default().split(' ').filter_map(|run| {
+                    let (first, last): (u64, u64) = match run.split_once('-') {
+                        Some((first, last)) => (first.parse().ok()?, last.parse().ok()?),
+                        None => (run.parse().ok()?, run.parse().ok()?),
+                    };
+                    let (first, last) = (first.min(last), first.max(last));
+                    Some((
+                        i64::try_from(first).unwrap_or(i64::MAX),
+                        i64::try_from(last).unwrap_or(i64::MAX),
+                    ))
+                });
+                asked.marked.extend(runs);
+            }
+            _ => asked.left = true,
+        }
+    }
+    asked.left |= asked.numbered && start != 1;
+    asked
 }
 
 /// The writing with each `@/` link outside code made the address of the
@@ -1188,6 +1255,39 @@ fn as_text(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn options_on_a_fence_are_read_as_zola_reads_them() {
+        let asked = |numbered, marked: &[(i64, i64)], left| FenceOptions {
+            numbered,
+            marked: marked.to_vec(),
+            left,
+        };
+        for (options, expected) in [
+            ("linenos", asked(true, &[], false)),
+            ("linenos=false", asked(true, &[], false)),
+            (" linenos , linenostart=1", asked(true, &[], false)),
+            ("linenos,linenostart=20", asked(true, &[], true)),
+            ("linenostart=20", asked(false, &[], false)),
+            ("linenos,linenostart=x", asked(true, &[], false)),
+            (
+                "hl_lines=1 3-5 9",
+                asked(false, &[(1, 1), (3, 5), (9, 9)], false),
+            ),
+            ("hl_lines=5-3", asked(false, &[(3, 5)], false)),
+            ("hl_lines=1 x -2 3-", asked(false, &[(1, 1)], false)),
+            (
+                "hl_lines=1,hl_lines=2",
+                asked(false, &[(1, 1), (2, 2)], false),
+            ),
+            ("hide_lines=2", asked(false, &[], true)),
+            ("name=mod.rs", asked(false, &[], true)),
+            ("wrap", asked(false, &[], true)),
+            (",,", asked(false, &[], false)),
+        ] {
+            assert_eq!(fence_options(options), expected, "{options}");
+        }
+    }
 
     #[test]
     fn a_tag_is_read_with_its_values() {

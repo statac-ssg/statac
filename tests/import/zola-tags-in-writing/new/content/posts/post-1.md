@@ -36,10 +36,31 @@ A link to [post 2](/posts/post-2/), to [its heading](/posts/post-2/#a-heading), 
 
 A summary marker inside a line  is taken out.
 
-```rust
+```rust numbered=true mark=1
 {{ youtube(id="in-code") }}
 ```
 
 A code span: `{{ youtube(id="in-span") }}` and `@/posts/post-2.md`.
 
 Words that only look like a call, \@name(1), are escaped, and the calls above and their `@end` are not.
+
+Code whose lines are numbered or marked:
+
+```rust numbered=true mark=2,4-5
+println!("one");
+println!("two");
+println!("three");
+println!("four");
+println!("five");
+```
+
+```rust mark=1-3
+println!("one");
+println!("two");
+println!("three");
+```
+
+```rust numbered=true
+println!("one");
+println!("two");
+```

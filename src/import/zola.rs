@@ -80,11 +80,19 @@ pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
                https://statac.dev/snippets/ describes, or take the calls out.",
 };
 
+pub(super) static CODE_LINES: FindingKind = FindingKind {
+    heading: "Line numbers and marked lines in code",
+    sentence: "Zola numbered or marked lines of each of these code blocks, and the import wrote \
+               `numbered=true` or `mark=` at the end of its first line to do the same: Statac gives \
+               each line a class, and the numbers and marks show once the site's stylesheet styles \
+               them, as https://statac.dev/writing/#lines describes.",
+};
+
 pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
     heading: "Options on code taken off",
-    sentence: "Statac reads the rest of a code block's first line as its caption, so Zola's \
-               options after a comma, such as `,linenos`, were taken off each of these: the code \
-               is shown without them.",
+    sentence: "Statac has no equal for some of Zola's options after a comma on each of these code \
+               blocks, such as `hide_lines`, a `linenostart` other than 1 or `name=`, so the import \
+               took them off: lines that `hide_lines` hid now show.",
 };
 
 pub(super) static FRONT_MATTER_UNREAD: FindingKind = FindingKind {

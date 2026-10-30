@@ -7,6 +7,7 @@
 //! makes a name ready for an address, which dates it reads from where, and
 //! what its own tags do in the writing.
 
+mod code;
 mod settings;
 mod title;
 mod url;
@@ -123,11 +124,19 @@ pub(super) static SNIPPET_CALLS: FindingKind = FindingKind {
                https://statac.dev/snippets/ describes, or take the calls out.",
 };
 
+pub(super) static CODE_LINES: FindingKind = FindingKind {
+    heading: "Line numbers and marked lines in code",
+    sentence: "Hugo numbered or marked lines of each of these code blocks, and the import wrote \
+               `numbered=true` or `mark=` at the end of its first line to do the same: Statac gives \
+               each line a class, and the numbers and marks show once the site's stylesheet styles \
+               them, as https://statac.dev/writing/#lines describes.",
+};
+
 pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
     heading: "Options on code taken off",
-    sentence: "Statac reads the rest of a code block's first line as its caption, so options such \
-               as `{linenos=true}`, and those handed to `highlight`, were taken off each of these: \
-               the code is shown without them.",
+    sentence: "Statac has no equal for some of the options on each of these code blocks, such as a \
+               `linenostart` other than 1, `hl_inline` or a class, so the import took them off: the \
+               code is shown without them.",
 };
 
 pub(super) static RAW_HTML: FindingKind = FindingKind {
