@@ -31,20 +31,29 @@ from the item's `id:`, so check there too.
 
 ## Example
 
-`data/people.yaml`:
+In `content/post-1.md`:
 
 ```yaml
-- name: Person 1
-  id: k3m9x2
-- name: Person 2
-  id: k3m9x2
+---
+title: Post 1
+id: k3m9x2
+---
 ```
 
-Give the second person its own id:
+And in `content/post-2.md`:
 
 ```yaml
-- name: Person 1
-  id: k3m9x2
-- name: Person 2
-  id: p7q2r8
+---
+title: Post 2
+id: k3m9x2
+---
+```
+
+Give the second post its own id:
+
+```yaml
+---
+title: Post 2
+id: p7q2r8
+---
 ```

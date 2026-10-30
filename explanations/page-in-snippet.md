@@ -35,10 +35,12 @@ In `snippets/card.html`, called as `{{ card(post) }}`:
 
 ```html
 <h2>{{ page.title }}</h2>
+<a href="{{ post.url }}">Read it</a>
 ```
 
 Show the post's own title:
 
 ```html
 <h2>{{ post.title }}</h2>
+<a href="{{ post.url }}">Read it</a>
 ```

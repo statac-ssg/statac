@@ -51,10 +51,17 @@ can remove them too.
 
 ## Example
 
-In `templates/og.wide.yaml`, a card that no page picks:
+The site's layout reads `page.card`, and `templates/og.wide.yaml` holds
+a card that no page picks:
 
 ```yaml
 background: wide.png
+font: text.ttf
+
+title.text: "{{ page.og_title }}"
+title.place: centre
+title.size: up to 75
+title.colour: "#F2E9D3"
 ```
 
 Once a page has `card: wide` in its front matter, that page is shared

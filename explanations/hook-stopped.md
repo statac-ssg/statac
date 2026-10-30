@@ -12,12 +12,12 @@ before it finishes, or if the system's shell doesn't start at all.
 ## What you'll see {#what-youll-see}
 
 ```text
-error  Hook stopped: `after_build` ended with exit code 1
+error  Hook stopped: `before_build` ended with exit code 1
   statac.yaml, line 1
-   1 │ after_build: gzip -k "$STATAC_OUT/missing.html"
-     │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   1 │ before_build: cat styles/base.css styles/print.css > assets/site.css
+     │               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   What it printed:
-    gzip: can't stat: missing.html: No such file or directory
+    cat: styles/print.css: No such file or directory
   More: https://statac.dev/e/hook-stopped/
 ```
 
@@ -55,18 +55,11 @@ place, so it must work on `STATAC_OUT`, not on `_site`. At that point,
 
 ## Example
 
-In `statac.yaml`:
+In `statac.yaml`, where the site has `assets/` and `styles/base.css` but
+no `styles/print.css`:
 
 ```yaml
-after_build: gzip -k "$STATAC_OUT/missing.html"
+before_build: cat styles/base.css styles/print.css > assets/site.css
 ```
 
-```text
-error  Hook stopped: `after_build` ended with exit code 1
-  statac.yaml, line 5
-  What it printed:
-    gzip: can't stat: missing.html: No such file or directory
-```
-
-Change the command to name a file that the built site has, then build
-again.
+Add `styles/print.css`, or take it out of the command, then build again.

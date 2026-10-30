@@ -12,7 +12,7 @@ use super::tests::kinds;
 use super::{explanation_link, more, severity};
 use crate::album::Progress;
 use crate::cli::Terminal;
-use crate::problem::{Code, Ended, Kind, Maker, Problem, Reason, Severity, Unheard};
+use crate::problem::{Code, Kind, Maker, Problem, Reason, Severity, Unheard};
 use crate::report::Report;
 use crate::source::{Place, Sources, Span};
 use crate::testing::Scratch;
@@ -36,8 +36,14 @@ struct Run {
     copies: &'static [(&'static str, &'static str)],
     /// Files the site is built with before `files` are written over them.
     first: &'static [(&'static str, &'static str)],
+    /// Folders of the site made read-only for the run.
+    read_only: &'static [&'static str],
+    /// Whether the run stands for one in the site's folder, which names
+    /// the site's files from there, not from the folder the command names.
+    inside: bool,
     /// Whether the run meets the kind as on Unix alone: Windows can't hold
-    /// some of its files, or spells a shell's words its own way.
+    /// some of its files, spells a shell's words its own way, or writes
+    /// into a read-only folder.
     unix: bool,
 }
 
@@ -55,6 +61,8 @@ impl Run {
             cut: &[],
             copies: &[],
             first: &[],
+            read_only: &[],
+            inside: false,
             unix: false,
         }
     }
@@ -73,6 +81,17 @@ impl Run {
 
     const fn built_first(self, first: &'static [(&'static str, &'static str)]) -> Run {
         Run { first, ..self }
+    }
+
+    const fn read_only(self, read_only: &'static [&'static str]) -> Run {
+        Run { read_only, ..self }
+    }
+
+    const fn inside(self) -> Run {
+        Run {
+            inside: true,
+            ..self
+        }
     }
 
     const fn on_unix(self) -> Run {
@@ -105,6 +124,11 @@ const RUNS: &[Run] = &[
         CHECK,
         &[("statac.yaml", "title: Site\ncode_style: ocean\n")],
     ),
+    Run::new(Code::CantWrite, &["build", "{site}"], &[])
+        .built_first(&[("content/post-1.md", "Post 1.\n")])
+        .read_only(&["_site"])
+        .inside()
+        .on_unix(),
     Run::new(
         Code::MalformedYaml,
         CHECK,
@@ -504,6 +528,19 @@ const RUNS: &[Run] = &[
             "---\ntitle: Post 1\ndate: 2026-10-04 09:30\n---\n",
         )],
     ),
+    Run::new(
+        Code::HookStopped,
+        &["build", "{site}"],
+        &[
+            (
+                "statac.yaml",
+                "before_build: cat styles/base.css styles/print.css > assets/site.css\n",
+            ),
+            ("styles/base.css", "body { margin: 0; }\n"),
+            ("assets/site.css", ""),
+        ],
+    )
+    .on_unix(),
     Run::new(
         Code::HookNotRun,
         CHECK,
@@ -1205,13 +1242,12 @@ const RUNS: &[Run] = &[
         CHECK,
         &[
             ("statac.yaml", "title: Site\nurl: https://example.org/\n"),
-            ("templates/og.yaml", CARD),
-            ("templates/og.wide.yaml", CARD),
+            ("templates/og.wide.yaml", WIDE_CARD),
             ("templates/page.html", CARD_LAYOUT),
             ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
         ],
     )
-    .with_images(&[("templates/og/background.png", 1200, 630)])
+    .with_images(&[("templates/og/wide.png", 1200, 630)])
     .with_copies(FONT),
     Run::new(
         Code::ImageMayNotShow,
@@ -1366,6 +1402,16 @@ footer.size: 36
 footer.colour: \"#B9A88F\"
 ";
 
+/// A card with the page's title in the middle, named `wide`.
+const WIDE_CARD: &str = "background: wide.png
+font: text.ttf
+
+title.text: \"{{ page.og_title }}\"
+title.place: centre
+title.size: up to 75
+title.colour: \"#F2E9D3\"
+";
+
 /// The font a card is drawn with.
 const FONT: &[(&str, &str)] = &[(
     "templates/og/text.ttf",
@@ -1422,20 +1468,6 @@ struct Drawn {
 /// explanation's Example meets.
 fn drawn() -> Vec<Drawn> {
     vec![
-        // What the command prints names the site's folder, which differs
-        // from run to run.
-        Drawn {
-            kind: Kind::HookStopped {
-                hook: "after_build".into(),
-                ended: Ended::Code(1),
-                said: "gzip: can't stat: missing.html: No such file or directory\n".into(),
-            },
-            place: Some((
-                "statac.yaml",
-                "after_build: gzip -k \"$STATAC_OUT/missing.html\"\n",
-                "gzip -k \"$STATAC_OUT/missing.html\"",
-            )),
-        },
         // A line of 52,310 characters.
         Drawn {
             kind: Kind::CodeNotColoured {
@@ -1540,7 +1572,24 @@ fn printed(run: &Run) -> String {
         let from = Path::new(env!("CARGO_MANIFEST_DIR")).join(from);
         site.write(path, std::fs::read(from).unwrap());
     }
-    ran(run.args, &site)
+    let kept: Vec<_> = (run.read_only.iter())
+        .map(|folder| {
+            let path = site.join(folder);
+            let kept = std::fs::metadata(&path).unwrap().permissions();
+            let mut read_only = kept.clone();
+            read_only.set_readonly(true);
+            std::fs::set_permissions(&path, read_only).unwrap();
+            (path, kept)
+        })
+        .collect();
+    let printed = ran(run.args, &site);
+    for (path, kept) in kept {
+        std::fs::set_permissions(path, kept).unwrap();
+    }
+    match run.inside {
+        true => printed.replace(&format!("{}/", site.to_string_lossy()), ""),
+        false => printed,
+    }
 }
 
 /// What a run of `args` prints, on either stream, with `{site}` standing
