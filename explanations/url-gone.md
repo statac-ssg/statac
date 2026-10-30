@@ -21,7 +21,9 @@ Each time it builds the site, and as `statac serve` runs, Statac adds
 every URL it published to `published.txt` at the top of the site's
 folder: each page from a file, each old URL in a `redirect_from`, each
 feed, and each file published unchanged. Drafts and scheduled posts aren't
-added until they are published. Commit the file with the site, so a
+added until they are published. If a URL in `published.txt` stops being
+published, Statac notices and tells you, so links other people have to
+your site don't quietly break. Commit the file with the site, so a
 build on any machine knows the same URLs.
 
 If a URL first appears while `statac serve` runs and goes again before

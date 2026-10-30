@@ -38,8 +38,11 @@ image.
 
 ## Example
 
-To stop showing the note, add this to `statac.yaml`:
+`content/photo-1.jpg.yaml`, beside `content/photo-1.jpg`:
 
 ```yaml
-quiet: [colour-converted]
+optimise: false
 ```
+
+Statac then publishes `photo-1.jpg` itself, with its Display P3 profile,
+in place of resized copies, and shows no note.

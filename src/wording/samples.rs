@@ -1,9 +1,10 @@
 //! The message each explanation shows under "What you'll see", held to
 //! what Statac prints. Where a small site can meet the kind, the message
 //! is the one a run of the command prints for the site, which follows the
-//! explanation's Example. Where none can, such as for a full disk, it is
-//! a fixture of the kind drawn as Statac draws it, at the Example's text
-//! where the kind has a place.
+//! explanation's Example. Where none can, such as for a full disk, or
+//! where the Example gives no message of the kind, it is a fixture of the
+//! kind drawn as Statac draws it, at the Example's text where the kind
+//! has a place.
 
 use std::ffi::OsString;
 use std::path::Path;
@@ -1456,16 +1457,17 @@ const DEEP: &str = concat!(
     "> The words.\n"
 );
 
-/// A kind no run in a test can meet, drawn at the first `at` in `text`,
-/// written in the site's file `path`, or in no file where there is no
-/// place.
+/// A kind no run in a test can meet, or that its Example doesn't give,
+/// drawn at the first `at` in `text`, written in the site's file `path`,
+/// or in no file where there is no place.
 struct Drawn {
     kind: Kind,
     place: Option<(&'static str, &'static str, &'static str)>,
 }
 
 /// The kinds drawn where their first fixture would not show what the
-/// explanation's Example meets.
+/// explanation's Example meets, or where the Example gives no message of
+/// the kind.
 fn drawn() -> Vec<Drawn> {
     vec![
         // A line of 52,310 characters.
@@ -1494,6 +1496,15 @@ fn drawn() -> Vec<Drawn> {
                  {% endfor %}\n",
                 "site.pages",
             )),
+        },
+        // The Example's sidecar leaves the image alone, with no copies to
+        // convert, so it gives no note.
+        Drawn {
+            kind: Kind::ColourConverted {
+                path: "content/photo-1.jpg".into(),
+                profile: Some("Display P3".into()),
+            },
+            place: None,
         },
         // Port 80 is refused only where an administrator alone may open
         // it, and a port in use moves `serve` on to the next.
