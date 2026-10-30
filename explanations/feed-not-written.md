@@ -33,17 +33,13 @@ publishes the page as you wrote it, and leaves the feed out.
 
 ## How to fix it
 
-Add what is missing: a `title:` line in `statac.yaml`, or the template.
+**No site `title`.** Add a `title:` line to `statac.yaml`.
 
-Statac builds a feed with the template that has the feed's file name, if
-you have one, such as `templates/rss.xml` for `rss.xml`. Otherwise, if the feed's
-URL ends in an extension other than `.xml`, Statac uses the template
-named `feed` with that extension, such as `templates/feed.json` for
-`/feed.json`, and otherwise `templates/feed.xml`. The message names the
-templates in the order Statac looks for them, and any one of them builds
-the feed. The template is handed `feed` (the feed's own URL), `list`
-(the list), `posts` (its posts, newest first) and `page` (the list
-page).
+**No template.** Add one of the templates the message names. It names
+them in the order Statac looks for them, and any one of them builds the
+feed. [Write the feed's template](https://statac.dev/feeds/#the-template)
+has an Atom template and an RSS template to copy, and says which
+template builds each feed and what the template is handed.
 
 A list can have several feeds, such as an Atom feed and an RSS feed:
 `feed: [feed.xml, rss.xml]` builds `feed.xml` with `templates/feed.xml`
@@ -54,23 +50,21 @@ if that builds it in another format than its name says. Statac leaves a
 feed out only if none of its templates exists, and warns once for each
 such set of templates, naming the first list that needs it.
 
-If you don't want the feed, take out the `feed:` line that asks for
-it.
+**A page at the feed's URL.** Give the feed a different URL with
+`feed:` on the list page, such as `feed: atom.xml`, or move the page.
 
-If a page is at the feed's URL, give the feed a different URL with
-`feed:` on the list page, such as `feed: atom.xml`, or move the
-page.
+**A list with nothing dated.** Give one of its pages a `date:`, or
+remove the `feed:` line. If the line cascades to several such lists,
+such as `pages.feed: true`, Statac warns once, at that line, and names
+the first of the lists.
 
-If nothing in the list is dated, give one of its pages a `date:`, or
-remove the `feed:` line. If the line cascades to several such
-lists, such as `pages.feed: true`, Statac warns once, at that line, and
-names the first of the lists.
-
-If the list has no list page, add an `index.md` to its folder, or for
-the site's own list, `content/index.md` or `templates/home.html`. If its
-list page has `index_page: false`, take that line out to publish the
-page. Or remove the `feed:` line. Statac warns once for all the lists
+**No list page, or `index_page: false`.** Add an `index.md` to the
+list's folder, or for the site's own list, `content/index.md` or
+`templates/home.html`. If its list page has `index_page: false`, take
+that line out to publish the page. Or remove the `feed:` line. Statac warns once for all the lists
 without a page, naming the first.
+
+If you don't want the feed, take out the `feed:` line that asks for it.
 
 ## Example
 

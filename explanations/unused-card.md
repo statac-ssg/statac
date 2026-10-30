@@ -23,7 +23,7 @@ likeliest reason is a step you haven't taken yet, so Statac tells you.
 
 ## How to fix it
 
-If no layout reads `page.card`, add the lines that point to the card to
+**No layout reads `page.card`.** Add the lines that point to the card to
 the `<head>` of a layout:
 
 ```html
@@ -41,7 +41,7 @@ The first test leaves these lines out of any page with no card. The
 test `{% if page.card.width %}` leaves out the width and height if the
 page is shared with its own social image, whose size Statac can't tell.
 
-If no page picks a card, write `card: <name>` in the front matter of
+**No page picks the card.** Write `card: <name>` in the front matter of
 the pages it is for, or cascade it to a folder's pages with
 `pages.card: <name>`.
 

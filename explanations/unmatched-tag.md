@@ -56,9 +56,15 @@ snippet writes.
 
 ## How to fix it
 
-Write the closing tag where the element should end, or remove the tag you
-don't need. A tag matches its closing tag whatever its letters' case, so
-`</table>` closes `<TABLE>`. Close a comment with `-->`.
+**A start tag with no end tag.** Write the end tag where the element
+should end, or remove the start tag if you don't need it. A start tag
+matches its end tag whatever its letters' case, so `</table>` closes
+`<TABLE>`.
+
+**A comment with no `-->`.** Write `-->` where the comment should end.
+
+**An end tag with nothing open.** Remove the end tag if you don't need
+it, or write the start tag where the element should begin.
 
 If a tag is left open on purpose, for a template to close, quieten the
 warning with `quiet: [unmatched-tag]` in `statac.yaml`.

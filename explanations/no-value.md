@@ -40,30 +40,31 @@ names. If some pages don't have it, say what they show instead:
   last `default`, the message names `page.summary`, the last value in the
   chain, which was missing.
 
-A filter that groups or collects pages by a field, such as
-`groupby("rank")`, `unique(attribute="rank")` or `map(attribute="rank")`,
-needs that field on every page it is given, because Statac would have to
-guess where to put a page without it. The message names the page that doesn't have
-the field. Leave out the pages without it first, as in
+**A filter that groups or collects pages by a field.** `groupby("rank")`,
+`unique(attribute="rank")` and `map(attribute="rank")` need the field on
+every page they are given, and the message names the page that doesn't
+have it. Leave out the pages without it first, as in
 `site.pages | selectattr("rank", "defined") | groupby("rank")`, or give
-`map` a `default=`. A filter that only tests a field, such as
-`selectattr("rank", "eq", 1)`, skips a page without it, as `if` does.
-`sort(attribute="rank")` puts pages without the field last, and warns.
+`map` a `default=`. [When a page has no such
+value](https://statac.dev/templates/#no-value) says what each filter
+does with a page that doesn't have the field.
 
-A tag or a series has a `url` and a `page` only if it has a list page.
-If `tag.url` has no value because `statac.yaml` doesn't ask for tag
-pages, add `tags.pages: true` to publish a page for each tag, or
-`series.pages: true` for each series. Statac before 0.7.0 published these
-pages without being asked, so a site made with it needs the setting for
-its tag links to work.
+**A tag's or a series' `url`.** A tag or a series has a `url` and a
+`page` only if it has a list page. If `tag.url` has no value because
+`statac.yaml` doesn't ask for tag pages, add `tags.pages: true` to
+publish a page for each tag, or `series.pages: true` for each series.
+For a site made before 0.7.0, see [Upgrading to
+0.7.0](https://statac.dev/upgrading/#other-stops).
 
-A list page that Statac makes itself, such as a tag's, has no `title`.
-For such a page, `{{ headline(page) }}` shows the list's name.
-For any other page, it shows the page's `title` if it has one.
+**A page Statac makes.** A list page that Statac makes itself, such as a
+tag's, has no `title`. For such a page, `{{ headline(page) }}` shows the
+list's name. For any other page, it shows the page's `title` if it has
+one.
 
-In a snippet, `page` is the page being built, not a page that the call
-passed to the snippet. If a call passes a post to a snippet as `post`, the
-snippet reads the post's fields as `post.summary` and so on.
+**`page` in a snippet.** In a snippet, `page` is the page being built,
+not a page that the call passed to the snippet. If a call passes a post
+to a snippet as `post`, the snippet reads the post's fields as
+`post.summary` and so on.
 
 ## Example
 

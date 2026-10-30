@@ -3,10 +3,10 @@
 Two files would be published at the same URL. Either their URLs are
 exactly the same, or their names differ only in ways that most disks
 ignore: capitals, or how an accented letter is stored. The message names
-both files. If one of them is a paginated page of a list, such as
-`/blog/page/2/`, the message names the list. If one of them is an old URL
-in a page's `redirect_from`, the message calls it a redirect, and points
-at that URL in `redirect_from`.
+both files. If one of them is an old URL in a page's `redirect_from`, the
+message calls it a redirect, and points at that URL in `redirect_from`.
+If one of them is a paginated page of a list, such as `/blog/page/2/`,
+the message names the list.
 
 ## What you'll see {#what-youll-see}
 
@@ -29,34 +29,37 @@ same file. So the site would change depending on where it was built.
 
 ## How to fix it
 
-Rename one of the two files, or remove the one you don't want. Files from
-`assets/` and `static/` are both published at the root of the site, beside
-the pages, so any of them can clash with another. Statac builds a Sass
-file into a stylesheet and publishes that, so `site.scss` and `site.css`
-in the same folder are published under the same name.
+**Two of your files.** Rename one of them, or remove the one you don't
+want. Files from `assets/` and `static/` are both published at the root
+of the site, beside the pages, so any of them can clash with another.
+Statac builds a Sass file into a stylesheet and publishes that, so
+`site.scss` and `site.css` in the same folder are published under the
+same name.
 
-The site's search index is a few files in `search/`, at the root of each
-language whose search box reads it: `search/index.js` and the files it
-reads, or `fr/search/index.js` for a site's French pages, under the
-site's path if it has one. A file of yours at one of those
-URLs, such as `static/search/index.js`, clashes with it, and the
-message names "the site's search index". Rename yours, or move it.
+**A file at the search index's URL.** The site's search index is a few
+files in `search/`, at the root of each language whose search box reads
+it: `search/index.js` and the files it reads, or `fr/search/index.js`
+for a site's French pages, under the site's path if it has one. A file
+of yours at one of those URLs, such as `static/search/index.js`, clashes
+with it, and the message names "the site's search index". Rename yours,
+or move it.
 
-An old URL in a page's `redirect_from` publishes a redirect there, so
-it clashes with anything else at that URL, and the message names it as
-"a redirect in" the page. This often happens after a page is renamed: its
-old URL is kept as a redirect, and a new page later given the old name
-lands on it. Take the URL out of `redirect_from` if the new page should
-have it, or give the new page another name.
+**An old URL kept by `redirect_from`.** A page's `redirect_from`
+publishes a redirect at each URL it lists, so the redirect clashes with
+anything else at that URL, and the message names it as "a redirect in"
+the page. This often happens after a page is renamed: its old URL is
+kept as a redirect, and a new page later given the old name lands on it.
+Take the URL out of `redirect_from` if the new page should have it, or
+give the new page another name.
 
-A page's own `permalink` sets its URL whatever its file is called,
-so renaming the file won't help. Change the `permalink`, which the
-message points at.
+**A page's own `permalink`.** A `permalink` sets the page's URL whatever
+its file is called, so renaming the file won't help. Change the
+`permalink`, which the message points at.
 
-A list too long for one page is paginated, with page 2 onwards beneath
-it, at the URLs that `pagination.permalink` in `statac.yaml` sets. By
-default, they are at `page/2/` and onwards. Give your page another URL,
-or put the paginated pages elsewhere, such as
+**Pagination.** A list too long for one page is paginated, with page 2
+onwards beneath it, at the URLs that `pagination.permalink` in
+`statac.yaml` sets. By default, they are at `page/2/` and onwards. Give
+your page another URL, or put the paginated pages elsewhere, such as
 `pagination.permalink: "{list}more/{n}/"`.
 
 ## Example

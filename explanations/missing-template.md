@@ -44,17 +44,18 @@ content of its own, so without its template there is nothing to publish.
 
 ## How to fix it
 
-Add the template to `templates/`, or correct the name. If there is a
-template with a similar name, Statac suggests it. To build a page with a
-different template, set `layout:` on the page, or `pages.layout:` in its
-folder's `index.md`.
+**A template named by `layout:` or `extends`.** Add the template to
+`templates/`, or correct the name. If there is a template with a similar
+name, Statac suggests it. To build a page with a different template, set
+`layout:` on the page, or `pages.layout:` in its folder's `index.md`.
 
-A list page Statac makes itself, such as a tag's page, has no front
-matter where you could write `layout:`, and a cascaded `layout:` doesn't
-reach a list page. Add `templates/folder.html` to build these pages, or
-`templates/home.html` for the home page. To build one page your own way,
-write a page of your own at its URL, such as `content/tags/rust.md` for
-the tag `rust`, and Statac builds that page in its place.
+**A list page Statac makes itself, such as a tag's page.** It has no
+front matter where you could write `layout:`, and a cascaded `layout:`
+doesn't reach a list page. Add `templates/folder.html` to build these
+pages, or `templates/home.html` for the home page. To build one page your
+own way, write a page of your own at its URL, such as
+`content/tags/rust.md` for the tag `rust`, and Statac builds that page in
+its place.
 
 ## Example
 

@@ -31,19 +31,22 @@ what you meant. If a known word is close, Statac suggests it.
 ## How to fix it
 
 Write the word Statac suggests, or one from the list on the relevant page
-of the documentation. A time zone is named after a place, such as
-`Europe/London` or `America/Chicago`. In a template, check the spelling
-against the field in the front matter, the setting in `statac.yaml`, or
-the file in `snippets/`.
+of the documentation.
 
-In a template, `loop` is set only inside a loop, between `{% for %}` and
-`{% endfor %}`. Statac reads a loop's own `if`, such as
-`{% for x in xs if loop.first %}`, before it sets `loop`, so test it with
-an `{% if %}` inside the loop instead.
+**A time zone.** Time zones are named after places, such as
+`Europe/London` or `America/Chicago`.
 
-A stamp is `=today`, `=now`, `=tomorrow`, `=yesterday` or a weekday from
-`=monday` to `=sunday`. To add a time after it, write two digits for the
-hour, a colon, and two digits for the minute, such as `=monday 09:00`.
+**A stamp in front matter.** Write `=today`, `=now`, `=tomorrow`,
+`=yesterday` or a weekday from `=monday` to `=sunday`. To add a time
+after it, write two digits for the hour, a colon, and two digits for the
+minute, such as `=monday 09:00`.
+
+**A name in a template.** Check the spelling against the field in the
+front matter, the setting in `statac.yaml`, or the file in `snippets/`.
+`loop` is set only inside a loop, between `{% for %}` and `{% endfor %}`.
+Statac reads a loop's own `if`, such as `{% for x in xs if loop.first %}`,
+before it sets `loop`, so test it with an `{% if %}` inside the loop
+instead.
 
 ## Example
 

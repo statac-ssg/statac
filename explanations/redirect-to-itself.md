@@ -33,12 +33,13 @@ redirect would leave its URL unusable.
 
 ## How to fix it
 
-Point `redirect_to` at the URL where the content is now. If the page
-should be published at its own URL after all, remove `redirect_to`. In a
-loop, redirect at least one page to a URL that isn't a redirect.
+**A `redirect_to` that leads back to the page.** Point `redirect_to` at
+the URL where the content is now. If the page should be published at its
+own URL after all, remove `redirect_to`. In a loop, redirect at least
+one page to a URL that isn't a redirect.
 
-Take the page's own URL out of `redirect_from`. Its other old URLs still
-redirect to it.
+**The page's own URL in `redirect_from`.** Take the URL out of
+`redirect_from`. The page's other old URLs still redirect to it.
 
 ## Example
 

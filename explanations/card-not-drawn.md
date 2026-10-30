@@ -38,12 +38,15 @@ without an image.
 
 ## How to fix it
 
-If a text doesn't fit, give those pages fewer words there. A shorter
-`og_title` shortens the title on the card and nowhere else. Or give the
-middle of the card more space, with a smaller `padding` or smaller texts
-at the top and bottom.
+**A text in the middle that doesn't fit.** Give those pages fewer words
+there. A shorter `og_title` shortens the title on the card and nowhere
+else. Or give the middle of the card more space, with a smaller
+`padding` or smaller texts at the top and bottom.
 
-If no font has a character, add a font that has it to the fonts the
+**No space between the top and bottom texts.** Make the texts at the top
+and the bottom smaller or shorter, or give the card a smaller `padding`.
+
+**A character no font has.** Add a font that has it to the fonts the
 message names: the card's `font`, or a text's own, such as `title.font`.
 Statac tries the fonts in the order they are written. If a font in
 `templates/og/` that the list doesn't name has every character missing,
