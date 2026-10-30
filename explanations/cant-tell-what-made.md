@@ -1,7 +1,8 @@
 # Can't tell what made the site
 
-`statac import` reads a site made by another tool, and works out which
-tool from the site's files:
+`statac import` can't tell which tool made the site in the folder it was
+given. It reads a site made by another tool, and works out which tool
+from the site's files:
 
 - A Jekyll site has `_config.yml` or `_config.yaml` at its top. Statac
   doesn't read Jekyll's settings from `_config.toml`: write them as YAML

@@ -1,9 +1,9 @@
 # Loop over every page
 
-A template loops over a list of the whole site's pages, such as
-`site.pages` or `site.posts`, and Statac builds so many pages with it
-that, between them, the loops go through millions of pages. The message
-says which list, and how many pages ran the loop.
+A template loops over a list of all the site's pages, such as
+`site.pages` or `site.posts`, and so many pages use it that the loops go
+through millions of pages between them. The message says which list,
+and how many pages ran the loop.
 
 ## What you'll see {#what-youll-see}
 

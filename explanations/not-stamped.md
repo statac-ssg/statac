@@ -1,6 +1,6 @@
 # Not stamped
 
-A value in a page's front matter is a stamp, such as `=today` or
+A value in a page's front matter is still a stamp, such as `=today` or
 `=monday 09:00`. A stamp is one of Statac's words that stands for a date,
 and is there until the real date is written in its place.
 

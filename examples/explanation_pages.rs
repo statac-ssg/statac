@@ -32,6 +32,42 @@ fn title(code: Code) -> &'static str {
         .unwrap_or_else(|| panic!("{} opens with no heading", code.name()))
 }
 
+/// What the kind is, for its line in the index: its explanation's first
+/// sentence, ended at a colon that opens its detail, and opening in lower
+/// case to follow the kind's name.
+fn summary(code: Code) -> String {
+    let name = code.name();
+    let text = code.explanation().replace("\r\n", "\n");
+    let opening = (text.split("\n\n").nth(1))
+        .unwrap_or_default()
+        .replace('\n', " ");
+    // A full stop in code, as in `one of data.`, ends nothing.
+    let mut in_code = false;
+    let (end, _) = (opening.char_indices())
+        .find(|&(at, c)| {
+            in_code ^= c == '`';
+            let next = opening[at + 1..].chars().next();
+            !in_code && matches!(c, '.' | ':') && matches!(next, None | Some(' '))
+        })
+        .unwrap_or_else(|| panic!("{name}'s first sentence has no full stop"));
+    let sentence = format!("{}.", &opening[..end]);
+    assert!(
+        sentence.chars().count() <= 180,
+        "{name}'s first sentence is too long for the index: {sentence}"
+    );
+    // A name keeps its capital: Statac, Sass, or one with a capital inside,
+    // such as YAML.
+    let first = sentence.split(' ').next().unwrap_or_default();
+    let named = first.starts_with("Statac")
+        || first.starts_with("Sass")
+        || first.chars().skip(1).any(char::is_uppercase);
+    let mut chars = sentence.chars();
+    match (named, chars.next()) {
+        (false, Some(letter)) => letter.to_lowercase().chain(chars).collect(),
+        _ => sentence,
+    }
+}
+
 fn front_matter(
     title: &str,
     summary: Option<&str>,
@@ -154,7 +190,12 @@ fn index() -> String {
         kinds.sort_by_key(|&code| title(code).to_lowercase());
         out.push_str(&format!("\n## {heading}\n\n{about}\n\n"));
         for code in kinds {
-            out.push_str(&format!("- [{}](/e/{}/)\n", title(code), code.name()));
+            out.push_str(&format!(
+                "- [{}](/e/{}/): {}\n",
+                title(code),
+                code.name(),
+                summary(code)
+            ));
         }
     }
     out

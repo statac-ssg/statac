@@ -1,9 +1,10 @@
 # Unusable date format
 
-`date_format` sets how the site's pages write dates, by example. You
-write one moment, Wednesday 31 December 2025 at 15:04, the way you want
-every date written, and Statac writes each date the same way. A template
-can do the same for a single date, such as
+Statac can't read the example date in `date_format`, or in a
+template's `date()` filter. `date_format` sets how the site's pages write
+dates, by example. You write one moment, Wednesday 31 December 2025 at
+15:04, the way you want every date written, and Statac writes each date
+the same way. A template can do the same for a single date, such as
 `{{ page.date | date("December 2025") }}`, or name one of the looks a
 date takes in the page's language, `long`, `short`, `day` or `stamp`,
 such as `{{ page.date | date("short") }}`.

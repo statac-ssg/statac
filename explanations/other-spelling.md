@@ -1,8 +1,8 @@
 # Other spelling
 
 A field or setting uses a word that Statac spells differently, or a
-page's content has a marker such as `<!--more-->` spelled differently,
-such as `<!-- More -->`. On a card, Statac uses `colour` and `centre`, never
+page's content has a marker spelled differently, such as `<!-- More -->`
+for `<!--more-->`. On a card, Statac uses `colour` and `centre`, never
 `color` or `center`. A stamp in front matter is written `=today` or
 `=monday 09:00`, never `=Today`, `=mon`, `=next monday` or `=monday 9am`.
 Statac refuses a Markdown file that starts with a `+++` line, the way some

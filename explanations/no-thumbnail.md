@@ -1,9 +1,9 @@
 # No thumbnail
 
-A page shows a video hosted on YouTube or Vimeo, and uses the video's
-`thumbnail`: the image shown in place of the video until a reader presses
-play. The site's `fetched/stills/` folder has no thumbnail for this video,
-so `thumbnail` is empty.
+A page shows a video hosted on YouTube or Vimeo with its `thumbnail`, but
+the site's `fetched/stills/` folder has no thumbnail for that video, so
+`thumbnail` is empty. The thumbnail is the image shown in place of the
+video until a reader presses play.
 
 ## What you'll see {#what-youll-see}
 

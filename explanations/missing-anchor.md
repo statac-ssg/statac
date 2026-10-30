@@ -1,8 +1,9 @@
 # Missing anchor
 
-A link points at a place on a page (the part after `#`). The page
-exists, but nothing on it has that id. A reader who follows the link lands
-at the top of the page instead of the part you meant.
+A link points at a place on a page (the part after `#`) that isn't
+there. The page exists, but nothing on it has that id. A reader who
+follows the link lands at the top of the page instead of the part you
+meant.
 
 ## What you'll see {#what-youll-see}
 

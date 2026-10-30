@@ -1,13 +1,12 @@
 # Missing translation
 
-Statac adds a little text of its own to a page's content: what a screen
-reader reads out for a footnote's back link, and the name of each kind of
-callout, such as "Note" or "Warning". This text comes from the page's
-language, and this language has no translation for it. Statac has these
-lines in English only. For any other language, their translations come
-from the site's own file in `languages/`. So Statac gives this note for a
-language with no such file, for a file without the line, or for a file
-whose line is empty.
+A page is in a language with no translation for some of the text Statac
+adds to its content: what a screen reader reads out for a footnote's back
+link, and the name of each kind of callout, such as "Note" or "Warning".
+Statac has these lines in English only. For any other language, their
+translations come from the site's own file in `languages/`. So Statac
+gives this note for a language with no such file, for a file without the
+line, or for a file whose line is empty.
 
 For a site made in another language Statac knows the dates and
 quotation marks of, `statac new` writes this file, with these lines in

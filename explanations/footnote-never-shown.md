@@ -1,6 +1,6 @@
 # Footnote never shown
 
-The page has a footnote definition, `[^label]: The note.`, but no
+A page has a footnote definition, `[^label]: The note.`, but no
 footnote reference in the content points at it. A definition appears at
 the foot of the page only if a reference points at it, so this one
 doesn't appear anywhere.

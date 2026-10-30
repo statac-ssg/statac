@@ -1,8 +1,8 @@
 # Alias limit
 
-In YAML, `&name` marks a value and `*name` repeats it somewhere else. The
-aliases in one file have repeated more than Statac will read: more than 10,000
-values, or more than 1 MB of text.
+The aliases in a YAML file have repeated more than Statac will read: more
+than 10,000 values, or more than 1 MB of text. In YAML, `&name` marks a
+value and `*name` repeats it somewhere else.
 
 ## What you'll see {#what-youll-see}
 

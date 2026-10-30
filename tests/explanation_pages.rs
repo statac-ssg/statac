@@ -49,6 +49,28 @@ fn the_pages_are_written_into_the_folder_given_and_one_of_no_kind_is_removed() {
 }
 
 #[test]
+fn the_index_says_what_each_kind_is() {
+    let pages = explanation_pages::pages();
+    let (_, index) = pages.iter().find(|(name, _)| name == "index.md").unwrap();
+    let kinds: Vec<&str> = index
+        .lines()
+        .filter(|line| line.starts_with("- ["))
+        .collect();
+    assert_eq!(kinds.len(), statac::problem::Code::ALL.len());
+    for line in &kinds {
+        assert!(line.contains("/): ") && line.ends_with('.'), "{line}");
+    }
+    // The sentence ends where a colon opens its detail, and a name keeps
+    // its capital.
+    for line in [
+        "- [Malformed YAML](/e/malformed-yaml/): Statac couldn't read some YAML.",
+        "- [Same id](/e/same-id/): two pages have the same `id:`.",
+    ] {
+        assert!(kinds.contains(&line), "{line}");
+    }
+}
+
+#[test]
 fn only_one_folder_holding_a_sites_settings_is_taken() {
     let given = |arguments: &[&PathBuf]| {
         explanation_pages::site_given(arguments.iter().map(|path| path.as_os_str().to_owned()))
