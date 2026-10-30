@@ -4405,6 +4405,58 @@ fn a_missing_data_value_names_the_file_or_folder() {
     }
 }
 
+/// A loop over a value that has none is told at that value, with the same
+/// suggestion, whether or not the loop has an `if`.
+#[test]
+fn a_filtered_loop_over_no_value_is_told_at_the_value() {
+    let cases = [
+        (
+            "{% for p in site.data.peple %}{{ p }}{% endfor %}",
+            "{% for p in site.data.peple if p.name %}{{ p }}{% endfor %}",
+        ),
+        (
+            "{% for p in site.data.lists.link %}{{ p }}{% else %}none{% endfor %}",
+            "{% for p in site.data.lists.link if p.url %}{{ p }}{% else %}none{% endfor %}",
+        ),
+        (
+            "{% for p in site.data.people.person_2 %}{{ p }}{% endfor %}",
+            "{% for p in site.data.people.person_2 if p %}{{ p }}{% endfor %}",
+        ),
+        (
+            "{% for p in\n  site.data.peple\n%}{{ p }}{% endfor %}",
+            "{% for p in\n  site.data.peple\n  if p.name\n%}{{ p }}{% endfor %}",
+        ),
+        (
+            "{% set people = site.data.peple %}{% for p in people %}{{ p }}{% endfor %}",
+            "{% set people = site.data.peple %}{% for p in people if p.name %}{{ p }}{% endfor %}",
+        ),
+        (
+            "{% for p in site.data.peple recursive %}{{ loop(p.people) }}{% endfor %}",
+            "{% for p in site.data.peple if p.name recursive %}{{ loop(p.people) }}{% endfor %}",
+        ),
+    ];
+    let told = |template: &str| {
+        let built = site(&[
+            ("content/post-1.md", "---\ntitle: Post 1\n---\n"),
+            ("data/people.yaml", "person-1:\n  name: Person 1\n"),
+            ("data/lists/links.yaml", "- url: /a/\n"),
+            ("templates/page.html", template),
+        ]);
+        let rendered = built.render("post-1.md");
+        assert_eq!(rendered.html, None, "{template}");
+        let kinds: Vec<Kind> = rendered.problems.iter().map(|p| p.kind.clone()).collect();
+        (kinds, built.told(&rendered.problems))
+    };
+    for (plain, filtered) in cases {
+        let (kinds, at) = told(plain);
+        assert!(
+            matches!(kinds[..], [Kind::NoValue { .. }]),
+            "{plain}: {kinds:?}"
+        );
+        assert_eq!(told(filtered), (kinds, at), "{filtered}");
+    }
+}
+
 /// `page.key` is the item's name on a page made from one, and on any other
 /// page a value it hasn't got, as `page.post` is on a page made for none.
 #[test]

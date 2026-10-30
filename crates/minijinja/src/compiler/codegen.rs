@@ -1,4 +1,4 @@
-// Changed from MiniJinja 3.0.1 for Statac: each call, and each print, is given its own span, whatever line its arguments end on.
+// Changed from MiniJinja 3.0.1 for Statac: each call, and each print, is given its own span, whatever line its arguments end on; a filtered loop iterates under its iterable's span, not its condition's.
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::mem;
@@ -603,9 +603,11 @@ impl<'source> CodeGenerator<'source> {
         // iterated over normally
         if let Some(ref filter_expr) = for_loop.filter_expr {
             self.add(Instruction::LoadConst(Value::from(0usize)));
-            self.push_span(filter_expr.span());
+            self.push_span(for_loop.iter.span());
             self.compile_expr(&for_loop.iter);
             self.start_for_loop(false, false);
+            self.pop_span();
+            self.push_span(filter_expr.span());
             self.add(Instruction::DupTop);
             self.compile_assignment(&for_loop.target);
             self.compile_expr(filter_expr);
