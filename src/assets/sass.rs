@@ -96,14 +96,20 @@ fn bytes(loc: &SpanLoc) -> Range<usize> {
     start..offset(text, loc.end.line, loc.end.column).max(start)
 }
 
-/// `file` as a path in the site. Sass may name a file by its real path,
-/// past any link in the site's.
+/// `file` as a path in the site, with forward slashes, as every other
+/// file is named. Sass may name a file by its real path, past any link in
+/// the site's.
 fn shown(file: &Path, site: &Path) -> PathBuf {
     let real = fs::canonicalize(site).unwrap_or_else(|_| site.to_path_buf());
-    file.strip_prefix(site)
-        .or_else(|_| file.strip_prefix(&real))
-        .unwrap_or(file)
-        .to_path_buf()
+    let rel = file
+        .strip_prefix(site)
+        .or_else(|_| file.strip_prefix(&real));
+    match rel {
+        Ok(rel) => crate::platform::slashed(rel)
+            .unwrap_or_else(|lossy| lossy)
+            .into(),
+        Err(_) => file.to_path_buf(),
+    }
 }
 
 /// The files Sass may read: those whose real path, past every link, is

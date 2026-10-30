@@ -371,7 +371,7 @@ fn what_sass_says_is_a_warning_at_the_line_that_said_it() {
             )
         })
         .collect();
-    let file = |name: &str| Path::new("assets").join(name).display().to_string();
+    let file = |name: &str| format!("assets/{name}");
     assert_eq!(
         said,
         [
@@ -420,8 +420,8 @@ fn sass_stopping_is_placed_where_it_stopped() {
     );
     let place = problem.place.unwrap();
     assert_eq!(
-        sources.path(place.source),
-        Path::new("assets").join("_parts.scss")
+        sources.path(place.source).to_str(),
+        Some("assets/_parts.scss")
     );
     assert_eq!(sources.spelling(place), "$nowhere");
     assert_eq!(
@@ -1101,7 +1101,7 @@ fn why_sass_stopped_is_told_in_its_own_words_at_the_text_it_is_about() {
         let seen = (
             crate::wording::headline(&problem.kind),
             crate::wording::suggestion(&problem.kind),
-            sources.path(place.source).to_path_buf(),
+            sources.path(place.source).display().to_string(),
             sources.line_column(place.source, start).line,
             format!(
                 "{}«{}»{}",
@@ -1113,7 +1113,7 @@ fn why_sass_stopped_is_told_in_its_own_words_at_the_text_it_is_about() {
         let wanted = (
             format!("Sass stopped: {headline}"),
             suggestion.map(str::to_owned),
-            Path::new("assets").join(file),
+            format!("assets/{file}"),
             *line,
             marked.to_string(),
         );
@@ -1615,7 +1615,10 @@ fn sass_reads_nothing_outside_assets() {
         }
     );
     let place = problem.place.unwrap();
-    assert_eq!(sources.path(place.source), Path::new("assets/site.scss"));
+    assert_eq!(
+        sources.path(place.source).to_str(),
+        Some("assets/site.scss")
+    );
     assert_eq!(
         sources
             .line_column(place.source, place.span.start as usize)

@@ -1,10 +1,10 @@
 //! The message each explanation shows under "What you'll see", held to
 //! what Statac prints. Where a small site can meet the kind, the message
 //! is the one a run of the command prints for the site, which follows the
-//! explanation's Example. Where none can, such as for a full disk, or
-//! where the Example gives no message of the kind, it is a fixture of the
-//! kind drawn as Statac draws it, at the Example's text where the kind
-//! has a place.
+//! explanation's Example. Where none can, such as for a full disk, where
+//! what a run prints turns on the system it runs on, or where the Example
+//! gives no message of the kind, it is a fixture of the kind drawn as
+//! Statac draws it, at the Example's text where the kind has a place.
 
 use std::ffi::OsString;
 use std::path::Path;
@@ -13,7 +13,7 @@ use super::tests::kinds;
 use super::{explanation_link, more, severity};
 use crate::album::Progress;
 use crate::cli::Terminal;
-use crate::problem::{Code, Kind, Maker, Problem, Reason, Severity, Unheard};
+use crate::problem::{Code, Ended, Kind, Maker, Problem, Reason, Severity, Unheard};
 use crate::report::Report;
 use crate::source::{Place, Sources, Span};
 use crate::testing::Scratch;
@@ -529,19 +529,6 @@ const RUNS: &[Run] = &[
             "---\ntitle: Post 1\ndate: 2026-10-04 09:30\n---\n",
         )],
     ),
-    Run::new(
-        Code::HookStopped,
-        &["build", "{site}"],
-        &[
-            (
-                "statac.yaml",
-                "before_build: cat styles/base.css styles/print.css > assets/site.css\n",
-            ),
-            ("styles/base.css", "body { margin: 0; }\n"),
-            ("assets/site.css", ""),
-        ],
-    )
-    .on_unix(),
     Run::new(
         Code::HookNotRun,
         CHECK,
@@ -1542,6 +1529,20 @@ fn drawn() -> Vec<Drawn> {
                     .into(),
             },
             place: None,
+        },
+        // What the command prints is the system's own: BusyBox's `cat`
+        // words a missing file its own way.
+        Drawn {
+            kind: Kind::HookStopped {
+                hook: "before_build".into(),
+                ended: Ended::Code(1),
+                said: "cat: styles/print.css: No such file or directory\n".into(),
+            },
+            place: Some((
+                "statac.yaml",
+                "before_build: cat styles/base.css styles/print.css > assets/site.css\n",
+                "cat styles/base.css styles/print.css > assets/site.css",
+            )),
         },
         // A run offers a new key each time.
         Drawn {

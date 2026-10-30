@@ -55,6 +55,11 @@ What changed in each release of Statac, the newest first.
   `build` finds an image too large to open or a copy it can't make, and
   how to publish an image in `static/` unchanged. Statac 0.7.2's
   explanation described only the first two reasons.
+- On Windows, Statac names the file in a problem with Sass with forward
+  slashes, such as `assets/_parts.scss`, as it names the file in every
+  other problem. Statac 0.7.2 used backslashes there, such as
+  `assets\_parts.scss`, in `sass-stopped`, `sass-warning` and
+  `outside-site`, and in `cant-read` for a stylesheet written in Sass.
 
 ### Changed
 
