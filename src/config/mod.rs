@@ -159,6 +159,12 @@ const SETTINGS: &[Setting] = &[
     ),
     setting("webmentions", Shape::Truth, Some(Preset::Truth(false))),
     setting("refuse_webmentions_from", Shape::WebAddresses, None),
+    setting(
+        "check_external_links",
+        Shape::Truth,
+        Some(Preset::Truth(false)),
+    ),
+    setting("unchecked_external_links", Shape::WebAddresses, None),
     setting("feed", Shape::Feed, None),
     setting("feed_key", Shape::Text, None),
     setting("feed_ids_before", Shape::Date, None),

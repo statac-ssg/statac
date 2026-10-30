@@ -113,6 +113,37 @@ const RUNS: &[Run] = &[
         ],
     ),
     Run::new(
+        Code::BrokenExternalLink,
+        &["check", "{site}", "--today=2026-10-09"],
+        &[
+            ("statac.yaml", "check_external_links: true\n"),
+            (
+                "content/post-1.md",
+                "Read [Post 2](https://example.org/post-2/) next.\n",
+            ),
+            (
+                "fetched/links",
+                "statac links 1\nhttps://example.org/post-2/\t404\t2026-10-06\n",
+            ),
+        ],
+    ),
+    Run::new(
+        Code::ExternalLinkMoved,
+        &["check", "{site}", "--today=2026-10-09"],
+        &[
+            ("statac.yaml", "check_external_links: true\n"),
+            (
+                "content/post-1.md",
+                "Read [Post 2](http://example.org/post-2/) next.\n",
+            ),
+            (
+                "fetched/links",
+                "statac links 1\nhttp://example.org/post-2/\tmoved \
+                 https://example.org/posts/post-2/\t2026-10-06\n",
+            ),
+        ],
+    ),
+    Run::new(
         Code::OtherSpelling,
         CHECK,
         &[(

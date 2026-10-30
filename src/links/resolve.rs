@@ -42,6 +42,16 @@ pub(crate) struct Site {
     watched_names: HashSet<String>,
     /// Whether each page checked notes what its links asked the site for.
     notes: bool,
+    /// What `statac refresh` recorded of the links to other sites, where
+    /// the site checks them.
+    external: Option<External>,
+}
+
+/// What the check of links to other sites reads.
+pub(crate) struct External {
+    pub(crate) answers: crate::fetched::links::Links,
+    /// The URLs `unchecked_external_links` lists.
+    pub(crate) unchecked: crate::config::refused::Refused,
 }
 
 /// Where a link leads.
@@ -115,7 +125,36 @@ impl Site {
             watched: HashSet::new(),
             watched_names: HashSet::new(),
             notes: false,
+            external: None,
         }
+    }
+
+    /// The same site, holding each link to another site to `external`.
+    pub(crate) fn checking(mut self, external: External) -> Site {
+        self.external = Some(external);
+        self
+    }
+
+    pub(crate) fn external(&self) -> Option<&External> {
+        self.external.as_ref()
+    }
+
+    /// The URL `written`, a link on the page published at `from`, leads to
+    /// on another site, as `fetched/links` records it.
+    pub(super) fn elsewhere(&self, written: &str, from: &str) -> Option<String> {
+        let link = self
+            .top
+            .join(from)
+            .and_then(|page| page.join(written))
+            .ok()?;
+        let host = link.host_str()?;
+        let ours = self.top.host_str() == Some(host)
+            || self.hosts.iter().any(|also| also == host)
+            || self.home.as_ref().is_some_and(|(home, _)| home == host);
+        if ours {
+            return None;
+        }
+        crate::fetched::links::key(&link)
     }
 
     /// The same site, with `files` the lists' own pages, each a path from

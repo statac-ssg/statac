@@ -51,6 +51,8 @@ macro_rules! codes {
 
 codes! {
     BrokenLink "broken-link",
+    BrokenExternalLink "broken-external-link",
+    ExternalLinkMoved "external-link-moved",
     OtherSpelling "other-spelling",
     RetiredSetting "retired-setting",
     CantWrite "cant-write",
@@ -316,6 +318,7 @@ impl Code {
     pub fn severity(self) -> Severity {
         match self {
             Code::BrokenLink
+            | Code::BrokenExternalLink
             | Code::WorkerOutsideImportMap
             | Code::UrlTaken
             | Code::UrlGone
@@ -397,6 +400,7 @@ impl Code {
             | Code::UnusedFeedTemplate
             | Code::UnusedLanguageFile
             | Code::LoopOverEveryPage
+            | Code::ExternalLinkMoved
             | Code::RefusedWebmentions => Severity::Note,
             Code::OtherSpelling
             | Code::RetiredSetting
@@ -482,6 +486,8 @@ impl Code {
     pub(crate) fn leaves_a_page_out(self) -> bool {
         match self {
             Code::BrokenLink
+            | Code::BrokenExternalLink
+            | Code::ExternalLinkMoved
             | Code::WorkerOutsideImportMap
             | Code::UrlTaken
             | Code::UrlGone
@@ -668,6 +674,21 @@ pub enum Kind {
         target: String,
         suggestion: Option<String>,
         inside: bool,
+    },
+    /// A link to another site that `statac refresh` found broken: the URL
+    /// as `fetched/links` records it, what the site answered, and how
+    /// many days before the build's it was asked, where the day is known.
+    BrokenExternalLink {
+        url: String,
+        broken: Broken,
+        days: Option<i64>,
+    },
+    /// A link to another site whose URL redirects permanently to `to`,
+    /// which answered: worth linking to instead, the scheme becoming
+    /// `https`, or the host or the path changing.
+    ExternalLinkMoved {
+        url: String,
+        to: String,
     },
     /// A second spelling of one of Statac's own words, refused however clear.
     OtherSpelling {
@@ -1589,7 +1610,8 @@ pub enum Kind {
         id: String,
         absent: bool,
     },
-    /// A line of `fetched/record` that doesn't read as Statac writes it.
+    /// A line of `fetched/record`, `fetched/links` or `published.txt`
+    /// that doesn't read as Statac writes it.
     MalformedRecord {
         fault: RecordFault,
     },
@@ -1689,6 +1711,15 @@ pub enum RecordFault {
     /// A line of `published.txt` that is no address from the top of the
     /// site, as written.
     NotAnAddress(String),
+    /// The first line of `fetched/links` isn't the one Statac writes.
+    LinksOpening,
+    /// A line of `fetched/links` of other than three fields, by how many
+    /// it has.
+    LinkFields(usize),
+    /// What is written where a line of `fetched/links` gives its URL.
+    NotALink(String),
+    /// What is written where a line of `fetched/links` gives its answer.
+    Answer(String),
 }
 
 /// What is wrong with a file a card's description names.
@@ -3101,6 +3132,8 @@ impl Kind {
     pub fn code(&self) -> Code {
         match self {
             Kind::BrokenLink { .. } => Code::BrokenLink,
+            Kind::BrokenExternalLink { .. } => Code::BrokenExternalLink,
+            Kind::ExternalLinkMoved { .. } => Code::ExternalLinkMoved,
             Kind::OtherSpelling { .. } => Code::OtherSpelling,
             Kind::RetiredSetting { .. } => Code::RetiredSetting,
             Kind::CantWrite { .. } => Code::CantWrite,
@@ -3820,6 +3853,17 @@ pub enum MathsFault {
     NoSuchLabel(String),
     /// Anything else, by what stands where Statac stopped.
     Unreadable(String),
+}
+
+/// What a site a page links to answered that shows the link is broken.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Broken {
+    /// `404` or `410`.
+    Missing(u16),
+    /// No name server knows the host.
+    NoHost(String),
+    /// The host's certificate has expired or names another host.
+    Certificate(String),
 }
 
 /// A site that keeps videos.

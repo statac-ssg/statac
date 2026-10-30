@@ -643,7 +643,12 @@ fn check_lists_the_javascript_between_the_problems_and_the_count() {
         sure: true,
         pages: 2,
     }];
-    let said = report.check_with(&problems, &Quiet::default(), &javascript);
+    let said = report.check_with(
+        &problems,
+        &Quiet::default(),
+        &javascript,
+        &Default::default(),
+    );
     assert!(
         said.contains(
             "\n\nJavaScript the site carries:\n  Written in `templates/page.html`, on 2 pages\n\n\
@@ -652,12 +657,12 @@ fn check_lists_the_javascript_between_the_problems_and_the_count() {
         "{said}"
     );
     assert_eq!(
-        report.check_with(&[], &Quiet::default(), &javascript),
+        report.check_with(&[], &Quiet::default(), &javascript, &Default::default()),
         "JavaScript the site carries:\n  Written in `templates/page.html`, on 2 pages\n\n\
          No problems.\n"
     );
     assert_eq!(
-        report.check_with(&problems, &Quiet::default(), &[]),
+        report.check_with(&problems, &Quiet::default(), &[], &Default::default()),
         report.check(&problems, &Quiet::default())
     );
 }

@@ -116,6 +116,9 @@ pub struct Outcome {
     pub hooks: crate::hooks::Ran,
     /// How old what was fetched is, where the site was written.
     pub(crate) fetched: crate::fetched::Ages,
+    /// What `fetched/links` says of the links to other sites, where the
+    /// site checks them.
+    pub(crate) links: crate::fetched::links::Tally,
     /// The photographs beside the writing that a page shows and none
     /// links, so only their copies are published and not the files
     /// themselves: each by where its own file would be published.
@@ -214,6 +217,7 @@ impl Outcome {
             cards: Cards::default(),
             hooks: crate::hooks::Ran::default(),
             fetched: crate::fetched::Ages::default(),
+            links: crate::fetched::links::Tally::default(),
             held_back: Vec::new(),
             kept: crate::published::Kept::default(),
             waited: Duration::ZERO,
@@ -555,9 +559,19 @@ impl Plan {
             .pages
             .iter()
             .filter(|(_, page)| page.source.is_none() || page.speaks_for.is_some());
-        let linked = links::Site::new(renderer.settings(), published)
+        let mut linked = links::Site::new(renderer.settings(), published)
             .listing(lists.map(|(_, page)| page.address.file()))
             .watching(held.keys().map(|&at| site.files[at].address.file()));
+        let settings = renderer.settings();
+        if settings.truth(crate::refresh::CHECK_EXTERNAL) == Some(true) {
+            linked = linked.checking(links::External {
+                answers: site.fetched.links.clone(),
+                unchecked: crate::config::refused::Refused::listed(
+                    settings,
+                    crate::refresh::UNCHECKED_EXTERNAL,
+                ),
+            });
+        }
         Plan {
             outputs,
             linked,
@@ -765,6 +779,9 @@ pub(crate) struct Concluded {
     held_back: HashSet<usize>,
     /// The search index of each language some page names it for.
     search: Vec<crate::search::File>,
+    /// What `fetched/links` says of the links to other sites, where the
+    /// site checks them.
+    links: crate::fetched::links::Tally,
 }
 
 impl Concluded {
@@ -845,6 +862,10 @@ pub(crate) fn conclude(
         renderer,
         built.iter().filter_map(|built| built.links.as_ref()),
         &made,
+    );
+    let (external, links) = linked.told_external(
+        renderer,
+        built.iter().filter_map(|built| built.links.as_ref()),
     );
     // What each list's pages told, by list.
     let mut on_list: HashMap<ListId, Vec<Problem>> = HashMap::new();
@@ -1044,6 +1065,7 @@ pub(crate) fn conclude(
         problem.kind.code() != Code::CallInHtml || !std::mem::replace(&mut said, true)
     });
     problems.extend(broken);
+    problems.extend(external);
     problems.extend(converted);
     if built.iter().any(|built| built.sized) {
         problems.extend(renderer.assets().narrowed().cloned());
@@ -1108,6 +1130,7 @@ pub(crate) fn conclude(
         cards,
         held_back,
         search,
+        links,
     }
 }
 
@@ -1178,6 +1201,7 @@ pub(crate) fn publish(
         cards: asked,
         held_back,
         search,
+        links,
     } = concluded;
     let Publishing {
         staging,
@@ -1395,7 +1419,12 @@ pub(crate) fn publish(
             let pictures = (site.pictures.iter())
                 .filter(|(_, picture)| picture.root == crate::album::Root::Fetched)
                 .map(|(_, picture)| picture.path.as_str());
-            crate::fetched::Ages::of(&site.fetched, pictures, &renderer.today())
+            let ages = crate::fetched::Ages::of(&site.fetched, pictures, &renderer.today());
+            crate::fetched::Ages {
+                links: links.asked(),
+                links_oldest: links.oldest,
+                ..ages
+            }
         }
         None => crate::fetched::Ages::default(),
     };
@@ -1413,6 +1442,7 @@ pub(crate) fn publish(
         cards,
         hooks,
         fetched,
+        links,
         held_back,
         kept: kept_published,
         waited: Duration::ZERO,

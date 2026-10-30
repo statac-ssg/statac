@@ -12,15 +12,15 @@ use crate::fetch::Refusal;
 use crate::platform::{Alike, Unwritable};
 use crate::problem::FeedFormat;
 use crate::problem::{
-    AddressFault, AllOf, ArgumentFault, Awaited, Because, Braced, CallFault, Called, CardFileFault,
-    Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found, Held, Hint, Holds,
-    InPlace, Instead, JsonFault, Kind, LabelledBy, Lack, ListFault, Look, Maker, Malformed,
-    MathsFault, Missing, MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener, OptionHint,
-    Own, PictureFault, Piece, Problem, Published, PublishedAsText, Reach, Reason, RecordFault,
-    Related, Relation, Repeated, Requirer, Rewrite, Root, SassFault, SassType, SetAside, Severity,
-    Shape, ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken, TakesFault,
-    TemplateFault, Told, Translated, Unheard, Unmatched, Unquietenable, Unread, Unsupported,
-    Unwritten, Waiting, Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
+    AddressFault, AllOf, ArgumentFault, Awaited, Because, Braced, Broken, CallFault, Called,
+    CardFileFault, Carried, Chooser, CommandHint, Ended, Expected, FormatFault, Former, Found,
+    Held, Hint, Holds, InPlace, Instead, JsonFault, Kind, LabelledBy, Lack, ListFault, Look, Maker,
+    Malformed, MathsFault, Missing, MoreAt, Named, NamedIn, Needed, NotDrawn, Occupant, Opener,
+    OptionHint, Own, PictureFault, Piece, Problem, Published, PublishedAsText, Reach, Reason,
+    RecordFault, Related, Relation, Repeated, Requirer, Rewrite, Root, SassFault, SassType,
+    SetAside, Severity, Shape, ShownBy, ShownWords, SiteMark, Sort, Stopped, SyntaxFault, Taken,
+    TakesFault, TemplateFault, Told, Translated, Unheard, Unmatched, Unquietenable, Unread,
+    Unsupported, Unwritten, Waiting, Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
 
 pub(crate) use crate::described::{
@@ -59,6 +59,22 @@ pub(crate) fn headline(kind: &Kind) -> String {
     match kind {
         Kind::BrokenLink { target, .. } => {
             format!("Broken link: nothing is published at `{target}`")
+        }
+        Kind::BrokenExternalLink { url, broken, .. } => match broken {
+            Broken::Missing(404) => format!("Broken external link: `{url}` answered 404 Not Found"),
+            Broken::Missing(status) => {
+                format!("Broken external link: `{url}` answered {status} Gone")
+            }
+            Broken::NoHost(host) => {
+                format!("Broken external link: nothing answers to the name `{host}`")
+            }
+            Broken::Certificate(host) => format!(
+                "Broken external link: the certificate of `{host}` has expired or is for \
+                 another host"
+            ),
+        },
+        Kind::ExternalLinkMoved { url, to } => {
+            format!("External link moved: `{url}` redirects permanently to `{to}`")
         }
         Kind::OtherSpelling { word, written, .. } | Kind::UnknownWord { word, written, .. } => {
             unknown(*word, written)
@@ -1100,7 +1116,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
             "Malformed record: {}",
             match fault {
                 RecordFault::Opening => "the first line isn't `statac fetched 1`".into(),
-                RecordFault::Fields(n) => {
+                RecordFault::Fields(n) | RecordFault::LinkFields(n) => {
                     format!("a line has {}, not 3", how_many(*n, "field", "fields"))
                 }
                 RecordFault::Path(path) => format!("`{path}` isn't a path inside `fetched/`"),
@@ -1109,6 +1125,11 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 RecordFault::Twice(path) => format!("`{path}` has two lines"),
                 RecordFault::NotAnAddress(written) => {
                     format!("`{written}` isn't a URL starting with `/`")
+                }
+                RecordFault::LinksOpening => "the first line isn't `statac links 1`".into(),
+                RecordFault::NotALink(written) => format!("`{written}` isn't a full URL"),
+                RecordFault::Answer(written) => {
+                    format!("`{written}` isn't an answer Statac records")
                 }
             }
         ),
@@ -2442,6 +2463,14 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             true => format!("To link inside the site, write `{s}`."),
             false => format!("Did you mean `{s}`?"),
         }),
+        Kind::BrokenExternalLink { days, .. } => Some(match days {
+            Some(days) => format!(
+                "`statac refresh` checked it {}. Change or remove the link.",
+                days_ago(*days)
+            ),
+            None => "Change or remove the link.".into(),
+        }),
+        Kind::ExternalLinkMoved { to, .. } => Some(format!("Link to `{to}` instead.")),
         Kind::OtherSpelling {
             word: Word::Marker,
             written,
@@ -3537,6 +3566,13 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Write it as a URL starting with `/`, such as `/about/`, or take the line out."
                     .into(),
             ),
+            RecordFault::LinksOpening => Some("Write `statac links 1` as its first line.".into()),
+            RecordFault::LinkFields(_) => Some(
+                "Write the URL, its answer and the day it was checked, separated by tabs.".into(),
+            ),
+            RecordFault::NotALink(_) | RecordFault::Answer(_) => Some(
+                "Delete the line. The next `statac refresh` checks the link again.".into(),
+            ),
         },
         Kind::TokenInSettings => Some(
             "Remove the line, add `webmentions: true`, and put the token in \
@@ -4468,6 +4504,10 @@ pub(crate) fn refusal(address: &str, refusal: &Refusal) -> String {
         }
         Refusal::Credentials => format!("`{address}` holds a user name or password"),
         Refusal::UnknownHost { host } => format!("nothing answers to the name `{host}`"),
+        Refusal::LookupFailed { host, reason } => format!(
+            "Statac couldn't look up `{host}`: {}",
+            crate::problem::system_words(reason)
+        ),
         Refusal::PrivateAddress { host, address } => {
             format!("`{host}` is at `{address}`, which isn't on the open web")
         }
@@ -4480,6 +4520,9 @@ pub(crate) fn refusal(address: &str, refusal: &Refusal) -> String {
         }
         // As long as a fetch is given, which `fetch` keeps to itself.
         Refusal::TimedOut => "no answer came within 30 seconds".into(),
+        Refusal::Certificate { host } => {
+            format!("the certificate of `{host}` has expired or is for another host")
+        }
         Refusal::Tls { host } => format!("Statac couldn't make a secure connection to `{host}`"),
         Refusal::Failed { reason } => crate::problem::system_words(reason),
     }
@@ -4688,6 +4731,141 @@ pub(crate) fn mentions_refreshed(fetched: usize, faces: usize, not_kept: usize) 
     match parts.is_empty() {
         true => "No new webmentions.".into(),
         false => parts.join(" "),
+    }
+}
+
+/// What `refresh` says where no link to another site is due to be
+/// checked.
+pub(crate) const NO_LINKS_DUE: &str = "No external links are due to be checked.";
+
+/// What `refresh` says as it starts checking `links` links to other sites,
+/// on `hosts` hosts.
+pub(crate) fn checking_links(links: usize, hosts: usize) -> String {
+    format!(
+        "Checking {} on {}.",
+        how_many(links, "external link", "external links"),
+        how_many(hosts, "site", "sites")
+    )
+}
+
+/// What `refresh` says every so often as it checks links to other sites.
+pub(crate) fn links_so_far(done: usize, of: usize) -> String {
+    format!(
+        "Checked {} of {}.",
+        grouped(done),
+        how_many(of, "external link", "external links")
+    )
+}
+
+/// What `refresh` says of a host that asked it to wait too long, and how
+/// many of its links it left for the next refresh.
+pub(crate) fn links_left(host: &str, count: usize) -> String {
+    format!(
+        "`{host}` asked Statac to wait, so {} to it {} left for the next `statac refresh`.",
+        how_many(count, "link", "links"),
+        if count == 1 { "is" } else { "are" }
+    )
+}
+
+/// What `refresh` says where `in_a_row` sites in a row didn't answer and
+/// it stopped checking links.
+pub(crate) fn links_stopped(in_a_row: usize) -> String {
+    format!(
+        "Stopped checking external links: {in_a_row} sites in a row didn't answer, so this \
+         computer may be offline. Statac recorded nothing for them."
+    )
+}
+
+/// What `refresh` says where no site it asked about a link answered.
+pub(crate) const LINKS_UNHEARD: &str =
+    "No site answered, so this computer may be offline. Statac recorded nothing for those links.";
+
+/// `refresh`'s line for links to other sites: how many it checked, and
+/// how many of those work, are broken and didn't answer, each where there
+/// is any.
+pub(crate) fn links_checked(
+    asked: usize,
+    answered: usize,
+    broken: usize,
+    unanswered: usize,
+) -> String {
+    let parts = link_answers(answered, broken, unanswered);
+    let checked = how_many(asked, "external link", "external links");
+    let line = format!("Checked {checked}: {}.", parts.join(", "));
+    match broken {
+        0 => line,
+        _ => format!("{line} Run `statac check` to see the broken ones."),
+    }
+}
+
+/// What `check` says of the site's links to other sites, a line each.
+pub(crate) const EXTERNAL_LINKS: &str = "External links:";
+
+/// The line of [`EXTERNAL_LINKS`] for those `statac refresh` checked: how
+/// many, the age of the oldest answer in days before the check's, and how
+/// many of them work, are broken and didn't answer, each where there is
+/// any.
+pub(crate) fn links_tally(
+    asked: usize,
+    oldest: Option<i64>,
+    answered: usize,
+    broken: usize,
+    unanswered: usize,
+) -> String {
+    let checked = grouped(asked);
+    let age = match oldest {
+        Some(days) if asked == 1 => format!(" {}", days_ago(days)),
+        Some(days) => format!(", the oldest {}", days_ago(days)),
+        None => String::new(),
+    };
+    let parts = link_answers(answered, broken, unanswered);
+    format!(
+        "{checked} checked by `statac refresh`{age}: {}.",
+        parts.join(", ")
+    )
+}
+
+/// How many links to other sites work, are broken and didn't answer,
+/// each where there is any.
+fn link_answers(answered: usize, broken: usize, unanswered: usize) -> Vec<String> {
+    let mut parts = Vec::new();
+    if answered > 0 {
+        let works = if answered == 1 { "works" } else { "work" };
+        parts.push(format!("{} {works}", grouped(answered)));
+    }
+    if broken > 0 {
+        parts.push(format!("{} broken", grouped(broken)));
+    }
+    if unanswered > 0 {
+        parts.push(format!("{} didn't answer", grouped(unanswered)));
+    }
+    parts
+}
+
+/// The line of [`EXTERNAL_LINKS`] for those `fetched/links` has no answer
+/// for.
+pub(crate) fn links_unasked(count: usize) -> String {
+    format!(
+        "{} not checked yet. Run `statac refresh` to check {}.",
+        grouped(count),
+        if count == 1 { "it" } else { "them" }
+    )
+}
+
+/// The line of [`EXTERNAL_LINKS`] for those `unchecked_external_links`
+/// lists.
+pub(crate) fn links_unchecked(count: usize) -> String {
+    format!("{} left out by `unchecked_external_links`.", grouped(count))
+}
+
+/// The part of [`fetched_ages`] for the answers in `fetched/links`: how
+/// many, and the age of the oldest, in days before the build's.
+pub(crate) fn links_age(links: usize, oldest: Option<i64>) -> String {
+    let counted = how_many(links, "external link checked", "external links checked");
+    match oldest {
+        None => counted,
+        Some(days) if links == 1 => format!("{counted}, {}", days_ago(days)),
+        Some(days) => format!("{counted}, the oldest {}", days_ago(days)),
     }
 }
 
@@ -5539,6 +5717,26 @@ mod tests {
                 ),
             ),
             (
+                record(RecordFault::LinksOpening),
+                "Malformed record: the first line isn't `statac links 1`",
+                Some("Write `statac links 1` as its first line."),
+            ),
+            (
+                record(RecordFault::LinkFields(2)),
+                "Malformed record: a line has 2 fields, not 3",
+                Some("Write the URL, its answer and the day it was checked, separated by tabs."),
+            ),
+            (
+                record(RecordFault::NotALink("example.org/".into())),
+                "Malformed record: `example.org/` isn't a full URL",
+                Some("Delete the line. The next `statac refresh` checks the link again."),
+            ),
+            (
+                record(RecordFault::Answer("fine".into())),
+                "Malformed record: `fine` isn't an answer Statac records",
+                Some("Delete the line. The next `statac refresh` checks the link again."),
+            ),
+            (
                 Kind::UnreadableImage {
                     path: "fetched/stills/youtube-abcdefghijk.jpg".into(),
                     fault: PictureFault::NotAStill,
@@ -5937,6 +6135,63 @@ mod tests {
         );
     }
 
+    #[test]
+    fn what_is_said_of_external_links_reads_as_written() {
+        assert_eq!(
+            fetched_ages(&[links_age(1_229, Some(40))]),
+            "Fetched: 1,229 external links checked, the oldest 40 days ago."
+        );
+        assert_eq!(links_age(1, Some(0)), "1 external link checked, today");
+        assert_eq!(
+            checking_links(1_234, 315),
+            "Checking 1,234 external links on 315 sites."
+        );
+        assert_eq!(checking_links(1, 1), "Checking 1 external link on 1 site.");
+        assert_eq!(
+            links_so_far(200, 1_234),
+            "Checked 200 of 1,234 external links."
+        );
+        assert_eq!(
+            links_left("github.com", 1),
+            "`github.com` asked Statac to wait, so 1 link to it is left for the next \
+             `statac refresh`."
+        );
+        assert_eq!(
+            links_checked(1_234, 1_100, 34, 100),
+            "Checked 1,234 external links: 1,100 work, 34 broken, 100 didn't answer. \
+             Run `statac check` to see the broken ones."
+        );
+        assert_eq!(
+            links_checked(1, 1, 0, 0),
+            "Checked 1 external link: 1 works."
+        );
+        assert_eq!(
+            links_checked(2, 0, 0, 2),
+            "Checked 2 external links: 2 didn't answer."
+        );
+        assert_eq!(
+            links_tally(1_234, Some(40), 1_100, 34, 100),
+            "1,234 checked by `statac refresh`, the oldest 40 days ago: 1,100 work, 34 broken, \
+             100 didn't answer."
+        );
+        assert_eq!(
+            links_tally(1, Some(3), 1, 0, 0),
+            "1 checked by `statac refresh` 3 days ago: 1 works."
+        );
+        assert_eq!(
+            links_unasked(5),
+            "5 not checked yet. Run `statac refresh` to check them."
+        );
+        assert_eq!(
+            links_unasked(1),
+            "1 not checked yet. Run `statac refresh` to check it."
+        );
+        assert_eq!(
+            links_unchecked(12),
+            "12 left out by `unchecked_external_links`."
+        );
+    }
+
     fn cards() -> Vec<(Kind, &'static str, Option<&'static str>)> {
         let wrong = |field: &str, expected, written: &str, respelt: Option<&str>| Kind::WrongKind {
             field: field.into(),
@@ -6177,7 +6432,42 @@ mod tests {
     }
 
     fn links() -> Vec<(Kind, &'static str, Option<&'static str>)> {
+        let broken = |broken, days| Kind::BrokenExternalLink {
+            url: "https://example.org/post-2/".into(),
+            broken,
+            days,
+        };
         vec![
+            (
+                broken(Broken::Missing(404), Some(3)),
+                "Broken external link: `https://example.org/post-2/` answered 404 Not Found",
+                Some("`statac refresh` checked it 3 days ago. Change or remove the link."),
+            ),
+            (
+                broken(Broken::Missing(410), Some(1)),
+                "Broken external link: `https://example.org/post-2/` answered 410 Gone",
+                Some("`statac refresh` checked it yesterday. Change or remove the link."),
+            ),
+            (
+                broken(Broken::NoHost("example.org".into()), Some(0)),
+                "Broken external link: nothing answers to the name `example.org`",
+                Some("`statac refresh` checked it today. Change or remove the link."),
+            ),
+            (
+                broken(Broken::Certificate("example.org".into()), None),
+                "Broken external link: the certificate of `example.org` has expired or is for \
+                 another host",
+                Some("Change or remove the link."),
+            ),
+            (
+                Kind::ExternalLinkMoved {
+                    url: "http://example.org/post-2/".into(),
+                    to: "https://example.org/posts/post-2/".into(),
+                },
+                "External link moved: `http://example.org/post-2/` redirects permanently to \
+                 `https://example.org/posts/post-2/`",
+                Some("Link to `https://example.org/posts/post-2/` instead."),
+            ),
             (
                 Kind::MissingDefinition {
                     written: "[^2]".into(),

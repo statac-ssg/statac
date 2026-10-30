@@ -693,16 +693,181 @@ fn a_name_that_answers_differently_at_a_second_hop_is_judged_again_and_refused()
     assert_eq!(server.requests().len(), 1);
 }
 
+/// What the system says looking up a name no name server knows.
+fn no_such_name() -> io::Error {
+    match cfg!(windows) {
+        true => io::Error::from_raw_os_error(11001),
+        false => io::Error::other(
+            "failed to lookup address information: nodename nor servname provided, or not known",
+        ),
+    }
+}
+
 #[test]
 fn a_name_nothing_answers_to_is_refused_as_such() {
-    let (lookup, _asks) = stand_in_for(vec![Err(io::Error::other("no such name"))]);
+    for answer in [Err(no_such_name()), Ok(Vec::new())] {
+        let (lookup, _asks) = stand_in_for(vec![answer]);
+        let plan = Plan::for_a_test(lookup, Vec::new(), TIME);
+        assert_eq!(
+            run(&plan, "http://absent.example/plain", 64),
+            Err(Refusal::UnknownHost {
+                host: "absent.example".to_owned()
+            })
+        );
+    }
+}
+
+#[test]
+fn a_name_that_couldnt_be_looked_up_is_refused_with_what_the_system_said() {
+    let said = "failed to lookup address information: Temporary failure in name resolution";
+    let (lookup, _asks) = stand_in_for(vec![Err(io::Error::other(said))]);
     let plan = Plan::for_a_test(lookup, Vec::new(), TIME);
     assert_eq!(
-        run(&plan, "http://absent.example/plain", 64),
-        Err(Refusal::UnknownHost {
-            host: "absent.example".to_owned()
+        run(&plan, "http://unasked.example/plain", 64),
+        Err(Refusal::LookupFailed {
+            host: "unasked.example".to_owned(),
+            reason: said.to_owned(),
         })
     );
+}
+
+#[test]
+fn a_certificate_expired_or_for_another_host_is_told_apart_from_other_secure_failures() {
+    use rustls::CertificateError as Fault;
+    let refusal = |fault| secure(&rustls::Error::InvalidCertificate(fault), "a.example");
+    let certificate = Refusal::Certificate {
+        host: "a.example".into(),
+    };
+    let tls = Refusal::Tls {
+        host: "a.example".into(),
+    };
+    for fault in [Fault::Expired, Fault::NotValidForName] {
+        assert_eq!(refusal(fault), certificate);
+    }
+    for fault in [
+        Fault::UnknownIssuer,
+        Fault::BadSignature,
+        Fault::NotValidYet,
+    ] {
+        assert_eq!(refusal(fault), tls);
+    }
+    assert_eq!(
+        secure(&rustls::Error::HandshakeNotComplete, "a.example"),
+        tls
+    );
+}
+
+/// A look within a test, at a server started here.
+fn look_at(server: &Server, path: &str, method: Method) -> Looked {
+    look_on(server.addr, &format!("http://a.example{path}"), method)
+}
+
+#[test]
+fn a_look_asks_with_head_names_itself_and_reads_no_body() {
+    let server = Server::start(|_| answered("a page", "text/html"));
+    let looked = look_at(&server, "/post-1/", Method::Head);
+    assert_eq!(
+        looked,
+        Looked {
+            redirects: Vec::new(),
+            end: Ending::Status {
+                status: 200,
+                challenge: false,
+                retry_after: None
+            }
+        }
+    );
+    let request = &server.requests()[0];
+    let mut lines = request.split("\r\n");
+    assert_eq!(lines.next(), Some("HEAD /post-1/ HTTP/1.1"));
+    let mut sent: Vec<String> = lines
+        .filter(|line| !line.is_empty())
+        .map(str::to_owned)
+        .collect();
+    sent.sort();
+    assert_eq!(
+        sent,
+        vec![
+            "accept-encoding: gzip".to_owned(),
+            "accept: text/html,application/xhtml+xml,*/*;q=0.8".to_owned(),
+            "host: a.example".to_owned(),
+            format!(
+                "user-agent: Statac/{} (link check; +https://statac.dev/link-check/)",
+                env!("CARGO_PKG_VERSION")
+            ),
+        ]
+    );
+    let looked = look_at(&server, "/post-1/", Method::Get);
+    assert_eq!(server.requests()[1].split(' ').next(), Some("GET"));
+    assert!(matches!(looked.end, Ending::Status { status: 200, .. }));
+}
+
+#[test]
+fn a_look_gives_each_redirect_and_the_last_status_whatever_it_is() {
+    let server = Server::start(|request| match path_of(request) {
+        "/a/" => redirected(301, "/b/"),
+        "/b/" => redirected(302, "http://b.example/c/"),
+        _ => answered_status(404),
+    });
+    let looked = look_at(&server, "/a/", Method::Head);
+    let url = |text: &str| Url::parse(text).unwrap();
+    assert_eq!(
+        looked.redirects,
+        [
+            (301, url("http://a.example/b/")),
+            (302, url("http://b.example/c/"))
+        ]
+    );
+    assert!(matches!(looked.end, Ending::Status { status: 404, .. }));
+}
+
+#[test]
+fn a_look_reads_a_challenge_and_how_long_to_wait_from_the_headers() {
+    let server = Server::start(|request| {
+        let answer = |status: u16, header: &str| {
+            format!("HTTP/1.1 {status} Whatever\r\n{header}\r\nContent-Length: 0\r\n\r\n")
+                .into_bytes()
+        };
+        match path_of(request) {
+            "/challenge/" => answer(403, "cf-mitigated: challenge"),
+            "/busy/" => answer(429, "Retry-After: 30"),
+            _ => answer(503, "Retry-After: Wed, 21 Oct 2026 07:28:00 GMT"),
+        }
+    });
+    let end = |path| look_at(&server, path, Method::Get).end;
+    assert_eq!(
+        end("/challenge/"),
+        Ending::Status {
+            status: 403,
+            challenge: true,
+            retry_after: None
+        }
+    );
+    assert_eq!(
+        end("/busy/"),
+        Ending::Status {
+            status: 429,
+            challenge: false,
+            retry_after: Some(30)
+        }
+    );
+    assert_eq!(
+        end("/dated/"),
+        Ending::Status {
+            status: 503,
+            challenge: false,
+            retry_after: None
+        }
+    );
+}
+
+#[test]
+fn a_look_redirected_a_sixth_time_ends_there_with_the_five_it_followed() {
+    let server = Server::start(|_| redirected(301, "/again/"));
+    let looked = look_at(&server, "/", Method::Head);
+    assert_eq!(looked.redirects.len(), 5);
+    assert_eq!(looked.end, Ending::Refused(Refusal::Redirects { limit: 5 }));
+    assert_eq!(server.requests().len(), 6);
 }
 
 #[test]

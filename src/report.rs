@@ -11,6 +11,7 @@ use std::time::Duration;
 use crate::build::{Cards, Copies, Javascript, Outcome};
 use crate::content::Included;
 use crate::fetched::Ages;
+use crate::fetched::links::Tally;
 use crate::hooks::{Before, Ran};
 use crate::problem::{Problem, Published, Quiet, Severity};
 use crate::source::{Place, SourceId, Sources};
@@ -232,6 +233,37 @@ impl<'a> Report<'a> {
         out
     }
 
+    /// What `fetched/links` says of the site's links to other sites, a line
+    /// for those checked, those not checked yet, and those the site's list
+    /// leaves out, each where there are any; nothing where the site has
+    /// none or doesn't check them.
+    pub(crate) fn external(&self, links: &Tally) -> String {
+        if links.urls.is_empty() {
+            return String::new();
+        }
+        let mut lines = Vec::new();
+        if links.asked() > 0 {
+            lines.push(wording::links_tally(
+                links.asked(),
+                links.oldest,
+                links.answered,
+                links.broken,
+                links.unanswered,
+            ));
+        }
+        if links.unasked > 0 {
+            lines.push(wording::links_unasked(links.unasked));
+        }
+        if links.unchecked > 0 {
+            lines.push(wording::links_unchecked(links.unchecked));
+        }
+        let mut out = format!("{}\n", wording::EXTERNAL_LINKS);
+        for line in lines {
+            out.push_str(&format!("  {line}\n"));
+        }
+        out
+    }
+
     /// What `build` did with the copies of photographs: those it made, and
     /// those it removed; nothing where it did neither.
     pub(crate) fn copies(&self, copies: Copies) -> String {
@@ -314,6 +346,9 @@ impl<'a> Report<'a> {
         if ages.mentions > 0 {
             parts.push(wording::mentions_age(ages.mentions, ages.newest));
         }
+        if ages.links > 0 {
+            parts.push(wording::links_age(ages.links, ages.links_oldest));
+        }
         match parts.is_empty() {
             true => String::new(),
             false => format!("{}\n", wording::fetched_ages(&parts)),
@@ -389,24 +424,27 @@ impl<'a> Report<'a> {
 
     /// What `check` says: every problem not quietened in full, then the count.
     pub fn check(&self, problems: &[Problem], quiet: &Quiet) -> String {
-        self.check_with(problems, quiet, &[])
+        self.check_with(problems, quiet, &[], &Tally::default())
     }
 
-    /// The same, with the JavaScript the site carries between the problems
-    /// and the count.
+    /// The same, with the JavaScript the site carries and what
+    /// `fetched/links` says of its links to other sites between the
+    /// problems and the count.
     pub(crate) fn check_with(
         &self,
         problems: &[Problem],
         quiet: &Quiet,
         javascript: &[Javascript],
+        links: &Tally,
     ) -> String {
         let shown = problems.iter().filter(|p| !quiet.quietens(&p.kind));
         let mut out = self.drawn(shown, true);
-        let carried = self.javascript(javascript);
-        if !out.is_empty() && !carried.is_empty() {
-            out.push('\n');
+        for part in [self.javascript(javascript), self.external(links)] {
+            if !out.is_empty() && !part.is_empty() {
+                out.push('\n');
+            }
+            out.push_str(&part);
         }
-        out.push_str(&carried);
         let counts = counts(
             &problems.iter().collect::<Vec<_>>(),
             quiet,

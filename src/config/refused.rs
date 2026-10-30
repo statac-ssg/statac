@@ -8,6 +8,8 @@
 //! on the same host and port where the other's path leads to it at a
 //! `/`, and the other has no query.
 //!
+//! `unchecked_external_links:` lists URLs the same way, read here too.
+//!
 //! Statac once kept the refused in `fetched/refused`, which it no longer
 //! reads: `check` tells a site that still has one the lines that carry its
 //! URLs over.
@@ -85,10 +87,24 @@ impl Refused {
     /// The lines `settings` write. A line that is no URL was told as the
     /// settings were read, and is left out.
     pub(crate) fn of(settings: &Settings) -> Refused {
-        let lines = (settings.texts(SETTING).iter())
+        Refused::listed(settings, SETTING)
+    }
+
+    /// The lines of the list `setting` in `settings`, read as
+    /// `refuse_webmentions_from:` is.
+    pub(crate) fn listed(settings: &Settings, setting: &str) -> Refused {
+        let lines = (settings.texts(setting).iter())
             .filter_map(|line| Some((line.value.clone(), Spot::of(&line.value)?)))
             .collect();
         Refused { lines }
+    }
+
+    /// The line, as written, that `url` is at or under.
+    pub(crate) fn covering(&self, url: &str) -> Option<&str> {
+        let spot = Spot::of(url)?;
+        (self.lines.iter())
+            .find(|(_, over)| spot.at_or_under(over))
+            .map(|(line, _)| line.as_str())
     }
 
     /// The line, as written, that refuses a mention sent from `url` by

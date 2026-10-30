@@ -155,7 +155,9 @@ const USAGE: [(&str, &str); 11] = [
                          as a video's thumbnail or a webmention, into
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
-                         the site's .statac/token.
+                         the site's .statac/token. If statac.yaml has
+                         check_external_links: true, it also asks other
+                         sites whether the links to them still work.
 ",
     ),
     (
@@ -483,12 +485,14 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
                     report.of_build(&outcome, &options.out(), took)
                 }
                 Mode::Check => {
-                    // A stopped run leaves pages out, so what it carries is unknown.
-                    let javascript = match outcome.stopped() {
-                        true => &[],
-                        false => outcome.javascript.as_slice(),
+                    // A stopped run leaves pages out, so what it carries
+                    // and links to is unknown.
+                    let none = Default::default();
+                    let (javascript, links) = match outcome.stopped() {
+                        true => (&[][..], &none),
+                        false => (outcome.javascript.as_slice(), &outcome.links),
                     };
-                    report.check_with(problems, &outcome.quiet, javascript)
+                    report.check_with(problems, &outcome.quiet, javascript, links)
                 }
             };
             say(terminal.out, &report.included(outcome.included));
@@ -542,6 +546,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             return refresh::run(
                 &options,
                 &crate::fetch::fetch,
+                &refresh::Network,
                 terminal.out,
                 terminal.colour_out,
             );

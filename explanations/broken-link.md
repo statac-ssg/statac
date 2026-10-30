@@ -25,8 +25,10 @@ shows that line, even if a template or snippet prints it. If a template
 or snippet wrote the URL itself, the warning shows the line that wrote it,
 and the page the link is on. Statac still publishes the page, with the
 link as you wrote it, because the link may point at something you are
-about to add. It publishes a redirect the same way. Statac doesn't check
-links to other sites, because a build never fetches anything.
+about to add. It publishes a redirect the same way. A build never fetches
+anything, so it doesn't check links to other sites. If `statac.yaml` has
+`check_external_links: true`, `statac refresh` asks the other sites, and
+a broken link to one is a `broken-external-link`.
 
 ## How to fix it
 

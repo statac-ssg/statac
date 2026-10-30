@@ -562,7 +562,9 @@ Usage:
                          as a video's thumbnail or a webmention, into
                          fetched/. Webmentions are asked for with the
                          token in STATAC_WEBMENTION_TOKEN, or else in
-                         the site's .statac/token.
+                         the site's .statac/token. If statac.yaml has
+                         check_external_links: true, it also asks other
+                         sites whether the links to them still work.
   statac new [folder]    Ask five questions and write a new site's settings
                          from the answers into the folder, which must be
                          empty or not there yet.

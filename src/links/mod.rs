@@ -20,6 +20,11 @@
 //! data, it is told where that is written. Each is known by where the
 //! build recorded each byte of the page as written.
 //!
+//! Where the site asks for its links to other sites to be checked, each
+//! link a reader follows to another site, an `<a>`'s or an `<area>`'s, is
+//! held to what `statac refresh` recorded of it in `fetched/links`, and
+//! told where it was written in the same way.
+//!
 //! An address is offered back as the link was written: one written with
 //! `@url(...)`, or with a template's `url(...)`, as another of the same.
 //! On a site published under a path, a link from the top of the domain
@@ -30,14 +35,15 @@ mod template;
 #[cfg(test)]
 mod tests;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
-pub(crate) use resolve::Site;
+pub(crate) use resolve::{External, Site};
 
 use crate::address::{self, Address};
+use crate::fetched::links::{Answer, Tally};
 use crate::ids::{PageId, TemplateId};
 use crate::linked::{Linked, Writing, scan};
-use crate::problem::{Kind, Problem};
+use crate::problem::{Broken, Kind, Problem};
 use crate::reads::{Key, Reads, Translation};
 use crate::slug;
 use crate::source::Place;
@@ -109,6 +115,8 @@ pub(crate) struct Checked {
     /// the site held there and whether that file was published only where
     /// a page links it, where the site notes what its pages ask of it.
     asked: Vec<(String, Option<String>, bool)>,
+    /// Its links to other sites, where the site checks them.
+    outbound: Vec<Outbound>,
 }
 
 impl Checked {
@@ -126,28 +134,24 @@ impl Checked {
     pub(crate) fn moved(&self, to: &Translation) -> Option<Checked> {
         let moved = |misses: &[Miss]| {
             let misses = misses.iter().map(|miss| {
-                let blame = match &miss.blame {
-                    Blame::Writing(place, handed) => Blame::Writing(to.place(*place)?, *handed),
-                    Blame::Shown(place, handed) => Blame::Shown(to.place(*place)?, *handed),
-                    Blame::Template(placed) => Blame::Template(match placed {
-                        Some(Placed::Attribute(template, at)) => {
-                            Some(Placed::Attribute(to.template(*template)?, *at))
-                        }
-                        Some(Placed::Printed(place)) => Some(Placed::Printed(to.place(*place)?)),
-                        None => None,
-                    }),
-                };
                 Some(Miss {
-                    blame,
+                    blame: miss.blame.moved(to)?,
                     ..miss.clone()
                 })
             });
             misses.collect::<Option<Vec<Miss>>>()
         };
+        let outbound = self.outbound.iter().map(|out| {
+            Some(Outbound {
+                blame: out.blame.moved(to)?,
+                ..out.clone()
+            })
+        });
         Some(Checked {
             page: to.page(self.page)?,
             misses: moved(&self.misses)?,
             anchors: moved(&self.anchors)?,
+            outbound: outbound.collect::<Option<Vec<Outbound>>>()?,
             ..self.clone()
         })
     }
@@ -164,6 +168,14 @@ struct Miss {
     file: Option<String>,
 }
 
+/// A link to another site.
+#[derive(Clone, Debug)]
+struct Outbound {
+    blame: Blame,
+    /// As `fetched/links` records it.
+    url: String,
+}
+
 /// Who wrote a link.
 #[derive(Clone, Debug)]
 enum Blame {
@@ -176,6 +188,24 @@ enum Blame {
     /// A template or snippet, writing this link, placed where that is
     /// known.
     Template(Option<Placed>),
+}
+
+impl Blame {
+    /// The same blame as another reading of the site has it; none where
+    /// that reading has no such template or place.
+    fn moved(&self, to: &Translation) -> Option<Blame> {
+        Some(match self {
+            Blame::Writing(place, handed) => Blame::Writing(to.place(*place)?, *handed),
+            Blame::Shown(place, handed) => Blame::Shown(to.place(*place)?, *handed),
+            Blame::Template(placed) => Blame::Template(match placed {
+                Some(Placed::Attribute(template, at)) => {
+                    Some(Placed::Attribute(to.template(*template)?, *at))
+                }
+                Some(Placed::Printed(place)) => Some(Placed::Printed(to.place(*place)?)),
+                None => None,
+            }),
+        })
+    }
 }
 
 /// Where a link a template or snippet wrote was written.
@@ -230,6 +260,7 @@ impl Site {
             reached: Vec::new(),
             cards: page.cards,
             asked: Vec::new(),
+            outbound: Vec::new(),
         };
         let own = (page.number == 1)
             .then(|| renderer.writing(page.id))
@@ -248,6 +279,9 @@ impl Site {
             .collect();
         for link in &scanned.links {
             let written = link.address();
+            let elsewhere = (link.followed && self.external().is_some())
+                .then(|| self.elsewhere(&written, &from))
+                .flatten();
             if let Some((path, file)) = self.watched(&written, &from) {
                 self.ask(&path, &mut checked);
                 checked.reached.extend(file);
@@ -317,19 +351,33 @@ impl Site {
                 let found = (writing.written.iter().find(there).map(|w| (w, false)))
                     .or_else(|| writing.handed.iter().find(there).map(|w| (w, true)))
                     .or_else(|| writing.written.iter().find(alike).map(|w| (w, false)));
-                match found {
+                match (found, elsewhere.clone()) {
+                    (Some((w, _)), Some(url)) if writer == page.id => {
+                        let blame = Blame::Writing(w.place, w.handed);
+                        checked.outbound.push(Outbound { blame, url });
+                        continue;
+                    }
+                    // Another page's writing holding it is told on that
+                    // page, where there is one.
+                    (Some((w, _)), Some(url)) => {
+                        if !site.pages.get(writer).lands() {
+                            let blame = Blame::Shown(w.place, w.handed);
+                            checked.outbound.push(Outbound { blame, url });
+                        }
+                        continue;
+                    }
                     // The writing's own links were followed above.
-                    Some((_, false)) if writer == page.id => continue,
-                    Some((w, true)) if writer == page.id => {
+                    (Some((_, false)), None) if writer == page.id => continue,
+                    (Some((w, true)), None) if writer == page.id => {
                         let blame = Blame::Writing(w.place, w.handed);
                         self.follow(&written, &from, blame, &mut checked);
                         continue;
                     }
-                    Some((w, _)) => {
+                    (Some((w, _)), None) => {
                         self.shown(site, writer, w, &written, &from, &mut checked);
                         continue;
                     }
-                    None => {}
+                    (None, _) => {}
                 }
             }
             // Written in a file, it is told there; else at the attribute,
@@ -338,7 +386,10 @@ impl Site {
                 .or(attribute)
                 .or(printed.map(Placed::Printed));
             let blame = Blame::Template(placed);
-            self.follow(&written, &from, blame, &mut checked);
+            match elsewhere {
+                Some(url) => checked.outbound.push(Outbound { blame, url }),
+                None => self.follow(&written, &from, blame, &mut checked),
+            }
         }
         checked.asked.sort_unstable();
         checked.asked.dedup();
@@ -486,82 +537,8 @@ impl Site {
                 .file
                 .as_deref()
                 .map_or(&[][..], |file| ids.get(file).copied().unwrap_or_default());
-            let sources = renderer.sources();
-            let in_writing = |place: Place, handed: bool| {
-                let path = sources.path(place.source).to_string_lossy();
-                let helper = !(handed || path.ends_with(".html") || path.ends_with(".htm"));
-                let written = sources.spelling(place);
-                Wrote {
-                    helper: helper.then_some(Helper::Call),
-                    used: helper && written.starts_with("@url(") && written.ends_with(')'),
-                }
-            };
-            let named = |place: Place| named_by_file(renderer.site(), place, &miss.written);
-            let problem = match &miss.blame {
-                Blame::Writing(place, handed) => {
-                    let wrote = in_writing(*place, *handed);
-                    let kind = self.kind(miss, page, there, wrote, named(*place), true);
-                    Problem::at(kind, *place)
-                }
-                Blame::Shown(place, handed) => {
-                    let wrote = in_writing(*place, *handed);
-                    let kind = self.kind(miss, page, there, wrote, named(*place), false);
-                    building(renderer, page, Problem::at(kind, *place))
-                }
-                Blame::Template(Some(Placed::Printed(place)))
-                    if renderer.template_of(place.source).is_none() =>
-                {
-                    let wrote = Wrote {
-                        helper: None,
-                        used: false,
-                    };
-                    let kind = self.kind(miss, page, there, wrote, None, false);
-                    building(renderer, page, Problem::at(kind, *place))
-                }
-                Blame::Template(placed) => {
-                    let text =
-                        |template: TemplateId| sources.text(renderer.template_source(template));
-                    let placed = placed.as_ref().and_then(|placed| match *placed {
-                        Placed::Attribute(template, at) => {
-                            Some((template, at..template::value_end(text(template), at)))
-                        }
-                        Placed::Printed(place) => {
-                            let template = renderer.template_of(place.source)?;
-                            let at = place.span.start as usize..place.span.end as usize;
-                            Some((template, at))
-                        }
-                    });
-                    let wrote = match &placed {
-                        Some((template, at)) => {
-                            let written = &text(*template)[at.clone()];
-                            // HTML printed whole is the writing's only
-                            // where it was read as Markdown.
-                            let helper = match template::prints_whole(text(*template), at) {
-                                false => Some(Helper::Function),
-                                true if written.contains("markdown") => Some(Helper::Call),
-                                true => None,
-                            };
-                            let inside = written.trim_start_matches(['{', '-', ' ']);
-                            Wrote {
-                                helper,
-                                used: helper == Some(Helper::Function)
-                                    && written.starts_with("{{")
-                                    && inside.starts_with("url("),
-                            }
-                        }
-                        None => Wrote {
-                            helper: None,
-                            used: false,
-                        },
-                    };
-                    let kind = self.kind(miss, page, there, wrote, None, false);
-                    let place = placed.map(|(template, at)| Place {
-                        source: renderer.template_source(template),
-                        span: crate::source::Span::new(at.start, at.end),
-                    });
-                    building(renderer, page, Problem::placed(kind, place))
-                }
-            };
+            let kind = |wrote, named, own| self.kind(miss, page, there, wrote, named, own);
+            let problem = placed(renderer, page, &miss.blame, Some(&miss.written), kind);
             // Once for each place it is written, naming the first page it
             // breaks on.
             if seen.insert((problem.place, miss.written.as_str())) {
@@ -569,6 +546,86 @@ impl Site {
             }
         }
         told
+    }
+
+    /// Each link to another site on the built pages that `fetched/links`
+    /// records as broken, or as redirecting permanently somewhere worth
+    /// linking to instead, told once where it was written, as [`Site::told`]
+    /// tells a link; and what the record says of the rest. Nothing where
+    /// the site doesn't check its links to other sites.
+    pub(crate) fn told_external<'a>(
+        &self,
+        renderer: &Renderer,
+        checked: impl IntoIterator<Item = &'a Checked>,
+    ) -> (Vec<Problem>, Tally) {
+        let Some(external) = self.external() else {
+            return (Vec::new(), Tally::default());
+        };
+        let today = renderer.today();
+        let mut outbound: Vec<(&Checked, &Outbound)> = (checked.into_iter())
+            .flat_map(|page| page.outbound.iter().map(move |out| (page, out)))
+            .collect();
+        outbound.sort_by_key(|(_, out)| !matches!(out.blame, Blame::Writing(..)));
+        let urls: BTreeSet<&str> = outbound.iter().map(|(_, out)| out.url.as_str()).collect();
+        let mut told = Vec::new();
+        let mut seen: HashSet<(Option<Place>, &str)> = HashSet::new();
+        for (page, out) in outbound {
+            if external.unchecked.covering(&out.url).is_some() {
+                continue;
+            }
+            let Some(line) = external.answers.get(&out.url) else {
+                continue;
+            };
+            let host = || {
+                let url = url::Url::parse(&out.url).ok();
+                url.and_then(|url| url.host_str().map(str::to_owned))
+                    .unwrap_or_default()
+            };
+            let kind = match &line.answer {
+                Answer::Missing(status) => Kind::BrokenExternalLink {
+                    url: out.url.clone(),
+                    broken: Broken::Missing(*status),
+                    days: crate::fetched::days_between(&line.day, &today),
+                },
+                Answer::NoHost | Answer::Certificate => Kind::BrokenExternalLink {
+                    url: out.url.clone(),
+                    broken: match line.answer {
+                        Answer::NoHost => Broken::NoHost(host()),
+                        _ => Broken::Certificate(host()),
+                    },
+                    days: crate::fetched::days_between(&line.day, &today),
+                },
+                Answer::Moved(to) if worth_moving(&out.url, to) => Kind::ExternalLinkMoved {
+                    url: out.url.clone(),
+                    to: to.clone(),
+                },
+                _ => continue,
+            };
+            let problem = placed(renderer, page, &out.blame, None, |_, _, _| kind);
+            if seen.insert((problem.place, out.url.as_str())) {
+                told.push(problem);
+            }
+        }
+        let mut tally = Tally::default();
+        for url in urls {
+            tally.urls.push(url.to_owned());
+            if external.unchecked.covering(url).is_some() {
+                tally.unchecked += 1;
+                continue;
+            }
+            let Some(line) = external.answers.get(url) else {
+                tally.unasked += 1;
+                continue;
+            };
+            match &line.answer {
+                answer if answer.answered() => tally.answered += 1,
+                answer if answer.broken() => tally.broken += 1,
+                _ => tally.unanswered += 1,
+            }
+            let days = crate::fetched::days_between(&line.day, &today).unwrap_or_default();
+            tally.oldest = Some(tally.oldest.map_or(days, |oldest| oldest.max(days)));
+        }
+        (told, tally)
     }
 
     /// What a link that lands nowhere is told as, with the nearest address
@@ -716,6 +773,113 @@ impl Helper {
             Helper::Function => format!("{{{{ url(\"{address}\") }}}}"),
         }
     }
+}
+
+/// The problem `kind` makes of a link on `page` that `blame` says who
+/// wrote, placed where it was written. `kind` is handed how the link was
+/// written, the address of the page `written`, the link's address, names
+/// by its file, where it is given, and whether the link is in `page`'s
+/// own writing.
+fn placed(
+    renderer: &Renderer,
+    page: &Checked,
+    blame: &Blame,
+    written: Option<&str>,
+    kind: impl FnOnce(Wrote, Option<String>, bool) -> Kind,
+) -> Problem {
+    let sources = renderer.sources();
+    let in_writing = |place: Place, handed: bool| {
+        let path = sources.path(place.source).to_string_lossy();
+        let helper = !(handed || path.ends_with(".html") || path.ends_with(".htm"));
+        let written = sources.spelling(place);
+        Wrote {
+            helper: helper.then_some(Helper::Call),
+            used: helper && written.starts_with("@url(") && written.ends_with(')'),
+        }
+    };
+    let named = |place: Place| named_by_file(renderer.site(), place, written?);
+    match blame {
+        Blame::Writing(place, handed) => {
+            let kind = kind(in_writing(*place, *handed), named(*place), true);
+            Problem::at(kind, *place)
+        }
+        Blame::Shown(place, handed) => {
+            let kind = kind(in_writing(*place, *handed), named(*place), false);
+            building(renderer, page, Problem::at(kind, *place))
+        }
+        Blame::Template(Some(Placed::Printed(place)))
+            if renderer.template_of(place.source).is_none() =>
+        {
+            let wrote = Wrote {
+                helper: None,
+                used: false,
+            };
+            building(
+                renderer,
+                page,
+                Problem::at(kind(wrote, None, false), *place),
+            )
+        }
+        Blame::Template(placed) => {
+            let text = |template: TemplateId| sources.text(renderer.template_source(template));
+            let placed = placed.as_ref().and_then(|placed| match *placed {
+                Placed::Attribute(template, at) => {
+                    Some((template, at..template::value_end(text(template), at)))
+                }
+                Placed::Printed(place) => {
+                    let template = renderer.template_of(place.source)?;
+                    let at = place.span.start as usize..place.span.end as usize;
+                    Some((template, at))
+                }
+            });
+            let wrote = match &placed {
+                Some((template, at)) => {
+                    let written = &text(*template)[at.clone()];
+                    // HTML printed whole is the writing's only where it was
+                    // read as Markdown.
+                    let helper = match template::prints_whole(text(*template), at) {
+                        false => Some(Helper::Function),
+                        true if written.contains("markdown") => Some(Helper::Call),
+                        true => None,
+                    };
+                    let inside = written.trim_start_matches(['{', '-', ' ']);
+                    Wrote {
+                        helper,
+                        used: helper == Some(Helper::Function)
+                            && written.starts_with("{{")
+                            && inside.starts_with("url("),
+                    }
+                }
+                None => Wrote {
+                    helper: None,
+                    used: false,
+                },
+            };
+            let kind = kind(wrote, None, false);
+            let place = placed.map(|(template, at)| Place {
+                source: renderer.template_source(template),
+                span: crate::source::Span::new(at.start, at.end),
+            });
+            building(renderer, page, Problem::placed(kind, place))
+        }
+    }
+}
+
+/// Whether a link to `from` that redirects permanently to `to` is worth
+/// changing: where the scheme becomes `https`, or the host or the path
+/// changes, beyond a `www.` and a final slash.
+fn worth_moving(from: &str, to: &str) -> bool {
+    let (Ok(from), Ok(to)) = (url::Url::parse(from), url::Url::parse(to)) else {
+        return false;
+    };
+    let host = |url: &url::Url| {
+        let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+        host.strip_prefix("www.").map(str::to_owned).unwrap_or(host)
+    };
+    let path = |url: &url::Url| url.path().trim_end_matches('/').to_owned();
+    (from.scheme() == "http" && to.scheme() == "https")
+        || host(&from) != host(&to)
+        || path(&from) != path(&to)
 }
 
 /// The problem, met building `page`.

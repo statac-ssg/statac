@@ -49,6 +49,12 @@ impl Attribute {
         ("poster", Attribute::Poster),
     ];
 
+    /// Whether a reader follows an address in this attribute of the
+    /// element `tag`: `href` on `<a>` or `<area>`.
+    fn followed_on(self, tag: &str) -> bool {
+        self == Attribute::Href && matches!(tag, "a" | "area")
+    }
+
     pub(crate) fn of(name: &str) -> Option<Attribute> {
         let (_, attribute) = Attribute::NAMED.iter().find(|(named, _)| *named == name)?;
         Some(*attribute)
@@ -65,6 +71,8 @@ pub(crate) struct Found {
     pub(crate) at: usize,
     /// Where the attribute's value starts on the page.
     pub(crate) value: usize,
+    /// Whether a reader follows it: the `href` of an `<a>` or an `<area>`.
+    pub(crate) followed: bool,
 }
 
 impl Found {
@@ -100,12 +108,14 @@ pub(crate) fn scan(html: &str) -> Scanned {
                         continue;
                     };
                     let value = attribute.at.start;
+                    let followed = kind.followed_on(&tag.name);
                     for (raw, at) in addresses(&attribute.value, kind == Attribute::Srcset, value) {
                         scanned.links.push(Found {
                             attribute: kind,
                             raw: raw.to_owned(),
                             at,
                             value,
+                            followed,
                         });
                     }
                 }
@@ -244,7 +254,7 @@ fn in_html(sources: &Sources, source: SourceId, span: Span, in_site: &[InSite]) 
                         span: Span::new(start, end),
                     },
                     handed: false,
-                    followed: kind == Attribute::Href && matches!(tag.name.as_str(), "a" | "area"),
+                    followed: kind.followed_on(&tag.name),
                 });
             }
         }

@@ -16,6 +16,12 @@
 //! A fetch gives the bytes back, or one refusal saying exactly why not.
 //! A refusal carries the bare facts; how it is worded for the author
 //! belongs to what shows it.
+//!
+//! A look asks for an address without fetching it, to learn whether it
+//! answers: judged and followed the same way, it reads no body, and gives
+//! back each redirect and the last status, or why nothing answered. It
+//! names itself as Statac's link check, with the page that explains it,
+//! and accepts a compressed answer, which it never reads.
 
 use std::io::{self, Read};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
@@ -43,6 +49,13 @@ const REDIRECTS: u32 = 5;
 /// no more itself.
 const ADDRESSES_KEPT: usize = 16;
 
+/// The whole of a look, name lookups and redirects included.
+const LOOK_TIME: Duration = Duration::from_secs(20);
+
+/// Where the docs explain the link check to the owners of the sites it
+/// asks.
+pub(crate) const LINK_CHECK_PAGE: &str = "https://statac.dev/link-check/";
+
 /// What a fetch brought back.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Fetched {
@@ -66,8 +79,10 @@ pub enum Refusal {
     NoHost,
     /// The address carries a user name or password.
     Credentials,
-    /// No name server answered for the host.
+    /// No name server knows the host.
     UnknownHost { host: String },
+    /// The host's name couldn't be looked up, as the system says.
+    LookupFailed { host: String, reason: String },
     /// The host stands for an address off the open web.
     PrivateAddress { host: String, address: IpAddr },
     /// The server answered `404` or `410`, that it has no such thing,
@@ -92,7 +107,10 @@ pub enum Refusal {
     },
     /// The fetch ran out of time.
     TimedOut,
-    /// The secure connection to the host could not be made.
+    /// The host's certificate has expired or names another host.
+    Certificate { host: String },
+    /// The secure connection to the host could not be made, for any other
+    /// reason.
     Tls { host: String },
     /// Anything else the network or the system said.
     Failed { reason: String },
@@ -130,6 +148,43 @@ pub(crate) fn fetch_allowing(
     )
 }
 
+/// How a look asks.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Method {
+    Head,
+    Get,
+}
+
+/// What a look found.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Looked {
+    /// Each redirect followed, in order: its status, and where it pointed.
+    pub redirects: Vec<(u16, Url)>,
+    pub end: Ending,
+}
+
+/// How a look ended.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Ending {
+    /// The last answer: its status, whether it said it is a challenge, a
+    /// page asking the visitor to prove they are a person, and how many
+    /// seconds its `Retry-After` asked to wait, where it gave a number.
+    Status {
+        status: u16,
+        challenge: bool,
+        retry_after: Option<u64>,
+    },
+    /// Nothing answered: the refusal saying why. A certificate that has
+    /// expired or names another host is [`Refusal::Certificate`].
+    Refused(Refusal),
+}
+
+/// Asks for `address` with `method`, judging each hop as a fetch does and
+/// pausing for `pause` before each redirect is followed.
+pub(crate) fn look(address: &str, method: Method, pause: Duration) -> Looked {
+    look_by(&Plan::for_a_look(), address, method, pause)
+}
+
 /// What a fetch is given beyond the caller's address and limit: the whole
 /// time it may take, how a name is looked up, and the addresses it may
 /// reach however they judge. A fetch looks names up with the system,
@@ -146,6 +201,13 @@ impl Plan {
             total: TIME,
             lookup: Lookup::System,
             allowed: Vec::new(),
+        }
+    }
+
+    fn for_a_look() -> Plan {
+        Plan {
+            total: LOOK_TIME,
+            ..Plan::for_a_fetch()
         }
     }
 
@@ -185,7 +247,7 @@ fn run(plan: &Plan, address: &str, limit: u64) -> Result<Fetched, Refusal> {
             .checked_duration_since(Instant::now())
             .ok_or(Refusal::TimedOut)?;
         let host = judged_hop(plan, &url, within, &judged)?;
-        let agent = agent_for(within, &judged);
+        let agent = agent_for(within, &judged, Asking::Fetch);
         let mut response = agent
             .get(url.as_str())
             .call()
@@ -232,6 +294,75 @@ fn run(plan: &Plan, address: &str, limit: u64) -> Result<Fetched, Refusal> {
             from: url,
             content_type,
         });
+    }
+}
+
+/// A look within a test, every name standing for `server` alone, a
+/// server on this machine standing in for the open web.
+#[cfg(test)]
+pub(crate) fn look_on(server: SocketAddr, address: &str, method: Method) -> Looked {
+    let lookup = Lookup::StandIn(Arc::new(move |_| Ok(vec![server])));
+    let plan = Plan::for_a_test(lookup, vec![server], LOOK_TIME);
+    look_by(&plan, address, method, Duration::ZERO)
+}
+
+fn look_by(plan: &Plan, address: &str, method: Method, pause: Duration) -> Looked {
+    let deadline = Instant::now() + plan.total;
+    let mut redirects = Vec::new();
+    let ended = |redirects, refusal| Looked {
+        redirects,
+        end: Ending::Refused(refusal),
+    };
+    let mut url = match Url::parse(address) {
+        Ok(url) => url,
+        Err(ParseError::EmptyHost) => return ended(redirects, Refusal::NoHost),
+        Err(_) => return ended(redirects, Refusal::NotAnAddress),
+    };
+    let judged = Arc::new(Mutex::new(None));
+    loop {
+        let Some(within) = deadline.checked_duration_since(Instant::now()) else {
+            return ended(redirects, Refusal::TimedOut);
+        };
+        let host = match judged_hop(plan, &url, within, &judged) {
+            Ok(host) => host,
+            Err(refusal) => return ended(redirects, refusal),
+        };
+        let agent = agent_for(within, &judged, Asking::Look);
+        let asked = match method {
+            Method::Head => agent.head(url.as_str()).call(),
+            Method::Get => agent.get(url.as_str()).call(),
+        };
+        let response = match asked {
+            Ok(response) => response,
+            Err(error) => return ended(redirects, refused(error, &host)),
+        };
+        let status = response.status().as_u16();
+        let headers = response.headers();
+        if is_a_redirect(status) {
+            if redirects.len() as u32 >= REDIRECTS {
+                return ended(redirects, Refusal::Redirects { limit: REDIRECTS });
+            }
+            match where_it_pointed(headers, &url) {
+                Ok(next) => {
+                    redirects.push((status, next.clone()));
+                    url = next;
+                }
+                Err(refusal) => return ended(redirects, refusal),
+            }
+            thread::sleep(pause.min(deadline.saturating_duration_since(Instant::now())));
+            continue;
+        }
+        let said = |name| headers.get(name).and_then(|value| value.to_str().ok());
+        let challenge = said("cf-mitigated").is_some_and(|value| value.trim() == "challenge");
+        let retry_after = said("retry-after").and_then(|value| value.trim().parse().ok());
+        return Looked {
+            redirects,
+            end: Ending::Status {
+                status,
+                challenge,
+                retry_after,
+            },
+        };
     }
 }
 
@@ -407,20 +538,26 @@ fn looked_up(
                 );
             });
             match answers.recv_timeout(within) {
-                Ok(Ok(addrs)) if !addrs.is_empty() => Ok(addrs),
-                Ok(_) => Err(Refusal::UnknownHost {
-                    host: host.to_owned(),
-                }),
+                Ok(answer) => found(host, answer),
                 Err(_) => Err(Refusal::TimedOut),
             }
         }
         #[cfg(test)]
-        Lookup::StandIn(stand_in) => stand_in(&host_port)
-            .ok()
-            .filter(|addrs| !addrs.is_empty())
-            .ok_or_else(|| Refusal::UnknownHost {
-                host: host.to_owned(),
-            }),
+        Lookup::StandIn(stand_in) => found(host, stand_in(&host_port)),
+    }
+}
+
+/// The addresses a lookup of `host` found, or why it found none.
+fn found(host: &str, answer: io::Result<Vec<SocketAddr>>) -> Result<Vec<SocketAddr>, Refusal> {
+    match answer {
+        Ok(addrs) if !addrs.is_empty() => Ok(addrs),
+        Err(error) if !crate::platform::no_such_name(&error) => Err(Refusal::LookupFailed {
+            host: host.to_owned(),
+            reason: error.to_string(),
+        }),
+        _ => Err(Refusal::UnknownHost {
+            host: host.to_owned(),
+        }),
     }
 }
 
@@ -428,7 +565,16 @@ fn looked_up(
 /// failure, uses no proxy the environment names, keeps no cookie, asks
 /// for no compressed encoding, and connects only to the addresses judged
 /// for the hop, within what remains of the fetch's time.
-fn agent_for(within: Duration, judged: &Arc<Mutex<Option<Granted>>>) -> Agent {
+fn agent_for(within: Duration, judged: &Arc<Mutex<Option<Granted>>>, asking: Asking) -> Agent {
+    let version = env!("CARGO_PKG_VERSION");
+    let (user_agent, accept, accept_encoding) = match asking {
+        Asking::Fetch => (format!("statac/{version}"), "", "identity"),
+        Asking::Look => (
+            format!("Statac/{version} (link check; +{LINK_CHECK_PAGE})"),
+            "text/html,application/xhtml+xml,*/*;q=0.8",
+            "gzip",
+        ),
+    };
     let tls = TlsConfig::builder()
         .provider(TlsProvider::Rustls)
         .root_certs(RootCerts::WebPki)
@@ -439,13 +585,21 @@ fn agent_for(within: Duration, judged: &Arc<Mutex<Option<Granted>>>) -> Agent {
         .http_status_as_error(false)
         .max_redirects(0)
         .max_redirects_will_error(false)
-        .user_agent(format!("statac/{}", env!("CARGO_PKG_VERSION")))
-        .accept("")
-        .accept_encoding("identity")
+        .user_agent(user_agent)
+        .accept(accept)
+        .accept_encoding(accept_encoding)
         .tls_config(tls)
         .timeout_global(Some(within))
         .build();
     Agent::with_parts(config, DefaultConnector::default(), Replay(judged.clone()))
+}
+
+/// Who the client asks for: a fetch, which reads what it is given, or a
+/// look, which reads nothing past the headers.
+#[derive(Copy, Clone)]
+enum Asking {
+    Fetch,
+    Look,
 }
 
 /// The addresses granted to the client for one hop, judged for the host
@@ -544,6 +698,23 @@ fn body_failed(error: io::Error) -> Refusal {
     }
 }
 
+/// What the failure of the secure connection to `host` says as a refusal:
+/// a certificate that has expired or names another host, which a browser
+/// warns of in the page's place, or anything else.
+fn secure(error: &rustls::Error, host: &str) -> Refusal {
+    use rustls::CertificateError as Fault;
+    let host = host.to_owned();
+    match error {
+        rustls::Error::InvalidCertificate(
+            Fault::Expired
+            | Fault::ExpiredContext { .. }
+            | Fault::NotValidForName
+            | Fault::NotValidForNameContext { .. },
+        ) => Refusal::Certificate { host },
+        _ => Refusal::Tls { host },
+    }
+}
+
 /// What the client's failure of a hop says as a refusal.
 fn refused(error: UreqError, host: &str) -> Refusal {
     match error {
@@ -551,11 +722,17 @@ fn refused(error: UreqError, host: &str) -> Refusal {
         UreqError::HostNotFound => Refusal::UnknownHost {
             host: host.to_owned(),
         },
-        UreqError::Rustls(_) | UreqError::Tls(_) => Refusal::Tls {
+        UreqError::Rustls(error) => secure(&error, host),
+        UreqError::Tls(_) => Refusal::Tls {
             host: host.to_owned(),
         },
-        UreqError::Io(error) => Refusal::Failed {
-            reason: error.to_string(),
+        // The secure connection's own failures arrive inside a reading
+        // error.
+        UreqError::Io(error) => match error.get_ref().and_then(|inner| inner.downcast_ref()) {
+            Some(tls) => secure(tls, host),
+            None => Refusal::Failed {
+                reason: error.to_string(),
+            },
         },
         _ => Refusal::Failed {
             reason: error.to_string(),

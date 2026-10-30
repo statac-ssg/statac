@@ -18,8 +18,16 @@
 //! First, each mention `refuse_webmentions_from` refuses is removed and
 //! recorded `absent`, so it is never fetched again, with each face no
 //! mention kept names.
+//!
+//! Last, on a site with `check_external_links: true`, the links its pages
+//! hold to other sites are checked, as `links` sets out. `serve` never
+//! checks them.
 
+mod links;
 mod mentions;
+
+pub(crate) use links::{CHECK_EXTERNAL, UNCHECKED_EXTERNAL};
+pub use links::{Look, Network};
 
 use std::collections::{BTreeSet, HashSet};
 use std::io::Write;
@@ -145,16 +153,23 @@ enum Unfetched {
 /// Fetches into the site `options` names, with `fetcher`, each still a
 /// page reads that it lacks, and the mentions the relay has that it
 /// lacks, and writes them and the record, saying each on `out` as it
-/// goes. Gives the exit code: 1 where the site has an error, where a still
-/// couldn't be fetched for any reason but the video site having none,
-/// where the relay couldn't be asked, where what was fetched couldn't be
-/// kept, or where what is refused couldn't be removed.
-pub fn run(options: &Options, fetcher: &dyn Fetch, out: &mut dyn Write, colour: bool) -> u8 {
+/// goes; then, where the site asks, checks its links to other sites with
+/// `looker`. Gives the exit code: 1 where the site has an error, where a
+/// still couldn't be fetched for any reason but the video site having
+/// none, where the relay couldn't be asked, where what was fetched
+/// couldn't be kept, or where what is refused couldn't be removed.
+pub fn run(
+    options: &Options,
+    fetcher: &dyn Fetch,
+    looker: &dyn Look,
+    out: &mut dyn Write,
+    colour: bool,
+) -> u8 {
     let mut say = |line: &str| {
         let _ = out.write_all(line.as_bytes());
         let _ = out.flush();
     };
-    refresh(options, fetcher, &mut say, colour, true)
+    refresh(options, fetcher, Some(looker), &mut say, colour, true)
 }
 
 /// [`run`], as `serve` fetches: each line is handed to `say` as it is
@@ -165,7 +180,7 @@ pub(crate) fn fetch_new(
     say: &mut dyn FnMut(&str),
     colour: bool,
 ) -> u8 {
-    refresh(options, fetcher, say, colour, false)
+    refresh(options, fetcher, None, say, colour, false)
 }
 
 /// Whether the site built as `outcome` has something to fetch: the still
@@ -178,11 +193,12 @@ pub(crate) fn wanted(outcome: &build::Outcome) -> bool {
     outcome.problems.iter().any(lacks) || webmentions == Some(true)
 }
 
-/// [`run`], saying where there is nothing to fetch only where
-/// `nothing_said`.
+/// [`run`], checking links to other sites only where given `looker`, and
+/// saying where there is nothing to fetch only where `nothing_said`.
 fn refresh(
     options: &Options,
     fetcher: &dyn Fetch,
+    looker: Option<&dyn Look>,
     say: &mut dyn FnMut(&str),
     colour: bool,
     nothing_said: bool,
@@ -272,6 +288,15 @@ fn refresh(
         say(&report.problem(problem));
     }
     let url = url.filter(|_| webmentions);
+    let looker = looker.filter(|_| settings.truth(CHECK_EXTERNAL) == Some(true));
+    let checking = links::Checking {
+        folder: &options.site.join(kept::FOLDER),
+        was: &site.fetched.links,
+        settings,
+        urls: &outcome.links.urls,
+        today,
+        report: &report,
+    };
     let folder = options.site.join(kept::FOLDER);
     let mut record = site.fetched.record.clone();
     let mut standing = standing_of(site);
@@ -286,6 +311,11 @@ fn refresh(
         if let Err(error) = keep_record(&folder, &site.fetched.record, &record, &standing) {
             say(&unwritten(&report, &kept::record_shown(), &error));
             code = 1;
+        }
+        if let Some(looker) = looker {
+            code |= links::check(&checking, looker, say);
+            drafts_left_out(say);
+            return code;
         }
         if nothing_said {
             say(&format!("{}\n", wording::NOTHING_TO_FETCH));
@@ -330,6 +360,9 @@ fn refresh(
             "{}\n",
             wording::mentions_refreshed(asked.fetched, asked.faces, asked.not_kept)
         ));
+    }
+    if let Some(looker) = looker {
+        code |= links::check(&checking, looker, say);
     }
     drafts_left_out(say);
     code

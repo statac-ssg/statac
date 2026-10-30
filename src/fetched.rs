@@ -12,7 +12,11 @@
 //! such as a refused mention, which is not asked for again. A file with no
 //! line is the author's own; a line whose file has gone is dropped the
 //! next time the record is written.
+//!
+//! What the sites a page links to answered is kept apart, in
+//! `fetched/links`, since a link has no file.
 
+pub(crate) mod links;
 pub(crate) mod mentions;
 pub(crate) mod stills;
 
@@ -186,16 +190,18 @@ impl Record {
 #[derive(Default, Debug)]
 pub(crate) struct Fetched {
     pub(crate) record: Record,
-    /// Every file in the folder but the record and the retired list of
-    /// refused webmentions, by its path under it with forward slashes,
+    pub(crate) links: links::Links,
+    /// Every file in the folder but the two records and the retired list
+    /// of refused webmentions, by its path under it with forward slashes,
     /// with where it really is: its path past every link under `real`.
     pub(crate) files: Vec<(String, String)>,
     /// The site's real path.
     pub(crate) real: PathBuf,
 }
 
-/// How old the stills in `fetched/stills/` and the mentions in
-/// `fetched/mentions/` are, as `build` says.
+/// How old the stills in `fetched/stills/`, the mentions in
+/// `fetched/mentions/` and the answers in `fetched/links` are, as `build`
+/// says.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 pub(crate) struct Ages {
     pub(crate) stills: usize,
@@ -208,6 +214,11 @@ pub(crate) struct Ages {
     /// How many days before `today` the newest mention the record dates
     /// was fetched.
     pub(crate) newest: Option<i64>,
+    /// The links to other sites `fetched/links` has an answer for, where
+    /// the site checks them.
+    pub(crate) links: usize,
+    /// How many days before `today` the oldest of those answers was given.
+    pub(crate) links_oldest: Option<i64>,
 }
 
 impl Ages {
@@ -246,7 +257,7 @@ impl Ages {
 }
 
 /// How many days `to` is after `from`.
-fn days_between(from: &Date, to: &Date) -> Option<i64> {
+pub(crate) fn days_between(from: &Date, to: &Date) -> Option<i64> {
     let civil = |date: &Date| {
         jiff::civil::Date::new(
             i16::try_from(date.year).ok()?,
@@ -273,7 +284,7 @@ pub(crate) fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>
     let mut fetched = Fetched::default();
     for (path, at) in crate::assets::walk(site, &real, FOLDER, false, &mut problems) {
         match path.as_str() {
-            RECORD => {}
+            RECORD | links::NAME => {}
             crate::config::refused::NAME => {
                 problems.push(retired(sources, &real, &at));
                 continue;
@@ -283,20 +294,30 @@ pub(crate) fn read(site: &Path, sources: &mut Sources) -> (Fetched, Vec<Problem>
                 continue;
             }
         }
+        let shown = match path.as_str() {
+            RECORD => record_shown(),
+            _ => links::shown(),
+        };
         let text = match sources.unsaved().read(&real, &at) {
             Ok(text) => text,
             Err(error) => {
                 problems.push(Problem::nowhere(Kind::CantRead {
-                    path: record_shown().into(),
+                    path: shown.into(),
                     reason: Reason::of(&error),
                 }));
                 continue;
             }
         };
-        let source = sources.add(record_shown(), text);
-        let (record, found) = Record::read(sources, source);
-        fetched.record = record;
-        problems.extend(found);
+        let source = sources.add(shown, text);
+        if path == RECORD {
+            let (record, found) = Record::read(sources, source);
+            fetched.record = record;
+            problems.extend(found);
+        } else {
+            let (links, found) = links::Links::read(sources, source);
+            fetched.links = links;
+            problems.extend(found);
+        }
     }
     fetched.real = real;
     (fetched, problems)

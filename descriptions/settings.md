@@ -236,6 +236,22 @@ the list. `statac refresh` deletes their files for good.
 
 More: https://statac.dev/webmentions/#turning-one-away
 
+## `check_external_links`
+
+`true` makes `statac refresh` ask each site the pages link to whether
+the link still works, and `statac check` tell you which links are
+broken. The default is `false`.
+
+More: https://statac.dev/link-check/
+
+## `unchecked_external_links`
+
+Full URLs that `statac refresh` doesn't check: a link to a URL in the
+list, or to a page under one, is never asked about, and `statac check`
+counts it instead.
+
+More: https://statac.dev/link-check/
+
 ## `search_without_javascript`
 
 `duckduckgo` gives a reader whose browser runs no JavaScript a box on

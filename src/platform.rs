@@ -1140,6 +1140,34 @@ pub(crate) fn console_reads_escapes() -> bool {
     !cfg!(windows) || set("WT_SESSION") || set("TERM")
 }
 
+/// Whether `error`, from looking up a host's name, says no name server
+/// knows the name, rather than that none could be asked.
+pub(crate) fn no_such_name(error: &io::Error) -> bool {
+    match cfg!(windows) {
+        true => no_such_name_on_windows(error),
+        false => no_such_name_elsewhere(error),
+    }
+}
+
+/// Windows says so by its code alone.
+fn no_such_name_on_windows(error: &io::Error) -> bool {
+    error.raw_os_error() == Some(11001)
+}
+
+/// The other systems say so only in words: glibc's, musl's and macOS's
+/// for a name nobody knows, and glibc's for a name with no address.
+fn no_such_name_elsewhere(error: &io::Error) -> bool {
+    let said = error.to_string();
+    [
+        "Name or service not known",
+        "Name does not resolve",
+        "nodename nor servname provided, or not known",
+        "No address associated with hostname",
+    ]
+    .iter()
+    .any(|words| said.contains(words))
+}
+
 /// Whether `code` is the exit code the system's shell gives for a command
 /// it couldn't find.
 pub(crate) fn command_not_found(code: i32) -> bool {
@@ -1156,6 +1184,31 @@ fn copy_whole(source: &std::fs::File, to: &mut std::fs::File) -> io::Result<u64>
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_name_nobody_knows_is_told_from_a_lookup_that_couldnt_be_made() {
+        let said = |words: &str| {
+            io::Error::other(format!("failed to lookup address information: {words}"))
+        };
+        for words in [
+            "Name or service not known",
+            "Name does not resolve",
+            "nodename nor servname provided, or not known",
+            "No address associated with hostname",
+        ] {
+            assert!(no_such_name_elsewhere(&said(words)), "{words}");
+            assert!(!no_such_name_on_windows(&said(words)), "{words}");
+        }
+        for words in ["Temporary failure in name resolution", "Try again"] {
+            assert!(!no_such_name_elsewhere(&said(words)), "{words}");
+        }
+        assert!(no_such_name_on_windows(&io::Error::from_raw_os_error(
+            11001
+        )));
+        assert!(!no_such_name_on_windows(&io::Error::from_raw_os_error(
+            11002
+        )));
+    }
+
     use super::*;
 
     /// Held by a test starting a program and by one locking a file: a

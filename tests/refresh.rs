@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use image::{ImageFormat, Rgb, RgbImage};
-use statac::fetch::{Fetched, Refusal};
+use statac::fetch::{Fetched, Looked, Method, Refusal};
 use statac::refresh::{self, Options, Token};
 
 const LAYOUT: &str = "<!doctype html>\n<title>{{ headline(page) }}</title>\n{{ page.content }}\n";
@@ -27,6 +27,20 @@ const MAXRES: &str = "https://i.ytimg.com/vi/abcdefghijk/maxresdefault.jpg";
 const HQ: &str = "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg";
 
 struct Site(PathBuf);
+
+/// What asks about links to other sites, for sites that don't check them,
+/// which never ask.
+struct Unasked;
+
+impl refresh::Look for Unasked {
+    fn look(&self, address: &str, _: Method) -> Looked {
+        panic!("asked about {address}")
+    }
+
+    fn pause(&self) -> std::time::Duration {
+        std::time::Duration::ZERO
+    }
+}
 
 impl Site {
     fn new(label: &str) -> Site {
@@ -111,7 +125,7 @@ impl Site {
             answers(address)
         };
         let mut out = Vec::new();
-        let code = refresh::run(&options, &fetcher, &mut out, false);
+        let code = refresh::run(&options, &fetcher, &Unasked, &mut out, false);
         let said = String::from_utf8(out).unwrap();
         assert!(!said.contains(TOKEN), "{said}");
         assert!(!format!("{options:?}").contains(TOKEN));
