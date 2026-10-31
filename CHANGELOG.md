@@ -2,6 +2,270 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.8.0 - 2026-10-31
+
+Statac installs, upgrades and removes itself: an install script on
+every machine, which checks each release's signature, `statac upgrade`
+and `statac uninstall`. It also checks links to other sites, publishes
+a page for each year, numbers and marks lines in code, and lists the
+pages that link to a page.
+
+### Breaking
+
+- Statac fills `page.backlinks` and `site.years` itself. It sets aside
+  a page's own `backlinks:` field, with a `set-aside` warning, and a
+  custom setting called `years` in `statac.yaml` stops the build with
+  `reserved-name`. Rename the field or the setting, as each message
+  suggests.
+
+### New
+
+- The install script is the way to install Statac on a Mac as well as
+  on Linux. In a terminal it asks two questions: where to put Statac,
+  `~/.local/bin` unless you choose another folder, and whether Statac
+  keeps itself up to date. If you say yes, `statac serve` checks for a
+  fix each time it starts, installs it and tells you. `--to=<folder>`
+  and `--updates=on` or `off` answer the questions, so the script also
+  runs unattended. With no terminal and no options, it puts Statac in
+  `~/.local/bin`, leaves it not keeping itself up to date, and says
+  so.
+- An install script for Windows, so Windows needs neither Scoop nor
+  winget: `irm https://get.statac.dev/install.ps1 | iex` in
+  PowerShell. It asks the same two questions, where to put Statac
+  (`%LOCALAPPDATA%\Programs\Statac` unless you say otherwise) and
+  whether it keeps itself up to date, and if there is no terminal to
+  ask in, it takes those answers and says so. To answer them
+  unattended, set `STATAC_TO` and `STATAC_UPDATES` first, and
+  `STATAC_VERSION` for a release other than the latest. It adds the
+  folder to your own PATH, not the machine's, and puts the licences in
+  `%LOCALAPPDATA%\Statac`.
+- Every release from 0.8.0 on is signed, and the install scripts check
+  a release's `SHA256SUMS` against its signature, as well as the
+  package against `SHA256SUMS`. The script for a Mac or Linux says
+  what it checked the signature with: `ssh-keygen`, which every Mac
+  has, as does Linux with OpenSSH 8.1 or later, or else OpenSSL 3. The
+  script for Windows checks the signature itself. If the signature
+  doesn't match, or a release from 0.8.0 on has no signature, the
+  script stops and installs nothing. On a machine with neither tool,
+  such as a stock Ubuntu 18.04 or Rocky Linux 8, the signature still
+  has to be there, and the script checks the package against
+  `SHA256SUMS` alone and says so. A release before 0.8.0, installed
+  with `--version` or `STATAC_VERSION`, has no signature, and the
+  script checks it against `SHA256SUMS` alone.
+- `statac upgrade` installs the latest release of Statac in place of
+  the one you run, where Statac's install script installed it, and
+  says from which version to which. It checks that the release is
+  signed with Statac's key and that the package matches the release's
+  `SHA256SUMS` before it changes anything, and if anything stops it,
+  Statac stays as it was. If Homebrew, Scoop, winget or Cargo
+  installed Statac, it names that tool's command instead.
+- If you chose to keep Statac up to date when the install script
+  installed it, `statac serve` checks for a fix as it starts and
+  installs it, and says so in one line: the new version runs from the
+  next time you start Statac. It installs fixes only, such as 0.8.1 in
+  place of 0.8.0, and names a later release, such as 0.9.0, for you to
+  install with `statac upgrade`. `statac build` never checks, and nor
+  does `statac serve --offline`. Turn it on or off with `statac
+  upgrade --updates=on` or `--updates=off`.
+- `statac uninstall` removes Statac where an install script put it:
+  the program, the file beside it that records your answer, and the
+  licences, with their folder if nothing else is in it. On Windows it
+  also takes the folder off your PATH, if the script added it. Where
+  Homebrew, Scoop, winget or Cargo installed Statac, it changes
+  nothing and names that tool's command.
+- `statac refresh` can check the links your pages hold to other sites.
+  Turn it on with `check_external_links: true` in `statac.yaml`. Each
+  `statac refresh` then asks each site about the links that are due,
+  one request at a time to a site with a second's pause, and records
+  each answer, with the date, in `fetched/links`, which you commit with
+  the site. A link that worked is asked again after 30 to 45 days, and
+  any other a week later. If 16 sites in a row don't answer, `statac
+  refresh` stops checking, since the computer may be offline, and
+  records nothing for them. `statac serve` never checks links, and
+  `build` and `check` never use the network.
+- `statac check` tells each link `fetched/links` records as broken,
+  where you wrote it, as a `broken-external-link` warning: the other
+  site answered 404 or 410, no site has the host's name, or the host's
+  certificate has expired or is for another host. Where a link
+  redirects permanently to a page that works, and the new URL uses
+  `https`, another host or another path, an `external-link-moved` note
+  suggests the new URL. A list under "External links:" counts the
+  links checked, those that didn't answer, those not checked yet and
+  those left out.
+- `unchecked_external_links:` in `statac.yaml` lists URLs, a line
+  each, that `statac refresh` doesn't check, matched the way
+  `refuse_webmentions_from` matches. A URL covers every page under it.
+- `statac build` says how old the oldest link check is, beside the
+  thumbnails and webmentions: `Fetched: 1,229 external links checked,
+  the oldest 40 days ago.`
+- Statac publishes a page for each year where `years.pages: true`
+  asks. Each year a post is dated in gets a list page at `/2026/`, or
+  where `years.permalink` puts it, listing that year's posts newest
+  first, with pagination and feeds like any list. `years.folder: blog`
+  keeps them to one folder's posts. Statac builds them with
+  `templates/folder.html`, where `page.list.word` is `year`, and
+  `page.list.previous` and `page.list.next` are the years either side.
+  `site.years` lists every year with a page, newest first. A new
+  warning, `no-year-pages`, tells you when no page has a date to make
+  a year's page from.
+- A code block can number its lines and mark some of them: put
+  `numbered=true` or `mark=` at the end of its opening line, after any
+  caption, as in ```` ```rust main.rs numbered=true mark=3-5,8 ````.
+  Each line of such a block goes in `<span class="hl-line">`, a marked
+  line also has the class `hl-marked`, and a numbered line has its
+  number in `data-line`, which your stylesheet shows, so copying the
+  code copies no numbers. A block that asks for neither is built
+  exactly as before.
+- In a template, `file.code` takes `from`, `to`, `numbered` and
+  `mark`, to show some of a file's lines, numbered from the first
+  shown, and to mark lines: `file.code(from=10, to=20, numbered=true,
+  mark="12-14")`. The docs' `@file` drop-in passes them on from its
+  call.
+- A new warning, `no-such-line`, tells you when a line to mark isn't
+  in the block or among the lines shown, or `from` or `to` is past the
+  end of the file.
+- `statac import` carries a code block's line numbers and marked lines
+  across from Hugo, Zola and Jekyll, writing `numbered=true` and
+  `mark=` at the end of the block's first line, and `IMPORT.md` lists
+  each block under "Line numbers and marked lines in code", since the
+  numbers and marks show only once the site's stylesheet styles them.
+  From Hugo it reads `linenos` and `hl_lines` in the braces after a
+  fence, `{linenos=table,hl_lines=[2,"4-6"]}`, and in the options
+  handed to `highlight`; from Zola, `linenos` and `hl_lines` after a
+  comma, ```` ```rust,linenos,hl_lines=1 3-5 ````; and from Jekyll,
+  `linenos` and `mark_lines` on `{% highlight %}`. The import counts
+  each mark from the block's first line, as each tool counts it.
+  `IMPORT.md` lists under "Options on code taken off" only what Statac
+  has no equal for, such as a `linenostart` other than 1, Zola's
+  `hide_lines` and `name=`, or Hugo's `hl_inline` and classes. Statac
+  0.7.3 took all of these off and listed every such block, and dropped
+  Jekyll's `linenos` without saying so.
+- `page.backlinks` lists the pages whose content links to the page,
+  newest first, each once. A link counts where a reader follows it
+  from the content: a Markdown link, `href` on `<a>` or `<area>`, or
+  `@url(...)`, to the page or to one of its old URLs. Images, links a
+  template writes, such as a menu's, and a page's links to itself
+  don't count. Each entry is the linking page, so a template can show
+  its `url`, `headline(other)` or anything else a page has. Statac
+  does no extra work for a site that doesn't use `page.backlinks`.
+- The language server answers `statac/backlinks` with the pages that
+  link to a page, each with its file, name, URL, date and the place of
+  each link, for an editor's list of what links here. On a code
+  block's opening line, after the language, it offers `numbered=true`
+  and `mark=`.
+- `statac import` converts a Zola site's wikilinks, where its
+  settings' `[markdown]` turns them on. No Zola release has wikilinks
+  yet, so the import follows the rules of the Zola branch that adds
+  them. Each `[[name]]`, `[[name|text]]` or `![[name]]` becomes an
+  ordinary Markdown link to the URL Zola linked it to, with the site's
+  path in front and any `#` part kept. The import finds the page or
+  file as Zola does: by its path in `content/`, then by a page's
+  `aliases`, then by the file's name alone. A wikilink that names
+  nothing Zola published, or names more than one page or file, stays
+  as written. `IMPORT.md` lists every wikilink, those converted and
+  those left. Before, the import left every wikilink as written, and
+  Statac showed it as text.
+
+### Fixed
+
+- Where `SHELL` isn't set, as in most containers, a Dockerfile's `RUN`
+  or a CI job, the install script gives the general line for adding
+  Statac's folder to your `PATH` and exits with 0. With Statac 0.7.3,
+  the script installed Statac, then stopped with exit code 2 before
+  giving that line, so a Dockerfile step or CI job that installed
+  Statac this way failed. Where `HOME` isn't set, the script still
+  installs, if `--to` names the folder for Statac and `XDG_DATA_HOME`
+  names the folder for its licences. If either is missing, the script
+  stops before downloading anything and says which. Statac 0.7.3
+  stopped with the shell's own "parameter not set" message.
+- Slicing a value that names nothing in `data/`, such as `{% for link
+  in site.data.links[:5] %}` before `data/links.yaml` is written, now
+  stops the build with "No value: `site.data.links` names nothing in
+  `data/`", as a loop over `site.data.links` does. Statac 0.7.3 took
+  the slice as an empty list and said nothing, so the page was
+  published without the list.
+- A code block whose opening line starts with a file's name keeps that
+  name as its caption when Statac has no colours for the file's kind,
+  such as `.gitignore`, `go.mod` or `nginx.conf`. Statac publishes the
+  code without colours, as it does for `notes-1.txt`, and doesn't warn.
+  Statac 0.7.3 read such a name as an unknown language: the block lost
+  its caption and, with `code_colours: true`, `check` warned of
+  `unknown-code-language`. A file's name after a folder, such as
+  `site/Makefile` or `docker/Dockerfile`, is now a caption too, and
+  Statac colours the code as that file's language.
+- With `code_colours: true`, Statac colours files ending `.opml`,
+  `.rss`, `.atom`, `.svg`, `.xslt`, `.xsd`, `.rdf`, `.plist`, `.wsdl`,
+  `.xaml`, `.xlf`, `.xliff`, `.nuspec`, `.csproj`, `.fsproj`, `.vbproj`
+  and `.vcxproj` as XML (`.xslt` as XSL), whether a code block's
+  opening line names the file or a template shows it with
+  `page.file()`. A code block opening with `vb.net` is coloured as
+  Visual Basic.
+- `statac serve` sends an OPML file as `text/x-opml`, an XSL stylesheet
+  as `application/xml`, a JPEG XL image as `image/jxl` and an Ogg video
+  (`.ogv`) as `video/ogg`, the types hosts such as GitHub Pages send.
+  Statac 0.7.3 sent each as `application/octet-stream`, so a browser
+  downloaded an OPML file or a video you linked to instead of showing
+  it, and Firefox didn't apply an XSL stylesheet to a feed or sitemap.
+  The built site doesn't change.
+- `statac serve` sends source and text files, such as `.c`, `.h`,
+  `.py`, `.sh`, `.rs`, `.go`, `.lua`, `.el`, `.yaml` and `.toml`, as
+  `text/plain; charset=utf-8`, so a browser shows a file you link to as
+  text. Statac 0.7.3 sent each as `application/octet-stream`, so the
+  browser downloaded it instead. Hosts disagree about these files: some
+  send a type that a browser shows and some a type that it downloads.
+  The built site doesn't change.
+- Moving a post's folder that holds an image, or adding an image in
+  `content/`, no longer makes `statac serve` build every page again.
+  With Statac 0.7.3, moving such a post on a site of about 5,000 files
+  built all of them again; now it builds 76.
+- Adding or removing a file in `content/`, such as a text file beside a
+  post, no longer makes `statac serve` build again pages that show
+  other images. With Statac 0.7.3, adding a text file beside a post on
+  a site of about 5,000 files built about 500 of them again; now it
+  builds none.
+- When a `for` loop with an `if` loops over a value that names nothing,
+  such as `{% for blog in site.data.blogroll if blog.feed %}` before
+  `data/blogroll.yaml` is written, Statac now puts the problem at the
+  value looped over, saying "No value: `site.data.blogroll` names
+  nothing in `data/`", with the suggestion it gives for the loop
+  without its `if`. Statac 0.7.3 put the problem at the `if`'s
+  condition, saying "No value: nothing is set for `blog.feed`", which
+  didn't say what was missing.
+- When a template sets a name to a value that names nothing in
+  `data/`, such as `{% set links = site.data.links %}` (or the same
+  with `with`), and then uses `links`, Statac now puts the problem at
+  `site.data.links` in the `set` tag, saying "No value:
+  `site.data.links` names nothing in `data/`". Statac 0.7.3 put the
+  problem where `links` was used, saying "No value: nothing is set for
+  `links`", which didn't say that the data file was missing.
+- A line of `published.txt` that starts with `/` but holds something
+  no URL Statac publishes can have is told by what is wrong with it,
+  with the caret under that part of the line. A `%` code, such as a URL
+  copied from a browser's address bar, is told as "`%` can't be in a
+  name", with the line written with its characters as themselves, such
+  as `/café/` for `/caf%C3%A9/`. A `#` is told with the line without it
+  and what follows it, and a `..` with the URL it leads to. A control
+  character, a character Windows can't have in a file name, a name
+  ending with `.` or a space, or a name Windows keeps for a device is
+  told with the suggestion to take the line out, since Statac never
+  publishes such a URL. Statac 0.7.3 said each of these lines wasn't a
+  URL starting with `/`.
+- The explanation of `malformed-record`, which `published.txt` problems
+  link to, now covers `published.txt`: how its lines are written, what
+  a malformed line usually looks like, and how to fix one. It also says
+  the same for `fetched/record` and `fetched/links`. Statac 0.7.3
+  described only `fetched/record`, so an author sent there by a line of
+  `published.txt` read about a file they hadn't been told of.
+
+### Changed
+
+- When `statac refresh` can't fetch a video's thumbnail because the
+  name of the host couldn't be looked up, it says what the system said,
+  instead of saying that nothing answers to the name. It says that only
+  when no name server knows the name. When the host's certificate has
+  expired or is for another host, it says so, instead of saying that
+  Statac couldn't make a secure connection.
+
 ## 0.7.3 - 2026-10-30
 
 ### Fixed
