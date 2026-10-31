@@ -13,20 +13,22 @@ use crate::source::Sources;
 use crate::testing::Scratch;
 
 /// One request a server or a stand-in was asked: its method, its host and
-/// path, and when it began and ended.
+/// path, when it began and when its answer was ready to send.
 #[derive(Clone, Debug)]
 struct Request {
     method: String,
     host: String,
     path: String,
     began: Instant,
-    ended: Instant,
+    answered: Instant,
 }
 
 type Requests = Arc<Mutex<Vec<Request>>>;
 
 /// A server on this machine answering each request with what `rule` makes
 /// of its method, host and path, each connection on a thread of its own.
+/// A request is recorded before its answer is sent, so a test reading the
+/// record once the step is done finds every request the step was answered.
 struct Server {
     addr: SocketAddr,
     requests: Requests,
@@ -56,16 +58,15 @@ impl Server {
                         .unwrap_or_default()
                         .to_owned();
                     let answer = rule(&method, &host, &path);
-                    let _ = stream.write_all(answer.as_bytes());
-                    let ended = Instant::now();
                     let request = Request {
                         method,
                         host,
                         path,
                         began,
-                        ended,
+                        answered: Instant::now(),
                     };
                     kept.lock().unwrap().push(request);
+                    let _ = stream.write_all(answer.as_bytes());
                 });
             }
         });
@@ -368,9 +369,8 @@ fn a_host_is_asked_one_request_at_a_time_with_the_pause_between() {
             .collect();
         asked.sort_by_key(|request| request.began);
         for pair in asked.windows(2) {
-            let gap = pair[1].began.saturating_duration_since(pair[0].ended);
-            // The server notes a request's end a moment after it answers.
-            assert!(gap + Duration::from_millis(10) >= pause, "{host}: {gap:?}");
+            let gap = pair[1].began.saturating_duration_since(pair[0].answered);
+            assert!(gap >= pause, "{host}: {gap:?}");
         }
     }
     // The two hosts are asked at once: one host alone would take four
@@ -404,7 +404,7 @@ fn eight_hosts_at_most_are_asked_at_once_the_busiest_first() {
     requests.sort_by_key(|request| request.began);
     let at_once = |at: Instant| {
         (requests.iter())
-            .filter(|request| request.began <= at && at < request.ended)
+            .filter(|request| request.began <= at && at < request.answered)
             .count()
     };
     let most = requests.iter().map(|request| at_once(request.began)).max();
@@ -634,8 +634,8 @@ fn a_host_asking_to_wait_a_moment_is_waited_for() {
         .iter()
         .find(|request| request.path == "/2/")
         .unwrap();
-    let last_of_first = first.map(|request| request.ended).max().unwrap();
-    assert!(second.began.duration_since(last_of_first) >= Duration::from_millis(990));
+    let last_of_first = first.map(|request| request.answered).max().unwrap();
+    assert!(second.began.duration_since(last_of_first) >= Duration::from_secs(1));
 }
 
 #[test]
