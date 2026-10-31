@@ -13,9 +13,9 @@
 # the answer in brackets and says so.
 #
 # It downloads the Windows package and checks it against the release's
-# SHA256SUMS, and SHA256SUMS against its signature where the release has
-# one. Ed25519 is written out below, since the .NET that Windows
-# PowerShell runs on has none. It adds the folder to the user's PATH,
+# SHA256SUMS, and SHA256SUMS against its signature, which every release
+# from 0.8.0 on has. Ed25519 is written out below, since the .NET that
+# Windows PowerShell runs on has none. It adds the folder to the user's PATH,
 # never the machine's, where neither holds it already, and the licences
 # that travel with the program go to %LOCALAPPDATA%\Statac. Beside the
 # program, .statac-install records the answer, where the licences are and
@@ -53,6 +53,20 @@
             $true
         } catch {
             $false
+        }
+    }
+
+    # Downloads a release's signature, saying whether it came: the server
+    # answers 404 where the release has none. A download that goes wrong in
+    # any other way stops, since the release can't be checked.
+    function Save-Signature([string] $address, [string] $file) {
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri $address -OutFile $file -ErrorAction Stop
+            $true
+        } catch {
+            $response = $_.Exception.Response
+            if ($response -and [int] $response.StatusCode -eq 404) { return $false }
+            Stop-Install "Can't download $address" $_.Exception.Message
         }
     }
 
@@ -304,6 +318,7 @@
     }
 
     function Install-Into([string] $work, [string] $version, [string] $to, [string] $updates) {
+        $asked = $version
         if ($version) {
             $sums = "$releases/v$version/SHA256SUMS"
             if (-not (Save-Download $sums "$work\SHA256SUMS")) {
@@ -325,21 +340,29 @@
         $expected = $line.Substring(0, $line.IndexOf(' '))
         $name = $package -replace '\.zip$', ''
         $version = ($name -replace '^statac-', '') -replace ('-' + [regex]::Escape($target) + '$'), ''
+        # Whether a signature is needed turns on the version asked for, not on
+        # SHA256SUMS, which can't be trusted until its signature is checked.
+        if ($asked -and $version -ne $asked) {
+            Stop-Install "$sums names Statac $version, not $asked, so nothing was installed."
+        }
         # Keeping up to date, and the signature, came with 0.8.0.
         $keeps = $version -notmatch '^0\.[0-7]\.'
+        if (-not $keeps -and -not $asked) {
+            Stop-Install "$sums names Statac $version, from before 0.8.0, so nothing was installed." 'This script comes with Statac 0.8.0 and later, so the newest release is 0.8.0 or later.'
+        }
         if (-not $keeps -and $updates -eq 'on') {
             Stop-Install ('Statac {0} can''t keep itself up to date: that came in 0.8.0.' -f $version) 'Leave `STATAC_UPDATES` unset, or install a later release.'
         }
 
         # Fetched from v<version>/, which never changes, so a cache holding an
-        # older latest/ can't pair it with a newer signature. A release is
-        # signed once it is published, so a release tried before then has none.
-        # SHA256SUMS.sig is the signature's 64 bytes, which Test-Signature
-        # reads; SHA256SUMS.sshsig, the same in OpenSSH's form, is for
-        # install.sh's ssh-keygen.
-        $signed = $false
-        if ($keeps -and (Save-Download "$releases/v$version/SHA256SUMS.sig" "$work\SHA256SUMS.sig")) {
-            $signed = $true
+        # older latest/ can't pair it with a newer signature. SHA256SUMS.sig
+        # is the signature's 64 bytes, which Test-Signature reads;
+        # SHA256SUMS.sshsig, the same in OpenSSH's form, is for install.sh's
+        # ssh-keygen.
+        if ($keeps) {
+            if (-not (Save-Signature "$releases/v$version/SHA256SUMS.sig" "$work\SHA256SUMS.sig")) {
+                Stop-Install "The release's SHA256SUMS has no signature, so nothing was installed." "Every release from 0.8.0 on is signed, and $releases/v$version/ holds no SHA256SUMS.sig."
+            }
             $message = [IO.File]::ReadAllBytes("$work\SHA256SUMS")
             $signature = [IO.File]::ReadAllBytes("$work\SHA256SUMS.sig")
             if (-not (Test-Signature $message $signature (ConvertFrom-Hex $key))) {
@@ -433,12 +456,9 @@
         if ($found -ne $expected.ToLowerInvariant()) {
             Stop-Install "The package doesn't match the release's SHA256SUMS, so nothing was installed." "Expected $expected, and the download is $found."
         }
-        if ($signed) {
+        if ($keeps) {
             Write-Host "Checked the package against the release's SHA256SUMS, and SHA256SUMS against"
             Write-Host '  its signature.'
-        } elseif ($keeps) {
-            Write-Host "Checked the package against the release's SHA256SUMS alone: its signature"
-            Write-Host "  couldn't be downloaded."
         } else {
             Write-Host "Checked the package against the release's SHA256SUMS. Releases before 0.8.0 aren't signed."
         }

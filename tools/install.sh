@@ -15,9 +15,10 @@
 #
 # It downloads the package for this machine and checks it against the
 # release's SHA256SUMS, and SHA256SUMS against its signature where the
-# release has one and the machine can check it: with ssh-keygen from
-# OpenSSH 8.1 or later, as every Mac has, or else with OpenSSL 3. The
-# licences that travel with the program go to ~/.local/share/statac.
+# machine can check it: with ssh-keygen from OpenSSH 8.1 or later, as every
+# Mac has, or else with OpenSSL 3. Every release from 0.8.0 on is signed,
+# so one with no signature is refused. The licences that travel with the
+# program go to ~/.local/share/statac.
 # Beside the program, .statac-install records the answer and where the
 # licences are, for `statac upgrade` and `statac uninstall`, which
 # removes what this puts in place. It asks for no password and changes no
@@ -33,8 +34,8 @@ key=9ba90e0b6ec11a149baad9a54d6cf33d15a872e75c08d915f7361225d32febde
 
 # The same key as the line of an allowed signers file that `ssh-keygen -Y
 # verify` reads, the signer's name first, and the namespace a release's
-# SSH signature is made in. tools/publish.sh signs with both as the tagged
-# script holds them.
+# SSH signature is made in. tools/take.sh signs with both as the release's
+# script holds them, and tools/publish.sh checks the signature with them.
 signer='statac ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJupDgtuwRoUm6rZpU1s8z0VqHLnXAjZFfc2EiXTL+ve'
 namespace=release@statac.dev
 
@@ -51,6 +52,25 @@ fetch() {
     else
         wget -q -O "$2" "$1"
     fi
+}
+
+# signature <file>: downloads the release's signature <file> into the work
+# folder, failing where the server has no such file. A download that goes
+# wrong in any other way stops, since the release can't be checked.
+signature() {
+    wanted=$releases/v$version/$1
+    if command -v curl >/dev/null 2>&1; then
+        status=$(curl -fsSL -w '%{http_code}' -o "$work/$1" "$wanted" 2>"$work/failed") && return 0
+    else
+        wget -q -S -O "$work/$1" "$wanted" 2>"$work/failed" && return 0
+        # -S writes each of the server's answers indented, a redirect's first.
+        status=$(sed -n 's|^ *HTTP/[0-9.]* \([0-9]*\).*|\1|p' "$work/failed" | tail -n 1)
+    fi
+    [ "$status" != 404 ] || return 1
+    reason=$(grep -v '^ ' "$work/failed" || true)
+    [ -n "$reason" ] || reason=$(sed -n 's|^ *\(HTTP/.*\)|\1|p' "$work/failed" | tail -n 1)
+    [ -z "$reason" ] || stop "Can't download $wanted" "$reason"
+    stop "Can't download $wanted"
 }
 
 sha256() {
@@ -239,6 +259,7 @@ main() {
     trap 'rm -rf "$work"' EXIT
     trap 'exit 1' HUP INT TERM
 
+    asked=$version
     if [ -n "$version" ]; then
         sums=$releases/v$version/SHA256SUMS
         fetch "$sums" "$work/SHA256SUMS" ||
@@ -259,25 +280,38 @@ main() {
     name=${package%.tar.gz}
     version=${name#statac-}
     version=${version%-"$target"}
+    # Whether a signature is needed turns on the version asked for, not on
+    # SHA256SUMS, which can't be trusted until its signature is checked.
+    if [ -n "$asked" ] && [ "$version" != "$asked" ]; then
+        stop "$sums names Statac $version, not $asked, so nothing was installed."
+    fi
     # Keeping up to date, and the signature, came with 0.8.0.
     case $version in
         0.[0-7].*) keeps=false ;;
         *) keeps=true ;;
     esac
+    if ! $keeps && [ -z "$asked" ]; then
+        stop "$sums names Statac $version, from before 0.8.0, so nothing was installed." \
+            "This script comes with Statac 0.8.0 and later, so the newest release is 0.8.0 or later."
+    fi
     if ! $keeps && [ "$updates" = on ]; then
         stop "Statac $version can't keep itself up to date: that came in 0.8.0." \
             "Leave out \`--updates=on\`, or install a later release."
     fi
 
     # Fetched from v<version>/, which never changes, so a cache holding an
-    # older latest/ can't pair it with a newer signature. A release is
-    # signed once it is published, so a release tried before then has none.
-    # SHA256SUMS.sshsig, the SSH signature, came after SHA256SUMS.sig, and
-    # where this machine can't check it, SHA256SUMS.sig is tried.
+    # older latest/ can't pair it with a newer signature. SHA256SUMS.sshsig,
+    # the SSH signature, came after SHA256SUMS.sig, and where this machine
+    # can't check it, SHA256SUMS.sig is tried. A machine that can check one
+    # of them never installs on the hash alone, since anyone serving the
+    # release could take that one away. A machine that can check neither
+    # still needs one of them there, and installs on the hash alone, saying
+    # so: whoever could forge a signature could change this script too,
+    # which comes from the same server.
     sshsig=false
     sig=false
     checked=
-    if $keeps && fetch "$releases/v$version/SHA256SUMS.sshsig" "$work/SHA256SUMS.sshsig" 2>/dev/null; then
+    if $keeps && signature SHA256SUMS.sshsig; then
         sshsig=true
         if verifier; then
             echo "$signer" >"$work/allowed_signers"
@@ -287,7 +321,7 @@ main() {
             checked=ssh-keygen
         fi
     fi
-    if $keeps && [ -z "$checked" ] && fetch "$releases/v$version/SHA256SUMS.sig" "$work/SHA256SUMS.sig" 2>/dev/null; then
+    if $keeps && [ -z "$checked" ] && signature SHA256SUMS.sig; then
         sig=true
         openssl=$(checker)
         if [ -n "$openssl" ]; then
@@ -297,6 +331,18 @@ main() {
                 stop "The release's SHA256SUMS isn't signed with Statac's key, so nothing was installed."
             checked=openssl
         fi
+    fi
+    if $keeps && ! $sshsig && ! $sig; then
+        stop "The release's SHA256SUMS has no signature, so nothing was installed." \
+            "Every release from 0.8.0 on is signed, and $releases/v$version/ holds neither SHA256SUMS.sshsig nor SHA256SUMS.sig."
+    fi
+    if $keeps && [ -z "$checked" ] && verifier; then
+        stop "The release's SHA256SUMS has no signature this machine can check, so nothing was installed." \
+            "$releases/v$version/ has no SHA256SUMS.sshsig, which \`ssh-keygen\` checks, and SHA256SUMS.sig needs OpenSSL 3."
+    fi
+    if $keeps && [ -z "$checked" ] && [ -n "$(checker)" ]; then
+        stop "The release's SHA256SUMS has no signature this machine can check, so nothing was installed." \
+            "$releases/v$version/ has no SHA256SUMS.sig, which OpenSSL 3 checks, and SHA256SUMS.sshsig needs \`ssh-keygen\` from OpenSSH 8.1 or later."
     fi
 
     echo "Installing Statac $version ($target)."
@@ -391,16 +437,10 @@ main() {
     elif [ "$checked" = openssl ]; then
         echo "Checked the package against the release's SHA256SUMS, and SHA256SUMS against"
         echo "  its signature with OpenSSL 3."
-    elif $sshsig; then
+    elif $keeps; then
         echo "Checked the package against the release's SHA256SUMS, but not its signature:"
         echo "  that needs \`ssh-keygen\` from OpenSSH 8.1 or later, or OpenSSL 3, and this"
         echo "  machine has neither."
-    elif $sig; then
-        echo "Checked the package against the release's SHA256SUMS, but not its signature:"
-        echo "  that needs OpenSSL 3, which this machine doesn't have."
-    elif $keeps; then
-        echo "Checked the package against the release's SHA256SUMS alone: its signature"
-        echo "  couldn't be downloaded."
     else
         echo "Checked the package against the release's SHA256SUMS. Releases before 0.8.0 aren't signed."
     fi

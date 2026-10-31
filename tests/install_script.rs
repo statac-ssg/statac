@@ -11,26 +11,17 @@
 
 #[path = "ed25519/cases.rs"]
 mod ed25519;
+mod releases;
 mod scratch;
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use rustls::SignatureScheme;
-use rustls::crypto::aws_lc_rs;
-use rustls::pki_types::PrivatePkcs8KeyDer;
+use releases::{KEY, Releases, TEST_KEY, hex_of, sha256, signature};
 use scratch::Scratch;
-
-/// Statac's key, as the script carries it, and the tests' own, its
-/// private half in PKCS #8, as `src/upgrade/tests.rs` has them.
-const KEY: &str = "9ba90e0b6ec11a149baad9a54d6cf33d15a872e75c08d915f7361225d32febde";
-const TEST_KEY: &str = "530c1dad1c6081a3172af0e023067098707b8619b7725705cbd5bd3e7299cc9b";
-const TEST_PRIVATE: &str = "302e020100300506032b657004220420c8e9544d25e30fee7798a7808d7fc8495fdec2be7890ab945763f9096ee66dcd";
 
 const VERSION: &str = "0.8.0";
 const TARGET: &str = "x86_64-pc-windows-msvc";
@@ -41,106 +32,24 @@ const LICENCES: [&str; 4] = [
     "THIRD-PARTY-GRAMMARS.md",
 ];
 
-fn bytes_of_hex(text: &str) -> Vec<u8> {
-    (0..text.len() / 2)
-        .map(|at| u8::from_str_radix(&text[at * 2..at * 2 + 2], 16).unwrap())
-        .collect()
-}
-
-fn hex_of(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-/// The tests' key's signature of `message`.
-fn signature(message: &[u8]) -> Vec<u8> {
-    let der = bytes_of_hex(TEST_PRIVATE);
-    let key = aws_lc_rs::sign::any_eddsa_type(&PrivatePkcs8KeyDer::from(&der[..])).unwrap();
-    let signer = key.choose_scheme(&[SignatureScheme::ED25519]).unwrap();
-    signer.sign(message).unwrap()
-}
-
-fn sha256(bytes: &[u8]) -> String {
-    let suite = aws_lc_rs::cipher_suite::TLS13_AES_128_GCM_SHA256
-        .tls13()
-        .unwrap();
-    hex_of(suite.common.hash_provider.hash(bytes).as_ref())
-}
-
-/// A server on this machine standing in for get.statac.dev, answering
-/// each path it holds with its bytes and any other with `404`.
-struct Releases {
-    addr: SocketAddr,
-    files: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-}
-
 impl Releases {
-    fn start() -> Releases {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let files: Arc<Mutex<HashMap<String, Vec<u8>>>> = Arc::default();
-        let held = files.clone();
-        std::thread::spawn(move || {
-            for stream in listener.incoming() {
-                let Ok(mut stream) = stream else {
-                    continue;
-                };
-                let mut request = Vec::new();
-                let mut buffer = [0; 1024];
-                while !request.windows(4).any(|end| end == b"\r\n\r\n") {
-                    match stream.read(&mut buffer) {
-                        Ok(0) | Err(_) => break,
-                        Ok(read) => request.extend(&buffer[..read]),
-                    }
-                }
-                let request = String::from_utf8_lossy(&request);
-                let path = request.split(' ').nth(1).unwrap_or_default().to_owned();
-                let body = held.lock().unwrap().get(&path).cloned();
-                let (status, body) = match body {
-                    Some(body) => ("200 OK", body),
-                    None => ("404 Not Found", b"nothing here".to_vec()),
-                };
-                // As get.statac.dev serves the scripts.
-                let kind = match path.ends_with(".zip") {
-                    true => "application/zip",
-                    false => "text/plain; charset=utf-8",
-                };
-                let head = format!(
-                    "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                    body.len()
-                );
-                let _ = stream.write_all(head.as_bytes());
-                let _ = stream.write_all(&body);
-            }
-        });
-        Releases { addr, files }
-    }
-
-    fn address(&self) -> String {
-        format!("http://{}", self.addr)
-    }
-
-    fn put(&self, path: &str, bytes: impl Into<Vec<u8>>) {
-        let mut files = self.files.lock().unwrap();
-        files.insert(path.to_owned(), bytes.into());
-    }
-
     /// The script, carrying the tests' key in place of Statac's, and a
-    /// release of `package` signed with it, which latest/ names.
-    fn publish(package: &[u8]) -> Releases {
+    /// release `version` of `package` signed with it, which latest/ names.
+    fn publish(version: &str, package: &[u8]) -> Releases {
         let releases = Releases::start();
         let script = include_str!("../tools/install.ps1");
         assert_eq!(script.matches(KEY).count(), 1);
         releases.put("/install.ps1", script.replace(KEY, TEST_KEY));
-        let name = format!("statac-{VERSION}-{TARGET}.zip");
+        let name = format!("statac-{version}-{TARGET}.zip");
         let sums = format!(
-            "{}  statac-{VERSION}-aarch64-apple-darwin.tar.gz\n{} *{name}\n",
+            "{}  statac-{version}-aarch64-apple-darwin.tar.gz\n{} *{name}\n",
             sha256(b"another platform's"),
             sha256(package),
         );
-        releases.put(&format!("/v{VERSION}/{name}"), package);
-        releases.put(&format!("/v{VERSION}/SHA256SUMS"), sums.clone());
+        releases.put(&format!("/v{version}/{name}"), package);
+        releases.put(&format!("/v{version}/SHA256SUMS"), sums.clone());
         releases.put(
-            &format!("/v{VERSION}/SHA256SUMS.sig"),
+            &format!("/v{version}/SHA256SUMS.sig"),
             signature(sums.as_bytes()),
         );
         releases.put("/latest/SHA256SUMS", sums);
@@ -148,33 +57,40 @@ impl Releases {
     }
 }
 
-/// The Windows package of the Statac these tests are built with, made as
-/// the release makes it, by Windows PowerShell's `Compress-Archive`.
-fn package() -> &'static [u8] {
-    static PACKAGE: OnceLock<Vec<u8>> = OnceLock::new();
-    PACKAGE.get_or_init(|| {
-        let staging = Scratch::new("install_script", "package");
-        let name = format!("statac-{VERSION}-{TARGET}");
-        let folder = staging.join(&name);
-        std::fs::create_dir_all(&folder).unwrap();
-        std::fs::copy(env!("CARGO_BIN_EXE_statac"), folder.join("statac.exe")).unwrap();
-        for licence in LICENCES {
-            let from = Path::new(env!("CARGO_MANIFEST_DIR")).join(licence);
-            std::fs::copy(from, folder.join(licence)).unwrap();
-        }
-        let made = Command::new("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command"])
-            .arg(format!(
-                "Compress-Archive -Path '{name}' -DestinationPath '{name}.zip'"
-            ))
-            .current_dir(&*staging)
-            .env_remove("PSModulePath")
-            .stdin(Stdio::null())
-            .output()
-            .unwrap();
-        assert!(made.status.success(), "{made:?}");
-        std::fs::read(staging.join(format!("{name}.zip"))).unwrap()
-    })
+/// The Windows package of the Statac these tests are built with, named
+/// as release `version`'s, made as the release makes it, by Windows
+/// PowerShell's `Compress-Archive`.
+fn package(version: &str) -> Vec<u8> {
+    static PACKAGES: Mutex<Vec<(String, Vec<u8>)>> = Mutex::new(Vec::new());
+    let mut packages = PACKAGES
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some((_, package)) = packages.iter().find(|(made, _)| made == version) {
+        return package.clone();
+    }
+    let staging = Scratch::new("install_script", &format!("package-{version}"));
+    let name = format!("statac-{version}-{TARGET}");
+    let folder = staging.join(&name);
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::copy(env!("CARGO_BIN_EXE_statac"), folder.join("statac.exe")).unwrap();
+    for licence in LICENCES {
+        let from = Path::new(env!("CARGO_MANIFEST_DIR")).join(licence);
+        std::fs::copy(from, folder.join(licence)).unwrap();
+    }
+    let made = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command"])
+        .arg(format!(
+            "Compress-Archive -Path '{name}' -DestinationPath '{name}.zip'"
+        ))
+        .current_dir(&*staging)
+        .env_remove("PSModulePath")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(made.status.success(), "{made:?}");
+    let package = std::fs::read(staging.join(format!("{name}.zip"))).unwrap();
+    packages.push((version.to_owned(), package.clone()));
+    package
 }
 
 /// The PowerShells this machine has: Windows PowerShell, always, and
@@ -369,7 +285,7 @@ fn holds(said: &str, lines: &[String]) {
 #[test]
 fn a_fresh_install_takes_the_defaults_and_adds_its_folder_to_the_users_path() {
     for shell in shells() {
-        let releases = Releases::publish(package());
+        let releases = Releases::publish(VERSION, &package(VERSION));
         let local = Local::new(&format!("defaults-{shell}"));
         let user_path = UserPath::set_aside();
         let folder = local.programs();
@@ -465,7 +381,7 @@ fn a_fresh_install_takes_the_defaults_and_adds_its_folder_to_the_users_path() {
 #[test]
 fn an_install_goes_to_the_folder_given_with_updates_off() {
     for shell in shells() {
-        let releases = Releases::publish(package());
+        let releases = Releases::publish(VERSION, &package(VERSION));
         let local = Local::new(&format!("given-{shell}"));
         let user_path = UserPath::set_aside();
         let folder = local.folder.join("Tools").join("Statac Here");
@@ -517,11 +433,11 @@ fn a_release_that_doesnt_match_its_signature_installs_nothing() {
                 "The release's SHA256SUMS isn't signed with Statac's key, so nothing was installed.",
             ),
         ] {
-            let releases = Releases::publish(package());
+            let releases = Releases::publish(VERSION, &package(VERSION));
             let name = format!("statac-{VERSION}-{TARGET}.zip");
             match label {
                 "package" => {
-                    let mut tampered = package().to_vec();
+                    let mut tampered = package(VERSION);
                     tampered.push(0);
                     releases.put(&format!("/v{VERSION}/{name}"), tampered);
                 }
@@ -540,6 +456,106 @@ fn a_release_that_doesnt_match_its_signature_installs_nothing() {
             assert!(!local.licences().exists(), "{shell}\n{said}");
             assert_eq!(user_path.now(), user_path.tests);
         }
+    }
+}
+
+#[test]
+fn a_release_from_0_8_0_on_without_its_signature_installs_nothing() {
+    for shell in shells() {
+        for label in ["missing", "failing"] {
+            let releases = Releases::publish(VERSION, &package(VERSION));
+            let signature = format!("/v{VERSION}/SHA256SUMS.sig");
+            let lines = match label {
+                "missing" => {
+                    releases.remove(&signature);
+                    vec![
+                        "The release's SHA256SUMS has no signature, so nothing was installed."
+                            .to_owned(),
+                        format!(
+                            "  Every release from 0.8.0 on is signed, and {}/v{VERSION}/ holds no SHA256SUMS.sig.",
+                            releases.address()
+                        ),
+                    ]
+                }
+                _ => {
+                    releases.fail(&signature);
+                    vec![format!("Can't download {}{signature}", releases.address())]
+                }
+            };
+            let local = Local::new(&format!("unsigned-{label}-{shell}"));
+            let user_path = UserPath::set_aside();
+            let (said, code) = install(shell, &releases, &local, &[]);
+            assert_eq!(code, Some(1), "{shell}\n{said}");
+            holds(&said, &lines);
+            assert!(!said.contains("Installing"), "{shell}\n{said}");
+            assert!(!local.programs().exists(), "{shell}\n{said}");
+            assert!(!local.licences().exists(), "{shell}\n{said}");
+            assert_eq!(user_path.now(), user_path.tests);
+        }
+    }
+}
+
+#[test]
+fn a_release_that_isnt_the_one_asked_for_installs_nothing() {
+    let before = "0.7.3";
+    for shell in shells() {
+        for asked in [None, Some(VERSION)] {
+            let releases = Releases::publish(before, &package(before));
+            releases.remove(&format!("/v{before}/SHA256SUMS.sig"));
+            let (options, lines) = match asked {
+                None => (
+                    Vec::new(),
+                    vec![
+                        format!(
+                            "{}/latest/SHA256SUMS names Statac 0.7.3, from before 0.8.0, so nothing was installed.",
+                            releases.address()
+                        ),
+                        "  This script comes with Statac 0.8.0 and later, so the newest release is 0.8.0 or later.".to_owned(),
+                    ],
+                ),
+                Some(asked) => {
+                    let older = releases.get(&format!("/v{before}/SHA256SUMS"));
+                    releases.put(&format!("/v{asked}/SHA256SUMS"), older);
+                    (
+                        vec![("STATAC_VERSION", asked)],
+                        vec![format!(
+                            "{}/v{asked}/SHA256SUMS names Statac 0.7.3, not 0.8.0, so nothing was installed.",
+                            releases.address()
+                        )],
+                    )
+                }
+            };
+            let local = Local::new(&format!("not-asked-{}-{shell}", asked.unwrap_or("latest")));
+            let user_path = UserPath::set_aside();
+            let (said, code) = install(shell, &releases, &local, &options);
+            assert_eq!(code, Some(1), "{shell}\n{said}");
+            holds(&said, &lines);
+            assert!(!local.programs().exists(), "{shell}\n{said}");
+            assert!(!local.licences().exists(), "{shell}\n{said}");
+            assert_eq!(user_path.now(), user_path.tests);
+        }
+    }
+}
+
+#[test]
+fn a_release_before_0_8_0_is_checked_against_its_sha256sums_alone() {
+    let version = "0.7.3";
+    for shell in shells() {
+        let releases = Releases::publish(version, &package(version));
+        releases.remove(&format!("/v{version}/SHA256SUMS.sig"));
+        let local = Local::new(&format!("before-{shell}"));
+        let _user_path = UserPath::set_aside();
+        let options = [("STATAC_VERSION", version)];
+        let (said, code) = install(shell, &releases, &local, &options);
+        assert_eq!(code, Some(0), "{shell}\n{said}");
+        holds(
+            &said,
+            &[
+                format!("Installing Statac {version} ({TARGET})."),
+                "Checked the package against the release's SHA256SUMS. Releases before 0.8.0 aren't signed.".into(),
+            ],
+        );
+        assert!(local.programs().join("statac.exe").is_file(), "{said}");
     }
 }
 
