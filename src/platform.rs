@@ -271,8 +271,9 @@ pub(crate) fn rename(from: &Path, to: &Path) -> io::Result<()> {
 /// step, so the program there is always whole and one running from it
 /// carries on. Windows refuses to replace a program that is running but
 /// lets it be renamed, so there the program is first moved to `aside`,
-/// which can be removed once nothing runs it. Where any step fails, the
-/// program is left as it was and `new` is removed.
+/// and removed from there where nothing runs it; where something does, it
+/// stays until it can be. Where any step fails, the program is left as it
+/// was and `new` is removed.
 pub(crate) fn replace_program(
     path: &Path,
     bytes: &[u8],
@@ -297,7 +298,9 @@ pub(crate) fn replace_program(
         }
         #[cfg(not(unix))]
         {
-            moved_aside_and_placed(new, path, aside)
+            moved_aside_and_placed(new, path, aside)?;
+            let _ = std::fs::remove_file(aside);
+            Ok(())
         }
     })();
     if written.is_err() {
@@ -1657,8 +1660,10 @@ mod tests {
         assert!(running.try_wait().unwrap().is_none(), "the program stopped");
         drop(running.stdin.take());
         assert!(running.wait().unwrap().success());
-        // Windows won't replace a running program, so it was moved aside.
-        assert_eq!(aside.exists(), cfg!(windows));
+        // Only Windows moves a running program aside.
+        if cfg!(unix) {
+            assert!(!aside.exists());
+        }
         remove_folder(&root).unwrap();
     }
 

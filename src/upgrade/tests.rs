@@ -662,14 +662,14 @@ fn updates_are_turned_on_and_off_in_the_marker_alone() {
 
 #[test]
 fn the_markers_lines_are_read_as_settings() {
-    let marker = Marker::read(
-        "# updates: on\n\n  updates :  on  \nupdates: off\nlicences: /usr/local/share/statac\nlater: kept\n",
-    );
+    // A whole path on any system.
+    let licences = std::env::temp_dir().join("statac");
+    let marker = Marker::read(&format!(
+        "# updates: on\n\n  updates :  on  \nupdates: off\nlicences: {}\nlater: kept\n",
+        licences.display()
+    ));
     assert_eq!(marker.updates(), Ok(true));
-    assert_eq!(
-        marker.licences(),
-        Some(PathBuf::from("/usr/local/share/statac"))
-    );
+    assert_eq!(marker.licences(), Some(licences));
     assert_eq!(marker.value("later"), Some("kept"));
     assert_eq!(Marker::read("").updates(), Ok(false));
     assert_eq!(Marker::read("updates: off").updates(), Ok(false));

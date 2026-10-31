@@ -49,7 +49,8 @@
 //!   old.
 //! - `.statac-old-<number>`: on Windows, the program an upgrade replaced
 //!   while it was running, moved aside since Windows won't replace it.
-//!   The next upgrade removes it once nothing runs it.
+//!   The upgrade removes it where nothing runs it, and otherwise the next
+//!   upgrade does once nothing runs it.
 //! - `.statac-install-<number>`: the marker being rewritten, left and
 //!   removed as a new program is.
 //!
