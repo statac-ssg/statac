@@ -108,8 +108,11 @@ tilde() {
 expand() {
     # shellcheck disable=SC2088
     case $1 in
-        "~") echo "$HOME" ;;
-        "~/"*) echo "$HOME/${1#"~/"}" ;;
+        "~" | "~/"*)
+            [ -n "${HOME:-}" ] ||
+                stop "Can't install Statac in \`$1\`: \`HOME\` isn't set." "Write the folder's whole path."
+            echo "$HOME${1#"~"}"
+            ;;
         *) echo "$1" ;;
     esac
 }
@@ -190,6 +193,17 @@ main() {
                 ;;
         esac
     done
+
+    # A container, a Dockerfile's RUN or a service may have no HOME, which
+    # the folders taken by default are in.
+    if [ -z "${HOME:-}" ]; then
+        [ -n "${XDG_DATA_HOME:-}" ] ||
+            stop "Can't install Statac: \`HOME\` isn't set, so there's nowhere for its licences." \
+                "Set \`HOME\`, then run this again."
+        [ -n "$to" ] ||
+            stop "Can't tell where to install Statac: \`HOME\` isn't set." \
+                "Give the folder with \`--to=<folder>\`."
+    fi
 
     system=$(uname -s)
     processor=$(uname -m)
@@ -293,7 +307,7 @@ main() {
         echo "Enter takes the answer in brackets." >/dev/tty
         echo >/dev/tty
     fi
-    usual=$HOME/.local/bin
+    [ -n "$to" ] || usual=$HOME/.local/bin
     taken=
     if [ -z "$to" ] && $asking; then
         echo "Where should Statac go?" >/dev/tty
@@ -448,7 +462,9 @@ main() {
         *)
             echo
             echo "$to isn't on your PATH, so \`statac\` alone won't be found."
-            case ${SHELL##*/} in
+            # Unset in many containers and CI jobs.
+            shell=${SHELL:-}
+            case ${shell##*/} in
                 fish) echo "  Add it: fish_add_path \"$to\"" ;;
                 zsh) echo "  Add this line to ~/.zshrc: export PATH=\"$to:\$PATH\"" ;;
                 bash) echo "  Add this line to ~/.bashrc: export PATH=\"$to:\$PATH\"" ;;
