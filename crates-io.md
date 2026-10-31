@@ -38,8 +38,8 @@ C and C++ compiler, CMake and Perl, and NASM on a machine with an Intel
 or AMD processor.
 
 [Installing](https://statac.dev/install/) has the other ways: a script on
-a Mac or Linux, Homebrew on a Mac, Scoop on Windows, and a package for
-each kind of machine.
+a Mac or Linux and one on Windows, Homebrew on a Mac, Scoop on Windows,
+and a package for each kind of machine.
 
 ## Documentation
 

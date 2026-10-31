@@ -369,19 +369,97 @@ fn removal_once_ended(path: &Path, id: u32) -> String {
         Some(rest) if !rest.starts_with(r"UNC\") => rest,
         _ => &path,
     };
-    // In single quotes PowerShell reads every character as written but a
-    // quote, which is doubled; it takes curved quotes for straight ones.
-    let path: String = (path.chars())
-        .flat_map(|c| match c {
-            '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}' => vec![c, c],
-            _ => vec![c],
-        })
-        .collect();
+    let path = single_quoted(path);
     format!(
         "Wait-Process -Id {id} -ErrorAction SilentlyContinue\n\
          foreach ($try in 1..40) {{\n\
-         \x20   try {{ Remove-Item -LiteralPath '{path}' -Force -ErrorAction Stop; break }}\n\
+         \x20   try {{ Remove-Item -LiteralPath {path} -Force -ErrorAction Stop; break }}\n\
          \x20   catch {{ Start-Sleep -Milliseconds 250 }}\n\
+         }}\n"
+    )
+}
+
+/// `text` as a string in PowerShell's single quotes, in which it reads
+/// every character as written but a quote, which is doubled; it takes
+/// curved quotes for straight ones.
+#[cfg(any(not(unix), test))]
+fn single_quoted(text: &str) -> String {
+    let mut quoted = String::from("'");
+    for c in text.chars() {
+        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}') {
+            quoted.push(c);
+        }
+        quoted.push(c);
+    }
+    quoted.push('\'');
+    quoted
+}
+
+/// Takes `entry` off the user's PATH, which Windows keeps in the registry,
+/// leaving every other entry as written, and gives whether it was on it.
+/// An entry matches with its case ignored and any closing backslash taken
+/// off. Windows PowerShell does the work, since the calls that do it can't
+/// be made from Statac without `unsafe`. Elsewhere there is no such PATH,
+/// and nothing changes.
+pub(crate) fn leave_user_path(entry: &str) -> io::Result<bool> {
+    #[cfg(unix)]
+    {
+        let _ = entry;
+        Ok(false)
+    }
+    #[cfg(not(unix))]
+    {
+        #[cfg(test)]
+        let _starting = crate::testing::starting();
+        let output = std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
+            .arg(encoded_command(&path_without(entry)))
+            .stdin(std::process::Stdio::null())
+            .output()?;
+        let said = String::from_utf8_lossy(&output.stdout);
+        match (output.status.success(), said.lines().last().map(str::trim)) {
+            (true, Some("removed")) => Ok(true),
+            (true, Some("absent")) => Ok(false),
+            _ => Err(io::Error::other(
+                String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+            )),
+        }
+    }
+}
+
+/// The PowerShell that takes `entry` off the user's PATH, saying `removed`
+/// or `absent`. The PATH is read as the registry holds it, `%NAME%` and
+/// all, and written back as the same kind of value. Deleting a variable
+/// the user doesn't have changes nothing, and has .NET tell every window
+/// that the environment has changed, which writing the registry alone
+/// doesn't.
+#[cfg(any(not(unix), test))]
+fn path_without(entry: &str) -> String {
+    let entry = single_quoted(entry);
+    format!(
+        "$ProgressPreference = 'SilentlyContinue'\n\
+         try {{\n\
+         \x20   $entry = {entry}.TrimEnd('\\')\n\
+         \x20   $environment = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)\n\
+         \x20   $path = $null\n\
+         \x20   if ($environment) {{ $path = $environment.GetValue('Path', $null, 'DoNotExpandEnvironmentNames') }}\n\
+         \x20   if ($null -eq $path) {{ 'absent'; exit 0 }}\n\
+         \x20   $entries = @($path -split ';')\n\
+         \x20   $kept = @($entries | Where-Object {{ $_.TrimEnd('\\') -ne $entry }})\n\
+         \x20   if ($kept.Count -eq $entries.Count) {{ 'absent'; exit 0 }}\n\
+         \x20   if ($kept.Count -eq 0) {{\n\
+         \x20       $environment.DeleteValue('Path')\n\
+         \x20   }} else {{\n\
+         \x20       $environment.SetValue('Path', ($kept -join ';'), $environment.GetValueKind('Path'))\n\
+         \x20   }}\n\
+         \x20   $nobodys = 'STATAC_INSTALL_PATH_CHANGED'\n\
+         \x20   if ($null -eq [Environment]::GetEnvironmentVariable($nobodys, 'User')) {{\n\
+         \x20       [Environment]::SetEnvironmentVariable($nobodys, $null, 'User')\n\
+         \x20   }}\n\
+         \x20   'removed'\n\
+         }} catch {{\n\
+         \x20   [Console]::Error.WriteLine($_.Exception.Message)\n\
+         \x20   exit 1\n\
          }}\n"
     )
 }
@@ -1798,6 +1876,13 @@ mod tests {
              \x20   try { Remove-Item -LiteralPath 'C:\\Tools\\O''Neil \u{2019}\u{2019}s\\statac\\.statac-old-7' -Force -ErrorAction Stop; break }\n\
              \x20   catch { Start-Sleep -Milliseconds 250 }\n\
              }\n"
+        );
+        let script = path_without("C:\\Tools\\O'Neil \u{2019}s\\Statac");
+        assert!(
+            script.contains(
+                "$entry = 'C:\\Tools\\O''Neil \u{2019}\u{2019}s\\Statac'.TrimEnd('\\')\n"
+            ),
+            "{script}"
         );
         // PowerShell's own example of -EncodedCommand, and each length of
         // the last group of three bytes.

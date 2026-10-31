@@ -518,7 +518,7 @@ fn another_tools_install_is_left_to_its_command() {
     let releases = Releases::start();
     let ways = match cfg!(windows) {
         true => {
-            "`scoop update statac`, `winget upgrade Statac.Statac` or `cargo install --locked statac`"
+            "`scoop update statac`, `winget upgrade Statac.Statac`, `cargo install --locked statac` or `irm https://get.statac.dev/install.ps1 | iex`"
         }
         false => {
             "`brew upgrade statac`, `cargo install --locked statac` or `curl -fsSL https://get.statac.dev | sh`"
@@ -854,7 +854,15 @@ impl Installed {
 
 #[test]
 fn an_uninstall_removes_the_program_the_marker_and_the_licences() {
-    let installed = Installed::scripted("uninstall", "on");
+    // A PATH entry the script added that is no longer there, which goes
+    // unmentioned, and elsewhere than Windows is never looked for.
+    let installed = Installed::new(
+        "uninstall",
+        Some(
+            "# Written by Statac's install script. statac upgrade reads it.\n\
+             updates: on\nlicences: <licences>\npath: C:\\statac-tests-entry-never-added\n",
+        ),
+    );
     installed.write_licences();
     let other = std::process::id().wrapping_add(1);
     for left in [
@@ -1015,10 +1023,9 @@ fn another_tools_install_is_left_to_its_uninstall_command() {
 }
 
 #[test]
-fn the_install_script_carries_statacs_key() {
-    let script =
-        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/install.sh"))
-            .unwrap();
+fn the_install_scripts_carry_statacs_key() {
+    let tools = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools");
+    let script = std::fs::read_to_string(tools.join("install.sh")).unwrap();
     let carried: Vec<&str> = (script.lines())
         .filter_map(|line| line.strip_prefix("key="))
         .collect();
@@ -1033,6 +1040,15 @@ fn the_install_script_carries_statacs_key() {
         signers,
         [format!("'statac ssh-ed25519 {}'", base64_of(&blob))]
     );
+
+    let script = std::fs::read_to_string(tools.join("install.ps1")).unwrap();
+    let carried: Vec<&str> = (script.lines())
+        .filter_map(|line| line.trim().strip_prefix("$key = '")?.strip_suffix('\''))
+        .collect();
+    assert_eq!(carried, [hex_of(&KEY)]);
+    // Windows PowerShell reads a script served with no character set as
+    // Latin-1.
+    assert!(script.is_ascii());
 }
 
 fn base64_of(bytes: &[u8]) -> String {
@@ -1122,6 +1138,23 @@ fn hashes_and_signatures_are_checked_by_the_tls_library() {
     assert!(!signed(message, &signed_message, &KEY));
     assert!(!signed(message, &signed_message[1..], &TEST_KEY));
     assert!(!signed(message, b"", &TEST_KEY));
+}
+
+// The cases the install script for Windows is held to as well.
+#[path = "../../tests/ed25519/cases.rs"]
+mod ed25519;
+
+#[test]
+fn signatures_are_checked_as_rfc_8032_requires() {
+    for case in ed25519::cases() {
+        let key: &[u8; 32] = case.key.as_slice().try_into().unwrap();
+        assert_eq!(
+            signed(&case.message, &case.signature, key),
+            case.accepted,
+            "{}",
+            case.label
+        );
+    }
 }
 
 #[test]

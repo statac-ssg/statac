@@ -33,6 +33,11 @@
 //!   the folder where it is gone; an uninstall removes them by name, and
 //!   the folder where it then holds nothing. Missing, or not a whole
 //!   path, and neither touches the licences.
+//! - `path`: on Windows, the entry the script added to the user's PATH,
+//!   the program's folder as a whole path. An uninstall takes the entry
+//!   off the user's PATH where it is still there. Missing, and the PATH is
+//!   left alone, as it is where the folder was on it before the script
+//!   ran. Elsewhere the script changes no PATH and writes no `path`.
 //!
 //! The script writes, with its own answer and folder:
 //!
@@ -41,6 +46,9 @@
 //! updates: off
 //! licences: /usr/local/share/statac
 //! ```
+//!
+//! The script for Windows, `tools/install.ps1`, writes the same, with
+//! Windows paths, and `path` where it added the folder to the PATH.
 //!
 //! # What an upgrade leaves beside the program
 //!
@@ -388,7 +396,7 @@ struct Tool {
     windows: bool,
 }
 
-const TOOLS: [Tool; 5] = [
+const TOOLS: [Tool; 6] = [
     Tool {
         installer: Installer::Homebrew,
         name: "Homebrew",
@@ -423,6 +431,13 @@ const TOOLS: [Tool; 5] = [
         upgrade: "curl -fsSL https://get.statac.dev | sh",
         uninstall: None,
         windows: false,
+    },
+    Tool {
+        installer: Installer::Script,
+        name: "the install script",
+        upgrade: "irm https://get.statac.dev/install.ps1 | iex",
+        uninstall: None,
+        windows: true,
     },
 ];
 
@@ -831,7 +846,7 @@ fn set_updates(install: &Install, on: bool) -> io::Result<()> {
 /// Does what `statac uninstall` asks, saying on `out` what happened, and
 /// gives the exit code: where Statac's install script installed it,
 /// removes the program, the marker and what upgrades left beside them,
-/// and the licences.
+/// the licences, and on Windows the entry the script added to the PATH.
 pub(crate) fn uninstall(out: &mut dyn Write) -> u8 {
     let mut say = |text: &str| {
         let _ = out.write_all(text.as_bytes());
@@ -937,6 +952,14 @@ fn uninstall_at(program: &Path, running: Version, say: &mut dyn FnMut(&str)) -> 
                 folder_removed,
                 holds_other,
             ));
+        }
+    }
+    let added = (install.marker.value("path")).filter(|entry| cfg!(windows) && !entry.is_empty());
+    if let Some(entry) = added {
+        match crate::platform::leave_user_path(entry) {
+            Ok(true) => line(&wording::path_left(entry)),
+            Ok(false) => {}
+            Err(error) => unremoved.push(wording::cant_leave_path(entry, &Reason::of(&error))),
         }
     }
     for said in &unremoved {

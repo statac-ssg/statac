@@ -82,6 +82,12 @@ brew tap statac/statac https://git.statac.dev/statac/homebrew-statac
 brew install statac/statac/statac
 ```
 
+On Windows, in PowerShell:
+
+```powershell
+irm https://get.statac.dev/install.ps1 | iex
+```
+
 On Windows, with [Scoop](https://scoop.sh):
 
 ```powershell

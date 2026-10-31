@@ -16,7 +16,8 @@
 # SHA256SUMS.sig and SHA256SUMS.sshsig, then latest-<major>.<minor>/SHA256SUMS names
 # it as the newest of its series and, unless a later release is out,
 # latest/SHA256SUMS as the newest of all, and the install script as tagged
-# goes to the top, as index.html.
+# goes to the top, as index.html, with the one for Windows beside it as
+# install.ps1.
 #
 # --dry-run makes every check and says each upload it would make, uploading
 # nothing, so a practice release can reach this step. It accepts a version
@@ -185,6 +186,8 @@ if $dry; then
     fi
     git -C "$root" show "$source:tools/install.sh" >"$folder/install.sh"
     echo "would publish install.sh from $source at the top"
+    git -C "$root" show "$source:tools/install.ps1" >"$folder/install.ps1"
+    echo "would publish install.ps1 from $source at the top"
     echo "Checked $version, built from $commit: nothing was uploaded."
     exit 0
 fi
@@ -215,15 +218,27 @@ bunny storage files upload "$folder/install.sh" -z "$zone" --to index.html \
     --content-type 'text/plain; charset=utf-8' --checksum >/dev/null ||
     stop "Couldn't upload install.sh." "v$version/ is published and latest/ names it."
 echo "published install.sh"
+git -C "$root" show "v$version:tools/install.ps1" >"$folder/install.ps1"
+bunny storage files upload "$folder/install.ps1" -z "$zone" --to install.ps1 \
+    --content-type 'text/plain; charset=utf-8' --checksum >/dev/null ||
+    stop "Couldn't upload install.ps1." "v$version/ is published, latest/ names it and install.sh is at the top."
+echo "published install.ps1"
 
 curl -fsS "$served/v$version/SHA256SUMS" | cmp -s - SHA256SUMS ||
     stop "What $served serves for v$version/SHA256SUMS isn't what was published."
-# The edge keeps / for 60 seconds.
+# The edge keeps / and /install.ps1 for 60 seconds.
 tries=0
 until curl -fsS "$served/" | cmp -s - "$folder/install.sh"; do
     tries=$((tries + 1))
     [ "$tries" -lt 15 ] ||
         stop "What $served serves at / isn't the install script as tagged."
+    sleep 5
+done
+tries=0
+until curl -fsS "$served/install.ps1" | cmp -s - "$folder/install.ps1"; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 15 ] ||
+        stop "What $served serves at /install.ps1 isn't the install script for Windows as tagged."
     sleep 5
 done
 echo "Published $version, built from $commit."

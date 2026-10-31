@@ -169,6 +169,10 @@ jobs:
           catch { $_; exit 1 }
           Remove-Item "$env:USERPROFILE\source.zip"
           Set-Location $source
+          # The install script's tests run under each PowerShell named here.
+          $seven = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+          if ($seven) { $seven = $seven.Version } else { $seven = 'none' }
+          "Windows PowerShell $($PSVersionTable.PSVersion); PowerShell 7: $seven"
           cmd /c "rustup toolchain install $rust --profile minimal 2>&1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmd /c "cargo +$rust test --release --locked --no-fail-fast --target x86_64-pc-windows-msvc 2>&1"

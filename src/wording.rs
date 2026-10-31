@@ -4320,6 +4320,18 @@ pub(crate) fn cant_remove_file(path: &str, reason: &Reason) -> String {
     format!("Can't remove `{path}`: {reason}.")
 }
 
+/// What `uninstall` says once it has taken `entry`, which the install
+/// script added, off the user's PATH.
+pub(crate) fn path_left(entry: &str) -> String {
+    format!("Removed `{entry}` from your PATH.")
+}
+
+/// What `uninstall` says where it couldn't take `entry` off the user's
+/// PATH.
+pub(crate) fn cant_leave_path(entry: &str, reason: &Reason) -> String {
+    format!("Can't remove `{entry}` from your PATH: {reason}.")
+}
+
 /// What `build` says, after Rust's report of a panic, of a fault of
 /// Statac's own.
 pub(crate) const BUILD_STOPPED: &str = "Build stopped: Statac met a fault of its own.";
