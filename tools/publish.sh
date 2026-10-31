@@ -10,8 +10,10 @@
 # already published. It signs SHA256SUMS with the release key, whose public
 # half the tagged Statac carries in src/upgrade.rs, and which it reads from
 # ~/.config/statac-release/signing-key.pem or the file STATAC_SIGNING_KEY
-# names. The version's files go to v<version>/, the signature beside
-# SHA256SUMS as SHA256SUMS.sig, then latest-<major>.<minor>/SHA256SUMS names
+# names. It signs it a second way too, as an SSH signature made with the
+# same key, with the signer and namespace tools/install.sh holds. The
+# version's files go to v<version>/, the signatures beside SHA256SUMS as
+# SHA256SUMS.sig and SHA256SUMS.sshsig, then latest-<major>.<minor>/SHA256SUMS names
 # it as the newest of its series and, unless a later release is out,
 # latest/SHA256SUMS as the newest of all, and the install script as tagged
 # goes to the top, as index.html.
@@ -44,6 +46,7 @@ folder=$(cd "$1" && pwd)
 root=$(cd "$(dirname "$0")/.." && pwd)
 
 command -v bunny >/dev/null 2>&1 || stop "Can't publish: \`bunny\` isn't installed."
+command -v ssh-keygen >/dev/null 2>&1 || stop "Can't sign the release: \`ssh-keygen\` isn't installed."
 [ -f "$key" ] || stop "Can't sign the release: there's no key at $key." \
     "Set STATAC_SIGNING_KEY to the release key's file."
 [ -f "$folder/SHA256SUMS" ] && [ -f "$folder/COMMIT" ] ||
@@ -83,8 +86,10 @@ git -C "$root" merge-base --is-ancestor "$commit" origin/main ||
 # Signed with the key whose public half this release carries, and checked,
 # so no release goes out that its own upgrade would refuse. The signature
 # is Ed25519's 64 bytes as they are, which needs OpenSSL 3, not LibreSSL.
-public=$(mktemp)
-trap 'rm -f "$public"' EXIT
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
+public=$work/public.pem
 openssl pkey -in "$key" -pubout -out "$public" 2>/dev/null ||
     stop "Can't read the key at $key." "It needs OpenSSL 3: \`openssl version\` says $(openssl version)."
 carried=$(openssl pkey -pubin -in "$public" -outform DER | tail -c 32 | od -An -tx1 | tr -d ' \n')
@@ -94,6 +99,51 @@ openssl pkeyutl -sign -rawin -inkey "$key" -in SHA256SUMS -out SHA256SUMS.sig ||
     stop "Can't sign $folder/SHA256SUMS."
 openssl pkeyutl -verify -rawin -pubin -inkey "$public" -in SHA256SUMS -sigfile SHA256SUMS.sig >/dev/null ||
     stop "The signature on $folder/SHA256SUMS doesn't check."
+
+# The SSH signature, which ssh-keygen makes only with a key in OpenSSH's own
+# format and can't read from the PEM file. Unencrypted, that format is
+# fixed fields round the public key and the private key's 32 bytes, laid
+# out as OpenSSH's PROTOCOL.key gives, so it is written here for this run
+# alone, and checked as the release's install script will check it.
+script=$(git -C "$root" show "$source:tools/install.sh")
+signer=$(echo "$script" | sed -n "s/^signer='\(.*\)'\$/\1/p")
+namespace=$(echo "$script" | sed -n 's/^namespace=//p')
+[ -n "$signer" ] && [ -n "$namespace" ] ||
+    stop "Can't read the SSH signer and namespace from tools/install.sh in $version."
+openssl pkey -pubin -in "$public" -outform DER | tail -c 32 >"$work/public.raw"
+ed25519() {
+    printf '\000\000\000\013ssh-ed25519\000\000\000\040'
+}
+(
+    umask 077
+    {
+        echo "-----BEGIN OPENSSH PRIVATE KEY-----"
+        {
+            printf 'openssh-key-v1\000\000\000\000\004none\000\000\000\004none\000\000\000\000\000\000\000\001'
+            printf '\000\000\000\063'
+            ed25519
+            cat "$work/public.raw"
+            # Two equal check numbers, the key, an empty comment, and
+            # padding to a whole number of 8 bytes.
+            printf '\000\000\000\210\000\000\000\000\000\000\000\000'
+            ed25519
+            cat "$work/public.raw"
+            printf '\000\000\000\100'
+            openssl pkey -in "$key" -outform DER | tail -c 32
+            cat "$work/public.raw"
+            printf '\000\000\000\000\001\002\003\004\005'
+        } | openssl base64
+        echo "-----END OPENSSH PRIVATE KEY-----"
+    } >"$work/key"
+) || stop "Can't write the key in OpenSSH's format."
+[ "$(ssh-keygen -y -f "$work/key" | cut -d ' ' -f 1,2)" = "${signer#* }" ] ||
+    stop "The key at $key isn't the one $version carries in tools/install.sh."
+ssh-keygen -Y sign -q -f "$work/key" -n "$namespace" <SHA256SUMS >SHA256SUMS.sshsig ||
+    stop "Can't make the SSH signature of $folder/SHA256SUMS."
+echo "$signer" >"$work/allowed_signers"
+ssh-keygen -Y verify -f "$work/allowed_signers" -I "${signer%% *}" -n "$namespace" \
+    -s SHA256SUMS.sshsig <SHA256SUMS >/dev/null ||
+    stop "The SSH signature on $folder/SHA256SUMS doesn't check."
 
 # latest/ moves only to a newer release, so a fix to an older series names
 # only its own series.
@@ -124,7 +174,7 @@ case $present in
 esac
 
 if $dry; then
-    for file in statac-* SHA256SUMS.sig SHA256SUMS; do
+    for file in statac-* SHA256SUMS.sig SHA256SUMS.sshsig SHA256SUMS; do
         echo "would publish v$version/$file"
     done
     echo "would make latest-$series/ name $version"
@@ -139,9 +189,9 @@ if $dry; then
     exit 0
 fi
 
-# The signature before SHA256SUMS, so a release whose SHA256SUMS can be
-# fetched always has its signature.
-for file in statac-* SHA256SUMS.sig SHA256SUMS; do
+# The signatures before SHA256SUMS, so a release whose SHA256SUMS can be
+# fetched always has them.
+for file in statac-* SHA256SUMS.sig SHA256SUMS.sshsig SHA256SUMS; do
     bunny storage files upload "$file" -z "$zone" --to "v$version/" --checksum >/dev/null ||
         stop "Couldn't upload $file." "v$version/ may be part-published: finish it by hand before latest/ names it."
     echo "published v$version/$file"

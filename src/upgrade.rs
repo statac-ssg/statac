@@ -69,6 +69,8 @@
 //! (or a space and an asterisk) and its name. From 0.8.0 `SHA256SUMS.sig`
 //! beside it is the Ed25519 signature of `SHA256SUMS`, its 64 bytes as
 //! they are, made with the key whose public half is [`KEY`].
+//! `SHA256SUMS.sshsig` is the same key's SSH signature of it, which the
+//! install script checks with `ssh-keygen` and an upgrade never reads.
 //! `latest/SHA256SUMS` is the newest release's, and
 //! `latest-<major>.<minor>/SHA256SUMS` the newest of that series'. An
 //! upgrade refuses a release whose `SHA256SUMS` isn't signed with

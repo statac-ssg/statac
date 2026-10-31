@@ -15,7 +15,8 @@
 #
 # It downloads the package for this machine and checks it against the
 # release's SHA256SUMS, and SHA256SUMS against its signature where the
-# release has one and the machine has OpenSSL 3 to check it with. The
+# release has one and the machine can check it: with ssh-keygen from
+# OpenSSH 8.1 or later, as every Mac has, or else with OpenSSL 3. The
 # licences that travel with the program go to ~/.local/share/statac.
 # Beside the program, .statac-install records the answer and where the
 # licences are, for `statac upgrade` and `statac uninstall`, which
@@ -29,6 +30,13 @@ releases=${STATAC_RELEASES:-https://get.statac.dev}
 # The public half of the key a release's SHA256SUMS is signed with, from
 # 0.8.0 on: Statac's own, as src/upgrade.rs holds it.
 key=9ba90e0b6ec11a149baad9a54d6cf33d15a872e75c08d915f7361225d32febde
+
+# The same key as the line of an allowed signers file that `ssh-keygen -Y
+# verify` reads, the signer's name first, and the namespace a release's
+# SSH signature is made in. tools/publish.sh signs with both as the tagged
+# script holds them.
+signer='statac ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJupDgtuwRoUm6rZpU1s8z0VqHLnXAjZFfc2EiXTL+ve'
+namespace=release@statac.dev
 
 stop() {
     echo "$1" >&2
@@ -51,6 +59,13 @@ sha256() {
     else
         shasum -a 256 "$1"
     fi | cut -d ' ' -f 1
+}
+
+# Whether this machine's ssh-keygen can check an SSH signature, which came
+# with OpenSSH 8.1.
+verifier() {
+    command -v ssh-keygen >/dev/null 2>&1 &&
+        ssh-keygen '-?' 2>&1 | grep -q -e '-Y verify'
 }
 
 # An OpenSSL that can check a signature of a whole file with an Ed25519
@@ -243,17 +258,30 @@ main() {
     # Fetched from v<version>/, which never changes, so a cache holding an
     # older latest/ can't pair it with a newer signature. A release is
     # signed once it is published, so a release tried before then has none.
-    signed=false
-    checked=false
-    if $keeps && fetch "$releases/v$version/SHA256SUMS.sig" "$work/SHA256SUMS.sig" 2>/dev/null; then
-        signed=true
+    # SHA256SUMS.sshsig, the SSH signature, came after SHA256SUMS.sig, and
+    # where this machine can't check it, SHA256SUMS.sig is tried.
+    sshsig=false
+    sig=false
+    checked=
+    if $keeps && fetch "$releases/v$version/SHA256SUMS.sshsig" "$work/SHA256SUMS.sshsig" 2>/dev/null; then
+        sshsig=true
+        if verifier; then
+            echo "$signer" >"$work/allowed_signers"
+            ssh-keygen -Y verify -f "$work/allowed_signers" -I "${signer%% *}" -n "$namespace" \
+                -s "$work/SHA256SUMS.sshsig" <"$work/SHA256SUMS" >/dev/null 2>&1 ||
+                stop "The release's SHA256SUMS isn't signed with Statac's key, so nothing was installed."
+            checked=ssh-keygen
+        fi
+    fi
+    if $keeps && [ -z "$checked" ] && fetch "$releases/v$version/SHA256SUMS.sig" "$work/SHA256SUMS.sig" 2>/dev/null; then
+        sig=true
         openssl=$(checker)
         if [ -n "$openssl" ]; then
             der >"$work/key.der"
             "$openssl" pkeyutl -verify -rawin -pubin -keyform DER -inkey "$work/key.der" \
                 -in "$work/SHA256SUMS" -sigfile "$work/SHA256SUMS.sig" >/dev/null 2>&1 ||
                 stop "The release's SHA256SUMS isn't signed with Statac's key, so nothing was installed."
-            checked=true
+            checked=openssl
         fi
     fi
 
@@ -343,9 +371,17 @@ main() {
     [ "$found" = "$expected" ] ||
         stop "The package doesn't match the release's SHA256SUMS, so nothing was installed." \
             "Expected $expected, and the download is $found."
-    if $checked; then
-        echo "Checked the package against the release's SHA256SUMS, and its signature."
-    elif $signed; then
+    if [ "$checked" = ssh-keygen ]; then
+        echo "Checked the package against the release's SHA256SUMS, and SHA256SUMS against"
+        echo "  its signature with \`ssh-keygen\`."
+    elif [ "$checked" = openssl ]; then
+        echo "Checked the package against the release's SHA256SUMS, and SHA256SUMS against"
+        echo "  its signature with OpenSSL 3."
+    elif $sshsig; then
+        echo "Checked the package against the release's SHA256SUMS, but not its signature:"
+        echo "  that needs \`ssh-keygen\` from OpenSSH 8.1 or later, or OpenSSL 3, and this"
+        echo "  machine has neither."
+    elif $sig; then
         echo "Checked the package against the release's SHA256SUMS, but not its signature:"
         echo "  that needs OpenSSL 3, which this machine doesn't have."
     elif $keeps; then

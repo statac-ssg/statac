@@ -1023,6 +1023,33 @@ fn the_install_script_carries_statacs_key() {
         .filter_map(|line| line.strip_prefix("key="))
         .collect();
     assert_eq!(carried, [hex_of(&KEY)]);
+    // OpenSSH's form: the key type and the key, each with its length first,
+    // in base64.
+    let blob = [b"\0\0\0\x0bssh-ed25519\0\0\0\x20".as_slice(), &KEY].concat();
+    let signers: Vec<&str> = (script.lines())
+        .filter_map(|line| line.strip_prefix("signer="))
+        .collect();
+    assert_eq!(
+        signers,
+        [format!("'statac ssh-ed25519 {}'", base64_of(&blob))]
+    );
+}
+
+fn base64_of(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut text = String::new();
+    for chunk in bytes.chunks(3) {
+        let joined = (chunk.iter().enumerate()).fold(0u32, |joined, (at, &byte)| {
+            joined | u32::from(byte) << (16 - 8 * at)
+        });
+        for at in 0..4 {
+            text.push(match at <= chunk.len() {
+                true => char::from(ALPHABET[(joined >> (18 - 6 * at) & 63) as usize]),
+                false => '=',
+            });
+        }
+    }
+    text
 }
 
 #[test]
