@@ -60,6 +60,8 @@ impl Hook<'_> {
 
     /// Runs the command and waits for it.
     pub(crate) fn run(&self) -> Result<(), Stopped> {
+        #[cfg(test)]
+        let _starting = crate::testing::starting();
         let not_started = |error: std::io::Error| Stopped {
             ended: Ended::NotStarted(crate::problem::Reason::of(&error)),
             said: String::new(),

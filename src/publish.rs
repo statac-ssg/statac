@@ -2611,6 +2611,7 @@ mod tests {
 
     #[test]
     fn a_second_hold_on_a_site_says_once_that_it_waits_and_waits_for_the_first() {
+        let _starting = crate::testing::starting();
         let scratch = scratch_with_site("held");
         let (first, unheld) = hold(&scratch.site(), || panic!("nothing holds the site"));
         assert!(unheld.is_none());

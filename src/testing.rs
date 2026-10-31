@@ -3,12 +3,22 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 /// How many paths [`Scratch::named`] has handed out in each run's folder
 /// that are still held. The folder stays while any is: a test making its
 /// path, or the folders above it, mustn't find it gone.
 static HELD: Mutex<BTreeMap<PathBuf, usize>> = Mutex::new(BTreeMap::new());
+
+/// Held by a test from before it starts a program until the program has
+/// run code of its own or ended, and by a test locking a file it has just
+/// let go of: on Unix a program being started keeps a copy of every file
+/// the process has open until then, so a lock stays held after its file
+/// is closed. Every program Statac starts in a test is started holding it.
+pub(crate) fn starting() -> MutexGuard<'static, ()> {
+    static STARTING: Mutex<()> = Mutex::new(());
+    STARTING.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 /// A folder of a test's own in the system's temporary folder, empty when
 /// made and removed when dropped.

@@ -898,6 +898,7 @@ fn proxies_the_environment_names_are_not_used() {
     child
         .env("NO_PROXY", "example.org")
         .env("STATAC_FETCH_PROXY_TEST", answer.addr.to_string());
+    let _starting = crate::testing::starting();
     let output = child
         .arg("fetch::tests::proxies_the_environment_names_are_not_used")
         .arg("--exact")

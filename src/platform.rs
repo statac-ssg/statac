@@ -340,6 +340,8 @@ pub(crate) fn remove_program(path: &Path, aside: &Path) -> io::Result<bool> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         retrying(|| std::fs::rename(path, aside), transient, &PAUSES)?;
         let script = removal_once_ended(aside, std::process::id());
+        #[cfg(test)]
+        let _starting = crate::testing::starting();
         std::process::Command::new("powershell.exe")
             .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
             .arg(encoded_command(&script))
@@ -1300,11 +1302,6 @@ mod tests {
 
     use super::*;
 
-    /// Held by a test starting a program and by one locking a file: a
-    /// program being started holds a copy of every open file until it
-    /// runs, which keeps a lock held after its file is closed.
-    static STARTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     #[test]
     fn a_disk_is_asked_about_capitals_by_a_folder_with_a_letter_in_its_name() {
         let top = std::env::temp_dir().join(format!("statac-capitals-{}", std::process::id()));
@@ -1648,9 +1645,7 @@ mod tests {
 
     #[test]
     fn a_lock_file_is_made_once_and_locked_by_one_handle_at_a_time() {
-        let _starting = STARTING
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _starting = crate::testing::starting();
         let root =
             std::env::temp_dir().join(format!("statac-platform-lock-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -1711,9 +1706,7 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let program = root.join(format!("statac{}", std::env::consts::EXE_SUFFIX));
         std::fs::copy(std::env::current_exe().unwrap(), &program).unwrap();
-        let starting = STARTING
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let starting = crate::testing::starting();
         let mut running = std::process::Command::new(&program)
             .arg("platform::tests::a_running_program_is_replaced_and_runs_on")
             .args(["--exact", "--nocapture", "--test-threads=1"])
@@ -1723,7 +1716,6 @@ mod tests {
             .stderr(std::process::Stdio::null())
             .spawn()
             .unwrap();
-        drop(starting);
         // Replaced once it runs, as a serve is: macOS can stall a program
         // replaced while it is still being started.
         let mut said = std::io::BufReader::new(running.stdout.take().unwrap());
@@ -1733,6 +1725,7 @@ mod tests {
             let read = std::io::BufRead::read_line(&mut said, &mut line).unwrap();
             assert!(read > 0, "the program ended before it said it was running");
         }
+        drop(starting);
         let (new, aside) = (root.join(".statac-new-1"), root.join(".statac-old-1"));
         replace_program(&program, b"the program after", &new, &aside).unwrap();
         assert_eq!(std::fs::read(&program).unwrap(), b"the program after");
