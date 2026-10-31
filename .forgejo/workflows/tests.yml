@@ -160,6 +160,13 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           try { [IO.Compression.ZipFile]::ExtractToDirectory("$env:USERPROFILE\source.zip", $source) }
           catch { $_; exit 1 }
+          # The zip dates every file at its commit, which can be older than
+          # what an earlier run built into the kept target folder, and cargo
+          # would then take a changed file as built. Dated now, as a checkout
+          # dates them.
+          $now = Get-Date
+          try { Get-ChildItem -LiteralPath $source -Recurse -File -Force -ErrorAction Stop | ForEach-Object { $_.LastWriteTime = $now } }
+          catch { $_; exit 1 }
           Remove-Item "$env:USERPROFILE\source.zip"
           Set-Location $source
           cmd /c "rustup toolchain install $rust --profile minimal 2>&1"
