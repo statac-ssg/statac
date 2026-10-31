@@ -1711,6 +1711,13 @@ pub enum RecordFault {
     /// A line of `published.txt` that is no address from the top of the
     /// site, as written.
     NotAnAddress(String),
+    /// A line of `published.txt` starting with `/` that holds a part no
+    /// address can have, by what is wrong with the part, with the line as
+    /// Statac writes it where mending that fault alone makes one.
+    Part {
+        fault: Box<AddressFault>,
+        meant: Option<Box<str>>,
+    },
     /// The first line of `fetched/links` isn't the one Statac writes.
     LinksOpening,
     /// A line of `fetched/links` of other than three fields, by how many

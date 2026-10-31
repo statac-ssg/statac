@@ -51,6 +51,147 @@ fn each_line_is_an_address_from_the_top_of_the_site_but_what_says_what_the_file_
 }
 
 #[test]
+fn a_line_starting_with_slash_that_no_address_can_be_is_told_by_its_part_with_the_line_meant() {
+    let told = |line: &str| {
+        let scratch = Scratch::new("published-part");
+        scratch.write(FILE, format!("/about/\n{line}\n"));
+        let mut sources = Sources::default();
+        let (record, problems) = Record::read(&scratch, &mut sources, &Settings::default());
+        assert_eq!(record.addresses.len(), 1, "{line}");
+        let [problem] = problems.as_slice() else {
+            panic!("{line}: {problems:?}");
+        };
+        (
+            crate::wording::headline(&problem.kind),
+            sources.spelling(problem.place.unwrap()).to_owned(),
+            crate::wording::suggestion(&problem.kind),
+        )
+    };
+    let percent = "Malformed record: `%` can't be in a name";
+    let hash = "Malformed record: `#` can't be in a name";
+    let dots = "Malformed record: `..` can't be a name";
+    let never = "Take the line out: Statac never publishes this URL.";
+    for (line, headline, at, suggestion) in [
+        (
+            "/caf%C3%A9/",
+            percent,
+            "caf%C3%A9",
+            "Write the characters themselves, not `%` codes: `/café/`.",
+        ),
+        (
+            "/notes/caf%c3%a9.pdf",
+            percent,
+            "caf%c3%a9.pdf",
+            "Write the characters themselves, not `%` codes: `/notes/café.pdf`.",
+        ),
+        // Not text, and another URL, each read as written.
+        (
+            "/caf%E9/",
+            percent,
+            "caf%E9",
+            "Write the characters themselves, not `%` codes.",
+        ),
+        (
+            "/a%2Fb/",
+            percent,
+            "a%2Fb",
+            "Write the characters themselves, not `%` codes.",
+        ),
+        (
+            "/notes/#top",
+            hash,
+            "#top",
+            "Leave out the `#` and what follows it: `/notes/`.",
+        ),
+        (
+            "/notes.pdf#page=2",
+            hash,
+            "notes.pdf#page=2",
+            "Leave out the `#` and what follows it: `/notes.pdf`.",
+        ),
+        (
+            "/notes/../about-2/",
+            dots,
+            "..",
+            "Write the URL without `..`: `/about-2/`.",
+        ),
+        (
+            "/notes/post-1/..",
+            dots,
+            "..",
+            "Write the URL without `..`: `/notes/`.",
+        ),
+        (
+            "/../../feed.xml",
+            dots,
+            "..",
+            "Write the URL without `..`: `/feed.xml`.",
+        ),
+        (
+            "/notes/./post-1/",
+            "Malformed record: `.` can't be a name",
+            ".",
+            "Write the URL without `.`: `/notes/post-1/`.",
+        ),
+        // Mending the first fault leaves another.
+        (
+            "/notes/../caf%C3%A9/",
+            dots,
+            "..",
+            "Write the URL without `..`.",
+        ),
+        (
+            "/notes/a\u{7}b/",
+            "Malformed record: a control character can't be in a name",
+            "a\u{7}b",
+            never,
+        ),
+        (
+            "/search?q=1",
+            "Malformed record: `?` can't be in a name",
+            "search?q=1",
+            never,
+        ),
+        (
+            "/notes./",
+            "Malformed record: a name can't end with `.`",
+            "notes.",
+            never,
+        ),
+        (
+            "/notes /post-1/",
+            "Malformed record: a name can't end with a space",
+            "notes ",
+            never,
+        ),
+        (
+            "/con/",
+            "Malformed record: Windows keeps `con` for a device",
+            "con",
+            never,
+        ),
+    ] {
+        assert_eq!(
+            told(line),
+            (headline.into(), at.into(), Some(suggestion.into())),
+            "{line}"
+        );
+    }
+    // A line with no opening `/` is told so, whatever else it holds.
+    assert_eq!(
+        told("caf%C3%A9/"),
+        (
+            "Malformed record: `caf%C3%A9/` isn't a URL starting with `/`".into(),
+            "caf%C3%A9/".into(),
+            Some(
+                "Write it as a URL starting with `/`, such as `/about/`, or take the line out."
+                    .into()
+            ),
+        )
+    );
+}
+
+#[test]
 fn an_address_kept_that_nothing_answers_at_is_told_at_its_line_with_the_sites_path() {
     let site = TempSite::site(&[
         (

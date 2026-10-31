@@ -1126,6 +1126,7 @@ pub(crate) fn headline(kind: &Kind) -> String {
                 RecordFault::NotAnAddress(written) => {
                     format!("`{written}` isn't a URL starting with `/`")
                 }
+                RecordFault::Part { fault, .. } => address_fault(fault),
                 RecordFault::LinksOpening => "the first line isn't `statac links 1`".into(),
                 RecordFault::NotALink(written) => format!("`{written}` isn't a full URL"),
                 RecordFault::Answer(written) => {
@@ -3566,6 +3567,18 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
                 "Write it as a URL starting with `/`, such as `/about/`, or take the line out."
                     .into(),
             ),
+            RecordFault::Part { fault, meant } => {
+                let mend = |how: &str| match meant {
+                    Some(meant) => format!("{how}: `{meant}`."),
+                    None => format!("{how}."),
+                };
+                Some(match &**fault {
+                    AddressFault::Percent => mend("Write the characters themselves, not `%` codes"),
+                    AddressFault::Hash => mend("Leave out the `#` and what follows it"),
+                    AddressFault::Dots(dots) => mend(&format!("Write the URL without `{dots}`")),
+                    _ => "Take the line out: Statac never publishes this URL.".into(),
+                })
+            }
             RecordFault::LinksOpening => Some("Write `statac links 1` as its first line.".into()),
             RecordFault::LinkFields(_) => Some(
                 "Write the URL, its answer and the day it was checked, separated by tabs.".into(),
@@ -5714,6 +5727,12 @@ mod tests {
             absent,
         };
         let record = |fault| Kind::MalformedRecord { fault };
+        let part = |fault, meant: Option<&str>| {
+            record(RecordFault::Part {
+                fault: Box::new(fault),
+                meant: meant.map(Box::from),
+            })
+        };
         let retired = |urls: &[&str], unread| Kind::RetiredFile {
             urls: urls.iter().map(|url| (*url).to_owned()).collect(),
             unread,
@@ -5779,6 +5798,41 @@ mod tests {
                 Some(
                     "Write it as a URL starting with `/`, such as `/about/`, or take the line out.",
                 ),
+            ),
+            (
+                part(AddressFault::Percent, Some("/café/")),
+                "Malformed record: `%` can't be in a name",
+                Some("Write the characters themselves, not `%` codes: `/café/`."),
+            ),
+            (
+                part(AddressFault::Percent, None),
+                "Malformed record: `%` can't be in a name",
+                Some("Write the characters themselves, not `%` codes."),
+            ),
+            (
+                part(AddressFault::Hash, Some("/notes/")),
+                "Malformed record: `#` can't be in a name",
+                Some("Leave out the `#` and what follows it: `/notes/`."),
+            ),
+            (
+                part(AddressFault::Dots("..".into()), Some("/notes/")),
+                "Malformed record: `..` can't be a name",
+                Some("Write the URL without `..`: `/notes/`."),
+            ),
+            (
+                part(AddressFault::Dots("..".into()), None),
+                "Malformed record: `..` can't be a name",
+                Some("Write the URL without `..`."),
+            ),
+            (
+                part(AddressFault::Control, None),
+                "Malformed record: a control character can't be in a name",
+                Some("Take the line out: Statac never publishes this URL."),
+            ),
+            (
+                part(AddressFault::Device("con".into()), None),
+                "Malformed record: Windows keeps `con` for a device",
+                Some("Take the line out: Statac never publishes this URL."),
             ),
             (
                 record(RecordFault::LinksOpening),

@@ -72,7 +72,9 @@ is, and Statac skips blank lines. Every other line is one URL:
 
 A malformed line in `published.txt` is usually a URL without its
 opening `/`, such as `about/`, a full URL, such as
-`https://example.org/about/`, or a URL written on two lines.
+`https://example.org/about/`, a URL copied from a browser's address
+bar, which writes `/café/` as `/caf%C3%A9/`, or a URL written on two
+lines.
 
 ## How to fix it
 
@@ -85,11 +87,19 @@ next `statac refresh` asks for it again. If you delete a line of
 
 In `published.txt`, write the URL the line meant, starting with `/`,
 such as `/about/` in place of `about/` or `https://example.org/about/`.
-If a URL is on two lines, take one of them out. Or take the line out:
-Statac then stops warning if that URL is no longer published. If the
-site still publishes the URL, the next build adds the line back, unless
-it is one of the list pages Statac makes, such as a tag's, or a
-paginated page.
+Write its characters as themselves, such as `/café/` in place of
+`/caf%C3%A9/`, leave out a `#` and what follows it, and write the URL
+without `..`, such as `/about/` in place of `/notes/../about/`. If a URL
+is on two lines, take one of them out. Or take the line out: Statac then
+stops warning if that URL is no longer published. If the site still
+publishes the URL, the next build adds the line back, unless it is one
+of the list pages Statac makes, such as a tag's, or a paginated page.
+
+Statac never publishes a URL with a control character in it, a
+character Windows can't have in a file name, such as `?` or `:`, a name
+that ends with `.` or a space, or a name Windows keeps for a device,
+such as `con`. If a line in `published.txt` holds one of these, take
+the line out.
 
 ## Example
 

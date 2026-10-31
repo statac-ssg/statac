@@ -25,7 +25,7 @@ use std::path::Path;
 
 use crate::address::Address;
 use crate::config::Settings;
-use crate::problem::{Kind, Named, Problem, Reason, RecordFault, Relation};
+use crate::problem::{AddressFault, Kind, Named, Problem, Reason, RecordFault, Relation};
 use crate::source::{Place, Sources, Span};
 
 /// The file's name at the top of the site.
@@ -104,6 +104,21 @@ impl Record {
             };
             let address = match read {
                 Ok(address) if written.starts_with('/') => address,
+                Err((fault, span)) if written.starts_with('/') => {
+                    let meant = meant(written, &fault).map(String::into_boxed_str);
+                    let part = Place {
+                        source,
+                        span: Span::new(from + span.start as usize, from + span.end as usize),
+                    };
+                    let kind = Kind::MalformedRecord {
+                        fault: RecordFault::Part {
+                            fault: Box::new(fault),
+                            meant,
+                        },
+                    };
+                    problems.push(Problem::at(kind, part));
+                    continue;
+                }
                 _ => {
                     problems.push(malformed(RecordFault::NotAnAddress(written.into())));
                     continue;
@@ -315,6 +330,49 @@ impl Record {
         written.hash = Some(blake3::hash(text.as_bytes()));
         Ok(written)
     }
+}
+
+/// The line `written` as Statac writes it, where mending `fault` alone
+/// makes it an address: each `%` code read as the character it stands
+/// for, the `#` and what follows it left out, or the `.` and `..` pieces
+/// followed as a browser follows them.
+fn meant(written: &str, fault: &AddressFault) -> Option<String> {
+    let mended = match fault {
+        AddressFault::Percent => {
+            let decoded = crate::address::decoded(written);
+            // `%2F` read as `/` would be another URL.
+            if decoded.matches('/').count() != written.matches('/').count() {
+                return None;
+            }
+            decoded
+        }
+        AddressFault::Hash => written[..written.find('#')?].to_owned(),
+        AddressFault::Dots(_) => {
+            let mut kept = Vec::new();
+            for piece in written.split('/') {
+                match piece {
+                    "" | "." => {}
+                    ".." => {
+                        kept.pop();
+                    }
+                    _ => kept.push(piece),
+                }
+            }
+            let folder =
+                written.ends_with('/') || written.ends_with("/.") || written.ends_with("/..");
+            match (kept.is_empty(), folder) {
+                (true, _) => "/".to_owned(),
+                (false, true) => format!("/{}/", kept.join("/")),
+                (false, false) => format!("/{}", kept.join("/")),
+            }
+        }
+        _ => return None,
+    };
+    let read = match mended.ends_with('/') {
+        true => Address::read(&mended),
+        false => Address::read_file(&mended),
+    };
+    read.ok().map(|address| address.as_str().to_owned())
 }
 
 /// Adds to `found` the path from the top of the built site of each file
