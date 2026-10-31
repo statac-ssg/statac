@@ -195,6 +195,7 @@ const ALIASES: &[(&str, &str)] = &[
     ("rhtml", "erb"),
     ("jinja2", "jinja"),
     ("j2", "jinja"),
+    ("vb.net", "vb"),
 ];
 
 /// Files known by their whole names and by no language's, each as it is
@@ -220,7 +221,29 @@ const NAMED_AS_THEIR_FILES: &[&str] = &[
 ];
 
 /// Endings of a file's name that no language is named by.
-const ENDINGS: &[(&str, &str)] = &[("h", "c"), ("hpp", "cpp"), ("cc", "cpp"), ("htm", "html")];
+const ENDINGS: &[(&str, &str)] = &[
+    ("h", "c"),
+    ("hpp", "cpp"),
+    ("cc", "cpp"),
+    ("htm", "html"),
+    ("atom", "xml"),
+    ("csproj", "xml"),
+    ("fsproj", "xml"),
+    ("nuspec", "xml"),
+    ("opml", "xml"),
+    ("plist", "xml"),
+    ("rdf", "xml"),
+    ("rss", "xml"),
+    ("svg", "xml"),
+    ("vbproj", "xml"),
+    ("vcxproj", "xml"),
+    ("wsdl", "xml"),
+    ("xaml", "xml"),
+    ("xlf", "xml"),
+    ("xliff", "xml"),
+    ("xsd", "xml"),
+    ("xslt", "xsl"),
+];
 
 /// A grammar as `grammars.bin` holds it.
 struct Held {
@@ -359,20 +382,38 @@ impl FirstWord {
 }
 
 /// What a fence's first word is: a language, as every word that names one
-/// is, in any capitals; else a file whose name gives a language, by its
-/// whole name as it is usually written, `Gemfile`, or by its ending,
-/// `example.rs`; else a language Statac doesn't know.
+/// is, in any capitals; else a file, where it is written as a file's name
+/// is, `example.rs` or `site/Makefile`; else a language Statac doesn't
+/// know.
 pub(crate) fn first_word(word: &str) -> FirstWord {
     match language(word) {
         unknown @ Language::Unknown { .. } => {
-            let named = match file_shaped(word) {
-                true => by_whole_name(word, |a, b| a == b).or_else(|| by_ending(word)),
-                false => None,
-            };
-            named.map_or(FirstWord::Language(unknown), FirstWord::File)
+            file_named(word).map_or(FirstWord::Language(unknown), FirstWord::File)
         }
         named => FirstWord::Language(named),
     }
+}
+
+/// The language a word written as a file's name gives: by its whole name
+/// as it is usually written, `Gemfile`, or after a folder as a language
+/// is, `site/Makefile`; else by its ending, plain where the ending names
+/// none, `.gitignore`. None for a word that is no file's name, such as
+/// `Caddyfile`, with no ending and no whole name known.
+fn file_named(word: &str) -> Option<Language> {
+    if !file_shaped(word) {
+        return None;
+    }
+    let own = || {
+        let name = last_part(word);
+        let after_a_folder = name.len() < word.len();
+        let known = NAMED_AS_THEIR_FILES
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(name));
+        (after_a_folder && known).then(|| language(name))
+    };
+    by_whole_name(word, |a, b| a == b)
+        .or_else(own)
+        .or_else(|| ending(word).map(|_| by_ending(word).unwrap_or(Language::Plain)))
 }
 
 /// The language the name of a file on disk gives: by its whole name, in
@@ -401,6 +442,15 @@ fn file_shaped(word: &str) -> bool {
 /// A file's name without the folders before it.
 fn last_part(name: &str) -> &str {
     name.rsplit('/').next().unwrap_or(name)
+}
+
+/// What follows the last dot of a file's name, where that is letters and
+/// digits with a letter among them: `1.5` and `v1.2` name no file.
+fn ending(name: &str) -> Option<&str> {
+    let (_, ending) = last_part(name).rsplit_once('.')?;
+    let fits = ending.chars().all(|c| c.is_ascii_alphanumeric())
+        && ending.chars().any(|c| c.is_ascii_alphabetic());
+    fits.then_some(ending)
 }
 
 fn by_whole_name(name: &str, same: impl Fn(&str, &str) -> bool) -> Option<Language> {

@@ -46,6 +46,7 @@ fn a_fence_word_names_a_grammar_by_its_name_alias_or_common_spelling() {
         ("golang", "go"),
         ("udiff", "diff"),
         ("octave", "matlab"),
+        ("VB.NET", "vb"),
     ] {
         assert_eq!(language(word), Language::Known(name), "{word}");
     }
@@ -107,6 +108,13 @@ fn a_files_name_gives_its_language_by_its_whole_name_or_its_ending() {
         ("CMakeLists.txt", "cmake"),
         ("Cargo.lock", "toml"),
         (".zshrc", "zsh"),
+        ("site/Makefile", "makefile"),
+        ("docker/dockerfile", "dockerfile"),
+        ("templates/blogroll.opml", "xml"),
+        ("feed.rss", "xml"),
+        ("feed.atom", "xml"),
+        ("logo.svg", "xml"),
+        ("style.xslt", "xsl"),
     ] {
         assert_eq!(
             first_word(word),
@@ -114,13 +122,20 @@ fn a_files_name_gives_its_language_by_its_whole_name_or_its_ending() {
             "{word}"
         );
     }
-    assert_eq!(first_word("notes-1.txt"), FirstWord::File(Language::Plain));
-    // An ending that names no language names no file.
+    // A file whose ending names no language is a file all the same, shown
+    // as it is.
     for word in [
+        "notes-1.txt",
         ".gitignore",
         "example.unknown",
-        "vb.net",
         "example.pyy",
+        "go.mod",
+        "site/nginx.conf",
+    ] {
+        assert_eq!(first_word(word), FirstWord::File(Language::Plain), "{word}");
+    }
+    // A name with no ending, and no whole name known, names no file.
+    for word in [
         "gemfile",
         "1.5",
         "v1.2",
@@ -128,7 +143,7 @@ fn a_files_name_gives_its_language_by_its_whole_name_or_its_ending() {
         "example.",
         "a:b.rs",
         "Caddyfile",
-        "site/Makefile",
+        "site/Caddyfile",
     ] {
         assert!(
             matches!(
@@ -144,6 +159,7 @@ fn a_files_name_gives_its_language_by_its_whole_name_or_its_ending() {
     assert_eq!(file_language("Makefile"), Language::Known("makefile"));
     assert_eq!(file_language("gemfile"), Language::Known("ruby"));
     assert_eq!(file_language("example.RS"), Language::Known("rs"));
+    assert_eq!(file_language("blogroll.opml"), Language::Known("xml"));
     for name in ["example", "rust", ".gitignore", "example.unknown"] {
         assert_eq!(file_language(name), Language::Plain, "{name}");
     }

@@ -2631,26 +2631,20 @@ fn code_not_asked_to_be_coloured_is_written_as_it_is_with_no_language_told() {
 }
 
 #[test]
-fn a_fence_opening_with_a_files_name_is_coloured_by_it_where_its_ending_names_a_language() {
+fn a_fence_opening_with_a_files_name_is_captioned_and_coloured_where_its_ending_names_a_language() {
     let built = site(&[
         ("statac.yaml", "language: en\ncode_colours: true\n"),
         (
             "content/post-1.md",
             "---\ntitle: Post 1\n---\n\n```post-1.rs\nfn main() {}\n```\n\n\
-             ```.gitignore\n/built\n```\n\n```Makefile\nall:\n```\n",
+             ```.gitignore\n/built\n```\n\n```Makefile\nall:\n```\n\n\
+             ```templates/blogroll.opml\n<opml/>\n```\n",
         ),
         BASE,
         PAGE,
     ]);
     let rendered = built.render("post-1.md");
-    assert_eq!(
-        built.told(&rendered.problems),
-        [(
-            "unknown-code-language",
-            "content/post-1.md".into(),
-            ".gitignore".into()
-        )]
-    );
+    assert_eq!(built.told(&rendered.problems), []);
     let html = rendered.html.unwrap();
     assert!(
         html.contains(
@@ -2661,7 +2655,15 @@ fn a_fence_opening_with_a_files_name_is_coloured_by_it_where_its_ending_names_a_
     );
     assert!(
         html.contains(
-            "<pre class=\"code\"><code class=\"language-.gitignore\">/built</code></pre>"
+            "<figure class=\"code\"><figcaption>.gitignore</figcaption>\
+             <pre><code>/built</code></pre></figure>"
+        ),
+        "{html}"
+    );
+    assert!(
+        html.contains(
+            "<figure class=\"code\"><figcaption>templates/blogroll.opml</figcaption>\
+             <pre><code class=\"language-xml\"><span class=\"hl-"
         ),
         "{html}"
     );

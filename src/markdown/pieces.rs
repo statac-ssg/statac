@@ -163,7 +163,11 @@ mod tests {
             ("ruby", "Gemfile for the site")
         );
         assert_eq!(fence("notes-1.txt"), ("", "notes-1.txt"));
-        assert_eq!(fence(".gitignore"), (".gitignore", ""));
+        assert_eq!(fence(".gitignore"), ("", ".gitignore"));
+        assert_eq!(
+            fence("templates/blogroll.opml"),
+            ("xml", "templates/blogroll.opml")
+        );
         assert_eq!(fence("Makefile"), ("Makefile", ""));
     }
 
