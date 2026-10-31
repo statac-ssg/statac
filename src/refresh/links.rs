@@ -21,8 +21,7 @@
 
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, mpsc};
+use std::sync::{Mutex, MutexGuard, PoisonError, mpsc};
 use std::time::Duration;
 
 use crate::config::Settings;
@@ -101,6 +100,18 @@ enum Told {
     /// A host that asked Statac to wait longer than it waits, with how
     /// many of its links are left unasked.
     Left { host: String, count: usize },
+    /// Too many answers in a row made no connection, so no more requests
+    /// are started.
+    Stopped,
+}
+
+/// The answers in a row that made no connection, counted by the workers
+/// as they tell each one, so the step stops at the last of them however
+/// far behind the answers are read.
+#[derive(Default)]
+struct Silence {
+    in_a_row: usize,
+    stopped: bool,
 }
 
 /// Checks each link due, saying on `say` what it does, and writes the
@@ -150,31 +161,35 @@ pub(super) fn check(checking: &Checking, looker: &dyn Look, say: &mut dyn FnMut(
     ));
     let workers = queue.len().min(HOSTS_AT_ONCE);
     let queue = Mutex::new(VecDeque::from(queue));
-    let stop = AtomicBool::new(false);
+    let silence = Mutex::new(Silence::default());
     let (sent, received) = mpsc::channel();
     let mut tally = Tally::default();
     std::thread::scope(|scope| {
         for _ in 0..workers {
             let sent = sent.clone();
-            let (queue, stop) = (&queue, &stop);
+            let (queue, silence) = (&queue, &silence);
             scope.spawn(move || {
                 while let Some((host, urls)) = next(queue) {
-                    if stop.load(Ordering::Relaxed) {
+                    if lock(silence).stopped {
                         break;
                     }
-                    ask_host(looker, &host, &urls, stop, &sent);
+                    ask_host(looker, &host, &urls, silence, &sent);
                 }
             });
         }
         drop(sent);
         // Answers with no connection made, waiting for some site to answer.
         let mut waiting: Vec<(Vec<String>, Answer)> = Vec::new();
-        let mut in_a_row = 0;
         let mut since_kept = 0;
         for told in received {
             let (urls, answer, connected) = match told {
                 Told::Left { host, count } => {
                     tally.left.push((host, count));
+                    continue;
+                }
+                Told::Stopped => {
+                    tally.stopped = true;
+                    waiting.clear();
                     continue;
                 }
                 Told::Asked {
@@ -200,21 +215,12 @@ pub(super) fn check(checking: &Checking, looker: &dyn Look, say: &mut dyn FnMut(
             match connected {
                 true => {
                     tally.connected = true;
-                    in_a_row = 0;
                     for (urls, answer) in waiting.drain(..) {
                         set(&urls, &answer, &mut tally);
                     }
                     set(&urls, &answer, &mut tally);
                 }
-                false => {
-                    in_a_row += 1;
-                    waiting.push((urls, answer));
-                    if in_a_row >= SILENT_IN_A_ROW && !tally.stopped {
-                        tally.stopped = true;
-                        stop.store(true, Ordering::Relaxed);
-                        waiting.clear();
-                    }
-                }
+                false => waiting.push((urls, answer)),
             }
             if since_kept >= KEPT_EVERY {
                 since_kept = 0;
@@ -293,10 +299,41 @@ impl Tally {
 }
 
 fn next(queue: &Mutex<VecDeque<(String, Vec<String>)>>) -> Option<(String, Vec<String>)> {
-    let mut queue = queue
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    queue.pop_front()
+    lock(queue).pop_front()
+}
+
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Tells `sent` what asking `urls` found, counting it in `silence`, and
+/// tells it the step stops where that makes too many in a row with no
+/// connection made. Sent with `silence` held, so the step reads the
+/// answers in the order they were counted.
+fn tell(
+    silence: &Mutex<Silence>,
+    sent: &mpsc::Sender<Told>,
+    urls: Vec<String>,
+    answer: Answer,
+    connected: bool,
+) {
+    let mut silence = lock(silence);
+    let _ = sent.send(Told::Asked {
+        urls,
+        answer,
+        connected,
+    });
+    if silence.stopped {
+        return;
+    }
+    silence.in_a_row = match connected {
+        true => 0,
+        false => silence.in_a_row + 1,
+    };
+    if silence.in_a_row >= SILENT_IN_A_ROW {
+        silence.stopped = true;
+        let _ = sent.send(Told::Stopped);
+    }
 }
 
 /// Asks each of `urls`, all on `host`, one at a time, telling `sent` each
@@ -305,15 +342,15 @@ fn ask_host(
     looker: &dyn Look,
     host: &str,
     urls: &[String],
-    stop: &AtomicBool,
+    silence: &Mutex<Silence>,
     sent: &mpsc::Sender<Told>,
 ) {
     let mut wait = Duration::ZERO;
     for (at, url) in urls.iter().enumerate() {
-        if stop.load(Ordering::Relaxed) {
+        std::thread::sleep(wait);
+        if lock(silence).stopped {
             return;
         }
-        std::thread::sleep(wait);
         let asked = ask(looker, url);
         wait = looker.pause();
         // A host that couldn't be reached at its first link answers for
@@ -323,11 +360,7 @@ fn ask_host(
             true => urls.to_vec(),
             false => vec![url.clone()],
         };
-        let _ = sent.send(Told::Asked {
-            urls: answering,
-            answer: asked.answer,
-            connected: asked.connected,
-        });
+        tell(silence, sent, answering, asked.answer, asked.connected);
         if whole_host {
             return;
         }

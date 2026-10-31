@@ -528,10 +528,10 @@ fn many_sites_in_a_row_not_answering_stop_the_step_and_none_is_recorded() {
          Stopped checking external links: 16 sites in a row didn't answer, so this computer \
          may be offline. Statac recorded nothing for them.\n"
     );
-    // Past the sixteenth, only the hosts already being asked as the step
-    // stops are asked.
+    // Past the sixteenth, only the hosts the other workers are already
+    // asking as the step stops are asked, however the threads are run.
     assert!(
-        looker.asked().len() <= 16 + HOSTS_AT_ONCE,
+        looker.asked().len() < 16 + HOSTS_AT_ONCE,
         "{:?}",
         looker.asked()
     );
