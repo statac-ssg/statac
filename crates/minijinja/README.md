@@ -10,6 +10,9 @@ kept for Statac's use alone. It follows Statac's needs, not MiniJinja's
 releases, and makes no promise to anyone else: its interface may change
 in any release, whatever its version says.
 
+Its version is its own, not MiniJinja's: it is based on MiniJinja
+3.0.1, with Statac's changes.
+
 For a template engine to use in your own project, use MiniJinja itself:
 [crates.io/crates/minijinja](https://crates.io/crates/minijinja), with
 its source at
