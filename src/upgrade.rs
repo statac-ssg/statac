@@ -1,10 +1,13 @@
-//! `statac upgrade`, and the upgrade `statac serve` makes as it starts.
+//! `statac upgrade`, the upgrade `statac serve` makes as it starts, and
+//! `statac uninstall`.
 //!
-//! Statac replaces itself only where its install script installed it,
+//! Statac replaces or removes itself only where its install script
+//! installed it,
 //! which it knows by the marker the script leaves beside the program,
-//! `.statac-install`. Anything else is another tool's to upgrade, and
-//! Statac names that tool's command, guessing the tool from where the
-//! program is: the guess picks a command to name, never what is replaced.
+//! `.statac-install`. Anything else is another tool's to upgrade or
+//! uninstall, and Statac names that tool's command, guessing the tool from
+//! where the program is: the guess picks a command to name, never what is
+//! replaced or removed.
 //!
 //! # The marker
 //!
@@ -27,13 +30,14 @@
 //!   path: `LICENSE-MIT`, `LICENSE-APACHE`, `THIRD-PARTY.md` and
 //!   `THIRD-PARTY-GRAMMARS.md`, the four files a package carries beside
 //!   the program. An upgrade writes the new release's over them, making
-//!   the folder where it is gone. Missing, or not a whole path, and an
-//!   upgrade writes no licences.
+//!   the folder where it is gone; an uninstall removes them by name, and
+//!   the folder where it then holds nothing. Missing, or not a whole
+//!   path, and neither touches the licences.
 //!
 //! The script writes, with its own answer and folder:
 //!
 //! ```text
-//! # Written by Statac's install script. statac upgrade reads it.
+//! # Written by Statac's install script. statac upgrade and statac uninstall read it.
 //! updates: off
 //! licences: /usr/local/share/statac
 //! ```
@@ -370,48 +374,83 @@ fn installer(program: &Path) -> Installer {
     }
 }
 
-/// Each tool that may have installed Statac, with its name and the
-/// command that upgrades Statac, and whether it is one for Windows.
-const TOOLS: [(Installer, &str, &str, bool); 5] = [
-    (
-        Installer::Homebrew,
-        "Homebrew",
-        "brew upgrade statac",
-        false,
-    ),
-    (Installer::Scoop, "Scoop", "scoop update statac", true),
-    (
-        Installer::Winget,
-        "winget",
-        "winget upgrade Statac.Statac",
-        true,
-    ),
-    (
-        Installer::Cargo,
-        "Cargo",
-        "cargo install --locked statac",
-        false,
-    ),
-    (
-        Installer::Script,
-        "the install script",
-        "curl -fsSL https://get.statac.dev | sh",
-        false,
-    ),
+/// A tool that may have installed Statac.
+struct Tool {
+    installer: Installer,
+    name: &'static str,
+    upgrade: &'static str,
+    /// The command that uninstalls Statac: none for the install script,
+    /// whose install `statac uninstall` removes.
+    uninstall: Option<&'static str>,
+    /// Whether it is a tool for Windows.
+    windows: bool,
+}
+
+const TOOLS: [Tool; 5] = [
+    Tool {
+        installer: Installer::Homebrew,
+        name: "Homebrew",
+        upgrade: "brew upgrade statac",
+        uninstall: Some("brew uninstall statac"),
+        windows: false,
+    },
+    Tool {
+        installer: Installer::Scoop,
+        name: "Scoop",
+        upgrade: "scoop update statac",
+        uninstall: Some("scoop uninstall statac"),
+        windows: true,
+    },
+    Tool {
+        installer: Installer::Winget,
+        name: "winget",
+        upgrade: "winget upgrade Statac.Statac",
+        uninstall: Some("winget uninstall Statac.Statac"),
+        windows: true,
+    },
+    Tool {
+        installer: Installer::Cargo,
+        name: "Cargo",
+        upgrade: "cargo install --locked statac",
+        uninstall: Some("cargo uninstall statac"),
+        windows: false,
+    },
+    Tool {
+        installer: Installer::Script,
+        name: "the install script",
+        upgrade: "curl -fsSL https://get.statac.dev | sh",
+        uninstall: None,
+        windows: false,
+    },
 ];
+
+/// The tools this system has that could have installed Statac.
+fn tools_here() -> impl Iterator<Item = &'static Tool> {
+    (TOOLS.iter())
+        .filter(|tool| tool.windows == cfg!(windows) || tool.installer == Installer::Cargo)
+}
 
 /// The line naming the command that upgrades Statac where `installer`
 /// installed it, or where that can't be told, the commands of each tool
 /// this system has that could have.
 fn upgrade_with(installer: Installer) -> String {
     let tool = (TOOLS.iter())
-        .find(|(tool, ..)| *tool == installer)
-        .map(|&(_, name, command, _)| (name, command));
-    let commands: Vec<&str> = (TOOLS.iter())
-        .filter(|&&(tool, _, _, windows)| windows == cfg!(windows) || tool == Installer::Cargo)
-        .map(|&(_, _, command, _)| command)
-        .collect();
+        .find(|tool| tool.installer == installer)
+        .map(|tool| (tool.name, tool.upgrade));
+    let commands: Vec<&str> = tools_here().map(|tool| tool.upgrade).collect();
     wording::upgrade_with(tool, &commands)
+}
+
+/// The line naming the command that uninstalls Statac where `installer`
+/// installed it, or where that can't be told, the commands of each tool
+/// this system has that could have, and the program at `program` to
+/// remove where none did.
+fn uninstall_with(installer: Installer, program: &Path) -> String {
+    let tool = (TOOLS.iter())
+        .find(|tool| tool.installer == installer)
+        .and_then(|tool| Some((tool.name, tool.uninstall?)));
+    let commands: Vec<&str> = tools_here().filter_map(|tool| tool.uninstall).collect();
+    wording::uninstall_with(tool, &commands, &shown(program))
 }
 
 /// Where the releases are fetched from, and how.
@@ -707,7 +746,7 @@ pub(crate) fn run(updates: Option<bool>, out: &mut dyn Write) -> u8 {
         Err(error) => {
             say(&format!(
                 "{}\n",
-                wording::cant_find_program(&Reason::of(&error))
+                wording::cant_find_program("upgrade", &Reason::of(&error))
             ));
             return 1;
         }
@@ -785,6 +824,133 @@ fn set_updates(install: &Install, on: bool) -> io::Result<()> {
     let fresh = format!("{NEW_MARKER}{}", std::process::id());
     let text = install.marker.with_updates(on);
     crate::platform::keep_file(install.folder(), MARKER, &fresh, text.as_bytes())
+}
+
+/// Does what `statac uninstall` asks, saying on `out` what happened, and
+/// gives the exit code: where Statac's install script installed it,
+/// removes the program, the marker and what upgrades left beside them,
+/// and the licences.
+pub(crate) fn uninstall(out: &mut dyn Write) -> u8 {
+    let mut say = |text: &str| {
+        let _ = out.write_all(text.as_bytes());
+        let _ = out.flush();
+    };
+    let program = match std::env::current_exe() {
+        Ok(program) => program,
+        Err(error) => {
+            say(&format!(
+                "{}\n",
+                wording::cant_find_program("uninstall", &Reason::of(&error))
+            ));
+            return 1;
+        }
+    };
+    uninstall_at(&program, Version::running(), &mut say)
+}
+
+fn uninstall_at(program: &Path, running: Version, say: &mut dyn FnMut(&str)) -> u8 {
+    let mut line = |text: &str| say(&format!("{text}\n"));
+    let install = match installed(program) {
+        Ok(Installed::Script(install)) => install,
+        Ok(Installed::Other(installer)) => {
+            let program = std::fs::canonicalize(program).unwrap_or_else(|_| program.into());
+            line(wording::UNINSTALL_NOT_SCRIPTED);
+            line(&uninstall_with(installer, &program));
+            return 1;
+        }
+        Err(error) => {
+            let path = shown(&program.parent().unwrap_or(program).join(MARKER));
+            line(&wording::cant_read_file(&path, &Reason::of(&error)));
+            return 1;
+        }
+    };
+    let folder = install.folder();
+    let aside = folder.join(format!("{OLD_PROGRAM}{}", std::process::id()));
+    let once_ended = match crate::platform::remove_program(&install.program, &aside) {
+        Ok(once_ended) => once_ended,
+        Err(error) => {
+            let path = shown(&install.program);
+            line(&wording::not_uninstalled(&path, &Reason::of(&error)));
+            return 1;
+        }
+    };
+    let mut unremoved = Vec::new();
+    let mut remove = |path: &Path| match std::fs::remove_file(path) {
+        Ok(()) => true,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+        Err(error) => {
+            unremoved.push(wording::cant_remove_file(&shown(path), &Reason::of(&error)));
+            false
+        }
+    };
+    let numbered = |name: &str, start: &str| {
+        name.strip_prefix(start)
+            .is_some_and(|number| number.parse::<u32>().is_ok())
+    };
+    for name in names_in(folder) {
+        let left = [OLD_PROGRAM, NEW_PROGRAM, NEW_MARKER]
+            .iter()
+            .any(|start| numbered(&name, start));
+        if left && folder.join(&name) != aside {
+            remove(&folder.join(&name));
+        }
+    }
+    remove(&install.marker_path());
+    line(&wording::uninstalled(
+        &running.to_string(),
+        &shown(folder),
+        once_ended,
+    ));
+
+    if let Some(licences) = install.marker.licences() {
+        let mut removed_any = false;
+        for licence in LICENCES {
+            removed_any |= remove(&licences.join(licence));
+        }
+        // A licence an upgrade was stopped while writing.
+        for name in names_in(&licences) {
+            let part_written = LICENCES.iter().any(|licence| {
+                (name.strip_prefix(&format!(".{licence}.")))
+                    .and_then(|rest| rest.strip_suffix(".tmp"))
+                    .is_some_and(|number| number.parse::<u32>().is_ok())
+            });
+            if part_written {
+                remove(&licences.join(&name));
+            }
+        }
+        let holds_other = !names_in(&licences).is_empty();
+        let folder_removed = licences.is_dir()
+            && !holds_other
+            && match std::fs::remove_dir(&licences) {
+                Ok(()) => true,
+                Err(error) => {
+                    let path = shown(&licences);
+                    unremoved.push(wording::cant_remove_file(&path, &Reason::of(&error)));
+                    false
+                }
+            };
+        if removed_any || folder_removed {
+            line(&wording::licences_removed(
+                &shown(&licences),
+                folder_removed,
+                holds_other,
+            ));
+        }
+    }
+    for said in &unremoved {
+        line(said);
+    }
+    u8::from(!unremoved.is_empty())
+}
+
+/// The names in the folder `folder`, none where it can't be read.
+fn names_in(folder: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return Vec::new();
+    };
+    (entries.flatten())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect()
 }
 
 /// What `statac serve` does as it starts, on a thread of its own, saying

@@ -56,14 +56,26 @@ pub(crate) enum Request {
     Upgrade {
         updates: Option<bool>,
     },
+    /// This Statac removed, with its licences.
+    Uninstall,
     /// The usage screen, for the command named before `--help`, or whole.
     Help(Option<&'static str>),
     Version,
 }
 
-const COMMANDS: [&str; 11] = [
-    "build", "check", "serve", "stamp", "refresh", "new", "import", "search", "explain", "lsp",
+const COMMANDS: [&str; 12] = [
+    "build",
+    "check",
+    "serve",
+    "stamp",
+    "refresh",
+    "new",
+    "import",
+    "search",
+    "explain",
+    "lsp",
     "upgrade",
+    "uninstall",
 ];
 
 /// Commands Statac once had, each with the setting that does its work now.
@@ -127,7 +139,7 @@ const OTHER_SPELLINGS: [(&str, &str); 7] = [
 const INTRO: &str = "Statac builds a website from a folder of Markdown.\n";
 
 /// Each command's entry on the usage screen, as the screen sets it.
-const USAGE: [(&str, &str); 11] = [
+const USAGE: [(&str, &str); 12] = [
     (
         "build",
         "  statac build [folder]  Read the site and write it out, ready to publish.\n",
@@ -200,6 +212,12 @@ const USAGE: [(&str, &str); 11] = [
         "upgrade",
         "  statac upgrade         Install the latest release of Statac in place of
                          this one, where Statac's install script put it.
+",
+    ),
+    (
+        "uninstall",
+        "  statac uninstall       Remove Statac and its licences, where Statac's
+                         install script put them.
 ",
     ),
 ];
@@ -390,6 +408,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>, terminal: &mut Terminal) ->
         Request::Serve { .. } => Some("serve"),
         Request::Search(_) => Some("search"),
         Request::Upgrade { .. } => Some("upgrade"),
+        Request::Uninstall => Some("uninstall"),
     };
     guarded(command, terminal, |terminal| {
         act(request, command, terminal)
@@ -470,6 +489,7 @@ fn act(mut request: Request, command: Option<&str>, terminal: &mut Terminal) -> 
             return crate::lsp::run(input, terminal.out);
         }
         Request::Upgrade { updates } => return crate::upgrade::run(updates, terminal.out),
+        Request::Uninstall => return crate::upgrade::uninstall(terminal.out),
         Request::Build { options, .. } | Request::Check { options, .. } => {
             let started = Instant::now();
             let outcome = build::run_saying(&options, terminal.progress);
@@ -631,6 +651,7 @@ fn site_of(request: &mut Request) -> Option<&mut PathBuf> {
         | Request::Explain(_)
         | Request::Lsp
         | Request::Upgrade { .. }
+        | Request::Uninstall
         | Request::Help(_)
         | Request::Version => None,
     }
@@ -1120,6 +1141,7 @@ fn parse_with(args: &[String], unreadable: &[bool]) -> Result<Request, Vec<Probl
         }),
         Some("lsp") => Request::Lsp,
         Some("upgrade") => Request::Upgrade { updates },
+        Some("uninstall") => Request::Uninstall,
         _ => Request::Explain(name.and_then(Code::from_name).expect("checked above")),
     })
 }

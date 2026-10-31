@@ -73,7 +73,7 @@ mkdir -p "$tried/releases/latest" "$tried/releases/v$version"
 cp SHA256SUMS "$tried/releases/latest/"
 cp SHA256SUMS statac-* "$tried/releases/v$version/"
 STATAC_RELEASES="file://$tried/releases" XDG_DATA_HOME="$tried/share" \
-    sh "$root/tools/install.sh" --to "$tried/installed" >/dev/null
+    sh "$root/tools/install.sh" --to="$tried/installed" --updates=off >/dev/null
 said=$("$tried/installed/statac" --version)
 [ "$said" = "Statac $version" ] ||
     stop "The installed package says \`$said\`, not \`Statac $version\`."

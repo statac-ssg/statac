@@ -819,6 +819,212 @@ fn what_an_upgrade_left_is_removed_once_nothing_needs_it() {
     assert_eq!(present(), kept);
 }
 
+/// What an uninstall of the install at `installed` said and its exit
+/// code, with 0.8.0 running.
+fn uninstalling(installed: &Installed) -> (String, u8) {
+    let mut said = String::new();
+    let code = uninstall_at(&installed.program, version("0.8.0"), &mut |text| {
+        said.push_str(text)
+    });
+    (said, code)
+}
+
+impl Installed {
+    /// The program's folder as an uninstall names it, every link on the
+    /// way resolved.
+    fn folder_shown(&self) -> String {
+        shown(&std::fs::canonicalize(self.scratch.join("bin")).unwrap())
+    }
+
+    fn licences_shown(&self) -> String {
+        self.scratch.join("share").display().to_string()
+    }
+
+    fn write_licences(&self) {
+        for licence in LICENCES {
+            self.scratch.write(&format!("share/{licence}"), licence);
+        }
+    }
+
+    /// What the line saying the program was removed reads.
+    fn uninstalled(&self) -> String {
+        wording::uninstalled("0.8.0", &self.folder_shown(), cfg!(windows))
+    }
+}
+
+#[test]
+fn an_uninstall_removes_the_program_the_marker_and_the_licences() {
+    let installed = Installed::scripted("uninstall", "on");
+    installed.write_licences();
+    let other = std::process::id().wrapping_add(1);
+    for left in [
+        format!("bin/{NEW_PROGRAM}{other}"),
+        format!("bin/{OLD_PROGRAM}{other}"),
+        format!("bin/{NEW_MARKER}{other}"),
+        format!("bin/{NEW_PROGRAM}not-a-number"),
+        "bin/another-program".to_owned(),
+        format!("share/{}", ".LICENSE-MIT.12.tmp"),
+    ] {
+        installed.scratch.write(&left, "left");
+    }
+    assert_eq!(
+        uninstalling(&installed),
+        (
+            format!(
+                "{}\nRemoved its licences, and their folder `{}`, which held nothing else.\n",
+                installed.uninstalled(),
+                installed.licences_shown()
+            ),
+            0
+        )
+    );
+    let mut kept = vec![
+        format!("{NEW_PROGRAM}not-a-number"),
+        "another-program".to_owned(),
+    ];
+    // On Windows the program waits aside until this process ends.
+    if cfg!(windows) {
+        kept.push(format!("{OLD_PROGRAM}{}", std::process::id()));
+    }
+    kept.sort();
+    assert_eq!(installed.beside(), kept);
+    assert!(!installed.scratch.join("share").exists());
+}
+
+#[test]
+fn an_uninstall_keeps_the_licences_folder_where_it_holds_other_files() {
+    let installed = Installed::scripted("uninstall-kept", "off");
+    installed.write_licences();
+    installed
+        .scratch
+        .write("share/notes.txt", "the author's own");
+    let (said, code) = uninstalling(&installed);
+    assert_eq!(
+        said,
+        format!(
+            "{}\nRemoved its licences from `{}`, and kept the folder, which holds other files.\n",
+            installed.uninstalled(),
+            installed.licences_shown()
+        )
+    );
+    assert_eq!(code, 0);
+    let names: Vec<String> = std::fs::read_dir(installed.scratch.join("share"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, ["notes.txt"]);
+}
+
+#[test]
+fn an_uninstall_says_nothing_of_licences_it_found_none_of() {
+    for (label, marker) in [
+        ("uninstall-unnamed", "updates: off\n"),
+        ("uninstall-gone", "updates: off\nlicences: <licences>\n"),
+    ] {
+        let installed = Installed::new(label, Some(marker));
+        assert_eq!(
+            uninstalling(&installed),
+            (format!("{}\n", installed.uninstalled()), 0)
+        );
+        assert!(!installed.program.exists());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn an_uninstall_that_cant_remove_the_program_changes_nothing() {
+    use std::os::unix::fs::PermissionsExt;
+    let installed = Installed::scripted("uninstall-denied", "off");
+    installed.write_licences();
+    let bin = installed.scratch.join("bin");
+    std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let said = uninstalling(&installed);
+    std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let program = shown(&std::fs::canonicalize(&installed.program).unwrap());
+    assert_eq!(
+        said,
+        (
+            format!(
+                "Didn't uninstall Statac: Statac can't remove `{program}` (permission denied).\n"
+            ),
+            1
+        )
+    );
+    assert_eq!(installed.beside(), [MARKER, "statac"]);
+    assert_eq!(
+        installed.licence("LICENSE-MIT").as_deref(),
+        Some("LICENSE-MIT")
+    );
+}
+
+#[test]
+fn another_tools_install_is_left_to_its_uninstall_command() {
+    let scratch = Scratch::new("uninstall-other");
+    let program = scratch.write("bin/statac", "another tool's program");
+    let ways = match cfg!(windows) {
+        true => {
+            "`scoop uninstall statac`, `winget uninstall Statac.Statac` or `cargo uninstall statac`"
+        }
+        false => "`brew uninstall statac` or `cargo uninstall statac`",
+    };
+    let shown_program = shown(&std::fs::canonicalize(&program).unwrap());
+    let cases = [
+        (
+            program.clone(),
+            format!(
+                "Uninstall it the way it was installed: {ways}, or delete `{shown_program}` if you put it there yourself."
+            ),
+        ),
+        (
+            scratch.write("Cellar/statac/0.8.0/bin/statac", "another tool's program"),
+            "Homebrew installed it, so uninstall it with `brew uninstall statac`.".into(),
+        ),
+        (
+            scratch.write(
+                "scoop/apps/statac/current/statac.exe",
+                "another tool's program",
+            ),
+            "Scoop installed it, so uninstall it with `scoop uninstall statac`.".into(),
+        ),
+        (
+            scratch.write(
+                "Microsoft/WinGet/Packages/Statac.Statac_Microsoft.Winget.Source/statac.exe",
+                "another tool's program",
+            ),
+            "winget installed it, so uninstall it with `winget uninstall Statac.Statac`.".into(),
+        ),
+        (
+            {
+                scratch.write(".cargo/.crates2.json", "{}");
+                scratch.write(".cargo/bin/statac", "another tool's program")
+            },
+            "Cargo installed it, so uninstall it with `cargo uninstall statac`.".into(),
+        ),
+    ];
+    for (program, line) in cases {
+        let mut said = String::new();
+        let code = uninstall_at(&program, version("0.8.0"), &mut |text| said.push_str(text));
+        assert_eq!(
+            (said, code),
+            (format!("{}\n{line}\n", wording::UNINSTALL_NOT_SCRIPTED), 1),
+            "{}",
+            program.display()
+        );
+        assert_eq!(std::fs::read(&program).unwrap(), b"another tool's program");
+    }
+}
+
+#[test]
+fn the_install_script_carries_statacs_key() {
+    let script =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/install.sh"))
+            .unwrap();
+    let carried: Vec<&str> = (script.lines())
+        .filter_map(|line| line.strip_prefix("key="))
+        .collect();
+    assert_eq!(carried, [hex_of(&KEY)]);
+}
+
 #[test]
 fn versions_are_read_and_ordered_as_numbers() {
     assert_eq!(

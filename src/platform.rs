@@ -319,6 +319,92 @@ fn moved_aside_and_placed(new: &Path, path: &Path, aside: &Path) -> io::Result<(
     })
 }
 
+/// Removes the program at `path`, which may be this one, running, and
+/// gives whether it goes only once this process has ended. Windows
+/// refuses to remove a program that is running but lets it be renamed,
+/// so there the program is moved to `aside` and a hidden PowerShell,
+/// started here, removes it once this process has ended. Where PowerShell
+/// can't be started, the program is moved back.
+pub(crate) fn remove_program(path: &Path, aside: &Path) -> io::Result<bool> {
+    #[cfg(unix)]
+    {
+        let _ = aside;
+        std::fs::remove_file(path).map(|()| false)
+    }
+    #[cfg(not(unix))]
+    {
+        use std::os::windows::process::CommandExt;
+        // Its own hidden console, which outlives the author's, and its own
+        // group, which Ctrl+C there doesn't reach.
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        retrying(|| std::fs::rename(path, aside), transient, &PAUSES)?;
+        let script = removal_once_ended(aside, std::process::id());
+        std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-EncodedCommand"])
+            .arg(encoded_command(&script))
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW)
+            .spawn()
+            .map(|_| true)
+            .inspect_err(|_| {
+                let _ = retrying(|| std::fs::rename(aside, path), transient, &PAUSES);
+            })
+    }
+}
+
+/// The PowerShell that removes the file at `path` once the process `id`
+/// has ended, trying for a few seconds after, since Windows may hold the
+/// program a moment longer than the process.
+#[cfg(any(not(unix), test))]
+fn removal_once_ended(path: &Path, id: u32) -> String {
+    let path = path.display().to_string();
+    // Written as the author would, without the prefix a path made whole
+    // carries on Windows.
+    let path = match path.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with(r"UNC\") => rest,
+        _ => &path,
+    };
+    // In single quotes PowerShell reads every character as written but a
+    // quote, which is doubled; it takes curved quotes for straight ones.
+    let path: String = (path.chars())
+        .flat_map(|c| match c {
+            '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}' => vec![c, c],
+            _ => vec![c],
+        })
+        .collect();
+    format!(
+        "Wait-Process -Id {id} -ErrorAction SilentlyContinue\n\
+         foreach ($try in 1..40) {{\n\
+         \x20   try {{ Remove-Item -LiteralPath '{path}' -Force -ErrorAction Stop; break }}\n\
+         \x20   catch {{ Start-Sleep -Milliseconds 250 }}\n\
+         }}\n"
+    )
+}
+
+/// `script` as PowerShell's `-EncodedCommand` takes it: UTF-16LE in
+/// base64, which no quoting on the command line can disturb.
+#[cfg(any(not(unix), test))]
+fn encoded_command(script: &str) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes: Vec<u8> = script.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let mut text = String::new();
+    for chunk in bytes.chunks(3) {
+        let joined = chunk.iter().enumerate().fold(0u32, |joined, (at, &byte)| {
+            joined | u32::from(byte) << (16 - 8 * at)
+        });
+        for at in 0..4 {
+            text.push(match at <= chunk.len() {
+                true => char::from(ALPHABET[(joined >> (18 - 6 * at) & 63) as usize]),
+                false => '=',
+            });
+        }
+    }
+    text
+}
+
 /// Why a file wasn't written over.
 #[derive(Debug)]
 pub(crate) enum Unwritten {
@@ -1686,6 +1772,50 @@ mod tests {
         assert_eq!(std::fs::read(&program).unwrap(), b"after");
         assert!(!aside.exists());
         remove_folder(&root).unwrap();
+    }
+
+    #[test]
+    fn a_program_is_removed_or_moved_aside_until_this_process_ends() {
+        let root =
+            std::env::temp_dir().join(format!("statac-platform-remove-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let (program, aside) = (root.join("statac"), root.join(".statac-old-1"));
+        std::fs::write(&program, "the program").unwrap();
+        let once_ended = remove_program(&program, &aside).unwrap();
+        assert!(!program.exists());
+        // On Windows it waits beside it for this process, the test's, to end.
+        assert_eq!(once_ended, cfg!(windows));
+        assert_eq!(aside.exists(), cfg!(windows));
+        if !cfg!(windows) {
+            remove_folder(&root).unwrap();
+        }
+    }
+
+    #[test]
+    fn powershell_is_handed_the_removal_whole() {
+        let script = removal_once_ended(
+            Path::new("\\\\?\\C:\\Tools\\O'Neil \u{2019}s\\statac\\.statac-old-7"),
+            7,
+        );
+        assert_eq!(
+            script,
+            "Wait-Process -Id 7 -ErrorAction SilentlyContinue\n\
+             foreach ($try in 1..40) {\n\
+             \x20   try { Remove-Item -LiteralPath 'C:\\Tools\\O''Neil \u{2019}\u{2019}s\\statac\\.statac-old-7' -Force -ErrorAction Stop; break }\n\
+             \x20   catch { Start-Sleep -Milliseconds 250 }\n\
+             }\n"
+        );
+        // PowerShell's own example of -EncodedCommand, and each length of
+        // the last group of three bytes.
+        assert_eq!(
+            encoded_command("dir \"c:\\program files\" "),
+            "ZABpAHIAIAAiAGMAOgBcAHAAcgBvAGcAcgBhAG0AIABmAGkAbABlAHMAIgAgAA=="
+        );
+        assert_eq!(encoded_command(""), "");
+        assert_eq!(encoded_command("a"), "YQA=");
+        assert_eq!(encoded_command("ab"), "YQBiAA==");
+        assert_eq!(encoded_command("é"), "6QA=");
     }
 
     #[test]

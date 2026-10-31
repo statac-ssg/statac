@@ -583,6 +583,8 @@ Usage:
                          editor starts it.
   statac upgrade         Install the latest release of Statac in place of
                          this one, where Statac's install script put it.
+  statac uninstall       Remove Statac and its licences, where Statac's
+                         install script put them.
 
 Without a folder, statac build, check, serve, stamp, refresh and search
 work on the site the current folder is in.
@@ -846,6 +848,28 @@ fn upgrade_is_read_with_its_option() {
             written: "--updates=on".into(),
             hint: OptionHint::ForOther {
                 command: "serve".into(),
+                option: "--updates".into(),
+                takers: vec!["upgrade"].into(),
+            },
+        }])
+    );
+}
+
+#[test]
+fn uninstall_is_read_alone() {
+    assert_eq!(parsed(&["uninstall"]), Ok(Request::Uninstall));
+    assert_eq!(
+        parsed(&["uninstall", "docs"]),
+        Err(vec![Kind::UnexpectedArgument {
+            written: "docs".into()
+        }])
+    );
+    assert_eq!(
+        parsed(&["uninstall", "--updates=off"]),
+        Err(vec![Kind::UnknownOption {
+            written: "--updates=off".into(),
+            hint: OptionHint::ForOther {
+                command: "uninstall".into(),
                 option: "--updates".into(),
                 takers: vec!["upgrade"].into(),
             },

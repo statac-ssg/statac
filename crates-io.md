@@ -37,9 +37,9 @@ Cargo builds Statac from its source, which needs Rust 1.99 or later, a
 C and C++ compiler, CMake and Perl, and NASM on a machine with an Intel
 or AMD processor.
 
-[Installing](https://statac.dev/install/) has the other ways: Homebrew on
-a Mac, a script on Linux, Scoop on Windows, and a package for each kind
-of machine.
+[Installing](https://statac.dev/install/) has the other ways: a script on
+a Mac or Linux, Homebrew on a Mac, Scoop on Windows, and a package for
+each kind of machine.
 
 ## Documentation
 

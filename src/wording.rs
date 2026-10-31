@@ -4197,9 +4197,10 @@ pub(crate) fn cant_write_file(path: &str, reason: &Reason) -> String {
     format!("Can't write `{path}`: {reason}.")
 }
 
-/// What `upgrade` says where the system can't say where the program is.
-pub(crate) fn cant_find_program(reason: &Reason) -> String {
-    format!("Can't upgrade: Statac can't tell where it is installed ({reason}).")
+/// What `upgrade` and `uninstall`, the `command`, say where the system
+/// can't say where the program is.
+pub(crate) fn cant_find_program(command: &str, reason: &Reason) -> String {
+    format!("Can't {command}: Statac can't tell where it is installed ({reason}).")
 }
 
 /// What `upgrade` says, asked to upgrade, where Statac's install script
@@ -4218,16 +4219,18 @@ pub(crate) const UPDATES_NOT_SCRIPTED: &str =
 pub(crate) fn upgrade_with(tool: Option<(&str, &str)>, commands: &[&str]) -> String {
     match tool {
         Some((tool, command)) => format!("{tool} installed it, so upgrade it with `{command}`."),
-        None => {
-            let commands: Vec<String> = (commands.iter())
-                .map(|command| format!("`{command}`"))
-                .collect();
-            let listed = match commands.as_slice() {
-                [rest @ .., last] if !rest.is_empty() => format!("{} or {last}", rest.join(", ")),
-                _ => commands.concat(),
-            };
-            format!("Upgrade it the way it was installed: {listed}.")
-        }
+        None => format!("Upgrade it the way it was installed: {}.", either(commands)),
+    }
+}
+
+/// `commands`, each in backticks, the last after "or".
+fn either(commands: &[&str]) -> String {
+    let commands: Vec<String> = (commands.iter())
+        .map(|command| format!("`{command}`"))
+        .collect();
+    match commands.as_slice() {
+        [rest @ .., last] if !rest.is_empty() => format!("{} or {last}", rest.join(", ")),
+        _ => commands.concat(),
     }
 }
 
@@ -4241,6 +4244,67 @@ pub(crate) fn updates(on: bool) -> String {
                   Turn this on with `statac upgrade --updates=on`."
             .into(),
     }
+}
+
+/// What `uninstall` says where Statac's install script didn't install it.
+pub(crate) const UNINSTALL_NOT_SCRIPTED: &str =
+    "Statac can't uninstall itself here: its install script didn't install it.";
+
+/// What `uninstall` says after the line above, given the tool whose folder
+/// the program is in and its command; with none, `commands`, each tool's
+/// that could have installed it, and the program's path, `program`.
+pub(crate) fn uninstall_with(
+    tool: Option<(&str, &str)>,
+    commands: &[&str],
+    program: &str,
+) -> String {
+    match tool {
+        Some((tool, command)) => format!("{tool} installed it, so uninstall it with `{command}`."),
+        None => format!(
+            "Uninstall it the way it was installed: {}, or delete `{program}` if you put it there yourself.",
+            either(commands)
+        ),
+    }
+}
+
+/// What `uninstall` says once it has removed Statac `version` from the
+/// folder `folder`; where `once_ended`, the program file goes only once
+/// the command has ended, as on Windows.
+pub(crate) fn uninstalled(version: &str, folder: &str, once_ended: bool) -> String {
+    match once_ended {
+        true => format!(
+            "Uninstalled Statac {version} from `{folder}`. Statac removes its program file once this command ends."
+        ),
+        false => format!("Uninstalled Statac {version} from `{folder}`."),
+    }
+}
+
+/// What `uninstall` says where it couldn't remove the program, at `path`,
+/// and has changed nothing.
+pub(crate) fn not_uninstalled(path: &str, reason: &Reason) -> String {
+    format!("Didn't uninstall Statac: Statac can't remove `{path}` ({reason}).")
+}
+
+/// What `uninstall` says of the licences it removed from `folder`, and of
+/// the folder: removed, or kept where it `holds_other` files.
+pub(crate) fn licences_removed(folder: &str, folder_removed: bool, holds_other: bool) -> String {
+    match (folder_removed, holds_other) {
+        (true, _) => {
+            format!("Removed its licences, and their folder `{folder}`, which held nothing else.")
+        }
+        (false, true) => {
+            format!(
+                "Removed its licences from `{folder}`, and kept the folder, which holds other files."
+            )
+        }
+        (false, false) => format!("Removed its licences from `{folder}`."),
+    }
+}
+
+/// What `uninstall` says where a file or folder it removes, at `path`,
+/// can't be removed.
+pub(crate) fn cant_remove_file(path: &str, reason: &Reason) -> String {
+    format!("Can't remove `{path}`: {reason}.")
 }
 
 /// What `build` says, after Rust's report of a panic, of a fault of
