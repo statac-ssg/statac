@@ -17,7 +17,7 @@ use super::frame;
 use super::render::{Shared, met_building};
 use super::values::node_value;
 use crate::address::{is_full, on_the_wire};
-use crate::album::{Picture, Root, Seen};
+use crate::album::{Found, Picture, Pictures, Root, Seen};
 use crate::fetched::stills;
 use crate::highlight::{self, Language, lines};
 use crate::ids::{PageId, PictureId};
@@ -404,8 +404,8 @@ fn folder_of(shared: &Shared, page: PageId) -> Option<&str> {
 }
 
 /// The picture `written` names from the page `of`, as its writing would
-/// name it.
-pub(super) fn found(shared: &Shared, of: PageId, written: &str) -> Option<PictureId> {
+/// name it, and the address that reaches it.
+pub(super) fn find(shared: &Shared, of: PageId, written: &str) -> Option<Found> {
     let published = shared.address_of(of);
     let from = crate::album::From {
         folder: folder_of(shared, of),
@@ -413,10 +413,16 @@ pub(super) fn found(shared: &Shared, of: PageId, written: &str) -> Option<Pictur
         base: &shared.base,
     };
     let found = shared.site.pictures.find(written, &from);
-    if found.is_none() {
+    if found.is_none() && Pictures::may_reach(written) {
         frame::read(Key::Pictures);
     }
-    found.map(|found| found.id)
+    found
+}
+
+/// The picture `written` names from the page `of`, as its writing would
+/// name it.
+pub(super) fn found(shared: &Shared, of: PageId, written: &str) -> Option<PictureId> {
+    find(shared, of, written).map(|found| found.id)
 }
 
 /// The file a relative name, or one from the top, reaches no file as: how

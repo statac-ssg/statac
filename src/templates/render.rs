@@ -2001,23 +2001,8 @@ impl markdown::Snippets for Prose<'_> {
 
     fn picture(&self, address: &str, place: Place, tagged: bool) -> Option<markdown::Picture> {
         let shared = self.shared;
-        let page = shared.site.pages.get(self.page);
-        // A page made from data is written in no folder of `content/`.
-        let folder = page
-            .made
-            .is_none()
-            .then(|| page.path.rfind('/').map_or("", |at| &page.path[..=at]));
-        let published = shared.address_of(self.page);
-        let from = crate::album::From {
-            folder,
-            page: &published,
-            base: &shared.base,
-        };
         let pictures = &shared.site.pictures;
-        let Some(found) = pictures.find(address, &from) else {
-            frame::read(Key::Pictures);
-            return None;
-        };
+        let found = super::media::find(shared, self.page, address)?;
         // How its tag reaches it depends on where the page is published.
         frame::read(Key::Field(self.page, shared.name_id("url")));
         frame::read(Key::Picture(found.id));

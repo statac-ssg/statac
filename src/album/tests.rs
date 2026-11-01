@@ -154,6 +154,23 @@ fn a_picture_is_found_by_its_file_and_written_as_reaches_it() {
 }
 
 #[test]
+fn a_name_may_reach_a_picture_unless_it_is_an_address_elsewhere() {
+    let cases = [
+        ("photo-1.jpg", true),
+        ("/img/photo-9.jpg", true),
+        ("../photo-2.jpg?v=2", true),
+        ("https://example.org/photo-1.jpg", false),
+        ("//example.org/photo-1.jpg", false),
+        ("data:image/png;base64,AAAA", false),
+        ("#top", false),
+        ("", false),
+    ];
+    for (written, expected) in cases {
+        assert_eq!(Pictures::may_reach(written), expected, "{written}");
+    }
+}
+
+#[test]
 fn a_name_is_walked_from_its_folder() {
     let cases = [
         (("", "photo-1.jpg"), Some("photo-1.jpg")),

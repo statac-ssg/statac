@@ -1218,6 +1218,83 @@ fn a_picture_named_in_the_writing_follows_the_file_the_name_reaches_first() {
     assert_eq!(built[1].0, 0, "{built:?}");
 }
 
+/// A picture nothing names added under `content/`, moved and removed.
+const PICTURE_ELSEWHERE: [Edit; 3] = [
+    ("a picture added", &|site| {
+        site.put("content/pictures/added.jpg", &jpeg(16, 16))
+    }),
+    ("the picture moved", &|site| {
+        let pictures = site.root().join("content/pictures");
+        fs::rename(pictures.join("added.jpg"), pictures.join("moved.jpg")).unwrap();
+    }),
+    ("the picture removed", &|site| {
+        site.remove("content/pictures/moved.jpg")
+    }),
+];
+
+/// How many outputs each of [`PICTURE_ELSEWHERE`] builds on a site of
+/// [`Site::new`] with `pages` written in it.
+fn built_by_a_picture_elsewhere(name: &str, pages: &[(&str, &str)]) -> Vec<usize> {
+    let site = Site::new(name);
+    for (path, text) in pages {
+        site.write(path, text);
+    }
+    let built = through(&site, &PICTURE_ELSEWHERE);
+    built[1..].iter().map(|(built, _)| *built).collect()
+}
+
+/// A full URL reaches none of the site's pictures, so a page naming a
+/// picture by one, in HTML with no `alt` or in Markdown, the site's piece
+/// for a picture handed it too, builds again for no picture of the site's.
+#[test]
+fn a_picture_named_by_a_full_url_follows_no_picture_of_the_sites() {
+    let none = built_by_a_picture_elsewhere("full-url-none", &[]);
+    let html = "Post 2 says this.\n\n<img src=\"https://example.com/photo.jpg\">";
+    let markdown = "Post 3 says this.\n\n![](https://example.com/photo.jpg)";
+    let full = built_by_a_picture_elsewhere(
+        "full-url",
+        &[
+            (
+                "content/post-2.md",
+                &post("Post 2", "2026-01-02", "one", html),
+            ),
+            (
+                "content/post-3.md",
+                &post("Post 3", "2026-01-03", "one", markdown),
+            ),
+            (
+                "snippets/markdown/image.html",
+                "<img src=\"{{ url }}\" alt=\"{{ alt }}\">\n",
+            ),
+        ],
+    );
+    assert_eq!(full, none);
+}
+
+/// A name that reaches no picture yet builds its page again once a picture
+/// is added that it reaches, and once that picture moves or is removed.
+#[test]
+fn a_picture_named_before_it_is_added_follows_the_picture() {
+    let none = built_by_a_picture_elsewhere("named-before-none", &[]);
+    let html = "Post 2 says this.\n\n<img src=\"/pictures/added.jpg\">";
+    let markdown = "Post 3 says this.\n\n![](../pictures/moved.jpg)";
+    let named = built_by_a_picture_elsewhere(
+        "named-before",
+        &[
+            (
+                "content/post-2.md",
+                &post("Post 2", "2026-01-02", "one", html),
+            ),
+            (
+                "content/post-3.md",
+                &post("Post 3", "2026-01-03", "one", markdown),
+            ),
+        ],
+    );
+    let more = named.iter().zip(&none).all(|(named, none)| named > none);
+    assert!(more, "{named:?} against {none:?}");
+}
+
 /// A page linking a photograph shown elsewhere is held to whether the
 /// photograph's original is published only where a page links it.
 #[test]

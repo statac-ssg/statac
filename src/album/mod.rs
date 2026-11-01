@@ -244,7 +244,7 @@ impl Pictures {
     /// from the page. None for an address elsewhere, or one that reaches
     /// no picture.
     pub(crate) fn find(&self, written: &str, from: &From<'_>) -> Option<Found> {
-        if written.is_empty() || crate::address::is_full(written) || written.starts_with('#') {
+        if !Self::may_reach(written) {
             return None;
         }
         let end = written.find(['?', '#']).unwrap_or(written.len());
@@ -294,6 +294,13 @@ impl Pictures {
             false => format!("{own}{rest}"),
         };
         Some(Found { id, address })
+    }
+
+    /// Whether `written` could name one of a site's pictures: false for an
+    /// address elsewhere, an empty one or a fragment alone, which `find`
+    /// answers with none whatever pictures the site has.
+    pub(crate) fn may_reach(written: &str) -> bool {
+        !(written.is_empty() || crate::address::is_full(written) || written.starts_with('#'))
     }
 
     /// The pictures whose file names `text` holds, as writing naming them
