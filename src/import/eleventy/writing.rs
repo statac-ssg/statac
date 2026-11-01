@@ -1,23 +1,31 @@
 //! An Eleventy page's writing: the template tags the old site ran over it
 //! first, in Liquid or Nunjucks, each converted where Statac's writing has
-//! an equal and otherwise left exactly as written; the excerpt marker; and
+//! an equal and otherwise left exactly as written; the lines the
+//! highlighting plugin marked; the excerpt marker; and
 //! the Markdown the old site's settings read differently, each line end
 //! inside a paragraph made a line break where they had `breaks: true`, and
 //! the rest counted. Nothing inside a code block or a code span is
 //! converted, but for what `raw` held.
 
 use std::collections::HashSet;
+use std::ops::Range;
 
-use crate::import::common::{ends_line, opens_line};
+use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
+
+use crate::import::common::{ends_line, line_words, opens_line};
 use crate::import::liquid::{
-    code_ranges, excerpt, excerpts_inside, finding, highlight, include_snippet, quoted,
-    quoted_value, raw, split_word, tag_at, within,
+    code_ranges, excerpt, excerpts_inside, find_statement, finding, highlight, include_snippet,
+    options, quoted, quoted_value, raw, split_word, tag_at, within,
 };
 use crate::import::{Finding, Spot};
 use crate::markdown::{self, Document, Kind, Node};
 use crate::source::{Sources, Span};
 
-use super::{ATTRIBUTES, EXCERPT_LEFT, HTML_SHOWN, LINK_NOT_MADE, TAG_IN_CODE, TAG_LEFT};
+use super::code;
+use super::{
+    ATTRIBUTES, CODE_LINES, CODE_OPTIONS, EXCERPT_LEFT, HTML_SHOWN, LINK_NOT_MADE, TAG_IN_CODE,
+    TAG_LEFT,
+};
 
 /// The language a page's tags are written in.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -42,6 +50,9 @@ pub(super) struct Context<'a> {
     pub(crate) linkify: bool,
     /// Whether the old site's Markdown showed HTML as text.
     pub(crate) html_off: bool,
+    /// Whether the old site used Eleventy's highlighting plugin, which
+    /// reads ```` ```js/1,3 ```` as the language `js` with lines to mark.
+    pub(crate) highlighter: bool,
     /// The path the old site was published under, as `/blog`, or empty.
     pub(crate) base: &'a str,
 }
@@ -282,14 +293,24 @@ enum Open {
 /// Converts the writing of `file`, whose first line is line `first_line`
 /// of the file.
 pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -> Converted {
-    let line_of = |at: usize| first_line + body[..at].matches('\n').count();
-    let spot = |at: usize, text: &str| Spot {
+    let spot_in = |body: &str, at: usize, text: &str| Spot {
         file: file.to_owned(),
-        line: Some(line_of(at)),
+        line: Some(first_line + body[..at].matches('\n').count()),
         text: text.to_owned(),
         times: None,
     };
     let mut findings = Vec::new();
+    let fenced;
+    let body = match cx.markdown && cx.highlighter {
+        true => {
+            fenced = fences_converted(body, &|at, text| spot_in(body, at, text), &mut findings);
+            fenced.as_str()
+        }
+        false => body,
+    };
+    // Offsets from here on are into the writing with its fences
+    // converted, which has the same lines.
+    let spot = |at: usize, text: &str| spot_in(body, at, text);
     let mut calls = Vec::new();
     let mut fences = Vec::new();
     let mut called = Vec::new();
@@ -361,16 +382,19 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
             match word {
                 "highlight" => {
                     let given = quoted_value(words).map_or(words.to_owned(), |(l, _)| l);
-                    let mut given = given.split_whitespace();
-                    let language = given.next().unwrap_or_default();
-                    // The plugin reads the rest as lines to mark, counted
-                    // from 0, and reads nothing from `linenos`.
-                    let plain = given.all(|word| word == "linenos");
-                    match plain
-                        .then(|| highlight(body, start, end, language, false, &[]))
-                        .flatten()
-                    {
-                        Some((text, resume, _)) => {
+                    let (language, asked) = code::from_tag(&given);
+                    let block = match language.contains(|c: char| c.is_whitespace() || c == '`') {
+                        true => None,
+                        false => highlighted(body, start, end, language, &asked),
+                    };
+                    match block {
+                        Some((text, resume, marked, changed)) => {
+                            if marked {
+                                findings.push(finding(&CODE_LINES, spot(start, written)));
+                            }
+                            if changed {
+                                findings.push(finding(&CODE_OPTIONS, spot(start, written)));
+                            }
                             out.push_str(&body[copied..start]);
                             fences.push(out.len());
                             out.push_str(&text);
@@ -511,6 +535,127 @@ pub(super) fn convert(body: &str, first_line: usize, file: &str, cx: &Context) -
         breaks,
         separators,
     }
+}
+
+/// The `highlight` tag at `start..end` as a fenced code block in
+/// `language`, with the lines `asked` marks marked: the block, where the
+/// writing resumes, whether it marks lines, and whether lines the plugin
+/// marked as added or removed were taken off. None where
+/// [`highlight`] gives none. The plugin counts lines from 0 in the code
+/// with the blank lines round it trimmed, which the block keeps, but for
+/// the line ending straight after the tag.
+fn highlighted(
+    body: &str,
+    start: usize,
+    end: usize,
+    language: &str,
+    asked: &code::Asked,
+) -> Option<(String, usize, bool, bool)> {
+    let (close, _) = find_statement(body, end, "endhighlight")?;
+    let inside = &body[end..close];
+    let count = i64::try_from(inside.trim().split('\n').count()).unwrap_or(i64::MAX);
+    let trimmed = i64::try_from(
+        inside[..inside.len() - inside.trim_start().len()]
+            .matches('\n')
+            .count(),
+    )
+    .unwrap_or(0);
+    let dropped = i64::from(inside.starts_with('\n') || inside.starts_with("\r\n"));
+    let first = 1 + trimmed - dropped;
+    let placed = |runs: &[(i64, i64)]| -> Vec<(i64, i64)> {
+        runs.iter()
+            .map(|&(from, to)| (from, to.min(count - 1)))
+            .filter(|(from, to)| from <= to)
+            .map(|(from, to)| (from + first, to + first))
+            .collect()
+    };
+    let changed = !placed(&asked.changed).is_empty();
+    let (text, resume, marked) =
+        highlight(body, start, end, language, false, &placed(&asked.marked))?;
+    Some((text, resume, marked, changed))
+}
+
+/// The writing with the first word of each fenced code block's opening
+/// line that the highlighting plugin read as a language and lines to mark,
+/// `js/1,3`, written as the language with Statac's words for the marked
+/// lines at the line's end, `js mark=2,4`, and the lines it marked as added
+/// or removed taken off, each told.
+fn fences_converted(
+    body: &str,
+    spot: &dyn Fn(usize, &str) -> Spot,
+    findings: &mut Vec<Finding>,
+) -> String {
+    let mut changes: Vec<(Range<usize>, String)> = Vec::new();
+    let mut open: Option<(usize, String)> = None;
+    let mut code = String::new();
+    for (event, range) in Parser::new_ext(body, options()).into_offset_iter() {
+        match event {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) => {
+                open = Some((range.start, info.into_string()));
+                code.clear();
+            }
+            Event::Text(text) if open.is_some() => code.push_str(&text),
+            Event::End(TagEnd::CodeBlock) => {
+                if let Some((start, info)) = open.take()
+                    && let Some(change) = fence_converted(body, start, &info, &code, spot, findings)
+                {
+                    changes.push(change);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out = String::with_capacity(body.len());
+    let mut copied = 0;
+    for (cut, words) in changes {
+        out.push_str(&body[copied..cut.start]);
+        out.push_str(&words);
+        copied = cut.end;
+    }
+    out.push_str(&body[copied..]);
+    out
+}
+
+/// The opening line of the fenced code block at `start`, whose info is
+/// `info` and code `code`, from its first word to its end, and what to
+/// write in its place, each change told. None where the first word isn't
+/// in the plugin's form.
+fn fence_converted(
+    body: &str,
+    start: usize,
+    info: &str,
+    code: &str,
+    spot: &dyn Fn(usize, &str) -> Spot,
+    findings: &mut Vec<Finding>,
+) -> Option<(Range<usize>, String)> {
+    let line_end = body[start..].find('\n').map_or(body.len(), |i| start + i);
+    let line = body[start..line_end].trim_end_matches('\r');
+    let fence = line.find(['`', '~'])?;
+    let after = line[fence..].trim_start_matches(['`', '~']).trim_start();
+    let word_start = line.len() - after.len();
+    let word_end = word_start + after.find(char::is_whitespace).unwrap_or(after.len());
+    let word = &line[word_start..word_end];
+    if info.split_whitespace().next() != Some(word) {
+        return None;
+    }
+    let (language, asked) = code::from_fence(word)?;
+    let counted_from_1 = |runs: &[(i64, i64)]| -> Vec<(i64, i64)> {
+        runs.iter()
+            .map(|&(from, to)| (from.saturating_add(1), to.saturating_add(1)))
+            .collect()
+    };
+    let words = line_words(false, &counted_from_1(&asked.marked), code);
+    if !words.is_empty() {
+        findings.push(finding(&CODE_LINES, spot(start, line.trim())));
+    }
+    if !line_words(false, &counted_from_1(&asked.changed), code).is_empty() {
+        findings.push(finding(&CODE_OPTIONS, spot(start, line.trim())));
+    }
+    let rest = line[word_end..].trim_end();
+    Some((
+        start + word_start..start + line.len(),
+        format!("{language}{rest}{words}"),
+    ))
 }
 
 /// `{{ }}` as Statac's writing takes it: an address in quotes through
@@ -719,6 +864,40 @@ mod tests {
         );
         assert_eq!(values("page.url"), None);
         assert_eq!(values(""), Some(Vec::new()));
+    }
+
+    #[test]
+    fn a_fence_is_read_for_marked_lines_only_where_the_site_used_the_plugin() {
+        let wrapping = HashSet::new();
+        let cx = |highlighter| Context {
+            engine: Engine::Liquid,
+            markdown: true,
+            separator: None,
+            wrapping: &wrapping,
+            breaks: false,
+            attributes: false,
+            linkify: false,
+            html_off: false,
+            highlighter,
+            base: "",
+        };
+        for (body, converted) in [
+            (
+                "```js/1,3\na\nb\nc\nd\n```\n",
+                "```js mark=2,4\na\nb\nc\nd\n```\n",
+            ),
+            ("~~~ js/0 \r\na\r\n~~~\r\n", "~~~ js mark=1\r\na\r\n~~~\r\n"),
+            (
+                "> ```js/1\n> a\n> b\n> ```\n",
+                "> ```js mark=2\n> a\n> b\n> ```\n",
+            ),
+            ("- ```js/0\n  a\n  ```\n", "- ```js mark=1\n  a\n  ```\n"),
+            ("```text/html\na\n```\n", "```text/html\na\n```\n"),
+            ("    js/1\n", "    js/1\n"),
+        ] {
+            assert_eq!(convert(body, 1, "post.md", &cx(false)).writing, body);
+            assert_eq!(convert(body, 1, "post.md", &cx(true)).writing, converted);
+        }
     }
 
     #[test]

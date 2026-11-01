@@ -48,6 +48,15 @@ pub(super) fn makes_feeds(folder: &Path) -> bool {
     needs(folder, &|name| name == "@11ty/eleventy-plugin-rss")
 }
 
+/// Whether the folder's `package.json` names among its dependencies
+/// Eleventy's highlighting plugin.
+pub(super) fn highlights_code(folder: &Path) -> bool {
+    needs(folder, &|name| name == HIGHLIGHTER)
+}
+
+/// Eleventy's highlighting plugin, which marks lines of code.
+const HIGHLIGHTER: &str = "@11ty/eleventy-plugin-syntaxhighlight";
+
 /// Whether the folder's `package.json` names among its dependencies a
 /// package `wanted` picks out.
 fn needs(folder: &Path, wanted: &dyn Fn(&str) -> bool) -> bool {
@@ -263,6 +272,8 @@ pub(super) struct Settings {
     pub(crate) library: Option<usize>,
     /// The plugin for attributes in braces, by the name it is fetched by.
     pub(crate) attributes: Option<Given<String>>,
+    /// Whether the settings fetch Eleventy's highlighting plugin.
+    pub(crate) highlighter: bool,
     pub(crate) separator: Option<Given<String>>,
     /// Where `excerpt: true` is, which with no separator ends an excerpt at
     /// the first `---` line.
@@ -349,6 +360,7 @@ pub(super) fn read(folder: &Path, name: &str) -> std::io::Result<Settings> {
         take(&mut settings.breaks, more.breaks);
         take(&mut settings.linkify, more.linkify);
         take(&mut settings.html, more.html);
+        settings.highlighter |= more.highlighter;
         if settings.attributes.is_none() && more.attributes.is_some() {
             settings.attributes = more.attributes;
             took = true;
@@ -552,6 +564,7 @@ fn scan(text: &str) -> Settings {
             continue;
         }
         match &pieces[at].token {
+            Token::Text(fetched) if fetched == HIGHLIGHTER => s.highlighter = true,
             Token::Text(fetched)
                 if fetched.contains("markdown-it-attrs") || fetched.contains("plugin-attrs") =>
             {
@@ -978,6 +991,23 @@ mod tests {
             ]
         );
         assert_eq!(fetched("import d from '../d.js';", ""), [] as [&str; 0]);
+    }
+
+    #[test]
+    fn the_highlighting_plugin_is_found_where_the_settings_fetch_it() {
+        for (text, found) in [
+            (
+                "const syntaxHighlight = require(\"@11ty/eleventy-plugin-syntaxhighlight\");",
+                true,
+            ),
+            (
+                "import syntaxHighlight from '@11ty/eleventy-plugin-syntaxhighlight';",
+                true,
+            ),
+            ("const rss = require(\"@11ty/eleventy-plugin-rss\");", false),
+        ] {
+            assert_eq!(scan(text).highlighter, found, "{text}");
+        }
     }
 
     #[test]

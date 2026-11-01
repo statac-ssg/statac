@@ -9,6 +9,7 @@
 //! are pages, where each is published, what the data beside a page or a
 //! folder hands it, and what its template tags do in the writing.
 
+mod code;
 mod permalink;
 mod settings;
 mod writing;
@@ -77,6 +78,21 @@ pub(super) static TAG_IN_CODE: FindingKind = FindingKind {
     heading: "Template tags inside code",
     sentence: "Eleventy ran these even inside code, and Statac shows code exactly as written, so \
                each now shows as written: write by hand what it made, where that was meant.",
+};
+
+pub(super) static CODE_LINES: FindingKind = FindingKind {
+    heading: "Marked lines in code",
+    sentence: "Eleventy's highlighting plugin marked lines of each of these code blocks, counting \
+               from 0, and the import wrote `mark=` at the end of its first line to mark the same \
+               lines, counting from 1: Statac gives each line a class, and the marks show once the \
+               site's stylesheet styles them, as https://statac.dev/writing/#lines describes.",
+};
+
+pub(super) static CODE_OPTIONS: FindingKind = FindingKind {
+    heading: "Options on code taken off",
+    sentence: "Eleventy's highlighting plugin marked lines of each of these code blocks as added \
+               and removed, and Statac has no equal for those marks, so the import took them off: \
+               Statac shows the code without them.",
 };
 
 pub(super) static INCLUDE: FindingKind = FindingKind {
@@ -1888,6 +1904,7 @@ impl Reader<'_> {
         let breaks_on = self.s.breaks.as_ref().is_some_and(|b| b.value);
         let linkify_on = self.s.linkify.as_ref().is_some_and(|b| b.value);
         let attributes_on = self.s.attributes.is_some();
+        let highlighter = self.s.highlighter || settings::highlights_code(self.folder);
         let base = self.s.base();
         let mut calls: Vec<writing::Call> = Vec::new();
         let mut breaks = 0;
@@ -1908,6 +1925,7 @@ impl Reader<'_> {
                 attributes: attributes_on,
                 linkify: linkify_on,
                 html_off,
+                highlighter,
                 base: &base,
             };
             let converted = writing::convert(&doc.body, doc.body_line, &doc.from, &cx);

@@ -4323,6 +4323,11 @@ fn eleventy_tags_in_the_writing_convert_or_stay_as_written() {
 }
 
 #[test]
+fn eleventy_marked_lines_become_statacs_counted_from_1() {
+    assert_eq!(fixture("eleventy-code-lines"), [BUILT]);
+}
+
+#[test]
 fn eleventy_line_ends_are_line_breaks_where_the_settings_said() {
     assert_eq!(fixture("eleventy-breaks"), [BUILT]);
 }
