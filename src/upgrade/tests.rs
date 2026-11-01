@@ -1,23 +1,20 @@
 //! The upgrade's tests, all on this machine: a server standing in for
-//! get.statac.dev, a key of the tests' own standing in for Statac's, and
-//! a folder standing in for where the install script put Statac.
+//! get.statac.dev and a key of the tests' own standing in for Statac's,
+//! each shared with the install scripts' tests, and a folder standing in
+//! for where the install script put Statac.
 
-use std::collections::HashMap;
-use std::io::Read;
 use std::net::{SocketAddr, TcpListener};
-use std::sync::{Arc, Mutex};
-use std::thread;
-
-use rustls::SignatureScheme;
-use rustls::pki_types::PrivatePkcs8KeyDer;
 
 use super::package::tests::{tar_gz, zip};
 use super::*;
 use crate::testing::Scratch;
 
-/// The tests' private key, in PKCS #8, and its public half.
-const TEST_PRIVATE: &str = "302e020100300506032b657004220420c8e9544d25e30fee7798a7808d7fc8495fdec2be7890ab945763f9096ee66dcd";
-const TEST_KEY: [u8; 32] = hex("530c1dad1c6081a3172af0e023067098707b8619b7725705cbd5bd3e7299cc9b");
+#[path = "../../tests/releases/mod.rs"]
+mod releases;
+
+use releases::{Releases, hex_of, signature};
+
+const TEST_KEY: [u8; 32] = hex(releases::TEST_KEY);
 
 /// A platform packaged as a gzipped tar file, and one as a zip file.
 const UNIX: &str = "x86_64-unknown-linux-musl";
@@ -27,91 +24,7 @@ fn version(written: &str) -> Version {
     Version::read(written).unwrap()
 }
 
-fn bytes_of_hex(text: &str) -> Vec<u8> {
-    (0..text.len() / 2)
-        .map(|at| u8::from_str_radix(&text[at * 2..at * 2 + 2], 16).unwrap())
-        .collect()
-}
-
-/// The tests' key's signature of `message`.
-fn signature(message: &[u8]) -> Vec<u8> {
-    let der = bytes_of_hex(TEST_PRIVATE);
-    let key = aws_lc_rs::sign::any_eddsa_type(&PrivatePkcs8KeyDer::from(&der[..])).unwrap();
-    let signer = key.choose_scheme(&[SignatureScheme::ED25519]).unwrap();
-    signer.sign(message).unwrap()
-}
-
-fn hex_of(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-/// A server on this machine standing in for get.statac.dev, answering
-/// each path it holds with its bytes and any other with `404`, and
-/// remembering each path asked for.
-struct Releases {
-    addr: SocketAddr,
-    files: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-    asked: Arc<Mutex<Vec<String>>>,
-}
-
 impl Releases {
-    fn start() -> Releases {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let files: Arc<Mutex<HashMap<String, Vec<u8>>>> = Arc::default();
-        let asked: Arc<Mutex<Vec<String>>> = Arc::default();
-        let (held, heard) = (files.clone(), asked.clone());
-        thread::spawn(move || {
-            for stream in listener.incoming() {
-                let Ok(mut stream) = stream else {
-                    continue;
-                };
-                let mut request = Vec::new();
-                let mut buffer = [0; 1024];
-                while !request.windows(4).any(|end| end == b"\r\n\r\n") {
-                    match stream.read(&mut buffer) {
-                        Ok(0) | Err(_) => break,
-                        Ok(read) => request.extend(&buffer[..read]),
-                    }
-                }
-                let request = String::from_utf8_lossy(&request);
-                let path = request.split(' ').nth(1).unwrap_or_default().to_owned();
-                heard.lock().unwrap().push(path.clone());
-                let body = held.lock().unwrap().get(&path).cloned();
-                let (status, body) = match body {
-                    Some(body) => ("200 OK", body),
-                    None => ("404 Not Found", b"nothing here".to_vec()),
-                };
-                let head = format!(
-                    "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                    body.len()
-                );
-                let _ = stream.write_all(head.as_bytes());
-                let _ = stream.write_all(&body);
-            }
-        });
-        Releases { addr, files, asked }
-    }
-
-    fn address(&self) -> String {
-        format!("http://{}", self.addr)
-    }
-
-    fn put(&self, path: &str, bytes: impl Into<Vec<u8>>) {
-        self.files
-            .lock()
-            .unwrap()
-            .insert(path.to_owned(), bytes.into());
-    }
-
-    fn remove(&self, path: &str) {
-        self.files.lock().unwrap().remove(path);
-    }
-
-    fn asked(&self) -> Vec<String> {
-        self.asked.lock().unwrap().clone()
-    }
-
     /// Publishes `version` with a package for `target` holding `program`
     /// and the licences, and one for another platform, signed with the
     /// tests' key, and makes each of `folders` name it.
@@ -124,8 +37,8 @@ impl Releases {
         let (other_name, other_package) = package(version, other, b"another platform's");
         let sums = format!(
             "{}  {other_name}\n{} *{name}\n",
-            hex_of(&sha256(&other_package)),
-            hex_of(&sha256(&bytes)),
+            releases::sha256(&other_package),
+            releases::sha256(&bytes),
         );
         self.put(&format!("/v{version}/{name}"), bytes);
         self.put(&format!("/v{version}/{other_name}"), other_package);
@@ -395,7 +308,7 @@ fn sums_that_dont_match_their_signature_are_refused() {
     let said = refused("tampered-sums", |releases| {
         // The package changed, and its sum with it, but not the signature.
         let (name, other) = package("0.8.1", UNIX, b"a program of someone else's");
-        let sums = format!("{}  {name}\n", hex_of(&sha256(&other)));
+        let sums = format!("{}  {name}\n", releases::sha256(&other));
         releases.put(&format!("/v0.8.1/{name}"), other);
         releases.put("/v0.8.1/SHA256SUMS", sums.clone());
         releases.put("/latest/SHA256SUMS", sums);
@@ -409,7 +322,7 @@ fn sums_that_dont_match_their_signature_are_refused() {
 #[test]
 fn sums_signed_with_another_key_are_refused() {
     let said = refused("other-key", |releases| {
-        let sums = releases.files.lock().unwrap()["/latest/SHA256SUMS"].clone();
+        let sums = releases.get("/latest/SHA256SUMS");
         let mut forged = signature(&sums);
         forged[0] ^= 1;
         releases.put("/v0.8.1/SHA256SUMS.sig", forged);
@@ -434,7 +347,7 @@ fn sums_with_no_signature_are_refused() {
 #[test]
 fn a_release_with_no_package_for_this_machine_is_refused() {
     let said = refused("no-package", |releases| {
-        let sums = releases.files.lock().unwrap()["/latest/SHA256SUMS"].clone();
+        let sums = releases.get("/latest/SHA256SUMS");
         let sums = String::from_utf8(sums).unwrap();
         let sums: String = sums
             .lines()
@@ -457,7 +370,7 @@ fn a_package_holding_no_program_is_refused() {
     let said = refused("no-program", |releases| {
         let name = format!("statac-0.8.1-{UNIX}.tar.gz");
         let package = tar_gz(&[("statac-0.8.1-elsewhere/statac", b'0', b"misplaced")]);
-        let sums = format!("{}  {name}\n", hex_of(&sha256(&package)));
+        let sums = format!("{}  {name}\n", releases::sha256(&package));
         releases.put(&format!("/v0.8.1/{name}"), package);
         releases.put("/latest/SHA256SUMS", sums.clone());
         releases.put("/v0.8.1/SHA256SUMS.sig", signature(sums.as_bytes()));
@@ -1024,6 +937,7 @@ fn another_tools_install_is_left_to_its_uninstall_command() {
 
 #[test]
 fn the_install_scripts_carry_statacs_key() {
+    assert_eq!(hex_of(&KEY), releases::KEY);
     let tools = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools");
     let script = std::fs::read_to_string(tools.join("install.sh")).unwrap();
     let carried: Vec<&str> = (script.lines())
