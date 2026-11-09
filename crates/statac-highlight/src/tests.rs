@@ -26,6 +26,46 @@ fn carried(html: &str) -> Vec<&str> {
         .collect()
 }
 
+/// Whether `class` is the class of a kind there is.
+fn is_a_kinds(class: &str) -> bool {
+    let kind = class.strip_prefix(CLASS_PREFIX);
+    kind.is_some_and(|kind| Kind::ALL.iter().any(|known| known.name() == kind))
+}
+
+/// The pieces a block of coloured code marks, as ranges in the code it
+/// shows.
+fn pieces_of(html: &str) -> Vec<Piece> {
+    let mut pieces = Vec::new();
+    let mut at = 0;
+    let mut open: Option<(usize, Kind)> = None;
+    let mut rest = html;
+    while let Some(c) = rest.chars().next() {
+        if let Some(after) = rest.strip_prefix("<span class=\"") {
+            let (class, after) = after.split_once("\">").unwrap();
+            let kind = Kind::ALL
+                .iter()
+                .find(|kind| class == format!("hl-{}", kind.name()));
+            open = Some((at, *kind.unwrap()));
+            rest = after;
+        } else if let Some(after) = rest.strip_prefix("</span>") {
+            let (start, kind) = open.take().unwrap();
+            pieces.push(Piece {
+                range: start..at,
+                kind,
+            });
+            rest = after;
+        } else if c == '&' {
+            let (_, after) = rest.split_once(';').unwrap();
+            at += 1;
+            rest = after;
+        } else {
+            at += c.len_utf8();
+            rest = &rest[c.len_utf8()..];
+        }
+    }
+    pieces
+}
+
 const RUST: &str = "fn main() {\n    let x = \"a<b & c\"; // note\n\n}";
 
 #[test]
@@ -53,28 +93,14 @@ fn a_fence_word_names_a_grammar_by_its_name_alias_or_common_spelling() {
     for word in ["text", "txt", "plain", "TEXT"] {
         assert_eq!(language(word), Language::Plain, "{word}");
     }
-    assert_eq!(
-        language("cosole"),
-        Language::Unknown {
-            nearest: Some("console")
-        }
-    );
-    for word in ["qbasic", "glsl", "obj", "pc", "ssh", "gas"] {
-        assert_eq!(
-            language(word),
-            Language::Unknown { nearest: None },
-            "{word}"
-        );
+    for word in ["cosole", "qbasic", "glsl", "obj", "pc", "ssh", "gas"] {
+        assert_eq!(language(word), Language::Unknown, "{word}");
     }
 }
 
 #[test]
 fn a_word_that_names_a_language_is_never_read_as_a_file() {
-    let words = PLAIN
-        .iter()
-        .chain(languages::LANGUAGES)
-        .chain(ALIASES.iter().map(|(alias, _)| alias));
-    for word in words {
+    for word in names() {
         assert_eq!(
             first_word(word),
             FirstWord::Language(language(word)),
@@ -146,10 +172,7 @@ fn a_files_name_gives_its_language_by_its_whole_name_or_its_ending() {
         "site/Caddyfile",
     ] {
         assert!(
-            matches!(
-                first_word(word),
-                FirstWord::Language(Language::Unknown { .. })
-            ),
+            first_word(word) == FirstWord::Language(Language::Unknown),
             "{word}"
         );
     }
@@ -166,17 +189,17 @@ fn a_files_name_gives_its_language_by_its_whole_name_or_its_ending() {
 }
 
 #[test]
-fn every_name_a_fence_can_use_is_a_grammar_statac_carries() {
+fn every_name_a_fence_can_use_is_a_grammar_the_crate_carries() {
     for (file, name) in FILES {
         assert!(languages::LANGUAGES.contains(name), "{file}");
-        assert!(matches!(language(file), Language::Unknown { .. }), "{file}");
+        assert_eq!(language(file), Language::Unknown, "{file}");
     }
     for name in NAMED_AS_THEIR_FILES {
         assert!(matches!(language(name), Language::Known(_)), "{name}");
     }
     for (ending, name) in ENDINGS {
         assert!(languages::LANGUAGES.contains(name), "{ending}");
-        assert!(matches!(language(ending), Language::Unknown { .. }));
+        assert_eq!(language(ending), Language::Unknown, "{ending}");
     }
     let carried: Vec<&str> = CARRIED.names.iter().map(|(name, _)| *name).collect();
     assert_eq!(carried, languages::LANGUAGES);
@@ -191,14 +214,13 @@ fn every_name_a_fence_can_use_is_a_grammar_statac_carries() {
 
 #[test]
 fn coloured_code_shows_the_same_text_with_one_class_to_a_piece() {
-    let html = Highlighter::default().html("rust", RUST);
+    let html = html("rust", RUST).unwrap();
     assert_eq!(shown(&html), RUST);
     assert!(!html.contains("<span>"), "{html}");
     let classes = carried(&html);
     assert!(!classes.is_empty());
     for class in classes {
-        let kind = class.strip_prefix(CLASS_PREFIX);
-        assert!(kind.is_some_and(|kind| KINDS.contains(&kind)), "{class}");
+        assert!(is_a_kinds(class), "{class}");
     }
 }
 
@@ -206,7 +228,10 @@ fn coloured_code_shows_the_same_text_with_one_class_to_a_piece() {
 /// by name: one renamed or taken away leaves their code uncoloured.
 #[test]
 fn the_classes_code_is_marked_with_are_the_nineteen_promised() {
-    let classes = KINDS.map(|kind| format!("{CLASS_PREFIX}{kind}"));
+    let classes: Vec<String> = Kind::ALL
+        .iter()
+        .map(|kind| format!("{CLASS_PREFIX}{}", kind.name()))
+        .collect();
     assert_eq!(
         classes,
         [
@@ -235,7 +260,7 @@ fn the_classes_code_is_marked_with_are_the_nineteen_promised() {
 
 #[test]
 fn each_piece_carries_the_class_of_its_kind_and_text_of_none_carries_none() {
-    let html = Highlighter::default().html("rust", RUST);
+    let html = html("rust", RUST).unwrap();
     // The spaces, the indentation and the blank line are of no kind.
     assert_eq!(
         &*html,
@@ -251,7 +276,7 @@ fn each_piece_carries_the_class_of_its_kind_and_text_of_none_carries_none() {
 #[test]
 fn a_piece_after_a_character_of_two_units_starts_where_it_should() {
     let code = "let s = \"\u{e9}\u{1d11e}\"; // \u{1d11e} note\nlet t = 1;";
-    let html = Highlighter::default().html("rust", code);
+    let html = html("rust", code).unwrap();
     assert_eq!(shown(&html), code);
     assert!(
         html.contains("<span class=\"hl-string\">&quot;\u{e9}\u{1d11e}&quot;</span>"),
@@ -266,7 +291,7 @@ fn a_piece_after_a_character_of_two_units_starts_where_it_should() {
 #[test]
 fn a_grammar_colours_the_languages_it_includes() {
     let code = "<style>a { color: red; }</style>\n<script>let x = 1;</script>";
-    let html = Highlighter::default().html("html", code);
+    let html = html("html", code).unwrap();
     assert!(
         html.contains("<span class=\"hl-property\">color</span>"),
         "{html}"
@@ -280,7 +305,7 @@ fn a_grammar_colours_the_languages_it_includes() {
 #[test]
 fn code_after_a_haxe_string_in_single_quotes_is_coloured() {
     let code = "trace('a $b');";
-    let html = Highlighter::default().html("haxe", code);
+    let html = html("haxe", code).unwrap();
     assert!(
         html.contains("<span class=\"hl-variable\">b</span>"),
         "{html}"
@@ -292,26 +317,24 @@ fn code_after_a_haxe_string_in_single_quotes_is_coloured() {
 }
 
 #[test]
-fn code_of_no_grammar_carried_is_shown_as_it_is() {
-    assert_eq!(coloured("no such language", "a < b"), "a &lt; b");
+fn code_of_no_grammar_carried_is_not_coloured() {
+    assert_eq!(html("no such language", "a < b"), None);
+    assert_eq!(pieces("no such language", "a < b"), None);
+    assert_eq!(html("Rust", "a < b"), None, "a name is in lower case");
 }
 
 #[test]
 fn every_scope_is_of_a_kind_there_is_and_every_kind_has_a_scope() {
     for (scope, kind) in SCOPES {
-        assert!(kind.is_none_or(|kind| KINDS.contains(&kind)), "{scope}");
+        assert!(
+            kind.is_none_or(|kind| Kind::ALL.iter().any(|known| known.name() == kind)),
+            "{scope}"
+        );
     }
-    for kind in KINDS {
-        assert!(SCOPES.iter().any(|(_, of)| *of == Some(kind)), "{kind}");
+    for kind in Kind::ALL {
+        let name = kind.name();
+        assert!(SCOPES.iter().any(|(_, of)| *of == Some(name)), "{name}");
     }
-}
-
-#[test]
-fn a_block_written_twice_is_coloured_once() {
-    let highlighter = Highlighter::default();
-    let first = highlighter.html("rust", RUST);
-    let second = highlighter.html("rust", RUST);
-    assert!(Arc::ptr_eq(&first, &second));
 }
 
 #[test]
@@ -331,11 +354,63 @@ fn every_language_carried_colours_code() {
                   $ echo \"$HOME\" | grep -v x > /dev/null\n- [ ] **bold** _it_ `code`\n";
     for name in languages::LANGUAGES {
         assert!(tokeniser(name).is_some(), "{name}");
-        let html = coloured(name, sample);
+        let html = html(name, sample).unwrap();
         assert_eq!(shown(&html), sample, "{name}");
         for class in carried(&html) {
-            let kind = class.strip_prefix(CLASS_PREFIX);
-            assert!(kind.is_some_and(|kind| KINDS.contains(&kind)), "{name}");
+            assert!(is_a_kinds(class), "{name}");
         }
+        assert_eq!(pieces(name, sample).unwrap(), pieces_of(&html), "{name}");
     }
+}
+
+#[test]
+fn each_piece_is_a_range_of_the_code_with_its_kind() {
+    let pieces = pieces("rust", RUST).unwrap();
+    let read: Vec<(&str, Kind)> = pieces
+        .iter()
+        .map(|piece| (&RUST[piece.range.clone()], piece.kind))
+        .collect();
+    assert_eq!(
+        read,
+        [
+            ("fn", Kind::Keyword),
+            ("main", Kind::Function),
+            ("()", Kind::Punctuation),
+            ("{", Kind::Punctuation),
+            ("let", Kind::Keyword),
+            ("x", Kind::Variable),
+            ("=", Kind::Operator),
+            ("\"a<b & c\"", Kind::String),
+            (";", Kind::Punctuation),
+            ("// note", Kind::Comment),
+            ("}", Kind::Punctuation),
+        ]
+    );
+}
+
+#[test]
+fn a_piece_of_a_kind_carried_over_lines_ends_at_each_line() {
+    let code = "/* a\r\nb */ x";
+    let pieces = pieces("c", code).unwrap();
+    let comments: Vec<&str> = pieces
+        .iter()
+        .filter(|piece| piece.kind == Kind::Comment)
+        .map(|piece| &code[piece.range.clone()])
+        .collect();
+    assert_eq!(comments, ["/* a\r", "b */"]);
+    assert_eq!(pieces_of(&html("c", code).unwrap()), pieces);
+}
+
+#[test]
+fn pieces_start_where_they_should_after_characters_of_two_units() {
+    let code = "let s = \"\u{e9}\u{1d11e}\"; // \u{1d11e} note\nlet t = 1;";
+    let pieces = pieces("rust", code).unwrap();
+    assert!(
+        pieces
+            .iter()
+            .any(|piece| &code[piece.range.clone()] == "// \u{1d11e} note"
+                && piece.kind == Kind::Comment),
+        "{pieces:?}"
+    );
+    assert_eq!(pieces_of(&html("rust", code).unwrap()), pieces);
 }

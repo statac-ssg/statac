@@ -1,0 +1,31 @@
+[package]
+name = "statac-highlight"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Code coloured by the kind of each piece, as Statac colours it: HTML with classes, or ranges with their kind"
+license = "MIT OR Apache-2.0"
+repository = "https://git.statac.dev/statac/statac"
+readme = "README.md"
+keywords = ["syntax-highlighting", "highlighting", "textmate", "code"]
+categories = ["text-processing"]
+include = [
+    "/src/",
+    "/examples/",
+    "/tests/",
+    "/LICENSE-APACHE",
+    "/LICENSE-MIT",
+    "/README.md",
+    "/THIRD-PARTY-GRAMMARS.md",
+    "/licences.md",
+    "/notices-read-at-source.txt",
+]
+
+[dependencies]
+# Pinned: a release that reads a grammar differently changes how code already published is coloured.
+ferriki-textmate = "=1.1.1"
+miniz_oxide = "0.9.1"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"

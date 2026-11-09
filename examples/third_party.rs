@@ -1,8 +1,10 @@
 //! Writes `THIRD-PARTY.md`, the list of other people's work a built
 //! `statac` and a new site carry, each with its licence and the notice it
-//! asks for: `cargo run --example third_party`. The tests fail while the
-//! crates it names differ from `Cargo.lock`, or the standard library it
-//! names is not the one `Cargo.toml` asks for.
+//! asks for: `cargo run --example third_party`. Beside it goes
+//! `THIRD-PARTY-GRAMMARS.md`, a copy of the notices of the grammars
+//! `statac-highlight` carries. The tests fail while the crates it names
+//! differ from `Cargo.lock`, the standard library it names is not the one
+//! `Cargo.toml` asks for, or the copy differs.
 //!
 //! The crates are those `cargo tree` says a binary links on any of
 //! [`TARGETS`]: build scripts' own crates, procedural macros and what only
@@ -75,6 +77,16 @@ fn root() -> PathBuf {
 /// Where the list is written.
 pub fn path() -> PathBuf {
     root().join("THIRD-PARTY.md")
+}
+
+/// The notices of the grammars `statac-highlight` carries, and where their
+/// copy goes beside the list.
+pub fn grammar_notices() -> (PathBuf, PathBuf) {
+    let file = "THIRD-PARTY-GRAMMARS.md";
+    (
+        root().join("crates/statac-highlight").join(file),
+        root().join(file),
+    )
 }
 
 /// Every crate `Cargo.lock` names that is not the workspace's own, by name
@@ -588,6 +600,8 @@ fn list() -> String {
 }
 
 fn main() {
+    let (notices, copy) = grammar_notices();
+    std::fs::copy(&notices, &copy).expect("the grammars' notices can be copied");
     let written = list();
     std::fs::write(path(), &written).expect("the list can be written");
     println!(

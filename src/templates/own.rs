@@ -78,10 +78,10 @@ fn highlighted(state: &State, value: &Value, word: &str) -> Value {
         return Value::from_safe_string(highlight::plain(&text));
     }
     let language = match highlight::first_word(word).language() {
-        Language::Unknown { nearest } => {
+        Language::Unknown => {
             let kind = Kind::UnknownCodeLanguage {
                 written: word.to_owned(),
-                nearest: nearest.map(str::to_owned),
+                nearest: highlight::nearest(word).map(str::to_owned),
             };
             super::media::told_at(at(), kind);
             Language::Plain

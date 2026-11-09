@@ -1,14 +1,14 @@
 # The notices of the grammars Statac carries
 
-Written by `cargo run --example grammars` from the `NOTICE` file of npm's
-tm-grammars 1.32.22,
+Written by `cargo run -p statac-highlight --example grammars` from the
+`NOTICE` file of npm's tm-grammars 1.32.22,
 https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz, and
-`src/highlight/notices-read-at-source.txt`.
+`crates/statac-highlight/notices-read-at-source.txt`.
 
-Every grammar a built `statac` colours code with, each with its licence,
-its source and the notice it asks for. A number in square brackets is a
-text under [Notices](#notices), where each text is given once, as the
-address above it gave it.
+Every grammar `statac-highlight`, and so a built `statac`, colours code
+with, each with its licence, its source and the notice it asks for. A
+number in square brackets is a text under [Notices](#notices), where
+each text is given once, as the address above it gave it.
 
 ## Grammars
 

@@ -1,6 +1,7 @@
 //! The list of other people's work a release carries names the crates
 //! `Cargo.lock` does, each at its version, and the standard library of the
-//! Rust `Cargo.toml` asks for.
+//! Rust `Cargo.toml` asks for, and the grammars' notices beside it are
+//! those the grammars' crate carries.
 
 #[allow(dead_code, reason = "the test reads the list, and `main` writes it")]
 #[path = "../examples/third_party.rs"]
@@ -37,5 +38,17 @@ fn the_list_names_the_standard_library_of_the_rust_the_manifest_asks_for() {
         written.contains(&format!("- Rust's standard library {asked}.")),
         "THIRD-PARTY.md does not name the standard library of Rust {asked}; read what it \
          carries again, into `licences/rust-std/`, and run `cargo run --example third_party`"
+    );
+}
+
+#[test]
+fn the_grammars_notices_beside_the_list_are_those_the_grammars_crate_carries() {
+    let (notices, copy) = third_party::grammar_notices();
+    let notices = std::fs::read_to_string(notices).unwrap();
+    let copy = std::fs::read_to_string(copy).unwrap();
+    assert!(
+        copy == notices,
+        "THIRD-PARTY-GRAMMARS.md differs from crates/statac-highlight's; run `cargo run \
+         --example third_party` to copy it"
     );
 }

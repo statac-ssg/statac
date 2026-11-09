@@ -1,6 +1,7 @@
 # Grammars Statac carries
 
-Written by `cargo run --example grammars` from npm's tm-grammars 1.32.22,
+Written by `cargo run -p statac-highlight --example grammars` from npm's
+tm-grammars 1.32.22,
 https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz.
 
 ## Grammars

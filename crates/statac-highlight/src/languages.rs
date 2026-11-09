@@ -1,5 +1,5 @@
-// Written by `cargo run --example grammars`. Every name and alias of a
-// grammar Statac carries, in order.
+// Written by `cargo run -p statac-highlight --example grammars`. Every
+// name and alias of a grammar the crate carries, in order.
 
 pub(super) const LANGUAGES: &[&str] = &[
     "1c",

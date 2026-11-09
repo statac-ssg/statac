@@ -6,11 +6,11 @@ mod grammars;
 
 #[test]
 fn every_grammar_carried_has_its_notice() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let licences = std::fs::read_to_string(root.join("src/highlight/licences.md")).unwrap();
+    let licences = std::fs::read_to_string(grammars::licences_path()).unwrap();
     let notices = std::fs::read_to_string(grammars::notices_path()).unwrap();
     let texts = grammars::texts(&notices);
-    let again = "run `cargo run --example grammars -- <tm-grammars>` to write it again";
+    let again =
+        "run `cargo run -p statac-highlight --example grammars -- <tm-grammars>` to write it again";
     let heading = grammars::LIST;
     let carried = grammars::listed(&licences, heading);
     let noticed = grammars::listed(&notices, heading);

@@ -1698,14 +1698,14 @@ fn code_languages(
                     }
                 }
             }
-            Language::Unknown { nearest } => {
+            Language::Unknown => {
                 let place = fence_word(&shared.sources, node.place);
                 problems.push(Problem::at(
                     Kind::UnknownCodeLanguage {
                         written: place
                             .map_or(word, |place| shared.sources.spelling(place))
                             .to_owned(),
-                        nearest: nearest.map(str::to_owned),
+                        nearest: highlight::nearest(word).map(str::to_owned),
                     },
                     place.unwrap_or(node.place),
                 ));

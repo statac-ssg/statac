@@ -1,4 +1,4 @@
-//! Writes what Statac colours code with, from the grammars of npm's
+//! Writes the grammars the crate colours code with, from npm's
 //! `tm-grammars` package.
 //!
 //! The grammars checked in were taken from `tm-grammars` 1.32.22, the
@@ -8,40 +8,39 @@
 //! ```text
 //! curl -LO https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz
 //! tar xzf tm-grammars-1.32.22.tgz
-//! cargo run --example grammars -- package
+//! cargo run -p statac-highlight --example grammars -- package
 //! ```
 //!
-//! - `src/highlight/grammars.bin`: the grammars the binary carries, the same
+//! Each file is written in the crate's folder:
+//!
+//! - `src/grammars.bin`: the grammars the crate carries, the same
 //!   bytes on every run. A grammar is carried only under a licence that lets
-//!   it ship inside a permissively licensed binary. Each is its JSON without
+//!   it ship inside a permissively licensed program. Each is its JSON without
 //!   the space between its parts, deflated on its own, so a build reads only
 //!   the grammars its code is in. Before them the file lists, for each, its
 //!   scope, its deflated length, the grammars that add rules to it and the
 //!   grammars it can't be read without; then every name and alias in order,
 //!   with its grammar. A number is four bytes, the lowest first, and a text
 //!   follows its length.
-//! - `src/highlight/languages.rs`: every name and alias a fence can use.
-//! - `src/highlight/licences.md`: every grammar carried, with its licence
-//!   and source.
+//! - `src/languages.rs`: every name and alias a code block can use.
+//! - `licences.md`: every grammar carried, with its licence and source.
 //! - `THIRD-PARTY-GRAMMARS.md`: the same list, each with the notice it asks
-//!   for, which a release carries. A grammar's notice is the one the
-//!   package's `NOTICE` file gives; where it gives none, the one
-//!   `src/highlight/notices-read-at-source.txt` holds. The tests fail while
-//!   a grammar carried has no notice there.
+//!   for, which the crate's package and a release of Statac carry. A
+//!   grammar's notice is the one the package's `NOTICE` file gives; where
+//!   it gives none, the one `notices-read-at-source.txt` holds. The tests
+//!   fail while a grammar carried has no notice there.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use ferriki_textmate::parse_raw_grammar;
-use statac::source::Sources;
-use statac::yaml::{Node, Resolved, Value};
 
 /// The version of `tm-grammars` the grammars are taken from. A new one is
 /// a change to this line, so the documentation above stays true.
 pub const PACKAGE: &str = "1.32.22";
 
-/// Licences that let a grammar ship inside a permissively licensed binary.
+/// Licences that let a grammar ship inside a permissively licensed program.
 const PERMISSIVE: &[&str] = &["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"];
 
 /// The TextMate bundles' own licence, in each bundle's README.
@@ -99,13 +98,18 @@ const READ_AT_SOURCE: &[(&str, &str, &str)] = &[
     ),
 ];
 
-fn highlight_folder() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("src/highlight")
+fn folder() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+}
+
+/// Where the list of grammars carried is written.
+pub fn licences_path() -> PathBuf {
+    folder().join("licences.md")
 }
 
 /// Where the notices are written.
 pub fn notices_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("THIRD-PARTY-GRAMMARS.md")
+    folder().join("THIRD-PARTY-GRAMMARS.md")
 }
 
 fn main() {
@@ -142,24 +146,17 @@ fn main() {
     }
     let grammars: Vec<&Grammar> = carried.iter().map(|(grammar, _, _)| grammar).collect();
     let held = grammars_bin(&package, &grammars);
-    std::fs::write(highlight_folder().join("grammars.bin"), &held).expect("grammars.bin");
+    std::fs::write(folder().join("src/grammars.bin"), &held).expect("grammars.bin");
 
     languages.sort();
     languages.dedup();
-    std::fs::write(
-        highlight_folder().join("languages.rs"),
-        languages_rs(&languages),
-    )
-    .expect("languages.rs");
-    std::fs::write(
-        highlight_folder().join("licences.md"),
-        licences_md(&version, &carried),
-    )
-    .expect("licences.md");
+    std::fs::write(folder().join("src/languages.rs"), languages_rs(&languages))
+        .expect("languages.rs");
+    std::fs::write(licences_path(), licences_md(&version, &carried)).expect("licences.md");
     let mut notices = Vec::new();
     for path in [
         package.join("NOTICE"),
-        highlight_folder().join("notices-read-at-source.txt"),
+        folder().join("notices-read-at-source.txt"),
     ] {
         let text = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
@@ -269,8 +266,9 @@ fn package_version(package: &Path) -> String {
 
 fn languages_rs(languages: &[String]) -> String {
     let mut out = String::from(
-        "// Written by `cargo run --example grammars`. Every name and alias of a\n\
-         // grammar Statac carries, in order.\n\npub(super) const LANGUAGES: &[&str] = &[\n",
+        "// Written by `cargo run -p statac-highlight --example grammars`. Every\n\
+         // name and alias of a grammar the crate carries, in order.\n\n\
+         pub(super) const LANGUAGES: &[&str] = &[\n",
     );
     for language in languages {
         writeln!(out, "    {language:?},").unwrap();
@@ -304,7 +302,8 @@ fn entries(carried: &[(Grammar, String, String)]) -> Vec<Entry> {
 fn licences_md(version: &str, carried: &[(Grammar, String, String)]) -> String {
     let mut out = format!(
         "# Grammars Statac carries\n\n\
-         Written by `cargo run --example grammars` from npm's tm-grammars {version},\n\
+         Written by `cargo run -p statac-highlight --example grammars` from npm's\n\
+         tm-grammars {version},\n\
          https://registry.npmjs.org/tm-grammars/-/tm-grammars-{version}.tgz.\n"
     );
     writeln!(out, "\n{LIST}\n").unwrap();
@@ -365,14 +364,14 @@ struct Text {
 fn notices_md(version: &str, carried: &[(Grammar, String, String)], notices: &[Notice]) -> String {
     let mut out = format!(
         "# The notices of the grammars Statac carries\n\n\
-         Written by `cargo run --example grammars` from the `NOTICE` file of npm's\n\
-         tm-grammars {version},\n\
+         Written by `cargo run -p statac-highlight --example grammars` from the\n\
+         `NOTICE` file of npm's tm-grammars {version},\n\
          https://registry.npmjs.org/tm-grammars/-/tm-grammars-{version}.tgz, and\n\
-         `src/highlight/notices-read-at-source.txt`.\n\n\
-         Every grammar a built `statac` colours code with, each with its licence,\n\
-         its source and the notice it asks for. A number in square brackets is a\n\
-         text under [Notices](#notices), where each text is given once, as the\n\
-         address above it gave it.\n"
+         `crates/statac-highlight/notices-read-at-source.txt`.\n\n\
+         Every grammar `statac-highlight`, and so a built `statac`, colours code\n\
+         with, each with its licence, its source and the notice it asks for. A\n\
+         number in square brackets is a text under [Notices](#notices), where\n\
+         each text is given once, as the address above it gave it.\n"
     );
     let mut texts: Vec<Text> = Vec::new();
     let mut without = Vec::new();
@@ -414,7 +413,7 @@ fn notices_md(version: &str, carried: &[(Grammar, String, String)], notices: &[N
     }
     assert!(
         without.is_empty(),
-        "no notice for {}; give each one in src/highlight/notices-read-at-source.txt",
+        "no notice for {}; give each one in notices-read-at-source.txt",
         without.join(", ")
     );
     out.push_str("\n## Notices\n");
@@ -468,23 +467,6 @@ pub fn texts(written: &str) -> BTreeSet<usize> {
     numbers
 }
 
-/// A JSON string's text.
-fn text_of(node: &Node) -> Option<String> {
-    match &node.value {
-        Value::Scalar(text) if node.resolved() == Some(Resolved::Str) => Some(text.clone()),
-        _ => None,
-    }
-}
-
-fn read_json(path: &Path) -> Node {
-    let text =
-        std::fs::read_to_string(path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
-    let mut sources = Sources::default();
-    let source = sources.add(path, text);
-    statac::yaml::read_json(&sources, source)
-        .unwrap_or_else(|_| panic!("{} is not JSON", path.display()))
-}
-
 /// JSON without the space between its parts.
 fn minified(json: &str) -> String {
     let mut out = String::with_capacity(json.len());
@@ -507,20 +489,67 @@ fn minified(json: &str) -> String {
     out
 }
 
-/// The scopes of the other grammars a grammar includes rules of.
-fn included(node: &Node, scopes: &mut BTreeSet<String>) {
-    match &node.value {
-        Value::Scalar(_) => {}
-        Value::Sequence(items) => items.iter().for_each(|item| included(item, scopes)),
-        Value::Mapping(entries) => {
-            for entry in entries {
-                included(&entry.value, scopes);
+/// The scopes of the other grammars a grammar includes rules of: the
+/// value of each `include` in its JSON, without the space between its
+/// parts, up to any `#`, where that is neither empty nor `$self` or
+/// `$base`.
+fn included(json: &str) -> BTreeSet<String> {
+    let mut scopes = BTreeSet::new();
+    let mut chars = json.chars();
+    // The string just read, and whether it is the value of an `include`.
+    let mut last: Option<String> = None;
+    let mut value = false;
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                let text = string(&mut chars);
+                if value {
+                    let scope = text.split('#').next().unwrap_or_default();
+                    if !scope.is_empty() && !scope.starts_with('$') {
+                        scopes.insert(scope.to_owned());
+                    }
+                }
+                value = false;
+                last = Some(text);
             }
-            let scope = node.get("include").and_then(text_of);
-            let scope = scope.and_then(|include| include.split('#').next().map(str::to_owned));
-            scopes.extend(scope.filter(|scope| !scope.is_empty() && !scope.starts_with('$')));
+            ':' => {
+                value = last.as_deref() == Some("include");
+                last = None;
+            }
+            _ => {
+                value = false;
+                last = None;
+            }
         }
     }
+    scopes
+}
+
+/// The text of a JSON string, read from after its opening quote to after
+/// its closing one.
+fn string(chars: &mut std::str::Chars) -> String {
+    let mut text = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => break,
+            '\\' => match chars.next() {
+                Some('b') => text.push('\u{8}'),
+                Some('f') => text.push('\u{c}'),
+                Some('n') => text.push('\n'),
+                Some('r') => text.push('\r'),
+                Some('t') => text.push('\t'),
+                Some('u') => {
+                    let hex: String = chars.by_ref().take(4).collect();
+                    let code = u32::from_str_radix(&hex, 16).ok();
+                    text.push(code.and_then(char::from_u32).unwrap_or('\u{fffd}'));
+                }
+                Some(c) => text.push(c),
+                None => break,
+            },
+            _ => text.push(c),
+        }
+    }
+    text
 }
 
 /// `grammars.bin`, in the form the documentation above gives.
@@ -539,8 +568,7 @@ fn grammars_bin(package: &Path, grammars: &[&Grammar]) -> Vec<u8> {
             .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
         assert_eq!(read.scope_name, grammar.scope, "{}", path.display());
         deflated.push(miniz_oxide::deflate::compress_to_vec(json.as_bytes(), 10));
-        let mut scopes = BTreeSet::new();
-        included(&read_json(&path), &mut scopes);
+        let scopes = included(&json);
         includes.push(scopes.iter().filter_map(|scope| place(scope)).collect());
     }
     let mut injectors = vec![BTreeSet::new(); grammars.len()];

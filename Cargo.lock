@@ -1681,7 +1681,6 @@ dependencies = [
  "codemap",
  "cosmic-text",
  "deunicode",
- "ferriki-textmate",
  "granit-parser",
  "grass",
  "http",
@@ -1702,6 +1701,7 @@ dependencies = [
  "rustix",
  "rustls",
  "statac-avif-sys",
+ "statac-highlight",
  "statac-minijinja",
  "toml",
  "unicode-normalization",
@@ -1716,6 +1716,14 @@ version = "0.1.1"
 dependencies = [
  "cc",
  "cmake",
+]
+
+[[package]]
+name = "statac-highlight"
+version = "0.1.0"
+dependencies = [
+ "ferriki-textmate",
+ "miniz_oxide 0.9.1",
 ]
 
 [[package]]
