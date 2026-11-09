@@ -2,6 +2,34 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.8.1 - 2026-11-09
+
+### Fixed
+
+- Adding, removing or moving an image anywhere in the site no longer
+  makes `statac serve` build again a page that shows an image from
+  another site by its full URL, such as `<img src="https://...">` with
+  no `alt`, or `![](https://...)`. With Statac 0.8.0, moving a post's
+  folder that holds an image on a site of about 5,000 files built 76
+  of them again; now it builds 48.
+
+### Fixed in `statac import`
+
+- It carries across the lines that Eleventy's highlighting plugin,
+  `@11ty/eleventy-plugin-syntaxhighlight`, marked, writing `mark=` at
+  the end of the block's first line. The plugin counts lines from 0 and
+  Statac counts from 1, so ```` ```js/1,3 ```` becomes
+  ```` ```js mark=2,4 ````, and so do `{% highlight "js 1,3" %}` in
+  Nunjucks and `{% highlight js 1,3 %}` in Liquid. `IMPORT.md` lists
+  each block under "Marked lines in code". The plugin also marked lines
+  added and removed, written ```` ```js/1/2 ````. Statac has no equal
+  for those marks, so the import takes them off and lists each block
+  under "Options on code taken off". It reads a fence this way only
+  where the old site uses the plugin, and leaves a fence such as
+  ```` ```text/html ```` unchanged. Statac 0.8.0 brought a fence such
+  as ```` ```js/1,3 ```` across with `js/1,3` for its language and said
+  nothing, and left a `highlight` tag that marks lines unchanged.
+
 ## 0.8.0 - 2026-10-31
 
 Statac installs, upgrades and removes itself: an install script on
