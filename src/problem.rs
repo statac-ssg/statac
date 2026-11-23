@@ -4105,6 +4105,17 @@ mod tests {
     }
 
     #[test]
+    fn a_page_for_unknown_words_is_headed_as_its_messages_open() {
+        for code in [Code::OtherSpelling, Code::UnknownWord] {
+            let heading = code.explanation().lines().next().unwrap();
+            assert!(heading.starts_with("# Unknown "), "{heading}");
+            for word in ["field", "setting"] {
+                assert!(heading.contains(word), "{heading}");
+            }
+        }
+    }
+
+    #[test]
     fn a_duplicate_key_points_back_at_its_first() {
         let mut sources = Sources::default();
         let first = Place {

@@ -1,4 +1,4 @@
-# Other spelling
+# Unknown spelling of a field, setting or other word
 
 A field or setting uses a word that Statac spells differently, or a
 page's content has a marker spelled differently, such as `<!-- More -->`

@@ -1,4 +1,4 @@
-# Unknown word
+# Unknown field, setting or other word
 
 Statac found a word it doesn't know in a place where it knows every word
 that can be written. That place is one of these: a setting under `tags.`

@@ -948,7 +948,7 @@ fn the_panel_is_handed_each_problem_in_parts_and_the_rounds() {
              {{\"text\":\"?\"}}],\"suggests\":\"page.summary\",\
              \"explanation\":\"https://statac.dev/e/unknown-word/\",\"quietened\":false}}]}},\
              \"explanations\":{{\"broken-link\":{{\"title\":\"Broken link\","
-        )) && stopped.contains("\"unknown-word\":{\"title\":\"Unknown word\",\"opening\":[")
+        )) && stopped.contains("\"title\":\"Unknown field, setting or other word\",\"opening\":[")
             && stopped.contains(&format!(
                 "\"round\":{{\"state\":\"stopped\",\"at\":\"{then}\",\"builtAt\":\"{at}\",\
                  \"changed\":[\"templates/page.html\"],\"built\":3,\"outputs\":3,"
