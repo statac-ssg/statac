@@ -20,10 +20,13 @@ note  Call in HTML: Statac builds `@book` as a snippet
 Calls work inside a page's HTML the same way they do in its Markdown, so
 you can place a snippet inside a `<div>` or a `<figure>` of your own. In
 HTML, only the names of the site's snippets count as calls. Inside
-`<style>`, `<script>`, `<pre>`, `<code>` and comments, nothing does.
+`<style>`, `<script>`, `<pre>`, `<code>` and comments, nothing does. Any
+other name stays as text, with an
+[unknown snippet in HTML](https://statac.dev/e/unknown-snippet-in-html/)
+warning.
 
-You usually mean text in HTML to appear unchanged, so an email address
-or a handle that happens to match a snippet's name would otherwise be
+You usually mean text in HTML to appear unchanged, so text such as
+`@book(2)` that happens to match a snippet's name would otherwise be
 replaced without any warning. Statac tells you once for the whole site,
 at the first call it builds inside HTML. Once you have understood it,
 you can quieten it.

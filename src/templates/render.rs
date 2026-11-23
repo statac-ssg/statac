@@ -2121,14 +2121,19 @@ impl markdown::Snippets for Prose<'_> {
         let shared = self.shared;
         let name = &call.name.value;
         let Some(snippet) = shared.templates.snippets.get(name) else {
-            // In HTML, only a name the site has is a call; anything
-            // else is the author's HTML, written back as it is.
-            if call.within != Within::Prose {
-                return shared.sources.spelling(place).to_owned();
-            }
             let nearest =
                 crate::suggest::nearest(name, shared.templates.snippets.keys().map(String::as_str))
                     .map(str::to_owned);
+            // In HTML, only a name the site has is a call; anything
+            // else is the author's HTML, written back as it is.
+            if call.within != Within::Prose {
+                let kind = Kind::UnknownSnippetInHtml {
+                    name: name.clone(),
+                    nearest,
+                };
+                frame::with(|frame| frame.problems.push(Problem::at(kind, place)));
+                return shared.sources.spelling(place).to_owned();
+            }
             let at = call.name.origin.place.unwrap_or(place);
             frame::with(|frame| {
                 frame.problems.push(Problem::at(

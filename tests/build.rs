@@ -2588,8 +2588,238 @@ fn a_call_written_as_text_in_a_value_reads_its_references_as_the_rest_does() {
 }
 
 #[test]
-fn a_name_the_site_has_no_snippet_for_in_html_is_published_as_written() {
-    let site = Site::new("no-call-in-html");
+fn a_call_in_html_to_a_name_the_site_has_no_snippet_for_is_published_and_warned_of() {
+    let site = Site::new("unknown-call-in-html");
+    site.write("snippets/book.html", "<cite>{{ title }}</cite>");
+    site.write("templates/page.html", "{{ page.content }}\n");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n\
+         <div>é @bok('x')</div>\n\n\
+         <img src=\"@nosuch('z.png')\" alt=\"\">\n\n\
+         <textarea>@someone(work)</textarea>\n\n\
+         A <span title=\"@other(1)\">span</span>.\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    for told in [
+        "\
+warning  Unknown snippet in HTML: `@bok` is published as text
+  content/post-1.md, line 5
+   5 │ <div>é @bok('x')</div>
+     │        ^^^^^^^^^
+  Did you mean `@book`? To show it as text, write `\\@bok`.
+  More: https://statac.dev/e/unknown-snippet-in-html/
+",
+        "\
+warning  Unknown snippet in HTML: `@nosuch` is published as text
+  content/post-1.md, line 7
+   7 │ <img src=\"@nosuch('z.png')\" alt=\"\">
+     │           ^^^^^^^^^^^^^^^^
+  Check the spelling, or write `\\@nosuch` to show it as text.
+  More: https://statac.dev/e/unknown-snippet-in-html/
+",
+        "\
+warning  Unknown snippet in HTML: `@someone` is published as text
+  content/post-1.md, line 9
+   9 │ <textarea>@someone(work)</textarea>
+     │           ^^^^^^^^^^^^^^
+  Check the spelling, or write `\\@someone` to show it as text.
+  More: https://statac.dev/e/unknown-snippet-in-html/
+",
+        "\
+warning  Unknown snippet in HTML: `@other` is published as text
+  content/post-1.md, line 11
+  11 │ A <span title=\"@other(1)\">span</span>.
+     │                ^^^^^^^^^
+  Check the spelling, or write `\\@other` to show it as text.
+  More: https://statac.dev/e/unknown-snippet-in-html/
+",
+    ] {
+        assert!(said.contains(told), "{told}\nnot in\n{said}");
+    }
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.contains("4 unknown-snippet-in-html"), "{said}");
+    let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    for published in [
+        "<div>é @bok('x')</div>",
+        "<img src=\"@nosuch('z.png')\" alt=\"\">",
+        "<textarea>@someone(work)</textarea>",
+        "<span title=\"@other(1)\">span</span>",
+    ] {
+        assert!(built.contains(published), "{published} not in {built}");
+    }
+}
+
+#[test]
+fn an_unknown_snippet_in_html_is_quietened_by_name_and_still_counted() {
+    let site = Site::new("unknown-call-in-html-quiet");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
+         quiet: [unknown-snippet-in-html]\n",
+    );
+    site.write("templates/page.html", "{{ page.content }}\n");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n<p>Ask @someone(work).</p>\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!((said.as_str(), code), ("1 warning, quietened.\n", 0));
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("1 warning, quietened.\n"), "{said}");
+    let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    assert!(built.contains("<p>Ask @someone(work).</p>"), "{built}");
+    let output = Command::new(env!("CARGO_BIN_EXE_statac"))
+        .args(["check", "--json", "--today=2026-10-04"])
+        .arg(&site.root)
+        .output()
+        .unwrap();
+    let said = String::from_utf8(output.stdout).unwrap();
+    for part in [
+        "\"severity\":\"warning\",\"kind\":\"unknown-snippet-in-html\"",
+        "\"message\":\"Unknown snippet in HTML: `@someone` is published as text\"",
+        "\"start\":{\"line\":5,\"column\":8,\"offset\":46}",
+        "\"explanation\":\"https://statac.dev/e/unknown-snippet-in-html/\",\"quietened\":true",
+    ] {
+        assert!(said.contains(part), "{part} not in {said}");
+    }
+}
+
+#[test]
+fn a_call_shown_on_several_pages_is_warned_of_once() {
+    let site = Site::new("unknown-call-in-html-once");
+    site.write(
+        "templates/page.html",
+        "{{ page.content }}{{ page.content }}\n",
+    );
+    site.write(
+        "templates/home.html",
+        "{% for post in site.posts %}{{ post.content }}{% endfor %}\n",
+    );
+    site.write("content/index.md", "---\ntitle: Home\n---\n");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n<p>@someone(work)</p>\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    assert_eq!(
+        said.matches("warning  Unknown snippet in HTML").count(),
+        1,
+        "{said}"
+    );
+}
+
+#[test]
+fn text_holding_an_at_sign_that_is_no_call_is_published_as_written() {
+    let cases = [
+        ("an email address", "name@example.org"),
+        ("an email address before a bracket", "name@example.org(x)"),
+        ("a handle", "@someone"),
+        ("a handle before a space and a bracket", "@someone (x)"),
+        ("a handle in brackets", "(@someone)"),
+        ("a handle in a URL", "https://example.org/@someone(1)"),
+        ("a digit after the sign", "@2x(1)"),
+    ];
+    for (case, text) in cases {
+        for (place, page, published) in [
+            ("Markdown", format!("A {text} b.\n"), format!("A {text} b.")),
+            (
+                "HTML",
+                format!("<div>A {text} b.</div>\n"),
+                format!("<div>A {text} b.</div>"),
+            ),
+            (
+                "an attribute",
+                format!("<div title=\"{text}\">a</div>\n"),
+                format!("<div title=\"{text}\">a</div>"),
+            ),
+        ] {
+            let site = Site::new("at-sign-as-text");
+            site.write("templates/page.html", "{{ page.content }}\n");
+            site.write(
+                "content/post-1.md",
+                &format!("---\ntitle: Post 1\ndate: 2026-01-01\n---\n{page}"),
+            );
+            let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+            assert_eq!(code, 0, "{case} in {place}: {said}");
+            assert!(
+                !said.contains("unknown-snippet-in-html"),
+                "{case} in {place}: {said}"
+            );
+            let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+            let built = built.replace(
+                "<a href=\"mailto:name@example.org\">name@example.org</a>",
+                "name@example.org",
+            );
+            let built = built.replace(
+                "<a href=\"https://example.org/@someone(1)\">https://example.org/@someone(1)</a>",
+                "https://example.org/@someone(1)",
+            );
+            assert!(
+                built.contains(&published),
+                "{case} in {place}: {published} not in {built}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_call_where_html_holds_no_calls_is_left_alone() {
+    for (case, page, published) in [
+        ("code", "<div><code>@nosuch('x')</code></div>\n", None),
+        ("pre", "<pre>@nosuch('x')</pre>\n", None),
+        ("upper-case pre", "<PRE>@nosuch('x')</PRE>\n", None),
+        (
+            "a comment, which no page carries",
+            "<div><!-- @nosuch('x') --></div>\n",
+            Some("<div></div>"),
+        ),
+        (
+            "style",
+            "<style>a::after { content: \"@nosuch('x')\" }</style>\n",
+            None,
+        ),
+        (
+            "script",
+            "<script>let a = \"@nosuch('x')\";</script>\n",
+            None,
+        ),
+        (
+            "a backslash in HTML",
+            "<div>\\@nosuch('x')</div>\n",
+            Some("<div>@nosuch('x')</div>"),
+        ),
+        (
+            "a backslash in an attribute",
+            "<div title=\"\\@nosuch('x')\">a</div>\n",
+            Some("<div title=\"@nosuch('x')\">a</div>"),
+        ),
+    ] {
+        let site = Site::new("call-as-typed-in-html");
+        site.write("templates/page.html", "{{ page.content }}\n");
+        site.write(
+            "content/post-1.md",
+            &format!("---\ntitle: Post 1\ndate: 2026-01-01\n---\n{page}"),
+        );
+        let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+        assert_eq!(code, 0, "{case}: {said}");
+        assert!(!said.contains("unknown-snippet-in-html"), "{case}: {said}");
+        let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+        let published = published.unwrap_or(page.trim_end());
+        assert!(
+            built.contains(published),
+            "{case}: {published} not in {built}"
+        );
+    }
+}
+
+#[test]
+fn a_call_in_html_in_a_value_shown_through_markdown_is_published_as_written() {
+    let site = Site::new("call-in-html-in-a-value");
     site.write(
         "templates/page.html",
         "{{ page.content }}\n{{ page.blurb | markdown }}\n",
@@ -2597,24 +2827,16 @@ fn a_name_the_site_has_no_snippet_for_in_html_is_published_as_written() {
     site.write(
         "content/post-1.md",
         "---\ntitle: Post 1\ndate: 2026-01-01\n\
-         blurb: '<div title=\"@nope(&quot;a&quot;)\">@nope(a &amp; b)</div>'\n---\n\
-         <div class=\"x\">Mail @nope(a &amp; b) and @nope(<em>c</em>) \
-         <a title=\"@nope(&quot;d&quot;)\">here</a></div>\n",
+         blurb: '<div title=\"@nope(&quot;a&quot;)\">@nope(a &amp; b)</div>'\n---\nText.\n",
     );
     let (said, code) = site.run(&["build", "--today=2026-10-04"]);
     assert_eq!(code, 0, "{said}");
     let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
     assert!(
-        built.contains(
-            "<div class=\"x\">Mail @nope(a &amp; b) and @nope(<em>c</em>) \
-             <a title=\"@nope(&quot;d&quot;)\">here</a></div>"
-        ),
-        "{built}"
-    );
-    assert!(
         built.contains("<div title=\"@nope(&quot;a&quot;)\">@nope(a &amp; b)</div>"),
         "{built}"
     );
+    assert!(!said.contains("unknown-snippet-in-html"), "{said}");
 }
 
 #[test]

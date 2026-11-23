@@ -651,11 +651,18 @@ fn a_call_in_the_writing_builds_the_same_snippet() {
     // The call built inside HTML is said, once.
     assert_eq!(
         built.told(&rendered.problems),
-        [(
-            "call-in-html",
-            "content/post-1.md".into(),
-            "@note('in html')".into()
-        )]
+        [
+            (
+                "call-in-html",
+                "content/post-1.md".into(),
+                "@note('in html')".into()
+            ),
+            (
+                "unknown-snippet-in-html",
+                "content/post-1.md".into(),
+                "@other('x')".into()
+            ),
+        ]
     );
     let rendered = built.render("post-2.md");
     assert_eq!(

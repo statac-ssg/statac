@@ -2064,6 +2064,34 @@ fn an_address_inside_the_site_moves_with_the_sites_path() {
 }
 
 #[test]
+fn a_call_in_html_follows_the_snippet_it_names_coming_and_going() {
+    let site = Site::new("call-in-html");
+    site.write(
+        "content/post-2.md",
+        &post(
+            "Post 2",
+            "2026-01-02",
+            "one",
+            "Post 2 says this.\n\n<div>@aside(text='Beside it.')</div>",
+        ),
+    );
+    through(
+        &site,
+        &[
+            ("the snippet added", &|site| {
+                site.write("snippets/aside.html", "<aside>{{ text }}</aside>\n")
+            }),
+            ("the snippet edited", &|site| {
+                site.write("snippets/aside.html", "<aside>{{ text }}!</aside>\n")
+            }),
+            ("the snippet removed", &|site| {
+                site.remove("snippets/aside.html")
+            }),
+        ],
+    );
+}
+
+#[test]
 fn what_a_kept_page_told_is_told_again_where_it_is_written() {
     let site = Site::new("told");
     let nowhere = post(

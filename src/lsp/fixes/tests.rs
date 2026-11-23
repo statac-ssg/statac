@@ -37,6 +37,28 @@ fn fixed(files: &[(&str, &str)]) -> Vec<String> {
 }
 
 #[test]
+fn an_unknown_snippet_in_html_is_offered_the_nearest_name_and_the_backslash() {
+    let found = fixed(&[
+        ("snippets/figure.html", "<img src=\"{{ src }}\" alt=\"\">"),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\n---\n<p>@figur('a.jpg')</p>\n\n<p>@someone(work)</p>\n",
+        ),
+    ]);
+    assert_eq!(
+        found,
+        [
+            "unknown-snippet-in-html in content/post-1.md: `@figur` as `@figure`, offered as \
+             Write it as `@figure`",
+            "unknown-snippet-in-html in content/post-1.md: `@figur` as `\\@figur`, offered as \
+             Write it as `\\@figur`",
+            "unknown-snippet-in-html in content/post-1.md: `@someone` as `\\@someone`, offered \
+             as Write it as `\\@someone`",
+        ]
+    );
+}
+
+#[test]
 fn a_word_spelled_near_one_statac_knows_is_written_as_that_word() {
     let found = fixed(&[
         (

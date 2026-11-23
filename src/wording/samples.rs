@@ -1060,6 +1060,17 @@ const RUNS: &[Run] = &[
         ],
     ),
     Run::new(
+        Code::UnknownSnippetInHtml,
+        CHECK,
+        &[
+            ("snippets/book.html", "<cite>{{ title }}</cite>\n"),
+            (
+                "content/post-1.md",
+                "<div class=\"aside\">@bok('Post 1')</div>\n",
+            ),
+        ],
+    ),
+    Run::new(
         Code::MoreWrittenTwice,
         CHECK,
         &[(

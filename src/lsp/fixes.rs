@@ -174,6 +174,13 @@ pub(super) fn fixes(problem: &Problem, sources: &Sources, base: &str) -> Vec<Fix
             })
         }
         Kind::CallInHtml { name } => respelt(&format!("@{name}"), &format!("\\@{name}")),
+        Kind::UnknownSnippetInHtml { name, nearest } => {
+            let written = format!("@{name}");
+            let meant = nearest.iter().map(|nearest| format!("@{nearest}"));
+            return (meant.chain([format!("\\{written}")]))
+                .filter_map(|text| respelt(&written, &text))
+                .collect();
+        }
         Kind::MissingFile {
             path,
             hint: Some(Hint::Closest(name)),

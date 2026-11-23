@@ -975,6 +975,9 @@ pub(crate) fn headline(kind: &Kind) -> String {
             }
         }
         Kind::CallInHtml { name } => format!("Call in HTML: Statac builds `@{name}` as a snippet"),
+        Kind::UnknownSnippetInHtml { name, .. } => {
+            format!("Unknown snippet in HTML: `@{name}` is published as text")
+        }
         Kind::UntitledPage { page, by, name } => {
             let by = match by {
                 Called::Summary => "its `summary`",
@@ -3409,6 +3412,12 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             .as_ref()
             .map(|written| format!("Write `{written}` to choose the pages once for the site.")),
         Kind::CallInHtml { name } => Some(format!("To show it as text, write `\\@{name}`.")),
+        Kind::UnknownSnippetInHtml { name, nearest } => Some(match nearest {
+            Some(nearest) => {
+                format!("Did you mean `@{nearest}`? To show it as text, write `\\@{name}`.")
+            }
+            None => format!("Check the spelling, or write `\\@{name}` to show it as text."),
+        }),
         Kind::UntitledPage { page, .. } => {
             let words = match page {
                 Named::ListPage(..) => {
@@ -7531,6 +7540,22 @@ mod tests {
                 },
                 "Call in HTML: Statac builds `@book` as a snippet",
                 Some(r"To show it as text, write `\@book`."),
+            ),
+            (
+                Kind::UnknownSnippetInHtml {
+                    name: "bok".into(),
+                    nearest: Some("book".into()),
+                },
+                "Unknown snippet in HTML: `@bok` is published as text",
+                Some(r"Did you mean `@book`? To show it as text, write `\@bok`."),
+            ),
+            (
+                Kind::UnknownSnippetInHtml {
+                    name: "someone".into(),
+                    nearest: None,
+                },
+                "Unknown snippet in HTML: `@someone` is published as text",
+                Some(r"Check the spelling, or write `\@someone` to show it as text."),
             ),
             (
                 Kind::UntitledPage {

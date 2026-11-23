@@ -173,6 +173,7 @@ codes! {
     SortedLast "sorted-last",
     LoopOverEveryPage "loop-over-every-page",
     CallInHtml "call-in-html",
+    UnknownSnippetInHtml "unknown-snippet-in-html",
     MoreWrittenTwice "more-written-twice",
     UntitledPage "untitled-page",
     MissingDefinition "missing-definition",
@@ -363,6 +364,7 @@ impl Code {
             | Code::DefinitionWrittenTwice
             | Code::CellNeverShown
             | Code::IdUsedTwice
+            | Code::UnknownSnippetInHtml
             | Code::UnmatchedTag
             | Code::SizeKept
             | Code::DescribesNoImage
@@ -545,6 +547,7 @@ impl Code {
             | Code::DefinitionWrittenTwice
             | Code::CellNeverShown
             | Code::IdUsedTwice
+            | Code::UnknownSnippetInHtml
             | Code::UnmatchedTag
             | Code::SizeKept
             | Code::ColourConverted
@@ -1427,6 +1430,12 @@ pub enum Kind {
     /// name, said once for the build.
     CallInHtml {
         name: String,
+    },
+    /// A call inside a page's HTML to a name the site has no snippet for,
+    /// published as written, with the nearest snippet's name.
+    UnknownSnippetInHtml {
+        name: String,
+        nearest: Option<String>,
     },
     /// A page a template asked the name of that has none the author wrote,
     /// so is called by what `by` says: `name`.
@@ -3268,6 +3277,7 @@ impl Kind {
             Kind::SortedLast { .. } => Code::SortedLast,
             Kind::LoopOverEveryPage { .. } => Code::LoopOverEveryPage,
             Kind::CallInHtml { .. } => Code::CallInHtml,
+            Kind::UnknownSnippetInHtml { .. } => Code::UnknownSnippetInHtml,
             Kind::UntitledPage { .. } => Code::UntitledPage,
             Kind::MissingDefinition { .. } => Code::MissingDefinition,
             Kind::MissingAnchor { .. } => Code::MissingAnchor,
