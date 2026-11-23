@@ -2,6 +2,60 @@
 
 What changed in each release of Statac, the newest first.
 
+## 0.8.2 - 2026-11-23
+
+### Fixed
+
+- Statac now warns of a call to a snippet the site doesn't have inside
+  HTML in a page's content, such as `<div>@nosuch('x')</div>`. The
+  warning, `unknown-snippet-in-html`, gives the line and column, and
+  offers the nearest snippet's name when one is close. Statac still
+  publishes the call as text and the build still succeeds. To keep the
+  text and stop the warning, write `\@nosuch('x')`, or add `quiet:
+  [unknown-snippet-in-html]` to `statac.yaml`. Statac 0.8.1 published
+  the call and said nothing.
+- A `permalink` or `pages.permalink` that uses a custom field
+  `statac.yaml` doesn't declare, such as `/p/{isbn}/`, still stops the
+  build, and the message now gives the line to add: ``To use a custom
+  field, add `fields.isbn: text` to `statac.yaml`.`` Statac 0.8.1 said
+  only ``there is no placeholder `{isbn}` ``.
+- After a save, `statac serve` counts what it built by pages, redirects
+  and feeds, such as `Built 1 of 4 pages and 1 of 1 feed`. Statac 0.8.1
+  added them together and called them files, such as `Built 2 of 6
+  files`, and left the site's other files out of the count.
+- The Reference, an editor's hover and the debug panel now say what
+  `draft`, the `none` test and `mentions` do. `draft` and `page.draft`
+  name every command that builds drafts: `statac serve`, and `statac
+  build`, `statac check` and `statac search` with `--drafts`. `none`
+  says that testing a value that isn't set stops the build, and points
+  to `defined`. `mentions` and `page.mentions` say that Statac only
+  passes the value on, so a layout has to show the webmentions itself.
+  Statac 0.8.1 said that only `statac serve` built drafts, and that
+  `mentions` showed a page's webmentions.
+- The explanations of `other-spelling` and `unknown-word` now have
+  titles that start with the words their messages start with: "Unknown
+  spelling of a field, setting or other word" and "Unknown field,
+  setting or other word". They were "Other spelling" and "Unknown
+  word", so a reader who saw a message such as ``Unknown field:
+  `template` `` couldn't find its page in the list of problems. The new
+  titles appear in `statac explain`, the debug panel and the docs. The
+  messages, the problem names and their URLs stay the same.
+- The links to read more about `untitled`, `draft`, `needs` and
+  `site.pages`, in the Reference, the debug panel and an editor's
+  hover, go to the sections of the docs that now cover them.
+
+### Changed
+
+- Messages, the debug panel, the Reference and the problem pages now
+  use the word a technical reader searches for: variable, date format
+  and named format, hash, token and syntax highlighting, EXIF
+  orientation, and translated pages. "Translations" now means only a
+  language's words. The debug panel's Names tab is now its Variables
+  tab, and Statac reports a misspelt variable in a template as
+  `Unknown variable`. Nothing an author writes changes:
+  `page.translations`, `translation_key` and every setting, field and
+  problem name stay the same.
+
 ## 0.8.1 - 2026-11-09
 
 ### Fixed
