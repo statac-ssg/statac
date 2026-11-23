@@ -3907,6 +3907,28 @@ pub struct Published {
     pub(crate) files: usize,
 }
 
+/// How many outputs of one kind a rebuild built, of how many the site has.
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+pub struct Share {
+    pub(crate) built: usize,
+    pub(crate) of: usize,
+}
+
+/// What a rebuild built of the site's outputs, by kind.
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+pub struct Shares {
+    pub(crate) pages: Share,
+    pub(crate) redirects: Share,
+    pub(crate) feeds: Share,
+}
+
+impl Shares {
+    /// Outputs of every kind built.
+    pub(crate) fn built(&self) -> usize {
+        self.pages.built + self.redirects.built + self.feeds.built
+    }
+}
+
 /// Where JavaScript the built pages carry comes from.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub(crate) enum Carried {

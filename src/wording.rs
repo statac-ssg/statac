@@ -22,6 +22,7 @@ use crate::problem::{
     TakesFault, TemplateFault, Told, Translated, Unheard, Unmatched, Unquietenable, Unread,
     Unsupported, Unwritten, Waiting, Wanted, Word, WordList, WordsFrom, WordsWanted, WrongPlace,
 };
+use crate::problem::{Share, Shares};
 
 pub(crate) use crate::described::{
     Described, field as described_field, setting as described_setting,
@@ -5074,13 +5075,24 @@ pub(crate) fn files_changed(files: &[String]) -> String {
     }
 }
 
-/// What a rebuild of `serve` built.
-pub(crate) fn built_round(built: usize, of: usize, seconds: f64) -> String {
-    format!(
-        "Built {} of {} in {seconds:.2} seconds.",
-        grouped(built),
-        how_many(of, "file", "files")
-    )
+/// What a rebuild of `serve` built. Pages are always counted, and a
+/// redirect or a feed where the rebuild built one.
+pub(crate) fn built_round(shares: &Shares, seconds: f64) -> String {
+    let share = |share: Share, one, many| {
+        format!(
+            "{} of {}",
+            grouped(share.built),
+            how_many(share.of, one, many)
+        )
+    };
+    let mut what = vec![share(shares.pages, "page", "pages")];
+    if shares.redirects.built > 0 {
+        what.push(share(shares.redirects, "redirect", "redirects"));
+    }
+    if shares.feeds.built > 0 {
+        what.push(share(shares.feeds, "feed", "feeds"));
+    }
+    format!("Built {} in {seconds:.2} seconds.", listed(&what))
 }
 
 /// A rebuild of `serve` that errors stopped.
@@ -11182,6 +11194,42 @@ mod tests {
         );
         assert_eq!(see_them(1), "Run `statac check` to see it.");
         assert_eq!(see_them(3), "Run `statac check` to see them.");
+    }
+
+    #[test]
+    fn a_rebuild_counts_each_kind_of_output_it_built() {
+        let share = |built, of| Share { built, of };
+        let cases = [
+            ((1, 2), (0, 0), (0, 0), "Built 1 of 2 pages"),
+            ((1, 1), (0, 0), (0, 0), "Built 1 of 1 page"),
+            ((0, 1), (0, 0), (0, 0), "Built 0 of 1 page"),
+            ((0, 4), (0, 1), (0, 1), "Built 0 of 4 pages"),
+            ((1, 4), (0, 1), (1, 1), "Built 1 of 4 pages and 1 of 1 feed"),
+            (
+                (0, 4),
+                (1, 2),
+                (0, 1),
+                "Built 0 of 4 pages and 1 of 2 redirects",
+            ),
+            (
+                (1, 4),
+                (1, 1),
+                (2, 3),
+                "Built 1 of 4 pages, 1 of 1 redirect and 2 of 3 feeds",
+            ),
+            ((1200, 3400), (0, 0), (0, 0), "Built 1,200 of 3,400 pages"),
+        ];
+        for (pages, redirects, feeds, line) in cases {
+            let shares = Shares {
+                pages: share(pages.0, pages.1),
+                redirects: share(redirects.0, redirects.1),
+                feeds: share(feeds.0, feeds.1),
+            };
+            assert_eq!(
+                built_round(&shares, 0.5),
+                format!("{line} in 0.50 seconds.")
+            );
+        }
     }
 
     fn yaml() -> Vec<(Kind, &'static str, Option<&'static str>)> {

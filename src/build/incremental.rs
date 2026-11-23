@@ -31,7 +31,7 @@ use crate::build::{
 use crate::content::Texts;
 use crate::disk::Clock;
 use crate::ids::PageId;
-use crate::problem::Problem;
+use crate::problem::{Problem, Shares};
 use crate::reads::{Key, Reads, Translation};
 use crate::search::Record;
 use crate::unsaved::Unsaved;
@@ -171,7 +171,7 @@ impl Checking {
             publishing,
         );
         build::told_once_built(&mut outcome, options);
-        self.built = (rebuilt.fresh, rebuilt.built.len());
+        self.built = (rebuilt.shares.built(), rebuilt.built.len());
         let built = Arc::new(rebuilt.built);
         self.last = Some(Kept::new(rebuilt.reading, built, rebuilt.keep));
         outcome
@@ -208,8 +208,8 @@ pub(crate) struct Rebuilt {
     /// Every output, in the order `plan` has them.
     pub(crate) built: Vec<Built>,
     pub(crate) concluded: Concluded,
-    /// Outputs built this round, the rest being kept.
-    pub(crate) fresh: usize,
+    /// Outputs built this round, the rest being kept, by kind.
+    pub(crate) shares: Shares,
     /// Every key an output of the kept round read that this round found
     /// holding something else, as the kept round names it, in order;
     /// noted only where the round was asked to note them.
@@ -312,7 +312,16 @@ pub(crate) fn rebuild(
     taken.before_building();
     lap(&mut took.comparing);
 
-    let fresh = kept.iter().filter(|kept| kept.is_none()).count();
+    let mut shares = Shares::default();
+    for (output, kept) in plan.outputs.iter().zip(&kept) {
+        let share = match output {
+            Output::Page(_) | Output::Later(..) => &mut shares.pages,
+            Output::Redirect(_) => &mut shares.redirects,
+            Output::Feed(_) => &mut shares.feeds,
+        };
+        share.of += 1;
+        share.built += usize::from(kept.is_none());
+    }
     let built: Vec<Built> = plan
         .outputs
         .par_iter()
@@ -351,7 +360,7 @@ pub(crate) fn rebuild(
         plan,
         built,
         concluded,
-        fresh,
+        shares,
         changed,
         took,
         keep: Keep {

@@ -560,9 +560,7 @@ impl Serving {
             .count();
         match (round.outcome.stopped(), took) {
             (true, _) => wording::stopped_round(errors),
-            (false, Some(took)) => {
-                wording::built_round(round.built, round.outputs, took.as_secs_f64())
-            }
+            (false, Some(took)) => wording::built_round(&round.shares, took.as_secs_f64()),
             (false, None) => String::new(),
         }
     }

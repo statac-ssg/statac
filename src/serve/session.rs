@@ -20,7 +20,7 @@ use crate::disk::KEPT;
 use crate::disk::{Clock, Inventory};
 use crate::hooks::Before;
 use crate::problem::Occupant;
-use crate::problem::{Kind, Problem};
+use crate::problem::{Kind, Problem, Shares};
 use crate::publish::{self, Left, Staging};
 use crate::reads::Key;
 use crate::stamp::{self, Pass};
@@ -74,6 +74,8 @@ pub struct Round {
     /// Outputs built this round, and how many the site has.
     pub built: usize,
     pub outputs: usize,
+    /// The same, by kind of output.
+    pub(crate) shares: Shares,
     /// Whether every page written differs from the one it replaces only
     /// by the names of stylesheets the round published under new names.
     pub restyled: bool,
@@ -382,7 +384,7 @@ impl Session {
             plan,
             mut built,
             mut concluded,
-            fresh,
+            shares,
             changed,
             took: rebuilt,
             keep,
@@ -515,8 +517,9 @@ impl Session {
             outcome,
             written: Vec::new(),
             removed: Vec::new(),
-            built: fresh,
+            built: shares.built(),
             outputs: built.len(),
+            shares,
             restyled,
             stamps,
             hooked: Vec::new(),
@@ -645,6 +648,7 @@ impl Round {
             removed: Vec::new(),
             built: 0,
             outputs: 0,
+            shares: Shares::default(),
             restyled: false,
             stamps: Pass::default(),
             hooked: Vec::new(),

@@ -389,6 +389,79 @@ fn a_saved_page_reloads() {
 }
 
 #[test]
+fn a_rebuild_says_how_many_of_each_kind_of_output_it_built() {
+    let served = served_as(
+        "shares",
+        How::Poll {
+            every: Duration::from_millis(100),
+        },
+        true,
+        |site| {
+            site.write(
+                "statac.yaml",
+                "title: Site\nurl: https://example.org\nlanguage: en\n\
+             timezone: Europe/London\nfeed_key: key\nfeed: true\n",
+            );
+            site.write(
+                "content/post-1.md",
+                "---\ntitle: Post 1\ndate: 2026-01-01\nredirect_from: [/old/]\n---\nThe post.\n",
+            );
+            site.write("data/facts.yaml", "name: first\n");
+            site.write(
+                "content/post-2.md",
+                "---\ntitle: Post 2\ndate: 2026-01-02\nlayout: facts\n---\nThe post.\n",
+            );
+            site.write("templates/facts.html", "{{ site.data.facts.name }}\n");
+            site.write(
+                "templates/redirect.html",
+                "<link rel=\"canonical\" href=\"{{ to | absolute }}\">\n",
+            );
+            site.write(
+                "templates/feed.xml",
+                "{% for post in posts %}{{ post.title }}: {{ post.content }}\n{% endfor %}",
+            );
+        },
+    );
+    assert!(
+        steady(&served, &served.said.text())
+            .contains("Wrote 3 pages, 1 redirect, 1 feed and 1 other file to "),
+        "{}",
+        served.said.text()
+    );
+    let saves = [
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-01\nredirect_from: [/old/]\n---\nSaved.\n",
+            "Built 1 of 3 pages and 1 of 1 feed in TIME seconds.",
+        ),
+        (
+            "assets/site.css",
+            "body { color: rebeccapurple; }\n",
+            "Built 2 of 3 pages in TIME seconds.",
+        ),
+        (
+            "data/facts.yaml",
+            "name: second\n",
+            "Built 1 of 3 pages in TIME seconds.",
+        ),
+        (
+            "content/post-1.md",
+            "---\ntitle: Post 1\ndate: 2026-01-01\nredirect_from: [/older/]\n---\nSaved.\n",
+            "Built 1 of 3 pages, 1 of 1 redirect and 1 of 1 feed in TIME seconds.",
+        ),
+    ];
+    for (file, text, wanted) in saves {
+        let mark = served.said.text().len();
+        served.change_and_wait(|| served.site.write(file, text));
+        let said = steady(&served, &served.said.after(mark, "\n"));
+        assert!(
+            said.contains(&format!(" changed. {wanted} ")),
+            "{file}: {said}"
+        );
+    }
+}
+
+#[test]
 fn a_save_through_a_temporary_file_is_one_change_to_the_real_file() {
     each_way("atomic", |way, served| {
         let post = served.site.path("content/post-1.md");
@@ -1749,7 +1822,7 @@ Press Ctrl+C to stop.
         "\
 Fetched `fetched/stills/youtube-abcdefghijk.jpg`.
 Fetched 1 thumbnail.
-FILES changed. Built 1 of 3 files in TIME seconds. Told the browser to reload.
+FILES changed. Built 1 of 3 pages in TIME seconds. Told the browser to reload.
 Gone since the last build: 1 no-thumbnail.
 "
     );
@@ -1809,7 +1882,7 @@ Press Ctrl+C to stop.
 Fetched `fetched/faces/0a523cc7bab84b06.jpg`.
 Fetched `fetched/mentions/1.yaml`.
 Fetched 1 webmention and 1 avatar.
-FILES changed. Built 1 of 2 files in TIME seconds. Told the browser to reload.
+FILES changed. Built 1 of 2 pages in TIME seconds. Told the browser to reload.
 "
     );
     // The three files are one round, and neither what fetching wrote nor
@@ -1944,7 +2017,7 @@ fn fetching_waits_for_the_first_round_with_no_error() {
     let said = served.said.after(mark, "Fetched 1 thumbnail.\n");
     let said = steady(&served, &said);
     assert!(
-        said.starts_with("`templates/page.html` changed. Built 3 of 3 files in TIME seconds."),
+        said.starts_with("`templates/page.html` changed. Built 3 of 3 pages in TIME seconds."),
         "{said}"
     );
     assert!(
