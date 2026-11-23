@@ -21,7 +21,11 @@ More: https://statac.dev/templates/#no-value
 
 ## `none`
 
-Whether the value is `none`.
+Whether the value is `none`, such as a field written with nothing after
+its colon. On a value that isn't set, `is none` stops the build. Use
+`defined` to test for that.
+
+More: https://statac.dev/templates/#no-value
 
 ## `true`
 

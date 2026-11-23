@@ -48,8 +48,9 @@ More: https://statac.dev/dates/#writing-a-date
 
 ## `draft`
 
-`true` leaves the page out of the build. `statac serve` still shows it,
-marked as a draft.
+`true` leaves the page out of `statac build`, `statac check` and
+`statac search`, unless they run with `--drafts`. `statac serve` shows
+it, marked as a draft, unless it runs with `--no-drafts`.
 
 More: https://statac.dev/front-matter/#drafts
 
@@ -220,7 +221,8 @@ More: https://statac.dev/social-cards/#what-a-preview-says
 
 ## `mentions`
 
-`true` if the page shows its webmentions. A template reads it as
-`page.mentions`.
+`true` or `false`, for a layout to read as `page.mentions`. Statac does
+nothing else with it: the layout has to show the webmentions itself,
+from `page.webmentions`.
 
 More: https://statac.dev/webmentions/#webmentions-in-a-layout

@@ -299,7 +299,8 @@ More: https://statac.dev/front-matter/#untitled
 
 ## `draft`
 
-`true` if the page is a draft. Only `statac serve` builds drafts.
+`true` if the page is a draft. `statac serve` builds drafts, and so do
+`statac build`, `statac check` and `statac search` with `--drafts`.
 
 More: https://statac.dev/front-matter/#drafts
 
@@ -419,6 +420,8 @@ More: https://statac.dev/social-cards/#a-picture-of-your-own
 
 ## `mentions`
 
-`true` if the page's `mentions` asks for its webmentions to be shown.
+The `mentions` the page writes, or the one cascaded to it, for a layout
+to test before it shows `page.webmentions`. Statac does nothing else
+with it. If neither sets one, `mentions` has no value.
 
 More: https://statac.dev/webmentions/#webmentions-in-a-layout
