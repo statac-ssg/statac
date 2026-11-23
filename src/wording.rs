@@ -2194,6 +2194,9 @@ pub(crate) fn address_fault(fault: &AddressFault) -> String {
         AddressFault::UnknownPiece { written, .. } => {
             format!("there is no placeholder `{written}`")
         }
+        AddressFault::UndeclaredField { field } => {
+            format!("there is no placeholder `{{{field}}}`")
+        }
         AddressFault::Unclosed => "`{` is never closed".into(),
         AddressFault::Stray => "`}` closes nothing".into(),
         AddressFault::Character(c) => format!("`{c}` can't be in a name"),
@@ -2935,6 +2938,9 @@ pub(crate) fn suggestion(kind: &Kind) -> Option<String> {
             AddressFault::UnknownPiece { nearest, .. } => {
                 nearest.as_ref().map(|s| format!("Did you mean `{s}`?"))
             }
+            AddressFault::UndeclaredField { field } => Some(format!(
+                "To use a custom field, add `fields.{field}: text` to `statac.yaml`."
+            )),
             AddressFault::Unclosed => Some("Close it with `}`.".into()),
             AddressFault::Character('\\') => Some("Separate folders with `/`.".into()),
             AddressFault::Character(_) | AddressFault::Control | AddressFault::Stray => {
@@ -9782,6 +9788,13 @@ mod tests {
                 }),
                 "Unusable URL: there is no placeholder `{yaer}`",
                 Some("Did you mean `{year}`?"),
+            ),
+            (
+                unusable(AddressFault::UndeclaredField {
+                    field: "book.author".into(),
+                }),
+                "Unusable URL: there is no placeholder `{book.author}`",
+                Some("To use a custom field, add `fields.book.author: text` to `statac.yaml`."),
             ),
             (
                 unusable(AddressFault::Unclosed),

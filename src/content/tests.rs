@@ -1100,12 +1100,6 @@ fn a_pattern_asking_for_a_field_a_page_lacks_is_refused_where_it_asks() {
             piece: "{isbn}".into(),
         },
     };
-    let no_piece = |nearest: Option<&str>| Kind::UnusableUrl {
-        fault: AddressFault::UnknownPiece {
-            written: "{isbn}".into(),
-            nearest: nearest.map(str::to_owned),
-        },
-    };
     type Files<'a> = Vec<(&'a str, &'a str)>;
     let cases: [(Files, Kind, &str, &str); 5] = [
         (
@@ -1152,7 +1146,11 @@ fn a_pattern_asking_for_a_field_a_page_lacks_is_refused_where_it_asks() {
                 "content/a.md",
                 "---\nisbn: Number 1\npermalink: /books/{isbn}/\n---\n",
             )],
-            no_piece(None),
+            Kind::UnusableUrl {
+                fault: AddressFault::UndeclaredField {
+                    field: "isbn".into(),
+                },
+            },
             "content/a.md",
             "{isbn}",
         ),
@@ -1164,7 +1162,12 @@ fn a_pattern_asking_for_a_field_a_page_lacks_is_refused_where_it_asks() {
                     "---\nisbm: Number 1\npermalink: /{isbn}/\n---\n",
                 ),
             ],
-            no_piece(Some("{isbm}")),
+            Kind::UnusableUrl {
+                fault: AddressFault::UnknownPiece {
+                    written: "{isbn}".into(),
+                    nearest: Some("{isbm}".into()),
+                },
+            },
             "content/a.md",
             "{isbn}",
         ),
@@ -1186,6 +1189,56 @@ fn a_pattern_asking_for_a_field_a_page_lacks_is_refused_where_it_asks() {
         problems(&read),
         [("needs-quotes", "content/a.md".into(), "3.10".into())]
     );
+}
+
+#[test]
+fn an_undeclared_field_fills_an_each_pattern_and_a_pages_pattern_offers_its_line() {
+    let settings = "language: en\ntimezone: Europe/London\n";
+    let post = "---\ndate: 2026-01-02\nisbn: Number 1\n---\n";
+    let read = site(&[
+        ("statac.yaml", settings),
+        (
+            "content/cards.md",
+            "---\neach: site.posts\npermalink: /cards/{isbn}/\n---\n",
+        ),
+        (
+            "content/table.md",
+            "---\neach: data.table\npermalink: /table/{isbn}/\n---\n",
+        ),
+        ("data/table.yaml", "- isbn: Number 2\n"),
+        ("content/post-1.md", post),
+    ]);
+    assert_eq!(problems(&read), []);
+    let at = |path: &str| page(&read, path).address.as_str().to_owned();
+    assert_eq!(at("cards.md/post-1.md"), "/cards/number-1/");
+    assert_eq!(at("table.md/1"), "/table/number-2/");
+
+    let folder = "---\npages.permalink: /p/{isbn}/\n---\n";
+    let read = site(&[
+        ("statac.yaml", settings),
+        ("content/p/index.md", folder),
+        ("content/p/post-1.md", post),
+    ]);
+    assert_eq!(
+        kinds_at(&read),
+        [(
+            Kind::UnusableUrl {
+                fault: AddressFault::UndeclaredField {
+                    field: "isbn".into(),
+                },
+            },
+            "{isbn}".to_owned(),
+        )]
+    );
+
+    let declared = format!("{settings}fields.isbn: text\n");
+    let read = site(&[
+        ("statac.yaml", &declared),
+        ("content/p/index.md", folder),
+        ("content/p/post-1.md", post),
+    ]);
+    assert_eq!(problems(&read), []);
+    assert_eq!(page(&read, "p/post-1.md").address.as_str(), "/p/number-1/");
 }
 
 #[test]

@@ -36,7 +36,9 @@ that ends up somewhere you didn't mean would be at the wrong URL.
 ## How to fix it
 
 Do what the message suggests: remove the character, correct the
-placeholder's name, or give the page a date.
+placeholder's name, declare the custom field, or give the page a date.
+If the message offers another placeholder and you meant a custom field,
+add a line such as `fields.isbn: text` to `statac.yaml`.
 
 ## Example
 

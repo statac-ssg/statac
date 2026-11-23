@@ -201,6 +201,30 @@ impl<'a> Fields<'a> {
         };
         crate::suggest::nearest(written, PIECES.iter().chain(declared).copied())
     }
+
+    /// Whether a `fields.` line would make `token` a declared field: a name
+    /// a page can write, not Statac's own, and neither inside nor around a
+    /// field already declared.
+    fn declarable(self, token: &str) -> bool {
+        let Fields::Declared(declared) = self else {
+            return false;
+        };
+        let within = |outer: &str, inner: &str| {
+            inner
+                .strip_prefix(outer)
+                .is_some_and(|rest| rest.starts_with('.'))
+        };
+        let head = token.split('.').next().unwrap_or(token);
+        token.split('.').all(|name| {
+            !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || "_-".contains(c))
+        }) && !crate::config::words::is_statacs(head)
+            && !declared
+                .iter()
+                .any(|d| within(d, token) || within(token, d))
+    }
 }
 
 fn faults(pattern: &str, handed: bool, fields: Fields) -> Vec<(Kind, Span)> {
@@ -260,13 +284,16 @@ fn faults(pattern: &str, handed: bool, fields: Fields) -> Vec<(Kind, Span)> {
                     "title" | "filename" => Some("slug"),
                     token => fields.nearest(token),
                 };
-                found.push((
-                    unusable(AddressFault::UnknownPiece {
+                let fault = match nearest {
+                    None if fields.declarable(token) => AddressFault::UndeclaredField {
+                        field: token.to_owned(),
+                    },
+                    nearest => AddressFault::UnknownPiece {
                         written: format!("{{{token}}}"),
                         nearest: nearest.map(|n| format!("{{{n}}}")),
-                    }),
-                    Span::new(start, end),
-                ));
+                    },
+                };
+                found.push((unusable(fault), Span::new(start, end)));
             }
             _ => {}
         }
@@ -809,6 +836,38 @@ mod tests {
             assert_eq!(found, expected, "{pattern}");
         }
         assert!(!pattern_faults("/books/{isbn}/", true, &[]).is_empty());
+    }
+
+    #[test]
+    fn a_pages_pattern_offers_a_field_line_only_where_one_would_work() {
+        let undeclared = |field: &str| AddressFault::UndeclaredField {
+            field: field.into(),
+        };
+        let unknown = |written: &str, nearest: Option<&str>| AddressFault::UnknownPiece {
+            written: written.into(),
+            nearest: nearest.map(str::to_owned),
+        };
+        let cases: [(&str, &[&str], AddressFault); 11] = [
+            ("{isbn}", &[], undeclared("isbn")),
+            ("{book.author}", &[], undeclared("book.author")),
+            ("{book.title}", &["book.author"], undeclared("book.title")),
+            ("{my_field-2}", &[], undeclared("my_field-2")),
+            ("{yaer}", &[], unknown("{yaer}", Some("{year}"))),
+            ("{title}", &[], unknown("{title}", Some("{slug}"))),
+            ("{tags}", &[], unknown("{tags}", None)),
+            ("{date}", &[], unknown("{date}", None)),
+            ("{a b}", &[], unknown("{a b}", None)),
+            ("{book}", &["book.author"], unknown("{book}", None)),
+            ("{book.author}", &["book"], unknown("{book.author}", None)),
+        ];
+        for (piece, declared, fault) in cases {
+            let pattern = format!("/p/{piece}/");
+            assert_eq!(
+                pattern_faults(&pattern, true, declared)[0].0,
+                Kind::UnusableUrl { fault },
+                "{piece}"
+            );
+        }
     }
 
     #[test]

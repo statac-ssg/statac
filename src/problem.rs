@@ -2758,6 +2758,10 @@ pub enum AddressFault {
         written: String,
         nearest: Option<String>,
     },
+    /// A `{field}` no pattern fills, which a `fields.` line would declare.
+    UndeclaredField {
+        field: String,
+    },
     /// A `{` nothing closes.
     Unclosed,
     /// A `}` nothing opened.
