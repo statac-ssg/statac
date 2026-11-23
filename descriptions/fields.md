@@ -18,7 +18,7 @@ More: https://statac.dev/writing/#page
 Statac then names it by its date. A folder of such pages usually
 cascades it with `pages.untitled: true`.
 
-More: https://statac.dev/lists/#pages-without-titles
+More: https://statac.dev/front-matter/#untitled
 
 ## `summary`
 
@@ -51,7 +51,7 @@ More: https://statac.dev/dates/#writing-a-date
 `true` leaves the page out of the build. `statac serve` still shows it,
 marked as a draft.
 
-More: https://statac.dev/lists/#drafts-and-posts-waiting-for-their-day
+More: https://statac.dev/front-matter/#drafts
 
 ## `layout`
 
@@ -92,7 +92,7 @@ More: https://statac.dev/urls/#sending-readers-on
 `needs: url` leaves the page out until the site has a `url`. A
 `sitemap.xml` needs it, since its URLs must be full.
 
-More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
+More: https://statac.dev/sitemaps/
 
 ## `translation_key`
 

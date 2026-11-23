@@ -58,7 +58,7 @@ paginated pages, the 404 page, and pages of the site's own that aren't
 HTML, such as a `sitemap.xml` or a `robots.txt`, but not redirects or
 feeds.
 
-More: https://statac.dev/feeds/#sitemap
+More: https://statac.dev/sitemaps/#sitemap
 
 ## `tags`
 

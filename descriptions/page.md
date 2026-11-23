@@ -295,13 +295,13 @@ More: https://statac.dev/videos/#youtube
 
 `true` if the page's `untitled` says it is meant to have no title.
 
-More: https://statac.dev/lists/#pages-without-titles
+More: https://statac.dev/front-matter/#untitled
 
 ## `draft`
 
 `true` if the page is a draft. Only `statac serve` builds drafts.
 
-More: https://statac.dev/lists/#drafts-and-posts-waiting-for-their-day
+More: https://statac.dev/front-matter/#drafts
 
 ## `layout`
 
@@ -341,7 +341,7 @@ More: https://statac.dev/urls/#sending-readers-on
 
 `url` if the page's front matter has `needs: url`.
 
-More: https://statac.dev/feeds/#sitemaps-robotstxt-and-other-files
+More: https://statac.dev/sitemaps/
 
 ## `translation_key`
 
