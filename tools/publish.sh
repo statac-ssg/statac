@@ -15,7 +15,8 @@
 # latest-<major>.<minor>/SHA256SUMS names it as the newest of its series
 # and, unless a later release is out, latest/SHA256SUMS as the newest of
 # all, and the install script as tagged goes to the top, as index.html,
-# with the one for Windows beside it as install.ps1.
+# with the one for Windows beside it as install.ps1. It then purges the pull
+# zone's cache and checks that the edge serves each file that changed.
 #
 # --dry-run makes every check and says each upload it would make, uploading
 # nothing, so a practice release can reach this step. It accepts a version
@@ -23,6 +24,7 @@
 set -eu
 
 zone=statac-get
+pull_zone=6861809
 served=https://statac-get.b-cdn.net
 
 stop() {
@@ -155,6 +157,7 @@ if $dry; then
     echo "would publish install.sh from $source at the top"
     git -C "$root" show "$source:tools/install.ps1" >"$folder/install.ps1"
     echo "would publish install.ps1 from $source at the top"
+    echo "would purge the pull zone's cache"
     echo "Checked $version, built from $commit: nothing was uploaded."
     exit 0
 fi
@@ -191,21 +194,33 @@ bunny storage files upload "$folder/install.ps1" -z "$zone" --to install.ps1 \
     stop "Couldn't upload install.ps1." "v$version/ is published, latest/ names it and install.sh is at the top."
 echo "published install.ps1"
 
+# The whole zone, since / can't be purged alone: a URL ending in / purges by
+# prefix unless exactPath is set, which a zone ignoring query strings doesn't
+# honour. The body is explicit because `bunny api` otherwise reads stdin.
+bunny api POST "/pullzone/$pull_zone/purgeCache" --body '{}' </dev/null >/dev/null ||
+    stop "Couldn't purge the pull zone's cache." \
+        "Every file is uploaded, but the edge may serve old ones until this works: bunny api POST /pullzone/$pull_zone/purgeCache --body '{}'"
+echo "purged the pull zone's cache"
+
+# Bunny gives no time for a purge to reach every edge.
+edge_serves() {
+    tries=0
+    until curl -fsS "$served$1" | cmp -s - "$2"; do
+        tries=$((tries + 1))
+        [ "$tries" -lt 15 ] || stop "$3"
+        sleep 5
+    done
+}
 curl -fsS "$served/v$version/SHA256SUMS" | cmp -s - SHA256SUMS ||
     stop "What $served serves for v$version/SHA256SUMS isn't what was published."
-# The edge keeps / and /install.ps1 for 60 seconds.
-tries=0
-until curl -fsS "$served/" | cmp -s - "$folder/install.sh"; do
-    tries=$((tries + 1))
-    [ "$tries" -lt 15 ] ||
-        stop "What $served serves at / isn't the install script as tagged."
-    sleep 5
-done
-tries=0
-until curl -fsS "$served/install.ps1" | cmp -s - "$folder/install.ps1"; do
-    tries=$((tries + 1))
-    [ "$tries" -lt 15 ] ||
-        stop "What $served serves at /install.ps1 isn't the install script for Windows as tagged."
-    sleep 5
-done
+edge_serves "/latest-$series/SHA256SUMS" SHA256SUMS \
+    "What $served serves at /latest-$series/SHA256SUMS isn't $version's SHA256SUMS."
+if $moves; then
+    edge_serves /latest/SHA256SUMS SHA256SUMS \
+        "What $served serves at /latest/SHA256SUMS isn't $version's SHA256SUMS."
+fi
+edge_serves / "$folder/install.sh" \
+    "What $served serves at / isn't the install script as tagged."
+edge_serves /install.ps1 "$folder/install.ps1" \
+    "What $served serves at /install.ps1 isn't the install script for Windows as tagged."
 echo "Published $version, built from $commit."
