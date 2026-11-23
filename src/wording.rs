@@ -1578,7 +1578,7 @@ fn format_suggestion(fault: &FormatFault) -> Option<String> {
                 let names: Vec<String> = (Look::ALL.iter())
                     .map(|look| look.name().to_owned())
                     .collect();
-                format!(", or name a look: {}", quoted_either(&names))
+                format!(", or use a named format: {}", quoted_either(&names))
             }
             false => String::new(),
         };
@@ -1663,9 +1663,9 @@ fn takes_fault(fault: &TakesFault) -> String {
     match fault {
         TakesFault::Unclosed => "the `takes` line has no `#}`".into(),
         TakesFault::NamesNothing => "the `takes` line names nothing".into(),
-        TakesFault::Missing => "a name is missing from the `takes` line".into(),
-        TakesFault::NotAlone(name) => format!("`{name}` must be the only name on its line"),
-        TakesFault::NotAName(piece) => format!("`{piece}` isn't a name a snippet can read"),
+        TakesFault::Missing => "a variable is missing from the `takes` line".into(),
+        TakesFault::NotAlone(name) => format!("`{name}` must be the only variable on its line"),
+        TakesFault::NotAName(piece) => format!("`{piece}` isn't a variable a snippet can read"),
         TakesFault::Twice(name) => format!("`{name}` is named twice"),
         TakesFault::TooMany => "the `takes` line names more than 2".into(),
         TakesFault::NeverRead(name) => format!("the snippet never reads `{name}`"),
@@ -2103,6 +2103,7 @@ fn word_name(word: Word) -> &'static str {
         Word::AddressPiece => "placeholder",
         Word::File => "file",
         Word::TimeZone => "time zone",
+        Word::Variable => "variable",
         Word::Name => "name",
         Word::Filter => "filter",
         Word::Test => "test",
@@ -4509,7 +4510,7 @@ pub(crate) fn hover_holds(written: &str, holds: Holds) -> Option<String> {
 
 /// What an editor's hover says a name is where what it holds isn't known.
 pub(crate) fn hover_name(written: &str) -> String {
-    format!("`{written}`, a name")
+    format!("`{written}`, a variable")
 }
 
 /// What an editor's hover says a function is, as `css` or `page.image`.
@@ -5147,7 +5148,7 @@ pub(crate) fn panel_list(word: Word, name: &str) -> String {
 pub(crate) const PANEL_READ_PAGES: &str = "Which pages there are";
 pub(crate) const PANEL_READ_LISTS: &str = "Which lists there are";
 pub(crate) const PANEL_READ_ORDER: &str = "The order of the pages in their lists";
-pub(crate) const PANEL_READ_TRANSLATIONS: &str = "Which pages are translations of which";
+pub(crate) const PANEL_READ_TRANSLATIONS: &str = "Which translated pages each page has";
 pub(crate) const PANEL_READ_BACKLINKS: &str = "Which pages link to which";
 pub(crate) const PANEL_READ_FILES: &str = "Which images and other files the site has";
 pub(crate) const PANEL_READ_MENTIONS: &str = "The webmentions in `fetched/mentions/`";
@@ -5278,7 +5279,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("copyPlaceLabel", said("Copy {place}")),
         ("holdsHere", said("On this page it holds {value}.")),
         ("holdsNothing", said("On this page it holds no value.")),
-        ("showInNames", said("Show in Names")),
+        ("showInNames", said("Show in Variables")),
         ("explain", said("What it means, and how to fix it")),
         ("allProblems", said("All problems")),
         ("builtThis", said("While building this page")),
@@ -5292,7 +5293,7 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("quietened", said("Quietened in `statac.yaml`")),
         // The drawer, and its tabs.
         ("problems", said("Problems")),
-        ("names", said("Names")),
+        ("names", said("Variables")),
         ("page", said(PANEL_PAGE)),
         ("site", said(PANEL_SITE)),
         ("parts", said("What the debug panel shows")),
@@ -5301,8 +5302,8 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
             said("Stopped at {time}; the page is from the build at {built}"),
         ),
         ("statusStoppedFirst", said("Stopped at {time}")),
-        ("find", said("Find a name")),
-        ("findHow", said("Find a name or a value")),
+        ("find", said("Find a variable")),
+        ("findHow", said("Find a variable or a value")),
         ("settings", said("Settings")),
         ("dockSide", said("Dock to the side")),
         ("dockBottom", said("Dock to the bottom")),
@@ -5330,11 +5331,11 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         ("fromExplain", said("From `statac explain {kind}`")),
         ("howToFix", said("How to fix it")),
         ("readOnline", said("Read it on statac.dev")),
-        // Names.
+        // Variables.
         ("held", said("{held} of {count} hold a value")),
         ("found", said("{n} found")),
-        ("hideEmpty", said("Hide names with no value here")),
-        ("onlyUsed", said("Only names this page uses")),
+        ("hideEmpty", said("Hide variables with no value here")),
+        ("onlyUsed", said("Only variables this page uses")),
         ("layoutFrom", said("Layout `{name}`, from `{file}`")),
         ("columnWrite", said(PANEL_COLUMNS[0])),
         ("columnHolds", said(PANEL_COLUMNS[1])),
@@ -5344,13 +5345,13 @@ pub(crate) fn panel_words() -> Vec<(&'static str, PanelWord)> {
         (
             "noMatch",
             said(
-                "No name here matches \u{201c}{query}\u{201d}. Write a name the way a \
+                "No variable here matches \u{201c}{query}\u{201d}. Write a variable the way a \
                  template does, such as `page.title`.",
             ),
         ),
-        ("noneLeft", said("The filters leave no name here.")),
+        ("noneLeft", said("The filters leave no variable here.")),
         ("noPage", said("No page is published at this URL.")),
-        ("chosen", said("The chosen name")),
+        ("chosen", said("The chosen variable")),
         ("copy", said("Copy")),
         ("copied", said("Copied")),
         ("here", said("Here")),
@@ -9412,8 +9413,10 @@ mod tests {
                 None,
             ),
             (
-                Kind::LoopInForIf { word: Word::Name },
-                "Unknown name: `loop`",
+                Kind::LoopInForIf {
+                    word: Word::Variable,
+                },
+                "Unknown variable: `loop`",
                 Some("`loop` has a value only inside the loop: test it with an `{% if %}` there."),
             ),
             (
@@ -9425,11 +9428,11 @@ mod tests {
             ),
             (
                 Kind::UnknownWord {
-                    word: Word::Name,
+                    word: Word::Variable,
                     written: "loop".into(),
                     nearest: None,
                 },
-                "Unknown name: `loop`",
+                "Unknown variable: `loop`",
                 None,
             ),
             (
@@ -9950,7 +9953,7 @@ mod tests {
                 "Unusable date format: nothing in `lnog` is in `Wednesday 31 December 2025, 3.04pm`",
                 Some(
                     "Write `Wednesday 31 December 2025, 3.04pm` the way dates should look, such as \
-                     `31/12/2025` or `31 December 2025`, or name a look: `long`, `short`, `day` \
+                     `31/12/2025` or `31 December 2025`, or use a named format: `long`, `short`, `day` \
                      or `stamp`.",
                 ),
             ),

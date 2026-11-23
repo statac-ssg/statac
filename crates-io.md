@@ -18,7 +18,7 @@ install beside it.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://git.statac.dev/statac/statac/raw/branch/main/.github/readme/debug-panel-dark.png">
-    <img src="https://git.statac.dev/statac/statac/raw/branch/main/.github/readme/debug-panel-light.png" alt="Statac's debug panel open at its Names tab over a page being served. A list shows each name a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
+    <img src="https://git.statac.dev/statac/statac/raw/branch/main/.github/readme/debug-panel-light.png" alt="Statac's debug panel open at its Variables tab over a page being served. A list shows each variable a template can write, such as {{ page.title }}, {{ page.date }} and {{ page.language }}, with what it holds on this page. Beside it, {{ page.title }} is described, with its value on this page, Ben Ledi, and the file and line it was written at, content/walks/2026-09-13-ben-ledi.md, line 2." width="860">
   </picture>
 </p>
 

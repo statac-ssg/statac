@@ -19,7 +19,7 @@ More: https://statac.dev/feeds/#the-template
 
 Writes a date the way an example date shows it, the same way
 `date_format` does: `date("31 December 2025")`. It also takes one of the
-language's looks: `long`, `short`, `day` or `stamp`. With nothing in the
+language's named formats: `long`, `short`, `day` or `stamp`. With nothing in the
 brackets, it writes the date in the site's date format.
 
 More: https://statac.dev/dates/#how-dates-look
@@ -42,7 +42,7 @@ More: https://statac.dev/writing/#markdown
 ## `highlight`
 
 Marks text as code, ready to go inside a `<code>` element, with a class
-on each piece for what kind of piece it is. It takes the language the
+on each token for its kind. It takes the language the
 way a code block names it: `highlight("rust")`. If `code_colours` isn't
 `true`, and in a feed, it adds no classes.
 

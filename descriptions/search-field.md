@@ -2,7 +2,7 @@
 
 Summary: The name and value of each hidden field in the search form that works without JavaScript.
 
-The names (variables) a template reads on each hidden field in
+The variables a template reads on each hidden field in
 `site.search_without_javascript.fields`.
 
 ## `name`

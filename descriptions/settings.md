@@ -62,9 +62,9 @@ More: https://statac.dev/writing/#punctuation
 
 ## `code_colours`
 
-`true` marks each piece of code in the content with a class for what
-kind of piece it is, such as `hl-keyword`, for the site's own stylesheet
-to colour. The default is `false`, and Statac writes code exactly as
+`true` turns on syntax highlighting: Statac marks each token of code in
+the content with a class for its kind, such as `hl-keyword`, for the
+site's own stylesheet to colour. The default is `false`, and Statac writes code exactly as
 typed.
 
 More: https://statac.dev/code-colours/

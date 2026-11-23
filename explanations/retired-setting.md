@@ -29,7 +29,7 @@ typed, with its language in its class, such as `language-rust`, which is what
 `none` asked for.
 
 With a theme, write `code_colours: true` in its place. Statac then marks
-each piece of code with a class for its kind, such as `hl-keyword`, as
+each token of code with a class for its kind, such as `hl-keyword`, as
 before. The colours are the site's own now: copy the theme's rules from
 [Code colours](https://statac.dev/code-colours/) into the site's
 stylesheet. A template that asked for `code.css` with

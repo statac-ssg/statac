@@ -1,7 +1,7 @@
 # Unmatched translation key
 
 A page has a `translation_key` that no published page in another
-language has, so it isn't linked to any translation.
+language has, so it isn't linked to any translated page.
 
 ## What you'll see {#what-youll-see}
 
@@ -17,9 +17,9 @@ warning  Unmatched translation key: no page in another language has `abuot`
 ## Why Statac warns
 
 Statac builds the page with the key you wrote. A key is there to link a
-page to its translations, so a key that links nothing usually means one
+page to its translated pages, so a key that links nothing usually means one
 of two things. Either it is spelled differently on the page and on its
-translation, or the translation hasn't been written yet. Statac counts a
+translated page, or the translated page hasn't been written yet. Statac counts a
 draft or a scheduled post as having its key, and links the page to it
 once it is published.
 
@@ -28,9 +28,9 @@ links anything.
 
 ## How to fix it
 
-Write the same key on the page's translation in each other language.
+Write the same key on the translated page in each other language.
 If the message suggests a key from another language, check whether the
-two keys were meant to be the same. If the page has no translation,
+two keys were meant to be the same. If the page has no translated pages,
 remove the key.
 
 ## Example
@@ -41,7 +41,7 @@ remove the key.
 translation_key: about
 ```
 
-and its English translation, `content/en/about-us.md`, has:
+and its translated page in English, `content/en/about-us.md`, has:
 
 ```yaml
 translation_key: abuot

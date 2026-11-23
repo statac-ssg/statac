@@ -2,7 +2,7 @@
 
 Summary: Every value a template can read on a YouTube or Vimeo video, such as its thumbnail.
 
-The names (variables) a template reads on the video that `page.youtube`
+The variables a template reads on the video that `page.youtube`
 or `page.vimeo` returns.
 
 ## `id`

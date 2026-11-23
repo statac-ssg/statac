@@ -19,8 +19,8 @@ error  Missing file: there is no `assets/sit.css`
 
 ## Why Statac stops
 
-Statac publishes each file in `assets/` under a new name made from its
-contents, and those functions write that name into the page. With no file,
+Statac publishes each file in `assets/` with a hash of its contents in
+its name, and those functions write that name into the page. With no file,
 there is no name to write, and the page would link to nothing. A card
 can't be drawn without its background or font.
 

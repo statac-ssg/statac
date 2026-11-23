@@ -45,8 +45,8 @@ a site built by a Statac that kept no `published.txt` learns what an
 upgrade no longer publishes. Each URL gone is told with "Published by an
 earlier build, in `_site`", and the first build writes every URL from
 `_site` into `published.txt`, paginated pages and tag pages among them,
-so later warnings are at their lines. Statac leaves out the files it
-names by their contents, and the script that reads a search index.
+so later warnings are at their lines. Statac leaves out the files whose
+names include a hash of their contents, and the script that reads a search index.
 
 ## How to fix it
 

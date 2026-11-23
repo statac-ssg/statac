@@ -671,7 +671,7 @@ fn a_hover_says_what_the_word_is_in_markdown_where_the_editor_reads_it() {
             .expect("the hover");
         assert_eq!(answer.text(&["result", "contents", "kind"]), Some(kind));
         let value = answer.text(&["result", "contents", "value"]).unwrap();
-        let first = "`code_colours`, a setting\n\n`true` marks each piece of code";
+        let first = "`code_colours`, a setting\n\n`true` turns on syntax highlighting";
         assert!(value.starts_with(first), "{value}");
         assert!(value.ends_with(&format!(".\n\n{more}")), "{value}");
         let range = ["result", "range"];

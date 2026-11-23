@@ -2,7 +2,7 @@
 
 Summary: Every value a template can read on a file, a video or a recording kept beside a page.
 
-The names (variables) a template reads on the file that `page.file`
+The variables a template reads on the file that `page.file`
 returns, and on the video or recording that `page.video` or `page.audio`
 returns. `{{ page.file("notes-1.pdf") }}` on its own writes the file's
 `url`.
@@ -35,7 +35,7 @@ More: https://statac.dev/videos/#files-videos-and-recordings
 ## `code`
 
 The file's contents, ready to go inside a `<code>` element. Statac marks
-each piece of the code with a class for what kind of piece it is, in the
+each token with a class for its kind, in the
 file's language, which Statac works out from the file's name. If
 `code_colours` isn't `true`, it is the file's text with no classes.
 Empty for a file over 200,000 bytes or one that isn't UTF-8 text.

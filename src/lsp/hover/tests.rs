@@ -69,9 +69,9 @@ fn a_setting_says_what_it_does() {
         lines,
         [
             "`code_colours`, a setting",
-            "`true` marks each piece of code in the content with a class for what kind of \
-             piece it is, such as `hl-keyword`, for the site's own stylesheet to colour. The \
-             default is `false`, and Statac writes code exactly as typed.",
+            "`true` turns on syntax highlighting: Statac marks each token of code in the content \
+             with a class for its kind, such as `hl-keyword`, for the site's own stylesheet to \
+             colour. The default is `false`, and Statac writes code exactly as typed.",
         ]
     );
     assert_eq!(more.unwrap(), "https://statac.dev/code-colours/");
@@ -470,7 +470,7 @@ fn a_name_or_field_in_a_template_says_what_it_holds_and_what_it_is() {
         ),
         (
             "{{ site.da|ta }}",
-            "`site.data`, a name",
+            "`site.data`, a variable",
             "data",
             Some((Group::Site, "data")),
         ),

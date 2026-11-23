@@ -1,6 +1,6 @@
 # Data named twice
 
-Two things in `data/` would have the same name in templates. They are
+Two things in `data/` would be the same variable in templates. They are
 either two files with the same name and different endings, such as
 `people.yaml` and `people.json`, or a file and a folder, such as
 `people.yaml` and `people/`.
@@ -16,7 +16,7 @@ error  Data named twice: `data/people.json` and `data/people.yaml` are both `sit
 ## Why Statac stops
 
 Templates read `data/people.yaml` as `site.data.people`, and read a
-folder `data/people/` under the same name. If two things share a name, Statac
+folder `data/people/` as the same variable. If two things share a variable, Statac
 can't tell which one you meant, and using either would quietly hide the
 other.
 

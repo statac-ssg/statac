@@ -2,7 +2,7 @@
 
 Summary: Every value a template can read on a page's webmentions, and on each comment or reaction.
 
-The names (variables) a template reads on `page.webmentions`, and on
+The variables a template reads on `page.webmentions`, and on
 each mention in it. Every value is plain text, never HTML.
 
 ## `comments`

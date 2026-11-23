@@ -2,7 +2,7 @@
 
 Summary: Every value a template can read on an image, such as its resized copies, size and alt text.
 
-The names (variables) a template reads on the image that `page.image`
+The variables a template reads on the image that `page.image`
 returns, and on each image from `page.images`, a video's `thumbnail`, a
 mention's `avatar`, and `image` in `image.html`. `{{ image }}` on its
 own writes the image's `src`. A template reads a custom field in the
@@ -47,14 +47,14 @@ More: https://statac.dev/images/#pictures-in-templates-and-snippets
 
 ## `width`
 
-The image's width in pixels, after Statac turns it the right way up.
+The image's width in pixels, after Statac applies its EXIF orientation.
 Empty if Statac doesn't know its size.
 
 More: https://statac.dev/images/#pictures-in-templates-and-snippets
 
 ## `height`
 
-The image's height in pixels, after Statac turns it the right way up.
+The image's height in pixels, after Statac applies its EXIF orientation.
 Empty if Statac doesn't know its size.
 
 More: https://statac.dev/images/#pictures-in-templates-and-snippets

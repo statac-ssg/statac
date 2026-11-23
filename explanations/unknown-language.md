@@ -20,7 +20,7 @@ warning  Unknown language: Statac has no translations for `sw`
 
 Statac is sure which language you mean, so the build continues. Without
 translations, Statac writes dates in figures, such as `2025-12-31`,
-whichever look a template names, and leaves quotation marks as they were
+whichever date format a template names, and leaves quotation marks as they were
 typed. A `date_format` that writes a month or a weekday in words stops
 the build, since there are no names to write it with. Text direction
 needs no translations: Statac still writes a page in Hebrew or Urdu

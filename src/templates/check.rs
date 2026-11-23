@@ -887,7 +887,7 @@ impl<'a> Checker<'a> {
             .find(|&&(former, ours)| former == name && self.extra.iter().any(|(n, _)| *n == ours))
         {
             let kind = Kind::OtherSpelling {
-                word: Word::Name,
+                word: Word::Variable,
                 written: name.to_owned(),
                 ours: ours.to_owned(),
             };
@@ -896,7 +896,7 @@ impl<'a> Checker<'a> {
         }
         let visible = self.visible();
         let nearest = nearest(name, visible.iter().map(String::as_str)).map(str::to_owned);
-        let kind = self.unknown_word(Word::Name, name, nearest);
+        let kind = self.unknown_word(Word::Variable, name, nearest);
         self.tell(kind, span);
     }
 

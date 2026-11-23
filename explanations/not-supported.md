@@ -10,7 +10,7 @@ in `snippets/`. A template places a snippet by calling it by its file name:
 For `import` and `from`, it suggests the call to write in place of each
 later use of what the line brought in.
 
-Some of Statac's own names, such as `lines` in a snippet called from the
+Some of Statac's own variables, such as `lines` in a snippet called from the
 content, aren't available in this version yet. The message says which
 one you used.
 
@@ -28,7 +28,7 @@ error  Not supported: `include`
 ## Why Statac stops
 
 With only one way to place a snippet, every template reads the same way,
-and a snippet call always shows what the snippet was handed. A name that
+and a snippet call always shows what the snippet was handed. A variable that
 isn't available yet would otherwise publish nothing in its place.
 
 ## How to fix it
@@ -36,7 +36,7 @@ isn't available yet would otherwise publish nothing in its place.
 Replace an `include` line with a call to the snippet. For `import` and
 `from`, take the line out, and replace each later use with a call to the
 snippet.
-If you used a name that isn't available yet, remove it from the template
+If you used a variable that isn't available yet, remove it from the template
 for now.
 
 ## Example

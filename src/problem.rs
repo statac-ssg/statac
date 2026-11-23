@@ -2464,7 +2464,9 @@ pub enum Word {
     AddressPiece,
     File,
     TimeZone,
-    /// A name a template reads, such as `posts`.
+    /// A variable a template reads, such as `posts`.
+    Variable,
+    /// A name a filter takes for a form it writes, such as `rss`.
     Name,
     Filter,
     Test,

@@ -4,10 +4,10 @@ Statac found a word it doesn't know in a place where it knows every word
 that can be written. That place is one of these: a setting under `tags.`
 or `series.`, a kind in a field declaration, a line in a language file,
 a time zone, a table in `data/` that `each:` refers to, a place on a card,
-a stamp in front matter such as `=tomorrow`, or a name in a template.
+a stamp in front matter such as `=tomorrow`, or a variable in a template.
 
-In a template, Statac knows every name that can be used: `page` and
-`site`, the fields of pages and settings, the names the template sets
+In a template, Statac knows everything that can be used: `page` and
+`site`, the fields of pages and settings, the variables the template sets
 itself, the filters and tests, the snippets in `snippets/`, and the site's
 tags and folders.
 
@@ -41,7 +41,7 @@ of the documentation.
 after it, write two digits for the hour, a colon, and two digits for the
 minute, such as `=monday 09:00`.
 
-**A name in a template.** Check the spelling against the field in the
+**A variable in a template.** Check the spelling against the field in the
 front matter, the setting in `statac.yaml`, or the file in `snippets/`.
 `loop` is set only inside a loop, between `{% for %}` and `{% endfor %}`.
 Statac reads a loop's own `if`, such as `{% for x in xs if loop.first %}`,

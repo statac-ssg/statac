@@ -30,7 +30,7 @@ Look at the place the caret points to. Common causes:
 - A block opened and never closed, such as `{% if %}` with no
   `{% endif %}`, or closed twice.
 - A snippet's first line, `{# takes photo, alt #}`, listing something the
-  snippet never uses, or listing more than two names. This line lists, in
+  snippet never uses, or listing more than two variables. This line lists, in
   order, the values a call may pass without a name. A call passes any
   others by name.
 

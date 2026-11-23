@@ -97,8 +97,8 @@ More: https://statac.dev/sitemaps/
 
 ## `translation_key`
 
-Links the page to its translations if their names differ. Pages with the
-same key are translations of each other.
+Links the page to its translated pages if their names differ. Pages with
+the same key are the same page in different languages.
 
 More: https://statac.dev/languages/#translations
 

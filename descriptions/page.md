@@ -2,8 +2,8 @@
 
 Summary: Every value a template can read on a page, from its title and URL to its images and webmentions.
 
-The names (variables) a template reads on a page: after `page.`, or
-after any other name that stands for a page, such as `post.title` or
+The variables a template reads on a page: after `page.`, or
+after any other variable that holds a page, such as `post.title` or
 `page.next.url`. A template reads a custom field the same way, such as
 `page.isbn`.
 

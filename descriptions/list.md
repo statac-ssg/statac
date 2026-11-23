@@ -2,7 +2,7 @@
 
 Summary: Every value a template can read on a folder, a tag, a series, a year or another list, such as its posts and feed.
 
-The names (variables) a template reads on a list: a folder, a tag, a
+The variables a template reads on a list: a folder, a tag, a
 series, a year, or a list a page makes with `posts:` or `each:`. A template
 reaches lists through `page.list`, `page.folder`, `page.tags`,
 `site.tags` and the like, and through `list` in a feed's template.

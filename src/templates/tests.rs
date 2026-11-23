@@ -1501,7 +1501,7 @@ fn a_name_nothing_has_is_told_when_the_template_is_read() {
         [
             (Word::Field, "page.titel".into(), Some("page.title".into())),
             (Word::Filter, "uper".into(), Some("upper".into())),
-            (Word::Name, "posts".into(), None),
+            (Word::Variable, "posts".into(), None),
             (Word::Snippet, "crad".into(), Some("card".into())),
         ]
     );
@@ -1511,7 +1511,7 @@ fn a_name_nothing_has_is_told_when_the_template_is_read() {
 /// reading it there is told when the template is read, at the `loop`.
 #[test]
 fn loop_in_a_fors_own_if_is_told_when_the_template_is_read() {
-    let name = "Unknown name: `loop`";
+    let name = "Unknown variable: `loop`";
     let in_if = Some("`loop` has a value only inside the loop: test it with an `{% if %}` there.");
     for (template, told) in [
         (

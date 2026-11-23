@@ -5,8 +5,8 @@ template's `date()` filter. `date_format` sets how the site's pages write
 dates, by example. You write one moment, Wednesday 31 December 2025 at
 15:04, the way you want every date written, and Statac writes each date
 the same way. A template can do the same for a single date, such as
-`{{ page.date | date("December 2025") }}`, or name one of the looks a
-date takes in the page's language, `long`, `short`, `day` or `stamp`,
+`{{ page.date | date("December 2025") }}`, or use one of the named
+formats in the page's language, `long`, `short`, `day` or `stamp`,
 such as `{{ page.date | date("short") }}`.
 
 Each piece of that moment is a different number or word, so Statac can
@@ -40,7 +40,7 @@ on every page.
 
 Write the moment Statac expects: 31 December 2025, with 15:04 or 3.04pm
 if you want the time. Write the month in the site's language, or as a
-number. In a template, you can name a look instead.
+number. In a template, you can use a named format instead.
 
 Statac refuses a month or weekday written in English, such as `December`
 on a site in Spanish, because it would otherwise copy the English word

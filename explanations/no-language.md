@@ -17,7 +17,7 @@ Each page states its language with `lang` on its `<html>` element, and a
 screen reader uses that to choose the voice it reads the page aloud in.
 With no `language`, templates get `en` for it, so a site written in
 another language is read aloud in an English voice. A browser also uses
-the same value to decide whether to offer a translation, and how to break
+the same value to decide whether to offer to translate the page, and how to break
 words at the ends of lines.
 
 The language also decides the translations Statac writes: the names of

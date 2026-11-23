@@ -17,8 +17,8 @@ warning  Worker outside the import map: `./worker.js` isn't published under that
 
 ## Why Statac warns
 
-Statac publishes each file in `assets/` under a new name made from its
-contents. If `js()` places a module on a page, or one of the page's scripts imports
+Statac publishes each file in `assets/` with a hash of its contents in
+its name. If `js()` places a module on a page, or one of the page's scripts imports
 a module as it runs, Statac adds an import map to the page. The map lets
 modules still import each other by their own names. Browsers read that
 map only on the page, never inside a worker. So the file name the script
