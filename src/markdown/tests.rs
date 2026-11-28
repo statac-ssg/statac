@@ -240,7 +240,7 @@ fn calls_in_raw_html_keep_out_of_code_and_comments() {
                 "@asset('in-an-attribute.png')".to_owned()
             ),
             (Within::Prose, "@image('after-code.jpg')".to_owned()),
-            (Within::Prose, "@image('in-a-span.jpg')".to_owned()),
+            (Within::Html, "@image('in-a-span.jpg')".to_owned()),
         ]
     );
     let html = html_of(&text);
@@ -767,7 +767,7 @@ fn calls_are_found_only_where_they_are_calls() {
         &'static [(&'static str, Within)],
         &'static str,
     );
-    let cases: [Case; 27] = [
+    let cases: [Case; 32] = [
         (
             "A @x(1) b.\n",
             &[("@x(1)", Within::Prose)],
@@ -854,8 +854,37 @@ fn calls_are_found_only_where_they_are_calls() {
         ),
         (
             "A <span>@x(1)</span>.\n",
+            &[("@x(1)", Within::Html)],
+            "<p>A <span><call x=html></span>.</p>",
+        ),
+        (
+            "A <SPAN><b>@x(1)</b> @y(2)</SPAN> @z(3).\n",
+            &[
+                ("@x(1)", Within::Html),
+                ("@y(2)", Within::Html),
+                ("@z(3)", Within::Prose),
+            ],
+            "<p>A <SPAN><b><call x=html></b> <call y=html></SPAN> <call z=prose>.</p>",
+        ),
+        (
+            "A <br> <img src=\"a.png\" alt=\"\"> <span/> @x(1).\n",
             &[("@x(1)", Within::Prose)],
-            "<p>A <span><call x=prose></span>.</p>",
+            "<call x=prose>.</p>",
+        ),
+        (
+            "A <span>left open @x(1).\n\nB @y(2).\n",
+            &[("@x(1)", Within::Html), ("@y(2)", Within::Prose)],
+            "<p>B <call y=prose>.</p>",
+        ),
+        (
+            "<div>\n\nA @x(1).\n\n</div>\n",
+            &[("@x(1)", Within::Prose)],
+            "<p>A <call x=prose>.</p>",
+        ),
+        (
+            "A <span>\\@x(1) <!-- @y(2) --></span>.\n",
+            &[],
+            "<p>A <span>@x(1) </span>.</p>",
         ),
         (
             "A <code>@x(1)</code>.\n",

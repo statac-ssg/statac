@@ -17,7 +17,7 @@ use super::node::{Alignment, CalloutKind, Kind, Node};
 use super::typography::SETS;
 use super::unmatched::{Block, Elements, Told};
 use super::{Definition, Document, InSite, controls};
-use crate::html::{RAW_TEXT, comment_close, end_tag, escape};
+use crate::html::{RAW_TEXT, VOID, comment_close, end_tag, escape};
 use crate::problem::DEEPEST_NESTING;
 use crate::problem::{Kind as ProblemKind, Problem};
 use crate::source::{Place, SourceId, Span};
@@ -1038,7 +1038,7 @@ impl<'a> Builder<'a> {
                     if becomes_a_node && piece.first =>
                 {
                     self.flush(&mut pending, from, at, words);
-                    let node = self.token_node(piece, Within::Prose);
+                    let node = self.token_node(piece, self.html.within());
                     self.push(node);
                     if !piece.last {
                         self.open = Some(piece.token);
@@ -1371,18 +1371,20 @@ fn put_back(
 }
 
 /// Raw HTML read in the order written, enough to know where a call sits:
-/// inside a tag, inside an element whose contents are shown as typed, or
-/// in a comment.
+/// inside a tag, inside an element, inside an element whose contents are
+/// shown as typed, or in a comment.
 #[derive(Default)]
 struct Html {
     /// Open elements whose contents are shown as typed.
     excluded: Vec<&'static str>,
+    /// Every open element, by its name in small letters, innermost last.
+    open: Vec<String>,
     in_comment: bool,
     /// The element whose text, up to its end tag, holds no markup.
     in_text: Option<&'static str>,
-    /// The tag being read, by its name where that matters, and whether it
+    /// The tag being read, by its name in small letters, and whether it
     /// closes an element.
-    in_tag: Option<(Option<&'static str>, bool)>,
+    in_tag: Option<(String, bool)>,
     quote: Option<char>,
     /// Whether the last character read is `/`: a tag may end in a later
     /// piece than its `/`.
@@ -1403,6 +1405,15 @@ fn holds_text(name: &str) -> bool {
 impl Html {
     fn literal(&self) -> bool {
         self.in_comment || !self.excluded.is_empty()
+    }
+
+    /// What surrounds the writing Markdown reads next, between the tags:
+    /// HTML while an element the raw HTML opened is open.
+    fn within(&self) -> Within {
+        match self.open.is_empty() {
+            true => Within::Prose,
+            false => Within::Html,
+        }
     }
 
     /// Reads on through `html`, giving where each placeholder sits, what
@@ -1454,18 +1465,25 @@ impl Html {
                     Within::Html
                 };
                 found.push((i, within, self.literal()));
-            } else if let Some((name, closing)) = self.in_tag {
+            } else if let Some((_, closing)) = self.in_tag {
                 match (self.quote, c) {
                     (Some(q), c) if c == q => self.quote = None,
                     (Some(_), _) => {}
                     (None, '"' | '\'') => self.quote = Some(c),
                     (None, '>') => {
-                        if let Some(name) = name {
-                            if closing {
-                                if let Some(p) = self.excluded.iter().rposition(|n| *n == name) {
-                                    self.excluded.truncate(p);
-                                }
-                            } else {
+                        let (name, _) = self.in_tag.take().expect("a tag");
+                        if closing {
+                            if let Some(p) = self.excluded.iter().rposition(|n| *n == name) {
+                                self.excluded.truncate(p);
+                            }
+                            if let Some(p) = self.open.iter().rposition(|n| *n == name) {
+                                self.open.truncate(p);
+                            }
+                        } else {
+                            let known = (EXCLUDED.iter().chain(RAW_TEXT).chain(&["plaintext"]))
+                                .copied()
+                                .find(|e| *e == name);
+                            if let Some(name) = known {
                                 if !self.slash && EXCLUDED.contains(&name) {
                                     self.excluded.push(name);
                                 }
@@ -1473,8 +1491,10 @@ impl Html {
                                     self.in_text = Some(name);
                                 }
                             }
+                            if !self.slash && !VOID.contains(&name.as_str()) {
+                                self.open.push(name);
+                            }
                         }
-                        self.in_tag = None;
                     }
                     _ => {}
                 }
@@ -1498,10 +1518,7 @@ impl Html {
                     .unwrap_or(html.len() - from);
                 let name = &html[from..from + len];
                 if name.starts_with(|c: char| c.is_ascii_alphabetic()) {
-                    let known = (EXCLUDED.iter().chain(RAW_TEXT).chain(&["plaintext"]))
-                        .copied()
-                        .find(|e| e.eq_ignore_ascii_case(name));
-                    self.in_tag = Some((known, closing));
+                    self.in_tag = Some((name.to_ascii_lowercase(), closing));
                     self.slash = false;
                     i = from + len;
                     continue;

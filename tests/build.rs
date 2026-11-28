@@ -2689,6 +2689,107 @@ fn an_unknown_snippet_in_html_is_quietened_by_name_and_still_counted() {
 }
 
 #[test]
+fn a_call_to_a_missing_snippet_in_html_inside_a_paragraph_is_published_and_warned_of() {
+    let site = Site::new("unknown-call-in-inline-html");
+    site.write("templates/page.html", "{{ page.content }}\n");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n\
+         Ask <span>@someone(work) & \\@x(1)</span> today.\n\n\
+         <div>Ask @someone(work) today.</div>\n\n\
+         A <span title=\"@someone(work)\">b</span>.\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    let told = "\
+warning  Unknown snippet in HTML: `@someone` is published as text
+  content/post-1.md, line 5
+   5 │ Ask <span>@someone(work) & \\@x(1)</span> today.
+     │           ^^^^^^^^^^^^^^
+  Check the spelling, or write `\\@someone` to show it as text.
+  More: https://statac.dev/e/unknown-snippet-in-html/
+";
+    assert!(said.contains(told), "{told}\nnot in\n{said}");
+    assert_eq!(said.matches("warning  Unknown snippet in HTML").count(), 3);
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.contains("3 unknown-snippet-in-html"), "{said}");
+    let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    for published in [
+        "<p>Ask <span>@someone(work) &amp; @x(1)</span> today.</p>",
+        "<div>Ask @someone(work) today.</div>",
+        "<p>A <span title=\"@someone(work)\">b</span>.</p>",
+    ] {
+        assert!(built.contains(published), "{published} not in {built}");
+    }
+
+    // Outside HTML the same call still stops the build.
+    site.write(
+        "content/post-2.md",
+        "---\ntitle: Post 2\ndate: 2026-01-02\n---\nAsk @someone(work) today.\n",
+    );
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 1, "{said}");
+    assert!(said.contains("error  Unknown snippet: `someone`"), "{said}");
+}
+
+#[test]
+fn a_call_in_html_inside_a_paragraph_builds_the_snippet_the_site_has() {
+    let site = Site::new("call-in-inline-html");
+    site.write("snippets/book.html", "<cite>{{ title }}</cite>");
+    site.write("templates/page.html", "{{ page.content }}\n");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\n\
+         Read <span>@book('Post 2')</span> and <code>@book('Post 3')</code> next.\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!(code, 0, "{said}");
+    let told = "\
+note  Call in HTML: Statac builds `@book` as a snippet
+  content/post-1.md, line 5
+   5 │ Read <span>@book('Post 2')</span> and <code>@book('Post 3')</code> next.
+     │            ^^^^^^^^^^^^^^^
+";
+    assert!(said.contains(told), "{told}\nnot in\n{said}");
+    assert!(!said.contains("unknown-snippet-in-html"), "{said}");
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    assert!(
+        built.contains(
+            "<p>Read <span><cite>Post 2</cite></span> and <code>@book('Post 3')</code> next.</p>"
+        ),
+        "{built}"
+    );
+}
+
+#[test]
+fn a_call_to_a_missing_snippet_in_html_inside_a_paragraph_is_quietened_by_name() {
+    let site = Site::new("unknown-call-in-inline-html-quiet");
+    site.write(
+        "statac.yaml",
+        "title: Site\nlanguage: en\ntimezone: UTC\npages.feed: false\n\
+         quiet: [unknown-snippet-in-html]\n",
+    );
+    site.write("templates/page.html", "{{ page.content }}\n");
+    site.write(
+        "content/post-1.md",
+        "---\ntitle: Post 1\ndate: 2026-01-01\n---\nAsk <span>@someone(work)</span> today.\n",
+    );
+    let (said, code) = site.check_without_javascript(&[]);
+    assert_eq!((said.as_str(), code), ("1 warning, quietened.\n", 0));
+    let (said, code) = site.run(&["build", "--today=2026-10-04"]);
+    assert_eq!(code, 0, "{said}");
+    assert!(said.starts_with("1 warning, quietened.\n"), "{said}");
+    let built = fs::read_to_string(site.out().join("post-1/index.html")).unwrap();
+    assert!(
+        built.contains("<p>Ask <span>@someone(work)</span> today.</p>"),
+        "{built}"
+    );
+}
+
+#[test]
 fn a_call_shown_on_several_pages_is_warned_of_once() {
     let site = Site::new("unknown-call-in-html-once");
     site.write(

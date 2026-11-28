@@ -627,7 +627,13 @@ fn a_picture_a_template_shows_inside_a_link_is_told_and_so_is_the_link() {
             "in a snippet the writing calls",
             "{{ page.content }}",
             "<a href=\"/post-1/\">@image(\"photo-1.jpg\")</a>\n",
-            &[LINK, INSIDE, ALT, ALONE],
+            &[
+                LINK,
+                INSIDE,
+                "note  Call in HTML: Statac builds `@image` as a snippet",
+                ALT,
+                ALONE,
+            ],
         ),
         (
             "linked by a snippet the writing calls",

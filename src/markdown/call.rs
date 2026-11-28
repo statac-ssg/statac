@@ -73,7 +73,8 @@ pub(crate) fn from_the_top(address: &str) -> bool {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Within {
     Prose,
-    /// Raw HTML, between its tags.
+    /// Raw HTML, between its tags: a block of HTML, or the writing inside
+    /// an element that HTML among the words opened.
     Html,
     /// Inside a tag in raw HTML: what the call writes is part of the tag.
     Attribute,
