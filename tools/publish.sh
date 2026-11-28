@@ -12,11 +12,12 @@
 # src/upgrade.rs and the signer and namespace its tools/install.sh holds.
 # The version's files go to v<version>/, the signatures beside SHA256SUMS
 # as SHA256SUMS.sig and SHA256SUMS.sshsig, then
-# latest-<major>.<minor>/SHA256SUMS names it as the newest of its series
-# and, unless a later release is out, latest/SHA256SUMS as the newest of
-# all, and the install script as tagged goes to the top, as index.html,
-# with the one for Windows beside it as install.ps1. It then purges the pull
-# zone's cache and checks that the edge serves each file that changed.
+# latest-<major>.<minor>/SHA256SUMS names it as the newest of its series.
+# Unless a later release is out, latest/SHA256SUMS then names it as the
+# newest of all, and the install script as tagged goes to the top, as
+# index.html, with the one for Windows beside it as install.ps1. It then
+# purges the pull zone's cache and checks that the edge serves each file
+# that changed.
 #
 # --dry-run makes every check and says each upload it would make, uploading
 # nothing, so a practice release can reach this step. It accepts a version
@@ -129,8 +130,21 @@ newer() {
     done
     return 1
 }
-latest=$(curl -fsS "$served/latest/SHA256SUMS" 2>/dev/null | sed -n '1s/.*statac-\([0-9][^-]*\)-.*/\1/p') ||
-    latest=
+# Asked of the zone, not the CDN, which might keep an older answer or fail
+# to give one. A missing file and a failed request look the same to
+# `bunny storage files download`, so the listing tells them apart.
+listed=$(bunny storage files list latest -z "$zone" -o json) ||
+    stop "Can't ask $zone which release latest/ names."
+latest=
+if printf '%s\n' "$listed" | grep -q '"objectName": *"SHA256SUMS"'; then
+    bunny storage files download latest/SHA256SUMS -z "$zone" --out "$work/latest" >/dev/null ||
+        stop "Can't download latest/SHA256SUMS from $zone."
+    latest=$(sed -n '1s/.*statac-\([0-9][^-]*\)-.*/\1/p' "$work/latest")
+    case $latest in
+        '' | *[!0-9.]* | .* | *. | *..*)
+            stop "Can't read which release latest/SHA256SUMS names in $zone." ;;
+    esac
+fi
 moves=true
 if [ -n "$latest" ] && ! newer "$latest" "$version"; then
     moves=false
@@ -150,13 +164,13 @@ if $dry; then
     echo "would make latest-$series/ name $version"
     if $moves; then
         echo "would make latest/ name $version"
+        git -C "$root" show "$source:tools/install.sh" >"$folder/install.sh"
+        echo "would publish install.sh from $source at the top"
+        git -C "$root" show "$source:tools/install.ps1" >"$folder/install.ps1"
+        echo "would publish install.ps1 from $source at the top"
     else
-        echo "would leave latest/ naming $latest"
+        echo "would leave latest/ naming $latest, and $latest's install scripts at the top"
     fi
-    git -C "$root" show "$source:tools/install.sh" >"$folder/install.sh"
-    echo "would publish install.sh from $source at the top"
-    git -C "$root" show "$source:tools/install.ps1" >"$folder/install.ps1"
-    echo "would publish install.ps1 from $source at the top"
     echo "would purge the pull zone's cache"
     echo "Checked $version, built from $commit: nothing was uploaded."
     exit 0
@@ -166,33 +180,34 @@ fi
 # fetched always has them.
 for file in statac-* SHA256SUMS.sig SHA256SUMS.sshsig SHA256SUMS; do
     bunny storage files upload "$file" -z "$zone" --to "v$version/" --checksum >/dev/null ||
-        stop "Couldn't upload $file." "v$version/ may be part-published: finish it by hand before latest/ names it."
+        stop "Couldn't upload $file." "v$version/ may be part-published: finish it by hand before latest-$series/ names it."
     echo "published v$version/$file"
 done
 bunny storage files upload SHA256SUMS -z "$zone" --to "latest-$series/" --checksum >/dev/null ||
     stop "Couldn't update latest-$series/SHA256SUMS." "v$version/ is published, but latest-$series/ still names the release before."
 echo "latest-$series/ names $version"
+# The install scripts, which get.statac.dev serves at its top, install
+# what latest/ names unless asked for a version, so they move with it: an
+# older series' scripts might not know a newer release's key or packages.
+# A request for / is answered from index.html, as text so a browser shows
+# it.
 if $moves; then
     bunny storage files upload SHA256SUMS -z "$zone" --to "latest/" --checksum >/dev/null ||
         stop "Couldn't update latest/SHA256SUMS." "v$version/ is published, but latest/ still names the release before."
     echo "latest/ names $version"
+    git -C "$root" show "v$version:tools/install.sh" >"$folder/install.sh"
+    bunny storage files upload "$folder/install.sh" -z "$zone" --to index.html \
+        --content-type 'text/plain; charset=utf-8' --checksum >/dev/null ||
+        stop "Couldn't upload install.sh." "v$version/ is published and latest/ names it."
+    echo "published install.sh"
+    git -C "$root" show "v$version:tools/install.ps1" >"$folder/install.ps1"
+    bunny storage files upload "$folder/install.ps1" -z "$zone" --to install.ps1 \
+        --content-type 'text/plain; charset=utf-8' --checksum >/dev/null ||
+        stop "Couldn't upload install.ps1." "v$version/ is published, latest/ names it and install.sh is at the top."
+    echo "published install.ps1"
 else
-    echo "latest/ still names $latest, which is newer"
+    echo "latest/ still names $latest, which is newer, and $latest's install scripts stay at the top"
 fi
-
-# The script that installs it, which get.statac.dev serves at its top:
-# a request for / is answered from index.html, as text so a browser
-# shows it.
-git -C "$root" show "v$version:tools/install.sh" >"$folder/install.sh"
-bunny storage files upload "$folder/install.sh" -z "$zone" --to index.html \
-    --content-type 'text/plain; charset=utf-8' --checksum >/dev/null ||
-    stop "Couldn't upload install.sh." "v$version/ is published and latest/ names it."
-echo "published install.sh"
-git -C "$root" show "v$version:tools/install.ps1" >"$folder/install.ps1"
-bunny storage files upload "$folder/install.ps1" -z "$zone" --to install.ps1 \
-    --content-type 'text/plain; charset=utf-8' --checksum >/dev/null ||
-    stop "Couldn't upload install.ps1." "v$version/ is published, latest/ names it and install.sh is at the top."
-echo "published install.ps1"
 
 # The whole zone, since / can't be purged alone: a URL ending in / purges by
 # prefix unless exactPath is set, which a zone ignoring query strings doesn't
@@ -218,9 +233,9 @@ edge_serves "/latest-$series/SHA256SUMS" SHA256SUMS \
 if $moves; then
     edge_serves /latest/SHA256SUMS SHA256SUMS \
         "What $served serves at /latest/SHA256SUMS isn't $version's SHA256SUMS."
+    edge_serves / "$folder/install.sh" \
+        "What $served serves at / isn't the install script as tagged."
+    edge_serves /install.ps1 "$folder/install.ps1" \
+        "What $served serves at /install.ps1 isn't the install script for Windows as tagged."
 fi
-edge_serves / "$folder/install.sh" \
-    "What $served serves at / isn't the install script as tagged."
-edge_serves /install.ps1 "$folder/install.ps1" \
-    "What $served serves at /install.ps1 isn't the install script for Windows as tagged."
 echo "Published $version, built from $commit."
